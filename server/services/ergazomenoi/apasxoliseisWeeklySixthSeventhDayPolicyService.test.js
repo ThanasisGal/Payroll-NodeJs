@@ -172,6 +172,8 @@ for (const rate of [null, '', -1, 'invalid']) {
     result = analyze([7, 7, 7, 7, 7, 7, 0], { pososto_prosayxhshs_6hs_hmeras: rate });
     assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
     assert.ok(result.reasons.includes('MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
+    assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
+    assert.strictEqual(result.sixthDay.value, null);
 }
 
 result = analyze([7, 7, 7, 7, 7, 6, 9]);

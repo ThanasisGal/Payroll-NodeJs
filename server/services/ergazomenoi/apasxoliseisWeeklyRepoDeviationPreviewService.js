@@ -215,22 +215,39 @@ function buildWeeklyRepoDeviationPreview({
                 existingAuditCountByRowKey
             });
             const resolution = repoTransfer.weekly_resolution;
+            const actualWorkdays = dailyFacts.filter(
+                (facts) => facts.countsAsActualWorkDay
+            ).length;
+            const sixthSeventhDayNeedsDecision =
+                sixthSeventhDay.status === 'NEEDS_HR_DECISION';
             deviations.push({
                 ...base,
-                status: profileReason ? STATUS.NEEDS_HR_DECISION : STATUS.READY,
+                status:
+                    profileReason || sixthSeventhDayNeedsDecision
+                        ? STATUS.NEEDS_HR_DECISION
+                        : STATUS.READY,
                 complete: true,
                 is_deviation: true,
-                reasons: profileReason ? [profileReason] : [],
+                reasons: [...new Set([
+                    ...(profileReason ? [profileReason] : []),
+                    ...(sixthSeventhDayNeedsDecision
+                        ? sixthSeventhDay.reasons || []
+                        : [])
+                ])],
                 expected_repo: expectedRepo,
                 actual_repo: actualRepo,
                 missing_repo: Math.max(Number(expectedRepo || 0) - Number(actualRepo), 0),
                 resolved_repo: resolution?.resolved_repo ?? actualRepo,
-                actual_workdays: resolution?.actual_workdays ??
-                    dailyFacts.filter((facts) => facts.countsAsActualWorkDay).length,
-                sixth_day_count: resolution?.sixth_day_count ??
-                    (sixthSeventhDay.sixthDay ? 1 : 0),
-                seventh_day_count: resolution?.seventh_day_count ??
-                    (sixthSeventhDay.seventhDay ? 1 : 0),
+                // Η ταξινόμηση 6ης/7ης ημέρας είναι ανεξάρτητη από το αν
+                // υπάρχει ασφαλές ζεύγος μεταφοράς ρεπό. Το αποτέλεσμα της
+                // μεταφοράς δεν επιτρέπεται να μηδενίζει την άμεση πολιτική.
+                actual_workdays: actualWorkdays,
+                sixth_day_count: sixthSeventhDay.sixthDay ? 1 : 0,
+                seventh_day_count: sixthSeventhDay.seventhDay ? 1 : 0,
+                sixth_day_date: sixthSeventhDay.sixthDay?.hmeromhnia || null,
+                seventh_day_date: sixthSeventhDay.seventhDay?.hmeromhnia || null,
+                sixth_seventh_day_status: sixthSeventhDay.status,
+                sixth_seventh_day_reasons: [...(sixthSeventhDay.reasons || [])],
                 repo_transfer_status: repoTransfer.eligibility_status,
                 repo_transfer_reasons: [...(repoTransfer.reasons || [])],
                 repo_transfer_source_available:

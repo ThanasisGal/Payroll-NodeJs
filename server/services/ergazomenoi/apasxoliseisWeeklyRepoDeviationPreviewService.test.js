@@ -9,6 +9,9 @@ const {
     analyzeWeeklyRepoTransferForEmploymentContract
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
 const {
+    analyzeWeeklySixthSeventhDay
+} = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
+const {
     buildWeeklyRepoTransferAtomicPageProjection
 } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
 const {
@@ -259,6 +262,10 @@ function testDeviationAndAtomicUseTheSameContractSelector() {
             weekRows,
             employmentProfile: profile
         });
+        const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
+            weekRows,
+            effectiveProfile: profile
+        });
         const preview = buildWeeklyRepoDeviationPreview({
             rows: weekRows,
             periodStart: '2026-06-01',
@@ -278,11 +285,11 @@ function testDeviationAndAtomicUseTheSameContractSelector() {
         );
         assert.strictEqual(
             deviation.sixth_day_count,
-            direct.weekly_resolution?.sixth_day_count ?? 0
+            sixthSeventhDay.sixthDay ? 1 : 0
         );
         assert.strictEqual(
             deviation.seventh_day_count,
-            direct.weekly_resolution?.seventh_day_count ?? 0
+            sixthSeventhDay.seventhDay ? 1 : 0
         );
         buildWeeklyRepoTransferAtomicPageProjection(
             { weeklyInputs: [{ weekRows, employmentProfile: profile }] },
@@ -301,6 +308,56 @@ function testDeviationAndAtomicUseTheSameContractSelector() {
         );
     }
     assert.deepStrictEqual(capturedVersions, ['v1', 'v2', 'v2', 'v2']);
+}
+
+function testSixthDaySurvivesMissingRepoTransferSource() {
+    const weekRows = rows('2026-06-01');
+    weekRows.forEach((row, index) => {
+        Object.assign(row, {
+            _id: `employee-0006-${index}`,
+            team: 'THA',
+            company_kod: '0004',
+            ypokatasthma: '0000',
+            kodikos: '0006'
+        });
+    });
+    Object.assign(weekRows[0], {
+        kathgoria_ergasias: 'ΑΝ',
+        ores_ergasias: 0,
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    });
+    weekRows.slice(1).forEach((row) => {
+        Object.assign(row, {
+            cards_apo_ora_01: '09:00',
+            cards_eos_ora_01: '17:00'
+        });
+    });
+    const profile = {
+        hmeres_ergasias_ebdomadas: 5,
+        typos_apasxolhshs: '0',
+        mhniaia_repo: 2,
+        pososto_prosayxhshs_6hs_hmeras: 40
+    };
+    const preview = buildWeeklyRepoDeviationPreview({
+        rows: weekRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-07',
+        asOfDate: '2026-06-08',
+        resolveWeeklyProfile: () => ({
+            expectedWeeklyRepo: 2,
+            effectiveProfile: profile
+        })
+    });
+    const deviation = preview.deviations[0];
+
+    assert.strictEqual(deviation.repo_transfer_status, 'NOT_APPLICABLE');
+    assert.ok(deviation.repo_transfer_reasons.includes('NO_SOURCE_CANDIDATE'));
+    assert.strictEqual(deviation.actual_workdays, 6);
+    assert.strictEqual(deviation.sixth_day_count, 1);
+    assert.strictEqual(deviation.seventh_day_count, 0);
+    assert.strictEqual(deviation.sixth_day_date, '2026-06-07');
 }
 
 function testDeviationAndAtomicContextParity() {
@@ -420,5 +477,6 @@ testRepoTransferLifecycleUsesEffectiveFinalRows();
 testLegacyPersistedRangeIsExplicit();
 testDeviationAndAtomicUseTheSameContractSelector();
 testDeviationAndAtomicContextParity();
+testSixthDaySurvivesMissingRepoTransferSource();
 
 console.log('weekly repo deviation Monday-Sunday preview tests passed');

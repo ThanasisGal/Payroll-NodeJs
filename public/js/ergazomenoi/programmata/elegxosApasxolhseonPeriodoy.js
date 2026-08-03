@@ -262,6 +262,7 @@ let currentReviewRows = [];
 let currentReviewDeviations = [];
 let currentPendingDeviationWeeks = [];
 let currentLegacyDeviations = [];
+let currentPolicyPreviewRowsById = new Map();
 let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentRepoTransferDecisionsByProposalId = new Map();
@@ -301,6 +302,34 @@ function rowIdentityKey(value) {
     if (value === null || value === undefined) return '';
 
     return String(value).trim();
+}
+
+const policyPreviewDecisionStatuses = new Set([
+    'NEEDS_REVIEW',
+    'PREFILLED_PENDING_APPROVAL',
+    'CONFLICT_AMBIGUOUS'
+]);
+
+function isPolicyPreviewDecisionStatus(status) {
+    return policyPreviewDecisionStatuses.has(String(status || '').trim());
+}
+
+function attachPolicyPreviewResults(rows = [], previewRows = []) {
+    currentPolicyPreviewRowsById = new Map(
+        (Array.isArray(previewRows) ? previewRows : [])
+            .map((previewRow) => [
+                rowIdentityKey(previewRow?.prodhlomena_oraria_id),
+                previewRow
+            ])
+            .filter(([id]) => Boolean(id))
+    );
+
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+        const preview = currentPolicyPreviewRowsById.get(
+            rowIdentityKey(row?._id || row?.id)
+        );
+        row.policyResult = preview?.policyResult || null;
+    });
 }
 
 function scenarioLabel(decision = {}) {
@@ -401,6 +430,10 @@ function renderScenarioBadge(row, repoTransferState) {
     const decision = row?.scenarioDecision;
 
     if (!decision || !decision.scenario_code) return '';
+    if (
+        row?.policyResult?.result_status &&
+        !isPolicyPreviewDecisionStatus(row.policyResult.result_status)
+    ) return '';
     if (decision.display_labels?.show_badge === false) return '';
     if (
         decision.requires_review === true &&
@@ -424,6 +457,10 @@ function renderScenarioBadge(row, repoTransferState) {
 }
 
 function isScenarioReviewRow(row) {
+    const policyStatus = row?.policyResult?.result_status;
+
+    if (policyStatus) return isPolicyPreviewDecisionStatus(policyStatus);
+
     return row?.scenarioDecision?.requires_review === true;
 }
 
@@ -1293,6 +1330,67 @@ function ensureReviewTableStructure() {
                 padding: 0.65rem 0.75rem;
             }
 
+            .policy-preview-main-accordion {
+                overflow: hidden;
+            }
+
+            .policy-preview-main-summary {
+                display: grid;
+                grid-template-columns: 1rem minmax(13rem, auto) minmax(0, 1fr) auto;
+                align-items: center;
+                gap: 0.65rem;
+                padding: 0.65rem 0.75rem;
+                cursor: pointer;
+                list-style: none;
+                background-color: #f8f9fa;
+            }
+
+            .policy-preview-main-summary::-webkit-details-marker {
+                display: none;
+            }
+
+            .policy-preview-main-summary::before {
+                content: '▸';
+                font-size: 0.9rem;
+                grid-column: 1;
+            }
+
+            .policy-preview-main-summary > .fw-semibold {
+                grid-column: 2;
+            }
+
+            .policy-preview-main-accordion[open] > .policy-preview-main-summary::before {
+                content: '▾';
+            }
+
+            .policy-preview-main-summary .policy-preview-summary-meta {
+                grid-column: 3;
+            }
+
+            .policy-preview-main-toggle-label {
+                grid-column: 4;
+                color: #495057;
+                font-size: 0.75rem;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+
+            .policy-preview-main-content {
+                border-top: 1px solid #dee2e6;
+            }
+
+            .policy-preview-diagnostics-accordion {
+                border: 1px solid #dee2e6;
+                border-radius: 0.35rem;
+                padding: 0.5rem 0.6rem;
+                background-color: #f8f9fa;
+            }
+
+            .policy-preview-diagnostics-accordion > summary {
+                cursor: pointer;
+                font-weight: 600;
+            }
+
             .policy-preview-group-card {
                 padding: 0.45rem 0.55rem;
                 margin-bottom: 0.45rem;
@@ -1630,6 +1728,18 @@ function ensureReviewTableStructure() {
             }
 
             @media (max-width: 991.98px) {
+                .policy-preview-main-summary {
+                    grid-template-columns: 1rem 1fr auto;
+                }
+
+                .policy-preview-main-summary .policy-preview-summary-meta {
+                    grid-column: 2 / -1;
+                }
+
+                .policy-preview-main-toggle-label {
+                    grid-column: 3;
+                }
+
                 .policy-preview-history-filters {
                     grid-template-columns: 1fr;
                 }
@@ -1840,7 +1950,37 @@ function renderDeviationNoteCell(dev) {
         `;
     }
 
-    return dev.note ? escapeHtml(dev.note) : '-';
+    const sixthDayText = dev.sixth_day_date
+        ? `<div><strong>6η ημέρα:</strong> ${escapeHtml(formatDate(dev.sixth_day_date))}</div>`
+        : '';
+    const seventhDayText = dev.seventh_day_date
+        ? `<div class="text-danger"><strong>7η ημέρα:</strong> ${escapeHtml(
+              formatDate(dev.seventh_day_date)
+          )}</div>`
+        : '';
+    const sixthDayReasonLabels = {
+        MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE:
+            'Λείπει ή δεν είναι έγκυρο το ποσοστό προσαύξησης 6ης ημέρας.',
+        ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION:
+            'Το ποσοστό προσαύξησης 6ης ημέρας είναι μηδενικό χωρίς έγκυρη εξαίρεση.',
+        SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC:
+            'Δεν μπορεί να επιλεγεί με ασφάλεια η ημερομηνία της 6ης ημέρας.'
+    };
+    const sixthDayDecisionText = Array.isArray(dev.sixth_seventh_day_reasons)
+        ? dev.sixth_seventh_day_reasons
+              .map((reason) => sixthDayReasonLabels[reason] || reason)
+              .filter(Boolean)
+              .map(
+                  (reason) =>
+                      `<div class="small text-warning-emphasis">${escapeHtml(reason)}</div>`
+              )
+              .join('')
+        : '';
+    const noteText = dev.note ? `<div>${escapeHtml(dev.note)}</div>` : '';
+
+    return sixthDayText || seventhDayText || sixthDayDecisionText || noteText
+        ? `${sixthDayText}${seventhDayText}${sixthDayDecisionText}${noteText}`
+        : '-';
 }
 
 function hasProfileChangeDeviation(deviations = []) {
@@ -1891,6 +2031,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
                     <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
                     <td>${renderDeviationNoteCell(dev)}${
+                        dev.repo_transfer_status === 'NEEDS_REVIEW' &&
                         Array.isArray(dev.repo_transfer_reasons) && dev.repo_transfer_reasons.length
                             ? `<div class="small text-muted mt-1">${escapeHtml(dev.repo_transfer_reasons.join(', '))}</div>`
                             : ''
@@ -2611,7 +2752,8 @@ async function fetchPolicyPreviewGrouping(baseParams) {
 
     return {
         grouping: payload.grouping || null,
-        atomicGroupProjection: payload.atomic_group_projection || null
+        atomicGroupProjection: payload.atomic_group_projection || null,
+        previewRows: Array.isArray(payload.rows) ? payload.rows : []
     };
 }
 
@@ -2738,7 +2880,14 @@ function getPolicyPreviewDecisionLabel(decisionType) {
 }
 
 function getPolicyPreviewDecisionButtons(group = {}) {
-    const buttons = [...policyPreviewDecisionButtons];
+    const hasProposal = (Array.isArray(group.items) ? group.items : []).some(
+        (item) => Object.keys(item?.proposed_values || {}).length > 0
+    );
+    const buttons = policyPreviewDecisionButtons.filter(({ type }) =>
+        hasProposal
+            ? type !== 'MARK_REVIEWED'
+            : ['MARK_REVIEWED', 'NEEDS_MORE_REVIEW'].includes(type)
+    );
 
     if (String(group.status || '').trim() === 'OK') {
         buttons.splice(1, 0, { type: 'MARK_OK', className: 'policy-preview-decision-info' });
@@ -3823,42 +3972,49 @@ function renderPolicyPreviewStatusBadge(status) {
     `;
 }
 
-function renderPolicyPreviewGroupingSummary(grouping) {
+function renderPolicyPreviewGroupingSummary(
+    grouping,
+    decisionGroups = [],
+    diagnosticGroups = [],
+    repoTransferDecisionCount = 0
+) {
     const summary = grouping?.summary || {};
-    const byStatus = summary.by_status || {};
-    const statusEntries = Object.entries(byStatus);
+    const decisionsCount = decisionGroups.reduce(
+        (total, group) => total + Number(group?.count || 0),
+        0
+    );
+    const diagnosticsCount = diagnosticGroups.reduce(
+        (total, group) => total + Number(group?.count || 0),
+        0
+    );
+    const completedCount = Math.max(
+        Number(summary.total || 0) - decisionsCount - diagnosticsCount,
+        0
+    );
 
     return `
-        <div class="policy-preview-summary-meta mb-2">
-            <span class="badge text-bg-light border">
-                Εμβέλεια: ${escapeHtml(getPolicyPreviewScopeLabel(grouping?.scope))}
-            </span>
-            <span class="badge text-bg-light border">
-                Σύνολο εγγραφών σελίδας: ${escapeHtml(summary.total ?? 0)}
-            </span>
-            <span class="badge text-bg-light border">
-                Ομάδες: ${escapeHtml(summary.groups_count ?? 0)}
-            </span>
-        </div>
-        <div class="small text-muted mb-2">
-            Η ομαδοποίηση αφορά τις εγγραφές της τρέχουσας σελίδας αποτελεσμάτων.
-        </div>
         <div class="policy-preview-summary-meta">
-            <span class="small fw-semibold">Ανά κατάσταση:</span>
+            <span class="badge ${decisionsCount > 0 ? 'text-bg-danger' : 'text-bg-success'}">
+                ${escapeHtml(decisionsCount)} ${decisionsCount === 1 ? 'εγγραφή χρειάζεται' : 'εγγραφές χρειάζονται'} απόφαση
+            </span>
+            <span class="badge text-bg-light border">
+                ${escapeHtml(decisionGroups.length)} ${decisionGroups.length === 1 ? 'ομάδα απόφασης' : 'ομάδες αποφάσεων'}
+            </span>
             ${
-                statusEntries.length > 0
-                    ? statusEntries
-                          .map(
-                              ([status, count]) => `
-                                  <span class="badge text-bg-light border">
-                                      ${renderPolicyPreviewStatusBadge(status)}
-                                      <span class="ms-1">${escapeHtml(count)}</span>
-                                  </span>
-                              `
-                          )
-                          .join('')
-                    : '<span class="small text-muted">-</span>'
+                repoTransferDecisionCount > 0
+                    ? `<span class="badge text-bg-warning">${escapeHtml(
+                          repoTransferDecisionCount
+                      )} ${repoTransferDecisionCount === 1 ? 'μεταφορά ρεπό προς απόφαση' : 'μεταφορές ρεπό προς απόφαση'}</span>`
+                    : ''
             }
+            ${
+                diagnosticsCount > 0
+                    ? `<span class="badge text-bg-secondary">${escapeHtml(diagnosticsCount)} τεχνικές εκκρεμότητες</span>`
+                    : ''
+            }
+            <span class="badge text-bg-light border">
+                ${escapeHtml(completedCount)} ολοκληρώθηκαν αυτόματα
+            </span>
         </div>
     `;
 }
@@ -4047,8 +4203,7 @@ function renderPolicyPreviewGroupItems(items = [], groupIndex = 0) {
                         <th>Απολογιστική κατηγορία</th>
                         <th>Προτεινόμενη κατηγορία</th>
                         <th>Ώρες καρτών</th>
-                        <th>Ενδείξεις</th>
-                        <th>Λεπτομέρειες</th>
+                        <th>Στοιχεία απόφασης</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -4062,14 +4217,13 @@ function renderPolicyPreviewGroupItems(items = [], groupIndex = 0) {
                                     <td>${escapeHtml(item.kathgoria_ergasias_apologistika || '-')}</td>
                                     <td>${escapeHtml(item.proposed_values?.kathgoria_ergasias_apologistika || '-')}</td>
                                     <td>${escapeHtml(formatPolicyPreviewHours(item.cards_ores_ergasias))}</td>
-                                    <td>${renderPolicyPreviewFlags(item.flags)}</td>
                                     <td>
                                         <button
                                             type="button"
                                             class="btn btn-sm btn-outline-primary policy-preview-details-btn"
                                             data-group-index="${escapeHtml(groupIndex)}"
                                             data-item-index="${escapeHtml(itemIndex)}">
-                                            Εμφάνιση
+                                            Προβολή
                                         </button>
                                     </td>
                                 </tr>
@@ -5454,71 +5608,104 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
     }
 
     const groups = Array.isArray(grouping.groups) ? grouping.groups : [];
-    const groupsHtml =
-        groups.length > 0
-            ? groups
-                  .map((group, index) => {
-                      const groupElementId = `policyPreviewGroupItems-${index}`;
-                      const groupTitle = getPolicyPreviewGroupTitle(group);
-                      const groupDescription = renderPolicyPreviewGroupDescription(group);
-                      const isExpanded = options.expandedGroupId === group.group_id;
+    const indexedGroups = groups.map((group, index) => ({ group, index }));
+    const decisionGroups = indexedGroups.filter(({ group }) =>
+        isPolicyPreviewDecisionStatus(group.status)
+    );
+    const diagnosticGroups = indexedGroups.filter(
+        ({ group }) => String(group.status || '').trim() === 'UNKNOWN_PATTERN'
+    );
+    const renderGroupCard = ({ group, index }, { allowDecision = true } = {}) => {
+        const groupElementId = `policyPreviewGroupItems-${index}`;
+        const groupTitle = getPolicyPreviewGroupTitle(group);
+        const isExpanded = options.expandedGroupId === group.group_id;
 
-                      return `
-                          <div
-                              class="border rounded policy-preview-group-card"
-                              data-group-id="${escapeHtml(group.group_id || '')}">
-                              <div class="policy-preview-group-header">
-                                  <div>
-                                      <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
-                                          ${renderPolicyPreviewStatusBadge(group.status)}
-                                          <span class="fw-semibold">${escapeHtml(groupTitle)}</span>
-                                      </div>
-                                      <div class="policy-preview-group-line text-muted mb-1">
-                                          Εγγραφές: ${escapeHtml(group.count ?? 0)}
-                                          · Εργαζόμενοι: ${escapeHtml(group.employees_count ?? 0)}
-                                          · Από: ${escapeHtml(formatPolicyPreviewDate(group.first_date))}
-                                          · Έως: ${escapeHtml(formatPolicyPreviewDate(group.last_date))}
-                                      </div>
-                                      <div class="policy-preview-group-line text-muted">
-                                          ${escapeHtml(groupDescription)}
-                                      </div>
-                                  </div>
-                                  <button
-                                      type="button"
-                                      class="btn btn-sm btn-outline-primary policy-preview-group-toggle policy-preview-toggle"
-                                      data-target-id="${escapeHtml(groupElementId)}"
-                                      aria-expanded="${String(isExpanded)}">
-                                      ${isExpanded ? 'Κλείσιμο' : 'Άνοιγμα'}
-                                  </button>
-                              </div>
-                              ${renderPolicyPreviewApprovalPanel(group, index)}
-                              <div
-                                  class="policy-preview-group-items ${isExpanded ? '' : 'd-none'} mt-2"
-                                  id="${escapeHtml(groupElementId)}">
-                                  ${renderPolicyPreviewGroupItems(group.items, index)}
-                              </div>
-                          </div>
-                      `;
-                  })
-                  .join('')
-            : `
-                <div class="text-muted small border rounded p-2">
-                    Δεν βρέθηκαν ομάδες για τα τρέχοντα φίλτρα.
+        return `
+            <div
+                class="border rounded policy-preview-group-card"
+                data-group-id="${escapeHtml(group.group_id || '')}">
+                <div class="policy-preview-group-header">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                            ${renderPolicyPreviewStatusBadge(group.status)}
+                            <span class="fw-semibold">${escapeHtml(groupTitle)}</span>
+                        </div>
+                        <div class="policy-preview-group-line text-muted">
+                            ${escapeHtml(group.count ?? 0)} εγγραφές ·
+                            ${escapeHtml(group.employees_count ?? 0)} εργαζόμενοι
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary policy-preview-group-toggle policy-preview-toggle"
+                        data-target-id="${escapeHtml(groupElementId)}"
+                        aria-expanded="${String(isExpanded)}">
+                        ${isExpanded ? 'Κλείσιμο' : 'Άνοιγμα'}
+                    </button>
                 </div>
-            `;
+                <div
+                    class="policy-preview-group-items ${isExpanded ? '' : 'd-none'} mt-2"
+                    id="${escapeHtml(groupElementId)}">
+                    ${allowDecision ? renderPolicyPreviewApprovalPanel(group, index) : ''}
+                    ${renderPolicyPreviewGroupItems(group.items, index)}
+                </div>
+            </div>
+        `;
+    };
+    const decisionGroupsHtml = decisionGroups.length
+        ? decisionGroups.map((entry) => renderGroupCard(entry)).join('')
+        : '<div class="small text-success fw-semibold py-2">Δεν απαιτείται απόφαση HR για τις τρέχουσες εγγραφές.</div>';
+    const diagnosticGroupsHtml = diagnosticGroups.length
+        ? `
+            <details class="policy-preview-diagnostics-accordion mt-2">
+                <summary>
+                    Τεχνικές εκκρεμότητες πολιτικής
+                    <span class="badge text-bg-secondary ms-1">${escapeHtml(
+                        diagnosticGroups.reduce(
+                            (total, entry) => total + Number(entry.group?.count || 0),
+                            0
+                        )
+                    )}</span>
+                </summary>
+                <div class="pt-2">
+                    <div class="small text-muted mb-2">
+                        Δεν απαιτούν απόφαση HR. Παραμένουν διαθέσιμες μόνο για διόρθωση της πολιτικής.
+                    </div>
+                    ${diagnosticGroups
+                        .map((entry) => renderGroupCard(entry, { allowDecision: false }))
+                        .join('')}
+                </div>
+            </details>
+        `
+        : '';
+    const showHistory = currentPolicyPreviewApprovalTotal > 0;
+    const showDryRun =
+        getPolicyPreviewApplyDryRunSummaryValue(
+            currentPolicyPreviewApplyDryRun?.summary,
+            'approvals_found'
+        ) > 0;
+    const repoTransferDecisionCount = Array.isArray(currentAtomicRepoTransferProjection?.groups)
+        ? currentAtomicRepoTransferProjection.groups.filter(
+              (group) => !isHrReviewGroupCompleted(group)
+          ).length
+        : 0;
+    const outerExpanded = Boolean(options.expandedGroupId || options.expandPolicyAccordion);
 
     container.innerHTML = `
-        ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
-        ${renderAppliedRepoTransferHistory()}
-        <div class="card border rounded policy-preview-card">
-            <div class="card-body">
-                <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap mb-1">
-                    <div>
-                        <div class="fw-semibold">Ομαδοποίηση Ελέγχου Πολιτικών</div>
-                    </div>
-                    <span class="badge text-bg-light border">Έκδοση: ${escapeHtml(grouping.version ?? '-')}</span>
-                </div>
-                ${renderPolicyPreviewGroupingSummary(grouping)}
+        <details class="card border rounded policy-preview-card policy-preview-main-accordion" ${outerExpanded ? 'open' : ''}>
+            <summary class="policy-preview-main-summary">
+                <span class="fw-semibold">Αποφάσεις Ελέγχου Πολιτικών</span>
+                ${renderPolicyPreviewGroupingSummary(
+                    grouping,
+                    decisionGroups.map(({ group }) => group),
+                    diagnosticGroups.map(({ group }) => group),
+                    repoTransferDecisionCount
+                )}
+                <span class="policy-preview-main-toggle-label">Άνοιγμα / κλείσιμο</span>
+            </summary>
+            <div class="card-body policy-preview-main-content">
+                ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
+                ${renderAppliedRepoTransferHistory()}
                 ${
                     currentPolicyPreviewApprovalsError
                         ? `<div class="alert alert-warning py-1 px-2 small mb-2">${escapeHtml(
@@ -5526,12 +5713,13 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                           )}</div>`
                         : ''
                 }
-                ${renderPolicyPreviewApprovalHistorySection()}
-                ${renderPolicyPreviewApplyDryRunSection()}
-                <hr class="my-2">
-                ${groupsHtml}
+                ${showHistory ? renderPolicyPreviewApprovalHistorySection() : ''}
+                ${showDryRun ? renderPolicyPreviewApplyDryRunSection() : ''}
+                <div class="fw-semibold mb-2">Αποφάσεις που εκκρεμούν</div>
+                ${decisionGroupsHtml}
+                ${diagnosticGroupsHtml}
             </div>
-        </div>
+        </details>
     `;
 
     bindAtomicRepoTransferEvents(container);
@@ -5603,6 +5791,7 @@ async function loadResults() {
         if (invalidBranch) return;
 
         currentAtomicRepoTransferProjection = null;
+        currentPolicyPreviewRowsById = new Map();
         renderPolicyPreviewGroups(null, { loading: true });
 
         const params = new URLSearchParams({
@@ -5701,6 +5890,7 @@ async function loadResults() {
         }
 
         if (groupingResult.status === 'fulfilled') {
+            attachPolicyPreviewResults(rows, groupingResult.value.previewRows);
             currentAtomicRepoTransferProjection = groupingResult.value.atomicGroupProjection || null;
             try {
                 await refreshRepoTransferDecisions();

@@ -1393,6 +1393,87 @@ function testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState() {
     elementsById.delete('policyPreviewGroupsContainer');
 }
 
+function testPolicyDecisionAccordionIsCompactAndDecisionOnly() {
+    const container = {
+        innerHTML: '',
+        querySelector: () => null,
+        querySelectorAll: () => []
+    };
+    const item = {
+        prodhlomena_oraria_id: 'row-1',
+        employee_kodikos: '0006',
+        hmeromhnia: '2026-06-06',
+        kathgoria_ergasias: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: '',
+        cards_ores_ergasias: 7,
+        proposed_values: {},
+        flags: {}
+    };
+    const group = (status, id, count, title) => ({
+        group_id: id,
+        status,
+        policy_code: 'UNKNOWN',
+        scenario_code: 'UNKNOWN',
+        action_type: 'UNKNOWN',
+        reason_code: 'UNKNOWN',
+        title,
+        count,
+        employees_count: 1,
+        items: [item]
+    });
+    const grouping = {
+        version: 1,
+        scope: 'page',
+        summary: { total: 22, groups_count: 3, by_status: {} },
+        groups: [
+            group('NEEDS_REVIEW', 'decision-group', 3, 'Απόφαση HR'),
+            group('UNKNOWN_PATTERN', 'diagnostic-group', 17, 'Τεχνική εκκρεμότητα'),
+            group('OK', 'ok-group', 2, 'Αυτόματα OK')
+        ]
+    };
+    elementsById.set('policyPreviewGroupsContainer', container);
+
+    sandbox.renderPolicyPreviewGroups(grouping);
+
+    assert.ok(container.innerHTML.includes('policy-preview-main-accordion'));
+    assert.ok(container.innerHTML.includes('3 εγγραφές χρειάζονται απόφαση'));
+    assert.ok(container.innerHTML.includes('17 τεχνικές εκκρεμότητες'));
+    assert.ok(container.innerHTML.includes('2 ολοκληρώθηκαν αυτόματα'));
+    assert.ok(container.innerHTML.includes('Τεχνικές εκκρεμότητες πολιτικής'));
+    assert.ok(container.innerHTML.includes('Δεν απαιτούν απόφαση HR'));
+    assert.ok(!container.innerHTML.includes('Αυτόματα OK'));
+    assert.strictEqual((container.innerHTML.match(/Απόφαση ελέγχου/g) || []).length, 1);
+    assert.ok(container.innerHTML.includes('Καταγραφή ως ελεγμένο'));
+    assert.ok(container.innerHTML.includes('Χρειάζεται περαιτέρω έλεγχο'));
+    assert.ok(!container.innerHTML.includes('Έγκριση πρότασης για μελλοντική εφαρμογή'));
+    assert.ok(!container.innerHTML.includes('Απόρριψη πρότασης'));
+    assert.ok(!container.innerHTML.includes('Ιστορικό Αποφάσεων Ελέγχου'));
+    assert.ok(!container.innerHTML.includes('Προεπισκόπηση Εφαρμογής'));
+    assert.strictEqual(sandbox.isScenarioReviewRow({
+        policyResult: { result_status: 'OK' },
+        scenarioDecision: { requires_review: true }
+    }), false);
+    assert.strictEqual(sandbox.isScenarioReviewRow({
+        policyResult: { result_status: 'UNKNOWN_PATTERN' },
+        scenarioDecision: { requires_review: true }
+    }), false);
+    assert.strictEqual(sandbox.isScenarioReviewRow({
+        policyResult: { result_status: 'NEEDS_REVIEW' }
+    }), true);
+    assert.deepStrictEqual(
+        Array.from(
+            sandbox.getPolicyPreviewDecisionButtons({
+                status: 'PREFILLED_PENDING_APPROVAL',
+                items: [{ proposed_values: { kathgoria_ergasias_apologistika: 'ΕΡΓ' } }]
+            }),
+            (button) => button.type
+        ),
+        ['NEEDS_MORE_REVIEW', 'REJECT_PROPOSAL', 'APPROVE_PREFILL']
+    );
+
+    elementsById.delete('policyPreviewGroupsContainer');
+}
+
 function minimalElement(overrides = {}) {
     const classes = new Set(String(overrides.className || '').split(/\s+/).filter(Boolean));
     return {
@@ -2356,6 +2437,7 @@ const tests = [
     testProposalDateRangeWording,
     testGenericIsolationSourceContract,
     testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState,
+    testPolicyDecisionAccordionIsCompactAndDecisionOnly,
     testMinimalWorkspaceEjsContract,
     testEmploymentReviewScrollContainerContract,
     testAllKnownBackendGroupingCodesHaveGreekLabels,

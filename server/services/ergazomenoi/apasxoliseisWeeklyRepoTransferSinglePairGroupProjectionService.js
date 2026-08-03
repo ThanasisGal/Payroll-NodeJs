@@ -151,7 +151,17 @@ function buildEmptyResult({
         eligibility_status: proposal?.eligibility_status || null,
         source_available: !reasons.includes('NO_SOURCE_CANDIDATE'),
         target_available: !reasons.includes('NO_TARGET_CANDIDATE'),
-        repo_resolution: proposal?.weekly_resolution || fallbackResolution,
+        // Η απουσία υποψηφίου ζεύγους μεταφοράς δεν ακυρώνει την ανεξάρτητη
+        // ταξινόμηση 6ης/7ης ημέρας της ίδιας εβδομάδας.
+        repo_resolution: proposal?.weekly_resolution
+            ? {
+                  ...proposal.weekly_resolution,
+                  actual_workdays: fallbackResolution.actual_workdays,
+                  sixth_day_count: fallbackResolution.sixth_day_count,
+                  seventh_day_count: fallbackResolution.seventh_day_count,
+                  sixth_seventh_day: fallbackResolution.sixth_seventh_day
+              }
+            : fallbackResolution,
         review_outcomes: proposal?.review_only_outcome
             ? [{ ...proposal.review_only_outcome }]
             : [],

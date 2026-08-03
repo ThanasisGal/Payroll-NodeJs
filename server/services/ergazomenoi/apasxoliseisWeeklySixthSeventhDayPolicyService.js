@@ -90,9 +90,42 @@ function analyzeWeeklySixthSeventhDay({
     if (actualDays.length <= 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: null });
     }
+    const seventhDay = actualDays.length === 7 ? actualDays[actualDays.length - 1] : null;
+    const sixthCandidates = seventhDay ? actualDays.slice(0, -1) : actualDays;
+    const selected = selectSixthDay(sixthCandidates);
+    if (!selected.day) {
+        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: [selected.reason], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay });
+    }
+    const sixthDayHours = Math.min(selected.day.actualWorkHours, 8);
+    const illegalOvertimeHours = Math.max(selected.day.actualWorkHours - 8, 0);
+    const classification = illegalOvertimeHours > 0
+        ? 'SIXTH_DAY_WITH_ILLEGAL_OVERTIME'
+        : 'SIXTH_DAY';
+    const sixthDayWithoutAmounts = {
+        ...selected.day,
+        sixthDayHours,
+        illegalOvertimeHours,
+        baseAmount: null,
+        premiumAmount: null,
+        value: null,
+        classification
+    };
+    const classificationWarnings = [...new Set([
+        ...dailyFacts.flatMap((day) => day.warnings),
+        ...(selected.warnings || []),
+        ...(seventhDay ? ['SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'] : [])
+    ])];
     const premiumRate = validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
     if (premiumRate === null) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: actualDays.length === 7 ? actualDays[actualDays.length - 1] : null });
+        return Object.freeze({
+            policyVersion: POLICY_VERSION,
+            status: STATUS.NEEDS_HR_DECISION,
+            reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'],
+            warnings: classificationWarnings,
+            dailyFacts,
+            sixthDay: sixthDayWithoutAmounts,
+            seventhDay
+        });
     }
     const specialCategory = String(
         effectiveProfile.eidikh_kathgoria_ergazomenoy ||
@@ -107,21 +140,13 @@ function analyzeWeeklySixthSeventhDay({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,
             reasons: ['ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'],
-            warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))],
+            warnings: classificationWarnings,
             dailyFacts,
-            sixthDay: null,
-            seventhDay: actualDays.length === 7 ? actualDays[actualDays.length - 1] : null
+            sixthDay: sixthDayWithoutAmounts,
+            seventhDay
         });
     }
-    const seventhDay = actualDays.length === 7 ? actualDays[actualDays.length - 1] : null;
-    const sixthCandidates = seventhDay ? actualDays.slice(0, -1) : actualDays;
-    const selected = selectSixthDay(sixthCandidates);
-    if (!selected.day) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: [selected.reason], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay });
-    }
     const rate = Number(String(hourlyRate).replace(',', '.'));
-    const sixthDayHours = Math.min(selected.day.actualWorkHours, 8);
-    const illegalOvertimeHours = Math.max(selected.day.actualWorkHours - 8, 0);
     const baseAmount = Number.isFinite(rate) && rate >= 0
         ? Number((sixthDayHours * rate).toFixed(2))
         : null;
@@ -131,16 +156,11 @@ function analyzeWeeklySixthSeventhDay({
     const sixthDayValue = baseAmount === null
         ? null
         : Number((baseAmount + premiumAmount).toFixed(2));
-    const warnings = [...new Set([
-        ...dailyFacts.flatMap((day) => day.warnings),
-        ...(selected.warnings || []),
-        ...(seventhDay ? ['SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'] : [])
-    ])];
     return Object.freeze({
         policyVersion: POLICY_VERSION,
         status: STATUS.READY,
         reasons: [],
-        warnings,
+        warnings: classificationWarnings,
         week: { start: range.weekStartKey, end: range.weekEndKey },
         premiumRate,
         premiumRateSource: effectiveProfile.source || null,
@@ -152,9 +172,7 @@ function analyzeWeeklySixthSeventhDay({
             baseAmount,
             premiumAmount,
             value: sixthDayValue,
-            classification: illegalOvertimeHours > 0
-                ? 'SIXTH_DAY_WITH_ILLEGAL_OVERTIME'
-                : 'SIXTH_DAY'
+            classification
         },
         seventhDay: seventhDay
             ? {
