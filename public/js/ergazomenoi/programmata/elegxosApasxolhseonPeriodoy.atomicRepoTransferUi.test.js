@@ -402,6 +402,29 @@ function testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates() 
     assert.strictEqual(applied.isAppliedRepoTarget, true);
 }
 
+function testDeclaredNonWorkStaysOnlyInDeclaredColumn() {
+    const neutral = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΜΕ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        cards_ores_ergasias: 0,
+        effective_is_full_time: false
+    }, {
+        declaredText: 'ΜΗ ΕΡΓΑΣΙΑ',
+        declaredClass: 'cell-non-work-day',
+        apologistikoText: '',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: true
+    }, null);
+
+    assert.strictEqual(neutral.declared.text, 'ΜΗ ΕΡΓΑΣΙΑ');
+    assert.strictEqual(neutral.apologistiko.text, '-');
+    assert.strictEqual(neutral.apologistiko.className, '');
+    assert.strictEqual(neutral.apologistiko.source, 'declared_non_work_neutral');
+    assert.strictEqual(neutral.isOriginalDeclaredNonWork, true);
+    assert.strictEqual(neutral.isOriginalDeclaredNeutral, true);
+}
+
 function mockClassList(initial = []) {
     const values = new Set(initial);
     return {
@@ -2418,6 +2441,7 @@ const tests = [
     testPersistedAnWithCardsIsNotBlanketRepoPresentation,
     testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow,
     testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates,
+    testDeclaredNonWorkStaysOnlyInDeclaredColumn,
     testEmployeeGroupsUseAccessibleSingleOpenAccordion,
     testAppliedHistoryRendersWithoutCurrentProjectionGroup,
     testReadyFullTimeAndSplitShift,

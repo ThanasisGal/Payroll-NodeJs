@@ -23,14 +23,15 @@ assert.strictEqual(
     true
 );
 
-// Το συμβατικό/ιστορικό καθεστώς υπερισχύει του λειτουργικού phase detector.
+// Η ημερήσια schedule phase υπερισχύει, επειδή το καθεστώς μπορεί να αλλάζει
+// μέσα στην ίδια εβδομάδα χωρίς να αποτελεί ενιαίο εβδομαδιαίο profile.
 assert.strictEqual(
     resolveReviewIsFullTimeProfile({ kathestos_apasxolhshs: '0' }, '2'),
-    true
+    false
 );
 assert.strictEqual(
     resolveReviewIsFullTimeProfile({ kathestos_apasxolhshs: '1' }, '0'),
-    false
+    true
 );
 
 // Phase fallback μόνο όταν οι όροι εργασίας δεν δίνουν ασφαλή απάντηση.

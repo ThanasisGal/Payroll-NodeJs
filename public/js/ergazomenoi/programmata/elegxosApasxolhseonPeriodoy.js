@@ -2333,11 +2333,19 @@ function resolveReviewRowPresentation(
         declaredCategory === 'ΑΝ' &&
         !hasActualCards &&
         !isAppliedRow;
-    const apologistiko = isOriginalDeclaredRepo
+    const isOriginalDeclaredNonWork =
+        declaredCategory === 'ΜΕ' &&
+        !hasActualCards &&
+        !isAppliedRow;
+    const isOriginalDeclaredNeutral =
+        isOriginalDeclaredRepo || isOriginalDeclaredNonWork;
+    const apologistiko = isOriginalDeclaredNeutral
         ? {
             text: '-',
             className: '',
-            source: 'declared_repo_neutral'
+            source: isOriginalDeclaredRepo
+                ? 'declared_repo_neutral'
+                : 'declared_non_work_neutral'
         }
         : resolveReviewApologistikoPresentation(row, derived);
     const isAppliedRepoTarget =
@@ -2356,10 +2364,12 @@ function resolveReviewRowPresentation(
                 ? 'cell-repo-day-applied'
                 : apologistiko.className
         },
-        badgeState: isOriginalDeclaredRepo ? {} : repoTransferState || {},
+        badgeState: isOriginalDeclaredNeutral ? {} : repoTransferState || {},
         isAppliedRow,
         isAppliedRepoTarget,
-        isOriginalDeclaredRepo
+        isOriginalDeclaredRepo,
+        isOriginalDeclaredNonWork,
+        isOriginalDeclaredNeutral
     };
 }
 

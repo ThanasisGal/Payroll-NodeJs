@@ -48,7 +48,7 @@ assert.strictEqual(analyzeWeeklySixthSeventhDay({
     weekRows: laterCardHoursOverEight,
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
-}).sixthDay.hmeromhnia, '2026-07-31');
+}).sixthDay.hmeromhnia, '2026-08-01');
 
 const incompleteInterval = week([7, 7, 7, 7, 7, 7, 0]);
 incompleteInterval[5].cards_eos_ora_01 = '';
@@ -126,7 +126,7 @@ result = analyzeWeeklySixthSeventhDay({
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
 });
-assert.strictEqual(result.sixthDay.hmeromhnia, '2026-07-31');
+assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
 
 const declaredOverEight = week([9, 9, 9, 9, 9, 9, 0]);
 declaredOverEight[5].ores_ergasias = 9;
@@ -182,7 +182,7 @@ for (const rate of [null, '', -1, 'invalid']) {
 
 result = analyze([7, 7, 7, 7, 7, 6, 9]);
 assert.strictEqual(result.seventhDay.hmeromhnia, '2026-08-02');
-assert.strictEqual(result.sixthDay.hmeromhnia, '2026-07-31');
+assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
 assert.ok(result.warnings.includes('SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'));
 assert.strictEqual(result.seventhDay.actualWorkHours, 9);
 assert.strictEqual(result.seventhDay.illegalOvertimeHours, 9);

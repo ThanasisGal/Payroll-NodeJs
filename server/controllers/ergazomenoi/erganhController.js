@@ -3365,10 +3365,29 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     ).trim();
     const apologistikiKathgoria = String(row.kathgoria_ergasias_apologistika || '').trim();
     const reviewPhaseCode = String(phaseCode || '').trim();
+    const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
     const isNonFullPhase = !resolveReviewIsFullTimeProfile(
         effectiveProfile,
         reviewPhaseCode
     );
+
+    // Σε ημερήσια μερική/εκ περιτροπής φάση, το προδηλωμένο «ΜΕ» χωρίς
+    // κάρτες είναι ήδη η ορθή κατάσταση «ΜΗ ΕΡΓΑΣΙΑ». Δεν αποτελεί
+    // απολογιστική μεταβολή, επομένως η απολογιστική στήλη μένει ουδέτερη.
+    if (
+        isNonFullPhase &&
+        declaredKathgoria === 'ΜΕ' &&
+        hasNoCards &&
+        (apologistikiKathgoria === 'ΑΝ' || apologistikiKathgoria === 'ΜΕ')
+    ) {
+        return {
+            ...row,
+            kathgoria_ergasias_apologistika: '',
+            repo_apologistika: false,
+            review_phase_code: reviewPhaseCode,
+            review_kathestos_code: reviewPhaseCode
+        };
+    }
 
     if (
         isNonFullPhase &&
@@ -3524,6 +3543,20 @@ function reviewApologistikoDisplay(row = {}) {
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
     ).trim();
+    const declaredCategory = String(
+        row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
+    ).trim();
+
+    // Το προδηλωμένο «ΜΕ» χωρίς κάρτες αποτυπώνεται αποκλειστικά στη
+    // στήλη Προδηλωμένο. Δεν επαναλαμβάνεται ως απολογιστική μεταβολή.
+    if (
+        declaredCategory === 'ΜΕ' &&
+        hasNoCards &&
+        !reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika') &&
+        (persistedCategory === '' || persistedCategory === 'ΑΝ' || persistedCategory === 'ΜΕ')
+    ) {
+        return { text: '-', type: '' };
+    }
     if (
         row.repo_apologistika === true ||
         (
@@ -4036,8 +4069,9 @@ async function getReviewRowsForExport(req) {
             exportYpokatasthma: normalizedRow.ypokatasthma || erg.ypokatasthma || '',
             effective_is_full_time: effectiveIsFullTime,
             effective_kathestos_apasxolhshs:
-                effectiveProfile.kathestos_apasxolhshs || '',
-            effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
+                reviewPhaseCode || effectiveProfile.kathestos_apasxolhshs || '',
+            effective_typos_apasxolhshs:
+                reviewPhaseCode || effectiveProfile.typos_apasxolhshs || '',
             effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
             effective_weekly_workdays:
                 Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
@@ -4045,7 +4079,9 @@ async function getReviewRowsForExport(req) {
                 Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
             effective_daily_hours:
                 Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
-            effective_profile_source: effectiveProfile.source || '',
+            effective_profile_source:
+                reviewPhaseCode ? 'SCHEDULE_PHASE' : effectiveProfile.source || '',
+            effective_schedule_phase_code: reviewPhaseCode,
             effective_profile_date: getProfileDateForDeviation(
                 effectiveProfile,
                 normalizedRow.hmeromhnia
@@ -5297,12 +5333,14 @@ class erganhController {
 
                     // Ιστορικά σωστό profile για την ΗΜΕΡΑ της εγγραφής.
                     // Χρησιμοποιείται από το frontend για display τύπου:
-                    // - πλήρης + μη εργασία: ΑΝΑΠΑΥΣΗ/ΡΕΠΟ
-                    // - μερική/εκ περιτροπής + μη εργασία: ΜΗ ΕΡΓΑΣΙΑ
+                    // Η ημερήσια schedule phase καθορίζει τη σημασία του
+                    // προδηλωμένου «ΜΕ». Η απολογιστική στήλη παραμένει
+                    // ουδέτερη όταν δεν υπάρχει πραγματική μεταβολή.
                     effective_is_full_time: effectiveIsFullTime,
                     effective_kathestos_apasxolhshs:
-                        effectiveProfile.kathestos_apasxolhshs || '',
-                    effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
+                        reviewPhaseCode || effectiveProfile.kathestos_apasxolhshs || '',
+                    effective_typos_apasxolhshs:
+                        reviewPhaseCode || effectiveProfile.typos_apasxolhshs || '',
                     effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
                     effective_weekly_workdays:
                         Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
@@ -5310,7 +5348,9 @@ class erganhController {
                         Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
                     effective_daily_hours:
                         Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
-                    effective_profile_source: effectiveProfile.source || '',
+                    effective_profile_source:
+                        reviewPhaseCode ? 'SCHEDULE_PHASE' : effectiveProfile.source || '',
+                    effective_schedule_phase_code: reviewPhaseCode,
                     effective_profile_date: getProfileDateForDeviation(
                         effectiveProfile,
                         normalizedRow.hmeromhnia

@@ -56,14 +56,15 @@ function resolveFullTimeFromWorkTerms(workTerms = {}) {
 }
 
 function resolveReviewIsFullTimeProfile(workTerms = {}, phaseCode = '') {
-    const contractualResolution = resolveFullTimeFromWorkTerms(workTerms);
-    if (contractualResolution !== null) return contractualResolution;
-
     const normalizedPhaseCode = String(phaseCode || '').trim();
     if (normalizedPhaseCode === '0') return true;
     if (normalizedPhaseCode === '1' || normalizedPhaseCode === '2') return false;
 
-    // «ΜΗ ΕΡΓΑΣΙΑ» επιτρέπεται μόνο όταν έχει τεκμηριωθεί μη πλήρης απασχόληση.
+    const contractualResolution = resolveFullTimeFromWorkTerms(workTerms);
+    if (contractualResolution !== null) return contractualResolution;
+
+    // «ΜΗ ΕΡΓΑΣΙΑ» επιτρέπεται μόνο όταν έχει τεκμηριωθεί μη πλήρης απασχόληση
+    // από την ημερήσια schedule phase ή, αν αυτή λείπει, από τους όρους εργασίας.
     // Σε άγνωστο/παλιό profile δεν υποβαθμίζουμε ένα ρεπό σε «ΜΗ ΕΡΓΑΣΙΑ».
     return true;
 }

@@ -17,42 +17,25 @@ function validRate(value) {
 }
 
 function selectSixthDay(candidates) {
-    const cardProvenCandidates = candidates.filter(
-        (day) => day.cardHours > 0
-    );
-    const preferred = cardProvenCandidates.filter(
-        (day) => day.actualWorkHours > 0 && day.actualWorkHours <= 8
-    ).sort((a, b) =>
-        a.actualWorkHours - b.actualWorkHours ||
-        a.hmeromhnia.localeCompare(b.hmeromhnia)
-    );
-    if (preferred.length > 0) {
-        const day = preferred[preferred.length - 1];
-        return {
-            day,
-            warnings: day.hasCompleteCardEvidence
-                ? []
-                : ['SIXTH_DAY_INCOMPLETE_CARD_INTERVAL']
-        };
-    }
-    const overEight = cardProvenCandidates
-        .filter((day) => day.actualWorkHours > 8)
-        .sort((a, b) =>
-            a.actualWorkHours - b.actualWorkHours ||
-            b.hmeromhnia.localeCompare(a.hmeromhnia)
-        );
-    if (overEight.length > 0) {
-        const day = overEight[0];
+    const cardProvenCandidates = candidates
+        .filter((day) => day.cardHours > 0)
+        .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
+    const day = cardProvenCandidates[cardProvenCandidates.length - 1] || null;
+
+    if (day) {
         return {
             day,
             warnings: [
-                'SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT',
+                ...(day.actualWorkHours > 8
+                    ? ['SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT']
+                    : []),
                 ...(day.hasCompleteCardEvidence
                     ? []
                     : ['SIXTH_DAY_INCOMPLETE_CARD_INTERVAL'])
             ]
         };
     }
+
     return { day: null, reason: 'SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC' };
 }
 

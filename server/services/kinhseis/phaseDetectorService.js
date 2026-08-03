@@ -392,6 +392,92 @@ function applyClassificationThresholdInfo(days, thresholdInfo) {
     });
 }
 
+function normalizeDailyEmploymentCode(value) {
+    const code = normalizeKathestosCode(value);
+    return ['0', '1', '2'].includes(code) ? code : '';
+}
+
+function getInitialDailyEmploymentCode(day = {}) {
+    const baseEmploymentCode = normalizeDailyEmploymentCode(
+        day.baseEmploymentCode || day.kathestos_apasxolhshs
+    );
+    const scheduledKathgoria = toTrimmedString(day.scheduledKathgoria).toUpperCase();
+
+    if (scheduledKathgoria === 'ΑΝ' || day.repo === true) return '0';
+    if (scheduledKathgoria === 'ΜΕ') return 'NON_FULL_NO_WORK';
+
+    if (day.expectedWorkDay === true) {
+        if (day.classification === 'PARTIAL_DAY') return '1';
+        if (baseEmploymentCode === '1' || baseEmploymentCode === '2') {
+            return baseEmploymentCode;
+        }
+        if (day.classification === 'FULL_DAY') return '0';
+    }
+
+    return baseEmploymentCode;
+}
+
+function findNearestResolvedEmploymentCode(days, startIndex, direction) {
+    for (
+        let index = startIndex + direction;
+        index >= 0 && index < days.length;
+        index += direction
+    ) {
+        const code = days[index]?.dailyEmploymentCode;
+        if (['0', '1', '2'].includes(code)) return code;
+    }
+
+    return '';
+}
+
+function resolveDailyEmploymentCodes(days = []) {
+    const normalizedDays = Array.isArray(days) ? days : [];
+
+    normalizedDays.forEach((day) => {
+        day.dailyEmploymentCode = getInitialDailyEmploymentCode(day);
+        day.dailyEmploymentCodeSource = day.dailyEmploymentCode === 'NON_FULL_NO_WORK'
+            ? 'SCHEDULE_NON_WORK_PENDING_CONTEXT'
+            : 'SCHEDULE_OR_DAILY_TERMS';
+    });
+
+    normalizedDays.forEach((day, index) => {
+        if (day.dailyEmploymentCode !== 'NON_FULL_NO_WORK') return;
+
+        const baseEmploymentCode = normalizeDailyEmploymentCode(
+            day.baseEmploymentCode || day.kathestos_apasxolhshs
+        );
+        const previousCode = findNearestResolvedEmploymentCode(normalizedDays, index, -1);
+        const nextCode = findNearestResolvedEmploymentCode(normalizedDays, index, 1);
+        const adjacentNonFullCode = [previousCode, nextCode].find(
+            (code) => code === '1' || code === '2'
+        );
+
+        day.dailyEmploymentCode =
+            adjacentNonFullCode ||
+            (baseEmploymentCode === '1' || baseEmploymentCode === '2'
+                ? baseEmploymentCode
+                : '2');
+        day.dailyEmploymentCodeSource = adjacentNonFullCode
+            ? 'SCHEDULE_ADJACENT_NON_FULL_PHASE'
+            : baseEmploymentCode === '1' || baseEmploymentCode === '2'
+                ? 'DAILY_TERMS_NON_FULL_PHASE'
+                : 'SCHEDULE_NON_WORK_ROTATIONAL_FALLBACK';
+    });
+
+    normalizedDays.forEach((day, index) => {
+        if (['0', '1', '2'].includes(day.dailyEmploymentCode)) return;
+
+        const previousCode = findNearestResolvedEmploymentCode(normalizedDays, index, -1);
+        const nextCode = findNearestResolvedEmploymentCode(normalizedDays, index, 1);
+        day.dailyEmploymentCode = previousCode || nextCode || '0';
+        day.dailyEmploymentCodeSource = previousCode || nextCode
+            ? 'ADJACENT_SCHEDULE_PHASE'
+            : 'SAFE_FULL_TIME_FALLBACK';
+    });
+
+    return normalizedDays;
+}
+
 function analyzePhasePattern(days, partialDayCount, fullDayCount) {
     const firstDay = days[0] || {};
     const classificationThresholdReason = firstDay.classificationThresholdReason || 'BASE_TERMS';
@@ -673,6 +759,9 @@ function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, karta
             relevantHours: expectedWorkInfo.relevantHours,
             termsSource: terms.source || '',
             kathestos_apasxolhshs: terms.typos_apasxolhshs || '',
+            baseEmploymentCode: normalizeDailyEmploymentCode(
+                terms.typos_apasxolhshs
+            ),
             typos_ebdomadas: terms.typos_ebdomadas || '',
             karta_ergasias: kartaErgasias,
             warnings: dayWarnings
@@ -828,6 +917,7 @@ function buildDayGroupKeyParts(day) {
         mo_oron_hmerhsias_ergasias: day.mo_oron_hmerhsias_ergasias,
         pososto_prosayxhshs_6hs_hmeras: day.pososto_prosayxhshs_6hs_hmeras,
         kathestos_apasxolhshs: day.kathestos_apasxolhshs,
+        dailyEmploymentCode: day.dailyEmploymentCode,
         typos_ebdomadas: day.typos_ebdomadas,
         sourceField: day.sourceField,
         karta_ergasias: day.karta_ergasias
@@ -887,6 +977,26 @@ function classifyPhase(days) {
     const partialDayCount = days.filter((day) => day.classification === 'PARTIAL_DAY').length;
     const fullDayCount = days.filter((day) => day.expectedWorkDay && day.classification === 'FULL_DAY').length;
     const phasePattern = analyzePhasePattern(days, partialDayCount, fullDayCount);
+    const dailyEmploymentCodes = [
+        ...new Set(days.map((day) => normalizeDailyEmploymentCode(day.dailyEmploymentCode)))
+    ].filter(Boolean);
+
+    if (dailyEmploymentCodes.length === 1) {
+        const dailyEmploymentCode = dailyEmploymentCodes[0];
+        if (dailyEmploymentCode === '0') {
+            return { detectedKathestos: 'PLHRHS', detectedKathestosCode: '0', ...phasePattern };
+        }
+        if (dailyEmploymentCode === '1') {
+            return { detectedKathestos: 'MERIKH', detectedKathestosCode: '1', ...phasePattern };
+        }
+        if (dailyEmploymentCode === '2') {
+            return {
+                detectedKathestos: 'EK_PERITROPHS',
+                detectedKathestosCode: '2',
+                ...phasePattern
+            };
+        }
+    }
 
     if (phasePattern.phasePatternKind === 'SIX_DAY_40H_PATTERN') {
         return { detectedKathestos: 'PLHRHS', detectedKathestosCode: '0', ...phasePattern };
@@ -1018,6 +1128,9 @@ function buildPhaseFromDays(days, index, employee, kartaErgasias) {
             prosthetiErgasiaHours: day.prosthetiErgasiaHours,
             termsSource: day.termsSource,
             kathestos_apasxolhshs: day.kathestos_apasxolhshs,
+            baseEmploymentCode: day.baseEmploymentCode,
+            dailyEmploymentCode: day.dailyEmploymentCode,
+            dailyEmploymentCodeSource: day.dailyEmploymentCodeSource,
             typos_ebdomadas: day.typos_ebdomadas,
             karta_ergasias: day.karta_ergasias,
             groupKey: day.groupKey,
@@ -1031,6 +1144,42 @@ function buildPhaseFromDays(days, index, employee, kartaErgasias) {
 }
 
 function groupDailyRowsIntoPhases(dailyRows, employee, kartaErgasias) {
+    const thresholdGroups = [];
+
+    dailyRows.forEach((day) => {
+        const thresholdGroupKey = [
+            day.hmeres_ergasias_ebdomadas,
+            day.ores_ergasias_ebdomadas,
+            day.mo_oron_hmerhsias_ergasias,
+            day.pososto_prosayxhshs_6hs_hmeras,
+            day.kathestos_apasxolhshs,
+            day.typos_ebdomadas,
+            day.sourceField,
+            day.karta_ergasias
+        ].join('|');
+        const weekGroupKey = buildWeekGroupKey(day.date);
+        const previousGroup = thresholdGroups[thresholdGroups.length - 1];
+
+        if (
+            !previousGroup ||
+            previousGroup.groupKey !== thresholdGroupKey ||
+            previousGroup.weekGroupKey !== weekGroupKey
+        ) {
+            thresholdGroups.push({ groupKey: thresholdGroupKey, weekGroupKey, days: [day] });
+            return;
+        }
+
+        previousGroup.days.push(day);
+    });
+
+    thresholdGroups.forEach((group) => {
+        applyClassificationThresholdInfo(
+            group.days,
+            buildClassificationThresholdInfo(group.days)
+        );
+        resolveDailyEmploymentCodes(group.days);
+    });
+
     const groups = [];
 
     dailyRows.forEach((day) => {
@@ -1052,12 +1201,9 @@ function groupDailyRowsIntoPhases(dailyRows, employee, kartaErgasias) {
         previousGroup.days.push(day);
     });
 
-    return groups.map((group, index) => {
-        const thresholdInfo = buildClassificationThresholdInfo(group.days);
-        applyClassificationThresholdInfo(group.days, thresholdInfo);
-
-        return buildPhaseFromDays(group.days, index, employee, kartaErgasias);
-    });
+    return groups.map((group, index) =>
+        buildPhaseFromDays(group.days, index, employee, kartaErgasias)
+    );
 }
 
 function buildOperationalPhases(phases = []) {
@@ -1372,5 +1518,8 @@ module.exports = {
     detectPayrollPhasesForDateRange,
     buildPeriodRange,
     applyWeeklySixthSeventhDayFacts,
-    filterDailyRowsToRequestedPeriod
+    filterDailyRowsToRequestedPeriod,
+    resolveDailyEmploymentCodes,
+    groupDailyRowsIntoPhases,
+    buildOperationalPhases
 };
