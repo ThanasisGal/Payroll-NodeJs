@@ -25,6 +25,7 @@ const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
 
 const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     '_id kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
+    'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
     'pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
     'nomimoOromisthio pragmatikoOromisthio ' +

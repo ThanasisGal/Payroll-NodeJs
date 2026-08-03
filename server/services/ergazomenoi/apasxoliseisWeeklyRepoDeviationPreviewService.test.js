@@ -95,6 +95,23 @@ function testCompletedMondaySundayRanges() {
     }
 }
 
+function testDepartureWeekDoesNotCreateWeeklyPolicyChecks() {
+    const result = buildWeeklyRepoDeviationPreview({
+        rows: rows('2026-06-01', 2),
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: fiveDayProfile,
+        resolveEmploymentPeriod: () => ({
+            employmentStart: '2025-01-01',
+            employmentEnd: '2026-06-02'
+        })
+    });
+
+    assert.deepStrictEqual(result.deviations, []);
+    assert.deepStrictEqual(result.pendingWeeks, []);
+}
+
 function testContractualProfileControlsExpectedRepo() {
     const sixDay = buildWeeklyRepoDeviationPreview({
         rows: rows('2026-06-15'),
@@ -492,6 +509,7 @@ function testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow() {
 
 testSundayAndMondayUseDifferentBuckets();
 testCompletedMondaySundayRanges();
+testDepartureWeekDoesNotCreateWeeklyPolicyChecks();
 testContractualProfileControlsExpectedRepo();
 testOpenTrailingWeekIsPendingNotDeviation();
 testRepoTransferLifecycleUsesEffectiveFinalRows();

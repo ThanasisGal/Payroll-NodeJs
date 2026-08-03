@@ -111,6 +111,7 @@ function buildWeeklyRepoDeviationPreview({
     periodEnd,
     asOfDate,
     resolveWeeklyProfile,
+    resolveEmploymentPeriod,
     resolveDailyProfile,
     isFullTimeProfile,
     holidayByDateKey = new Map(),
@@ -169,6 +170,26 @@ function buildWeeklyRepoDeviationPreview({
             week_definition: 'MONDAY_SUNDAY',
             is_legacy_policy: false
         };
+
+        const employmentPeriod =
+            typeof resolveEmploymentPeriod === 'function'
+                ? resolveEmploymentPeriod({
+                      ypokatasthma: first.ypokatasthma,
+                      kodikos: first.kodikos,
+                      weekStart,
+                      weekEnd
+                  }) || {}
+                : {};
+        const employmentStart = dateKeyUtc(employmentPeriod.employmentStart);
+        const employmentEnd = dateKeyUtc(employmentPeriod.employmentEnd);
+        if (
+            (employmentStart && weekStart < employmentStart) ||
+            (employmentEnd && weekEnd > employmentEnd)
+        ) {
+            // Η πολιτική εβδομαδιαίων ρεπό/6ης/7ης ημέρας δεν εφαρμόζεται
+            // σε εβδομάδα που τέμνεται από πρόσληψη ή αποχώρηση.
+            continue;
+        }
 
         if (weekEnd > asOfKey) {
             pendingWeeks.push({

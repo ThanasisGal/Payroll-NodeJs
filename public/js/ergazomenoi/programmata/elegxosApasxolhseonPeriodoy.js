@@ -2247,6 +2247,32 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
     ).trim();
+    const hasActualCards =
+        num(row.cards_ores_ergasias) > 0 || hasValidCardInterval(row);
+    const hasDeclaredWork =
+        num(row.ores_ergasias) > 0 ||
+        [1, 2, 3].some((n) => {
+            const p = pairNo(n);
+            return (
+                hasMeaningfulValue(row[`apo_ora_${p}`]) ||
+                hasMeaningfulValue(row[`eos_ora_${p}`])
+            );
+        });
+    const invalidPersistedNonWork =
+        persistedCategory === 'ΜΕ' &&
+        hasDeclaredWork &&
+        hasActualCards;
+
+    if (invalidPersistedNonWork) {
+        return {
+            text: derived.apologistikoText || '',
+            className: isApologistikoIntervalPresent(row)
+                ? 'cell-apologistiko'
+                : '',
+            source: 'derived'
+        };
+    }
+
     const persistedRepo =
         row.repo_apologistika === true ||
         (persistedCategory === 'ΑΝ' && derived.isApologistikoRepoRow === true);

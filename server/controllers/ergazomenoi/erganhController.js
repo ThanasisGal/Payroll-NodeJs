@@ -166,6 +166,11 @@ const {
     resolveReviewIsFullTimeProfile
 } = require('../../services/ergazomenoi/apasxoliseisReviewEmploymentProfileService');
 const {
+    buildPostDepartureExclusionDescriptors,
+    isDateWithinEmploymentPeriod,
+    isWeekFullyWithinEmploymentPeriod
+} = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
+const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
     SOURCE_VERSION: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
     buildWeeklyRepoDeviationPreview,
@@ -1492,6 +1497,11 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     ]);
 
     const employeeByKodikos = buildCompanyWideUniqueEmployeeByKodikos(employeeRows);
+    const atomicPolicyRows = atomicRows.filter((row) => {
+        const employee = employeeByKodikos.get(String(row?.kodikos || '').trim());
+        if (!employee) return true;
+        return isWeekFullyWithinEmploymentPeriod(row.hmeromhnia, employee);
+    });
     const historyByKodikos = new Map();
     historyRows.forEach((history) => {
         const kodikos = String(history?.kodikos || '').trim();
@@ -1510,7 +1520,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     });
 
     const builtInputs = buildWeeklyRepoTransferAtomicInputs({
-        rows: atomicRows,
+        rows: atomicPolicyRows,
         periodStart: analysisPeriodStart,
         periodEnd: analysisPeriodEnd,
         validationPeriodStart: requestedPeriodStart,
@@ -1624,10 +1634,26 @@ async function runWeeklyRepoPostCheck({
         }
     };
 
+    const periodStart = clampDateStartUtc(apoDate);
+    const periodEnd = clampDateEndUtc(eosDate);
+
     const employeeQuery = {
         team: sessionTeam,
         company_kod: companyId,
-        energos: true
+        $and: mongoose.trusted([
+            {
+                $or: mongoose.trusted([
+                    { hmeromhnia_proslhpshs: null },
+                    { hmeromhnia_proslhpshs: mongoose.trusted({ $lte: periodEnd }) }
+                ])
+            },
+            {
+                $or: mongoose.trusted([
+                    { hmeromhnia_apoxorhshs: null },
+                    { hmeromhnia_apoxorhshs: mongoose.trusted({ $gte: periodStart }) }
+                ])
+            }
+        ])
     };
 
     if (selectedYpokatasthma) {
@@ -1637,6 +1663,7 @@ async function runWeeklyRepoPostCheck({
     const employees = await ErgazomenoiModel.find(employeeQuery)
         .select(
             'ypokatasthma kodikos eponymo onoma ' +
+                'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                 'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                 'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                 'typos_apasxolhshs typos_ebdomadas ' +
@@ -1658,9 +1685,6 @@ async function runWeeklyRepoPostCheck({
     if (kodikoi.length === 0) {
         return result;
     }
-
-    const periodStart = clampDateStartUtc(apoDate);
-    const periodEnd = clampDateEndUtc(eosDate);
 
     const istorikoRowsByKodikos = new Map();
 
@@ -1743,7 +1767,7 @@ async function runWeeklyRepoPostCheck({
         postCheckRowsQuery.ypokatasthma = selectedYpokatasthma;
     }
 
-    const rows = await ProdhlomenaOrariaModel.find(postCheckRowsQuery)
+    const loadedRows = await ProdhlomenaOrariaModel.find(postCheckRowsQuery)
         .select(
             'team company_kod kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika repo repo_apologistika ' +
                 'ores_ergasias cards_ores_ergasias ores_apoysias adeia adeia_apologistika ' +
@@ -1756,6 +1780,13 @@ async function runWeeklyRepoPostCheck({
         )
         .sort({ kodikos: 1, hmeromhnia: 1 })
         .lean();
+
+    const rows = loadedRows.filter((row) => {
+        const employee = employeesByKodikos.get(String(row.kodikos || ''));
+        return employee
+            ? isDateWithinEmploymentPeriod(row.hmeromhnia, employee)
+            : false;
+    });
 
     result.recordsChecked = rows.length;
 
@@ -1786,6 +1817,10 @@ async function runWeeklyRepoPostCheck({
 
         for (const week of weekRanges) {
             let pragmatikaRepo = 0;
+            const weekFullyInsideEmployment = isWeekFullyWithinEmploymentPeriod(
+                week.weekStart,
+                erg
+            );
 
             const weeklyProfileInfo = getWeeklyRepoProfileInfo({
                 week,
@@ -1808,11 +1843,18 @@ async function runWeeklyRepoPostCheck({
                 );
                 if (weekRow) weekRows.push(weekRow);
             }
-            const sixthSeventhAnalysis = analyzeWeeklySixthSeventhDay({
-                weekRows,
-                effectiveProfile,
-                hourlyRate: effectiveProfile.pragmatikoOromisthio
-            });
+            const sixthSeventhAnalysis = weekFullyInsideEmployment
+                ? analyzeWeeklySixthSeventhDay({
+                      weekRows,
+                      effectiveProfile,
+                      hourlyRate: effectiveProfile.pragmatikoOromisthio
+                  })
+                : {
+                      status: 'READY',
+                      reasons: [],
+                      sixthDay: null,
+                      seventhDay: null
+                  };
 
             for (
                 let day = clampDateStartUtc(week.weekStart);
@@ -1833,6 +1875,18 @@ async function runWeeklyRepoPostCheck({
                 const isFullTimeProfile = isFullTimeWorkTerms(dailyProfile);
 
                 const update = {};
+
+                // Αδύνατος απολογιστικός χαρακτηρισμός: με δηλωμένες ώρες
+                // και πραγματική εργασία από κάρτες, το παλιό «ΜΕ» δεν
+                // επιτρέπεται να επιβιώνει σε καμία ημερήσια φάση.
+                if (
+                    isNonZeroHours(row.ores_ergasias) &&
+                    cardsOresIsNonZero &&
+                    String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΜΕ'
+                ) {
+                    update.kathgoria_ergasias_apologistika = '';
+                    update.repo_apologistika = false;
+                }
 
                 const declaredNonWork = isFullTimeProfile
                     ? kathgoriaErgasias === 'ΑΝ'
@@ -1918,6 +1972,7 @@ async function runWeeklyRepoPostCheck({
 
             if (
                 week.isFullWeek &&
+                weekFullyInsideEmployment &&
                 (
                     weeklyProfileInfo.repoResolutionReason ||
                     Number(pragmatikaRepo) !== Number(expectedWeeklyRepo)
@@ -3354,6 +3409,26 @@ function reviewIntervals(row, apoPrefix, eosPrefix, suffix = '') {
         .join(' / ');
 }
 
+function reviewHasCardEvidence(row = {}) {
+    return (
+        reviewNum(row.cards_ores_ergasias) > 0 ||
+        [1, 2, 3].some((n) => {
+            const p = String(n).padStart(2, '0');
+            return Boolean(
+                String(row[`cards_apo_ora_${p}`] || '').trim() ||
+                String(row[`cards_eos_ora_${p}`] || '').trim()
+            );
+        })
+    );
+}
+
+function reviewHasDeclaredWorkEvidence(row = {}) {
+    return (
+        reviewNum(row.ores_ergasias) > 0 ||
+        Boolean(reviewIntervals(row, 'apo_ora', 'eos_ora'))
+    );
+}
+
 function reviewEffectiveKathgoria(row = {}) {
     const apologistiki = String(row.kathgoria_ergasias_apologistika || '').trim();
     return apologistiki || String(row.kathgoria_ergasias || '').trim();
@@ -3365,11 +3440,29 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     ).trim();
     const apologistikiKathgoria = String(row.kathgoria_ergasias_apologistika || '').trim();
     const reviewPhaseCode = String(phaseCode || '').trim();
-    const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
+    const hasCards = reviewHasCardEvidence(row);
+    const hasNoCards = !hasCards;
     const isNonFullPhase = !resolveReviewIsFullTimeProfile(
         effectiveProfile,
         reviewPhaseCode
     );
+
+    // Δηλωμένη εργασία + κάρτες αποκλείουν το «ΜΕ» σε κάθε ημερήσια φάση.
+    // Καθαρίζεται και στην απόκριση ώστε παλιά δεδομένα να μη φαίνονται λάθος
+    // πριν από τον επόμενο επανυπολογισμό.
+    if (
+        reviewHasDeclaredWorkEvidence(row) &&
+        hasCards &&
+        apologistikiKathgoria === 'ΜΕ'
+    ) {
+        return {
+            ...row,
+            kathgoria_ergasias_apologistika: '',
+            repo_apologistika: false,
+            review_phase_code: reviewPhaseCode,
+            review_kathestos_code: reviewPhaseCode
+        };
+    }
 
     // Σε ημερήσια μερική/εκ περιτροπής φάση, το προδηλωμένο «ΜΕ» χωρίς
     // κάρτες είναι ήδη η ορθή κατάσταση «ΜΗ ΕΡΓΑΣΙΑ». Δεν αποτελεί
@@ -3392,6 +3485,7 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     if (
         isNonFullPhase &&
         declaredKathgoria === 'ΕΡΓ' &&
+        hasNoCards &&
         apologistikiKathgoria === 'ΑΝ'
     ) {
         return {
@@ -3537,7 +3631,8 @@ function reviewProgramDisplay(row = {}) {
 
 function reviewApologistikoDisplay(row = {}) {
     const effectiveKathgoria = reviewEffectiveKathgoria(row);
-    const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
+    const hasCards = reviewHasCardEvidence(row);
+    const hasNoCards = !hasCards;
     const isFullTimeProfile = reviewIsFullTimeProfile(row);
 
     const persistedCategory = String(
@@ -3546,6 +3641,17 @@ function reviewApologistikoDisplay(row = {}) {
     const declaredCategory = String(
         row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
     ).trim();
+    const intervals = reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika');
+
+    if (
+        persistedCategory === 'ΜΕ' &&
+        reviewHasDeclaredWorkEvidence(row) &&
+        hasCards
+    ) {
+        return intervals
+            ? { text: intervals, type: 'apologistiko' }
+            : { text: '-', type: '' };
+    }
 
     // Το προδηλωμένο «ΜΕ» χωρίς κάρτες αποτυπώνεται αποκλειστικά στη
     // στήλη Προδηλωμένο. Δεν επαναλαμβάνεται ως απολογιστική μεταβολή.
@@ -3601,7 +3707,6 @@ function reviewApologistikoDisplay(row = {}) {
         }
     }
 
-    const intervals = reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika');
     if (intervals) return { text: intervals, type: 'apologistiko' };
     if (persistedCategory) return { text: persistedCategory, type: 'persisted' };
 
@@ -3905,10 +4010,60 @@ function buildProdhlomenaReviewFilter(req) {
     if (andFilters.length > 0) filter.$and = mongoose.trusted(andFilters);
     return filter;
 }
+
+function applyPostDepartureExclusionsToFilter(filter, descriptors = []) {
+    if (!filter || descriptors.length === 0) return filter;
+    const exclusions = descriptors.map((descriptor) => {
+        const exclusion = {
+            kodikos: descriptor.kodikos,
+            hmeromhnia: mongoose.trusted({ $gt: descriptor.departureEnd })
+        };
+        if (descriptor.ypokatasthma) {
+            exclusion.ypokatasthma = descriptor.ypokatasthma;
+        }
+        return exclusion;
+    });
+    const existing = Array.isArray(filter.$nor) ? filter.$nor : [];
+    filter.$nor = mongoose.trusted([...existing, ...exclusions]);
+    return filter;
+}
+
+async function applyEmploymentDepartureScopeToFilters({
+    filters = [],
+    team,
+    companyId,
+    ypokatasthma = '',
+    kodikos = ''
+}) {
+    const employeeFilter = { team, company_kod: companyId };
+    const cleanBranch = String(ypokatasthma || '').trim();
+    const cleanKodikos = String(kodikos || '').trim();
+    if (cleanBranch) employeeFilter.ypokatasthma = cleanBranch.padStart(4, '0');
+    if (cleanKodikos) employeeFilter.kodikos = cleanKodikos;
+
+    const employees = await ErgazomenoiModel.find(employeeFilter)
+        .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
+        .lean();
+    const descriptors = buildPostDepartureExclusionDescriptors(employees);
+    filters.forEach((filter) => applyPostDepartureExclusionsToFilter(filter, descriptors));
+    return { employees, descriptors };
+}
+
 const REVIEW_SELECT_FIELDS =
     'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
 async function getReviewRowsForExport(req) {
-    const rows = await ProdhlomenaOrariaModel.find(buildProdhlomenaReviewFilter(req))
+    const reviewFilter = buildProdhlomenaReviewFilter(req);
+    const { employees: lifecycleEmployees } = await applyEmploymentDepartureScopeToFilters({
+        filters: [reviewFilter],
+        team: req.session.userTeam,
+        companyId: req.session.companyInUse,
+        ypokatasthma: req.query.ypokatasthma,
+        kodikos: req.query.kodikos
+    });
+    const lifecycleByKodikos = new Map(
+        lifecycleEmployees.map((employee) => [String(employee.kodikos || ''), employee])
+    );
+    const rows = await ProdhlomenaOrariaModel.find(reviewFilter)
         .select(REVIEW_SELECT_FIELDS)
         .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
         .lean();
@@ -3922,7 +4077,7 @@ async function getReviewRowsForExport(req) {
               kodikos: mongoose.trusted({ $in: kodikoi })
           })
               .select(
-                  'kodikos eponymo onoma ypokatasthma ' +
+                  'kodikos eponymo onoma ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                       'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                       'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                       'typos_apasxolhshs typos_ebdomadas'
@@ -4090,7 +4245,16 @@ async function getReviewRowsForExport(req) {
         };
     });
 
-    enrichedRows.__deviations = deviations.map(mapDeviationForReviewExport);
+    enrichedRows.__deviations = deviations
+        .filter((deviation) =>
+            isWeekFullyWithinEmploymentPeriod(
+                deviation.week_apo,
+                lifecycleByKodikos.get(String(deviation.kodikos)) ||
+                    ergByKodikos.get(String(deviation.kodikos)) ||
+                    {}
+            )
+        )
+        .map(mapDeviationForReviewExport);
     return enrichedRows;
 }
 function makeReviewPdfDocument() {
@@ -5061,6 +5225,21 @@ class erganhController {
                 deviationContextFilter.kodikos = String(kodikos).trim();
             }
 
+            const { employees: lifecycleEmployees } =
+                await applyEmploymentDepartureScopeToFilters({
+                filters: [filter, deviationContextFilter],
+                team: sessionTeam,
+                companyId,
+                ypokatasthma,
+                kodikos
+            });
+            const lifecycleByKodikos = new Map(
+                lifecycleEmployees.map((employee) => [
+                    String(employee.kodikos || ''),
+                    employee
+                ])
+            );
+
             const [rows, total, deviationContextRows] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
@@ -5117,6 +5296,7 @@ class erganhController {
             })
                 .select(
                     'kodikos eponymo onoma pososto_prosayxhshs_6hs_hmeras ' +
+                        'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                         'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                         'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                         'typos_apasxolhshs typos_ebdomadas'
@@ -5406,6 +5586,13 @@ class erganhController {
                               noCardsDisplayContext.argiesByDateKey || new Map(),
                           existingAuditCountByRowKey:
                               deviationAuditCountByRowKey,
+                          resolveEmploymentPeriod: ({ kodikos: employeeKodikos }) => {
+                              const employee = ergByKodikos.get(String(employeeKodikos)) || {};
+                              return {
+                                  employmentStart: employee.hmeromhnia_proslhpshs || null,
+                                  employmentEnd: employee.hmeromhnia_apoxorhshs || null
+                              };
+                          },
                           resolveDailyProfile: (row) =>
                               getEffectiveRepoProfileForDate(
                                   row.hmeromhnia,
@@ -5430,6 +5617,16 @@ class erganhController {
                 enrichedDeviations
             );
             const legacyDeviations = deviations
+                .filter((deviation) => {
+                    const employee =
+                        lifecycleByKodikos.get(String(deviation.kodikos)) ||
+                        ergByKodikos.get(String(deviation.kodikos)) ||
+                        {};
+                    return isWeekFullyWithinEmploymentPeriod(
+                        deviation.week_apo,
+                        employee
+                    );
+                })
                 .map((d) =>
                     normalizeLegacyDeviation({
                         _id: d._id,
@@ -5574,6 +5771,14 @@ class erganhController {
             if (kodikos && String(kodikos).trim() !== '') {
                 filter.kodikos = String(kodikos).trim();
             }
+
+            await applyEmploymentDepartureScopeToFilters({
+                filters: [filter],
+                team: sessionTeam,
+                companyId,
+                ypokatasthma,
+                kodikos
+            });
 
             const [rows, total] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
@@ -7436,7 +7641,20 @@ class erganhController {
             const employeeQuery = {
                 team: sessionTeam,
                 company_kod: companyId,
-                energos: true
+                $and: mongoose.trusted([
+                    {
+                        $or: mongoose.trusted([
+                            { hmeromhnia_proslhpshs: null },
+                            { hmeromhnia_proslhpshs: mongoose.trusted({ $lte: eosDate }) }
+                        ])
+                    },
+                    {
+                        $or: mongoose.trusted([
+                            { hmeromhnia_apoxorhshs: null },
+                            { hmeromhnia_apoxorhshs: mongoose.trusted({ $gte: apoDate }) }
+                        ])
+                    }
+                ])
             };
 
             if (selectedYpokatasthma) {
@@ -7446,6 +7664,7 @@ class erganhController {
             const ergazomenoi = await ErgazomenoiModel.find(employeeQuery)
                 .select(
                     'kodikos eponymo onoma ypokatasthma ' +
+                        'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                         'aa_eggrafhs hmeres_ergasias_ebdomadas ' +
                         'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
                         'typos_apasxolhshs typos_ebdomadas ' +
@@ -7604,7 +7823,14 @@ class erganhController {
                     .sort({ kodikos: 1, hmeromhnia: 1 })
                     .lean();
 
-                prodhlomena.push(...chunkRecords);
+                prodhlomena.push(
+                    ...chunkRecords.filter((row) => {
+                        const employee = employeesByKodikos.get(String(row.kodikos || ''));
+                        return employee
+                            ? isDateWithinEmploymentPeriod(row.hmeromhnia, employee)
+                            : false;
+                    })
+                );
             }
 
             prodhlomena.sort((a, b) => {

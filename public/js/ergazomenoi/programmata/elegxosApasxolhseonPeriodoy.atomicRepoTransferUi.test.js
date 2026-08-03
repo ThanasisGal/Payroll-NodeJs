@@ -302,6 +302,49 @@ function testPersistedAnWithCardsIsNotBlanketRepoPresentation() {
     assert.notStrictEqual(presentation.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
 }
 
+function testFullTimeDeclaredWorkWithCardsNeverDisplaysPersistedNonWork() {
+    const baseRow = {
+        kathgoria_ergasias_original: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΜΕ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 2.88,
+        cards_apo_ora_01: '09:04',
+        cards_eos_ora_01: '12:27',
+        effective_is_full_time: true
+    };
+
+    const neutral = sandbox.resolveReviewApologistikoPresentation(baseRow, {
+        apologistikoText: '',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    });
+    assert.strictEqual(neutral.text, '');
+    assert.notStrictEqual(neutral.text, 'ΜΗ ΕΡΓΑΣΙΑ');
+
+    const nonFullPhase = sandbox.resolveReviewApologistikoPresentation({
+        ...baseRow,
+        effective_is_full_time: false
+    }, {
+        apologistikoText: '',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    });
+    assert.strictEqual(nonFullPhase.text, '');
+    assert.notStrictEqual(nonFullPhase.text, 'ΜΗ ΕΡΓΑΣΙΑ');
+
+    const intervals = sandbox.resolveReviewApologistikoPresentation({
+        ...baseRow,
+        apo_ora_01_apologistika: '09:04',
+        eos_ora_01_apologistika: '12:27'
+    }, {
+        apologistikoText: '09:04–12:27',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    });
+    assert.strictEqual(intervals.text, '09:04–12:27');
+    assert.strictEqual(intervals.className, 'cell-apologistiko');
+}
+
 function testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow() {
     vm.runInContext(`
         currentAtomicRepoTransferProjection = { groups: [] };
@@ -2439,6 +2482,7 @@ const tests = [
     testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation,
     testContractualEmploymentTypeWinsOverOperationalPhaseForRestDisplay,
     testPersistedAnWithCardsIsNotBlanketRepoPresentation,
+    testFullTimeDeclaredWorkWithCardsNeverDisplaysPersistedNonWork,
     testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow,
     testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates,
     testDeclaredNonWorkStaysOnlyInDeclaredColumn,
