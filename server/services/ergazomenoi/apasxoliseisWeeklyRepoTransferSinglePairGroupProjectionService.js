@@ -261,7 +261,8 @@ function buildDescription({ employeeKodikos, sourceDate, targetDate, targetCateg
         `Μεταφορά ρεπό για τον εργαζόμενο ${employeeKodikos}: ` +
         `η ${displayDate(sourceDate)} γίνεται εργασία και η ${displayDate(targetDate)} ` +
         `γίνεται ρεπό (${targetCategory}, ${employmentLabel}). ` +
-        'Η atomic read-only πρόταση απαιτεί ενιαία έγκριση και δεν είναι ακόμη διαθέσιμη για εφαρμογή.'
+        'Οι δύο αλλαγές απαιτούν μία ενιαία απόφαση HR. Η προεπισκόπηση δεν αλλάζει δεδομένα· ' +
+        'η εφαρμογή επιτρέπεται μόνο μετά από έγκριση και επιτυχή έλεγχο ασφαλείας του server.'
     );
 }
 

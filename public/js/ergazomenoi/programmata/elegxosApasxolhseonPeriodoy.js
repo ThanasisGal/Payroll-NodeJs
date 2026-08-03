@@ -4449,7 +4449,7 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Η προτεινόμενη αλλαγή δεν αποκαθιστά τον απαιτούμενο αριθμό ρεπό.',
     INCOMPLETE_EMPLOYEE_WEEK: 'Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
     ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED:
-        'Η εκ περιτροπής απασχόληση δεν υποστηρίζεται ακόμη από την αυτόματη διαδικασία.',
+        'Η περίπτωση εκ περιτροπής απασχόλησης δεν δρομολογήθηκε στην απαιτούμενη πολιτική v2.',
     NO_TARGET_CANDIDATE: 'Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
     NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS:
         'Βρέθηκε μη προγραμματισμένη εργασία με κάρτες, αλλά όχι αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.',
@@ -4721,9 +4721,9 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                         )}
                     </div>
                     <div class="atomic-repo-transfer-safety-flags">
-                        <span>Μία πρόταση / δύο συνδεδεμένες αλλαγές</span>
-                        <span>Μόνο για έλεγχο</span>
-                        <span>Η πρόταση δεν είναι διαθέσιμη για εφαρμογή στην παρούσα κατάσταση.</span>
+                        <span>Μία απόφαση / δύο συνδεδεμένες αλλαγές</span>
+                        <span>Απαιτείται απόφαση HR</span>
+                        <span>Καμία αλλαγή δεν γίνεται από την προεπισκόπηση.</span>
                     </div>
                 </div>
                 <button
@@ -5558,10 +5558,11 @@ function renderAtomicRepoTransferProjection(projection) {
     const groupSafetyHtml = groups.length ? `
         <div class="atomic-repo-transfer-main-warning">
             <div>Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές και εφαρμόζεται μόνο ως σύνολο.</div>
-            <div>Η πρόταση εμφανίζεται μόνο για έλεγχο. Δεν έχει γίνει καμία αλλαγή στα δεδομένα.</div>
+            <div>Η προεπισκόπηση δεν αλλάζει δεδομένα. Καταγράφεται πρώτα μία ενιαία απόφαση HR.</div>
         </div>
         <div class="atomic-repo-transfer-unavailable">
-            Η εφαρμογή της πρότασης δεν είναι ακόμη διαθέσιμη.
+            Η ενέργεια εφαρμογής εμφανίζεται μόνο μετά από έγκριση και μόνο όταν ο server
+            επιβεβαιώσει ότι επιτρέπεται η ασφαλής εφαρμογή.
         </div>
     ` : '';
     const reviewSafetyHtml = reviewOutcomes.length ? `
@@ -5579,7 +5580,7 @@ function renderAtomicRepoTransferProjection(projection) {
                         <div class="fw-semibold" id="atomicRepoTransferTitle">
                             ${groups.length ? 'Προτάσεις Μεταφοράς Ρεπό' : 'Έλεγχος Μεταφοράς Ρεπό'}
                         </div>
-                        <span class="atomic-repo-transfer-readonly-badge">Μόνο για έλεγχο</span>
+                        <span class="atomic-repo-transfer-readonly-badge">Ροή έγκρισης HR</span>
                     </div>
                     ${groupSafetyHtml}
                     ${reviewSafetyHtml}
