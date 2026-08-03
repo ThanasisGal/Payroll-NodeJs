@@ -80,7 +80,7 @@ function partTimeWeek() {
     return rows;
 }
 
-function build(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }, contexts = {}) {
+function build(rows, profile = { typos_apasxolhshs: 'PLHRHS'}, contexts = {}) {
     return buildWeeklyRepoTransferSinglePairGroupProjection({
         weekRows: rows,
         employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
@@ -196,8 +196,7 @@ function testValidFullTimeProjection() {
 
 function testValidPartTimeProjection() {
     const result = build(partTimeWeek(), {
-        typos_apasxolhshs: 'MERIKH',
-        mhniaia_repo: 2
+        typos_apasxolhshs: 'MERIKH'
     });
     assertReady(result);
     const group = result.groups[0];
@@ -275,7 +274,7 @@ function testSplitShiftIntervalsArePreservedInProjection() {
     });
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: twoIntervalRows,
-        employmentProfile: { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+        employmentProfile: { typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5 }
     });
     const twoIntervalResult = build(twoIntervalRows);
     assertReady(twoIntervalResult);
@@ -351,7 +350,7 @@ function testSplitShiftIntervalsArePreservedInProjection() {
 
 function testNonReadyProposalPaths() {
     assertNotAvailable(
-        build(fullTimeWeek(), { typos_apasxolhshs: 'EK_PERITROPHS', mhniaia_repo: 2 }),
+        build(fullTimeWeek(), { typos_apasxolhshs: 'EK_PERITROPHS'}),
         'ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED'
     );
 
@@ -370,9 +369,7 @@ function testNonReadyProposalPaths() {
     const deficit = fullTimeWeek();
     deficit[6] = workRow(6);
     const sixthDayResolution = build(deficit, {
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        pososto_prosayxhshs_6hs_hmeras: 0,
+        typos_apasxolhshs: 'PLHRHS', pososto_prosayxhshs_6hs_hmeras: 0,
         eidikh_kathgoria_ergazomenoy: '0009'
     });
     assert.strictEqual(sixthDayResolution.projection_status, 'READY');
@@ -385,7 +382,7 @@ function testNonReadyProposalPaths() {
         1
     );
     assert.strictEqual(
-        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 })
+        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS'})
             .projection_status,
         'READY'
     );
@@ -427,7 +424,7 @@ function deepFreezeFixture(value) {
 
 function testInputImmutability() {
     const rows = fullTimeWeek();
-    const profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 };
+    const profile = { typos_apasxolhshs: 'PLHRHS'};
     const holidayByDateKey = new Map([[dateKey(0), null]]);
     const existingAuditCountByRowKey = { [dateKey(0)]: 0 };
     const before = JSON.stringify({ rows, profile, existingAuditCountByRowKey });
@@ -448,9 +445,7 @@ function testInputImmutability() {
 
     const frozenRows = deepFreezeFixture(fullTimeWeek());
     const frozenProfile = deepFreezeFixture({
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        hmeres_ergasias_ebdomadas: 5
+        typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
     });
     const frozenHoliday = deepFreezeFixture(new Map([[dateKey(0), null]]));
     const frozenAudit = deepFreezeFixture({});
@@ -468,7 +463,7 @@ function testOutputOwnershipAndFreeze() {
     const rows = fullTimeWeek();
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+        employmentProfile: { typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5 }
     });
     const result = build(rows);
     const group = result.groups[0];

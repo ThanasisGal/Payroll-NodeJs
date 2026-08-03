@@ -3,7 +3,8 @@ const {
     POLICY_VERSION,
     STATUS,
     normalizeLegacyDeviation,
-    buildWeeklyRepoDeviationPreview
+    buildWeeklyRepoDeviationPreview,
+    attachSixthDayPresentationToRows
 } = require('./apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
     analyzeWeeklyRepoTransferForEmploymentContract
@@ -117,15 +118,11 @@ function testContractualProfileControlsExpectedRepo() {
             expectedWeeklyRepo: 99,
             repoResolutionReason: null,
             effectiveProfile: {
-                hmeres_ergasias_ebdomadas: 4,
-                raw_mhniaia_repo: 2
+                hmeres_ergasias_ebdomadas: 4
             }
         })
     });
     assert.strictEqual(fourDay.deviations[0].expected_repo, 3);
-    assert.strictEqual(fourDay.deviations[0].raw_mhniaia_repo, 2);
-    assert.strictEqual(fourDay.deviations[0].derived_mhniaia_repo, 3);
-    assert.strictEqual(fourDay.deviations[0].mhniaia_repo_conflicts_with_contract, true);
 
     const changed = buildWeeklyRepoDeviationPreview({
         rows: rows('2026-06-15'),
@@ -230,14 +227,13 @@ function testLegacyPersistedRangeIsExplicit() {
 
 function testDeviationAndAtomicUseTheSameContractSelector() {
     const profiles = [
-        { typos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5, mhniaia_repo: 2 },
-        { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6, mhniaia_repo: 1 },
-        { typos_apasxolhshs: 'EK_PERITROPHS', hmeres_ergasias_ebdomadas: 6, mhniaia_repo: 1 },
+        { typos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5 },
+        { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 },
+        { typos_apasxolhshs: 'EK_PERITROPHS', hmeres_ergasias_ebdomadas: 6 },
         {
             typos_apasxolhshs: 'MERIKH',
             hmeres_ergasias_ebdomadas: 3,
-            mo_oron_hmerhsias_ergasias: 4,
-            mhniaia_repo: 4
+            mo_oron_hmerhsias_ergasias: 4
         }
     ];
     const capturedVersions = [];
@@ -272,7 +268,7 @@ function testDeviationAndAtomicUseTheSameContractSelector() {
             periodEnd: '2026-06-30',
             asOfDate: '2026-06-30',
             resolveWeeklyProfile: () => ({
-                expectedWeeklyRepo: profile.mhniaia_repo,
+                expectedWeeklyRepo: 7 - profile.hmeres_ergasias_ebdomadas,
                 effectiveProfile: profile
             })
         });
@@ -337,7 +333,6 @@ function testSixthDaySurvivesMissingRepoTransferSource() {
     const profile = {
         hmeres_ergasias_ebdomadas: 5,
         typos_apasxolhshs: '0',
-        mhniaia_repo: 2,
         pososto_prosayxhshs_6hs_hmeras: 40
     };
     const preview = buildWeeklyRepoDeviationPreview({
@@ -358,6 +353,7 @@ function testSixthDaySurvivesMissingRepoTransferSource() {
     assert.strictEqual(deviation.sixth_day_count, 1);
     assert.strictEqual(deviation.seventh_day_count, 0);
     assert.strictEqual(deviation.sixth_day_date, '2026-06-07');
+    assert.strictEqual(deviation.sixth_day_premium_rate, 40);
 }
 
 function testDeviationAndAtomicContextParity() {
@@ -469,6 +465,31 @@ function testDeviationAndAtomicContextParity() {
     }
 }
 
+function testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow() {
+    const reviewRows = attachSixthDayPresentationToRows(
+        [
+            { kodikos: '0006', hmeromhnia: '2026-06-05' },
+            { kodikos: '0006', hmeromhnia: '2026-06-06' },
+            { kodikos: '0007', hmeromhnia: '2026-06-06' }
+        ],
+        [
+            {
+                kodikos: '0006',
+                sixth_day_date: '2026-06-06',
+                sixth_day_premium_rate: 0,
+                sixth_seventh_day_status: 'READY'
+            }
+        ]
+    );
+
+    assert.strictEqual(reviewRows[0].is_sixth_day, false);
+    assert.strictEqual(reviewRows[0].sixth_day_premium_rate, null);
+    assert.strictEqual(reviewRows[1].is_sixth_day, true);
+    assert.strictEqual(reviewRows[1].sixth_day_premium_rate, 0);
+    assert.strictEqual(reviewRows[1].sixth_day_policy_status, 'READY');
+    assert.strictEqual(reviewRows[2].is_sixth_day, false);
+}
+
 testSundayAndMondayUseDifferentBuckets();
 testCompletedMondaySundayRanges();
 testContractualProfileControlsExpectedRepo();
@@ -478,5 +499,6 @@ testLegacyPersistedRangeIsExplicit();
 testDeviationAndAtomicUseTheSameContractSelector();
 testDeviationAndAtomicContextParity();
 testSixthDaySurvivesMissingRepoTransferSource();
+testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow();
 
 console.log('weekly repo deviation Monday-Sunday preview tests passed');

@@ -65,9 +65,7 @@ function dependencies(rows, decisions = [], executions = []) {
         energos: true,
         archived: false,
         kathestos_apasxolhshs: 'PLHRHS',
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        hmeres_ergasias_ebdomadas: 5,
+        typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5,
         mo_oron_hmerhsias_ergasias: 8
     }));
     return {

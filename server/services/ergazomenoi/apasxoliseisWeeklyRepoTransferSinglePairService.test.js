@@ -114,7 +114,7 @@ function autoLeavePriorityWeek() {
     return rows;
 }
 
-function analyze(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }, contexts = {}) {
+function analyze(rows, profile = { typos_apasxolhshs: 'PLHRHS'}, contexts = {}) {
     return analyzeWeeklyRepoTransferSinglePair({
         weekRows: rows,
         employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
@@ -171,7 +171,7 @@ function testValidFullTimeTargetBeforeSource() {
 
 function testValidPartTimeAndCountsMeAndAnAsRepo() {
     const rows = partTimeWeek();
-    const result = analyze(rows, { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 });
+    const result = analyze(rows, { typos_apasxolhshs: 'MERIKH'});
     assertEligible(result, dateKey(2), dateKey(4), 'ΜΕ');
     assert.strictEqual(result.counts.existing_actual_repo, 1);
 
@@ -182,15 +182,14 @@ function testValidPartTimeAndCountsMeAndAnAsRepo() {
         cards_apo_ora_01: '',
         cards_eos_ora_01: ''
     });
-    const withAn = analyze(rows, { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 });
+    const withAn = analyze(rows, { typos_apasxolhshs: 'MERIKH'});
     assertReason(withAn, 'REPO_LIMIT_EXCEEDED');
     assert.strictEqual(withAn.counts.existing_actual_repo, 2);
 }
 
 function testRotationalIsNotApplicable() {
     const result = analyze(fullTimeWeek(), {
-        typos_apasxolhshs: 'EK_PERITROPHS',
-        mhniaia_repo: 2
+        typos_apasxolhshs: 'EK_PERITROPHS'
     });
     assert.strictEqual(result.eligibility_status, 'NOT_APPLICABLE');
     assertReason(result, 'ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED');
@@ -385,7 +384,7 @@ function testExactRepoCount() {
     assert.strictEqual(deficit.employee.repo_resolution_source, 'CONTRACTUAL_WEEKLY_WORKDAYS');
     assert.strictEqual(deficit.counts.predicted_final_repo, 1);
 
-    const excess = analyze(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 });
+    const excess = analyze(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS'});
     assert.strictEqual(excess.eligibility_status, 'ELIGIBLE');
     assert.strictEqual(excess.counts.predicted_final_repo, 2);
 }
@@ -459,9 +458,7 @@ function testBlankZeroUnscheduledProductionSourceRegression() {
 
     const before = JSON.stringify(rows);
     const result = analyze(rows, {
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        mo_oron_hmerhsias_ergasias: 8,
+        typos_apasxolhshs: 'PLHRHS', mo_oron_hmerhsias_ergasias: 8,
         external_break_minutes: 30
     });
 
@@ -621,9 +618,7 @@ function testRealShapeOptionalHolidayAndAutoSourceFixture() {
     const result = analyze(
         rows,
         {
-            typos_apasxolhshs: 'PLHRHS',
-            mhniaia_repo: 2,
-            mo_oron_hmerhsias_ergasias: 8,
+            typos_apasxolhshs: 'PLHRHS', mo_oron_hmerhsias_ergasias: 8,
             external_break_minutes: 30
         },
         optionalHolidayContext('2026-06-02', true, 'Αγίου Πνεύματος')
@@ -663,9 +658,7 @@ function testNonHolidayAutoSourceFixture() {
         apologistiko_biblio: true
     });
     const profile = {
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        mo_oron_hmerhsias_ergasias: 8,
+        typos_apasxolhshs: 'PLHRHS', mo_oron_hmerhsias_ergasias: 8,
         external_break_minutes: 30
     };
     assertEligible(analyze(rows, profile), '2026-06-16', '2026-06-20', 'ΑΝ');
@@ -856,8 +849,7 @@ function testAutoCalculatedLeaveWithTwoTargetsNeedsReview() {
 function testSixDayRepoLimitWithExistingRepoIsExceeded() {
     const result = analyze(autoLeavePriorityWeek(), {
         typos_apasxolhshs: 'PLHRHS',
-        hmeres_ergasias_ebdomadas: 6,
-        mhniaia_repo: 1
+        hmeres_ergasias_ebdomadas: 6
     });
     assertReason(result, 'REPO_LIMIT_EXCEEDED');
     assert.strictEqual(result.counts.existing_actual_repo, 1);
@@ -869,8 +861,7 @@ function testValidSixDayFullTimeRemainsV1RepoTransfer() {
     rows[6] = workRow(6);
     const result = analyze(rows, {
         typos_apasxolhshs: 'PLHRHS',
-        hmeres_ergasias_ebdomadas: 6,
-        mhniaia_repo: 1
+        hmeres_ergasias_ebdomadas: 6
     });
     assertEligible(result, dateKey(1), dateKey(4), 'ΑΝ');
     assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
@@ -902,14 +893,7 @@ function testSplitShiftPrioritySourceRemainsSupported() {
 }
 
 function testInvalidRepoLimits() {
-    [1.5, 'invalid'].forEach((mhniaiaRepo) => {
-        const result = analyze(fullTimeWeek(), {
-            typos_apasxolhshs: 'PLHRHS',
-            mhniaia_repo: mhniaiaRepo
-        });
-        assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-    });
-    [0, undefined].forEach((weeklyWorkdays) => {
+    [0, undefined, 1.5, 'invalid'].forEach((weeklyWorkdays) => {
         const result = analyze(fullTimeWeek(), {
             typos_apasxolhshs: 'PLHRHS',
             hmeres_ergasias_ebdomadas: weeklyWorkdays
@@ -950,9 +934,7 @@ function testInvalidWeekInputs() {
 function testInputImmutability() {
     const weekRows = fullTimeWeek();
     const employmentProfile = {
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        source: 'ISTORIKO',
+        typos_apasxolhshs: 'PLHRHS', source: 'ISTORIKO',
         profile_changed_inside_week: true
     };
     const holidayByDateKey = { [dateKey(0)]: null };
@@ -999,9 +981,7 @@ function testResultMetadataIsPrimitiveAndInputIsUnfrozen() {
     const rows = fullTimeWeek();
     rows[1]._id = inputId;
     const result = analyze(rows, {
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        effective_date: effectiveDate,
+        typos_apasxolhshs: 'PLHRHS', effective_date: effectiveDate,
         istorikoId: historyId
     });
 
@@ -1024,39 +1004,17 @@ function testResultMetadataIsPrimitiveAndInputIsUnfrozen() {
     assert.strictEqual(Object.isFrozen(arbitraryId), false);
 }
 
-function testRepoLimitResultNormalizationDoesNotFreezeInvalidInputs() {
-    const invalidRepoValues = [
-        { value: 2 },
-        [],
-        new Date('2026-07-01T00:00:00.000Z'),
-        { valueOf() { return 2; } }
-    ];
-
-    invalidRepoValues.forEach((invalidRepoValue) => {
+function testExpectedRepoComesOnlyFromContractualWeeklyWorkdays() {
+    for (const workdays of [5, 6]) {
         const result = analyze(fullTimeWeek(), {
             typos_apasxolhshs: 'PLHRHS',
-            mhniaia_repo: invalidRepoValue
+            hmeres_ergasias_ebdomadas: workdays
         });
-        assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-        assert.strictEqual(result.employee.mhniaia_repo, 2);
-        assert.notStrictEqual(result.employee.mhniaia_repo, invalidRepoValue);
-        assert.strictEqual(Object.isFrozen(invalidRepoValue), false);
-    });
-
-    [1, 2].forEach((repoLimit) => {
-        const rows = repoLimit === 1
-            ? (() => {
-                  const value = fullTimeWeek();
-                  value[6] = workRow(6);
-                  return value;
-              })()
-            : fullTimeWeek();
-        const result = analyze(rows, {
-            typos_apasxolhshs: 'PLHRHS',
-            mhniaia_repo: repoLimit
-        });
-        assert.strictEqual(result.employee.mhniaia_repo, 2);
-    });
+        assert.strictEqual(
+            result.employee.effective_expected_weekly_repo,
+            7 - workdays
+        );
+    }
 }
 
 function testIdNormalizationUsesOnlySafeSupportedForms() {
@@ -1100,9 +1058,7 @@ function testIdNormalizationUsesOnlySafeSupportedForms() {
 function testDeepFrozenInputsRemainSupported() {
     const weekRows = deepFreezeFixture(fullTimeWeek());
     const employmentProfile = deepFreezeFixture({
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        hmeres_ergasias_ebdomadas: 5,
+        typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5,
         source: 'ISTORIKO'
     });
     const holidayByDateKey = deepFreezeFixture({});
@@ -1163,7 +1119,7 @@ function run() {
     testInvalidWeekInputs();
     testInputImmutability();
     testResultMetadataIsPrimitiveAndInputIsUnfrozen();
-    testRepoLimitResultNormalizationDoesNotFreezeInvalidInputs();
+    testExpectedRepoComesOnlyFromContractualWeeklyWorkdays();
     testIdNormalizationUsesOnlySafeSupportedForms();
     testDeepFrozenInputsRemainSupported();
     testDeterminismAcrossInputOrder();

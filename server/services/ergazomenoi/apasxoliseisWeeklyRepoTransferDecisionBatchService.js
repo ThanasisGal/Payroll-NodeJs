@@ -231,8 +231,6 @@ async function loadWeeklyRepoTransferDecisionBatch({
             const effective = profileInfo.effectiveProfile || {};
             const profile = {
                 typos_apasxolhshs: effective.typos_apasxolhshs || '',
-                mhniaia_repo: effective.mhniaia_repo,
-                raw_mhniaia_repo: effective.raw_mhniaia_repo,
                 pososto_prosayxhshs_6hs_hmeras:
                     effective.pososto_prosayxhshs_6hs_hmeras,
                 hmeres_ergasias_ebdomadas: effective.hmeres_ergasias_ebdomadas,

@@ -31,7 +31,7 @@ function models({ employees, audits = [], history = [] }) {
         }
     };
 }
-const employee = { _id: new mongoose.Types.ObjectId(), kodikos: '0001', ypokatasthma: '0000', energos: true, archived: false, kathestos_apasxolhshs: '0', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
+const employee = { _id: new mongoose.Types.ObjectId(), kodikos: '0001', ypokatasthma: '0000', energos: true, archived: false, kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
 const holidayContextBuilder = async () => ({ companyFlags: { apasxolhsh_kata_tis_argies: false, leitoyrgia_stis_mh_ypoxreotikes_argies: false }, company_kodikos: '0004', argiesByDateKey: new Map() });
 const scope = { team: 'THA', company_kod: 'company-id', company_kodikos: '0004', year: '2026' };
 
@@ -41,42 +41,39 @@ async function run() {
     assert.strictEqual(context.weekRows.length, 7);
     assert.strictEqual(context.employee, employee);
     assert.strictEqual(context.employmentProfile.profile_source, 'ERG_AKTUAL');
-    assert.strictEqual(context.employmentProfile.raw_mhniaia_repo, 2);
     assert.strictEqual(String(context.audits[0].prodhlomena_oraria_id), String(sourceId));
     assert.strictEqual(configured.log.prodFilters[0].team, 'THA');
     assert.strictEqual(configured.log.prodFilters[1].ypokatasthma, '0000');
     assert.ok(configured.log.selects.includes(ROW_FIELDS.join(' ')));
 
-    const rawEmployee = { ...employee, mhniaia_repo: 3, hmeres_ergasias_ebdomadas: 4 };
-    const employeeRawContext = await defaultContextLoader({
+    const fourDayEmployee = { ...employee, hmeres_ergasias_ebdomadas: 4 };
+    const employeeFourDayContext = await defaultContextLoader({
         scope,
         sourceId: String(sourceId),
         targetId: String(targetId),
-        models: models({ employees: [rawEmployee] }).value,
+        models: models({ employees: [fourDayEmployee] }).value,
         holidayContextBuilder
     });
-    assert.strictEqual(employeeRawContext.employmentProfile.mhniaia_repo, 0);
-    assert.strictEqual(employeeRawContext.employmentProfile.raw_mhniaia_repo, 3);
+    assert.strictEqual(employeeFourDayContext.employmentProfile.hmeres_ergasias_ebdomadas, 4);
 
     const historyRawContext = await defaultContextLoader({
         scope,
         sourceId: String(sourceId),
         targetId: String(targetId),
         models: models({
-            employees: [rawEmployee],
+            employees: [fourDayEmployee],
             history: [{
                 _id: new mongoose.Types.ObjectId(),
                 afora_allagh_oron_ergasias: true,
                 hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-06-01T00:00:00Z'),
                 kathestos_apasxolhshs: '0',
-                mhniaia_repo: 4,
                 hmeres_ergasias_ebdomadas: 4
             }]
         }).value,
         holidayContextBuilder
     });
     assert.strictEqual(historyRawContext.employmentProfile.profile_source, 'ISTORIKO');
-    assert.strictEqual(historyRawContext.employmentProfile.raw_mhniaia_repo, 4);
+    assert.strictEqual(historyRawContext.employmentProfile.hmeres_ergasias_ebdomadas, 4);
 
     for (const employees of [[], [employee, { ...employee, _id: new mongoose.Types.ObjectId() }], [{ ...employee, ypokatasthma: '0001' }]]) {
         await assert.rejects(() => defaultContextLoader({ scope, sourceId: String(sourceId), targetId: String(targetId), models: models({ employees }).value, holidayContextBuilder }), (error) => error.statusCode === 409);

@@ -178,6 +178,24 @@ function testWeeklyResolutionShowsRepoAndSixthDayFacts() {
     assert.ok(html.includes('<strong>6</strong>'));
 }
 
+function testSixthDayCardsBadgeShowsApplicableRate() {
+    assertContains(
+        sandbox.renderSixthDayCardsBadge({
+            is_sixth_day: true,
+            sixth_day_premium_rate: 10
+        }),
+        ['6η ημέρα · 10%']
+    );
+    assertContains(
+        sandbox.renderSixthDayCardsBadge({
+            is_sixth_day: true,
+            sixth_day_premium_rate: 0
+        }),
+        ['6η ημέρα · 0%']
+    );
+    assert.strictEqual(sandbox.renderSixthDayCardsBadge({}), '');
+}
+
 function getVisibleText(html) {
     return String(html || '')
         .replace(/<[^>]*>/g, ' ')
@@ -1189,7 +1207,6 @@ function testDiagnostics() {
         INCOMPLETE_EMPLOYEE_WEEK: 5,
         ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED: 4,
         NO_TARGET_CANDIDATE: 3,
-        INVALID_MHNIAIA_REPO: 2,
         MULTIPLE_SOURCE_CANDIDATES: 1
     };
     projection.warning_counts = { TARGET_ZERO_HOURS_WITH_CARD_INTERVALS: 1 };
@@ -1205,7 +1222,6 @@ function testDiagnostics() {
         '5 περιπτώσεις: Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
         '4 περιπτώσεις: Η εκ περιτροπής απασχόληση δεν υποστηρίζεται ακόμη από την αυτόματη διαδικασία.',
         '3 περιπτώσεις: Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
-        '2 περιπτώσεις: Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
         '1 περίπτωση: Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
         'μηδενικές συνολικές ώρες αλλά περιέχει στοιχεία καρτών'
     ]);
@@ -1223,7 +1239,6 @@ function testDiagnostics() {
         '5 περιπτώσεις:',
         '4 περιπτώσεις:',
         '3 περιπτώσεις:',
-        '2 περιπτώσεις:',
         '1 περίπτωση:'
     ];
     orderedLabels.reduce((previousIndex, label) => {
@@ -2396,6 +2411,7 @@ async function testHrLoadingLocksAndRestoresFilters() {
 
 const tests = [
     testWeeklyResolutionShowsRepoAndSixthDayFacts,
+    testSixthDayCardsBadgeShowsApplicableRate,
     testPersistedRepoCategoryOverridesDerivedLeave,
     testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation,
     testContractualEmploymentTypeWinsOverOperationalPhaseForRestDisplay,

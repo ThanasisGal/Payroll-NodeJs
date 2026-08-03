@@ -33,6 +33,7 @@ function analyze(hours, profile = {}, hourlyRate = 10) {
 let result = analyze([4, 4, 4, 4, 4, 7, 0]);
 assert.strictEqual(result.status, 'READY');
 assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
+assert.strictEqual(result.sixthDay.premiumRate, 40);
 assert.strictEqual(result.sixthDay.value, 98);
 assert.strictEqual(result.sixthDay.baseAmount, 70);
 assert.strictEqual(result.sixthDay.premiumAmount, 28);
@@ -157,10 +158,12 @@ result = analyzeWeeklySixthSeventhDay({
 assert.strictEqual(result.status, 'READY');
 assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
 
-assert.strictEqual(analyze([7, 7, 7, 7, 7, 7, 0], {
+result = analyze([7, 7, 7, 7, 7, 7, 0], {
     pososto_prosayxhshs_6hs_hmeras: 0,
     eidikh_kathgoria_ergazomenoy: '0009'
-}).sixthDay.value, 70);
+});
+assert.strictEqual(result.sixthDay.value, 70);
+assert.strictEqual(result.sixthDay.premiumRate, 0);
 result = analyze([7, 7, 7, 7, 7, 7, 0], {
     pososto_prosayxhshs_6hs_hmeras: 0,
     eidikh_kathgoria_ergazomenoy: '0001'
@@ -173,6 +176,7 @@ for (const rate of [null, '', -1, 'invalid']) {
     assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
     assert.ok(result.reasons.includes('MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
     assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
+    assert.strictEqual(result.sixthDay.premiumRate, null);
     assert.strictEqual(result.sixthDay.value, null);
 }
 

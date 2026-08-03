@@ -1088,6 +1088,21 @@ function renderReviewDateCell(row = {}) {
     return `<div>${formattedDate}</div><span class="review-holiday-description-badge"${titleAttribute}>${escapeHtml(description)}</span>`;
 }
 
+function renderSixthDayCardsBadge(row = {}) {
+    if (row.is_sixth_day !== true) return '';
+
+    const rawRate = row.sixth_day_premium_rate;
+    const parsedRate =
+        rawRate === null || rawRate === undefined || String(rawRate).trim() === ''
+            ? null
+            : Number(String(rawRate).replace(',', '.'));
+    const rateLabel = Number.isFinite(parsedRate)
+        ? `${String(parsedRate).replace('.', ',')}%`
+        : 'ποσοστό εκκρεμεί';
+
+    return `<span class="badge text-bg-warning d-block mt-1 review-sixth-day-badge">6η ημέρα · ${escapeHtml(rateLabel)}</span>`;
+}
+
 function employeeGroupKey(row) {
     // return [row.ypokatasthma || '', row.kodikos || ''].join('|');
     return String(row.kodikos || '').trim();
@@ -1880,7 +1895,6 @@ function renderDeviationProfileCell(dev) {
     const effectiveRepo =
         dev.effective_expected_repo ??
         dev.expected_repo ??
-        dev.effective_mhniaia_repo ??
         '';
     const weeklyWorkdays = Number(dev.effective_weekly_workdays || 0);
     const effectiveType = employmentTypeLabel(dev.effective_typos_apasxolhshs);
@@ -1893,7 +1907,6 @@ function renderDeviationProfileCell(dev) {
             ${hasReadableEmploymentType ? `<div>${escapeHtml(effectiveType)}</div>` : ''}
             ${weeklyWorkdays ? `<small class="text-muted d-block">Συμβατικές ημέρες εργασίας: ${escapeHtml(weeklyWorkdays)}</small>` : ''}
             <small class="text-muted">Αναμενόμενες ημέρες μη εργασίας: ${escapeHtml(effectiveRepo)}</small>
-            ${dev.mhniaia_repo_conflicts_with_contract ? `<div class="small text-warning-emphasis">Το mhniaia_repo (${escapeHtml(dev.raw_mhniaia_repo ?? '-')}) δεν συμφωνεί με το συμβατικό προφίλ.</div>` : ''}
         `;
     }
 
@@ -1902,7 +1915,6 @@ function renderDeviationProfileCell(dev) {
         ${hasReadableEmploymentType ? `<div>${escapeHtml(effectiveType)}</div>` : ''}
         ${weeklyWorkdays ? `<div>${escapeHtml(weeklyWorkdays)} συμβατικές ημέρες εργασίας</div>` : ''}
         <div>${escapeHtml(effectiveRepo)} αναμενόμενες ημέρες μη εργασίας</div>
-        ${dev.mhniaia_repo_conflicts_with_contract ? `<div class="small text-warning-emphasis">Το mhniaia_repo (${escapeHtml(dev.raw_mhniaia_repo ?? '-')}) δεν συμφωνεί με το συμβατικό προφίλ.</div>` : ''}
         ${
             effectiveDate
                 ? `<small class="text-muted">Ισχύει από: ${escapeHtml(effectiveDate)}</small>`
@@ -1932,7 +1944,7 @@ function renderDeviationNoteCell(dev) {
     if (dev.profile_changed_inside_week) {
         const excessRepo =
             Number(dev.actual_repo ?? dev.pragmatikaRepo ?? 0) -
-            Number(dev.expected_repo ?? dev.mhniaia_repo ?? 0);
+            Number(dev.expected_repo ?? 0);
         const excessText =
             excessRepo > 0
                 ? `<div>Πλεονάζοντα ρεπό: <strong>${escapeHtml(excessRepo)}</strong></div>`
@@ -2023,7 +2035,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                 >
                     <td>${formatDate(dev.week_apo || dev.weekStart)}</td>
                     <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
-                    <td class="text-end">${escapeHtml(dev.expected_repo ?? dev.mhniaia_repo ?? '-')}</td>
+                    <td class="text-end">${escapeHtml(dev.expected_repo ?? '-')}</td>
                     <td class="text-end fw-bold">${escapeHtml(dev.actual_repo ?? dev.pragmatikaRepo ?? '-')}</td>
                     <td class="text-end">${escapeHtml(dev.resolved_repo ?? dev.actual_repo ?? '-')}</td>
                     <td class="text-end">${escapeHtml(dev.actual_workdays ?? '-')}</td>
@@ -2537,7 +2549,10 @@ function renderReviewRows(rows = [], deviations = []) {
             <td>${row.ypokatasthma || ''}</td>
             <td>${row.kodikos || ''}</td>
             <td${tdClass(rowPresentation.declared.className)}>${rowPresentation.declared.text}</td>
-            <td>${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}</td>
+            <td>
+                ${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}
+                ${renderSixthDayCardsBadge(row)}
+            </td>
             <td${tdClass(rowPresentation.apologistiko.className)}>
                 ${rowPresentation.apologistiko.text}
                 ${renderScenarioBadge(row, rowPresentation.badgeState)}
@@ -4402,7 +4417,6 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
     NO_TARGET_CANDIDATE: 'Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
     NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS:
         'Βρέθηκε μη προγραμματισμένη εργασία με κάρτες, αλλά όχι αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.',
-    INVALID_MHNIAIA_REPO: 'Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
     INVALID_EFFECTIVE_WEEKLY_WORKDAYS:
         'Δεν είναι δυνατό να επιβεβαιωθεί αν η σύμβαση προβλέπει πενθήμερη ή εξαήμερη εργασία.',
     PROFILE_CHANGED_INSIDE_WEEK:

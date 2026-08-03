@@ -693,7 +693,6 @@ function buildResult({
             company_kod: normalizePrimitiveString(employee.company_kod),
             kodikos: normalizePrimitiveString(employee.kodikos),
             typos_apasxolhshs: normalizePrimitiveString(employee.typos_apasxolhshs),
-            mhniaia_repo: normalizeRepoLimitForResult(employee.mhniaia_repo),
             effective_expected_weekly_repo:
                 normalizeRepoLimitForResult(employee.effective_expected_weekly_repo),
             repo_resolution_source:
@@ -753,7 +752,6 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         week: {},
         employee: {
             typos_apasxolhshs: normalizeEmploymentType(profile.typos_apasxolhshs),
-            mhniaia_repo: profile.mhniaia_repo,
             profile_source: profile.source,
             profile_istoriko_id: profile.istorikoId,
             profile_effective_date:
@@ -840,7 +838,6 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
             reasons: ['INVALID_EFFECTIVE_EXPECTED_WEEKLY_REPO']
         });
     }
-    base.employee.mhniaia_repo = repoLimit;
     base.employee.effective_expected_weekly_repo = repoLimit;
     base.employee.repo_resolution_source = repoResolution.repoResolutionSource;
     base.employee.scheduled_work_days = repoResolution.scheduledWorkDays;
@@ -1185,7 +1182,6 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
     };
     if (
         establishedResult.eligibility_status === ELIGIBILITY_STATUS.INVALID_INPUT ||
-        establishedResult.reasons.includes('INVALID_EXPLICIT_MHNIAIA_REPO') ||
         establishedResult.reasons.includes('INVALID_EFFECTIVE_WEEKLY_WORKDAYS')
     ) {
         return deepFreeze(common);

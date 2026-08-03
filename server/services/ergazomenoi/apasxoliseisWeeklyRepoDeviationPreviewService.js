@@ -34,6 +34,33 @@ function employeeKey(row = {}) {
     return `${String(row.ypokatasthma || '').trim()}|${String(row.kodikos || '').trim()}`;
 }
 
+function attachSixthDayPresentationToRows(rows = [], deviations = []) {
+    const sixthDayByEmployeeAndDate = new Map();
+    for (const deviation of Array.isArray(deviations) ? deviations : []) {
+        const deviationEmployeeKey = employeeKey(deviation);
+        const sixthDayDate = dateKeyUtc(deviation?.sixth_day_date);
+        if (!deviationEmployeeKey || !sixthDayDate) continue;
+
+        sixthDayByEmployeeAndDate.set(`${deviationEmployeeKey}|${sixthDayDate}`, {
+            rate: deviation.sixth_day_premium_rate ?? null,
+            status: deviation.sixth_seventh_day_status || ''
+        });
+    }
+
+    return (Array.isArray(rows) ? rows : []).map((row) => {
+        const sixthDay = sixthDayByEmployeeAndDate.get(
+            `${employeeKey(row)}|${dateKeyUtc(row?.hmeromhnia)}`
+        );
+
+        return {
+            ...row,
+            is_sixth_day: Boolean(sixthDay),
+            sixth_day_premium_rate: sixthDay?.rate ?? null,
+            sixth_day_policy_status: sixthDay?.status || ''
+        };
+    });
+}
+
 function isEffectiveRepo(row = {}, isFullTimeProfile = () => true) {
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
@@ -245,6 +272,8 @@ function buildWeeklyRepoDeviationPreview({
                 sixth_day_count: sixthSeventhDay.sixthDay ? 1 : 0,
                 seventh_day_count: sixthSeventhDay.seventhDay ? 1 : 0,
                 sixth_day_date: sixthSeventhDay.sixthDay?.hmeromhnia || null,
+                sixth_day_premium_rate:
+                    sixthSeventhDay.sixthDay?.premiumRate ?? null,
                 seventh_day_date: sixthSeventhDay.seventhDay?.hmeromhnia || null,
                 sixth_seventh_day_status: sixthSeventhDay.status,
                 sixth_seventh_day_reasons: [...(sixthSeventhDay.reasons || [])],
@@ -265,14 +294,6 @@ function buildWeeklyRepoDeviationPreview({
                     expectedRepoResolution.effectiveWeeklyWorkdays,
                 expected_repo_source:
                     expectedRepoResolution.repoResolutionSource,
-                raw_mhniaia_repo:
-                    expectedRepoResolution.rawMhniaiaRepo,
-                derived_mhniaia_repo:
-                    expectedRepoResolution.derivedMhniaiaRepo,
-                mhniaia_repo_conflicts_with_contract:
-                    expectedRepoResolution.mhniaiaRepoConflictsWithContract === true,
-                // Legacy alias retained only so old review/export consumers remain readable.
-                effective_mhniaia_repo: expectedRepo,
                 effective_typos_apasxolhshs:
                     weeklyProfile.effectiveProfile?.typos_apasxolhshs || '',
                 effective_profile_source:
@@ -299,5 +320,6 @@ module.exports = {
     SOURCE_VERSION,
     STATUS,
     normalizeLegacyDeviation,
+    attachSixthDayPresentationToRows,
     buildWeeklyRepoDeviationPreview
 };

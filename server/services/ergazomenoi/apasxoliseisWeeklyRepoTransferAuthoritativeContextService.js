@@ -26,7 +26,7 @@ const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
 const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     '_id kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
-    'mhniaia_repo pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
+    'pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
     'nomimoOromisthio pragmatikoOromisthio ' +
     'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
     'dialleima_entos_ektos_orarioy dialleima_se_lepta';
@@ -36,7 +36,7 @@ const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
-    'kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
+    'kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
     'nomimoOromisthio pragmatikoOromisthio ' +
     'employment_profile_source afora_allagh_oron_ergasias createdAt updatedAt';
 
@@ -135,8 +135,7 @@ function profileSignature(profile = {}) {
         String(profile.hmeres_ergasias_ebdomadas ?? ''),
         String(profile.ores_ergasias_ebdomadas ?? ''),
         String(profile.mo_oron_hmerhsias_ergasias ?? ''),
-        String(profile.pososto_prosayxhshs_6hs_hmeras ?? ''),
-        String(profile.raw_mhniaia_repo ?? profile.mhniaia_repo ?? '')
+        String(profile.pososto_prosayxhshs_6hs_hmeras ?? '')
     ].join('|');
 }
 function getProfileDateForDeviation(profile = {}, fallbackDate = null) {

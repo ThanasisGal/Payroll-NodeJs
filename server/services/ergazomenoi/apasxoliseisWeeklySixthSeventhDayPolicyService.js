@@ -105,6 +105,7 @@ function analyzeWeeklySixthSeventhDay({
         ...selected.day,
         sixthDayHours,
         illegalOvertimeHours,
+        premiumRate: null,
         baseAmount: null,
         premiumAmount: null,
         value: null,
@@ -127,6 +128,10 @@ function analyzeWeeklySixthSeventhDay({
             seventhDay
         });
     }
+    const sixthDayWithRate = {
+        ...sixthDayWithoutAmounts,
+        premiumRate
+    };
     const specialCategory = String(
         effectiveProfile.eidikh_kathgoria_ergazomenoy ||
         effectiveProfile.eidikh_periptosh ||
@@ -142,7 +147,7 @@ function analyzeWeeklySixthSeventhDay({
             reasons: ['ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'],
             warnings: classificationWarnings,
             dailyFacts,
-            sixthDay: sixthDayWithoutAmounts,
+            sixthDay: sixthDayWithRate,
             seventhDay
         });
     }
@@ -169,6 +174,7 @@ function analyzeWeeklySixthSeventhDay({
             ...selected.day,
             sixthDayHours,
             illegalOvertimeHours,
+            premiumRate,
             baseAmount,
             premiumAmount,
             value: sixthDayValue,

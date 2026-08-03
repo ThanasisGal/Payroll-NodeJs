@@ -36,9 +36,8 @@ controller/route tests παραμένουν source contracts επειδή η φ�
 
 ## Authoritative expected-repo contract
 
-Το `mhniaia_repo` δεν συμμετέχει στον υπολογισμό της εβδομαδιαίας
-υποχρέωσης. Διατηρείται μόνο ως διαγνωστική/legacy πληροφορία. Για FULL,
-MERIKH και EK_PERITROPHS, όταν το authoritative
+Δεν χρησιμοποιείται ανεξάρτητο πεδίο αναμενόμενων ρεπό. Για FULL, MERIKH
+και EK_PERITROPHS, όταν το authoritative
 `hmeres_ergasias_ebdomadas` είναι ακέραιος από 1 έως 6, ο αναμενόμενος
 αριθμός μη εργάσιμων ημερών είναι:
 
@@ -46,7 +45,7 @@ MERIKH και EK_PERITROPHS, όταν το authoritative
 
 Άρα πενθήμερο profile έχει expected count 2, εξαήμερο 1 και τετραήμερο 3.
 Άκυρες ή ασαφείς συμβατικές ημέρες απορρίπτονται fail-closed χωρίς inference
-από τις εβδομαδιαίες ώρες ή από το `mhniaia_repo`. Το FULL target παραμένει
+από τις εβδομαδιαίες ώρες. Το FULL target παραμένει
 `ΑΝ`, ενώ MERIKH και EK_PERITROPHS χρησιμοποιούν `ΜΕ`.
 
 ## Όρια και ατομικότητα μεταφοράς

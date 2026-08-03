@@ -66,24 +66,15 @@ function resolved(
     expectedRepo,
     source,
     scheduledDays,
-    effectiveWeeklyWorkdays,
-    effectiveProfile = {}
+    effectiveWeeklyWorkdays
 ) {
-    const rawMhniaiaRepo =
-        effectiveProfile.raw_mhniaia_repo ?? effectiveProfile.mhniaia_repo ?? null;
-    const parsedRawMhniaiaRepo = profileInteger(rawMhniaiaRepo);
     return Object.freeze({
         ok: true,
         reason: null,
         effectiveExpectedWeeklyRepo: expectedRepo,
         repoResolutionSource: source,
         scheduledWorkDays: scheduledDays,
-        effectiveWeeklyWorkdays,
-        rawMhniaiaRepo,
-        derivedMhniaiaRepo: expectedRepo,
-        mhniaiaRepoConflictsWithContract:
-            Number.isSafeInteger(parsedRawMhniaiaRepo) &&
-            parsedRawMhniaiaRepo !== expectedRepo
+        effectiveWeeklyWorkdays
     });
 }
 
@@ -110,8 +101,7 @@ function resolveEffectiveExpectedWeeklyRepo({ weekRows = [], effectiveProfile = 
             7 - workdays,
             REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS,
             scheduledDays,
-            workdays,
-            effectiveProfile
+            workdays
         );
     }
     return diagnostic(

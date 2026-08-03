@@ -82,7 +82,7 @@ function partTimeWeek() {
     return rows;
 }
 
-function build(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }, contexts = {}) {
+function build(rows, profile = { typos_apasxolhshs: 'PLHRHS'}, contexts = {}) {
     return buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
         employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
@@ -95,9 +95,7 @@ function buildV2(rows, dependencies = {}) {
     return buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
         employmentProfile: {
-            typos_apasxolhshs: 'MERIKH',
-            mhniaia_repo: 2,
-            hmeres_ergasias_ebdomadas: 5
+            typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5
         },
         contractVersion: 'v2'
     }, dependencies);
@@ -222,8 +220,7 @@ function testValidFullTimeProposal() {
 
 function testValidPartTimeProposal() {
     const result = build(partTimeWeek(), {
-        typos_apasxolhshs: 'MERIKH',
-        mhniaia_repo: 2
+        typos_apasxolhshs: 'MERIKH'
     });
     assertReadyContract(result, dateKey(2), dateKey(4), 'ΜΕ');
     assert.strictEqual(result.items[0].proposed_values.ores_ergasias_apologistika, 4);
@@ -435,9 +432,7 @@ function testSourceProposalPreservesCompatibleCalculatedShapeAndBookFlag() {
     rows[4].apologistiko_biblio = true;
     const before = JSON.stringify(rows);
     const result = build(rows, {
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        mo_oron_hmerhsias_ergasias: 8,
+        typos_apasxolhshs: 'PLHRHS', mo_oron_hmerhsias_ergasias: 8,
         external_break_minutes: 30
     });
 
@@ -468,8 +463,7 @@ function testPartialProposalClearsProvisionalAutoLeaveFields() {
         ores_apoysias_apologistika: 0
     });
     const result = build(rows, {
-        typos_apasxolhshs: 'MERIKH',
-        mhniaia_repo: 2
+        typos_apasxolhshs: 'MERIKH'
     });
 
     assertReadyContract(result, dateKey(2), dateKey(4), 'ΜΕ');
@@ -532,7 +526,7 @@ function testV2InvalidResultsPreserveVersions() {
         './apasxoliseisWeeklyRepoTransferSinglePairService'
     ).analyzeWeeklyRepoTransferSinglePairV2({
         weekRows: validRows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
     });
 
     const invalidHours = partTimeWeek();
@@ -552,7 +546,7 @@ function testV2InvalidResultsPreserveVersions() {
         './apasxoliseisWeeklyRepoTransferSinglePairService'
     ).analyzeWeeklyRepoTransferSinglePairV2({
         weekRows: fallbackRows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
     });
     fallbackRows[2].cards_ores_ergasias = 'not-a-number';
     assertV2Invalid(
@@ -593,7 +587,7 @@ function testV2InvalidResultsPreserveVersions() {
 
 function testNonEligibleAnalyzerPaths() {
     assertNotAvailable(
-        build(fullTimeWeek(), { typos_apasxolhshs: 'EK_PERITROPHS', mhniaia_repo: 2 }),
+        build(fullTimeWeek(), { typos_apasxolhshs: 'EK_PERITROPHS'}),
         'ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED'
     );
 
@@ -616,7 +610,7 @@ function testNonEligibleAnalyzerPaths() {
         'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'
     );
     assert.strictEqual(
-        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 })
+        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS'})
             .proposal_status,
         'READY'
     );
@@ -635,7 +629,7 @@ function deepFreezeFixture(value) {
 
 function testInputImmutabilityAndFreezeIsolation() {
     const mutableRows = fullTimeWeek();
-    const mutableProfile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 };
+    const mutableProfile = { typos_apasxolhshs: 'PLHRHS'};
     const mutableHoliday = new Map([[dateKey(0), null]]);
     const mutableAudit = { [dateKey(0)]: 0 };
     const before = JSON.stringify({ mutableRows, mutableProfile, mutableAudit });
@@ -655,9 +649,7 @@ function testInputImmutabilityAndFreezeIsolation() {
 
     const frozenRows = deepFreezeFixture(fullTimeWeek());
     const frozenProfile = deepFreezeFixture({
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        hmeres_ergasias_ebdomadas: 5
+        typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
     });
     const frozenHoliday = deepFreezeFixture(new Map([[dateKey(0), deepFreezeFixture({ isHoliday: false })]]));
     const frozenAudit = deepFreezeFixture({});

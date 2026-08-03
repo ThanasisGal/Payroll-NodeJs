@@ -169,6 +169,7 @@ const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
     SOURCE_VERSION: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
     buildWeeklyRepoDeviationPreview,
+    attachSixthDayPresentationToRows,
     normalizeLegacyDeviation
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
@@ -1543,8 +1544,6 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
 
             return {
                 typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
-                mhniaia_repo: effectiveProfile.mhniaia_repo,
-                raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
                 pososto_prosayxhshs_6hs_hmeras:
                     effectiveProfile.pososto_prosayxhshs_6hs_hmeras,
                 hmeres_ergasias_ebdomadas:
@@ -1637,7 +1636,7 @@ async function runWeeklyRepoPostCheck({
 
     const employees = await ErgazomenoiModel.find(employeeQuery)
         .select(
-            'ypokatasthma kodikos eponymo onoma mhniaia_repo ' +
+            'ypokatasthma kodikos eponymo onoma ' +
                 'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                 'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                 'typos_apasxolhshs typos_ebdomadas ' +
@@ -1709,7 +1708,7 @@ async function runWeeklyRepoPostCheck({
                     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                     'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                     'typos_apasxolhshs typos_ebdomadas ' +
-                    'mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
+                    'pososto_prosayxhshs_6hs_hmeras ' +
                     'nomimoOromisthio pragmatikoOromisthio ' +
                     'employment_profile_source afora_allagh_oron_ergasias createdAt'
             )
@@ -1925,17 +1924,6 @@ async function runWeeklyRepoPostCheck({
                 )
             ) {
                 const excessRepo = Math.max(0, Number(pragmatikaRepo) - Number(expectedWeeklyRepo));
-                const rawMhniaiaRepo =
-                    effectiveProfile.raw_mhniaia_repo ??
-                    effectiveProfile.mhniaia_repo ??
-                    null;
-                const parsedRawMhniaiaRepo =
-                    rawMhniaiaRepo === null ||
-                    rawMhniaiaRepo === undefined ||
-                    String(rawMhniaiaRepo).trim() === ''
-                        ? null
-                        : Number(rawMhniaiaRepo);
-
                 result.deviations.push({
                     team: sessionTeam,
                     company_kod: companyId,
@@ -1959,26 +1947,18 @@ async function runWeeklyRepoPostCheck({
                         Number(expectedWeeklyRepo || 0) - Number(pragmatikaRepo),
                         0
                     ),
-                    mhniaia_repo: expectedWeeklyRepo,
                     pragmatikaRepo,
                     profile_changed_inside_week: weeklyProfileInfo.profileChangedInsideWeek,
                     excess_repo: excessRepo,
-                    effective_mhniaia_repo: expectedWeeklyRepo,
                     effective_expected_repo: expectedWeeklyRepo,
                     effective_weekly_workdays:
                         Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
                     expected_repo_source: weeklyProfileInfo.repoResolutionSource || '',
-                    raw_mhniaia_repo: rawMhniaiaRepo,
-                    derived_mhniaia_repo: expectedWeeklyRepo,
-                    mhniaia_repo_conflicts_with_contract:
-                        Number.isSafeInteger(parsedRawMhniaiaRepo) &&
-                        parsedRawMhniaiaRepo !== Number(expectedWeeklyRepo),
                     effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                     effective_profile_source:
                         effectiveProfile.employment_profile_source || effectiveProfile.source || '',
                     effective_profile_date: weeklyProfileInfo.effectiveProfileDate,
                     effective_profile_istoriko_id: effectiveProfile.istorikoId || null,
-                    previous_mhniaia_repo: getExpectedWeeklyRepo(previousProfile),
                     previous_typos_apasxolhshs: previousProfile.typos_apasxolhshs || '',
                     previous_profile_source:
                         previousProfile.employment_profile_source || previousProfile.source || '',
@@ -2041,19 +2021,13 @@ async function runWeeklyRepoPostCheck({
                 missing_repo: d.missing_repo,
                 profile_changed_inside_week: d.profile_changed_inside_week,
                 excess_repo: d.excess_repo,
-                effective_mhniaia_repo: d.effective_mhniaia_repo,
                 effective_expected_repo: d.effective_expected_repo,
                 effective_weekly_workdays: d.effective_weekly_workdays,
                 expected_repo_source: d.expected_repo_source,
-                raw_mhniaia_repo: d.raw_mhniaia_repo,
-                derived_mhniaia_repo: d.derived_mhniaia_repo,
-                mhniaia_repo_conflicts_with_contract:
-                    d.mhniaia_repo_conflicts_with_contract,
                 effective_typos_apasxolhshs: d.effective_typos_apasxolhshs,
                 effective_profile_source: d.effective_profile_source,
                 effective_profile_date: d.effective_profile_date,
                 effective_profile_istoriko_id: d.effective_profile_istoriko_id,
-                previous_mhniaia_repo: d.previous_mhniaia_repo,
                 previous_typos_apasxolhshs: d.previous_typos_apasxolhshs,
                 previous_profile_source: d.previous_profile_source,
                 previous_profile_date: d.previous_profile_date,
@@ -2272,7 +2246,6 @@ function buildWorkTermsFromEmployee(ergazomenos = {}) {
         typos_apasxolhshs: employmentType,
         typos_ebdomadas: ergazomenos.typos_ebdomadas || '',
         typos_ergazomenon: ergazomenos.typos_ergazomenon || '',
-        mhniaia_repo: getNumber(ergazomenos.mhniaia_repo, 0),
         employment_profile_source: 'ERG_AKTUAL',
         hmeromhnia_allaghs_symbashs: null
     };
@@ -2302,7 +2275,6 @@ function buildWorkTermsFromHistory(row = {}, fallbackErgazomenos = {}) {
         typos_apasxolhshs: employmentType,
         typos_ebdomadas: row.typos_ebdomadas || fallback.typos_ebdomadas || '',
         typos_ergazomenon: row.typos_ergazomenon || fallback.typos_ergazomenon || '',
-        mhniaia_repo: getNumber(row.mhniaia_repo, fallback.mhniaia_repo || 0),
         employment_profile_source: row.employment_profile_source || 'ISTORIKO',
         hmeromhnia_allaghs_symbashs: row.hmeromhnia_allaghs_symbashs || null,
         hmeromhnia_allaghs_orarioy_apo: row.hmeromhnia_allaghs_orarioy_apo || null,
@@ -3652,19 +3624,13 @@ function mapDeviationForReviewExport(d = {}) {
         profile_changed_inside_week: d.profile_changed_inside_week === true,
         excess_repo: Number(d.excess_repo || 0),
         effective_expected_repo: Number(
-            d.effective_expected_repo ?? d.effective_mhniaia_repo ?? d.expected_repo ?? 0
+            d.effective_expected_repo ?? d.expected_repo ?? 0
         ),
         effective_weekly_workdays: Number(d.effective_weekly_workdays || 0),
         expected_repo_source: d.expected_repo_source || '',
-        raw_mhniaia_repo: d.raw_mhniaia_repo ?? null,
-        derived_mhniaia_repo: d.derived_mhniaia_repo ?? null,
-        mhniaia_repo_conflicts_with_contract:
-            d.mhniaia_repo_conflicts_with_contract === true,
-        effective_mhniaia_repo: Number(d.effective_mhniaia_repo || d.expected_repo || 0),
         effective_typos_apasxolhshs: d.effective_typos_apasxolhshs || '',
         effective_profile_source: d.effective_profile_source || '',
         effective_profile_date: d.effective_profile_date,
-        previous_mhniaia_repo: Number(d.previous_mhniaia_repo || 0),
         previous_typos_apasxolhshs: d.previous_typos_apasxolhshs || '',
         previous_profile_date: d.previous_profile_date,
         deviation_type: d.deviation_type || '',
@@ -3682,9 +3648,6 @@ function reviewDeviationProfileText(dev = {}) {
         parts.push(`${dev.effective_weekly_workdays} συμβατικές ημέρες εργασίας`);
     }
     parts.push(`${repo} αναμενόμενες ημέρες μη εργασίας`);
-    if (dev.mhniaia_repo_conflicts_with_contract) {
-        parts.push(`Απόκλιση mhniaia_repo: ${dev.raw_mhniaia_repo ?? '-'}`);
-    }
     if (dev.effective_profile_date)
         parts.push(`Ισχύει από: ${reviewDateOnly(dev.effective_profile_date)}`);
     return parts.join(' | ');
@@ -3926,7 +3889,7 @@ async function getReviewRowsForExport(req) {
               kodikos: mongoose.trusted({ $in: kodikoi })
           })
               .select(
-                  'kodikos eponymo onoma ypokatasthma mhniaia_repo ' +
+                  'kodikos eponymo onoma ypokatasthma ' +
                       'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                       'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                       'typos_apasxolhshs typos_ebdomadas'
@@ -3989,7 +3952,7 @@ async function getReviewRowsForExport(req) {
                     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                     'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                     'typos_apasxolhshs typos_ebdomadas ' +
-                    'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt'
+                    'employment_profile_source afora_allagh_oron_ergasias createdAt'
             )
             .sort({
                 kodikos: 1,
@@ -4071,7 +4034,6 @@ async function getReviewRowsForExport(req) {
             onoma: erg.onoma || '',
             employeeName: `${erg.eponymo || ''} ${erg.onoma || ''}`.trim(),
             exportYpokatasthma: normalizedRow.ypokatasthma || erg.ypokatasthma || '',
-            effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
             effective_is_full_time: effectiveIsFullTime,
             effective_kathestos_apasxolhshs:
                 effectiveProfile.kathestos_apasxolhshs || '',
@@ -5118,7 +5080,7 @@ class erganhController {
                 kodikos: mongoose.trusted({ $in: kodikoiRows })
             })
                 .select(
-                    'kodikos eponymo onoma mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
+                    'kodikos eponymo onoma pososto_prosayxhshs_6hs_hmeras ' +
                         'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                         'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                         'typos_apasxolhshs typos_ebdomadas'
@@ -5206,7 +5168,7 @@ class erganhController {
                             'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                             'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                             'typos_apasxolhshs typos_ebdomadas ' +
-                            'mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
+                            'pososto_prosayxhshs_6hs_hmeras ' +
                             'employment_profile_source afora_allagh_oron_ergasias createdAt'
                     )
                     .sort({
@@ -5337,7 +5299,6 @@ class erganhController {
                     // Χρησιμοποιείται από το frontend για display τύπου:
                     // - πλήρης + μη εργασία: ΑΝΑΠΑΥΣΗ/ΡΕΠΟ
                     // - μερική/εκ περιτροπής + μη εργασία: ΜΗ ΕΡΓΑΣΙΑ
-                    effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
                     effective_is_full_time: effectiveIsFullTime,
                     effective_kathestos_apasxolhshs:
                         effectiveProfile.kathestos_apasxolhshs || '',
@@ -5424,6 +5385,10 @@ class erganhController {
             };
             const enrichedDeviations = deviationPreview.deviations.map(withEmployeeNames);
             const pendingDeviationWeeks = deviationPreview.pendingWeeks.map(withEmployeeNames);
+            const reviewRows = attachSixthDayPresentationToRows(
+                enrichedRows,
+                enrichedDeviations
+            );
             const legacyDeviations = deviations
                 .map((d) =>
                     normalizeLegacyDeviation({
@@ -5450,7 +5415,7 @@ class erganhController {
                 limit: limitNum,
                 total,
                 totalPages: Math.ceil(total / limitNum),
-                rows: enrichedRows,
+                rows: reviewRows,
                 deviations: enrichedDeviations,
                 pendingDeviationWeeks,
                 legacyDeviations,

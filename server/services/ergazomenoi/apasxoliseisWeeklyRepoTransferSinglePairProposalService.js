@@ -123,9 +123,6 @@ function copyAnalysisMetadata(analysis) {
             typos_apasxolhshs: normalizePrimitiveString(
                 analysis?.employee?.typos_apasxolhshs
             ),
-            mhniaia_repo: Number.isSafeInteger(analysis?.employee?.mhniaia_repo)
-                ? analysis.employee.mhniaia_repo
-                : null,
             effective_expected_weekly_repo:
                 Number.isSafeInteger(analysis?.employee?.effective_expected_weekly_repo)
                     ? analysis.employee.effective_expected_weekly_repo

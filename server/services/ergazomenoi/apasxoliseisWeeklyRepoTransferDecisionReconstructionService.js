@@ -121,8 +121,6 @@ async function defaultContextLoader({
     const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
     const employmentProfile = {
         typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
-        mhniaia_repo: effectiveProfile.mhniaia_repo,
-        raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
         pososto_prosayxhshs_6hs_hmeras:
             effectiveProfile.pososto_prosayxhshs_6hs_hmeras,
         hmeres_ergasias_ebdomadas: effectiveProfile.hmeres_ergasias_ebdomadas,
@@ -175,7 +173,6 @@ function buildCanonicalSnapshot({ scope, context, group }) {
                 effective_from: entry.hmeromhnia_isxyos_oron_ergasias_apo || entry.hmeromhnia_allaghs_orarioy_apo || entry.hmeromhnia_allaghs_symbashs,
                 effective_to: entry.hmeromhnia_isxyos_oron_ergasias_eos || entry.hmeromhnia_allaghs_orarioy_eos,
                 typos_apasxolhshs: entry.typos_apasxolhshs || entry.kathestos_apasxolhshs,
-                mhniaia_repo: entry.mhniaia_repo,
                 hmeres_ergasias_ebdomadas: entry.hmeres_ergasias_ebdomadas,
                 ores_ergasias_ebdomadas: entry.ores_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias: entry.mo_oron_hmerhsias_ergasias,

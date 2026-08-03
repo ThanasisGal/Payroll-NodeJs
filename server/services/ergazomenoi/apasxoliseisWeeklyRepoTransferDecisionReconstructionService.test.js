@@ -59,7 +59,7 @@ async function run() {
         repo_resolution: {
             ...group.repo_resolution,
             effective_expected_weekly_repo: 2,
-            repo_resolution_source: 'EXPLICIT_MHNIAIA_REPO',
+            repo_resolution_source: 'ALTERED_CONTRACT_SOURCE',
             scheduled_work_days: 5,
             effective_weekly_workdays: 5
         }

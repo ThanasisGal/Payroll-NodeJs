@@ -60,12 +60,11 @@ const autoLeave = (date, from, to) =>
         kathgoria_adeias_apologistika: 'ΑΔΑΛ'
     });
 
-const profile = (premiumRate, monthlyRepos, effectiveDate) => ({
+const profile = (premiumRate, effectiveDate) => ({
     typos_apasxolhshs: '0',
     hmeres_ergasias_ebdomadas: 5,
     ores_ergasias_ebdomadas: 40,
     mo_oron_hmerhsias_ergasias: 8,
-    mhniaia_repo: monthlyRepos,
     pososto_prosayxhshs_6hs_hmeras: premiumRate,
     dialleima_se_lepta: 30,
     dialleima_entos_ektos_orarioy: false,
@@ -79,7 +78,7 @@ module.exports = Object.freeze([
     {
         employeeCode: '0005',
         week: '2026-06-01/2026-06-07',
-        employmentProfile: profile(0, 1, '2026-06-01'),
+        employmentProfile: profile(0, '2026-06-01'),
         rows: [
             work('2026-06-01', 8.35, '14:11', '22:32', { ores_ergasias_apologistika: 7.85 }),
             work('2026-06-02', 7.1, '15:12', '22:18', {
@@ -99,7 +98,7 @@ module.exports = Object.freeze([
     {
         employeeCode: '0002',
         week: '2026-06-15/2026-06-21',
-        employmentProfile: profile(0, 2, '2026-06-15'),
+        employmentProfile: profile(0, '2026-06-15'),
         rows: [
             work('2026-06-15', 8.816667, '14:08', '22:57', {
                 kathgoria_ergasias: 'ΑΝ', repo: true, ores_ergasias: 0,
@@ -136,7 +135,7 @@ module.exports = Object.freeze([
     {
         employeeCode: '0002',
         week: '2026-06-22/2026-06-28',
-        employmentProfile: profile(0, 2, '2026-06-22'),
+        employmentProfile: profile(0, '2026-06-22'),
         rows: [
             work('2026-06-22', 7.6667, '14:49', '22:29', {
                 kathgoria_ergasias: 'ΑΝ', repo: true, ores_ergasias: 0,
@@ -156,7 +155,7 @@ module.exports = Object.freeze([
     {
         employeeCode: '0003',
         week: '2026-06-01/2026-06-07',
-        employmentProfile: profile(null, 2, '2026-06-01'),
+        employmentProfile: profile(null, '2026-06-01'),
         rows: [
             work('2026-06-01', 0, '', '', {
                 kathgoria_ergasias: 'ΑΝ', kathgoria_ergasias_apologistika: 'ΑΝ',
