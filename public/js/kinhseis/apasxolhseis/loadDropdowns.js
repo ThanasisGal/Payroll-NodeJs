@@ -3528,9 +3528,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.getElementById('value16').textContent = parseInt(
                         _ergazomenoi.paketo_apodoxon
                     );
-                    document.getElementById('value17').textContent = parseInt(
-                        _ergazomenoi.mhniaia_repo
-                    );
                     document.getElementById('eidikhKathgoriaErgazomenoy_Hidden').value =
                         _ergazomenoi.eidikh_kathgoria_ergazomenoy;
                     document.getElementById('oikogeneiakhKatastash_Hidden').value =
