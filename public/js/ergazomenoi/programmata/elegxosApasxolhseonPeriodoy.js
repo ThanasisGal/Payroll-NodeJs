@@ -4463,8 +4463,8 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Το ποσοστό προσαύξησης 6ης ημέρας είναι μηδενικό, αλλά δεν τεκμηριώνεται επιτρεπόμενη ειδική κατηγορία εξαίρεσης.',
     SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC:
         'Δεν μπορεί να προσδιοριστεί με ασφάλεια η 6η ημέρα από τις δηλωμένες ώρες και τις ώρες καρτών.',
-    SIXTH_DAY_INCOMPLETE_CARD_INTERVAL:
-        'Η επιλεγμένη 6η ημέρα έχει θετικές ώρες καρτών αλλά ελλιπές διάστημα κάρτας.',
+    INCOMPLETE_CARD_INTERVAL:
+        'Υπάρχει ασύζευκτο χτύπημα κάρτας· δεν έγινε απολογιστικός υπολογισμός.',
     SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT:
         'ΣΗΜΑΝΤΙΚΟ: Η επιλεγμένη 6η ημέρα υπερβαίνει τις οκτώ πραγματικές ώρες.',
     SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION:

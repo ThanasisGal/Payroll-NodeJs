@@ -67,4 +67,15 @@ const cardFacts = facts('ΕΡΓ', 8, 8, {
 assert.strictEqual(cardFacts.cardHours, 8);
 assert.strictEqual(cardFacts.hasCompleteCardEvidence, true);
 
+const incompleteCardFacts = facts('ΕΡΓ', 8, 8, {
+    cards_apo_ora_01: '09:00',
+    cards_eos_ora_01: ''
+});
+assert.strictEqual(incompleteCardFacts.actualWorkHours, 0);
+assert.strictEqual(incompleteCardFacts.leaveHours, 0);
+assert.strictEqual(incompleteCardFacts.holidayCreditedHours, 0);
+assert.strictEqual(incompleteCardFacts.countsAsActualWorkDay, false);
+assert.deepStrictEqual(incompleteCardFacts.reasons, []);
+assert.deepStrictEqual(incompleteCardFacts.warnings, ['INCOMPLETE_CARD_INTERVAL']);
+
 console.log('daily actual-work facts tests passed');

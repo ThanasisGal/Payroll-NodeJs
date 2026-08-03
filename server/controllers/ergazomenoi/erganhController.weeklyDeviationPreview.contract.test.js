@@ -102,6 +102,14 @@ assert.ok(
     )
 );
 assert.ok(calculationSource.includes('ProdhlomenaOrariaModel.find(prodhlomenaQuery)'));
+assert.ok(calculationSource.includes('if (hasIncompleteCardPair(calculationRec))'));
+assert.ok(calculationSource.includes('buildIncompleteCardSafeUpdate()'));
+assert.strictEqual(
+    (calculationSource.match(/checkIncompleteCardPairAgainstDeclared\(/g) || []).length,
+    0
+);
+assert.ok(postCheckSource.includes('if (hasIncompleteCardPair(row))'));
+assert.ok(postCheckSource.includes('buildIncompleteCardSafeUpdate()'));
 
 const atomicStart = source.indexOf('async function buildAtomicRepoTransferPolicyPreviewProjection');
 const atomicEnd = source.indexOf('function getWeekRangesInsidePeriod', atomicStart);

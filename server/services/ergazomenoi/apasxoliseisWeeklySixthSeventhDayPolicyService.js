@@ -25,14 +25,10 @@ function selectSixthDay(candidates) {
     if (day) {
         return {
             day,
-            warnings: [
-                ...(day.actualWorkHours > 8
+            warnings:
+                day.actualWorkHours > 8
                     ? ['SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT']
-                    : []),
-                ...(day.hasCompleteCardEvidence
-                    ? []
-                    : ['SIXTH_DAY_INCOMPLETE_CARD_INTERVAL'])
-            ]
+                    : []
         };
     }
 

@@ -207,6 +207,10 @@ const {
 const {
     buildDailyCompensationBreakdown
 } = require('../../services/ergazomenoi/apasxoliseisDailyCompensationBreakdownService');
+const {
+    hasIncompleteCardPair,
+    buildIncompleteCardSafeUpdate
+} = require('../../services/ergazomenoi/apasxoliseisIncompleteCardSafetyService');
 const ApasxoliseisCompanyPolicyRuleModel = require('../../models/apasxoliseisCompanyPolicyRule');
 
 const REPO_TRANSFER_APPLY_ERRORS = Object.freeze({
@@ -379,131 +383,6 @@ function checkEarlyOrLateCard(context, pairNo) {
     }
 
     return {};
-}
-
-// ============================================================
-// Ανακατασκευή απολογιστικού όταν υπάρχει ελλιπές ζεύγος κάρτας
-// αλλά υπάρχει προδηλωμένο ωράριο για το ίδιο ζεύγος.
-//
-// Περιπτώσεις:
-// 1) Λείπει cards_apo_ora_NN, υπάρχει cards_eos_ora_NN:
-//    apo_ora_NN_apologistika = apo_ora_NN
-//    eos_ora_NN_apologistika = cards_eos_ora_NN
-//
-// 2) Υπάρχει cards_apo_ora_NN, λείπει cards_eos_ora_NN:
-//    apo_ora_NN_apologistika = cards_apo_ora_NN
-//    eos_ora_NN_apologistika = eos_ora_NN
-//
-// Σημείωση:
-// Το cards_ores_ergasias πρέπει να είναι η ΘΕΤΙΚΗ διάρκεια του
-// ανακατασκευασμένου χρόνου εργασίας. Δηλαδή:
-//    eos - apo
-// και όχι apo - eos ή ores_ergasias - (eos - apo).
-// Αλλιώς παράγονται αρνητικά/λανθασμένα αποτελέσματα.
-// ============================================================
-function checkIncompleteCardPairAgainstDeclared(context) {
-    const { rec } = context;
-
-    const update = {
-        apo_ora_01_apologistika: rec.apo_ora_01_apologistika || '',
-        eos_ora_01_apologistika: rec.eos_ora_01_apologistika || '',
-        apo_ora_02_apologistika: rec.apo_ora_02_apologistika || '',
-        eos_ora_02_apologistika: rec.eos_ora_02_apologistika || '',
-        apo_ora_03_apologistika: rec.apo_ora_03_apologistika || '',
-        eos_ora_03_apologistika: rec.eos_ora_03_apologistika || ''
-    };
-
-    let changed = false;
-
-    for (let pairNo = 1; pairNo <= 3; pairNo++) {
-        const p = String(pairNo).padStart(2, '0');
-
-        const declaredApoField = `apo_ora_${p}`;
-        const declaredEosField = `eos_ora_${p}`;
-        const cardApoField = `cards_apo_ora_${p}`;
-        const cardEosField = `cards_eos_ora_${p}`;
-        const apoApologField = `apo_ora_${p}_apologistika`;
-        const eosApologField = `eos_ora_${p}_apologistika`;
-
-        const declaredApo = rec[declaredApoField];
-        const declaredEos = rec[declaredEosField];
-        const cardApo = rec[cardApoField];
-        const cardEos = rec[cardEosField];
-
-        const hasDeclaredApo = hasTime(declaredApo);
-        const hasDeclaredEos = hasTime(declaredEos);
-        const hasCardApo = hasTime(cardApo);
-        const hasCardEos = hasTime(cardEos);
-
-        // Χωρίς πλήρες προδηλωμένο ζεύγος δεν μπορούμε να ανακατασκευάσουμε ασφαλώς.
-        if (!hasDeclaredApo || !hasDeclaredEos) continue;
-
-        // Διάρκεια του συγκεκριμένου προδηλωμένου ζεύγους.
-        // Παράδειγμα 16:00 - 00:00 => 8 ώρες.
-        const declaredPairMinutes = durationMinutesSafe(declaredApo, declaredEos);
-        if (declaredPairMinutes <= 0) continue;
-
-        // ============================================================
-        // Λείπει η είσοδος κάρτας, υπάρχει έξοδος.
-        //
-        // apo_ora_NN_apologistika = cards_eos_ora_NN - προδηλωμένη διάρκεια
-        // eos_ora_NN_apologistika = cards_eos_ora_NN
-        //
-        // Παράδειγμα:
-        // Προδηλωμένο 16:00 - 00:00 = 8 ώρες
-        // Κάρτα: - 23:58
-        // Απολογιστικό: 15:58 - 23:58
-        // ============================================================
-        if (!hasCardApo && hasCardEos) {
-            const cardEosMinutes = timeToMinutesSafe(cardEos);
-            if (cardEosMinutes === null) continue;
-
-            update[apoApologField] = minutesToTimeSafe(cardEosMinutes - declaredPairMinutes);
-            update[eosApologField] = cardEos;
-
-            changed = true;
-            continue;
-        }
-
-        // ============================================================
-        // Υπάρχει είσοδος κάρτας, λείπει η έξοδος.
-        //
-        // apo_ora_NN_apologistika = cards_apo_ora_NN
-        // eos_ora_NN_apologistika = cards_apo_ora_NN + προδηλωμένη διάρκεια
-        //
-        // Παράδειγμα:
-        // Προδηλωμένο 16:00 - 00:00 = 8 ώρες
-        // Κάρτα: 16:02 -
-        // Απολογιστικό: 16:02 - 00:02
-        // ============================================================
-        if (hasCardApo && !hasCardEos) {
-            const cardApoMinutes = timeToMinutesSafe(cardApo);
-            if (cardApoMinutes === null) continue;
-
-            update[apoApologField] = cardApo;
-            update[eosApologField] = minutesToTimeSafe(cardApoMinutes + declaredPairMinutes);
-
-            changed = true;
-        }
-    }
-
-    if (!changed) return {};
-
-    const apologistikaMinutes =
-        durationMinutesSafe(update.apo_ora_01_apologistika, update.eos_ora_01_apologistika) +
-        durationMinutesSafe(update.apo_ora_02_apologistika, update.eos_ora_02_apologistika) +
-        durationMinutesSafe(update.apo_ora_03_apologistika, update.eos_ora_03_apologistika);
-
-    return {
-        apologistiko_biblio: true,
-        ...update,
-
-        // Για ελλιπές ζεύγος κάρτας, αφού ανακατασκευάζουμε απολογιστικό
-        // ίσης διάρκειας με το προδηλωμένο ζεύγος, οι ώρες καρτών της ημέρας
-        // δεν πρέπει να μένουν 0.00 ούτε να γίνονται αρνητικές.
-        cards_ores_ergasias: toHours(apologistikaMinutes),
-        ores_ergasias_apologistika: toHours(apologistikaMinutes)
-    };
 }
 
 function hasTime(value) {
@@ -1876,6 +1755,22 @@ async function runWeeklyRepoPostCheck({
 
                 const update = {};
 
+                if (hasIncompleteCardPair(row)) {
+                    Object.assign(update, buildIncompleteCardSafeUpdate());
+
+                    if (row.is_locked !== true) {
+                        bulkOps.push({
+                            updateOne: {
+                                filter: { _id: row._id },
+                                update: { $set: update },
+                                upsert: false
+                            }
+                        });
+                    }
+
+                    continue;
+                }
+
                 // Αδύνατος απολογιστικός χαρακτηρισμός: με δηλωμένες ώρες
                 // και πραγματική εργασία από κάρτες, το παλιό «ΜΕ» δεν
                 // επιτρέπεται να επιβιώνει σε καμία ημερήσια φάση.
@@ -3019,34 +2914,18 @@ function getEffectiveDailyWorkMinutesForApologistika(rec, ergazomenos = null) {
 // (νύχτα, αργίες, πρόσθετη εργασία, υπερεργασία, υπερωρίες).
 //
 // Κανόνας:
-// - Αν οι κάρτες είναι πλήρεις, υπολογίζουμε από τις πραγματικές κάρτες.
-// - Αν υπάρχει ελλιπές ζεύγος κάρτας (μόνο είσοδος ή μόνο έξοδος) και
-//   έχει παραχθεί απολογιστικό ζεύγος, χρησιμοποιούμε το απολογιστικό
-//   ως ασφαλή ανακατασκευή του χρόνου.
-// Έτσι δεν κόβουμε πραγματική υπερωρία από πλήρεις κάρτες, αλλά δεν
-// μηδενίζουμε και τις ημέρες με ελλιπείς κάρτες.
+// - Αν υπάρχει έστω ένα ελλιπές ζεύγος κάρτας, δεν μαντεύουμε την ώρα που
+//   λείπει και δεν παράγουμε payroll buckets για την ημέρα.
+// - Με πλήρεις κάρτες χρησιμοποιούμε τις πραγματικές κάρτες και μόνο ως
+//   fallback ήδη έγκυρα απολογιστικά διαστήματα.
 // ============================================================
-function hasIncompleteCardPair(rec = {}) {
-    for (let n = 1; n <= 3; n++) {
-        const p = String(n).padStart(2, '0');
-        const hasApo = hasTime(rec[`cards_apo_ora_${p}`]);
-        const hasEos = hasTime(rec[`cards_eos_ora_${p}`]);
-
-        if (hasApo !== hasEos) {
-            return true;
-        }
+function getPayrollCalculationIntervals(rec, ergazomenos = null) {
+    if (hasIncompleteCardPair(rec)) {
+        return [];
     }
 
-    return false;
-}
-
-function getPayrollCalculationIntervals(rec, ergazomenos = null) {
     const rawIntervals = getCardIntervals(rec, ergazomenos);
     const apologistikaIntervals = getApologistikaIntervals(rec);
-
-    if (hasIncompleteCardPair(rec) && apologistikaIntervals.length > 0) {
-        return apologistikaIntervals;
-    }
 
     if (rawIntervals.length > 0) {
         return rawIntervals;
@@ -7908,6 +7787,10 @@ class erganhController {
                         parseInt(effectiveErgazomenos.evelikth_proselefsh || 0, 10) || 0
                 };
 
+                if (hasIncompleteCardPair(calculationRec)) {
+                    continue;
+                }
+
                 const preliminaryUpdate = {};
                 const preliminarySplitUpdate =
                     checkBrokenProgramVsBrokenCards(preliminaryContext);
@@ -7917,10 +7800,6 @@ class erganhController {
                     Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 2));
                     Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 3));
                 }
-                Object.assign(
-                    preliminaryUpdate,
-                    checkIncompleteCardPairAgainstDeclared(preliminaryContext)
-                );
                 Object.assign(preliminaryUpdate, checkContinuousVsBrokenCards(preliminaryContext));
                 Object.assign(
                     preliminaryUpdate,
@@ -7964,6 +7843,28 @@ class erganhController {
 
                 const update = {};
 
+                if (hasIncompleteCardPair(calculationRec)) {
+                    Object.assign(update, buildIncompleteCardSafeUpdate());
+
+                    if (!isDateInsideRange(rec.hmeromhnia, apoDate, eosDate)) continue;
+                    if (rec.is_locked === true) continue;
+
+                    bulkOps.push({
+                        updateOne: {
+                            filter: {
+                                _id: rec._id,
+                                team: sessionTeam,
+                                company_kod: companyId,
+                                kodikos: rec.kodikos,
+                                hmeromhnia: rec.hmeromhnia
+                            },
+                            update: { $set: update },
+                            upsert: false
+                        }
+                    });
+                    continue;
+                }
+
                 const splitUpdate = checkBrokenProgramVsBrokenCards(context);
                 Object.assign(update, splitUpdate);
                 if (Object.keys(splitUpdate).length === 0) {
@@ -7971,8 +7872,6 @@ class erganhController {
                     Object.assign(update, checkEarlyOrLateCard(context, 2));
                     Object.assign(update, checkEarlyOrLateCard(context, 3));
                 }
-                Object.assign(update, checkIncompleteCardPairAgainstDeclared(context));
-
                 Object.assign(update, checkContinuousVsBrokenCards(context));
                 Object.assign(update, checkBrokenProgramVsContinuousCards(context));
                 Object.assign(update, checkNoDeclaredScheduleCards(context));

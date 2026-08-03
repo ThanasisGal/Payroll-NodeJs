@@ -12,6 +12,7 @@ const REASON = Object.freeze({
 });
 
 const WARNING = Object.freeze({
+    INCOMPLETE_CARD_INTERVAL: 'INCOMPLETE_CARD_INTERVAL',
     CARD_HOURS_EXCEED_DECLARED_HOURS: 'CARD_HOURS_EXCEED_DECLARED_HOURS',
     MIXED_WORK_AND_HOURLY_LEAVE: 'MIXED_WORK_AND_HOURLY_LEAVE',
     MIXED_WORK_AND_SICKNESS: 'MIXED_WORK_AND_SICKNESS',
@@ -59,8 +60,12 @@ function resolveDailyActualWorkFacts(row = {}) {
 
     const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
-    const hasCompleteCardEvidence = buildCardIntervals(row).some(
+    const cardIntervals = buildCardIntervals(row);
+    const hasCompleteCardEvidence = cardIntervals.some(
         (interval) => interval.isComplete && !interval.isZeroLength
+    );
+    const hasIncompleteCardInterval = cardIntervals.some(
+        (interval) => !interval.isComplete && (interval.start || interval.end)
     );
     if (reasons.length > 0) {
         return Object.freeze({
@@ -75,6 +80,25 @@ function resolveDailyActualWorkFacts(row = {}) {
             countsAsActualWorkDay: false,
             reasons,
             warnings
+        });
+    }
+
+    // Ένα μονό χτύπημα δεν επιτρέπει ασφαλή συμπλήρωση της ώρας που λείπει.
+    // Η ημέρα παραμένει τεχνική εκκρεμότητα του ελέγχου καρτών και δεν
+    // μετατρέπεται αυτόματα σε εργασία, άδεια, αργία ή ρεπό.
+    if (hasIncompleteCardInterval) {
+        return Object.freeze({
+            category,
+            declaredWorkHours: declared.value,
+            cardHours: cards.value,
+            hasCompleteCardEvidence,
+            actualWorkHours: 0,
+            leaveHours: 0,
+            holidayCreditedHours: 0,
+            sicknessHours: 0,
+            countsAsActualWorkDay: false,
+            reasons: [],
+            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL]
         });
     }
 

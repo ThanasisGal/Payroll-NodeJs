@@ -57,8 +57,9 @@ result = analyzeWeeklySixthSeventhDay({
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
 });
-assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
-assert.ok(result.warnings.includes('SIXTH_DAY_INCOMPLETE_CARD_INTERVAL'));
+assert.strictEqual(result.status, 'NOT_APPLICABLE');
+assert.strictEqual(result.sixthDay, null);
+assert.ok(result.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
 
 const noCardSunday = week([7, 7, 7, 7, 7, 7, 0]);
 assert.strictEqual(analyzeWeeklySixthSeventhDay({
