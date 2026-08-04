@@ -31,6 +31,10 @@ const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentU
 const {
     downloadSubmittedErganiPdfWithPlaywright
 } = require('../../utils/erganh/erganiSubmittedPdfDownloader');
+const {
+    SCHEDULE_CATEGORY: ERGANI_SCHEDULE_CATEGORY,
+    parseErganiScheduleCell
+} = require('../../services/ergani/erganiScheduleCellParserService');
 const { generateE3XML, generateE3NJSON } = require('../../utils/xmlGenerators/e3N_v1Generator');
 const {
     compareE3NPreSubmit
@@ -12564,16 +12568,6 @@ async function processOrariaXlsx(filePath, sessionTeam, sessionYearInUse) {
 
     let teliko_row = 1;
 
-    function extractTimePairs(text) {
-        const regex = /(\d{2}:\d{2})-(\d{2}:\d{2})/g;
-        const pairs = [];
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-            pairs.push({ from: match[1], to: match[2] });
-        }
-        return pairs;
-    }
-
     function writeTeliko(rowNum, colA, colB, colC, colD, colE, colF, colG, colH) {
         const newRow = sheetTeliko.getRow(rowNum);
         newRow.getCell(1).value = colA;
@@ -12599,24 +12593,24 @@ async function processOrariaXlsx(filePath, sessionTeam, sessionYearInUse) {
         const colD = row.getCell(4).value;
         const colE = row.getCell(5).value;
 
-        if (colI === 'ΜΗ ΕΡΓΑΣΙΑ') {
+        const parsedSchedule = parseErganiScheduleCell(colI);
+
+        if (parsedSchedule.category === ERGANI_SCHEDULE_CATEGORY.NO_WORK) {
             writeTeliko(teliko_row++, colA, colB, colD, colC, colE, 'ΜΕ', '', '');
             return;
         }
-        if (colI === 'ΑΝΑΠΑΥΣΗ/ΡΕΠΟ') {
+        if (parsedSchedule.category === ERGANI_SCHEDULE_CATEGORY.REST) {
             writeTeliko(teliko_row++, colA, colB, colD, colC, colE, 'ΑΝ', '', '');
             return;
         }
-        if (colI?.startsWith('ΕΡΓΑΣΙΑ ')) {
-            const pairs = extractTimePairs(colI);
-            pairs.forEach((pair) => {
+        if (parsedSchedule.category === ERGANI_SCHEDULE_CATEGORY.WORK) {
+            parsedSchedule.pairs.forEach((pair) => {
                 writeTeliko(teliko_row++, colA, colB, colD, colC, colE, 'ΕΡΓ', pair.from, pair.to);
             });
             return;
         }
-        if (colI?.startsWith('ΤΗΛΕΡΓΑΣΙΑ ')) {
-            const pairs = extractTimePairs(colI);
-            pairs.forEach((pair) => {
+        if (parsedSchedule.category === ERGANI_SCHEDULE_CATEGORY.TELEWORK) {
+            parsedSchedule.pairs.forEach((pair) => {
                 writeTeliko(teliko_row++, colA, colB, colD, colC, colE, 'ΤΗΛ', pair.from, pair.to);
             });
             return;
