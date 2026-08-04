@@ -31,6 +31,10 @@ const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentU
 const {
     downloadSubmittedErganiPdfWithPlaywright
 } = require('../../utils/erganh/erganiSubmittedPdfDownloader');
+const {
+    SCHEDULE_CATEGORY: ERGANI_SCHEDULE_CATEGORY,
+    parseErganiScheduleCell
+} = require('../../services/ergani/erganiScheduleCellParserService');
 const { generateE3XML, generateE3NJSON } = require('../../utils/xmlGenerators/e3N_v1Generator');
 const {
     compareE3NPreSubmit
@@ -134,6 +138,9 @@ const {
     summarizeApasxoliseisPolicyPreviewResults
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewService');
 const {
+    buildRestPeriodPolicyPreviewRows
+} = require('../../services/ergazomenoi/apasxoliseisRestPeriodPreviewService');
+const {
     buildApasxoliseisPolicyPreviewGrouping
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService');
 const {
@@ -158,15 +165,33 @@ const {
     getWeeklyRepoProfileInfo
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const {
+    LEAVE_PROVENANCE,
+    classifyLeaveProvenance
+} = require('../../services/ergazomenoi/apasxoliseisLeaveProvenanceService');
+const {
+    resolveFullTimeFromWorkTerms,
+    resolveReviewIsFullTimeProfile
+} = require('../../services/ergazomenoi/apasxoliseisReviewEmploymentProfileService');
+const {
+    buildPostDepartureExclusionDescriptors,
+    isDateWithinEmploymentPeriod,
+    isWeekFullyWithinEmploymentPeriod
+} = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
+const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
     SOURCE_VERSION: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
     buildWeeklyRepoDeviationPreview,
+    attachSixthDayPresentationToRows,
     normalizeLegacyDeviation
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
     createPolicyPreviewApprovalRecord,
-    listPolicyPreviewApprovalRecords
+    listPolicyPreviewApprovalRecords,
+    listActiveReusablePolicyDecisionRecords
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService');
+const {
+    applyReusablePolicyDecisionsToPreviewRows
+} = require('../../services/ergazomenoi/apasxoliseisReusablePolicyDecisionService');
 const {
     runPolicyPreviewApplyDryRun
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyDryRunService');
@@ -187,6 +212,19 @@ const { applyWeeklyRepoTransfer } = require('../../services/ergazomenoi/apasxoli
 const { validateApplySession } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService');
 const { getWeeklyRepoTransferApplyRuntimeState } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
 const { assertWeeklyRepoTransferApplyIndexesReady } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
+const {
+    analyzeWeeklySixthSeventhDay
+} = require('../../services/ergazomenoi/apasxoliseisWeeklySixthSeventhDayPolicyService');
+const {
+    buildDailyCompensationBreakdown
+} = require('../../services/ergazomenoi/apasxoliseisDailyCompensationBreakdownService');
+const {
+    buildPartialVerifiedCardUpdate
+} = require('../../services/ergazomenoi/apasxoliseisIncompleteCardSafetyService');
+const {
+    resolveCardPairVerification
+} = require('../../services/ergazomenoi/apasxoliseisCardPairResolverService');
+const ApasxoliseisCompanyPolicyRuleModel = require('../../models/apasxoliseisCompanyPolicyRule');
 
 const REPO_TRANSFER_APPLY_ERRORS = Object.freeze({
     APPLY_RUNTIME_DISABLED: [503, 'Η εφαρμογή εγκεκριμένων μεταφορών ρεπό δεν είναι ενεργοποιημένη.'],
@@ -358,131 +396,6 @@ function checkEarlyOrLateCard(context, pairNo) {
     }
 
     return {};
-}
-
-// ============================================================
-// Ανακατασκευή απολογιστικού όταν υπάρχει ελλιπές ζεύγος κάρτας
-// αλλά υπάρχει προδηλωμένο ωράριο για το ίδιο ζεύγος.
-//
-// Περιπτώσεις:
-// 1) Λείπει cards_apo_ora_NN, υπάρχει cards_eos_ora_NN:
-//    apo_ora_NN_apologistika = apo_ora_NN
-//    eos_ora_NN_apologistika = cards_eos_ora_NN
-//
-// 2) Υπάρχει cards_apo_ora_NN, λείπει cards_eos_ora_NN:
-//    apo_ora_NN_apologistika = cards_apo_ora_NN
-//    eos_ora_NN_apologistika = eos_ora_NN
-//
-// Σημείωση:
-// Το cards_ores_ergasias πρέπει να είναι η ΘΕΤΙΚΗ διάρκεια του
-// ανακατασκευασμένου χρόνου εργασίας. Δηλαδή:
-//    eos - apo
-// και όχι apo - eos ή ores_ergasias - (eos - apo).
-// Αλλιώς παράγονται αρνητικά/λανθασμένα αποτελέσματα.
-// ============================================================
-function checkIncompleteCardPairAgainstDeclared(context) {
-    const { rec } = context;
-
-    const update = {
-        apo_ora_01_apologistika: rec.apo_ora_01_apologistika || '',
-        eos_ora_01_apologistika: rec.eos_ora_01_apologistika || '',
-        apo_ora_02_apologistika: rec.apo_ora_02_apologistika || '',
-        eos_ora_02_apologistika: rec.eos_ora_02_apologistika || '',
-        apo_ora_03_apologistika: rec.apo_ora_03_apologistika || '',
-        eos_ora_03_apologistika: rec.eos_ora_03_apologistika || ''
-    };
-
-    let changed = false;
-
-    for (let pairNo = 1; pairNo <= 3; pairNo++) {
-        const p = String(pairNo).padStart(2, '0');
-
-        const declaredApoField = `apo_ora_${p}`;
-        const declaredEosField = `eos_ora_${p}`;
-        const cardApoField = `cards_apo_ora_${p}`;
-        const cardEosField = `cards_eos_ora_${p}`;
-        const apoApologField = `apo_ora_${p}_apologistika`;
-        const eosApologField = `eos_ora_${p}_apologistika`;
-
-        const declaredApo = rec[declaredApoField];
-        const declaredEos = rec[declaredEosField];
-        const cardApo = rec[cardApoField];
-        const cardEos = rec[cardEosField];
-
-        const hasDeclaredApo = hasTime(declaredApo);
-        const hasDeclaredEos = hasTime(declaredEos);
-        const hasCardApo = hasTime(cardApo);
-        const hasCardEos = hasTime(cardEos);
-
-        // Χωρίς πλήρες προδηλωμένο ζεύγος δεν μπορούμε να ανακατασκευάσουμε ασφαλώς.
-        if (!hasDeclaredApo || !hasDeclaredEos) continue;
-
-        // Διάρκεια του συγκεκριμένου προδηλωμένου ζεύγους.
-        // Παράδειγμα 16:00 - 00:00 => 8 ώρες.
-        const declaredPairMinutes = durationMinutesSafe(declaredApo, declaredEos);
-        if (declaredPairMinutes <= 0) continue;
-
-        // ============================================================
-        // Λείπει η είσοδος κάρτας, υπάρχει έξοδος.
-        //
-        // apo_ora_NN_apologistika = cards_eos_ora_NN - προδηλωμένη διάρκεια
-        // eos_ora_NN_apologistika = cards_eos_ora_NN
-        //
-        // Παράδειγμα:
-        // Προδηλωμένο 16:00 - 00:00 = 8 ώρες
-        // Κάρτα: - 23:58
-        // Απολογιστικό: 15:58 - 23:58
-        // ============================================================
-        if (!hasCardApo && hasCardEos) {
-            const cardEosMinutes = timeToMinutesSafe(cardEos);
-            if (cardEosMinutes === null) continue;
-
-            update[apoApologField] = minutesToTimeSafe(cardEosMinutes - declaredPairMinutes);
-            update[eosApologField] = cardEos;
-
-            changed = true;
-            continue;
-        }
-
-        // ============================================================
-        // Υπάρχει είσοδος κάρτας, λείπει η έξοδος.
-        //
-        // apo_ora_NN_apologistika = cards_apo_ora_NN
-        // eos_ora_NN_apologistika = cards_apo_ora_NN + προδηλωμένη διάρκεια
-        //
-        // Παράδειγμα:
-        // Προδηλωμένο 16:00 - 00:00 = 8 ώρες
-        // Κάρτα: 16:02 -
-        // Απολογιστικό: 16:02 - 00:02
-        // ============================================================
-        if (hasCardApo && !hasCardEos) {
-            const cardApoMinutes = timeToMinutesSafe(cardApo);
-            if (cardApoMinutes === null) continue;
-
-            update[apoApologField] = cardApo;
-            update[eosApologField] = minutesToTimeSafe(cardApoMinutes + declaredPairMinutes);
-
-            changed = true;
-        }
-    }
-
-    if (!changed) return {};
-
-    const apologistikaMinutes =
-        durationMinutesSafe(update.apo_ora_01_apologistika, update.eos_ora_01_apologistika) +
-        durationMinutesSafe(update.apo_ora_02_apologistika, update.eos_ora_02_apologistika) +
-        durationMinutesSafe(update.apo_ora_03_apologistika, update.eos_ora_03_apologistika);
-
-    return {
-        apologistiko_biblio: true,
-        ...update,
-
-        // Για ελλιπές ζεύγος κάρτας, αφού ανακατασκευάζουμε απολογιστικό
-        // ίσης διάρκειας με το προδηλωμένο ζεύγος, οι ώρες καρτών της ημέρας
-        // δεν πρέπει να μένουν 0.00 ούτε να γίνονται αρνητικές.
-        cards_ores_ergasias: toHours(apologistikaMinutes),
-        ores_ergasias_apologistika: toHours(apologistikaMinutes)
-    };
 }
 
 function hasTime(value) {
@@ -1348,26 +1261,16 @@ function buildReviewHolidayResponseFields(row = {}, context = {}) {
 }
 
 function getExpectedWeeklyRepo(ergazomenos) {
-    const raw = ergazomenos?.mhniaia_repo;
-    const parsed = Number(raw ?? 0);
-    return Number.isFinite(parsed) ? parsed : 0;
+    const contractualWorkdays = Number(ergazomenos?.hmeres_ergasias_ebdomadas);
+    return Number.isSafeInteger(contractualWorkdays) &&
+        contractualWorkdays >= 1 &&
+        contractualWorkdays <= 6
+        ? 7 - contractualWorkdays
+        : 0;
 }
 
 function isFullTimeWorkTerms(workTerms = {}) {
-    const typos = String(workTerms.typos_apasxolhshs ?? '')
-        .trim()
-        .toUpperCase();
-
-    if (typos === '0' || typos === 'PLHRHS' || typos === 'ΠΛΗΡΗΣ') {
-        return true;
-    }
-
-    if (typos === '1' || typos === '2' || typos === 'MERIKH' || typos === 'EK_PERITROPHS') {
-        return false;
-    }
-
-    const weeklyHours = Number(workTerms.ores_ergasias_ebdomadas || 0);
-    return weeklyHours >= 40;
+    return resolveFullTimeFromWorkTerms(workTerms) === true;
 }
 
 function asDateOnlyUtc(value, endOfDay = false) {
@@ -1413,7 +1316,16 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
         });
     }
 
-    const atomicRows = await ProdhlomenaOrariaModel.find(fullPeriodFilter)
+    const analysisPeriodStart = startOfWeekMondayUtc(requestedPeriodStart);
+    const analysisPeriodEnd = endOfWeekSundayUtc(requestedPeriodEnd);
+    const atomicReadFilter = {
+        ...fullPeriodFilter,
+        hmeromhnia: mongoose.trusted({
+            $gte: analysisPeriodStart,
+            $lte: analysisPeriodEnd
+        })
+    };
+    const atomicRows = await ProdhlomenaOrariaModel.find(atomicReadFilter)
         .select(ATOMIC_REPO_TRANSFER_ROW_FIELDS)
         .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1, _id: 1 })
         .lean();
@@ -1445,13 +1357,13 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
                   $or: mongoose.trusted([
                       {
                           hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({
-                              $lte: requestedPeriodEnd
+                              $lte: analysisPeriodEnd
                           })
                       },
                       {
                           hmeromhnia_isxyos_oron_ergasias_apo: null,
                           hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({
-                              $lte: requestedPeriodEnd
+                              $lte: analysisPeriodEnd
                           })
                       }
                   ])
@@ -1477,6 +1389,11 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     ]);
 
     const employeeByKodikos = buildCompanyWideUniqueEmployeeByKodikos(employeeRows);
+    const atomicPolicyRows = atomicRows.filter((row) => {
+        const employee = employeeByKodikos.get(String(row?.kodikos || '').trim());
+        if (!employee) return true;
+        return isWeekFullyWithinEmploymentPeriod(row.hmeromhnia, employee);
+    });
     const historyByKodikos = new Map();
     historyRows.forEach((history) => {
         const kodikos = String(history?.kodikos || '').trim();
@@ -1495,9 +1412,11 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     });
 
     const builtInputs = buildWeeklyRepoTransferAtomicInputs({
-        rows: atomicRows,
-        periodStart: requestedPeriodStart,
-        periodEnd: requestedPeriodEnd,
+        rows: atomicPolicyRows,
+        periodStart: analysisPeriodStart,
+        periodEnd: analysisPeriodEnd,
+        validationPeriodStart: requestedPeriodStart,
+        validationPeriodEnd: requestedPeriodEnd,
         asOfDate: authoritativeAsOfDate,
         holidayByDateKey,
         existingAuditCountByRowKey,
@@ -1527,8 +1446,6 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
 
             return {
                 typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
-                mhniaia_repo: effectiveProfile.mhniaia_repo,
-                raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
                 pososto_prosayxhshs_6hs_hmeras:
                     effectiveProfile.pososto_prosayxhshs_6hs_hmeras,
                 hmeres_ergasias_ebdomadas:
@@ -1551,7 +1468,10 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
         }
     });
 
-    return buildWeeklyRepoTransferAtomicPageProjection(builtInputs);
+    return buildWeeklyRepoTransferAtomicPageProjection(builtInputs, {
+        presentationStart: requestedPeriodStart,
+        presentationEnd: requestedPeriodEnd
+    });
 }
 
 function getWeekRangesInsidePeriod(apoDate, eosDate) {
@@ -1598,13 +1518,34 @@ async function runWeeklyRepoPostCheck({
     const result = {
         recordsChecked: 0,
         recordsUpdated: 0,
-        deviations: []
+        deviations: [],
+        compensationBreakdowns: {
+            ready: 0,
+            needsHrDecision: 0,
+            daysWithRejectedCompanyRule: 0
+        }
     };
+
+    const periodStart = clampDateStartUtc(apoDate);
+    const periodEnd = clampDateEndUtc(eosDate);
 
     const employeeQuery = {
         team: sessionTeam,
         company_kod: companyId,
-        energos: true
+        $and: mongoose.trusted([
+            {
+                $or: mongoose.trusted([
+                    { hmeromhnia_proslhpshs: null },
+                    { hmeromhnia_proslhpshs: mongoose.trusted({ $lte: periodEnd }) }
+                ])
+            },
+            {
+                $or: mongoose.trusted([
+                    { hmeromhnia_apoxorhshs: null },
+                    { hmeromhnia_apoxorhshs: mongoose.trusted({ $gte: periodStart }) }
+                ])
+            }
+        ])
     };
 
     if (selectedYpokatasthma) {
@@ -1613,10 +1554,13 @@ async function runWeeklyRepoPostCheck({
 
     const employees = await ErgazomenoiModel.find(employeeQuery)
         .select(
-            'ypokatasthma kodikos eponymo onoma mhniaia_repo ' +
+            'ypokatasthma kodikos eponymo onoma ' +
+                'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                 'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
-                'typos_ergazomenon'
+                'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                'typos_apasxolhshs typos_ebdomadas ' +
+                'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
+                'pososto_prosayxhshs_6hs_hmeras nomimoOromisthio pragmatikoOromisthio'
         )
         .sort({ kodikos: 1 })
         .lean();
@@ -1633,9 +1577,6 @@ async function runWeeklyRepoPostCheck({
     if (kodikoi.length === 0) {
         return result;
     }
-
-    const periodStart = clampDateStartUtc(apoDate);
-    const periodEnd = clampDateEndUtc(eosDate);
 
     const istorikoRowsByKodikos = new Map();
 
@@ -1681,8 +1622,11 @@ async function runWeeklyRepoPostCheck({
                     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                    'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
-                    'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt'
+                    'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                    'typos_apasxolhshs typos_ebdomadas ' +
+                    'pososto_prosayxhshs_6hs_hmeras ' +
+                    'nomimoOromisthio pragmatikoOromisthio ' +
+                    'employment_profile_source afora_allagh_oron_ergasias createdAt'
             )
             .sort({
                 kodikos: 1,
@@ -1701,7 +1645,7 @@ async function runWeeklyRepoPostCheck({
         }
     }
 
-    const rows = await ProdhlomenaOrariaModel.find({
+    const postCheckRowsQuery = {
         team: sessionTeam,
         company_kod: companyId,
         kodikos: mongoose.trusted({ $in: kodikoi }),
@@ -1709,15 +1653,52 @@ async function runWeeklyRepoPostCheck({
             $gte: periodStart,
             $lte: periodEnd
         })
-    })
+    };
+
+    if (selectedYpokatasthma) {
+        postCheckRowsQuery.ypokatasthma = selectedYpokatasthma;
+    }
+
+    const loadedRows = await ProdhlomenaOrariaModel.find(postCheckRowsQuery)
         .select(
-            'team company_kod kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
-                'ores_ergasias cards_ores_ergasias apologistiko_biblio is_locked'
+            'team company_kod kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika repo repo_apologistika ' +
+                'ores_ergasias cards_ores_ergasias ores_apoysias adeia adeia_apologistika ' +
+                'kathgoria_adeias kathgoria_adeias_apologistika argia argia_apologistika ' +
+                'astheneia astheneia_apologistika apologistiko_biblio is_locked ' +
+                'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                'ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+                'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ' +
+                'ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika'
         )
         .sort({ kodikos: 1, hmeromhnia: 1 })
         .lean();
 
+    const rows = loadedRows.filter((row) => {
+        const employee = employeesByKodikos.get(String(row.kodikos || ''));
+        return employee
+            ? isDateWithinEmploymentPeriod(row.hmeromhnia, employee)
+            : false;
+    });
+
+    const postCheckArgiesDateSet = new Set(
+        rows
+            .filter((row) => row.argia === true || row.argia_apologistika === true)
+            .map((row) => dateKeyUtc(row.hmeromhnia))
+    );
+
     result.recordsChecked = rows.length;
+
+    const companyPolicyRules = await ApasxoliseisCompanyPolicyRuleModel.find({
+        team: sessionTeam,
+        company_kod: companyId,
+        status: 'ACTIVE',
+        effective_from: mongoose.trusted({ $lte: periodEnd }),
+        $or: mongoose.trusted([
+            { effective_to: mongoose.trusted({ $gte: periodStart }) },
+            { effective_to: null }
+        ])
+    })
+        .lean();
 
     const rowsByEmployeeAndDate = new Map();
 
@@ -1734,6 +1715,10 @@ async function runWeeklyRepoPostCheck({
 
         for (const week of weekRanges) {
             let pragmatikaRepo = 0;
+            const weekFullyInsideEmployment = isWeekFullyWithinEmploymentPeriod(
+                week.weekStart,
+                erg
+            );
 
             const weeklyProfileInfo = getWeeklyRepoProfileInfo({
                 week,
@@ -1744,6 +1729,30 @@ async function runWeeklyRepoPostCheck({
             const expectedWeeklyRepo = weeklyProfileInfo.expectedWeeklyRepo;
             const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
             const previousProfile = weeklyProfileInfo.previousProfile || {};
+
+            const weekRows = [];
+            for (
+                let weekDay = clampDateStartUtc(week.weekStart);
+                weekDay.getTime() <= week.weekEnd.getTime();
+                weekDay = addDaysUtc(weekDay, 1)
+            ) {
+                const weekRow = rowsByEmployeeAndDate.get(
+                    `${erg.kodikos}|${dateKeyUtc(weekDay)}`
+                );
+                if (weekRow) weekRows.push(weekRow);
+            }
+            const sixthSeventhAnalysis = weekFullyInsideEmployment
+                ? analyzeWeeklySixthSeventhDay({
+                      weekRows,
+                      effectiveProfile,
+                      hourlyRate: effectiveProfile.pragmatikoOromisthio
+                  })
+                : {
+                      status: 'READY',
+                      reasons: [],
+                      sixthDay: null,
+                      seventhDay: null
+                  };
 
             for (
                 let day = clampDateStartUtc(week.weekStart);
@@ -1764,14 +1773,46 @@ async function runWeeklyRepoPostCheck({
                 const isFullTimeProfile = isFullTimeWorkTerms(dailyProfile);
 
                 const update = {};
+                const hasUnresolvedCardPair = resolveCardPairVerification(
+                    row
+                ).hasUnresolvedCardEvidence;
 
-                if (kathgoriaErgasias === 'ΑΝ' && oresErgasiasIsZero && cardsOresIsZero) {
-                    if (isFullTimeProfile) {
-                        pragmatikaRepo += 1;
-                    }
-                } else if (kathgoriaErgasias === 'ΑΝ' && oresErgasiasIsZero && cardsOresIsNonZero) {
+                if (hasUnresolvedCardPair) {
+                    Object.assign(update, buildPartialVerifiedCardUpdate(row).update);
+                }
+
+                // Αδύνατος απολογιστικός χαρακτηρισμός: με δηλωμένες ώρες
+                // και πραγματική εργασία από κάρτες, το παλιό «ΜΕ» δεν
+                // επιτρέπεται να επιβιώνει σε καμία ημερήσια φάση.
+                if (
+                    !hasUnresolvedCardPair &&
+                    isNonZeroHours(row.ores_ergasias) &&
+                    cardsOresIsNonZero &&
+                    String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΜΕ'
+                ) {
+                    update.kathgoria_ergasias_apologistika = '';
+                    update.repo_apologistika = false;
+                }
+
+                const declaredNonWork = isFullTimeProfile
+                    ? kathgoriaErgasias === 'ΑΝ'
+                    : kathgoriaErgasias === 'ΜΕ' || kathgoriaErgasias === 'ΑΝ';
+
+                if (
+                    !hasUnresolvedCardPair &&
+                    declaredNonWork &&
+                    oresErgasiasIsZero &&
+                    cardsOresIsZero
+                ) {
+                    pragmatikaRepo += 1;
+                } else if (
+                    !hasUnresolvedCardPair &&
+                    declaredNonWork &&
+                    oresErgasiasIsZero &&
+                    cardsOresIsNonZero
+                ) {
                     update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
-                } else if (isNoCardDeclaredWorkRow(row)) {
+                } else if (!hasUnresolvedCardPair && isNoCardDeclaredWorkRow(row)) {
                     const noCardsDisplayStatus = resolveNoCardsDisplayStatus(
                         row,
                         noCardsDisplayContext
@@ -1788,6 +1829,64 @@ async function runWeeklyRepoPostCheck({
                         noCardsDisplayStatus === 'ΑΔΕΙΑ' ? 'ΑΔΑΛ' : '';
                 }
 
+                const rowDateKey = dateKeyUtc(row.hmeromhnia);
+                const isSixthDay = sixthSeventhAnalysis?.sixthDay?.hmeromhnia === rowDateKey;
+                const isSeventhDay =
+                    sixthSeventhAnalysis?.seventhDay?.hmeromhnia === rowDateKey;
+                const weeklyIllegalOvertimeHours = isSixthDay
+                    ? sixthSeventhAnalysis.sixthDay.illegalOvertimeHours
+                    : isSeventhDay
+                      ? sixthSeventhAnalysis.seventhDay.illegalOvertimeHours
+                      : 0;
+                if (weeklyIllegalOvertimeHours > 0) {
+                    Object.assign(
+                        update,
+                        buildWeeklyIllegalOvertimeUpdate(
+                            { ...row, ...update },
+                            dailyProfile,
+                            weeklyIllegalOvertimeHours,
+                            postCheckArgiesDateSet
+                        )
+                    );
+                }
+                const compensationBreakdown = buildDailyCompensationBreakdown({
+                    row: { ...row, ...update },
+                    companyKod: companyId,
+                    atDate: row.hmeromhnia,
+                    paidHourlyRate: dailyProfile.pragmatikoOromisthio,
+                    legalHourlyRate: dailyProfile.nomimoOromisthio,
+                    sixthDayHours: isSixthDay
+                        ? sixthSeventhAnalysis.sixthDay.sixthDayHours
+                        : 0,
+                    weeklyIllegalOvertimeHours,
+                    sixthDayMandatoryRatePercent:
+                        dailyProfile.pososto_prosayxhshs_6hs_hmeras,
+                    companyRules: companyPolicyRules,
+                    blockingReasons:
+                        week.isFullWeek && sixthSeventhAnalysis.status === 'NEEDS_HR_DECISION'
+                            ? sixthSeventhAnalysis.reasons
+                            : []
+                });
+                update.ores_pragmatikhs_ergasias_apologistika =
+                    compensationBreakdown.hours.actualWorkHours;
+                update.ores_adeias_pistomenes_apologistika =
+                    compensationBreakdown.hours.paidLeaveHours;
+                update.ores_argias_pistomenes_apologistika =
+                    compensationBreakdown.hours.holidayCreditedHours;
+                update.compensation_breakdown_apologistika = compensationBreakdown;
+                if (compensationBreakdown.status === 'READY') {
+                    result.compensationBreakdowns.ready += 1;
+                } else {
+                    result.compensationBreakdowns.needsHrDecision += 1;
+                }
+                if (
+                    compensationBreakdown.warnings.some((warning) =>
+                        String(warning).startsWith('REJECTED_')
+                    )
+                ) {
+                    result.compensationBreakdowns.daysWithRejectedCompanyRule += 1;
+                }
+
                 if (Object.keys(update).length > 0 && row.is_locked !== true) {
                     bulkOps.push({
                         updateOne: {
@@ -1801,13 +1900,13 @@ async function runWeeklyRepoPostCheck({
 
             if (
                 week.isFullWeek &&
+                weekFullyInsideEmployment &&
                 (
                     weeklyProfileInfo.repoResolutionReason ||
                     Number(pragmatikaRepo) !== Number(expectedWeeklyRepo)
                 )
             ) {
                 const excessRepo = Math.max(0, Number(pragmatikaRepo) - Number(expectedWeeklyRepo));
-
                 result.deviations.push({
                     team: sessionTeam,
                     company_kod: companyId,
@@ -1827,17 +1926,22 @@ async function runWeeklyRepoPostCheck({
                     repo_resolution_source: weeklyProfileInfo.repoResolutionSource,
                     repo_resolution_reason: weeklyProfileInfo.repoResolutionReason,
                     actual_repo: pragmatikaRepo,
-                    mhniaia_repo: expectedWeeklyRepo,
+                    missing_repo: Math.max(
+                        Number(expectedWeeklyRepo || 0) - Number(pragmatikaRepo),
+                        0
+                    ),
                     pragmatikaRepo,
                     profile_changed_inside_week: weeklyProfileInfo.profileChangedInsideWeek,
                     excess_repo: excessRepo,
-                    effective_mhniaia_repo: expectedWeeklyRepo,
+                    effective_expected_repo: expectedWeeklyRepo,
+                    effective_weekly_workdays:
+                        Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
+                    expected_repo_source: weeklyProfileInfo.repoResolutionSource || '',
                     effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                     effective_profile_source:
                         effectiveProfile.employment_profile_source || effectiveProfile.source || '',
                     effective_profile_date: weeklyProfileInfo.effectiveProfileDate,
                     effective_profile_istoriko_id: effectiveProfile.istorikoId || null,
-                    previous_mhniaia_repo: getExpectedWeeklyRepo(previousProfile),
                     previous_typos_apasxolhshs: previousProfile.typos_apasxolhshs || '',
                     previous_profile_source:
                         previousProfile.employment_profile_source || previousProfile.source || '',
@@ -1867,12 +1971,18 @@ async function runWeeklyRepoPostCheck({
     // Πριν γράψουμε τα νέα αποτελέσματα, καθαρίζουμε μόνο τις αποκλίσεις
     // της ίδιας ομάδας/εταιρείας/περιόδου, ώστε το review να δείχνει πάντα
     // το τελευταίο αποτέλεσμα του υπολογισμού χωρίς να χρειάζεται νέο re-calc.
-    await ProdhlomenaOrariaDeviationsModel.deleteMany({
+    const deviationsCleanupFilter = {
         team: sessionTeam,
         company_kod: companyId,
         period_apo: asDateOnlyUtc(apoDate),
         period_eos: asDateOnlyUtc(eosDate, true)
-    });
+    };
+
+    if (selectedYpokatasthma) {
+        deviationsCleanupFilter.ypokatasthma = selectedYpokatasthma;
+    }
+
+    await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter);
 
     if (result.deviations.length > 0) {
         await ProdhlomenaOrariaDeviationsModel.insertMany(
@@ -1891,14 +2001,16 @@ async function runWeeklyRepoPostCheck({
                 sourceVersion: d.sourceVersion,
                 expected_repo: d.expected_repo,
                 actual_repo: d.actual_repo,
+                missing_repo: d.missing_repo,
                 profile_changed_inside_week: d.profile_changed_inside_week,
                 excess_repo: d.excess_repo,
-                effective_mhniaia_repo: d.effective_mhniaia_repo,
+                effective_expected_repo: d.effective_expected_repo,
+                effective_weekly_workdays: d.effective_weekly_workdays,
+                expected_repo_source: d.expected_repo_source,
                 effective_typos_apasxolhshs: d.effective_typos_apasxolhshs,
                 effective_profile_source: d.effective_profile_source,
                 effective_profile_date: d.effective_profile_date,
                 effective_profile_istoriko_id: d.effective_profile_istoriko_id,
-                previous_mhniaia_repo: d.previous_mhniaia_repo,
                 previous_typos_apasxolhshs: d.previous_typos_apasxolhshs,
                 previous_profile_source: d.previous_profile_source,
                 previous_profile_date: d.previous_profile_date,
@@ -2104,6 +2216,8 @@ function buildWorkTermsFromEmployee(ergazomenos = {}) {
     const weeklyHours = getNumber(ergazomenos.ores_ergasias_ebdomadas, 40);
     const averageDailyHours =
         getNumber(ergazomenos.mo_oron_hmerhsias_ergasias, 0) || weeklyHours / Math.max(hmeres, 1);
+    const employmentType =
+        ergazomenos.kathestos_apasxolhshs || ergazomenos.typos_apasxolhshs || '';
 
     return {
         source: 'ERG_AKTUAL',
@@ -2111,10 +2225,10 @@ function buildWorkTermsFromEmployee(ergazomenos = {}) {
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: weeklyHours,
         mo_oron_hmerhsias_ergasias: averageDailyHours,
-        typos_apasxolhshs: ergazomenos.typos_apasxolhshs || '',
+        kathestos_apasxolhshs: employmentType,
+        typos_apasxolhshs: employmentType,
         typos_ebdomadas: ergazomenos.typos_ebdomadas || '',
         typos_ergazomenon: ergazomenos.typos_ergazomenon || '',
-        mhniaia_repo: getNumber(ergazomenos.mhniaia_repo, 0),
         employment_profile_source: 'ERG_AKTUAL',
         hmeromhnia_allaghs_symbashs: null
     };
@@ -2127,6 +2241,12 @@ function buildWorkTermsFromHistory(row = {}, fallbackErgazomenos = {}) {
     const weeklyHours = getNumber(row.ores_ergasias_ebdomadas, fallback.ores_ergasias_ebdomadas);
     const averageDailyHours =
         getNumber(row.mo_oron_hmerhsias_ergasias, 0) || weeklyHours / Math.max(hmeres, 1);
+    const employmentType =
+        row.kathestos_apasxolhshs ||
+        row.typos_apasxolhshs ||
+        fallback.kathestos_apasxolhshs ||
+        fallback.typos_apasxolhshs ||
+        '';
 
     return {
         source: 'ISTORIKO',
@@ -2134,10 +2254,10 @@ function buildWorkTermsFromHistory(row = {}, fallbackErgazomenos = {}) {
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: weeklyHours,
         mo_oron_hmerhsias_ergasias: averageDailyHours,
-        typos_apasxolhshs: row.typos_apasxolhshs || fallback.typos_apasxolhshs || '',
+        kathestos_apasxolhshs: employmentType,
+        typos_apasxolhshs: employmentType,
         typos_ebdomadas: row.typos_ebdomadas || fallback.typos_ebdomadas || '',
         typos_ergazomenon: row.typos_ergazomenon || fallback.typos_ergazomenon || '',
-        mhniaia_repo: getNumber(row.mhniaia_repo, fallback.mhniaia_repo || 0),
         employment_profile_source: row.employment_profile_source || 'ISTORIKO',
         hmeromhnia_allaghs_symbashs: row.hmeromhnia_allaghs_symbashs || null,
         hmeromhnia_allaghs_orarioy_apo: row.hmeromhnia_allaghs_orarioy_apo || null,
@@ -2297,6 +2417,37 @@ function toHours(minutes) {
     return +(minutes / 60).toFixed(2);
 }
 
+function buildWeeklyIllegalOvertimeUpdate(
+    rec,
+    workTerms,
+    illegalOvertimeHours,
+    argiesDateSet
+) {
+    const targetMinutes = Math.max(0, Math.round(Number(illegalOvertimeHours || 0) * 60));
+    const workedMinutes = [];
+
+    for (const interval of getPayrollCalculationIntervals(rec, workTerms)) {
+        for (let minute = interval.start; minute < interval.end; minute++) {
+            workedMinutes.push(minute);
+        }
+    }
+
+    const illegalMinutes = workedMinutes.slice(Math.max(0, workedMinutes.length - targetMinutes));
+    const classified = emptyClassifiedMinutes();
+    for (const minute of illegalMinutes) {
+        addClassifiedMinute(classified, rec, minute, argiesDateSet);
+    }
+
+    return {
+        ores_paranomhs_yperorias_apologistika: toHours(classified.normal),
+        ores_paranomhs_yperorias_nyxtas_apologistika: toHours(classified.night),
+        ores_paranomhs_yperorias_argion_apologistika: toHours(classified.holiday),
+        ores_paranomhs_yperorias_argion_nyxtas_apologistika: toHours(
+            classified.holidayNight
+        )
+    };
+}
+
 function chunkArray(arr, size = 300) {
     const chunks = [];
 
@@ -2368,12 +2519,14 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     const declaredMinutes = getDailyDeclaredMinutes(rec);
     const dailyCardsMinutes = getPayrollDailyWorkMinutes(rec, ergazomenos);
 
-    // Βάση ημέρας για το πότε ξεκινάει το extra:
-    // - Αν υπάρχει προδηλωμένο πρόγραμμα, ξεκινάμε μετά τα προδηλωμένα λεπτά.
-    // - Αν δεν υπάρχει προδηλωμένο, ξεκινάμε μετά το συμβατικό ημερήσιο όριο
-    //   του εργαζομένου από τους effective όρους εργασίας/ιστορικό.
-    const baseWorkMinutes =
-        declaredMinutes > 0 ? declaredMinutes : rules.contractualDailyLimitMinutes;
+    // Στην πλήρη απασχόληση η μικρότερη προδήλωση δεν επιτρέπεται να κατεβάζει
+    // τη συμβατική ημερήσια βάση και να δημιουργεί πλασματική υπερεργασία.
+    // Η απόκλιση από το προδηλωμένο πρόγραμμα ελέγχεται χωριστά.
+    const baseWorkMinutes = employmentTypeForAdditional === 'FULL'
+        ? rules.contractualDailyLimitMinutes
+        : declaredMinutes > 0
+            ? declaredMinutes
+            : rules.contractualDailyLimitMinutes;
 
     const regularDay = isRegularWorkingDayForOverwork(rec, ergazomenos);
 
@@ -2827,34 +2980,28 @@ function getEffectiveDailyWorkMinutesForApologistika(rec, ergazomenos = null) {
 // (νύχτα, αργίες, πρόσθετη εργασία, υπερεργασία, υπερωρίες).
 //
 // Κανόνας:
-// - Αν οι κάρτες είναι πλήρεις, υπολογίζουμε από τις πραγματικές κάρτες.
-// - Αν υπάρχει ελλιπές ζεύγος κάρτας (μόνο είσοδος ή μόνο έξοδος) και
-//   έχει παραχθεί απολογιστικό ζεύγος, χρησιμοποιούμε το απολογιστικό
-//   ως ασφαλή ανακατασκευή του χρόνου.
-// Έτσι δεν κόβουμε πραγματική υπερωρία από πλήρεις κάρτες, αλλά δεν
-// μηδενίζουμε και τις ημέρες με ελλιπείς κάρτες.
+// - Αν υπάρχει ελλιπές ζεύγος, χρησιμοποιούμε μόνο τα ανεξάρτητα πλήρη
+//   ζεύγη. Δεν μαντεύουμε την ώρα που λείπει και δεν συνδέουμε διαφορετικά
+//   slots μεταξύ τους.
+// - Με πλήρεις κάρτες χρησιμοποιούμε τις πραγματικές κάρτες και μόνο ως
+//   fallback ήδη έγκυρα απολογιστικά διαστήματα.
 // ============================================================
-function hasIncompleteCardPair(rec = {}) {
-    for (let n = 1; n <= 3; n++) {
-        const p = String(n).padStart(2, '0');
-        const hasApo = hasTime(rec[`cards_apo_ora_${p}`]);
-        const hasEos = hasTime(rec[`cards_eos_ora_${p}`]);
+function getPayrollCalculationIntervals(rec, ergazomenos = null) {
+    const verification = resolveCardPairVerification(rec);
 
-        if (hasApo !== hasEos) {
-            return true;
-        }
+    if (verification.hasUnresolvedCardEvidence) {
+        return verification.completePairs.map((pair) => ({
+            index: Number(pair.pairNumber),
+            apo: pair.start,
+            eos: pair.end,
+            start: pair.startMinutes,
+            end: pair.isOvernight ? pair.endMinutes + 1440 : pair.endMinutes,
+            source: 'CARD_PARTIALLY_VERIFIED'
+        }));
     }
 
-    return false;
-}
-
-function getPayrollCalculationIntervals(rec, ergazomenos = null) {
     const rawIntervals = getCardIntervals(rec, ergazomenos);
     const apologistikaIntervals = getApologistikaIntervals(rec);
-
-    if (hasIncompleteCardPair(rec) && apologistikaIntervals.length > 0) {
-        return apologistikaIntervals;
-    }
 
     if (rawIntervals.length > 0) {
         return rawIntervals;
@@ -2958,13 +3105,15 @@ function checkOresApoysias(context) {
         declaredHours > 0 && absenceDiff > toleranceHours ? +absenceDiff.toFixed(2) : 0;
 
     // ============================================================
-    // Σε αυτή τη φάση ΔΕΝ πειράζουμε:
+    // Αυτός ο βοηθητικός υπολογισμός ενημερώνει αποκλειστικά εργασία και απουσία.
+    // Δεν πειράζει:
     // - υπερεργασίες
     // - νόμιμες υπερωρίες
     // - παράνομες υπερωρίες
     // - apo_ora_yperories / eos_ora_yperories
     //
-    // Αυτά θα υπολογιστούν/διορθωθούν σε επόμενη φάση.
+    // Οι παραπάνω κατηγορίες υπολογίζονται από τις εξειδικευμένες υπηρεσίες
+    // ημερήσιας ταξινόμησης και ανάλυσης αποδοχών.
     // ============================================================
     return {
         ores_ergasias_apologistika: +effectiveCardsHours.toFixed(2),
@@ -3217,6 +3366,26 @@ function reviewIntervals(row, apoPrefix, eosPrefix, suffix = '') {
         .join(' / ');
 }
 
+function reviewHasCardEvidence(row = {}) {
+    return (
+        reviewNum(row.cards_ores_ergasias) > 0 ||
+        [1, 2, 3].some((n) => {
+            const p = String(n).padStart(2, '0');
+            return Boolean(
+                String(row[`cards_apo_ora_${p}`] || '').trim() ||
+                String(row[`cards_eos_ora_${p}`] || '').trim()
+            );
+        })
+    );
+}
+
+function reviewHasDeclaredWorkEvidence(row = {}) {
+    return (
+        reviewNum(row.ores_ergasias) > 0 ||
+        Boolean(reviewIntervals(row, 'apo_ora', 'eos_ora'))
+    );
+}
+
 function reviewEffectiveKathgoria(row = {}) {
     const apologistiki = String(row.kathgoria_ergasias_apologistika || '').trim();
     return apologistiki || String(row.kathgoria_ergasias || '').trim();
@@ -3228,14 +3397,52 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     ).trim();
     const apologistikiKathgoria = String(row.kathgoria_ergasias_apologistika || '').trim();
     const reviewPhaseCode = String(phaseCode || '').trim();
-    const isNonFullPhase =
-        reviewPhaseCode === '1' ||
-        reviewPhaseCode === '2' ||
-        (!reviewPhaseCode && !isFullTimeWorkTerms(effectiveProfile));
+    const hasCards = reviewHasCardEvidence(row);
+    const hasNoCards = !hasCards;
+    const isNonFullPhase = !resolveReviewIsFullTimeProfile(
+        effectiveProfile,
+        reviewPhaseCode
+    );
+
+    // Δηλωμένη εργασία + κάρτες αποκλείουν το «ΜΕ» σε κάθε ημερήσια φάση.
+    // Καθαρίζεται και στην απόκριση ώστε παλιά δεδομένα να μη φαίνονται λάθος
+    // πριν από τον επόμενο επανυπολογισμό.
+    if (
+        reviewHasDeclaredWorkEvidence(row) &&
+        hasCards &&
+        apologistikiKathgoria === 'ΜΕ'
+    ) {
+        return {
+            ...row,
+            kathgoria_ergasias_apologistika: '',
+            repo_apologistika: false,
+            review_phase_code: reviewPhaseCode,
+            review_kathestos_code: reviewPhaseCode
+        };
+    }
+
+    // Σε ημερήσια μερική/εκ περιτροπής φάση, το προδηλωμένο «ΜΕ» χωρίς
+    // κάρτες είναι ήδη η ορθή κατάσταση «ΜΗ ΕΡΓΑΣΙΑ». Δεν αποτελεί
+    // απολογιστική μεταβολή, επομένως η απολογιστική στήλη μένει ουδέτερη.
+    if (
+        isNonFullPhase &&
+        declaredKathgoria === 'ΜΕ' &&
+        hasNoCards &&
+        (apologistikiKathgoria === 'ΑΝ' || apologistikiKathgoria === 'ΜΕ')
+    ) {
+        return {
+            ...row,
+            kathgoria_ergasias_apologistika: '',
+            repo_apologistika: false,
+            review_phase_code: reviewPhaseCode,
+            review_kathestos_code: reviewPhaseCode
+        };
+    }
 
     if (
         isNonFullPhase &&
         declaredKathgoria === 'ΕΡΓ' &&
+        hasNoCards &&
         apologistikiKathgoria === 'ΑΝ'
     ) {
         return {
@@ -3322,17 +3529,44 @@ function getReviewPhaseCodeForRow(row = {}, phaseContextByKodikos = new Map()) {
 }
 
 function reviewIsFullTimeProfile(row = {}) {
-    const reviewPhaseCode = String(row.review_phase_code ?? row.review_kathestos_code ?? '').trim();
-    if (reviewPhaseCode === '0') return true;
-    if (reviewPhaseCode === '1' || reviewPhaseCode === '2') return false;
-
-    return (
+    if (
         row.effective_is_full_time === true ||
         row.effective_is_full_time === 'true' ||
         row.effective_is_full_time === 1 ||
-        row.effective_is_full_time === '1' ||
-        String(row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs ?? '').trim() === '0'
+        row.effective_is_full_time === '1'
+    ) {
+        return true;
+    }
+    if (
+        row.effective_is_full_time === false ||
+        row.effective_is_full_time === 'false' ||
+        row.effective_is_full_time === 0 ||
+        row.effective_is_full_time === '0'
+    ) {
+        return false;
+    }
+
+    const reviewPhaseCode = String(row.review_phase_code ?? row.review_kathestos_code ?? '').trim();
+    return resolveReviewIsFullTimeProfile(
+        {
+            kathestos_apasxolhshs:
+                row.effective_kathestos_apasxolhshs ?? row.kathestos_apasxolhshs,
+            typos_apasxolhshs:
+                row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs,
+            hmeres_ergasias_ebdomadas:
+                row.effective_weekly_workdays ?? row.hmeres_ergasias_ebdomadas,
+            ores_ergasias_ebdomadas:
+                row.effective_weekly_hours ?? row.ores_ergasias_ebdomadas,
+            mo_oron_hmerhsias_ergasias:
+                row.effective_daily_hours ?? row.mo_oron_hmerhsias_ergasias
+        },
+        reviewPhaseCode
     );
+}
+
+function reviewLeaveProvenance(row = {}) {
+    const persisted = String(row.leave_provenance || '').trim();
+    return persisted || classifyLeaveProvenance(row);
 }
 
 function reviewProgramDisplay(row = {}) {
@@ -3354,12 +3588,38 @@ function reviewProgramDisplay(row = {}) {
 
 function reviewApologistikoDisplay(row = {}) {
     const effectiveKathgoria = reviewEffectiveKathgoria(row);
-    const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
+    const hasCards = reviewHasCardEvidence(row);
+    const hasNoCards = !hasCards;
     const isFullTimeProfile = reviewIsFullTimeProfile(row);
 
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
     ).trim();
+    const declaredCategory = String(
+        row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
+    ).trim();
+    const intervals = reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika');
+
+    if (
+        persistedCategory === 'ΜΕ' &&
+        reviewHasDeclaredWorkEvidence(row) &&
+        hasCards
+    ) {
+        return intervals
+            ? { text: intervals, type: 'apologistiko' }
+            : { text: '-', type: '' };
+    }
+
+    // Το προδηλωμένο «ΜΕ» χωρίς κάρτες αποτυπώνεται αποκλειστικά στη
+    // στήλη Προδηλωμένο. Δεν επαναλαμβάνεται ως απολογιστική μεταβολή.
+    if (
+        declaredCategory === 'ΜΕ' &&
+        hasNoCards &&
+        !reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika') &&
+        (persistedCategory === '' || persistedCategory === 'ΑΝ' || persistedCategory === 'ΜΕ')
+    ) {
+        return { text: '-', type: '' };
+    }
     if (
         row.repo_apologistika === true ||
         (
@@ -3390,6 +3650,10 @@ function reviewApologistikoDisplay(row = {}) {
         return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
     }
 
+    if (reviewLeaveProvenance(row) === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE) {
+        return { text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ', type: 'adeia_suggestion' };
+    }
+
     if (!persistedCategory) {
         const noCardsDisplayStatus = String(row.noCardsDisplayStatus || '').trim();
         if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {
@@ -3400,7 +3664,6 @@ function reviewApologistikoDisplay(row = {}) {
         }
     }
 
-    const intervals = reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika');
     if (intervals) return { text: intervals, type: 'apologistiko' };
     if (persistedCategory) return { text: persistedCategory, type: 'persisted' };
 
@@ -3452,13 +3715,17 @@ function mapDeviationForReviewExport(d = {}) {
         weekEnd: dateKeyUtc(d.week_eos),
         expected_repo: Number(d.expected_repo || 0),
         actual_repo: Number(d.actual_repo || 0),
+        missing_repo: Number(d.missing_repo || 0),
         profile_changed_inside_week: d.profile_changed_inside_week === true,
         excess_repo: Number(d.excess_repo || 0),
-        effective_mhniaia_repo: Number(d.effective_mhniaia_repo || d.expected_repo || 0),
+        effective_expected_repo: Number(
+            d.effective_expected_repo ?? d.expected_repo ?? 0
+        ),
+        effective_weekly_workdays: Number(d.effective_weekly_workdays || 0),
+        expected_repo_source: d.expected_repo_source || '',
         effective_typos_apasxolhshs: d.effective_typos_apasxolhshs || '',
         effective_profile_source: d.effective_profile_source || '',
         effective_profile_date: d.effective_profile_date,
-        previous_mhniaia_repo: Number(d.previous_mhniaia_repo || 0),
         previous_typos_apasxolhshs: d.previous_typos_apasxolhshs || '',
         previous_profile_date: d.previous_profile_date,
         deviation_type: d.deviation_type || '',
@@ -3467,12 +3734,15 @@ function mapDeviationForReviewExport(d = {}) {
 }
 
 function reviewDeviationProfileText(dev = {}) {
-    const repo = dev.effective_mhniaia_repo ?? dev.expected_repo ?? '';
+    const repo = dev.effective_expected_repo ?? dev.expected_repo ?? '';
     const type = reviewEmploymentTypeLabel(dev.effective_typos_apasxolhshs);
     const parts = [];
     if (dev.profile_changed_inside_week) parts.push('Τελικό προφίλ εβδομάδας');
     if (type && type !== '-') parts.push(type);
-    parts.push(`${repo} ρεπό`);
+    if (dev.effective_weekly_workdays) {
+        parts.push(`${dev.effective_weekly_workdays} συμβατικές ημέρες εργασίας`);
+    }
+    parts.push(`${repo} αναμενόμενες ημέρες μη εργασίας`);
     if (dev.effective_profile_date)
         parts.push(`Ισχύει από: ${reviewDateOnly(dev.effective_profile_date)}`);
     return parts.join(' | ');
@@ -3697,10 +3967,60 @@ function buildProdhlomenaReviewFilter(req) {
     if (andFilters.length > 0) filter.$and = mongoose.trusted(andFilters);
     return filter;
 }
+
+function applyPostDepartureExclusionsToFilter(filter, descriptors = []) {
+    if (!filter || descriptors.length === 0) return filter;
+    const exclusions = descriptors.map((descriptor) => {
+        const exclusion = {
+            kodikos: descriptor.kodikos,
+            hmeromhnia: mongoose.trusted({ $gt: descriptor.departureEnd })
+        };
+        if (descriptor.ypokatasthma) {
+            exclusion.ypokatasthma = descriptor.ypokatasthma;
+        }
+        return exclusion;
+    });
+    const existing = Array.isArray(filter.$nor) ? filter.$nor : [];
+    filter.$nor = mongoose.trusted([...existing, ...exclusions]);
+    return filter;
+}
+
+async function applyEmploymentDepartureScopeToFilters({
+    filters = [],
+    team,
+    companyId,
+    ypokatasthma = '',
+    kodikos = ''
+}) {
+    const employeeFilter = { team, company_kod: companyId };
+    const cleanBranch = String(ypokatasthma || '').trim();
+    const cleanKodikos = String(kodikos || '').trim();
+    if (cleanBranch) employeeFilter.ypokatasthma = cleanBranch.padStart(4, '0');
+    if (cleanKodikos) employeeFilter.kodikos = cleanKodikos;
+
+    const employees = await ErgazomenoiModel.find(employeeFilter)
+        .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
+        .lean();
+    const descriptors = buildPostDepartureExclusionDescriptors(employees);
+    filters.forEach((filter) => applyPostDepartureExclusionsToFilter(filter, descriptors));
+    return { employees, descriptors };
+}
+
 const REVIEW_SELECT_FIELDS =
-    'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ores_ergasias_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
+    'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
 async function getReviewRowsForExport(req) {
-    const rows = await ProdhlomenaOrariaModel.find(buildProdhlomenaReviewFilter(req))
+    const reviewFilter = buildProdhlomenaReviewFilter(req);
+    const { employees: lifecycleEmployees } = await applyEmploymentDepartureScopeToFilters({
+        filters: [reviewFilter],
+        team: req.session.userTeam,
+        companyId: req.session.companyInUse,
+        ypokatasthma: req.query.ypokatasthma,
+        kodikos: req.query.kodikos
+    });
+    const lifecycleByKodikos = new Map(
+        lifecycleEmployees.map((employee) => [String(employee.kodikos || ''), employee])
+    );
+    const rows = await ProdhlomenaOrariaModel.find(reviewFilter)
         .select(REVIEW_SELECT_FIELDS)
         .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
         .lean();
@@ -3714,9 +4034,10 @@ async function getReviewRowsForExport(req) {
               kodikos: mongoose.trusted({ $in: kodikoi })
           })
               .select(
-                  'kodikos eponymo onoma ypokatasthma mhniaia_repo ' +
+                  'kodikos eponymo onoma ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                       'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                      'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+                      'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                      'typos_apasxolhshs typos_ebdomadas'
               )
               .lean()
         : [];
@@ -3774,8 +4095,9 @@ async function getReviewRowsForExport(req) {
                     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                    'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
-                    'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt'
+                    'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                    'typos_apasxolhshs typos_ebdomadas ' +
+                    'employment_profile_source afora_allagh_oron_ergasias createdAt'
             )
             .sort({
                 kodikos: 1,
@@ -3835,6 +4157,11 @@ async function getReviewRowsForExport(req) {
             reviewPhaseCode
         );
         const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
+        const leaveProvenance = classifyLeaveProvenance(normalizedRow);
+        const effectiveIsFullTime = resolveReviewIsFullTimeProfile(
+            effectiveProfile,
+            reviewPhaseCode
+        );
 
         return {
             ...normalizedRow,
@@ -3845,20 +4172,28 @@ async function getReviewRowsForExport(req) {
                 normalizedRow,
                 noCardsDisplayContext
             ),
+            leave_provenance: leaveProvenance,
+            is_auto_calculated_leave:
+                leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE,
             eponymo: erg.eponymo || '',
             onoma: erg.onoma || '',
             employeeName: `${erg.eponymo || ''} ${erg.onoma || ''}`.trim(),
             exportYpokatasthma: normalizedRow.ypokatasthma || erg.ypokatasthma || '',
-            effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
-            effective_is_full_time:
-                reviewPhaseCode === '0'
-                    ? true
-                    : reviewPhaseCode === '1' || reviewPhaseCode === '2'
-                      ? false
-                      : isFullTimeWorkTerms(effectiveProfile),
-            effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
+            effective_is_full_time: effectiveIsFullTime,
+            effective_kathestos_apasxolhshs:
+                reviewPhaseCode || effectiveProfile.kathestos_apasxolhshs || '',
+            effective_typos_apasxolhshs:
+                reviewPhaseCode || effectiveProfile.typos_apasxolhshs || '',
             effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
-            effective_profile_source: effectiveProfile.source || '',
+            effective_weekly_workdays:
+                Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
+            effective_weekly_hours:
+                Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
+            effective_daily_hours:
+                Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
+            effective_profile_source:
+                reviewPhaseCode ? 'SCHEDULE_PHASE' : effectiveProfile.source || '',
+            effective_schedule_phase_code: reviewPhaseCode,
             effective_profile_date: getProfileDateForDeviation(
                 effectiveProfile,
                 normalizedRow.hmeromhnia
@@ -3867,7 +4202,16 @@ async function getReviewRowsForExport(req) {
         };
     });
 
-    enrichedRows.__deviations = deviations.map(mapDeviationForReviewExport);
+    enrichedRows.__deviations = deviations
+        .filter((deviation) =>
+            isWeekFullyWithinEmploymentPeriod(
+                deviation.week_apo,
+                lifecycleByKodikos.get(String(deviation.kodikos)) ||
+                    ergByKodikos.get(String(deviation.kodikos)) ||
+                    {}
+            )
+        )
+        .map(mapDeviationForReviewExport);
     return enrichedRows;
 }
 function makeReviewPdfDocument() {
@@ -4838,6 +5182,21 @@ class erganhController {
                 deviationContextFilter.kodikos = String(kodikos).trim();
             }
 
+            const { employees: lifecycleEmployees } =
+                await applyEmploymentDepartureScopeToFilters({
+                filters: [filter, deviationContextFilter],
+                team: sessionTeam,
+                companyId,
+                ypokatasthma,
+                kodikos
+            });
+            const lifecycleByKodikos = new Map(
+                lifecycleEmployees.map((employee) => [
+                    String(employee.kodikos || ''),
+                    employee
+                ])
+            );
+
             const [rows, total, deviationContextRows] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
@@ -4845,14 +5204,19 @@ class erganhController {
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
-                            'repo argia perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
+                            'repo adeia kathgoria_adeias ores_apoysias hr_declared_leave ' +
+                            'argia perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
                             'ores_ergasias cards_ores_ergasias ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
                             'ores_prostheths_ergasias_apologistika ' +
                             'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
                             'ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ' +
                             'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika ' +
-                            'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ' +
-                            'ores_ergasias_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+                            'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika ' +
+                            'astheneia astheneia_apologistika ' +
+                            'ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ' +
+                            'ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika ' +
+                            'compensation_breakdown_apologistika ' +
+                            'ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
                             'is_locked locked_by locked_at unlocked_by unlocked_at'
                     )
                     .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
@@ -4888,9 +5252,11 @@ class erganhController {
                 kodikos: mongoose.trusted({ $in: kodikoiRows })
             })
                 .select(
-                    'kodikos eponymo onoma mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
+                    'kodikos eponymo onoma pososto_prosayxhshs_6hs_hmeras ' +
+                        'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                         'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                        'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+                        'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                        'typos_apasxolhshs typos_ebdomadas'
                         + ' dialleima_se_lepta dialleima_entos_ektos_orarioy'
                         + ' eidikh_kathgoria_ergazomenoy eidikh_periptosh'
                 )
@@ -4973,8 +5339,9 @@ class erganhController {
                             'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                             'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                             'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                            'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
-                            'mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
+                            'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                            'typos_apasxolhshs typos_ebdomadas ' +
+                            'pososto_prosayxhshs_6hs_hmeras ' +
                             'employment_profile_source afora_allagh_oron_ergasias createdAt'
                     )
                     .sort({
@@ -5076,6 +5443,11 @@ class erganhController {
                     reviewPhaseCode
                 );
                 const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
+                const leaveProvenance = classifyLeaveProvenance(normalizedRow);
+                const effectiveIsFullTime = resolveReviewIsFullTimeProfile(
+                    effectiveProfile,
+                    reviewPhaseCode
+                );
 
                 return {
                     ...normalizedRow,
@@ -5086,6 +5458,9 @@ class erganhController {
                         normalizedRow,
                         noCardsDisplayContext
                     ),
+                    leave_provenance: leaveProvenance,
+                    is_auto_calculated_leave:
+                        leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE,
                     ...buildReviewHolidayResponseFields(
                         normalizedRow,
                         noCardsDisplayContext
@@ -5095,18 +5470,24 @@ class erganhController {
 
                     // Ιστορικά σωστό profile για την ΗΜΕΡΑ της εγγραφής.
                     // Χρησιμοποιείται από το frontend για display τύπου:
-                    // - πλήρης + μη εργασία: ΑΝΑΠΑΥΣΗ/ΡΕΠΟ
-                    // - μερική/εκ περιτροπής + μη εργασία: ΜΗ ΕΡΓΑΣΙΑ
-                    effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
-                    effective_is_full_time:
-                        reviewPhaseCode === '0'
-                            ? true
-                            : reviewPhaseCode === '1' || reviewPhaseCode === '2'
-                              ? false
-                              : isFullTimeWorkTerms(effectiveProfile),
-                    effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
+                    // Η ημερήσια schedule phase καθορίζει τη σημασία του
+                    // προδηλωμένου «ΜΕ». Η απολογιστική στήλη παραμένει
+                    // ουδέτερη όταν δεν υπάρχει πραγματική μεταβολή.
+                    effective_is_full_time: effectiveIsFullTime,
+                    effective_kathestos_apasxolhshs:
+                        reviewPhaseCode || effectiveProfile.kathestos_apasxolhshs || '',
+                    effective_typos_apasxolhshs:
+                        reviewPhaseCode || effectiveProfile.typos_apasxolhshs || '',
                     effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
-                    effective_profile_source: effectiveProfile.source || '',
+                    effective_weekly_workdays:
+                        Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
+                    effective_weekly_hours:
+                        Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
+                    effective_daily_hours:
+                        Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
+                    effective_profile_source:
+                        reviewPhaseCode ? 'SCHEDULE_PHASE' : effectiveProfile.source || '',
+                    effective_schedule_phase_code: reviewPhaseCode,
                     effective_profile_date: getProfileDateForDeviation(
                         effectiveProfile,
                         normalizedRow.hmeromhnia
@@ -5162,6 +5543,13 @@ class erganhController {
                               noCardsDisplayContext.argiesByDateKey || new Map(),
                           existingAuditCountByRowKey:
                               deviationAuditCountByRowKey,
+                          resolveEmploymentPeriod: ({ kodikos: employeeKodikos }) => {
+                              const employee = ergByKodikos.get(String(employeeKodikos)) || {};
+                              return {
+                                  employmentStart: employee.hmeromhnia_proslhpshs || null,
+                                  employmentEnd: employee.hmeromhnia_apoxorhshs || null
+                              };
+                          },
                           resolveDailyProfile: (row) =>
                               getEffectiveRepoProfileForDate(
                                   row.hmeromhnia,
@@ -5181,7 +5569,21 @@ class erganhController {
             };
             const enrichedDeviations = deviationPreview.deviations.map(withEmployeeNames);
             const pendingDeviationWeeks = deviationPreview.pendingWeeks.map(withEmployeeNames);
+            const reviewRows = attachSixthDayPresentationToRows(
+                enrichedRows,
+                enrichedDeviations
+            );
             const legacyDeviations = deviations
+                .filter((deviation) => {
+                    const employee =
+                        lifecycleByKodikos.get(String(deviation.kodikos)) ||
+                        ergByKodikos.get(String(deviation.kodikos)) ||
+                        {};
+                    return isWeekFullyWithinEmploymentPeriod(
+                        deviation.week_apo,
+                        employee
+                    );
+                })
                 .map((d) =>
                     normalizeLegacyDeviation({
                         _id: d._id,
@@ -5207,7 +5609,7 @@ class erganhController {
                 limit: limitNum,
                 total,
                 totalPages: Math.ceil(total / limitNum),
-                rows: enrichedRows,
+                rows: reviewRows,
                 deviations: enrichedDeviations,
                 pendingDeviationWeeks,
                 legacyDeviations,
@@ -5327,6 +5729,15 @@ class erganhController {
                 filter.kodikos = String(kodikos).trim();
             }
 
+            const { descriptors: lifecycleDescriptors } =
+                await applyEmploymentDepartureScopeToFilters({
+                    filters: [filter],
+                    team: sessionTeam,
+                    companyId,
+                    ypokatasthma,
+                    kodikos
+                });
+
             const [rows, total] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
@@ -5336,7 +5747,7 @@ class erganhController {
                             'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
-                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika apologistiko_biblio ' +
+                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika compensation_breakdown_apologistika apologistiko_biblio ' +
                             'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika argia kyriakes_apologistika ores_apoysias_apologistika ' +
                             'is_locked locked_by locked_at'
                     )
@@ -5391,6 +5802,44 @@ class erganhController {
                 (rowEndDates.length > 0
                     ? new Date(Math.max(...rowEndDates.map((date) => date.getTime())))
                     : null);
+            let restContextRows = rows;
+            const requestedPolicyCode = String(policy_code || '').trim();
+
+            if (
+                !requestedPolicyCode &&
+                kodikoiRows.length > 0 &&
+                periodStart &&
+                periodEnd
+            ) {
+                const restContextStart = new Date(
+                    periodStart.getTime() - 24 * 60 * 60 * 1000
+                );
+                const restContextEnd = new Date(
+                    periodEnd.getTime() + 24 * 60 * 60 * 1000
+                );
+                const restContextFilter = {
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    kodikos: mongoose.trusted({ $in: kodikoiRows }),
+                    hmeromhnia: mongoose.trusted({
+                        $gte: restContextStart,
+                        $lte: restContextEnd
+                    })
+                };
+
+                applyPostDepartureExclusionsToFilter(
+                    restContextFilter,
+                    lifecycleDescriptors
+                );
+                restContextRows = await ProdhlomenaOrariaModel.find(restContextFilter)
+                    .select(
+                        'team company_kod ypokatasthma kodikos hmeromhnia ' +
+                            'kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                            'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias'
+                    )
+                    .sort({ kodikos: 1, hmeromhnia: 1 })
+                    .lean();
+            }
             const scenarioContext =
                 periodStart && periodEnd
                     ? await buildNoCardsDisplayContext({
@@ -5402,6 +5851,23 @@ class erganhController {
                           periodEnd
                     })
                     : { companyFlags: {}, argiesByDateKey: new Map() };
+            const atomicAnalysisStart = requestedPeriodStart
+                ? startOfWeekMondayUtc(requestedPeriodStart)
+                : null;
+            const atomicAnalysisEnd = requestedPeriodEnd
+                ? endOfWeekSundayUtc(requestedPeriodEnd)
+                : null;
+            const atomicScenarioContext =
+                atomicAnalysisStart && atomicAnalysisEnd
+                    ? await buildNoCardsDisplayContext({
+                          team: sessionTeam,
+                          companyId,
+                          companyKodikos: req.session.companyKodikos,
+                          etos: req.session.yearInUse,
+                          periodStart: atomicAnalysisStart,
+                          periodEnd: atomicAnalysisEnd
+                      })
+                    : null;
             const companyFlags = scenarioContext.companyFlags || {};
             const normalizedCompanyFlags = {
                 companyWorksOnMandatoryHoliday:
@@ -5409,13 +5875,27 @@ class erganhController {
                 companyWorksOnOptionalHoliday:
                     companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true
             };
-            const previewRows = buildApasxoliseisPolicyPreviewRows({
+            const basePreviewRows = buildApasxoliseisPolicyPreviewRows({
                 rows,
                 argiesByDateKey: scenarioContext.argiesByDateKey || new Map(),
                 companyFlags: normalizedCompanyFlags,
                 employeeContextByKodikos,
-                policyCode: String(policy_code || '').trim(),
+                policyCode: requestedPolicyCode,
                 defaultPolicyMode: String(mode || '').trim()
+            });
+            const restPreviewRows = requestedPolicyCode
+                ? []
+                : buildRestPeriodPolicyPreviewRows({
+                      rows: restContextRows,
+                      presentationRowIds: rows.map((row) => String(row._id || ''))
+                  });
+            const reusableDecisionRules = await listActiveReusablePolicyDecisionRecords({
+                session: req.session,
+                ypokatasthma: String(ypokatasthma || '').trim()
+            });
+            const previewRows = applyReusablePolicyDecisionsToPreviewRows({
+                rows: [...basePreviewRows, ...restPreviewRows],
+                rules: reusableDecisionRules
             });
             const summary = summarizeApasxoliseisPolicyPreviewResults(previewRows);
             const grouping = buildApasxoliseisPolicyPreviewGrouping(previewRows);
@@ -5426,12 +5906,10 @@ class erganhController {
                 requestedPeriodStart,
                 requestedPeriodEnd,
                 authoritativeAsOfDate: req.session.appDate,
-                holidayByDateKey: scenarioContext.argiesByDateKey || new Map(),
-                holidayContextResolved:
-                    requestedPeriodStart?.getUTCFullYear() ===
-                        requestedPeriodEnd?.getUTCFullYear() &&
-                    String(requestedPeriodStart?.getUTCFullYear()) ===
-                        String(req.session.yearInUse || '').trim()
+                holidayByDateKey: atomicScenarioContext?.argiesByDateKey || new Map(),
+                holidayContextResolved: Boolean(
+                    atomicScenarioContext?.argiesByDateKey instanceof Map
+                )
             });
 
             return res.json(
@@ -5561,7 +6039,11 @@ class erganhController {
             return res.status(201).json({
                 success: true,
                 approval_id: approval._id,
-                message: 'Η απόφαση καταγράφηκε επιτυχώς.'
+                reuse_scope: approval.reuse_scope,
+                message:
+                    approval.reuse_scope === 'FUTURE_IDENTICAL'
+                        ? 'Η απόφαση καταγράφηκε και θα χρησιμοποιείται σε μελλοντικές ίδιες περιπτώσεις.'
+                        : 'Η απόφαση καταγράφηκε επιτυχώς.'
             });
         } catch (error) {
             console.error('[createProdhlomenaOrariaPolicyPreviewApproval] ❌', error);
@@ -5752,7 +6234,7 @@ class erganhController {
                             'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
-                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika apologistiko_biblio ' +
+                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika compensation_breakdown_apologistika apologistiko_biblio ' +
                             'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika argia kyriakes_apologistika ores_apoysias_apologistika ' +
                             'is_locked locked_by locked_at'
                     )
@@ -7173,7 +7655,20 @@ class erganhController {
             const employeeQuery = {
                 team: sessionTeam,
                 company_kod: companyId,
-                energos: true
+                $and: mongoose.trusted([
+                    {
+                        $or: mongoose.trusted([
+                            { hmeromhnia_proslhpshs: null },
+                            { hmeromhnia_proslhpshs: mongoose.trusted({ $lte: eosDate }) }
+                        ])
+                    },
+                    {
+                        $or: mongoose.trusted([
+                            { hmeromhnia_apoxorhshs: null },
+                            { hmeromhnia_apoxorhshs: mongoose.trusted({ $gte: apoDate }) }
+                        ])
+                    }
+                ])
             };
 
             if (selectedYpokatasthma) {
@@ -7183,6 +7678,7 @@ class erganhController {
             const ergazomenoi = await ErgazomenoiModel.find(employeeQuery)
                 .select(
                     'kodikos eponymo onoma ypokatasthma ' +
+                        'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                         'aa_eggrafhs hmeres_ergasias_ebdomadas ' +
                         'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
                         'typos_apasxolhshs typos_ebdomadas ' +
@@ -7282,7 +7778,8 @@ class erganhController {
                         'kodikos aa_eggrafhs hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                             'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                             'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                            'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                            'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                            'typos_apasxolhshs typos_ebdomadas ' +
                             'afora_allagh_oron_ergasias createdAt'
                     )
                     .sort({
@@ -7324,6 +7821,10 @@ class erganhController {
                     })
                 };
 
+                if (selectedYpokatasthma) {
+                    prodhlomenaQuery.ypokatasthma = selectedYpokatasthma;
+                }
+
                 const chunkRecords = await ProdhlomenaOrariaModel.find(prodhlomenaQuery)
                     .select(
                         'kodikos hmeromhnia repo argia is_locked ' +
@@ -7336,7 +7837,14 @@ class erganhController {
                     .sort({ kodikos: 1, hmeromhnia: 1 })
                     .lean();
 
-                prodhlomena.push(...chunkRecords);
+                prodhlomena.push(
+                    ...chunkRecords.filter((row) => {
+                        const employee = employeesByKodikos.get(String(row.kodikos || ''));
+                        return employee
+                            ? isDateWithinEmploymentPeriod(row.hmeromhnia, employee)
+                            : false;
+                    })
+                );
             }
 
             prodhlomena.sort((a, b) => {
@@ -7413,24 +7921,45 @@ class erganhController {
                 };
 
                 const preliminaryUpdate = {};
-                const preliminarySplitUpdate =
-                    checkBrokenProgramVsBrokenCards(preliminaryContext);
-                Object.assign(preliminaryUpdate, preliminarySplitUpdate);
-                if (Object.keys(preliminarySplitUpdate).length === 0) {
-                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 1));
-                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 2));
-                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 3));
+                if (
+                    resolveCardPairVerification(calculationRec)
+                        .hasUnresolvedCardEvidence
+                ) {
+                    Object.assign(
+                        preliminaryUpdate,
+                        buildPartialVerifiedCardUpdate(calculationRec).update
+                    );
+                } else {
+                    const preliminarySplitUpdate =
+                        checkBrokenProgramVsBrokenCards(preliminaryContext);
+                    Object.assign(preliminaryUpdate, preliminarySplitUpdate);
+                    if (Object.keys(preliminarySplitUpdate).length === 0) {
+                        Object.assign(
+                            preliminaryUpdate,
+                            checkEarlyOrLateCard(preliminaryContext, 1)
+                        );
+                        Object.assign(
+                            preliminaryUpdate,
+                            checkEarlyOrLateCard(preliminaryContext, 2)
+                        );
+                        Object.assign(
+                            preliminaryUpdate,
+                            checkEarlyOrLateCard(preliminaryContext, 3)
+                        );
+                    }
+                    Object.assign(
+                        preliminaryUpdate,
+                        checkContinuousVsBrokenCards(preliminaryContext)
+                    );
+                    Object.assign(
+                        preliminaryUpdate,
+                        checkBrokenProgramVsContinuousCards(preliminaryContext)
+                    );
+                    Object.assign(
+                        preliminaryUpdate,
+                        checkNoDeclaredScheduleCards(preliminaryContext)
+                    );
                 }
-                Object.assign(
-                    preliminaryUpdate,
-                    checkIncompleteCardPairAgainstDeclared(preliminaryContext)
-                );
-                Object.assign(preliminaryUpdate, checkContinuousVsBrokenCards(preliminaryContext));
-                Object.assign(
-                    preliminaryUpdate,
-                    checkBrokenProgramVsContinuousCards(preliminaryContext)
-                );
-                Object.assign(preliminaryUpdate, checkNoDeclaredScheduleCards(preliminaryContext));
 
                 const weeklyRec = { ...calculationRec, ...preliminaryUpdate };
 
@@ -7467,19 +7996,24 @@ class erganhController {
                 };
 
                 const update = {};
+                const hasUnresolvedCardPair = resolveCardPairVerification(
+                    calculationRec
+                ).hasUnresolvedCardEvidence;
 
-                const splitUpdate = checkBrokenProgramVsBrokenCards(context);
-                Object.assign(update, splitUpdate);
-                if (Object.keys(splitUpdate).length === 0) {
-                    Object.assign(update, checkEarlyOrLateCard(context, 1));
-                    Object.assign(update, checkEarlyOrLateCard(context, 2));
-                    Object.assign(update, checkEarlyOrLateCard(context, 3));
+                if (hasUnresolvedCardPair) {
+                    Object.assign(update, buildPartialVerifiedCardUpdate(calculationRec).update);
+                } else {
+                    const splitUpdate = checkBrokenProgramVsBrokenCards(context);
+                    Object.assign(update, splitUpdate);
+                    if (Object.keys(splitUpdate).length === 0) {
+                        Object.assign(update, checkEarlyOrLateCard(context, 1));
+                        Object.assign(update, checkEarlyOrLateCard(context, 2));
+                        Object.assign(update, checkEarlyOrLateCard(context, 3));
+                    }
+                    Object.assign(update, checkContinuousVsBrokenCards(context));
+                    Object.assign(update, checkBrokenProgramVsContinuousCards(context));
+                    Object.assign(update, checkNoDeclaredScheduleCards(context));
                 }
-                Object.assign(update, checkIncompleteCardPairAgainstDeclared(context));
-
-                Object.assign(update, checkContinuousVsBrokenCards(context));
-                Object.assign(update, checkBrokenProgramVsContinuousCards(context));
-                Object.assign(update, checkNoDeclaredScheduleCards(context));
 
                 // Από αυτό το σημείο και μετά οι υπολογισμοί πρέπει να βλέπουν το
                 // ήδη παραγμένο απολογιστικό ωράριο, όχι μόνο το αρχικό rec/raw cards.
@@ -7491,8 +8025,10 @@ class erganhController {
 
                 Object.assign(update, checkNightHours(workingContext));
                 Object.assign(update, checkSundayHolidayHours(workingContext));
-                Object.assign(update, checkRepoAdeiaAstheneiaApologistika(workingContext));
-                Object.assign(update, checkOresApoysias(workingContext));
+                if (!hasUnresolvedCardPair) {
+                    Object.assign(update, checkRepoAdeiaAstheneiaApologistika(workingContext));
+                    Object.assign(update, checkOresApoysias(workingContext));
+                }
 
                 const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
                 const weeklyState = weeklyStateMap.get(weekKey);
@@ -7560,6 +8096,7 @@ class erganhController {
                     recordsUpdated: weeklyRepoPostCheck.recordsUpdated,
                     deviationsCount: weeklyRepoPostCheck.deviations.length,
                     deviationsSaved: weeklyRepoPostCheck.deviationsSaved || 0,
+                    compensationBreakdowns: weeklyRepoPostCheck.compensationBreakdowns,
                     deviations: weeklyRepoPostCheck.deviations
                 }
             });
@@ -12082,16 +12619,6 @@ async function processOrariaXlsx(filePath, sessionTeam, sessionYearInUse) {
 
     let teliko_row = 1;
 
-    function extractTimePairs(text) {
-        const regex = /(\d{2}:\d{2})-(\d{2}:\d{2})/g;
-        const pairs = [];
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-            pairs.push({ from: match[1], to: match[2] });
-        }
-        return pairs;
-    }
-
     function writeTeliko(rowNum, colA, colB, colC, colD, colE, colF, colG, colH) {
         const newRow = sheetTeliko.getRow(rowNum);
         newRow.getCell(1).value = colA;
@@ -12117,24 +12644,24 @@ async function processOrariaXlsx(filePath, sessionTeam, sessionYearInUse) {
         const colD = row.getCell(4).value;
         const colE = row.getCell(5).value;
 
-        if (colI === 'ΜΗ ΕΡΓΑΣΙΑ') {
+        const parsedSchedule = parseErganiScheduleCell(colI);
+
+        if (parsedSchedule.category === ERGANI_SCHEDULE_CATEGORY.NO_WORK) {
             writeTeliko(teliko_row++, colA, colB, colD, colC, colE, 'ΜΕ', '', '');
             return;
         }
-        if (colI === 'ΑΝΑΠΑΥΣΗ/ΡΕΠΟ') {
+        if (parsedSchedule.category === ERGANI_SCHEDULE_CATEGORY.REST) {
             writeTeliko(teliko_row++, colA, colB, colD, colC, colE, 'ΑΝ', '', '');
             return;
         }
-        if (colI?.startsWith('ΕΡΓΑΣΙΑ ')) {
-            const pairs = extractTimePairs(colI);
-            pairs.forEach((pair) => {
+        if (parsedSchedule.category === ERGANI_SCHEDULE_CATEGORY.WORK) {
+            parsedSchedule.pairs.forEach((pair) => {
                 writeTeliko(teliko_row++, colA, colB, colD, colC, colE, 'ΕΡΓ', pair.from, pair.to);
             });
             return;
         }
-        if (colI?.startsWith('ΤΗΛΕΡΓΑΣΙΑ ')) {
-            const pairs = extractTimePairs(colI);
-            pairs.forEach((pair) => {
+        if (parsedSchedule.category === ERGANI_SCHEDULE_CATEGORY.TELEWORK) {
+            parsedSchedule.pairs.forEach((pair) => {
                 writeTeliko(teliko_row++, colA, colB, colD, colC, colE, 'ΤΗΛ', pair.from, pair.to);
             });
             return;

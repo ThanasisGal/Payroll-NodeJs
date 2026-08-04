@@ -135,6 +135,8 @@ function buildWeeklyRepoTransferAtomicInputs({
     rows = [],
     periodStart = null,
     periodEnd = null,
+    validationPeriodStart = periodStart,
+    validationPeriodEnd = periodEnd,
     asOfDate = null,
     resolveEmploymentProfile,
     holidayByDateKey = new Map(),
@@ -143,7 +145,10 @@ function buildWeeklyRepoTransferAtomicInputs({
     const weeklyInputs = [];
     const inputReasonCodes = [];
 
-    const rangeDiagnostic = getAtomicPeriodRangeDiagnostic({ periodStart, periodEnd });
+    const rangeDiagnostic = getAtomicPeriodRangeDiagnostic({
+        periodStart: validationPeriodStart,
+        periodEnd: validationPeriodEnd
+    });
     if (rangeDiagnostic) {
         inputReasonCodes.push(rangeDiagnostic);
         return { weeklyInputs, inputReasonCodes };
@@ -167,12 +172,12 @@ function buildWeeklyRepoTransferAtomicInputs({
     [...buckets.values()]
         .sort((left, right) => left.key.localeCompare(right.key))
         .forEach((bucket) => {
+            if (asOfDateKey && bucket.weekEnd >= asOfDateKey) {
+                inputReasonCodes.push(INPUT_REASON.OPEN_WEEK);
+                return;
+            }
             if (bucket.weekEnd > periodEndKey) {
-                inputReasonCodes.push(
-                    asOfDateKey && bucket.weekEnd > asOfDateKey
-                        ? INPUT_REASON.OPEN_WEEK
-                        : INPUT_REASON.PARTIAL_WEEK
-                );
+                inputReasonCodes.push(INPUT_REASON.PARTIAL_WEEK);
                 return;
             }
 

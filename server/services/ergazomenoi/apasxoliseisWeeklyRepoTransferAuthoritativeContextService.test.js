@@ -29,7 +29,11 @@ function testRowFieldEquivalence() {
         'ores_prostheths_ergasias_apologistika',
         'ores_yperergasias_argion_nyxtas_apologistika',
         'ores_nominhs_yperorias_argion_nyxtas_apologistika',
-        'ores_paranomhs_yperorias_argion_nyxtas_apologistika'
+        'ores_paranomhs_yperorias_argion_nyxtas_apologistika',
+        'ores_pragmatikhs_ergasias_apologistika',
+        'ores_adeias_pistomenes_apologistika',
+        'ores_argias_pistomenes_apologistika',
+        'compensation_breakdown_apologistika'
     ].forEach((field) => assert.ok(authoritative.has(field), `missing ${field}`));
 }
 
@@ -58,7 +62,7 @@ function testHolidayContexts() {
 
 function testCanonicalWeeklyProfile() {
     const employee = {
-        kathestos_apasxolhshs: '0', mhniaia_repo: 2,
+        kathestos_apasxolhshs: '0',
         hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
         mo_oron_hmerhsias_ergasias: 8
     };
@@ -73,13 +77,13 @@ function testCanonicalWeeklyProfile() {
     assert.strictEqual(fallback.expectedWeeklyRepo, 2);
     assert.strictEqual(fallback.profileChangedInsideWeek, false);
     const history = [
-        { _id: 'h1', hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-06-01'), hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-06-17'), kathestos_apasxolhshs: '0', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40 },
-        { _id: 'h2', hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-06-18'), kathestos_apasxolhshs: '1', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 30 }
+        { _id: 'h1', hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-06-01'), hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-06-17'), kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40 },
+        { _id: 'h2', hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-06-18'), kathestos_apasxolhshs: '1', hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 30 }
     ];
     const changed = getWeeklyRepoProfileInfo({ week, istorikoRows: history, ergazomenos: employee });
-    assert.strictEqual(String(changed.effectiveProfile.istorikoId), 'h1');
-    assert.strictEqual(changed.expectedWeeklyRepo, null);
-    assert.strictEqual(changed.repoResolutionReason, 'PROFILE_CHANGED_INSIDE_WEEK');
+    assert.strictEqual(String(changed.effectiveProfile.istorikoId), 'h2');
+    assert.strictEqual(changed.expectedWeeklyRepo, 1);
+    assert.strictEqual(changed.repoResolutionReason, null);
     assert.strictEqual(changed.profileChangedInsideWeek, true);
     assert.strictEqual(
         changed.effectiveProfileDate,
@@ -113,8 +117,6 @@ function scheduledRows(count) {
 function repoTransferProfile(profile) {
     return {
         typos_apasxolhshs: profile.typos_apasxolhshs,
-        mhniaia_repo: profile.mhniaia_repo,
-        raw_mhniaia_repo: profile.raw_mhniaia_repo,
         hmeres_ergasias_ebdomadas: profile.hmeres_ergasias_ebdomadas
     };
 }
@@ -134,51 +136,46 @@ function resolveThroughAuthoritativeProfile({ employee, history = [], rows }) {
     };
 }
 
-function testRawAuthoritativeRepoResolution() {
+function testContractualWeeklyRepoResolution() {
     const employee = {
         kathestos_apasxolhshs: '1',
-        mhniaia_repo: 3,
         hmeres_ergasias_ebdomadas: 4
     };
     const employeeResult = resolveThroughAuthoritativeProfile({
         employee,
         rows: scheduledRows(5)
     });
-    assert.strictEqual(employeeResult.profileInfo.effectiveProfile.raw_mhniaia_repo, 3);
-    assert.strictEqual(employeeResult.result.ok, false);
-    assert.strictEqual(
-        employeeResult.result.reason,
-        'INVALID_EFFECTIVE_WEEKLY_WORKDAYS'
-    );
+    assert.strictEqual(employeeResult.result.ok, true);
+    assert.strictEqual(employeeResult.result.effectiveExpectedWeeklyRepo, 3);
+    assert.strictEqual(employeeResult.result.repoResolutionSource, 'CONTRACTUAL_WEEKLY_WORKDAYS');
 
     const history = [{
         _id: 'history-authoritative',
         afora_allagh_oron_ergasias: true,
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-01',
         kathestos_apasxolhshs: '1',
-        mhniaia_repo: 4,
         hmeres_ergasias_ebdomadas: 4
     }];
     const historyResult = resolveThroughAuthoritativeProfile({
-        employee: { ...employee, mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 },
+        employee: { ...employee, hmeres_ergasias_ebdomadas: 5 },
         history,
         rows: scheduledRows(5)
     });
     assert.strictEqual(historyResult.profileInfo.effectiveProfile.source, 'ISTORIKO');
-    assert.strictEqual(historyResult.profileInfo.effectiveProfile.raw_mhniaia_repo, 4);
-    assert.strictEqual(historyResult.result.ok, false);
+    assert.strictEqual(historyResult.result.ok, true);
+    assert.strictEqual(historyResult.result.effectiveExpectedWeeklyRepo, 3);
 
-    const invalid = resolveThroughAuthoritativeProfile({
-        employee: { ...employee, mhniaia_repo: 7, hmeres_ergasias_ebdomadas: 5 },
+    const fiveDay = resolveThroughAuthoritativeProfile({
+        employee: { ...employee, hmeres_ergasias_ebdomadas: 5 },
         rows: scheduledRows(5)
     }).result;
-    assert.strictEqual(invalid.ok, true);
-    assert.strictEqual(invalid.effectiveExpectedWeeklyRepo, 2);
-    assert.strictEqual(invalid.repoResolutionSource, 'CONTRACTUAL_WEEKLY_WORKDAYS');
+    assert.strictEqual(fiveDay.ok, true);
+    assert.strictEqual(fiveDay.effectiveExpectedWeeklyRepo, 2);
+    assert.strictEqual(fiveDay.repoResolutionSource, 'CONTRACTUAL_WEEKLY_WORKDAYS');
 
-    for (const [workdays, expected] of [[5, 2], [6, 1]]) {
+    for (const [workdays, expected] of [[1, 6], [2, 5], [3, 4], [4, 3], [5, 2], [6, 1]]) {
         const fallback = resolveThroughAuthoritativeProfile({
-            employee: { ...employee, mhniaia_repo: 0, hmeres_ergasias_ebdomadas: workdays },
+            employee: { ...employee, hmeres_ergasias_ebdomadas: workdays },
             rows: scheduledRows(5)
         }).result;
         assert.strictEqual(fallback.effectiveExpectedWeeklyRepo, expected);
@@ -186,7 +183,7 @@ function testRawAuthoritativeRepoResolution() {
     }
 
     const sixScheduled = resolveThroughAuthoritativeProfile({
-        employee: { ...employee, mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 },
+        employee: { ...employee, hmeres_ergasias_ebdomadas: 5 },
         rows: scheduledRows(6)
     }).result;
     assert.strictEqual(sixScheduled.effectiveExpectedWeeklyRepo, 2);
@@ -226,7 +223,6 @@ function test0002ThroughAuthoritativeProjectionPath() {
         ergazomenos: {
             kodikos: '0002',
             kathestos_apasxolhshs: '0',
-            mhniaia_repo: 2,
             hmeres_ergasias_ebdomadas: 5
         }
     });
@@ -327,6 +323,13 @@ async function testTeamScopedCompanyResolution() {
     assert.strictEqual(byId.company_kodikos, '0004');
     assert.strictEqual(String(companyQueries[1]._id), thaId);
     assert.strictEqual(companyQueries[1].team, 'THA');
+    await buildNoCardsDisplayContext({
+        ...base,
+        companyId: '0004',
+        periodStart: new Date('2026-12-28T00:00:00Z'),
+        periodEnd: new Date('2027-01-03T23:59:59Z')
+    });
+    assert.deepStrictEqual(argiesQueries[2].etos.$in, ['2026', '2027']);
     await assert.rejects(
         () => buildNoCardsDisplayContext({ ...base, companyId: blgId }),
         (error) => error.statusCode === 409
@@ -342,7 +345,7 @@ async function run() {
     testHolidayContexts();
     testProfileDateForDeviationPrecedenceAndFallbacks();
     testCanonicalWeeklyProfile();
-    testRawAuthoritativeRepoResolution();
+    testContractualWeeklyRepoResolution();
     test0002ThroughAuthoritativeProjectionPath();
     testControllerImportsSharedProfileDateHelper();
     await testTeamScopedCompanyResolution();

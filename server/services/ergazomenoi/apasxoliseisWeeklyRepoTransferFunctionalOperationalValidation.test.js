@@ -80,19 +80,17 @@ const COMMAND = Object.freeze({
     request_id: 'validation-request-0001'
 });
 const EMPLOYMENT_FIXTURES = Object.freeze([
-    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v3', targetCategory: 'ΑΝ', mhniaia_repo: 2, workdays: 5, dailyHours: 8 }),
-    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v3', targetCategory: 'ΜΕ', mhniaia_repo: 2, workdays: 5, dailyHours: 4 }),
-    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v3', targetCategory: 'ΜΕ', mhniaia_repo: 2, workdays: 5, dailyHours: 4 }),
+    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v4', targetCategory: 'ΑΝ', workdays: 5, dailyHours: 8 }),
+    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v4', targetCategory: 'ΜΕ', workdays: 5, dailyHours: 4 }),
+    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v4', targetCategory: 'ΜΕ', workdays: 5, dailyHours: 4 }),
     Object.freeze({
         name: 'MERIKH_REDUCED_DAYS_AND_HOURS',
         family: 'PARTIAL_FAMILY',
         typos_apasxolhshs: 'MERIKH',
         contractVersion: 'v2',
-        proposalVersion: 'repo-transfer-single-pair-proposal:v3',
+        proposalVersion: 'repo-transfer-single-pair-proposal:v4',
         targetCategory: 'ΜΕ',
-        profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 2,
-        workdays: 5,
+        profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS', workdays: 5,
         dailyHours: 4
     }),
     Object.freeze({
@@ -100,11 +98,9 @@ const EMPLOYMENT_FIXTURES = Object.freeze([
         family: 'PARTIAL_FAMILY',
         typos_apasxolhshs: 'EK_PERITROPHS',
         contractVersion: 'v2',
-        proposalVersion: 'repo-transfer-single-pair-proposal:v3',
+        proposalVersion: 'repo-transfer-single-pair-proposal:v4',
         targetCategory: 'ΜΕ',
-        profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 2,
-        workdays: 5,
+        profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS', workdays: 5,
         dailyHours: 4
     })
 ]);
@@ -119,6 +115,7 @@ const COVERAGE_FILES = Object.freeze([
 
 function applyValues(repo = false, category = '') {
     return Object.fromEntries(APPLY_FIELDS.map((field) => {
+        if (field === 'compensation_breakdown_apologistika') return [field, null];
         if (field === 'repo_apologistika') return [field, repo];
         if (field === 'adeia_apologistika') return [field, false];
         if (field === 'kathgoria_ergasias_apologistika') return [field, category];
@@ -191,8 +188,6 @@ async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
     const rows = weekRows(employment);
     const employmentProfile = {
         typos_apasxolhshs: employment.typos_apasxolhshs,
-        mhniaia_repo: employment.mhniaia_repo,
-        raw_mhniaia_repo: employment.mhniaia_repo,
         hmeres_ergasias_ebdomadas: employment.workdays,
         ores_ergasias_ebdomadas: employment.workdays * employment.dailyHours,
         mo_oron_hmerhsias_ergasias: employment.dailyHours
@@ -248,8 +243,8 @@ async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
     const snapshot = reconstruction.snapshot;
     assert.deepStrictEqual(snapshot.repo_resolution, group.repo_resolution);
     assert.strictEqual(
-        snapshot.employment_profile.raw_mhniaia_repo,
-        employment.mhniaia_repo
+        snapshot.employment_profile.hmeres_ergasias_ebdomadas,
+        employment.workdays
     );
     assert.strictEqual(snapshot.proposal_version, employment.proposalVersion);
     assert.strictEqual(snapshot.source.proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
@@ -425,9 +420,7 @@ async function authoritativeAppliedState(store) {
         energos: true,
         archived: false,
         kathestos_apasxolhshs: store.fixture.employment.typos_apasxolhshs,
-        typos_apasxolhshs: store.fixture.employment.typos_apasxolhshs,
-        mhniaia_repo: store.fixture.employment.mhniaia_repo,
-        hmeres_ergasias_ebdomadas: store.fixture.employment.workdays,
+        typos_apasxolhshs: store.fixture.employment.typos_apasxolhshs, hmeres_ergasias_ebdomadas: store.fixture.employment.workdays,
         ores_ergasias_ebdomadas:
             store.fixture.employment.workdays * store.fixture.employment.dailyHours,
         mo_oron_hmerhsias_ergasias: store.fixture.employment.dailyHours
@@ -525,7 +518,10 @@ async function run() {
         if (employment.workdays === 4) {
             assert.strictEqual(store.fixture.analysis.counts.existing_actual_repo, 2);
             assert.strictEqual(store.fixture.analysis.counts.predicted_final_repo, 3);
-            assert.strictEqual(store.fixture.analysis.employee.mhniaia_repo, 3);
+            assert.strictEqual(
+                store.fixture.analysis.employee.effective_expected_weekly_repo,
+                3
+            );
         }
         assert.strictEqual(store.fixture.snapshot.proposal_version, employment.proposalVersion);
         assert.strictEqual(store.fixture.snapshot.source.proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');

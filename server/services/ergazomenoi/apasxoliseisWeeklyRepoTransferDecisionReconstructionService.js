@@ -23,7 +23,7 @@ const {
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const { getMondaySundayWeekRange } = require('../../utils/date/mondaySundayWeek');
 
-const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v2';
+const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v3';
 const ROW_FIELDS = Object.freeze(ATOMIC_REPO_TRANSFER_ROW_FIELDS.split(/\s+/).filter(Boolean));
 
 function conflict(message) { const error = new Error(message); error.statusCode = 409; return error; }
@@ -121,8 +121,6 @@ async function defaultContextLoader({
     const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
     const employmentProfile = {
         typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
-        mhniaia_repo: effectiveProfile.mhniaia_repo,
-        raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
         pososto_prosayxhshs_6hs_hmeras:
             effectiveProfile.pososto_prosayxhshs_6hs_hmeras,
         hmeres_ergasias_ebdomadas: effectiveProfile.hmeres_ergasias_ebdomadas,
@@ -175,7 +173,6 @@ function buildCanonicalSnapshot({ scope, context, group }) {
                 effective_from: entry.hmeromhnia_isxyos_oron_ergasias_apo || entry.hmeromhnia_allaghs_orarioy_apo || entry.hmeromhnia_allaghs_symbashs,
                 effective_to: entry.hmeromhnia_isxyos_oron_ergasias_eos || entry.hmeromhnia_allaghs_orarioy_eos,
                 typos_apasxolhshs: entry.typos_apasxolhshs || entry.kathestos_apasxolhshs,
-                mhniaia_repo: entry.mhniaia_repo,
                 hmeres_ergasias_ebdomadas: entry.hmeres_ergasias_ebdomadas,
                 ores_ergasias_ebdomadas: entry.ores_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias: entry.mo_oron_hmerhsias_ergasias,
@@ -202,7 +199,7 @@ async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLo
     if (candidateScopes.size !== 1 || context.candidates.some((row) => String(row.team) !== String(scope.team) || String(row.company_kod) !== String(scope.company_kod) || !String(row.ypokatasthma || '').trim() || !String(row.kodikos || '').trim())) throw conflict('Τα στοιχεία της πρότασης δεν ανήκουν στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.');
     const auditCounts = new Map(); context.audits.forEach((audit) => { const id = String(audit.prodhlomena_oraria_id); auditCounts.set(id, (auditCounts.get(id) || 0) + 1); });
     const contractVersion = command.expected_proposal_version ===
-        'repo-transfer-single-pair-proposal:v3'
+        'repo-transfer-single-pair-proposal:v4'
         ? normalizeEmploymentType(context.employmentProfile?.typos_apasxolhshs) ===
             EMPLOYMENT_TYPE.FULL
             ? 'v1'

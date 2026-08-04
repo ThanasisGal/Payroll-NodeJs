@@ -28,6 +28,7 @@ const REASON_CODES = Object.freeze({
     SPLIT_SHIFT_DEVIATION_FOUND: 'SPLIT_SHIFT_DEVIATION_FOUND',
     DECLARED_REPO_WITH_CARDS: 'DECLARED_REPO_WITH_CARDS',
     DECLARED_NON_WORK_WITH_CARDS: 'DECLARED_NON_WORK_WITH_CARDS',
+    UNSCHEDULED_DAY_WITH_CARDS: 'UNSCHEDULED_DAY_WITH_CARDS',
     REPO_TRANSFER_CANDIDATE: 'REPO_TRANSFER_CANDIDATE',
     LEGAL_CLASSIFICATION_REQUIRED: 'LEGAL_CLASSIFICATION_REQUIRED',
     UNKNOWN_PATTERN: 'UNKNOWN_PATTERN'
@@ -42,6 +43,7 @@ const SCENARIO_CODES = Object.freeze({
         'DECLARED_WORK_NO_CARDS_HOLIDAY_OPTIONAL_COMPANY_CLOSED',
     DECLARED_REPO_WITH_CARDS: 'DECLARED_REPO_WITH_CARDS',
     DECLARED_NON_WORK_WITH_CARDS: 'DECLARED_NON_WORK_WITH_CARDS',
+    UNSCHEDULED_DAY_WITH_CARDS: 'UNSCHEDULED_DAY_WITH_CARDS',
     ZERO_LENGTH_CARD_INTERVAL: 'ZERO_LENGTH_CARD_INTERVAL',
     SPLIT_SHIFT_MATCHED_WITH_DEVIATION: 'SPLIT_SHIFT_MATCHED_WITH_DEVIATION',
     REPO_TRANSFER_WITHIN_WEEK: 'REPO_TRANSFER_WITHIN_WEEK',
@@ -76,6 +78,75 @@ function hasCompleteNonZeroIntervals(intervals = []) {
     return (
         Array.isArray(intervals) &&
         intervals.filter((interval) => interval?.isComplete && !interval?.isZeroLength).length >= 2
+    );
+}
+
+function isSafeUnscheduledDayWithCards(facts = {}) {
+    const missingCriticalFacts = Array.isArray(facts?.warnings?.missingCriticalFacts)
+        ? facts.warnings.missingCriticalFacts
+        : [];
+    const conflictingFacts = Array.isArray(facts?.warnings?.conflictingFacts)
+        ? facts.warnings.conflictingFacts
+        : [];
+    const cardIntervals = Array.isArray(facts?.cards?.cardIntervalsNormalized)
+        ? facts.cards.cardIntervalsNormalized
+        : [];
+    const incompleteCardPairs = Array.isArray(facts?.cards?.incompleteCardPairs)
+        ? facts.cards.incompleteCardPairs
+        : [];
+    const apologistikaCategory = String(
+        facts?.apologistika?.currentApologistikaCategory || ''
+    ).trim();
+
+    return (
+        missingCriticalFacts.length === 1 &&
+        missingCriticalFacts[0] === 'MISSING_KATHGORIA_ERGASIAS' &&
+        conflictingFacts.length === 0 &&
+        facts?.warnings?.legalClassificationPending !== true &&
+        String(facts?.declared?.kathgoria_ergasias || '').trim() === '' &&
+        facts?.declared?.isDeclaredRepo === false &&
+        facts?.declared?.isDeclaredNonWork === false &&
+        facts?.declared?.hasDeclaredHours === false &&
+        facts?.declared?.hasDeclaredIntervals === false &&
+        facts?.cards?.hasCards === true &&
+        Number(facts?.cards?.cardHours) > 0 &&
+        cardIntervals.length > 0 &&
+        incompleteCardPairs.length === 0 &&
+        facts?.cards?.hasInvalidCardTimeValue !== true &&
+        facts?.leave?.hasDeclaredLeave === false &&
+        facts?.leave?.hasDeclaredSickness === false &&
+        String(facts?.leave?.kathgoria_adeias_apologistika || '').trim() === '' &&
+        facts?.apologistika?.existingFlags?.adeia_apologistika !== true &&
+        facts?.apologistika?.existingFlags?.astheneia_apologistika !== true &&
+        facts?.apologistika?.existingFlags?.repo_apologistika !== true &&
+        facts?.apologistika?.existingFlags?.argia !== true &&
+        ['', 'ΕΡΓ'].includes(apologistikaCategory)
+    );
+}
+
+function isResolvedUnscheduledDayWithCards(facts = {}) {
+    if (!isSafeUnscheduledDayWithCards(facts)) return false;
+
+    const apologistikaIntervals = Array.isArray(
+        facts?.apologistika?.currentApologistikaIntervals
+    )
+        ? facts.apologistika.currentApologistikaIntervals
+        : [];
+    const completeIntervals = apologistikaIntervals.filter(
+        (interval) => interval?.isComplete && !interval?.isZeroLength
+    );
+    const incompleteIntervals = apologistikaIntervals.filter(
+        (interval) => !interval?.isComplete && (interval?.start || interval?.end)
+    );
+
+    return (
+        facts?.apologistika?.currentApologistikaCategory === 'ΕΡΓ' &&
+        Number(facts?.apologistika?.currentApologistikaHours) > 0 &&
+        Number(facts?.apologistika?.currentActualWorkHours) > 0 &&
+        completeIntervals.length > 0 &&
+        incompleteIntervals.length === 0 &&
+        facts?.apologistika?.compensationBreakdownStatus === 'READY' &&
+        facts?.apologistika?.compensationBreakdownReasons.length === 0
     );
 }
 
@@ -168,6 +239,31 @@ function makeUnknownDecision(facts = {}) {
 
 function getMvpScenarioTemplates() {
     return [
+        {
+            scenario_code: SCENARIO_CODES.UNSCHEDULED_DAY_WITH_CARDS,
+            description:
+                'Μη προδηλωμένη ημέρα, με πλήρεις κάρτες και ολοκληρωμένα απολογιστικά πεδία, ακόμη και όταν η ημέρα είναι αργία.',
+            confidence: CONFIDENCE.HIGH,
+            requires_review: false,
+            reasons: [REASON_CODES.UNSCHEDULED_DAY_WITH_CARDS],
+            match: (facts) => isResolvedUnscheduledDayWithCards(facts),
+            proposed_updates: {},
+            display_labels: {
+                show_badge: false
+            }
+        },
+        {
+            scenario_code: SCENARIO_CODES.UNSCHEDULED_DAY_WITH_CARDS,
+            description:
+                'Μη προδηλωμένη ημέρα με μηδενικές δηλωμένες ώρες και πλήρεις κάρτες.',
+            confidence: CONFIDENCE.HIGH,
+            requires_review: true,
+            reasons: [REASON_CODES.UNSCHEDULED_DAY_WITH_CARDS],
+            match: (facts) => isSafeUnscheduledDayWithCards(facts),
+            proposed_updates: {
+                kathgoria_ergasias_apologistika: 'ΕΡΓ'
+            }
+        },
         {
             scenario_code: SCENARIO_CODES.DECLARED_WORK_NO_CARDS_LEAVE,
             description: 'Προδηλωμένο ΕΡΓ χωρίς κάρτες, με καταχωρημένη άδεια.',
@@ -318,7 +414,7 @@ function getMvpScenarioTemplates() {
 }
 
 function matchApasxoliseisScenarioFacts(facts, options = {}) {
-    if (hasCriticalWarnings(facts)) {
+    if (hasCriticalWarnings(facts) && !isSafeUnscheduledDayWithCards(facts)) {
         return makeUnknownDecision(facts);
     }
 
@@ -339,5 +435,6 @@ module.exports = {
     SCENARIO_CODES,
     CONFIDENCE,
     DECISION_STATUS,
-    REASON_CODES
+    REASON_CODES,
+    isResolvedUnscheduledDayWithCards
 };

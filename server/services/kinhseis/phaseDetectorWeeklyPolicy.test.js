@@ -77,7 +77,7 @@ test('first cross-month week uses previous-month context but presents requested 
     );
 
     assert.equal(analyses[0].complete, true);
-    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-07-04');
+    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
     assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
     assert.deepEqual(requested.map((day) => day.date), [
         '2026-07-01',
@@ -107,7 +107,7 @@ test('completed trailing cross-month week classifies next-month seventh day', ()
     );
 
     assert.equal(analyses[0].status, 'READY');
-    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-07-04');
+    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
     assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
     assert.deepEqual(requested.map((day) => day.date), ['2026-06-29', '2026-06-30']);
 });
@@ -183,15 +183,15 @@ test('missing rows after week completion require HR decision instead of remainin
     assert.equal(analyses[0].asOfDate, '2026-07-10');
 });
 
-test('work-facts weekly path keeps an in-week profile change visible for HR decision', () => {
+test('work-facts weekly path uses the Sunday profile after an in-week profile change', () => {
     const { dailyRows, orariaByDate } = buildWeek({ changedProfile: true });
     const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
         asOfDate: '2026-06-15'
     });
 
     result.forEach((day) => {
-        assert.equal(day.weeklyComplianceStatus, 'NEEDS_HR_DECISION');
-        assert.deepEqual(day.weeklyComplianceReasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
+        assert.equal(day.weeklyComplianceStatus, 'NOT_APPLICABLE');
+        assert.deepEqual(day.weeklyComplianceReasons, []);
         assert.equal(day.isSixthDay, false);
         assert.equal(day.isSeventhDay, false);
     });

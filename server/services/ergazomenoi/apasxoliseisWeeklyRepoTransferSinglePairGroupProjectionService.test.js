@@ -80,7 +80,7 @@ function partTimeWeek() {
     return rows;
 }
 
-function build(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }, contexts = {}) {
+function build(rows, profile = { typos_apasxolhshs: 'PLHRHS'}, contexts = {}) {
     return buildWeeklyRepoTransferSinglePairGroupProjection({
         weekRows: rows,
         employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
@@ -118,10 +118,10 @@ function assertSafetyContract(group) {
     assert.strictEqual(group.employees_count, 1);
     assert.deepStrictEqual(group.pair_contract, {
         choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR',
-        proposal_version: 'repo-transfer-single-pair-proposal:v3',
+        proposal_version: 'repo-transfer-single-pair-proposal:v4',
         policy_versions: {
-            weekly_repo: 'foundation:v2',
-            source_work: 'foundation:v1'
+            weekly_repo: 'foundation:v3',
+            source_work: 'foundation:v3'
         },
         atomic_pair_required: true,
         requires_hr_review: true,
@@ -178,8 +178,9 @@ function testValidFullTimeProjection() {
     assert.strictEqual(
         group.description,
         'Μεταφορά ρεπό για τον εργαζόμενο 001: η 07/07/2026 γίνεται εργασία και η ' +
-            '10/07/2026 γίνεται ρεπό (ΑΝ, πλήρης απασχόληση). Η atomic read-only πρόταση ' +
-            'απαιτεί ενιαία έγκριση και δεν είναι ακόμη διαθέσιμη για εφαρμογή.'
+            '10/07/2026 γίνεται ρεπό (ΑΝ, πλήρης απασχόληση). Οι δύο αλλαγές απαιτούν ' +
+            'μία ενιαία απόφαση HR. Η προεπισκόπηση δεν αλλάζει δεδομένα· η εφαρμογή ' +
+            'επιτρέπεται μόνο μετά από έγκριση και επιτυχή έλεγχο ασφαλείας του server.'
     );
     assert.strictEqual(group.first_date, dateKey(1));
     assert.strictEqual(group.last_date, dateKey(4));
@@ -196,8 +197,7 @@ function testValidFullTimeProjection() {
 
 function testValidPartTimeProjection() {
     const result = build(partTimeWeek(), {
-        typos_apasxolhshs: 'MERIKH',
-        mhniaia_repo: 2
+        typos_apasxolhshs: 'MERIKH'
     });
     assertReady(result);
     const group = result.groups[0];
@@ -237,7 +237,7 @@ function testStableGroupIdentity() {
         'group_type=ATOMIC_PAIRED_PROPOSAL|' +
             'scenario=REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR|' +
             'choice=TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR|' +
-            'proposal_version=repo-transfer-single-pair-proposal:v3|' +
+            'proposal_version=repo-transfer-single-pair-proposal:v4|' +
             'employee=001|week=2026-07-06:2026-07-12|source=row-1|target=row-4'
     );
     assert.match(first.groups[0].group_id, /^policy-preview-paired-group-[a-f0-9]{16}$/);
@@ -275,7 +275,7 @@ function testSplitShiftIntervalsArePreservedInProjection() {
     });
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: twoIntervalRows,
-        employmentProfile: { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+        employmentProfile: { typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5 }
     });
     const twoIntervalResult = build(twoIntervalRows);
     assertReady(twoIntervalResult);
@@ -293,7 +293,11 @@ function testSplitShiftIntervalsArePreservedInProjection() {
         eos_ora_02_apologistika: '16:00',
         apo_ora_03_apologistika: '',
         eos_ora_03_apologistika: '',
-        ores_ergasias_apologistika: 7.5
+        ores_ergasias_apologistika: 7.5,
+        ores_pragmatikhs_ergasias_apologistika: 7.5,
+        ores_adeias_pistomenes_apologistika: 0,
+        ores_argias_pistomenes_apologistika: 0,
+        compensation_breakdown_apologistika: null
     };
 
     assert.deepStrictEqual(twoIntervalSource.proposed_values, twoIntervalValues);
@@ -347,7 +351,7 @@ function testSplitShiftIntervalsArePreservedInProjection() {
 
 function testNonReadyProposalPaths() {
     assertNotAvailable(
-        build(fullTimeWeek(), { typos_apasxolhshs: 'EK_PERITROPHS', mhniaia_repo: 2 }),
+        build(fullTimeWeek(), { typos_apasxolhshs: 'EK_PERITROPHS'}),
         'ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED'
     );
 
@@ -366,9 +370,7 @@ function testNonReadyProposalPaths() {
     const deficit = fullTimeWeek();
     deficit[6] = workRow(6);
     const sixthDayResolution = build(deficit, {
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        pososto_prosayxhshs_6hs_hmeras: 0,
+        typos_apasxolhshs: 'PLHRHS', pososto_prosayxhshs_6hs_hmeras: 0,
         eidikh_kathgoria_ergazomenoy: '0009'
     });
     assert.strictEqual(sixthDayResolution.projection_status, 'READY');
@@ -381,7 +383,7 @@ function testNonReadyProposalPaths() {
         1
     );
     assert.strictEqual(
-        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 })
+        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS'})
             .projection_status,
         'READY'
     );
@@ -423,7 +425,7 @@ function deepFreezeFixture(value) {
 
 function testInputImmutability() {
     const rows = fullTimeWeek();
-    const profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 };
+    const profile = { typos_apasxolhshs: 'PLHRHS'};
     const holidayByDateKey = new Map([[dateKey(0), null]]);
     const existingAuditCountByRowKey = { [dateKey(0)]: 0 };
     const before = JSON.stringify({ rows, profile, existingAuditCountByRowKey });
@@ -444,9 +446,7 @@ function testInputImmutability() {
 
     const frozenRows = deepFreezeFixture(fullTimeWeek());
     const frozenProfile = deepFreezeFixture({
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        hmeres_ergasias_ebdomadas: 5
+        typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
     });
     const frozenHoliday = deepFreezeFixture(new Map([[dateKey(0), null]]));
     const frozenAudit = deepFreezeFixture({});
@@ -464,7 +464,7 @@ function testOutputOwnershipAndFreeze() {
     const rows = fullTimeWeek();
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+        employmentProfile: { typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5 }
     });
     const result = build(rows);
     const group = result.groups[0];

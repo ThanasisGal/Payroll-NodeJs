@@ -6,7 +6,6 @@ const {
     resolveEmploymentTypeFromFormData,
     normalizeWeeklyWorkdaysValue,
     resolveEffectiveWeeklyWorkdays,
-    resolveExpectedWeeklyRepo,
     buildCanonicalWorkTermsSnapshotFields
 } = require('./getOrarioTermsForDate');
 const {
@@ -27,7 +26,6 @@ function historyRecord(overrides = {}) {
         ores_ergasias_ebdomadas: 40,
         mo_oron_hmerhsias_ergasias: 8,
         typos_ebdomadas: '5HMERH',
-        mhniaia_repo: 2,
         ...overrides
     };
 }
@@ -38,7 +36,6 @@ function currentProfile(overrides = {}) {
         ores_ergasias_ebdomadas: 40,
         mo_oron_hmerhsias_ergasias: 8,
         apasxolhsh_basei_symbashs: '5',
-        mhniaia_repo: 2,
         ...overrides
     });
 }
@@ -213,142 +210,28 @@ function testWeeklyWorkdaysNormalizationAndPriority() {
     );
 }
 
-function testExplicitRepoWins() {
-    [1, '1', '1,0'].forEach((repo) => {
-        assert.strictEqual(
-            resolveExpectedWeeklyRepo({ mhniaia_repo: repo, hmeres_ergasias_ebdomadas: 5 }),
-            1
-        );
-    });
-    [2, '2', '2,0'].forEach((repo) => {
-        assert.strictEqual(
-            resolveExpectedWeeklyRepo({ mhniaia_repo: repo, hmeres_ergasias_ebdomadas: 6 }),
-            2
-        );
-    });
-}
-
-function testDerivedCurrentAndHistoryRepo() {
-    assert.strictEqual(
-        currentProfile({ mhniaia_repo: 0, hmeres_ergasias_ebdomadas: 5 }).mhniaia_repo,
-        2
-    );
-    assert.strictEqual(
-        currentProfile({ mhniaia_repo: undefined, hmeres_ergasias_ebdomadas: 6 }).mhniaia_repo,
-        1
-    );
-    assert.strictEqual(
-        effectiveHistory({ mhniaia_repo: 0, hmeres_ergasias_ebdomadas: 5 }).mhniaia_repo,
-        2
-    );
-    assert.strictEqual(
-        effectiveHistory({ mhniaia_repo: undefined, hmeres_ergasias_ebdomadas: 6 }).mhniaia_repo,
-        1
-    );
-}
-
-function testRawAuthoritativeRepoIsPreservedWithoutChangingLegacyRepo() {
-    for (const rawValue of [3, 4, 6, 7, 1.5, -1, 'invalid']) {
-        const current = currentProfile({
-            mhniaia_repo: rawValue,
-            hmeres_ergasias_ebdomadas: 5
-        });
-        assert.strictEqual(current.raw_mhniaia_repo, rawValue);
-        assert.strictEqual(current.mhniaia_repo, 2);
-
-        const history = effectiveHistory({
-            mhniaia_repo: rawValue,
-            hmeres_ergasias_ebdomadas: 6
-        });
-        assert.strictEqual(history.raw_mhniaia_repo, rawValue);
-        assert.strictEqual(history.mhniaia_repo, 1);
-        assert.strictEqual(history.source, 'ISTORIKO');
-    }
-}
-
-function testWeeklyDayStringAndCurrentContractFallbacks() {
-    assert.strictEqual(
-        effectiveHistory({
-            mhniaia_repo: 0,
-            hmeres_ergasias_ebdomadas: undefined,
-            typos_ebdomadas: '5HMERH'
-        }).mhniaia_repo,
-        2
-    );
-    assert.strictEqual(
-        effectiveHistory({
-            mhniaia_repo: 0,
-            hmeres_ergasias_ebdomadas: undefined,
-            typos_ebdomadas: '6HMERH'
-        }).mhniaia_repo,
-        1
-    );
-    assert.strictEqual(
-        currentProfile({
-            mhniaia_repo: 0,
-            hmeres_ergasias_ebdomadas: undefined,
-            apasxolhsh_basei_symbashs: '5'
-        }).mhniaia_repo,
-        2
-    );
-    assert.strictEqual(
-        currentProfile({
-            mhniaia_repo: 0,
-            hmeres_ergasias_ebdomadas: undefined,
-            apasxolhsh_basei_symbashs: '6'
-        }).mhniaia_repo,
-        1
-    );
-}
-
-function testUnsupportedWorkdaysRemainUnresolved() {
-    [0, 1, 2, 3, 4, 7, undefined, 'invalid'].forEach((workdays) => {
-        assert.strictEqual(
-            resolveExpectedWeeklyRepo({
-                mhniaia_repo: 0,
-                hmeres_ergasias_ebdomadas: workdays
-            }),
-            0
-        );
-    });
-
-    assert.strictEqual(
-        resolveExpectedWeeklyRepo({
-            kathestos_apasxolhshs: '0',
-            ores_ergasias_ebdomadas: 40,
-            hmeres_ergasias_ebdomadas: 0,
-            mhniaia_repo: 0
-        }),
-        0
-    );
-}
-
 function testSnapshotFields() {
     const fiveDay = buildCanonicalWorkTermsSnapshotFields({
         kathestos_apasxolhshs: '0',
         apasxolhsh_basei_symbashs: '6',
-        hmeres_ergasias_ebdomadas: 5,
-        mhniaia_repo: 2
+        hmeres_ergasias_ebdomadas: 5
     });
     assert.deepStrictEqual(fiveDay, {
         kathestos_apasxolhshs: '0',
         typos_apasxolhshs: '0',
         typos_ebdomadas: '5HMERH',
-        mhniaia_repo: 2,
         pososto_prosayxhshs_6hs_hmeras: null
     });
 
     const sixDay = buildCanonicalWorkTermsSnapshotFields({
         kathestos_apasxolhshs: '2',
         apasxolhsh_basei_symbashs: '5',
-        hmeres_ergasias_ebdomadas: 6,
-        mhniaia_repo: 1
+        hmeres_ergasias_ebdomadas: 6
     });
     assert.deepStrictEqual(sixDay, {
         kathestos_apasxolhshs: '2',
         typos_apasxolhshs: '2',
         typos_ebdomadas: '6HMERH',
-        mhniaia_repo: 1,
         pososto_prosayxhshs_6hs_hmeras: null
     });
 }
@@ -357,8 +240,7 @@ function testInputImmutability() {
     const employee = {
         kathestos_apasxolhshs: '0',
         hmeres_ergasias_ebdomadas: 5,
-        ores_ergasias_ebdomadas: 40,
-        mhniaia_repo: 2
+        ores_ergasias_ebdomadas: 40
     };
     const history = [historyRecord({ kathestos_apasxolhshs: '1' })];
     const employeeBefore = clone(employee);
@@ -379,11 +261,6 @@ function run() {
     testInvalidCanonicalDoesNotUseLegacyFallback();
     testFormCanonicalInvalidValueBlocksLegacyFallback();
     testWeeklyWorkdaysNormalizationAndPriority();
-    testExplicitRepoWins();
-    testDerivedCurrentAndHistoryRepo();
-    testRawAuthoritativeRepoIsPreservedWithoutChangingLegacyRepo();
-    testWeeklyDayStringAndCurrentContractFallbacks();
-    testUnsupportedWorkdaysRemainUnresolved();
     testSnapshotFields();
     testInputImmutability();
     console.log('getOrarioTermsForDate tests passed');

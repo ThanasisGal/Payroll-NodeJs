@@ -15,11 +15,17 @@ function makeRow({
     reason = 'DEFAULT_REASON',
     proposedUpdates = {},
     cardHours = 0,
-    apologistikaCategory = ''
+    apologistikaCategory = '',
+    previewId = '',
+    diagnosticDetails = null,
+    reusableDecision = null,
+    ypokatasthma = '0000'
 }) {
     return {
+        preview_id: previewId,
         prodhlomena_oraria_id: id,
         kodikos,
+        ypokatasthma,
         hmeromhnia: date,
         scenarioDecision: {
             scenario_code: scenarioCode,
@@ -29,7 +35,8 @@ function makeRow({
             declared_category: 'ΕΡΓ',
             apologistika_category: apologistikaCategory,
             card_hours: cardHours,
-            has_cards: cardHours > 0
+            has_cards: cardHours > 0,
+            rest_period_diagnostic: diagnosticDetails
         },
         policyResult: {
             result_status: status,
@@ -38,11 +45,36 @@ function makeRow({
             mode,
             reasons: [reason],
             proposed_updates: proposedUpdates,
+            reusable_decision: reusableDecision,
             blocked: false,
             requires_human_approval: false,
             batch_approvable: false
         }
     };
+}
+
+function testReusableDecisionMetadataIsProjectedWithoutNewHrObligation() {
+    const reusableDecision = {
+        approval_id: 'approval-1',
+        approved_by_user_name: 'HR User',
+        approved_at: '2026-06-30T10:00:00.000Z'
+    };
+    const grouping = buildApasxoliseisPolicyPreviewGrouping([
+        makeRow({
+            id: 'resolved-1',
+            kodikos: '001',
+            date: '2026-07-01',
+            status: 'RESOLVED_BY_POLICY',
+            policyCode: 'UNSCHEDULED_DAY_WITH_COMPLETE_CARDS',
+            scenarioCode: 'UNSCHEDULED_DAY_WITH_CARDS',
+            reason: 'UNSCHEDULED_DAY_WITH_CARDS',
+            reusableDecision
+        })
+    ]);
+
+    assert.deepStrictEqual(grouping.groups[0].reusable_decision, reusableDecision);
+    assert.strictEqual(grouping.groups[0].items[0].reusable_decision.approval_id, 'approval-1');
+    assert.strictEqual(grouping.groups[0].reusable_eligible, false);
 }
 
 function testPresentationKeepsUnderlyingApologistikaCategory() {
@@ -65,6 +97,39 @@ function testPresentationKeepsUnderlyingApologistikaCategory() {
     assert.strictEqual(item.kathgoria_ergasias, 'ΕΡΓ');
     assert.strictEqual(item.kathgoria_ergasias_apologistika, 'ΑΔΕΙΑ');
     assert.strictEqual(item.proposed_values.kathgoria_ergasias_apologistika, 'ΑΝ');
+}
+
+function testRestDiagnosticKeepsCompositePreviewIdentityAndDecisionFacts() {
+    const diagnosticDetails = {
+        check_type: 'INTERDAY_REST',
+        current_date: '2026-06-01',
+        next_date: '2026-06-02',
+        previous_end: '22:00',
+        next_start: '08:59',
+        measured_rest_minutes: 659,
+        minimum_rest_minutes: 660
+    };
+    const grouping = buildApasxoliseisPolicyPreviewGrouping([
+        makeRow({
+            id: '507f1f77bcf86cd799439011',
+            previewId: '507f1f77bcf86cd799439011:INTERDAY_REST:2026-06-01',
+            kodikos: '0001',
+            date: '2026-06-02',
+            status: 'NEEDS_REVIEW',
+            policyCode: 'INTERDAY_MINIMUM_REST',
+            scenarioCode: 'INTERDAY_REST_VIOLATION',
+            reason: 'INTERDAY_REST_BELOW_MINIMUM',
+            diagnosticDetails
+        })
+    ]);
+    const item = grouping.groups[0].items[0];
+
+    assert.strictEqual(
+        item.preview_id,
+        '507f1f77bcf86cd799439011:INTERDAY_REST:2026-06-01'
+    );
+    assert.strictEqual(item.prodhlomena_oraria_id, '507f1f77bcf86cd799439011');
+    assert.deepStrictEqual(item.diagnostic_details, diagnosticDetails);
 }
 
 function testEmptyList() {
@@ -233,5 +298,7 @@ testDeterministicSorting();
 testMissingPolicyOrScenario();
 testDateOnlyStringPassesThrough();
 testPresentationKeepsUnderlyingApologistikaCategory();
+testRestDiagnosticKeepsCompositePreviewIdentityAndDecisionFacts();
+testReusableDecisionMetadataIsProjectedWithoutNewHrObligation();
 
 console.log('apasxoliseis policy preview grouping tests passed');

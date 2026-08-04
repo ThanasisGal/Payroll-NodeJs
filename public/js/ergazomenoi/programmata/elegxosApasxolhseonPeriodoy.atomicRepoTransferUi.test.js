@@ -178,6 +178,24 @@ function testWeeklyResolutionShowsRepoAndSixthDayFacts() {
     assert.ok(html.includes('<strong>6</strong>'));
 }
 
+function testSixthDayCardsBadgeShowsApplicableRate() {
+    assertContains(
+        sandbox.renderSixthDayCardsBadge({
+            is_sixth_day: true,
+            sixth_day_premium_rate: 10
+        }),
+        ['6η ημέρα · 10%']
+    );
+    assertContains(
+        sandbox.renderSixthDayCardsBadge({
+            is_sixth_day: true,
+            sixth_day_premium_rate: 0
+        }),
+        ['6η ημέρα · 0%']
+    );
+    assert.strictEqual(sandbox.renderSixthDayCardsBadge({}), '');
+}
+
 function getVisibleText(html) {
     return String(html || '')
         .replace(/<[^>]*>/g, ' ')
@@ -210,6 +228,61 @@ function testPersistedRepoCategoryOverridesDerivedLeave() {
     assert.strictEqual(derived.source, 'derived');
 }
 
+function testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation() {
+    const autoCalculated = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias_original: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 0,
+        adeia: false,
+        adeia_apologistika: true,
+        kathgoria_adeias_apologistika: 'ΑΔΑΛ',
+        leave_provenance: 'AUTO_CALCULATED_LEAVE'
+    }, { apologistikoText: '' });
+    assert.strictEqual(autoCalculated.text, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+    assert.strictEqual(autoCalculated.className, 'cell-adeia-suggestion');
+    assert.strictEqual(autoCalculated.source, 'derived');
+
+    const hrDeclared = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias_original: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 0,
+        adeia: true,
+        adeia_apologistika: true,
+        kathgoria_adeias: 'ΚΑΝΟΝΙΚΗ',
+        kathgoria_adeias_apologistika: 'ΑΔΑΛ',
+        leave_provenance: 'HR_DECLARED_LEAVE'
+    }, { apologistikoText: '' });
+    assert.strictEqual(hrDeclared.text, 'ΑΔΕΙΑ');
+    assert.notStrictEqual(hrDeclared.className, 'cell-adeia-suggestion');
+}
+
+function testContractualEmploymentTypeWinsOverOperationalPhaseForRestDisplay() {
+    assert.strictEqual(
+        sandbox.resolveReviewIsFullTimePresentation({
+            effective_is_full_time: true,
+            review_phase_code: '2'
+        }),
+        true
+    );
+    assert.strictEqual(
+        sandbox.resolveReviewIsFullTimePresentation({
+            effective_is_full_time: false,
+            review_phase_code: '0'
+        }),
+        false
+    );
+    assert.strictEqual(
+        sandbox.resolveReviewIsFullTimePresentation({
+            effective_kathestos_apasxolhshs: '',
+            effective_typos_apasxolhshs: '0',
+            review_phase_code: '2'
+        }),
+        true
+    );
+}
+
 function testPersistedAnWithCardsIsNotBlanketRepoPresentation() {
     const presentation = sandbox.resolveReviewApologistikoPresentation({
         kathgoria_ergasias: 'ΑΝ',
@@ -227,6 +300,49 @@ function testPersistedAnWithCardsIsNotBlanketRepoPresentation() {
     assert.strictEqual(presentation.text, '08:30–16:06');
     assert.strictEqual(presentation.className, 'cell-apologistiko');
     assert.notStrictEqual(presentation.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+}
+
+function testFullTimeDeclaredWorkWithCardsNeverDisplaysPersistedNonWork() {
+    const baseRow = {
+        kathgoria_ergasias_original: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΜΕ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 2.88,
+        cards_apo_ora_01: '09:04',
+        cards_eos_ora_01: '12:27',
+        effective_is_full_time: true
+    };
+
+    const neutral = sandbox.resolveReviewApologistikoPresentation(baseRow, {
+        apologistikoText: '',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    });
+    assert.strictEqual(neutral.text, '');
+    assert.notStrictEqual(neutral.text, 'ΜΗ ΕΡΓΑΣΙΑ');
+
+    const nonFullPhase = sandbox.resolveReviewApologistikoPresentation({
+        ...baseRow,
+        effective_is_full_time: false
+    }, {
+        apologistikoText: '',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    });
+    assert.strictEqual(nonFullPhase.text, '');
+    assert.notStrictEqual(nonFullPhase.text, 'ΜΗ ΕΡΓΑΣΙΑ');
+
+    const intervals = sandbox.resolveReviewApologistikoPresentation({
+        ...baseRow,
+        apo_ora_01_apologistika: '09:04',
+        eos_ora_01_apologistika: '12:27'
+    }, {
+        apologistikoText: '09:04–12:27',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    });
+    assert.strictEqual(intervals.text, '09:04–12:27');
+    assert.strictEqual(intervals.className, 'cell-apologistiko');
 }
 
 function testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow() {
@@ -327,6 +443,29 @@ function testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates() 
     assert.strictEqual(applied.apologistiko.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
     assert.strictEqual(applied.apologistiko.className, 'cell-repo-day-applied');
     assert.strictEqual(applied.isAppliedRepoTarget, true);
+}
+
+function testDeclaredNonWorkStaysOnlyInDeclaredColumn() {
+    const neutral = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΜΕ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        cards_ores_ergasias: 0,
+        effective_is_full_time: false
+    }, {
+        declaredText: 'ΜΗ ΕΡΓΑΣΙΑ',
+        declaredClass: 'cell-non-work-day',
+        apologistikoText: '',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: true
+    }, null);
+
+    assert.strictEqual(neutral.declared.text, 'ΜΗ ΕΡΓΑΣΙΑ');
+    assert.strictEqual(neutral.apologistiko.text, '-');
+    assert.strictEqual(neutral.apologistiko.className, '');
+    assert.strictEqual(neutral.apologistiko.source, 'declared_non_work_neutral');
+    assert.strictEqual(neutral.isOriginalDeclaredNonWork, true);
+    assert.strictEqual(neutral.isOriginalDeclaredNeutral, true);
 }
 
 function mockClassList(initial = []) {
@@ -442,10 +581,10 @@ function testReadyFullTimeAndSplitShift() {
     const html = render(readyProjection());
     assertContains(html, [
         'Προτάσεις Μεταφοράς Ρεπό',
-        'Μόνο για έλεγχο',
+        'Ροή έγκρισης HR',
         'Πρόταση προς έλεγχο από HR',
         'Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές',
-        'Η πρόταση εμφανίζεται μόνο για έλεγχο',
+        'Η προεπισκόπηση δεν αλλάζει δεδομένα',
         'Ημέρα που γίνεται εργασία',
         'Ημέρα που γίνεται ρεπό',
         'ΑΝ',
@@ -736,9 +875,10 @@ function testCompleteVisibleSectionContainsNoTechnicalTerms() {
             'Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές'
         )
     );
-    assert.ok(visibleText.includes('Η πρόταση εμφανίζεται μόνο για έλεγχο'));
+    assert.ok(visibleText.includes('Η προεπισκόπηση δεν αλλάζει δεδομένα'));
     assert.ok(visibleText.includes('Συνδεδεμένη πρόταση μεταφοράς ρεπό'));
-    assert.ok(visibleText.includes('Η εφαρμογή της πρότασης δεν είναι ακόμη διαθέσιμη'));
+    assert.ok(visibleText.includes('Η ενέργεια εφαρμογής εμφανίζεται μόνο μετά από έγκριση'));
+    assert.ok(visibleText.includes('Ροή έγκρισης HR'));
 }
 
 function testPartTimeTargetIsNotAnError() {
@@ -834,8 +974,29 @@ function testConfidenceAndDecisionTerminology() {
     assert.ok(details.includes('Βεβαιότητα αντιστοίχισης: Υψηλή'));
     assert.ok(!details.includes('Προτεραιότητα'));
     assert.ok(source.includes("NEEDS_MORE_REVIEW: 'Χρειάζεται περαιτέρω έλεγχο'"));
-    assert.ok(source.includes('Η πρόταση δεν είναι διαθέσιμη για εφαρμογή στην παρούσα κατάσταση.'));
+    assert.ok(source.includes('Καμία αλλαγή δεν γίνεται από την προεπισκόπηση.'));
     assert.ok(!source.includes('<span>Δεν μπορεί να εφαρμοστεί</span>'));
+}
+
+function testResolvedUnscheduledWorkDoesNotRenderReviewBadge() {
+    const resolved = sandbox.renderScenarioBadge({
+        scenarioDecision: {
+            scenario_code: 'UNSCHEDULED_DAY_WITH_CARDS',
+            confidence: 'HIGH',
+            requires_review: false,
+            display_labels: { show_badge: false }
+        }
+    });
+    assert.strictEqual(resolved, '');
+    assert.strictEqual(
+        sandbox.isScenarioReviewRow({
+            scenarioDecision: {
+                scenario_code: 'UNSCHEDULED_DAY_WITH_CARDS',
+                requires_review: false
+            }
+        }),
+        false
+    );
 }
 
 function testBranchRequiredForDecisionButtons() {
@@ -1113,7 +1274,6 @@ function testDiagnostics() {
         INCOMPLETE_EMPLOYEE_WEEK: 5,
         ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED: 4,
         NO_TARGET_CANDIDATE: 3,
-        INVALID_MHNIAIA_REPO: 2,
         MULTIPLE_SOURCE_CANDIDATES: 1
     };
     projection.warning_counts = { TARGET_ZERO_HOURS_WITH_CARD_INTERVALS: 1 };
@@ -1127,9 +1287,8 @@ function testDiagnostics() {
         '7 περιπτώσεις: Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.',
         '6 περιπτώσεις: Η προτεινόμενη αλλαγή δεν αποκαθιστά τον απαιτούμενο αριθμό ρεπό.',
         '5 περιπτώσεις: Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
-        '4 περιπτώσεις: Η εκ περιτροπής απασχόληση δεν υποστηρίζεται ακόμη από την αυτόματη διαδικασία.',
+        '4 περιπτώσεις: Η περίπτωση εκ περιτροπής απασχόλησης δεν δρομολογήθηκε στην απαιτούμενη πολιτική v2.',
         '3 περιπτώσεις: Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
-        '2 περιπτώσεις: Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
         '1 περίπτωση: Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
         'μηδενικές συνολικές ώρες αλλά περιέχει στοιχεία καρτών'
     ]);
@@ -1147,7 +1306,6 @@ function testDiagnostics() {
         '5 περιπτώσεις:',
         '4 περιπτώσεις:',
         '3 περιπτώσεις:',
-        '2 περιπτώσεις:',
         '1 περίπτωση:'
     ];
     orderedLabels.reduce((previousIndex, label) => {
@@ -1313,6 +1471,87 @@ function testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState() {
     sandbox.renderPolicyPreviewGroups(null, { error: 'preview failed' });
     sandbox.renderPolicyPreviewGroups(grouping);
     assert.ok(!container.innerHTML.includes('Προτάσεις Μεταφοράς Ρεπό'));
+
+    elementsById.delete('policyPreviewGroupsContainer');
+}
+
+function testPolicyDecisionAccordionIsCompactAndDecisionOnly() {
+    const container = {
+        innerHTML: '',
+        querySelector: () => null,
+        querySelectorAll: () => []
+    };
+    const item = {
+        prodhlomena_oraria_id: 'row-1',
+        employee_kodikos: '0006',
+        hmeromhnia: '2026-06-06',
+        kathgoria_ergasias: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: '',
+        cards_ores_ergasias: 7,
+        proposed_values: {},
+        flags: {}
+    };
+    const group = (status, id, count, title) => ({
+        group_id: id,
+        status,
+        policy_code: 'UNKNOWN',
+        scenario_code: 'UNKNOWN',
+        action_type: 'UNKNOWN',
+        reason_code: 'UNKNOWN',
+        title,
+        count,
+        employees_count: 1,
+        items: [item]
+    });
+    const grouping = {
+        version: 1,
+        scope: 'page',
+        summary: { total: 22, groups_count: 3, by_status: {} },
+        groups: [
+            group('NEEDS_REVIEW', 'decision-group', 3, 'Απόφαση HR'),
+            group('UNKNOWN_PATTERN', 'diagnostic-group', 17, 'Τεχνική εκκρεμότητα'),
+            group('OK', 'ok-group', 2, 'Αυτόματα OK')
+        ]
+    };
+    elementsById.set('policyPreviewGroupsContainer', container);
+
+    sandbox.renderPolicyPreviewGroups(grouping);
+
+    assert.ok(container.innerHTML.includes('policy-preview-main-accordion'));
+    assert.ok(container.innerHTML.includes('3 εγγραφές χρειάζονται απόφαση'));
+    assert.ok(container.innerHTML.includes('17 τεχνικές εκκρεμότητες'));
+    assert.ok(container.innerHTML.includes('2 ολοκληρώθηκαν αυτόματα'));
+    assert.ok(container.innerHTML.includes('Τεχνικές εκκρεμότητες πολιτικής'));
+    assert.ok(container.innerHTML.includes('Δεν απαιτούν απόφαση HR'));
+    assert.ok(!container.innerHTML.includes('Αυτόματα OK'));
+    assert.strictEqual((container.innerHTML.match(/Απόφαση ελέγχου/g) || []).length, 1);
+    assert.ok(container.innerHTML.includes('Καταγραφή ως ελεγμένο'));
+    assert.ok(container.innerHTML.includes('Χρειάζεται περαιτέρω έλεγχο'));
+    assert.ok(!container.innerHTML.includes('Έγκριση πρότασης για μελλοντική εφαρμογή'));
+    assert.ok(!container.innerHTML.includes('Απόρριψη πρότασης'));
+    assert.ok(!container.innerHTML.includes('Ιστορικό Αποφάσεων Ελέγχου'));
+    assert.ok(!container.innerHTML.includes('Προεπισκόπηση Εφαρμογής'));
+    assert.strictEqual(sandbox.isScenarioReviewRow({
+        policyResult: { result_status: 'OK' },
+        scenarioDecision: { requires_review: true }
+    }), false);
+    assert.strictEqual(sandbox.isScenarioReviewRow({
+        policyResult: { result_status: 'UNKNOWN_PATTERN' },
+        scenarioDecision: { requires_review: true }
+    }), false);
+    assert.strictEqual(sandbox.isScenarioReviewRow({
+        policyResult: { result_status: 'NEEDS_REVIEW' }
+    }), true);
+    assert.deepStrictEqual(
+        Array.from(
+            sandbox.getPolicyPreviewDecisionButtons({
+                status: 'PREFILLED_PENDING_APPROVAL',
+                items: [{ proposed_values: { kathgoria_ergasias_apologistika: 'ΕΡΓ' } }]
+            }),
+            (button) => button.type
+        ),
+        ['NEEDS_MORE_REVIEW', 'REJECT_PROPOSAL', 'APPROVE_PREFILL']
+    );
 
     elementsById.delete('policyPreviewGroupsContainer');
 }
@@ -2239,10 +2478,15 @@ async function testHrLoadingLocksAndRestoresFilters() {
 
 const tests = [
     testWeeklyResolutionShowsRepoAndSixthDayFacts,
+    testSixthDayCardsBadgeShowsApplicableRate,
     testPersistedRepoCategoryOverridesDerivedLeave,
+    testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation,
+    testContractualEmploymentTypeWinsOverOperationalPhaseForRestDisplay,
     testPersistedAnWithCardsIsNotBlanketRepoPresentation,
+    testFullTimeDeclaredWorkWithCardsNeverDisplaysPersistedNonWork,
     testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow,
     testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates,
+    testDeclaredNonWorkStaysOnlyInDeclaredColumn,
     testEmployeeGroupsUseAccessibleSingleOpenAccordion,
     testAppliedHistoryRendersWithoutCurrentProjectionGroup,
     testReadyFullTimeAndSplitShift,
@@ -2258,6 +2502,7 @@ const tests = [
     testReadOnlySafety,
     testServerDerivedRepoTransferPermissionsAndRoleVisibility,
     testConfidenceAndDecisionTerminology,
+    testResolvedUnscheduledWorkDoesNotRenderReviewBadge,
     testBranchRequiredForDecisionButtons,
     testAllBranchSkipsDecisionRequests,
     testOnlyCurrentDecisionDisablesButtons,
@@ -2277,6 +2522,7 @@ const tests = [
     testProposalDateRangeWording,
     testGenericIsolationSourceContract,
     testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState,
+    testPolicyDecisionAccordionIsCompactAndDecisionOnly,
     testMinimalWorkspaceEjsContract,
     testEmploymentReviewScrollContainerContract,
     testAllKnownBackendGroupingCodesHaveGreekLabels,

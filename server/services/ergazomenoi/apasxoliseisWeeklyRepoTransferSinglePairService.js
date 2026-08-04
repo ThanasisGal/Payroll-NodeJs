@@ -22,8 +22,8 @@ const {
 } = require('../../utils/date/mondaySundayWeek');
 
 const SCENARIO_CODE = 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR';
-const SCENARIO_VERSION = 'repo-transfer-single-pair:v3';
-const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v3';
+const SCENARIO_VERSION = 'repo-transfer-single-pair:v4';
+const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v4';
 
 const ELIGIBILITY_STATUS = Object.freeze({
     ELIGIBLE: 'ELIGIBLE',
@@ -242,15 +242,28 @@ function isProvisionalAutoCalculatedLeave({
     const workHoursState = apologistikaState.numericStates.find(
         (state) => state.field === 'ores_ergasias_apologistika'
     ) || { kind: 'ZERO', value: 0 };
+    const actualWorkHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_pragmatikhs_ergasias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
     const absenceHoursState = apologistikaState.numericStates.find(
         (state) => state.field === 'ores_apoysias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
+    const paidLeaveHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_adeias_pistomenes_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
+    const holidayCreditedHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_argias_pistomenes_apologistika'
     ) || { kind: 'ZERO', value: 0 };
     const unrelatedPositiveHours = apologistikaState.numericStates.some(
         (state) =>
             state.kind === 'POSITIVE' &&
-            !['ores_ergasias_apologistika', 'ores_apoysias_apologistika'].includes(
-                state.field
-            )
+            ![
+                'ores_ergasias_apologistika',
+                'ores_apoysias_apologistika',
+                'ores_pragmatikhs_ergasias_apologistika',
+                'ores_adeias_pistomenes_apologistika',
+                'ores_argias_pistomenes_apologistika'
+            ].includes(state.field)
     );
     const declaredHours = toFiniteNumber(row.ores_ergasias);
     const workHoursMatchFallback =
@@ -258,6 +271,11 @@ function isProvisionalAutoCalculatedLeave({
         (workHoursState.kind === 'POSITIVE' &&
             declaredHours !== null &&
             workHoursState.value === declaredHours);
+    const paidLeaveHoursCompatible =
+        paidLeaveHoursState.kind === 'ZERO' ||
+        (paidLeaveHoursState.kind === 'POSITIVE' &&
+            declaredHours !== null &&
+            numbersMatch(paidLeaveHoursState.value, declaredHours));
     const autoLeaveMarker =
         facts.leave.adeia_apologistika ||
         apologistikaState.category === 'ΑΔΕΙΑ' ||
@@ -284,6 +302,9 @@ function isProvisionalAutoCalculatedLeave({
         apologistikaState.invalidNumericValue === false &&
         workHoursMatchFallback &&
         absenceHoursState.kind === 'ZERO' &&
+        actualWorkHoursState.kind === 'ZERO' &&
+        paidLeaveHoursCompatible &&
+        holidayCreditedHoursState.kind === 'ZERO' &&
         unrelatedPositiveHours === false &&
         hasCompleteNonZeroApologistikaInterval(row) === false &&
         facts.apologistika.existingFlags.repo_apologistika === false
@@ -291,6 +312,7 @@ function isProvisionalAutoCalculatedLeave({
 }
 
 const AUTO_SOURCE_DERIVED_HOUR_FIELDS = new Set([
+    'ores_pragmatikhs_ergasias_apologistika',
     'ores_nyxtas_apologistika',
     'ores_argion_prosayxhsh_apologistika',
     'ores_argion_ergasia_apologistika',
@@ -379,13 +401,21 @@ function isProvisionalAutoCalculatedSourceWork({
     apologistikaState,
     employmentProfile
 }) {
+    const isBlankUnscheduledDay =
+        toTrimmedString(row.kathgoria_ergasias) === '' &&
+        toFiniteNumber(row.ores_ergasias) === 0 &&
+        facts.declared.hasDeclaredIntervals === false;
     const declaredRestOrNonWork =
         facts.declared.isDeclaredRepo ||
         facts.declared.isDeclaredNonWork ||
+        isBlankUnscheduledDay ||
         toBoolean(row.repo);
     const categoryCompatible = ['', 'ΕΡΓ'].includes(apologistikaState.category);
     const workHoursState = apologistikaState.numericStates.find(
         (state) => state.field === 'ores_ergasias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
+    const actualWorkHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_pragmatikhs_ergasias_apologistika'
     ) || { kind: 'ZERO', value: 0 };
     const apologistikaIntervalHours = facts.apologistika.currentApologistikaIntervals
         .filter((interval) => interval.isComplete && !interval.isZeroLength)
@@ -410,6 +440,11 @@ function isProvisionalAutoCalculatedSourceWork({
             ].some((expected) =>
                 numbersMatch(workHoursState.value, expected)
             ));
+    const actualWorkHoursCompatible =
+        actualWorkHoursState.kind === 'ZERO' ||
+        (actualWorkHoursState.kind === 'POSITIVE' &&
+            [cardHours, cardHoursAfterKnownBreak, apologistikaIntervalHours]
+                .some((expected) => numbersMatch(actualWorkHoursState.value, expected)));
     const unrelatedPositiveHours = apologistikaState.numericStates.some((state) => {
         if (state.kind !== 'POSITIVE') return false;
         if (state.field === 'ores_ergasias_apologistika') return false;
@@ -417,7 +452,9 @@ function isProvisionalAutoCalculatedSourceWork({
     });
     const positiveDerivedHours = apologistikaState.numericStates.filter(
         (state) =>
-            state.kind === 'POSITIVE' && AUTO_SOURCE_DERIVED_HOUR_FIELDS.has(state.field)
+            state.kind === 'POSITIVE' &&
+            AUTO_SOURCE_DERIVED_HOUR_FIELDS.has(state.field) &&
+            state.field !== 'ores_pragmatikhs_ergasias_apologistika'
     );
     const isSunday = new Date(row.hmeromhnia).getUTCDay() === 0;
     const derivedHoursCompatibleWithProvenance =
@@ -447,6 +484,7 @@ function isProvisionalAutoCalculatedSourceWork({
         categoryCompatible &&
         apologistikaState.invalidNumericValue === false &&
         workHoursCompatible &&
+        actualWorkHoursCompatible &&
         unrelatedPositiveHours === false &&
         derivedHoursCompatibleWithProvenance &&
         sourceIntervalsMatchAutoResult(row, facts, employmentProfile)
@@ -521,6 +559,13 @@ function buildRowInfo(row, contexts) {
 
 function sourceExclusions(info) {
     const reasons = [];
+    const blockingCriticalWarnings = info.criticalWarnings.filter(
+        (warning) =>
+            !(
+                info.provisionalAutoCalculatedSourceWork &&
+                warning === 'MISSING_KATHGORIA_ERGASIAS'
+            )
+    );
     if (info.row.is_locked === true) reasons.push('SOURCE_LOCKED');
     if (info.manualOverride && info.row.is_locked !== true) reasons.push('SOURCE_MANUAL_OVERRIDE');
     if (
@@ -530,7 +575,7 @@ function sourceExclusions(info) {
         reasons.push('SOURCE_LEAVE_OR_SICKNESS');
     }
     if (info.holidayState.blocksRepoTransfer) reasons.push('SOURCE_HOLIDAY');
-    if (info.criticalWarnings.length > 0) reasons.push('SOURCE_CONFLICTING_FACTS');
+    if (blockingCriticalWarnings.length > 0) reasons.push('SOURCE_CONFLICTING_FACTS');
     if (
         !info.facts.cards.cardIntervalsNormalized.length ||
         info.facts.cards.incompleteCardPairs.length > 0
@@ -648,7 +693,6 @@ function buildResult({
             company_kod: normalizePrimitiveString(employee.company_kod),
             kodikos: normalizePrimitiveString(employee.kodikos),
             typos_apasxolhshs: normalizePrimitiveString(employee.typos_apasxolhshs),
-            mhniaia_repo: normalizeRepoLimitForResult(employee.mhniaia_repo),
             effective_expected_weekly_repo:
                 normalizeRepoLimitForResult(employee.effective_expected_weekly_repo),
             repo_resolution_source:
@@ -708,7 +752,6 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         week: {},
         employee: {
             typos_apasxolhshs: normalizeEmploymentType(profile.typos_apasxolhshs),
-            mhniaia_repo: profile.mhniaia_repo,
             profile_source: profile.source,
             profile_istoriko_id: profile.istorikoId,
             profile_effective_date:
@@ -795,7 +838,6 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
             reasons: ['INVALID_EFFECTIVE_EXPECTED_WEEKLY_REPO']
         });
     }
-    base.employee.mhniaia_repo = repoLimit;
     base.employee.effective_expected_weekly_repo = repoLimit;
     base.employee.repo_resolution_source = repoResolution.repoResolutionSource;
     base.employee.scheduled_work_days = repoResolution.scheduledWorkDays;
@@ -810,12 +852,21 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
     );
     const sourceCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
     const targetCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
-    const potentialSources = rowInfos.filter(
-        (info) =>
-            toTrimmedString(info.row.kathgoria_ergasias) === sourceCategory &&
+    const potentialSources = rowInfos.filter((info) => {
+        const category = toTrimmedString(info.row.kathgoria_ergasias);
+        const isFullTimeBlankUnscheduledSource =
+            employmentType === EMPLOYMENT_TYPE.FULL &&
+            category === '' &&
+            toFiniteNumber(info.row.ores_ergasias) === 0 &&
+            info.facts.declared.hasDeclaredIntervals === false &&
+            info.provisionalAutoCalculatedSourceWork;
+
+        return (
+            (category === sourceCategory || isFullTimeBlankUnscheduledSource) &&
             info.cardHours !== null &&
             info.cardHours > 0
-    );
+        );
+    });
     const cleanSources = potentialSources.filter((info) => sourceExclusions(info).length === 0);
     const potentialTargets = rowInfos.filter(
         (info) =>
@@ -856,6 +907,18 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
                 cleanTargets.length > 1 ? 'MULTIPLE_TARGET_CANDIDATES' : 'NO_TARGET_CANDIDATE',
                 ...unsafeReasons
             ],
+            counts
+        });
+    }
+
+    if (
+        cleanSources[0].dateKey.slice(0, 7) !==
+        cleanTargets[0].dateKey.slice(0, 7)
+    ) {
+        return buildResult({
+            ...base,
+            status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['CROSS_MONTH_REPO_TRANSFER_NOT_ALLOWED'],
             counts
         });
     }
@@ -1119,7 +1182,6 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
     };
     if (
         establishedResult.eligibility_status === ELIGIBILITY_STATUS.INVALID_INPUT ||
-        establishedResult.reasons.includes('INVALID_EXPLICIT_MHNIAIA_REPO') ||
         establishedResult.reasons.includes('INVALID_EFFECTIVE_WEEKLY_WORKDAYS')
     ) {
         return deepFreeze(common);

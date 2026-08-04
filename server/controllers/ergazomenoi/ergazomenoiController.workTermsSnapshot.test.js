@@ -32,7 +32,7 @@ function testWeeklyDayFieldsCannotBecomeEmploymentType() {
     });
 }
 
-function testWeekTypeAndRepoSnapshot() {
+function testWeekTypeSnapshot() {
     assert.strictEqual(
         snapshot({ hmeres_ergasias_ebdomadas: 5 }).typos_ebdomadas,
         '5HMERH'
@@ -41,45 +41,6 @@ function testWeekTypeAndRepoSnapshot() {
         snapshot({ hmeres_ergasias_ebdomadas: 6 }).typos_ebdomadas,
         '6HMERH'
     );
-    assert.strictEqual(snapshot({ mhniaia_repo: 1 }).mhniaia_repo, 1);
-    assert.strictEqual(snapshot({ mhniaia_repo: 2 }).mhniaia_repo, 2);
-}
-
-function testExpectedRepoSnapshotFallback() {
-    assert.strictEqual(snapshot({ hmeres_ergasias_ebdomadas: 5 }).mhniaia_repo, 2);
-    assert.strictEqual(snapshot({ hmeres_ergasias_ebdomadas: 6 }).mhniaia_repo, 1);
-    assert.strictEqual(
-        snapshot({ hmeres_ergasias_ebdomadas: 5, mhniaia_repo: 1 }).mhniaia_repo,
-        1
-    );
-    assert.strictEqual(
-        snapshot({ hmeres_ergasias_ebdomadas: 6, mhniaia_repo: 2 }).mhniaia_repo,
-        2
-    );
-    assert.strictEqual(
-        buildCanonicalWorkTermsSnapshotFields(
-            { hmeres_ergasias_ebdomadas: 5 },
-            { mhniaia_repo: 1 }
-        ).mhniaia_repo,
-        1
-    );
-    assert.strictEqual(
-        buildCanonicalWorkTermsSnapshotFields(
-            { hmeres_ergasias_ebdomadas: 6 },
-            { mhniaia_repo: 2 }
-        ).mhniaia_repo,
-        2
-    );
-    assert.strictEqual(snapshot({ hmeres_ergasias_ebdomadas: 3 }).mhniaia_repo, 0);
-}
-
-function testWeekTypeRemainsIndependentFromRepo() {
-    const explicitMismatch = snapshot({
-        hmeres_ergasias_ebdomadas: 5,
-        mhniaia_repo: 1
-    });
-    assert.strictEqual(explicitMismatch.typos_ebdomadas, '5HMERH');
-    assert.strictEqual(explicitMismatch.mhniaia_repo, 1);
 }
 
 function testInvalidCanonicalSnapshotDoesNotUseLegacyFallback() {
@@ -92,7 +53,6 @@ function testInvalidCanonicalSnapshotDoesNotUseLegacyFallback() {
         kathestos_apasxolhshs: '',
         typos_apasxolhshs: '',
         typos_ebdomadas: '5HMERH',
-        mhniaia_repo: 2,
         pososto_prosayxhshs_6hs_hmeras: null
     });
 
@@ -124,9 +84,7 @@ function testControllerUsesPureCanonicalSnapshotHelper() {
 function run() {
     testCanonicalEmploymentTypes();
     testWeeklyDayFieldsCannotBecomeEmploymentType();
-    testWeekTypeAndRepoSnapshot();
-    testExpectedRepoSnapshotFallback();
-    testWeekTypeRemainsIndependentFromRepo();
+    testWeekTypeSnapshot();
     testInvalidCanonicalSnapshotDoesNotUseLegacyFallback();
     testControllerUsesPureCanonicalSnapshotHelper();
     console.log('ergazomenoi controller work-terms snapshot tests passed');

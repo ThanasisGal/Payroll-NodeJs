@@ -57,7 +57,94 @@ assert.ok(source.includes('pendingDeviationWeeks'));
 assert.ok(source.includes('legacyDeviations'));
 assert.ok(source.includes('normalizeLegacyDeviation({'));
 assert.ok(source.includes('deviationPolicyVersion: deviationPreview.policyVersion'));
+const cleanupFilterStart = source.indexOf('const deviationsCleanupFilter = {');
+const cleanupFilterEnd = source.indexOf(
+    'await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter);',
+    cleanupFilterStart
+);
+assert.ok(cleanupFilterStart >= 0 && cleanupFilterEnd > cleanupFilterStart);
+const cleanupFilterSource = source.slice(cleanupFilterStart, cleanupFilterEnd);
+assert.ok(cleanupFilterSource.includes('team: sessionTeam'));
+assert.ok(cleanupFilterSource.includes('company_kod: companyId'));
+assert.ok(cleanupFilterSource.includes('period_apo: asDateOnlyUtc(apoDate)'));
+assert.ok(cleanupFilterSource.includes('period_eos: asDateOnlyUtc(eosDate, true)'));
+assert.ok(cleanupFilterSource.includes('if (selectedYpokatasthma)'));
+assert.ok(
+    cleanupFilterSource.includes(
+        'deviationsCleanupFilter.ypokatasthma = selectedYpokatasthma;'
+    )
+);
 assert.ok(!source.includes('startOfWeekSunday'));
 assert.ok(!source.includes('endOfWeekSaturday'));
+
+const postCheckStart = source.indexOf('async function runWeeklyRepoPostCheck({');
+const postCheckEnd = source.indexOf('function getDailyDeclaredMinutes', postCheckStart);
+assert.ok(postCheckStart >= 0 && postCheckEnd > postCheckStart);
+const postCheckSource = source.slice(postCheckStart, postCheckEnd);
+assert.ok(postCheckSource.includes('const postCheckRowsQuery = {'));
+assert.ok(postCheckSource.includes('if (selectedYpokatasthma)'));
+assert.ok(
+    postCheckSource.includes(
+        'postCheckRowsQuery.ypokatasthma = selectedYpokatasthma;'
+    )
+);
+assert.ok(postCheckSource.includes('ProdhlomenaOrariaModel.find(postCheckRowsQuery)'));
+
+const calculationStart = source.indexOf('static calcApasxolhseisPeriodoy');
+const calculationEnd = source.indexOf('static ', calculationStart + 7);
+assert.ok(calculationStart >= 0 && calculationEnd > calculationStart);
+const calculationSource = source.slice(calculationStart, calculationEnd);
+assert.ok(calculationSource.includes('const prodhlomenaQuery = {'));
+assert.ok(calculationSource.includes('if (selectedYpokatasthma)'));
+assert.ok(
+    calculationSource.includes(
+        'prodhlomenaQuery.ypokatasthma = selectedYpokatasthma;'
+    )
+);
+assert.ok(calculationSource.includes('ProdhlomenaOrariaModel.find(prodhlomenaQuery)'));
+assert.ok(calculationSource.includes('resolveCardPairVerification(calculationRec)'));
+assert.ok(
+    calculationSource.includes('buildPartialVerifiedCardUpdate(calculationRec).update')
+);
+assert.ok(!calculationSource.includes('buildIncompleteCardSafeUpdate()'));
+assert.strictEqual(
+    (calculationSource.match(/checkIncompleteCardPairAgainstDeclared\(/g) || []).length,
+    0
+);
+assert.ok(/resolveCardPairVerification\(\s*row\s*\)/.test(postCheckSource));
+assert.ok(postCheckSource.includes('buildPartialVerifiedCardUpdate(row).update'));
+assert.ok(!postCheckSource.includes('buildIncompleteCardSafeUpdate()'));
+
+const payrollIntervalsStart = source.indexOf(
+    'function getPayrollCalculationIntervals(rec, ergazomenos = null)'
+);
+const payrollIntervalsEnd = source.indexOf(
+    'function getPayrollDailyWorkMinutes',
+    payrollIntervalsStart
+);
+assert.ok(
+    payrollIntervalsStart >= 0 && payrollIntervalsEnd > payrollIntervalsStart
+);
+const payrollIntervalsSource = source.slice(
+    payrollIntervalsStart,
+    payrollIntervalsEnd
+);
+assert.ok(payrollIntervalsSource.includes('resolveCardPairVerification(rec)'));
+assert.ok(payrollIntervalsSource.includes('verification.completePairs.map'));
+assert.ok(payrollIntervalsSource.includes("source: 'CARD_PARTIALLY_VERIFIED'"));
+assert.ok(!payrollIntervalsSource.includes('hasIncompleteCardPair'));
+
+const atomicStart = source.indexOf('async function buildAtomicRepoTransferPolicyPreviewProjection');
+const atomicEnd = source.indexOf('function getWeekRangesInsidePeriod', atomicStart);
+assert.ok(atomicStart >= 0 && atomicEnd > atomicStart);
+const atomicSource = source.slice(atomicStart, atomicEnd);
+assert.ok(atomicSource.includes('startOfWeekMondayUtc(requestedPeriodStart)'));
+assert.ok(atomicSource.includes('endOfWeekSundayUtc(requestedPeriodEnd)'));
+assert.ok(atomicSource.includes('validationPeriodStart: requestedPeriodStart'));
+assert.ok(atomicSource.includes('validationPeriodEnd: requestedPeriodEnd'));
+assert.ok(atomicSource.includes('presentationStart: requestedPeriodStart'));
+assert.ok(atomicSource.includes('presentationEnd: requestedPeriodEnd'));
+assert.ok(atomicSource.includes('$gte: analysisPeriodStart'));
+assert.ok(atomicSource.includes('$lte: analysisPeriodEnd'));
 
 console.log('employment review weekly deviation preview controller contract passed');

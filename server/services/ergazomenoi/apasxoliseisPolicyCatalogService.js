@@ -28,7 +28,8 @@ const POLICY_CATEGORIES = Object.freeze({
     BASELINE_OK: 'BASELINE_OK',
     ABSENCE_OR_HOLIDAY: 'ABSENCE_OR_HOLIDAY',
     WEEKLY_REPO: 'WEEKLY_REPO',
-    CARDS_ON_NON_WORK: 'CARDS_ON_NON_WORK'
+    CARDS_ON_NON_WORK: 'CARDS_ON_NON_WORK',
+    REST_PERIOD: 'REST_PERIOD'
 });
 
 function deepFreeze(value) {
@@ -102,6 +103,58 @@ const POLICY_MODE_DEFINITIONS = deepFreeze([
 ]);
 
 const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
+    {
+        policy_code: 'SPLIT_SHIFT_MINIMUM_REST',
+        policy_version: 'verified-card-rest-periods:v1',
+        title: 'Ελάχιστη ανάπαυση σε σπαστό ωράριο',
+        description:
+            'Ελέγχει ότι μεταξύ διαδοχικών επαληθευμένων ζευγών καρτών της ίδιας ημέρας μεσολαβούν τουλάχιστον 3 ώρες.',
+        category: POLICY_CATEGORIES.REST_PERIOD,
+        default_mode: POLICY_MODE.REVIEW_ONLY,
+        supported_modes: [POLICY_MODE.REVIEW_ONLY],
+        default_priority: 60,
+        safety_level: POLICY_SAFETY_LEVEL.HIGH_RISK,
+        batch_approvable: false,
+        requires_human_approval: true,
+        required_facts: ['cards.verifiedPairs'],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [],
+        result_statuses: [
+            POLICY_RESULT_STATUS.NEEDS_REVIEW,
+            POLICY_RESULT_STATUS.UNKNOWN_PATTERN
+        ],
+        related_scenario_codes: ['SPLIT_SHIFT_REST_VIOLATION'],
+        notes: [
+            'Δεν συμπληρώνει ελλιπές χτύπημα και δεν αλλάζει κάρτες ή απολογιστικά πεδία.',
+            'Ανεπαρκή στοιχεία εμφανίζονται μόνο ως τεχνική εκκρεμότητα.'
+        ]
+    },
+    {
+        policy_code: 'INTERDAY_MINIMUM_REST',
+        policy_version: 'verified-card-rest-periods:v1',
+        title: 'Ελάχιστη ανάπαυση μεταξύ διαδοχικών ημερών',
+        description:
+            'Ελέγχει ότι από το τελευταίο επαληθευμένο ζεύγος της τρέχουσας ημέρας έως το πρώτο της επόμενης μεσολαβούν τουλάχιστον 11 ώρες.',
+        category: POLICY_CATEGORIES.REST_PERIOD,
+        default_mode: POLICY_MODE.REVIEW_ONLY,
+        supported_modes: [POLICY_MODE.REVIEW_ONLY],
+        default_priority: 60,
+        safety_level: POLICY_SAFETY_LEVEL.HIGH_RISK,
+        batch_approvable: false,
+        requires_human_approval: true,
+        required_facts: ['cards.currentDayVerifiedPairs', 'cards.nextDayVerifiedPairs'],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [],
+        result_statuses: [
+            POLICY_RESULT_STATUS.NEEDS_REVIEW,
+            POLICY_RESULT_STATUS.UNKNOWN_PATTERN
+        ],
+        related_scenario_codes: ['INTERDAY_REST_VIOLATION'],
+        notes: [
+            'Δεν συμπληρώνει ελλιπές χτύπημα και δεν αλλάζει κάρτες ή απολογιστικά πεδία.',
+            'Ο έλεγχος γίνεται μόνο μεταξύ διαδοχικών ημερολογιακών ημερών.'
+        ]
+    },
     {
         policy_code: 'CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK',
         policy_version: 'preview:v1',
@@ -213,7 +266,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
     },
     {
         policy_code: 'WEEKLY_REPO_BALANCE',
-        policy_version: 'foundation:v2',
+        policy_version: 'foundation:v3',
         title: 'Ισορροπία εβδομαδιαίων ρεπό',
         description:
             'Ελέγχει ή εξηγεί 1 ή 2 ρεπό ανά εβδομάδα και πιθανή αντικατάσταση ρεπό μέσα στην ίδια εβδομάδα.',
@@ -251,7 +304,11 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
             'kathgoria_ergasias_apologistika',
             'adeia_apologistika',
             'kathgoria_adeias_apologistika',
-            'ores_apoysias_apologistika'
+            'ores_apoysias_apologistika',
+            'ores_pragmatikhs_ergasias_apologistika',
+            'ores_adeias_pistomenes_apologistika',
+            'ores_argias_pistomenes_apologistika',
+            'compensation_breakdown_apologistika'
         ],
         result_statuses: [
             POLICY_RESULT_STATUS.OK,
@@ -266,11 +323,67 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         ]
     },
     {
-        policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
+        policy_code: 'UNSCHEDULED_DAY_WITH_COMPLETE_CARDS',
         policy_version: 'foundation:v1',
-        title: 'Δηλωμένο ρεπό ή μη εργασία με κάρτες',
+        title: 'Μη προδηλωμένη ημέρα με πλήρεις κάρτες',
         description:
-            'Χειρίζεται περιπτώσεις όπου η ημέρα είναι δηλωμένη ως ΡΕΠΟ ή ΜΗ ΕΡΓΑΣΙΑ αλλά υπάρχουν κάρτες.',
+            'Θεωρεί ολοκληρωμένη τη μη προδηλωμένη εργασία όταν οι κάρτες και τα απολογιστικά αποτελέσματα είναι πλήρη και συνεπή, ανεξάρτητα από το αν η ημέρα είναι αργία.',
+        category: POLICY_CATEGORIES.CARDS_ON_NON_WORK,
+        default_mode: POLICY_MODE.SUGGESTION,
+        supported_modes: [
+            POLICY_MODE.REVIEW_ONLY,
+            POLICY_MODE.SUGGESTION,
+            POLICY_MODE.PREFILL
+        ],
+        default_priority: 95,
+        safety_level: POLICY_SAFETY_LEVEL.MEDIUM_RISK,
+        batch_approvable: false,
+        requires_human_approval: false,
+        required_facts: [
+            'declared.kathgoria_ergasias',
+            'declared.hasDeclaredHours',
+            'declared.hasDeclaredIntervals',
+            'cards.hasCards',
+            'cards.cardIntervalsNormalized',
+            'cards.cardHours',
+            'apologistika.currentApologistikaCategory',
+            'apologistika.currentApologistikaIntervals',
+            'apologistika.currentApologistikaHours',
+            'apologistika.currentActualWorkHours',
+            'apologistika.compensationBreakdownStatus'
+        ],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [
+            'kathgoria_ergasias_apologistika',
+            'apo_ora_01_apologistika',
+            'eos_ora_01_apologistika',
+            'apo_ora_02_apologistika',
+            'eos_ora_02_apologistika',
+            'apo_ora_03_apologistika',
+            'eos_ora_03_apologistika',
+            'ores_ergasias_apologistika',
+            'ores_pragmatikhs_ergasias_apologistika',
+            'compensation_breakdown_apologistika'
+        ],
+        result_statuses: [
+            POLICY_RESULT_STATUS.RESOLVED_BY_POLICY,
+            POLICY_RESULT_STATUS.PREFILLED_PENDING_APPROVAL,
+            POLICY_RESULT_STATUS.NEEDS_REVIEW,
+            POLICY_RESULT_STATUS.CONFLICT_AMBIGUOUS
+        ],
+        related_scenario_codes: ['UNSCHEDULED_DAY_WITH_CARDS'],
+        notes: [
+            'Δεν δημιουργεί απόφαση HR όταν ο υπολογισμός έχει ολοκληρωθεί με READY breakdown.',
+            'Η ίδια αρχή ισχύει και σε αργία, εφόσον η εργασία και οι προσαυξήσεις έχουν ήδη υπολογιστεί χωρίς εκκρεμότητα.',
+            'Ελλιπή ή ασυνεπή απολογιστικά στοιχεία παραμένουν προς έλεγχο.'
+        ]
+    },
+    {
+        policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
+        policy_version: 'foundation:v3',
+        title: 'Ρεπό, μη εργασία ή μη προδηλωμένη ημέρα με κάρτες',
+        description:
+            'Χειρίζεται περιπτώσεις όπου η ημέρα είναι δηλωμένη ως ΡΕΠΟ/ΜΗ ΕΡΓΑΣΙΑ ή είναι ασφαλώς μη προδηλωμένη, αλλά υπάρχουν πλήρεις κάρτες.',
         category: POLICY_CATEGORIES.CARDS_ON_NON_WORK,
         default_mode: POLICY_MODE.SUGGESTION,
         supported_modes: [
@@ -285,6 +398,9 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         required_facts: [
             'declared.isDeclaredRepo',
             'declared.isDeclaredNonWork',
+            'declared.kathgoria_ergasias',
+            'declared.hasDeclaredHours',
+            'declared.hasDeclaredIntervals',
             'cards.hasCards',
             'cards.cardIntervalsNormalized',
             'cards.cardHours'
@@ -309,7 +425,11 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
             'eos_ora_02_apologistika',
             'apo_ora_03_apologistika',
             'eos_ora_03_apologistika',
-            'ores_ergasias_apologistika'
+            'ores_ergasias_apologistika',
+            'ores_pragmatikhs_ergasias_apologistika',
+            'ores_adeias_pistomenes_apologistika',
+            'ores_argias_pistomenes_apologistika',
+            'compensation_breakdown_apologistika'
         ],
         result_statuses: [
             POLICY_RESULT_STATUS.PREFILLED_PENDING_APPROVAL,

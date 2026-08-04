@@ -3,10 +3,16 @@
 const REASON = Object.freeze({
     INVALID_DECLARED_HOURS: 'INVALID_DECLARED_HOURS',
     INVALID_CARD_HOURS: 'INVALID_CARD_HOURS',
+    INVALID_EXPLICIT_HOURLY_LEAVE_HOURS: 'INVALID_EXPLICIT_HOURLY_LEAVE_HOURS',
+    EXPLICIT_HOURLY_LEAVE_EXCEEDS_DECLARED_BALANCE:
+        'EXPLICIT_HOURLY_LEAVE_EXCEEDS_DECLARED_BALANCE',
+    FULL_DAY_LEAVE_WITH_CARD_WORK_REQUIRES_HR_DECISION:
+        'FULL_DAY_LEAVE_WITH_CARD_WORK_REQUIRES_HR_DECISION',
     UNSUPPORTED_DAILY_CATEGORY: 'UNSUPPORTED_DAILY_CATEGORY'
 });
 
 const WARNING = Object.freeze({
+    INCOMPLETE_CARD_INTERVAL: 'INCOMPLETE_CARD_INTERVAL',
     CARD_HOURS_EXCEED_DECLARED_HOURS: 'CARD_HOURS_EXCEED_DECLARED_HOURS',
     MIXED_WORK_AND_HOURLY_LEAVE: 'MIXED_WORK_AND_HOURLY_LEAVE',
     MIXED_WORK_AND_SICKNESS: 'MIXED_WORK_AND_SICKNESS',
@@ -17,8 +23,8 @@ const {
     classifyLeaveProvenance
 } = require('./apasxoliseisLeaveProvenanceService');
 const {
-    buildCardIntervals
-} = require('./apasxoliseisScenarioFactsService');
+    resolveCardPairVerification
+} = require('./apasxoliseisCardPairResolverService');
 
 function nonNegativeNumber(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -43,24 +49,36 @@ function categoryOf(row = {}) {
 function resolveDailyActualWorkFacts(row = {}) {
     const declared = nonNegativeNumber(row.ores_ergasias);
     const cards = nonNegativeNumber(row.cards_ores_ergasias);
+    const explicitHourlyLeave = nonNegativeNumber(
+        row.explicit_hourly_leave_hours ?? row.ores_apoysias
+    );
     const reasons = [];
     const warnings = [];
     if (!declared.ok) reasons.push(REASON.INVALID_DECLARED_HOURS);
     if (!cards.ok) reasons.push(REASON.INVALID_CARD_HOURS);
+    if (!explicitHourlyLeave.ok) reasons.push(REASON.INVALID_EXPLICIT_HOURLY_LEAVE_HOURS);
 
     const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
-    const hasCompleteCardEvidence = buildCardIntervals(row).some(
-        (interval) => interval.isComplete && !interval.isZeroLength
-    );
+    const cardVerification = resolveCardPairVerification(row);
+    const hasCompleteCardEvidence = cardVerification.hasCompleteCardEvidence;
+    const hasIncompleteCardInterval = cardVerification.hasUnresolvedCardEvidence;
+    const verificationFacts = {
+        cardVerificationStatus: cardVerification.status,
+        verifiedCardHours: cardVerification.verifiedHours,
+        completeCardPairNumbers: cardVerification.completePairNumbers,
+        unresolvedCardPairNumbers: cardVerification.unresolvedPairNumbers
+    };
     if (reasons.length > 0) {
         return Object.freeze({
             category,
             declaredWorkHours: declared.ok ? declared.value : null,
             cardHours: cards.ok ? cards.value : null,
             hasCompleteCardEvidence,
+            ...verificationFacts,
             actualWorkHours: 0,
             leaveHours: 0,
+            holidayCreditedHours: 0,
             sicknessHours: 0,
             countsAsActualWorkDay: false,
             reasons,
@@ -68,21 +86,55 @@ function resolveDailyActualWorkFacts(row = {}) {
         });
     }
 
+    // Τα πλήρη ζεύγη παραμένουν αποδεδειγμένος χρόνος ακόμη κι όταν άλλο
+    // ζεύγος της ημέρας είναι ελλιπές. Το ανεξακρίβωτο τμήμα δεν
+    // συμπληρώνεται και δεν μετατρέπεται σε εργασία, άδεια, αργία ή ρεπό.
+    if (hasIncompleteCardInterval) {
+        const verifiedActualWorkHours = hasCompleteCardEvidence
+            ? cardVerification.verifiedHours
+            : 0;
+        return Object.freeze({
+            category,
+            declaredWorkHours: declared.value,
+            cardHours: cards.value,
+            hasCompleteCardEvidence,
+            ...verificationFacts,
+            actualWorkHours: verifiedActualWorkHours,
+            leaveHours: 0,
+            holidayCreditedHours: 0,
+            sicknessHours: 0,
+            countsAsActualWorkDay: verifiedActualWorkHours > 0,
+            reasons: [],
+            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL]
+        });
+    }
+
     let actualWorkHours = 0;
     let leaveHours = 0;
+    let holidayCreditedHours = 0;
     let sicknessHours = 0;
     if (leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE) {
         leaveHours = declared.value;
     } else if (category === 'ΕΡΓ') {
         actualWorkHours = cards.value;
     } else if (category === 'ΑΔΕΙΑ') {
-        actualWorkHours = cards.value > 0 ? cards.value : declared.value;
-        leaveHours = cards.value > 0 ? Math.max(declared.value - cards.value, 0) : 0;
-        if (actualWorkHours > 0 && leaveHours > 0) {
+        actualWorkHours = cards.value;
+        if (explicitHourlyLeave.value > 0) {
+            leaveHours = explicitHourlyLeave.value;
+            if (leaveHours + cards.value > declared.value + 0.02) {
+                reasons.push(REASON.EXPLICIT_HOURLY_LEAVE_EXCEEDS_DECLARED_BALANCE);
+            }
+        } else if (cards.value > 0) {
+            reasons.push(REASON.FULL_DAY_LEAVE_WITH_CARD_WORK_REQUIRES_HR_DECISION);
+        } else {
+            leaveHours = declared.value;
+        }
+        if (actualWorkHours > 0 && explicitHourlyLeave.value > 0) {
             warnings.push(WARNING.MIXED_WORK_AND_HOURLY_LEAVE);
         }
     } else if (category === 'ΑΡΓΙΑ') {
-        actualWorkHours = declared.value;
+        actualWorkHours = cards.value;
+        holidayCreditedHours = Math.max(declared.value - cards.value, 0);
         if (cards.value > declared.value) {
             warnings.push(WARNING.HOLIDAY_CARD_HOURS_EXCEED_DECLARED_HOURS);
         }
@@ -107,8 +159,10 @@ function resolveDailyActualWorkFacts(row = {}) {
         declaredWorkHours: declared.value,
         cardHours: cards.value,
         hasCompleteCardEvidence,
+        ...verificationFacts,
         actualWorkHours,
         leaveHours,
+        holidayCreditedHours,
         sicknessHours,
         countsAsActualWorkDay: actualWorkHours > 0,
         reasons: [...new Set(reasons)],

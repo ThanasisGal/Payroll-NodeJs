@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const ApasxoliseisPolicyPreviewApprovalsModel = require('../../models/apasxoliseisPolicyPreviewApproval');
+const {
+    REUSE_SCOPE,
+    REUSE_STATUS,
+    buildReusableMatchCriteriaFromGroup,
+    buildReusableDecisionFingerprint,
+    getReusableDecisionEligibility
+} = require('./apasxoliseisReusablePolicyDecisionService');
 
 const ALLOWED_DECISION_TYPES = Object.freeze([
     'APPROVE_PREFILL',
@@ -10,6 +17,7 @@ const ALLOWED_DECISION_TYPES = Object.freeze([
     'NEEDS_MORE_REVIEW'
 ]);
 const ALLOWED_DECISION_STATUSES = Object.freeze(['RECORDED', 'CANCELLED']);
+const REUSABLE_DECISION_ALLOWED_ROLES = new Set(['A', 'S', 'HR']);
 const MAX_ITEMS = 500;
 const MAX_PAYLOAD_BYTES = 256 * 1024;
 const MAX_NESTED_KEYS = 100;
@@ -142,11 +150,16 @@ function validatePolicyPreviewApprovalPayload(payload = {}) {
     const groupId = toTrimmedString(group.group_id, 150);
     const groupKey = toTrimmedString(group.group_key, 1000);
     const decisionType = toTrimmedString(source.decision_type, 50).toUpperCase();
+    const reuseScope =
+        toTrimmedString(source.reuse_scope, 50).toUpperCase() || REUSE_SCOPE.ONE_TIME;
 
     if (!groupId) throw validationError('Το group_id είναι υποχρεωτικό.');
     if (!groupKey) throw validationError('Το group_key είναι υποχρεωτικό.');
     if (!ALLOWED_DECISION_TYPES.includes(decisionType)) {
         throw validationError('Ο τύπος απόφασης δεν υποστηρίζεται.');
+    }
+    if (!Object.values(REUSE_SCOPE).includes(reuseScope)) {
+        throw validationError('Η εμβέλεια επαναχρησιμοποίησης δεν υποστηρίζεται.');
     }
     if (!Array.isArray(source.items)) {
         throw validationError('Το items πρέπει να είναι array.');
@@ -191,6 +204,7 @@ function validatePolicyPreviewApprovalPayload(payload = {}) {
             reason_code: toTrimmedString(group.reason_code, 150)
         },
         decision_type: decisionType,
+        reuse_scope: reuseScope,
         notes: toTrimmedString(source.notes, 2000),
         client_payload_version: toTrimmedString(source.client_payload_version, 50),
         items
@@ -261,6 +275,37 @@ async function createPolicyPreviewApprovalRecord({
 }) {
     const scope = validateSessionScope(session);
     const normalized = validatePolicyPreviewApprovalPayload(payload);
+    if (
+        normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL &&
+        !REUSABLE_DECISION_ALLOWED_ROLES.has(scope.created_by_user_role.toUpperCase())
+    ) {
+        const error = new Error(
+            'Μόνο HR, Admin ή Supervisor μπορεί να εγκρίνει ίδιες μελλοντικές περιπτώσεις.'
+        );
+        error.statusCode = 403;
+        throw error;
+    }
+    const reuseMatchCriteria = buildReusableMatchCriteriaFromGroup(
+        {
+            ...normalized.group,
+            ypokatasthma: normalized.ypokatasthma
+        },
+        normalized.ypokatasthma
+    );
+    const reuseEligibility = getReusableDecisionEligibility({
+        group: reuseMatchCriteria,
+        decisionType: normalized.decision_type,
+        items: normalized.items
+    });
+
+    if (normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL && !reuseEligibility.eligible) {
+        throw validationError(reuseEligibility.reason);
+    }
+
+    const reuseFingerprint =
+        normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL
+            ? buildReusableDecisionFingerprint(reuseMatchCriteria)
+            : '';
     const existing = await approvalModel
         .findOne(buildRecordedDecisionLookup(scope, normalized))
         .select('_id')
@@ -268,6 +313,25 @@ async function createPolicyPreviewApprovalRecord({
 
     if (existing) {
         throw conflictError('Η ίδια καταγεγραμμένη απόφαση υπάρχει ήδη για αυτή την ομάδα.');
+    }
+
+    if (reuseFingerprint) {
+        const existingReusable = await approvalModel
+            .findOne({
+                team: scope.team,
+                company_kod: scope.company_kod,
+                ypokatasthma: normalized.ypokatasthma,
+                reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL,
+                reuse_status: REUSE_STATUS.ACTIVE,
+                reuse_fingerprint: reuseFingerprint,
+                decision_status: 'RECORDED'
+            })
+            .select('_id')
+            .lean();
+
+        if (existingReusable) {
+            throw conflictError('Υπάρχει ήδη ενεργή έγκριση HR για ίδιες μελλοντικές περιπτώσεις.');
+        }
     }
 
     return approvalModel.create({
@@ -289,6 +353,18 @@ async function createPolicyPreviewApprovalRecord({
         reason_code: normalized.group.reason_code,
         decision_type: normalized.decision_type,
         decision_status: 'RECORDED',
+        reuse_scope: normalized.reuse_scope,
+        reuse_status:
+            normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL
+                ? REUSE_STATUS.ACTIVE
+                : REUSE_STATUS.NOT_APPLICABLE,
+        reuse_fingerprint: reuseFingerprint,
+        reuse_match_criteria: reuseFingerprint ? reuseMatchCriteria : null,
+        reuse_effective_from:
+            normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL
+                ? normalized.apo_hmeromhnia
+                : null,
+        reuse_effective_to: null,
         items: normalized.items,
         snapshot_summary: buildApprovalAuditSnapshot(normalized),
         created_by_user_id: scope.created_by_user_id,
@@ -298,6 +374,28 @@ async function createPolicyPreviewApprovalRecord({
         notes: normalized.notes,
         client_payload_version: normalized.client_payload_version
     });
+}
+
+async function listActiveReusablePolicyDecisionRecords({
+    session,
+    ypokatasthma,
+    approvalModel = ApasxoliseisPolicyPreviewApprovalsModel
+}) {
+    const scope = validateSessionScope(session);
+    const branch = toTrimmedString(ypokatasthma, 20);
+    if (!branch || branch.toUpperCase() === 'ALL' || branch.includes(',')) return [];
+
+    return approvalModel
+        .find({
+            team: scope.team,
+            company_kod: scope.company_kod,
+            ypokatasthma: branch.padStart(4, '0'),
+            reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL,
+            reuse_status: REUSE_STATUS.ACTIVE,
+            decision_status: 'RECORDED'
+        })
+        .sort({ created_at: -1 })
+        .lean();
 }
 
 function buildPolicyPreviewApprovalListFilter({ session, filters = {} }) {
@@ -318,9 +416,11 @@ function buildPolicyPreviewApprovalListFilter({ session, filters = {} }) {
 
     const groupId = toTrimmedString(source.group_id, 150);
     const policyCode = toTrimmedString(source.policy_code, 150);
+    const ypokatasthma = toTrimmedString(source.ypokatasthma, 20);
     const decisionStatus = toTrimmedString(source.decision_status, 50).toUpperCase();
     if (groupId) filter.group_id = groupId;
     if (policyCode) filter.policy_code = policyCode;
+    if (ypokatasthma) filter.ypokatasthma = ypokatasthma.padStart(4, '0');
     if (decisionStatus) {
         if (!ALLOWED_DECISION_STATUSES.includes(decisionStatus)) {
             throw validationError('Η κατάσταση απόφασης δεν υποστηρίζεται.');
@@ -365,5 +465,6 @@ module.exports = {
     buildRecordedDecisionLookup,
     buildPolicyPreviewApprovalListFilter,
     createPolicyPreviewApprovalRecord,
-    listPolicyPreviewApprovalRecords
+    listPolicyPreviewApprovalRecords,
+    listActiveReusablePolicyDecisionRecords
 };

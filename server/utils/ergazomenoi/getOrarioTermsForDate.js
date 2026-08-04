@@ -129,35 +129,11 @@ function resolveEffectiveWeeklyWorkdays(record = {}) {
     return null;
 }
 
-function normalizeExplicitWeeklyRepoValue(value) {
-    const normalized = toNumberOrNull(value);
-    return normalized === 1 || normalized === 2 ? normalized : null;
-}
-
-function repoFromWeeklyWorkdays(workdays) {
-    if (workdays === 5) return 2;
-    if (workdays === 6) return 1;
-    return 0;
-}
-
-function resolveExpectedWeeklyRepo(record = {}) {
-    const explicitRepo = normalizeExplicitWeeklyRepoValue(record.mhniaia_repo);
-    if (explicitRepo !== null) return explicitRepo;
-
-    return repoFromWeeklyWorkdays(resolveEffectiveWeeklyWorkdays(record));
-}
-
 function buildCanonicalWorkTermsSnapshotFields(formData = {}, fallbackErgazomenos = {}) {
     const canonicalEmploymentType = resolveEmploymentTypeFromFormData(formData);
-    const explicitFormRepo = normalizeExplicitWeeklyRepoValue(formData.mhniaia_repo);
-    const explicitFallbackRepo = normalizeExplicitWeeklyRepoValue(
-        fallbackErgazomenos.mhniaia_repo
-    );
     const formWorkdays = resolveEffectiveWeeklyWorkdays(formData);
     const fallbackWorkdays = resolveEffectiveWeeklyWorkdays(fallbackErgazomenos);
     const effectiveWorkdays = formWorkdays ?? fallbackWorkdays;
-    const mhniaiaRepo =
-        explicitFormRepo ?? explicitFallbackRepo ?? repoFromWeeklyWorkdays(effectiveWorkdays);
     const sixthDayPremiumRate =
         Object.prototype.hasOwnProperty.call(formData, 'pososto_prosayxhshs_6hs_hmeras') &&
         String(formData.pososto_prosayxhshs_6hs_hmeras ?? '').trim() !== ''
@@ -170,7 +146,6 @@ function buildCanonicalWorkTermsSnapshotFields(formData = {}, fallbackErgazomeno
         typos_ebdomadas:
             formData.typos_ebdomadas ||
             getTyposEbdomadasFromHmeres(effectiveWorkdays),
-        mhniaia_repo: mhniaiaRepo,
         pososto_prosayxhshs_6hs_hmeras: sixthDayPremiumRate
     };
 }
@@ -203,9 +178,11 @@ function buildFallbackTerms(ergazomenos = {}) {
 
         kathestos_apasxolhshs: employmentType,
         typos_apasxolhshs: employmentType,
-        mhniaia_repo: resolveExpectedWeeklyRepo(ergazomenos),
-        raw_mhniaia_repo: ergazomenos.mhniaia_repo,
         pososto_prosayxhshs_6hs_hmeras: ergazomenos.pososto_prosayxhshs_6hs_hmeras,
+        nomimoOromisthio: toNumberOrZero(ergazomenos.nomimoOromisthio),
+        pragmatikoOromisthio: toNumberOrZero(ergazomenos.pragmatikoOromisthio),
+        eidikh_kathgoria_ergazomenoy: ergazomenos.eidikh_kathgoria_ergazomenoy || '',
+        eidikh_periptosh: ergazomenos.eidikh_periptosh || '',
 
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,
@@ -223,7 +200,7 @@ function buildFallbackTerms(ergazomenos = {}) {
     };
 }
 
-function buildTermsFromHistoryRecord(record) {
+function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}) {
     const hmeres = toNumberOrZero(record.hmeres_ergasias_ebdomadas);
     const ores = toNumberOrZero(record.ores_ergasias_ebdomadas);
     const mo =
@@ -237,9 +214,21 @@ function buildTermsFromHistoryRecord(record) {
 
         kathestos_apasxolhshs: employmentType,
         typos_apasxolhshs: employmentType,
-        mhniaia_repo: resolveExpectedWeeklyRepo(record),
-        raw_mhniaia_repo: record.mhniaia_repo,
-        pososto_prosayxhshs_6hs_hmeras: record.pososto_prosayxhshs_6hs_hmeras,
+        pososto_prosayxhshs_6hs_hmeras:
+            toNumberOrNull(record.pososto_prosayxhshs_6hs_hmeras) ??
+            toNumberOrNull(fallbackErgazomenos.pososto_prosayxhshs_6hs_hmeras),
+        nomimoOromisthio:
+            toNumberOrNull(record.nomimoOromisthio) ??
+            toNumberOrZero(fallbackErgazomenos.nomimoOromisthio),
+        pragmatikoOromisthio:
+            toNumberOrNull(record.pragmatikoOromisthio) ??
+            toNumberOrZero(fallbackErgazomenos.pragmatikoOromisthio),
+        eidikh_kathgoria_ergazomenoy:
+            record.eidikh_kathgoria_ergazomenoy ||
+            fallbackErgazomenos.eidikh_kathgoria_ergazomenoy ||
+            '',
+        eidikh_periptosh:
+            record.eidikh_periptosh || fallbackErgazomenos.eidikh_periptosh || '',
 
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,
@@ -299,7 +288,7 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
         return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
     });
 
-    return buildTermsFromHistoryRecord(matchingRows[0]);
+    return buildTermsFromHistoryRecord(matchingRows[0], ergazomenos);
 }
 
 module.exports = {
@@ -308,7 +297,6 @@ module.exports = {
     resolveEmploymentTypeFromFormData,
     normalizeWeeklyWorkdaysValue,
     resolveEffectiveWeeklyWorkdays,
-    resolveExpectedWeeklyRepo,
     buildCanonicalWorkTermsSnapshotFields,
     normalizeDateOnly,
     getEffectiveTermsApo,

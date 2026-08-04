@@ -19,8 +19,8 @@ const {
     resolveCurrentApologistikaDisplayCategory
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 
-const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v3';
-const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v3';
+const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v4';
+const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v4';
 const CHOICE_CODE = 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR';
 
 const PROPOSAL_STATUS = Object.freeze({
@@ -48,13 +48,21 @@ const APOLOGISTIKA_INTERVAL_FIELDS = Object.freeze([
 
 const REQUIRED_WEEKLY_REPO_FIELDS = Object.freeze([
     'repo_apologistika',
-    'kathgoria_ergasias_apologistika'
+    'kathgoria_ergasias_apologistika',
+    'ores_pragmatikhs_ergasias_apologistika',
+    'ores_adeias_pistomenes_apologistika',
+    'ores_argias_pistomenes_apologistika',
+    'compensation_breakdown_apologistika'
 ]);
 
 const REQUIRED_SOURCE_WORK_FIELDS = Object.freeze([
     'kathgoria_ergasias_apologistika',
     ...APOLOGISTIKA_INTERVAL_FIELDS.flat(),
-    'ores_ergasias_apologistika'
+    'ores_ergasias_apologistika',
+    'ores_pragmatikhs_ergasias_apologistika',
+    'ores_adeias_pistomenes_apologistika',
+    'ores_argias_pistomenes_apologistika',
+    'compensation_breakdown_apologistika'
 ]);
 
 function deepFreeze(value) {
@@ -115,9 +123,6 @@ function copyAnalysisMetadata(analysis) {
             typos_apasxolhshs: normalizePrimitiveString(
                 analysis?.employee?.typos_apasxolhshs
             ),
-            mhniaia_repo: Number.isSafeInteger(analysis?.employee?.mhniaia_repo)
-                ? analysis.employee.mhniaia_repo
-                : null,
             effective_expected_weekly_repo:
                 Number.isSafeInteger(analysis?.employee?.effective_expected_weekly_repo)
                     ? analysis.employee.effective_expected_weekly_repo
@@ -333,6 +338,10 @@ function materializeSourceValues(row) {
         proposedValues[endField] = materializable ? interval.end : '';
     });
     proposedValues.ores_ergasias_apologistika = sourceHours;
+    proposedValues.ores_pragmatikhs_ergasias_apologistika = sourceHours;
+    proposedValues.ores_adeias_pistomenes_apologistika = 0;
+    proposedValues.ores_argias_pistomenes_apologistika = 0;
+    proposedValues.compensation_breakdown_apologistika = null;
 
     return { proposedValues };
 }
@@ -344,6 +353,10 @@ function materializeTargetValues(targetCategory) {
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_ergasias_apologistika: 0,
+        ores_pragmatikhs_ergasias_apologistika: 0,
+        ores_adeias_pistomenes_apologistika: 0,
+        ores_argias_pistomenes_apologistika: 0,
+        compensation_breakdown_apologistika: null,
         ores_apoysias_apologistika: 0,
         apo_ora_01_apologistika: '',
         eos_ora_01_apologistika: '',

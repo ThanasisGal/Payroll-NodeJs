@@ -6,9 +6,9 @@ const {
     resolveDailyActualWorkFacts
 } = require('./apasxoliseisDailyActualWorkFactsService');
 
-const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v1';
+const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v2';
 const STATUS = Object.freeze({ READY: 'READY', NOT_APPLICABLE: 'NOT_APPLICABLE', NEEDS_HR_DECISION: 'NEEDS_HR_DECISION' });
-const ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES = new Set(['0009', '0018', '0020', '0021']);
+const ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES = new Set(['0009']);
 
 function validRate(value) {
     if (value === null || value === undefined || String(value).trim() === '') return null;
@@ -17,34 +17,35 @@ function validRate(value) {
 }
 
 function selectSixthDay(candidates) {
-    const cardProvenCandidates = candidates.filter(
-        (day) => day.cardHours > 0
+    const cardProvenCandidates = candidates
+        .filter((day) => day.cardHours > 0)
+        .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
+    const standardCandidates = cardProvenCandidates.filter(
+        (day) => day.actualWorkHours > 5 && day.actualWorkHours <= 8
     );
-    const preferred = cardProvenCandidates.filter(
-        (day) => day.declaredWorkHours > 5 && day.declaredWorkHours <= 8
-    );
-    if (preferred.length > 0) {
-        const day = preferred[preferred.length - 1];
-        return {
-            day,
-            warnings: day.hasCompleteCardEvidence
-                ? []
-                : ['SIXTH_DAY_INCOMPLETE_CARD_INTERVAL']
-        };
+    const day = standardCandidates[standardCandidates.length - 1] || null;
+
+    if (day) {
+        return { day, warnings: [] };
     }
-    const overEight = cardProvenCandidates.filter((day) => day.declaredWorkHours > 8);
-    if (overEight.length > 0) {
-        const day = overEight[overEight.length - 1];
+
+    const fallback = [...cardProvenCandidates].sort((a, b) => {
+        const distance = Math.abs(b.actualWorkHours - 8) - Math.abs(a.actualWorkHours - 8);
+        return distance || a.hmeromhnia.localeCompare(b.hmeromhnia);
+    }).at(-1) || null;
+
+    if (fallback) {
         return {
-            day,
+            day: fallback,
             warnings: [
-                'SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT',
-                ...(day.hasCompleteCardEvidence
-                    ? []
-                    : ['SIXTH_DAY_INCOMPLETE_CARD_INTERVAL'])
+                'SIXTH_DAY_NO_STANDARD_CANDIDATE_CLOSEST_TO_EIGHT',
+                ...(fallback.actualWorkHours > 8
+                    ? ['SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT']
+                    : [])
             ]
         };
     }
+
     return { day: null, reason: 'SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC' };
 }
 
@@ -65,9 +66,6 @@ function analyzeWeeklySixthSeventhDay({
     ) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'], warnings: [], dailyFacts: [] });
     }
-    if (effectiveProfile.profile_changed_inside_week === true) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['PROFILE_CHANGED_INSIDE_WEEK'], warnings: [], dailyFacts: [] });
-    }
     if (Number(effectiveProfile.hmeres_ergasias_ebdomadas) !== 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [], dailyFacts: [] });
     }
@@ -78,14 +76,63 @@ function analyzeWeeklySixthSeventhDay({
     if (factReasons.length > 0) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: factReasons, warnings: [], dailyFacts });
     }
+    if (dailyFacts.some((day) => day.cardVerificationStatus !== 'READY')) {
+        return Object.freeze({
+            policyVersion: POLICY_VERSION,
+            status: STATUS.NEEDS_HR_DECISION,
+            reasons: ['CARD_VERIFICATION_PENDING'],
+            warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))],
+            dailyFacts,
+            sixthDay: null,
+            seventhDay: null
+        });
+    }
     const actualDays = dailyFacts.filter((day) => day.countsAsActualWorkDay);
     if (actualDays.length <= 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: null });
     }
+    const seventhDay = actualDays.length === 7 ? actualDays[actualDays.length - 1] : null;
+    const sixthCandidates = seventhDay ? actualDays.slice(0, -1) : actualDays;
+    const selected = selectSixthDay(sixthCandidates);
+    if (!selected.day) {
+        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: [selected.reason], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay });
+    }
+    const sixthDayHours = Math.min(selected.day.actualWorkHours, 8);
+    const illegalOvertimeHours = Math.max(selected.day.actualWorkHours - 8, 0);
+    const classification = illegalOvertimeHours > 0
+        ? 'SIXTH_DAY_WITH_ILLEGAL_OVERTIME'
+        : 'SIXTH_DAY';
+    const sixthDayWithoutAmounts = {
+        ...selected.day,
+        sixthDayHours,
+        illegalOvertimeHours,
+        premiumRate: null,
+        baseAmount: null,
+        premiumAmount: null,
+        value: null,
+        classification
+    };
+    const classificationWarnings = [...new Set([
+        ...dailyFacts.flatMap((day) => day.warnings),
+        ...(selected.warnings || []),
+        ...(seventhDay ? ['SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'] : [])
+    ])];
     const premiumRate = validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
     if (premiumRate === null) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: actualDays.length === 7 ? actualDays[actualDays.length - 1] : null });
+        return Object.freeze({
+            policyVersion: POLICY_VERSION,
+            status: STATUS.NEEDS_HR_DECISION,
+            reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'],
+            warnings: classificationWarnings,
+            dailyFacts,
+            sixthDay: sixthDayWithoutAmounts,
+            seventhDay
+        });
     }
+    const sixthDayWithRate = {
+        ...sixthDayWithoutAmounts,
+        premiumRate
+    };
     const specialCategory = String(
         effectiveProfile.eidikh_kathgoria_ergazomenoy ||
         effectiveProfile.eidikh_periptosh ||
@@ -99,38 +146,49 @@ function analyzeWeeklySixthSeventhDay({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,
             reasons: ['ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'],
-            warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))],
+            warnings: classificationWarnings,
             dailyFacts,
-            sixthDay: null,
-            seventhDay: actualDays.length === 7 ? actualDays[actualDays.length - 1] : null
+            sixthDay: sixthDayWithRate,
+            seventhDay
         });
     }
-    const seventhDay = actualDays.length === 7 ? actualDays[actualDays.length - 1] : null;
-    const sixthCandidates = seventhDay ? actualDays.slice(0, -1) : actualDays;
-    const selected = selectSixthDay(sixthCandidates);
-    if (!selected.day) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: [selected.reason], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay });
-    }
     const rate = Number(String(hourlyRate).replace(',', '.'));
-    const sixthDayValue = Number.isFinite(rate) && rate >= 0
-        ? Number((selected.day.actualWorkHours * rate * (1 + premiumRate / 100)).toFixed(2))
+    const baseAmount = Number.isFinite(rate) && rate >= 0
+        ? Number((sixthDayHours * rate).toFixed(2))
         : null;
-    const warnings = [...new Set([
-        ...dailyFacts.flatMap((day) => day.warnings),
-        ...(selected.warnings || []),
-        ...(seventhDay ? ['SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'] : [])
-    ])];
+    const premiumAmount = baseAmount === null
+        ? null
+        : Number((baseAmount * premiumRate / 100).toFixed(2));
+    const sixthDayValue = baseAmount === null
+        ? null
+        : Number((baseAmount + premiumAmount).toFixed(2));
     return Object.freeze({
         policyVersion: POLICY_VERSION,
         status: STATUS.READY,
         reasons: [],
-        warnings,
+        warnings: classificationWarnings,
         week: { start: range.weekStartKey, end: range.weekEndKey },
         premiumRate,
         premiumRateSource: effectiveProfile.source || null,
         dailyFacts,
-        sixthDay: { ...selected.day, value: sixthDayValue },
-        seventhDay
+        sixthDay: {
+            ...selected.day,
+            sixthDayHours,
+            illegalOvertimeHours,
+            premiumRate,
+            baseAmount,
+            premiumAmount,
+            value: sixthDayValue,
+            classification
+        },
+        seventhDay: seventhDay
+            ? {
+                  ...seventhDay,
+                  severity: 'SERIOUS_VIOLATION',
+                  classification: 'SEVENTH_DAY_ILLEGAL_OVERTIME',
+                  illegalOvertimeHours: seventhDay.actualWorkHours
+              }
+            : null
     });
 }
 

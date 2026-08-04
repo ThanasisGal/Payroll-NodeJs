@@ -87,9 +87,7 @@ function analyze(rows, type = 'MERIKH', profile = {}, contexts = {}) {
     return analyzeWeeklyRepoTransferSinglePairV2({
         weekRows: rows,
         employmentProfile: {
-            typos_apasxolhshs: type,
-            mhniaia_repo: 1,
-            hmeres_ergasias_ebdomadas: 6,
+            typos_apasxolhshs: type, hmeres_ergasias_ebdomadas: 6,
             ...profile
         },
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
@@ -101,9 +99,7 @@ function assertEquivalentPartialPolicy(rows, profile = {}) {
     const merikhV1 = analyzeWeeklyRepoTransferSinglePairV1({
         weekRows: rows,
         employmentProfile: {
-            typos_apasxolhshs: 'MERIKH',
-            mhniaia_repo: 1,
-            hmeres_ergasias_ebdomadas: 6,
+            typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6,
             ...profile
         }
     });
@@ -121,7 +117,7 @@ function assertEquivalentPartialPolicy(rows, profile = {}) {
     assertEquivalentPartialPolicy(rows);
     const result = analyze(rows, 'EK_PERITROPHS');
     assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v3');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
     assert.strictEqual(result.source.semantic_target_category, 'ΕΡΓ');
     assert.strictEqual(result.target.semantic_target_category, 'ΜΕ');
     assert.strictEqual(result.counts.existing_actual_repo, 0);
@@ -135,9 +131,9 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
 }
 
 {
-    const result = analyze(week(), 'MERIKH', { mhniaia_repo: 0 });
+    const result = analyze(week(), 'MERIKH', {});
     assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-    assert.strictEqual(result.employee.mhniaia_repo, 1);
+    assert.strictEqual(result.employee.effective_expected_weekly_repo, 1);
     assert.strictEqual(result.employee.repo_resolution_source, 'CONTRACTUAL_WEEKLY_WORKDAYS');
 }
 
@@ -147,39 +143,35 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
         const result = analyze(fourDayWeek, type, {
             hmeres_ergasias_ebdomadas: 4,
             ores_ergasias_ebdomadas: 16,
-            mo_oron_hmerhsias_ergasias: 4,
-            mhniaia_repo: 3
+            mo_oron_hmerhsias_ergasias: 4
         });
-        assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW', type);
-        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v3');
+        assert.strictEqual(result.eligibility_status, 'ELIGIBLE', type);
+        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
         assert.strictEqual(result.employee.typos_apasxolhshs, type);
-        assert.ok(result.reasons.includes('INVALID_EFFECTIVE_WEEKLY_WORKDAYS'));
+        assert.strictEqual(result.employee.effective_expected_weekly_repo, 3);
+        assert.strictEqual(result.counts.predicted_final_repo, 3);
 
         const proposal = buildWeeklyRepoTransferSinglePairProposal({
             weekRows: fourDayWeek,
             employmentProfile: {
                 typos_apasxolhshs: type,
-                hmeres_ergasias_ebdomadas: 4,
-                mhniaia_repo: 3,
-                mo_oron_hmerhsias_ergasias: 4
+                hmeres_ergasias_ebdomadas: 4, mo_oron_hmerhsias_ergasias: 4
             },
             contractVersion: 'v2'
         });
-        assert.strictEqual(proposal.proposal_status, 'NOT_AVAILABLE');
+        assert.strictEqual(proposal.proposal_status, 'READY');
         assert.strictEqual(proposal.proposal_version, PROPOSAL_VERSION_V2);
 
         const projection = buildWeeklyRepoTransferSinglePairGroupProjection({
             weekRows: fourDayWeek,
             employmentProfile: {
                 typos_apasxolhshs: type,
-                hmeres_ergasias_ebdomadas: 4,
-                mhniaia_repo: 3,
-                mo_oron_hmerhsias_ergasias: 4
+                hmeres_ergasias_ebdomadas: 4, mo_oron_hmerhsias_ergasias: 4
             },
             contractVersion: 'v2'
         });
-        assert.strictEqual(projection.projection_status, 'NOT_AVAILABLE');
-        assert.strictEqual(projection.groups.length, 0);
+        assert.strictEqual(projection.projection_status, 'READY');
+        assert.strictEqual(projection.groups.length, 1);
     }
 }
 
@@ -188,20 +180,19 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
         weekRows: week({ existingRepo: [0, 6] }),
         employmentProfile: {
             typos_apasxolhshs: 'MERIKH',
-            hmeres_ergasias_ebdomadas: 4,
-            mhniaia_repo: 3
+            hmeres_ergasias_ebdomadas: 4
         }
     });
-    assert.strictEqual(v1.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(v1.reasons.includes('INVALID_EFFECTIVE_WEEKLY_WORKDAYS'));
+    assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(v1.employee.effective_expected_weekly_repo, 3);
 }
 
 {
-    const deficit = analyze(week(), 'MERIKH', { mhniaia_repo: 2 });
+    const deficit = analyze(week(), 'MERIKH', {});
     assert.strictEqual(deficit.eligibility_status, 'ELIGIBLE');
     assert.strictEqual(deficit.employee.repo_resolution_source, 'CONTRACTUAL_WEEKLY_WORKDAYS');
 
-    const exceeded = analyze(week({ existingRepo: [6] }), 'MERIKH', { mhniaia_repo: 1 });
+    const exceeded = analyze(week({ existingRepo: [6] }), 'MERIKH', {});
     assert.strictEqual(exceeded.eligibility_status, 'NEEDS_REVIEW');
     assert.ok(exceeded.reasons.includes('REPO_LIMIT_EXCEEDED'));
 }
@@ -309,7 +300,7 @@ for (const mutate of [
 
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 },
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 },
         contractVersion: 'v2'
     });
     assert.strictEqual(proposal.review_only_outcome.outcome_code, 'PARTIAL_OFFSET_TARGET_BLOCKED');
@@ -344,7 +335,7 @@ for (const mutate of [
 
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 },
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 },
         contractVersion: 'v2'
     });
     assert.strictEqual(proposal.review_only_outcome.outcome_code, 'PARTIAL_OFFSET_TARGET_BLOCKED');
@@ -443,7 +434,7 @@ for (const invalidTimes of [
     rows[4].cards_eos_ora_01 = '10:00';
     const v1 = analyzeWeeklyRepoTransferSinglePairV1({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
     assert.ok(v1.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
@@ -456,7 +447,7 @@ for (const invalidTimes of [
     rows[4].cards_ores_ergasias = 'invalid';
     const v1 = analyzeWeeklyRepoTransferSinglePairV1({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
     assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
@@ -470,7 +461,7 @@ for (const invalidTimes of [
     rows[4].cards_eos_ora_01 = '14:00';
     const v1 = analyzeWeeklyRepoTransferSinglePairV1({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
     assert.strictEqual(v1.eligibility_status, 'NEEDS_REVIEW');
@@ -541,7 +532,7 @@ for (const invalidTimes of [
 
         const proposal = buildWeeklyRepoTransferSinglePairProposal({
             weekRows: rows,
-            employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 },
+            employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 },
             contractVersion: 'v2',
             ...contexts
         });
@@ -586,7 +577,7 @@ for (const invalidTimes of [
 
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 },
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 },
         contractVersion: 'v2'
     });
     assert.strictEqual(proposal.proposal_version, PROPOSAL_VERSION_V2);
@@ -613,7 +604,7 @@ for (const invalidTimes of [
     const page = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [{
             weekRows: rows,
-            employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 }
+            employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
         }]
     });
     assert.strictEqual(page.groups.length, 0);
@@ -636,7 +627,7 @@ for (const invalidHours of [0, '0', '', null, -1, NaN, Infinity, 'invalid']) {
     const validFallbackAnalysis = analyze(week({ targets: [] }));
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 },
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 },
         contractVersion: 'v2'
     }, {
         analyzer: () => validFallbackAnalysis
@@ -651,7 +642,7 @@ for (const invalidHours of [0, '0', '', null, -1, NaN, Infinity, 'invalid']) {
     rows[1].cards_ores_ergasias = '4.50';
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 },
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 },
         contractVersion: 'v2'
     });
     assert.strictEqual(proposal.review_only_outcome.source.cards_ores_ergasias, 4.5);
@@ -660,24 +651,24 @@ for (const invalidHours of [0, '0', '', null, -1, NaN, Infinity, 'invalid']) {
 {
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: week(),
-        employmentProfile: { typos_apasxolhshs: 'EK_PERITROPHS', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 },
+        employmentProfile: { typos_apasxolhshs: 'EK_PERITROPHS', hmeres_ergasias_ebdomadas: 6 },
         contractVersion: 'v2'
     });
     assert.strictEqual(proposal.proposal_status, 'READY');
-    assert.strictEqual(proposal.policy_context.weekly_repo_policy_version, 'foundation:v2');
-    assert.strictEqual(proposal.policy_context.source_work_policy_version, 'foundation:v1');
+    assert.strictEqual(proposal.policy_context.weekly_repo_policy_version, 'foundation:v3');
+    assert.strictEqual(proposal.policy_context.source_work_policy_version, 'foundation:v3');
     assert.strictEqual(proposal.items[0].proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
     assert.strictEqual(proposal.items[1].proposed_values.kathgoria_ergasias_apologistika, 'ΜΕ');
     assert.strictEqual(proposal.items[1].proposed_values.repo_apologistika, true);
 
     const projection = buildWeeklyRepoTransferSinglePairGroupProjection({
         weekRows: week(),
-        employmentProfile: { typos_apasxolhshs: 'EK_PERITROPHS', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6 },
+        employmentProfile: { typos_apasxolhshs: 'EK_PERITROPHS', hmeres_ergasias_ebdomadas: 6 },
         contractVersion: 'v2'
     });
     assert.strictEqual(projection.projection_status, 'READY');
     assert.ok(projection.groups[0].group_key.includes(
-        'proposal_version=repo-transfer-single-pair-proposal:v3'
+        'proposal_version=repo-transfer-single-pair-proposal:v4'
     ));
 }
 

@@ -286,7 +286,6 @@ const ErgazomenoiSchema = new Schema(
         symfonhtheis_misthos_genikos: { type: Number, default: 0 },
         symfonhtheis_misthos_apasxolhseis: { type: Number, default: 0 },
         paketo_apodoxon: { type: Number, default: 0 },
-        mhniaia_repo: { type: Number, default: 0 },
         pososto_prosayxhshs_6hs_hmeras: { type: Number, min: 0 },
         ypologismos_foroy: { type: Boolean, default: false },
         oros_sth_symbash_n_3986_2011: { type: Boolean, default: false },
@@ -382,6 +381,10 @@ const ProdhlomenaOrariaSchema = new Schema(
         apologistiko_biblio: { type: Boolean, default: false },
         kathgoria_ergasias_apologistika: { type: String, trim: true },
         ores_ergasias_apologistika: { type: Number, default: 0 },
+        ores_pragmatikhs_ergasias_apologistika: { type: Number, default: 0 },
+        ores_adeias_pistomenes_apologistika: { type: Number, default: 0 },
+        ores_argias_pistomenes_apologistika: { type: Number, default: 0 },
+        compensation_breakdown_apologistika: { type: Schema.Types.Mixed, default: null },
         ores_nyxtas_apologistika: { type: Number, default: 0 },
         ores_argion_prosayxhsh_apologistika: { type: Number, default: 0 },
         ores_argion_ergasia_apologistika: { type: Number, default: 0 },
@@ -488,6 +491,7 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
 
         expected_repo: { type: Number, default: 0 },
         actual_repo: { type: Number, default: 0 },
+        missing_repo: { type: Number, default: 0 },
 
         // Οι παλιές εγγραφές χωρίς version παραμένουν legacy και δεν
         // επανερμηνεύονται ως Monday-Sunday current-policy preview.
@@ -496,7 +500,9 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
         profile_changed_inside_week: { type: Boolean, default: false },
         excess_repo: { type: Number, default: 0 },
 
-        effective_mhniaia_repo: { type: Number, default: 0 },
+        effective_expected_repo: { type: Number, default: 0 },
+        effective_weekly_workdays: { type: Number, default: 0 },
+        expected_repo_source: { type: String, trim: true, default: '' },
         effective_typos_apasxolhshs: { type: String, trim: true, default: '' },
         effective_profile_source: { type: String, trim: true, default: '' },
         effective_profile_date: { type: Date },
@@ -505,7 +511,6 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
             ref: 'IstorikoProslhpseonAllagon'
         },
 
-        previous_mhniaia_repo: { type: Number, default: 0 },
         previous_typos_apasxolhshs: { type: String, trim: true, default: '' },
         previous_profile_source: { type: String, trim: true, default: '' },
         previous_profile_date: { type: Date },
@@ -752,10 +757,6 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
             default: false
         },
 
-        mhniaia_repo: {
-            type: Number,
-            default: 0
-        },
         pososto_prosayxhshs_6hs_hmeras: {
             type: Number,
             min: 0

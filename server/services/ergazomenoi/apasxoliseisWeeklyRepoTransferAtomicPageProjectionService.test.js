@@ -88,9 +88,7 @@ function partTimeWeek(start = '2026-07-06', employeeKodikos = '001') {
 function weeklyInput(
     rows,
     employmentProfile = {
-        typos_apasxolhshs: 'PLHRHS',
-        mhniaia_repo: 2,
-        hmeres_ergasias_ebdomadas: 5
+        typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
     }
 ) {
     return {
@@ -122,9 +120,7 @@ function testCompleteWeekInputConstruction() {
         resolveEmploymentProfile: (context) => {
             calls.push(context);
             return {
-                typos_apasxolhshs: 'PLHRHS',
-                mhniaia_repo: 2,
-                hmeres_ergasias_ebdomadas: 5
+                typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
             };
         }
     });
@@ -151,9 +147,7 @@ function testCompleteWeekInputConstruction() {
         periodStart: '2026-07-07',
         periodEnd: '2026-07-12',
         resolveEmploymentProfile: () => ({
-            typos_apasxolhshs: 'PLHRHS',
-            mhniaia_repo: 2,
-            hmeres_ergasias_ebdomadas: 5
+            typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
         })
     });
     assert.deepStrictEqual(partialPeriod.weeklyInputs, []);
@@ -166,9 +160,7 @@ function testCompleteWeekInputConstruction() {
         periodStart: '2026-07-06',
         periodEnd: '2026-07-12',
         resolveEmploymentProfile: () => ({
-            typos_apasxolhshs: 'PLHRHS',
-            mhniaia_repo: 2,
-            hmeres_ergasias_ebdomadas: 5
+            typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
         })
     });
     assert.deepStrictEqual(duplicate.weeklyInputs, []);
@@ -209,6 +201,86 @@ function testOpenTrailingWeekIsDistinctFromCompletedPartialFilter() {
     });
     assert.deepStrictEqual(completedPartial.weeklyInputs, []);
     assert.deepStrictEqual(completedPartial.inputReasonCodes, [INPUT_REASON.PARTIAL_WEEK]);
+
+    const fullButStillOpen = buildWeeklyRepoTransferAtomicInputs({
+        rows: fullTimeWeek('2026-06-29', '001'),
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        validationPeriodStart: '2026-06-01',
+        validationPeriodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(fullButStillOpen.weeklyInputs, []);
+    assert.deepStrictEqual(fullButStillOpen.inputReasonCodes, [INPUT_REASON.OPEN_WEEK]);
+
+    const sundayIsStillOpen = buildWeeklyRepoTransferAtomicInputs({
+        rows: fullTimeWeek('2026-06-29', '001'),
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        asOfDate: '2026-07-05',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(sundayIsStillOpen.weeklyInputs, []);
+    assert.deepStrictEqual(sundayIsStillOpen.inputReasonCodes, [INPUT_REASON.OPEN_WEEK]);
+
+    const completedOnMonday = buildWeeklyRepoTransferAtomicInputs({
+        rows: fullTimeWeek('2026-06-29', '001'),
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        asOfDate: '2026-07-06',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.strictEqual(completedOnMonday.weeklyInputs.length, 1);
+    assert.deepStrictEqual(completedOnMonday.inputReasonCodes, []);
+}
+
+function testBoundaryWeekUsesContextButRespectsPresentationAndMonth() {
+    const rows = fullTimeWeek('2026-06-29', '001');
+    rows[1] = workRow('2026-06-29', 1, '001');
+    rows[3] = workRow('2026-06-29', 3, '001', { kathgoria_ergasias: 'ΑΝ' });
+    const built = buildWeeklyRepoTransferAtomicInputs({
+        rows,
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        validationPeriodStart: '2026-07-01',
+        validationPeriodEnd: '2026-07-31',
+        asOfDate: '2026-07-06',
+        resolveEmploymentProfile: () => ({
+            typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5
+        })
+    });
+    assert.strictEqual(built.weeklyInputs.length, 1);
+
+    const visible = buildWeeklyRepoTransferAtomicPageProjection(built, {
+        presentationStart: '2026-07-01',
+        presentationEnd: '2026-07-31'
+    });
+    assert.strictEqual(visible.summary.groups_count, 1);
+    assert.deepStrictEqual(
+        visible.groups[0].items.map((item) => item.hmeromhnia),
+        ['2026-07-02', '2026-07-03']
+    );
+
+    const contextOnlyRows = fullTimeWeek('2026-06-29', '002');
+    contextOnlyRows[1] = workRow('2026-06-29', 1, '002', {
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    });
+    contextOnlyRows[4] = workRow('2026-06-29', 4, '002');
+    contextOnlyRows[0] = workRow('2026-06-29', 0, '002', {
+        kathgoria_ergasias: 'ΑΝ'
+    });
+    const contextOnly = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: [weeklyInput(contextOnlyRows)]
+    }, {
+        presentationStart: '2026-07-01',
+        presentationEnd: '2026-07-31'
+    });
+    assert.strictEqual(contextOnly.summary.groups_count, 0);
+    assert.strictEqual(contextOnly.summary.context_only_groups_count, 1);
 }
 
 function testValidFullTimeAndPartTimeWeeks() {
@@ -236,9 +308,7 @@ function testValidFullTimeAndPartTimeWeeks() {
     const partTime = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [
             weeklyInput(partTimeWeek(), {
-                typos_apasxolhshs: 'MERIKH',
-                mhniaia_repo: 2,
-                hmeres_ergasias_ebdomadas: 5
+                typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5
             })
         ]
     });
@@ -262,9 +332,7 @@ function testInputConstructionSeparatesEmployeesAndWeeks() {
         periodStart: '2026-07-06',
         periodEnd: '2026-07-19',
         resolveEmploymentProfile: () => ({
-            typos_apasxolhshs: 'PLHRHS',
-            mhniaia_repo: 2,
-            hmeres_ergasias_ebdomadas: 5
+            typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
         })
     });
 
@@ -299,9 +367,7 @@ function testBranchAwareBucketsAndResolverContext() {
         resolveEmploymentProfile: (context) => {
             contexts.push(context);
             return {
-                typos_apasxolhshs: 'PLHRHS',
-                mhniaia_repo: 2,
-                hmeres_ergasias_ebdomadas: 5
+                typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5
             };
         }
     });
@@ -330,7 +396,7 @@ function testBranchAwareBucketsAndResolverContext() {
         rows: [...branchOne.slice(0, 3), ...branchTwo.slice(3)],
         periodStart: '2026-07-06',
         periodEnd: '2026-07-12',
-        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 })
+        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS'})
     });
     assert.deepStrictEqual(complementary.weeklyInputs, []);
     assert.deepStrictEqual(complementary.inputReasonCodes, [
@@ -342,7 +408,7 @@ function testBranchAwareBucketsAndResolverContext() {
         rows: branchOne.map((row) => ({ ...row, ypokatasthma: '' })),
         periodStart: '2026-07-06',
         periodEnd: '2026-07-12',
-        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 })
+        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS'})
     });
     assert.deepStrictEqual(missingBranch.weeklyInputs, []);
     assert.strictEqual(missingBranch.inputReasonCodes.length, 7);
@@ -380,7 +446,7 @@ function testCompanyWideEmployeeUniquenessAndBranchCompatibility() {
         periodEnd: '2026-07-12',
         resolveEmploymentProfile: ({ ypokatasthma }) =>
             isEmployeeCompatibleWithBranch({ ...employee, ypokatasthma: '0002' }, ypokatasthma)
-                ? { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }
+                ? { typos_apasxolhshs: 'PLHRHS'}
                 : null
     });
     assert.deepStrictEqual(branchMismatch.weeklyInputs, []);
@@ -408,7 +474,7 @@ function testAtomicPeriodRangeLimit() {
         rows: fullTimeWeek(),
         periodStart: '2026-01-01',
         periodEnd: '2026-03-04',
-        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 })
+        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS'})
     });
     assert.deepStrictEqual(overLimit.weeklyInputs, []);
     assert.deepStrictEqual(overLimit.inputReasonCodes, [INPUT_REASON.DATE_RANGE_EXCEEDS_LIMIT]);
@@ -449,9 +515,7 @@ function testNonReadyInvalidAndDuplicateDiagnostics() {
     const nonReady = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [
             weeklyInput(fullTimeWeek(), {
-                typos_apasxolhshs: 'EK_PERITROPHS',
-                mhniaia_repo: 2,
-                hmeres_ergasias_ebdomadas: 5
+                typos_apasxolhshs: 'EK_PERITROPHS', hmeres_ergasias_ebdomadas: 5
             })
         ]
     });
@@ -591,11 +655,11 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
         weeklyInputs: [
             weeklyInput(
                 noTargetPartTimeWeek('2026-07-13', '001'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+                { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
             ),
             weeklyInput(
                 noTargetPartTimeWeek('2026-07-06', '001'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+                { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
             )
         ]
     });
@@ -611,11 +675,11 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
         weeklyInputs: [
             weeklyInput(
                 noTargetPartTimeWeek('2026-07-06', '002'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+                { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
             ),
             weeklyInput(
                 noTargetPartTimeWeek('2026-07-06', '001'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+                { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
             )
         ]
     });
@@ -635,7 +699,7 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
             }));
             return weeklyInput(
                 rows,
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+                { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
             );
         })
     });
@@ -652,7 +716,7 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
             weeklyInput(fullTimeWeek('2026-07-06', '001')),
             weeklyInput(
                 noTargetPartTimeWeek('2026-07-06', '002'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
+                { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
             )
         ]
     });
@@ -665,6 +729,7 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
 function run() {
     testCompleteWeekInputConstruction();
     testOpenTrailingWeekIsDistinctFromCompletedPartialFilter();
+    testBoundaryWeekUsesContextButRespectsPresentationAndMonth();
     testValidFullTimeAndPartTimeWeeks();
     testInputConstructionSeparatesEmployeesAndWeeks();
     testBranchAwareBucketsAndResolverContext();

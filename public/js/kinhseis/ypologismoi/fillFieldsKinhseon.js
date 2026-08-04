@@ -86,7 +86,6 @@ async function fillFields(result, sharedParams, loaderContainer) {
     document.getElementById("value14").textContent = parseFloat(_ergazomenoi.symfonhtheis_misthos_genikos).toFixed(2);
     document.getElementById("value15").textContent = parseFloat(_ergazomenoi.symfonhtheis_misthos_apasxolhseis).toFixed(2);
     document.getElementById("value16").textContent = parseInt(_ergazomenoi.paketo_apodoxon);
-    document.getElementById("value17").textContent = parseInt(_ergazomenoi.mhniaia_repo);
     document.getElementById("eidikhKathgoriaErgazomenoy_Hidden").value = _ergazomenoi.eidikh_kathgoria_ergazomenoy;
     document.getElementById("oikogeneiakhKatastash_Hidden").value = _ergazomenoi.oikogeneiakh_katastash;
     document.getElementById("typosErgazomenon_Hidden").value = _ergazomenoi.typos_ergazomenon;

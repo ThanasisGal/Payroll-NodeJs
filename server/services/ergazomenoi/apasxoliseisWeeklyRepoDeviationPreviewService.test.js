@@ -3,11 +3,15 @@ const {
     POLICY_VERSION,
     STATUS,
     normalizeLegacyDeviation,
-    buildWeeklyRepoDeviationPreview
+    buildWeeklyRepoDeviationPreview,
+    attachSixthDayPresentationToRows
 } = require('./apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
     analyzeWeeklyRepoTransferForEmploymentContract
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
+const {
+    analyzeWeeklySixthSeventhDay
+} = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 const {
     buildWeeklyRepoTransferAtomicPageProjection
 } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
@@ -81,7 +85,31 @@ function testCompletedMondaySundayRanges() {
         assert.strictEqual(result.deviations[0].week_eos, end);
         assert.strictEqual(result.deviations[0].policyVersion, POLICY_VERSION);
         assert.strictEqual(result.deviations[0].expected_repo, 2);
+        assert.strictEqual(result.deviations[0].missing_repo, 2);
+        assert.strictEqual(result.deviations[0].effective_expected_repo, 2);
+        assert.strictEqual(result.deviations[0].effective_weekly_workdays, 5);
+        assert.strictEqual(
+            result.deviations[0].expected_repo_source,
+            'CONTRACTUAL_WEEKLY_WORKDAYS'
+        );
     }
+}
+
+function testDepartureWeekDoesNotCreateWeeklyPolicyChecks() {
+    const result = buildWeeklyRepoDeviationPreview({
+        rows: rows('2026-06-01', 2),
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: fiveDayProfile,
+        resolveEmploymentPeriod: () => ({
+            employmentStart: '2025-01-01',
+            employmentEnd: '2026-06-02'
+        })
+    });
+
+    assert.deepStrictEqual(result.deviations, []);
+    assert.deepStrictEqual(result.pendingWeeks, []);
 }
 
 function testContractualProfileControlsExpectedRepo() {
@@ -97,6 +125,21 @@ function testContractualProfileControlsExpectedRepo() {
         })
     });
     assert.strictEqual(sixDay.deviations[0].expected_repo, 1);
+
+    const fourDay = buildWeeklyRepoDeviationPreview({
+        rows: rows('2026-06-15'),
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: () => ({
+            expectedWeeklyRepo: 99,
+            repoResolutionReason: null,
+            effectiveProfile: {
+                hmeres_ergasias_ebdomadas: 4
+            }
+        })
+    });
+    assert.strictEqual(fourDay.deviations[0].expected_repo, 3);
 
     const changed = buildWeeklyRepoDeviationPreview({
         rows: rows('2026-06-15'),
@@ -201,14 +244,13 @@ function testLegacyPersistedRangeIsExplicit() {
 
 function testDeviationAndAtomicUseTheSameContractSelector() {
     const profiles = [
-        { typos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5, mhniaia_repo: 2 },
-        { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6, mhniaia_repo: 1 },
-        { typos_apasxolhshs: 'EK_PERITROPHS', hmeres_ergasias_ebdomadas: 6, mhniaia_repo: 1 },
+        { typos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5 },
+        { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 },
+        { typos_apasxolhshs: 'EK_PERITROPHS', hmeres_ergasias_ebdomadas: 6 },
         {
             typos_apasxolhshs: 'MERIKH',
             hmeres_ergasias_ebdomadas: 3,
-            mo_oron_hmerhsias_ergasias: 4,
-            mhniaia_repo: 4
+            mo_oron_hmerhsias_ergasias: 4
         }
     ];
     const capturedVersions = [];
@@ -233,13 +275,17 @@ function testDeviationAndAtomicUseTheSameContractSelector() {
             weekRows,
             employmentProfile: profile
         });
+        const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
+            weekRows,
+            effectiveProfile: profile
+        });
         const preview = buildWeeklyRepoDeviationPreview({
             rows: weekRows,
             periodStart: '2026-06-01',
             periodEnd: '2026-06-30',
             asOfDate: '2026-06-30',
             resolveWeeklyProfile: () => ({
-                expectedWeeklyRepo: profile.mhniaia_repo,
+                expectedWeeklyRepo: 7 - profile.hmeres_ergasias_ebdomadas,
                 effectiveProfile: profile
             })
         });
@@ -252,11 +298,11 @@ function testDeviationAndAtomicUseTheSameContractSelector() {
         );
         assert.strictEqual(
             deviation.sixth_day_count,
-            direct.weekly_resolution?.sixth_day_count ?? 0
+            sixthSeventhDay.sixthDay ? 1 : 0
         );
         assert.strictEqual(
             deviation.seventh_day_count,
-            direct.weekly_resolution?.seventh_day_count ?? 0
+            sixthSeventhDay.seventhDay ? 1 : 0
         );
         buildWeeklyRepoTransferAtomicPageProjection(
             { weeklyInputs: [{ weekRows, employmentProfile: profile }] },
@@ -275,6 +321,56 @@ function testDeviationAndAtomicUseTheSameContractSelector() {
         );
     }
     assert.deepStrictEqual(capturedVersions, ['v1', 'v2', 'v2', 'v2']);
+}
+
+function testSixthDaySurvivesMissingRepoTransferSource() {
+    const weekRows = rows('2026-06-01');
+    weekRows.forEach((row, index) => {
+        Object.assign(row, {
+            _id: `employee-0006-${index}`,
+            team: 'THA',
+            company_kod: '0004',
+            ypokatasthma: '0000',
+            kodikos: '0006'
+        });
+    });
+    Object.assign(weekRows[0], {
+        kathgoria_ergasias: 'ΑΝ',
+        ores_ergasias: 0,
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    });
+    weekRows.slice(1).forEach((row) => {
+        Object.assign(row, {
+            cards_apo_ora_01: '09:00',
+            cards_eos_ora_01: '17:00'
+        });
+    });
+    const profile = {
+        hmeres_ergasias_ebdomadas: 5,
+        typos_apasxolhshs: '0',
+        pososto_prosayxhshs_6hs_hmeras: 40
+    };
+    const preview = buildWeeklyRepoDeviationPreview({
+        rows: weekRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-07',
+        asOfDate: '2026-06-08',
+        resolveWeeklyProfile: () => ({
+            expectedWeeklyRepo: 2,
+            effectiveProfile: profile
+        })
+    });
+    const deviation = preview.deviations[0];
+
+    assert.strictEqual(deviation.repo_transfer_status, 'NOT_APPLICABLE');
+    assert.ok(deviation.repo_transfer_reasons.includes('NO_SOURCE_CANDIDATE'));
+    assert.strictEqual(deviation.actual_workdays, 6);
+    assert.strictEqual(deviation.sixth_day_count, 1);
+    assert.strictEqual(deviation.seventh_day_count, 0);
+    assert.strictEqual(deviation.sixth_day_date, '2026-06-07');
+    assert.strictEqual(deviation.sixth_day_premium_rate, 40);
 }
 
 function testDeviationAndAtomicContextParity() {
@@ -386,13 +482,41 @@ function testDeviationAndAtomicContextParity() {
     }
 }
 
+function testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow() {
+    const reviewRows = attachSixthDayPresentationToRows(
+        [
+            { kodikos: '0006', hmeromhnia: '2026-06-05' },
+            { kodikos: '0006', hmeromhnia: '2026-06-06' },
+            { kodikos: '0007', hmeromhnia: '2026-06-06' }
+        ],
+        [
+            {
+                kodikos: '0006',
+                sixth_day_date: '2026-06-06',
+                sixth_day_premium_rate: 0,
+                sixth_seventh_day_status: 'READY'
+            }
+        ]
+    );
+
+    assert.strictEqual(reviewRows[0].is_sixth_day, false);
+    assert.strictEqual(reviewRows[0].sixth_day_premium_rate, null);
+    assert.strictEqual(reviewRows[1].is_sixth_day, true);
+    assert.strictEqual(reviewRows[1].sixth_day_premium_rate, 0);
+    assert.strictEqual(reviewRows[1].sixth_day_policy_status, 'READY');
+    assert.strictEqual(reviewRows[2].is_sixth_day, false);
+}
+
 testSundayAndMondayUseDifferentBuckets();
 testCompletedMondaySundayRanges();
+testDepartureWeekDoesNotCreateWeeklyPolicyChecks();
 testContractualProfileControlsExpectedRepo();
 testOpenTrailingWeekIsPendingNotDeviation();
 testRepoTransferLifecycleUsesEffectiveFinalRows();
 testLegacyPersistedRangeIsExplicit();
 testDeviationAndAtomicUseTheSameContractSelector();
 testDeviationAndAtomicContextParity();
+testSixthDaySurvivesMissingRepoTransferSource();
+testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow();
 
 console.log('weekly repo deviation Monday-Sunday preview tests passed');

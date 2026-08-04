@@ -62,7 +62,12 @@ function profileInteger(value) {
     return Number.isSafeInteger(number) ? number : NaN;
 }
 
-function resolved(expectedRepo, source, scheduledDays, effectiveWeeklyWorkdays) {
+function resolved(
+    expectedRepo,
+    source,
+    scheduledDays,
+    effectiveWeeklyWorkdays
+) {
     return Object.freeze({
         ok: true,
         reason: null,
@@ -91,9 +96,9 @@ function resolveEffectiveExpectedWeeklyRepo({ weekRows = [], effectiveProfile = 
     }
 
     const workdays = profileInteger(effectiveProfile.hmeres_ergasias_ebdomadas);
-    if (workdays === 5 || workdays === 6) {
+    if (workdays >= 1 && workdays <= 6) {
         return resolved(
-            workdays === 5 ? 2 : 1,
+            7 - workdays,
             REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS,
             scheduledDays,
             workdays

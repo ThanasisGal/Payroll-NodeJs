@@ -53,6 +53,22 @@ const ApasxoliseisPolicyPreviewApprovalSchema = new Schema(
             enum: ['RECORDED', 'CANCELLED'],
             default: 'RECORDED'
         },
+        reuse_scope: {
+            type: String,
+            required: true,
+            enum: ['ONE_TIME', 'FUTURE_IDENTICAL'],
+            default: 'ONE_TIME'
+        },
+        reuse_status: {
+            type: String,
+            required: true,
+            enum: ['NOT_APPLICABLE', 'ACTIVE', 'REVOKED'],
+            default: 'NOT_APPLICABLE'
+        },
+        reuse_fingerprint: { type: String, trim: true, maxlength: 64, default: '' },
+        reuse_match_criteria: { type: Schema.Types.Mixed, default: null },
+        reuse_effective_from: { type: Date, default: null },
+        reuse_effective_to: { type: Date, default: null },
 
         items: {
             type: [PolicyPreviewApprovalItemSchema],
@@ -103,6 +119,16 @@ ApasxoliseisPolicyPreviewApprovalSchema.index({
     company_kod: 1,
     policy_code: 1,
     decision_status: 1,
+    created_at: -1
+});
+
+ApasxoliseisPolicyPreviewApprovalSchema.index({
+    team: 1,
+    company_kod: 1,
+    ypokatasthma: 1,
+    reuse_scope: 1,
+    reuse_status: 1,
+    reuse_fingerprint: 1,
     created_at: -1
 });
 

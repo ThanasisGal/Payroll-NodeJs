@@ -151,7 +151,17 @@ function buildEmptyResult({
         eligibility_status: proposal?.eligibility_status || null,
         source_available: !reasons.includes('NO_SOURCE_CANDIDATE'),
         target_available: !reasons.includes('NO_TARGET_CANDIDATE'),
-        repo_resolution: proposal?.weekly_resolution || fallbackResolution,
+        // Η απουσία υποψηφίου ζεύγους μεταφοράς δεν ακυρώνει την ανεξάρτητη
+        // ταξινόμηση 6ης/7ης ημέρας της ίδιας εβδομάδας.
+        repo_resolution: proposal?.weekly_resolution
+            ? {
+                  ...proposal.weekly_resolution,
+                  actual_workdays: fallbackResolution.actual_workdays,
+                  sixth_day_count: fallbackResolution.sixth_day_count,
+                  seventh_day_count: fallbackResolution.seventh_day_count,
+                  sixth_seventh_day: fallbackResolution.sixth_seventh_day
+              }
+            : fallbackResolution,
         review_outcomes: proposal?.review_only_outcome
             ? [{ ...proposal.review_only_outcome }]
             : [],
@@ -251,7 +261,8 @@ function buildDescription({ employeeKodikos, sourceDate, targetDate, targetCateg
         `Μεταφορά ρεπό για τον εργαζόμενο ${employeeKodikos}: ` +
         `η ${displayDate(sourceDate)} γίνεται εργασία και η ${displayDate(targetDate)} ` +
         `γίνεται ρεπό (${targetCategory}, ${employmentLabel}). ` +
-        'Η atomic read-only πρόταση απαιτεί ενιαία έγκριση και δεν είναι ακόμη διαθέσιμη για εφαρμογή.'
+        'Οι δύο αλλαγές απαιτούν μία ενιαία απόφαση HR. Η προεπισκόπηση δεν αλλάζει δεδομένα· ' +
+        'η εφαρμογή επιτρέπεται μόνο μετά από έγκριση και επιτυχή έλεγχο ασφαλείας του server.'
     );
 }
 

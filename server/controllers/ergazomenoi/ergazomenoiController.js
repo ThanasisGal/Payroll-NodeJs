@@ -422,10 +422,6 @@ function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {})
         toNumberOrNull(formData.mo_oron_hmerhsias_ergasias) ||
         (hmeres && weeklyHours ? +(weeklyHours / hmeres).toFixed(4) : null);
 
-    // Το mhniaia_repo χρησιμοποιείται πλέον από τον απολογιστικό έλεγχο
-    // ως αναμενόμενα ρεπό ανά εβδομάδα. Το κρατάμε σαν snapshot στο ιστορικό,
-    // ώστε οι έλεγχοι παλιών περιόδων να μη βασίζονται στην τρέχουσα εικόνα
-    // του ErgazomenoiModel μετά από μεταβολές σύμβασης/ωραρίου.
     const canonicalSnapshotFields = buildCanonicalWorkTermsSnapshotFields(
         formData,
         fallbackErgazomenos
@@ -906,10 +902,6 @@ class ergazomenoiController {
                 typos_ebdomadas:
                     data.typos_ebdomadas ||
                     getTyposEbdomadasFromHmeres(data.hmeres_ergasias_ebdomadas),
-                mhniaia_repo:
-                    toNumberOrNull(data.mhniaia_repo) ??
-                    toNumberOrNull(ergazomenos.mhniaia_repo) ??
-                    0,
                 pososto_prosayxhshs_6hs_hmeras:
                     Object.prototype.hasOwnProperty.call(data, 'pososto_prosayxhshs_6hs_hmeras')
                         ? toNumberOrNull(data.pososto_prosayxhshs_6hs_hmeras)
@@ -1636,7 +1628,6 @@ class ergazomenoiController {
         newErgazomenos.symfonhtheis_misthos_apasxolhseis =
             formData.symfonhtheis_misthos_apasxolhseis;
         newErgazomenos.paketo_apodoxon = formData.paketo_apodoxon;
-        newErgazomenos.mhniaia_repo = formData.mhniaia_repo;
         newErgazomenos.pososto_prosayxhshs_6hs_hmeras =
             toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras);
         newErgazomenos.ypologismos_foroy = formData.ypologismos_foroy;
@@ -3609,7 +3600,6 @@ class ergazomenoiController {
             symfonhtheis_misthos_genikos: formData.symfonhtheis_misthos_genikos,
             symfonhtheis_misthos_apasxolhseis: formData.symfonhtheis_misthos_apasxolhseis,
             paketo_apodoxon: formData.paketo_apodoxon,
-            mhniaia_repo: formData.mhniaia_repo,
             pososto_prosayxhshs_6hs_hmeras:
                 toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras),
             ypologismos_foroy: formData.ypologismos_foroy,

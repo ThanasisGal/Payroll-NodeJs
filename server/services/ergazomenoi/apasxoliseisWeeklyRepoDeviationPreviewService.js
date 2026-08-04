@@ -13,8 +13,11 @@ const {
 const {
     analyzeWeeklyRepoTransferForEmploymentContract
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
+const {
+    resolveEffectiveExpectedWeeklyRepo
+} = require('./apasxoliseisWeeklyRepoTransferExpectedRepoResolverService');
 
-const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v1';
+const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v2';
 const SOURCE_VERSION = 'raw-prodhlomena-oraria-daily-rows:v1';
 const STATUS = Object.freeze({
     READY: 'READY',
@@ -31,23 +34,51 @@ function employeeKey(row = {}) {
     return `${String(row.ypokatasthma || '').trim()}|${String(row.kodikos || '').trim()}`;
 }
 
+function attachSixthDayPresentationToRows(rows = [], deviations = []) {
+    const sixthDayByEmployeeAndDate = new Map();
+    for (const deviation of Array.isArray(deviations) ? deviations : []) {
+        const deviationEmployeeKey = employeeKey(deviation);
+        const sixthDayDate = dateKeyUtc(deviation?.sixth_day_date);
+        if (!deviationEmployeeKey || !sixthDayDate) continue;
+
+        sixthDayByEmployeeAndDate.set(`${deviationEmployeeKey}|${sixthDayDate}`, {
+            rate: deviation.sixth_day_premium_rate ?? null,
+            status: deviation.sixth_seventh_day_status || ''
+        });
+    }
+
+    return (Array.isArray(rows) ? rows : []).map((row) => {
+        const sixthDay = sixthDayByEmployeeAndDate.get(
+            `${employeeKey(row)}|${dateKeyUtc(row?.hmeromhnia)}`
+        );
+
+        return {
+            ...row,
+            is_sixth_day: Boolean(sixthDay),
+            sixth_day_premium_rate: sixthDay?.rate ?? null,
+            sixth_day_policy_status: sixthDay?.status || ''
+        };
+    });
+}
+
 function isEffectiveRepo(row = {}, isFullTimeProfile = () => true) {
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
     ).trim();
     const effectiveCategory =
         persistedCategory || String(row.kathgoria_ergasias || '').trim();
+    const fullTime = isFullTimeProfile(row) === true;
+    const expectedCategory = fullTime ? 'ΑΝ' : 'ΜΕ';
     const persistedRepo =
-        row.repo_apologistika === true || persistedCategory === 'ΑΝ';
+        row.repo_apologistika === true || persistedCategory === expectedCategory;
     const effectiveHours = persistedRepo
         ? row.ores_ergasias_apologistika
         : row.ores_ergasias;
 
     return (
-        (persistedRepo || effectiveCategory === 'ΑΝ') &&
+        (persistedRepo || effectiveCategory === expectedCategory) &&
         finiteZero(effectiveHours) &&
-        finiteZero(row.cards_ores_ergasias) &&
-        isFullTimeProfile(row) === true
+        finiteZero(row.cards_ores_ergasias)
     );
 }
 
@@ -80,6 +111,7 @@ function buildWeeklyRepoDeviationPreview({
     periodEnd,
     asOfDate,
     resolveWeeklyProfile,
+    resolveEmploymentPeriod,
     resolveDailyProfile,
     isFullTimeProfile,
     holidayByDateKey = new Map(),
@@ -139,6 +171,26 @@ function buildWeeklyRepoDeviationPreview({
             is_legacy_policy: false
         };
 
+        const employmentPeriod =
+            typeof resolveEmploymentPeriod === 'function'
+                ? resolveEmploymentPeriod({
+                      ypokatasthma: first.ypokatasthma,
+                      kodikos: first.kodikos,
+                      weekStart,
+                      weekEnd
+                  }) || {}
+                : {};
+        const employmentStart = dateKeyUtc(employmentPeriod.employmentStart);
+        const employmentEnd = dateKeyUtc(employmentPeriod.employmentEnd);
+        if (
+            (employmentStart && weekStart < employmentStart) ||
+            (employmentEnd && weekEnd > employmentEnd)
+        ) {
+            // Η πολιτική εβδομαδιαίων ρεπό/6ης/7ης ημέρας δεν εφαρμόζεται
+            // σε εβδομάδα που τέμνεται από πρόσληψη ή αποχώρηση.
+            continue;
+        }
+
         if (weekEnd > asOfKey) {
             pendingWeeks.push({
                 ...base,
@@ -171,9 +223,14 @@ function buildWeeklyRepoDeviationPreview({
                       weekRows: uniqueRows
                   }) || {}
                 : {};
-        const expectedRepo = weeklyProfile.expectedWeeklyRepo;
-        const profileReason = weeklyProfile.repoResolutionReason || null;
         const effectiveProfile = weeklyProfile.effectiveProfile || {};
+        const expectedRepoResolution = resolveEffectiveExpectedWeeklyRepo({
+            weekRows: uniqueRows,
+            effectiveProfile
+        });
+        const expectedRepo = expectedRepoResolution.effectiveExpectedWeeklyRepo;
+        const profileReason =
+            weeklyProfile.repoResolutionReason || expectedRepoResolution.reason || null;
         const actualRepo = uniqueRows.filter((row) => {
             const dailyProfile =
                 typeof resolveDailyProfile === 'function'
@@ -206,21 +263,41 @@ function buildWeeklyRepoDeviationPreview({
                 existingAuditCountByRowKey
             });
             const resolution = repoTransfer.weekly_resolution;
+            const actualWorkdays = dailyFacts.filter(
+                (facts) => facts.countsAsActualWorkDay
+            ).length;
+            const sixthSeventhDayNeedsDecision =
+                sixthSeventhDay.status === 'NEEDS_HR_DECISION';
             deviations.push({
                 ...base,
-                status: profileReason ? STATUS.NEEDS_HR_DECISION : STATUS.READY,
+                status:
+                    profileReason || sixthSeventhDayNeedsDecision
+                        ? STATUS.NEEDS_HR_DECISION
+                        : STATUS.READY,
                 complete: true,
                 is_deviation: true,
-                reasons: profileReason ? [profileReason] : [],
+                reasons: [...new Set([
+                    ...(profileReason ? [profileReason] : []),
+                    ...(sixthSeventhDayNeedsDecision
+                        ? sixthSeventhDay.reasons || []
+                        : [])
+                ])],
                 expected_repo: expectedRepo,
                 actual_repo: actualRepo,
+                missing_repo: Math.max(Number(expectedRepo || 0) - Number(actualRepo), 0),
                 resolved_repo: resolution?.resolved_repo ?? actualRepo,
-                actual_workdays: resolution?.actual_workdays ??
-                    dailyFacts.filter((facts) => facts.countsAsActualWorkDay).length,
-                sixth_day_count: resolution?.sixth_day_count ??
-                    (sixthSeventhDay.sixthDay ? 1 : 0),
-                seventh_day_count: resolution?.seventh_day_count ??
-                    (sixthSeventhDay.seventhDay ? 1 : 0),
+                // Η ταξινόμηση 6ης/7ης ημέρας είναι ανεξάρτητη από το αν
+                // υπάρχει ασφαλές ζεύγος μεταφοράς ρεπό. Το αποτέλεσμα της
+                // μεταφοράς δεν επιτρέπεται να μηδενίζει την άμεση πολιτική.
+                actual_workdays: actualWorkdays,
+                sixth_day_count: sixthSeventhDay.sixthDay ? 1 : 0,
+                seventh_day_count: sixthSeventhDay.seventhDay ? 1 : 0,
+                sixth_day_date: sixthSeventhDay.sixthDay?.hmeromhnia || null,
+                sixth_day_premium_rate:
+                    sixthSeventhDay.sixthDay?.premiumRate ?? null,
+                seventh_day_date: sixthSeventhDay.seventhDay?.hmeromhnia || null,
+                sixth_seventh_day_status: sixthSeventhDay.status,
+                sixth_seventh_day_reasons: [...(sixthSeventhDay.reasons || [])],
                 repo_transfer_status: repoTransfer.eligibility_status,
                 repo_transfer_reasons: [...(repoTransfer.reasons || [])],
                 repo_transfer_source_available:
@@ -233,7 +310,11 @@ function buildWeeklyRepoDeviationPreview({
                     profileReason === 'PROFILE_CHANGED_INSIDE_WEEK'
                         ? 'PROFILE_CHANGED_INSIDE_WEEK'
                         : 'WEEKLY_REPO_MISMATCH',
-                effective_mhniaia_repo: expectedRepo,
+                effective_expected_repo: expectedRepo,
+                effective_weekly_workdays:
+                    expectedRepoResolution.effectiveWeeklyWorkdays,
+                expected_repo_source:
+                    expectedRepoResolution.repoResolutionSource,
                 effective_typos_apasxolhshs:
                     weeklyProfile.effectiveProfile?.typos_apasxolhshs || '',
                 effective_profile_source:
@@ -260,5 +341,6 @@ module.exports = {
     SOURCE_VERSION,
     STATUS,
     normalizeLegacyDeviation,
+    attachSixthDayPresentationToRows,
     buildWeeklyRepoDeviationPreview
 };

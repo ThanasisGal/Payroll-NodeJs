@@ -1,19 +1,29 @@
 const { ROW_FIELDS, fingerprintSnapshot, reconstructWeeklyRepoTransferDecision } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const { applyError, validateApplyCommand, commandIdentity, validateApplySession } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
 
-const APPLY_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika']);
+const APPLY_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika','ores_pragmatikhs_ergasias_apologistika','ores_adeias_pistomenes_apologistika','ores_argias_pistomenes_apologistika','compensation_breakdown_apologistika']);
 const APPLY_FIELD_TYPES = Object.freeze({
     kathgoria_ergasias_apologistika: 'string', repo_apologistika: 'boolean',
     adeia_apologistika: 'boolean', kathgoria_adeias_apologistika: 'string',
     ores_apoysias_apologistika: 'number', apo_ora_01_apologistika: 'string',
     eos_ora_01_apologistika: 'string', apo_ora_02_apologistika: 'string',
     eos_ora_02_apologistika: 'string', apo_ora_03_apologistika: 'string',
-    eos_ora_03_apologistika: 'string', ores_ergasias_apologistika: 'number'
+    eos_ora_03_apologistika: 'string', ores_ergasias_apologistika: 'number',
+    ores_pragmatikhs_ergasias_apologistika: 'number',
+    ores_adeias_pistomenes_apologistika: 'number',
+    ores_argias_pistomenes_apologistika: 'number',
+    compensation_breakdown_apologistika: 'object_or_null'
 });
 const APPLY_FIELD_SET = new Set(APPLY_FIELDS);
 const CURRENT_GUARD_EXCLUDED_FIELDS = new Set(['_id','team','company_kod','ypokatasthma','kodikos','hmeromhnia','is_locked']);
 const CURRENT_GUARD_FIELDS = Object.freeze(ROW_FIELDS.filter((field) => !CURRENT_GUARD_EXCLUDED_FIELDS.has(field)));
 function isPlainObject(value) { if (!value || typeof value !== 'object' || Array.isArray(value)) return false; const prototype = Object.getPrototypeOf(value); return prototype === Object.prototype || prototype === null; }
+function hasExpectedType(value, expectedType, { nullable = false } = {}) {
+    if (value === null) return nullable || expectedType === 'object_or_null';
+    if (expectedType === 'object_or_null') return isPlainObject(value);
+    if (typeof value !== expectedType) return false;
+    return expectedType !== 'number' || Number.isFinite(value);
+}
 function lean(query) { return query && typeof query.lean === 'function' ? query.lean() : query; }
 function dateKey(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10); }
 function equal(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
@@ -23,7 +33,7 @@ function validateCurrentApplyValues(values) {
     const result = {};
     for (const field of APPLY_FIELDS) {
         const value = values?.[field] === undefined ? null : values[field]; const expectedType = APPLY_FIELD_TYPES[field];
-        if (value !== null && (typeof value !== expectedType || expectedType === 'number' && !Number.isFinite(value))) throw applyError('INVALID_CURRENT_VALUE', 409);
+        if (!hasExpectedType(value, expectedType, { nullable: true })) throw applyError('INVALID_CURRENT_VALUE', 409);
         result[field] = value;
     }
     return Object.freeze(result);
@@ -35,7 +45,8 @@ function validateProposed(values) {
     const result = {};
     for (const field of APPLY_FIELDS) {
         const value = values[field]; const expectedType = APPLY_FIELD_TYPES[field];
-        if (typeof value !== expectedType || expectedType === 'number' && !Number.isFinite(value)) throw applyError('INVALID_PROPOSED_VALUE', 409);
+        if (field === 'compensation_breakdown_apologistika' && value !== null) throw applyError('INVALID_PROPOSED_VALUE', 409);
+        if (!hasExpectedType(value, expectedType)) throw applyError('INVALID_PROPOSED_VALUE', 409);
         result[field] = value;
     }
     return Object.freeze(result);
