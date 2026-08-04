@@ -1246,7 +1246,8 @@ let _manualExtraApodoxesDiafora = null;
 
 function setupManualPragmatikoOromisthioEditor() {
     const input = document.getElementById('pragmatikoOromisthio');
-    if (!input) return;
+    if (!input || input.__manualOromisthioEditorBound) return;
+    input.__manualOromisthioEditorBound = true;
 
     input.title = 'F9 ή διπλό κλικ: Επεξεργασία | F10: Οριστικοποίηση';
 
@@ -1278,6 +1279,8 @@ function setupManualPragmatikoOromisthioEditor() {
         }
     });
 
+    if (document.__manualOromisthioKeyboardBound) return;
+    document.__manualOromisthioKeyboardBound = true;
     document.addEventListener('keydown', async (event) => {
         const activeEl = document.activeElement;
         const isManualInputFocused = activeEl?.id === 'pragmatikoOromisthio';
@@ -1521,15 +1524,10 @@ async function applyManualPragmatikoOromisthio() {
     // Κρατάμε το ΠΑΛΙΟ σύνολο βάσει ωρών ΠΡΙΝ πειραχθούν τα πεδία από τον manual υπολογισμό.
     // Από αυτό θα αφαιρεθεί ο νέος πραγματικός μισθός για να βρούμε τη διαφορά που θα μπει
     // στο poso_symbashs_basei_oron_ergasias_${row} του EXTRA στοιχείου.
-    let previousSynoloBaseiOron = toDecimal(synoloBaseiEl?.value);
-
-    // Αν ο χρήστης ξαναπατήσει F9/F10 ενώ υπάρχει ήδη manual EXTRA γραμμή,
-    // το τρέχον σύνολο βάσει ωρών περιέχει και την παλιά διαφορά.
-    // Την αφαιρούμε για να ξαναϋπολογιστεί η νέα διαφορά πάνω στην πραγματική βάση.
-    if (_manualExtraApodoxesRow && _manualExtraApodoxesDiafora) {
-        previousSynoloBaseiOron = previousSynoloBaseiOron.minus(_manualExtraApodoxesDiafora);
-        if (previousSynoloBaseiOron.lt(0)) previousSynoloBaseiOron = new Decimal(0);
-    }
+    let previousSynoloBaseiOron = toDecimal(synoloBaseiEl?.value).minus(
+        _TOTAL_EXTRA_APODOXES
+    );
+    if (previousSynoloBaseiOron.lt(0)) previousSynoloBaseiOron = new Decimal(0);
 
     const neoOromisthio = getManualDecimalFromInput(oromisthioEl);
 
