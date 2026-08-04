@@ -41,7 +41,7 @@
         "fs-extra": "11.3.0",
         "geoip-lite": "^2.0.2",
         "helmet": "^8.1.0",
-        "ip-address": "^10.2.0",
+        "ip-address": "^10.4.0",
         "jquery": "^3.7.1",
         "jsonwebtoken": "9.0.2",
         "jwt-decode": "4.0.0",
@@ -67,7 +67,10 @@
         "unzipper": "^0.12.3",
         "bluebird": "^3.7.2",
         "fast-xml-parser": "^5.5.7",
-        "uuid": "^11.1.1"
+        "uuid": "^11.1.1",
+        "socket.io-parser": "4.2.7",
+        "brace-expansion@^1.0.0": "1.1.18",
+        "brace-expansion@^2.0.0": "2.1.4"
     },
     "devDependencies": {
         "@types/node": "^22.5.5",
