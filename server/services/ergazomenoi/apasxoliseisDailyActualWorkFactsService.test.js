@@ -4,19 +4,39 @@ const {
 } = require('./apasxoliseisDailyActualWorkFactsService');
 
 function facts(category, ores, cards, flags = {}) {
+    const numericCards = Number(cards);
+    const endMinutes = 9 * 60 + Math.round(numericCards * 60);
+    const completePair = Number.isFinite(numericCards) && numericCards > 0
+        ? {
+              cards_apo_ora_01: '09:00',
+              cards_eos_ora_01: `${String(Math.floor(endMinutes / 60) % 24).padStart(
+                  2,
+                  '0'
+              )}:${String(endMinutes % 60).padStart(2, '0')}`
+          }
+        : {};
     return resolveDailyActualWorkFacts({
         kathgoria_ergasias: category,
         ores_ergasias: ores,
         cards_ores_ergasias: cards,
+        ...completePair,
         ...flags
     });
 }
-const expected = (values) => ({
-    declaredWorkHours: values.actualWorkHours === 0 ? 0 : 8,
-    cardHours: 0,
-    hasCompleteCardEvidence: false,
-    ...values
-});
+const expected = (values) => {
+    const cardHours = values.cardHours ?? 0;
+    const hasCompleteCardEvidence = cardHours > 0;
+    return {
+        declaredWorkHours: values.actualWorkHours === 0 ? 0 : 8,
+        cardHours: 0,
+        hasCompleteCardEvidence,
+        cardVerificationStatus: 'READY',
+        verifiedCardHours: hasCompleteCardEvidence ? cardHours : 0,
+        completeCardPairNumbers: hasCompleteCardEvidence ? ['01'] : [],
+        unresolvedCardPairNumbers: [],
+        ...values
+    };
+};
 
 assert.deepStrictEqual(
     facts('ΑΔΕΙΑ', 8, 0, { adeia: true }),
@@ -25,6 +45,10 @@ assert.deepStrictEqual(
         declaredWorkHours: 8,
         cardHours: 0,
         hasCompleteCardEvidence: false,
+        cardVerificationStatus: 'READY',
+        verifiedCardHours: 0,
+        completeCardPairNumbers: [],
+        unresolvedCardPairNumbers: [],
         actualWorkHours: 0,
         leaveHours: 8,
         holidayCreditedHours: 0,
@@ -77,5 +101,22 @@ assert.strictEqual(incompleteCardFacts.holidayCreditedHours, 0);
 assert.strictEqual(incompleteCardFacts.countsAsActualWorkDay, false);
 assert.deepStrictEqual(incompleteCardFacts.reasons, []);
 assert.deepStrictEqual(incompleteCardFacts.warnings, ['INCOMPLETE_CARD_INTERVAL']);
+assert.strictEqual(incompleteCardFacts.cardVerificationStatus, 'UNVERIFIED');
+assert.strictEqual(incompleteCardFacts.verifiedCardHours, 0);
+assert.deepStrictEqual(incompleteCardFacts.unresolvedCardPairNumbers, ['01']);
+
+const partiallyVerifiedFacts = facts('ΕΡΓ', 8, 8, {
+    cards_apo_ora_01: '09:00',
+    cards_eos_ora_01: '13:00',
+    cards_apo_ora_02: '16:00',
+    cards_eos_ora_02: ''
+});
+assert.strictEqual(partiallyVerifiedFacts.cardVerificationStatus, 'PARTIALLY_VERIFIED');
+assert.strictEqual(partiallyVerifiedFacts.verifiedCardHours, 4);
+assert.strictEqual(partiallyVerifiedFacts.actualWorkHours, 4);
+assert.strictEqual(partiallyVerifiedFacts.countsAsActualWorkDay, true);
+assert.deepStrictEqual(partiallyVerifiedFacts.completeCardPairNumbers, ['01']);
+assert.deepStrictEqual(partiallyVerifiedFacts.unresolvedCardPairNumbers, ['02']);
+assert.deepStrictEqual(partiallyVerifiedFacts.warnings, ['INCOMPLETE_CARD_INTERVAL']);
 
 console.log('daily actual-work facts tests passed');

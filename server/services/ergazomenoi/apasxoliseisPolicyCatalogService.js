@@ -28,7 +28,8 @@ const POLICY_CATEGORIES = Object.freeze({
     BASELINE_OK: 'BASELINE_OK',
     ABSENCE_OR_HOLIDAY: 'ABSENCE_OR_HOLIDAY',
     WEEKLY_REPO: 'WEEKLY_REPO',
-    CARDS_ON_NON_WORK: 'CARDS_ON_NON_WORK'
+    CARDS_ON_NON_WORK: 'CARDS_ON_NON_WORK',
+    REST_PERIOD: 'REST_PERIOD'
 });
 
 function deepFreeze(value) {
@@ -102,6 +103,58 @@ const POLICY_MODE_DEFINITIONS = deepFreeze([
 ]);
 
 const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
+    {
+        policy_code: 'SPLIT_SHIFT_MINIMUM_REST',
+        policy_version: 'verified-card-rest-periods:v1',
+        title: 'Ελάχιστη ανάπαυση σε σπαστό ωράριο',
+        description:
+            'Ελέγχει ότι μεταξύ διαδοχικών επαληθευμένων ζευγών καρτών της ίδιας ημέρας μεσολαβούν τουλάχιστον 3 ώρες.',
+        category: POLICY_CATEGORIES.REST_PERIOD,
+        default_mode: POLICY_MODE.REVIEW_ONLY,
+        supported_modes: [POLICY_MODE.REVIEW_ONLY],
+        default_priority: 60,
+        safety_level: POLICY_SAFETY_LEVEL.HIGH_RISK,
+        batch_approvable: false,
+        requires_human_approval: true,
+        required_facts: ['cards.verifiedPairs'],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [],
+        result_statuses: [
+            POLICY_RESULT_STATUS.NEEDS_REVIEW,
+            POLICY_RESULT_STATUS.UNKNOWN_PATTERN
+        ],
+        related_scenario_codes: ['SPLIT_SHIFT_REST_VIOLATION'],
+        notes: [
+            'Δεν συμπληρώνει ελλιπές χτύπημα και δεν αλλάζει κάρτες ή απολογιστικά πεδία.',
+            'Ανεπαρκή στοιχεία εμφανίζονται μόνο ως τεχνική εκκρεμότητα.'
+        ]
+    },
+    {
+        policy_code: 'INTERDAY_MINIMUM_REST',
+        policy_version: 'verified-card-rest-periods:v1',
+        title: 'Ελάχιστη ανάπαυση μεταξύ διαδοχικών ημερών',
+        description:
+            'Ελέγχει ότι από το τελευταίο επαληθευμένο ζεύγος της τρέχουσας ημέρας έως το πρώτο της επόμενης μεσολαβούν τουλάχιστον 11 ώρες.',
+        category: POLICY_CATEGORIES.REST_PERIOD,
+        default_mode: POLICY_MODE.REVIEW_ONLY,
+        supported_modes: [POLICY_MODE.REVIEW_ONLY],
+        default_priority: 60,
+        safety_level: POLICY_SAFETY_LEVEL.HIGH_RISK,
+        batch_approvable: false,
+        requires_human_approval: true,
+        required_facts: ['cards.currentDayVerifiedPairs', 'cards.nextDayVerifiedPairs'],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [],
+        result_statuses: [
+            POLICY_RESULT_STATUS.NEEDS_REVIEW,
+            POLICY_RESULT_STATUS.UNKNOWN_PATTERN
+        ],
+        related_scenario_codes: ['INTERDAY_REST_VIOLATION'],
+        notes: [
+            'Δεν συμπληρώνει ελλιπές χτύπημα και δεν αλλάζει κάρτες ή απολογιστικά πεδία.',
+            'Ο έλεγχος γίνεται μόνο μεταξύ διαδοχικών ημερολογιακών ημερών.'
+        ]
+    },
     {
         policy_code: 'CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK',
         policy_version: 'preview:v1',

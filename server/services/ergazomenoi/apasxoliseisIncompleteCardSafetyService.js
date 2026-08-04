@@ -1,4 +1,8 @@
 const CARD_PAIR_NUMBERS = Object.freeze(['01', '02', '03']);
+const {
+    CARD_VERIFICATION_STATUS,
+    resolveCardPairVerification
+} = require('./apasxoliseisCardPairResolverService');
 
 const RESET_NUMBER_FIELDS = Object.freeze([
     'ores_ergasias_apologistika',
@@ -66,10 +70,39 @@ function buildIncompleteCardSafeUpdate() {
     return update;
 }
 
+function buildPartialVerifiedCardUpdate(row = {}) {
+    const verification = resolveCardPairVerification(row, {
+        pairNumbers: CARD_PAIR_NUMBERS
+    });
+    const update = buildIncompleteCardSafeUpdate();
+    const hasVerifiedWork = verification.hasCompleteCardEvidence;
+
+    update.apologistiko_biblio = false;
+    update.kathgoria_ergasias_apologistika = hasVerifiedWork ? 'ΕΡΓ' : '';
+    update.ores_ergasias_apologistika = Number(
+        verification.verifiedHours.toFixed(2)
+    );
+    update.ores_pragmatikhs_ergasias_apologistika = Number(
+        verification.verifiedHours.toFixed(2)
+    );
+
+    for (const pair of verification.completePairs) {
+        update[`apo_ora_${pair.pairNumber}_apologistika`] = pair.start;
+        update[`eos_ora_${pair.pairNumber}_apologistika`] = pair.end;
+    }
+
+    return {
+        verificationStatus: verification.status,
+        update
+    };
+}
+
 module.exports = {
     CARD_PAIR_NUMBERS,
     RESET_NUMBER_FIELDS,
     getIncompleteCardPairs,
     hasIncompleteCardPair,
-    buildIncompleteCardSafeUpdate
+    buildIncompleteCardSafeUpdate,
+    buildPartialVerifiedCardUpdate,
+    CARD_VERIFICATION_STATUS
 };

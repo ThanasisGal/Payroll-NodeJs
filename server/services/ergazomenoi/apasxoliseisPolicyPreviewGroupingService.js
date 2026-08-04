@@ -2,6 +2,9 @@
 // This module must stay free of DB, controller, route, network, and filesystem dependencies.
 
 const crypto = require('crypto');
+const {
+    getReusableDecisionEligibility
+} = require('./apasxoliseisReusablePolicyDecisionService');
 
 const STATUS_PRIORITY = Object.freeze({
     NEEDS_REVIEW: 10,
@@ -91,10 +94,11 @@ function buildPreviewItem(row = {}) {
     const policyResult = asObject(row.policyResult);
     const factsSummary = asObject(row.scenarioFactsSummary);
     const prodhlomenaOrariaId = String(row.prodhlomena_oraria_id || '').trim();
+    const previewId = String(row.preview_id || prodhlomenaOrariaId).trim();
     const employeeKodikos = String(row.kodikos || '').trim();
 
     return {
-        preview_id: prodhlomenaOrariaId,
+        preview_id: previewId,
         prodhlomena_oraria_id: prodhlomenaOrariaId,
         employee_id: null,
         employee_kodikos: employeeKodikos,
@@ -107,6 +111,8 @@ function buildPreviewItem(row = {}) {
             factsSummary.kathgoria_ergasias_apologistika ||
             null,
         cards_ores_ergasias: factsSummary.card_hours ?? null,
+        diagnostic_details: asObject(factsSummary.rest_period_diagnostic),
+        reusable_decision: asObject(policyResult.reusable_decision),
         proposed_values: asObject(policyResult.proposed_updates),
         flags: {
             has_cards: factsSummary.has_cards === true,
@@ -204,6 +210,7 @@ function buildApasxoliseisPolicyPreviewGrouping(rows = []) {
                 scenario_code: parts.scenario_code,
                 action_type: parts.action_type,
                 reason_code: parts.reason_code,
+                ypokatasthma: String(row.ypokatasthma || '').trim(),
                 title: buildGroupTitle(parts, row),
                 description: buildGroupDescription(parts, row),
                 count: 0,
@@ -237,6 +244,17 @@ function buildApasxoliseisPolicyPreviewGrouping(rows = []) {
         group.items.sort(sortItems);
         group.employees_count = group._employeeKeys.size;
         group.representative_item = group.items[0] || null;
+        group.reusable_decision =
+            group.items.find(
+                (item) => Object.keys(asObject(item.reusable_decision)).length > 0
+            )?.reusable_decision || null;
+        const reusableEligibility = getReusableDecisionEligibility({
+            group,
+            items: group.items
+        });
+        group.reusable_eligible = reusableEligibility.eligible;
+        group.reusable_ineligible_reason_code = reusableEligibility.reason_code;
+        group.reusable_ineligible_reason = reusableEligibility.reason;
         delete group._employeeKeys;
         return group;
     });

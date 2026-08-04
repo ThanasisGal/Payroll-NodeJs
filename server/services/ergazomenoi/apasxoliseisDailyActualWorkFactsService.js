@@ -23,8 +23,8 @@ const {
     classifyLeaveProvenance
 } = require('./apasxoliseisLeaveProvenanceService');
 const {
-    buildCardIntervals
-} = require('./apasxoliseisScenarioFactsService');
+    resolveCardPairVerification
+} = require('./apasxoliseisCardPairResolverService');
 
 function nonNegativeNumber(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -60,19 +60,22 @@ function resolveDailyActualWorkFacts(row = {}) {
 
     const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
-    const cardIntervals = buildCardIntervals(row);
-    const hasCompleteCardEvidence = cardIntervals.some(
-        (interval) => interval.isComplete && !interval.isZeroLength
-    );
-    const hasIncompleteCardInterval = cardIntervals.some(
-        (interval) => !interval.isComplete && (interval.start || interval.end)
-    );
+    const cardVerification = resolveCardPairVerification(row);
+    const hasCompleteCardEvidence = cardVerification.hasCompleteCardEvidence;
+    const hasIncompleteCardInterval = cardVerification.hasUnresolvedCardEvidence;
+    const verificationFacts = {
+        cardVerificationStatus: cardVerification.status,
+        verifiedCardHours: cardVerification.verifiedHours,
+        completeCardPairNumbers: cardVerification.completePairNumbers,
+        unresolvedCardPairNumbers: cardVerification.unresolvedPairNumbers
+    };
     if (reasons.length > 0) {
         return Object.freeze({
             category,
             declaredWorkHours: declared.ok ? declared.value : null,
             cardHours: cards.ok ? cards.value : null,
             hasCompleteCardEvidence,
+            ...verificationFacts,
             actualWorkHours: 0,
             leaveHours: 0,
             holidayCreditedHours: 0,
@@ -83,20 +86,24 @@ function resolveDailyActualWorkFacts(row = {}) {
         });
     }
 
-    // Ένα μονό χτύπημα δεν επιτρέπει ασφαλή συμπλήρωση της ώρας που λείπει.
-    // Η ημέρα παραμένει τεχνική εκκρεμότητα του ελέγχου καρτών και δεν
-    // μετατρέπεται αυτόματα σε εργασία, άδεια, αργία ή ρεπό.
+    // Τα πλήρη ζεύγη παραμένουν αποδεδειγμένος χρόνος ακόμη κι όταν άλλο
+    // ζεύγος της ημέρας είναι ελλιπές. Το ανεξακρίβωτο τμήμα δεν
+    // συμπληρώνεται και δεν μετατρέπεται σε εργασία, άδεια, αργία ή ρεπό.
     if (hasIncompleteCardInterval) {
+        const verifiedActualWorkHours = hasCompleteCardEvidence
+            ? cardVerification.verifiedHours
+            : 0;
         return Object.freeze({
             category,
             declaredWorkHours: declared.value,
             cardHours: cards.value,
             hasCompleteCardEvidence,
-            actualWorkHours: 0,
+            ...verificationFacts,
+            actualWorkHours: verifiedActualWorkHours,
             leaveHours: 0,
             holidayCreditedHours: 0,
             sicknessHours: 0,
-            countsAsActualWorkDay: false,
+            countsAsActualWorkDay: verifiedActualWorkHours > 0,
             reasons: [],
             warnings: [WARNING.INCOMPLETE_CARD_INTERVAL]
         });
@@ -152,6 +159,7 @@ function resolveDailyActualWorkFacts(row = {}) {
         declaredWorkHours: declared.value,
         cardHours: cards.value,
         hasCompleteCardEvidence,
+        ...verificationFacts,
         actualWorkHours,
         leaveHours,
         holidayCreditedHours,

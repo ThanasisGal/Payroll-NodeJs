@@ -102,14 +102,37 @@ assert.ok(
     )
 );
 assert.ok(calculationSource.includes('ProdhlomenaOrariaModel.find(prodhlomenaQuery)'));
-assert.ok(calculationSource.includes('if (hasIncompleteCardPair(calculationRec))'));
-assert.ok(calculationSource.includes('buildIncompleteCardSafeUpdate()'));
+assert.ok(calculationSource.includes('resolveCardPairVerification(calculationRec)'));
+assert.ok(
+    calculationSource.includes('buildPartialVerifiedCardUpdate(calculationRec).update')
+);
+assert.ok(!calculationSource.includes('buildIncompleteCardSafeUpdate()'));
 assert.strictEqual(
     (calculationSource.match(/checkIncompleteCardPairAgainstDeclared\(/g) || []).length,
     0
 );
-assert.ok(postCheckSource.includes('if (hasIncompleteCardPair(row))'));
-assert.ok(postCheckSource.includes('buildIncompleteCardSafeUpdate()'));
+assert.ok(/resolveCardPairVerification\(\s*row\s*\)/.test(postCheckSource));
+assert.ok(postCheckSource.includes('buildPartialVerifiedCardUpdate(row).update'));
+assert.ok(!postCheckSource.includes('buildIncompleteCardSafeUpdate()'));
+
+const payrollIntervalsStart = source.indexOf(
+    'function getPayrollCalculationIntervals(rec, ergazomenos = null)'
+);
+const payrollIntervalsEnd = source.indexOf(
+    'function getPayrollDailyWorkMinutes',
+    payrollIntervalsStart
+);
+assert.ok(
+    payrollIntervalsStart >= 0 && payrollIntervalsEnd > payrollIntervalsStart
+);
+const payrollIntervalsSource = source.slice(
+    payrollIntervalsStart,
+    payrollIntervalsEnd
+);
+assert.ok(payrollIntervalsSource.includes('resolveCardPairVerification(rec)'));
+assert.ok(payrollIntervalsSource.includes('verification.completePairs.map'));
+assert.ok(payrollIntervalsSource.includes("source: 'CARD_PARTIALLY_VERIFIED'"));
+assert.ok(!payrollIntervalsSource.includes('hasIncompleteCardPair'));
 
 const atomicStart = source.indexOf('async function buildAtomicRepoTransferPolicyPreviewProjection');
 const atomicEnd = source.indexOf('function getWeekRangesInsidePeriod', atomicStart);

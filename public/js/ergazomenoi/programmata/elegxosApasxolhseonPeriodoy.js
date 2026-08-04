@@ -135,6 +135,8 @@ const policyPreviewPolicyLabels = {
         'Ρεπό, μη εργασία ή μη προδηλωμένη ημέρα με κάρτες',
     NO_CARDS_DECLARED_WORK_LEAVE_OR_HOLIDAY: 'Εργασία χωρίς κάρτες λόγω άδειας ή αργίας',
     WEEKLY_REPO_BALANCE: 'Ισορροπία εβδομαδιαίων ρεπό',
+    SPLIT_SHIFT_MINIMUM_REST: 'Ελάχιστη ανάπαυση σε σπαστό ωράριο',
+    INTERDAY_MINIMUM_REST: 'Ελάχιστη ανάπαυση μεταξύ διαδοχικών ημερών',
     UNKNOWN: 'Δεν αντιστοιχίστηκε διαθέσιμη πολιτική'
 };
 
@@ -153,6 +155,12 @@ const policyPreviewScenarioLabels = {
     ZERO_LENGTH_CARD_INTERVAL: 'Μηδενικό διάστημα κάρτας',
     SPLIT_SHIFT_MATCHED_WITH_DEVIATION: 'Σπαστό ωράριο με απόκλιση',
     REPO_TRANSFER_WITHIN_WEEK: 'Πιθανή μεταφορά ρεπό εντός εβδομάδας',
+    SPLIT_SHIFT_REST_VIOLATION: 'Ανάπαυση σπαστού ωραρίου κάτω από 3 ώρες',
+    INTERDAY_REST_VIOLATION: 'Ημερήσια ανάπαυση κάτω από 11 ώρες',
+    SPLIT_SHIFT_REST_TECHNICAL_PENDING:
+        'Ο έλεγχος ανάπαυσης σπαστού αναμένει πλήρη στοιχεία καρτών',
+    INTERDAY_REST_TECHNICAL_PENDING:
+        'Ο έλεγχος ημερήσιας ανάπαυσης αναμένει πλήρη στοιχεία καρτών',
     UNKNOWN: 'Δεν αντιστοιχίστηκε διαθέσιμο σενάριο'
 };
 
@@ -185,6 +193,11 @@ const policyPreviewReasonLabels = {
     CARD_NOT_REQUIRED: 'Δεν απαιτείται κάρτα εργασίας',
     EMPLOYEE_CARD_NOT_REQUIRED: 'Δεν απαιτείται κάρτα εργασίας',
     NO_APOLOGISTIKO_BIBLIO: 'Δεν αφορά απολογιστικό βιβλίο',
+    SPLIT_REST_BELOW_MINIMUM: 'Η ανάπαυση μεταξύ τμημάτων είναι μικρότερη από 3 ώρες',
+    SPLIT_INTERVALS_OVERLAP: 'Τα τμήματα του σπαστού ωραρίου επικαλύπτονται',
+    INTERDAY_REST_BELOW_MINIMUM: 'Η ανάπαυση μεταξύ ημερών είναι μικρότερη από 11 ώρες',
+    INTERDAY_INTERVALS_OVERLAP: 'Τα διαστήματα εργασίας διαδοχικών ημερών επικαλύπτονται',
+    CARD_VERIFICATION_PENDING: 'Αναμένονται πλήρη και επαληθεύσιμα χτυπήματα καρτών',
     UNKNOWN: 'Δεν καταγράφηκε ειδική αιτιολογία'
 };
 
@@ -317,6 +330,12 @@ function isPolicyPreviewDecisionStatus(status) {
 function attachPolicyPreviewResults(rows = [], previewRows = []) {
     currentPolicyPreviewRowsById = new Map(
         (Array.isArray(previewRows) ? previewRows : [])
+            .filter((previewRow) => {
+                const sourceId = rowIdentityKey(previewRow?.prodhlomena_oraria_id);
+                const previewId = rowIdentityKey(previewRow?.preview_id);
+
+                return !previewId || previewId === sourceId;
+            })
             .map((previewRow) => [
                 rowIdentityKey(previewRow?.prodhlomena_oraria_id),
                 previewRow
@@ -422,6 +441,20 @@ function renderScenarioBadge(row, repoTransferState) {
             <div class="review-scenario-badge-row">
                 <span class="review-scenario-badge review-scenario-badge-applied">
                     ΕΦΑΡΜΟΣΤΗΚΕ
+                </span>
+            </div>
+        `;
+    }
+
+    const reusableDecision = row?.policyResult?.reusable_decision;
+    if (reusableDecision?.approval_id) {
+        const approvedBy = reusableDecision.approved_by_user_name || 'HR';
+        const approvedAt = formatPolicyPreviewDateTime(reusableDecision.approved_at);
+        return `
+            <div class="review-scenario-badge-row">
+                <span class="review-scenario-badge review-scenario-badge-classified"
+                      title="${escapeHtml(`Εγκρίθηκε από ${approvedBy} στις ${approvedAt}`)}">
+                    ΒΑΣΕΙ ΠΑΛΑΙΟΤΕΡΗΣ ΕΓΚΡΙΣΗΣ HR
                 </span>
             </div>
         `;
@@ -2812,6 +2845,7 @@ function buildPolicyPreviewApprovalsParams(baseParams) {
     return new URLSearchParams({
         apo_hmeromhnia: baseParams.get('apo_hmeromhnia') || '',
         eos_hmeromhnia: baseParams.get('eos_hmeromhnia') || '',
+        ypokatasthma: baseParams.get('ypokatasthma') || '',
         decision_status: 'RECORDED',
         page: '1',
         limit: '200'
@@ -3831,6 +3865,11 @@ function renderPolicyPreviewApprovalPanel(group = {}, groupIndex = 0) {
                 )}</span>
             </div>
             ${
+                latest.reuse_scope === 'FUTURE_IDENTICAL' && latest.reuse_status === 'ACTIVE'
+                    ? '<div class="small text-success fw-semibold mt-1">Ενεργή και για μελλοντικές ίδιες περιπτώσεις.</div>'
+                    : ''
+            }
+            ${
                 latest.notes
                     ? `<div class="small mt-1"><span class="fw-semibold">Σημειώσεις:</span> ${escapeHtml(
                           latest.notes
@@ -3890,8 +3929,11 @@ async function getPolicyPreviewCsrfToken() {
     return freshToken;
 }
 
-async function confirmPolicyPreviewDecision(decisionType) {
+async function confirmPolicyPreviewDecision(group, decisionType) {
     const decisionLabel = getPolicyPreviewDecisionLabel(decisionType);
+    const reusableDecisionTypes = new Set(['MARK_OK', 'MARK_REVIEWED', 'REJECT_PROPOSAL']);
+    const canReuse =
+        group?.reusable_eligible === true && reusableDecisionTypes.has(decisionType);
     const decisionMessage =
         decisionType === 'APPROVE_PREFILL'
             ? 'Η πρόταση θα χαρακτηριστεί ως εγκεκριμένη για μελλοντική εφαρμογή, αλλά δεν θα εφαρμοστεί τώρα καμία αλλαγή στα Προδηλωμένα.'
@@ -3904,19 +3946,40 @@ async function confirmPolicyPreviewDecision(decisionType) {
                 <div class="fw-semibold mb-2">${escapeHtml(decisionLabel)}</div>
                 <div class="mb-2">${escapeHtml(decisionMessage)}</div>
                 <div>Βεβαιωθείτε ότι εργάζεστε στη σωστή εταιρεία. Η ενέργεια θα καταγραφεί στο ιστορικό αποφάσεων.</div>
+                ${
+                    canReuse
+                        ? `<div class="form-check mt-3 p-2 border rounded bg-light">
+                               <input class="form-check-input ms-0 me-2" type="checkbox" id="policyPreviewReuseFutureIdentical">
+                               <label class="form-check-label fw-semibold" for="policyPreviewReuseFutureIdentical">
+                                   Χρήση της ίδιας απόφασης σε μελλοντικές ίδιες περιπτώσεις
+                               </label>
+                               <div class="small text-muted mt-1">
+                                   Ισχύει μόνο για την ίδια εταιρεία, το ίδιο παράρτημα και ακριβώς το ίδιο σενάριο πολιτικής. Ο χρήστης θα ενημερώνεται για την παλιότερη έγκριση HR.
+                               </div>
+                           </div>`
+                        : ''
+                }
+                <label class="form-label mt-3" for="policyPreviewDecisionNotes">Σημειώσεις</label>
+                <textarea class="form-control" id="policyPreviewDecisionNotes" maxlength="2000" rows="3" placeholder="Προαιρετικές σημειώσεις"></textarea>
             </div>
         `,
-        input: 'textarea',
-        inputLabel: 'Σημειώσεις',
-        inputPlaceholder: 'Προαιρετικές σημειώσεις',
-        inputAttributes: { maxlength: '2000' },
         showCancelButton: true,
         confirmButtonText: 'Καταγραφή απόφασης',
         cancelButtonText: 'Άκυρο',
-        reverseButtons: true
+        reverseButtons: true,
+        preConfirm: () => ({
+            notes: String(
+                Swal.getPopup()?.querySelector('#policyPreviewDecisionNotes')?.value || ''
+            ).trim(),
+            reuseScope:
+                canReuse &&
+                Swal.getPopup()?.querySelector('#policyPreviewReuseFutureIdentical')?.checked === true
+                    ? 'FUTURE_IDENTICAL'
+                    : 'ONE_TIME'
+        })
     });
 
-    return result.isConfirmed ? String(result.value || '').trim() : null;
+    return result.isConfirmed ? result.value : null;
 }
 
 async function submitPolicyPreviewDecision(group, decisionType) {
@@ -3928,8 +3991,8 @@ async function submitPolicyPreviewDecision(group, decisionType) {
         throw new Error('Η ομάδα δεν περιέχει έγκυρα δεδομένα για καταγραφή απόφασης.');
     }
 
-    const notes = await confirmPolicyPreviewDecision(decisionType);
-    if (notes === null) return;
+    const confirmation = await confirmPolicyPreviewDecision(group, decisionType);
+    if (confirmation === null) return;
 
     policyPreviewApprovalSubmitting = true;
 
@@ -3947,6 +4010,7 @@ async function submitPolicyPreviewDecision(group, decisionType) {
             body: JSON.stringify({
                 apo_hmeromhnia: currentPolicyPreviewBaseParams.get('apo_hmeromhnia') || '',
                 eos_hmeromhnia: currentPolicyPreviewBaseParams.get('eos_hmeromhnia') || '',
+                ypokatasthma: currentPolicyPreviewBaseParams.get('ypokatasthma') || '',
                 group: {
                     group_id: group.group_id,
                     group_key: group.group_key,
@@ -3958,7 +4022,8 @@ async function submitPolicyPreviewDecision(group, decisionType) {
                     reason_code: group.reason_code
                 },
                 decision_type: decisionType,
-                notes,
+                reuse_scope: confirmation.reuseScope,
+                notes: confirmation.notes,
                 client_payload_version: 'policy-preview-groups-ui-1',
                 items: group.items
             })
@@ -3998,9 +4063,32 @@ async function submitPolicyPreviewDecision(group, decisionType) {
                 'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.';
         }
 
-        renderPolicyPreviewGroups(currentPolicyPreviewGrouping, {
-            expandedGroupId: group.group_id
-        });
+        if (confirmation.reuseScope === 'FUTURE_IDENTICAL') {
+            try {
+                const refreshedPreview = await fetchPolicyPreviewGrouping(
+                    currentPolicyPreviewBaseParams
+                );
+                attachPolicyPreviewResults(currentReviewRows, refreshedPreview.previewRows);
+                currentAtomicRepoTransferProjection =
+                    refreshedPreview.atomicGroupProjection || currentAtomicRepoTransferProjection;
+                renderCurrentReviewRows();
+                renderPolicyPreviewGroups(refreshedPreview.grouping, {
+                    atomicGroupProjection: refreshedPreview.atomicGroupProjection
+                });
+            } catch (previewRefreshError) {
+                console.warn(
+                    '[submitPolicyPreviewDecision] Reusable decision refresh unavailable:',
+                    previewRefreshError
+                );
+                renderPolicyPreviewGroups(currentPolicyPreviewGrouping, {
+                    expandedGroupId: group.group_id
+                });
+            }
+        } else {
+            renderPolicyPreviewGroups(currentPolicyPreviewGrouping, {
+                expandedGroupId: group.group_id
+            });
+        }
 
         await Swal.fire({
             icon: 'success',
@@ -4027,7 +4115,8 @@ function renderPolicyPreviewGroupingSummary(
     grouping,
     decisionGroups = [],
     diagnosticGroups = [],
-    repoTransferDecisionCount = 0
+    repoTransferDecisionCount = 0,
+    inheritedApprovalGroups = []
 ) {
     const summary = grouping?.summary || {};
     const decisionsCount = decisionGroups.reduce(
@@ -4035,6 +4124,10 @@ function renderPolicyPreviewGroupingSummary(
         0
     );
     const diagnosticsCount = diagnosticGroups.reduce(
+        (total, group) => total + Number(group?.count || 0),
+        0
+    );
+    const inheritedApprovalCount = inheritedApprovalGroups.reduce(
         (total, group) => total + Number(group?.count || 0),
         0
     );
@@ -4061,6 +4154,13 @@ function renderPolicyPreviewGroupingSummary(
             ${
                 diagnosticsCount > 0
                     ? `<span class="badge text-bg-secondary">${escapeHtml(diagnosticsCount)} τεχνικές εκκρεμότητες</span>`
+                    : ''
+            }
+            ${
+                inheritedApprovalCount > 0
+                    ? `<span class="badge text-bg-success">${escapeHtml(
+                          inheritedApprovalCount
+                      )} βάσει παλιότερης έγκρισης HR</span>`
                     : ''
             }
             <span class="badge text-bg-light border">
@@ -4136,6 +4236,43 @@ function formatPolicyPreviewIntervals(row = {}, apoPrefix, eosPrefix, suffix = '
 }
 
 function renderPolicyPreviewDetailsRows(item = {}, reviewRow = null) {
+    const diagnostic = item.diagnostic_details || {};
+
+    if (diagnostic.check_type) {
+        const isInterday = diagnostic.check_type === 'INTERDAY_REST';
+        const dateText = isInterday
+            ? `${formatPolicyPreviewDate(diagnostic.current_date)} → ${formatPolicyPreviewDate(
+                  diagnostic.next_date
+              )}`
+            : formatPolicyPreviewDate(item.hmeromhnia);
+        const intervalText = [diagnostic.previous_end, diagnostic.next_start]
+            .filter(Boolean)
+            .join(' → ') || '-';
+
+        return [
+            ['Κωδικός εργαζομένου', item.employee_kodikos || '-'],
+            ['Ημερομηνία/ες', dateText],
+            ['Λήξη → επόμενη έναρξη', intervalText],
+            [
+                'Πραγματική ανάπαυση',
+                formatPolicyPreviewRestMinutes(diagnostic.measured_rest_minutes)
+            ],
+            [
+                'Ελάχιστη απαιτούμενη ανάπαυση',
+                formatPolicyPreviewRestMinutes(diagnostic.minimum_rest_minutes)
+            ]
+        ]
+            .map(
+                ([label, value]) => `
+                    <tr>
+                        <th class="text-start">${escapeHtml(label)}</th>
+                        <td>${escapeHtml(value)}</td>
+                    </tr>
+                `
+            )
+            .join('');
+    }
+
     const row = reviewRow || {};
     const proposedCategory =
         item.proposed_values?.kathgoria_ergasias_apologistika || '-';
@@ -4197,6 +4334,7 @@ function renderPolicyPreviewDetailsRows(item = {}, reviewRow = null) {
 
 function showPolicyPreviewItemDetails(item = {}) {
     const reviewRow = findPolicyPreviewReviewRow(item);
+    const isRestDiagnostic = Boolean(item?.diagnostic_details?.check_type);
     const note = reviewRow
         ? 'Εμφανίζονται τα στοιχεία που είναι ήδη διαθέσιμα στο τρέχον read-only response της σελίδας.'
         : 'Τα πλήρη στοιχεία της εγγραφής δεν είναι διαθέσιμα στο τρέχον response. Για πλήρη στοιχεία ProdhlomenaOrariaModel θα χρειαστεί ξεχωριστό read-only endpoint.';
@@ -4205,14 +4343,18 @@ function showPolicyPreviewItemDetails(item = {}) {
             <table class="table table-sm table-bordered align-middle mb-2">
                 <tbody>
                     ${renderPolicyPreviewDetailsRows(item, reviewRow)}
-                    <tr>
-                        <th class="text-start">Προτεινόμενες τιμές</th>
-                        <td>${renderPolicyPreviewCompactValues(item.proposed_values)}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-start">Ενδείξεις</th>
-                        <td>${renderPolicyPreviewFlags(item.flags)}</td>
-                    </tr>
+                    ${
+                        isRestDiagnostic
+                            ? ''
+                            : `<tr>
+                                <th class="text-start">Προτεινόμενες τιμές</th>
+                                <td>${renderPolicyPreviewCompactValues(item.proposed_values)}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-start">Ενδείξεις</th>
+                                <td>${renderPolicyPreviewFlags(item.flags)}</td>
+                            </tr>`
+                    }
                 </tbody>
             </table>
             <div class="small text-muted">
@@ -4239,9 +4381,85 @@ function showPolicyPreviewItemDetails(item = {}) {
     new bootstrap.Modal(document.getElementById('detailsModal')).show();
 }
 
+function formatPolicyPreviewRestMinutes(value) {
+    const minutes = Number(value);
+    if (!Number.isFinite(minutes)) return 'Δεν υπολογίστηκε — αναμένονται πλήρη χτυπήματα';
+
+    const absoluteMinutes = Math.abs(Math.round(minutes));
+    const hoursPart = Math.floor(absoluteMinutes / 60);
+    const minutesPart = absoluteMinutes % 60;
+    const sign = minutes < 0 ? '-' : '';
+
+    return `${sign}${hoursPart} ώρες ${minutesPart} λεπτά`;
+}
+
+function renderRestPeriodPolicyPreviewGroupItems(items = [], groupIndex = 0) {
+    return `
+        <table class="table table-sm table-bordered align-middle mb-0 policy-preview-items-table">
+            <thead class="table-light">
+                <tr>
+                    <th>Κωδικός</th>
+                    <th>Ημερομηνία/ες</th>
+                    <th>Λήξη → έναρξη</th>
+                    <th>Πραγματική ανάπαυση</th>
+                    <th>Απαιτούμενη</th>
+                    <th>Στοιχεία</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items
+                    .map((item, itemIndex) => {
+                        const diagnostic = item.diagnostic_details || {};
+                        const isInterday = diagnostic.check_type === 'INTERDAY_REST';
+                        const dates = isInterday
+                            ? `${formatPolicyPreviewDate(
+                                  diagnostic.current_date
+                              )} → ${formatPolicyPreviewDate(diagnostic.next_date)}`
+                            : formatPolicyPreviewDate(item.hmeromhnia);
+                        const interval = [diagnostic.previous_end, diagnostic.next_start]
+                            .filter(Boolean)
+                            .join(' → ') || '-';
+
+                        return `
+                            <tr>
+                                <td>${escapeHtml(item.employee_kodikos || '-')}</td>
+                                <td>${escapeHtml(dates)}</td>
+                                <td>${escapeHtml(interval)}</td>
+                                <td>${escapeHtml(
+                                    formatPolicyPreviewRestMinutes(
+                                        diagnostic.measured_rest_minutes
+                                    )
+                                )}</td>
+                                <td>${escapeHtml(
+                                    formatPolicyPreviewRestMinutes(
+                                        diagnostic.minimum_rest_minutes
+                                    )
+                                )}</td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary policy-preview-details-btn"
+                                        data-group-index="${escapeHtml(groupIndex)}"
+                                        data-item-index="${escapeHtml(itemIndex)}">
+                                        Προβολή
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    })
+                    .join('')}
+            </tbody>
+        </table>
+    `;
+}
+
 function renderPolicyPreviewGroupItems(items = [], groupIndex = 0) {
     if (!Array.isArray(items) || items.length === 0) {
         return '<div class="text-muted small p-2">Δεν υπάρχουν items για αυτή την ομάδα.</div>';
+    }
+
+    if (items.every((item) => item?.diagnostic_details?.check_type)) {
+        return renderRestPeriodPolicyPreviewGroupItems(items, groupIndex);
     }
 
     return `
@@ -5666,6 +5884,9 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
     const diagnosticGroups = indexedGroups.filter(
         ({ group }) => String(group.status || '').trim() === 'UNKNOWN_PATTERN'
     );
+    const inheritedApprovalGroups = indexedGroups.filter(
+        ({ group }) => Boolean(group?.reusable_decision?.approval_id)
+    );
     const renderGroupCard = ({ group, index }, { allowDecision = true } = {}) => {
         const groupElementId = `policyPreviewGroupItems-${index}`;
         const groupTitle = getPolicyPreviewGroupTitle(group);
@@ -5697,6 +5918,31 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                 <div
                     class="policy-preview-group-items ${isExpanded ? '' : 'd-none'} mt-2"
                     id="${escapeHtml(groupElementId)}">
+                    ${
+                        group?.reusable_decision?.approval_id
+                            ? `<div class="alert alert-success py-2 px-3 small mb-2">
+                                   <div class="fw-semibold">Εγκρίνεται βάσει παλιότερης απόφασης HR</div>
+                                   <div>
+                                       Από ${escapeHtml(
+                                           group.reusable_decision.approved_by_user_name || 'HR'
+                                       )} · ${escapeHtml(
+                                           formatPolicyPreviewDateTime(
+                                               group.reusable_decision.approved_at
+                                           )
+                                       )} · Απόφαση ${escapeHtml(
+                                           group.reusable_decision.approval_id
+                                       )}
+                                   </div>
+                                   ${
+                                       group.reusable_decision.notes
+                                           ? `<div>Σημειώσεις: ${escapeHtml(
+                                                 group.reusable_decision.notes
+                                             )}</div>`
+                                           : ''
+                                   }
+                               </div>`
+                            : ''
+                    }
                     ${allowDecision ? renderPolicyPreviewApprovalPanel(group, index) : ''}
                     ${renderPolicyPreviewGroupItems(group.items, index)}
                 </div>
@@ -5729,6 +5975,29 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
             </details>
         `
         : '';
+    const inheritedApprovalGroupsHtml = inheritedApprovalGroups.length
+        ? `
+            <details class="policy-preview-diagnostics-accordion mt-2">
+                <summary>
+                    Εγκρίθηκαν βάσει παλιότερης απόφασης HR
+                    <span class="badge text-bg-success ms-1">${escapeHtml(
+                        inheritedApprovalGroups.reduce(
+                            (total, entry) => total + Number(entry.group?.count || 0),
+                            0
+                        )
+                    )}</span>
+                </summary>
+                <div class="pt-2">
+                    <div class="small text-muted mb-2">
+                        Δεν απαιτείται νέα απόφαση. Η αντιστοίχιση έγινε στην ίδια εταιρεία, στο ίδιο παράρτημα και στο ίδιο σενάριο πολιτικής.
+                    </div>
+                    ${inheritedApprovalGroups
+                        .map((entry) => renderGroupCard(entry, { allowDecision: false }))
+                        .join('')}
+                </div>
+            </details>
+        `
+        : '';
     const showHistory = currentPolicyPreviewApprovalTotal > 0;
     const showDryRun =
         getPolicyPreviewApplyDryRunSummaryValue(
@@ -5750,7 +6019,8 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                     grouping,
                     decisionGroups.map(({ group }) => group),
                     diagnosticGroups.map(({ group }) => group),
-                    repoTransferDecisionCount
+                    repoTransferDecisionCount,
+                    inheritedApprovalGroups.map(({ group }) => group)
                 )}
                 <span class="policy-preview-main-toggle-label">Άνοιγμα / κλείσιμο</span>
             </summary>
@@ -5768,6 +6038,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                 ${showDryRun ? renderPolicyPreviewApplyDryRunSection() : ''}
                 <div class="fw-semibold mb-2">Αποφάσεις που εκκρεμούν</div>
                 ${decisionGroupsHtml}
+                ${inheritedApprovalGroupsHtml}
                 ${diagnosticGroupsHtml}
             </div>
         </details>

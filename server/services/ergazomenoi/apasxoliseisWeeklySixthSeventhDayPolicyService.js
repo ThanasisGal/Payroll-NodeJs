@@ -65,6 +65,17 @@ function analyzeWeeklySixthSeventhDay({
     if (factReasons.length > 0) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: factReasons, warnings: [], dailyFacts });
     }
+    if (dailyFacts.some((day) => day.cardVerificationStatus !== 'READY')) {
+        return Object.freeze({
+            policyVersion: POLICY_VERSION,
+            status: STATUS.NEEDS_HR_DECISION,
+            reasons: ['CARD_VERIFICATION_PENDING'],
+            warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))],
+            dailyFacts,
+            sixthDay: null,
+            seventhDay: null
+        });
+    }
     const actualDays = dailyFacts.filter((day) => day.countsAsActualWorkDay);
     if (actualDays.length <= 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: null });

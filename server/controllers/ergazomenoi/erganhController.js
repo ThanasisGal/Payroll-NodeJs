@@ -134,6 +134,9 @@ const {
     summarizeApasxoliseisPolicyPreviewResults
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewService');
 const {
+    buildRestPeriodPolicyPreviewRows
+} = require('../../services/ergazomenoi/apasxoliseisRestPeriodPreviewService');
+const {
     buildApasxoliseisPolicyPreviewGrouping
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService');
 const {
@@ -179,8 +182,12 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
     createPolicyPreviewApprovalRecord,
-    listPolicyPreviewApprovalRecords
+    listPolicyPreviewApprovalRecords,
+    listActiveReusablePolicyDecisionRecords
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService');
+const {
+    applyReusablePolicyDecisionsToPreviewRows
+} = require('../../services/ergazomenoi/apasxoliseisReusablePolicyDecisionService');
 const {
     runPolicyPreviewApplyDryRun
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyDryRunService');
@@ -208,9 +215,11 @@ const {
     buildDailyCompensationBreakdown
 } = require('../../services/ergazomenoi/apasxoliseisDailyCompensationBreakdownService');
 const {
-    hasIncompleteCardPair,
-    buildIncompleteCardSafeUpdate
+    buildPartialVerifiedCardUpdate
 } = require('../../services/ergazomenoi/apasxoliseisIncompleteCardSafetyService');
+const {
+    resolveCardPairVerification
+} = require('../../services/ergazomenoi/apasxoliseisCardPairResolverService');
 const ApasxoliseisCompanyPolicyRuleModel = require('../../models/apasxoliseisCompanyPolicyRule');
 
 const REPO_TRANSFER_APPLY_ERRORS = Object.freeze({
@@ -1754,27 +1763,19 @@ async function runWeeklyRepoPostCheck({
                 const isFullTimeProfile = isFullTimeWorkTerms(dailyProfile);
 
                 const update = {};
+                const hasUnresolvedCardPair = resolveCardPairVerification(
+                    row
+                ).hasUnresolvedCardEvidence;
 
-                if (hasIncompleteCardPair(row)) {
-                    Object.assign(update, buildIncompleteCardSafeUpdate());
-
-                    if (row.is_locked !== true) {
-                        bulkOps.push({
-                            updateOne: {
-                                filter: { _id: row._id },
-                                update: { $set: update },
-                                upsert: false
-                            }
-                        });
-                    }
-
-                    continue;
+                if (hasUnresolvedCardPair) {
+                    Object.assign(update, buildPartialVerifiedCardUpdate(row).update);
                 }
 
                 // Αδύνατος απολογιστικός χαρακτηρισμός: με δηλωμένες ώρες
                 // και πραγματική εργασία από κάρτες, το παλιό «ΜΕ» δεν
                 // επιτρέπεται να επιβιώνει σε καμία ημερήσια φάση.
                 if (
+                    !hasUnresolvedCardPair &&
                     isNonZeroHours(row.ores_ergasias) &&
                     cardsOresIsNonZero &&
                     String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΜΕ'
@@ -1787,11 +1788,21 @@ async function runWeeklyRepoPostCheck({
                     ? kathgoriaErgasias === 'ΑΝ'
                     : kathgoriaErgasias === 'ΜΕ' || kathgoriaErgasias === 'ΑΝ';
 
-                if (declaredNonWork && oresErgasiasIsZero && cardsOresIsZero) {
+                if (
+                    !hasUnresolvedCardPair &&
+                    declaredNonWork &&
+                    oresErgasiasIsZero &&
+                    cardsOresIsZero
+                ) {
                     pragmatikaRepo += 1;
-                } else if (declaredNonWork && oresErgasiasIsZero && cardsOresIsNonZero) {
+                } else if (
+                    !hasUnresolvedCardPair &&
+                    declaredNonWork &&
+                    oresErgasiasIsZero &&
+                    cardsOresIsNonZero
+                ) {
                     update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
-                } else if (isNoCardDeclaredWorkRow(row)) {
+                } else if (!hasUnresolvedCardPair && isNoCardDeclaredWorkRow(row)) {
                     const noCardsDisplayStatus = resolveNoCardsDisplayStatus(
                         row,
                         noCardsDisplayContext
@@ -2914,14 +2925,24 @@ function getEffectiveDailyWorkMinutesForApologistika(rec, ergazomenos = null) {
 // (νύχτα, αργίες, πρόσθετη εργασία, υπερεργασία, υπερωρίες).
 //
 // Κανόνας:
-// - Αν υπάρχει έστω ένα ελλιπές ζεύγος κάρτας, δεν μαντεύουμε την ώρα που
-//   λείπει και δεν παράγουμε payroll buckets για την ημέρα.
+// - Αν υπάρχει ελλιπές ζεύγος, χρησιμοποιούμε μόνο τα ανεξάρτητα πλήρη
+//   ζεύγη. Δεν μαντεύουμε την ώρα που λείπει και δεν συνδέουμε διαφορετικά
+//   slots μεταξύ τους.
 // - Με πλήρεις κάρτες χρησιμοποιούμε τις πραγματικές κάρτες και μόνο ως
 //   fallback ήδη έγκυρα απολογιστικά διαστήματα.
 // ============================================================
 function getPayrollCalculationIntervals(rec, ergazomenos = null) {
-    if (hasIncompleteCardPair(rec)) {
-        return [];
+    const verification = resolveCardPairVerification(rec);
+
+    if (verification.hasUnresolvedCardEvidence) {
+        return verification.completePairs.map((pair) => ({
+            index: Number(pair.pairNumber),
+            apo: pair.start,
+            eos: pair.end,
+            start: pair.startMinutes,
+            end: pair.isOvernight ? pair.endMinutes + 1440 : pair.endMinutes,
+            source: 'CARD_PARTIALLY_VERIFIED'
+        }));
     }
 
     const rawIntervals = getCardIntervals(rec, ergazomenos);
@@ -5653,13 +5674,14 @@ class erganhController {
                 filter.kodikos = String(kodikos).trim();
             }
 
-            await applyEmploymentDepartureScopeToFilters({
-                filters: [filter],
-                team: sessionTeam,
-                companyId,
-                ypokatasthma,
-                kodikos
-            });
+            const { descriptors: lifecycleDescriptors } =
+                await applyEmploymentDepartureScopeToFilters({
+                    filters: [filter],
+                    team: sessionTeam,
+                    companyId,
+                    ypokatasthma,
+                    kodikos
+                });
 
             const [rows, total] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
@@ -5725,6 +5747,44 @@ class erganhController {
                 (rowEndDates.length > 0
                     ? new Date(Math.max(...rowEndDates.map((date) => date.getTime())))
                     : null);
+            let restContextRows = rows;
+            const requestedPolicyCode = String(policy_code || '').trim();
+
+            if (
+                !requestedPolicyCode &&
+                kodikoiRows.length > 0 &&
+                periodStart &&
+                periodEnd
+            ) {
+                const restContextStart = new Date(
+                    periodStart.getTime() - 24 * 60 * 60 * 1000
+                );
+                const restContextEnd = new Date(
+                    periodEnd.getTime() + 24 * 60 * 60 * 1000
+                );
+                const restContextFilter = {
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    kodikos: mongoose.trusted({ $in: kodikoiRows }),
+                    hmeromhnia: mongoose.trusted({
+                        $gte: restContextStart,
+                        $lte: restContextEnd
+                    })
+                };
+
+                applyPostDepartureExclusionsToFilter(
+                    restContextFilter,
+                    lifecycleDescriptors
+                );
+                restContextRows = await ProdhlomenaOrariaModel.find(restContextFilter)
+                    .select(
+                        'team company_kod ypokatasthma kodikos hmeromhnia ' +
+                            'kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                            'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias'
+                    )
+                    .sort({ kodikos: 1, hmeromhnia: 1 })
+                    .lean();
+            }
             const scenarioContext =
                 periodStart && periodEnd
                     ? await buildNoCardsDisplayContext({
@@ -5760,13 +5820,27 @@ class erganhController {
                 companyWorksOnOptionalHoliday:
                     companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true
             };
-            const previewRows = buildApasxoliseisPolicyPreviewRows({
+            const basePreviewRows = buildApasxoliseisPolicyPreviewRows({
                 rows,
                 argiesByDateKey: scenarioContext.argiesByDateKey || new Map(),
                 companyFlags: normalizedCompanyFlags,
                 employeeContextByKodikos,
-                policyCode: String(policy_code || '').trim(),
+                policyCode: requestedPolicyCode,
                 defaultPolicyMode: String(mode || '').trim()
+            });
+            const restPreviewRows = requestedPolicyCode
+                ? []
+                : buildRestPeriodPolicyPreviewRows({
+                      rows: restContextRows,
+                      presentationRowIds: rows.map((row) => String(row._id || ''))
+                  });
+            const reusableDecisionRules = await listActiveReusablePolicyDecisionRecords({
+                session: req.session,
+                ypokatasthma: String(ypokatasthma || '').trim()
+            });
+            const previewRows = applyReusablePolicyDecisionsToPreviewRows({
+                rows: [...basePreviewRows, ...restPreviewRows],
+                rules: reusableDecisionRules
             });
             const summary = summarizeApasxoliseisPolicyPreviewResults(previewRows);
             const grouping = buildApasxoliseisPolicyPreviewGrouping(previewRows);
@@ -5910,7 +5984,11 @@ class erganhController {
             return res.status(201).json({
                 success: true,
                 approval_id: approval._id,
-                message: 'Η απόφαση καταγράφηκε επιτυχώς.'
+                reuse_scope: approval.reuse_scope,
+                message:
+                    approval.reuse_scope === 'FUTURE_IDENTICAL'
+                        ? 'Η απόφαση καταγράφηκε και θα χρησιμοποιείται σε μελλοντικές ίδιες περιπτώσεις.'
+                        : 'Η απόφαση καταγράφηκε επιτυχώς.'
             });
         } catch (error) {
             console.error('[createProdhlomenaOrariaPolicyPreviewApproval] ❌', error);
@@ -7787,25 +7865,46 @@ class erganhController {
                         parseInt(effectiveErgazomenos.evelikth_proselefsh || 0, 10) || 0
                 };
 
-                if (hasIncompleteCardPair(calculationRec)) {
-                    continue;
-                }
-
                 const preliminaryUpdate = {};
-                const preliminarySplitUpdate =
-                    checkBrokenProgramVsBrokenCards(preliminaryContext);
-                Object.assign(preliminaryUpdate, preliminarySplitUpdate);
-                if (Object.keys(preliminarySplitUpdate).length === 0) {
-                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 1));
-                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 2));
-                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 3));
+                if (
+                    resolveCardPairVerification(calculationRec)
+                        .hasUnresolvedCardEvidence
+                ) {
+                    Object.assign(
+                        preliminaryUpdate,
+                        buildPartialVerifiedCardUpdate(calculationRec).update
+                    );
+                } else {
+                    const preliminarySplitUpdate =
+                        checkBrokenProgramVsBrokenCards(preliminaryContext);
+                    Object.assign(preliminaryUpdate, preliminarySplitUpdate);
+                    if (Object.keys(preliminarySplitUpdate).length === 0) {
+                        Object.assign(
+                            preliminaryUpdate,
+                            checkEarlyOrLateCard(preliminaryContext, 1)
+                        );
+                        Object.assign(
+                            preliminaryUpdate,
+                            checkEarlyOrLateCard(preliminaryContext, 2)
+                        );
+                        Object.assign(
+                            preliminaryUpdate,
+                            checkEarlyOrLateCard(preliminaryContext, 3)
+                        );
+                    }
+                    Object.assign(
+                        preliminaryUpdate,
+                        checkContinuousVsBrokenCards(preliminaryContext)
+                    );
+                    Object.assign(
+                        preliminaryUpdate,
+                        checkBrokenProgramVsContinuousCards(preliminaryContext)
+                    );
+                    Object.assign(
+                        preliminaryUpdate,
+                        checkNoDeclaredScheduleCards(preliminaryContext)
+                    );
                 }
-                Object.assign(preliminaryUpdate, checkContinuousVsBrokenCards(preliminaryContext));
-                Object.assign(
-                    preliminaryUpdate,
-                    checkBrokenProgramVsContinuousCards(preliminaryContext)
-                );
-                Object.assign(preliminaryUpdate, checkNoDeclaredScheduleCards(preliminaryContext));
 
                 const weeklyRec = { ...calculationRec, ...preliminaryUpdate };
 
@@ -7842,39 +7941,24 @@ class erganhController {
                 };
 
                 const update = {};
+                const hasUnresolvedCardPair = resolveCardPairVerification(
+                    calculationRec
+                ).hasUnresolvedCardEvidence;
 
-                if (hasIncompleteCardPair(calculationRec)) {
-                    Object.assign(update, buildIncompleteCardSafeUpdate());
-
-                    if (!isDateInsideRange(rec.hmeromhnia, apoDate, eosDate)) continue;
-                    if (rec.is_locked === true) continue;
-
-                    bulkOps.push({
-                        updateOne: {
-                            filter: {
-                                _id: rec._id,
-                                team: sessionTeam,
-                                company_kod: companyId,
-                                kodikos: rec.kodikos,
-                                hmeromhnia: rec.hmeromhnia
-                            },
-                            update: { $set: update },
-                            upsert: false
-                        }
-                    });
-                    continue;
+                if (hasUnresolvedCardPair) {
+                    Object.assign(update, buildPartialVerifiedCardUpdate(calculationRec).update);
+                } else {
+                    const splitUpdate = checkBrokenProgramVsBrokenCards(context);
+                    Object.assign(update, splitUpdate);
+                    if (Object.keys(splitUpdate).length === 0) {
+                        Object.assign(update, checkEarlyOrLateCard(context, 1));
+                        Object.assign(update, checkEarlyOrLateCard(context, 2));
+                        Object.assign(update, checkEarlyOrLateCard(context, 3));
+                    }
+                    Object.assign(update, checkContinuousVsBrokenCards(context));
+                    Object.assign(update, checkBrokenProgramVsContinuousCards(context));
+                    Object.assign(update, checkNoDeclaredScheduleCards(context));
                 }
-
-                const splitUpdate = checkBrokenProgramVsBrokenCards(context);
-                Object.assign(update, splitUpdate);
-                if (Object.keys(splitUpdate).length === 0) {
-                    Object.assign(update, checkEarlyOrLateCard(context, 1));
-                    Object.assign(update, checkEarlyOrLateCard(context, 2));
-                    Object.assign(update, checkEarlyOrLateCard(context, 3));
-                }
-                Object.assign(update, checkContinuousVsBrokenCards(context));
-                Object.assign(update, checkBrokenProgramVsContinuousCards(context));
-                Object.assign(update, checkNoDeclaredScheduleCards(context));
 
                 // Από αυτό το σημείο και μετά οι υπολογισμοί πρέπει να βλέπουν το
                 // ήδη παραγμένο απολογιστικό ωράριο, όχι μόνο το αρχικό rec/raw cards.
@@ -7886,8 +7970,10 @@ class erganhController {
 
                 Object.assign(update, checkNightHours(workingContext));
                 Object.assign(update, checkSundayHolidayHours(workingContext));
-                Object.assign(update, checkRepoAdeiaAstheneiaApologistika(workingContext));
-                Object.assign(update, checkOresApoysias(workingContext));
+                if (!hasUnresolvedCardPair) {
+                    Object.assign(update, checkRepoAdeiaAstheneiaApologistika(workingContext));
+                    Object.assign(update, checkOresApoysias(workingContext));
+                }
 
                 const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
                 const weeklyState = weeklyStateMap.get(weekKey);

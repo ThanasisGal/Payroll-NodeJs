@@ -99,6 +99,14 @@ function testValidPayloadAccepted() {
     assert.strictEqual(normalized.decision_type, 'MARK_REVIEWED');
     assert.strictEqual(normalized.items.length, 1);
     assert.strictEqual(normalized.items[0].cards_ores_ergasias, 8);
+    assert.strictEqual(normalized.reuse_scope, 'ONE_TIME');
+}
+
+function testInvalidReuseScopeRejected() {
+    assertValidationError(
+        () => validatePolicyPreviewApprovalPayload(makePayload({ reuse_scope: 'FOREVER' })),
+        /εμβέλεια επαναχρησιμοποίησης/
+    );
 }
 
 function testDuplicatePreviewIdRejected() {
@@ -206,6 +214,103 @@ async function testCreateWritesOnlyToInjectedApprovalModel() {
     assert.strictEqual(createdRecord.company_kod, session.companyInUse);
     assert.strictEqual(createdRecord.decision_status, 'RECORDED');
     assert.strictEqual(createdRecord.items.length, 1);
+    assert.strictEqual(createdRecord.reuse_scope, 'ONE_TIME');
+    assert.strictEqual(createdRecord.reuse_status, 'NOT_APPLICABLE');
+}
+
+async function testReusableApprovalStoresServerFingerprintAndAuditScope() {
+    const lookups = [];
+    let createdRecord = null;
+    const fakeApprovalModel = {
+        findOne(filter) {
+            lookups.push(filter);
+            return {
+                select() {
+                    return { lean: async () => null };
+                }
+            };
+        },
+        async create(record) {
+            createdRecord = record;
+            return { _id: 'reusable-approval-id', ...record };
+        }
+    };
+
+    await createPolicyPreviewApprovalRecord({
+        session,
+        payload: makePayload({
+            ypokatasthma: '0000',
+            reuse_scope: 'FUTURE_IDENTICAL',
+            items: [makeItem({ proposed_values: {} })]
+        }),
+        approvalModel: fakeApprovalModel
+    });
+
+    assert.strictEqual(lookups.length, 2);
+    assert.strictEqual(createdRecord.reuse_scope, 'FUTURE_IDENTICAL');
+    assert.strictEqual(createdRecord.reuse_status, 'ACTIVE');
+    assert.strictEqual(createdRecord.reuse_fingerprint.length, 64);
+    assert.strictEqual(createdRecord.reuse_match_criteria.ypokatasthma, '0000');
+    assert.strictEqual(
+        createdRecord.reuse_effective_from.toISOString(),
+        '2026-06-01T00:00:00.000Z'
+    );
+}
+
+async function testReusableApprovalRejectsLegalRestAndDataChanges() {
+    const fakeApprovalModel = {
+        findOne() {
+            throw new Error('DB lookup must not run for invalid reusable approval');
+        }
+    };
+
+    await assert.rejects(
+        () =>
+            createPolicyPreviewApprovalRecord({
+                session,
+                payload: makePayload({
+                    ypokatasthma: '0000',
+                    reuse_scope: 'FUTURE_IDENTICAL',
+                    group: {
+                        ...makePayload().group,
+                        policy_code: 'INTERDAY_MINIMUM_REST',
+                        reason_code: 'INTERDAY_REST_BELOW_MINIMUM'
+                    },
+                    items: [makeItem({ proposed_values: {} })]
+                }),
+                approvalModel: fakeApprovalModel
+            }),
+        /ανάπαυσης/
+    );
+
+    await assert.rejects(
+        () =>
+            createPolicyPreviewApprovalRecord({
+                session,
+                payload: makePayload({
+                    ypokatasthma: '0000',
+                    reuse_scope: 'FUTURE_IDENTICAL'
+                }),
+                approvalModel: fakeApprovalModel
+            }),
+        /μεταβάλλει δεδομένα/
+    );
+}
+
+async function testReusableApprovalRequiresHrAdminOrSupervisorRole() {
+    await assert.rejects(
+        () =>
+            createPolicyPreviewApprovalRecord({
+                session: { ...session, userRole: 'U' },
+                payload: makePayload({
+                    ypokatasthma: '0000',
+                    reuse_scope: 'FUTURE_IDENTICAL',
+                    items: [makeItem({ proposed_values: {} })]
+                }),
+                approvalModel: {}
+            }),
+        (error) => error.statusCode === 403 && /HR, Admin ή Supervisor/.test(error.message)
+    );
 }
 
 async function run() {
@@ -213,12 +318,16 @@ async function run() {
     testInvalidDecisionTypeRejected();
     testInvalidItemsRejected();
     testValidPayloadAccepted();
+    testInvalidReuseScopeRejected();
     testDuplicatePreviewIdRejected();
     testItemOutsidePeriodRejected();
     testInactiveSessionRejected();
     testMissingOrInvalidSessionUserIdRejected();
     testListingFilterUsesSessionScope();
     await testCreateWritesOnlyToInjectedApprovalModel();
+    await testReusableApprovalStoresServerFingerprintAndAuditScope();
+    await testReusableApprovalRejectsLegalRestAndDataChanges();
+    await testReusableApprovalRequiresHrAdminOrSupervisorRole();
     console.log('apasxoliseis policy preview approval service tests passed');
 }
 

@@ -8,7 +8,12 @@ const {
 } = require('./apasxoliseisCompanyPolicyRuleService');
 
 const POLICY_VERSION = 'daily-cumulative-compensation-breakdown:v2';
-const STATUS = Object.freeze({ READY: 'READY', NEEDS_HR_DECISION: 'NEEDS_HR_DECISION' });
+const STATUS = Object.freeze({
+    READY: 'READY',
+    PARTIALLY_VERIFIED: 'PARTIALLY_VERIFIED',
+    UNVERIFIED: 'UNVERIFIED',
+    NEEDS_HR_DECISION: 'NEEDS_HR_DECISION'
+});
 
 function numberOrNull(value) {
     if (value === null || value === undefined || String(value).trim() === '') return null;
@@ -154,10 +159,15 @@ function buildDailyCompensationBreakdown({
         ? null
         : money(baseWorkAmount + premiumTotalAmount);
     const hasBlockingReason = reasons.length > 0;
+    const verificationStatus = [STATUS.PARTIALLY_VERIFIED, STATUS.UNVERIFIED].includes(
+        facts.cardVerificationStatus
+    )
+        ? facts.cardVerificationStatus
+        : STATUS.READY;
 
     return Object.freeze({
         policyVersion: POLICY_VERSION,
-        status: reasons.length > 0 ? STATUS.NEEDS_HR_DECISION : STATUS.READY,
+        status: hasBlockingReason ? STATUS.NEEDS_HR_DECISION : verificationStatus,
         reasons: [...new Set(reasons)],
         warnings: [...new Set(warnings)],
         hours: {

@@ -9,6 +9,8 @@ const row = {
     kathgoria_ergasias: 'ΕΡΓ',
     ores_ergasias: 8,
     cards_ores_ergasias: 10,
+    cards_apo_ora_01: '09:00',
+    cards_eos_ora_01: '19:00',
     ores_nyxtas_apologistika: 2,
     ores_argion_prosayxhsh_apologistika: 2,
     ores_argion_ergasia_apologistika: 0
@@ -36,6 +38,27 @@ assert.strictEqual(result.accumulationRule, 'BASE_ONCE_PREMIUMS_CUMULATIVE');
 result = buildDailyCompensationBreakdown({
     row: {
         company_kod: 'COMPANY-1',
+        hmeromhnia: '2026-08-01',
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 4,
+        cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: '13:00',
+        cards_apo_ora_02: '16:00',
+        cards_eos_ora_02: ''
+    },
+    paidHourlyRate: 10,
+    legalHourlyRate: 8
+});
+assert.strictEqual(result.status, 'PARTIALLY_VERIFIED');
+assert.strictEqual(result.hours.actualWorkHours, 4);
+assert.strictEqual(result.amounts.baseActualWorkAmount, 40);
+assert.strictEqual(result.amounts.grossWorkAmount, 40);
+assert.ok(result.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
+
+result = buildDailyCompensationBreakdown({
+    row: {
+        company_kod: 'COMPANY-1',
         hmeromhnia: '2026-08-02',
         kathgoria_ergasias: 'ΑΡΓΙΑ',
         argia: true,
@@ -58,7 +81,9 @@ result = buildDailyCompensationBreakdown({
         kathgoria_ergasias: 'ΑΔΕΙΑ',
         adeia: true,
         ores_ergasias: 8,
-        cards_ores_ergasias: 4
+        cards_ores_ergasias: 4,
+        cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: '13:00'
     },
     paidHourlyRate: 10,
     legalHourlyRate: 8
@@ -68,7 +93,7 @@ assert.ok(result.reasons.includes('FULL_DAY_LEAVE_WITH_CARD_WORK_REQUIRES_HR_DEC
 assert.strictEqual(result.amounts.grossWorkAmount, null);
 
 result = buildDailyCompensationBreakdown({
-    row: { ...row, cards_ores_ergasias: 8 },
+    row: { ...row, cards_ores_ergasias: 8, cards_eos_ora_01: '17:00' },
     paidHourlyRate: 10,
     legalHourlyRate: 8,
     companyRules: [{
