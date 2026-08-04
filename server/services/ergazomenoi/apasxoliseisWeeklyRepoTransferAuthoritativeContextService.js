@@ -156,13 +156,11 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
         new Set(profiles.map(profileSignature)).size > 1 ||
         profileSignature(first) !== profileSignature(sundayProfile);
     const effective = {
-        ...(profiles[0] || first),
+        ...sundayProfile,
         profile_changed_inside_week: profileChangedInsideWeek
     };
     const contractualWeeklyWorkdays = Number(effective.hmeres_ergasias_ebdomadas);
-    const expectedWeeklyRepo = profileChangedInsideWeek
-        ? null
-        : Number.isSafeInteger(contractualWeeklyWorkdays) &&
+    const expectedWeeklyRepo = Number.isSafeInteger(contractualWeeklyWorkdays) &&
             contractualWeeklyWorkdays >= 1 &&
             contractualWeeklyWorkdays <= 6
           ? 7 - contractualWeeklyWorkdays
@@ -171,14 +169,12 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
         expectedWeeklyRepo,
         repoResolutionSource:
             expectedWeeklyRepo === null ? null : 'CONTRACTUAL_WEEKLY_WORKDAYS',
-        repoResolutionReason: profileChangedInsideWeek
-            ? 'PROFILE_CHANGED_INSIDE_WEEK'
-            : expectedWeeklyRepo === null
+        repoResolutionReason: expectedWeeklyRepo === null
                 ? 'INVALID_EFFECTIVE_WEEKLY_WORKDAYS'
                 : null,
         profileChangedInsideWeek,
         effectiveProfile: effective,
-        effectiveProfileDate: getProfileDateForDeviation(effective, week.weekStart),
+        effectiveProfileDate: getProfileDateForDeviation(effective, sunday),
         previousProfile: first,
         previousProfileDate: getProfileDateForDeviation(first, week.weekStart)
     };

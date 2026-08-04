@@ -1680,6 +1680,12 @@ async function runWeeklyRepoPostCheck({
             : false;
     });
 
+    const postCheckArgiesDateSet = new Set(
+        rows
+            .filter((row) => row.argia === true || row.argia_apologistika === true)
+            .map((row) => dateKeyUtc(row.hmeromhnia))
+    );
+
     result.recordsChecked = rows.length;
 
     const companyPolicyRules = await ApasxoliseisCompanyPolicyRuleModel.find({
@@ -1827,6 +1833,22 @@ async function runWeeklyRepoPostCheck({
                 const isSixthDay = sixthSeventhAnalysis?.sixthDay?.hmeromhnia === rowDateKey;
                 const isSeventhDay =
                     sixthSeventhAnalysis?.seventhDay?.hmeromhnia === rowDateKey;
+                const weeklyIllegalOvertimeHours = isSixthDay
+                    ? sixthSeventhAnalysis.sixthDay.illegalOvertimeHours
+                    : isSeventhDay
+                      ? sixthSeventhAnalysis.seventhDay.illegalOvertimeHours
+                      : 0;
+                if (weeklyIllegalOvertimeHours > 0) {
+                    Object.assign(
+                        update,
+                        buildWeeklyIllegalOvertimeUpdate(
+                            { ...row, ...update },
+                            dailyProfile,
+                            weeklyIllegalOvertimeHours,
+                            postCheckArgiesDateSet
+                        )
+                    );
+                }
                 const compensationBreakdown = buildDailyCompensationBreakdown({
                     row: { ...row, ...update },
                     companyKod: companyId,
@@ -1836,11 +1858,7 @@ async function runWeeklyRepoPostCheck({
                     sixthDayHours: isSixthDay
                         ? sixthSeventhAnalysis.sixthDay.sixthDayHours
                         : 0,
-                    weeklyIllegalOvertimeHours: isSixthDay
-                        ? sixthSeventhAnalysis.sixthDay.illegalOvertimeHours
-                        : isSeventhDay
-                          ? sixthSeventhAnalysis.seventhDay.illegalOvertimeHours
-                          : 0,
+                    weeklyIllegalOvertimeHours,
                     sixthDayMandatoryRatePercent:
                         dailyProfile.pososto_prosayxhshs_6hs_hmeras,
                     companyRules: companyPolicyRules,
@@ -2399,6 +2417,37 @@ function toHours(minutes) {
     return +(minutes / 60).toFixed(2);
 }
 
+function buildWeeklyIllegalOvertimeUpdate(
+    rec,
+    workTerms,
+    illegalOvertimeHours,
+    argiesDateSet
+) {
+    const targetMinutes = Math.max(0, Math.round(Number(illegalOvertimeHours || 0) * 60));
+    const workedMinutes = [];
+
+    for (const interval of getPayrollCalculationIntervals(rec, workTerms)) {
+        for (let minute = interval.start; minute < interval.end; minute++) {
+            workedMinutes.push(minute);
+        }
+    }
+
+    const illegalMinutes = workedMinutes.slice(Math.max(0, workedMinutes.length - targetMinutes));
+    const classified = emptyClassifiedMinutes();
+    for (const minute of illegalMinutes) {
+        addClassifiedMinute(classified, rec, minute, argiesDateSet);
+    }
+
+    return {
+        ores_paranomhs_yperorias_apologistika: toHours(classified.normal),
+        ores_paranomhs_yperorias_nyxtas_apologistika: toHours(classified.night),
+        ores_paranomhs_yperorias_argion_apologistika: toHours(classified.holiday),
+        ores_paranomhs_yperorias_argion_nyxtas_apologistika: toHours(
+            classified.holidayNight
+        )
+    };
+}
+
 function chunkArray(arr, size = 300) {
     const chunks = [];
 
@@ -2470,12 +2519,14 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     const declaredMinutes = getDailyDeclaredMinutes(rec);
     const dailyCardsMinutes = getPayrollDailyWorkMinutes(rec, ergazomenos);
 
-    // Βάση ημέρας για το πότε ξεκινάει το extra:
-    // - Αν υπάρχει προδηλωμένο πρόγραμμα, ξεκινάμε μετά τα προδηλωμένα λεπτά.
-    // - Αν δεν υπάρχει προδηλωμένο, ξεκινάμε μετά το συμβατικό ημερήσιο όριο
-    //   του εργαζομένου από τους effective όρους εργασίας/ιστορικό.
-    const baseWorkMinutes =
-        declaredMinutes > 0 ? declaredMinutes : rules.contractualDailyLimitMinutes;
+    // Στην πλήρη απασχόληση η μικρότερη προδήλωση δεν επιτρέπεται να κατεβάζει
+    // τη συμβατική ημερήσια βάση και να δημιουργεί πλασματική υπερεργασία.
+    // Η απόκλιση από το προδηλωμένο πρόγραμμα ελέγχεται χωριστά.
+    const baseWorkMinutes = employmentTypeForAdditional === 'FULL'
+        ? rules.contractualDailyLimitMinutes
+        : declaredMinutes > 0
+            ? declaredMinutes
+            : rules.contractualDailyLimitMinutes;
 
     const regularDay = isRegularWorkingDayForOverwork(rec, ergazomenos);
 

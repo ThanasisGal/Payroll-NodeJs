@@ -81,9 +81,9 @@ function testCanonicalWeeklyProfile() {
         { _id: 'h2', hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-06-18'), kathestos_apasxolhshs: '1', hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 30 }
     ];
     const changed = getWeeklyRepoProfileInfo({ week, istorikoRows: history, ergazomenos: employee });
-    assert.strictEqual(String(changed.effectiveProfile.istorikoId), 'h1');
-    assert.strictEqual(changed.expectedWeeklyRepo, null);
-    assert.strictEqual(changed.repoResolutionReason, 'PROFILE_CHANGED_INSIDE_WEEK');
+    assert.strictEqual(String(changed.effectiveProfile.istorikoId), 'h2');
+    assert.strictEqual(changed.expectedWeeklyRepo, 1);
+    assert.strictEqual(changed.repoResolutionReason, null);
     assert.strictEqual(changed.profileChangedInsideWeek, true);
     assert.strictEqual(
         changed.effectiveProfileDate,

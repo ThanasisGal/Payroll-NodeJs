@@ -854,17 +854,17 @@ function applyWeeklySixthSeventhDayFacts(
             day.mo_oron_hmerhsias_ergasias,
             day.pososto_prosayxhshs_6hs_hmeras
         ].join('|')));
-        const first = days[0];
+        const sunday = days[days.length - 1];
         const analysis = analyzeWeeklySixthSeventhDay({
             weekRows: days.map((day) => ({
                 ...(orariaByDate.get(day.date) || {}),
                 hmeromhnia: day.date
             })),
             effectiveProfile: {
-                hmeres_ergasias_ebdomadas: first.hmeres_ergasias_ebdomadas,
+                hmeres_ergasias_ebdomadas: sunday.hmeres_ergasias_ebdomadas,
                 pososto_prosayxhshs_6hs_hmeras:
-                    first.pososto_prosayxhshs_6hs_hmeras,
-                source: first.termsSource,
+                    sunday.pososto_prosayxhshs_6hs_hmeras,
+                source: sunday.termsSource,
                 profile_changed_inside_week: signatures.size > 1
             }
         });

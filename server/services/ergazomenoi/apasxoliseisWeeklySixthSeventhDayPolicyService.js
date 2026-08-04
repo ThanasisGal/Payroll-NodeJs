@@ -20,15 +20,29 @@ function selectSixthDay(candidates) {
     const cardProvenCandidates = candidates
         .filter((day) => day.cardHours > 0)
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
-    const day = cardProvenCandidates[cardProvenCandidates.length - 1] || null;
+    const standardCandidates = cardProvenCandidates.filter(
+        (day) => day.actualWorkHours > 5 && day.actualWorkHours <= 8
+    );
+    const day = standardCandidates[standardCandidates.length - 1] || null;
 
     if (day) {
+        return { day, warnings: [] };
+    }
+
+    const fallback = [...cardProvenCandidates].sort((a, b) => {
+        const distance = Math.abs(b.actualWorkHours - 8) - Math.abs(a.actualWorkHours - 8);
+        return distance || a.hmeromhnia.localeCompare(b.hmeromhnia);
+    }).at(-1) || null;
+
+    if (fallback) {
         return {
-            day,
-            warnings:
-                day.actualWorkHours > 8
+            day: fallback,
+            warnings: [
+                'SIXTH_DAY_NO_STANDARD_CANDIDATE_CLOSEST_TO_EIGHT',
+                ...(fallback.actualWorkHours > 8
                     ? ['SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT']
-                    : []
+                    : [])
+            ]
         };
     }
 
@@ -51,9 +65,6 @@ function analyzeWeeklySixthSeventhDay({
         dates.some((date) => getMondaySundayWeekRange(date)?.weekStartKey !== range.weekStartKey)
     ) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'], warnings: [], dailyFacts: [] });
-    }
-    if (effectiveProfile.profile_changed_inside_week === true) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['PROFILE_CHANGED_INSIDE_WEEK'], warnings: [], dailyFacts: [] });
     }
     if (Number(effectiveProfile.hmeres_ergasias_ebdomadas) !== 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [], dailyFacts: [] });

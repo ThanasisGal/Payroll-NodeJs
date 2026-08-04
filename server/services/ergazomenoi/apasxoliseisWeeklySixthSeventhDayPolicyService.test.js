@@ -48,7 +48,17 @@ assert.strictEqual(analyzeWeeklySixthSeventhDay({
     weekRows: laterCardHoursOverEight,
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
-}).sixthDay.hmeromhnia, '2026-08-01');
+}).sixthDay.hmeromhnia, '2026-07-31');
+
+const productionSevenDayExample = week([8.60, 7.97, 6.48, 7.32, 7.42, 8.12, 6.78]);
+result = analyzeWeeklySixthSeventhDay({
+    weekRows: productionSevenDayExample,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
+    hourlyRate: 10
+});
+assert.strictEqual(result.sixthDay.hmeromhnia, '2026-07-31');
+assert.strictEqual(result.sixthDay.actualWorkHours, 7.42);
+assert.strictEqual(result.seventhDay.hmeromhnia, '2026-08-02');
 
 const incompleteInterval = week([7, 7, 7, 7, 7, 7, 0]);
 incompleteInterval[5].cards_eos_ora_01 = '';
@@ -128,7 +138,7 @@ result = analyzeWeeklySixthSeventhDay({
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
 });
-assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
+assert.strictEqual(result.sixthDay.hmeromhnia, '2026-07-31');
 
 const declaredOverEight = week([9, 9, 9, 9, 9, 9, 0]);
 declaredOverEight[5].ores_ergasias = 9;
@@ -208,7 +218,6 @@ assert.strictEqual(result.status, 'READY');
 assert.strictEqual(result.sixthDay.value, 77);
 
 result = analyze([7, 7, 7, 7, 7, 7, 0], { profile_changed_inside_week: true });
-assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
-assert.ok(result.reasons.includes('PROFILE_CHANGED_INSIDE_WEEK'));
+assert.strictEqual(result.status, 'READY');
 
 console.log('weekly sixth/seventh-day policy tests passed');
