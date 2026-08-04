@@ -16,6 +16,13 @@ function validRate(value) {
     return Number.isFinite(rate) && rate >= 0 ? rate : null;
 }
 
+function resolveSeventhDayIllegalOvertimeHours(day) {
+    const declaredHours = Number(day?.declaredWorkHours);
+    return Number.isFinite(declaredHours) && declaredHours >= 0
+        ? declaredHours
+        : Number(day?.actualWorkHours || 0);
+}
+
 function selectSixthDay(candidates) {
     const cardProvenCandidates = candidates
         .filter((day) => day.cardHours > 0)
@@ -162,6 +169,9 @@ function analyzeWeeklySixthSeventhDay({
     const sixthDayValue = baseAmount === null
         ? null
         : Number((baseAmount + premiumAmount).toFixed(2));
+    const seventhDayIllegalOvertimeHours = seventhDay
+        ? resolveSeventhDayIllegalOvertimeHours(seventhDay)
+        : 0;
     return Object.freeze({
         policyVersion: POLICY_VERSION,
         status: STATUS.READY,
@@ -186,7 +196,7 @@ function analyzeWeeklySixthSeventhDay({
                   ...seventhDay,
                   severity: 'SERIOUS_VIOLATION',
                   classification: 'SEVENTH_DAY_ILLEGAL_OVERTIME',
-                  illegalOvertimeHours: seventhDay.actualWorkHours
+                  illegalOvertimeHours: seventhDayIllegalOvertimeHours
               }
             : null
     });
@@ -197,6 +207,7 @@ module.exports = {
     STATUS,
     ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES,
     validRate,
+    resolveSeventhDayIllegalOvertimeHours,
     selectSixthDay,
     analyzeWeeklySixthSeventhDay
 };

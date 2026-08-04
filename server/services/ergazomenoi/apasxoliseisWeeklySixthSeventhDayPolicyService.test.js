@@ -197,9 +197,39 @@ assert.strictEqual(result.seventhDay.hmeromhnia, '2026-08-02');
 assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
 assert.ok(result.warnings.includes('SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'));
 assert.strictEqual(result.seventhDay.actualWorkHours, 9);
-assert.strictEqual(result.seventhDay.illegalOvertimeHours, 9);
+assert.strictEqual(result.seventhDay.illegalOvertimeHours, 8);
 assert.strictEqual(result.seventhDay.severity, 'SERIOUS_VIOLATION');
 assert.strictEqual(result.seventhDay.classification, 'SEVENTH_DAY_ILLEGAL_OVERTIME');
+
+const employee0004RegressionWeek = week([8.60, 7.97, 6.48, 7.32, 7.42, 8.12, 7.28]);
+employee0004RegressionWeek.forEach((day, index) => {
+    const date = new Date('2026-06-15T00:00:00.000Z');
+    date.setUTCDate(date.getUTCDate() + index);
+    day.hmeromhnia = date.toISOString().slice(0, 10);
+    day.ores_ergasias = [8.60, 7.97, 6.48, 7.32, 7.42, 8.12, 6.78][index];
+});
+Object.assign(employee0004RegressionWeek[6], {
+    cards_apo_ora_01: '15:40',
+    cards_eos_ora_01: '22:57',
+    cards_ores_ergasias: 7.28,
+    ores_nyxtas_apologistika: 0.45,
+    ores_argion_prosayxhsh_apologistika: 6.78
+});
+const regressionInput = {
+    weekRows: employee0004RegressionWeek,
+    effectiveProfile: {
+        hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40
+    },
+    hourlyRate: 10
+};
+const firstRegressionResult = analyzeWeeklySixthSeventhDay(regressionInput);
+const secondRegressionResult = analyzeWeeklySixthSeventhDay(regressionInput);
+assert.strictEqual(firstRegressionResult.sixthDay.hmeromhnia, '2026-06-19');
+assert.strictEqual(firstRegressionResult.seventhDay.hmeromhnia, '2026-06-21');
+assert.strictEqual(firstRegressionResult.seventhDay.actualWorkHours, 7.28);
+assert.strictEqual(firstRegressionResult.seventhDay.illegalOvertimeHours, 6.78);
+assert.deepStrictEqual(secondRegressionResult, firstRegressionResult);
 
 for (const noLongerExempt of ['0018', '0020', '0021']) {
     result = analyze([7, 7, 7, 7, 7, 7, 0], {

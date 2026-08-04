@@ -1,4 +1,5 @@
 	<% const safe = (k) => (ergazomenoiData && ergazomenoiData[k]) || ''; %>
+	<% const actualOrLegal = (actual, legal) => actual !== null && actual !== undefined && actual !== '' ? actual : legal; %>
 	<div id="editApodoxesTomDropdownScope">
 
 	<input type="hidden" name="kodikosSymbashs_Kathgorias_Eidikothtas" id="kodikosSymbashs_Kathgorias_Eidikothtas" />
@@ -249,7 +250,7 @@
 			</label>
 		</div>
 		<div class="col-1-5">
-			<input type="number" class="form-control input-contents right-align bg-2b97001e clearAble" name="pragmatikosMisthos" id="pragmatikosMisthos" value="<%= parseFloat(ergazomenoiData.pragmatikosMisthos || 0).toFixed(2) %>" readonly />
+			<input type="number" class="form-control input-contents right-align bg-2b97001e clearAble" name="pragmatikosMisthos" id="pragmatikosMisthos" value="<%= parseFloat(actualOrLegal(ergazomenoiData.pragmatikosMisthos, ergazomenoiData.nomimosMisthos) || 0).toFixed(2) %>" readonly />
 		</div>
 
 		<div class="col-0-5"></div>
@@ -260,7 +261,7 @@
 			</label>
 		</div>
 		<div class="col-1-5">
-			<input type="number" class="form-control input-contents right-align bg-2b97001e clearAble" name="pragmatikoHmeromisthio" id="pragmatikoHmeromisthio" value="<%= parseFloat(ergazomenoiData.pragmatikoHmeromisthio || 0).toFixed(2) %>" readonly />
+			<input type="number" class="form-control input-contents right-align bg-2b97001e clearAble" name="pragmatikoHmeromisthio" id="pragmatikoHmeromisthio" value="<%= parseFloat(actualOrLegal(ergazomenoiData.pragmatikoHmeromisthio, ergazomenoiData.nomimoHmeromisthio) || 0).toFixed(4) %>" readonly />
 		</div>
 
 		<div class="col-0-5"></div>
@@ -276,7 +277,7 @@
 				class="form-control input-contents right-align bg-2b97001e clearAble manual-oromisthio-input"
 				name="pragmatikoOromisthio" 
 				id="pragmatikoOromisthio" 
-				value="<%= parseFloat(ergazomenoiData.pragmatikoOromisthio || 0).toFixed(4) %>" 
+				value="<%= parseFloat(actualOrLegal(ergazomenoiData.pragmatikoOromisthio, ergazomenoiData.nomimoOromisthio) || 0).toFixed(4) %>"
 				readonly 
 				title="F9: Επεξεργασία | F10: Οριστικοποίηση"
 			/>
@@ -284,6 +285,9 @@
 	</div>
 
 	<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+		<div class="col-12 text-end">
+			<small class="text-danger">F9: Τροποποίηση Πραγματικού Ωρομισθίου / F10: Οριστικοποίηση</small>
+		</div>
 		<div class="col-9"></div>
 
 		<button type="button" class="btn btn-brown rounded-4 mt-2 w-20 buttons-content" name="reCalcButton" id="reCalcButton">

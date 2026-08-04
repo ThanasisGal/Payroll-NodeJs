@@ -216,6 +216,9 @@ const {
     analyzeWeeklySixthSeventhDay
 } = require('../../services/ergazomenoi/apasxoliseisWeeklySixthSeventhDayPolicyService');
 const {
+    buildWeeklyIllegalOvertimePersistenceMapping
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyIllegalOvertimeMappingService');
+const {
     buildDailyCompensationBreakdown
 } = require('../../services/ergazomenoi/apasxoliseisDailyCompensationBreakdownService');
 const {
@@ -1845,7 +1848,8 @@ async function runWeeklyRepoPostCheck({
                             { ...row, ...update },
                             dailyProfile,
                             weeklyIllegalOvertimeHours,
-                            postCheckArgiesDateSet
+                            postCheckArgiesDateSet,
+                            { clearOverlappingLegal: isSeventhDay }
                         )
                     );
                 }
@@ -2421,7 +2425,8 @@ function buildWeeklyIllegalOvertimeUpdate(
     rec,
     workTerms,
     illegalOvertimeHours,
-    argiesDateSet
+    argiesDateSet,
+    options = {}
 ) {
     const targetMinutes = Math.max(0, Math.round(Number(illegalOvertimeHours || 0) * 60));
     const workedMinutes = [];
@@ -2438,14 +2443,15 @@ function buildWeeklyIllegalOvertimeUpdate(
         addClassifiedMinute(classified, rec, minute, argiesDateSet);
     }
 
-    return {
-        ores_paranomhs_yperorias_apologistika: toHours(classified.normal),
-        ores_paranomhs_yperorias_nyxtas_apologistika: toHours(classified.night),
-        ores_paranomhs_yperorias_argion_apologistika: toHours(classified.holiday),
-        ores_paranomhs_yperorias_argion_nyxtas_apologistika: toHours(
-            classified.holidayNight
-        )
-    };
+    return buildWeeklyIllegalOvertimePersistenceMapping(
+        {
+            normal: toHours(classified.normal),
+            night: toHours(classified.night),
+            holiday: toHours(classified.holiday),
+            holidayNight: toHours(classified.holidayNight)
+        },
+        options
+    );
 }
 
 function chunkArray(arr, size = 300) {
