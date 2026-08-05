@@ -11,6 +11,11 @@ const LABELS = Object.freeze({
     NORMAL: 'Κανονική', SIXTH: '6η ημέρα', SEVENTH: '7η ημέρα',
     AUTOMATIC: 'Αυτόματα', HR: 'HR', PENDING_HR: 'Εκκρεμεί HR'
 });
+const STATUS_LABELS = Object.freeze({
+    READY: 'Έτοιμο',
+    NEEDS_HR_DECISION: 'Απαιτεί απόφαση HR',
+    NOT_APPLICABLE: ''
+});
 const TOTAL_FIELDS = Object.freeze([
     'ores_ergasias_apologistika', 'ores_apoysias_apologistika',
     'ores_nyxtas_apologistika', 'ores_argion_prosayxhsh_apologistika',
@@ -26,6 +31,11 @@ function number(value) {
     return Number.isFinite(parsed) ? parsed : 0;
 }
 function rounded(value) { return Number(number(value).toFixed(2)); }
+function validHours(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = Number(String(value).replace(',', '.'));
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
 function id(value) { return String(value?._id ?? value ?? ''); }
 function createdAt(value) {
     const time = new Date(value?.applied_at || value?.updated_at || value?.created_at || 0).getTime();
@@ -173,13 +183,15 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
                 classification === 'SIXTH' ? 'ΠΑΡΑΒΑΣΗ ΠΕΝΘΗΜΕΡΟΥ' :
                 classification === 'SEVENTH' ? 'ΣΟΒΑΡΗ ΠΑΡΑΒΑΣΗ' : '';
             const sixthDayHours = classification === 'SIXTH'
-                ? rounded(analysis.sixthDay?.sixthDayHours ?? row.sixth_day_hours ?? row.ores_ergasias ?? 0) : 0;
+                ? rounded(validHours(row.ores_ergasias) ?? analysis.sixthDay?.sixthDayHours ??
+                    row.sixth_day_hours ?? 0) : 0;
             const policy = {
                 version: analysis.policyVersion || row.policyVersion || 'legacy',
                 legacy: !row.policyVersion,
                 weekStart: week.weekStartKey, weekEnd: week.weekEndKey,
                 classification, classificationLabel: LABELS[classification],
                 source, sourceLabel: LABELS[source], status: analysis.status,
+                statusLabel: STATUS_LABELS[analysis.status] ?? String(analysis.status || ''),
                 severity, sixthDayHours,
                 sixthDayRate: classification === 'SIXTH' ? (analysis.sixthDay?.premiumRate ?? profile.pososto_prosayxhshs_6hs_hmeras ?? null) : null
             };
@@ -199,5 +211,5 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
     return { policyVersion: POLICY_VERSION, rows: projectedRows, totals: { employees: employeeTotals, branches: branchTotals, grand: grandTotals } };
 }
 
-module.exports = { LABELS, TOTAL_FIELDS, illegalBreakdown, emptyTotals, addTotals,
+module.exports = { LABELS, STATUS_LABELS, TOTAL_FIELDS, illegalBreakdown, emptyTotals, addTotals,
     decisionIsActiveApplied, buildReviewExportProjection };

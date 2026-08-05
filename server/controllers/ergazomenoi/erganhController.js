@@ -6822,7 +6822,7 @@ class erganhController {
                     policy_week_end: row.policy?.weekEnd || '',
                     policy_classification: row.policy?.classificationLabel || '',
                     policy_source: row.policy?.sourceLabel || '',
-                    policy_status: row.policy?.status || '',
+                    policy_status: row.policy?.statusLabel || '',
                     policy_severity: row.policy?.severity || '',
                     sixth_day_hours: reviewNum(row.policy?.sixthDayHours),
                     sixth_day_rate: row.policy?.sixthDayRate ?? '',
@@ -7357,7 +7357,7 @@ class erganhController {
                     const values = [
                         `${row.policy?.weekStart || ''} – ${row.policy?.weekEnd || ''}`,
                         row.policy?.classificationLabel, row.policy?.sourceLabel,
-                        [row.policy?.status, row.policy?.severity].filter(Boolean).join('\n'),
+                        [row.policy?.statusLabel, row.policy?.severity].filter(Boolean).join('\n'),
                         row.policy?.classification === 'SIXTH' ? `${reviewHours(row.policy.sixthDayHours)} / ${row.policy.sixthDayRate ?? '-'}%` : '-',
                         reviewHours(row.illegalOvertime?.normal), reviewHours(row.illegalOvertime?.night),
                         reviewHours(row.illegalOvertime?.holiday), reviewHours(row.illegalOvertime?.holidayNight),
@@ -7996,11 +7996,6 @@ class erganhController {
                 if (selectedYpokatasthma) {
                     prodhlomenaQuery.ypokatasthma = selectedYpokatasthma;
                 }
-                for (const col of [29, 32, 33, 34, 35, 36]) {
-                    r.getCell(col).numFmt = '0.00';
-                    r.getCell(col).alignment = { vertical: 'middle', horizontal: 'right' };
-                }
-
                 const chunkRecords = await ProdhlomenaOrariaModel.find(prodhlomenaQuery)
                     .select(
                         'kodikos hmeromhnia repo argia is_locked ' +

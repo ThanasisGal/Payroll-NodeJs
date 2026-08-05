@@ -51,6 +51,33 @@ test('0004 regression: 19/06 sixth 7.42, 21/06 seventh, illegal total 6.78', () 
     assert.equal(projection.totals.grand.illegalTotal, 6.78);
 });
 
+test('sixth-day export prefers declared row hours and uses them in every total', () => {
+    const rows = week('2026-06-15', [8.6, 7.97, 6.48, 7.32, 7.92, 8.12, 7.28]);
+    rows[4].ores_ergasias = 7.42;
+    rows[4].ores_ergasias_apologistika = 7.42;
+
+    const projection = buildReviewExportProjection({ rows });
+    const sixthDay = projection.rows.find((row) => row.policy.classification === 'SIXTH');
+
+    assert.equal(sixthDay.policy.sixthDayHours, 7.42);
+    assert.equal(projection.totals.employees['0004'].sixthDayHours, 7.42);
+    assert.equal(projection.totals.branches['0001'].sixthDayHours, 7.42);
+    assert.equal(projection.totals.grand.sixthDayHours, 7.42);
+});
+
+test('export policy status is presentation-safe Greek while internal status stays unchanged', () => {
+    const normalProjection = buildReviewExportProjection({
+        rows: week('2026-06-15', [0, 0, 0, 0, 0, 0, 0])
+    });
+    assert.equal(normalProjection.rows[0].policy.status, 'NOT_APPLICABLE');
+    assert.equal(normalProjection.rows[0].policy.statusLabel, '');
+
+    const readyProjection = buildReviewExportProjection({ rows: week() });
+    assert.equal(readyProjection.rows[0].policy.status, 'READY');
+    assert.equal(readyProjection.rows[0].policy.statusLabel, 'Έτοιμο');
+    assert.ok(readyProjection.rows.every((row) => row.policy.statusLabel !== 'NOT_APPLICABLE'));
+});
+
 test('illegal categories are exclusive, total is categorized only, mismatch threshold is > 0.02', () => {
     const mapped = illegalBreakdown({
         ores_paranomhs_yperorias_apologistika: 1,
