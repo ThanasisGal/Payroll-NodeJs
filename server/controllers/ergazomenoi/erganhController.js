@@ -216,6 +216,12 @@ const {
     analyzeWeeklySixthSeventhDay
 } = require('../../services/ergazomenoi/apasxoliseisWeeklySixthSeventhDayPolicyService');
 const {
+    buildReviewExportProjection
+} = require('../../services/ergazomenoi/apasxoliseisReviewExportProjectionService');
+const ApasxoliseisPolicyPreviewApprovalModel = require('../../models/apasxoliseisPolicyPreviewApproval');
+const ApasxoliseisWeeklyRepoTransferDecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
+const ApasxoliseisWeeklyRepoTransferExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
+const {
     buildWeeklyIllegalOvertimePersistenceMapping
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyIllegalOvertimeMappingService');
 const {
@@ -3873,7 +3879,10 @@ function createReviewTotals() {
         ores_paranomhs_yperorias_nyxtas_apologistika: 0,
         ores_paranomhs_yperorias_argion_apologistika: 0,
         ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0,
-        paranomiYperoria: 0
+        paranomiYperoria: 0,
+        sixthDayCount: 0,
+        seventhDayCount: 0,
+        sixthDayHours: 0
     };
 }
 function addReviewTotals(t, row) {
@@ -3913,6 +3922,9 @@ function addReviewTotals(t, row) {
     t.ores_paranomhs_yperorias_argion_nyxtas_apologistika += reviewNum(
         row.ores_paranomhs_yperorias_argion_nyxtas_apologistika
     );
+    t.sixthDayCount += row.policy?.classification === 'SIXTH' ? 1 : 0;
+    t.seventhDayCount += row.policy?.classification === 'SEVENTH' ? 1 : 0;
+    t.sixthDayHours += reviewNum(row.policy?.sixthDayHours);
     t.paranomiYperoria += reviewParanomiYperoriaTotal(row);
 }
 function buildProdhlomenaReviewFilter(req) {
@@ -4043,7 +4055,7 @@ async function getReviewRowsForExport(req) {
                   'kodikos eponymo onoma ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                       'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                       'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
-                      'typos_apasxolhshs typos_ebdomadas'
+                      'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras'
               )
               .lean()
         : [];
@@ -4102,7 +4114,7 @@ async function getReviewRowsForExport(req) {
                     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                     'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
-                    'typos_apasxolhshs typos_ebdomadas ' +
+                    'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
                     'employment_profile_source afora_allagh_oron_ergasias createdAt'
             )
             .sort({
@@ -4147,7 +4159,7 @@ async function getReviewRowsForExport(req) {
               })
             : {};
 
-    const enrichedRows = rows.map((row) => {
+    const enrichReviewRow = (row) => {
         const erg = ergByKodikos.get(row.kodikos) || {};
         const istorikoRowsForEmployee =
             istorikoRowsByKodikos.get(String(row.kodikos || '').trim()) || [];
@@ -4197,6 +4209,8 @@ async function getReviewRowsForExport(req) {
                 Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
             effective_daily_hours:
                 Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
+            effective_sixth_day_rate:
+                effectiveProfile.pososto_prosayxhshs_6hs_hmeras ?? null,
             effective_profile_source:
                 reviewPhaseCode ? 'SCHEDULE_PHASE' : effectiveProfile.source || '',
             effective_schedule_phase_code: reviewPhaseCode,
@@ -4206,9 +4220,23 @@ async function getReviewRowsForExport(req) {
             ),
             effective_profile_istoriko_id: effectiveProfile.istorikoId || null
         };
-    });
+    };
+    const enrichedRows = rows.map(enrichReviewRow);
+    let policyContextRows = enrichedRows;
+    if (rows.length > 0 && periodStart && periodEnd) {
+        const policyContextFilter = { ...reviewFilter };
+        delete policyContextFilter.$and;
+        policyContextFilter.hmeromhnia = mongoose.trusted({
+            $gte: startOfWeekMondayUtc(periodStart),
+            $lte: endOfWeekSundayUtc(periodEnd)
+        });
+        policyContextRows = (await ProdhlomenaOrariaModel.find(policyContextFilter)
+            .select(REVIEW_SELECT_FIELDS)
+            .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+            .lean()).map(enrichReviewRow);
+    }
 
-    enrichedRows.__deviations = deviations
+    const exportDeviations = deviations
         .filter((deviation) =>
             isWeekFullyWithinEmploymentPeriod(
                 deviation.week_apo,
@@ -4218,7 +4246,52 @@ async function getReviewRowsForExport(req) {
             )
         )
         .map(mapDeviationForReviewExport);
-    return enrichedRows;
+
+    const decisionRangeFilter = periodStart && periodEnd ? {
+        week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
+        week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) })
+    } : {};
+    const [approvals, decisions, executions] = await Promise.all([
+        ApasxoliseisPolicyPreviewApprovalModel.find({
+            team: req.session.userTeam,
+            company_kod: req.session.companyInUse,
+            decision_status: 'RECORDED',
+            ...(periodStart && periodEnd ? {
+                apo_hmeromhnia: mongoose.trusted({ $lte: periodEnd }),
+                eos_hmeromhnia: mongoose.trusted({ $gte: periodStart })
+            } : {})
+        }).sort({ created_at: -1 }).lean(),
+        ApasxoliseisWeeklyRepoTransferDecisionModel.find({
+            team: req.session.userTeam,
+            company_kod: req.session.companyInUse,
+            decision_status: 'RECORDED',
+            ...decisionRangeFilter
+        }).sort({ created_at: -1 }).lean(),
+        ApasxoliseisWeeklyRepoTransferExecutionModel.find({
+            team: req.session.userTeam,
+            company_kod: req.session.companyInUse,
+            execution_status: 'APPLIED',
+            ...decisionRangeFilter
+        }).sort({ applied_at: -1 }).lean()
+    ]);
+    const executionByDecisionId = new Map(
+        executions.map((execution) => [String(execution.decision_id || ''), execution])
+    );
+    const decisionsWithApplyState = decisions.map((decision) => ({
+        ...decision,
+        ...(executionByDecisionId.get(String(decision._id || '')) || {})
+    }));
+    const projection = buildReviewExportProjection({
+        rows: enrichedRows,
+        policyRows: policyContextRows,
+        approvals,
+        decisions: decisionsWithApplyState,
+        deviations: exportDeviations
+    });
+    projection.rows.__deviations = exportDeviations;
+    projection.rows.__projectionTotals = projection.totals;
+    projection.rows.__policyVersion = projection.policyVersion;
+    return projection.rows;
 }
 function makeReviewPdfDocument() {
     const doc = new PDFDocument({
@@ -6409,15 +6482,31 @@ class erganhController {
                 { header: 'Κατηγορία\nΆδειας', key: 'kathgoria_adeias_apologistika', width: 13 },
                 { header: 'Κυριακή', key: 'kyriakes_apologistika', width: 9 },
                 { header: 'Περιγραφή\nΑργίας', key: 'perigrafh_argias', width: 20 },
-                { header: 'Κλειδ.', key: 'is_locked', width: 9 }
+                { header: 'Κλειδ.', key: 'is_locked', width: 9 },
+                { header: 'Εβδομάδα από', key: 'policy_week_start', width: 13 },
+                { header: 'Εβδομάδα έως', key: 'policy_week_end', width: 13 },
+                { header: 'Χαρακτηρισμός ημέρας', key: 'policy_classification', width: 17 },
+                { header: 'Πηγή χαρακτηρισμού', key: 'policy_source', width: 15 },
+                { header: 'Κατάσταση πολιτικής', key: 'policy_status', width: 18 },
+                { header: 'Σοβαρότητα', key: 'policy_severity', width: 27 },
+                { header: 'Ώρες 6ης ημέρας', key: 'sixth_day_hours', width: 13 },
+                { header: 'Ποσοστό προσαύξησης 6ης ημέρας', key: 'sixth_day_rate', width: 16 },
+                { header: 'Αιτιολογία / σημείωση πολιτικής', key: 'policy_note', width: 38 },
+                { header: 'Παράνομη υπερωρία κανονική', key: 'illegal_normal', width: 15 },
+                { header: 'Παράνομη υπερωρία νύχτας', key: 'illegal_night', width: 15 },
+                { header: 'Παράνομη υπερωρία Κυριακής/αργίας', key: 'illegal_holiday', width: 18 },
+                { header: 'Παράνομη υπερωρία Κυριακής/αργίας και νύχτας', key: 'illegal_holiday_night', width: 20 },
+                { header: 'Σύνολο παράνομης υπερωρίας', key: 'illegal_total', width: 16 },
+                { header: 'Έλεγχος συνέπειας', key: 'consistency_check', width: 22 }
             ];
 
             const HEADER_ROW_HEIGHT = 42;
             const GROUP_ROW_HEIGHT = 22;
             const EMPLOYEE_TOTAL_ROW_HEIGHT = 20;
-            const LAST_EXCEL_COLUMN = 'V';
+            const LAST_EXCEL_COLUMN = 'AK';
+            const LAST_EXCEL_COLUMN_NUMBER = 37;
 
-            const styleExcelRange = (row, fromCol = 1, toCol = 22, styleFn = null) => {
+            const styleExcelRange = (row, fromCol = 1, toCol = LAST_EXCEL_COLUMN_NUMBER, styleFn = null) => {
                 for (let col = fromCol; col <= toCol; col++) {
                     const cell = row.getCell(col);
 
@@ -6504,7 +6593,14 @@ class erganhController {
                     ores_prostheths_ergasias_apologistika: t.ores_prostheths_ergasias_apologistika,
                     yperergasia_total: t.yperergasia,
                     nomimi_total: t.nomimiYperoria,
-                    paranomi_total: t.paranomiYperoria
+                    paranomi_total: t.paranomiYperoria,
+                    policy_classification: `6ες: ${t.sixthDayCount} | 7ες: ${t.seventhDayCount}`,
+                    sixth_day_hours: t.sixthDayHours,
+                    illegal_normal: t.ores_paranomhs_yperorias_apologistika,
+                    illegal_night: t.ores_paranomhs_yperorias_nyxtas_apologistika,
+                    illegal_holiday: t.ores_paranomhs_yperorias_argion_apologistika,
+                    illegal_holiday_night: t.ores_paranomhs_yperorias_argion_nyxtas_apologistika,
+                    illegal_total: t.paranomiYperoria
                 });
 
                 r.font = { name: 'DejaVu Sans', size: 9, bold: true };
@@ -6514,7 +6610,7 @@ class erganhController {
                 worksheet.mergeCells(`A${r.number}:H${r.number}`);
                 r.getCell(1).value = label;
 
-                styleExcelRange(r, 1, 22, (c) => {
+                styleExcelRange(r, 1, LAST_EXCEL_COLUMN_NUMBER, (c) => {
                     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
                     c.alignment = {
                         vertical: 'middle',
@@ -6642,7 +6738,7 @@ class erganhController {
                         bold: true,
                         color: { argb: 'FFFFFFFF' }
                     };
-                    styleExcelRange(br, 1, 22, (c) => {
+                    styleExcelRange(br, 1, LAST_EXCEL_COLUMN_NUMBER, (c) => {
                         c.fill = {
                             type: 'pattern',
                             pattern: 'solid',
@@ -6678,7 +6774,7 @@ class erganhController {
                     worksheet.mergeCells(`A${er.number}:${LAST_EXCEL_COLUMN}${er.number}`);
                     er.getCell(1).value = `Εργαζόμενος: ${employeeKey}${changeBadge}`;
                     er.font = { name: 'DejaVu Sans', size: 9, bold: true };
-                    styleExcelRange(er, 1, 22, (c) => {
+                    styleExcelRange(er, 1, LAST_EXCEL_COLUMN_NUMBER, (c) => {
                         c.fill = {
                             type: 'pattern',
                             pattern: 'solid',
@@ -6721,7 +6817,22 @@ class erganhController {
                     kathgoria_adeias_apologistika: row.kathgoria_adeias_apologistika || '',
                     kyriakes_apologistika: row.kyriakes_apologistika ? 'ΝΑΙ' : '',
                     perigrafh_argias: row.perigrafh_argias || '',
-                    is_locked: row.is_locked ? 'ΝΑΙ' : ''
+                    is_locked: row.is_locked ? 'ΝΑΙ' : '',
+                    policy_week_start: row.policy?.weekStart || '',
+                    policy_week_end: row.policy?.weekEnd || '',
+                    policy_classification: row.policy?.classificationLabel || '',
+                    policy_source: row.policy?.sourceLabel || '',
+                    policy_status: row.policy?.status || '',
+                    policy_severity: row.policy?.severity || '',
+                    sixth_day_hours: reviewNum(row.policy?.sixthDayHours),
+                    sixth_day_rate: row.policy?.sixthDayRate ?? '',
+                    policy_note: row.policy?.note || '',
+                    illegal_normal: row.illegalOvertime?.normal || 0,
+                    illegal_night: row.illegalOvertime?.night || 0,
+                    illegal_holiday: row.illegalOvertime?.holiday || 0,
+                    illegal_holiday_night: row.illegalOvertime?.holidayNight || 0,
+                    illegal_total: row.illegalOvertime?.total || 0,
+                    consistency_check: row.illegalOvertime?.mismatch ? 'ΑΣΥΜΦΩΝΙΑ ΔΕΔΟΜΕΝΩΝ' : ''
                 });
 
                 detail.outlineLevel = 2;
@@ -6737,7 +6848,9 @@ class erganhController {
                     };
                 });
 
-                for (let col = 9; col <= 16; col++) detail.getCell(col).numFmt = '0.00';
+                for (const col of [9,10,11,12,13,14,15,16,29,30,32,33,34,35,36]) {
+                    detail.getCell(col).numFmt = '0.00';
+                }
 
                 const displayFills = {
                     declared_repo: 'FFFFF2CC',
@@ -6845,11 +6958,11 @@ class erganhController {
                 });
 
                 if (i > 1) {
-                    for (let col = 9; col <= 16; col++) r.getCell(col).numFmt = '0.00';
+                    for (const col of [9,10,11,12,13,14,15,16,29,30,32,33,34,35,36]) r.getCell(col).numFmt = '0.00';
                 }
             });
 
-            worksheet.autoFilter = { from: 'A1', to: 'V1' };
+            worksheet.autoFilter = { from: 'A1', to: 'AK1' };
 
             // Τα πλάτη έχουν οριστεί ρητά πιο πάνω ώστε να γεμίζουν όλο το πλάτος
             // της Α4 Landscape. Δεν κάνουμε auto-fit εδώ, γιατί θα ξαναστενέψει/ανοίξει
@@ -7215,6 +7328,57 @@ class erganhController {
             let branchHeaderPending = false;
             const grandTotals = createReviewTotals();
             const employeeTotalsSummary = [];
+            let currentEmployeePolicyRows = [];
+
+            const drawEmployeePolicyTable = () => {
+                if (currentEmployeePolicyRows.length === 0) return;
+                const policyCols = [
+                    ['Εβδομάδα Δευτέρα–Κυριακή', 76], ['Χαρακτηρισμός', 52],
+                    ['Πηγή', 38], ['Κατάσταση / σοβαρότητα', 92],
+                    ['6η ώρες / %', 47], ['Παράν. καν.', 38], ['Νύχτα', 34],
+                    ['Κυρ./αργ.', 40], ['Κυρ./αργ. νύχτα', 45], ['Σύνολο', 36],
+                    ['Αιτιολογία / warnings', 100]
+                ];
+                const policyScale = tableWidth / policyCols.reduce((sum, [, width]) => sum + width, 0);
+                const scaled = policyCols.map(([label, width]) => [label, width * policyScale]);
+                newPageIfNeeded(29);
+                doc.rect(x0, y, tableWidth, 11).fill('#5B2C6F');
+                doc.font(bold).fontSize(6.5).fillColor('#FFF')
+                    .text('Πολιτική v2 — εβδομάδα Δευτέρα έως Κυριακή', x0 + 3, y + 2.5, { width: tableWidth - 6 });
+                y += 11;
+                let x = x0;
+                scaled.forEach(([label, width]) => {
+                    drawCell(x, y, width, 18, label, { fill: '#E8DAEF', fontSize: 5.4, boldText: true, align: 'center', ellipsis: false });
+                    x += width;
+                });
+                y += 18;
+                currentEmployeePolicyRows.forEach((row) => {
+                    const note = row.policy?.note || '';
+                    const values = [
+                        `${row.policy?.weekStart || ''} – ${row.policy?.weekEnd || ''}`,
+                        row.policy?.classificationLabel, row.policy?.sourceLabel,
+                        [row.policy?.status, row.policy?.severity].filter(Boolean).join('\n'),
+                        row.policy?.classification === 'SIXTH' ? `${reviewHours(row.policy.sixthDayHours)} / ${row.policy.sixthDayRate ?? '-'}%` : '-',
+                        reviewHours(row.illegalOvertime?.normal), reviewHours(row.illegalOvertime?.night),
+                        reviewHours(row.illegalOvertime?.holiday), reviewHours(row.illegalOvertime?.holidayNight),
+                        reviewHours(row.illegalOvertime?.total), note || '-'
+                    ];
+                    doc.font(regular).fontSize(5.2);
+                    const rowH = Math.max(17, doc.heightOfString(String(note || '-'), { width: scaled.at(-1)[1] - 3 }) + 5);
+                    newPageIfNeeded(rowH);
+                    x = x0;
+                    values.forEach((value, index) => {
+                        drawCell(x, y, scaled[index][1], rowH, value, {
+                            fontSize: 5.2, ellipsis: false,
+                            fill: row.policy?.severity ? '#FFF3CD' : null,
+                            align: index >= 4 && index <= 9 ? 'right' : 'left'
+                        });
+                        x += scaled[index][1];
+                    });
+                    y += rowH;
+                });
+                currentEmployeePolicyRows = [];
+            };
 
             const cloneReviewTotalsForPdf = (sourceTotals = {}) => {
                 const cloned = createReviewTotals();
@@ -7241,7 +7405,7 @@ class erganhController {
                 const totalLabelFontSize = options.totalLabelFontSize || 7.2;
                 const h = hasOvertimeBreakdown
                     ? options.breakdownHeight || 43
-                    : options.normalHeight || 19;
+                    : Math.max(options.normalHeight || 19, 27);
                 const movedToNewPage = newPageIfNeeded(h + 3);
                 if (movedToNewPage && typeof options.afterPageBreak === 'function') {
                     options.afterPageBreak();
@@ -7252,7 +7416,7 @@ class erganhController {
                 doc.font(bold)
                     .fontSize(totalLabelFontSize)
                     .fillColor('#000')
-                    .text(label, x0 + 2, rowY + 3.4, {
+                    .text(`${label}\n6ες ημέρες: ${totals.sixthDayCount || 0} | 7ες ημέρες: ${totals.seventhDayCount || 0} | Ώρες 6ης: ${reviewHours(totals.sixthDayHours)}`, x0 + 2, rowY + 3.4, {
                         width: cols.slice(0, 4).reduce((a, [, w]) => a + w, 0) - 4,
                         height: h - 5,
                         ellipsis: true
@@ -7407,6 +7571,7 @@ class erganhController {
 
             const closeEmployee = () => {
                 if (!currentEmployee) return;
+                drawEmployeePolicyTable();
                 drawTotals(`Σύνολα εργαζομένου: ${currentEmployee}`, employeeTotals, '#E2F0D9', {
                     breakdownHeight: 45,
                     normalHeight: 20,
@@ -7572,6 +7737,7 @@ class erganhController {
                 addReviewTotals(employeeTotals, row);
                 addReviewTotals(branchTotals, row);
                 addReviewTotals(grandTotals, row);
+                currentEmployeePolicyRows.push(row);
             }
 
             closeBranch();
@@ -7829,6 +7995,10 @@ class erganhController {
 
                 if (selectedYpokatasthma) {
                     prodhlomenaQuery.ypokatasthma = selectedYpokatasthma;
+                }
+                for (const col of [29, 32, 33, 34, 35, 36]) {
+                    r.getCell(col).numFmt = '0.00';
+                    r.getCell(col).alignment = { vertical: 'middle', horizontal: 'right' };
                 }
 
                 const chunkRecords = await ProdhlomenaOrariaModel.find(prodhlomenaQuery)
