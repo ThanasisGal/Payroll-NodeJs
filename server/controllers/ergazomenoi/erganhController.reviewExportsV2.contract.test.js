@@ -13,6 +13,8 @@ test('Excel/PDF parity contract uses the same pure projection', () => {
     assert.match(controller, /static exportProdhlomenaOrariaReviewExcel[\s\S]*getReviewRowsForExport\(req\)/);
     assert.match(controller, /static exportProdhlomenaOrariaReviewPdf[\s\S]*getReviewRowsForExport\(req\)/);
     assert.match(controller, /Πολιτική v2 — εβδομάδα Δευτέρα έως Κυριακή/);
+    assert.match(controller, /policy_status: row\.policy\?\.statusLabel \|\| ''/);
+    assert.match(controller, /\[row\.policy\?\.statusLabel, row\.policy\?\.severity\]/);
 });
 
 test('Excel render/content smoke test contains all 22 original plus 15 v2 headers', async () => {
