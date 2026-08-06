@@ -1403,6 +1403,13 @@ router.post(
     erganhController.createProdhlomenaOrariaPolicyPreviewApproval
 );
 
+router.post(
+    '/api/prodhlomena-oraria/review/policies/approvals/:approvalId/revoke',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.revokeProdhlomenaOrariaPolicyPreviewApproval
+);
+
 router.get(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions/current',
     checkAuth,

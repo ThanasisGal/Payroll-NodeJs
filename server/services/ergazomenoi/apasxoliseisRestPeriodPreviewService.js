@@ -99,11 +99,21 @@ function buildPreviewRow({ anchorRow, result, suffix }) {
                 ? definition.violationScenario
                 : definition.pendingScenario,
             scenario_version: POLICY_VERSION,
+            rule_branch: isViolation
+                ? `${result.checkType}_VERIFIED_VIOLATION`
+                : `${result.checkType}_TECHNICAL_PENDING`,
             confidence: isViolation ? 'HIGH' : 'UNVERIFIED',
             requires_review: isViolation,
             reasons: [...result.reasons],
             warnings: [...result.warnings],
             proposed_updates: {},
+            policy_thresholds: {
+                minimum_rest_minutes: Number(result.minimumRestMinutes)
+            },
+            policy_conditions: {
+                check_type: result.checkType,
+                verification_status: isViolation ? 'VERIFIED_VIOLATION' : 'TECHNICAL_PENDING'
+            },
             display_labels: {
                 badge: definition.title,
                 show_badge: true
@@ -121,6 +131,9 @@ function buildPreviewRow({ anchorRow, result, suffix }) {
             success: isViolation,
             policy_code: definition.code,
             policy_version: POLICY_VERSION,
+            rule_branch: isViolation
+                ? `${result.checkType}_VERIFIED_VIOLATION`
+                : `${result.checkType}_TECHNICAL_PENDING`,
             policy_title: definition.title,
             mode: 'REVIEW_ONLY',
             result_status: isViolation ? 'NEEDS_REVIEW' : 'UNKNOWN_PATTERN',

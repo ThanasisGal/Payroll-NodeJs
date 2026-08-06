@@ -25,6 +25,14 @@ const TOTAL_FIELDS = Object.freeze([
     'ores_nominhs_yperorias_apologistika', 'ores_nominhs_yperorias_nyxtas_apologistika',
     'ores_nominhs_yperorias_argion_apologistika', 'ores_nominhs_yperorias_argion_nyxtas_apologistika'
 ]);
+const NUMERIC_FINDING_FIELDS = Object.freeze([
+    'ores_apoysias_apologistika',
+    'ores_prostheths_ergasias_apologistika',
+    'ores_yperergasias_apologistika', 'ores_yperergasias_nyxtas_apologistika',
+    'ores_yperergasias_argion_apologistika', 'ores_yperergasias_argion_nyxtas_apologistika',
+    'ores_nominhs_yperorias_apologistika', 'ores_nominhs_yperorias_nyxtas_apologistika',
+    'ores_nominhs_yperorias_argion_apologistika', 'ores_nominhs_yperorias_argion_nyxtas_apologistika'
+]);
 
 function number(value) {
     const parsed = Number(String(value ?? 0).replace(',', '.'));
@@ -130,7 +138,34 @@ function reasonText({ analysis, decision, approval, deviation, mismatch }) {
     return sections.join('\n');
 }
 
-function buildReviewExportProjection({ rows = [], policyRows = rows, approvals = [], decisions = [], deviations = [] } = {}) {
+function hasNumericFinding(row) {
+    return NUMERIC_FINDING_FIELDS.some((field) => Math.abs(number(row[field])) > 0) ||
+        number(row.illegalOvertime?.total) > 0;
+}
+function isActualSixthOrSeventhDay(row) {
+    return ['SIXTH', 'SEVENTH'].includes(row.policy?.classification) &&
+        (number(row.ores_ergasias_apologistika) > 0 || number(row.ores_ergasias) > 0 ||
+            number(row.cards_ores_ergasias) > 0);
+}
+function hasHrOnlyFinding(row) {
+    return ['HR', 'PENDING_HR'].includes(row.policy?.source) ||
+        String(row.policy?.note || '').trim() !== '';
+}
+function filterFindingsOnly(rows) {
+    const representativeHrGroups = new Set();
+    return rows.filter((row) => {
+        if (hasNumericFinding(row) || isActualSixthOrSeventhDay(row) || row.illegalOvertime?.mismatch) {
+            return true;
+        }
+        if (!hasHrOnlyFinding(row)) return false;
+        const key = `${String(row.kodikos || '').trim()}|${row.policy?.weekStart || ''}`;
+        if (representativeHrGroups.has(key)) return false;
+        representativeHrGroups.add(key);
+        return true;
+    });
+}
+
+function buildReviewExportProjection({ rows = [], policyRows = rows, approvals = [], decisions = [], deviations = [], findingsOnly = false } = {}) {
     const sourceRows = Array.isArray(rows) ? rows : [];
     const contextRows = Array.isArray(policyRows) ? policyRows : sourceRows;
     const groups = new Map();
@@ -201,15 +236,16 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
     });
     projectedRows.sort((a, b) => String(a.exportYpokatasthma || a.ypokatasthma || '').localeCompare(String(b.exportYpokatasthma || b.ypokatasthma || '')) ||
         String(a.kodikos || '').localeCompare(String(b.kodikos || '')) || dateKeyUtc(a.hmeromhnia).localeCompare(dateKeyUtc(b.hmeromhnia)));
+    const exportRows = findingsOnly ? filterFindingsOnly(projectedRows) : projectedRows;
     const employeeTotals = {}, branchTotals = {}, grandTotals = emptyTotals();
-    projectedRows.forEach((row) => {
+    exportRows.forEach((row) => {
         const employeeKey = String(row.kodikos || '');
         const branchKey = String(row.exportYpokatasthma || row.ypokatasthma || '');
         employeeTotals[employeeKey] ||= emptyTotals(); branchTotals[branchKey] ||= emptyTotals();
         addTotals(employeeTotals[employeeKey], row); addTotals(branchTotals[branchKey], row); addTotals(grandTotals, row);
     });
-    return { policyVersion: POLICY_VERSION, rows: projectedRows, totals: { employees: employeeTotals, branches: branchTotals, grand: grandTotals } };
+    return { policyVersion: POLICY_VERSION, rows: exportRows, totals: { employees: employeeTotals, branches: branchTotals, grand: grandTotals } };
 }
 
-module.exports = { LABELS, STATUS_LABELS, TOTAL_FIELDS, illegalBreakdown, emptyTotals, addTotals,
-    decisionIsActiveApplied, buildReviewExportProjection };
+module.exports = { LABELS, STATUS_LABELS, TOTAL_FIELDS, NUMERIC_FINDING_FIELDS, illegalBreakdown, emptyTotals, addTotals,
+    decisionIsActiveApplied, filterFindingsOnly, buildReviewExportProjection };

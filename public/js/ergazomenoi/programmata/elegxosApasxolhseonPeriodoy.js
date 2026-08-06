@@ -8,6 +8,10 @@ function userCanRecordRepoTransferDecision() {
     return document.getElementById('canRecordRepoTransferDecision')?.value === '1';
 }
 
+function userCanManageReusablePolicyApproval() {
+    return document.getElementById('canManageReusablePolicyApproval')?.value === '1';
+}
+
 function userCanApplyRepoTransferDecision() {
     return document.getElementById('canApplyRepoTransferDecision')?.value === '1';
 }
@@ -2921,12 +2925,20 @@ function buildPolicyPreviewApprovalsMap(records = []) {
 
         const existing = approvalsByGroupId.get(groupId) || {
             latest: null,
-            decisionTypes: new Set(),
+            historyDecisionTypes: new Set(),
+            blockingDecisionTypes: new Set(),
             count: 0
         };
         const decisionType = String(record?.decision_type || '').trim();
+        const reuseScope = String(record?.reuse_scope || '').trim();
+        const reuseStatus = String(record?.reuse_status || '').trim();
+        const blocksNewDecision =
+            reuseScope !== 'FUTURE_IDENTICAL' || reuseStatus === 'ACTIVE';
 
-        if (decisionType) existing.decisionTypes.add(decisionType);
+        if (decisionType) existing.historyDecisionTypes.add(decisionType);
+        if (decisionType && blocksNewDecision) {
+            existing.blockingDecisionTypes.add(decisionType);
+        }
         existing.count += 1;
 
         const existingTime = new Date(existing.latest?.created_at || 0).getTime() || 0;
@@ -3845,7 +3857,7 @@ function renderPolicyPreviewApprovalPanel(group = {}, groupIndex = 0) {
     const groupId = String(group.group_id || '').trim();
     const approvalState = currentPolicyPreviewApprovalsByGroupId.get(groupId);
     const latest = approvalState?.latest || null;
-    const existingDecisionTypes = approvalState?.decisionTypes || new Set();
+    const existingDecisionTypes = approvalState?.blockingDecisionTypes || new Set();
     const decisionDetails = latest
         ? `
             <div class="small mb-1">
@@ -3866,7 +3878,8 @@ function renderPolicyPreviewApprovalPanel(group = {}, groupIndex = 0) {
             </div>
             ${
                 latest.reuse_scope === 'FUTURE_IDENTICAL' && latest.reuse_status === 'ACTIVE'
-                    ? '<div class="small text-success fw-semibold mt-1">Ενεργή και για μελλοντικές ίδιες περιπτώσεις.</div>'
+                    ? `<div class="small text-success fw-semibold mt-1">Ενεργή και για μελλοντικές ίδιες περιπτώσεις.</div>
+                       ${userCanManageReusablePolicyApproval() ? `<button type="button" class="btn btn-sm btn-outline-danger mt-2 policy-preview-revoke-btn" data-approval-id="${escapeHtml(latest._id)}">Ανάκληση πολιτικής</button>` : ''}`
                     : ''
             }
             ${
@@ -3879,7 +3892,9 @@ function renderPolicyPreviewApprovalPanel(group = {}, groupIndex = 0) {
         `
         : '<div class="small text-muted">Δεν έχει καταγραφεί απόφαση για αυτή την ομάδα.</div>';
 
-    const buttonsHtml = getPolicyPreviewDecisionButtons(group)
+    const buttonsHtml = (userCanManageReusablePolicyApproval()
+        ? getPolicyPreviewDecisionButtons(group)
+        : [])
         .map(({ type, className }) => {
             const alreadyRecorded = existingDecisionTypes.has(type);
             const title = alreadyRecorded ? 'Έχει ήδη καταγραφεί.' : getPolicyPreviewDecisionLabel(type);
@@ -3929,9 +3944,51 @@ async function getPolicyPreviewCsrfToken() {
     return freshToken;
 }
 
+async function revokePolicyPreviewApproval(approvalId) {
+    const confirmation = await Swal.fire({
+        icon: 'warning',
+        title: 'Ανάκληση reusable πολιτικής',
+        text: 'Η πολιτική δεν θα εφαρμόζεται σε μελλοντικές περιπτώσεις.',
+        input: 'textarea',
+        inputLabel: 'Υποχρεωτική αιτιολογία',
+        inputAttributes: { maxlength: '1000' },
+        showCancelButton: true,
+        confirmButtonText: 'Ανάκληση πολιτικής',
+        cancelButtonText: 'Άκυρο',
+        preConfirm: (value) => {
+            const reason = String(value || '').trim();
+            if (!reason) {
+                Swal.showValidationMessage('Η αιτιολογία ανάκλησης είναι υποχρεωτική.');
+                return false;
+            }
+            return reason;
+        }
+    });
+    if (!confirmation.isConfirmed) return;
+    const token = await getPolicyPreviewCsrfToken();
+    const response = await fetch(`/api/prodhlomena-oraria/review/policies/approvals/${encodeURIComponent(approvalId)}/revoke`, {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json',
+            'CSRF-Token': token, 'x-csrf-token': token },
+        body: JSON.stringify({ reason: confirmation.value })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) throw new Error(payload.message || 'Αποτυχία ανάκλησης πολιτικής.');
+    if (currentPolicyPreviewBaseParams) {
+        await refreshPolicyPreviewApprovals(currentPolicyPreviewBaseParams);
+        const refreshed = await fetchPolicyPreviewGrouping(currentPolicyPreviewBaseParams);
+        attachPolicyPreviewResults(currentReviewRows, refreshed.previewRows);
+        renderCurrentReviewRows();
+        renderPolicyPreviewGroups(refreshed.grouping, { atomicGroupProjection: refreshed.atomicGroupProjection });
+    }
+    await Swal.fire({ icon: 'success', title: 'Η πολιτική ανακλήθηκε' });
+}
+
 async function confirmPolicyPreviewDecision(group, decisionType) {
     const decisionLabel = getPolicyPreviewDecisionLabel(decisionType);
-    const reusableDecisionTypes = new Set(['MARK_OK', 'MARK_REVIEWED', 'REJECT_PROPOSAL']);
+    const reusableDecisionTypes = new Set([
+        'APPROVE_PREFILL', 'MARK_OK', 'MARK_REVIEWED', 'REJECT_PROPOSAL'
+    ]);
     const canReuse =
         group?.reusable_eligible === true && reusableDecisionTypes.has(decisionType);
     const decisionMessage =
@@ -5940,6 +5997,13 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                                              )}</div>`
                                            : ''
                                    }
+                                   ${
+                                       userCanManageReusablePolicyApproval()
+                                           ? `<button type="button" class="btn btn-sm btn-outline-danger mt-2 policy-preview-revoke-btn" data-approval-id="${escapeHtml(
+                                                 group.reusable_decision.approval_id
+                                             )}">Ανάκληση πολιτικής</button>`
+                                           : ''
+                                   }
                                </div>`
                             : ''
                     }
@@ -6091,6 +6155,15 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                     title: 'Σφάλμα',
                     text: error.message || 'Δεν ήταν δυνατή η καταγραφή της απόφασης.'
                 });
+            }
+        });
+    });
+    container.querySelectorAll('.policy-preview-revoke-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            try {
+                await revokePolicyPreviewApproval(button.dataset.approvalId);
+            } catch (error) {
+                Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message });
             }
         });
     });

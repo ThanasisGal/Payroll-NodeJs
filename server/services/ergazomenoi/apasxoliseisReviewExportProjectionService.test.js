@@ -143,3 +143,39 @@ test('filter parity: projection never introduces rows outside its pure input', (
     assert.equal(String(projection.rows[0].hmeromhnia).slice(0, 10), '2026-06-19');
     assert.equal(projection.rows[0].policy.classification, 'SIXTH');
 });
+
+test('findings-only excludes normal, zero and plain NOT_APPLICABLE rows without changing default projection', () => {
+    const rows = week('2026-06-15', [0, 0, 0, 0, 0, 0, 0]);
+    assert.equal(buildReviewExportProjection({ rows }).rows.length, 7);
+    assert.equal(buildReviewExportProjection({ rows, findingsOnly: true }).rows.length, 0);
+});
+
+test('findings-only retains every material numeric finding, mismatch and actual sixth/seventh day', () => {
+    const rows = week();
+    Object.assign(rows[0], { ores_apoysias_apologistika: 1 });
+    Object.assign(rows[1], { ores_prostheths_ergasias_apologistika: 1 });
+    Object.assign(rows[2], { ores_yperergasias_apologistika: 1 });
+    Object.assign(rows[3], { ores_nominhs_yperorias_apologistika: 1 });
+    Object.assign(rows[6], {
+        ores_paranomhs_yperorias_apologistika: 1,
+        canonical_illegal_overtime_total: 2
+    });
+    const projection = buildReviewExportProjection({ rows, findingsOnly: true });
+    assert.deepEqual(projection.rows.map((row) => String(row.hmeromhnia).slice(0, 10)), [
+        '2026-06-15', '2026-06-16', '2026-06-17', '2026-06-18',
+        '2026-06-19', '2026-06-20', '2026-06-21'
+    ]);
+    assert.equal(projection.totals.grand.illegalTotal, 1);
+});
+
+test('findings-only keeps one representative HR-only row per employee and week', () => {
+    const rows = week('2026-06-15', [0, 0, 0, 0, 0, 0, 0]);
+    const approval = {
+        decision_status: 'RECORDED', decision_type: 'MARK_REVIEWED', notes: 'Εγκρίθηκε από HR',
+        apo_hmeromhnia: '2026-06-15', eos_hmeromhnia: '2026-06-21',
+        items: rows.map((row) => ({ employee_kodikos: '0004', hmeromhnia: row.hmeromhnia }))
+    };
+    const projection = buildReviewExportProjection({ rows, approvals: [approval], findingsOnly: true });
+    assert.equal(projection.rows.length, 1);
+    assert.equal(projection.rows[0].policy.source, 'HR');
+});

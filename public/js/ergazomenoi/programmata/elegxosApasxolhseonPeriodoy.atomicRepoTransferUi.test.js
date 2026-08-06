@@ -1514,6 +1514,7 @@ function testPolicyDecisionAccordionIsCompactAndDecisionOnly() {
         ]
     };
     elementsById.set('policyPreviewGroupsContainer', container);
+    elementsById.set('canManageReusablePolicyApproval', { value: '1' });
 
     sandbox.renderPolicyPreviewGroups(grouping);
 
@@ -1554,6 +1555,188 @@ function testPolicyDecisionAccordionIsCompactAndDecisionOnly() {
     );
 
     elementsById.delete('policyPreviewGroupsContainer');
+    elementsById.delete('canManageReusablePolicyApproval');
+}
+
+async function testResolvedInheritedGroupOffersOnlySharedPolicyRevoke() {
+    const approvalId = '6a743bc11cc18bdde16f3dcd';
+    let revokeClickHandler = null;
+    let revokedApprovalId = null;
+    const revokeButton = {
+        dataset: { approvalId },
+        addEventListener(eventName, handler) {
+            if (eventName === 'click') revokeClickHandler = handler;
+        }
+    };
+    const container = {
+        innerHTML: '',
+        querySelector: () => null,
+        querySelectorAll(selector) {
+            return selector === '.policy-preview-revoke-btn' ? [revokeButton] : [];
+        }
+    };
+    const resolvedGroup = {
+        group_id: 'resolved-inherited-group',
+        status: 'RESOLVED_BY_POLICY',
+        policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
+        scenario_code: 'DECLARED_REPO_WITH_CARDS',
+        action_type: 'SUGGESTION',
+        reason_code: 'DECLARED_REPO_WITH_CARDS',
+        title: 'Ρεπό, μη εργασία ή μη προδηλωμένη ημέρα με κάρτες',
+        count: 15,
+        employees_count: 6,
+        reusable_decision: {
+            approval_id: approvalId,
+            approved_by_user_name: 'HR',
+            approved_at: '2026-08-06T07:46:09.390Z'
+        },
+        items: []
+    };
+    const grouping = {
+        version: 1,
+        scope: 'page',
+        summary: { total: 15, groups_count: 1, by_status: { RESOLVED_BY_POLICY: 15 } },
+        groups: [resolvedGroup]
+    };
+    const saved = snapshotSandboxFunctions(['revokePolicyPreviewApproval']);
+    elementsById.set('policyPreviewGroupsContainer', container);
+
+    try {
+        for (const role of ['A', 'S', 'HR']) {
+            elementsById.set('canManageReusablePolicyApproval', { value: '1', role });
+            sandbox.renderPolicyPreviewGroups(grouping);
+            assert.ok(container.innerHTML.includes('Εγκρίνεται βάσει παλιότερης απόφασης HR'));
+            assert.ok(container.innerHTML.includes('Ανάκληση πολιτικής'), role);
+            assert.ok(container.innerHTML.includes(`data-approval-id="${approvalId}"`), role);
+            assert.ok(!container.innerHTML.includes('policy-preview-decision-btn'), role);
+            assert.ok(!container.innerHTML.includes('Έγκριση πρότασης για μελλοντική εφαρμογή'), role);
+            assert.ok(!container.innerHTML.includes('Απόρριψη πρότασης'), role);
+            assert.ok(!container.innerHTML.includes('Χρειάζεται περαιτέρω έλεγχο'), role);
+        }
+
+        sandbox.revokePolicyPreviewApproval = async (id) => { revokedApprovalId = id; };
+        assert.ok(revokeClickHandler);
+        await revokeClickHandler();
+        assert.strictEqual(revokedApprovalId, approvalId);
+
+        elementsById.set('canManageReusablePolicyApproval', { value: '0' });
+        sandbox.renderPolicyPreviewGroups(grouping);
+        assert.ok(!container.innerHTML.includes('Ανάκληση πολιτικής'));
+
+        for (const reusableDecision of [null, { approved_by_user_name: 'HR' }]) {
+            elementsById.set('canManageReusablePolicyApproval', { value: '1' });
+            sandbox.renderPolicyPreviewGroups({
+                ...grouping,
+                groups: [{ ...resolvedGroup, reusable_decision: reusableDecision }]
+            });
+            assert.ok(!container.innerHTML.includes('Ανάκληση πολιτικής'));
+        }
+
+        const revokeSource = source.slice(
+            source.indexOf('async function revokePolicyPreviewApproval'),
+            source.indexOf('async function confirmPolicyPreviewDecision')
+        );
+        assert.ok(revokeSource.includes('Υποχρεωτική αιτιολογία'));
+        assert.ok(revokeSource.includes('refreshPolicyPreviewApprovals(currentPolicyPreviewBaseParams)'));
+        assert.ok(revokeSource.includes('fetchPolicyPreviewGrouping(currentPolicyPreviewBaseParams)'));
+    } finally {
+        restoreSandboxFunctions(saved);
+        elementsById.delete('policyPreviewGroupsContainer');
+        elementsById.delete('canManageReusablePolicyApproval');
+    }
+}
+
+function testRevokedReusableHistoryDoesNotBlockNewApproval() {
+    const groupId = 'policy-preview-group-e00c43d2f21c212a';
+    const revoked = {
+        _id: '6a743bc11cc18bdde16f3dcd',
+        group_id: groupId,
+        decision_type: 'APPROVE_PREFILL',
+        decision_status: 'RECORDED',
+        reuse_scope: 'FUTURE_IDENTICAL',
+        reuse_status: 'REVOKED',
+        created_at: '2026-08-06T07:46:09.390Z'
+    };
+    const oneTimeReject = {
+        _id: 'one-time-reject',
+        group_id: groupId,
+        decision_type: 'REJECT_PROPOSAL',
+        decision_status: 'RECORDED',
+        reuse_scope: 'ONE_TIME',
+        reuse_status: 'NOT_APPLICABLE',
+        created_at: '2026-08-06T08:00:00.000Z'
+    };
+    const state = sandbox.buildPolicyPreviewApprovalsMap([revoked, oneTimeReject]).get(groupId);
+
+    assert.strictEqual(state.count, 2);
+    assert.strictEqual(state.historyDecisionTypes.has('APPROVE_PREFILL'), true);
+    assert.strictEqual(state.historyDecisionTypes.has('REJECT_PROPOSAL'), true);
+    assert.strictEqual(state.blockingDecisionTypes.has('APPROVE_PREFILL'), false);
+    assert.strictEqual(state.blockingDecisionTypes.has('REJECT_PROPOSAL'), true);
+    assert.strictEqual(state.latest._id, oneTimeReject._id);
+
+    const activeState = sandbox.buildPolicyPreviewApprovalsMap([{
+        ...revoked,
+        _id: 'active-reusable',
+        reuse_status: 'ACTIVE'
+    }]).get(groupId);
+    assert.strictEqual(activeState.count, 1);
+    assert.strictEqual(activeState.historyDecisionTypes.has('APPROVE_PREFILL'), true);
+    assert.strictEqual(activeState.blockingDecisionTypes.has('APPROVE_PREFILL'), true);
+
+    elementsById.set('canManageReusablePolicyApproval', { value: '1' });
+    try {
+        vm.runInContext('currentPolicyPreviewApprovalsByGroupId = new Map()', sandbox);
+        sandbox.currentPolicyPreviewApprovalsByGroupId = new Map([[groupId, state]]);
+        vm.runInContext(
+            `currentPolicyPreviewApprovalsByGroupId = buildPolicyPreviewApprovalsMap(${JSON.stringify([
+                revoked,
+                oneTimeReject
+            ])})`,
+            sandbox
+        );
+        const html = sandbox.renderPolicyPreviewApprovalPanel({
+            group_id: groupId,
+            status: 'PREFILLED_PENDING_APPROVAL',
+            items: [{ proposed_values: { kathgoria_ergasias_apologistika: 'ΕΡΓ' } }]
+        });
+        assert.ok(html.includes('Καταγεγραμμένες αποφάσεις:</span>\n                2'));
+        assert.ok(!/data-decision-type="APPROVE_PREFILL"[^>]*disabled/.test(html));
+        assert.ok(/data-decision-type="REJECT_PROPOSAL"[^>]*disabled/.test(html));
+        assert.ok(!/data-decision-type="NEEDS_MORE_REVIEW"[^>]*disabled/.test(html));
+
+        vm.runInContext(
+            `currentPolicyPreviewApprovalsByGroupId = buildPolicyPreviewApprovalsMap(${JSON.stringify([{
+                ...revoked,
+                _id: 'active-reusable',
+                reuse_status: 'ACTIVE'
+            }])})`,
+            sandbox
+        );
+        const activeHtml = sandbox.renderPolicyPreviewApprovalPanel({
+            group_id: groupId,
+            status: 'PREFILLED_PENDING_APPROVAL',
+            items: [{ proposed_values: { kathgoria_ergasias_apologistika: 'ΕΡΓ' } }]
+        });
+        assert.ok(/data-decision-type="APPROVE_PREFILL"[^>]*disabled/.test(activeHtml));
+
+        vm.runInContext(
+            `currentPolicyPreviewApprovalRecords = ${JSON.stringify([revoked])}; ` +
+                'currentPolicyPreviewApprovalsByGroupId = buildPolicyPreviewApprovalsMap(currentPolicyPreviewApprovalRecords)',
+            sandbox
+        );
+        assert.strictEqual(
+            vm.runInContext('currentPolicyPreviewApprovalRecords.length', sandbox),
+            1
+        );
+        assert.strictEqual(
+            vm.runInContext('currentPolicyPreviewApprovalRecords[0].reuse_status', sandbox),
+            'REVOKED'
+        );
+    } finally {
+        elementsById.delete('canManageReusablePolicyApproval');
+        vm.runInContext('currentPolicyPreviewApprovalsByGroupId = new Map()', sandbox);
+    }
 }
 
 function minimalElement(overrides = {}) {
@@ -1994,6 +2177,7 @@ function testRoleScopedRenderedEjs() {
     assert.ok(!hr.includes('id="policyPreviewGroupsContainer"'));
     assert.ok(hr.includes('id="ypokatasthmata"'));
     assert.ok(hr.includes('initYpokatasthmataDropdowns.js'));
+    assert.ok(/id="canManageReusablePolicyApproval"\s+value="1"/.test(hr));
 
     ['A', 'S'].forEach((role) => {
         const html = renderViewForRole(role);
@@ -2003,6 +2187,7 @@ function testRoleScopedRenderedEjs() {
         assert.ok(html.includes('id="policyPreviewGroupsContainer"'));
         assert.ok(html.includes('id="ypokatasthmata"'));
         assert.ok(html.includes('initYpokatasthmataDropdowns.js'));
+        assert.ok(/id="canManageReusablePolicyApproval"\s+value="1"/.test(html));
         assert.deepStrictEqual(duplicateIds(html), [], `${role} rendered duplicate IDs`);
     });
 
@@ -2013,6 +2198,7 @@ function testRoleScopedRenderedEjs() {
     assert.ok(!unknown.includes('initYpokatasthmataDropdowns.js'));
     assert.ok(unknown.includes('Δεν έχετε δικαίωμα χρήσης του ελέγχου απασχολήσεων.'));
     assert.ok(!unknown.includes('hr-review-decision-btn'));
+    assert.ok(/id="canManageReusablePolicyApproval"\s+value="0"/.test(unknown));
     assert.deepStrictEqual(duplicateIds(hr), [], 'HR rendered duplicate IDs');
     assert.deepStrictEqual(duplicateIds(unknown), [], 'UNKNOWN rendered duplicate IDs');
 }
@@ -2523,6 +2709,8 @@ const tests = [
     testGenericIsolationSourceContract,
     testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState,
     testPolicyDecisionAccordionIsCompactAndDecisionOnly,
+    testResolvedInheritedGroupOffersOnlySharedPolicyRevoke,
+    testRevokedReusableHistoryDoesNotBlockNewApproval,
     testMinimalWorkspaceEjsContract,
     testEmploymentReviewScrollContainerContract,
     testAllKnownBackendGroupingCodesHaveGreekLabels,

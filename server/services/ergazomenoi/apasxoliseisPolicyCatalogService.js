@@ -46,6 +46,29 @@ function deepFreeze(value) {
     return value;
 }
 
+function resolveEffectivePolicyParameters(policy, overrides = {}) {
+    const schema = policy?.allowed_parameters_schema || {};
+    const supplied = overrides && typeof overrides === 'object' && !Array.isArray(overrides)
+        ? overrides
+        : {};
+    const unknown = Object.keys(supplied).filter((key) => !Object.hasOwn(schema, key));
+    if (unknown.length) throw new Error(`UNKNOWN_POLICY_PARAMETER:${unknown.join(',')}`);
+
+    return Object.entries(schema).reduce((resolved, [key, definition]) => {
+        const value = Object.hasOwn(supplied, key) ? supplied[key] : definition.default;
+        if (value === undefined) throw new Error(`MISSING_POLICY_PARAMETER_DEFAULT:${key}`);
+        const validType = definition.type === 'integer'
+            ? Number.isInteger(value)
+            : typeof value === definition.type;
+        if (!validType || (definition.minimum !== undefined && value < definition.minimum) ||
+            (definition.maximum !== undefined && value > definition.maximum)) {
+            throw new Error(`INVALID_POLICY_PARAMETER:${key}`);
+        }
+        resolved[key] = value;
+        return resolved;
+    }, {});
+}
+
 const POLICY_RESULT_STATUS_DEFINITIONS = deepFreeze([
     {
         status: POLICY_RESULT_STATUS.OK,
@@ -554,5 +577,6 @@ module.exports = {
     getApasxoliseisPolicyCatalog,
     getApasxoliseisPolicyByCode,
     getApasxoliseisPoliciesByCategory,
+    resolveEffectivePolicyParameters,
     validateApasxoliseisPolicyCatalog
 };

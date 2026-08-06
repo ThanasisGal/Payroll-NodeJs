@@ -186,6 +186,7 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
     createPolicyPreviewApprovalRecord,
+    revokePolicyPreviewApprovalRecord,
     listPolicyPreviewApprovalRecords,
     listActiveReusablePolicyDecisionRecords
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService');
@@ -4286,7 +4287,8 @@ async function getReviewRowsForExport(req) {
         policyRows: policyContextRows,
         approvals,
         decisions: decisionsWithApplyState,
-        deviations: exportDeviations
+        deviations: exportDeviations,
+        findingsOnly: true
     });
     projection.rows.__deviations = exportDeviations;
     projection.rows.__projectionTotals = projection.totals;
@@ -6129,10 +6131,31 @@ class erganhController {
 
             return res.status(error.statusCode || 500).json({
                 success: false,
+                code: error.code || undefined,
+                existing_approval: error.existingApproval || undefined,
                 message:
                     error.statusCode && error.statusCode < 500
                         ? error.message
                         : 'Σφάλμα κατά την καταγραφή της απόφασης πολιτικής απασχολήσεων.'
+            });
+        }
+    };
+
+    static revokeProdhlomenaOrariaPolicyPreviewApproval = async (req, res) => {
+        try {
+            const approval = await revokePolicyPreviewApprovalRecord({
+                session: req.session,
+                approvalId: req.params.approvalId,
+                reason: req.body?.reason
+            });
+            return res.json({ success: true, approval, message: 'Η reusable πολιτική ανακλήθηκε.' });
+        } catch (error) {
+            console.error('[revokeProdhlomenaOrariaPolicyPreviewApproval] ❌', error);
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode && error.statusCode < 500
+                    ? error.message
+                    : 'Σφάλμα κατά την ανάκληση της reusable πολιτικής.'
             });
         }
     };

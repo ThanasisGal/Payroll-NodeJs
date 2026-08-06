@@ -7,6 +7,7 @@
     };
     const normalizedUserRole = String(userRole || '').trim().toUpperCase();
     const canRecordRepoTransferDecision = ['A', 'S', 'HR'].includes(normalizedUserRole);
+    const canManageReusablePolicyApproval = ['A', 'S', 'HR'].includes(normalizedUserRole);
     const canApplyRepoTransferDecision = ['A', 'S'].includes(normalizedUserRole);
     const canUseAdvancedEmploymentReview = ['A', 'S'].includes(normalizedUserRole);
     const companyInUse = companyId || '';
@@ -374,6 +375,11 @@
         type="hidden"
         id="canRecordRepoTransferDecision"
         value="<%= canRecordRepoTransferDecision ? '1' : '0' %>"
+    />
+    <input
+        type="hidden"
+        id="canManageReusablePolicyApproval"
+        value="<%= canManageReusablePolicyApproval ? '1' : '0' %>"
     />
     <input
         type="hidden"
