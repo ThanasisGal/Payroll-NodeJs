@@ -29,6 +29,8 @@ function makeRow({
         hmeromhnia: date,
         scenarioDecision: {
             scenario_code: scenarioCode,
+            scenario_version: 'scenario:v1',
+            rule_branch: reason,
             reasons: [reason]
         },
         scenarioFactsSummary: {
@@ -41,6 +43,8 @@ function makeRow({
         policyResult: {
             result_status: status,
             policy_code: policyCode,
+            policy_version: 'policy:v1',
+            rule_branch: reason,
             policy_title: policyCode ? `Policy ${policyCode}` : null,
             mode,
             reasons: [reason],
@@ -74,6 +78,9 @@ function testReusableDecisionMetadataIsProjectedWithoutNewHrObligation() {
 
     assert.deepStrictEqual(grouping.groups[0].reusable_decision, reusableDecision);
     assert.strictEqual(grouping.groups[0].items[0].reusable_decision.approval_id, 'approval-1');
+    assert.strictEqual(grouping.groups[0].status, 'RESOLVED_BY_POLICY');
+    assert.strictEqual(grouping.summary.by_status.RESOLVED_BY_POLICY, 1);
+    assert.strictEqual(grouping.summary.by_status.PREFILLED_PENDING_APPROVAL, undefined);
     assert.strictEqual(grouping.groups[0].reusable_eligible, false);
 }
 
@@ -97,6 +104,11 @@ function testPresentationKeepsUnderlyingApologistikaCategory() {
     assert.strictEqual(item.kathgoria_ergasias, 'ΕΡΓ');
     assert.strictEqual(item.kathgoria_ergasias_apologistika, 'ΑΔΕΙΑ');
     assert.strictEqual(item.proposed_values.kathgoria_ergasias_apologistika, 'ΑΝ');
+    assert.strictEqual(item.policy_context.policy_version, 'POLICY:V1');
+    assert.strictEqual(item.policy_context.scenario_version, 'SCENARIO:V1');
+    assert.strictEqual(item.policy_context.decision_grain, 'ROW_DAY');
+    assert.strictEqual(item.policy_context.rule_branch, 'REPO_TRANSFER_CANDIDATE');
+    assert.strictEqual(item.policy_context.proposed_values, undefined);
 }
 
 function testRestDiagnosticKeepsCompositePreviewIdentityAndDecisionFacts() {

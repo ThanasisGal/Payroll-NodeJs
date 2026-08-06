@@ -14,18 +14,8 @@ const REUSE_STATUS = Object.freeze({
     REVOKED: 'REVOKED'
 });
 
-const REUSABLE_DECISION_TYPES = new Set(['MARK_OK', 'MARK_REVIEWED', 'REJECT_PROPOSAL']);
-const NON_REUSABLE_POLICY_CODES = new Set([
-    'SPLIT_SHIFT_MINIMUM_REST',
-    'INTERDAY_MINIMUM_REST'
-]);
-const NON_REUSABLE_REASON_CODES = new Set([
-    'CARD_VERIFICATION_PENDING',
-    'UNKNOWN_PATTERN',
-    'SPLIT_REST_BELOW_MINIMUM',
-    'SPLIT_INTERVALS_OVERLAP',
-    'INTERDAY_REST_BELOW_MINIMUM',
-    'INTERDAY_INTERVALS_OVERLAP'
+const REUSABLE_DECISION_TYPES = new Set([
+    'APPROVE_PREFILL', 'MARK_OK', 'MARK_REVIEWED', 'REJECT_PROPOSAL'
 ]);
 
 function asArray(value) {
@@ -78,13 +68,179 @@ function buildReusableMatchCriteriaFromPreviewRow(row = {}, branch = '') {
     };
 }
 
-function buildReusableDecisionFingerprint(criteria = {}) {
-    const normalized = buildReusableMatchCriteriaFromGroup(criteria, criteria.ypokatasthma);
-    return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+function stableObject(value) {
+    const source = asObject(value);
+    return Object.keys(source).sort().reduce((result, key) => {
+        result[key] = source[key];
+        return result;
+    }, {});
 }
 
-function containsProposedValues(items = []) {
-    return asArray(items).some((item) => Object.keys(asObject(item?.proposed_values)).length > 0);
+function stableValue(value) {
+    if (Array.isArray(value)) return value.map(stableValue);
+    if (!value || typeof value !== 'object') return value;
+    return Object.keys(value).sort().reduce((result, key) => {
+        result[key] = stableValue(value[key]);
+        return result;
+    }, {});
+}
+
+function buildPolicySpecificConditions(policyCode, scenarioCode, facts = {}, supplied = {}) {
+    const policy = normalize(policyCode, '');
+    const scenario = normalize(scenarioCode, '');
+    const evidenceClass = facts.has_cards === true
+        ? 'VERIFIED_CARDS'
+        : facts.has_zero_length_card_interval === true
+            ? 'UNRESOLVED_CARD_EVIDENCE'
+            : 'NO_CARDS';
+    if (['SPLIT_SHIFT_MINIMUM_REST', 'INTERDAY_MINIMUM_REST'].includes(policy)) {
+        return stableValue(supplied);
+    }
+    if (policy === 'NO_CARDS_DECLARED_WORK_LEAVE_OR_HOLIDAY') {
+        const conditions = {
+            declared_category: normalize(facts.declared_category, ''),
+            card_evidence_class: evidenceClass
+        };
+        if (scenario.includes('HOLIDAY')) {
+            Object.assign(conditions, {
+                holiday_class: facts.is_mandatory_holiday === true
+                    ? 'MANDATORY'
+                    : facts.is_optional_holiday === true ? 'OPTIONAL' : 'NONE'
+            });
+        }
+        return stableValue({ ...conditions, ...asObject(supplied) });
+    }
+    if (['WEEKLY_REPO_BALANCE', 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS'].includes(policy)) {
+        return stableValue({
+            declared_category: normalize(facts.declared_category, ''),
+            card_evidence_class: evidenceClass,
+            ...asObject(supplied)
+        });
+    }
+    return stableValue(supplied);
+}
+
+function buildReusablePolicyContextFromPreviewRow(row = {}) {
+    const policy = asObject(row.policyResult);
+    const scenario = asObject(row.scenarioDecision);
+    const facts = asObject(row.scenarioFactsSummary);
+    const audit = asObject(policy.audit_payload);
+    return {
+        policy_version: normalize(policy.policy_version || audit.policy_version, ''),
+        scenario_version: normalize(scenario.scenario_version || audit.scenario_version, ''),
+        decision_grain: normalize(policy.decision_grain || 'ROW_DAY'),
+        rule_branch: normalize(policy.rule_branch || scenario.rule_branch, ''),
+        parameters: stableValue(audit.parameters),
+        thresholds: stableValue({
+            ...asObject(scenario.policy_thresholds),
+            ...asObject(policy.policy_thresholds)
+        }),
+        conditions: buildPolicySpecificConditions(
+            policy.policy_code,
+            scenario.scenario_code,
+            facts,
+            { ...asObject(scenario.policy_conditions), ...asObject(policy.policy_conditions) }
+        ),
+        application_gates: {
+            is_locked: facts.is_locked === true,
+            has_manual_override: facts.has_manual_override === true
+        }
+    };
+}
+
+function buildReusablePolicyCriteria(groupCriteria = {}, item = {}) {
+    const context = asObject(item.policy_context);
+    return stableValue({
+        version: 3,
+        team: normalize(groupCriteria.team, ''),
+        company_kod: normalize(groupCriteria.company_kod, ''),
+        ypokatasthma: normalizeBranch(groupCriteria.ypokatasthma),
+        employee_kodikos: normalize(item.employee_kodikos, ''),
+        policy_code: normalize(groupCriteria.policy_code),
+        scenario_code: normalize(groupCriteria.scenario_code),
+        action_type: normalize(groupCriteria.action_type),
+        policy_version: normalize(context.policy_version, ''),
+        scenario_version: normalize(context.scenario_version, ''),
+        decision_grain: normalize(context.decision_grain, ''),
+        rule_branch: normalize(context.rule_branch, ''),
+        parameters: stableValue(context.parameters),
+        thresholds: stableValue(context.thresholds),
+        conditions: stableValue(context.conditions)
+    });
+}
+
+function buildReusablePolicyCriteriaV4(groupCriteria = {}, item = {}) {
+    const context = asObject(item.policy_context);
+    return stableValue({
+        version: 4,
+        team: normalize(groupCriteria.team, ''),
+        company_kod: normalize(groupCriteria.company_kod, ''),
+        ypokatasthma: normalizeBranch(groupCriteria.ypokatasthma),
+        policy_code: normalize(groupCriteria.policy_code),
+        scenario_code: normalize(groupCriteria.scenario_code),
+        action_type: normalize(groupCriteria.action_type),
+        policy_version: normalize(context.policy_version, ''),
+        scenario_version: normalize(context.scenario_version, ''),
+        decision_grain: normalize(context.decision_grain, ''),
+        rule_branch: normalize(context.rule_branch, ''),
+        parameters: stableValue(asObject(context.parameters)),
+        thresholds: stableValue(asObject(context.thresholds)),
+        conditions: stableValue(asObject(context.conditions))
+    });
+}
+
+function buildReusableItemMatchCriteria(groupCriteria = {}, item = {}) {
+    const flags = asObject(item.flags);
+    return {
+        ...buildReusableMatchCriteriaFromGroup(groupCriteria, groupCriteria.ypokatasthma),
+        version: 2,
+        team: normalize(groupCriteria.team, ''),
+        company_kod: normalize(groupCriteria.company_kod, ''),
+        decision_type: normalize(groupCriteria.decision_type, ''),
+        employee_kodikos: normalize(item.employee_kodikos, ''),
+        declared_category: normalize(item.kathgoria_ergasias, ''),
+        apologistika_category: normalize(item.kathgoria_ergasias_apologistika, ''),
+        declared_hours: Number(item.declared_hours ?? 0),
+        card_hours: Number(item.cards_ores_ergasias ?? 0),
+        conditions: stableObject(flags),
+        proposed_values: stableObject(item.proposed_values)
+    };
+}
+
+function buildReusableItemMatchCriteriaFromPreviewRow(row = {}, decisionType = '') {
+    const facts = asObject(row.scenarioFactsSummary);
+    const policy = asObject(row.policyResult);
+    return buildReusableItemMatchCriteria({
+        ...buildReusableMatchCriteriaFromPreviewRow(row),
+        team: row.team,
+        company_kod: row.company_kod,
+        decision_type: decisionType
+    }, {
+        employee_kodikos: row.kodikos,
+        kathgoria_ergasias: facts.declared_category,
+        kathgoria_ergasias_apologistika: facts.apologistika_category,
+        declared_hours: facts.declared_hours,
+        cards_ores_ergasias: facts.card_hours,
+        proposed_values: policy.proposed_updates,
+        flags: {
+            has_cards: facts.has_cards === true,
+            is_holiday: facts.is_holiday === true,
+            is_mandatory_holiday: facts.is_mandatory_holiday === true,
+            is_optional_holiday: facts.is_optional_holiday === true,
+            is_locked: facts.is_locked === true,
+            has_manual_override: facts.has_manual_override === true,
+            blocked: policy.blocked === true,
+            requires_human_approval: policy.requires_human_approval === true,
+            batch_approvable: policy.batch_approvable === true
+        }
+    });
+}
+
+function buildReusableDecisionFingerprint(criteria = {}) {
+    const normalized = Number(criteria.version) >= 2
+        ? stableValue(criteria)
+        : buildReusableMatchCriteriaFromGroup(criteria, criteria.ypokatasthma);
+    return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 
 function getReusableDecisionEligibility({ group = {}, decisionType = '', items = group.items } = {}) {
@@ -98,39 +254,20 @@ function getReusableDecisionEligibility({ group = {}, decisionType = '', items =
             reason: 'Ο συγκεκριμένος τύπος απόφασης δεν μπορεί να γίνει μόνιμος κανόνας.'
         };
     }
-    if (criteria.status !== 'NEEDS_REVIEW' && criteria.status !== 'OK') {
+    if (['UNKNOWN', 'RESOLVED_BY_POLICY'].includes(criteria.status) || criteria.policy_code === 'UNKNOWN') {
         return {
             eligible: false,
             reason_code: 'STATUS_NOT_REUSABLE',
             reason: 'Η κατάσταση δεν είναι ασφαλής για επαναχρησιμοποίηση.'
         };
     }
-    if (NON_REUSABLE_POLICY_CODES.has(criteria.policy_code)) {
-        return {
-            eligible: false,
-            reason_code: 'LEGAL_REST_RULE',
-            reason: 'Οι παραβάσεις ελάχιστης ανάπαυσης δεν μπορούν να καλυφθούν από παλιότερη έγκριση.'
-        };
-    }
-    if (NON_REUSABLE_REASON_CODES.has(criteria.reason_code)) {
-        return {
-            eligible: false,
-            reason_code: 'UNVERIFIED_OR_LEGAL_FACTS',
-            reason: 'Η περίπτωση απαιτεί πλήρη στοιχεία ή νέο νομικό έλεγχο.'
-        };
-    }
-    if (containsProposedValues(items)) {
-        return {
-            eligible: false,
-            reason_code: 'PROPOSED_DATA_CHANGE',
-            reason: 'Πρόταση που μεταβάλλει δεδομένα χρειάζεται έγκριση των συγκεκριμένων τιμών.'
-        };
-    }
-
     return { eligible: true, reason_code: '', reason: '' };
 }
 
 function utcDateKey(value) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string' && value.trim() === '') return null;
+
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
 }
@@ -169,9 +306,13 @@ function applyReusablePolicyDecisionsToPreviewRows({ rows = [], rules = [] } = {
         ) {
             return;
         }
-        const fingerprint = String(rule.reuse_fingerprint || '').trim();
-        if (!fingerprint || activeRulesByFingerprint.has(fingerprint)) return;
-        activeRulesByFingerprint.set(fingerprint, rule);
+        const fingerprints = asArray(rule.reuse_fingerprints).length
+            ? rule.reuse_fingerprints
+            : [rule.reuse_fingerprint];
+        fingerprints.map((value) => String(value || '').trim()).filter(Boolean).forEach((fingerprint) => {
+            if (!activeRulesByFingerprint.has(fingerprint)) activeRulesByFingerprint.set(fingerprint, []);
+            activeRulesByFingerprint.get(fingerprint).push(rule);
+        });
     });
 
     return asArray(rows).map((row) => {
@@ -183,8 +324,78 @@ function applyReusablePolicyDecisionsToPreviewRows({ rows = [], rules = [] } = {
         });
         if (!eligibility.eligible) return row;
 
-        const fingerprint = buildReusableDecisionFingerprint(criteria);
-        const rule = activeRulesByFingerprint.get(fingerprint);
+        const policyContext = buildReusablePolicyContextFromPreviewRow(row);
+        const policyCriteriaBase = {
+            ...criteria,
+            team: row.team,
+            company_kod: row.company_kod
+        };
+        const v4Criteria = buildReusablePolicyCriteriaV4(
+            policyCriteriaBase,
+            { policy_context: policyContext }
+        );
+        const v4Fingerprint = buildReusableDecisionFingerprint(v4Criteria);
+        const effectiveV4Rules = (activeRulesByFingerprint.get(v4Fingerprint) || [])
+            .filter((candidate) => isRuleEffectiveForRow(candidate, row));
+        if (effectiveV4Rules.length > 1) {
+            return {
+                ...row,
+                policyResult: {
+                    ...asObject(row.policyResult),
+                    reusable_conflict: true,
+                    reusable_conflict_code: 'MULTIPLE_ACTIVE_REUSABLE_DECISIONS'
+                }
+            };
+        }
+        const v3Criteria = buildReusablePolicyCriteria(
+            policyCriteriaBase,
+            { employee_kodikos: row.kodikos, policy_context: policyContext }
+        );
+        const v3Fingerprint = buildReusableDecisionFingerprint(v3Criteria);
+        const effectiveV3Rules = (activeRulesByFingerprint.get(v3Fingerprint) || [])
+            .filter((candidate) => isRuleEffectiveForRow(candidate, row));
+        if (effectiveV3Rules.length > 1) {
+            return {
+                ...row,
+                policyResult: {
+                    ...asObject(row.policyResult),
+                    reusable_conflict: true,
+                    reusable_conflict_code: 'MULTIPLE_ACTIVE_REUSABLE_DECISIONS'
+                }
+            };
+        }
+        const gates = asObject(policyContext.application_gates);
+        const matchedPolicyRule = effectiveV4Rules[0] || effectiveV3Rules[0] || null;
+        if (matchedPolicyRule && (gates.is_locked || gates.has_manual_override)) {
+            return {
+                ...row,
+                policyResult: {
+                    ...asObject(row.policyResult),
+                    reusable_application_blocked: true,
+                    reusable_application_gate_code: gates.is_locked
+                        ? 'CURRENT_RECORD_LOCKED'
+                        : 'CURRENT_MANUAL_OVERRIDE'
+                }
+            };
+        }
+        let rule = matchedPolicyRule;
+        const v2Fingerprints = [...REUSABLE_DECISION_TYPES].map((decisionType) =>
+            buildReusableDecisionFingerprint(
+                buildReusableItemMatchCriteriaFromPreviewRow(row, decisionType)
+            ));
+        const legacyFingerprint = buildReusableDecisionFingerprint(criteria);
+        if (!rule) rule = v2Fingerprints.flatMap((fingerprint) =>
+            activeRulesByFingerprint.get(fingerprint) || []).find((candidate) =>
+            isRuleEffectiveForRow(candidate, row)) || null;
+        if (!rule) {
+            const legacyRule = (activeRulesByFingerprint.get(legacyFingerprint) || [])[0];
+            const employeeCodes = new Set(asArray(legacyRule?.items).map((item) => normalize(item.employee_kodikos, '')).filter(Boolean));
+            const sameLegacyScope = legacyRule &&
+                normalize(legacyRule.team, '') === normalize(row.team, '') &&
+                normalize(legacyRule.company_kod, '') === normalize(row.company_kod, '') &&
+                normalizeBranch(legacyRule.ypokatasthma) === normalizeBranch(row.ypokatasthma);
+            if (sameLegacyScope && employeeCodes.has(normalize(row.kodikos, ''))) rule = legacyRule;
+        }
         if (!rule || !isRuleEffectiveForRow(rule, row)) return row;
 
         return {
@@ -210,7 +421,14 @@ module.exports = {
     REUSABLE_DECISION_TYPES,
     buildReusableMatchCriteriaFromGroup,
     buildReusableMatchCriteriaFromPreviewRow,
+    buildReusablePolicyContextFromPreviewRow,
+    buildReusablePolicyCriteria,
+    buildReusablePolicyCriteriaV4,
+    buildReusableItemMatchCriteria,
+    buildReusableItemMatchCriteriaFromPreviewRow,
     buildReusableDecisionFingerprint,
     getReusableDecisionEligibility,
+    utcDateKey,
+    isRuleEffectiveForRow,
     applyReusablePolicyDecisionsToPreviewRows
 };

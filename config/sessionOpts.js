@@ -1,21 +1,26 @@
 const MongoStore = require('connect-mongo');
+const {
+    automaticDbSchemaOperationsEnabled,
+    buildSessionStoreOptions
+} = require('../server/config/automaticDbSchemaOperations');
 
 const isProd = process.env.NODE_ENV === 'production';
 const diarkeia_session = Number(process.env.DIARKEIA_SESSION || 60);
 const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secret";
 const mongoUrl = process.env.MONGODB_URL;
+const sessionStoreAutomaticIndexCreationEnabled = automaticDbSchemaOperationsEnabled();
 
 const sessionOpts = {
     secret: process.env.SESSION_SECRET || process.env.SECRET || "default-secret",
     resave: false,
     saveUninitialized: false,
     store: mongoUrl
-        ? MongoStore.create({
+        ? MongoStore.create(buildSessionStoreOptions({
                 mongoUrl,
                 ttl: 60 * diarkeia_session,
                 autoRemove: 'native',
                 touchAfter: 60 * 10,
-            })
+            }))
         : undefined,
     cookie: {
         maxAge  : 1000 * 60 * diarkeia_session,
@@ -30,4 +35,4 @@ const sessionOpts = {
     unset: 'destroy',  // ✅ Clear session on logout
 };
 
-module.exports = { sessionOpts, isProd };
+module.exports = { sessionOpts, isProd, sessionStoreAutomaticIndexCreationEnabled };

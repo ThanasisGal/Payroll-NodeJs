@@ -152,6 +152,7 @@ function isResolvedUnscheduledDayWithCards(facts = {}) {
 
 function buildScenarioDecision({
     scenario_code,
+    rule_branch,
     confidence,
     requires_review,
     reasons = [],
@@ -166,6 +167,7 @@ function buildScenarioDecision({
     return {
         scenario_code,
         scenario_version: SCENARIO_VERSION,
+        rule_branch,
         confidence,
         requires_review: requires_review === true,
         decision_status:
@@ -191,6 +193,7 @@ function makeDecision(template, facts, options = {}) {
 
     return buildScenarioDecision({
         scenario_code: template.scenario_code,
+        rule_branch: template.rule_branch || template.scenario_code,
         confidence: template.confidence,
         requires_review: template.requires_review,
         reasons: template.reasons,
@@ -218,6 +221,7 @@ function makeUnknownDecision(facts = {}) {
 
     return buildScenarioDecision({
         scenario_code: SCENARIO_CODES.UNKNOWN_PATTERN_REQUIRES_REVIEW,
+        rule_branch: SCENARIO_CODES.UNKNOWN_PATTERN_REQUIRES_REVIEW,
         confidence: CONFIDENCE.LOW,
         requires_review: true,
         reasons,

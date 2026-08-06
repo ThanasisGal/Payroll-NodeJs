@@ -5,7 +5,8 @@ const {
     POLICY_RESULT_STATUS,
     POLICY_MODE,
     getApasxoliseisPolicyCatalog,
-    getApasxoliseisPolicyByCode
+    getApasxoliseisPolicyByCode,
+    resolveEffectivePolicyParameters
 } = require('./apasxoliseisPolicyCatalogService');
 
 function asObject(value) {
@@ -243,6 +244,24 @@ function evaluateApasxoliseisPolicyForScenario(input = {}) {
     }
 
     const policy = selected.policy;
+    let effectiveParameters;
+    try {
+        effectiveParameters = resolveEffectivePolicyParameters(policy, safeInput.parameters);
+    } catch (error) {
+        return buildEmptyResult({
+            success: false,
+            policy,
+            mode: policy.default_mode,
+            result_status: POLICY_RESULT_STATUS.CONFLICT_AMBIGUOUS,
+            reasons,
+            warnings: uniqueArray([...warnings, error.message]),
+            blocked: true,
+            blocked_reasons: ['INVALID_EFFECTIVE_POLICY_PARAMETERS'],
+            audit_payload: { policy_code: policy.policy_code, policy_version: policy.policy_version,
+                scenario_code: scenarioCode, scenario_version: scenarioDecision.scenario_version,
+                parameters_resolution_error: error.message }
+        });
+    }
     const resolvedMode = resolveMode(policy, safeInput.mode);
     const filteredUpdates = filterAllowedProposedUpdates(
         policy,
@@ -289,6 +308,7 @@ function evaluateApasxoliseisPolicyForScenario(input = {}) {
         batch_approvable: policy.batch_approvable === true,
         requires_human_approval: policy.requires_human_approval === true,
         reasons: uniqueArray(reasons),
+        rule_branch: String(scenarioDecision.rule_branch || '').trim(),
         warnings: allWarnings,
         proposed_updates: proposedUpdates,
         blocked: uniqueBlockedReasons.length > 0,
@@ -296,7 +316,7 @@ function evaluateApasxoliseisPolicyForScenario(input = {}) {
         audit_payload: buildAuditPayload({
             policy,
             mode: resolvedMode.mode,
-            parameters: safeInput.parameters,
+            parameters: effectiveParameters,
             context: safeInput.context,
             scenarioDecision,
             proposedUpdateFields: Object.keys(proposedUpdates),

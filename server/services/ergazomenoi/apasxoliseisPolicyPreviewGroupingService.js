@@ -3,7 +3,8 @@
 
 const crypto = require('crypto');
 const {
-    getReusableDecisionEligibility
+    getReusableDecisionEligibility,
+    buildReusablePolicyContextFromPreviewRow
 } = require('./apasxoliseisReusablePolicyDecisionService');
 
 const STATUS_PRIORITY = Object.freeze({
@@ -111,9 +112,11 @@ function buildPreviewItem(row = {}) {
             factsSummary.kathgoria_ergasias_apologistika ||
             null,
         cards_ores_ergasias: factsSummary.card_hours ?? null,
+        declared_hours: factsSummary.declared_hours ?? null,
         diagnostic_details: asObject(factsSummary.rest_period_diagnostic),
         reusable_decision: asObject(policyResult.reusable_decision),
         proposed_values: asObject(policyResult.proposed_updates),
+        policy_context: buildReusablePolicyContextFromPreviewRow(row),
         flags: {
             has_cards: factsSummary.has_cards === true,
             is_holiday: factsSummary.is_holiday === true,

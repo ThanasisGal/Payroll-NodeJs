@@ -137,7 +137,16 @@ function testUnsafeBlankDaysRemainUnknown() {
             label
         );
         assert.strictEqual(decision.can_auto_apply, false, label);
+        assert.strictEqual(decision.rule_branch, 'UNKNOWN_PATTERN_REQUIRES_REVIEW', label);
     });
+}
+
+function testScenarioExposesStableRuleBranch() {
+    const facts = buildApasxoliseisScenarioFacts(productionUnscheduledRow({
+        kathgoria_ergasias: 'ΜΕ', cards_ores_ergasias: 8
+    }));
+    const decision = matchApasxoliseisScenarioFacts(facts);
+    assert.strictEqual(decision.rule_branch, decision.scenario_code);
 }
 
 function run() {
@@ -145,6 +154,7 @@ function run() {
     testProductionUnscheduledHolidayWorkIsResolvedWithoutHrReview();
     testIncompleteApologistikaStillRequireReview();
     testUnsafeBlankDaysRemainUnknown();
+    testScenarioExposesStableRuleBranch();
     console.log('apasxoliseis scenario matcher tests passed');
 }
 

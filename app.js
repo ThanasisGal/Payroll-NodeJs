@@ -2,6 +2,12 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
+const mongoose = require('mongoose');
+const {
+    configureMongooseAutomaticSchemaOperations
+} = require('./server/config/automaticDbSchemaOperations');
+const automaticDbSchemaOperations = configureMongooseAutomaticSchemaOperations(mongoose);
+
 const node_env = process.env.NODE_ENV || 'development';
 
 // Ρύθμιση static assets
@@ -24,14 +30,17 @@ const expressLayout = require('express-ejs-layouts');
 const methodOverride = require('method-override');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const { sessionOpts, isProd } = require('./config/sessionOpts');
+const {
+    sessionOpts,
+    isProd,
+    sessionStoreAutomaticIndexCreationEnabled
+} = require('./config/sessionOpts');
 const flash = require('express-flash-message').default;
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./server/config/db');
-const mongoose = require('mongoose');
 mongoose.set('sanitizeFilter', true);
 const geoGuard = require('./server/middlewares/geoGuard');
 const usersRoute = require('./server/routes/usersRoute');
@@ -61,6 +70,7 @@ const textCacheManager = require('./server/utils/textCacheManager');
 const {
     startPayrollPrecalcScheduler
 } = require('./server/services/kinhseis/workFactsSchedulerRunner');
+const { startUsageCleanupGuarded } = require('./server/utils/usageCleanupStartupGuard');
 
 const app = express();
 app.disable('x-powered-by');
@@ -89,6 +99,9 @@ logger.info(`STATIC_BASE:       ${STATIC_BASE}`);
 logger.info(`isProd:            ${isProd}`);
 logger.info(`CDN_DOMAIN:        ${CDN_DOMAIN}`);
 logger.info(`S3_BUCKET:         ${S3_BUCKET}`);
+logger.info(`DB autoIndex:      ${automaticDbSchemaOperations.autoIndex === false ? 'disabled' : 'default'}`);
+logger.info(`DB autoCreate:     ${automaticDbSchemaOperations.autoCreate === false ? 'disabled' : 'default'}`);
+logger.info(`Session TTL index: ${sessionStoreAutomaticIndexCreationEnabled ? 'default' : 'disabled'}`);
 if (CLOUDFRONT_DOMAIN) {
     logger.info(`CloudFront:         ${CLOUDFRONT_DOMAIN}`);
 }
@@ -912,11 +925,9 @@ async function startServer() {
         // ✅ Usage Cleanup Job -- τρέχει κάθε 5 λεπτά
         const { cleanupOrphanedSessions } = require('./server/utils/usageCleanup');
 
-        // Τρέξε αμέσως κατά την εκκίνηση
-        cleanupOrphanedSessions();
-
-        // Και μετά κάθε 5 λεπτά
-        setInterval(cleanupOrphanedSessions, 5 * 60 * 1000);
+        app.locals.usageCleanup = startUsageCleanupGuarded({
+            cleanup: cleanupOrphanedSessions
+        });
 
         app.locals.payrollPrecalcScheduler = startPayrollPrecalcScheduler();
 
