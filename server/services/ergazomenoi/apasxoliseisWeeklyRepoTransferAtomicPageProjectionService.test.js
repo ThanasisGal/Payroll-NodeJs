@@ -10,6 +10,9 @@ const {
     MAX_ATOMIC_PERIOD_DAYS,
     INPUT_REASON
 } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
+const {
+    buildAtomicReusableCriteriaV5
+} = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService');
 
 function dateKey(start, offset) {
     const date = new Date(`${start}T00:00:00.000Z`);
@@ -726,6 +729,99 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
     assert.strictEqual(combined.summary.employees_count, 2);
 }
 
+function testAtomicReusableApprovalResolvesOnlyMetadata() {
+    const built = { weeklyInputs: [weeklyInput(fullTimeWeek())] };
+    const pending = buildWeeklyRepoTransferAtomicPageProjection(built);
+    const currentGroup = pending.groups[0];
+    const currentValues = JSON.stringify({
+        items: currentGroup.items,
+        repo_resolution: currentGroup.repo_resolution
+    });
+    const fingerprint = buildAtomicReusableCriteriaV5(currentGroup).fingerprint;
+    const active = {
+        _id: 'approval-v5',
+        reuse_scope: 'FUTURE_IDENTICAL',
+        reuse_status: 'ACTIVE',
+        decision_status: 'RECORDED',
+        decision_type: 'APPROVE_PROPOSAL',
+        reuse_effective_from: '2026-07-01',
+        reuse_effective_to: null,
+        reuse_fingerprint: fingerprint,
+        created_by_user_name: 'HR User',
+        created_at: '2026-07-20T10:00:00.000Z'
+    };
+    const resolved = buildWeeklyRepoTransferAtomicPageProjection(built, {
+        reusableApprovals: [active]
+    });
+    assert.strictEqual(resolved.groups[0].status, 'RESOLVED_BY_POLICY');
+    assert.deepStrictEqual(resolved.groups[0].reusable_decision, {
+        approval_id: 'approval-v5',
+        approved_by_user_name: 'HR User',
+        approved_at: '2026-07-20T10:00:00.000Z',
+        effective_from: '2026-07-01',
+        effective_to: null,
+        fingerprint_version: 5
+    });
+    assert.strictEqual(JSON.stringify({
+        items: resolved.groups[0].items,
+        repo_resolution: resolved.groups[0].repo_resolution
+    }), currentValues);
+
+    for (const overrides of [
+        { reuse_effective_from: '2026-07-08' },
+        { reuse_effective_to: '2026-07-09' },
+        { reuse_status: 'REVOKED' }
+    ]) {
+        const result = buildWeeklyRepoTransferAtomicPageProjection(built, {
+            reusableApprovals: [{ ...active, ...overrides }]
+        });
+        assert.strictEqual(result.groups[0].status, 'NEEDS_REVIEW');
+        assert.strictEqual(result.groups[0].reusable_decision, undefined);
+    }
+    const conflict = buildWeeklyRepoTransferAtomicPageProjection(built, {
+        reusableApprovals: [active, { ...active, _id: 'approval-v5-duplicate' }]
+    });
+    assert.strictEqual(conflict.groups[0].status, 'NEEDS_REVIEW');
+    assert.strictEqual(conflict.groups[0].reusable_conflict, true);
+    assert.ok(conflict.groups[0].atomic_reusable_diagnostics.includes(
+        'ATOMIC_REUSABLE_MULTIPLE_ACTIVE_MATCHES'
+    ));
+}
+
+function testAtomicPreviewOverlapKeepsEveryGroupPending() {
+    const original = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: [weeklyInput(fullTimeWeek())]
+    }).groups[0];
+    const first = JSON.parse(JSON.stringify(original));
+    const second = JSON.parse(JSON.stringify(original));
+    second.group_id = `${first.group_id}-overlap`;
+    second.group_key = `${first.group_key}-overlap`;
+    second.items[1].prodhlomena_oraria_id = 'overlap-target-2';
+    second.items[1].preview_id = 'overlap-target-preview-2';
+    second.representative_item = second.items[0];
+    const projected = [first, second];
+    let index = 0;
+    const result = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: [{ weekRows: fullTimeWeek() }, { weekRows: fullTimeWeek() }]
+    }, {
+        singleWeekProjectionBuilder: () => ({
+            projection_status: 'READY',
+            reasons: [],
+            warnings: [],
+            review_outcomes: [],
+            groups: [projected[index++]]
+        })
+    });
+    assert.strictEqual(result.groups.length, 2);
+    result.groups.forEach((group) => {
+        assert.strictEqual(group.status, 'NEEDS_REVIEW');
+        assert.strictEqual(group.reusable_conflict, true);
+        assert.ok(group.atomic_reusable_diagnostics.includes(
+            'ATOMIC_LINKED_SET_ROW_OVERLAP'
+        ));
+    });
+}
+
 function run() {
     testCompleteWeekInputConstruction();
     testOpenTrailingWeekIsDistinctFromCompletedPartialFilter();
@@ -741,6 +837,8 @@ function run() {
     testDeterminismOwnershipAndInputPreservation();
     testWarningsAndResponseComposition();
     testReviewOutcomeSummaryIdentityAndSorting();
+    testAtomicReusableApprovalResolvesOnlyMetadata();
+    testAtomicPreviewOverlapKeepsEveryGroupPending();
     console.log('apasxoliseis weekly repo transfer atomic page projection tests passed');
 }
 

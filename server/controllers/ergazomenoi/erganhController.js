@@ -1307,7 +1307,9 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     requestedPeriodEnd,
     authoritativeAsOfDate,
     holidayByDateKey,
-    holidayContextResolved
+    holidayContextResolved,
+    reusableApprovals = [],
+    includeContextGroups = false
 }) {
     const rangeDiagnostic = getAtomicPeriodRangeDiagnostic({
         periodStart: requestedPeriodStart,
@@ -1479,8 +1481,9 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     });
 
     return buildWeeklyRepoTransferAtomicPageProjection(builtInputs, {
-        presentationStart: requestedPeriodStart,
-        presentationEnd: requestedPeriodEnd
+        presentationStart: includeContextGroups ? analysisPeriodStart : requestedPeriodStart,
+        presentationEnd: includeContextGroups ? analysisPeriodEnd : requestedPeriodEnd,
+        reusableApprovals
     });
 }
 
@@ -4282,12 +4285,41 @@ async function getReviewRowsForExport(req) {
         ...decision,
         ...(executionByDecisionId.get(String(decision._id || '')) || {})
     }));
+    const atomicAnalysisStart = periodStart ? startOfWeekMondayUtc(periodStart) : null;
+    const atomicAnalysisEnd = periodEnd ? endOfWeekSundayUtc(periodEnd) : null;
+    const atomicScenarioContext = atomicAnalysisStart && atomicAnalysisEnd
+        ? await buildNoCardsDisplayContext({
+              team: req.session.userTeam,
+              companyId: req.session.companyInUse,
+              companyKodikos: req.session.companyKodikos,
+              etos: req.session.yearInUse,
+              periodStart: atomicAnalysisStart,
+              periodEnd: atomicAnalysisEnd
+          })
+        : null;
+    const activeReusableApprovals = await listActiveReusablePolicyDecisionRecords({
+        session: req.session,
+        ypokatasthma: String(req.query.ypokatasthma || '').trim()
+    });
+    const atomicGroupProjection = await buildAtomicRepoTransferPolicyPreviewProjection({
+        sessionTeam: req.session.userTeam,
+        companyId: req.session.companyInUse,
+        fullPeriodFilter: reviewFilter,
+        requestedPeriodStart: periodStart,
+        requestedPeriodEnd: periodEnd,
+        authoritativeAsOfDate: req.session.appDate,
+        holidayByDateKey: atomicScenarioContext?.argiesByDateKey || new Map(),
+        holidayContextResolved: Boolean(atomicScenarioContext?.argiesByDateKey instanceof Map),
+        reusableApprovals: activeReusableApprovals,
+        includeContextGroups: true
+    });
     const projection = buildReviewExportProjection({
         rows: enrichedRows,
         policyRows: policyContextRows,
         approvals,
         decisions: decisionsWithApplyState,
         deviations: exportDeviations,
+        atomicGroupProjection,
         findingsOnly: true
     });
     projection.rows.__deviations = exportDeviations;
@@ -5990,7 +6022,8 @@ class erganhController {
                 holidayByDateKey: atomicScenarioContext?.argiesByDateKey || new Map(),
                 holidayContextResolved: Boolean(
                     atomicScenarioContext?.argiesByDateKey instanceof Map
-                )
+                ),
+                reusableApprovals: reusableDecisionRules
             });
 
             return res.json(
@@ -6112,9 +6145,84 @@ class erganhController {
 
     static createProdhlomenaOrariaPolicyPreviewApproval = async (req, res) => {
         try {
+            const requestedDecisionGrain = String(
+                req.body?.group?.decision_grain || ''
+            ).trim().toUpperCase();
+            let authoritativeAtomicGroup = null;
+            let authoritativeAtomicOverlap = null;
+            if (requestedDecisionGrain === 'ATOMIC_LINKED_SET') {
+                const requestedPeriodStart = asDateOnlyUtc(req.body?.apo_hmeromhnia);
+                const requestedPeriodEnd = asDateOnlyUtc(req.body?.eos_hmeromhnia, true);
+                const branchInput = String(req.body?.ypokatasthma || '').trim();
+                const branch = branchInput ? branchInput.padStart(4, '0') : '';
+                if (
+                    Number.isNaN(requestedPeriodStart.getTime()) ||
+                    Number.isNaN(requestedPeriodEnd.getTime()) ||
+                    requestedPeriodStart > requestedPeriodEnd ||
+                    !branch
+                ) {
+                    const error = new Error('Λείπει το έγκυρο πεδίο ατομικής προεπισκόπησης του διακομιστή.');
+                    error.statusCode = 400;
+                    throw error;
+                }
+                const fullPeriodFilter = {
+                    team: req.session.userTeam,
+                    company_kod: req.session.companyInUse,
+                    ypokatasthma: branch
+                };
+                await applyEmploymentDepartureScopeToFilters({
+                    filters: [fullPeriodFilter],
+                    team: req.session.userTeam,
+                    companyId: req.session.companyInUse,
+                    ypokatasthma: branch
+                });
+                const atomicScenarioContext = await buildNoCardsDisplayContext({
+                    team: req.session.userTeam,
+                    companyId: req.session.companyInUse,
+                    companyKodikos: req.session.companyKodikos,
+                    etos: req.session.yearInUse,
+                    periodStart: startOfWeekMondayUtc(requestedPeriodStart),
+                    periodEnd: endOfWeekSundayUtc(requestedPeriodEnd)
+                });
+                const projection = await buildAtomicRepoTransferPolicyPreviewProjection({
+                    sessionTeam: req.session.userTeam,
+                    companyId: req.session.companyInUse,
+                    fullPeriodFilter,
+                    requestedPeriodStart,
+                    requestedPeriodEnd,
+                    authoritativeAsOfDate: req.session.appDate,
+                    holidayByDateKey: atomicScenarioContext?.argiesByDateKey || new Map(),
+                    holidayContextResolved: Boolean(
+                        atomicScenarioContext?.argiesByDateKey instanceof Map
+                    )
+                });
+                const requestedGroupId = String(req.body?.group?.group_id || '').trim();
+                const requestedGroupKey = String(req.body?.group?.group_key || '').trim();
+                const requestedRowIds = new Set(
+                    (Array.isArray(req.body?.items) ? req.body.items : [])
+                        .map((item) => String(item?.prodhlomena_oraria_id || '').trim())
+                        .filter(Boolean)
+                );
+                authoritativeAtomicGroup = projection.groups.find((group) =>
+                    group.group_id === requestedGroupId &&
+                    group.group_key === requestedGroupKey &&
+                    group.items.length === requestedRowIds.size &&
+                    group.items.every((item) => requestedRowIds.has(
+                        String(item.prodhlomena_oraria_id || '')
+                    ))
+                ) || null;
+                authoritativeAtomicOverlap = authoritativeAtomicGroup
+                    ? {
+                          conflict: authoritativeAtomicGroup.atomic_reusable_diagnostics
+                              .includes('ATOMIC_LINKED_SET_ROW_OVERLAP')
+                      }
+                    : null;
+            }
             const approval = await createPolicyPreviewApprovalRecord({
                 session: req.session,
-                payload: req.body
+                payload: req.body,
+                authoritativeAtomicGroup,
+                authoritativeAtomicOverlap
             });
 
             return res.status(201).json({
@@ -6148,14 +6256,14 @@ class erganhController {
                 approvalId: req.params.approvalId,
                 reason: req.body?.reason
             });
-            return res.json({ success: true, approval, message: 'Η reusable πολιτική ανακλήθηκε.' });
+            return res.json({ success: true, approval, message: 'Η επαναχρησιμοποιήσιμη πολιτική ανακλήθηκε.' });
         } catch (error) {
             console.error('[revokeProdhlomenaOrariaPolicyPreviewApproval] ❌', error);
             return res.status(error.statusCode || 500).json({
                 success: false,
                 message: error.statusCode && error.statusCode < 500
                     ? error.message
-                    : 'Σφάλμα κατά την ανάκληση της reusable πολιτικής.'
+                    : 'Σφάλμα κατά την ανάκληση της επαναχρησιμοποιήσιμης πολιτικής.'
             });
         }
     };

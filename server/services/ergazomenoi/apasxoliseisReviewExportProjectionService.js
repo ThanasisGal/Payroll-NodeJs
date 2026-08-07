@@ -14,7 +14,20 @@ const LABELS = Object.freeze({
 const STATUS_LABELS = Object.freeze({
     READY: 'Έτοιμο',
     NEEDS_HR_DECISION: 'Απαιτεί απόφαση HR',
+    RESOLVED_BY_POLICY: 'Εγκρίθηκε βάσει παλιότερης απόφασης HR',
     NOT_APPLICABLE: ''
+});
+const ATOMIC_ROLE_ORDER = Object.freeze([
+    'SOURCE_BECOMES_WORK',
+    'TARGET_BECOMES_REPO'
+]);
+const ATOMIC_DIAGNOSTIC_LABELS = Object.freeze({
+    ATOMIC_LINKED_SET_ROW_OVERLAP:
+        'Η ίδια ημέρα συμμετέχει σε περισσότερες ατομικές προτάσεις.',
+    ATOMIC_REUSABLE_MULTIPLE_ACTIVE_MATCHES:
+        'Βρέθηκαν πολλαπλές ενεργές επαναχρησιμοποιήσιμες πολιτικές.',
+    ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED:
+        'Δεν επιβεβαιώθηκε με ασφάλεια το παράρτημα της ημέρας προέλευσης.'
 });
 const TOTAL_FIELDS = Object.freeze([
     'ores_ergasias_apologistika', 'ores_apoysias_apologistika',
@@ -51,6 +64,73 @@ function createdAt(value) {
 }
 function unique(values) {
     return [...new Set(values.map((value) => String(value || '').trim()).filter(Boolean))];
+}
+function atomicDiagnosticLabel(code) {
+    return ATOMIC_DIAGNOSTIC_LABELS[code] ||
+        'Η συνδεδεμένη πρόταση απαιτεί επιπλέον έλεγχο.';
+}
+function buildAtomicApprovalNote(reusable = {}) {
+    const parts = ['Εγκρίθηκε βάσει παλιότερης απόφασης HR'];
+    if (reusable.approved_by_user_name) parts.push(`Εγκρίνων: ${reusable.approved_by_user_name}`);
+    if (reusable.approved_at) parts.push(`Ημερομηνία έγκρισης: ${dateKeyUtc(reusable.approved_at)}`);
+    if (reusable.effective_from) parts.push(`Ισχύει από: ${dateKeyUtc(reusable.effective_from)}`);
+    parts.push(reusable.effective_to
+        ? `Ισχύει έως: ${dateKeyUtc(reusable.effective_to)}`
+        : 'Ισχύει χωρίς λήξη');
+    parts.push(`Έκδοση επαναχρησιμοποιήσιμου αποτυπώματος: ${Number(reusable.fingerprint_version) || 5}`);
+    return parts.join(' | ');
+}
+
+function selectAtomicExportRows(sourceRows, contextRows, atomicGroupProjection) {
+    const sourceIds = new Set(sourceRows.map((row) => id(row?._id || row?.id)).filter(Boolean));
+    const contextById = new Map(
+        contextRows.map((row) => [id(row?._id || row?.id), row]).filter(([rowId]) => rowId)
+    );
+    const atomicByRowId = new Map();
+    const selectedRows = [...sourceRows];
+    const selectedIds = new Set(sourceIds);
+    const excludedIncompleteAtomicIds = new Set();
+
+    (Array.isArray(atomicGroupProjection?.groups) ? atomicGroupProjection.groups : [])
+        .forEach((group) => {
+            const items = Array.isArray(group?.items) ? group.items : [];
+            const canonicalItems = ATOMIC_ROLE_ORDER.map((role) =>
+                items.find((item) => item?.role === role)
+            );
+            const itemIds = canonicalItems.map((item) => id(item?.prodhlomena_oraria_id));
+            const validStructure = group?.group_type === 'ATOMIC_PAIRED_PROPOSAL' &&
+                group?.decision_grain === 'ATOMIC_LINKED_SET' &&
+                group?.count === 2 && group?.decision_units_count === 1 &&
+                items.length === 2 && canonicalItems.every(Boolean) &&
+                itemIds.every(Boolean) && new Set(itemIds).size === 2;
+            if (!validStructure || !itemIds.some((rowId) => sourceIds.has(rowId))) return;
+            if (!itemIds.every((rowId) => contextById.has(rowId))) {
+                itemIds.forEach((rowId) => excludedIncompleteAtomicIds.add(rowId));
+                return;
+            }
+
+            itemIds.forEach((rowId, index) => {
+                if (!selectedIds.has(rowId)) {
+                    selectedRows.push(contextById.get(rowId));
+                    selectedIds.add(rowId);
+                }
+                atomicByRowId.set(rowId, {
+                    groupId: String(group.group_id || ''),
+                    groupKey: String(group.group_key || ''),
+                    role: ATOMIC_ROLE_ORDER[index],
+                    status: String(group.status || 'NEEDS_REVIEW'),
+                    diagnostics: unique(group.atomic_reusable_diagnostics || []),
+                    reusableDecision: group.reusable_decision || null
+                });
+            });
+        });
+
+    return {
+        rows: selectedRows.filter((row) =>
+            !excludedIncompleteAtomicIds.has(id(row?._id || row?.id))
+        ),
+        atomicByRowId
+    };
 }
 function illegalBreakdown(row = {}) {
     const result = {
@@ -152,8 +232,12 @@ function hasHrOnlyFinding(row) {
         String(row.policy?.note || '').trim() !== '';
 }
 function filterFindingsOnly(rows) {
+    const atomicGroupIds = new Set(rows
+        .map((row) => row.policy?.atomicGroup?.groupId)
+        .filter(Boolean));
     const representativeHrGroups = new Set();
     return rows.filter((row) => {
+        if (atomicGroupIds.has(row.policy?.atomicGroup?.groupId)) return true;
         if (hasNumericFinding(row) || isActualSixthOrSeventhDay(row) || row.illegalOvertime?.mismatch) {
             return true;
         }
@@ -165,9 +249,10 @@ function filterFindingsOnly(rows) {
     });
 }
 
-function buildReviewExportProjection({ rows = [], policyRows = rows, approvals = [], decisions = [], deviations = [], findingsOnly = false } = {}) {
+function buildReviewExportProjection({ rows = [], policyRows = rows, approvals = [], decisions = [], deviations = [], atomicGroupProjection = null, findingsOnly = false } = {}) {
     const sourceRows = Array.isArray(rows) ? rows : [];
     const contextRows = Array.isArray(policyRows) ? policyRows : sourceRows;
+    const atomicSelection = selectAtomicExportRows(sourceRows, contextRows, atomicGroupProjection);
     const groups = new Map();
     contextRows.forEach((row) => {
         const date = dateKeyUtc(row.hmeromhnia);
@@ -178,7 +263,7 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
         groups.get(key).rows.push(row);
     });
     const outputGroups = new Map();
-    sourceRows.forEach((row) => {
+    atomicSelection.rows.forEach((row) => {
         const date = dateKeyUtc(row.hmeromhnia);
         const week = getMondaySundayWeekRange(date);
         if (!date || !week) return;
@@ -231,6 +316,22 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
                 sixthDayRate: classification === 'SIXTH' ? (analysis.sixthDay?.premiumRate ?? profile.pososto_prosayxhshs_6hs_hmeras ?? null) : null
             };
             policy.note = reasonText({ analysis, decision, approval, deviation, mismatch: illegalOvertime.mismatch });
+            const atomicGroup = atomicSelection.atomicByRowId.get(id(row?._id || row?.id));
+            if (atomicGroup) {
+                const resolved = atomicGroup.status === 'RESOLVED_BY_POLICY' &&
+                    atomicGroup.reusableDecision?.approval_id;
+                policy.atomicGroup = atomicGroup;
+                policy.source = resolved ? 'HR' : 'PENDING_HR';
+                policy.sourceLabel = LABELS[policy.source];
+                policy.status = resolved ? 'RESOLVED_BY_POLICY' : 'NEEDS_HR_DECISION';
+                policy.statusLabel = STATUS_LABELS[policy.status];
+                policy.severity = resolved ? '' : 'ΑΠΑΙΤΕΙ ΑΠΟΦΑΣΗ HR';
+                const atomicNote = resolved
+                    ? buildAtomicApprovalNote(atomicGroup.reusableDecision)
+                    : unique(atomicGroup.diagnostics).map(atomicDiagnosticLabel).join(' | ') ||
+                        'Συνδεδεμένη πρόταση προέλευσης/προορισμού — απαιτεί έλεγχο.';
+                policy.note = unique([policy.note, atomicNote]).join('\n');
+            }
             projectedRows.push({ ...row, policy, illegalOvertime });
         });
     });
@@ -248,4 +349,4 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
 }
 
 module.exports = { LABELS, STATUS_LABELS, TOTAL_FIELDS, NUMERIC_FINDING_FIELDS, illegalBreakdown, emptyTotals, addTotals,
-    decisionIsActiveApplied, filterFindingsOnly, buildReviewExportProjection };
+    decisionIsActiveApplied, filterFindingsOnly, selectAtomicExportRows, buildReviewExportProjection };

@@ -53,6 +53,16 @@ assertScenarioProjectionFields(
     policyPreviewSource,
     'getProdhlomenaOrariaPolicyPreview'
 );
+
+assert.match(policyPreviewSource, /reusableApprovals: reusableDecisionRules/);
+const approvalCreateSource = getControllerMethodSource(
+    'createProdhlomenaOrariaPolicyPreviewApproval',
+    'revokeProdhlomenaOrariaPolicyPreviewApproval'
+);
+assert.match(approvalCreateSource, /requestedDecisionGrain === 'ATOMIC_LINKED_SET'/);
+assert.match(approvalCreateSource, /buildAtomicRepoTransferPolicyPreviewProjection\(\{/);
+assert.match(approvalCreateSource, /authoritativeAtomicGroup/);
+assert.doesNotMatch(approvalCreateSource, /buildAtomicReusableCriteriaV5|fingerprint/);
 assertScenarioProjectionFields(
     scenarioClassificationSource,
     'getProdhlomenaOrariaScenarioClassifications'

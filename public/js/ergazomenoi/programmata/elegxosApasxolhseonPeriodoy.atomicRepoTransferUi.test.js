@@ -56,14 +56,18 @@ const sandbox = {
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox, { filename: sourcePath });
 
-function setRepoTransferPermissions({ decision, apply } = {}) {
+function setRepoTransferPermissions({ decision, apply, manageReusable } = {}) {
     if (decision === undefined) elementsById.delete('canRecordRepoTransferDecision');
     else elementsById.set('canRecordRepoTransferDecision', { value: decision ? '1' : '0' });
     if (apply === undefined) elementsById.delete('canApplyRepoTransferDecision');
     else elementsById.set('canApplyRepoTransferDecision', { value: apply ? '1' : '0' });
+    if (manageReusable === undefined) elementsById.delete('canManageReusablePolicyApproval');
+    else elementsById.set('canManageReusablePolicyApproval', {
+        value: manageReusable ? '1' : '0'
+    });
 }
 
-setRepoTransferPermissions({ decision: true, apply: true });
+setRepoTransferPermissions({ decision: true, apply: true, manageReusable: true });
 
 function proposedValues({ category, repo, hours, intervals = [] }) {
     const values = {
@@ -100,6 +104,9 @@ function readyProjection({ targetCategory = 'ΑΝ', sourceIntervals } = {}) {
         groups: [
             {
                 group_id: 'atomic-group-1',
+                group_key: 'atomic-group-key-1',
+                group_type: 'ATOMIC_PAIRED_PROPOSAL',
+                decision_grain: 'ATOMIC_LINKED_SET',
                 status: 'NEEDS_REVIEW',
                 title: 'Μεταφορά ρεπό εντός εβδομάδας',
                 description: 'Ασφαλής πρόταση για ανθρώπινο έλεγχο.',
@@ -107,6 +114,10 @@ function readyProjection({ targetCategory = 'ΑΝ', sourceIntervals } = {}) {
                 last_date: '2026-07-09',
                 count: 2,
                 decision_units_count: 1,
+                pair_contract: {
+                    proposal_version: 'repo-transfer-single-pair-proposal:v4',
+                    choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR'
+                },
                 warnings: [],
                 repo_resolution: {
                     effective_expected_weekly_repo: 2,
@@ -119,6 +130,7 @@ function readyProjection({ targetCategory = 'ΑΝ', sourceIntervals } = {}) {
                 items: [
                     {
                         role: 'SOURCE_BECOMES_WORK',
+                        prodhlomena_oraria_id: '507f1f77bcf86cd799439021',
                         employee_kodikos: '001',
                         hmeromhnia: '2026-07-06',
                         kathgoria_ergasias: 'ΑΝ',
@@ -136,6 +148,7 @@ function readyProjection({ targetCategory = 'ΑΝ', sourceIntervals } = {}) {
                     },
                     {
                         role: 'TARGET_BECOMES_REPO',
+                        prodhlomena_oraria_id: '507f1f77bcf86cd799439022',
                         employee_kodikos: '001',
                         hmeromhnia: '2026-07-09',
                         kathgoria_ergasias: 'ΕΡΓ',
@@ -1431,7 +1444,10 @@ function testGenericIsolationSourceContract() {
     const genericSource = source.slice(genericStart, source.indexOf('async function loadResults'));
 
     assert.ok(atomicStart >= 0 && genericStart > atomicStart);
-    assert.ok(!atomicSource.includes('submitPolicyPreviewDecision'));
+    assert.ok(atomicSource.includes(
+        "submitPolicyPreviewDecision(group, 'APPROVE_PROPOSAL', {"
+    ));
+    assert.ok(atomicSource.includes('forceAtomicReuse: true'));
     assert.ok(!atomicSource.includes('renderPolicyPreviewApprovalPanel'));
     assert.ok(!atomicSource.includes('getPolicyPreviewDecisionButtons'));
     assert.ok(genericSource.includes('renderPolicyPreviewApprovalPanel(group, index)'));
@@ -2662,6 +2678,167 @@ async function testHrLoadingLocksAndRestoresFilters() {
     }
 }
 
+function testAtomicReusablePendingResolvedAndConflictUi() {
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('apo_hmeromhnia=2026-07-01&eos_hmeromhnia=2026-07-31&ypokatasthma=0001')", sandbox);
+    vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map()', sandbox);
+    setRepoTransferPermissions({ decision: true, apply: true, manageReusable: true });
+    const pending = render(readyProjection());
+    assert.strictEqual((pending.match(/atomic-repo-transfer-decision-btn/g) || []).length, 3);
+    assert.strictEqual((pending.match(/atomic-repo-transfer-reusable-btn/g) || []).length, 1);
+    assert.ok(pending.includes('Έγκριση πρότασης για μελλοντική εφαρμογή'));
+    assert.ok(!pending.includes('data-item-decision-code'));
+
+    setRepoTransferPermissions({ decision: true, apply: false, manageReusable: false });
+    const unauthorized = render(readyProjection());
+    assert.ok(!unauthorized.includes('atomic-repo-transfer-reusable-btn'));
+    assert.strictEqual((unauthorized.match(/atomic-repo-transfer-decision-btn/g) || []).length, 3);
+
+    setRepoTransferPermissions({ decision: true, apply: true, manageReusable: true });
+    const resolvedProjection = readyProjection();
+    Object.assign(resolvedProjection.groups[0], {
+        status: 'RESOLVED_BY_POLICY',
+        reusable_decision: {
+            approval_id: 'approval-v5',
+            approved_by_user_name: 'HR User',
+            approved_at: '2026-07-20T10:00:00.000Z',
+            effective_from: '2026-07-01',
+            effective_to: null,
+            fingerprint_version: 5
+        }
+    });
+    const resolved = render(resolvedProjection);
+    assertContains(resolved, [
+        'Εγκρίθηκε βάσει παλιότερης απόφασης HR',
+        'HR User',
+        'Χωρίς λήξη',
+        'Έκδοση επαναχρησιμοποιήσιμου αποτυπώματος: 5',
+        'Ανάκληση πολιτικής',
+        'data-approval-id="approval-v5"',
+        'απαιτείται νέα καταγεγραμμένη απόφαση για την τρέχουσα πρόταση'
+    ]);
+    assert.ok(!resolved.includes('atomic-repo-transfer-decision-btn'));
+    assert.ok(!resolved.includes('atomic-repo-transfer-reusable-btn'));
+    assert.ok(!resolved.includes('atomic-repo-transfer-apply-btn'));
+
+    const conflictProjection = readyProjection();
+    Object.assign(conflictProjection.groups[0], {
+        reusable_conflict: true,
+        atomic_reusable_diagnostics: ['ATOMIC_LINKED_SET_ROW_OVERLAP']
+    });
+    const conflict = render(conflictProjection);
+    assert.ok(conflict.includes('Η ίδια ημέρα συμμετέχει σε περισσότερες από μία προτάσεις'));
+    assert.ok(!conflict.includes('atomic-repo-transfer-reusable-btn'));
+    assert.strictEqual((conflict.match(/atomic-repo-transfer-decision-btn/g) || []).length, 3);
+
+    setMinimalRenderElements();
+    elementsById.set('ypokatasthmata_stathera', { value: '0001' });
+    vm.runInContext(`currentHrReviewProjection = ${JSON.stringify(readyProjection())}; currentHrReviewLoaded = true; currentRepoTransferDecisionsByProposalId = new Map()`, sandbox);
+    sandbox.classifyHrReviewGroups();
+    sandbox.renderHrReviewWorkspace();
+    const minimalPending = elementsById.get('hrReviewPendingContainer').innerHTML;
+    assert.strictEqual((minimalPending.match(/hr-review-decision-btn/g) || []).length, 3);
+    assert.strictEqual((minimalPending.match(/hr-review-reusable-btn/g) || []).length, 1);
+
+    vm.runInContext(`currentHrReviewProjection = ${JSON.stringify(resolvedProjection)}; currentHrReviewLoaded = true; currentRepoTransferDecisionsByProposalId = new Map()`, sandbox);
+    sandbox.classifyHrReviewGroups();
+    sandbox.renderHrReviewWorkspace();
+    const minimalResolved = elementsById.get('hrReviewCompletedContainer').innerHTML;
+    assert.ok(minimalResolved.includes('Εγκρίθηκε βάσει παλιότερης απόφασης HR'));
+    assert.ok(minimalResolved.includes('Ανάκληση πολιτικής'));
+    assert.ok(!minimalResolved.includes('hr-review-decision-btn'));
+    assert.ok(!minimalResolved.includes('hr-review-apply-btn'));
+    clearMinimalRenderElements();
+    elementsById.delete('ypokatasthmata_stathera');
+}
+
+async function testAtomicReusableSubmitUsesGenericApprovalContract() {
+    const projection = readyProjection();
+    const group = projection.groups[0];
+    let submitted = null;
+    const saved = snapshotSandboxFunctions([
+        'confirmPolicyPreviewDecision',
+        'getPolicyPreviewCsrfToken',
+        'refreshPolicyPreviewApprovals',
+        'fetchPolicyPreviewGrouping',
+        'attachPolicyPreviewResults',
+        'renderCurrentReviewRows',
+        'renderPolicyPreviewGroups',
+        'fetch'
+    ]);
+    const savedSwal = sandbox.Swal;
+    try {
+        vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('apo_hmeromhnia=2026-07-01&eos_hmeromhnia=2026-07-31&ypokatasthma=0001')", sandbox);
+        vm.runInContext('currentPolicyPreviewGrouping = { scope: "page" }; currentReviewRows = []', sandbox);
+        sandbox.confirmPolicyPreviewDecision = async (_group, decisionType, options) => {
+            assert.strictEqual(decisionType, 'APPROVE_PROPOSAL');
+            assert.strictEqual(options.forceAtomicReuse, true);
+            return { notes: 'future atomic', reuseScope: 'FUTURE_IDENTICAL' };
+        };
+        sandbox.getPolicyPreviewCsrfToken = async () => 'csrf';
+        sandbox.refreshPolicyPreviewApprovals = async () => {};
+        sandbox.fetchPolicyPreviewGrouping = async () => ({
+            grouping: { scope: 'page', groups: [] },
+            previewRows: [],
+            atomicGroupProjection: projection
+        });
+        sandbox.attachPolicyPreviewResults = () => {};
+        sandbox.renderCurrentReviewRows = () => {};
+        sandbox.renderPolicyPreviewGroups = () => {};
+        sandbox.Swal = { fire: async () => ({ isConfirmed: true }) };
+        sandbox.fetch = async (url, options) => {
+            assert.strictEqual(url, '/api/prodhlomena-oraria/review/policies/approvals');
+            submitted = JSON.parse(options.body);
+            return { ok: true, status: 201, json: async () => ({ success: true }) };
+        };
+        await sandbox.submitPolicyPreviewDecision(group, 'APPROVE_PROPOSAL', {
+            forceAtomicReuse: true
+        });
+        assert.strictEqual(submitted.group.decision_grain, 'ATOMIC_LINKED_SET');
+        assert.strictEqual(submitted.group.group_type, 'ATOMIC_PAIRED_PROPOSAL');
+        assert.strictEqual(submitted.decision_type, 'APPROVE_PROPOSAL');
+        assert.strictEqual(submitted.reuse_scope, 'FUTURE_IDENTICAL');
+        assert.deepStrictEqual(submitted.items.map((item) => item.prodhlomena_oraria_id),
+            ['507f1f77bcf86cd799439021', '507f1f77bcf86cd799439022']);
+        assert.strictEqual(Object.prototype.hasOwnProperty.call(submitted, 'reuse_fingerprint'), false);
+        assert.strictEqual(Object.prototype.hasOwnProperty.call(submitted, 'reuse_match_criteria'), false);
+    } finally {
+        sandbox.Swal = savedSwal;
+        restoreSandboxFunctions(saved);
+    }
+}
+
+async function testAtomicReusableConfirmationUsesApproveProposalLabel() {
+    const group = readyProjection().groups[0];
+    const savedSwal = sandbox.Swal;
+    let modalOptions = null;
+    try {
+        sandbox.Swal = {
+            getPopup: () => ({
+                querySelector: (selector) => selector === '#policyPreviewDecisionNotes'
+                    ? { value: '' }
+                    : null
+            }),
+            fire: async (options) => {
+                modalOptions = options;
+                return { isConfirmed: true, value: options.preConfirm() };
+            }
+        };
+
+        const result = await sandbox.confirmPolicyPreviewDecision(
+            group,
+            'APPROVE_PROPOSAL',
+            { forceAtomicReuse: true }
+        );
+
+        assert.ok(modalOptions.html.includes('Έγκριση πρότασης'));
+        assert.ok(!modalOptions.html.includes('Άγνωστη απόφαση'));
+        assert.ok(modalOptions.html.includes('policyPreviewReuseFutureIdentical'));
+        assert.strictEqual(result.reuseScope, 'FUTURE_IDENTICAL');
+    } finally {
+        sandbox.Swal = savedSwal;
+    }
+}
+
 const tests = [
     testWeeklyResolutionShowsRepoAndSixthDayFacts,
     testSixthDayCardsBadgeShowsApplicableRate,
@@ -2733,6 +2910,9 @@ const tests = [
     testHrApproveAndRejectPostPaths,
     testHrPostSuccessRefreshFailureWarning,
     testHrLoadingLocksAndRestoresFilters,
+    testAtomicReusablePendingResolvedAndConflictUi,
+    testAtomicReusableConfirmationUsesApproveProposalLabel,
+    testAtomicReusableSubmitUsesGenericApprovalContract,
     testApplyPostSuccessAndRefreshSuccess,
     testApplyPostSuccessAndRefreshFailure,
     testApplyServerAndNetworkFailures,
