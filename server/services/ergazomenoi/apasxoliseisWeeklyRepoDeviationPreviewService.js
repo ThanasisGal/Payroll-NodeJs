@@ -16,6 +16,10 @@ const {
 const {
     resolveEffectiveExpectedWeeklyRepo
 } = require('./apasxoliseisWeeklyRepoTransferExpectedRepoResolverService');
+const {
+    MODE: EFFECTIVE_REPO_MODE,
+    resolveEffectiveRepoState
+} = require('./apasxoliseisEffectiveRepoStateService');
 
 const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v2';
 const SOURCE_VERSION = 'raw-prodhlomena-oraria-daily-rows:v1';
@@ -59,27 +63,6 @@ function attachSixthDayPresentationToRows(rows = [], deviations = []) {
             sixth_day_policy_status: sixthDay?.status || ''
         };
     });
-}
-
-function isEffectiveRepo(row = {}, isFullTimeProfile = () => true) {
-    const persistedCategory = String(
-        row.kathgoria_ergasias_apologistika || ''
-    ).trim();
-    const effectiveCategory =
-        persistedCategory || String(row.kathgoria_ergasias || '').trim();
-    const fullTime = isFullTimeProfile(row) === true;
-    const expectedCategory = fullTime ? 'ΑΝ' : 'ΜΕ';
-    const persistedRepo =
-        row.repo_apologistika === true || persistedCategory === expectedCategory;
-    const effectiveHours = persistedRepo
-        ? row.ores_ergasias_apologistika
-        : row.ores_ergasias;
-
-    return (
-        (persistedRepo || effectiveCategory === expectedCategory) &&
-        finiteZero(effectiveHours) &&
-        finiteZero(row.cards_ores_ergasias)
-    );
 }
 
 function normalizeLegacyDeviation(row = {}) {
@@ -231,17 +214,39 @@ function buildWeeklyRepoDeviationPreview({
         const expectedRepo = expectedRepoResolution.effectiveExpectedWeeklyRepo;
         const profileReason =
             weeklyProfile.repoResolutionReason || expectedRepoResolution.reason || null;
-        const actualRepo = uniqueRows.filter((row) => {
+        const effectiveRepoStates = uniqueRows.map((row) => {
             const dailyProfile =
                 typeof resolveDailyProfile === 'function'
                     ? resolveDailyProfile(row) || {}
                     : {};
-            return isEffectiveRepo(row, () =>
+            const expectedRepoCategory =
                 typeof isFullTimeProfile === 'function'
-                    ? isFullTimeProfile(dailyProfile)
-                    : true
-            );
-        }).length;
+                    ? isFullTimeProfile(dailyProfile) === true
+                        ? 'ΑΝ'
+                        : 'ΜΕ'
+                    : null;
+            const state = resolveEffectiveRepoState({
+                row,
+                mode: EFFECTIVE_REPO_MODE.CURRENT,
+                expectedRepoCategory
+            });
+            const effectiveHours =
+                state.provenance === 'APOLOGISTIKA_CURRENT'
+                    ? row.ores_ergasias_apologistika
+                    : row.ores_ergasias;
+
+            return {
+                state,
+                countsAsRepo:
+                    state.effectiveRepo === true &&
+                    finiteZero(effectiveHours) &&
+                    finiteZero(row.cards_ores_ergasias)
+            };
+        });
+        const repoStateReasons = [...new Set(
+            effectiveRepoStates.flatMap(({ state }) => state.diagnostics || [])
+        )];
+        const actualRepo = effectiveRepoStates.filter(({ countsAsRepo }) => countsAsRepo).length;
 
         const hasResolvedExpectedRepo =
             expectedRepo !== null &&
@@ -249,7 +254,8 @@ function buildWeeklyRepoDeviationPreview({
             Number.isFinite(Number(expectedRepo));
         if (
             !hasResolvedExpectedRepo ||
-            Number(actualRepo) !== Number(expectedRepo)
+            Number(actualRepo) !== Number(expectedRepo) ||
+            repoStateReasons.length > 0
         ) {
             const dailyFacts = uniqueRows.map((row) => resolveDailyActualWorkFacts(row));
             const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
@@ -271,7 +277,7 @@ function buildWeeklyRepoDeviationPreview({
             deviations.push({
                 ...base,
                 status:
-                    profileReason || sixthSeventhDayNeedsDecision
+                    profileReason || sixthSeventhDayNeedsDecision || repoStateReasons.length > 0
                         ? STATUS.NEEDS_HR_DECISION
                         : STATUS.READY,
                 complete: true,
@@ -280,7 +286,8 @@ function buildWeeklyRepoDeviationPreview({
                     ...(profileReason ? [profileReason] : []),
                     ...(sixthSeventhDayNeedsDecision
                         ? sixthSeventhDay.reasons || []
-                        : [])
+                        : []),
+                    ...repoStateReasons
                 ])],
                 expected_repo: expectedRepo,
                 actual_repo: actualRepo,

@@ -183,8 +183,73 @@ function testValidPartTimeAndCountsMeAndAnAsRepo() {
         cards_eos_ora_01: ''
     });
     const withAn = analyze(rows, { typos_apasxolhshs: 'MERIKH'});
-    assertReason(withAn, 'REPO_LIMIT_EXCEEDED');
-    assert.strictEqual(withAn.counts.existing_actual_repo, 2);
+    assertEligible(withAn, dateKey(2), dateKey(4), 'ΜΕ');
+    assert.strictEqual(withAn.counts.existing_actual_repo, 1);
+
+    rows[0].repo = true;
+    const withExplicitAnRepo = analyze(rows, { typos_apasxolhshs: 'MERIKH'});
+    assertReason(withExplicitAnRepo, 'REPO_LIMIT_EXCEEDED');
+    assert.strictEqual(withExplicitAnRepo.counts.existing_actual_repo, 2);
+}
+
+function testCanonicalCurrentProposedRepoStateAndIsolation() {
+    const appliedSourceRows = fullTimeWeek();
+    Object.assign(appliedSourceRows[6], {
+        kathgoria_ergasias: 'ΑΝ',
+        repo: true,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        repo_apologistika: false
+    });
+    const appliedSource = analyze(appliedSourceRows);
+    assert.strictEqual(appliedSource.counts.existing_actual_repo, 0);
+    assert.strictEqual(appliedSource.counts.predicted_final_repo, 1);
+
+    const appliedTargetRows = fullTimeWeek();
+    Object.assign(appliedTargetRows[6], {
+        kathgoria_ergasias: 'ΕΡΓ',
+        repo: false,
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true
+    });
+    const appliedTarget = analyze(appliedTargetRows);
+    assert.strictEqual(appliedTarget.counts.existing_actual_repo, 1);
+    assert.strictEqual(appliedTarget.counts.predicted_final_repo, 2);
+
+    const partialRows = partTimeWeek();
+    Object.assign(partialRows[6], {
+        kathgoria_ergasias: 'ΕΡΓ',
+        repo: false,
+        kathgoria_ergasias_apologistika: 'ΜΕ',
+        repo_apologistika: true
+    });
+    const partial = analyze(partialRows, { typos_apasxolhshs: 'MERIKH' });
+    assert.strictEqual(partial.counts.existing_actual_repo, 1);
+    assert.strictEqual(partial.counts.predicted_final_repo, 2);
+
+    for (const metadata of [
+        { reuse_status: 'ACTIVE', approval_id: 'synthetic-approval' },
+        { reusable_decision: { status: 'RESOLVED_BY_POLICY' } },
+        { decision_status: 'RECORDED', decision_type: 'APPROVE_PROPOSAL' }
+    ]) {
+        const approvalRows = fullTimeWeek();
+        Object.assign(approvalRows[6], {
+            fingerprint: 'synthetic-fingerprint',
+            ...metadata
+        });
+        assert.deepStrictEqual(analyze(approvalRows).counts, analyze(fullTimeWeek()).counts);
+    }
+
+    const immutableRows = fullTimeWeek();
+    const originalRows = JSON.parse(JSON.stringify(immutableRows));
+    analyze(immutableRows);
+    assert.deepStrictEqual(immutableRows, originalRows);
+
+    const conflictRows = fullTimeWeek();
+    Object.assign(conflictRows[6], {
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        repo_apologistika: true
+    });
+    assertReason(analyze(conflictRows), 'CATEGORY_REPO_CONFLICT');
 }
 
 function testRotationalIsNotApplicable() {
@@ -1085,6 +1150,7 @@ function run() {
     testValidFullTimeTargetAfterSource();
     testValidFullTimeTargetBeforeSource();
     testValidPartTimeAndCountsMeAndAnAsRepo();
+    testCanonicalCurrentProposedRepoStateAndIsolation();
     testRotationalIsNotApplicable();
     testZeroLengthTargetRemainsEligible();
     testTargetCardAnomaliesRemainEligibleWithWarnings();
