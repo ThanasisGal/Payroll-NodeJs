@@ -60,12 +60,6 @@ function normalizeScopes(scopes) {
         if (loadedRowIds.length === 0) continue;
         normalized.push(Object.freeze({ team, company_kod, ypokatasthma, loadedRowIds }));
     }
-    if (normalized.length > 1) {
-        const [{ team, company_kod }] = normalized;
-        if (normalized.some((scope) => scope.team !== team || scope.company_kod !== company_kod)) {
-            throw new TypeError('Applied protection scopes must share team and company.');
-        }
-    }
     return Object.freeze(normalized);
 }
 
@@ -83,13 +77,26 @@ function buildAppliedExecutionQuery(scopes) {
     const normalized = normalizeScopes(scopes);
     if (normalized.length === 0) return null;
     const [first] = normalized;
-    const query = {
-        team: first.team,
-        company_kod: first.company_kod,
-        execution_status: 'APPLIED'
+    const sameTeamCompany = normalized.every(
+        (scope) => scope.team === first.team && scope.company_kod === first.company_kod
+    );
+    if (sameTeamCompany) {
+        const query = {
+            team: first.team,
+            company_kod: first.company_kod,
+            execution_status: 'APPLIED'
+        };
+        if (normalized.length === 1) return { ...query, ...rowMatchClause(first) };
+        return { ...query, $or: normalized.map(rowMatchClause) };
+    }
+    return {
+        execution_status: 'APPLIED',
+        $or: normalized.map((scope) => ({
+            team: scope.team,
+            company_kod: scope.company_kod,
+            ...rowMatchClause(scope)
+        }))
     };
-    if (normalized.length === 1) return { ...query, ...rowMatchClause(first) };
-    return { ...query, $or: normalized.map(rowMatchClause) };
 }
 
 function trustServerGeneratedInOperators(value) {
@@ -150,7 +157,12 @@ async function loadAppliedRepoTransferProtectionContext({
         .lean();
     const contexts = normalizedScopes.map((scope) =>
         buildAppliedRepoTransferProtectionContext({
-            executions,
+            executions: executions.filter(
+                (execution) =>
+                    execution.team === scope.team &&
+                    execution.company_kod === scope.company_kod &&
+                    execution.ypokatasthma === scope.ypokatasthma
+            ),
             scope: {
                 team: scope.team,
                 company_kod: scope.company_kod,

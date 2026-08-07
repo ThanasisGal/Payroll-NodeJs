@@ -179,6 +179,7 @@ const {
     loadAppliedRepoTransferProtectionContext
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionContextService');
 const {
+    DIAGNOSTIC: APPLIED_PROTECTION_DIAGNOSTIC,
     sanitizeAppliedRepoTransferUpdate
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionService');
 const {
@@ -1231,6 +1232,34 @@ function isDateInsideRange(date, fromDate, toDate) {
 
 function getWeekKeyMonday(date) {
     return dateKeyUtc(startOfWeekMondayUtc(date));
+}
+
+async function loadAppliedProtectionForRows(rows = []) {
+    const rowIdsByScope = new Map();
+    for (const row of rows) {
+        const team = String(row?.team || '').trim();
+        const company_kod = String(row?.company_kod || '').trim();
+        const ypokatasthma = String(row?.ypokatasthma || '').trim();
+        if (!row?._id || !team || !company_kod || !ypokatasthma) continue;
+        const key = `${team}|${company_kod}|${ypokatasthma}`;
+        if (!rowIdsByScope.has(key)) {
+            rowIdsByScope.set(key, { team, company_kod, ypokatasthma, loadedRowIds: [] });
+        }
+        rowIdsByScope.get(key).loadedRowIds.push(row._id);
+    }
+    return loadAppliedRepoTransferProtectionContext({ scopes: [...rowIdsByScope.values()] });
+}
+
+function blocksInteractiveAppliedIdentityChange(result) {
+    const attemptedIdentityChange =
+        result.removedIdentityFields.length > 0 || result.blockedIdentityFields.length > 0;
+    return (
+        result.blockedIdentityFields.length > 0 ||
+        (attemptedIdentityChange &&
+            result.diagnostics.includes(
+                APPLIED_PROTECTION_DIAGNOSTIC.CURRENT_IDENTITY_DIFFERS_FROM_APPLIED_EXECUTION
+            ))
+    );
 }
 
 function clampDateStartUtc(date) {
@@ -8600,10 +8629,26 @@ class erganhController {
                 });
             }
 
+            const appliedProtectionContext = await loadAppliedProtectionForRows([oldRecord]);
+            const protectedManualUpdate = sanitizeAppliedRepoTransferUpdate({
+                rowId: oldRecord._id,
+                currentRow: oldRecord,
+                update: cleanUpdates,
+                protectionContext: appliedProtectionContext
+            });
+            if (blocksInteractiveAppliedIdentityChange(protectedManualUpdate)) {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'Η εγγραφή συμμετέχει σε εφαρμοσμένη μεταφορά ρεπό και η ταυτότητα ρεπό δεν μπορεί να αλλάξει από τη χειροκίνητη επεξεργασία.'
+                });
+            }
+            const permittedUpdates = { ...protectedManualUpdate.sanitizedUpdate };
+
             const oldValues = {};
             const newValues = {};
 
-            for (const [field, value] of Object.entries(cleanUpdates)) {
+            for (const [field, value] of Object.entries(permittedUpdates)) {
                 const oldValue = oldRecord[field];
 
                 if (String(oldValue ?? '') !== String(value ?? '')) {
@@ -8619,9 +8664,9 @@ class erganhController {
                 });
             }
 
-            cleanUpdates.is_locked = true;
-            cleanUpdates.locked_by = changedBy;
-            cleanUpdates.locked_at = new Date();
+            permittedUpdates.is_locked = true;
+            permittedUpdates.locked_by = changedBy;
+            permittedUpdates.locked_at = new Date();
 
             await ProdhlomenaOrariaModel.updateOne(
                 {
@@ -8630,7 +8675,7 @@ class erganhController {
                     company_kod: companyId
                 },
                 {
-                    $set: cleanUpdates
+                    $set: permittedUpdates
                 }
             );
 
@@ -8816,7 +8861,22 @@ class erganhController {
                 });
             }
 
-            const restoreValues = audit.oldValues || {};
+            const requestedRestoreValues = { ...(audit.oldValues || {}) };
+            const appliedProtectionContext = await loadAppliedProtectionForRows([oldRecord]);
+            const protectedRestoreUpdate = sanitizeAppliedRepoTransferUpdate({
+                rowId: oldRecord._id,
+                currentRow: oldRecord,
+                update: requestedRestoreValues,
+                protectionContext: appliedProtectionContext
+            });
+            if (blocksInteractiveAppliedIdentityChange(protectedRestoreUpdate)) {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'Η επαναφορά θα άλλαζε ταυτότητα ρεπό που προστατεύεται από εφαρμοσμένη μεταφορά.'
+                });
+            }
+            const restoreValues = { ...protectedRestoreUpdate.sanitizedUpdate };
 
             restoreValues.is_locked = true;
             restoreValues.locked_by = changedBy;
@@ -13228,8 +13288,8 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
         argiesMap[key] = a.perigrafh || '';
     });
 
-    // -------- 4) Φτιάξε τα bulk ops --------
-    const bulkOps = [];
+    // -------- 4) Προετοίμασε τα records --------
+    const preparedRecords = [];
     let i = 0;
 
     while (i < rows.length) {
@@ -13362,26 +13422,66 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
             }
         }
 
-        bulkOps.push({
-            updateOne: {
-                filter: {
-                    team: record.team,
-                    company_kod: record.company_kod,
-                    ypokatasthma: record.ypokatasthma,
-                    kodikos: record.kodikos,
-                    hmeromhnia: record.hmeromhnia
-                },
-                update: { $set: record },
-                upsert: true
-            }
+        preparedRecords.push({
+            filter: {
+                team: record.team,
+                company_kod: record.company_kod,
+                ypokatasthma: record.ypokatasthma,
+                kodikos: record.kodikos,
+                hmeromhnia: record.hmeromhnia
+            },
+            record
         });
 
         i++;
     }
 
-    if (bulkOps.length === 0) {
+    if (preparedRecords.length === 0) {
         console.log('[saveTelikoToProdhlomena] Δεν υπάρχουν εγγραφές προς αποθήκευση');
         return;
+    }
+
+    const existingRows = await ProdhlomenaOrariaModel.find({
+        $or: mongoose.trusted(preparedRecords.map(({ filter }) => filter))
+    })
+        .select(
+            '_id team company_kod ypokatasthma kodikos hmeromhnia ' +
+                'kathgoria_ergasias_apologistika repo_apologistika'
+        )
+        .lean();
+    const recordKey = ({ team, company_kod, ypokatasthma, kodikos, hmeromhnia }) =>
+        [team, company_kod, ypokatasthma, kodikos, new Date(hmeromhnia).toISOString()].join('|');
+    const existingRowsByKey = new Map(existingRows.map((row) => [recordKey(row), row]));
+    const appliedProtectionContext = await loadAppliedProtectionForRows(existingRows);
+    let protectedIdentityAttempts = 0;
+    const bulkOps = preparedRecords.map(({ filter, record }) => {
+        const existingRow = existingRowsByKey.get(recordKey(record));
+        let protectedRecordUpdate = record;
+        if (existingRow) {
+            const sanitized = sanitizeAppliedRepoTransferUpdate({
+                rowId: existingRow._id,
+                currentRow: existingRow,
+                update: record,
+                protectionContext: appliedProtectionContext
+            });
+            protectedRecordUpdate = sanitized.sanitizedUpdate;
+            if (sanitized.hasConflict || sanitized.blockedIdentityFields.length > 0) {
+                protectedIdentityAttempts++;
+            }
+        }
+        return {
+            updateOne: {
+                filter,
+                update: { $set: protectedRecordUpdate },
+                upsert: true
+            }
+        };
+    });
+    if (protectedIdentityAttempts > 0) {
+        console.warn(
+            `[saveTelikoToProdhlomena] ${protectedIdentityAttempts} protected repo identity ` +
+                'updates were blocked; nonidentity schedule fields remain eligible for update.'
+        );
     }
 
     // -------- 5) Σπάσε σε chunks --------

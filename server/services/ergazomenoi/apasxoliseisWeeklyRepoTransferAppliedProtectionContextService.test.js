@@ -182,11 +182,14 @@ test('empty calculation rows avoid even the single query', async () => {
     assert.deepEqual(result.entriesByRowId, {});
 });
 
-test('different team/company scopes are rejected before query execution', async () => {
+test('multi-company batch remains one query with exact scoped clauses', async () => {
     const model = fakeModel([]);
-    await assert.rejects(() => loadAppliedRepoTransferProtectionContext({
+    await loadAppliedRepoTransferProtectionContext({
         scopes: [scope(), { ...scope('0001', [IDS.other]), company_kod: 'OTHER' }],
         executionModel: model
-    }), /share team and company/);
-    assert.equal(model.calls.find, 0);
+    });
+    assert.equal(model.calls.find, 1);
+    assert.equal(model.calls.query.execution_status, 'APPLIED');
+    assert.equal(model.calls.query.$or[0].company_kod, 'COMPANY');
+    assert.equal(model.calls.query.$or[1].company_kod, 'OTHER');
 });
