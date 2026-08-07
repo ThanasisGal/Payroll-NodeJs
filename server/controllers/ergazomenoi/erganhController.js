@@ -176,6 +176,12 @@ const {
     resolveCanonicalRepoDayCountState
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalRepoCountService');
 const {
+    loadAppliedRepoTransferProtectionContext
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionContextService');
+const {
+    sanitizeAppliedRepoTransferUpdate
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionService');
+const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod
@@ -1529,7 +1535,9 @@ async function runWeeklyRepoPostCheck({
     apoDate,
     eosDate,
     selectedYpokatasthma = '',
-    noCardsDisplayContext = {}
+    noCardsDisplayContext = {},
+    appliedProtectionContext,
+    appliedProtectionReasonsByWeek = new Map()
 }) {
     const result = {
         recordsChecked: 0,
@@ -1732,6 +1740,10 @@ async function runWeeklyRepoPostCheck({
         for (const week of weekRanges) {
             let pragmatikaRepo = 0;
             const repoStateReasons = new Set();
+            const protectionWeekKey = `${erg.kodikos}|${getWeekKeyMonday(week.weekStart)}`;
+            for (const reason of appliedProtectionReasonsByWeek.get(protectionWeekKey) || []) {
+                repoStateReasons.add(reason);
+            }
             const weekFullyInsideEmployment = isWeekFullyWithinEmploymentPeriod(
                 week.weekStart,
                 erg
@@ -1906,11 +1918,24 @@ async function runWeeklyRepoPostCheck({
                     result.compensationBreakdowns.daysWithRejectedCompanyRule += 1;
                 }
 
-                if (Object.keys(update).length > 0 && row.is_locked !== true) {
+                const protectedUpdate = sanitizeAppliedRepoTransferUpdate({
+                    rowId: row._id,
+                    currentRow: row,
+                    update,
+                    protectionContext: appliedProtectionContext
+                });
+                for (const reason of protectedUpdate.diagnostics) {
+                    repoStateReasons.add(reason);
+                }
+
+                if (
+                    Object.keys(protectedUpdate.sanitizedUpdate).length > 0 &&
+                    row.is_locked !== true
+                ) {
                     bulkOps.push({
                         updateOne: {
                             filter: { _id: row._id },
-                            update: { $set: update },
+                            update: { $set: protectedUpdate.sanitizedUpdate },
                             upsert: false
                         }
                     });
@@ -8145,7 +8170,8 @@ class erganhController {
                 }
                 const chunkRecords = await ProdhlomenaOrariaModel.find(prodhlomenaQuery)
                     .select(
-                        'kodikos hmeromhnia repo argia is_locked ' +
+                        '_id kodikos ypokatasthma hmeromhnia repo argia is_locked ' +
+                            'kathgoria_ergasias_apologistika repo_apologistika ' +
                             'ores_ergasias cards_ores_ergasias ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 ' +
@@ -8173,6 +8199,25 @@ class erganhController {
 
                 return new Date(a.hmeromhnia).getTime() - new Date(b.hmeromhnia).getTime();
             });
+
+            const appliedProtectionRowIdsByBranch = new Map();
+            for (const row of prodhlomena) {
+                const branch = String(row.ypokatasthma || '').trim();
+                if (!branch) continue;
+                if (!appliedProtectionRowIdsByBranch.has(branch)) {
+                    appliedProtectionRowIdsByBranch.set(branch, []);
+                }
+                appliedProtectionRowIdsByBranch.get(branch).push(row._id);
+            }
+            const appliedProtectionContext = await loadAppliedRepoTransferProtectionContext({
+                scopes: [...appliedProtectionRowIdsByBranch].map(([ypokatasthma, loadedRowIds]) => ({
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    ypokatasthma,
+                    loadedRowIds
+                }))
+            });
+            const appliedProtectionReasonsByWeek = new Map();
 
             const noCardsDisplayContext = await buildNoCardsDisplayContext({
                 team: sessionTeam,
@@ -8358,9 +8403,25 @@ class erganhController {
                     );
                 }
 
-                if (Object.keys(update).length === 0) continue;
                 if (!isDateInsideRange(rec.hmeromhnia, apoDate, eosDate)) continue;
                 if (rec.is_locked === true) continue;
+
+                const protectedUpdate = sanitizeAppliedRepoTransferUpdate({
+                    rowId: rec._id,
+                    currentRow: rec,
+                    update,
+                    protectionContext: appliedProtectionContext
+                });
+                if (protectedUpdate.diagnostics.length > 0) {
+                    const diagnosticWeekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
+                    if (!appliedProtectionReasonsByWeek.has(diagnosticWeekKey)) {
+                        appliedProtectionReasonsByWeek.set(diagnosticWeekKey, new Set());
+                    }
+                    for (const reason of protectedUpdate.diagnostics) {
+                        appliedProtectionReasonsByWeek.get(diagnosticWeekKey).add(reason);
+                    }
+                }
+                if (Object.keys(protectedUpdate.sanitizedUpdate).length === 0) continue;
 
                 bulkOps.push({
                     updateOne: {
@@ -8371,7 +8432,7 @@ class erganhController {
                             kodikos: rec.kodikos,
                             hmeromhnia: rec.hmeromhnia
                         },
-                        update: { $set: update },
+                        update: { $set: protectedUpdate.sanitizedUpdate },
                         upsert: false
                     }
                 });
@@ -8396,7 +8457,9 @@ class erganhController {
                 apoDate,
                 eosDate,
                 selectedYpokatasthma,
-                noCardsDisplayContext
+                noCardsDisplayContext,
+                appliedProtectionContext,
+                appliedProtectionReasonsByWeek
             });
 
             console.log(

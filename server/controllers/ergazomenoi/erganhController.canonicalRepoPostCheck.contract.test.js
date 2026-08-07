@@ -34,7 +34,9 @@ test('canonical repo diagnostics use the existing in-memory HR decision result',
 });
 
 test('post-check persistence blocks remain structurally unchanged', () => {
-    assert.ok(postCheckSource.includes('update: { $set: update }'));
+    assert.ok(postCheckSource.includes(
+        'update: { $set: protectedUpdate.sanitizedUpdate }'
+    ));
     assert.ok(postCheckSource.includes(
         'await ProdhlomenaOrariaModel.bulkWrite(chunk, { ordered: false })'
     ));
