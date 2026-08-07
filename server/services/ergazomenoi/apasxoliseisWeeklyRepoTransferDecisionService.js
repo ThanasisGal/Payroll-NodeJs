@@ -1,9 +1,14 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const DecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
+const PolicyApprovalModel = require('../../models/apasxoliseisPolicyPreviewApproval');
 const { validateSessionScope } = require('./apasxoliseisPolicyPreviewApprovalService');
 const { reconstructWeeklyRepoTransferDecision } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const { getAtomicPeriodRangeDiagnostic } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
+const {
+    buildAtomicReusableCriteriaV5,
+    isEffectiveForBothMembers
+} = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService');
 
 const DECISION_CODES = Object.freeze(['APPROVE_PROPOSAL', 'REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']);
 const DECISION_ALLOWED_ROLES = Object.freeze(['A', 'S', 'HR']);
@@ -69,7 +74,7 @@ function commandIdentity(command) {
 }
 function presentation(record, currentFingerprint = null) { return { id: String(record._id || ''), proposal_id: record.proposal_id, decision_code: record.decision_code, decision_status: record.decision_status, notes: record.notes || '', ypokatasthma: record.ypokatasthma, employee_kodikos: record.employee_kodikos, week_start: record.week_start, week_end: record.week_end, created_by_user_name: record.created_by_user_name, created_at: record.created_at, is_current: Boolean(currentFingerprint && record.snapshot_fingerprint === currentFingerprint) }; }
 
-async function createWeeklyRepoTransferDecision({ session, payload, decisionModel = DecisionModel, reconstruct = reconstructWeeklyRepoTransferDecision }) {
+async function createWeeklyRepoTransferDecision({ session, payload, decisionModel = DecisionModel, approvalModel = PolicyApprovalModel, reconstruct = reconstructWeeklyRepoTransferDecision }) {
     const scope = scopeFromSession(session); const command = validateCommand(payload);
     const normalizedCommandIdentity = commandIdentity(command);
     const retry = await decisionModel.findOne({
@@ -84,6 +89,38 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
     const initial = await reconstruct({ scope, command });
     const final = await reconstruct({ scope, command });
     if (initial.fingerprint !== final.fingerprint) throw errorWithStatus('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο πριν καταγράψετε απόφαση.', 409);
+    if (command.decision_code !== 'APPROVE_PROPOSAL' &&
+        final.group?.decision_grain === 'ATOMIC_LINKED_SET') {
+        const reusable = buildAtomicReusableCriteriaV5(final.group);
+        if (!reusable.fingerprint) {
+            throw errorWithStatus('Η πρόταση δεν είναι ασφαλής για έλεγχο επαναχρησιμοποιήσιμης πολιτικής.', 409);
+        }
+        const reusableCandidates = await approvalModel.find({
+            team: scope.team,
+            company_kod: scope.company_kod,
+            ypokatasthma: final.group.ypokatasthma,
+            reuse_scope: 'FUTURE_IDENTICAL',
+            reuse_status: 'ACTIVE',
+            decision_status: 'RECORDED',
+            decision_type: 'APPROVE_PROPOSAL',
+            $or: [
+                { reuse_fingerprint: reusable.fingerprint },
+                { reuse_fingerprints: mongoose.trusted({ $in: [reusable.fingerprint] }) }
+            ]
+        }).select('_id reuse_effective_from reuse_effective_to').lean();
+        const applicable = reusableCandidates.find((approval) =>
+            isEffectiveForBothMembers(approval, reusable.validation.canonical_items)
+        );
+        if (applicable) {
+            const error = errorWithStatus(
+                'Υπάρχει ενεργή επαναχρησιμοποιήσιμη έγκριση για την πρόταση και πρέπει πρώτα να ανακληθεί.',
+                409
+            );
+            error.code = 'ACTIVE_ATOMIC_REUSABLE_APPROVAL_ALREADY_APPLIES';
+            error.existingApproval = { _id: applicable._id };
+            throw error;
+        }
+    }
     const snapshot = final.snapshot;
     const existingDecision = await decisionModel.findOne({
         team: scope.team,

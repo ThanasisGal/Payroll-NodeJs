@@ -1,13 +1,18 @@
 const assert = require('assert');
+const mongoose = require('mongoose');
 
 const {
     buildWeeklyRepoTransferSinglePairGroupProjection,
     PROJECTION_STATUS,
-    GROUP_TYPE
+    GROUP_TYPE,
+    normalizeRowId
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
 const {
     buildWeeklyRepoTransferSinglePairProposal
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
+const {
+    buildAtomicReusableCriteriaV5
+} = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService');
 
 const WEEK_START = '2026-07-06';
 
@@ -22,6 +27,7 @@ function workRow(offset, overrides = {}) {
         _id: `row-${offset}`,
         team: 'team-a',
         company_kod: 'company-a',
+        ypokatasthma: '0001',
         kodikos: '001',
         hmeromhnia: dateKey(offset),
         kathgoria_ergasias: 'ΕΡΓ',
@@ -110,6 +116,7 @@ function assertReady(result) {
 
 function assertSafetyContract(group) {
     assert.strictEqual(group.group_type, GROUP_TYPE);
+    assert.strictEqual(group.decision_grain, 'ATOMIC_LINKED_SET');
     assert.strictEqual(group.status, 'NEEDS_REVIEW');
     assert.strictEqual(group.action_type, 'PAIRED_PROPOSAL');
     assert.strictEqual(group.reason_code, 'REPO_TRANSFER_CANDIDATE');
@@ -139,11 +146,22 @@ function assertSafetyContract(group) {
             requires_human_approval: true,
             approval_supported: false,
             batch_approvable: false,
-            runtime_apply_supported: false
+            runtime_apply_supported: false,
+            is_locked: false,
+            has_manual_override: false,
+            current_eligible: true
         });
     });
     assert.strictEqual(JSON.stringify(group).includes('APPROVE_PREFILL'), false);
     assert.strictEqual(Object.prototype.hasOwnProperty.call(group, 'decision_type'), false);
+    assert.strictEqual(group.atomic_reusable_context.target_category,
+        group.items[1].kathgoria_ergasias_apologistika);
+    assert.ok(group.atomic_reusable_context.policy_versions.primary);
+    assert.ok(group.atomic_reusable_context.policy_versions.secondary);
+    const reusable = buildAtomicReusableCriteriaV5(group);
+    assert.strictEqual(reusable.validation.eligible, true,
+        reusable.validation.diagnostics.join(','));
+    assert.strictEqual(reusable.criteria.version, 5);
 }
 
 function assertNotAvailable(result, reason) {
@@ -516,6 +534,130 @@ function testTargetPresentationMetadataDoesNotChangeGroupIdentity() {
     assert.ok(!group.group_key.includes('ΑΔΕΙΑ'));
 }
 
+function testMissingAuthoritativeSourceScopeDisablesOnlyV5Reuse() {
+    const rows = fullTimeWeek();
+    const normal = buildWeeklyRepoTransferSinglePairGroupProjection({
+        weekRows: rows,
+        reusableScopeRows: rows,
+        employmentProfile: {
+            typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5
+        }
+    });
+    const unresolved = buildWeeklyRepoTransferSinglePairGroupProjection({
+        weekRows: rows,
+        reusableScopeRows: [{ ...rows[0], _id: 'unrelated-row', ypokatasthma: '9999' }],
+        employmentProfile: {
+            typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5
+        }
+    });
+    const normalGroup = normal.groups[0];
+    const unresolvedGroup = unresolved.groups[0];
+    const normalV5 = buildAtomicReusableCriteriaV5(normalGroup);
+    const unresolvedV5 = buildAtomicReusableCriteriaV5(unresolvedGroup);
+
+    assert.strictEqual(normalV5.validation.eligible, true);
+    assert.ok(normalV5.fingerprint);
+    assert.strictEqual(unresolved.projection_status, PROJECTION_STATUS.READY);
+    assert.strictEqual(unresolvedGroup.status, normalGroup.status);
+    assert.strictEqual(unresolvedGroup.group_id, normalGroup.group_id);
+    assert.strictEqual(unresolvedGroup.items.length, 2);
+    assert.strictEqual(unresolvedGroup.ypokatasthma, null);
+    assert.notStrictEqual(unresolvedGroup.ypokatasthma, '9999');
+    assert.deepStrictEqual(unresolvedGroup.atomic_reusable_diagnostics,
+        ['ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED']);
+    assert.strictEqual(unresolvedV5.validation.eligible, false);
+    assert.ok(unresolvedV5.validation.diagnostics.includes(
+        'ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED'
+    ));
+    assert.strictEqual(unresolvedV5.criteria, null);
+    assert.strictEqual(unresolvedV5.fingerprint, null);
+}
+
+function testMongoObjectIdRowsResolveAuthoritativeSourceScope() {
+    const rows = fullTimeWeek();
+    rows.forEach((row, index) => {
+        row._id = new mongoose.Types.ObjectId(
+            `507f1f77bcf86cd7994390${String(index + 10).padStart(2, '0')}`
+        );
+    });
+    Object.assign(rows[1], {
+        has_manual_override: true,
+        current_eligible: false
+    });
+    const result = buildWeeklyRepoTransferSinglePairGroupProjection({
+        weekRows: rows,
+        reusableScopeRows: rows,
+        employmentProfile: {
+            typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5
+        }
+    });
+    assertReady(result);
+    const group = result.groups[0];
+    const [source, target] = group.items;
+
+    assert.strictEqual(source.prodhlomena_oraria_id, rows[1]._id.toHexString());
+    assert.strictEqual(target.prodhlomena_oraria_id, rows[4]._id.toHexString());
+    assert.strictEqual(group.ypokatasthma, '0001');
+    assert.ok(!group.atomic_reusable_diagnostics.includes(
+        'ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED'
+    ));
+    assert.deepStrictEqual(source.flags, {
+        atomic_pair_member: true,
+        requires_human_approval: true,
+        approval_supported: false,
+        batch_approvable: false,
+        runtime_apply_supported: false,
+        is_locked: false,
+        has_manual_override: true,
+        current_eligible: false
+    });
+    assert.strictEqual(target.flags.is_locked, false);
+    assert.strictEqual(target.flags.has_manual_override, false);
+    assert.strictEqual(target.flags.current_eligible, true);
+
+    const eligibleRows = rows.map((row) => ({
+        ...row,
+        has_manual_override: false,
+        current_eligible: true
+    }));
+    const eligibleGroup = buildWeeklyRepoTransferSinglePairGroupProjection({
+        weekRows: eligibleRows,
+        reusableScopeRows: eligibleRows,
+        employmentProfile: {
+            typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5
+        }
+    }).groups[0];
+    const reusable = buildAtomicReusableCriteriaV5(eligibleGroup);
+    assert.strictEqual(reusable.validation.eligible, true,
+        reusable.validation.diagnostics.join(','));
+    assert.ok(!reusable.validation.diagnostics.includes(
+        'ATOMIC_LINKED_SET_BRANCH_MISMATCH'
+    ));
+    assert.ok(reusable.fingerprint);
+
+    const unrelatedScope = eligibleRows.map((row) => ({ ...row }));
+    unrelatedScope[1]._id = new mongoose.Types.ObjectId('507f1f77bcf86cd799439099');
+    const unresolvedGroup = buildWeeklyRepoTransferSinglePairGroupProjection({
+        weekRows: eligibleRows,
+        reusableScopeRows: unrelatedScope,
+        employmentProfile: {
+            typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5
+        }
+    }).groups[0];
+    assert.strictEqual(unresolvedGroup.ypokatasthma, null);
+    assert.deepStrictEqual(unresolvedGroup.atomic_reusable_diagnostics,
+        ['ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED']);
+
+    assert.strictEqual(normalizeRowId(rows[1]._id), rows[1]._id.toHexString());
+    assert.strictEqual(normalizeRowId(' row-source '), 'row-source');
+    assert.strictEqual(normalizeRowId({ toString: () => rows[1]._id.toHexString() }), null);
+}
+
 function run() {
     testValidFullTimeProjection();
     testValidPartTimeProjection();
@@ -528,6 +670,8 @@ function run() {
     testInputImmutability();
     testOutputOwnershipAndFreeze();
     testTargetPresentationMetadataDoesNotChangeGroupIdentity();
+    testMissingAuthoritativeSourceScopeDisablesOnlyV5Reuse();
+    testMongoObjectIdRowsResolveAuthoritativeSourceScope();
     console.log('apasxoliseis weekly repo transfer single-pair group projection tests passed');
 }
 

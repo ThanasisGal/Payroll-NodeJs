@@ -42,6 +42,7 @@ const ApasxoliseisPolicyPreviewApprovalSchema = new Schema(
             type: String,
             required: true,
             enum: [
+                'APPROVE_PROPOSAL',
                 'APPROVE_PREFILL',
                 'MARK_OK',
                 'MARK_REVIEWED',

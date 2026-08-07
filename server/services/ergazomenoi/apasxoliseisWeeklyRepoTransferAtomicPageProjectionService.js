@@ -12,6 +12,10 @@ const {
 const {
     resolveRepoTransferContractVersion
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
+const {
+    validateAtomicGroupOverlaps,
+    matchAtomicReusableApproval
+} = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService');
 
 const PAGE_PROJECTION_STATUS = Object.freeze({
     READY: 'READY'
@@ -303,7 +307,8 @@ function buildWeeklyRepoTransferAtomicPageProjection(
     {
         singleWeekProjectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection,
         presentationStart = null,
-        presentationEnd = null
+        presentationEnd = null,
+        reusableApprovals = []
     } = {}
 ) {
     const presentationStartKey = dateKeyUtc(presentationStart);
@@ -390,7 +395,34 @@ function buildWeeklyRepoTransferAtomicPageProjection(
         summary.ready_count++;
     });
 
-    const groups = [...groupsById.values()].sort(compareGroups);
+    const reconstructedGroups = [...groupsById.values()].sort(compareGroups);
+    const overlapResults = validateAtomicGroupOverlaps(reconstructedGroups);
+    const groups = reconstructedGroups.map((group, index) => {
+        const match = matchAtomicReusableApproval({
+            group,
+            approvals: reusableApprovals,
+            overlap: overlapResults[index]
+        });
+        if (match.resolved) {
+            return {
+                ...group,
+                status: 'RESOLVED_BY_POLICY',
+                reusable_decision: match.reusable_approval,
+                atomic_reusable_diagnostics: match.diagnostics
+            };
+        }
+        return {
+            ...group,
+            atomic_reusable_diagnostics: [
+                ...new Set([
+                    ...(group.atomic_reusable_diagnostics || []),
+                    ...overlapResults[index].diagnostics,
+                    ...match.diagnostics
+                ])
+            ],
+            reusable_conflict: match.status === 'CONFLICT' || overlapResults[index].conflict
+        };
+    });
     const sortedReviewOutcomes = reviewOutcomes
         .filter((outcome) => {
             const dates = [

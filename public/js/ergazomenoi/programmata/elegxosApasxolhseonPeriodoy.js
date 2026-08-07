@@ -229,6 +229,7 @@ const policyPreviewFieldLabels = {
 };
 
 const policyPreviewDecisionLabels = Object.freeze({
+    APPROVE_PROPOSAL: 'Έγκριση πρότασης',
     APPROVE_PREFILL: 'Έγκριση πρότασης για μελλοντική εφαρμογή',
     MARK_OK: 'Καταγραφή ως OK',
     MARK_REVIEWED: 'Καταγραφή ως ελεγμένο',
@@ -3947,7 +3948,7 @@ async function getPolicyPreviewCsrfToken() {
 async function revokePolicyPreviewApproval(approvalId) {
     const confirmation = await Swal.fire({
         icon: 'warning',
-        title: 'Ανάκληση reusable πολιτικής',
+        title: 'Ανάκληση επαναχρησιμοποιήσιμης πολιτικής',
         text: 'Η πολιτική δεν θα εφαρμόζεται σε μελλοντικές περιπτώσεις.',
         input: 'textarea',
         inputLabel: 'Υποχρεωτική αιτιολογία',
@@ -3980,17 +3981,25 @@ async function revokePolicyPreviewApproval(approvalId) {
         attachPolicyPreviewResults(currentReviewRows, refreshed.previewRows);
         renderCurrentReviewRows();
         renderPolicyPreviewGroups(refreshed.grouping, { atomicGroupProjection: refreshed.atomicGroupProjection });
+        if (currentHrReviewLoaded && refreshed.atomicGroupProjection) {
+            currentHrReviewProjection = refreshed.atomicGroupProjection;
+            classifyHrReviewGroups();
+            renderHrReviewWorkspace();
+        }
     }
     await Swal.fire({ icon: 'success', title: 'Η πολιτική ανακλήθηκε' });
 }
 
-async function confirmPolicyPreviewDecision(group, decisionType) {
+async function confirmPolicyPreviewDecision(group, decisionType, options = {}) {
     const decisionLabel = getPolicyPreviewDecisionLabel(decisionType);
     const reusableDecisionTypes = new Set([
         'APPROVE_PREFILL', 'MARK_OK', 'MARK_REVIEWED', 'REJECT_PROPOSAL'
     ]);
-    const canReuse =
-        group?.reusable_eligible === true && reusableDecisionTypes.has(decisionType);
+    const forceAtomicReuse = options.forceAtomicReuse === true &&
+        group?.decision_grain === 'ATOMIC_LINKED_SET' &&
+        decisionType === 'APPROVE_PROPOSAL';
+    const canReuse = forceAtomicReuse ||
+        (group?.reusable_eligible === true && reusableDecisionTypes.has(decisionType));
     const decisionMessage =
         decisionType === 'APPROVE_PREFILL'
             ? 'Η πρόταση θα χαρακτηριστεί ως εγκεκριμένη για μελλοντική εφαρμογή, αλλά δεν θα εφαρμοστεί τώρα καμία αλλαγή στα Προδηλωμένα.'
@@ -4028,18 +4037,19 @@ async function confirmPolicyPreviewDecision(group, decisionType) {
             notes: String(
                 Swal.getPopup()?.querySelector('#policyPreviewDecisionNotes')?.value || ''
             ).trim(),
-            reuseScope:
-                canReuse &&
-                Swal.getPopup()?.querySelector('#policyPreviewReuseFutureIdentical')?.checked === true
+            reuseScope: forceAtomicReuse
                     ? 'FUTURE_IDENTICAL'
-                    : 'ONE_TIME'
+                    : canReuse &&
+                      Swal.getPopup()?.querySelector('#policyPreviewReuseFutureIdentical')?.checked === true
+                        ? 'FUTURE_IDENTICAL'
+                        : 'ONE_TIME'
         })
     });
 
     return result.isConfirmed ? result.value : null;
 }
 
-async function submitPolicyPreviewDecision(group, decisionType) {
+async function submitPolicyPreviewDecision(group, decisionType, options = {}) {
     if (policyPreviewApprovalSubmitting) return;
     if (!currentPolicyPreviewBaseParams) {
         throw new Error('Δεν είναι διαθέσιμη η περίοδος της προεπισκόπησης.');
@@ -4048,7 +4058,7 @@ async function submitPolicyPreviewDecision(group, decisionType) {
         throw new Error('Η ομάδα δεν περιέχει έγκυρα δεδομένα για καταγραφή απόφασης.');
     }
 
-    const confirmation = await confirmPolicyPreviewDecision(group, decisionType);
+    const confirmation = await confirmPolicyPreviewDecision(group, decisionType, options);
     if (confirmation === null) return;
 
     policyPreviewApprovalSubmitting = true;
@@ -4076,7 +4086,9 @@ async function submitPolicyPreviewDecision(group, decisionType) {
                     policy_code: group.policy_code,
                     scenario_code: group.scenario_code,
                     action_type: group.action_type,
-                    reason_code: group.reason_code
+                    reason_code: group.reason_code,
+                    group_type: group.group_type,
+                    decision_grain: group.decision_grain
                 },
                 decision_type: decisionType,
                 reuse_scope: confirmation.reuseScope,
@@ -4913,6 +4925,54 @@ function getAtomicRepoTransferWarningMessage(code) {
     return 'Η πρόταση περιέχει προειδοποίηση και παραμένει μόνο για ανθρώπινο έλεγχο.';
 }
 
+const atomicReusableBlockingDiagnostics = new Set([
+    'ATOMIC_LINKED_SET_ROW_OVERLAP',
+    'ATOMIC_REUSABLE_MULTIPLE_ACTIVE_MATCHES',
+    'ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED',
+    'ATOMIC_LINKED_SET_CONTRACT_INVALID',
+    'ATOMIC_LINKED_SET_POLICY_CONTEXT_INCOMPLETE',
+    'ATOMIC_LINKED_SET_PROFILE_CONTEXT_INCOMPLETE',
+    'ATOMIC_LINKED_SET_MEMBER_INELIGIBLE'
+]);
+
+function atomicReusableDiagnosticMessage(code) {
+    const messages = {
+        ATOMIC_LINKED_SET_ROW_OVERLAP:
+            'Η ίδια ημέρα συμμετέχει σε περισσότερες από μία προτάσεις. Απαιτείται χειροκίνητος έλεγχος όλων των προτάσεων.',
+        ATOMIC_REUSABLE_MULTIPLE_ACTIVE_MATCHES:
+            'Βρέθηκαν πολλαπλές ενεργές πολιτικές για την ίδια περίπτωση. Απαιτείται επίλυση από HR.',
+        ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED:
+            'Δεν επιβεβαιώθηκε με ασφάλεια το παράρτημα της ημέρας προέλευσης.',
+        ATOMIC_LINKED_SET_MEMBER_INELIGIBLE:
+            'Ένα από τα δύο συνδεδεμένα μέλη δεν είναι διαθέσιμο για επαναχρησιμοποιήσιμη έγκριση.'
+    };
+    return messages[code] ||
+        'Η συνδεδεμένη πρόταση δεν είναι κατάλληλη για μελλοντική επαναχρησιμοποιήσιμη έγκριση.';
+}
+
+function renderAtomicReusableDecision(group = {}) {
+    const reusable = group.reusable_decision || {};
+    if (group.status !== 'RESOLVED_BY_POLICY' || !reusable.approval_id) return '';
+    const effectiveTo = reusable.effective_to
+        ? formatPolicyPreviewDate(reusable.effective_to)
+        : 'Χωρίς λήξη';
+    const revoke = userCanManageReusablePolicyApproval()
+        ? `<button type="button" class="btn btn-sm btn-outline-danger policy-preview-revoke-btn" data-approval-id="${escapeHtml(reusable.approval_id)}">Ανάκληση πολιτικής</button>`
+        : '';
+    return `
+        <div class="atomic-repo-transfer-reusable-resolution">
+            <div class="fw-semibold">Εγκρίθηκε βάσει παλιότερης απόφασης HR</div>
+            <div class="small">Εγκρίθηκε από: ${escapeHtml(reusable.approved_by_user_name || 'HR')}</div>
+            <div class="small">Ημερομηνία έγκρισης: ${escapeHtml(formatPolicyPreviewDateTime(reusable.approved_at))}</div>
+            <div class="small">Ισχύει από: ${escapeHtml(formatPolicyPreviewDate(reusable.effective_from))}</div>
+            <div class="small">Λήξη: ${escapeHtml(effectiveTo)}</div>
+            <div class="small">Έκδοση επαναχρησιμοποιήσιμου αποτυπώματος: ${escapeHtml(reusable.fingerprint_version || 5)}</div>
+            <div class="small text-muted mt-1">Η έγκριση βάσει παλιότερης πολιτικής δεν εφαρμόζει αυτόματα τη μεταφορά. Για την εφαρμογή απαιτείται νέα καταγεγραμμένη απόφαση για την τρέχουσα πρόταση.</div>
+            <div class="mt-2">${revoke}</div>
+        </div>
+    `;
+}
+
 function renderAtomicRepoTransferGroup(group = {}, index = 0) {
     const items = Array.isArray(group.items) ? group.items : [];
     const source = items.find((item) => item?.role === 'SOURCE_BECOMES_WORK') || {};
@@ -4925,6 +4985,21 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
     const recordedDecision = decisionState?.current_decision || null;
     const selectedBranch = String(currentPolicyPreviewBaseParams?.get('ypokatasthma') || '').trim();
     const hasSpecificBranch = selectedBranch !== '' && selectedBranch.toUpperCase() !== 'ALL' && !selectedBranch.includes(',');
+    const isResolvedByReusable = group.status === 'RESOLVED_BY_POLICY' &&
+        Boolean(group.reusable_decision?.approval_id);
+    const reusableDiagnostics = Array.isArray(group.atomic_reusable_diagnostics)
+        ? group.atomic_reusable_diagnostics
+        : [];
+    const blockingReusableDiagnostics = reusableDiagnostics.filter((code) =>
+        atomicReusableBlockingDiagnostics.has(code)
+    );
+    const canOfferAtomicReusable = !isResolvedByReusable &&
+        group.status === 'NEEDS_REVIEW' &&
+        group.decision_grain === 'ATOMIC_LINKED_SET' &&
+        blockingReusableDiagnostics.length === 0 &&
+        userCanManageReusablePolicyApproval() &&
+        hasSpecificBranch &&
+        !recordedDecision;
     const decisionLabels = {
         APPROVE_PROPOSAL: 'Έγκριση πρότασης',
         REJECT_PROPOSAL: 'Απόρριψη πρότασης',
@@ -4975,10 +5050,18 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                </div>
            </details>`
         : '';
-    const decisionButtons = userCanRecordRepoTransferDecision() ? Object.entries(decisionLabels).map(([code, label]) => {
+    const decisionButtons = !isResolvedByReusable && userCanRecordRepoTransferDecision() ? Object.entries(decisionLabels).map(([code, label]) => {
         const style = code === 'APPROVE_PROPOSAL' ? 'policy-preview-decision-success' : code === 'REJECT_PROPOSAL' ? 'policy-preview-decision-danger' : 'policy-preview-decision-warning';
         return `<button type="button" class="btn btn-sm ${style} atomic-repo-transfer-decision-btn" data-atomic-group-index="${escapeHtml(index)}" data-decision-code="${escapeHtml(code)}" ${recordedDecision || !hasSpecificBranch ? 'disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
     }).join('') : '';
+    const reusableApprovalButton = canOfferAtomicReusable
+        ? `<button type="button" class="btn btn-sm btn-outline-success atomic-repo-transfer-reusable-btn" data-atomic-group-index="${escapeHtml(index)}">Έγκριση πρότασης για μελλοντική εφαρμογή</button>`
+        : '';
+    const reusableDiagnosticHtml = blockingReusableDiagnostics.length
+        ? `<div class="atomic-repo-transfer-group-warnings mt-2">${blockingReusableDiagnostics
+              .map((code) => `<div class="atomic-repo-transfer-warning" data-diagnostic-code="${escapeHtml(code)}">${escapeHtml(atomicReusableDiagnosticMessage(code))}</div>`)
+              .join('')}</div>`
+        : '';
     return `
         <article class="atomic-repo-transfer-group" data-atomic-group-id="${escapeHtml(
             group.group_id || ''
@@ -4986,7 +5069,7 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
             <div class="atomic-repo-transfer-group-header">
                 <div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                        <span class="badge text-bg-warning">Πρόταση προς έλεγχο από HR</span>
+                        <span class="badge ${isResolvedByReusable ? 'text-bg-success' : 'text-bg-warning'}">${isResolvedByReusable ? 'Επιλύθηκε από επαναχρησιμοποιήσιμη πολιτική' : 'Πρόταση προς έλεγχο από HR'}</span>
                         <span class="fw-semibold">Συνδεδεμένη πρόταση μεταφοράς ρεπό</span>
                     </div>
                     <div class="small text-muted">
@@ -5023,6 +5106,7 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                     : ''
             }
             ${renderAtomicRepoTransferResolution(group)}
+            ${reusableDiagnosticHtml}
             <div
                 class="atomic-repo-transfer-pair ${isExpanded ? '' : 'd-none'}"
                 id="${escapeHtml(detailsId)}">
@@ -5034,10 +5118,10 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
             <div class="policy-preview-approval-panel mt-2">
                 <div class="small fw-semibold mb-1">Απόφαση για ολόκληρη τη συνδεδεμένη πρόταση</div>
                 ${hasSpecificBranch ? '' : '<div class="small text-warning-emphasis mb-2">Για την καταγραφή απόφασης επιλέξτε συγκεκριμένο υποκατάστημα.</div>'}
-                ${recordedDecisionHtml}
+                ${isResolvedByReusable ? renderAtomicReusableDecision(group) : recordedDecisionHtml}
                 ${staleDecisionHtml}
                 ${previousDecisionHistory}
-                <div class="policy-preview-decision-actions mt-2">${decisionButtons}</div>
+                <div class="policy-preview-decision-actions mt-2">${decisionButtons}${reusableApprovalButton}</div>
                 ${applyHtml}
             </div>
         </article>
@@ -5063,6 +5147,25 @@ function bindAtomicRepoTransferEvents(container) {
             if (!group) return;
             try { await submitRepoTransferDecision(group, String(button.dataset.decisionCode || '')); }
             catch (error) { await Swal.fire({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' }); }
+        });
+    });
+    container.querySelectorAll('.atomic-repo-transfer-reusable-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const group = currentAtomicRepoTransferProjection?.groups?.[
+                Number(button.dataset.atomicGroupIndex)
+            ];
+            if (!group) return;
+            try {
+                await submitPolicyPreviewDecision(group, 'APPROVE_PROPOSAL', {
+                    forceAtomicReuse: true
+                });
+            } catch (error) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Δεν καταγράφηκε η επαναχρησιμοποιήσιμη έγκριση',
+                    text: error.message || 'Παρουσιάστηκε σφάλμα.'
+                });
+            }
         });
     });
     container.querySelectorAll('.atomic-repo-transfer-apply-btn').forEach((button) => {
@@ -5328,7 +5431,8 @@ function isHrReviewGroupCompleted(group = {}) {
     );
 
     return Boolean(
-        decisionState?.current_decision ||
+        group.status === 'RESOLVED_BY_POLICY' && group.reusable_decision?.approval_id ||
+            decisionState?.current_decision ||
             decisionState?.apply_state === 'ALREADY_APPLIED' ||
             decisionState?.current_execution?.execution_status === 'APPLIED'
     );
@@ -5421,13 +5525,34 @@ function renderHrPendingCase() {
             decisionState.apply_state === 'STALE_DECISION' && hasHistoricalApproval
                 ? '<div class="alert alert-warning small mt-3 mb-3">Υπήρχε προηγούμενη έγκριση, αλλά τα δεδομένα της πρότασης έχουν αλλάξει. Ελέγξτε ξανά και καταγράψτε νέα απόφαση.</div>'
                 : '';
+        const selectedBranch = getHrSelectedBranch();
+        const hasSpecificBranch = selectedBranch !== '' &&
+            selectedBranch.toUpperCase() !== 'ALL' &&
+            !selectedBranch.includes(',');
+        const blockingReusableDiagnostics = (
+            Array.isArray(group.atomic_reusable_diagnostics)
+                ? group.atomic_reusable_diagnostics
+                : []
+        ).filter((code) => atomicReusableBlockingDiagnostics.has(code));
+        const reusableWarning = blockingReusableDiagnostics.length
+            ? `<div class="alert alert-warning small mt-3 mb-3">${escapeHtml(
+                  atomicReusableDiagnosticMessage(blockingReusableDiagnostics[0])
+              )}</div>`
+            : '';
+        const reusableAction = userCanManageReusablePolicyApproval() &&
+            hasSpecificBranch && blockingReusableDiagnostics.length === 0
+            ? `<button type="button" class="btn btn-outline-success hr-review-reusable-btn employment-review-action-btn">Έγκριση πρότασης για μελλοντική εφαρμογή</button>`
+            : '';
         const decisionActions = userCanRecordRepoTransferDecision()
             ? `<div class="hr-review-decision-actions">
                    <button type="button" class="btn policy-preview-decision-success hr-review-decision-btn employment-review-action-btn employment-review-action-success" data-decision-code="APPROVE_PROPOSAL">Αποδοχή πρότασης</button>
                    <button type="button" class="btn policy-preview-decision-danger hr-review-decision-btn employment-review-action-btn employment-review-action-danger" data-decision-code="REJECT_PROPOSAL">Δεν ισχύει</button>
                    <button type="button" class="btn policy-preview-decision-warning hr-review-decision-btn employment-review-action-btn employment-review-action-warning" data-decision-code="NEEDS_MORE_REVIEW">Χρειάζομαι οδηγία</button>
+                   ${reusableAction}
                </div>`
-            : '';
+            : reusableAction
+                ? `<div class="hr-review-decision-actions">${reusableAction}</div>`
+                : '';
         return `<article class="hr-review-proposal-card" data-group-id="${escapeHtml(String(group.group_id || ''))}" data-group-index="${groupIndex}">
             <div class="hr-review-employee">
                 ${employeeName ? `<h4>${escapeHtml(employeeName)}</h4>` : ''}
@@ -5436,6 +5561,7 @@ function renderHrPendingCase() {
             </div>
             <div class="hr-review-days-grid">${renderHrReviewDay(source, 'work')}${renderHrReviewDay(target, 'rest')}</div>
             ${staleDecisionNotice}
+            ${reusableWarning}
             <div class="hr-review-question">Είναι σωστή αυτή η πρόταση;</div>
             ${decisionActions}
         </article>`;
@@ -5535,6 +5661,8 @@ function renderHrCompletedCases() {
                 STALE_DECISION: 'Τα δεδομένα έχουν αλλάξει μετά την έγκριση και απαιτείται νέος έλεγχος.'
             };
             const approved = decision.decision_code === 'APPROVE_PROPOSAL';
+            const inheritedReusable = group.status === 'RESOLVED_BY_POLICY' &&
+                group.reusable_decision?.approval_id;
             const applyAction = state.apply_state === 'ALREADY_APPLIED' && state.current_execution
                 ? `<div class="mt-2"><span class="badge text-bg-success">Εφαρμόστηκε</span> ${escapeHtml(formatPolicyPreviewDateTime(state.current_execution.applied_at))}${state.current_execution.created_by_user_name ? ` · ${escapeHtml(state.current_execution.created_by_user_name)}` : ''}</div>`
                 : approved && state.can_apply === true && userCanApplyRepoTransferDecision()
@@ -5548,6 +5676,7 @@ function renderHrCompletedCases() {
                     <div>${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(formatPolicyPreviewDate(group.last_date))}</div>
                     ${decision.created_by_user_name ? `<div>Καταχώριση: ${escapeHtml(decision.created_by_user_name)}</div>` : ''}
                     ${decision.notes ? `<div>Σημείωση: ${escapeHtml(decision.notes)}</div>` : ''}
+                    ${inheritedReusable ? renderAtomicReusableDecision(group) : ''}
                     ${applyAction}
                 </li>
             `;
@@ -5673,7 +5802,9 @@ async function loadHrReviewQueue() {
 function bindHrReviewEvents() {
     document.getElementById('hrReviewStartBtn')?.addEventListener('click', loadHrReviewQueue);
     document.getElementById('hrReviewPendingContainer')?.addEventListener('click', async (event) => {
-        const button = event.target.closest?.('.hr-review-decision-btn');
+        const button = event.target.closest?.(
+            '.hr-review-decision-btn, .hr-review-reusable-btn'
+        );
         if (!button || button.disabled) return;
         const card = button.closest('.hr-review-proposal-card[data-group-id]');
         const group = currentHrPendingGroups.find(
@@ -5681,12 +5812,23 @@ function bindHrReviewEvents() {
         );
         if (!group) return;
         try {
-            await submitRepoTransferDecision(group, String(button.dataset.decisionCode || ''), { mode: 'hr' });
+            if (button.classList?.contains('hr-review-reusable-btn')) {
+                await submitPolicyPreviewDecision(group, 'APPROVE_PROPOSAL', {
+                    forceAtomicReuse: true
+                });
+            } else {
+                await submitRepoTransferDecision(group, String(button.dataset.decisionCode || ''), { mode: 'hr' });
+            }
         } catch (error) {
             await Swal.fire({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' });
         }
     });
     document.getElementById('hrReviewCompletedContainer')?.addEventListener('click', async (event) => {
+        const revokeButton = event.target.closest?.('.policy-preview-revoke-btn');
+        if (revokeButton) {
+            await revokePolicyPreviewApproval(revokeButton.dataset.approvalId);
+            return;
+        }
         const button = event.target.closest?.('.hr-review-apply-btn');
         if (!button || button.disabled) return;
         const group = currentHrCompletedGroups.find(

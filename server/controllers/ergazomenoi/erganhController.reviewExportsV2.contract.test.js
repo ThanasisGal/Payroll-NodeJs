@@ -13,6 +13,9 @@ test('Excel/PDF parity contract uses the same pure projection', () => {
     assert.match(controller, /static exportProdhlomenaOrariaReviewExcel[\s\S]*getReviewRowsForExport\(req\)/);
     assert.match(controller, /static exportProdhlomenaOrariaReviewPdf[\s\S]*getReviewRowsForExport\(req\)/);
     assert.match(controller, /buildReviewExportProjection\(\{[\s\S]*findingsOnly: true/);
+    assert.match(controller, /buildAtomicRepoTransferPolicyPreviewProjection\(\{/);
+    assert.match(controller, /includeContextGroups: true/);
+    assert.match(controller, /buildReviewExportProjection\(\{[\s\S]*atomicGroupProjection,[\s\S]*findingsOnly: true/);
     assert.match(controller, /Πολιτική v2 — εβδομάδα Δευτέρα έως Κυριακή/);
     assert.match(controller, /policy_status: row\.policy\?\.statusLabel \|\| ''/);
     assert.match(controller, /\[row\.policy\?\.statusLabel, row\.policy\?\.severity\]/);

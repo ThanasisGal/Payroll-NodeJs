@@ -10,8 +10,18 @@ const {
     getReusableDecisionEligibility,
     isRuleEffectiveForRow
 } = require('./apasxoliseisReusablePolicyDecisionService');
+const {
+    DECISION_GRAIN: ATOMIC_DECISION_GRAIN,
+    CANONICAL_ROLES,
+    validateAtomicLinkedSet,
+    buildAtomicReusableCriteriaV5,
+    validateAtomicReusableDecision,
+    isEffectiveForBothMembers,
+    isMemberEligible
+} = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService');
 
 const ALLOWED_DECISION_TYPES = Object.freeze([
+    'APPROVE_PROPOSAL',
     'APPROVE_PREFILL',
     'MARK_OK',
     'MARK_REVIEWED',
@@ -184,6 +194,10 @@ function validatePolicyPreviewApprovalPayload(payload = {}) {
     if (!ALLOWED_DECISION_TYPES.includes(decisionType)) {
         throw validationError('Ο τύπος απόφασης δεν υποστηρίζεται.');
     }
+    const decisionGrain = toTrimmedString(group.decision_grain, 100).toUpperCase();
+    if (decisionType === 'APPROVE_PROPOSAL' && decisionGrain !== ATOMIC_DECISION_GRAIN) {
+        throw validationError('Η έγκριση πρότασης υποστηρίζεται μόνο για ατομικό συνδεδεμένο σύνολο.');
+    }
     if (!Object.values(REUSE_SCOPE).includes(reuseScope)) {
         throw validationError('Η εμβέλεια επαναχρησιμοποίησης δεν υποστηρίζεται.');
     }
@@ -230,7 +244,9 @@ function validatePolicyPreviewApprovalPayload(payload = {}) {
             scenario_code: toTrimmedString(group.scenario_code, 150),
             status: toTrimmedString(group.status, 100),
             action_type: toTrimmedString(group.action_type, 100),
-            reason_code: toTrimmedString(group.reason_code, 150)
+            reason_code: toTrimmedString(group.reason_code, 150),
+            group_type: toTrimmedString(group.group_type, 100).toUpperCase(),
+            decision_grain: decisionGrain
         },
         decision_type: decisionType,
         reuse_scope: reuseScope,
@@ -307,11 +323,14 @@ function buildRecordedDecisionLookup(scope, payload) {
 async function createPolicyPreviewApprovalRecord({
     session,
     payload,
+    authoritativeAtomicGroup = null,
+    authoritativeAtomicOverlap = null,
     approvalModel = ApasxoliseisPolicyPreviewApprovalsModel,
     now = new Date()
 }) {
     const scope = validateSessionScope(session);
-    const normalized = validatePolicyPreviewApprovalPayload(payload);
+    let normalized = validatePolicyPreviewApprovalPayload(payload);
+    const isAtomic = normalized.group.decision_grain === ATOMIC_DECISION_GRAIN;
     if (
         normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL &&
         !REUSABLE_DECISION_ALLOWED_ROLES.has(scope.created_by_user_role.toUpperCase())
@@ -321,6 +340,88 @@ async function createPolicyPreviewApprovalRecord({
         );
         error.statusCode = 403;
         throw error;
+    }
+    let atomicBuilt = null;
+    if (isAtomic) {
+        if (normalized.reuse_scope === REUSE_SCOPE.ONE_TIME) {
+            const error = validationError(
+                'Οι εφάπαξ ατομικές αποφάσεις καταγράφονται μόνο στην ειδική ροή μεταφοράς ρεπό.'
+            );
+            error.code = 'ATOMIC_ONE_TIME_USES_DEDICATED_PIPELINE';
+            throw error;
+        }
+        const decisionValidation = validateAtomicReusableDecision({
+            reuseScope: normalized.reuse_scope,
+            decisionType: normalized.decision_type
+        });
+        if (!decisionValidation.valid) {
+            const error = validationError(
+                'Μόνο η έγκριση πρότασης μπορεί να αποθηκευτεί ως επαναχρησιμοποιήσιμη ατομική απόφαση.'
+            );
+            error.code = decisionValidation.diagnostic;
+            throw error;
+        }
+        if (!authoritativeAtomicGroup || authoritativeAtomicOverlap?.conflict === true) {
+            const error = validationError(
+                'Το έγκυρο ατομικό συνδεδεμένο σύνολο του διακομιστή δεν είναι διαθέσιμο ή έχει επικάλυψη.'
+            );
+            error.code = authoritativeAtomicOverlap?.conflict === true
+                ? 'ATOMIC_LINKED_SET_ROW_OVERLAP'
+                : 'AUTHORITATIVE_ATOMIC_LINKED_SET_REQUIRED';
+            throw error;
+        }
+        if (
+            normalized.group.group_id !== authoritativeAtomicGroup.group_id ||
+            normalized.group.group_key !== authoritativeAtomicGroup.group_key
+        ) {
+            const error = validationError('Η ατομική ομάδα δεν συμφωνεί με την τρέχουσα προβολή του διακομιστή.');
+            error.code = 'ATOMIC_LINKED_SET_IDENTITY_MISMATCH';
+            throw error;
+        }
+        const linkedValidation = validateAtomicLinkedSet(authoritativeAtomicGroup);
+        if (!linkedValidation.eligible || !linkedValidation.canonical_items.every(isMemberEligible)) {
+            const error = validationError('Το τρέχον ατομικό συνδεδεμένο σύνολο δεν είναι κατάλληλο για επαναχρησιμοποίηση.');
+            error.code = linkedValidation.diagnostics[0] || 'ATOMIC_LINKED_SET_MEMBER_INELIGIBLE';
+            error.diagnostics = linkedValidation.diagnostics;
+            throw error;
+        }
+        atomicBuilt = buildAtomicReusableCriteriaV5(authoritativeAtomicGroup);
+        if (!atomicBuilt.fingerprint) {
+            throw validationError('Δεν ήταν δυνατή η δημιουργία έγκυρου αποτυπώματος έκδοσης 5 από τον διακομιστή.');
+        }
+        const authoritativeItems = atomicBuilt.validation.canonical_items.map((item, index) =>
+            normalizeApprovalItem({
+                ...item,
+                preview_id: item.preview_id || item.prodhlomena_oraria_id,
+                policy_context: authoritativeAtomicGroup.atomic_reusable_context,
+                flags: {
+                    ...asObject(item.flags),
+                    atomic_role: CANONICAL_ROLES[index]
+                }
+            }, index));
+        normalized = {
+            ...normalized,
+            ypokatasthma: authoritativeAtomicGroup.ypokatasthma,
+            group: {
+                ...normalized.group,
+                group_type: authoritativeAtomicGroup.group_type,
+                decision_grain: authoritativeAtomicGroup.decision_grain,
+                policy_code: authoritativeAtomicGroup.policy_code,
+                scenario_code: authoritativeAtomicGroup.scenario_code,
+                status: authoritativeAtomicGroup.status,
+                action_type: authoritativeAtomicGroup.action_type,
+                reason_code: authoritativeAtomicGroup.reason_code
+            },
+            items: authoritativeItems
+        };
+        if (
+            atomicBuilt.criteria.team !== scope.team.toUpperCase() ||
+            atomicBuilt.criteria.company !== scope.company_kod.toUpperCase()
+        ) {
+            const error = validationError('Η έγκυρη ατομική ομάδα του διακομιστή είναι εκτός του πεδίου της συνεδρίας.');
+            error.code = 'ATOMIC_LINKED_SET_SCOPE_MISMATCH';
+            throw error;
+        }
     }
     const reuseMatchCriteria = buildReusableMatchCriteriaFromGroup(
         {
@@ -340,22 +441,24 @@ async function createPolicyPreviewApprovalRecord({
         items: normalized.items
     });
 
-    if (normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL && !reuseEligibility.eligible) {
+    if (!isAtomic && normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL &&
+        !reuseEligibility.eligible) {
         throw validationError(reuseEligibility.reason);
     }
 
-    const reuseCriteria = normalized.items.map((item) =>
-        buildReusablePolicyCriteriaV4(reuseMatchCriteria, item));
-    if (normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL && reuseCriteria.some((criteria) =>
+    const reuseCriteria = isAtomic
+        ? [atomicBuilt.criteria]
+        : normalized.items.map((item) => buildReusablePolicyCriteriaV4(reuseMatchCriteria, item));
+    if (!isAtomic && normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL && reuseCriteria.some((criteria) =>
         !criteria.policy_version || !criteria.scenario_version ||
         !criteria.decision_grain || !criteria.rule_branch)) {
         throw validationError(
             'Η πολιτική δεν παρέχει πλήρη έκδοση, grain και rule branch για ασφαλή μελλοντική χρήση.'
         );
     }
-    const candidatePolicyFingerprints = [
-        ...new Set(reuseCriteria.map(buildReusableDecisionFingerprint))
-    ];
+    const candidatePolicyFingerprints = isAtomic
+        ? [atomicBuilt.fingerprint]
+        : [...new Set(reuseCriteria.map(buildReusableDecisionFingerprint))];
     const reuseFingerprints = normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL
         ? candidatePolicyFingerprints
         : [];
@@ -367,9 +470,11 @@ async function createPolicyPreviewApprovalRecord({
 
     const existingDecisionApplies = existing && (
         normalized.reuse_scope !== REUSE_SCOPE.FUTURE_IDENTICAL ||
-        normalized.items.some((item) =>
-            isRuleEffectiveForRow(existing, { hmeromhnia: item.hmeromhnia })
-        )
+        (isAtomic
+            ? isEffectiveForBothMembers(existing, atomicBuilt.validation.canonical_items)
+            : normalized.items.some((item) =>
+                isRuleEffectiveForRow(existing, { hmeromhnia: item.hmeromhnia })
+            ))
     );
     if (existingDecisionApplies) {
         throw conflictError('Η ίδια καταγεγραμμένη απόφαση υπάρχει ήδη για αυτή την ομάδα.');
@@ -402,15 +507,15 @@ async function createPolicyPreviewApprovalRecord({
                     'active_policy_key active_policy_keys reuse_fingerprint reuse_fingerprints'
             )
             .lean();
-        const applicableReusable = activeReusableCandidates.find((rule) =>
-            normalized.items.some((item) =>
+        const applicableReusable = activeReusableCandidates.find((rule) => isAtomic
+            ? isEffectiveForBothMembers(rule, atomicBuilt.validation.canonical_items)
+            : normalized.items.some((item) =>
                 isRuleEffectiveForRow(rule, { hmeromhnia: item.hmeromhnia })
-            )
-        );
+            ));
 
         if (applicableReusable) {
             const error = conflictError(
-                'Υπάρχει ήδη ενεργή reusable πολιτική που εφαρμόζεται σε αυτή την περίπτωση και πρέπει πρώτα να ανακληθεί.'
+                'Υπάρχει ήδη ενεργή επαναχρησιμοποιήσιμη πολιτική που εφαρμόζεται σε αυτή την περίπτωση και πρέπει πρώτα να ανακληθεί.'
             );
             error.code = 'ACTIVE_REUSABLE_POLICY_ALREADY_APPLIES';
             error.existingApproval = {
@@ -441,14 +546,14 @@ async function createPolicyPreviewApprovalRecord({
                     'reuse_effective_from reuse_effective_to active_policy_key'
             )
             .lean();
-        const existingReusable = reusableCandidates.find((rule) =>
-            normalized.items.some((item) =>
+        const existingReusable = reusableCandidates.find((rule) => isAtomic
+            ? isEffectiveForBothMembers(rule, atomicBuilt.validation.canonical_items)
+            : normalized.items.some((item) =>
                 isRuleEffectiveForRow(rule, { hmeromhnia: item.hmeromhnia })
-            )
-        );
+            ));
 
         if (existingReusable) {
-            const error = conflictError('Υπάρχει ήδη ενεργή reusable πολιτική και πρέπει πρώτα να ανακληθεί.');
+            const error = conflictError('Υπάρχει ήδη ενεργή επαναχρησιμοποιήσιμη πολιτική και πρέπει πρώτα να ανακληθεί.');
             error.existingApproval = existingReusable;
             throw error;
         }
@@ -482,7 +587,18 @@ async function createPolicyPreviewApprovalRecord({
         reuse_fingerprints: reuseFingerprints,
         active_policy_key: reuseFingerprint,
         active_policy_keys: reuseFingerprints,
-        reuse_match_criteria: reuseFingerprint ? { version: 4, variants: reuseCriteria } : null,
+        reuse_match_criteria: reuseFingerprint
+            ? isAtomic
+                ? {
+                      version: 5,
+                      decision_grain: ATOMIC_DECISION_GRAIN,
+                      linked_set_type: authoritativeAtomicGroup.group_type,
+                      linked_member_count: 2,
+                      role_contract: [...CANONICAL_ROLES],
+                      criteria: atomicBuilt.criteria
+                  }
+                : { version: 4, variants: reuseCriteria }
+            : null,
         reuse_effective_from:
             normalized.reuse_scope === REUSE_SCOPE.FUTURE_IDENTICAL
                 ? normalized.apo_hmeromhnia
@@ -498,7 +614,7 @@ async function createPolicyPreviewApprovalRecord({
         client_payload_version: normalized.client_payload_version
     });
     if (reuseFingerprint && typeof approvalModel.countDocuments === 'function') {
-        const activeCount = await approvalModel.countDocuments({
+        const activeCountFilter = {
             team: scope.team,
             company_kod: scope.company_kod,
             ypokatasthma: normalized.ypokatasthma,
@@ -509,7 +625,26 @@ async function createPolicyPreviewApprovalRecord({
             reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL,
             reuse_status: REUSE_STATUS.ACTIVE,
             decision_status: 'RECORDED'
-        });
+        };
+        if (isAtomic) {
+            const memberDates = atomicBuilt.validation.canonical_items
+                .map((item) => new Date(`${item.hmeromhnia}T00:00:00.000Z`))
+                .sort((left, right) => left - right);
+            activeCountFilter.reuse_effective_from = mongoose.trusted({
+                $lte: memberDates[0]
+            });
+            activeCountFilter.$and = [
+                { $or: activeCountFilter.$or },
+                {
+                    $or: [
+                        { reuse_effective_to: null },
+                        { reuse_effective_to: mongoose.trusted({ $gte: memberDates[1] }) }
+                    ]
+                }
+            ];
+            delete activeCountFilter.$or;
+        }
+        const activeCount = await approvalModel.countDocuments(activeCountFilter);
         if (activeCount > 1) {
             let cancelled;
             try {
@@ -530,7 +665,7 @@ async function createPolicyPreviewApprovalRecord({
                 }, { new: true, runValidators: true }).lean();
             } catch (cause) {
                 const cancellationError = new Error(
-                    'Αποτυχία ασφαλούς ακύρωσης νέας reusable approval μετά από concurrent conflict.'
+                    'Αποτυχία ασφαλούς ακύρωσης νέας επαναχρησιμοποιήσιμης έγκρισης μετά από ταυτόχρονη σύγκρουση.'
                 );
                 cancellationError.statusCode = 500;
                 cancellationError.code = 'POST_CREATE_CONFLICT_CANCELLATION_FAILED';
@@ -539,14 +674,14 @@ async function createPolicyPreviewApprovalRecord({
             }
             if (!cancelled) {
                 const cancellationError = new Error(
-                    'Η νέα reusable approval δεν ακυρώθηκε μετά από concurrent conflict.'
+                    'Η νέα επαναχρησιμοποιήσιμη έγκριση δεν ακυρώθηκε μετά από ταυτόχρονη σύγκρουση.'
                 );
                 cancellationError.statusCode = 500;
                 cancellationError.code = 'POST_CREATE_CONFLICT_CANCELLATION_FAILED';
                 throw cancellationError;
             }
             const error = conflictError(
-                'Εντοπίστηκε ταυτόχρονη ενεργή reusable πολιτική και η νέα εγγραφή ακυρώθηκε με ασφάλεια.'
+                'Εντοπίστηκε ταυτόχρονη ενεργή επαναχρησιμοποιήσιμη πολιτική και η νέα εγγραφή ακυρώθηκε με ασφάλεια.'
             );
             error.code = 'MULTIPLE_ACTIVE_REUSABLE_DECISIONS';
             throw error;
@@ -564,7 +699,7 @@ async function revokePolicyPreviewApprovalRecord({
 }) {
     const scope = validateSessionScope(session);
     if (!REUSABLE_DECISION_ALLOWED_ROLES.has(scope.created_by_user_role.toUpperCase())) {
-        const error = new Error('Δεν έχετε δικαίωμα ανάκλησης reusable πολιτικής.');
+        const error = new Error('Δεν έχετε δικαίωμα ανάκλησης επαναχρησιμοποιήσιμης πολιτικής.');
         error.statusCode = 403;
         throw error;
     }
@@ -577,11 +712,11 @@ async function revokePolicyPreviewApprovalRecord({
     const existing = await approvalModel.findOne(scopedBase).select(
         '_id reuse_scope reuse_status decision_status ypokatasthma active_policy_key'
     ).lean();
-    if (!existing) throw notFoundError('Η reusable approval δεν βρέθηκε στο ενεργό scope.');
+    if (!existing) throw notFoundError('Η επαναχρησιμοποιήσιμη έγκριση δεν βρέθηκε στο ενεργό πεδίο.');
     if (existing.reuse_scope !== REUSE_SCOPE.FUTURE_IDENTICAL ||
         existing.decision_status !== 'RECORDED' || existing.reuse_status !== REUSE_STATUS.ACTIVE ||
         !existing.active_policy_key) {
-        throw conflictError('Η approval δεν είναι ενεργή reusable πολιτική που μπορεί να ανακληθεί.');
+        throw conflictError('Η έγκριση δεν είναι ενεργή επαναχρησιμοποιήσιμη πολιτική που μπορεί να ανακληθεί.');
     }
     const revoked = await approvalModel.findOneAndUpdate({
         ...scopedBase,
@@ -599,7 +734,7 @@ async function revokePolicyPreviewApprovalRecord({
             revoke_reason: revokeReason
         }
     }, { new: true, runValidators: true }).lean();
-    if (!revoked) throw conflictError('Η reusable πολιτική ανακλήθηκε ήδη ή άλλαξε κατάσταση.');
+    if (!revoked) throw conflictError('Η επαναχρησιμοποιήσιμη πολιτική ανακλήθηκε ήδη ή άλλαξε κατάσταση.');
     return {
         approval_id: String(revoked._id),
         reuse_status: revoked.reuse_status,

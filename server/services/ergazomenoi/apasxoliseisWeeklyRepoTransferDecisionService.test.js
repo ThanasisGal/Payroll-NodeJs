@@ -26,6 +26,54 @@ function reconstruction(fingerprint = 'a'.repeat(64)) {
     };
 }
 
+function atomicReconstruction(fingerprint = 'a'.repeat(64)) {
+    const base = reconstruction(fingerprint);
+    return {
+        ...base,
+        group: {
+            group_id: command.proposal_id,
+            group_key: 'safe-key',
+            group_type: 'ATOMIC_PAIRED_PROPOSAL',
+            decision_grain: 'ATOMIC_LINKED_SET',
+            team: session.userTeam,
+            company_kod: session.companyInUse,
+            ypokatasthma: '0001',
+            scenario_code: 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR',
+            action_type: 'PAIRED_PROPOSAL',
+            count: 2,
+            decision_units_count: 1,
+            pair_contract: {
+                atomic_pair_required: true,
+                choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR',
+                proposal_version: 'repo-transfer-single-pair-proposal:v4'
+            },
+            atomic_reusable_context: {
+                primary_policy_code: 'WEEKLY_REPO_BALANCE',
+                secondary_policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
+                policy_versions: { primary: 'foundation:v3', secondary: 'foundation:v3' },
+                source_conditions: { current_category: 'ΑΝ', required_result_category: 'ΕΡΓ' },
+                target_conditions: { current_category: 'ΕΡΓ', required_result_category: 'ΑΝ' },
+                employment_profile_class: { type: 'FULL_TIME', weekly_days: 5 },
+                effective_parameters: { expected_repo: 2, weekly_days: 5 },
+                thresholds: { linked_member_count: 2, decision_units_count: 1 },
+                role_structure: {
+                    SOURCE_BECOMES_WORK: { transition: 'REPO_OR_NON_WORK_TO_WORK' },
+                    TARGET_BECOMES_REPO: { transition: 'WORK_TO_REPO_OR_NON_WORK' }
+                },
+                target_repo_category_rule: 'FULL_TIME_REPO_DAY',
+                target_category: 'ΑΝ',
+                week_boundary_semantics: 'MONDAY_TO_SUNDAY_SAME_NATURAL_WEEK'
+            },
+            items: [
+                { role: 'SOURCE_BECOMES_WORK', prodhlomena_oraria_id: SOURCE,
+                    employee_kodikos: '001', hmeromhnia: '2026-06-15' },
+                { role: 'TARGET_BECOMES_REPO', prodhlomena_oraria_id: TARGET,
+                    employee_kodikos: '001', hmeromhnia: '2026-06-19' }
+            ]
+        }
+    };
+}
+
 function fakeModel(existing = []) {
     const records = [...existing];
     const queryResult = (value) => ({ lean: async () => value });
@@ -127,6 +175,35 @@ async function run() {
         assert.strictEqual(saved.decision.decision_code, decision_code);
         assert.strictEqual(perDecisionModel.records.length, 1);
     }
+
+    let reusableLookup;
+    let blockedCreateCalled = false;
+    const atomic = atomicReconstruction();
+    const atomicFingerprint = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService')
+        .buildAtomicReusableCriteriaV5(atomic.group).fingerprint;
+    await assert.rejects(() => createWeeklyRepoTransferDecision({
+        session,
+        payload: { ...command, decision_code: 'REJECT_PROPOSAL', request_id: 'atomic-reject' },
+        decisionModel: {
+            ...fakeModel(),
+            create: async () => { blockedCreateCalled = true; }
+        },
+        approvalModel: {
+            find(filter) {
+                reusableLookup = filter;
+                return { select: () => ({ lean: async () => [{
+                    _id: 'active-atomic',
+                    reuse_effective_from: new Date('2026-06-01T00:00:00.000Z'),
+                    reuse_effective_to: null
+                }] }) };
+            }
+        },
+        reconstruct: async () => atomic
+    }), (error) => error.statusCode === 409 &&
+        error.code === 'ACTIVE_ATOMIC_REUSABLE_APPROVAL_ALREADY_APPLIES');
+    assert.strictEqual(blockedCreateCalled, false);
+    assert.strictEqual(reusableLookup.reuse_fingerprint, undefined);
+    assert.strictEqual(reusableLookup.$or[0].reuse_fingerprint, atomicFingerprint);
 
     const model = fakeModel(); let calls = 0;
     const result = await createWeeklyRepoTransferDecision({ session, payload: command, decisionModel: model, reconstruct: async () => { calls++; return reconstruction(); } });

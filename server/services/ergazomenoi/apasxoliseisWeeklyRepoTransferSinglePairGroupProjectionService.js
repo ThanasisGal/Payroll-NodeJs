@@ -26,6 +26,8 @@ const PRIMARY_POLICY_CODE = 'WEEKLY_REPO_BALANCE';
 const SECONDARY_POLICY_CODE = 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS';
 const SOURCE_ROLE = 'SOURCE_BECOMES_WORK';
 const TARGET_ROLE = 'TARGET_BECOMES_REPO';
+const DECISION_GRAIN = 'ATOMIC_LINKED_SET';
+const SOURCE_SCOPE_UNRESOLVED = 'ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED';
 
 function deepFreeze(value) {
     if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -45,6 +47,21 @@ function primitiveString(value, maxLength = 200) {
     if (typeof value === 'number' && !Number.isFinite(value)) return null;
     const normalized = String(value).trim();
     return normalized ? normalized.slice(0, maxLength) : null;
+}
+
+function normalizeRowId(value, maxLength = 100) {
+    if (typeof value === 'boolean') return null;
+    const primitive = primitiveString(value, maxLength);
+    if (primitive) return primitive;
+    if (!value || typeof value !== 'object') return null;
+
+    try {
+        return typeof value.toHexString === 'function'
+            ? primitiveString(value.toHexString(), maxLength)
+            : null;
+    } catch (_error) {
+        return null;
+    }
 }
 
 function dateKey(value) {
@@ -230,7 +247,7 @@ function validateReadyProposal(proposal) {
     return null;
 }
 
-function projectItem(item, groupKey) {
+function projectItem(item, groupKey, currentRow = {}) {
     return {
         preview_id: buildPreviewId(groupKey, item),
         prodhlomena_oraria_id: primitiveString(item.prodhlomena_oraria_id, 100),
@@ -250,8 +267,53 @@ function projectItem(item, groupKey) {
             requires_human_approval: true,
             approval_supported: false,
             batch_approvable: false,
-            runtime_apply_supported: false
+            runtime_apply_supported: false,
+            is_locked: currentRow.is_locked === true,
+            has_manual_override: currentRow.has_manual_override === true,
+            current_eligible: currentRow.current_eligible !== false
         }
+    };
+}
+
+function buildAtomicReusableContext({ proposal, employmentProfile, targetCategory }) {
+    return {
+        primary_policy_code: PRIMARY_POLICY_CODE,
+        secondary_policy_code: SECONDARY_POLICY_CODE,
+        policy_versions: {
+            primary: proposal.policy_context.weekly_repo_policy_version,
+            secondary: proposal.policy_context.source_work_policy_version
+        },
+        source_conditions: {
+            current_category: proposal.items[0].current_category,
+            required_result_category: 'ΕΡΓ'
+        },
+        target_conditions: {
+            current_category: proposal.items[1].current_category,
+            required_result_category: targetCategory
+        },
+        employment_profile_class: {
+            typos_apasxolhshs: primitiveString(employmentProfile.typos_apasxolhshs, 100),
+            hmeres_ergasias_ebdomadas: employmentProfile.hmeres_ergasias_ebdomadas ?? null
+        },
+        effective_parameters: {
+            effective_expected_weekly_repo:
+                proposal.employee.effective_expected_weekly_repo,
+            scheduled_work_days: proposal.employee.scheduled_work_days,
+            effective_weekly_workdays: proposal.employee.effective_weekly_workdays
+        },
+        thresholds: {
+            linked_member_count: 2,
+            decision_units_count: 1
+        },
+        role_structure: {
+            [SOURCE_ROLE]: { transition: 'REPO_OR_NON_WORK_TO_WORK' },
+            [TARGET_ROLE]: { transition: 'WORK_TO_REPO_OR_NON_WORK' }
+        },
+        target_repo_category_rule: targetCategory === 'ΜΕ'
+            ? 'PART_TIME_NON_WORK_DAY'
+            : 'FULL_TIME_REPO_DAY',
+        target_category: targetCategory,
+        week_boundary_semantics: 'MONDAY_TO_SUNDAY_SAME_NATURAL_WEEK'
     };
 }
 
@@ -268,6 +330,7 @@ function buildDescription({ employeeKodikos, sourceDate, targetDate, targetCateg
 
 function buildWeeklyRepoTransferSinglePairGroupProjection({
     weekRows = [],
+    reusableScopeRows = weekRows,
     employmentProfile = {},
     holidayByDateKey = new Map(),
     existingAuditCountByRowKey = new Map(),
@@ -311,17 +374,33 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
         targetId: targetProposalItem.prodhlomena_oraria_id,
         proposalVersion: proposal.proposal_version
     });
+    const rowById = new Map(weekRows.map((row) => [
+        normalizeRowId(row?._id || row?.id, 100), row
+    ]));
     const items = [
-        projectItem(sourceProposalItem, groupKey),
-        projectItem(targetProposalItem, groupKey)
+        projectItem(sourceProposalItem, groupKey,
+            rowById.get(sourceProposalItem.prodhlomena_oraria_id)),
+        projectItem(targetProposalItem, groupKey,
+            rowById.get(targetProposalItem.prodhlomena_oraria_id))
     ];
     const itemDates = items.map((item) => item.hmeromhnia).sort();
     const warnings = copyReasons(proposal.warnings);
     const targetCategory = items[1].kathgoria_ergasias_apologistika;
+    const sourceWeekRow = reusableScopeRows.find((row) =>
+        normalizeRowId(row?._id || row?.id, 100) ===
+            sourceProposalItem.prodhlomena_oraria_id
+    );
     const group = {
         group_id: buildGroupId(groupKey),
         group_key: groupKey,
         group_type: GROUP_TYPE,
+        decision_grain: DECISION_GRAIN,
+        team: primitiveString(proposal.employee.team),
+        company_kod: primitiveString(proposal.employee.company_kod),
+        ypokatasthma: primitiveString(sourceWeekRow?.ypokatasthma, 100),
+        atomic_reusable_diagnostics: sourceWeekRow
+            ? []
+            : [SOURCE_SCOPE_UNRESOLVED],
         status: 'NEEDS_REVIEW',
         policy_code: PRIMARY_POLICY_CODE,
         secondary_policy_code: SECONDARY_POLICY_CODE,
@@ -359,6 +438,11 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
                 reason: 'ATOMIC_APPLY_SUPPORT_REQUIRED'
             }
         },
+        atomic_reusable_context: buildAtomicReusableContext({
+            proposal,
+            employmentProfile,
+            targetCategory
+        }),
         warnings: [...warnings],
       repo_resolution: {
             effective_expected_weekly_repo:
@@ -397,5 +481,7 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
 module.exports = {
     buildWeeklyRepoTransferSinglePairGroupProjection,
     PROJECTION_STATUS,
-    GROUP_TYPE
+    GROUP_TYPE,
+    normalizeRowId,
+    DECISION_GRAIN
 };

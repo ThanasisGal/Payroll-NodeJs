@@ -10,6 +10,9 @@ const {
     revokePolicyPreviewApprovalRecord,
     listActiveReusablePolicyDecisionRecords
 } = require('./apasxoliseisPolicyPreviewApprovalService');
+const {
+    buildAtomicReusableCriteriaV5
+} = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService');
 
 const session = {
     userTeam: 'team-a',
@@ -61,6 +64,227 @@ function makePayload(overrides = {}) {
         items: [makeItem()],
         ...overrides
     };
+}
+
+function makeAtomicGroup(overrides = {}) {
+    const base = {
+        group_id: 'atomic-group-1',
+        group_key: 'atomic-group-key-1',
+        group_type: 'ATOMIC_PAIRED_PROPOSAL',
+        decision_grain: 'ATOMIC_LINKED_SET',
+        team: session.userTeam,
+        company_kod: session.companyInUse,
+        ypokatasthma: '0001',
+        status: 'NEEDS_REVIEW',
+        policy_code: 'WEEKLY_REPO_BALANCE',
+        scenario_code: 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR',
+        action_type: 'PAIRED_PROPOSAL',
+        reason_code: 'REPO_TRANSFER_CANDIDATE',
+        count: 2,
+        decision_units_count: 1,
+        pair_contract: {
+            atomic_pair_required: true,
+            choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR',
+            proposal_version: 'repo-transfer-single-pair-proposal:v4'
+        },
+        atomic_reusable_context: {
+            primary_policy_code: 'WEEKLY_REPO_BALANCE',
+            secondary_policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
+            policy_versions: { primary: 'foundation:v3', secondary: 'foundation:v3' },
+            source_conditions: { current_category: 'ΑΝ', required_result_category: 'ΕΡΓ' },
+            target_conditions: { current_category: 'ΕΡΓ', required_result_category: 'ΑΝ' },
+            employment_profile_class: { type: 'FULL_TIME', weekly_days: 5 },
+            effective_parameters: { expected_repo: 2, weekly_days: 5 },
+            thresholds: { linked_member_count: 2, decision_units_count: 1 },
+            role_structure: {
+                SOURCE_BECOMES_WORK: { transition: 'REPO_OR_NON_WORK_TO_WORK' },
+                TARGET_BECOMES_REPO: { transition: 'WORK_TO_REPO_OR_NON_WORK' }
+            },
+            target_repo_category_rule: 'FULL_TIME_REPO_DAY',
+            target_category: 'ΑΝ',
+            week_boundary_semantics: 'MONDAY_TO_SUNDAY_SAME_NATURAL_WEEK'
+        },
+        atomic_reusable_diagnostics: [],
+        items: [
+            {
+                preview_id: '507f1f77bcf86cd799439021',
+                prodhlomena_oraria_id: '507f1f77bcf86cd799439021',
+                employee_kodikos: '001', team: session.userTeam,
+                company_kod: session.companyInUse, ypokatasthma: '0001',
+                role: 'SOURCE_BECOMES_WORK', hmeromhnia: '2026-07-06',
+                kathgoria_ergasias: 'ΑΝ', proposed_values: { marker: 'current-source' },
+                flags: { current_eligible: true }
+            },
+            {
+                preview_id: '507f1f77bcf86cd799439022',
+                prodhlomena_oraria_id: '507f1f77bcf86cd799439022',
+                employee_kodikos: '001', team: session.userTeam,
+                company_kod: session.companyInUse, ypokatasthma: '0001',
+                role: 'TARGET_BECOMES_REPO', hmeromhnia: '2026-07-10',
+                kathgoria_ergasias: 'ΕΡΓ', proposed_values: { marker: 'current-target' },
+                flags: { current_eligible: true }
+            }
+        ]
+    };
+    return { ...base, ...overrides };
+}
+
+function makeAtomicPayload(group, overrides = {}) {
+    return makePayload({
+        apo_hmeromhnia: '2026-07-01',
+        eos_hmeromhnia: '2026-07-31',
+        ypokatasthma: '0001',
+        group: {
+            group_id: group.group_id,
+            group_key: group.group_key,
+            group_type: group.group_type,
+            decision_grain: group.decision_grain,
+            status: group.status,
+            policy_code: group.policy_code,
+            scenario_code: group.scenario_code,
+            action_type: group.action_type,
+            reason_code: group.reason_code
+        },
+        decision_type: 'APPROVE_PROPOSAL',
+        reuse_scope: 'FUTURE_IDENTICAL',
+        reuse_fingerprint: 'client-forged-fingerprint',
+        items: group.items,
+        ...overrides
+    });
+}
+
+function atomicApprovalModel(candidates = []) {
+    let created = null;
+    return {
+        model: {
+            findOne: () => ({ select: () => ({ lean: async () => null }) }),
+            find: () => ({ select: () => ({ lean: async () => candidates }) }),
+            create: async (record) => { created = record; return { _id: 'atomic-created', ...record }; },
+            countDocuments: async () => 1
+        },
+        created: () => created
+    };
+}
+
+async function testAuthoritativeAtomicV5ApprovalCreationAndGuards() {
+    const group = makeAtomicGroup();
+    const expected = buildAtomicReusableCriteriaV5(group);
+    const storage = atomicApprovalModel();
+    await createPolicyPreviewApprovalRecord({
+        session,
+        payload: makeAtomicPayload(group),
+        authoritativeAtomicGroup: group,
+        authoritativeAtomicOverlap: { conflict: false },
+        approvalModel: storage.model
+    });
+    const created = storage.created();
+    assert.strictEqual(created.reuse_fingerprint, expected.fingerprint);
+    assert.notStrictEqual(created.reuse_fingerprint, 'client-forged-fingerprint');
+    assert.strictEqual(created.reuse_match_criteria.version, 5);
+    assert.strictEqual(created.reuse_match_criteria.decision_grain, 'ATOMIC_LINKED_SET');
+    assert.deepStrictEqual(created.reuse_match_criteria.role_contract,
+        ['SOURCE_BECOMES_WORK', 'TARGET_BECOMES_REPO']);
+    assert.deepStrictEqual(created.items.map((item) => item.flags.atomic_role),
+        ['SOURCE_BECOMES_WORK', 'TARGET_BECOMES_REPO']);
+
+    for (const decisionType of ['REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']) {
+        const blocked = atomicApprovalModel();
+        await assert.rejects(() => createPolicyPreviewApprovalRecord({
+            session,
+            payload: makeAtomicPayload(group, { decision_type: decisionType }),
+            authoritativeAtomicGroup: group,
+            authoritativeAtomicOverlap: { conflict: false },
+            approvalModel: blocked.model
+        }), (error) => error.statusCode === 400 &&
+            error.code === 'ATOMIC_REUSABLE_DECISION_TYPE_NOT_ALLOWED');
+        assert.strictEqual(blocked.created(), null);
+    }
+
+    const invalidCases = [
+        {
+            group: { ...group, items: [group.items[0]] },
+            overlap: { conflict: false }
+        },
+        {
+            group: { ...group, items: [group.items[1]] },
+            overlap: { conflict: false }
+        },
+        {
+            group: {
+                ...group,
+                ypokatasthma: null,
+                atomic_reusable_diagnostics: ['ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED']
+            },
+            overlap: { conflict: false }
+        },
+        { group, overlap: { conflict: true } }
+    ];
+    for (const invalid of invalidCases) {
+        const blocked = atomicApprovalModel();
+        await assert.rejects(() => createPolicyPreviewApprovalRecord({
+            session,
+            payload: makeAtomicPayload(group),
+            authoritativeAtomicGroup: invalid.group,
+            authoritativeAtomicOverlap: invalid.overlap,
+            approvalModel: blocked.model
+        }), (error) => error.statusCode === 400);
+        assert.strictEqual(blocked.created(), null);
+    }
+    await assert.rejects(() => createPolicyPreviewApprovalRecord({
+        session,
+        payload: makeAtomicPayload(group, {
+            reuse_scope: 'ONE_TIME',
+            decision_type: 'REJECT_PROPOSAL'
+        }),
+        authoritativeAtomicGroup: group,
+        authoritativeAtomicOverlap: { conflict: false },
+        approvalModel: atomicApprovalModel().model
+    }), (error) => error.statusCode === 400 &&
+        error.code === 'ATOMIC_ONE_TIME_USES_DEDICATED_PIPELINE');
+}
+
+async function testAtomicV5DuplicateLifecycleAndCrossEmployeeIdentity() {
+    const group = makeAtomicGroup();
+    const fingerprint = buildAtomicReusableCriteriaV5(group).fingerprint;
+    const active = {
+        _id: 'active-v5', reuse_scope: 'FUTURE_IDENTICAL', reuse_status: 'ACTIVE',
+        decision_status: 'RECORDED', decision_type: 'APPROVE_PROPOSAL',
+        reuse_effective_from: new Date('2026-07-01T00:00:00.000Z'),
+        reuse_effective_to: null, reuse_fingerprint: fingerprint
+    };
+    for (const employeeKodikos of ['001', '999']) {
+        const employeeGroup = {
+            ...group,
+            items: group.items.map((item) => ({ ...item, employee_kodikos: employeeKodikos }))
+        };
+        const blocked = atomicApprovalModel([active]);
+        await assert.rejects(() => createPolicyPreviewApprovalRecord({
+            session,
+            payload: makeAtomicPayload(employeeGroup),
+            authoritativeAtomicGroup: employeeGroup,
+            authoritativeAtomicOverlap: { conflict: false },
+            approvalModel: blocked.model
+        }), (error) => error.statusCode === 409);
+        assert.strictEqual(blocked.created(), null);
+    }
+
+    for (const historical of [
+        { ...active, reuse_status: 'REVOKED' },
+        { ...active, decision_status: 'CANCELLED' },
+        { ...active, reuse_effective_to: new Date('2026-07-05T00:00:00.000Z') }
+    ]) {
+        const visible = historical.reuse_status === 'ACTIVE' &&
+            historical.decision_status === 'RECORDED' ? [historical] : [];
+        const allowed = atomicApprovalModel(visible);
+        await createPolicyPreviewApprovalRecord({
+            session,
+            payload: makeAtomicPayload(group),
+            authoritativeAtomicGroup: group,
+            authoritativeAtomicOverlap: { conflict: false },
+            approvalModel: allowed.model
+        });
+        assert.ok(allowed.created());
+    }
 }
 
 function assertValidationError(fn, expectedText) {
@@ -826,6 +1050,8 @@ async function run() {
     await testPostCreateRaceCancellationFailureIsFailClosed();
     await testRevokeIsScopedAtomicAndAudited();
     await testRevokeValidationAndAuthorization();
+    await testAuthoritativeAtomicV5ApprovalCreationAndGuards();
+    await testAtomicV5DuplicateLifecycleAndCrossEmployeeIdentity();
     console.log('apasxoliseis policy preview approval service tests passed');
 }
 

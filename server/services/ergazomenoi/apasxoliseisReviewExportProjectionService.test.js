@@ -23,6 +23,44 @@ function week(start = '2026-06-15', cards = [8.6, 7.97, 6.48, 7.32, 7.42, 8.12, 
     });
 }
 
+function atomicFixture({ status = 'NEEDS_REVIEW', diagnostics = [], reusableDecision } = {}) {
+    return {
+        groups: [{
+            group_id: 'atomic-export-1',
+            group_key: 'atomic-export-key-1',
+            group_type: 'ATOMIC_PAIRED_PROPOSAL',
+            decision_grain: 'ATOMIC_LINKED_SET',
+            count: 2,
+            decision_units_count: 1,
+            status,
+            atomic_reusable_diagnostics: diagnostics,
+            reusable_decision: reusableDecision,
+            items: [
+                { role: 'SOURCE_BECOMES_WORK', prodhlomena_oraria_id: 'row-source' },
+                { role: 'TARGET_BECOMES_REPO', prodhlomena_oraria_id: 'row-target' }
+            ]
+        }]
+    };
+}
+
+function atomicRows() {
+    const rows = week('2026-06-29', [0, 7, 7, 7, 7, 0, 0]);
+    rows.forEach((row, index) => { row._id = `week-row-${index}`; });
+    Object.assign(rows[0], {
+        _id: 'row-source',
+        kathgoria_ergasias: 'ΑΝ',
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        ores_ergasias_apologistika: 7.25
+    });
+    Object.assign(rows[1], {
+        _id: 'row-target',
+        kathgoria_ergasias: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        ores_ergasias_apologistika: 0
+    });
+    return rows;
+}
+
 test('Monday-Sunday boundaries survive month and year changes', () => {
     const rows = week('2026-12-28', [7, 7, 7, 7, 7, 7, 0]);
     const projection = buildReviewExportProjection({ rows });
@@ -178,4 +216,114 @@ test('findings-only keeps one representative HR-only row per employee and week',
     const projection = buildReviewExportProjection({ rows, approvals: [approval], findingsOnly: true });
     assert.equal(projection.rows.length, 1);
     assert.equal(projection.rows[0].policy.source, 'HR');
+});
+
+test('atomic export keeps the authoritative source and target together', () => {
+    const rows = atomicRows();
+    const projection = buildReviewExportProjection({
+        rows: [rows[0], rows[1]],
+        policyRows: rows,
+        atomicGroupProjection: atomicFixture(),
+        findingsOnly: true
+    });
+    assert.deepEqual(projection.rows.map((row) => row._id), ['row-source', 'row-target']);
+    assert.deepEqual(projection.rows.map((row) => row.policy.atomicGroup.role), [
+        'SOURCE_BECOMES_WORK', 'TARGET_BECOMES_REPO'
+    ]);
+    assert.ok(projection.rows.every((row) => row.policy.status === 'NEEDS_HR_DECISION'));
+});
+
+test('atomic export never emits a half pair when source or target context is missing', () => {
+    const rows = atomicRows();
+    for (const missingId of ['row-source', 'row-target']) {
+        const available = rows.filter((row) => row._id !== missingId);
+        const presentation = available.filter((row) =>
+            ['row-source', 'row-target'].includes(row._id)
+        );
+        const projection = buildReviewExportProjection({
+            rows: presentation,
+            policyRows: available,
+            atomicGroupProjection: atomicFixture(),
+            findingsOnly: true
+        });
+        assert.equal(projection.rows.length, 0);
+    }
+});
+
+test('presentation-boundary atomic export adds the context-only member only with full context', () => {
+    const rows = atomicRows();
+    const projection = buildReviewExportProjection({
+        rows: [rows[1]],
+        policyRows: rows,
+        atomicGroupProjection: atomicFixture(),
+        findingsOnly: true
+    });
+    assert.deepEqual(projection.rows.map((row) => row._id), ['row-source', 'row-target']);
+
+    const incomplete = buildReviewExportProjection({
+        rows: [rows[1]],
+        policyRows: rows.filter((row) => row._id !== 'row-source'),
+        atomicGroupProjection: atomicFixture(),
+        findingsOnly: true
+    });
+    assert.equal(incomplete.rows.length, 0);
+});
+
+test('resolved atomic export includes reusable metadata without replacing current values', () => {
+    const rows = atomicRows();
+    const originalValues = rows.slice(0, 2).map((row) => ({
+        id: row._id,
+        category: row.kathgoria_ergasias_apologistika,
+        hours: row.ores_ergasias_apologistika
+    }));
+    const projection = buildReviewExportProjection({
+        rows: rows.slice(0, 2),
+        policyRows: rows,
+        atomicGroupProjection: atomicFixture({
+            status: 'RESOLVED_BY_POLICY',
+            reusableDecision: {
+                approval_id: 'approval-v5',
+                approved_by_user_name: 'HR User',
+                approved_at: '2026-06-20T10:00:00.000Z',
+                effective_from: '2026-06-01',
+                effective_to: null,
+                fingerprint_version: 5,
+                reuse_fingerprint: 'must-not-be-exported'
+            }
+        }),
+        findingsOnly: true
+    });
+    assert.equal(projection.rows.length, 2);
+    assert.ok(projection.rows.every((row) =>
+        row.policy.statusLabel === 'Εγκρίθηκε βάσει παλιότερης απόφασης HR'
+    ));
+    assert.match(projection.rows[0].policy.note, /HR User/);
+    assert.match(projection.rows[0].policy.note,
+        /Έκδοση επαναχρησιμοποιήσιμου αποτυπώματος: 5/);
+    assert.doesNotMatch(projection.rows[0].policy.note, /must-not-be-exported/);
+    assert.deepEqual(projection.rows.map((row) => ({
+        id: row._id,
+        category: row.kathgoria_ergasias_apologistika,
+        hours: row.ores_ergasias_apologistika
+    })), originalValues);
+});
+
+test('atomic overlap and reusable conflict export as a complete pending pair', () => {
+    const rows = atomicRows();
+    for (const diagnostic of [
+        'ATOMIC_LINKED_SET_ROW_OVERLAP',
+        'ATOMIC_REUSABLE_MULTIPLE_ACTIVE_MATCHES',
+        'ATOMIC_LINKED_SET_SOURCE_SCOPE_UNRESOLVED'
+    ]) {
+        const projection = buildReviewExportProjection({
+            rows: rows.slice(0, 2),
+            policyRows: rows,
+            atomicGroupProjection: atomicFixture({ diagnostics: [diagnostic] }),
+            findingsOnly: true
+        });
+        assert.equal(projection.rows.length, 2);
+        assert.ok(projection.rows.every((row) => row.policy.source === 'PENDING_HR'));
+        assert.ok(projection.rows.every((row) => row.policy.severity === 'ΑΠΑΙΤΕΙ ΑΠΟΦΑΣΗ HR'));
+        assert.ok(projection.rows.every((row) => row.policy.note.trim().length > 0));
+    }
 });
