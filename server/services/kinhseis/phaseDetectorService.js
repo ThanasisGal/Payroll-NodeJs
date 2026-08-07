@@ -27,6 +27,9 @@ const {
     endOfWeekSundayUtc,
     getMondaySundayWeekRange
 } = require('../../utils/date/mondaySundayWeek');
+const {
+    resolveDailyRepoCalculationState
+} = require('../ergazomenoi/apasxoliseisDailyRepoCalculationStateService');
 
 const HOURS_TOLERANCE = 0.01;
 const WEEKLY_40H_TOLERANCE = 0.1;
@@ -585,14 +588,7 @@ function analyzePhasePattern(days, partialDayCount, fullDayCount) {
     };
 }
 
-function getEffectiveKathgoria(row = {}) {
-    const apologistiki = toTrimmedString(row.kathgoria_ergasias_apologistika);
-    if (apologistiki) return apologistiki;
-
-    return toTrimmedString(row.kathgoria_ergasias);
-}
-
-function buildExpectedWorkInfo(row, kartaErgasias, warnings = []) {
+function buildExpectedWorkInfo(row, kartaErgasias, warnings = [], dailyProfile = {}) {
     const sourceField = kartaErgasias ? 'ores_ergasias_apologistika' : 'ores_ergasias';
 
     if (!row) {
@@ -615,7 +611,12 @@ function buildExpectedWorkInfo(row, kartaErgasias, warnings = []) {
         };
     }
 
-    const effectiveKathgoria = getEffectiveKathgoria(row);
+    const repoState = resolveDailyRepoCalculationState({
+        row,
+        dailyProfile
+    });
+    warnings.push(...repoState.diagnostics);
+    const effectiveKathgoria = repoState.effectiveCategory;
     const scheduledKathgoria = toTrimmedString(row.kathgoria_ergasias);
     const actualKathgoria = toTrimmedString(row.kathgoria_ergasias_apologistika);
     const scheduledHours = toNumberOrZero(row.ores_ergasias);
@@ -626,7 +627,7 @@ function buildExpectedWorkInfo(row, kartaErgasias, warnings = []) {
     const classificationSourceField = hasScheduledPattern ? 'ores_ergasias' : sourceField;
     const repo = row.repo === true;
     const repoApologistika = row.repo_apologistika === true;
-    const isRepoDay = repo || repoApologistika || scheduledKathgoria === 'ΑΝ' || actualKathgoria === 'ΑΝ';
+    const isRepoDay = repoState.effectiveRepo === true;
     const isScheduledWorkCategory = scheduledKathgoria === 'ΕΡΓ' || scheduledKathgoria === 'ΤΗΛ';
     const isScheduledNoWorkCategory = scheduledKathgoria === 'ΑΝ' || scheduledKathgoria === 'ΜΕ';
     const isActualWorkCategory = actualKathgoria === 'ΕΡΓ' || actualKathgoria === 'ΤΗΛ';
@@ -698,7 +699,12 @@ function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, karta
         const orario = orariaByDate.get(date) || null;
         const dayWarnings = [];
         const fullDailyHours = buildFullDailyHours({ ...terms, hmeromhnia: date }, dayWarnings);
-        const expectedWorkInfo = buildExpectedWorkInfo(orario, kartaErgasias, dayWarnings);
+        const expectedWorkInfo = buildExpectedWorkInfo(
+            orario,
+            kartaErgasias,
+            dayWarnings,
+            terms
+        );
         const classification = classifyDay(expectedWorkInfo.classificationHours, fullDailyHours);
         const dailyFactHours = buildDailyFactHours(orario);
         const actualWorkFacts = resolveDailyActualWorkFacts(orario || {});
