@@ -213,7 +213,7 @@ function reasonText({ analysis, decision, approval, deviation, mismatch }) {
     if (warnings.length) sections.push(`Προειδοποιήσεις: ${warnings.join(', ')}`);
     const hr = unique([decision?.notes, approval?.notes]);
     if (hr.length) sections.push(`Απόφαση HR: ${hr.join(' | ')}`);
-    const deviations = unique([deviation?.note]);
+    const deviations = unique([...(deviation?.reasons || []), deviation?.note]);
     if (deviations.length) sections.push(`Απόκλιση ρεπό: ${deviations.join(' | ')}`);
     return sections.join('\n');
 }
@@ -285,16 +285,18 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
             profile_changed_inside_week: deviation?.profile_changed_inside_week === true
         };
         const analysis = analyzeWeeklySixthSeventhDay({ weekRows: sorted, effectiveProfile: profile });
+        const deviationRequiresHr = deviation?.status === 'NEEDS_HR_DECISION';
         const decision = decisions.filter((item) => exactEmployeeWeek(item, kodikos, week) && decisionIsActiveApplied(item))
             .sort((a, b) => createdAt(b) - createdAt(a))[0] || null;
         const outputRows = outputGroups.get(groupKey) || [];
         outputRows.forEach((row) => {
             const dateKey = dateKeyUtc(row.hmeromhnia);
             const approval = approvalForDate(approvals, row, dateKey, week);
-            const automatic = analysis.sixthDay?.hmeromhnia === dateKey ? 'SIXTH' :
-                analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL';
+            const requiresHr = analysis.status === 'NEEDS_HR_DECISION' || deviationRequiresHr;
+            const automatic = requiresHr ? 'NORMAL' :
+                analysis.sixthDay?.hmeromhnia === dateKey ? 'SIXTH' :
+                    analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL';
             const hrClassification = classificationFromRecord(decision, dateKey);
-            const requiresHr = analysis.status === 'NEEDS_HR_DECISION';
             const approvalClassification = classificationFromApproval(approval, row, dateKey);
             const classification = hrClassification || approvalClassification || automatic;
             const source = decision ? 'HR' : approval ? 'HR' :
@@ -311,8 +313,11 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
                 legacy: !row.policyVersion,
                 weekStart: week.weekStartKey, weekEnd: week.weekEndKey,
                 classification, classificationLabel: LABELS[classification],
-                source, sourceLabel: LABELS[source], status: analysis.status,
-                statusLabel: STATUS_LABELS[analysis.status] ?? String(analysis.status || ''),
+                source, sourceLabel: LABELS[source],
+                status: requiresHr ? 'NEEDS_HR_DECISION' : analysis.status,
+                statusLabel: requiresHr
+                    ? STATUS_LABELS.NEEDS_HR_DECISION
+                    : STATUS_LABELS[analysis.status] ?? String(analysis.status || ''),
                 severity, sixthDayHours,
                 sixthDayRate: classification === 'SIXTH' ? (analysis.sixthDay?.premiumRate ?? profile.pososto_prosayxhshs_6hs_hmeras ?? null) : null
             };

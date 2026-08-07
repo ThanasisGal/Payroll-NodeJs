@@ -492,6 +492,8 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
         expected_repo: { type: Number, default: 0 },
         actual_repo: { type: Number, default: 0 },
         missing_repo: { type: Number, default: 0 },
+        status: { type: String, trim: true },
+        reasons: { type: [String], default: undefined },
 
         // Οι παλιές εγγραφές χωρίς version παραμένουν legacy και δεν
         // επανερμηνεύονται ως Monday-Sunday current-policy preview.

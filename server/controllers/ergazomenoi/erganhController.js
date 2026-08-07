@@ -173,6 +173,9 @@ const {
     resolveReviewIsFullTimeProfile
 } = require('../../services/ergazomenoi/apasxoliseisReviewEmploymentProfileService');
 const {
+    resolveCanonicalRepoDayCountState
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalRepoCountService');
+const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod
@@ -1675,7 +1678,7 @@ async function runWeeklyRepoPostCheck({
     const loadedRows = await ProdhlomenaOrariaModel.find(postCheckRowsQuery)
         .select(
             'team company_kod kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika repo repo_apologistika ' +
-                'ores_ergasias cards_ores_ergasias ores_apoysias adeia adeia_apologistika ' +
+                'ores_ergasias ores_ergasias_apologistika cards_ores_ergasias ores_apoysias adeia adeia_apologistika ' +
                 'kathgoria_adeias kathgoria_adeias_apologistika argia argia_apologistika ' +
                 'astheneia astheneia_apologistika apologistiko_biblio is_locked ' +
                 'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
@@ -1728,6 +1731,7 @@ async function runWeeklyRepoPostCheck({
 
         for (const week of weekRanges) {
             let pragmatikaRepo = 0;
+            const repoStateReasons = new Set();
             const weekFullyInsideEmployment = isWeekFullyWithinEmploymentPeriod(
                 week.weekStart,
                 erg
@@ -1775,12 +1779,8 @@ async function runWeeklyRepoPostCheck({
                 const row = rowsByEmployeeAndDate.get(`${erg.kodikos}|${dateKeyUtc(day)}`);
                 if (!row) continue;
 
-                // Για τον post-check κοιτάμε ΠΑΝΤΑ την αρχική προδηλωμένη κατηγορία.
-                // Το kathgoria_ergasias_apologistika είναι αποτέλεσμα του ελέγχου και
-                // χρησιμοποιείται στο review/display, όχι σαν είσοδος του κανόνα.
                 const kathgoriaErgasias = String(row.kathgoria_ergasias || '').trim();
                 const oresErgasiasIsZero = isZeroHours(row.ores_ergasias);
-                const cardsOresIsZero = isZeroHours(row.cards_ores_ergasias);
                 const cardsOresIsNonZero = isNonZeroHours(row.cards_ores_ergasias);
                 const dailyProfile = getEffectiveRepoProfileForDate(day, istorikoRows, erg);
                 const isFullTimeProfile = isFullTimeWorkTerms(dailyProfile);
@@ -1789,6 +1789,14 @@ async function runWeeklyRepoPostCheck({
                 const hasUnresolvedCardPair = resolveCardPairVerification(
                     row
                 ).hasUnresolvedCardEvidence;
+                const repoCountState = resolveCanonicalRepoDayCountState({
+                    row,
+                    dailyProfile,
+                    hasUnresolvedCardPair
+                });
+                for (const reason of repoCountState.diagnostics) {
+                    repoStateReasons.add(reason);
+                }
 
                 if (hasUnresolvedCardPair) {
                     Object.assign(update, buildPartialVerifiedCardUpdate(row).update);
@@ -1812,10 +1820,7 @@ async function runWeeklyRepoPostCheck({
                     : kathgoriaErgasias === 'ΜΕ' || kathgoriaErgasias === 'ΑΝ';
 
                 if (
-                    !hasUnresolvedCardPair &&
-                    declaredNonWork &&
-                    oresErgasiasIsZero &&
-                    cardsOresIsZero
+                    repoCountState.countsAsRepo
                 ) {
                     pragmatikaRepo += 1;
                 } else if (
@@ -1917,7 +1922,8 @@ async function runWeeklyRepoPostCheck({
                 weekFullyInsideEmployment &&
                 (
                     weeklyProfileInfo.repoResolutionReason ||
-                    Number(pragmatikaRepo) !== Number(expectedWeeklyRepo)
+                    Number(pragmatikaRepo) !== Number(expectedWeeklyRepo) ||
+                    repoStateReasons.size > 0
                 )
             ) {
                 const excessRepo = Math.max(0, Number(pragmatikaRepo) - Number(expectedWeeklyRepo));
@@ -1939,6 +1945,12 @@ async function runWeeklyRepoPostCheck({
                     expected_repo: expectedWeeklyRepo,
                     repo_resolution_source: weeklyProfileInfo.repoResolutionSource,
                     repo_resolution_reason: weeklyProfileInfo.repoResolutionReason,
+                    ...(repoStateReasons.size > 0
+                        ? {
+                              status: 'NEEDS_HR_DECISION',
+                              reasons: [...repoStateReasons]
+                          }
+                        : {}),
                     actual_repo: pragmatikaRepo,
                     missing_repo: Math.max(
                         Number(expectedWeeklyRepo || 0) - Number(pragmatikaRepo),
@@ -2016,6 +2028,8 @@ async function runWeeklyRepoPostCheck({
                 expected_repo: d.expected_repo,
                 actual_repo: d.actual_repo,
                 missing_repo: d.missing_repo,
+                status: d.status || undefined,
+                reasons: Array.isArray(d.reasons) ? d.reasons : undefined,
                 profile_changed_inside_week: d.profile_changed_inside_week,
                 excess_repo: d.excess_repo,
                 effective_expected_repo: d.effective_expected_repo,
@@ -3732,6 +3746,8 @@ function mapDeviationForReviewExport(d = {}) {
         expected_repo: Number(d.expected_repo || 0),
         actual_repo: Number(d.actual_repo || 0),
         missing_repo: Number(d.missing_repo || 0),
+        ...(d.status ? { status: d.status } : {}),
+        ...(Array.isArray(d.reasons) ? { reasons: [...d.reasons] } : {}),
         profile_changed_inside_week: d.profile_changed_inside_week === true,
         excess_repo: Number(d.excess_repo || 0),
         effective_expected_repo: Number(

@@ -136,6 +136,53 @@ test('mixed-profile deviation blocks automatic sixth/seventh-day export classifi
     ));
 });
 
+test('persisted canonical repo diagnostics remain fail-closed in shared Excel/PDF projection', () => {
+    for (const reason of [
+        'CATEGORY_REPO_CONFLICT',
+        'DAILY_EMPLOYMENT_PROFILE_UNRESOLVED'
+    ]) {
+        const rows = week();
+        const originalHours = rows.map((row) => row.ores_ergasias_apologistika);
+        const projection = buildReviewExportProjection({
+            rows,
+            deviations: [{
+                kodikos: '0004',
+                week_apo: '2026-06-15',
+                week_eos: '2026-06-21',
+                status: 'NEEDS_HR_DECISION',
+                reasons: [reason]
+            }]
+        });
+
+        assert.ok(projection.rows.every((row) => row.policy.status === 'NEEDS_HR_DECISION'));
+        assert.ok(projection.rows.every((row) => row.policy.source === 'PENDING_HR'));
+        assert.ok(projection.rows.every((row) => row.policy.classification === 'NORMAL'));
+        assert.ok(projection.rows.every((row) => row.policy.note.includes(reason)));
+        assert.deepEqual(
+            projection.rows.map((row) => row.ores_ergasias_apologistika),
+            originalHours
+        );
+    }
+});
+
+test('legacy deviation without status or reasons remains compatible without fake HR state', () => {
+    const projection = buildReviewExportProjection({
+        rows: week(),
+        deviations: [{
+            kodikos: '0004',
+            week_apo: '2026-06-15',
+            week_eos: '2026-06-21',
+            note: ''
+        }]
+    });
+
+    assert.ok(projection.rows.every((row) => row.policy.status !== 'NEEDS_HR_DECISION'));
+    assert.ok(projection.rows.every((row) => !row.policy.note.includes('CATEGORY_REPO_CONFLICT')));
+    assert.ok(projection.rows.every((row) =>
+        !row.policy.note.includes('DAILY_EMPLOYMENT_PROFILE_UNRESOLVED')
+    ));
+});
+
 test('illegal categories are exclusive, total is categorized only, mismatch threshold is > 0.02', () => {
     const mapped = illegalBreakdown({
         ores_paranomhs_yperorias_apologistika: 1,
