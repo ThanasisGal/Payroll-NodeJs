@@ -275,7 +275,31 @@ result = analyze([7, 7, 7, 7, 7, 7, 0], {
 assert.strictEqual(result.status, 'READY');
 assert.strictEqual(result.sixthDay.value, 77);
 
-result = analyze([7, 7, 7, 7, 7, 7, 0], { profile_changed_inside_week: true });
-assert.strictEqual(result.status, 'READY');
+const mixedProfileSixthDay = analyze(
+    [7, 7, 7, 7, 7, 7, 0],
+    { profile_changed_inside_week: true }
+);
+assert.strictEqual(mixedProfileSixthDay.status, 'NEEDS_HR_DECISION');
+assert.deepStrictEqual(mixedProfileSixthDay.reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
+assert.strictEqual(mixedProfileSixthDay.sixthDay, null);
+assert.strictEqual(mixedProfileSixthDay.seventhDay, null);
+
+const mixedProfileSeventhDay = analyze(
+    [7, 7, 7, 7, 7, 7, 9],
+    { profile_changed_inside_week: true }
+);
+assert.strictEqual(mixedProfileSeventhDay.status, 'NEEDS_HR_DECISION');
+assert.deepStrictEqual(mixedProfileSeventhDay.reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
+assert.strictEqual(mixedProfileSeventhDay.sixthDay, null);
+assert.strictEqual(mixedProfileSeventhDay.seventhDay, null);
+
+const unchangedProfileSeventhDay = analyze(
+    [7, 7, 7, 7, 7, 7, 9],
+    { profile_changed_inside_week: false }
+);
+assert.strictEqual(unchangedProfileSeventhDay.status, 'READY');
+assert.strictEqual(unchangedProfileSeventhDay.sixthDay.hmeromhnia, '2026-08-01');
+assert.strictEqual(unchangedProfileSeventhDay.seventhDay.hmeromhnia, '2026-08-02');
+assert.strictEqual(unchangedProfileSeventhDay.seventhDay.illegalOvertimeHours, 9);
 
 console.log('weekly sixth/seventh-day policy tests passed');

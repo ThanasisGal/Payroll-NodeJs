@@ -71,6 +71,17 @@ function analyzeWeeklySixthSeventhDay({
     ) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'], warnings: [], dailyFacts: [] });
     }
+    if (effectiveProfile.profile_changed_inside_week === true) {
+        return Object.freeze({
+            policyVersion: POLICY_VERSION,
+            status: STATUS.NEEDS_HR_DECISION,
+            reasons: ['PROFILE_CHANGED_INSIDE_WEEK'],
+            warnings: [],
+            dailyFacts: [],
+            sixthDay: null,
+            seventhDay: null
+        });
+    }
     if (Number(effectiveProfile.hmeres_ergasias_ebdomadas) !== 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [], dailyFacts: [] });
     }

@@ -154,6 +154,13 @@ function testContractualProfileControlsExpectedRepo() {
     });
     assert.strictEqual(changed.deviations[0].status, STATUS.NEEDS_HR_DECISION);
     assert.deepStrictEqual(changed.deviations[0].reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
+    assert.strictEqual(changed.deviations[0].sixth_seventh_day_status, 'NEEDS_HR_DECISION');
+    assert.deepStrictEqual(
+        changed.deviations[0].sixth_seventh_day_reasons,
+        ['PROFILE_CHANGED_INSIDE_WEEK']
+    );
+    assert.strictEqual(changed.deviations[0].sixth_day_count, 0);
+    assert.strictEqual(changed.deviations[0].seventh_day_count, 0);
 }
 
 function testOpenTrailingWeekIsPendingNotDeviation() {

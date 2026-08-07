@@ -116,6 +116,26 @@ test('export policy status is presentation-safe Greek while internal status stay
     assert.ok(readyProjection.rows.every((row) => row.policy.statusLabel !== 'NOT_APPLICABLE'));
 });
 
+test('mixed-profile deviation blocks automatic sixth/seventh-day export classification', () => {
+    const rows = week();
+    const projection = buildReviewExportProjection({
+        rows,
+        deviations: [{
+            kodikos: '0004',
+            week_apo: '2026-06-15',
+            week_eos: '2026-06-21',
+            profile_changed_inside_week: true
+        }]
+    });
+
+    assert.ok(projection.rows.every((row) => row.policy.status === 'NEEDS_HR_DECISION'));
+    assert.ok(projection.rows.every((row) => row.policy.source === 'PENDING_HR'));
+    assert.ok(projection.rows.every((row) => row.policy.classification === 'NORMAL'));
+    assert.ok(projection.rows.every((row) =>
+        row.policy.note.includes('PROFILE_CHANGED_INSIDE_WEEK')
+    ));
+});
+
 test('illegal categories are exclusive, total is categorized only, mismatch threshold is > 0.02', () => {
     const mapped = illegalBreakdown({
         ores_paranomhs_yperorias_apologistika: 1,

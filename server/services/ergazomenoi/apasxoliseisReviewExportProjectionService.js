@@ -274,22 +274,23 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
     const projectedRows = [];
     groups.forEach(({ week, rows: weekRows }, groupKey) => {
         const sorted = [...weekRows].sort((a, b) => dateKeyUtc(a.hmeromhnia).localeCompare(dateKeyUtc(b.hmeromhnia)));
+        const kodikos = String(sorted[0]?.kodikos || '').trim();
+        const deviation = deviations.find((item) => exactEmployeeWeek(item, kodikos, week)) || null;
         const profile = {
             hmeres_ergasias_ebdomadas: sorted.at(-1)?.effective_weekly_workdays,
             pososto_prosayxhshs_6hs_hmeras: sorted.at(-1)?.effective_sixth_day_rate ??
                 sorted.at(-1)?.pososto_prosayxhshs_6hs_hmeras,
             eidikh_kathgoria_ergazomenoy: sorted.at(-1)?.eidikh_kathgoria_ergazomenoy,
-            source: sorted.at(-1)?.effective_profile_source
+            source: sorted.at(-1)?.effective_profile_source,
+            profile_changed_inside_week: deviation?.profile_changed_inside_week === true
         };
         const analysis = analyzeWeeklySixthSeventhDay({ weekRows: sorted, effectiveProfile: profile });
-        const kodikos = String(sorted[0]?.kodikos || '').trim();
         const decision = decisions.filter((item) => exactEmployeeWeek(item, kodikos, week) && decisionIsActiveApplied(item))
             .sort((a, b) => createdAt(b) - createdAt(a))[0] || null;
         const outputRows = outputGroups.get(groupKey) || [];
         outputRows.forEach((row) => {
             const dateKey = dateKeyUtc(row.hmeromhnia);
             const approval = approvalForDate(approvals, row, dateKey, week);
-            const deviation = deviations.find((item) => exactEmployeeWeek(item, kodikos, week)) || null;
             const automatic = analysis.sixthDay?.hmeromhnia === dateKey ? 'SIXTH' :
                 analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL';
             const hrClassification = classificationFromRecord(decision, dateKey);
