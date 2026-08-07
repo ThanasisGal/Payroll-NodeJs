@@ -197,9 +197,37 @@ assert.strictEqual(result.seventhDay.hmeromhnia, '2026-08-02');
 assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
 assert.ok(result.warnings.includes('SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'));
 assert.strictEqual(result.seventhDay.actualWorkHours, 9);
-assert.strictEqual(result.seventhDay.illegalOvertimeHours, 8);
+assert.strictEqual(result.seventhDay.illegalOvertimeHours, 9);
 assert.strictEqual(result.seventhDay.severity, 'SERIOUS_VIOLATION');
 assert.strictEqual(result.seventhDay.classification, 'SEVENTH_DAY_ILLEGAL_OVERTIME');
+
+const declaredAboveActual = week([7, 7, 7, 7, 7, 7, 7]);
+declaredAboveActual[6].ores_ergasias = 10;
+const declaredAboveActualResult = analyzeWeeklySixthSeventhDay({
+    weekRows: declaredAboveActual,
+    effectiveProfile: {
+        hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40
+    },
+    hourlyRate: 10
+});
+assert.strictEqual(declaredAboveActualResult.seventhDay.actualWorkHours, 7);
+assert.strictEqual(declaredAboveActualResult.seventhDay.illegalOvertimeHours, 7);
+
+const sameActualDifferentDeclared = week([7, 7, 7, 7, 7, 7, 7]);
+sameActualDifferentDeclared[6].ores_ergasias = 3;
+const sameActualDifferentDeclaredResult = analyzeWeeklySixthSeventhDay({
+    weekRows: sameActualDifferentDeclared,
+    effectiveProfile: {
+        hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40
+    },
+    hourlyRate: 10
+});
+assert.strictEqual(
+    sameActualDifferentDeclaredResult.seventhDay.illegalOvertimeHours,
+    declaredAboveActualResult.seventhDay.illegalOvertimeHours
+);
 
 const employee0004RegressionWeek = week([8.60, 7.97, 6.48, 7.32, 7.42, 8.12, 7.28]);
 employee0004RegressionWeek.forEach((day, index) => {
@@ -228,7 +256,7 @@ const secondRegressionResult = analyzeWeeklySixthSeventhDay(regressionInput);
 assert.strictEqual(firstRegressionResult.sixthDay.hmeromhnia, '2026-06-19');
 assert.strictEqual(firstRegressionResult.seventhDay.hmeromhnia, '2026-06-21');
 assert.strictEqual(firstRegressionResult.seventhDay.actualWorkHours, 7.28);
-assert.strictEqual(firstRegressionResult.seventhDay.illegalOvertimeHours, 6.78);
+assert.strictEqual(firstRegressionResult.seventhDay.illegalOvertimeHours, 7.28);
 assert.deepStrictEqual(secondRegressionResult, firstRegressionResult);
 
 for (const noLongerExempt of ['0018', '0020', '0021']) {

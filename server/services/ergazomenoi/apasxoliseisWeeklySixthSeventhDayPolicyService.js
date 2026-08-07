@@ -17,10 +17,8 @@ function validRate(value) {
 }
 
 function resolveSeventhDayIllegalOvertimeHours(day) {
-    const declaredHours = Number(day?.declaredWorkHours);
-    return Number.isFinite(declaredHours) && declaredHours >= 0
-        ? declaredHours
-        : Number(day?.actualWorkHours || 0);
+    const actualHours = Number(day?.actualWorkHours);
+    return Number.isFinite(actualHours) && actualHours >= 0 ? actualHours : 0;
 }
 
 function selectSixthDay(candidates) {
