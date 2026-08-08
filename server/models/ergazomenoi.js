@@ -998,7 +998,9 @@ ErgazomenoiErganhSchema.index({ team: 1, companykod_object: 1, ypokatasthma_kodi
     payload_fingerprint: 1, submission_status: 1, document_status: 1 },
 { name: 'ergani_final_submission_payload_lookup' });
 ErgazomenoiErganhSchema.index({ team: 1, companykod_object: 1, request_id: 1,
-    submission_code: 1 }, { unique: true, sparse: true, name: 'unique_ergani_submission_command_request' });
+    submission_code: 1 }, { unique: true,
+    partialFilterExpression: { request_id: { $type: 'string' } },
+    name: 'unique_ergani_submission_command_request' });
 
 const ErgazomenoiErganhModel = model('ErgazomenoiErganh', ErgazomenoiErganhSchema);
 
