@@ -8,7 +8,7 @@ const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCritical
 const { startOfWeekMondayUtc, endOfWeekSundayUtc } = require('../../utils/date/mondaySundayWeek');
 const { assertPeriodControlIndexesReady } = require('./apasxoliseisPeriodControlIndexGuardService');
 
-const MODES = Object.freeze({ NORMAL: 'NORMAL', LOCKED: 'LOCKED', CORRECTIVE_ONLY: 'CORRECTIVE_ONLY' });
+const MODES = Object.freeze({ NORMAL: 'NORMAL', LOCKED: 'LOCKED', FINALIZED: 'FINALIZED', CORRECTIVE_ONLY: 'CORRECTIVE_ONLY' });
 
 function periodError(code, statusCode, message) {
     const error = new Error(message || code); error.code = code; error.statusCode = statusCode; return error;
@@ -65,11 +65,12 @@ function isPastDeadline(deadline, now = new Date()) {
 }
 function resolveEffectiveMode({ storedStatus = 'OPEN', deadline, now = new Date() }) {
     if (isPastDeadline(deadline, now)) return MODES.CORRECTIVE_ONLY;
+    if (storedStatus === 'FINALIZED') return MODES.FINALIZED;
     return storedStatus === 'LOCKED' ? MODES.LOCKED : MODES.NORMAL;
 }
 function projectPeriodControl({ scope, record = null, now = new Date() }) {
     const deadline = record?.deadline ? dateOnly(record.deadline, 'προθεσμία') : calculatePeriodDeadline(scope.period_end);
-    const storedStatus = record?.status === 'LOCKED' ? 'LOCKED' : 'OPEN';
+    const storedStatus = ['LOCKED', 'FINALIZED'].includes(record?.status) ? record.status : 'OPEN';
     const effectiveMode = resolveEffectiveMode({ storedStatus, deadline, now });
     const normal = effectiveMode === MODES.NORMAL;
     return Object.freeze({
@@ -77,9 +78,16 @@ function projectPeriodControl({ scope, record = null, now = new Date() }) {
         deadline: deadline.toISOString().slice(0, 10), past_deadline: effectiveMode === MODES.CORRECTIVE_ONLY,
         locked_at: record?.locked_at || null, locked_by_user_name: record?.locked_by_user_name || '',
         locked_by_user_role: record?.locked_by_user_role || '', version: record?.version || 0,
+        finalized_at: record?.finalized_at || null, finalized_by_user_name: record?.finalized_by_user_name || '',
+        frozen_snapshot_id: record?.frozen_snapshot_id || null,
+        frozen_snapshot_fingerprint: record?.frozen_snapshot_fingerprint || '',
+        submitted_at: record?.submitted_at || null, submission_reference: record?.submission_reference || null,
+        submission_protocol: record?.submission_protocol || '', submission_status: record?.submission_status || '',
+        submission_timeliness: record?.submission_timeliness || 'NOT_SUBMITTED',
         can_calculate: normal, can_record_decision: normal, can_repo_transfer: normal,
         can_manual_edit: normal, can_unlock_period: effectiveMode === MODES.LOCKED,
-        can_corrective: effectiveMode === MODES.CORRECTIVE_ONLY
+        can_finalize: storedStatus === 'LOCKED' && effectiveMode !== MODES.CORRECTIVE_ONLY,
+        can_corrective: storedStatus === 'FINALIZED'
     });
 }
 function filterForScope(scope) { return { ...scope }; }
@@ -107,6 +115,7 @@ async function assertNormalPeriod({ scope, now = new Date(), expectedToken = nul
         throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409, 'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
     }
     if (state.effective_mode === MODES.LOCKED) throw periodError('PERIOD_CONTROL_LOCKED', 409, 'Η περίοδος είναι κλειδωμένη.');
+    if (state.effective_mode === MODES.FINALIZED) throw periodError('PERIOD_CONTROL_FINALIZED', 409, 'Η περίοδος είναι οριστικοποιημένη.');
     if (state.effective_mode === MODES.CORRECTIVE_ONLY) throw periodError('PERIOD_CONTROL_CORRECTIVE_ONLY', 409, 'Η περίοδος επιτρέπει μόνο διορθωτική μισθοδοσία.');
     return { state, token: stateToken(state) };
 }
@@ -304,9 +313,10 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
         }
     }
     const current = await queryLean(withSession(periodControlModel.findOne(filterForScope(scope)), dbSession));
-    const previousStatus = current?.status === 'LOCKED' ? 'LOCKED' : 'OPEN';
+    const previousStatus = ['LOCKED', 'FINALIZED'].includes(current?.status) ? current.status : 'OPEN';
     const target = action === 'LOCK' ? 'LOCKED' : action === 'UNLOCK' ? 'OPEN' : null;
     if (!target) throw periodError('INVALID_PERIOD_TRANSITION', 400, 'Μη έγκυρη μετάβαση περιόδου.');
+    if (previousStatus === 'FINALIZED') throw periodError('PERIOD_CONTROL_FINALIZED', 409, 'Η οριστικοποιημένη περίοδος δεν ξεκλειδώνεται.');
     if (action === 'LOCK' && current?.active_calculation_id) {
         throw periodError('PERIOD_CONTROL_CALCULATION_IN_PROGRESS', 409,
             'Δεν είναι δυνατή η ολοκλήρωση του κλειδώματος επειδή βρίσκεται σε εξέλιξη Υπολογισμός Απασχολήσεων.');

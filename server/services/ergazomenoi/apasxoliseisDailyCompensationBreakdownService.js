@@ -6,6 +6,7 @@ const {
     COMMON_RATE_PERCENT,
     resolveCompanyPolicyRate
 } = require('./apasxoliseisCompanyPolicyRuleService');
+const { roundPayrollMoney } = require('../kinhseis/payrollMoneyService');
 
 const POLICY_VERSION = 'daily-cumulative-compensation-breakdown:v2';
 const STATUS = Object.freeze({
@@ -31,7 +32,7 @@ function hourlyRateOrNull(value) {
 }
 
 function money(value) {
-    return Number(Number(value).toFixed(2));
+    return roundPayrollMoney(value);
 }
 
 function sumFields(row, fields) {

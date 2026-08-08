@@ -6556,7 +6556,20 @@ let currentEmploymentPeriodControl = null;
 const employmentPeriodModeLabels = Object.freeze({
     NORMAL: 'Ανοικτή',
     LOCKED: 'Κλειδωμένη',
+    FINALIZED: 'Οριστικοποιημένη περίοδος',
     CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'
+});
+const employmentSubmissionTimelinessLabels = Object.freeze({
+    NOT_SUBMITTED: 'Δεν έχει συνδεθεί', TIMELY: 'Εμπρόθεσμη', LATE: 'Εκπρόθεσμη'
+});
+const correctiveDeltaLabels = Object.freeze({
+    ores_ergasias_apologistika: 'Ώρες εργασίας', ores_prostheths_ergasias_apologistika: 'Πρόσθετη εργασία',
+    ores_yperergasias_apologistika: 'Υπερεργασία', ores_nominhs_yperorias_apologistika: 'Νόμιμη υπερωρία',
+    ores_paranomhs_yperorias_apologistika: 'Παράνομη υπερωρία', ores_nyxtas_apologistika: 'Νυχτερινές ώρες',
+    ores_argion_prosayxhsh_apologistika: 'Προσαύξηση Κυριακής/αργίας',
+    ores_argion_ergasia_apologistika: 'Εργασία Κυριακής/αργίας', sixth_day_hours: 'Ώρες 6ης ημέρας',
+    seventh_day_hours: 'Ώρες 7ης ημέρας', baseActualWorkAmount: 'Βασικές αποδοχές',
+    premiumTotalAmount: 'Σύνολο προσαυξήσεων', grossWorkAmount: 'Συνολικό ποσό'
 });
 
 function renderEmploymentPeriodControl(state) {
@@ -6569,12 +6582,35 @@ function renderEmploymentPeriodControl(state) {
         employmentPeriodModeLabels[mode] || 'Απαιτείται έλεγχος';
     document.getElementById('employmentPeriodControlDeadline').textContent =
         formatPolicyPreviewDate(state?.deadline);
+    document.getElementById('employmentPeriodFinalizedAt').textContent =
+        formatPolicyPreviewDate(state?.finalized_at) || '-';
+    document.getElementById('employmentPeriodSubmission').textContent =
+        employmentSubmissionTimelinessLabels[state?.submission_timeliness] || 'Δεν έχει συνδεθεί';
+    document.getElementById('employmentPeriodProtocol').textContent = state?.submission_protocol || '-';
     const actions = state?.allowed_actions || {};
     document.getElementById('lockEmploymentPeriodBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.lock_period === true && state?.index_readiness?.ready === true)
     );
     document.getElementById('unlockEmploymentPeriodBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.unlock_period === true && state?.index_readiness?.ready === true)
+    );
+    document.getElementById('finalizeEmploymentPeriodBtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && actions.finalize_period === true)
+    );
+    document.getElementById('openCorrectivePayrollBtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && actions.open_corrective === true)
+    );
+    document.getElementById('employmentPeriodCorrectiveLegend')?.classList.toggle(
+        'd-none', !state?.corrective_case
+    );
+    document.getElementById('calculateCorrectivePayrollBtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && state?.corrective_case?.status === 'ACTIVE')
+    );
+    document.getElementById('closeCorrectivePayrollBtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && state?.corrective_case?.status === 'ACTIVE' && state.corrective_case.has_delta)
+    );
+    document.getElementById('postCorrectivePayrollBtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && actions.post_corrective_payroll === true)
     );
     const message = document.getElementById('employmentPeriodControlMessage');
     if (message) {
@@ -6584,6 +6620,128 @@ function renderEmploymentPeriodControl(state) {
               ? 'Οι κανονικές μεταβολές έχουν απενεργοποιηθεί μετά την προθεσμία.'
               : '';
     }
+}
+
+function currentCorrectiveBranch() {
+    return String(document.getElementById('ypokatasthma_stathera_advanced')?.value || getHrSelectedBranch() || '').trim();
+}
+
+async function calculateCorrectivePayroll() {
+    const state = currentEmploymentPeriodControl;
+    if (!state?.corrective_case?.case_id) throw new Error('Δεν υπάρχει ενεργή διορθωτική μισθοδοσία.');
+    const result = await Swal.fire({
+        title: 'Καταχώρηση διορθωτικών στοιχείων',
+        html: '<label class="form-label" for="correctiveEmployee">Κωδικός εργαζομένου</label>' +
+            '<input id="correctiveEmployee" class="swal2-input" autocomplete="off">' +
+            '<label class="form-label" for="correctiveDate">Ημερομηνία</label>' +
+            '<input id="correctiveDate" type="date" class="swal2-input">' +
+            '<label class="form-label" for="correctiveStart">Διορθωμένη είσοδος</label>' +
+            '<input id="correctiveStart" type="time" class="swal2-input">' +
+            '<label class="form-label" for="correctiveEnd">Διορθωμένη έξοδος</label>' +
+            '<input id="correctiveEnd" type="time" class="swal2-input">' +
+            '<label class="form-label" for="correctiveReason">Αιτιολογία</label>' +
+            '<textarea id="correctiveReason" class="swal2-textarea"></textarea>' +
+            '<label class="form-check mt-2"><input id="correctiveSubmission" type="checkbox" class="form-check-input"> Απαιτείται νέα υποβολή</label>',
+        showCancelButton: true,
+        confirmButtonText: 'Υπολογισμός διορθωτικής μισθοδοσίας', cancelButtonText: 'Ακύρωση',
+        preConfirm: () => {
+            const employee = String(document.getElementById('correctiveEmployee')?.value || '').trim();
+            const date = String(document.getElementById('correctiveDate')?.value || '');
+            const start = String(document.getElementById('correctiveStart')?.value || '');
+            const end = String(document.getElementById('correctiveEnd')?.value || '');
+            const reason = String(document.getElementById('correctiveReason')?.value || '').trim();
+            if (!employee || !date || !start || !end || !reason) {
+                Swal.showValidationMessage('Όλα τα διορθωτικά στοιχεία και η αιτιολογία είναι υποχρεωτικά.'); return false;
+            }
+            return { employee, date, start, end, reason,
+                requiresNewSubmission: document.getElementById('correctiveSubmission')?.checked === true };
+        }
+    });
+    if (!result.isConfirmed) return;
+    const command = result.value;
+    const response = await fetch('/api/prodhlomena-oraria/review/period-control/corrective/calculate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({ ypokatasthma: currentCorrectiveBranch(), case_id: state.corrective_case.case_id,
+            reason: command.reason, request_id: `corrective-calculate-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            requires_new_submission: command.requiresNewSubmission,
+            corrections: [{ type: 'REPLACE_HISTORICAL_CARD_INTERVALS', employee_kodikos: command.employee,
+                date: command.date, intervals: [{ start: command.start, end: command.end }] }] })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || 'Ο διορθωτικός υπολογισμός απέτυχε.');
+    await loadEmploymentPeriodControl(currentCorrectiveBranch());
+    await loadResults();
+    await Swal.fire({ icon: 'success', title: 'Διορθωτική διαφορά', text: payload.message });
+}
+
+async function postCorrectivePayroll() {
+    const state = currentEmploymentPeriodControl;
+    if (state?.corrective_case?.status !== 'CLOSED') throw new Error('Η διορθωτική υπόθεση πρέπει πρώτα να κλείσει.');
+    const result = await Swal.fire({ title: 'Καταχώριση διορθωτικής μισθοδοσίας',
+        html: '<label class="form-label" for="postingEmployee">Κωδικός εργαζομένου</label>' +
+            '<input id="postingEmployee" class="swal2-input" autocomplete="off">' +
+            '<label class="form-label" for="postingEarningsType">Τύπος αποδοχών</label>' +
+            '<input id="postingEarningsType" class="swal2-input" autocomplete="off">' +
+            '<label class="form-label" for="postingReason">Αιτιολογία</label>' +
+            '<textarea id="postingReason" class="swal2-textarea"></textarea>',
+        showCancelButton: true, confirmButtonText: 'Καταχώριση', cancelButtonText: 'Ακύρωση',
+        preConfirm: () => { const employee = String(document.getElementById('postingEmployee')?.value || '').trim();
+            const type = String(document.getElementById('postingEarningsType')?.value || '').trim();
+            const reason = String(document.getElementById('postingReason')?.value || '').trim();
+            if (!employee || !type || !reason) { Swal.showValidationMessage('Απαιτούνται εργαζόμενος, τύπος αποδοχών και αιτιολογία.'); return false; }
+            return { employee, type, reason }; } });
+    if (!result.isConfirmed) return;
+    const response = await fetch('/api/prodhlomena-oraria/review/period-control/corrective/payroll-post', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ypokatasthma: currentCorrectiveBranch(), case_id: state.corrective_case.case_id,
+            employee_kodikos: result.value.employee, typos_apodoxon: result.value.type,
+            reason: result.value.reason,
+            request_id: `corrective-payroll-${Date.now()}-${Math.random().toString(16).slice(2)}` }) });
+    const payload = await response.json(); if (!response.ok || !payload.success) throw new Error(payload.message || 'Η καταχώριση απέτυχε.');
+    await Swal.fire({ icon: 'success', title: 'Διορθωτική μισθοδοσία',
+        html: `Συμψηφισμός: ${payload.offset_applied}<br>Παρακράτηση: ${payload.withholding_amount}<br>` +
+            `Πληρωτέα διαφορά: ${payload.payable_now}<br>Νέος α/α μισθοδοσίας: ${payload.aa_misthodosias}` });
+    await loadEmploymentPeriodControl(currentCorrectiveBranch());
+}
+
+async function closeCorrectivePayroll() {
+    const state = currentEmploymentPeriodControl;
+    const confirmation = await Swal.fire({ title: 'Κλείσιμο διορθωτικής μισθοδοσίας', input: 'textarea',
+        inputLabel: 'Αιτιολογία', showCancelButton: true, confirmButtonText: 'Κλείσιμο', cancelButtonText: 'Ακύρωση',
+        inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
+    if (!confirmation.isConfirmed) return;
+    const response = await fetch('/api/prodhlomena-oraria/review/period-control/corrective/close', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({ ypokatasthma: currentCorrectiveBranch(), case_id: state?.corrective_case?.case_id,
+            reason: String(confirmation.value || '').trim() })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || 'Το κλείσιμο απέτυχε.');
+    await loadEmploymentPeriodControl(currentCorrectiveBranch());
+    await Swal.fire({ icon: 'success', title: 'Διορθωμένη μισθοδοσία', text: payload.message });
+}
+
+async function runEmploymentPeriodLifecycleAction(kind) {
+    const corrective = kind === 'corrective';
+    const confirmation = await Swal.fire({ icon: 'warning',
+        title: corrective ? 'Άνοιγμα διορθωτικής μισθοδοσίας' : 'Οριστικοποίηση περιόδου',
+        text: corrective ? 'Το αρχικό οριστικοποιημένο αποτέλεσμα θα παραμείνει αμετάβλητο.' :
+            'Θα δημιουργηθεί παγωμένο ιστορικό αποτέλεσμα που δεν ανακατασκευάζεται από μελλοντικές πολιτικές.',
+        input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
+        confirmButtonText: corrective ? 'Άνοιγμα διορθωτικής μισθοδοσίας' : 'Οριστικοποίηση περιόδου',
+        cancelButtonText: 'Ακύρωση', inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
+    if (!confirmation.isConfirmed) return;
+    const branch = String(document.getElementById('ypokatasthma_stathera_advanced')?.value || getHrSelectedBranch() || '').trim();
+    const suffix = corrective ? 'corrective/open' : 'finalize';
+    const response = await fetch(`/api/prodhlomena-oraria/review/period-control/${suffix}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({ ypokatasthma: branch, reason: String(confirmation.value || '').trim(),
+            request_id: `period-${kind}-${Date.now()}-${Math.random().toString(16).slice(2)}` })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || 'Η ενέργεια απέτυχε.');
+    await loadEmploymentPeriodControl(branch);
+    await Swal.fire({ icon: 'success', title: corrective ? 'Διορθωτική μισθοδοσία σε εξέλιξη' : 'Οριστικοποιημένη περίοδος', text: payload.message });
 }
 
 async function loadEmploymentPeriodControl(ypokatasthma) {
@@ -6704,12 +6862,14 @@ async function loadResults() {
         currentApprovalHistoryFilters.searchText = '';
 
         const rows = payload.rows || [];
-        try {
-            const scenarioRows = await fetchScenarioClassifications(params);
-            const scenarioByProdhlomenaId = buildScenarioClassificationsMap(scenarioRows);
-            attachScenarioClassifications(rows, scenarioByProdhlomenaId);
-        } catch (scenarioError) {
-            console.warn('[loadResults] Scenario classifications unavailable:', scenarioError);
+        if (payload.finalized !== true) {
+            try {
+                const scenarioRows = await fetchScenarioClassifications(params);
+                const scenarioByProdhlomenaId = buildScenarioClassificationsMap(scenarioRows);
+                attachScenarioClassifications(rows, scenarioByProdhlomenaId);
+            } catch (scenarioError) {
+                console.warn('[loadResults] Scenario classifications unavailable:', scenarioError);
+            }
         }
 
         currentReviewRows = rows;
@@ -6718,6 +6878,33 @@ async function loadResults() {
         currentLegacyDeviations = payload.legacyDeviations || [];
         renderCurrentReviewRows();
 
+        const correctiveSummary = document.getElementById('employmentPeriodCorrectiveSummary');
+        if (correctiveSummary) {
+            correctiveSummary.replaceChildren();
+            const deltaRows = payload.corrective?.delta?.rows || [];
+            const payrollPostings = payload.corrective?.payroll_postings || [];
+            if (deltaRows.length || payrollPostings.length) {
+                const title = document.createElement('div'); title.className = 'fw-semibold';
+                title.textContent = 'Διορθωτική διαφορά'; correctiveSummary.appendChild(title);
+                for (const delta of deltaRows) {
+                    const line = document.createElement('div');
+                    const changes = Object.entries(delta).filter(([field, value]) => field !== 'key' && Number(value) !== 0)
+                        .map(([field, value]) => `${correctiveDeltaLabels[field] || 'Μεταβολή'}: ${value}`).join(' · ');
+                    line.textContent = `${delta.key || ''} — ${changes}`; correctiveSummary.appendChild(line);
+                }
+                for (const posting of payrollPostings) {
+                    const line = document.createElement('div');
+                    line.textContent = `${posting.employee_kodikos || ''} — Συμψηφισμός: ${posting.offset_applied || 0}` +
+                        ` · Παρακράτηση: ${posting.withholding_amount || 0}` +
+                        ` · Πληρωτέα διαφορά: ${posting.payable_now || 0}` +
+                        ` · Νέος α/α μισθοδοσίας: ${posting.corrective_aa_misthodosias || '-'}`;
+                    correctiveSummary.appendChild(line);
+                }
+                correctiveSummary.classList.remove('d-none');
+            } else correctiveSummary.classList.add('d-none');
+        }
+
+        if (payload.finalized !== true) {
         const [groupingResult, approvalsResult, dryRunResult] = await Promise.allSettled([
             fetchPolicyPreviewGrouping(params),
             refreshPolicyPreviewApprovals(params),
@@ -6771,6 +6958,9 @@ async function loadResults() {
                     policyPreviewError.message ||
                     'Αποτυχία ανάκτησης ομαδοποίησης πολιτικών.'
             });
+        }
+        } else {
+            renderPolicyPreviewGroups(null);
         }
     } catch (error) {
         console.error(error);
@@ -7727,6 +7917,21 @@ document.getElementById('lockEmploymentPeriodBtn')?.addEventListener('click', ()
 });
 document.getElementById('unlockEmploymentPeriodBtn')?.addEventListener('click', () => {
     transitionEmploymentPeriod('unlock').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('finalizeEmploymentPeriodBtn')?.addEventListener('click', () => {
+    runEmploymentPeriodLifecycleAction('finalize').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('openCorrectivePayrollBtn')?.addEventListener('click', () => {
+    runEmploymentPeriodLifecycleAction('corrective').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('calculateCorrectivePayrollBtn')?.addEventListener('click', () => {
+    calculateCorrectivePayroll().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('closeCorrectivePayrollBtn')?.addEventListener('click', () => {
+    closeCorrectivePayroll().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('postCorrectivePayrollBtn')?.addEventListener('click', () => {
+    postCorrectivePayroll().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);

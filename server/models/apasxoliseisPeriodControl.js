@@ -8,7 +8,7 @@ const schema = new Schema({
     ypokatasthma: { type: String, trim: true, required: true, immutable: true },
     period_start: { type: Date, required: true, immutable: true },
     period_end: { type: Date, required: true, immutable: true },
-    status: { type: String, enum: ['OPEN', 'LOCKED'], required: true, default: 'OPEN' },
+    status: { type: String, enum: ['OPEN', 'LOCKED', 'FINALIZED'], required: true, default: 'OPEN' },
     deadline: { type: Date, required: true, immutable: true },
     locked_at: { type: Date, default: null },
     locked_by_user_id: { type: Schema.Types.ObjectId, default: null },
@@ -20,6 +20,18 @@ const schema = new Schema({
     last_transition_command_identity: { type: String, trim: true, default: '' },
     active_calculation_id: { type: String, trim: true, default: '' },
     active_calculation_started_at: { type: Date, default: null },
+    frozen_snapshot_id: { type: Schema.Types.ObjectId, ref: 'ApasxoliseisPeriodFrozenSnapshot', default: null },
+    frozen_snapshot_fingerprint: { type: String, trim: true, default: '' },
+    finalized_at: { type: Date, default: null },
+    finalized_by_user_id: { type: Schema.Types.ObjectId, default: null },
+    finalized_by_user_name: { type: String, trim: true, default: '' },
+    finalized_by_user_role: { type: String, trim: true, enum: ['', 'A', 'S', 'HR'], default: '' },
+    finalize_reason: { type: String, trim: true, maxlength: 2000, default: '' },
+    submitted_at: { type: Date, default: null },
+    submission_reference: { type: Schema.Types.ObjectId, ref: 'ErgazomenoiErganh', default: null },
+    submission_protocol: { type: String, trim: true, default: '' },
+    submission_status: { type: String, trim: true, default: '' },
+    submission_timeliness: { type: String, enum: ['', 'NOT_SUBMITTED', 'TIMELY', 'LATE'], default: 'NOT_SUBMITTED' },
     write_fence_version: { type: Number, required: true, min: 0, default: 0 },
     version: { type: Number, required: true, min: 1, default: 1 },
     created_at: { type: Date, required: true, default: Date.now },
@@ -34,5 +46,11 @@ const schema = new Schema({
 schema.index({
     team: 1, company_kod: 1, ypokatasthma: 1, period_start: 1, period_end: 1
 }, { unique: true, name: 'unique_apasxoliseis_period_control_scope' });
+
+schema.pre('validate', function requireFrozenSnapshotForFinalized() {
+    if (this.status === 'FINALIZED' && (!this.frozen_snapshot_id || !this.frozen_snapshot_fingerprint)) {
+        this.invalidate('status', 'FINALIZED requires a persisted frozen snapshot.');
+    }
+});
 
 module.exports = model('ApasxoliseisPeriodControl', schema);

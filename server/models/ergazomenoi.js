@@ -287,6 +287,12 @@ const ErgazomenoiSchema = new Schema(
         symfonhtheis_misthos_apasxolhseis: { type: Number, default: 0 },
         paketo_apodoxon: { type: Number, default: 0 },
         pososto_prosayxhshs_6hs_hmeras: { type: Number, min: 0 },
+        corrective_payroll_withholding_rate_percent: {
+            type: Number,
+            min: 0,
+            max: 100,
+            default: 0
+        },
         ypologismos_foroy: { type: Boolean, default: false },
         oros_sth_symbash_n_3986_2011: { type: Boolean, default: false },
         oysiodeis_oroi: { type: String, trim: true },
@@ -884,6 +890,8 @@ const ErgazomenoiErganhSchema = new Schema(
         protocol: { type: String, trim: true, index: true },
         submit_date_text: { type: String, trim: true },
         submit_date: { type: Date },
+        employment_period_start: { type: Date },
+        employment_period_end: { type: Date },
         erganh_submission_id: { type: String, trim: true, index: true },
 
         // ---------------------------------------------------------------------

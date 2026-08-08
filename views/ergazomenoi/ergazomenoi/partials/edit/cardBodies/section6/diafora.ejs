@@ -90,6 +90,17 @@
     </div>
 </div>
 
+<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+    <div class="col-9 left-align">
+        <label for="corrective_payroll_withholding_rate_percent" class="col-form-label label-font-size">
+            Ποσοστό παρακράτησης διορθωτικής μισθοδοσίας
+        </label>
+    </div>
+    <div class="col-1-5 left-align">
+        <input type="number" id="corrective_payroll_withholding_rate_percent" name="corrective_payroll_withholding_rate_percent" class="form-control input-contents right-align" min="0" max="100" step="0.01" value="<%= safeFloat('corrective_payroll_withholding_rate_percent') %>" />
+    </div>
+</div>
+
 <hr class="margin-top-0_2rem margin-bottom--0_1rem margin-left--1rem margin-right--1rem" />
 
 <div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">

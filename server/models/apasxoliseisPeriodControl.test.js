@@ -7,7 +7,7 @@ const Audit = require('./apasxoliseisPeriodControlAudit');
 const options = Control.schema.options;
 assert.strictEqual(options.autoIndex, false);
 assert.strictEqual(options.autoCreate, false);
-assert.deepStrictEqual(Control.schema.path('status').enumValues, ['OPEN', 'LOCKED']);
+assert.deepStrictEqual(Control.schema.path('status').enumValues, ['OPEN', 'LOCKED', 'FINALIZED']);
 assert.strictEqual(Control.schema.path('team').options.immutable, true);
 assert.strictEqual(Control.schema.path('period_start').options.immutable, true);
 const unique = Control.schema.indexes().find(([, config]) => config.name === 'unique_apasxoliseis_period_control_scope');

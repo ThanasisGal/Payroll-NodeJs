@@ -10,6 +10,8 @@ const writePlanSource = fs.readFileSync(
     path.join(__dirname, '../../services/ergazomenoi/apasxoliseisWeeklyPostCheckWritePlanService.js'),
     'utf8'
 );
+const dailyAdapterSource = fs.readFileSync(path.join(__dirname,
+    '../../services/ergazomenoi/apasxoliseisEmploymentDailyCalculationAdapterService.js'), 'utf8');
 const calculationStart = source.indexOf('static calcApasxolhseisPeriodoy = async');
 const calculationEnd = source.indexOf('static updateProdhlomenaOrariaReviewRecord', calculationStart);
 const calculation = source.slice(calculationStart, calculationEnd);
@@ -43,15 +45,15 @@ test('main calculation performs one scoped prefetch after all rows are loaded', 
 });
 
 test('main update is sanitized exactly once before entering main bulk operations', () => {
-    const calls = calculation.match(/sanitizeAppliedRepoTransferUpdate\(\{/g) || [];
+    const calls = dailyAdapterSource.match(/operations\.sanitizeAppliedRepoTransferUpdate\(\{/g) || [];
     assert.equal(calls.length, 1);
-    assert.ok(calculation.includes('update: { $set: protectedUpdate.sanitizedUpdate }'));
+    assert.ok(calculation.includes('update: { $set: dailyPlan.sanitizedUpdate }'));
     assert.ok(!calculation.includes('update: { $set: update }'));
 });
 
 test('main sanitizer diagnostics are grouped by employee/week in memory', () => {
     assert.ok(calculation.includes('const appliedProtectionReasonsByWeek = new Map()'));
-    assert.ok(calculation.includes('protectedUpdate.diagnostics'));
+    assert.ok(calculation.includes('dailyPlan.protectionDiagnostics'));
     assert.ok(calculation.includes('appliedProtectionReasonsByWeek.get(diagnosticWeekKey).add(reason)'));
 });
 

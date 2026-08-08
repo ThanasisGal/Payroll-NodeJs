@@ -11,6 +11,8 @@ const postCheckWritePlan = fs.readFileSync(
     path.join(__dirname, '..', '..', 'services', 'ergazomenoi', 'apasxoliseisWeeklyPostCheckWritePlanService.js'),
     'utf8'
 );
+const dailyAdapterSource = fs.readFileSync(path.join(__dirname, '..', '..', 'services', 'ergazomenoi',
+    'apasxoliseisEmploymentDailyCalculationAdapterService.js'), 'utf8');
 
 assert.ok(routeSource.includes("router.get('/api/prodhlomena-oraria/review'"));
 assert.ok(routeSource.includes('erganhController.getProdhlomenaOrariaForReview'));
@@ -106,10 +108,10 @@ assert.ok(
     )
 );
 assert.ok(calculationSource.includes('ProdhlomenaOrariaModel.find(prodhlomenaQuery)'));
-assert.ok(calculationSource.includes('resolveCardPairVerification(calculationRec)'));
-assert.ok(
-    calculationSource.includes('buildPartialVerifiedCardUpdate(calculationRec).update')
-);
+assert.ok(calculationSource.includes('buildEmploymentDailyPreliminaryUpdate({'));
+assert.ok(calculationSource.includes('buildEmploymentDailyCalculationUpdate({'));
+assert.ok(dailyAdapterSource.includes('operations.resolveCardPairVerification(calculationRow)'));
+assert.ok(dailyAdapterSource.includes('operations.buildPartialVerifiedCardUpdate(calculationRow).update'));
 assert.ok(!calculationSource.includes('buildIncompleteCardSafeUpdate()'));
 assert.strictEqual(
     (calculationSource.match(/checkIncompleteCardPairAgainstDeclared\(/g) || []).length,
