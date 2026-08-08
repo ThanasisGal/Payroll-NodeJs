@@ -68,6 +68,7 @@ assert.deepStrictEqual(analytics(payloadFor([row({ kathgoria_ergasias_apologisti
 const pureLeaveRow = row({ kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ', adeia_apologistika: true,
     apo_ora_01_apologistika: '', eos_ora_01_apologistika: '' });
 const pureSicknessRow = row({ kathgoria_ergasias_apologistika: '', astheneia_apologistika: true,
+    kathgoria_ergasias: 'ΕΡΓ',
     apo_ora_01_apologistika: '', eos_ora_01_apologistika: '' });
 assert.throws(() => payloadFor([pureLeaveRow]), (error) => code(error) === 'WTODAILY_NO_SUBMITTABLE_ROWS');
 assert.throws(() => payloadFor([pureSicknessRow]), (error) => code(error) === 'WTODAILY_NO_SUBMITTABLE_ROWS');
@@ -79,6 +80,26 @@ assert.deepStrictEqual(analytics(payloadFor([row({ astheneia_apologistika: true 
     [{ f_type: 'ΕΡΓ', f_from: '08:00', f_to: '16:00' }]);
 assert.deepStrictEqual(analytics(payloadFor([row({ argia: true, kyriakes_apologistika: 8 })])),
     [{ f_type: 'ΕΡΓ', f_from: '08:00', f_to: '16:00' }]);
+
+const categoryPrecedence = build([row({ kathgoria_ergasias_apologistika: 'ΕΡΓ', kathgoria_ergasias: 'ΑΝ' })]);
+assert.deepStrictEqual(categoryPrecedence.employees[0].category_sources, ['APOLOGISTIKA_CATEGORY']);
+const declaredWork = build([row({ kathgoria_ergasias_apologistika: '', kathgoria_ergasias: 'ΕΡΓ' })]);
+assert.strictEqual(declaredWork.employees[0].analytics[0].f_type, 'ΕΡΓ');
+assert.deepStrictEqual(declaredWork.employees[0].category_sources, ['DECLARED_CATEGORY_FALLBACK']);
+assert.deepStrictEqual(analytics(payloadFor([row({ kathgoria_ergasias_apologistika: '', kathgoria_ergasias: 'ΑΝ' })])),
+    [{ f_type: 'ΑΝ', f_from: '', f_to: '' }]);
+assert.deepStrictEqual(analytics(payloadFor([row({ kathgoria_ergasias_apologistika: '', kathgoria_ergasias: 'ΜΕ' })])),
+    [{ f_type: 'ΜΕ', f_from: '', f_to: '' }]);
+assert.deepStrictEqual(analytics(payloadFor([row({ kathgoria_ergasias_apologistika: '', kathgoria_ergasias: 'ΤΗΛ' })])),
+    [{ f_type: 'ΤΗΛ', f_from: '08:00', f_to: '16:00' }]);
+assert.throws(() => build([row({ kathgoria_ergasias_apologistika: 'UNKNOWN', kathgoria_ergasias: 'ΕΡΓ' })]),
+    (e) => code(e) === 'UNSUPPORTED_WTODAILY_TYPE');
+assert.throws(() => build([row({ kathgoria_ergasias_apologistika: '', kathgoria_ergasias: 'ΕΡΓ',
+    adeia_apologistika: true })]), (e) => code(e) === 'WTODAILY_NO_SUBMITTABLE_ROWS');
+assert.throws(() => build([row({ kathgoria_ergasias_apologistika: '', kathgoria_ergasias: 'ΕΡΓ',
+    astheneia_apologistika: true })]), (e) => code(e) === 'WTODAILY_NO_SUBMITTABLE_ROWS');
+assert.throws(() => build([row({ kathgoria_ergasias_apologistika: '', kathgoria_ergasias: '' })]),
+    (e) => code(e) === 'UNSUPPORTED_WTODAILY_TYPE');
 
 const duplicate = payloadFor([row(), row()]);
 assert.strictEqual(duplicate.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO.length, 1);

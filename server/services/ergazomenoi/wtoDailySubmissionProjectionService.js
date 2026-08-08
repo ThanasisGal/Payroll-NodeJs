@@ -42,13 +42,23 @@ function validateTime(value, label) {
 }
 
 function resolveType(row) {
-    const source = clean(row.kathgoria_ergasias_apologistika).toUpperCase();
-    const rule = TYPE_RULES[source];
-    if (!rule && (row.adeia_apologistika === true || row.astheneia_apologistika === true)) {
+    const apologistikaCategory = clean(row.kathgoria_ergasias_apologistika).toUpperCase();
+    const apologistikaRule = TYPE_RULES[apologistikaCategory];
+    if (!apologistikaRule && (row.adeia_apologistika === true || row.astheneia_apologistika === true)) {
         return null;
     }
-    if (!rule) throw projectionError('UNSUPPORTED_WTODAILY_TYPE', `Μη υποστηριζόμενος WTODayilyA τύπος: ${source || '(κενό)'}.`, { value: source });
-    return rule;
+    if (apologistikaRule) {
+        return Object.freeze({ rule: apologistikaRule, source: 'APOLOGISTIKA_CATEGORY' });
+    }
+    if (apologistikaCategory) throw projectionError('UNSUPPORTED_WTODAILY_TYPE',
+        `Μη υποστηριζόμενος WTODayilyA τύπος: ${apologistikaCategory}.`, { value: apologistikaCategory });
+    const declaredCategory = clean(row.kathgoria_ergasias).toUpperCase();
+    const declaredRule = TYPE_RULES[declaredCategory];
+    if (declaredRule) {
+        return Object.freeze({ rule: declaredRule, source: 'DECLARED_CATEGORY_FALLBACK' });
+    }
+    throw projectionError('UNSUPPORTED_WTODAILY_TYPE',
+        `Μη υποστηριζόμενος WTODayilyA τύπος: ${declaredCategory || '(κενό)'}.`, { value: declaredCategory });
 }
 
 function identityFor(row, employeeByCode) {
@@ -124,13 +134,14 @@ function buildWtoDailySubmissionProjection({ rows, employees, branch, periodStar
     for (const row of submitRows) {
         const rowDate = dateKey(row.hmeromhnia, 'employee date');
         if (rowDate < startKey || rowDate > endKey) throw projectionError('WTODAILY_ROW_OUTSIDE_PERIOD', 'Η frozen εγγραφή βρίσκεται εκτός περιόδου.', { date: rowDate });
-        const rule = resolveType(row);
-        if (!rule) continue;
+        const resolvedType = resolveType(row);
+        if (!resolvedType) continue;
         const identity = identityFor(row, employeeByCode);
         const key = `${identity.f_afm}|${rowDate}`;
-        const resolvedAnalytics = resolveWtoDailyAnalytics(row, rule);
+        const resolvedAnalytics = resolveWtoDailyAnalytics(row, resolvedType.rule);
         const candidate = { ...identity, f_date: formatDate(rowDate),
-            analytics: resolvedAnalytics.analytics, analytic_sources: [resolvedAnalytics.source] };
+            analytics: resolvedAnalytics.analytics, analytic_sources: [resolvedAnalytics.source],
+            category_sources: [resolvedType.source] };
         if (!grouped.has(key)) grouped.set(key, candidate);
         else {
             const current = grouped.get(key);
@@ -139,6 +150,7 @@ function buildWtoDailySubmissionProjection({ rows, employees, branch, periodStar
             }
             current.analytics.push(...candidate.analytics);
             current.analytic_sources.push(...candidate.analytic_sources);
+            current.category_sources.push(...candidate.category_sources);
         }
     }
     const employeeDays = [...grouped.values()].map((employee) => ({ ...employee,
