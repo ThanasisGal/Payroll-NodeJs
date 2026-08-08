@@ -170,6 +170,10 @@ function buildWeeklyRepoPostCheckWritePlan({
                       hourlyRate: effectiveProfile.pragmatikoOromisthio
                   })
                 : { status: 'READY', reasons: [], sixthDay: null, seventhDay: null };
+            const canonicalBlockingReasons =
+                sixthSeventhAnalysis.status === 'NEEDS_HR_DECISION'
+                    ? [...new Set(sixthSeventhAnalysis.reasons || [])]
+                    : [];
 
             for (let day = clampDateStartUtc(week.weekStart); day <= week.weekEnd; day = addDaysUtc(day, 1)) {
                 const row = rowsByEmployeeAndDate.get(`${erg.kodikos}|${dateKeyUtc(day)}`);
@@ -280,9 +284,17 @@ function buildWeeklyRepoPostCheckWritePlan({
                 }
             }
 
+            const allBlockingReasons = [
+                ...new Set([...repoStateReasons, ...canonicalBlockingReasons])
+            ];
+            const isProfileChangeDeviation =
+                weeklyProfileInfo.profileChangedInsideWeek === true ||
+                canonicalBlockingReasons.includes('PROFILE_CHANGED_INSIDE_WEEK');
+
             if (week.isFullWeek && weekFullyInsideEmployment &&
                 (weeklyProfileInfo.repoResolutionReason ||
-                    Number(pragmatikaRepo) !== Number(expectedWeeklyRepo) || repoStateReasons.size > 0)) {
+                    Number(pragmatikaRepo) !== Number(expectedWeeklyRepo) ||
+                    repoStateReasons.size > 0 || canonicalBlockingReasons.length > 0)) {
                 const excessRepo = Math.max(0, Number(pragmatikaRepo) - Number(expectedWeeklyRepo));
                 deviations.push({
                     team: sessionTeam,
@@ -302,8 +314,8 @@ function buildWeeklyRepoPostCheckWritePlan({
                     expected_repo: expectedWeeklyRepo,
                     repo_resolution_source: weeklyProfileInfo.repoResolutionSource,
                     repo_resolution_reason: weeklyProfileInfo.repoResolutionReason,
-                    ...(repoStateReasons.size > 0
-                        ? { status: 'NEEDS_HR_DECISION', reasons: [...repoStateReasons] } : {}),
+                    ...(allBlockingReasons.length > 0
+                        ? { status: 'NEEDS_HR_DECISION', reasons: allBlockingReasons } : {}),
                     actual_repo: pragmatikaRepo,
                     missing_repo: Math.max(Number(expectedWeeklyRepo || 0) - Number(pragmatikaRepo), 0),
                     pragmatikaRepo,
@@ -322,7 +334,7 @@ function buildWeeklyRepoPostCheckWritePlan({
                         previousProfile.employment_profile_source || previousProfile.source || '',
                     previous_profile_date: weeklyProfileInfo.previousProfileDate,
                     previous_profile_istoriko_id: previousProfile.istorikoId || null,
-                    deviation_type: weeklyProfileInfo.profileChangedInsideWeek
+                    deviation_type: isProfileChangeDeviation
                         ? 'PROFILE_CHANGED_INSIDE_WEEK' : 'WEEKLY_REPO_MISMATCH',
                     note: weeklyProfileInfo.profileChangedInsideWeek && excessRepo > 0
                         ? 'Υπάρχουν επιπλέον ρεπό σε εβδομάδα με αλλαγή όρων εργασίας. Να ελεγχθεί αν πρέπει να χαρακτηριστούν ως ΑΔΑΛ.'

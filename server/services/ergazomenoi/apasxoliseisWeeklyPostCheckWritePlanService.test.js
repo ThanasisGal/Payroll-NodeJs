@@ -139,6 +139,11 @@ function updateFor(result, date) {
     return operation.updateOne.update.$set;
 }
 
+function onlyDeviation(result) {
+    assert.equal(result.deviations.length, 1);
+    return result.deviations[0];
+}
+
 // Input rows deliberately represent the post-first-stage/reload boundary.
 const sixthRows = week([7, 7, 7, 7, 7, 9, 0]);
 let result = plan(sixthRows);
@@ -204,6 +209,102 @@ assert.equal(update.compensation_breakdown_apologistika.status, 'NEEDS_HR_DECISI
 assert.ok(update.compensation_breakdown_apologistika.reasons.includes('CARD_VERIFICATION_PENDING'));
 assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 0);
 
+const ambiguousRows = week([7, 7, 7, 7, 7, 7, 0]);
+Object.assign(ambiguousRows[6], {
+    kathgoria_ergasias: 'ΕΡΓ',
+    kathgoria_ergasias_apologistika: 'ΕΡΓ',
+    repo: false,
+    repo_apologistika: false
+});
+result = plan(ambiguousRows);
+let deviation = onlyDeviation(result);
+assert.equal(deviation.status, 'NEEDS_HR_DECISION');
+assert.ok(deviation.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+
+const pendingRows = week([7, 7, 7, 7, 7, 0, 0]);
+pendingRows[0].cards_eos_ora_01 = '';
+result = plan(pendingRows);
+deviation = onlyDeviation(result);
+assert.equal(deviation.expected_repo, 2);
+assert.equal(deviation.actual_repo, 2);
+assert.equal(deviation.missing_repo, 0);
+assert.equal(deviation.excess_repo, 0);
+assert.equal(deviation.status, 'NEEDS_HR_DECISION');
+assert.deepEqual(deviation.reasons, ['CARD_VERIFICATION_PENDING']);
+update = updateFor(result, '2026-08-03');
+assert.ok(update.compensation_breakdown_apologistika.reasons.includes('CARD_VERIFICATION_PENDING'));
+assert.ok(deviation.reasons.every((reason) =>
+    update.compensation_breakdown_apologistika.reasons.includes(reason)
+));
+
+const profileRows = week([7, 7, 7, 7, 7, 0, 0]);
+Object.assign(profileRows[6], {
+    kathgoria_ergasias: 'ΕΡΓ',
+    kathgoria_ergasias_apologistika: 'ΕΡΓ',
+    repo: false,
+    repo_apologistika: false
+});
+const changedHistory = {
+    _id: '200000000000000000000001',
+    kodikos: 'D1',
+    hmeromhnia_isxyos_oron_ergasias_apo: '2026-08-06',
+    hmeres_ergasias_ebdomadas: 6,
+    ores_ergasias_ebdomadas: 40,
+    mo_oron_hmerhsias_ergasias: 6.67,
+    typos_apasxolhshs: '0',
+    pososto_prosayxhshs_6hs_hmeras: 40,
+    nomimoOromisthio: 8,
+    pragmatikoOromisthio: 10,
+    employment_profile_source: 'D3_HISTORY'
+};
+result = plan(profileRows, {
+    istorikoRowsByKodikos: new Map([['D1', [changedHistory]]])
+});
+deviation = onlyDeviation(result);
+assert.equal(deviation.expected_repo, 1);
+assert.equal(deviation.actual_repo, 1);
+assert.equal(deviation.missing_repo, 0);
+assert.equal(deviation.excess_repo, 0);
+assert.equal(deviation.status, 'NEEDS_HR_DECISION');
+assert.deepEqual(deviation.reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
+assert.equal(deviation.deviation_type, 'PROFILE_CHANGED_INSIDE_WEEK');
+
+result = plan(ambiguousRows, {
+    appliedProtectionReasonsByWeek: new Map([[
+        'D1|2026-08-03',
+        new Set([
+            'CURRENT_IDENTITY_DIFFERS_FROM_APPLIED_EXECUTION',
+            'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
+        ])
+    ]])
+});
+deviation = onlyDeviation(result);
+assert.deepEqual(deviation.reasons, [
+    'CURRENT_IDENTITY_DIFFERS_FROM_APPLIED_EXECUTION',
+    'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
+]);
+
+const readyRows = week([7, 7, 7, 7, 7, 0, 0]);
+result = plan(readyRows);
+assert.deepEqual(result.deviations, []);
+
+const mismatchRows = week([7, 7, 7, 7, 7, 0, 0]);
+Object.assign(mismatchRows[6], {
+    kathgoria_ergasias: 'ΕΡΓ',
+    kathgoria_ergasias_apologistika: 'ΕΡΓ',
+    repo: false,
+    repo_apologistika: false
+});
+result = plan(mismatchRows);
+deviation = onlyDeviation(result);
+assert.equal(deviation.expected_repo, 2);
+assert.equal(deviation.actual_repo, 1);
+assert.equal(deviation.missing_repo, 1);
+assert.equal(deviation.excess_repo, 0);
+assert.equal(deviation.status, undefined);
+assert.equal(deviation.reasons, undefined);
+assert.equal(deviation.deviation_type, 'WEEKLY_REPO_MISMATCH');
+
 result = plan(sixthRows);
 update = updateFor(result, '2026-08-08');
 assert.equal(
@@ -241,4 +342,4 @@ assert.deepEqual(result.compensationBreakdowns, {
 });
 assert.deepEqual(result.diagnostics, []);
 
-console.log('weekly post-check pure write-plan contract tests passed (9 contracts)');
+console.log('weekly post-check pure write-plan contract tests passed (16 contracts)');
