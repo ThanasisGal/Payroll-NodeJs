@@ -232,7 +232,7 @@ function test0002ThroughAuthoritativeProjectionPath() {
     });
     assert.strictEqual(projection.projection_status, 'NOT_AVAILABLE');
     assert.strictEqual(projection.groups.length, 0);
-    assert.ok(projection.reasons.includes('MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
+    assert.ok(projection.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
 }
 
 function testProfileDateForDeviationPrecedenceAndFallbacks() {
@@ -273,7 +273,7 @@ function testControllerImportsSharedProfileDateHelper() {
     assert.ok(sharedImport.includes('getProfileDateForDeviation'));
     assert.strictEqual(
         (controllerSource.match(/getProfileDateForDeviation\s*\(/g) || []).length,
-        2
+        3
     );
     assert.doesNotMatch(controllerSource, /function\s+getProfileDateForDeviation\s*\(/);
 }

@@ -154,7 +154,7 @@ for (const [type, analyzer] of [
     assert.strictEqual(result.employee.repo_resolution_source, 'CONTRACTUAL_WEEKLY_WORKDAYS');
     assert.ok(result.reasons.includes(
         type === 'PLHRHS'
-            ? 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'
+            ? 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
             : 'REPO_DEFICIT_REMAINS'
     ));
     assert.strictEqual(result.eligibility_status, ELIGIBILITY_STATUS.NEEDS_REVIEW);
