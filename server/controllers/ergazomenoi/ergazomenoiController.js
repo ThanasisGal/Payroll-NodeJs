@@ -415,6 +415,14 @@ function parseSixthDayPremiumRate(value, { defaultForNew = false } = {}) {
     return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
+function parseCorrectivePayrollWithholdingRate(value) {
+    if (value === null || value === undefined || String(value).trim() === '') return 0;
+    const normalized = String(value).replace(',', '.').trim();
+    const number = Number(normalized);
+    if (!/^\d{1,3}(?:\.\d{1,2})?$/.test(normalized) || !Number.isFinite(number) || number < 0 || number > 100) return null;
+    return number;
+}
+
 function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {}) {
     const hmeres = toNumberOrNull(formData.hmeres_ergasias_ebdomadas);
     const weeklyHours = toNumberOrNull(formData.ores_ergasias_ebdomadas);
@@ -1273,6 +1281,12 @@ class ergazomenoiController {
             });
         }
         formData.pososto_prosayxhshs_6hs_hmeras = sixthDayPremiumRate;
+        const correctiveWithholdingRate = parseCorrectivePayrollWithholdingRate(
+            formData.corrective_payroll_withholding_rate_percent);
+        if (correctiveWithholdingRate === null) return res.status(400).json({ success: false,
+            reason: 'INVALID_CORRECTIVE_PAYROLL_WITHHOLDING_RATE',
+            message: 'Το ποσοστό παρακράτησης διορθωτικής μισθοδοσίας πρέπει να είναι από 0 έως 100 με έως 2 δεκαδικά.' });
+        formData.corrective_payroll_withholding_rate_percent = correctiveWithholdingRate;
 
         // ============================================================================
         // ✅ AUTO ENABLE E7N / MA_222
@@ -1630,6 +1644,8 @@ class ergazomenoiController {
         newErgazomenos.paketo_apodoxon = formData.paketo_apodoxon;
         newErgazomenos.pososto_prosayxhshs_6hs_hmeras =
             toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras);
+        newErgazomenos.corrective_payroll_withholding_rate_percent =
+            formData.corrective_payroll_withholding_rate_percent;
         newErgazomenos.ypologismos_foroy = formData.ypologismos_foroy;
         newErgazomenos.oysiodeis_oroi = formData.oysiodeis_oroi_stathera || '0';
         newErgazomenos.oros_sth_symbash_n_3986_2011 = formData.oros_sth_symbash_n_3986_2011;
@@ -3309,6 +3325,12 @@ class ergazomenoiController {
             });
         }
         formData.pososto_prosayxhshs_6hs_hmeras = sixthDayPremiumRate;
+        const correctiveWithholdingRate = parseCorrectivePayrollWithholdingRate(
+            formData.corrective_payroll_withholding_rate_percent);
+        if (correctiveWithholdingRate === null) return res.status(400).json({ success: false,
+            reason: 'INVALID_CORRECTIVE_PAYROLL_WITHHOLDING_RATE',
+            message: 'Το ποσοστό παρακράτησης διορθωτικής μισθοδοσίας πρέπει να είναι από 0 έως 100 με έως 2 δεκαδικά.' });
+        formData.corrective_payroll_withholding_rate_percent = correctiveWithholdingRate;
         const { employeeScope, employeeCode: kodikosErgazomenoy } = scopedAccess;
 
         formData.team = omadaErgasias;
@@ -3602,6 +3624,8 @@ class ergazomenoiController {
             paketo_apodoxon: formData.paketo_apodoxon,
             pososto_prosayxhshs_6hs_hmeras:
                 toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras),
+            corrective_payroll_withholding_rate_percent:
+                formData.corrective_payroll_withholding_rate_percent,
             ypologismos_foroy: formData.ypologismos_foroy,
             updatedAt: Date.now()
         };

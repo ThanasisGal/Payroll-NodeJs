@@ -943,7 +943,6 @@ function testServerDerivedRepoTransferPermissionsAndRoleVisibility() {
     assert.ok(viewSource.includes('id="canRecordRepoTransferDecision"'));
     assert.ok(viewSource.includes('id="canApplyRepoTransferDecision"'));
     assert.ok(viewSource.includes("['A', 'S', 'HR'].includes(normalizedUserRole)"));
-    assert.ok(viewSource.includes("['A', 'S'].includes(normalizedUserRole)"));
     assert.ok(viewSource.includes('id="canReviewEdit"'));
     assert.ok(!viewSource.includes('id="currentUserRole"'));
     assert.ok(!viewSource.includes('id="userRole"'));
@@ -954,7 +953,7 @@ function testServerDerivedRepoTransferPermissionsAndRoleVisibility() {
     for (const permissions of [
         { role: 'A', decision: true, apply: true },
         { role: 'S', decision: true, apply: true },
-        { role: 'HR', decision: true, apply: false },
+        { role: 'HR', decision: true, apply: true },
         { role: 'UNKNOWN', decision: false, apply: false }
     ]) {
         setRepoTransferPermissions(permissions);
@@ -1852,7 +1851,7 @@ function restoreSandboxFunctions(snapshot) {
 }
 
 function testMinimalWorkspaceEjsContract() {
-    assert.ok(viewSource.includes("const canUseAdvancedEmploymentReview = ['A', 'S'].includes(normalizedUserRole)"));
+    assert.ok(viewSource.includes("const canUseAdvancedEmploymentReview = ['A', 'S', 'HR'].includes(normalizedUserRole)"));
     assert.ok(viewSource.includes('id="canUseAdvancedEmploymentReview"'));
     assert.ok(viewSource.includes('id="hrReviewWorkspace"'));
     assert.ok(viewSource.includes('<% if (canUseAdvancedEmploymentReview) { %>'));
@@ -2188,14 +2187,14 @@ function testEmploymentReviewBranchActionLayoutContract() {
 function testRoleScopedRenderedEjs() {
     const hr = renderViewForRole('HR');
     assert.ok(hr.includes('id="hrReviewWorkspace"'));
-    assert.ok(!hr.includes('id="advancedReviewWorkspace"'));
-    assert.ok(!hr.includes('id="resultsTable"'));
-    assert.ok(!hr.includes('id="policyPreviewGroupsContainer"'));
+    assert.ok(hr.includes('id="advancedReviewWorkspace"'));
+    assert.ok(hr.includes('id="resultsTable"'));
+    assert.ok(hr.includes('id="policyPreviewGroupsContainer"'));
     assert.ok(hr.includes('id="ypokatasthmata"'));
     assert.ok(hr.includes('initYpokatasthmataDropdowns.js'));
     assert.ok(/id="canManageReusablePolicyApproval"\s+value="1"/.test(hr));
 
-    ['A', 'S'].forEach((role) => {
+    ['A', 'S', 'HR'].forEach((role) => {
         const html = renderViewForRole(role);
         assert.ok(html.includes('id="hrReviewWorkspace"'));
         assert.ok(html.includes('id="advancedReviewWorkspace"'));
@@ -2402,6 +2401,13 @@ async function testLightweightHrLoadingRequests() {
     const projection = readyProjection();
     sandbox.fetch = async (url, options = {}) => {
         urls.push({ url: String(url), method: options.method || 'GET' });
+        if (String(url).startsWith('/api/prodhlomena-oraria/review/period-control/current?')) {
+            return {
+                ok: true,
+                json: async () => ({ success: true, effective_mode: 'NORMAL', deadline: '2026-08-31',
+                    version: 0, allowed_actions: {}, index_readiness: { ready: false } })
+            };
+        }
         if (String(url).startsWith('/api/prodhlomena-oraria/review/policies/preview?')) {
             return {
                 ok: true,
@@ -2419,9 +2425,10 @@ async function testLightweightHrLoadingRequests() {
     };
     vm.runInContext('currentHrReviewLoading = false; currentHrReviewLoaded = false', sandbox);
     await sandbox.loadHrReviewQueue();
-    assert.strictEqual(urls.length, 2);
-    assert.ok(urls[0].url.startsWith('/api/prodhlomena-oraria/review/policies/preview?'));
-    assert.ok(urls[1].url.startsWith('/api/prodhlomena-oraria/review/repo-transfer-decisions/current?'));
+    assert.strictEqual(urls.length, 3);
+    assert.ok(urls[0].url.startsWith('/api/prodhlomena-oraria/review/period-control/current?'));
+    assert.ok(urls[1].url.startsWith('/api/prodhlomena-oraria/review/policies/preview?'));
+    assert.ok(urls[2].url.startsWith('/api/prodhlomena-oraria/review/repo-transfer-decisions/current?'));
     assert.ok(urls.every((call) => call.method === 'GET'));
     const allUrls = urls.map((call) => call.url).join('\n');
     assert.ok(!allUrls.includes('/api/prodhlomena-oraria/review?'));

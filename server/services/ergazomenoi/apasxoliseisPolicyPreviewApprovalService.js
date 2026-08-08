@@ -19,6 +19,10 @@ const {
     isEffectiveForBothMembers,
     isMemberEligible
 } = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService');
+const {
+    CRITICAL_EMPLOYMENT_DECISION_ROLES,
+    assertCriticalEmploymentDecisionRole
+} = require('./apasxoliseisCriticalActionAuthorizationService');
 
 const ALLOWED_DECISION_TYPES = Object.freeze([
     'APPROVE_PROPOSAL',
@@ -29,7 +33,7 @@ const ALLOWED_DECISION_TYPES = Object.freeze([
     'NEEDS_MORE_REVIEW'
 ]);
 const ALLOWED_DECISION_STATUSES = Object.freeze(['RECORDED', 'CANCELLED']);
-const REUSABLE_DECISION_ALLOWED_ROLES = new Set(['A', 'S', 'HR']);
+const REUSABLE_DECISION_ALLOWED_ROLES = new Set(CRITICAL_EMPLOYMENT_DECISION_ROLES);
 const MAX_ITEMS = 500;
 const MAX_PAYLOAD_BYTES = 1024 * 1024;
 const MAX_NESTED_KEYS = 100;
@@ -341,6 +345,7 @@ async function createPolicyPreviewApprovalRecord({
         error.statusCode = 403;
         throw error;
     }
+    assertCriticalEmploymentDecisionRole(session);
     let atomicBuilt = null;
     if (isAtomic) {
         if (normalized.reuse_scope === REUSE_SCOPE.ONE_TIME) {

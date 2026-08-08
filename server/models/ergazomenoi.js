@@ -287,6 +287,12 @@ const ErgazomenoiSchema = new Schema(
         symfonhtheis_misthos_apasxolhseis: { type: Number, default: 0 },
         paketo_apodoxon: { type: Number, default: 0 },
         pososto_prosayxhshs_6hs_hmeras: { type: Number, min: 0 },
+        corrective_payroll_withholding_rate_percent: {
+            type: Number,
+            min: 0,
+            max: 100,
+            default: 0
+        },
         ypologismos_foroy: { type: Boolean, default: false },
         oros_sth_symbash_n_3986_2011: { type: Boolean, default: false },
         oysiodeis_oroi: { type: String, trim: true },
@@ -492,6 +498,8 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
         expected_repo: { type: Number, default: 0 },
         actual_repo: { type: Number, default: 0 },
         missing_repo: { type: Number, default: 0 },
+        status: { type: String, trim: true },
+        reasons: { type: [String], default: undefined },
 
         // Οι παλιές εγγραφές χωρίς version παραμένουν legacy και δεν
         // επανερμηνεύονται ως Monday-Sunday current-policy preview.
@@ -882,6 +890,8 @@ const ErgazomenoiErganhSchema = new Schema(
         protocol: { type: String, trim: true, index: true },
         submit_date_text: { type: String, trim: true },
         submit_date: { type: Date },
+        employment_period_start: { type: Date },
+        employment_period_end: { type: Date },
         erganh_submission_id: { type: String, trim: true, index: true },
 
         // ---------------------------------------------------------------------
@@ -914,6 +924,11 @@ const ErgazomenoiErganhSchema = new Schema(
         xml_filename: { type: String, trim: true },
 
         request_payload: { type: Schema.Types.Mixed },
+        payload_fingerprint: { type: String, trim: true, index: true },
+        request_id: { type: String, trim: true, index: true },
+        actor_role: { type: String, trim: true },
+        pdf_deferred: { type: Boolean, default: false },
+        reconciliation_required: { type: Boolean, default: false },
         erganh_raw_response: { type: Schema.Types.Mixed },
         error_message: { type: String, trim: true },
 
@@ -978,6 +993,14 @@ ErgazomenoiErganhSchema.index({ submission_code: 1, protocol: 1, submit_date_tex
 ErgazomenoiErganhSchema.index({ ergazomenos_object: 1, createdAt: -1 });
 ErgazomenoiErganhSchema.index({ companykod_object: 1, submission_year: 1, submission_month: 1 });
 ErgazomenoiErganhSchema.index({ companykod_object: 1, createdAt: -1 });
+ErgazomenoiErganhSchema.index({ team: 1, companykod_object: 1, ypokatasthma_kodikos: 1,
+    employment_period_start: 1, employment_period_end: 1, submission_code: 1,
+    payload_fingerprint: 1, submission_status: 1, document_status: 1 },
+{ name: 'ergani_final_submission_payload_lookup' });
+ErgazomenoiErganhSchema.index({ team: 1, companykod_object: 1, request_id: 1,
+    submission_code: 1 }, { unique: true,
+    partialFilterExpression: { request_id: { $type: 'string' } },
+    name: 'unique_ergani_submission_command_request' });
 
 const ErgazomenoiErganhModel = model('ErgazomenoiErganh', ErgazomenoiErganhSchema);
 

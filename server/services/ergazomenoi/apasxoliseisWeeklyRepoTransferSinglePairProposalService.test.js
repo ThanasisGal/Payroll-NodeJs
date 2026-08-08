@@ -607,7 +607,7 @@ function testNonEligibleAnalyzerPaths() {
     deficit[6] = workRow(6);
     assertNotAvailable(
         build(deficit),
-        'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'
+        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
     );
     assert.strictEqual(
         build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS'})

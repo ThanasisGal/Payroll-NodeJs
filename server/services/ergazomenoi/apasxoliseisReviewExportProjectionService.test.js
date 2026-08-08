@@ -19,7 +19,10 @@ function week(start = '2026-06-15', cards = [8.6, 7.97, 6.48, 7.32, 7.42, 8.12, 
     return cards.map((hours, index) => {
         const date = new Date(`${start}T00:00:00.000Z`);
         date.setUTCDate(date.getUTCDate() + index);
-        return day(date.toISOString().slice(0, 10), hours, index === 6 ? 6.78 : hours);
+        return day(date.toISOString().slice(0, 10), hours, index === 6 ? 6.78 : hours, {
+            kathgoria_ergasias: index === 4 || index === 6 ? 'ΑΝ' : 'ΕΡΓ',
+            repo: index === 4 || index === 6
+        });
     });
 }
 
@@ -70,37 +73,41 @@ test('Monday-Sunday boundaries survive month and year changes', () => {
     assert.equal(projection.rows.filter((row) => row.policy.classification === 'SEVENTH').length, 0);
 });
 
-test('0004 regression: 19/06 sixth 7.42, 21/06 seventh, illegal total 6.78', () => {
+test('0004 canonical repo regression: 21/06 sixth, 19/06 seventh with all hours illegal', () => {
     const rows = week();
-    Object.assign(rows[6], {
-        ores_paranomhs_yperorias_argion_apologistika: 6.78,
+    Object.assign(rows[4], {
+        ores_paranomhs_yperorias_apologistika: 7.42,
         ores_nominhs_yperorias_apologistika: 0,
         ores_yperergasias_apologistika: 0
     });
     const projection = buildReviewExportProjection({ rows });
     const friday = projection.rows.find((row) => String(row.hmeromhnia).startsWith('2026-06-19'));
     const sunday = projection.rows.find((row) => String(row.hmeromhnia).startsWith('2026-06-21'));
-    assert.equal(friday.policy.classification, 'SIXTH');
-    assert.equal(friday.policy.sixthDayHours, 7.42);
-    assert.equal(sunday.policy.classification, 'SEVENTH');
-    assert.equal(sunday.illegalOvertime.total, 6.78);
-    assert.equal(sunday.ores_nominhs_yperorias_apologistika, 0);
-    assert.equal(sunday.ores_yperergasias_apologistika, 0);
-    assert.equal(projection.totals.grand.illegalTotal, 6.78);
+    assert.equal(friday.policy.classification, 'SEVENTH');
+    assert.equal(friday.illegalOvertime.total, 7.42);
+    assert.equal(sunday.policy.classification, 'SIXTH');
+    assert.equal(sunday.policy.sixthDayHours, 7.28);
+    assert.equal(friday.ores_nominhs_yperorias_apologistika, 0);
+    assert.equal(friday.ores_yperergasias_apologistika, 0);
+    assert.equal(projection.totals.grand.illegalTotal, 7.42);
 });
 
-test('sixth-day export prefers declared row hours and uses them in every total', () => {
-    const rows = week('2026-06-15', [8.6, 7.97, 6.48, 7.32, 7.92, 8.12, 7.28]);
-    rows[4].ores_ergasias = 7.42;
-    rows[4].ores_ergasias_apologistika = 7.42;
+test('sixth-day export uses canonical hours when declared hours differ from actual', () => {
+    const rows = week('2026-06-15', [8.6, 7.97, 6.48, 7.32, 9, 8.12, 10]);
+    rows[4].ores_ergasias = 10;
+    rows[4].ores_ergasias_apologistika = 10;
+    rows[4].ores_paranomhs_yperorias_apologistika = 1;
+    rows[4].canonical_illegal_overtime_total = 1;
 
     const projection = buildReviewExportProjection({ rows });
     const sixthDay = projection.rows.find((row) => row.policy.classification === 'SIXTH');
 
-    assert.equal(sixthDay.policy.sixthDayHours, 7.42);
-    assert.equal(projection.totals.employees['0004'].sixthDayHours, 7.42);
-    assert.equal(projection.totals.branches['0001'].sixthDayHours, 7.42);
-    assert.equal(projection.totals.grand.sixthDayHours, 7.42);
+    assert.equal(sixthDay.policy.sixthDayHours, 8);
+    assert.equal(sixthDay.illegalOvertime.total, 1);
+    assert.equal(projection.totals.employees['0004'].sixthDayHours, 8);
+    assert.equal(projection.totals.branches['0001'].sixthDayHours, 8);
+    assert.equal(projection.totals.grand.sixthDayHours, 8);
+    assert.equal(projection.totals.grand.illegalTotal, 1);
 });
 
 test('export policy status is presentation-safe Greek while internal status stays unchanged', () => {
@@ -114,6 +121,73 @@ test('export policy status is presentation-safe Greek while internal status stay
     assert.equal(readyProjection.rows[0].policy.status, 'READY');
     assert.equal(readyProjection.rows[0].policy.statusLabel, 'Έτοιμο');
     assert.ok(readyProjection.rows.every((row) => row.policy.statusLabel !== 'NOT_APPLICABLE'));
+});
+
+test('mixed-profile deviation blocks automatic sixth/seventh-day export classification', () => {
+    const rows = week();
+    const projection = buildReviewExportProjection({
+        rows,
+        deviations: [{
+            kodikos: '0004',
+            week_apo: '2026-06-15',
+            week_eos: '2026-06-21',
+            profile_changed_inside_week: true
+        }]
+    });
+
+    assert.ok(projection.rows.every((row) => row.policy.status === 'NEEDS_HR_DECISION'));
+    assert.ok(projection.rows.every((row) => row.policy.source === 'PENDING_HR'));
+    assert.ok(projection.rows.every((row) => row.policy.classification === 'NORMAL'));
+    assert.ok(projection.rows.every((row) =>
+        row.policy.note.includes('PROFILE_CHANGED_INSIDE_WEEK')
+    ));
+});
+
+test('persisted canonical repo diagnostics remain fail-closed in shared Excel/PDF projection', () => {
+    for (const reason of [
+        'CATEGORY_REPO_CONFLICT',
+        'DAILY_EMPLOYMENT_PROFILE_UNRESOLVED'
+    ]) {
+        const rows = week();
+        const originalHours = rows.map((row) => row.ores_ergasias_apologistika);
+        const projection = buildReviewExportProjection({
+            rows,
+            deviations: [{
+                kodikos: '0004',
+                week_apo: '2026-06-15',
+                week_eos: '2026-06-21',
+                status: 'NEEDS_HR_DECISION',
+                reasons: [reason]
+            }]
+        });
+
+        assert.ok(projection.rows.every((row) => row.policy.status === 'NEEDS_HR_DECISION'));
+        assert.ok(projection.rows.every((row) => row.policy.source === 'PENDING_HR'));
+        assert.ok(projection.rows.every((row) => row.policy.classification === 'NORMAL'));
+        assert.ok(projection.rows.every((row) => row.policy.note.includes(reason)));
+        assert.deepEqual(
+            projection.rows.map((row) => row.ores_ergasias_apologistika),
+            originalHours
+        );
+    }
+});
+
+test('legacy deviation without status or reasons remains compatible without fake HR state', () => {
+    const projection = buildReviewExportProjection({
+        rows: week(),
+        deviations: [{
+            kodikos: '0004',
+            week_apo: '2026-06-15',
+            week_eos: '2026-06-21',
+            note: ''
+        }]
+    });
+
+    assert.ok(projection.rows.every((row) => row.policy.status !== 'NEEDS_HR_DECISION'));
+    assert.ok(projection.rows.every((row) => !row.policy.note.includes('CATEGORY_REPO_CONFLICT')));
+    assert.ok(projection.rows.every((row) =>
+        !row.policy.note.includes('DAILY_EMPLOYMENT_PROFILE_UNRESOLVED')
+    ));
 });
 
 test('illegal categories are exclusive, total is categorized only, mismatch threshold is > 0.02', () => {
@@ -144,6 +218,30 @@ test('HR exact-week applied decision wins; pending/stale/cancelled decisions do 
     assert.equal(decisionIsActiveApplied({ ...base, is_current: false }), false);
 });
 
+test('canonical resolved analysis precedes policy approval and keeps alternate sixth hours row-local', () => {
+    const rows = week();
+    const canonicalResolutionsByWeek = new Map([['0004|2026-06-15', {
+        decision: { decision_type: 'CLASSIFICATION_BY_DATE' },
+        analysis: {
+            status: 'READY', reasons: [], warnings: [], policyVersion: 'canonical-test',
+            sixthDay: { hmeromhnia: '2026-06-19', sixthDayHours: 7.42, premiumRate: 40 },
+            seventhDay: { hmeromhnia: '2026-06-21', illegalOvertimeHours: 7.28 }
+        }
+    }]]);
+    const approval = { decision_status: 'RECORDED', decision_type: 'MARK_REVIEWED',
+        created_at: '2026-06-22', apo_hmeromhnia: '2026-06-15', eos_hmeromhnia: '2026-06-21',
+        items: [{ employee_kodikos: '0004', hmeromhnia: '2026-06-19',
+            proposed_values: { classification: 'NORMAL' } }] };
+    const projection = buildReviewExportProjection({ rows, approvals: [approval],
+        canonicalResolutionsByWeek });
+    const friday = projection.rows.find((row) => row.hmeromhnia === '2026-06-19');
+    const sunday = projection.rows.find((row) => row.hmeromhnia === '2026-06-21');
+    assert.equal(friday.policy.source, 'HR');
+    assert.equal(friday.policy.classification, 'SIXTH');
+    assert.equal(friday.policy.sixthDayHours, 7.42);
+    assert.equal(sunday.policy.classification, 'SEVENTH');
+});
+
 test('policy approval precedence, pending HR, rates, legacy and employee/branch/grand totals', () => {
     const rows = week();
     rows.forEach((row) => { row.policyVersion = undefined; });
@@ -151,12 +249,20 @@ test('policy approval precedence, pending HR, rates, legacy and employee/branch/
         apo_hmeromhnia: '2026-06-15', eos_hmeromhnia: '2026-06-21',
         items: [{ employee_kodikos: '0004', hmeromhnia: '2026-06-19', proposed_values: { classification: 'SIXTH' } }] };
     let projection = buildReviewExportProjection({ rows, approvals: [approval] });
-    assert.equal(projection.rows[4].policy.source, 'HR');
-    assert.equal(projection.rows[4].policy.legacy, true);
+    const friday = projection.rows[4];
+    const sunday = projection.rows[6];
+    assert.equal(friday.policy.source, 'HR');
+    assert.equal(friday.policy.legacy, true);
+    assert.equal(friday.policy.classification, 'SIXTH');
+    assert.equal(friday.policy.sixthDayHours, 7.42);
+    assert.notEqual(friday.policy.sixthDayHours, 7.28);
+    assert.equal(sunday.policy.source, 'AUTOMATIC');
+    assert.equal(sunday.policy.classification, 'SIXTH');
+    assert.equal(sunday.policy.sixthDayHours, 7.28);
     assert.deepEqual(projection.totals.employees['0004'], projection.totals.branches['0001']);
     assert.deepEqual(projection.totals.branches['0001'], projection.totals.grand);
-    assert.equal(projection.totals.grand.sixthDayCount, 1);
-    assert.equal(projection.totals.grand.seventhDayCount, 1);
+    assert.equal(projection.totals.grand.sixthDayCount, 2);
+    assert.equal(projection.totals.grand.seventhDayCount, 0);
     for (const rate of [null, '', -1, 'missing']) {
         const rateRows = week();
         rateRows.forEach((row) => { row.effective_sixth_day_rate = rate; });
@@ -169,7 +275,8 @@ test('policy approval precedence, pending HR, rates, legacy and employee/branch/
         rateRows.forEach((row) => { row.effective_sixth_day_rate = rate; });
         if (rate === 0) rateRows.forEach((row) => { row.eidikh_kathgoria_ergazomenoy = '0009'; });
         projection = buildReviewExportProjection({ rows: rateRows });
-        assert.equal(projection.rows[4].policy.sixthDayRate, rate);
+        const sixthDay = projection.rows.find((row) => row.policy.classification === 'SIXTH');
+        assert.equal(sixthDay.policy.sixthDayRate, rate);
     }
 });
 
@@ -179,7 +286,7 @@ test('filter parity: projection never introduces rows outside its pure input', (
     const projection = buildReviewExportProjection({ rows, policyRows });
     assert.equal(projection.rows.length, 1);
     assert.equal(String(projection.rows[0].hmeromhnia).slice(0, 10), '2026-06-19');
-    assert.equal(projection.rows[0].policy.classification, 'SIXTH');
+    assert.equal(projection.rows[0].policy.classification, 'SEVENTH');
 });
 
 test('findings-only excludes normal, zero and plain NOT_APPLICABLE rows without changing default projection', () => {

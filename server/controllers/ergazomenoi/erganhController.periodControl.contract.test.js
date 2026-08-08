@@ -1,0 +1,44 @@
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const controller = fs.readFileSync(path.join(__dirname, 'erganhController.js'), 'utf8');
+const routes = fs.readFileSync(path.join(__dirname, '../../routes/usersRoute.js'), 'utf8');
+const view = fs.readFileSync(path.join(__dirname, '../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
+const browser = fs.readFileSync(path.join(__dirname, '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const policyExecution = fs.readFileSync(path.join(__dirname, '../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyExecutionService.js'), 'utf8');
+
+assert.match(controller, /calculationOwnership = await acquirePeriodCalculationOwnership\(\{ scope: periodControlScope \}\)/);
+assert.match(controller, /runWithPeriodCalculationWriteFence\(\{[\s\S]*calculationId: calculationOwnership\.calculationId[\s\S]*ProdhlomenaOrariaModel\.bulkWrite\(chunk, \{/);
+assert.match(controller, /runWeeklyRepoPostCheck\(\{[\s\S]*calculationId: calculationOwnership\.calculationId/);
+assert.match(controller, /replaceDeviations[\s\S]*deleteMany\(deviationsCleanupFilter[\s\S]*insertMany[\s\S]*runWithPeriodCalculationWriteFence/);
+assert.match(controller, /releasePeriodCalculationOwnership\(\{[\s\S]*calculationOwnership = null;[\s\S]*return res\.json/);
+assert.match(controller, /createWeeklyCanonicalDecision[\s\S]*assertActiveEmploymentReviewPeriodNormal/);
+assert.match(controller, /createWeeklyCanonicalDecision[\s\S]*kind: 'WEEKLY_CONTEXT'/);
+assert.match(controller, /recordWeeklyCanonicalDecision\([\s\S]*mutationRunner:[\s\S]*runWithPeriodWriteFence/);
+assert.match(controller, /createWeeklyRepoTransferDecision[\s\S]*periodGuard/);
+assert.match(controller, /createWeeklyRepoTransferDecision[\s\S]*kind: 'WEEKLY_CONTEXT'/);
+assert.match(controller, /createWeeklyRepoTransferDecision\([\s\S]*mutationRunner:[\s\S]*runWithPeriodWriteFence/);
+assert.match(controller, /applyWeeklyRepoTransferDecision[\s\S]*assertActiveEmploymentReviewPeriodNormal/);
+assert.match(controller, /periodWriteGuard:[\s\S]*start: plan\.source\.date[\s\S]*start: plan\.target\.date/);
+assert.match(controller, /periodFence: \(\{ session \}\) => fencePeriodForWrite/);
+assert.strictEqual((controller.match(/assertActiveEmploymentReviewPeriodNormal\(req, oldRecord\.ypokatasthma/g) || []).length, 3);
+assert.ok((controller.match(/scope: periodAccess\.scope,[\s\S]{0,120}expectedToken: periodAccess\.token/g) || []).length >= 3);
+assert.match(controller, /runProdhlomenaOrariaPolicyPreviewApplyExecutionLocked[\s\S]*assertActiveEmploymentReviewPeriodNormal/);
+assert.match(policyExecution, /runPolicyPreviewApplyExecutionLocked[\s\S]*return buildLockedApplyExecutionResult\(applyPlan\)/);
+assert.doesNotMatch(policyExecution.slice(policyExecution.indexOf('async function runPolicyPreviewApplyExecutionLocked')), /model\.bulkWrite|writer\(/);
+assert.match(routes, /period-control\/current'[\s\S]*checkAuth[\s\S]*requireEmploymentReviewAccess/);
+assert.match(routes, /period-control\/:action\(lock\|unlock\)'[\s\S]*requireCriticalEmploymentDecisionRole/);
+assert.ok(view.includes('Κατάσταση περιόδου'));
+assert.ok(view.includes('Κλείδωμα περιόδου'));
+assert.ok(view.includes('Ξεκλείδωμα περιόδου'));
+assert.ok(browser.includes("NORMAL: 'Ανοικτή'"));
+assert.ok(browser.includes("LOCKED: 'Κλειδωμένη'"));
+assert.ok(browser.includes("CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'"));
+assert.ok(browser.includes('δεν ξεκλειδώνει χειροκίνητα κλειδωμένες ημερήσιες εγγραφές'));
+assert.ok(browser.includes("transitionEmploymentPeriod('unlock')"));
+assert.ok(browser.includes("/period-control/${action}"));
+assert.ok(!/apologistiko_biblio[\s\S]{0,80}(PERIOD_CONTROL|periodControl)/.test(controller));
+console.log('erganhController period control contract tests: 32/32 PASS');

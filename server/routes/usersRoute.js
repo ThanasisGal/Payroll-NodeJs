@@ -64,6 +64,9 @@ const {
     authorizeAntistoixishUpdate
 } = require('../middlewares/companyWriteAccess');
 const requireEmploymentReviewAccess = requireUserPrivilegeForm('ElegxosApasxolhseonPeriodoy');
+const {
+    requireCriticalEmploymentDecisionRole
+} = require('../services/ergazomenoi/apasxoliseisCriticalActionAuthorizationService');
 const requireAdminRole = require('../middlewares/requireAdminRole.js');
 const { requireUserPrivilegesManagerRole } = require('../middlewares/requireAdminRole.js');
 const sanitizeNumberFields = require('../middlewares/sanitizeNumbers');
@@ -1355,6 +1358,43 @@ router.get(
 router.get('/api/prodhlomena-oraria/review', checkAuth, requireEmploymentReviewAccess, erganhController.getProdhlomenaOrariaForReview);
 
 router.get(
+    '/api/prodhlomena-oraria/review/period-control/current',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getEmploymentReviewPeriodControl
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/period-control/:action(lock|unlock)',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.transitionEmploymentReviewPeriodControl
+);
+
+router.post('/api/prodhlomena-oraria/review/period-control/finalize', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.finalizeEmploymentReviewPeriod);
+router.post('/api/prodhlomena-oraria/review/period-control/submission/final', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.submitFinalWTODayilyA);
+router.post('/api/prodhlomena-oraria/review/period-control/submission-link', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.linkEmploymentReviewPeriodSubmission);
+router.post('/api/prodhlomena-oraria/review/period-control/corrective/open', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.openEmploymentReviewCorrectiveCase);
+router.post('/api/prodhlomena-oraria/review/period-control/corrective/calculate', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.calculateEmploymentReviewCorrectiveCase);
+router.post('/api/prodhlomena-oraria/review/period-control/corrective/close', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.closeEmploymentReviewCorrectiveCase);
+router.post('/api/prodhlomena-oraria/review/period-control/corrective/payroll-post', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.postEmploymentReviewCorrectivePayroll);
+
+router.get(
     '/api/prodhlomena-oraria/policies/catalog',
     checkAuth,
     requireEmploymentReviewAccess,
@@ -1393,6 +1433,7 @@ router.post(
     '/api/prodhlomena-oraria/review/policies/apply-execution',
     checkAuth,
     requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
     erganhController.runProdhlomenaOrariaPolicyPreviewApplyExecutionLocked
 );
 
@@ -1400,6 +1441,7 @@ router.post(
     '/api/prodhlomena-oraria/review/policies/approvals',
     checkAuth,
     requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
     erganhController.createProdhlomenaOrariaPolicyPreviewApproval
 );
 
@@ -1407,7 +1449,30 @@ router.post(
     '/api/prodhlomena-oraria/review/policies/approvals/:approvalId/revoke',
     checkAuth,
     requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
     erganhController.revokeProdhlomenaOrariaPolicyPreviewApproval
+);
+
+router.get(
+    '/api/prodhlomena-oraria/review/canonical-decisions/current',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getWeeklyCanonicalDecisionCurrent
+);
+
+router.get(
+    '/api/prodhlomena-oraria/review/canonical-decisions',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getWeeklyCanonicalDecisions
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/canonical-decisions',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.createWeeklyCanonicalDecision
 );
 
 router.get(
@@ -1428,6 +1493,7 @@ router.post(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions',
     checkAuth,
     requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
     erganhController.createWeeklyRepoTransferDecision
 );
 
@@ -1435,6 +1501,7 @@ router.post(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions/:decisionId/apply',
     checkAuth,
     requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
     erganhController.applyWeeklyRepoTransferDecision
 );
 
@@ -1461,21 +1528,32 @@ router.get(
 
 router.patch(
     '/api/prodhlomena-oraria/review/:id',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
     erganhController.updateProdhlomenaOrariaReviewRecord
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/:id/audit',
+    checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getProdhlomenaOrariaReviewAudit
 );
 
 router.patch(
     '/api/prodhlomena-oraria/review/:id/unlock',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
     erganhController.unlockProdhlomenaOrariaReviewRecord
 );
 
 router.post(
     '/api/prodhlomena-oraria/review/:id/restore/:auditId',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
     erganhController.restoreProdhlomenaOrariaReviewRecord
 );
 

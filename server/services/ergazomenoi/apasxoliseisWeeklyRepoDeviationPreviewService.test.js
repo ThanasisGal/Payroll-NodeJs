@@ -154,6 +154,13 @@ function testContractualProfileControlsExpectedRepo() {
     });
     assert.strictEqual(changed.deviations[0].status, STATUS.NEEDS_HR_DECISION);
     assert.deepStrictEqual(changed.deviations[0].reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
+    assert.strictEqual(changed.deviations[0].sixth_seventh_day_status, 'NEEDS_HR_DECISION');
+    assert.deepStrictEqual(
+        changed.deviations[0].sixth_seventh_day_reasons,
+        ['PROFILE_CHANGED_INSIDE_WEEK']
+    );
+    assert.strictEqual(changed.deviations[0].sixth_day_count, 0);
+    assert.strictEqual(changed.deviations[0].seventh_day_count, 0);
 }
 
 function testOpenTrailingWeekIsPendingNotDeviation() {
@@ -200,7 +207,9 @@ function previewRepoTransferWeek(options = {}) {
         periodStart: '2026-06-01',
         periodEnd: '2026-06-30',
         asOfDate: '2026-06-30',
-        resolveWeeklyProfile: fiveDayProfile
+        resolveWeeklyProfile: fiveDayProfile,
+        resolveDailyProfile: () => ({ fullTime: true }),
+        isFullTimeProfile: (profile) => profile.fullTime === true
     });
 }
 
@@ -223,6 +232,104 @@ function testRepoTransferLifecycleUsesEffectiveFinalRows() {
     assert.strictEqual(rolledBack.deviations.length, 1);
     assert.strictEqual(rolledBack.deviations[0].expected_repo, 2);
     assert.strictEqual(rolledBack.deviations[0].actual_repo, 1);
+}
+
+function previewCanonicalRepoState(repoRow, { partial = false } = {}) {
+    const weekRows = rows('2026-06-15');
+    weekRows[6] = { ...weekRows[6], ...repoRow };
+    return buildWeeklyRepoDeviationPreview({
+        rows: weekRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: () => ({
+            repoResolutionReason: null,
+            effectiveProfile: {
+                hmeres_ergasias_ebdomadas: partial ? 5 : 5,
+                typos_apasxolhshs: partial ? '1' : '0'
+            }
+        }),
+        resolveDailyProfile: () => ({ fullTime: !partial }),
+        isFullTimeProfile: (profile) => profile.fullTime === true
+    });
+}
+
+function testCanonicalCurrentRepoStateAndApprovalIsolation() {
+    const baseRepo = previewCanonicalRepoState({
+        kathgoria_ergasias: 'ΑΝ',
+        repo: true,
+        ores_ergasias: 0,
+        cards_ores_ergasias: 0
+    });
+    assert.strictEqual(baseRepo.deviations[0].actual_repo, 1);
+
+    const appliedSource = previewCanonicalRepoState({
+        kathgoria_ergasias: 'ΑΝ',
+        repo: true,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        repo_apologistika: false,
+        ores_ergasias_apologistika: 0,
+        cards_ores_ergasias: 0
+    });
+    assert.strictEqual(appliedSource.deviations[0].actual_repo, 0);
+
+    const appliedTarget = previewCanonicalRepoState({
+        kathgoria_ergasias: 'ΕΡΓ',
+        repo: false,
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        ores_ergasias_apologistika: 0,
+        cards_ores_ergasias: 0
+    });
+    assert.strictEqual(appliedTarget.deviations[0].actual_repo, 1);
+
+    const partialTarget = previewCanonicalRepoState({
+        kathgoria_ergasias: 'ΕΡΓ',
+        repo: false,
+        kathgoria_ergasias_apologistika: 'ΜΕ',
+        repo_apologistika: true,
+        ores_ergasias_apologistika: 0,
+        cards_ores_ergasias: 0
+    }, { partial: true });
+    assert.strictEqual(partialTarget.deviations[0].actual_repo, 1);
+
+    const defaultFalse = previewCanonicalRepoState({
+        kathgoria_ergasias: 'ΑΝ',
+        repo: true,
+        kathgoria_ergasias_apologistika: '',
+        repo_apologistika: false,
+        ores_ergasias: 0,
+        cards_ores_ergasias: 0
+    });
+    assert.strictEqual(defaultFalse.deviations[0].actual_repo, 1);
+
+    for (const metadata of [
+        { reuse_status: 'ACTIVE', approval_id: 'synthetic-approval' },
+        { reusable_decision: { status: 'RESOLVED_BY_POLICY' } },
+        { decision_status: 'RECORDED', decision_type: 'APPROVE_PROPOSAL' }
+    ]) {
+        const approvalOnly = previewCanonicalRepoState({
+            kathgoria_ergasias: 'ΑΝ',
+            repo: true,
+            ores_ergasias: 0,
+            cards_ores_ergasias: 0,
+            fingerprint: 'synthetic-fingerprint',
+            ...metadata
+        });
+        assert.strictEqual(approvalOnly.deviations[0].actual_repo, 1);
+    }
+
+    const conflict = previewCanonicalRepoState({
+        kathgoria_ergasias: 'ΕΡΓ',
+        repo: false,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        repo_apologistika: true,
+        ores_ergasias_apologistika: 0,
+        cards_ores_ergasias: 0
+    });
+    assert.strictEqual(conflict.deviations[0].actual_repo, 0);
+    assert.strictEqual(conflict.deviations[0].status, STATUS.NEEDS_HR_DECISION);
+    assert.ok(conflict.deviations[0].reasons.includes('CATEGORY_REPO_CONFLICT'));
 }
 
 function testLegacyPersistedRangeIsExplicit() {
@@ -346,6 +453,10 @@ function testSixthDaySurvivesMissingRepoTransferSource() {
             cards_apo_ora_01: '09:00',
             cards_eos_ora_01: '17:00'
         });
+    });
+    Object.assign(weekRows[6], {
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true
     });
     const profile = {
         hmeres_ergasias_ebdomadas: 5,
@@ -513,6 +624,7 @@ testDepartureWeekDoesNotCreateWeeklyPolicyChecks();
 testContractualProfileControlsExpectedRepo();
 testOpenTrailingWeekIsPendingNotDeviation();
 testRepoTransferLifecycleUsesEffectiveFinalRows();
+testCanonicalCurrentRepoStateAndApprovalIsolation();
 testLegacyPersistedRangeIsExplicit();
 testDeviationAndAtomicUseTheSameContractSelector();
 testDeviationAndAtomicContextParity();

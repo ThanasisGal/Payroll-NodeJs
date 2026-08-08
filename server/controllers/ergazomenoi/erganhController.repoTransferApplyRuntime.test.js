@@ -30,7 +30,7 @@ const decisionBatchService = fs.readFileSync(
 const action = controller.slice(controller.indexOf('static applyWeeklyRepoTransferDecision'), controller.indexOf('static getWeeklyRepoTransferDecisionBatch'));
 
 assert.ok(routes.includes("'/api/prodhlomena-oraria/review/repo-transfer-decisions/:decisionId/apply'"));
-assert.ok(routes.includes('checkAuth,\n    requireEmploymentReviewAccess,\n    erganhController.applyWeeklyRepoTransferDecision'));
+assert.ok(routes.includes('checkAuth,\n    requireEmploymentReviewAccess,\n    requireCriticalEmploymentDecisionRole,\n    erganhController.applyWeeklyRepoTransferDecision'));
 assert.ok(app.indexOf('createRepoTransferApplyBodyMiddleware') < app.indexOf('createRepoTransferDecisionBodyMiddleware()'));
 assert.ok(action.includes('decision_id: req.params.decisionId'));
 assert.ok(action.includes('request_id: req.body.request_id'));

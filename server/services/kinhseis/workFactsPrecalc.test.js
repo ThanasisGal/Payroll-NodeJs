@@ -279,7 +279,8 @@ test('real weekly analysis flows through work-facts payload into target-only car
             paranomiYperoriaHours: 0
         });
         orariaByDate.set(date, {
-            kathgoria_ergasias: 'ΕΡΓ',
+            kathgoria_ergasias: index >= 5 ? 'ΑΝ' : 'ΕΡΓ',
+            repo: index >= 5,
             ores_ergasias: 8,
             cards_ores_ergasias: hours[index],
             cards_apo_ora_01: '09:00',

@@ -16,6 +16,10 @@ const {
 const {
     resolveEffectiveExpectedWeeklyRepo
 } = require('./apasxoliseisWeeklyRepoTransferExpectedRepoResolverService');
+const {
+    MODE: EFFECTIVE_REPO_MODE,
+    resolveEffectiveRepoState
+} = require('./apasxoliseisEffectiveRepoStateService');
 
 const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v2';
 const SOURCE_VERSION = 'raw-prodhlomena-oraria-daily-rows:v1';
@@ -59,27 +63,6 @@ function attachSixthDayPresentationToRows(rows = [], deviations = []) {
             sixth_day_policy_status: sixthDay?.status || ''
         };
     });
-}
-
-function isEffectiveRepo(row = {}, isFullTimeProfile = () => true) {
-    const persistedCategory = String(
-        row.kathgoria_ergasias_apologistika || ''
-    ).trim();
-    const effectiveCategory =
-        persistedCategory || String(row.kathgoria_ergasias || '').trim();
-    const fullTime = isFullTimeProfile(row) === true;
-    const expectedCategory = fullTime ? 'ΑΝ' : 'ΜΕ';
-    const persistedRepo =
-        row.repo_apologistika === true || persistedCategory === expectedCategory;
-    const effectiveHours = persistedRepo
-        ? row.ores_ergasias_apologistika
-        : row.ores_ergasias;
-
-    return (
-        (persistedRepo || effectiveCategory === expectedCategory) &&
-        finiteZero(effectiveHours) &&
-        finiteZero(row.cards_ores_ergasias)
-    );
 }
 
 function normalizeLegacyDeviation(row = {}) {
@@ -231,17 +214,39 @@ function buildWeeklyRepoDeviationPreview({
         const expectedRepo = expectedRepoResolution.effectiveExpectedWeeklyRepo;
         const profileReason =
             weeklyProfile.repoResolutionReason || expectedRepoResolution.reason || null;
-        const actualRepo = uniqueRows.filter((row) => {
+        const effectiveRepoStates = uniqueRows.map((row) => {
             const dailyProfile =
                 typeof resolveDailyProfile === 'function'
                     ? resolveDailyProfile(row) || {}
                     : {};
-            return isEffectiveRepo(row, () =>
+            const expectedRepoCategory =
                 typeof isFullTimeProfile === 'function'
-                    ? isFullTimeProfile(dailyProfile)
-                    : true
-            );
-        }).length;
+                    ? isFullTimeProfile(dailyProfile) === true
+                        ? 'ΑΝ'
+                        : 'ΜΕ'
+                    : null;
+            const state = resolveEffectiveRepoState({
+                row,
+                mode: EFFECTIVE_REPO_MODE.CURRENT,
+                expectedRepoCategory
+            });
+            const effectiveHours =
+                state.provenance === 'APOLOGISTIKA_CURRENT'
+                    ? row.ores_ergasias_apologistika
+                    : row.ores_ergasias;
+
+            return {
+                state,
+                countsAsRepo:
+                    state.effectiveRepo === true &&
+                    finiteZero(effectiveHours) &&
+                    finiteZero(row.cards_ores_ergasias)
+            };
+        });
+        const repoStateReasons = [...new Set(
+            effectiveRepoStates.flatMap(({ state }) => state.diagnostics || [])
+        )];
+        const actualRepo = effectiveRepoStates.filter(({ countsAsRepo }) => countsAsRepo).length;
 
         const hasResolvedExpectedRepo =
             expectedRepo !== null &&
@@ -249,7 +254,8 @@ function buildWeeklyRepoDeviationPreview({
             Number.isFinite(Number(expectedRepo));
         if (
             !hasResolvedExpectedRepo ||
-            Number(actualRepo) !== Number(expectedRepo)
+            Number(actualRepo) !== Number(expectedRepo) ||
+            repoStateReasons.length > 0
         ) {
             const dailyFacts = uniqueRows.map((row) => resolveDailyActualWorkFacts(row));
             const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
@@ -263,15 +269,26 @@ function buildWeeklyRepoDeviationPreview({
                 existingAuditCountByRowKey
             });
             const resolution = repoTransfer.weekly_resolution;
+            const projectedSixthSeventhDay = resolution?.sixth_seventh_day;
+            const authoritativeSixthSeventhDay = projectedSixthSeventhDay?.status
+                ? {
+                      ...sixthSeventhDay,
+                      status: projectedSixthSeventhDay.status,
+                      reasons: [...(projectedSixthSeventhDay.reasons || [])],
+                      warnings: [...(projectedSixthSeventhDay.warnings || [])],
+                      sixthDay: projectedSixthSeventhDay.sixth_day || null,
+                      seventhDay: projectedSixthSeventhDay.seventh_day || null
+                  }
+                : sixthSeventhDay;
             const actualWorkdays = dailyFacts.filter(
                 (facts) => facts.countsAsActualWorkDay
             ).length;
             const sixthSeventhDayNeedsDecision =
-                sixthSeventhDay.status === 'NEEDS_HR_DECISION';
+                authoritativeSixthSeventhDay.status === 'NEEDS_HR_DECISION';
             deviations.push({
                 ...base,
                 status:
-                    profileReason || sixthSeventhDayNeedsDecision
+                    profileReason || sixthSeventhDayNeedsDecision || repoStateReasons.length > 0
                         ? STATUS.NEEDS_HR_DECISION
                         : STATUS.READY,
                 complete: true,
@@ -279,8 +296,9 @@ function buildWeeklyRepoDeviationPreview({
                 reasons: [...new Set([
                     ...(profileReason ? [profileReason] : []),
                     ...(sixthSeventhDayNeedsDecision
-                        ? sixthSeventhDay.reasons || []
-                        : [])
+                        ? authoritativeSixthSeventhDay.reasons || []
+                        : []),
+                    ...repoStateReasons
                 ])],
                 expected_repo: expectedRepo,
                 actual_repo: actualRepo,
@@ -290,14 +308,14 @@ function buildWeeklyRepoDeviationPreview({
                 // υπάρχει ασφαλές ζεύγος μεταφοράς ρεπό. Το αποτέλεσμα της
                 // μεταφοράς δεν επιτρέπεται να μηδενίζει την άμεση πολιτική.
                 actual_workdays: actualWorkdays,
-                sixth_day_count: sixthSeventhDay.sixthDay ? 1 : 0,
-                seventh_day_count: sixthSeventhDay.seventhDay ? 1 : 0,
-                sixth_day_date: sixthSeventhDay.sixthDay?.hmeromhnia || null,
+                sixth_day_count: authoritativeSixthSeventhDay.sixthDay ? 1 : 0,
+                seventh_day_count: authoritativeSixthSeventhDay.seventhDay ? 1 : 0,
+                sixth_day_date: authoritativeSixthSeventhDay.sixthDay?.hmeromhnia || null,
                 sixth_day_premium_rate:
-                    sixthSeventhDay.sixthDay?.premiumRate ?? null,
-                seventh_day_date: sixthSeventhDay.seventhDay?.hmeromhnia || null,
-                sixth_seventh_day_status: sixthSeventhDay.status,
-                sixth_seventh_day_reasons: [...(sixthSeventhDay.reasons || [])],
+                    authoritativeSixthSeventhDay.sixthDay?.premiumRate ?? null,
+                seventh_day_date: authoritativeSixthSeventhDay.seventhDay?.hmeromhnia || null,
+                sixth_seventh_day_status: authoritativeSixthSeventhDay.status,
+                sixth_seventh_day_reasons: [...(authoritativeSixthSeventhDay.reasons || [])],
                 repo_transfer_status: repoTransfer.eligibility_status,
                 repo_transfer_reasons: [...(repoTransfer.reasons || [])],
                 repo_transfer_source_available:

@@ -471,7 +471,6 @@ async function run() {
         'DECISION_ALREADY_APPLIED',
         'RUNTIME_DISABLED',
         'INDEXES_NOT_READY',
-        'NOT_AUTHORIZED',
         'STALE_DECISION',
         'ALREADY_APPLIED'
     ]) {
@@ -606,11 +605,17 @@ async function run() {
         await assert.rejects(() => integratedApply(store, payload), (error) => error.code === code);
         assert.strictEqual(store.counters.writerCalls, 0);
     }
-    for (const role of ['HR', 'U']) {
-        const store = await createStore();
-        await assert.rejects(() => integratedApply(store, COMMAND, { ...SESSION, userRole: role }), (error) => error.code === 'APPLY_NOT_AUTHORIZED');
-        assert.strictEqual(store.counters.writerCalls, 0);
-    }
+    const hrStore = await createStore();
+    const hrSuccess = await integratedApply(hrStore, COMMAND, { ...SESSION, userRole: 'HR' });
+    assert.strictEqual(hrSuccess.idempotent, false);
+    assert.strictEqual(hrStore.counters.writerCalls, 1);
+
+    const unauthorizedStore = await createStore();
+    await assert.rejects(
+        () => integratedApply(unauthorizedStore, COMMAND, { ...SESSION, userRole: 'U' }),
+        (error) => error.code === 'APPLY_NOT_AUTHORIZED'
+    );
+    assert.strictEqual(unauthorizedStore.counters.writerCalls, 0);
 
     for (const failAt of ['before-source', 'source-update', 'target-update', 'source-audit', 'target-audit', 'execution', 'commit', 'abort']) {
         const store = await createStore({ failAt });

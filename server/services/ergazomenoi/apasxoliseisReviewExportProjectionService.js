@@ -213,7 +213,7 @@ function reasonText({ analysis, decision, approval, deviation, mismatch }) {
     if (warnings.length) sections.push(`Προειδοποιήσεις: ${warnings.join(', ')}`);
     const hr = unique([decision?.notes, approval?.notes]);
     if (hr.length) sections.push(`Απόφαση HR: ${hr.join(' | ')}`);
-    const deviations = unique([deviation?.note]);
+    const deviations = unique([...(deviation?.reasons || []), deviation?.note]);
     if (deviations.length) sections.push(`Απόκλιση ρεπό: ${deviations.join(' | ')}`);
     return sections.join('\n');
 }
@@ -249,7 +249,9 @@ function filterFindingsOnly(rows) {
     });
 }
 
-function buildReviewExportProjection({ rows = [], policyRows = rows, approvals = [], decisions = [], deviations = [], atomicGroupProjection = null, findingsOnly = false } = {}) {
+function buildReviewExportProjection({ rows = [], policyRows = rows, approvals = [], decisions = [],
+    canonicalResolutionsByWeek = new Map(), deviations = [], atomicGroupProjection = null,
+    findingsOnly = false } = {}) {
     const sourceRows = Array.isArray(rows) ? rows : [];
     const contextRows = Array.isArray(policyRows) ? policyRows : sourceRows;
     const atomicSelection = selectAtomicExportRows(sourceRows, contextRows, atomicGroupProjection);
@@ -274,44 +276,61 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
     const projectedRows = [];
     groups.forEach(({ week, rows: weekRows }, groupKey) => {
         const sorted = [...weekRows].sort((a, b) => dateKeyUtc(a.hmeromhnia).localeCompare(dateKeyUtc(b.hmeromhnia)));
+        const kodikos = String(sorted[0]?.kodikos || '').trim();
+        const deviation = deviations.find((item) => exactEmployeeWeek(item, kodikos, week)) || null;
         const profile = {
             hmeres_ergasias_ebdomadas: sorted.at(-1)?.effective_weekly_workdays,
             pososto_prosayxhshs_6hs_hmeras: sorted.at(-1)?.effective_sixth_day_rate ??
                 sorted.at(-1)?.pososto_prosayxhshs_6hs_hmeras,
             eidikh_kathgoria_ergazomenoy: sorted.at(-1)?.eidikh_kathgoria_ergazomenoy,
-            source: sorted.at(-1)?.effective_profile_source
+            source: sorted.at(-1)?.effective_profile_source,
+            profile_changed_inside_week: deviation?.profile_changed_inside_week === true
         };
-        const analysis = analyzeWeeklySixthSeventhDay({ weekRows: sorted, effectiveProfile: profile });
-        const kodikos = String(sorted[0]?.kodikos || '').trim();
+        const automaticAnalysis = analyzeWeeklySixthSeventhDay({ weekRows: sorted, effectiveProfile: profile });
+        const canonicalResolution = canonicalResolutionsByWeek.get(groupKey) || null;
+        const analysis = canonicalResolution?.analysis || automaticAnalysis;
+        const deviationRequiresHr = deviation?.status === 'NEEDS_HR_DECISION';
         const decision = decisions.filter((item) => exactEmployeeWeek(item, kodikos, week) && decisionIsActiveApplied(item))
             .sort((a, b) => createdAt(b) - createdAt(a))[0] || null;
         const outputRows = outputGroups.get(groupKey) || [];
         outputRows.forEach((row) => {
             const dateKey = dateKeyUtc(row.hmeromhnia);
             const approval = approvalForDate(approvals, row, dateKey, week);
-            const deviation = deviations.find((item) => exactEmployeeWeek(item, kodikos, week)) || null;
-            const automatic = analysis.sixthDay?.hmeromhnia === dateKey ? 'SIXTH' :
-                analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL';
+            const requiresHr = analysis.status === 'NEEDS_HR_DECISION' || deviationRequiresHr;
+            const automatic = requiresHr ? 'NORMAL' :
+                analysis.sixthDay?.hmeromhnia === dateKey ? 'SIXTH' :
+                    analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL';
             const hrClassification = classificationFromRecord(decision, dateKey);
-            const requiresHr = analysis.status === 'NEEDS_HR_DECISION';
+            const canonicalClassification = canonicalResolution?.decision && analysis.status !== 'NEEDS_HR_DECISION'
+                ? analysis.sixthDay?.hmeromhnia === dateKey ? 'SIXTH'
+                    : analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL'
+                : null;
             const approvalClassification = classificationFromApproval(approval, row, dateKey);
-            const classification = hrClassification || approvalClassification || automatic;
-            const source = decision ? 'HR' : approval ? 'HR' :
+            const explicitHrClassification = hrClassification || canonicalClassification || approvalClassification;
+            const classification = explicitHrClassification || automatic;
+            const source = decision ? 'HR' : canonicalClassification ? 'HR' : approval ? 'HR' :
                 requiresHr ? 'PENDING_HR' : 'AUTOMATIC';
             const illegalOvertime = illegalBreakdown(row);
             const severity = source === 'PENDING_HR' ? 'ΑΠΑΙΤΕΙ ΑΠΟΦΑΣΗ HR' :
                 classification === 'SIXTH' ? 'ΠΑΡΑΒΑΣΗ ΠΕΝΘΗΜΕΡΟΥ' :
                 classification === 'SEVENTH' ? 'ΣΟΒΑΡΗ ΠΑΡΑΒΑΣΗ' : '';
             const sixthDayHours = classification === 'SIXTH'
-                ? rounded(validHours(row.ores_ergasias) ?? analysis.sixthDay?.sixthDayHours ??
-                    row.sixth_day_hours ?? 0) : 0;
+                ? rounded(!hrClassification && !approvalClassification &&
+                    analysis.sixthDay?.hmeromhnia === dateKey
+                    ? analysis.sixthDay.sixthDayHours
+                    : validHours(row.ores_ergasias) ??
+                        validHours(row.sixth_day_hours) ?? 0)
+                : 0;
             const policy = {
                 version: analysis.policyVersion || row.policyVersion || 'legacy',
                 legacy: !row.policyVersion,
                 weekStart: week.weekStartKey, weekEnd: week.weekEndKey,
                 classification, classificationLabel: LABELS[classification],
-                source, sourceLabel: LABELS[source], status: analysis.status,
-                statusLabel: STATUS_LABELS[analysis.status] ?? String(analysis.status || ''),
+                source, sourceLabel: LABELS[source],
+                status: requiresHr ? 'NEEDS_HR_DECISION' : analysis.status,
+                statusLabel: requiresHr
+                    ? STATUS_LABELS.NEEDS_HR_DECISION
+                    : STATUS_LABELS[analysis.status] ?? String(analysis.status || ''),
                 severity, sixthDayHours,
                 sixthDayRate: classification === 'SIXTH' ? (analysis.sixthDay?.premiumRate ?? profile.pososto_prosayxhshs_6hs_hmeras ?? null) : null
             };

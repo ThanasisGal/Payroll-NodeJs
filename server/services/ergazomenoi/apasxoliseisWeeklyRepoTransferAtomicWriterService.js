@@ -23,13 +23,14 @@ function executionRecord(plan, timestamp) { return { decision_id: plan.decision.
 async function freshRow(model, plan, row, session) { return queryWithSession(model.findOne({ _id: row.id, team: plan.scope.team, company_kod: plan.scope.company_kod, ypokatasthma: plan.decision.ypokatasthma, kodikos: plan.decision.employee_kodikos, hmeromhnia: new Date(`${String(row.date).slice(0, 10)}T00:00:00.000Z`) }), session); }
 function verifyFresh(fresh, row, prefix) { if (!fresh) throw applyError(`${prefix}_STALE`, 409); if (fresh.is_locked === true) throw applyError(`${prefix}_LOCKED`, 409); if (JSON.stringify(pickCurrentGuardValues(fresh)) !== JSON.stringify(row.expected_current)) throw applyError(`${prefix}_STALE`, 409); return Object.freeze({ ...row, version: Number.isInteger(fresh.__v) ? fresh.__v : undefined }); }
 
-async function writeWeeklyRepoTransferAtomically({ plan, connection = mongoose.connection, prodhlomenaModel = ProdhlomenaOrariaModel, auditModel = ProdhlomenaOrariaAuditModel, executionModel = ExecutionModel, capabilityProbe = defaultCapabilityProbe, now = () => new Date() }) {
+async function writeWeeklyRepoTransferAtomically({ plan, connection = mongoose.connection, prodhlomenaModel = ProdhlomenaOrariaModel, auditModel = ProdhlomenaOrariaAuditModel, executionModel = ExecutionModel, capabilityProbe = defaultCapabilityProbe, now = () => new Date(), periodFence }) {
     let transactionCapable = false;
     try { transactionCapable = await capabilityProbe(connection); } catch { transactionCapable = false; }
     if (!transactionCapable) throw applyError('TRANSACTIONS_UNAVAILABLE', 503);
     const session = await connection.startSession(); let execution;
     try {
         await session.withTransaction(async () => {
+            if (typeof periodFence === 'function') await periodFence({ session, plan });
             const sourceFresh = await freshRow(prodhlomenaModel, plan, plan.source, session); const source = verifyFresh(sourceFresh, plan.source, 'SOURCE');
             const targetFresh = await freshRow(prodhlomenaModel, plan, plan.target, session); const target = verifyFresh(targetFresh, plan.target, 'TARGET');
             const sourceResult = await prodhlomenaModel.updateOne(mongoose.trusted(rowFilter(plan, source)), updateDocument(source), { session });

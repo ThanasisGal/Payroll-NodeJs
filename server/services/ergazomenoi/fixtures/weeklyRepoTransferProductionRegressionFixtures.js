@@ -92,7 +92,11 @@ module.exports = Object.freeze([
             autoLeave('2026-06-04', '13:00', '21:00'),
             work('2026-06-05', 8.083333, '14:36', '22:41', { ores_ergasias_apologistika: 7.58 }),
             work('2026-06-06', 8.316667, '14:35', '22:54', { ores_ergasias_apologistika: 7.82 }),
-            work('2026-06-07', 8.183333, '14:38', '22:49', { ores_ergasias_apologistika: 7.68 })
+            work('2026-06-07', 8.183333, '14:38', '22:49', {
+                kathgoria_ergasias_apologistika: 'ΑΝ',
+                repo_apologistika: true,
+                ores_ergasias_apologistika: 7.68
+            })
         ]
     },
     {
@@ -108,25 +112,22 @@ module.exports = Object.freeze([
                 ores_nyxtas_apologistika: 0.95
             }),
             work('2026-06-16', 8.18333, '14:17', '22:28', {
-                kathgoria_ergasias_apologistika: 'ΑΝ',
                 ores_ergasias_apologistika: 7.68
             }),
             autoLeave('2026-06-17', '13:00', '21:00'),
             work('2026-06-18', 7.83333, '14:35', '22:25', {
-                kathgoria_ergasias_apologistika: 'ΑΝ',
                 ores_ergasias_apologistika: 7.33,
                 ores_apoysias_apologistika: 0.67
             }),
             work('2026-06-19', 9.05, '13:18', '22:21', {
-                kathgoria_ergasias_apologistika: 'ΑΝ',
                 ores_ergasias_apologistika: 8.55
             }),
             work('2026-06-20', 8.58333, '14:58', '23:33', {
-                kathgoria_ergasias_apologistika: 'ΑΝ',
                 ores_ergasias_apologistika: 8.08
             }),
             work('2026-06-21', 7.31667, '15:39', '22:58', {
                 kathgoria_ergasias_apologistika: 'ΑΝ',
+                repo_apologistika: true,
                 ores_ergasias_apologistika: 6.82,
                 ores_apoysias_apologistika: 1.18
             })
@@ -144,12 +145,16 @@ module.exports = Object.freeze([
                 eos_ora_01_apologistika: '22:49',
                 ores_nyxtas_apologistika: 0.48
             }),
-            work('2026-06-23', 8.1333, '14:22', '22:30', { kathgoria_ergasias_apologistika: 'ΑΝ', ores_ergasias_apologistika: 7.63 }),
+            work('2026-06-23', 8.1333, '14:22', '22:30', { ores_ergasias_apologistika: 7.63 }),
             autoLeave('2026-06-24', '13:00', '21:00'),
-            work('2026-06-25', 8.0333, '15:06', '23:08', { kathgoria_ergasias_apologistika: 'ΑΝ', ores_ergasias_apologistika: 7.53 }),
-            work('2026-06-26', 8.4333, '13:58', '22:24', { kathgoria_ergasias_apologistika: 'ΑΝ', ores_ergasias_apologistika: 7.93 }),
-            work('2026-06-27', 8.3, '14:49', '23:07', { kathgoria_ergasias_apologistika: 'ΑΝ', ores_ergasias_apologistika: 7.8 }),
-            work('2026-06-28', 8.2333, '15:14', '23:28', { kathgoria_ergasias_apologistika: 'ΑΝ', ores_ergasias_apologistika: 7.73 })
+            work('2026-06-25', 8.0333, '15:06', '23:08', { ores_ergasias_apologistika: 7.53 }),
+            work('2026-06-26', 8.4333, '13:58', '22:24', { ores_ergasias_apologistika: 7.93 }),
+            work('2026-06-27', 8.3, '14:49', '23:07', { ores_ergasias_apologistika: 7.8 }),
+            work('2026-06-28', 8.2333, '15:14', '23:28', {
+                kathgoria_ergasias_apologistika: 'ΑΝ',
+                repo_apologistika: true,
+                ores_ergasias_apologistika: 7.73
+            })
         ]
     },
     {

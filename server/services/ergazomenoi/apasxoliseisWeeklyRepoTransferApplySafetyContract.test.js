@@ -10,7 +10,7 @@ const productionFiles = ['server/services/ergazomenoi/apasxoliseisWeeklyRepoTran
 const writer = read(productionFiles[2]); const preflight = read(productionFiles[1]);
 const routeSource = read('server/routes/usersRoute.js'); const controllerSource = read('server/controllers/ergazomenoi/erganhController.js');
 assert.strictEqual((routeSource.match(/repo-transfer-decisions\/:decisionId\/apply/g) || []).length, 1);
-assert.ok(/checkAuth,[\s\S]{0,80}applyWeeklyRepoTransferDecision/.test(routeSource));
+assert.ok(/checkAuth,[\s\S]{0,160}requireCriticalEmploymentDecisionRole,[\s\S]{0,80}applyWeeklyRepoTransferDecision/.test(routeSource));
 assert.ok(/getWeeklyRepoTransferApplyRuntimeState/.test(controllerSource)); assert.ok(/assertWeeklyRepoTransferApplyIndexesReady/.test(controllerSource));
 const controllerAction = controllerSource.slice(controllerSource.indexOf('static applyWeeklyRepoTransferDecision'), controllerSource.indexOf('static getWeeklyRepoTransferDecisionBatch'));
 assert.ok(controllerAction.indexOf('validateApplySession(req.session)') < controllerAction.indexOf('getWeeklyRepoTransferApplyRuntimeState()'));

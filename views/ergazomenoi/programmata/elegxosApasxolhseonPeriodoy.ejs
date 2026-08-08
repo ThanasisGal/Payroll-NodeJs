@@ -8,8 +8,8 @@
     const normalizedUserRole = String(userRole || '').trim().toUpperCase();
     const canRecordRepoTransferDecision = ['A', 'S', 'HR'].includes(normalizedUserRole);
     const canManageReusablePolicyApproval = ['A', 'S', 'HR'].includes(normalizedUserRole);
-    const canApplyRepoTransferDecision = ['A', 'S'].includes(normalizedUserRole);
-    const canUseAdvancedEmploymentReview = ['A', 'S'].includes(normalizedUserRole);
+    const canApplyRepoTransferDecision = ['A', 'S', 'HR'].includes(normalizedUserRole);
+    const canUseAdvancedEmploymentReview = ['A', 'S', 'HR'].includes(normalizedUserRole);
     const companyInUse = companyId || '';
 %>
 
@@ -75,6 +75,47 @@
                             Έναρξη ελέγχου
                         </button>
                     </div>
+                </div>
+
+                <div id="employmentPeriodControlPanel" class="alert alert-light border d-none mb-3" aria-live="polite">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div>
+                            <span class="fw-semibold">Κατάσταση περιόδου:</span>
+                            <span id="employmentPeriodControlStatus">Απαιτείται έλεγχος</span>
+                            <span class="mx-2">·</span>
+                            <span class="fw-semibold">Προθεσμία:</span>
+                            <span id="employmentPeriodControlDeadline">-</span>
+                            <span class="mx-2">·</span>
+                            <span class="fw-semibold">Ημερομηνία οριστικοποίησης:</span>
+                            <span id="employmentPeriodFinalizedAt">-</span>
+                            <span class="mx-2">·</span>
+                            <span class="fw-semibold">Υποβολή:</span>
+                            <span id="employmentPeriodSubmission">Δεν έχει συνδεθεί</span>
+                            <span class="mx-2">·</span>
+                            <span class="fw-semibold">Πρωτόκολλο:</span>
+                            <span id="employmentPeriodProtocol">-</span>
+                        </div>
+                        <div id="employmentPeriodControlActions" class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-danger btn-sm d-none" id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm d-none" id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>
+                            <button type="button" class="btn btn-outline-success btn-sm d-none" id="finalizeEmploymentPeriodBtn">Οριστικοποίηση περιόδου</button>
+                            <button type="button" class="btn btn-success btn-sm d-none" id="submitFinalWTODayilyABtn">Τελική υποβολή Απολογιστικού Πίνακα στο ΕΡΓΑΝΗ</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm d-none" id="openCorrectivePayrollBtn">Άνοιγμα διορθωτικής μισθοδοσίας</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm d-none" id="calculateCorrectivePayrollBtn">Καταχώρηση διορθωτικών στοιχείων και υπολογισμός</button>
+                            <button type="button" class="btn btn-outline-dark btn-sm d-none" id="closeCorrectivePayrollBtn">Κλείσιμο διορθωτικής μισθοδοσίας</button>
+                            <button type="button" class="btn btn-outline-success btn-sm d-none" id="postCorrectivePayrollBtn">Καταχώριση διορθωτικής μισθοδοσίας</button>
+                        </div>
+                    </div>
+                    <div id="employmentPeriodControlMessage" class="small text-muted mt-1"></div>
+                    <div id="employmentPeriodCorrectiveLegend" class="small mt-1 d-none">
+                        <span class="fw-semibold">Αρχικό οριστικοποιημένο αποτέλεσμα</span>
+                        <span class="mx-2">·</span>
+                        <span>Διορθωτική διαφορά</span>
+                        <span class="mx-2">·</span>
+                        <span>Διορθωμένο αποτέλεσμα</span>
+                    </div>
+                    <div id="employmentPeriodCorrectiveSummary" class="small mt-2 d-none"></div>
+                    <div class="small text-muted mt-2">Η XML ενέργεια αποτελεί προεπισκόπηση / προσωρινή καταχώριση. Η τελική υποβολή γίνεται μέσω REST μόνο για επιλέξιμη οριστικοποιημένη περίοδο.</div>
                 </div>
 
                 <div class="employment-review-scroll-container employment-review-scroll-container--minimal">
@@ -364,12 +405,29 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="canonicalDecisionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Απόφαση εβδομαδιαίου ελέγχου</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Κλείσιμο"></button>
+                </div>
+                <div class="modal-body" id="canonicalDecisionContainer">
+                    <div class="text-muted">Φόρτωση τρέχουσας κατάστασης…</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Κλείσιμο</button>
+                </div>
+            </div>
+        </div>
+    </div>
     </section>
     <% } %>
     <input
         type="hidden"
         id="canReviewEdit"
-        value="<%= userRole === 'A' || userRole === 'S' ? '1' : '0' %>"
+        value="<%= ['A', 'S', 'HR'].includes(normalizedUserRole) ? '1' : '0' %>"
     />
     <input
         type="hidden"

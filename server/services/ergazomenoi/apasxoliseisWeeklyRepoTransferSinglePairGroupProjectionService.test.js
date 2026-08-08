@@ -386,7 +386,12 @@ function testNonReadyProposalPaths() {
     assertNotAvailable(build(multipleTargets), 'MULTIPLE_TARGET_CANDIDATES');
 
     const deficit = fullTimeWeek();
-    deficit[6] = workRow(6);
+    deficit[6] = workRow(6, {
+        kathgoria_ergasias: 'ΑΝ',
+        repo: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true
+    });
     const sixthDayResolution = build(deficit, {
         typos_apasxolhshs: 'PLHRHS', pososto_prosayxhshs_6hs_hmeras: 0,
         eidikh_kathgoria_ergazomenoy: '0009'

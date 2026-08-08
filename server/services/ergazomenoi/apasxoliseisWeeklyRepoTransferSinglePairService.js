@@ -9,6 +9,10 @@ const {
     resolveEffectiveExpectedWeeklyRepo
 } = require('./apasxoliseisWeeklyRepoTransferExpectedRepoResolverService');
 const {
+    MODE: EFFECTIVE_REPO_MODE,
+    resolveEffectiveRepoState
+} = require('./apasxoliseisEffectiveRepoStateService');
+const {
     analyzeWeeklySixthSeventhDay,
     STATUS: SIXTH_DAY_STATUS
 } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
@@ -923,28 +927,87 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         });
     }
 
-    const isActualRepo = (info) => {
-        if (info.cardHours !== 0) return false;
-        const category = toTrimmedString(info.row.kathgoria_ergasias);
-        if (employmentType === EMPLOYMENT_TYPE.FULL) {
-            return category === 'ΑΝ' || toBoolean(info.row.repo);
-        }
-        return category === 'ΜΕ' || category === 'ΑΝ' || toBoolean(info.row.repo);
+    const currentRepoStates = rowInfos.map((info) => ({
+        info,
+        state: resolveEffectiveRepoState({
+            row: info.row,
+            mode: EFFECTIVE_REPO_MODE.CURRENT,
+            expectedRepoCategory: targetCategory
+        })
+    }));
+    const currentRepoReasons = [...new Set(
+        currentRepoStates.flatMap(({ state }) => state.diagnostics || [])
+    )];
+    if (currentRepoReasons.length > 0) {
+        return buildResult({
+            ...base,
+            status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: currentRepoReasons,
+            counts
+        });
+    }
+
+    const sourceProposedValues = {
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        repo_apologistika: false
     };
-    counts.existing_actual_repo = rowInfos.filter(isActualRepo).length;
-    counts.predicted_final_repo = counts.existing_actual_repo + 1;
+    const targetProposedValues = {
+        kathgoria_ergasias_apologistika: targetCategory,
+        repo_apologistika: true
+    };
+    const sourceProposedState = resolveEffectiveRepoState({
+        row: cleanSources[0].row,
+        mode: EFFECTIVE_REPO_MODE.PROPOSED,
+        expectedRepoCategory: targetCategory,
+        proposedValues: sourceProposedValues
+    });
+    const targetProposedState = resolveEffectiveRepoState({
+        row: cleanTargets[0].row,
+        mode: EFFECTIVE_REPO_MODE.PROPOSED,
+        expectedRepoCategory: targetCategory,
+        proposedValues: targetProposedValues
+    });
+    const proposedRepoReasons = [...new Set([
+        ...(sourceProposedState.diagnostics || []),
+        ...(targetProposedState.diagnostics || [])
+    ])];
+    if (proposedRepoReasons.length > 0) {
+        return buildResult({
+            ...base,
+            status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: proposedRepoReasons,
+            counts
+        });
+    }
+
+    counts.existing_actual_repo = currentRepoStates.filter(
+        ({ info, state }) => info.cardHours === 0 && state.effectiveRepo === true
+    ).length;
+    counts.predicted_final_repo = currentRepoStates.filter(({ info, state }) => {
+        if (info.dateKey === cleanSources[0].dateKey) {
+            return info.cardHours === 0 && sourceProposedState.effectiveRepo === true;
+        }
+        if (info.dateKey === cleanTargets[0].dateKey) {
+            return info.cardHours === 0 && targetProposedState.effectiveRepo === true;
+        }
+        return info.cardHours === 0 && state.effectiveRepo === true;
+    }).length;
     counts.resolved_repo = counts.predicted_final_repo;
 
     const sixthDayProjectionRows = rows.map((row) => {
-        const id = normalizeId(row._id || row.id);
-        if (id === normalizeId(cleanSources[0].row._id || cleanSources[0].row.id)) {
-            return { ...row, kathgoria_ergasias_apologistika: 'ΕΡΓ' };
-        }
-        if (id === normalizeId(cleanTargets[0].row._id || cleanTargets[0].row.id)) {
+        const rowDateKey = dateKeyUtc(row.hmeromhnia);
+        if (rowDateKey === cleanSources[0].dateKey) {
             return {
                 ...row,
-                kathgoria_ergasias_apologistika: targetCategory,
-                repo_apologistika: true,
+                kathgoria_ergasias_apologistika: sourceProposedState.effectiveCategory,
+                repo_apologistika: sourceProposedState.effectiveRepo
+            };
+        }
+        if (rowDateKey === cleanTargets[0].dateKey) {
+            return {
+                ...row,
+                kathgoria_ergasias_apologistika: targetProposedState.effectiveCategory,
+                repo_apologistika: targetProposedState.effectiveRepo,
                 adeia_apologistika: false,
                 kathgoria_adeias_apologistika: '',
                 ores_apoysias_apologistika: 0,

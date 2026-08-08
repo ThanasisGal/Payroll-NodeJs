@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { validateSessionScope } = require('./apasxoliseisPolicyPreviewApprovalService');
+const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
 
 const ACTION_CODE = 'APPLY_APPROVED_LINKED_REPO_TRANSFER';
 const COMMAND_KEYS = Object.freeze(['decision_id', 'request_id']);
@@ -24,7 +25,7 @@ function validateApplyCommand(payload) {
 function commandIdentity(command) { return crypto.createHash('sha256').update(`${ACTION_CODE}:${command.decision_id}`).digest('hex'); }
 function validateApplySession(session) {
     let scope; try { scope = validateSessionScope(session); } catch (error) { throw applyError('APPLY_NOT_AUTHORIZED', 403, error.message); }
-    if (!['A', 'S'].includes(scope.created_by_user_role)) throw applyError('APPLY_NOT_AUTHORIZED', 403);
+    try { assertCriticalEmploymentDecisionRole(session); } catch (error) { throw applyError('APPLY_NOT_AUTHORIZED', 403, error.message); }
     return Object.freeze({ ...scope, company_kodikos: String(session.companyKodikos || '').trim(), year: String(session.yearInUse || '').trim() });
 }
 

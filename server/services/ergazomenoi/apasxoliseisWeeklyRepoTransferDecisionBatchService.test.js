@@ -162,10 +162,10 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
     assert.strictEqual(result.records[0].current_decision.decision_code, 'APPROVE_PROPOSAL');
     assert.strictEqual(result.records[0].history_count, 2);
     assert.strictEqual(deps.counter.executions, 1);
-    assert.strictEqual(result.records[0].apply_state, 'NOT_AUTHORIZED');
+    assert.strictEqual(result.records[0].apply_state, 'RUNTIME_DISABLED');
     assert.strictEqual(result.records[0].can_apply, false);
     assert.strictEqual(result.records[0].apply_allowed, false);
-    assert.deepStrictEqual(result.records[0].apply_readiness, { status: 'BLOCKED', reason: 'NOT_AUTHORIZED' });
+    assert.deepStrictEqual(result.records[0].apply_readiness, { status: 'BLOCKED', reason: 'RUNTIME_DISABLED' });
     assert.strictEqual(result.records[0].runtime_enabled, false);
     assert.deepStrictEqual(result.records[0].history.map((entry) => entry.is_current), [true, false]);
     assert.ok(!JSON.stringify(result).includes('snapshot_fingerprint'));
