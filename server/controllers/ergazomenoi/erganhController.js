@@ -245,6 +245,9 @@ const {
     buildPartialVerifiedCardUpdate
 } = require('../../services/ergazomenoi/apasxoliseisIncompleteCardSafetyService');
 const {
+    isCriticalEmploymentDecisionRoleAllowed
+} = require('../../services/ergazomenoi/apasxoliseisCriticalActionAuthorizationService');
+const {
     resolveCardPairVerification
 } = require('../../services/ergazomenoi/apasxoliseisCardPairResolverService');
 const ApasxoliseisCompanyPolicyRuleModel = require('../../models/apasxoliseisCompanyPolicyRule');
@@ -950,11 +953,7 @@ function checkRepoAdeiaAstheneiaApologistika(context) {
 }
 
 function canReviewEdit(req) {
-    const userRole = String(req.session?.userRole || '')
-        .trim()
-        .toUpperCase();
-
-    return userRole === 'A' || userRole === 'S';
+    return isCriticalEmploymentDecisionRoleAllowed(req.session?.userRole);
 }
 
 // Συνάρτηση για ανάγνωση του Excel αρχείου

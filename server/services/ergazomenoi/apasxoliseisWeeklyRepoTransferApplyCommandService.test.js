@@ -7,6 +7,6 @@ assert.deepStrictEqual(validateApplyCommand(valid), valid);
 [null, [], 'x', { decision_id: valid.decision_id }, { request_id: valid.request_id }, { ...valid, decision_id: 'bad' }, { ...valid, request_id: 'short' }, { ...valid, extra: 1 }, { ...valid, nested: {} }, { ...valid, request_id: [] }, { ...valid, '$set': 'x' }, { ...valid, 'x.y': 'x' }].forEach((value) => fails(value, value?.decision_id === 'bad' ? 'INVALID_DECISION_ID' : value?.request_id === 'short' ? 'INVALID_REQUEST_ID' : 'INVALID_APPLY_COMMAND'));
 assert.throws(() => validateApplyCommand({ ...valid, request_id: `r${'x'.repeat(MAX_COMMAND_BYTES)}` }), (error) => ['APPLY_COMMAND_TOO_LARGE','INVALID_REQUEST_ID'].includes(error.code));
 assert.strictEqual(commandIdentity(valid), commandIdentity({ ...valid, request_id: 'request-9999' }));
-['A','S'].forEach((role) => assert.strictEqual(validateApplySession({ ...session, userRole: role }).created_by_user_role, role));
-for (const changed of [{ userRole: 'HR' }, { userStatus: 'I' }]) assert.throws(() => validateApplySession({ ...session, ...changed }), (error) => error.statusCode === 403 && error.code === 'APPLY_NOT_AUTHORIZED');
+['A','S','HR'].forEach((role) => assert.strictEqual(validateApplySession({ ...session, userRole: role }).created_by_user_role, role));
+for (const changed of [{ userRole: 'U' }, { userStatus: 'I' }]) assert.throws(() => validateApplySession({ ...session, ...changed }), (error) => error.statusCode === 403 && error.code === 'APPLY_NOT_AUTHORIZED');
 console.log('weekly repo-transfer apply command tests passed');

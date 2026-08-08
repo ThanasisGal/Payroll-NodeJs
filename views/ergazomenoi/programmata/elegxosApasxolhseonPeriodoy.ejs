@@ -8,8 +8,8 @@
     const normalizedUserRole = String(userRole || '').trim().toUpperCase();
     const canRecordRepoTransferDecision = ['A', 'S', 'HR'].includes(normalizedUserRole);
     const canManageReusablePolicyApproval = ['A', 'S', 'HR'].includes(normalizedUserRole);
-    const canApplyRepoTransferDecision = ['A', 'S'].includes(normalizedUserRole);
-    const canUseAdvancedEmploymentReview = ['A', 'S'].includes(normalizedUserRole);
+    const canApplyRepoTransferDecision = ['A', 'S', 'HR'].includes(normalizedUserRole);
+    const canUseAdvancedEmploymentReview = ['A', 'S', 'HR'].includes(normalizedUserRole);
     const companyInUse = companyId || '';
 %>
 
@@ -369,7 +369,7 @@
     <input
         type="hidden"
         id="canReviewEdit"
-        value="<%= userRole === 'A' || userRole === 'S' ? '1' : '0' %>"
+        value="<%= ['A', 'S', 'HR'].includes(normalizedUserRole) ? '1' : '0' %>"
     />
     <input
         type="hidden"

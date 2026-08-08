@@ -9,9 +9,13 @@ const {
     buildAtomicReusableCriteriaV5,
     isEffectiveForBothMembers
 } = require('./apasxoliseisWeeklyRepoTransferAtomicReusableDecisionService');
+const {
+    CRITICAL_EMPLOYMENT_DECISION_ROLES,
+    isCriticalEmploymentDecisionRoleAllowed
+} = require('./apasxoliseisCriticalActionAuthorizationService');
 
 const DECISION_CODES = Object.freeze(['APPROVE_PROPOSAL', 'REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']);
-const DECISION_ALLOWED_ROLES = Object.freeze(['A', 'S', 'HR']);
+const DECISION_ALLOWED_ROLES = CRITICAL_EMPLOYMENT_DECISION_ROLES;
 const COMMAND_KEYS = Object.freeze(['proposal_id','expected_source_id','expected_target_id','expected_proposal_version','expected_choice_code','decision_code','notes','request_id']);
 const MAX_COMMAND_BYTES = 16 * 1024;
 
@@ -23,7 +27,7 @@ function decisionAuthorizationError() {
 }
 function text(value, max) { return String(value ?? '').trim().slice(0, max); }
 function isWeeklyRepoTransferDecisionRoleAllowed(role) {
-    return DECISION_ALLOWED_ROLES.includes(String(role ?? '').trim().toUpperCase());
+    return isCriticalEmploymentDecisionRoleAllowed(role);
 }
 function assertWeeklyRepoTransferDecisionAuthorization(session = {}) {
     let scope;

@@ -5,9 +5,13 @@ const {
     validateApplyPlanFilters,
     runPolicyPreviewApplyPlan
 } = require('./apasxoliseisPolicyPreviewApplyPlanService');
+const {
+    CRITICAL_EMPLOYMENT_DECISION_ROLES,
+    isCriticalEmploymentDecisionRoleAllowed
+} = require('./apasxoliseisCriticalActionAuthorizationService');
 
 const APPLY_EXECUTION_STATUS = 'LOCKED';
-const APPLY_EXECUTION_ALLOWED_ROLES = Object.freeze(['A', 'S']);
+const APPLY_EXECUTION_ALLOWED_ROLES = CRITICAL_EMPLOYMENT_DECISION_ROLES;
 const APPLY_EXECUTION_CONFIRMATION_TOKEN = 'APPLY_POLICY_PREVIEW_CHANGES';
 const APPLY_EXECUTION_LOCKED_MESSAGE =
     'Η πραγματική εφαρμογή προτεινόμενων τιμών είναι απενεργοποιημένη σε αυτό το στάδιο.';
@@ -37,7 +41,7 @@ function assertApplyExecutionPermission(session = {}) {
         throw error;
     }
 
-    if (!APPLY_EXECUTION_ALLOWED_ROLES.includes(scope.created_by_user_role)) {
+    if (!isCriticalEmploymentDecisionRoleAllowed(scope.created_by_user_role)) {
         throw executionError(
             'Δεν έχετε δικαίωμα πρόσβασης στην εκτέλεση εφαρμογής προτεινόμενων τιμών.',
             403,
