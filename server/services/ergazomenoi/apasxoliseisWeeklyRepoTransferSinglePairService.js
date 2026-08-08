@@ -980,29 +980,30 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         });
     }
 
-    const sourceId = normalizeId(cleanSources[0].row._id || cleanSources[0].row.id);
-    const targetId = normalizeId(cleanTargets[0].row._id || cleanTargets[0].row.id);
     counts.existing_actual_repo = currentRepoStates.filter(
         ({ info, state }) => info.cardHours === 0 && state.effectiveRepo === true
     ).length;
     counts.predicted_final_repo = currentRepoStates.filter(({ info, state }) => {
-        const id = normalizeId(info.row._id || info.row.id);
-        if (id === sourceId) return info.cardHours === 0 && sourceProposedState.effectiveRepo === true;
-        if (id === targetId) return info.cardHours === 0 && targetProposedState.effectiveRepo === true;
+        if (info.dateKey === cleanSources[0].dateKey) {
+            return info.cardHours === 0 && sourceProposedState.effectiveRepo === true;
+        }
+        if (info.dateKey === cleanTargets[0].dateKey) {
+            return info.cardHours === 0 && targetProposedState.effectiveRepo === true;
+        }
         return info.cardHours === 0 && state.effectiveRepo === true;
     }).length;
     counts.resolved_repo = counts.predicted_final_repo;
 
     const sixthDayProjectionRows = rows.map((row) => {
-        const id = normalizeId(row._id || row.id);
-        if (id === sourceId) {
+        const rowDateKey = dateKeyUtc(row.hmeromhnia);
+        if (rowDateKey === cleanSources[0].dateKey) {
             return {
                 ...row,
                 kathgoria_ergasias_apologistika: sourceProposedState.effectiveCategory,
                 repo_apologistika: sourceProposedState.effectiveRepo
             };
         }
-        if (id === targetId) {
+        if (rowDateKey === cleanTargets[0].dateKey) {
             return {
                 ...row,
                 kathgoria_ergasias_apologistika: targetProposedState.effectiveCategory,

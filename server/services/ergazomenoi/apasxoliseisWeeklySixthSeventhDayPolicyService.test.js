@@ -9,7 +9,8 @@ function week(hours = [8, 8, 8, 8, 8, 7, 0]) {
         date.setUTCDate(date.getUTCDate() + index);
         return ({
         hmeromhnia: date.toISOString().slice(0, 10),
-        kathgoria_ergasias: 'ΕΡΓ',
+        kathgoria_ergasias: index >= 5 ? 'ΑΝ' : 'ΕΡΓ',
+        repo: index >= 5,
         ores_ergasias: 8,
         cards_ores_ergasias: cards,
         cards_apo_ora_01: cards > 0 ? '09:00' : '',
@@ -48,7 +49,7 @@ assert.strictEqual(analyzeWeeklySixthSeventhDay({
     weekRows: laterCardHoursOverEight,
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
-}).sixthDay.hmeromhnia, '2026-07-31');
+}).sixthDay.hmeromhnia, '2026-08-01');
 
 const productionSevenDayExample = week([8.60, 7.97, 6.48, 7.32, 7.42, 8.12, 6.78]);
 result = analyzeWeeklySixthSeventhDay({
@@ -56,9 +57,9 @@ result = analyzeWeeklySixthSeventhDay({
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
 });
-assert.strictEqual(result.sixthDay.hmeromhnia, '2026-07-31');
-assert.strictEqual(result.sixthDay.actualWorkHours, 7.42);
-assert.strictEqual(result.seventhDay.hmeromhnia, '2026-08-02');
+assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-02');
+assert.strictEqual(result.sixthDay.actualWorkHours, 6.78);
+assert.strictEqual(result.seventhDay.hmeromhnia, '2026-08-01');
 
 const incompleteInterval = week([7, 7, 7, 7, 7, 7, 0]);
 incompleteInterval[5].cards_eos_ora_01 = '';
@@ -138,7 +139,7 @@ result = analyzeWeeklySixthSeventhDay({
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
 });
-assert.strictEqual(result.sixthDay.hmeromhnia, '2026-07-31');
+assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
 
 const declaredOverEight = week([9, 9, 9, 9, 9, 9, 0]);
 declaredOverEight[5].ores_ergasias = 9;
@@ -253,10 +254,10 @@ const regressionInput = {
 };
 const firstRegressionResult = analyzeWeeklySixthSeventhDay(regressionInput);
 const secondRegressionResult = analyzeWeeklySixthSeventhDay(regressionInput);
-assert.strictEqual(firstRegressionResult.sixthDay.hmeromhnia, '2026-06-19');
-assert.strictEqual(firstRegressionResult.seventhDay.hmeromhnia, '2026-06-21');
-assert.strictEqual(firstRegressionResult.seventhDay.actualWorkHours, 7.28);
-assert.strictEqual(firstRegressionResult.seventhDay.illegalOvertimeHours, 7.28);
+assert.strictEqual(firstRegressionResult.sixthDay.hmeromhnia, '2026-06-21');
+assert.strictEqual(firstRegressionResult.seventhDay.hmeromhnia, '2026-06-20');
+assert.strictEqual(firstRegressionResult.seventhDay.actualWorkHours, 8.12);
+assert.strictEqual(firstRegressionResult.seventhDay.illegalOvertimeHours, 8.12);
 assert.deepStrictEqual(secondRegressionResult, firstRegressionResult);
 
 for (const noLongerExempt of ['0018', '0020', '0021']) {
@@ -301,5 +302,101 @@ assert.strictEqual(unchangedProfileSeventhDay.status, 'READY');
 assert.strictEqual(unchangedProfileSeventhDay.sixthDay.hmeromhnia, '2026-08-01');
 assert.strictEqual(unchangedProfileSeventhDay.seventhDay.hmeromhnia, '2026-08-02');
 assert.strictEqual(unchangedProfileSeventhDay.seventhDay.illegalOvertimeHours, 9);
+
+// C3.4: the two current canonical repo identities drive the handoff from the
+// selected sixth day to the complementary remaining repo.
+const basicIdentity = analyze([7, 7, 7, 7, 7, 7, 0]);
+assert.deepStrictEqual(basicIdentity.canonicalRepoDayIdentities, [
+    '2026-08-01',
+    '2026-08-02'
+]);
+assert.strictEqual(basicIdentity.sixthDayRepoIdentity, '2026-08-01');
+assert.strictEqual(basicIdentity.remainingRepoIdentity, '2026-08-02');
+assert.strictEqual(basicIdentity.seventhDay, null);
+
+const bothReposWorked = analyze([7, 7, 7, 7, 7, 6, 9]);
+assert.strictEqual(bothReposWorked.sixthDayRepoIdentity, '2026-08-01');
+assert.strictEqual(bothReposWorked.remainingRepoIdentity, '2026-08-02');
+assert.strictEqual(bothReposWorked.seventhDay.hmeromhnia, '2026-08-02');
+
+// Reverse chronological trap: Sunday is selected as sixth by the existing
+// standard-candidate tie-break, so the earlier Saturday identity is seventh.
+const reverseChronological = analyze([7, 7, 7, 7, 7, 9, 7]);
+assert.strictEqual(reverseChronological.sixthDayRepoIdentity, '2026-08-02');
+assert.strictEqual(reverseChronological.remainingRepoIdentity, '2026-08-01');
+assert.strictEqual(reverseChronological.seventhDay.hmeromhnia, '2026-08-01');
+
+const transferredRepoWeek = week([7, 7, 7, 7, 7, 7, 7]);
+Object.assign(transferredRepoWeek[4], {
+    kathgoria_ergasias_apologistika: 'ΑΝ',
+    repo_apologistika: true
+});
+Object.assign(transferredRepoWeek[5], {
+    kathgoria_ergasias_apologistika: 'ΕΡΓ',
+    repo_apologistika: false
+});
+Object.assign(transferredRepoWeek[6], {
+    kathgoria_ergasias: 'ΑΝ',
+    repo: true
+});
+const transferredRepoResult = analyzeWeeklySixthSeventhDay({
+    weekRows: transferredRepoWeek,
+    effectiveProfile: {
+        hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40
+    },
+    hourlyRate: 10
+});
+assert.deepStrictEqual(transferredRepoResult.canonicalRepoDayIdentities, [
+    '2026-07-31',
+    '2026-08-02'
+]);
+assert.ok(!transferredRepoResult.canonicalRepoDayIdentities.includes('2026-08-01'));
+assert.strictEqual(transferredRepoResult.sixthDayRepoIdentity, '2026-08-02');
+assert.strictEqual(transferredRepoResult.remainingRepoIdentity, '2026-07-31');
+assert.strictEqual(transferredRepoResult.seventhDay.hmeromhnia, '2026-07-31');
+assert.notStrictEqual(transferredRepoResult.sixthDayRepoIdentity, '2026-08-01');
+assert.notStrictEqual(transferredRepoResult.remainingRepoIdentity, '2026-08-01');
+assert.notStrictEqual(transferredRepoResult.seventhDay.hmeromhnia, '2026-08-01');
+
+const changedSixthSelection = analyze([7, 7, 7, 7, 7, 7, 9]);
+assert.strictEqual(changedSixthSelection.sixthDayRepoIdentity, '2026-08-01');
+assert.strictEqual(changedSixthSelection.remainingRepoIdentity, '2026-08-02');
+assert.notStrictEqual(
+    changedSixthSelection.remainingRepoIdentity,
+    reverseChronological.remainingRepoIdentity
+);
+
+const nonRepoLastOccurrence = week([7, 7, 7, 7, 7, 7, 7]);
+Object.assign(nonRepoLastOccurrence[2], { kathgoria_ergasias: 'ΑΝ', repo: true });
+Object.assign(nonRepoLastOccurrence[3], { kathgoria_ergasias: 'ΑΝ', repo: true });
+Object.assign(nonRepoLastOccurrence[5], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
+Object.assign(nonRepoLastOccurrence[6], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
+const nonRepoLastResult = analyzeWeeklySixthSeventhDay({
+    weekRows: nonRepoLastOccurrence,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
+    hourlyRate: 10
+});
+assert.strictEqual(nonRepoLastResult.seventhDay.hmeromhnia, '2026-07-29');
+assert.notStrictEqual(nonRepoLastResult.seventhDay.hmeromhnia, '2026-08-02');
+
+const ambiguousRepoWeek = week([7, 7, 7, 7, 7, 7, 7]);
+ambiguousRepoWeek.forEach((day) => Object.assign(day, {
+    kathgoria_ergasias: 'ΕΡΓ',
+    repo: false
+}));
+const ambiguousRepoResult = analyzeWeeklySixthSeventhDay({
+    weekRows: ambiguousRepoWeek,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 }
+});
+assert.strictEqual(ambiguousRepoResult.status, 'NEEDS_HR_DECISION');
+assert.ok(ambiguousRepoResult.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+assert.strictEqual(ambiguousRepoResult.sixthDay, null);
+assert.strictEqual(ambiguousRepoResult.seventhDay, null);
+
+assert.strictEqual(bothReposWorked.seventhDay.illegalOvertimeHours, 9);
+assert.strictEqual(bothReposWorked.seventhDay.classification, 'SEVENTH_DAY_ILLEGAL_OVERTIME');
+assert.strictEqual(bothReposWorked.seventhDay.severity, 'SERIOUS_VIOLATION');
+assert.strictEqual(Object.hasOwn(bothReposWorked.seventhDay, 'sixthDayHours'), false);
 
 console.log('weekly sixth/seventh-day policy tests passed');

@@ -40,6 +40,12 @@ function row(day, overrides = {}) {
 function sixWorkdaysWithAutoLeave() {
     const rows = Array.from({ length: 7 }, (_, index) => row(index + 1));
     Object.assign(rows[0], { kathgoria_ergasias: 'ΑΝ', repo: true });
+    Object.assign(rows[5], {
+        kathgoria_ergasias: 'ΑΝ',
+        repo: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true
+    });
     Object.assign(rows[6], {
         cards_ores_ergasias: 0,
         cards_apo_ora_01: '',
@@ -160,6 +166,8 @@ for (const marker of [
 
 {
     const rows = Array.from({ length: 7 }, (_, index) => row(index + 1));
+    Object.assign(rows[5], { kathgoria_ergasias: 'ΑΝ', repo: true });
+    Object.assign(rows[6], { kathgoria_ergasias: 'ΑΝ', repo: true });
     const analysis = analyzeWeeklySixthSeventhDay({
         weekRows: rows,
         effectiveProfile: profile

@@ -40,12 +40,12 @@ const outcomes = fixtures.map((fixture) => {
         resolvedRepos: resolution?.resolved_repo ?? null,
         actualWorkdays: resolution?.actual_workdays ??
             dailyFacts.filter((fact) => fact.countsAsActualWorkDay).length,
-        sixthDay: resolution?.sixth_day?.hmeromhnia ||
+        sixthDay: resolution?.sixth_seventh_day?.sixth_day?.hmeromhnia ||
             sixthSeventh.sixthDay?.hmeromhnia || null,
-        seventhDay: resolution?.seventh_day?.hmeromhnia ||
+        seventhDay: resolution?.sixth_seventh_day?.seventh_day?.hmeromhnia ||
             sixthSeventh.seventhDay?.hmeromhnia || null,
-        sixthDayStatus: sixthSeventh.status,
-        sixthDayReasons: sixthSeventh.reasons,
+        sixthDayStatus: resolution?.sixth_seventh_day?.status || sixthSeventh.status,
+        sixthDayReasons: resolution?.sixth_seventh_day?.reasons || sixthSeventh.reasons,
         source: analysis.source?.hmeromhnia || null,
         target: analysis.target?.hmeromhnia || null,
         eligibility: analysis.eligibility_status,
@@ -83,9 +83,9 @@ assert.deepStrictEqual(
         // Μετά τη μεταφορά ρεπό, η 6η ημέρα επιλέγεται από τις έξι
         // πραγματικές ημέρες εργασίας με τον συμφωνημένο tie-break:
         // η χρονολογικά τελευταία ημέρα με 5 < πραγματικές ώρες <= 8.
-        { source: '2026-06-02', target: '2026-06-04', sixthDay: '2026-06-02' },
+        { source: '2026-06-02', target: '2026-06-04', sixthDay: '2026-06-07' },
         { source: '2026-06-15', target: '2026-06-17', sixthDay: '2026-06-21' },
-        { source: '2026-06-22', target: '2026-06-24', sixthDay: '2026-06-22' }
+        { source: '2026-06-22', target: '2026-06-24', sixthDay: '2026-06-28' }
     ]
 );
 assert.ok(

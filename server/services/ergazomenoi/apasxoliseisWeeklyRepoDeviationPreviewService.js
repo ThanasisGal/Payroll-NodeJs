@@ -269,11 +269,22 @@ function buildWeeklyRepoDeviationPreview({
                 existingAuditCountByRowKey
             });
             const resolution = repoTransfer.weekly_resolution;
+            const projectedSixthSeventhDay = resolution?.sixth_seventh_day;
+            const authoritativeSixthSeventhDay = projectedSixthSeventhDay?.status
+                ? {
+                      ...sixthSeventhDay,
+                      status: projectedSixthSeventhDay.status,
+                      reasons: [...(projectedSixthSeventhDay.reasons || [])],
+                      warnings: [...(projectedSixthSeventhDay.warnings || [])],
+                      sixthDay: projectedSixthSeventhDay.sixth_day || null,
+                      seventhDay: projectedSixthSeventhDay.seventh_day || null
+                  }
+                : sixthSeventhDay;
             const actualWorkdays = dailyFacts.filter(
                 (facts) => facts.countsAsActualWorkDay
             ).length;
             const sixthSeventhDayNeedsDecision =
-                sixthSeventhDay.status === 'NEEDS_HR_DECISION';
+                authoritativeSixthSeventhDay.status === 'NEEDS_HR_DECISION';
             deviations.push({
                 ...base,
                 status:
@@ -285,7 +296,7 @@ function buildWeeklyRepoDeviationPreview({
                 reasons: [...new Set([
                     ...(profileReason ? [profileReason] : []),
                     ...(sixthSeventhDayNeedsDecision
-                        ? sixthSeventhDay.reasons || []
+                        ? authoritativeSixthSeventhDay.reasons || []
                         : []),
                     ...repoStateReasons
                 ])],
@@ -297,14 +308,14 @@ function buildWeeklyRepoDeviationPreview({
                 // υπάρχει ασφαλές ζεύγος μεταφοράς ρεπό. Το αποτέλεσμα της
                 // μεταφοράς δεν επιτρέπεται να μηδενίζει την άμεση πολιτική.
                 actual_workdays: actualWorkdays,
-                sixth_day_count: sixthSeventhDay.sixthDay ? 1 : 0,
-                seventh_day_count: sixthSeventhDay.seventhDay ? 1 : 0,
-                sixth_day_date: sixthSeventhDay.sixthDay?.hmeromhnia || null,
+                sixth_day_count: authoritativeSixthSeventhDay.sixthDay ? 1 : 0,
+                seventh_day_count: authoritativeSixthSeventhDay.seventhDay ? 1 : 0,
+                sixth_day_date: authoritativeSixthSeventhDay.sixthDay?.hmeromhnia || null,
                 sixth_day_premium_rate:
-                    sixthSeventhDay.sixthDay?.premiumRate ?? null,
-                seventh_day_date: sixthSeventhDay.seventhDay?.hmeromhnia || null,
-                sixth_seventh_day_status: sixthSeventhDay.status,
-                sixth_seventh_day_reasons: [...(sixthSeventhDay.reasons || [])],
+                    authoritativeSixthSeventhDay.sixthDay?.premiumRate ?? null,
+                seventh_day_date: authoritativeSixthSeventhDay.seventhDay?.hmeromhnia || null,
+                sixth_seventh_day_status: authoritativeSixthSeventhDay.status,
+                sixth_seventh_day_reasons: [...(authoritativeSixthSeventhDay.reasons || [])],
                 repo_transfer_status: repoTransfer.eligibility_status,
                 repo_transfer_reasons: [...(repoTransfer.reasons || [])],
                 repo_transfer_source_available:

@@ -454,6 +454,10 @@ function testSixthDaySurvivesMissingRepoTransferSource() {
             cards_eos_ora_01: '17:00'
         });
     });
+    Object.assign(weekRows[6], {
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true
+    });
     const profile = {
         hmeres_ergasias_ebdomadas: 5,
         typos_apasxolhshs: '0',

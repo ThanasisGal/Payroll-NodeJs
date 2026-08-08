@@ -5,6 +5,13 @@ const {
 const {
     resolveDailyActualWorkFacts
 } = require('./apasxoliseisDailyActualWorkFactsService');
+const {
+    MODE: EFFECTIVE_REPO_MODE,
+    resolveEffectiveRepoState
+} = require('./apasxoliseisEffectiveRepoStateService');
+const {
+    resolveFullTimeFromWorkTerms
+} = require('./apasxoliseisReviewEmploymentProfileService');
 
 const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v2';
 const STATUS = Object.freeze({ READY: 'READY', NOT_APPLICABLE: 'NOT_APPLICABLE', NEEDS_HR_DECISION: 'NEEDS_HR_DECISION' });
@@ -52,6 +59,54 @@ function selectSixthDay(candidates) {
     }
 
     return { day: null, reason: 'SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC' };
+}
+
+function resolveCanonicalRepoDayIdentities({
+    weekRows = [],
+    effectiveProfile = {}
+} = {}) {
+    const fullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
+    const explicitRepoCategories = [...new Set(
+        weekRows
+            .flatMap((row) => [
+                row?.kathgoria_ergasias_apologistika,
+                row?.kathgoria_ergasias
+            ])
+            .map((value) => String(value || '').trim())
+            .filter((value) => value === 'ΑΝ' || value === 'ΜΕ')
+    )];
+    const expectedRepoCategory = fullTime === null
+        ? (explicitRepoCategories.length === 1 ? explicitRepoCategories[0] : null)
+        : (fullTime ? 'ΑΝ' : 'ΜΕ');
+    const states = weekRows.map((row) => ({
+        identity: dateKeyUtc(row?.hmeromhnia),
+        state: resolveEffectiveRepoState({
+            row,
+            mode: EFFECTIVE_REPO_MODE.CURRENT,
+            expectedRepoCategory
+        })
+    }));
+    const diagnostics = [...new Set(states.flatMap(({ state }) => state.diagnostics || []))];
+    const identities = states
+        .filter(({ identity, state }) => identity && state.effectiveRepo === true)
+        .map(({ identity }) => identity)
+        .sort();
+
+    if (diagnostics.length > 0 || identities.length !== 2) {
+        return Object.freeze({
+            ok: false,
+            canonicalRepoDayIdentities: Object.freeze([]),
+            reasons: Object.freeze([
+                ...(diagnostics.length > 0 ? diagnostics : []),
+                ...(identities.length !== 2 ? ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'] : [])
+            ])
+        });
+    }
+    return Object.freeze({
+        ok: true,
+        canonicalRepoDayIdentities: Object.freeze(identities),
+        reasons: Object.freeze([])
+    });
 }
 
 function analyzeWeeklySixthSeventhDay({
@@ -107,12 +162,40 @@ function analyzeWeeklySixthSeventhDay({
     if (actualDays.length <= 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: null });
     }
-    const seventhDay = actualDays.length === 7 ? actualDays[actualDays.length - 1] : null;
-    const sixthCandidates = seventhDay ? actualDays.slice(0, -1) : actualDays;
+    const repoIdentityResolution = resolveCanonicalRepoDayIdentities({
+        weekRows: rows,
+        effectiveProfile
+    });
+    if (!repoIdentityResolution.ok) {
+        return Object.freeze({
+            policyVersion: POLICY_VERSION,
+            status: STATUS.NEEDS_HR_DECISION,
+            reasons: [...repoIdentityResolution.reasons],
+            warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))],
+            dailyFacts,
+            canonicalRepoDayIdentities: [],
+            sixthDayRepoIdentity: null,
+            remainingRepoIdentity: null,
+            sixthDay: null,
+            seventhDay: null
+        });
+    }
+    const canonicalRepoDayIdentities = [...repoIdentityResolution.canonicalRepoDayIdentities];
+    const workedRepoDays = actualDays.filter((day) =>
+        canonicalRepoDayIdentities.includes(day.hmeromhnia)
+    );
+    const sixthCandidates = workedRepoDays;
     const selected = selectSixthDay(sixthCandidates);
     if (!selected.day) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: [selected.reason], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay });
+        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: [selected.reason], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, canonicalRepoDayIdentities, sixthDayRepoIdentity: null, remainingRepoIdentity: null, sixthDay: null, seventhDay: null });
     }
+    const sixthDayRepoIdentity = selected.day.hmeromhnia;
+    const remainingRepoIdentity = canonicalRepoDayIdentities.find(
+        (identity) => identity !== sixthDayRepoIdentity
+    ) || null;
+    const seventhDay = remainingRepoIdentity
+        ? actualDays.find((day) => day.hmeromhnia === remainingRepoIdentity) || null
+        : null;
     const sixthDayHours = Math.min(selected.day.actualWorkHours, 8);
     const illegalOvertimeHours = Math.max(selected.day.actualWorkHours - 8, 0);
     const classification = illegalOvertimeHours > 0
@@ -141,6 +224,9 @@ function analyzeWeeklySixthSeventhDay({
             reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'],
             warnings: classificationWarnings,
             dailyFacts,
+            canonicalRepoDayIdentities,
+            sixthDayRepoIdentity,
+            remainingRepoIdentity,
             sixthDay: sixthDayWithoutAmounts,
             seventhDay
         });
@@ -164,6 +250,9 @@ function analyzeWeeklySixthSeventhDay({
             reasons: ['ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'],
             warnings: classificationWarnings,
             dailyFacts,
+            canonicalRepoDayIdentities,
+            sixthDayRepoIdentity,
+            remainingRepoIdentity,
             sixthDay: sixthDayWithRate,
             seventhDay
         });
@@ -190,6 +279,9 @@ function analyzeWeeklySixthSeventhDay({
         premiumRate,
         premiumRateSource: effectiveProfile.source || null,
         dailyFacts,
+        canonicalRepoDayIdentities,
+        sixthDayRepoIdentity,
+        remainingRepoIdentity,
         sixthDay: {
             ...selected.day,
             sixthDayHours,
@@ -217,6 +309,7 @@ module.exports = {
     ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES,
     validRate,
     resolveSeventhDayIllegalOvertimeHours,
+    resolveCanonicalRepoDayIdentities,
     selectSixthDay,
     analyzeWeeklySixthSeventhDay
 };
