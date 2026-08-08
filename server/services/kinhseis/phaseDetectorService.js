@@ -881,7 +881,7 @@ function applyWeeklySixthSeventhDayFacts(
             day.weeklyComplianceWarnings = analysis.warnings;
             day.isSixthDay = analysis.sixthDay?.hmeromhnia === day.date;
             day.isSeventhDay = analysis.seventhDay?.hmeromhnia === day.date;
-            if (day.isSixthDay) day.sixthDayHours = analysis.sixthDay.actualWorkHours;
+            if (day.isSixthDay) day.sixthDayHours = analysis.sixthDay.sixthDayHours;
         });
         weeklyAnalyses.push({
             weekStart: range.weekStartKey,

@@ -298,7 +298,8 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
                     analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL';
             const hrClassification = classificationFromRecord(decision, dateKey);
             const approvalClassification = classificationFromApproval(approval, row, dateKey);
-            const classification = hrClassification || approvalClassification || automatic;
+            const explicitHrClassification = hrClassification || approvalClassification;
+            const classification = explicitHrClassification || automatic;
             const source = decision ? 'HR' : approval ? 'HR' :
                 requiresHr ? 'PENDING_HR' : 'AUTOMATIC';
             const illegalOvertime = illegalBreakdown(row);
@@ -306,8 +307,12 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
                 classification === 'SIXTH' ? 'ΠΑΡΑΒΑΣΗ ΠΕΝΘΗΜΕΡΟΥ' :
                 classification === 'SEVENTH' ? 'ΣΟΒΑΡΗ ΠΑΡΑΒΑΣΗ' : '';
             const sixthDayHours = classification === 'SIXTH'
-                ? rounded(validHours(row.ores_ergasias) ?? analysis.sixthDay?.sixthDayHours ??
-                    row.sixth_day_hours ?? 0) : 0;
+                ? rounded(!explicitHrClassification &&
+                    analysis.sixthDay?.hmeromhnia === dateKey
+                    ? analysis.sixthDay.sixthDayHours
+                    : validHours(row.ores_ergasias) ??
+                        validHours(row.sixth_day_hours) ?? 0)
+                : 0;
             const policy = {
                 version: analysis.policyVersion || row.policyVersion || 'legacy',
                 legacy: !row.policyVersion,

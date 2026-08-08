@@ -59,6 +59,34 @@ test('work-facts weekly path classifies sixth and seventh days without losing ac
     );
 });
 
+test('work-facts propagates canonical sixth-day hours and preserves excess and identities', () => {
+    for (const { actualHours, expectedSixthHours, expectedIllegalHours } of [
+        { actualHours: 7.42, expectedSixthHours: 7.42, expectedIllegalHours: 0 },
+        { actualHours: 8, expectedSixthHours: 8, expectedIllegalHours: 0 },
+        { actualHours: 9, expectedSixthHours: 8, expectedIllegalHours: 1 }
+    ]) {
+        const remainingRepoHours = actualHours > 8 ? 10 : 6;
+        const { dailyRows, orariaByDate } = buildWeek({
+            hours: [7, 7, 7, 7, 7, remainingRepoHours, actualHours]
+        });
+        const analyses = [];
+        const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+            asOfDate: '2026-06-15',
+            weeklyAnalyses: analyses
+        });
+        const analysis = analyses[0];
+
+        assert.equal(result[6].isSixthDay, true);
+        assert.equal(result[6].sixthDayHours, expectedSixthHours);
+        assert.equal(analysis.sixthDay.sixthDayHours, expectedSixthHours);
+        assert.equal(analysis.sixthDay.illegalOvertimeHours, expectedIllegalHours);
+        assert.equal(analysis.sixthDay.hmeromhnia, '2026-06-14');
+        assert.equal(analysis.seventhDay.hmeromhnia, '2026-06-13');
+        assert.equal(result[5].isSeventhDay, true);
+        assert.equal(analysis.seventhDay.illegalOvertimeHours, remainingRepoHours);
+    }
+});
+
 test('first cross-month week uses previous-month context but presents requested dates only', () => {
     const { dailyRows, orariaByDate } = buildWeek({
         start: '2026-06-29',
