@@ -924,6 +924,11 @@ const ErgazomenoiErganhSchema = new Schema(
         xml_filename: { type: String, trim: true },
 
         request_payload: { type: Schema.Types.Mixed },
+        payload_fingerprint: { type: String, trim: true, index: true },
+        request_id: { type: String, trim: true, index: true },
+        actor_role: { type: String, trim: true },
+        pdf_deferred: { type: Boolean, default: false },
+        reconciliation_required: { type: Boolean, default: false },
         erganh_raw_response: { type: Schema.Types.Mixed },
         error_message: { type: String, trim: true },
 
@@ -988,6 +993,12 @@ ErgazomenoiErganhSchema.index({ submission_code: 1, protocol: 1, submit_date_tex
 ErgazomenoiErganhSchema.index({ ergazomenos_object: 1, createdAt: -1 });
 ErgazomenoiErganhSchema.index({ companykod_object: 1, submission_year: 1, submission_month: 1 });
 ErgazomenoiErganhSchema.index({ companykod_object: 1, createdAt: -1 });
+ErgazomenoiErganhSchema.index({ team: 1, companykod_object: 1, ypokatasthma_kodikos: 1,
+    employment_period_start: 1, employment_period_end: 1, submission_code: 1,
+    payload_fingerprint: 1, submission_status: 1, document_status: 1 },
+{ name: 'ergani_final_submission_payload_lookup' });
+ErgazomenoiErganhSchema.index({ team: 1, companykod_object: 1, request_id: 1,
+    submission_code: 1 }, { unique: true, sparse: true, name: 'unique_ergani_submission_command_request' });
 
 const ErgazomenoiErganhModel = model('ErgazomenoiErganh', ErgazomenoiErganhSchema);
 

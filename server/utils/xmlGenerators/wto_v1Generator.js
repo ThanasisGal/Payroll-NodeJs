@@ -5,6 +5,9 @@
 const fs = require('fs');
 const path = require('path');
 const libxmljs = require('libxmljs2');
+const {
+    buildWtoDailySubmissionProjection
+} = require('../../services/ergazomenoi/wtoDailySubmissionProjectionService');
 
 async function generateWTOXML(companyData, ypokatasthmataData, prodhlomenaRows, options = {}) {
     try {
@@ -29,19 +32,20 @@ async function generateWTOXML(companyData, ypokatasthmataData, prodhlomenaRows, 
             throw new Error('[WTO-v1] Δεν βρέθηκαν εγγραφές με apologistiko_biblio=true.');
         }
 
-        const xmlData = {
-            f_aa_pararthmatos: normalizePararthmaKodikos(
-                options.ypokatasthma || ypokatasthmataData?.kodikos
-            ),
-            f_rel_protocol: '',
-            f_rel_date: '',
-            f_comments: options.comments || '',
-            f_from_date: formatDateForErganh(options.apo_hmeromhnia || validRows[0].hmeromhnia),
-            f_to_date: formatDateForErganh(
-                options.eos_hmeromhnia || validRows[validRows.length - 1].hmeromhnia
-            ),
-            employees: buildEmployees(validRows)
-        };
+        const employeesByCode = new Map();
+        validRows.forEach((row) => employeesByCode.set(String(row.kodikos || '').trim(), {
+            kodikos: row.kodikos, afm: row.afm_ergazomenoy || row.afm,
+            eponymo: row.eponymo_ergazomenoy || row.eponymo,
+            onoma: row.onoma_ergazomenoy || row.onoma
+        }));
+        const xmlData = options.projection || buildWtoDailySubmissionProjection({
+            rows: validRows,
+            employees: [...employeesByCode.values()],
+            branch: options.ypokatasthma || ypokatasthmataData?.kodikos,
+            periodStart: options.apo_hmeromhnia,
+            periodEnd: options.eos_hmeromhnia,
+            comments: options.comments || ''
+        });
 
         const xml = buildWTOXML(xmlData);
 
@@ -130,57 +134,6 @@ async function generateWTOXML(companyData, ypokatasthmataData, prodhlomenaRows, 
     }
 }
 
-function buildEmployees(rows) {
-    const grouped = new Map();
-
-    for (const row of rows) {
-        const afm = safeString(row.afm_ergazomenoy || row.afm);
-        const date = formatDateForErganh(row.hmeromhnia);
-        const key = `${afm}|${date}`;
-
-        if (!grouped.has(key)) {
-            grouped.set(key, {
-                f_afm: afm,
-                f_eponymo: safeString(row.eponymo_ergazomenoy || row.eponymo).toUpperCase(),
-                f_onoma: safeString(row.onoma_ergazomenoy || row.onoma).toUpperCase(),
-                f_date: date,
-                analytics: []
-            });
-        }
-
-        const employee = grouped.get(key);
-        employee.analytics.push(...buildAnalytics(row));
-    }
-
-    return Array.from(grouped.values()).filter((emp) => emp.analytics.length > 0);
-}
-
-function buildAnalytics(row) {
-    const analytics = [];
-    const type = row.kathgoria_ergasias_apologistika || row.kathgoria_ergasias || 'ΕΡΓ';
-
-    pushAnalyticIfValid(analytics, type, row.apo_ora_01_apologistika, row.eos_ora_01_apologistika);
-
-    pushAnalyticIfValid(analytics, type, row.apo_ora_02_apologistika, row.eos_ora_02_apologistika);
-
-    pushAnalyticIfValid(analytics, type, row.apo_ora_03_apologistika, row.eos_ora_03_apologistika);
-
-    return analytics;
-}
-
-function pushAnalyticIfValid(analytics, type, from, to) {
-    const cleanFrom = normalizeTime(from);
-    const cleanTo = normalizeTime(to);
-
-    if (!cleanFrom || !cleanTo) return;
-
-    analytics.push({
-        f_type: safeString(type || 'ΕΡΓ').toUpperCase(),
-        f_from: cleanFrom,
-        f_to: cleanTo
-    });
-}
-
 function buildWTOXML(data) {
     const employeesXml = data.employees
         .map((emp) => {
@@ -222,18 +175,6 @@ ${employeesXml}
 </WTOS>`;
 }
 
-function normalizeTime(value) {
-    if (value === null || value === undefined) return '';
-
-    const str = String(value).trim();
-    if (!str || str === '--:--') return '';
-
-    const match = str.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
-    if (!match) return '';
-
-    return str;
-}
-
 function formatDateForErganh(date) {
     if (!date) return '';
 
@@ -262,15 +203,6 @@ function formatDateForFilename(dateOrString) {
     const year = String(d.getFullYear());
 
     return `${day}-${month}-${year}`;
-}
-
-function normalizePararthmaKodikos(value) {
-    if (value === null || value === undefined) return '0';
-
-    const str = String(value).trim();
-    if (!str) return '0';
-
-    return str;
 }
 
 function safeString(value) {

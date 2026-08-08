@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { canonicalize, SNAPSHOT_SCHEMA_VERSION } = require('./apasxoliseisPeriodFrozenSnapshotService');
+const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 const { startOfWeekMondayUtc, addDaysUtc, dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 
 function fail(code, message) { const error = new Error(message); error.code = code; error.statusCode = 409; throw error; }
@@ -17,7 +17,8 @@ function patchHistoricalCardFacts(row, command) {
 function deviationWeekKey(row = {}) { return `${String(row.kodikos || '')}|${dateKeyUtc(row.week_apo || row.weekStart)}`; }
 
 function recalculateFrozenCorrectiveWeeks({ baselineSnapshot, commands, runAuthoritativeWeek }) {
-    if (baselineSnapshot?.snapshot_schema_version !== SNAPSHOT_SCHEMA_VERSION ||
+    if (!['employment-period-frozen:v2', 'employment-period-frozen:v3'].includes(
+        baselineSnapshot?.snapshot_schema_version) ||
         !Array.isArray(baselineSnapshot?.weekly_calculation_context?.rows)) fail(
         'CORRECTIVE_FROZEN_WEEKLY_CONTEXT_UNSUPPORTED',
         'Το παγωμένο αποτέλεσμα δεν διαθέτει τα απαιτούμενα ιστορικά στοιχεία για ασφαλή εβδομαδιαίο επανυπολογισμό.');

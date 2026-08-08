@@ -2,10 +2,10 @@
 
 const crypto = require('crypto');
 
-const SNAPSHOT_SCHEMA_VERSION = 'employment-period-frozen:v2';
+const SNAPSHOT_SCHEMA_VERSION = 'employment-period-frozen:v3';
 const DEFAULT_SOURCE_VERSION = 'employment-calculation:v2';
 const DAILY_FIELDS = Object.freeze([
-    '_id', 'kodikos', 'ypokatasthma', 'hmeromhnia', 'kathgoria_ergasias_apologistika',
+    '_id', 'kodikos', 'ypokatasthma', 'hmeromhnia', 'apologistiko_biblio', 'kathgoria_ergasias_apologistika',
     'kathgoria_ergasias', 'repo', 'repo_effective_identity', 'repo_original_identity',
     'ores_ergasias', 'ores_apoysias', 'adeia', 'kathgoria_adeias', 'astheneia',
     'argia', 'argia_apologistika', 'is_locked',
@@ -33,7 +33,7 @@ const DAILY_FIELDS = Object.freeze([
     'effective_schedule_phase_code',
     'effective_sixth_day_rate', 'sixth_seventh_classification', 'sixth_day_hours', 'seventh_day_hours'
 ]);
-const EMPLOYEE_FIELDS = Object.freeze(['kodikos', 'eponymo', 'onoma', 'hmeres_ergasias_ebdomadas',
+const EMPLOYEE_FIELDS = Object.freeze(['kodikos', 'afm', 'eponymo', 'onoma', 'hmeres_ergasias_ebdomadas',
     'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias', 'kathestos_apasxolhshs',
     'typos_apasxolhshs', 'typos_ebdomadas', 'pososto_prosayxhshs_6hs_hmeras',
     'nomimoHmeromisthio', 'nomimoOromisthio', 'pragmatikoHmeromisthio', 'pragmatikoOromisthio',

@@ -80,7 +80,8 @@ async function linkEmploymentPeriodSubmission({ session: userSession, scope: inp
     if (!mongoose.isValidObjectId(String(submissionId || ''))) throw periodError('INVALID_SUBMISSION_REFERENCE', 400, 'Μη έγκυρη αναφορά υποβολής.');
     const submission = await submissionModel.findOne({ _id: submissionId, team: scope.team,
         companykod_object: scope.company_kod, ypokatasthma_kodikos: scope.ypokatasthma,
-        process_code: '207',
+        employment_period_start: scope.period_start, employment_period_end: scope.period_end,
+        submission_code: 'WTODayilyA', submission_id: { $type: 'number', $gt: 0 },
         submission_status: 'SUCCESS', is_final: true, document_status: 'ACTIVE' }).lean();
     if (!submission?.submit_date || !submission?.protocol) throw periodError('SUBMISSION_NOT_AUTHORITATIVE', 409, 'Η υποβολή δεν διαθέτει έγκυρη ημερομηνία και πρωτόκολλο.');
     const submissionPeriod = authoritativeSubmissionPeriod(submission);

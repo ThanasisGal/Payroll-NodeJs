@@ -305,7 +305,16 @@ const {
     getPeriodLifecycleIndexState,
     assertPeriodLifecycleIndexesReady
 } = require('../../services/ergazomenoi/apasxoliseisPeriodLifecycleIndexGuardService');
-const { projectFrozenReview } = require('../../services/ergazomenoi/apasxoliseisPeriodFrozenSnapshotService');
+const { projectFrozenReview,
+    canonicalize } = require('../../services/ergazomenoi/apasxoliseisPeriodFrozenSnapshotService');
+const {
+    buildWtoDailySubmissionProjection,
+    buildWTODayilyAPayload
+} = require('../../services/ergazomenoi/wtoDailySubmissionProjectionService');
+const { getWtoDailySubmissionIndexState,
+    assertWtoDailySubmissionIndexesReady } = require('../../services/ergazomenoi/wtoDailySubmissionIndexGuardService');
+const { assertWtoDailyFrozenSnapshotVersion, resolveWtoDailyRestIdentity,
+    buildWtoDailyPayloadFingerprint } = require('../../services/ergazomenoi/wtoDailyRestIdentityService');
 const { buildEmploymentDailyPreliminaryUpdate, buildEmploymentDailyCalculationUpdate } =
     require('../../services/ergazomenoi/apasxoliseisEmploymentDailyCalculationAdapterService');
 const { postCorrectivePayroll } = require('../../services/ergazomenoi/apasxoliseisCorrectivePayrollPostingService');
@@ -1084,7 +1093,7 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
         payrollResults, payrollPhaseFacts, policyRules] = await Promise.all([
         ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(range) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
         ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(weeklyRange) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
-        ErgazomenoiModel.find(base).select('kodikos eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio').lean(),
+        ErgazomenoiModel.find(base).select('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio').lean(),
         ProdhlomenaOrariaDeviationsModel.find({ ...base, period_apo: asDateOnlyUtc(scope.period_start), period_eos: asDateOnlyUtc(scope.period_end, true) }).sort({ kodikos: 1, week_apo: 1 }).lean(),
         ApasxoliseisWeeklyCanonicalDecisionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), decision_status: 'RECORDED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
         ApasxoliseisWeeklyRepoTransferExecutionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), execution_status: 'APPLIED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
@@ -6564,6 +6573,23 @@ class erganhController {
                     .select('case_id status opened_at reason corrective_delta corrected_result_fingerprint').lean()
             ]);
             const lifecycleIndexReadiness = await getPeriodLifecycleIndexState();
+            const finalSubmissionIndexReadiness = await getWtoDailySubmissionIndexState();
+            const finalSnapshot = state.stored_status === 'FINALIZED' && state.frozen_snapshot_id
+                ? await ApasxoliseisPeriodFrozenSnapshotModel.findOne({ _id: state.frozen_snapshot_id,
+                    ...scope, frozen_snapshot_fingerprint: state.frozen_snapshot_fingerprint })
+                    .select('frozen_snapshot').lean() : null;
+            const finalRows = finalSnapshot?.frozen_snapshot?.daily_results || [];
+            let finalProjection = null;
+            let finalProjectionError = null;
+            if (finalSnapshot?.frozen_snapshot) {
+                try {
+                    finalProjection = buildWtoDailySubmissionProjection({ rows: finalRows,
+                        employees: finalSnapshot.frozen_snapshot.employees,
+                        branch: scope.ypokatasthma, periodStart: scope.period_start,
+                        periodEnd: scope.period_end });
+                } catch (error) { finalProjectionError = { code: error.code, message: error.message }; }
+            }
+            const finalEmployeeCount = new Set((finalProjection?.employees || []).map((row) => row.f_afm)).size;
             const correctivePosting = latestCorrective?.status === 'CLOSED' ?
                 await ApasxoliseisCorrectivePayrollPostingModel.find({ ...scope, case_id: latestCorrective.case_id })
                     .select('employee_kodikos typos_apodoxon corrective_aa_misthodosias gross_corrective_delta offset_applied withholding_amount payable_now carry_forward_created posting_status').lean() : [];
@@ -6595,13 +6621,26 @@ class erganhController {
                     lock_period: state.effective_mode === 'NORMAL',
                     unlock_period: state.can_unlock_period,
                     finalize_period: state.can_finalize && lifecycleIndexReadiness.ready,
+                    submit_final_wtodailya: state.stored_status === 'FINALIZED' &&
+                        !state.past_deadline && Boolean(finalSnapshot?.frozen_snapshot) &&
+                        lifecycleIndexReadiness.ready && finalSubmissionIndexReadiness.ready &&
+                        Boolean(finalProjection) && !state.submission_reference,
                     open_corrective: state.can_corrective && lifecycleIndexReadiness.ready,
                     corrective: state.can_corrective,
                     post_corrective_payroll: latestCorrective?.status === 'CLOSED' &&
                         Boolean(latestCorrective.corrected_result_fingerprint) && lifecycleIndexReadiness.ready
                 },
+                final_submission_summary: {
+                    branch: scope.ypokatasthma,
+                    period_start: scope.period_start.toISOString().slice(0, 10),
+                    period_end: scope.period_end.toISOString().slice(0, 10),
+                    employees_count: finalEmployeeCount,
+                    employee_days_count: finalProjection?.employees?.length || 0,
+                    validation_error: finalProjectionError
+                },
                 index_readiness: indexReadiness,
-                lifecycle_index_readiness: lifecycleIndexReadiness
+                lifecycle_index_readiness: lifecycleIndexReadiness,
+                final_submission_index_readiness: finalSubmissionIndexReadiness
             });
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false, code: error.code,
@@ -6622,6 +6661,149 @@ class erganhController {
                 frozen_snapshot_fingerprint: result.snapshot.frozen_snapshot_fingerprint });
         } catch (error) { return res.status(error.statusCode || 500).json({ success: false,
             code: error.code, message: error.statusCode ? error.message : 'Η οριστικοποίηση περιόδου απέτυχε.' }); }
+    };
+
+    static submitFinalWTODayilyA = async (req, res) => {
+        let externalSuccess = null;
+        try {
+            const body = req.body || {};
+            if (body.WTOS !== undefined || body.employees !== undefined || body.payload !== undefined ||
+                body.protocol !== undefined || body.f_rel_protocol !== undefined || body.f_rel_date !== undefined) {
+                const error = new Error('Το αίτημα περιέχει μη επιτρεπτά authoritative πεδία.');
+                error.code = 'FORGED_WTODAILY_PAYLOAD'; error.statusCode = 400; throw error;
+            }
+            const reason = String(body.reason || '').trim();
+            const requestId = String(body.request_id || '').trim();
+            if (!reason || !requestId) {
+                const error = new Error('Απαιτούνται αιτιολογία και αναγνωριστικό αιτήματος.');
+                error.code = 'INVALID_WTODAILY_COMMAND'; error.statusCode = 400; throw error;
+            }
+            const scope = await activeEmploymentReviewPeriodScope(req, body.ypokatasthma);
+            await assertWtoDailySubmissionIndexesReady();
+            const [state, readiness] = await Promise.all([
+                getPeriodControl({ scope }), getPeriodLifecycleIndexState()
+            ]);
+            if (!readiness.ready) {
+                const error = new Error('Οι απαιτούμενες ασφαλείς υπηρεσίες/indexes δεν είναι διαθέσιμες.');
+                error.code = 'PERIOD_LIFECYCLE_INDEXES_NOT_READY'; error.statusCode = 503; throw error;
+            }
+            if (state.stored_status !== 'FINALIZED') {
+                const error = new Error('Η τελική WTODayilyA υποβολή απαιτεί οριστικοποιημένη περίοδο.');
+                error.code = 'WTODAILY_PERIOD_NOT_FINALIZED'; error.statusCode = 409; throw error;
+            }
+            if (state.past_deadline) {
+                const error = new Error('Η προθεσμία τελικής WTODayilyA υποβολής έχει παρέλθει.');
+                error.code = 'WTODAILY_DEADLINE_PASSED'; error.statusCode = 409; throw error;
+            }
+            const frozen = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
+                _id: state.frozen_snapshot_id, ...scope,
+                frozen_snapshot_fingerprint: state.frozen_snapshot_fingerprint
+            }).lean();
+            if (!frozen?.frozen_snapshot) {
+                const error = new Error('Δεν υπάρχει έγκυρο frozen snapshot για την περίοδο.');
+                error.code = 'WTODAILY_FROZEN_SNAPSHOT_REQUIRED'; error.statusCode = 409; throw error;
+            }
+            assertWtoDailyFrozenSnapshotVersion(frozen.frozen_snapshot);
+            const projection = buildWtoDailySubmissionProjection({
+                rows: frozen.frozen_snapshot.daily_results,
+                employees: frozen.frozen_snapshot.employees,
+                branch: scope.ypokatasthma,
+                periodStart: scope.period_start,
+                periodEnd: scope.period_end,
+                comments: reason
+            });
+            const payload = buildWTODayilyAPayload(projection);
+            const fingerprint = buildWtoDailyPayloadFingerprint({ team: scope.team,
+                company: scope.company_kod, branch: scope.ypokatasthma,
+                periodStart: scope.period_start, periodEnd: scope.period_end, payload });
+            const requestRecord = await ErgazomenoiErganhModel.findOne({ team: scope.team,
+                companykod_object: scope.company_kod, request_id: requestId,
+                submission_code: 'WTODayilyA' }).lean();
+            if (requestRecord && requestRecord.payload_fingerprint !== fingerprint) {
+                const error = new Error('Το request_id έχει χρησιμοποιηθεί για διαφορετικό authoritative payload.');
+                error.code = 'WTODAILY_REQUEST_ID_CONFLICT'; error.statusCode = 409; throw error;
+            }
+            const existing = requestRecord || await ErgazomenoiErganhModel.findOne({ team: scope.team,
+                companykod_object: scope.company_kod, ypokatasthma_kodikos: scope.ypokatasthma,
+                employment_period_start: scope.period_start, employment_period_end: scope.period_end,
+                submission_code: 'WTODayilyA', payload_fingerprint: fingerprint,
+                submission_status: 'SUCCESS', is_final: true, document_status: 'ACTIVE' }).lean();
+            if (existing) return res.json({ success: true, idempotent: true,
+                submissionCode: 'WTODayilyA', protocol: existing.protocol,
+                submitDate: existing.submit_date_text, erganhSubmissionId: existing.erganh_submission_id,
+                erganhLogId: existing._id, pdfUrl: existing.pdf_s3_url || '' });
+            const [company, branch, password] = await Promise.all([
+                CompaniesModel.findOne({ _id: scope.company_kod, team: scope.team }).lean(),
+                YpokatasthmataModel.findOne({ companykod_object: scope.company_kod, team: scope.team,
+                    kodikos: scope.ypokatasthma }).lean(),
+                PasswordsModel.findOne({ team: scope.team, companykod_object: scope.company_kod, kodikos: '0002' }).lean()
+            ]);
+            if (!company || !branch || !password?.username || !password?.password) {
+                const error = new Error('Λείπουν authoritative στοιχεία εταιρείας, παραρτήματος ή credentials ΕΡΓΑΝΗ.');
+                error.code = 'WTODAILY_SUBMISSION_CONTEXT_MISSING'; error.statusCode = 409; throw error;
+            }
+            const restResult = await uploadJsonDocumentToErgani({ submissionCode: 'WTODayilyA', payload,
+                creds: { username: password.username, password: password.password,
+                    userType: process.env.ERGANI_USERTYPE || '01' }, fetchSubmittedPdf: true });
+            if (!restResult?.success) return res.status(502).json({ success: false,
+                code: 'WTODAILY_REST_SUBMISSION_FAILED', message: restResult?.error || 'Η υποβολή WTODayilyA απέτυχε.' });
+            const resolvedIdentity = resolveWtoDailyRestIdentity(restResult, process.env.ERGANI_ENV);
+            externalSuccess = { protocol: restResult.protocol, id: restResult.id, submitDate: restResult.submitDate };
+            let pdfStorage = { pdfSaved: false, pdfS3Key: null, pdfS3Url: null, pdfRelativePath: null,
+                pdfFilename: null, pdfContentType: null, pdfSizeBytes: 0,
+                pdfSaveError: restResult?.submittedPdf?.error || null };
+            const pdfBuffer = restResult?.submittedPdf?.buffer;
+            if (Buffer.isBuffer(pdfBuffer) && pdfBuffer.subarray(0, 5).toString() === '%PDF-') {
+                pdfStorage = await saveSubmittedErganiPdfToS3({ pdfBuffer, contentType: 'application/pdf',
+                    ergazomenos: { team: scope.team, kodikos: `PERIOD_${projection.f_from_date}_${projection.f_to_date}`,
+                        eponymo: 'WTO', onoma: 'DAILY' }, companyData: company, restResult,
+                    submissionFolder: 'WTODayilyA' });
+            }
+            const submittedAt = parseErganiSubmitDate(restResult.submitDate);
+            if (!submittedAt || !restResult.protocol || !restResult.id) {
+                const error = new Error('Το REST success δεν περιέχει authoritative protocol/id/submitDate.');
+                error.code = 'WTODAILY_REST_RESULT_INCOMPLETE'; error.statusCode = 502; throw error;
+            }
+            const record = await ErgazomenoiErganhModel.create({ team: scope.team,
+                companykod_object: scope.company_kod, companykod: company.kod || company.kodikos || '',
+                ypokatasthma_object: branch._id, ypokatasthma_kodikos: scope.ypokatasthma,
+                submission_code: resolvedIdentity.submission_code,
+                submission_id: resolvedIdentity.submission_id,
+                submission_description: restResult.submission?.description || '',
+                process_description: 'Απολογιστικός Πίνακας Ωραρίων', upload_method: 'REST',
+                environment: resolvedIdentity.environment,
+                submission_status: 'SUCCESS',
+                is_temporary: false, is_final: true, document_status: 'ACTIVE',
+                protocol: restResult.protocol, submit_date_text: restResult.submitDate,
+                submit_date: submittedAt, erganh_submission_id: String(restResult.id),
+                employment_period_start: scope.period_start, employment_period_end: scope.period_end,
+                submission_year: submittedAt.getFullYear(), submission_month: submittedAt.getMonth() + 1,
+                submission_day: submittedAt.getDate(), request_payload: payload,
+                payload_fingerprint: fingerprint, request_id: requestId,
+                erganh_raw_response: restResult.raw || null, error_message: pdfStorage.pdfSaveError,
+                pdf_s3_key: pdfStorage.pdfS3Key, pdf_s3_url: pdfStorage.pdfS3Url,
+                pdf_relative_path: pdfStorage.pdfRelativePath, pdf_filename: pdfStorage.pdfFilename,
+                pdf_content_type: pdfStorage.pdfContentType, pdf_size_bytes: pdfStorage.pdfSizeBytes,
+                pdf_deferred: !pdfStorage.pdfSaved, created_by_user: req.session.userId,
+                created_by_username: req.session.userName || req.session.username || '', actor_role: req.session.userRole });
+            await linkEmploymentPeriodSubmission({ session: req.session, scope, reason,
+                submissionId: record._id, submissionModel: ErgazomenoiErganhModel });
+            return res.status(201).json({ success: true, idempotent: false,
+                submissionCode: 'WTODayilyA', protocol: restResult.protocol,
+                submitDate: restResult.submitDate, erganhSubmissionId: restResult.id,
+                erganhLogId: record._id, pdfSaved: pdfStorage.pdfSaved,
+                pdfUrl: pdfStorage.pdfS3Url || '', pdfDeferred: !pdfStorage.pdfSaved });
+        } catch (error) {
+            console.error('[submitFinalWTODayilyA]', error.code || error.message);
+            if (externalSuccess) return res.status(503).json({ success: false,
+                code: 'WTODAILY_RECONCILIATION_REQUIRED', reconciliation_required: true,
+                protocol: externalSuccess.protocol, erganhSubmissionId: externalSuccess.id,
+                submitDate: externalSuccess.submitDate,
+                message: 'Η υποβολή έγινε δεκτή από το ΕΡΓΑΝΗ, αλλά η τοπική καταγραφή/σύνδεση απέτυχε. Απαιτείται συμφωνία χωρίς αυτόματη επανυποβολή.' });
+            return res.status(error.statusCode || 500).json({ success: false,
+                code: error.code, message: error.statusCode && error.statusCode < 500 ? error.message :
+                    'Η τελική υποβολή WTODayilyA δεν ολοκληρώθηκε.' });
+        }
     };
 
     static linkEmploymentReviewPeriodSubmission = async (req, res) => {

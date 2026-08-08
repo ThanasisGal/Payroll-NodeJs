@@ -6597,6 +6597,9 @@ function renderEmploymentPeriodControl(state) {
     document.getElementById('finalizeEmploymentPeriodBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.finalize_period === true)
     );
+    document.getElementById('submitFinalWTODayilyABtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && actions.submit_final_wtodailya === true)
+    );
     document.getElementById('openCorrectivePayrollBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.open_corrective === true)
     );
@@ -6742,6 +6745,35 @@ async function runEmploymentPeriodLifecycleAction(kind) {
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η ενέργεια απέτυχε.');
     await loadEmploymentPeriodControl(branch);
     await Swal.fire({ icon: 'success', title: corrective ? 'Διορθωτική μισθοδοσία σε εξέλιξη' : 'Οριστικοποιημένη περίοδος', text: payload.message });
+}
+
+async function submitFinalWTODayilyA() {
+    const state = currentEmploymentPeriodControl;
+    const summary = state?.final_submission_summary || {};
+    const confirmation = await Swal.fire({ icon: 'warning',
+        title: 'Οριστική υποβολή στο ΕΡΓΑΝΗ',
+        html: `<div class="text-start"><div><strong>Περίοδος:</strong> ${escapeHtml(summary.period_start || '')} – ${escapeHtml(summary.period_end || '')}</div>` +
+            `<div><strong>Παράρτημα:</strong> ${escapeHtml(summary.branch || '')}</div>` +
+            `<div><strong>Εργαζόμενοι:</strong> ${Number(summary.employees_count) || 0}</div>` +
+            `<div><strong>Ημερήσιες εγγραφές:</strong> ${Number(summary.employee_days_count) || 0}</div>` +
+            '<div class="alert alert-danger mt-3 mb-0">Πρόκειται για ΟΡΙΣΤΙΚΗ υποβολή Απολογιστικού Πίνακα Ωραρίων.</div>' +
+            '<label class="form-label mt-3" for="finalWtoReason">Αιτιολογία</label><textarea id="finalWtoReason" class="swal2-textarea"></textarea></div>',
+        showCancelButton: true, confirmButtonText: 'Οριστική υποβολή', cancelButtonText: 'Ακύρωση',
+        preConfirm: () => { const reason = String(document.getElementById('finalWtoReason')?.value || '').trim();
+            if (!reason) { Swal.showValidationMessage('Η αιτιολογία είναι υποχρεωτική.'); return false; }
+            return reason; }
+    });
+    if (!confirmation.isConfirmed) return;
+    const response = await fetch('/api/prodhlomena-oraria/review/period-control/submission/final', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({ ypokatasthma: currentCorrectiveBranch(), reason: confirmation.value,
+            request_id: `wtodailya-final-${Date.now()}-${Math.random().toString(16).slice(2)}` })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || 'Η τελική υποβολή απέτυχε.');
+    await loadEmploymentPeriodControl(currentCorrectiveBranch());
+    await Swal.fire({ icon: 'success', title: payload.idempotent ? 'Ήδη υποβλημένο' : 'Οριστική υποβολή ολοκληρώθηκε',
+        text: `Πρωτόκολλο: ${payload.protocol || '-'}` });
 }
 
 async function loadEmploymentPeriodControl(ypokatasthma) {
@@ -7920,6 +7952,9 @@ document.getElementById('unlockEmploymentPeriodBtn')?.addEventListener('click', 
 });
 document.getElementById('finalizeEmploymentPeriodBtn')?.addEventListener('click', () => {
     runEmploymentPeriodLifecycleAction('finalize').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('submitFinalWTODayilyABtn')?.addEventListener('click', () => {
+    submitFinalWTODayilyA().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('openCorrectivePayrollBtn')?.addEventListener('click', () => {
     runEmploymentPeriodLifecycleAction('corrective').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));

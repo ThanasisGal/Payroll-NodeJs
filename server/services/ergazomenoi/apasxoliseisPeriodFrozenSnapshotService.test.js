@@ -13,7 +13,7 @@ const { isPastDeadline } = require('./apasxoliseisPeriodControlService');
 const scope = { team: 'T', company_kod: 'C', ypokatasthma: '0001',
     period_start: '2026-06-01', period_end: '2026-06-30' };
 const daily = [{ _id: 'row1', kodikos: '001', ypokatasthma: '0001', hmeromhnia: new Date('2026-06-03'),
-    kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8, cards_ores_ergasias: 8,
+    apologistiko_biblio: true, kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8, cards_ores_ergasias: 8,
     cards_apo_ora_01: '09:00', cards_eos_ora_01: '17:00',
     ores_ergasias_apologistika: 8, ores_yperergasias_apologistika: 1,
     ores_nominhs_yperorias_apologistika: 0.5, ores_paranomhs_yperorias_apologistika: 0.25,
@@ -31,7 +31,7 @@ const weeklyRows = Array.from({ length: 7 }, (_, index) => { const date = new Da
 daily[0].effective_profile_resolved = weeklyRows[0].effective_profile_resolved;
 const input = { scope, dailyResults: daily, weeklyDailyResults: weeklyRows,
     calendarFacts: weeklyRows.map((row) => ({ hmeromhnia: row.hmeromhnia, is_holiday: false })),
-    employees: [{ kodikos: '001', eponymo: 'ΕΠ', onoma: 'ΟΝ', hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40,
+    employees: [{ kodikos: '001', afm: '123456789', eponymo: 'ΕΠ', onoma: 'ΟΝ', hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40,
         pragmatikoOromisthio: 10, password: 'excluded' }],
     payrollResults: [{ kodikos: '001', aa_misthodosias: '1', typos_apodoxon: '01', synolo_mikton_apodoxon: 1000 }],
     deviations: [{ kodikos: '001', week_apo: '2026-06-01', status: 'NEEDS_HR', reasons: ['X'] }],
@@ -48,6 +48,11 @@ const auditNoise = buildEmploymentPeriodFrozenSnapshot({ ...input,
     appliedRepoTransfers: input.appliedRepoTransfers.map((row) => ({ ...row, applied_at: new Date('2030-01-01'), created_by_user_name: 'other' })) });
 assert.strictEqual(one.frozen_snapshot_fingerprint, auditNoise.frozen_snapshot_fingerprint);
 assert.strictEqual(one.frozen_snapshot_fingerprint.length, 64);
+assert.strictEqual(one.snapshot.snapshot_schema_version, 'employment-period-frozen:v3');
+assert.strictEqual(one.snapshot.employees[0].afm, '123456789');
+assert.strictEqual(one.snapshot.daily_results[0].apologistiko_biblio, true);
+assert.strictEqual(one.snapshot.daily_results[0].cards_apo_ora_01, '09:00');
+assert.strictEqual(one.snapshot.daily_results[0].cards_eos_ora_01, '17:00');
 assert.strictEqual(one.snapshot.policy_context.policy_version, 'v7');
 assert.strictEqual(one.snapshot.employees[0].pososto_prosayxhshs_6hs_hmeras, 40);
 assert.strictEqual(one.snapshot.canonical_decisions[0].request_id, 'e2');

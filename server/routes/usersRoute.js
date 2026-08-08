@@ -1375,6 +1375,9 @@ router.post(
 router.post('/api/prodhlomena-oraria/review/period-control/finalize', checkAuth,
     requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
     erganhController.finalizeEmploymentReviewPeriod);
+router.post('/api/prodhlomena-oraria/review/period-control/submission/final', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.submitFinalWTODayilyA);
 router.post('/api/prodhlomena-oraria/review/period-control/submission-link', checkAuth,
     requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
     erganhController.linkEmploymentReviewPeriodSubmission);
