@@ -6,6 +6,13 @@ const {
     buildWeeklyIllegalOvertimePersistenceMapping,
     OVERLAPPING_LEGAL_FIELDS
 } = require('./apasxoliseisWeeklyIllegalOvertimeMappingService');
+const { analyzeWeeklySixthSeventhDay } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
+const { buildCanonicalWeeklyDecisionSnapshot, fingerprint } =
+    require('./apasxoliseisWeeklyCanonicalDecisionService');
+const { buildWeeklyCanonicalDecisionSnapshotInput, groupWeeklyCanonicalDecisions } =
+    require('./apasxoliseisWeeklyCanonicalDecisionSnapshotInputService');
+const { getWeeklyRepoProfileInfo } =
+    require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 
 const ILLEGAL_FIELDS = [
     'ores_paranomhs_yperorias_apologistika',
@@ -144,6 +151,30 @@ function onlyDeviation(result) {
     return result.deviations[0];
 }
 
+function decisionFor(rows, decisionType, decisionPayload, overrides = {}) {
+    const sourceEmployee = employee();
+    const decisionWeek = { naturalWeekStart: new Date('2026-08-03'),
+        naturalWeekEnd: new Date('2026-08-09'), weekStart: new Date('2026-08-03'),
+        weekEnd: new Date('2026-08-09'), isFullWeek: true };
+    const effectiveProfile = getWeeklyRepoProfileInfo({ week: decisionWeek,
+        istorikoRows: [], ergazomenos: sourceEmployee }).effectiveProfile;
+    const automaticAnalysis = analyzeWeeklySixthSeventhDay({ weekRows: rows,
+        effectiveProfile, hourlyRate: effectiveProfile.pragmatikoOromisthio });
+    const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
+        team: 'THA', company_kod: 'company', employee: sourceEmployee,
+        week: decisionWeek,
+        weekRows: rows, effectiveProfile, profileHistory: [], automaticAnalysis,
+        appliedProtectionContext: overrides.appliedProtectionContext || { entriesByRowId: {} }
+    });
+    const snapshot = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
+    return { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+        employee_kodikos: 'D1', week_start: new Date('2026-08-03'),
+        week_end: new Date('2026-08-09'), decision_status: 'RECORDED',
+        snapshot_fingerprint: snapshot.fingerprint, decision_type: decisionType,
+        decision_payload: decisionPayload, decision_payload_fingerprint: fingerprint(decisionPayload),
+        created_at: new Date('2026-08-10') };
+}
+
 // Input rows deliberately represent the post-first-stage/reload boundary.
 const sixthRows = week([7, 7, 7, 7, 7, 9, 0]);
 let result = plan(sixthRows);
@@ -220,6 +251,49 @@ result = plan(ambiguousRows);
 let deviation = onlyDeviation(result);
 assert.equal(deviation.status, 'NEEDS_HR_DECISION');
 assert.ok(deviation.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+
+const humanRepoRows = week([7, 7, 7, 7, 7, 9, 7]);
+Object.assign(humanRepoRows[4], { kathgoria_ergasias: 'ΑΝ',
+    kathgoria_ergasias_apologistika: 'ΑΝ', repo: true, repo_apologistika: true });
+const humanRepoDecision = decisionFor(humanRepoRows,
+    'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', {
+        current_repo_identities: ['2026-08-08', '2026-08-09'], applied_execution_id: null
+    });
+result = plan(humanRepoRows, {
+    canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([humanRepoDecision])
+});
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 0);
+assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 9);
+update = updateFor(result, '2026-08-09');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7);
+deviation = onlyDeviation(result);
+assert.ok(!Array.isArray(deviation.reasons) ||
+    !deviation.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+
+const classificationDecision = decisionFor(humanRepoRows, 'CLASSIFICATION_BY_DATE', {
+    classification_by_date: { '2026-08-08': 'SIXTH', '2026-08-09': 'SEVENTH' }
+});
+result = plan(humanRepoRows, {
+    canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([classificationDecision])
+});
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 8);
+assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 1);
+update = updateFor(result, '2026-08-09');
+assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 7);
+assert.equal(ILLEGAL_FIELDS.reduce((sum, field) => sum + update[field], 0), 7);
+OVERLAPPING_LEGAL_FIELDS.forEach((field) => assert.equal(update[field], 0));
+
+const staleDecision = { ...decisionFor(ambiguousRows,
+    'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', {
+        current_repo_identities: ['2026-08-08', '2026-08-09'], applied_execution_id: null
+    }), snapshot_fingerprint: '0'.repeat(64) };
+result = plan(ambiguousRows, {
+    canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([staleDecision])
+});
+deviation = onlyDeviation(result);
+assert.ok(deviation.reasons.includes('CANONICAL_DECISION_STALE'));
 
 const pendingRows = week([7, 7, 7, 7, 7, 0, 0]);
 pendingRows[0].cards_eos_ora_01 = '';

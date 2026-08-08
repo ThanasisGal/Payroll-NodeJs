@@ -394,6 +394,33 @@ assert.ok(ambiguousRepoResult.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DE
 assert.strictEqual(ambiguousRepoResult.sixthDay, null);
 assert.strictEqual(ambiguousRepoResult.seventhDay, null);
 
+const humanClassificationRows = week([7, 7, 7, 7, 7, 9, 7]);
+const humanClassificationResult = analyzeWeeklySixthSeventhDay({
+    weekRows: humanClassificationRows,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
+    hourlyRate: 10,
+    classificationByDateOverride: {
+        '2026-08-01': 'SIXTH',
+        '2026-08-02': 'SEVENTH'
+    }
+});
+assert.strictEqual(humanClassificationResult.status, 'READY');
+assert.strictEqual(humanClassificationResult.sixthDay.hmeromhnia, '2026-08-01');
+assert.strictEqual(humanClassificationResult.sixthDay.sixthDayHours, 8);
+assert.strictEqual(humanClassificationResult.sixthDay.illegalOvertimeHours, 1);
+assert.strictEqual(humanClassificationResult.seventhDay.hmeromhnia, '2026-08-02');
+assert.strictEqual(humanClassificationResult.seventhDay.illegalOvertimeHours, 7);
+
+const invalidHumanClassification = analyzeWeeklySixthSeventhDay({
+    weekRows: humanClassificationRows,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
+    classificationByDateOverride: { '2026-08-01': 'NORMAL' }
+});
+assert.strictEqual(invalidHumanClassification.status, 'NEEDS_HR_DECISION');
+assert.deepStrictEqual(invalidHumanClassification.reasons, [
+    'CANONICAL_DECISION_CLASSIFICATION_INVALID'
+]);
+
 assert.strictEqual(bothReposWorked.seventhDay.illegalOvertimeHours, 9);
 assert.strictEqual(bothReposWorked.seventhDay.classification, 'SEVENTH_DAY_ILLEGAL_OVERTIME');
 assert.strictEqual(bothReposWorked.seventhDay.severity, 'SERIOUS_VIOLATION');

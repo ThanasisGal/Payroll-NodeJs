@@ -31,7 +31,9 @@ const baseInput = {
 };
 const commands = {
     profile: { decision_type: 'PROFILE_CHANGED_INSIDE_WEEK', request_id: 'request-profile',
-        decision_payload: { profile_outcome: 'USE_PROFILE', profile_reference: { history_id: 'history-1' } } },
+        decision_payload: { profile_outcome: 'USE_PROFILE', profile_reference: { history_id: 'history-1' },
+            selected_profile_reference: { kind: 'HISTORY', id: 'history-1' },
+            selected_profile_fingerprint: 'a'.repeat(64) } },
     card: { decision_type: 'CARD_VERIFICATION_PENDING', request_id: 'request-card',
         decision_payload: { verified: true, evidence_reference: 'AUDIT:card-correction-1', corrected_row_ids: ['row-1'] } },
     repo: { decision_type: 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', request_id: 'request-repo',
@@ -69,6 +71,11 @@ function changed(path, value) {
     const canonical = buildCanonicalWeeklyDecisionSnapshot(baseInput);
     assert.equal(canonical.scope.scope_key, 'THA|company-a|0001|001|2026-06-01|2026-06-07');
     for (const command of Object.values(commands)) assert.doesNotThrow(() => validateDecisionCommand({ session, command, currentInput: baseInput }));
+    assert.throws(() => validateDecisionCommand({ session, currentInput: baseInput, command: {
+        decision_type: 'PROFILE_CHANGED_INSIDE_WEEK', request_id: 'request-old-profile',
+        decision_payload: { profile_outcome: 'USE_PROFILE',
+            profile_reference: { history_id: 'history-1' } }
+    } }), /deterministic/);
 
     const store = model();
     const first = await recordWeeklyCanonicalDecision({ session, command: commands.card, currentInput: baseInput, decisionModel: store, indexReadinessGuard: indexesReady });

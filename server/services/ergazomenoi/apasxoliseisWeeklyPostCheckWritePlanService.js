@@ -13,6 +13,13 @@ const {
     analyzeWeeklySixthSeventhDay
 } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 const {
+    buildWeeklyCanonicalDecisionSnapshotInput,
+    weeklyCanonicalDecisionGroupKey
+} = require('./apasxoliseisWeeklyCanonicalDecisionSnapshotInputService');
+const {
+    resolveWeeklyCanonicalDecisionAnalysis
+} = require('./apasxoliseisWeeklyCanonicalDecisionResolutionService');
+const {
     resolveCanonicalRepoDayCountState
 } = require('./apasxoliseisWeeklyCanonicalRepoCountService');
 const {
@@ -118,6 +125,7 @@ function buildWeeklyRepoPostCheckWritePlan({
     noCardsDisplayContext = {},
     appliedProtectionContext,
     appliedProtectionReasonsByWeek = new Map(),
+    canonicalDecisionsByWeek = new Map(),
     buildWeeklyIllegalOvertimeUpdate
 }) {
     if (typeof buildWeeklyIllegalOvertimeUpdate !== 'function') {
@@ -163,13 +171,39 @@ function buildWeeklyRepoPostCheckWritePlan({
                 const row = rowsByEmployeeAndDate.get(`${erg.kodikos}|${dateKeyUtc(day)}`);
                 if (row) weekRows.push(row);
             }
-            const sixthSeventhAnalysis = weekFullyInsideEmployment
+            const automaticSixthSeventhAnalysis = weekFullyInsideEmployment
                 ? analyzeWeeklySixthSeventhDay({
                       weekRows,
                       effectiveProfile,
                       hourlyRate: effectiveProfile.pragmatikoOromisthio
-                  })
+                })
                 : { status: 'READY', reasons: [], sixthDay: null, seventhDay: null };
+            const decisionKey = weeklyCanonicalDecisionGroupKey({
+                ypokatasthma: erg.ypokatasthma,
+                employee_kodikos: erg.kodikos,
+                week_start: week.naturalWeekStart,
+                week_end: week.naturalWeekEnd
+            });
+            const decisionRecords = canonicalDecisionsByWeek.get(decisionKey) || [];
+            let sixthSeventhAnalysis = automaticSixthSeventhAnalysis;
+            if (weekFullyInsideEmployment && decisionRecords.length > 0 &&
+                automaticSixthSeventhAnalysis.status === 'NEEDS_HR_DECISION') {
+                const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
+                    team: sessionTeam, company_kod: companyId, employee: erg, week, weekRows,
+                    effectiveProfile, profileHistory: istorikoRows,
+                    automaticAnalysis: automaticSixthSeventhAnalysis,
+                    appliedProtectionContext
+                });
+                sixthSeventhAnalysis = resolveWeeklyCanonicalDecisionAnalysis({
+                    automaticAnalysis: automaticSixthSeventhAnalysis,
+                    snapshotInput,
+                    decisionRecords,
+                    weekRows,
+                    effectiveProfile,
+                    employee: erg,
+                    profileHistory: istorikoRows
+                }).analysis;
+            }
             const canonicalBlockingReasons =
                 sixthSeventhAnalysis.status === 'NEEDS_HR_DECISION'
                     ? [...new Set(sixthSeventhAnalysis.reasons || [])]

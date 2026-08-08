@@ -218,6 +218,30 @@ test('HR exact-week applied decision wins; pending/stale/cancelled decisions do 
     assert.equal(decisionIsActiveApplied({ ...base, is_current: false }), false);
 });
 
+test('canonical resolved analysis precedes policy approval and keeps alternate sixth hours row-local', () => {
+    const rows = week();
+    const canonicalResolutionsByWeek = new Map([['0004|2026-06-15', {
+        decision: { decision_type: 'CLASSIFICATION_BY_DATE' },
+        analysis: {
+            status: 'READY', reasons: [], warnings: [], policyVersion: 'canonical-test',
+            sixthDay: { hmeromhnia: '2026-06-19', sixthDayHours: 7.42, premiumRate: 40 },
+            seventhDay: { hmeromhnia: '2026-06-21', illegalOvertimeHours: 7.28 }
+        }
+    }]]);
+    const approval = { decision_status: 'RECORDED', decision_type: 'MARK_REVIEWED',
+        created_at: '2026-06-22', apo_hmeromhnia: '2026-06-15', eos_hmeromhnia: '2026-06-21',
+        items: [{ employee_kodikos: '0004', hmeromhnia: '2026-06-19',
+            proposed_values: { classification: 'NORMAL' } }] };
+    const projection = buildReviewExportProjection({ rows, approvals: [approval],
+        canonicalResolutionsByWeek });
+    const friday = projection.rows.find((row) => row.hmeromhnia === '2026-06-19');
+    const sunday = projection.rows.find((row) => row.hmeromhnia === '2026-06-21');
+    assert.equal(friday.policy.source, 'HR');
+    assert.equal(friday.policy.classification, 'SIXTH');
+    assert.equal(friday.policy.sixthDayHours, 7.42);
+    assert.equal(sunday.policy.classification, 'SEVENTH');
+});
+
 test('policy approval precedence, pending HR, rates, legacy and employee/branch/grand totals', () => {
     const rows = week();
     rows.forEach((row) => { row.policyVersion = undefined; });

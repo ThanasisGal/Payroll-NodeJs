@@ -4,6 +4,8 @@ const path = require('node:path');
 const test = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, 'erganhController.js'), 'utf8');
+const plannerSource = fs.readFileSync(path.join(__dirname,
+    '../../services/ergazomenoi/apasxoliseisWeeklyPostCheckWritePlanService.js'), 'utf8');
 const postCheckStart = source.indexOf('async function runWeeklyRepoPostCheck({');
 const postCheckEnd = source.indexOf('function getDailyDeclaredMinutes', postCheckStart);
 const postCheckSource = source.slice(postCheckStart, postCheckEnd);
@@ -17,24 +19,24 @@ test('weekly post-check uses canonical CURRENT repo counting with daily terms', 
         "require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalRepoCountService')"
     ));
     assert.ok(postCheckSource.includes('ores_ergasias_apologistika'));
-    assert.ok(postCheckSource.includes('resolveCanonicalRepoDayCountState({'));
-    assert.ok(postCheckSource.includes('dailyProfile,'));
-    assert.ok(postCheckSource.includes('hasUnresolvedCardPair'));
-    assert.ok(/if \(\s*repoCountState\.countsAsRepo\s*\)/.test(postCheckSource));
-    assert.ok(!postCheckSource.includes('cardsOresIsZero'));
+    assert.ok(plannerSource.includes('resolveCanonicalRepoDayCountState({'));
+    assert.ok(plannerSource.includes('dailyProfile,'));
+    assert.ok(plannerSource.includes('hasUnresolvedCardPair'));
+    assert.ok(/if \(\s*repoCountState\.countsAsRepo\s*\)/.test(plannerSource));
+    assert.ok(!plannerSource.includes('cardsOresIsZero'));
 });
 
 test('canonical repo diagnostics use the existing in-memory HR decision result', () => {
-    assert.ok(postCheckSource.includes('repoStateReasons.add(reason)'));
-    assert.ok(postCheckSource.includes(
+    assert.ok(plannerSource.includes('repoStateReasons.add(reason)'));
+    assert.ok(plannerSource.includes(
         "status: 'NEEDS_HR_DECISION'"
     ));
-    assert.ok(postCheckSource.includes('reasons: [...repoStateReasons]'));
-    assert.ok(postCheckSource.includes('repoStateReasons.size > 0'));
+    assert.ok(plannerSource.includes('reasons: allBlockingReasons'));
+    assert.ok(plannerSource.includes('repoStateReasons.size > 0'));
 });
 
 test('post-check persistence blocks remain structurally unchanged', () => {
-    assert.ok(postCheckSource.includes(
+    assert.ok(plannerSource.includes(
         'update: { $set: protectedUpdate.sanitizedUpdate }'
     ));
     assert.ok(postCheckSource.includes(

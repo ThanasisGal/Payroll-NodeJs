@@ -232,6 +232,15 @@ const {
 const ApasxoliseisPolicyPreviewApprovalModel = require('../../models/apasxoliseisPolicyPreviewApproval');
 const ApasxoliseisWeeklyRepoTransferDecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
 const ApasxoliseisWeeklyRepoTransferExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
+const ApasxoliseisWeeklyCanonicalDecisionModel = require('../../models/apasxoliseisWeeklyCanonicalDecision');
+const {
+    buildWeeklyCanonicalDecisionSnapshotInput,
+    weeklyCanonicalDecisionGroupKey,
+    groupWeeklyCanonicalDecisions
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionSnapshotInputService');
+const {
+    resolveWeeklyCanonicalDecisionAnalysis
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionResolutionService');
 const {
     buildWeeklyIllegalOvertimePersistenceMapping
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyIllegalOvertimeMappingService');
@@ -1755,6 +1764,20 @@ async function runWeeklyRepoPostCheck({
     })
         .lean();
 
+    const canonicalDecisionQuery = {
+        team: sessionTeam,
+        company_kod: companyId,
+        employee_kodikos: mongoose.trusted({ $in: kodikoi }),
+        week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
+        week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) }),
+        decision_status: 'RECORDED'
+    };
+    if (selectedYpokatasthma) canonicalDecisionQuery.ypokatasthma = selectedYpokatasthma;
+    const canonicalDecisionsByWeek = groupWeeklyCanonicalDecisions(
+        await ApasxoliseisWeeklyCanonicalDecisionModel.find(canonicalDecisionQuery)
+            .sort({ created_at: -1 }).lean()
+    );
+
     const writePlan = buildWeeklyRepoPostCheckWritePlan({
         sessionTeam,
         companyId,
@@ -1768,6 +1791,7 @@ async function runWeeklyRepoPostCheck({
         noCardsDisplayContext,
         appliedProtectionContext,
         appliedProtectionReasonsByWeek,
+        canonicalDecisionsByWeek,
         buildWeeklyIllegalOvertimeUpdate
     });
     const bulkOps = writePlan.bulkOps;
@@ -3863,7 +3887,9 @@ async function getReviewRowsForExport(req) {
                   'kodikos eponymo onoma ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                       'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                       'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
-                      'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras'
+                      'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
+                      'nomimoOromisthio pragmatikoOromisthio typos_ergazomenon ' +
+                      'eidikh_kathgoria_ergazomenoy eidikh_periptosh'
               )
               .lean()
         : [];
@@ -3923,6 +3949,7 @@ async function getReviewRowsForExport(req) {
                     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                     'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                     'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
+                    'nomimoOromisthio pragmatikoOromisthio ' +
                     'employment_profile_source afora_allagh_oron_ergasias createdAt'
             )
             .sort({
@@ -4059,7 +4086,7 @@ async function getReviewRowsForExport(req) {
         week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
         week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) })
     } : {};
-    const [approvals, decisions, executions] = await Promise.all([
+    const [approvals, decisions, executions, canonicalDecisions] = await Promise.all([
         ApasxoliseisPolicyPreviewApprovalModel.find({
             team: req.session.userTeam,
             company_kod: req.session.companyInUse,
@@ -4080,7 +4107,18 @@ async function getReviewRowsForExport(req) {
             company_kod: req.session.companyInUse,
             execution_status: 'APPLIED',
             ...decisionRangeFilter
-        }).sort({ applied_at: -1 }).lean()
+        }).sort({ applied_at: -1 }).lean(),
+        kodikoi.length && periodStart && periodEnd
+            ? ApasxoliseisWeeklyCanonicalDecisionModel.find({
+            team: req.session.userTeam,
+            company_kod: req.session.companyInUse,
+            decision_status: 'RECORDED',
+            ...(String(req.query.ypokatasthma || '').trim()
+                ? { ypokatasthma: String(req.query.ypokatasthma).trim().padStart(4, '0') } : {}),
+            employee_kodikos: mongoose.trusted({ $in: kodikoi }),
+            ...decisionRangeFilter
+        }).sort({ created_at: -1 }).lean()
+            : Promise.resolve([])
     ]);
     const executionByDecisionId = new Map(
         executions.map((execution) => [String(execution.decision_id || ''), execution])
@@ -4117,11 +4155,65 @@ async function getReviewRowsForExport(req) {
         reusableApprovals: activeReusableApprovals,
         includeContextGroups: true
     });
+    const canonicalDecisionsByWeek = groupWeeklyCanonicalDecisions(canonicalDecisions);
+    const canonicalResolutionsByWeek = new Map();
+    const reviewWeekRows = new Map();
+    for (const row of policyContextRows) {
+        const weekStart = dateKeyUtc(startOfWeekMondayUtc(row.hmeromhnia));
+        const key = `${String(row.kodikos || '').trim()}|${weekStart}`;
+        if (!reviewWeekRows.has(key)) reviewWeekRows.set(key, []);
+        reviewWeekRows.get(key).push(row);
+    }
+    for (const [projectionKey, weekRows] of reviewWeekRows) {
+        const firstRow = weekRows[0];
+        const employee = ergByKodikos.get(firstRow.kodikos) || {};
+        const naturalWeekStart = startOfWeekMondayUtc(firstRow.hmeromhnia);
+        const naturalWeekEnd = endOfWeekSundayUtc(firstRow.hmeromhnia);
+        const week = { naturalWeekStart, naturalWeekEnd, weekStart: naturalWeekStart,
+            weekEnd: naturalWeekEnd, isFullWeek: weekRows.length === 7 };
+        const histories = istorikoRowsByKodikos.get(String(firstRow.kodikos || '').trim()) || [];
+        const weeklyProfileInfo = getWeeklyRepoProfileInfo({ week, istorikoRows: histories,
+            ergazomenos: employee });
+        const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
+        const automaticAnalysis = analyzeWeeklySixthSeventhDay({ weekRows,
+            effectiveProfile, hourlyRate: effectiveProfile.pragmatikoOromisthio });
+        const decisionKey = weeklyCanonicalDecisionGroupKey({
+            ypokatasthma: firstRow.ypokatasthma || employee.ypokatasthma,
+            employee_kodikos: firstRow.kodikos,
+            week_start: naturalWeekStart,
+            week_end: naturalWeekEnd
+        });
+        const records = canonicalDecisionsByWeek.get(decisionKey) || [];
+        if (!records.length || automaticAnalysis.status !== 'NEEDS_HR_DECISION') continue;
+        const matchingExecutions = executions.filter((execution) =>
+            String(execution.employee_kodikos || '') === String(firstRow.kodikos || '') &&
+            dateKeyUtc(execution.week_start) === dateKeyUtc(naturalWeekStart) &&
+            dateKeyUtc(execution.week_end) === dateKeyUtc(naturalWeekEnd));
+        const entriesByRowId = {};
+        matchingExecutions.forEach((execution) => {
+            for (const [field, role] of [['source_prodhlomena_oraria_id', 'SOURCE'],
+                ['target_prodhlomena_oraria_id', 'TARGET']]) {
+                const rowId = String(execution[field] || '');
+                if (rowId) entriesByRowId[rowId] = { state: 'PROTECTED', rowId,
+                    executionId: String(execution._id || ''), role };
+            }
+        });
+        const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
+            team: req.session.userTeam, company_kod: req.session.companyInUse,
+            employee, week, weekRows, effectiveProfile, profileHistory: histories,
+            automaticAnalysis, appliedProtectionContext: { entriesByRowId }
+        });
+        canonicalResolutionsByWeek.set(projectionKey, resolveWeeklyCanonicalDecisionAnalysis({
+            automaticAnalysis, snapshotInput, decisionRecords: records, weekRows,
+            effectiveProfile, employee, profileHistory: histories
+        }));
+    }
     const projection = buildReviewExportProjection({
         rows: enrichedRows,
         policyRows: policyContextRows,
         approvals,
         decisions: decisionsWithApplyState,
+        canonicalResolutionsByWeek,
         deviations: exportDeviations,
         atomicGroupProjection,
         findingsOnly: true

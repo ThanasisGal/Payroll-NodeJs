@@ -249,7 +249,9 @@ function filterFindingsOnly(rows) {
     });
 }
 
-function buildReviewExportProjection({ rows = [], policyRows = rows, approvals = [], decisions = [], deviations = [], atomicGroupProjection = null, findingsOnly = false } = {}) {
+function buildReviewExportProjection({ rows = [], policyRows = rows, approvals = [], decisions = [],
+    canonicalResolutionsByWeek = new Map(), deviations = [], atomicGroupProjection = null,
+    findingsOnly = false } = {}) {
     const sourceRows = Array.isArray(rows) ? rows : [];
     const contextRows = Array.isArray(policyRows) ? policyRows : sourceRows;
     const atomicSelection = selectAtomicExportRows(sourceRows, contextRows, atomicGroupProjection);
@@ -284,7 +286,9 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
             source: sorted.at(-1)?.effective_profile_source,
             profile_changed_inside_week: deviation?.profile_changed_inside_week === true
         };
-        const analysis = analyzeWeeklySixthSeventhDay({ weekRows: sorted, effectiveProfile: profile });
+        const automaticAnalysis = analyzeWeeklySixthSeventhDay({ weekRows: sorted, effectiveProfile: profile });
+        const canonicalResolution = canonicalResolutionsByWeek.get(groupKey) || null;
+        const analysis = canonicalResolution?.analysis || automaticAnalysis;
         const deviationRequiresHr = deviation?.status === 'NEEDS_HR_DECISION';
         const decision = decisions.filter((item) => exactEmployeeWeek(item, kodikos, week) && decisionIsActiveApplied(item))
             .sort((a, b) => createdAt(b) - createdAt(a))[0] || null;
@@ -297,17 +301,21 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
                 analysis.sixthDay?.hmeromhnia === dateKey ? 'SIXTH' :
                     analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL';
             const hrClassification = classificationFromRecord(decision, dateKey);
+            const canonicalClassification = canonicalResolution?.decision && analysis.status !== 'NEEDS_HR_DECISION'
+                ? analysis.sixthDay?.hmeromhnia === dateKey ? 'SIXTH'
+                    : analysis.seventhDay?.hmeromhnia === dateKey ? 'SEVENTH' : 'NORMAL'
+                : null;
             const approvalClassification = classificationFromApproval(approval, row, dateKey);
-            const explicitHrClassification = hrClassification || approvalClassification;
+            const explicitHrClassification = hrClassification || canonicalClassification || approvalClassification;
             const classification = explicitHrClassification || automatic;
-            const source = decision ? 'HR' : approval ? 'HR' :
+            const source = decision ? 'HR' : canonicalClassification ? 'HR' : approval ? 'HR' :
                 requiresHr ? 'PENDING_HR' : 'AUTOMATIC';
             const illegalOvertime = illegalBreakdown(row);
             const severity = source === 'PENDING_HR' ? 'ΑΠΑΙΤΕΙ ΑΠΟΦΑΣΗ HR' :
                 classification === 'SIXTH' ? 'ΠΑΡΑΒΑΣΗ ΠΕΝΘΗΜΕΡΟΥ' :
                 classification === 'SEVENTH' ? 'ΣΟΒΑΡΗ ΠΑΡΑΒΑΣΗ' : '';
             const sixthDayHours = classification === 'SIXTH'
-                ? rounded(!explicitHrClassification &&
+                ? rounded(!hrClassification && !approvalClassification &&
                     analysis.sixthDay?.hmeromhnia === dateKey
                     ? analysis.sixthDay.sixthDayHours
                     : validHours(row.ores_ergasias) ??

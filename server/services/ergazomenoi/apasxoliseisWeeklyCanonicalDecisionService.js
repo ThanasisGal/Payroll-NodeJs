@@ -11,7 +11,7 @@ const {
 } = require('./apasxoliseisWeeklyCanonicalDecisionIndexGuardService');
 
 const SNAPSHOT_VERSION = 'weekly-canonical-human-decision-snapshot:v1';
-const DECISION_SCHEMA_VERSION = 'weekly-canonical-human-decision:v1';
+const DECISION_SCHEMA_VERSION = 'weekly-canonical-human-decision:v2';
 const APPLICABILITY = Object.freeze({
     APPLICABLE: 'APPLICABLE',
     STALE: 'STALE',
@@ -26,6 +26,7 @@ const DECISION_TYPES = Object.freeze([
 ]);
 const CLASSIFICATIONS = new Set(['NORMAL', 'SIXTH', 'SEVENTH']);
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/;
+const PROFILE_FINGERPRINT_VERSION = 'weekly-canonical-selected-profile:v1';
 
 function fail(message, statusCode = 400, code = 'INVALID_WEEKLY_CANONICAL_DECISION') {
     const error = new Error(message); error.statusCode = statusCode; error.code = code; return error;
@@ -48,6 +49,31 @@ function stable(value) {
 }
 function fingerprint(value) {
     return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
+}
+function selectedProfileFingerprint(profile = {}) {
+    const source = object(profile);
+    return fingerprint(stable({
+        version: PROFILE_FINGERPRINT_VERSION,
+        hmeres_ergasias_ebdomadas: source.hmeres_ergasias_ebdomadas ?? null,
+        ores_ergasias_ebdomadas: source.ores_ergasias_ebdomadas ?? null,
+        mo_oron_hmerhsias_ergasias: source.mo_oron_hmerhsias_ergasias ?? null,
+        kathestos_apasxolhshs: source.kathestos_apasxolhshs ?? null,
+        typos_apasxolhshs: source.typos_apasxolhshs ?? null,
+        typos_ebdomadas: source.typos_ebdomadas ?? null,
+        typos_ergazomenon: source.typos_ergazomenon ?? null,
+        pososto_prosayxhshs_6hs_hmeras: source.pososto_prosayxhshs_6hs_hmeras ?? null,
+        nomimoOromisthio: source.nomimoOromisthio ?? null,
+        pragmatikoOromisthio: source.pragmatikoOromisthio ?? null,
+        eidikh_kathgoria_ergazomenoy: source.eidikh_kathgoria_ergazomenoy ?? null,
+        eidikh_periptosh: source.eidikh_periptosh ?? null,
+        source: source.employment_profile_source ?? source.source ?? null,
+        istorikoId: text(source.istorikoId ?? source._id, 50) || null,
+        hmeromhnia_isxyos_oron_ergasias_apo: source.hmeromhnia_isxyos_oron_ergasias_apo ?? null,
+        hmeromhnia_isxyos_oron_ergasias_eos: source.hmeromhnia_isxyos_oron_ergasias_eos ?? null,
+        hmeromhnia_allaghs_orarioy_apo: source.hmeromhnia_allaghs_orarioy_apo ?? null,
+        hmeromhnia_allaghs_orarioy_eos: source.hmeromhnia_allaghs_orarioy_eos ?? null,
+        hmeromhnia_allaghs_symbashs: source.hmeromhnia_allaghs_symbashs ?? null
+    }));
 }
 function uniqueSorted(values) {
     return [...new Set((Array.isArray(values) ? values : []).map((value) => text(value, 150)).filter(Boolean))].sort();
@@ -135,6 +161,19 @@ function validateDecisionPayload(decisionType, payload, snapshotResult) {
             (!text(reference.history_id, 50) && !text(reference.effective_date, 10) && !text(reference.source, 100))) {
             throw fail('Μη έγκυρη απόφαση profile change.');
         }
+        if (outcome === 'USE_PROFILE') {
+            const selectedReference = object(source.selected_profile_reference);
+            const kind = text(selectedReference.kind, 30).toUpperCase();
+            const id = text(selectedReference.id, 100);
+            const selectedFingerprint = text(source.selected_profile_fingerprint, 64);
+            if (!['HISTORY', 'CURRENT_EMPLOYEE'].includes(kind) || !id ||
+                !/^[a-f0-9]{64}$/i.test(selectedFingerprint)) {
+                throw fail('Μη έγκυρη deterministic αναφορά επιλεγμένου profile.');
+            }
+            return stable({ profile_outcome: outcome, profile_reference: reference,
+                selected_profile_reference: { kind, id },
+                selected_profile_fingerprint: selectedFingerprint.toLowerCase() });
+        }
         return stable({ profile_outcome: outcome, profile_reference: reference });
     }
     if (decisionType === 'CARD_VERIFICATION_PENDING') {
@@ -150,7 +189,9 @@ function validateDecisionPayload(decisionType, payload, snapshotResult) {
             throw fail('Απαιτούνται ακριβώς δύο CURRENT repo identities μέσα στην εβδομάδα.');
         }
         const applied = snapshotResult.snapshot.applied_atomic_repo_transfer;
-        if (applied && text(source.applied_execution_id, 50) !== text(applied.execution_id, 50)) {
+        const appliedExecutionId = text(applied?.execution_id, 50);
+        if (applied && appliedExecutionId &&
+            text(source.applied_execution_id, 50) !== appliedExecutionId) {
             throw fail('Η απόφαση συγκρούεται με εφαρμοσμένη atomic repo transfer.', 409,
                 'APPLIED_ATOMIC_REPO_TRANSFER_CONFLICT');
         }
@@ -312,10 +353,36 @@ async function getLatestApplicableWeeklyCanonicalDecision({ session, currentInpu
     return { applicability: APPLICABILITY.APPLICABLE, record: applicable[0], current_fingerprint: current.fingerprint };
 }
 
+function resolvePreloadedWeeklyCanonicalDecision({ currentInput, records = [] } = {}) {
+    const current = buildCanonicalWeeklyDecisionSnapshot(currentInput);
+    const scoped = (Array.isArray(records) ? records : []).filter((record) =>
+        record?.decision_status === 'RECORDED' &&
+        record?.team === current.scope.team && record?.company_kod === current.scope.company_kod &&
+        record?.ypokatasthma === current.scope.ypokatasthma &&
+        String(record?.employee_kodikos || '') === current.scope.employee_kodikos &&
+        dateKey(record?.week_start) === current.scope.week_start &&
+        dateKey(record?.week_end) === current.scope.week_end
+    );
+    if (!scoped.length) return { applicability: APPLICABILITY.NOT_FOUND, record: null,
+        current_fingerprint: current.fingerprint };
+    const applicable = scoped.filter((record) => record.snapshot_fingerprint === current.fingerprint);
+    if (!applicable.length) return { applicability: APPLICABILITY.STALE,
+        record: [...scoped].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0],
+        current_fingerprint: current.fingerprint };
+    const identities = new Set(applicable.map((record) =>
+        `${record.decision_type}|${record.decision_payload_fingerprint}`));
+    if (identities.size > 1) return { applicability: APPLICABILITY.CONFLICT,
+        records: applicable, current_fingerprint: current.fingerprint };
+    return { applicability: APPLICABILITY.APPLICABLE,
+        record: [...applicable].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0],
+        current_fingerprint: current.fingerprint };
+}
+
 module.exports = {
-    SNAPSHOT_VERSION, DECISION_SCHEMA_VERSION, APPLICABILITY, DECISION_TYPES,
-    stable, fingerprint, scopeFromInput, buildCanonicalWeeklyDecisionSnapshot,
+    SNAPSHOT_VERSION, DECISION_SCHEMA_VERSION, PROFILE_FINGERPRINT_VERSION, APPLICABILITY, DECISION_TYPES,
+    stable, fingerprint, selectedProfileFingerprint, scopeFromInput, buildCanonicalWeeklyDecisionSnapshot,
     validateDecisionPayload, validateDecisionCommand, isDuplicateKey, applicableFilter,
     classifyConcurrentDuplicate, recordWeeklyCanonicalDecision,
-    listWeeklyCanonicalDecisions, getLatestApplicableWeeklyCanonicalDecision
+    listWeeklyCanonicalDecisions, getLatestApplicableWeeklyCanonicalDecision,
+    resolvePreloadedWeeklyCanonicalDecision
 };
