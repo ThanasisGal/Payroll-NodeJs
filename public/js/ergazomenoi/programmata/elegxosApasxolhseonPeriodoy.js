@@ -8,6 +8,10 @@ function userCanRecordRepoTransferDecision() {
     return document.getElementById('canRecordRepoTransferDecision')?.value === '1';
 }
 
+function userCanRecordCanonicalDecision() {
+    return document.getElementById('canRecordRepoTransferDecision')?.value === '1';
+}
+
 function userCanManageReusablePolicyApproval() {
     return document.getElementById('canManageReusablePolicyApproval')?.value === '1';
 }
@@ -2085,7 +2089,12 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                         Array.isArray(dev.repo_transfer_reasons) && dev.repo_transfer_reasons.length
                             ? `<div class="small text-muted mt-1">${escapeHtml(dev.repo_transfer_reasons.join(', '))}</div>`
                             : ''
-                    }</td>
+                    }${dev.status === 'NEEDS_HR_DECISION'
+                        ? `<div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary canonical-decision-open"
+                            data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
+                            data-ypokatasthma="${escapeHtml(dev.ypokatasthma || '')}"
+                            data-week-start="${escapeHtml(String(dev.week_apo || dev.weekStart || '').slice(0, 10))}">Καταγραφή απόφασης</button></div>`
+                        : ''}</td>
                 </tr>
             `
         )
@@ -2120,6 +2129,236 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
     `;
 
     tbody.appendChild(wrapperTr);
+    wrapperTr.querySelectorAll('.canonical-decision-open').forEach((button) => {
+        button.addEventListener('click', () => openCanonicalDecisionPanel(button.dataset));
+    });
+}
+
+const canonicalApplicabilityLabels = {
+    APPLICABLE: 'Ενεργή απόφαση',
+    STALE: 'Η απόφαση χρειάζεται επανέλεγχο επειδή άλλαξαν τα δεδομένα',
+    CONFLICT: 'Υπάρχουν αντικρουόμενες αποφάσεις — απαιτείται έλεγχος',
+    NOT_FOUND: 'Δεν υπάρχει ενεργή απόφαση'
+};
+
+const canonicalStatusLabels = {
+    NEEDS_HR_DECISION: 'Απαιτείται απόφαση',
+    READY: 'Ολοκληρωμένο',
+    NOT_APPLICABLE: 'Δεν εφαρμόζεται'
+};
+
+const canonicalReasonLabels = {
+    PROFILE_CHANGED_INSIDE_WEEK: 'Αλλαγή όρων εργασίας μέσα στην εβδομάδα',
+    CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση στοιχείων κάρτας',
+    CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC:
+        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι δύο ημέρες ανάπαυσης/ρεπό της εβδομάδας',
+    CANONICAL_DECISION_STALE:
+        'Η προηγούμενη απόφαση χρειάζεται επανέλεγχο επειδή άλλαξαν τα δεδομένα',
+    CANONICAL_DECISION_CONFLICT: 'Υπάρχουν αντικρουόμενες αποφάσεις',
+    CANONICAL_DECISION_OUTCOME_NOT_CONSUMABLE:
+        'Η συγκεκριμένη απόφαση δεν μπορεί να εφαρμοστεί στον υπολογισμό',
+    CANONICAL_DECISION_PROFILE_REFERENCE_INVALID:
+        'Το επιλεγμένο προφίλ εργασίας δεν είναι πλέον έγκυρο',
+    CANONICAL_DECISION_APPLIED_TRANSFER_CONFLICT:
+        'Η απόφαση συγκρούεται με ήδη εφαρμοσμένη μεταφορά ρεπό',
+    CANONICAL_DECISION_CLASSIFICATION_INVALID:
+        'Η επιλεγμένη ταξινόμηση ημερών δεν είναι συμβατή με την εβδομάδα',
+    CANONICAL_DECISION_REPO_IDENTITIES_INVALID:
+        'Οι επιλεγμένες ημέρες ανάπαυσης/ρεπό δεν είναι συμβατές με την εβδομάδα',
+    INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK:
+        'Η εβδομάδα δεν περιέχει πλήρη στοιχεία από Δευτέρα έως Κυριακή',
+    FULL_DAY_LEAVE_WITH_CARD_WORK_REQUIRES_HR_DECISION:
+        'Υπάρχει εργασία με κάρτα σε ημέρα πλήρους άδειας',
+    SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC:
+        'Δεν μπορεί να προσδιοριστεί με βεβαιότητα η 6η ημέρα',
+    MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE:
+        'Λείπει ή δεν είναι έγκυρο το ποσοστό προσαύξησης 6ης ημέρας',
+    ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION:
+        'Το ποσοστό προσαύξησης 6ης ημέρας είναι μηδενικό χωρίς καταχωρημένη εξαίρεση',
+    CATEGORY_REPO_CONFLICT:
+        'Η κατηγορία ημέρας δεν συμφωνεί με την ένδειξη ημέρας ανάπαυσης/ρεπό',
+    INVALID_DECLARED_HOURS: 'Οι δηλωμένες ώρες δεν είναι έγκυρες',
+    INVALID_CARD_HOURS: 'Οι ώρες κάρτας δεν είναι έγκυρες',
+    INVALID_EXPLICIT_HOURLY_LEAVE_HOURS: 'Οι ώρες ωριαίας άδειας δεν είναι έγκυρες',
+    EXPLICIT_HOURLY_LEAVE_EXCEEDS_DECLARED_BALANCE:
+        'Οι ώρες ωριαίας άδειας υπερβαίνουν το διαθέσιμο δηλωμένο υπόλοιπο',
+    UNSUPPORTED_DAILY_CATEGORY: 'Η κατηγορία ημέρας δεν υποστηρίζεται για αυτόματο υπολογισμό'
+};
+
+const canonicalDecisionTypeLabels = {
+    PROFILE_CHANGED_INSIDE_WEEK: 'Επιλογή προφίλ εργασίας',
+    CARD_VERIFICATION_PENDING: 'Τεκμηρίωση στοιχείων κάρτας',
+    CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC: 'Επιλογή ημερών ανάπαυσης/ρεπό',
+    CLASSIFICATION_BY_DATE: 'Ταξινόμηση ημερών'
+};
+
+const canonicalProfileSourceLabels = {
+    CURRENT_EMPLOYEE: 'Τρέχον προφίλ εργαζομένου',
+    ERG_AKTUAL: 'Τρέχον προφίλ εργαζομένου',
+    ISTORIKO: 'Ιστορικό προφίλ εργασίας'
+};
+
+const canonicalActorRoleLabels = {
+    A: 'Διαχειριστής',
+    S: 'Επόπτης',
+    HR: 'Υπεύθυνος Ανθρώπινου Δυναμικού'
+};
+
+function canonicalStatusLabel(value) {
+    return canonicalStatusLabels[String(value || '').trim()] || 'Απαιτείται έλεγχος';
+}
+
+function canonicalReasonLabel(value) {
+    return canonicalReasonLabels[String(value || '').trim()] || 'Απαιτείται πρόσθετος έλεγχος';
+}
+
+function canonicalDecisionTypeLabel(value) {
+    return canonicalDecisionTypeLabels[String(value || '').trim()] || 'Απόφαση εβδομαδιαίου ελέγχου';
+}
+
+function canonicalDecisionRequestId() {
+    if (window.crypto?.randomUUID) return `canonical:${window.crypto.randomUUID()}`;
+    return `canonical:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+}
+
+function canonicalDecisionParams(scope) {
+    return new URLSearchParams({
+        employee_kodikos: scope.employeeKodikos || scope.employee_kodikos || '',
+        ypokatasthma: scope.ypokatasthma || '',
+        week_start: scope.weekStart || scope.week_start || ''
+    });
+}
+
+function renderCanonicalDecisionHistory(records = []) {
+    if (!records.length) return '<div class="text-muted small">Δεν υπάρχει ιστορικό αποφάσεων.</div>';
+    return `<div class="table-responsive"><table class="table table-sm table-bordered">
+        <thead><tr><th>Ημερομηνία</th><th>Χρήστης</th><th>Ρόλος</th><th>Τύπος</th><th>Κατάσταση</th><th>Σημειώσεις</th></tr></thead>
+        <tbody>${records.map((record) => `<tr>
+            <td>${escapeHtml(record.created_at ? new Date(record.created_at).toLocaleString('el-GR') : '-')}</td>
+            <td>${escapeHtml(record.actor?.name || '-')}</td><td>${escapeHtml(canonicalActorRoleLabels[record.actor?.role] || 'Εξουσιοδοτημένος χρήστης')}</td>
+            <td>${escapeHtml(canonicalDecisionTypeLabel(record.decision_type))}</td>
+            <td>${escapeHtml(canonicalApplicabilityLabels[record.applicability] || 'Απαιτείται έλεγχος')}</td>
+            <td>${escapeHtml(record.notes || '-')}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function canonicalDecisionActionOptions(context) {
+    const actions = context.supported_actions || {};
+    const options = [];
+    if (actions.profile) options.push(['PROFILE_CHANGED_INSIDE_WEEK', 'Επιλογή προφίλ εργασίας']);
+    if (actions.card_documentary) options.push(['CARD_VERIFICATION_PENDING', 'Καταγραφή τεκμηρίου κάρτας (δεν επιλύει ώρες)']);
+    if (actions.repo_identities) options.push(['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', 'Επιλογή δύο ημερών ανάπαυσης/ρεπό']);
+    if (actions.classification_by_date) options.push(['CLASSIFICATION_BY_DATE', 'Ταξινόμηση ημερών']);
+    return options;
+}
+
+function renderCanonicalDecisionEditor(context) {
+    if (!userCanRecordCanonicalDecision()) {
+        return '<div class="alert alert-secondary mb-0">Έχετε πρόσβαση προβολής. Η καταγραφή απόφασης απαιτεί ρόλο Admin, Supervisor ή HR.</div>';
+    }
+    if (!context.index_readiness?.ready) {
+        return '<div class="alert alert-secondary mb-0">Η καταγραφή αποφάσεων δεν είναι προσωρινά διαθέσιμη.</div>';
+    }
+    const options = canonicalDecisionActionOptions(context);
+    if (!options.length) return '<div class="alert alert-warning mb-0">Δεν υπάρχει ασφαλής διαθέσιμη ενέργεια για τις τρέχουσες αιτίες.</div>';
+    const profiles = (context.profile_candidates || []).map((candidate, index) =>
+        `<option value="${index}">${escapeHtml(canonicalProfileSourceLabels[candidate.source] || 'Προφίλ εργασίας')}${candidate.effective_date ? ` · ${escapeHtml(formatDate(candidate.effective_date))}` : ''}</option>`).join('');
+    const repoDates = (context.current_repo_candidate_dates || []).map((date) =>
+        `<label class="form-check form-check-inline"><input class="form-check-input canonical-repo-date" type="checkbox" value="${escapeHtml(date)}"><span class="form-check-label">${escapeHtml(formatDate(date))}</span></label>`).join('');
+    const classifications = (context.week_rows || []).map((row) =>
+        `<div class="input-group input-group-sm mb-1"><span class="input-group-text">${escapeHtml(formatDate(row.date))}</span>
+        <select class="form-select canonical-classification" data-date="${escapeHtml(row.date)}">
+        <option value="NORMAL">Κανονική ημέρα</option><option value="SIXTH">6η ημέρα</option><option value="SEVENTH">7η ημέρα</option></select></div>`).join('');
+    return `<form id="canonicalDecisionForm">
+        <label class="form-label">Τύπος απόφασης</label>
+        <select class="form-select form-select-sm mb-3" id="canonicalDecisionType">${options.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join('')}</select>
+        <div class="canonical-decision-input" data-type="PROFILE_CHANGED_INSIDE_WEEK"><label class="form-label">Επιλογή προφίλ εργασίας</label><select class="form-select form-select-sm" id="canonicalProfileCandidate">${profiles}</select></div>
+        <div class="canonical-decision-input d-none" data-type="CARD_VERIFICATION_PENDING"><div class="alert alert-warning py-2">Η απόφαση είναι μόνο τεκμηριωτική. Η διόρθωση των στοιχείων κάρτας απαιτείται πριν επιλυθεί ο υπολογισμός.</div><label class="form-label">Αναφορά τεκμηρίου/διόρθωσης</label><input class="form-control form-control-sm" id="canonicalCardEvidence" maxlength="500"></div>
+        <div class="canonical-decision-input d-none" data-type="CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC"><div class="mb-2">Επιλέξτε ακριβώς δύο έγκυρες ημέρες ανάπαυσης/ρεπό:</div>${repoDates || '<span class="text-muted">Δεν υπάρχουν διαθέσιμες ημέρες ανάπαυσης/ρεπό.</span>'}</div>
+        <div class="canonical-decision-input d-none" data-type="CLASSIFICATION_BY_DATE"><div class="small text-muted mb-2">Η επιλογή θα ελεγχθεί από το σύστημα ώστε η εβδομαδιαία ταξινόμηση να είναι πλήρης και συνεπής.</div>${classifications}</div>
+        <label class="form-label mt-3">Σημειώσεις</label><textarea class="form-control form-control-sm" id="canonicalDecisionNotes" maxlength="2000"></textarea>
+        <button class="btn btn-primary btn-sm mt-3" type="submit">Καταγραφή απόφασης</button>
+        <div id="canonicalDecisionFeedback" class="small mt-2"></div>
+    </form>`;
+}
+
+function canonicalDecisionPayload(context, type) {
+    if (type === 'PROFILE_CHANGED_INSIDE_WEEK') {
+        const candidate = context.profile_candidates?.[Number(document.getElementById('canonicalProfileCandidate')?.value)];
+        if (!candidate) throw new Error('Δεν επιλέχθηκε έγκυρο προφίλ εργασίας.');
+        return { profile_outcome: 'USE_PROFILE',
+            profile_reference: { effective_date: candidate.effective_date, source: candidate.source },
+            selected_profile_reference: candidate.reference,
+            selected_profile_fingerprint: candidate.selected_profile_fingerprint };
+    }
+    if (type === 'CARD_VERIFICATION_PENDING') {
+        const evidence = document.getElementById('canonicalCardEvidence')?.value.trim();
+        if (!evidence) throw new Error('Απαιτείται αναφορά τεκμηρίου.');
+        return { verified: true, evidence_reference: evidence, corrected_row_ids: [] };
+    }
+    if (type === 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC') {
+        const dates = [...document.querySelectorAll('.canonical-repo-date:checked')].map((item) => item.value);
+        if (dates.length !== 2) throw new Error('Επιλέξτε ακριβώς δύο ημερομηνίες.');
+        return { current_repo_identities: dates };
+    }
+    const map = {};
+    document.querySelectorAll('.canonical-classification').forEach((select) => { map[select.dataset.date] = select.value; });
+    return { classification_by_date: map };
+}
+
+async function openCanonicalDecisionPanel(scope) {
+    const modalElement = document.getElementById('canonicalDecisionModal');
+    const container = document.getElementById('canonicalDecisionContainer');
+    if (!modalElement || !container) return;
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    container.innerHTML = '<div class="text-muted">Φόρτωση τρέχουσας κατάστασης…</div>';
+    try {
+        const params = canonicalDecisionParams(scope);
+        const [currentResponse, historyResponse] = await Promise.all([
+            fetch(`/api/prodhlomena-oraria/review/canonical-decisions/current?${params}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }),
+            fetch(`/api/prodhlomena-oraria/review/canonical-decisions?${params}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        ]);
+        const current = await currentResponse.json();
+        const history = await historyResponse.json();
+        if (!currentResponse.ok || !current.success) throw new Error(current.message || 'Αποτυχία φόρτωσης.');
+        container.innerHTML = `<div class="row g-3"><div class="col-lg-6">
+            <div><strong>${escapeHtml(current.employee?.kodikos || '')} ${escapeHtml(current.employee?.eponymo || '')} ${escapeHtml(current.employee?.onoma || '')}</strong></div>
+            <div>Εβδομάδα: ${escapeHtml(formatDate(current.scope.week_start))}–${escapeHtml(formatDate(current.scope.week_end))}</div>
+            <div class="mt-2"><span class="badge text-bg-warning">${escapeHtml(canonicalStatusLabel(current.canonical.status))}</span></div>
+            <div class="small mt-2">${(current.canonical.reasons || []).map((reason) => `<div>${escapeHtml(canonicalReasonLabel(reason))}</div>`).join('')}</div>
+            <div class="alert alert-light border mt-3">${escapeHtml(canonicalApplicabilityLabels[current.applicability] || 'Απαιτείται έλεγχος')}</div>
+        </div><div class="col-lg-6">${renderCanonicalDecisionEditor(current)}</div></div>
+        <hr><h6>Ιστορικό αποφάσεων</h6><div class="small text-muted mb-2">Οι καταχωρημένες αποφάσεις διατηρούνται στο ιστορικό.</div>${renderCanonicalDecisionHistory(history.records || [])}`;
+        const typeSelect = document.getElementById('canonicalDecisionType');
+        const showType = () => document.querySelectorAll('.canonical-decision-input').forEach((node) => node.classList.toggle('d-none', node.dataset.type !== typeSelect?.value));
+        typeSelect?.addEventListener('change', showType); showType();
+        document.getElementById('canonicalDecisionForm')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const feedback = document.getElementById('canonicalDecisionFeedback');
+            try {
+                const type = typeSelect.value;
+                const response = await fetch('/api/prodhlomena-oraria/review/canonical-decisions', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json',
+                        'CSRF-Token': csrfToken, 'x-csrf-token': csrfToken },
+                    body: JSON.stringify({ ypokatasthma: current.scope.ypokatasthma,
+                        employee_kodikos: current.scope.employee_kodikos,
+                        week_start: current.scope.week_start,
+                        request_id: canonicalDecisionRequestId(), decision_type: type,
+                        decision_payload: canonicalDecisionPayload(current, type),
+                        notes: document.getElementById('canonicalDecisionNotes')?.value || '' })
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message || 'Η καταγραφή απέτυχε.');
+                feedback.className = 'small mt-2 text-success';
+                feedback.textContent = `${result.message} Η επανεκτέλεση υπολογισμού γίνεται από το υπάρχον κουμπί.`;
+                setTimeout(() => openCanonicalDecisionPanel(current.scope), 500);
+            } catch (error) {
+                feedback.className = 'small mt-2 text-danger'; feedback.textContent = error.message;
+            }
+        });
+    } catch (error) {
+        container.innerHTML = `<div class="alert alert-danger">${escapeHtml(error.message)}</div>`;
+    }
 }
 
 function appendGrandTotalsRow(tbody, totals) {

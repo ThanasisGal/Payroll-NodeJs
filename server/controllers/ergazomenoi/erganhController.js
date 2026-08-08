@@ -242,6 +242,18 @@ const {
     resolveWeeklyCanonicalDecisionAnalysis
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionResolutionService');
 const {
+    loadWeeklyCanonicalDecisionContext,
+    validateCommandForCurrentContext,
+    projectCurrentContext,
+    safeDecisionProjection
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionContextService');
+const {
+    recordWeeklyCanonicalDecision
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionService');
+const {
+    getWeeklyCanonicalDecisionIndexState
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionIndexGuardService');
+const {
     buildWeeklyIllegalOvertimePersistenceMapping
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyIllegalOvertimeMappingService');
 const {
@@ -6160,6 +6172,98 @@ class erganhController {
                 message: error.statusCode && error.statusCode < 500
                     ? error.message
                     : 'Σφάλμα κατά την ανάκληση της επαναχρησιμοποιήσιμης πολιτικής.'
+            });
+        }
+    };
+
+    static getWeeklyCanonicalDecisionCurrent = async (req, res) => {
+        try {
+            const context = await loadWeeklyCanonicalDecisionContext({
+                session: req.session,
+                ypokatasthma: req.query?.ypokatasthma,
+                employee_kodikos: req.query?.employee_kodikos,
+                week_start: req.query?.week_start
+            });
+            const indexReadiness = await getWeeklyCanonicalDecisionIndexState();
+            return res.json(projectCurrentContext(context, indexReadiness));
+        } catch (error) {
+            console.error('[getWeeklyCanonicalDecisionCurrent]', error?.code || 'INTERNAL_ERROR');
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                code: error.code || undefined,
+                message: error.statusCode && error.statusCode < 500
+                    ? error.message : 'Δεν ήταν δυνατή η ανακατασκευή της εβδομαδιαίας απόφασης.'
+            });
+        }
+    };
+
+    static getWeeklyCanonicalDecisions = async (req, res) => {
+        try {
+            const context = await loadWeeklyCanonicalDecisionContext({
+                session: req.session,
+                ypokatasthma: req.query?.ypokatasthma,
+                employee_kodikos: req.query?.employee_kodikos,
+                week_start: req.query?.week_start
+            });
+            return res.json({
+                success: true,
+                scope: context.scope,
+                applicability: context.resolution.applicability,
+                records: context.decisionRecords.map((record) => ({
+                    ...safeDecisionProjection(record),
+                    applicability: record.snapshot_fingerprint === context.snapshot?.fingerprint
+                        ? context.resolution.applicability : 'STALE'
+                }))
+            });
+        } catch (error) {
+            console.error('[getWeeklyCanonicalDecisions]', error?.code || 'INTERNAL_ERROR');
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                code: error.code || undefined,
+                message: error.statusCode && error.statusCode < 500
+                    ? error.message : 'Δεν ήταν δυνατή η ανάκτηση του ιστορικού αποφάσεων.'
+            });
+        }
+    };
+
+    static createWeeklyCanonicalDecision = async (req, res) => {
+        try {
+            const body = req.body || {};
+            const context = await loadWeeklyCanonicalDecisionContext({
+                session: req.session,
+                ypokatasthma: body.ypokatasthma,
+                employee_kodikos: body.employee_kodikos,
+                week_start: body.week_start
+            });
+            const command = validateCommandForCurrentContext({ session: req.session, body, context });
+            const result = await recordWeeklyCanonicalDecision({
+                session: req.session,
+                command,
+                currentInput: context.snapshotInput
+            });
+            return res.status(result.idempotent ? 200 : 201).json({
+                success: true,
+                idempotent: result.idempotent,
+                decision: safeDecisionProjection(result.record),
+                message: result.idempotent
+                    ? 'Η απόφαση είχε ήδη καταγραφεί.'
+                    : 'Η εβδομαδιαία απόφαση καταγράφηκε. Εκτελέστε ξανά τον υπολογισμό απασχολήσεων.'
+            });
+        } catch (error) {
+            console.error('[createWeeklyCanonicalDecision]', error?.code || 'INTERNAL_ERROR');
+            const status = error?.code === 'CANONICAL_DECISION_INDEXES_NOT_READY' ? 503
+                : ['REQUEST_ID_CONFLICT', 'CONFLICTING_APPLICABLE_DECISIONS',
+                    'APPLIED_ATOMIC_REPO_TRANSFER_CONFLICT',
+                    'CANONICAL_DECISION_APPLIED_TRANSFER_CONFLICT',
+                    'CANONICAL_DECISION_CLASSIFICATION_INVALID',
+                    'CANONICAL_DECISION_PROFILE_REFERENCE_INVALID',
+                    'CANONICAL_WEEK_NOT_BLOCKED'].includes(error?.code) ? 409
+                    : error.statusCode || 500;
+            return res.status(status).json({
+                success: false,
+                code: error.code || undefined,
+                message: status < 500 || status === 503
+                    ? error.message : 'Δεν ήταν δυνατή η καταγραφή της εβδομαδιαίας απόφασης.'
             });
         }
     };

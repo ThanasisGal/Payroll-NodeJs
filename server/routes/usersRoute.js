@@ -1417,6 +1417,28 @@ router.post(
 );
 
 router.get(
+    '/api/prodhlomena-oraria/review/canonical-decisions/current',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getWeeklyCanonicalDecisionCurrent
+);
+
+router.get(
+    '/api/prodhlomena-oraria/review/canonical-decisions',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getWeeklyCanonicalDecisions
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/canonical-decisions',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.createWeeklyCanonicalDecision
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions/current',
     checkAuth,
     requireEmploymentReviewAccess,

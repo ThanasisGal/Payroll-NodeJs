@@ -9,6 +9,28 @@ const SOURCE_VERSION = 'weekly-post-check-canonical-decision-input:v1';
 
 function id(value) { return String(value?._id ?? value ?? '').trim(); }
 
+function dateOrNull(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function selectRelevantProfileHistory(profileHistory = [], week = {}) {
+    const start = dateOrNull(week?.naturalWeekStart || week?.weekStart);
+    const end = dateOrNull(week?.naturalWeekEnd || week?.weekEnd);
+    if (!start || !end) return [];
+    return (Array.isArray(profileHistory) ? profileHistory : []).filter((row) => {
+        const termsStart = dateOrNull(row.hmeromhnia_isxyos_oron_ergasias_apo);
+        const termsEnd = dateOrNull(row.hmeromhnia_isxyos_oron_ergasias_eos);
+        if (termsStart) return termsStart <= end && (!termsEnd || termsEnd >= start);
+        const scheduleStart = dateOrNull(row.hmeromhnia_allaghs_orarioy_apo);
+        const scheduleEnd = dateOrNull(row.hmeromhnia_allaghs_orarioy_eos);
+        if (scheduleStart) return scheduleStart <= end && (!scheduleEnd || scheduleEnd >= start);
+        const contractChange = dateOrNull(row.hmeromhnia_allaghs_symbashs);
+        return Boolean(contractChange && contractChange <= end);
+    });
+}
+
 function normalizeAppliedAtomicRepoTransfer({ weekRows = [], protectionContext } = {}) {
     const entries = weekRows.map((row) => protectionContext?.entriesByRowId?.[id(row)]).filter(Boolean);
     if (!entries.length) return null;
@@ -48,7 +70,7 @@ function buildWeeklyCanonicalDecisionSnapshotInput({
         current_repo_identities: currentRepoIdentities,
         actual_work_facts: actualFacts,
         effective_profile: effectiveProfile,
-        profile_history: profileHistory,
+        profile_history: selectRelevantProfileHistory(profileHistory, week),
         canonical_status: automaticAnalysis.status,
         canonical_reasons: automaticAnalysis.reasons,
         policy_version: automaticAnalysis.policyVersion || POLICY_VERSION,
@@ -76,6 +98,7 @@ function groupWeeklyCanonicalDecisions(records = []) {
 
 module.exports = {
     SOURCE_VERSION,
+    selectRelevantProfileHistory,
     normalizeAppliedAtomicRepoTransfer,
     buildWeeklyCanonicalDecisionSnapshotInput,
     weeklyCanonicalDecisionGroupKey,
