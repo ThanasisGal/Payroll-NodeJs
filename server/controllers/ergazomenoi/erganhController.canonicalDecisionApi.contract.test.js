@@ -50,5 +50,9 @@ assert.ok(!browser.includes("HR: 'Ανθρώπινο Δυναμικό'"));
 assert.ok(!browser.includes('Απόφαση HR'));
 assert.ok(!view.includes('Απόφαση HR'));
 assert.ok(browser.includes("['A', 'S', 'HR']") || view.includes("['A', 'S', 'HR']"));
+assert.ok(browser.includes(
+    'Διαχειριστή, Επόπτη ή Υπεύθυνου Ανθρώπινου Δυναμικού'
+));
+assert.ok(!browser.includes('Admin, Supervisor ή HR'));
 
-console.log('canonical decision API/workspace contract tests passed (45 contracts)');
+console.log('canonical decision API/workspace contract tests passed (47 contracts)');

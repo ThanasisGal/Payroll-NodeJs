@@ -2253,7 +2253,7 @@ function canonicalDecisionActionOptions(context) {
 
 function renderCanonicalDecisionEditor(context) {
     if (!userCanRecordCanonicalDecision()) {
-        return '<div class="alert alert-secondary mb-0">Έχετε πρόσβαση προβολής. Η καταγραφή απόφασης απαιτεί ρόλο Admin, Supervisor ή HR.</div>';
+        return '<div class="alert alert-secondary mb-0">Έχετε πρόσβαση προβολής. Η καταγραφή απόφασης απαιτεί δικαιώματα Διαχειριστή, Επόπτη ή Υπεύθυνου Ανθρώπινου Δυναμικού.</div>';
     }
     if (!context.index_readiness?.ready) {
         return '<div class="alert alert-secondary mb-0">Η καταγραφή αποφάσεων δεν είναι προσωρινά διαθέσιμη.</div>';
