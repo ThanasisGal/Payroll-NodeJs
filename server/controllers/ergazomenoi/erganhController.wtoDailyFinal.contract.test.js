@@ -7,7 +7,7 @@ const routes = fs.readFileSync(path.join(__dirname, '../../routes/usersRoute.js'
 assert.match(routes, /period-control\/submission\/final'[\s\S]*checkAuth[\s\S]*requireEmploymentReviewAccess[\s\S]*requireCriticalEmploymentDecisionRole[\s\S]*submitFinalWTODayilyA/);
 assert.match(controller, /stored_status !== 'FINALIZED'/);
 assert.match(controller, /state\.past_deadline/);
-assert.match(controller, /submissionCode: 'WTODayilyA', payload,[\s\S]*fetchSubmittedPdf: true/);
+assert.match(controller, /submissionCode: 'WTODailyA', payload,[\s\S]*fetchSubmittedPdf: true/);
 assert.match(controller, /resolveWtoDailyRestIdentity\(restResult, process\.env\.ERGANI_ENV\)/);
 assert.match(controller, /submission_id: resolvedIdentity\.submission_id/);
 assert.doesNotMatch(controller.slice(controller.indexOf('static submitFinalWTODayilyA'),
@@ -19,4 +19,4 @@ const finalMethod = controller.slice(controller.indexOf('static submitFinalWTODa
     controller.indexOf('static linkEmploymentReviewPeriodSubmission'));
 assert.doesNotMatch(finalMethod, /ErgazomenoiModel\.find/);
 assert.match(controller, /linkEmploymentPeriodSubmission/);
-console.log('WTODayilyA final endpoint contract tests passed');
+console.log('WTODailyA final endpoint contract tests passed');

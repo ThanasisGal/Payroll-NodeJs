@@ -23,5 +23,5 @@ const { REQUIRED_INDEXES, getWtoDailySubmissionIndexState, assertWtoDailySubmiss
     assert.deepStrictEqual(wrongPartial.mismatched, ['unique_ergani_submission_command_request']);
     await assert.rejects(() => assertWtoDailySubmissionIndexesReady({ loader: async () => [] }),
         (error) => error.code === 'WTODAILY_INDEXES_NOT_READY');
-    console.log('WTODayilyA index readiness tests passed');
+    console.log('WTODailyA index readiness tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

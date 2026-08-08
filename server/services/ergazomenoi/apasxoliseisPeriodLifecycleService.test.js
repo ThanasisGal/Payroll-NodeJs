@@ -174,12 +174,12 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
 
     const submissionStore = stores({ status: 'FINALIZED' });
     const submission = { _id: '507f1f77bcf86cd799439014', submit_date: new Date('2026-07-31T12:00:00Z'),
-        protocol: 'PROTO-1', submission_status: 'SUCCESS', submission_code: 'WTODayilyA', submission_id: 91,
+        protocol: 'PROTO-1', submission_status: 'SUCCESS', submission_code: 'WTODailyA', submission_id: 91,
         employment_period_start: new Date('2026-06-01T00:00:00.000Z'),
         employment_period_end: new Date('2026-06-30T00:00:00.000Z') };
     const submissionModel = { findOne(filter) { assert.strictEqual(filter.ypokatasthma_kodikos, '0001');
         assert.strictEqual(String(filter.companykod_object), scope.company_kod);
-        assert.strictEqual(filter.submission_code, 'WTODayilyA');
+        assert.strictEqual(filter.submission_code, 'WTODailyA');
         assert.deepStrictEqual(filter.submission_id, { $type: 'number', $gt: 0 });
         assert.strictEqual(filter.process_code, undefined);
         assert.strictEqual(filter.employment_period_start.toISOString().slice(0, 10), scope.period_start);
@@ -193,7 +193,7 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
     const productionSubmissionStore = stores({ status: 'FINALIZED' });
     const productionSubmission = { ...submission, _id: '507f1f77bcf86cd799439015', submission_id: 207 };
     const productionSubmissionModel = { findOne(filter) {
-        assert.strictEqual(filter.submission_code, 'WTODayilyA');
+        assert.strictEqual(filter.submission_code, 'WTODailyA');
         assert.deepStrictEqual(filter.submission_id, { $type: 'number', $gt: 0 });
         assert.strictEqual(filter.process_code, undefined);
         return query(productionSubmission);
@@ -216,7 +216,7 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
         submissionId: submission._id, submissionModel: wrongBranchSubmissionModel,
         periodControlModel: submissionStore.period, auditModel: submissionStore.audit, transactionRunner: runner }),
     (error) => error.code === 'SUBMISSION_NOT_AUTHORITATIVE');
-    const wrongTypeSubmissionModel = { findOne(filter) { assert.strictEqual(filter.submission_code, 'WTODayilyA');
+    const wrongTypeSubmissionModel = { findOne(filter) { assert.strictEqual(filter.submission_code, 'WTODailyA');
         assert.strictEqual(filter.process_code, undefined); return query(null); } };
     await assert.rejects(() => linkEmploymentPeriodSubmission({ session: allowed, scope, reason: 'Λάθος τύπος',
         submissionId: submission._id, submissionModel: wrongTypeSubmissionModel,

@@ -10,11 +10,11 @@ assert.strictEqual(assertWtoDailyFrozenSnapshotVersion({ snapshot_schema_version
     employees: [{ kodikos: '1', afm: '123456789', eponymo: 'ΕΠ', onoma: 'ΟΝ' }] })
     .snapshot_schema_version, 'employment-period-frozen:v3');
 
-assert.deepStrictEqual(resolveWtoDailyRestIdentity({ submission: { id: 91, code: 'WTODayilyA' } }, 'trial'), {
-    environment: 'trial', submission_code: 'WTODayilyA', submission_id: 91
+assert.deepStrictEqual(resolveWtoDailyRestIdentity({ submission: { id: 91, code: 'WTODailyA' } }, 'trial'), {
+    environment: 'trial', submission_code: 'WTODailyA', submission_id: 91
 });
-assert.deepStrictEqual(resolveWtoDailyRestIdentity({ submission: { id: 207, code: 'WTODayilyA' } }, 'production'), {
-    environment: 'production', submission_code: 'WTODayilyA', submission_id: 207
+assert.deepStrictEqual(resolveWtoDailyRestIdentity({ submission: { id: 207, code: 'WTODailyA' } }, 'production'), {
+    environment: 'production', submission_code: 'WTODailyA', submission_id: 207
 });
 assert.throws(() => resolveWtoDailyRestIdentity({ submission: { id: 207, code: 'OTHER' } }, 'trial'),
     (error) => error.code === 'WTODAILY_RESOLVED_SUBMISSION_INVALID');
@@ -28,4 +28,5 @@ const productionFingerprint = buildWtoDailyPayloadFingerprint({ ...fingerprintIn
     environment: 'production', submission_id: 207 });
 assert.strictEqual(trialFingerprint, productionFingerprint);
 assert.strictEqual(trialFingerprint.length, 64);
-console.log('WTODayilyA environment-specific REST identity tests passed');
+assert.throws(() => resolveWtoDailyRestIdentity({ submission: { id: 91, code: 'WTODayilyA' } }, 'trial'));
+console.log('WTODailyA environment-specific REST identity tests passed');

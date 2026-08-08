@@ -5,7 +5,7 @@ const { SNAPSHOT_SCHEMA_VERSION } = require('./apasxoliseisPeriodFrozenSnapshotS
 
 function assertWtoDailyFrozenSnapshotVersion(snapshot) {
     if (snapshot?.snapshot_schema_version !== SNAPSHOT_SCHEMA_VERSION) {
-        const error = new Error('Η frozen ταυτότητα εργαζομένων δεν ανήκει στο υποστηριζόμενο WTODayilyA snapshot schema.');
+        const error = new Error('Η frozen ταυτότητα εργαζομένων δεν ανήκει στο υποστηριζόμενο WTODailyA snapshot schema.');
         error.code = 'WTODAILY_FROZEN_IDENTITY_VERSION_UNSUPPORTED'; error.statusCode = 409; throw error;
     }
     return snapshot;
@@ -14,8 +14,8 @@ function assertWtoDailyFrozenSnapshotVersion(snapshot) {
 function resolveWtoDailyRestIdentity(restResult, environment = process.env.ERGANI_ENV) {
     const code = String(restResult?.submission?.code || '').trim();
     const id = Number(restResult?.submission?.id);
-    if (code !== 'WTODayilyA' || !Number.isInteger(id) || id <= 0) {
-        const error = new Error('Το REST result δεν περιέχει valid resolved WTODayilyA submission identity.');
+    if (code !== 'WTODailyA' || !Number.isInteger(id) || id <= 0) {
+        const error = new Error('Το REST result δεν περιέχει valid resolved WTODailyA submission identity.');
         error.code = 'WTODAILY_RESOLVED_SUBMISSION_INVALID'; error.statusCode = 502; throw error;
     }
     return Object.freeze({
@@ -28,7 +28,7 @@ function resolveWtoDailyRestIdentity(restResult, environment = process.env.ERGAN
 function buildWtoDailyPayloadFingerprint({ team, company, branch, periodStart, periodEnd, payload }) {
     return crypto.createHash('sha256').update(JSON.stringify(canonicalize({
         team, company, branch, period_start: periodStart, period_end: periodEnd,
-        submission_code: 'WTODayilyA', payload
+        submission_code: 'WTODailyA', payload
     }))).digest('hex');
 }
 

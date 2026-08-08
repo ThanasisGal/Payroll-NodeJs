@@ -50,14 +50,28 @@ function normalizeSubmissionList(value) {
     return [];
 }
 
+function normalizeSubmissionRecord(record) {
+    if (!record || typeof record !== 'object') return { id: null, code: '', description: '' };
+    const firstDefined = (keys) => keys.find((key) => record[key] !== undefined && record[key] !== null);
+    const idKey = firstDefined(['id', 'Id', 'ID', 'submissionId', 'SubmissionId']);
+    const codeKey = firstDefined(['code', 'Code', 'CODE', 'submissionCode', 'SubmissionCode']);
+    const descriptionKey = firstDefined(['description', 'Description', 'submissionDescription',
+        'SubmissionDescription', 'title', 'Title']);
+    return {
+        id: idKey ? record[idKey] : null,
+        code: codeKey ? String(record[codeKey]).trim() : '',
+        description: descriptionKey ? String(record[descriptionKey]).trim() : ''
+    };
+}
+
 function normalizeSubmissionId(value) {
     if (value === null || value === undefined) return '';
     return String(value).trim();
 }
 
-async function resolveSubmissionByCode(accessToken, submissionCode) {
-    const submissionsRaw = await getSubmissions(accessToken);
-    const submissions = normalizeSubmissionList(submissionsRaw);
+async function resolveSubmissionByCode(accessToken, submissionCode, { getSubmissionsFn = getSubmissions } = {}) {
+    const submissionsRaw = await getSubmissionsFn(accessToken);
+    const submissions = normalizeSubmissionList(submissionsRaw).map(normalizeSubmissionRecord);
 
     const found = submissions.find((x) => {
         return (
@@ -72,6 +86,9 @@ async function resolveSubmissionByCode(accessToken, submissionCode) {
 
     if (!found) {
         throw new Error(`Δεν βρέθηκε submission code ${submissionCode} στο Submissions List.`);
+    }
+    if (!Number.isInteger(Number(found.id)) || Number(found.id) <= 0) {
+        throw new Error(`Το submission code ${submissionCode} δεν έχει έγκυρο numeric id.`);
     }
 
     return {
@@ -378,5 +395,7 @@ async function uploadJsonDocumentToErgani({
 module.exports = {
     uploadJsonDocumentToErgani,
     resolveSubmissionByCode,
+    normalizeSubmissionList,
+    normalizeSubmissionRecord,
     assertRestSubmitAllowed
 };

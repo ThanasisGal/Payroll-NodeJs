@@ -6688,11 +6688,11 @@ class erganhController {
                 error.code = 'PERIOD_LIFECYCLE_INDEXES_NOT_READY'; error.statusCode = 503; throw error;
             }
             if (state.stored_status !== 'FINALIZED') {
-                const error = new Error('Η τελική WTODayilyA υποβολή απαιτεί οριστικοποιημένη περίοδο.');
+                const error = new Error('Η τελική WTODailyA υποβολή απαιτεί οριστικοποιημένη περίοδο.');
                 error.code = 'WTODAILY_PERIOD_NOT_FINALIZED'; error.statusCode = 409; throw error;
             }
             if (state.past_deadline) {
-                const error = new Error('Η προθεσμία τελικής WTODayilyA υποβολής έχει παρέλθει.');
+                const error = new Error('Η προθεσμία τελικής WTODailyA υποβολής έχει παρέλθει.');
                 error.code = 'WTODAILY_DEADLINE_PASSED'; error.statusCode = 409; throw error;
             }
             const frozen = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
@@ -6718,7 +6718,7 @@ class erganhController {
                 periodStart: scope.period_start, periodEnd: scope.period_end, payload });
             const requestRecord = await ErgazomenoiErganhModel.findOne({ team: scope.team,
                 companykod_object: scope.company_kod, request_id: requestId,
-                submission_code: 'WTODayilyA' }).lean();
+                submission_code: 'WTODailyA' }).lean();
             if (requestRecord && requestRecord.payload_fingerprint !== fingerprint) {
                 const error = new Error('Το request_id έχει χρησιμοποιηθεί για διαφορετικό authoritative payload.');
                 error.code = 'WTODAILY_REQUEST_ID_CONFLICT'; error.statusCode = 409; throw error;
@@ -6726,10 +6726,10 @@ class erganhController {
             const existing = requestRecord || await ErgazomenoiErganhModel.findOne({ team: scope.team,
                 companykod_object: scope.company_kod, ypokatasthma_kodikos: scope.ypokatasthma,
                 employment_period_start: scope.period_start, employment_period_end: scope.period_end,
-                submission_code: 'WTODayilyA', payload_fingerprint: fingerprint,
+                submission_code: 'WTODailyA', payload_fingerprint: fingerprint,
                 submission_status: 'SUCCESS', is_final: true, document_status: 'ACTIVE' }).lean();
             if (existing) return res.json({ success: true, idempotent: true,
-                submissionCode: 'WTODayilyA', protocol: existing.protocol,
+                submissionCode: 'WTODailyA', protocol: existing.protocol,
                 submitDate: existing.submit_date_text, erganhSubmissionId: existing.erganh_submission_id,
                 erganhLogId: existing._id, pdfUrl: existing.pdf_s3_url || '' });
             const [company, branch, password] = await Promise.all([
@@ -6742,11 +6742,11 @@ class erganhController {
                 const error = new Error('Λείπουν authoritative στοιχεία εταιρείας, παραρτήματος ή credentials ΕΡΓΑΝΗ.');
                 error.code = 'WTODAILY_SUBMISSION_CONTEXT_MISSING'; error.statusCode = 409; throw error;
             }
-            const restResult = await uploadJsonDocumentToErgani({ submissionCode: 'WTODayilyA', payload,
+            const restResult = await uploadJsonDocumentToErgani({ submissionCode: 'WTODailyA', payload,
                 creds: { username: password.username, password: password.password,
                     userType: process.env.ERGANI_USERTYPE || '01' }, fetchSubmittedPdf: true });
             if (!restResult?.success) return res.status(502).json({ success: false,
-                code: 'WTODAILY_REST_SUBMISSION_FAILED', message: restResult?.error || 'Η υποβολή WTODayilyA απέτυχε.' });
+                code: 'WTODAILY_REST_SUBMISSION_FAILED', message: restResult?.error || 'Η υποβολή WTODailyA απέτυχε.' });
             const resolvedIdentity = resolveWtoDailyRestIdentity(restResult, process.env.ERGANI_ENV);
             externalSuccess = { protocol: restResult.protocol, id: restResult.id, submitDate: restResult.submitDate };
             let pdfStorage = { pdfSaved: false, pdfS3Key: null, pdfS3Url: null, pdfRelativePath: null,
@@ -6757,7 +6757,7 @@ class erganhController {
                 pdfStorage = await saveSubmittedErganiPdfToS3({ pdfBuffer, contentType: 'application/pdf',
                     ergazomenos: { team: scope.team, kodikos: `PERIOD_${projection.f_from_date}_${projection.f_to_date}`,
                         eponymo: 'WTO', onoma: 'DAILY' }, companyData: company, restResult,
-                    submissionFolder: 'WTODayilyA' });
+                    submissionFolder: 'WTODailyA' });
             }
             const submittedAt = parseErganiSubmitDate(restResult.submitDate);
             if (!submittedAt || !restResult.protocol || !restResult.id) {
@@ -6789,7 +6789,7 @@ class erganhController {
             await linkEmploymentPeriodSubmission({ session: req.session, scope, reason,
                 submissionId: record._id, submissionModel: ErgazomenoiErganhModel });
             return res.status(201).json({ success: true, idempotent: false,
-                submissionCode: 'WTODayilyA', protocol: restResult.protocol,
+                submissionCode: 'WTODailyA', protocol: restResult.protocol,
                 submitDate: restResult.submitDate, erganhSubmissionId: restResult.id,
                 erganhLogId: record._id, pdfSaved: pdfStorage.pdfSaved,
                 pdfUrl: pdfStorage.pdfS3Url || '', pdfDeferred: !pdfStorage.pdfSaved });
@@ -6802,7 +6802,7 @@ class erganhController {
                 message: 'Η υποβολή έγινε δεκτή από το ΕΡΓΑΝΗ, αλλά η τοπική καταγραφή/σύνδεση απέτυχε. Απαιτείται συμφωνία χωρίς αυτόματη επανυποβολή.' });
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code, message: error.statusCode && error.statusCode < 500 ? error.message :
-                    'Η τελική υποβολή WTODayilyA δεν ολοκληρώθηκε.' });
+                    'Η τελική υποβολή WTODailyA δεν ολοκληρώθηκε.' });
         }
     };
 

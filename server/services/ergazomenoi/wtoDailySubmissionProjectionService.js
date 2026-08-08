@@ -51,14 +51,14 @@ function resolveType(row) {
         return Object.freeze({ rule: apologistikaRule, source: 'APOLOGISTIKA_CATEGORY' });
     }
     if (apologistikaCategory) throw projectionError('UNSUPPORTED_WTODAILY_TYPE',
-        `Μη υποστηριζόμενος WTODayilyA τύπος: ${apologistikaCategory}.`, { value: apologistikaCategory });
+        `Μη υποστηριζόμενος WTODailyA τύπος: ${apologistikaCategory}.`, { value: apologistikaCategory });
     const declaredCategory = clean(row.kathgoria_ergasias).toUpperCase();
     const declaredRule = TYPE_RULES[declaredCategory];
     if (declaredRule) {
         return Object.freeze({ rule: declaredRule, source: 'DECLARED_CATEGORY_FALLBACK' });
     }
     throw projectionError('UNSUPPORTED_WTODAILY_TYPE',
-        `Μη υποστηριζόμενος WTODayilyA τύπος: ${declaredCategory || '(κενό)'}.`, { value: declaredCategory });
+        `Μη υποστηριζόμενος WTODailyA τύπος: ${declaredCategory || '(κενό)'}.`, { value: declaredCategory });
 }
 
 function identityFor(row, employeeByCode) {
@@ -122,7 +122,7 @@ function buildWtoDailySubmissionProjection({ rows, employees, branch, periodStar
     if (protocol.length > 50) throw projectionError('INVALID_WTODAILY_RELATED_PROTOCOL', 'Το σχετικό πρωτόκολλο δεν μπορεί να υπερβαίνει τους 50 χαρακτήρες.');
     const relDate = clean(relatedDate);
     if (relDate) formatDate(relDate, 'related date');
-    if (protocol || relDate) throw projectionError('UNSUPPORTED_WTODAILY_CORRECTIVE_SUBMISSION', 'Η συσχέτιση διορθωτικής WTODayilyA υποβολής δεν υποστηρίζεται ακόμη.');
+    if (protocol || relDate) throw projectionError('UNSUPPORTED_WTODAILY_CORRECTIVE_SUBMISSION', 'Η συσχέτιση διορθωτικής WTODailyA υποβολής δεν υποστηρίζεται ακόμη.');
     const startKey = dateKey(periodStart, 'period start');
     const endKey = dateKey(periodEnd, 'period end');
     if (startKey > endKey) throw projectionError('INVALID_WTODAILY_PERIOD', 'Μη έγκυρη frozen περίοδος.');

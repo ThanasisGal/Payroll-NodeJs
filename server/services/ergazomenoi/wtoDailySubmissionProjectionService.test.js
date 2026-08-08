@@ -181,4 +181,4 @@ assert.deepStrictEqual(representative.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO.map
     { date: '05/06/2026', analytics: [{ f_type: 'ΤΗΛ', f_from: '09:00', f_to: '17:00' }] }
 ]);
 
-console.log('WTODayilyA authoritative projection tests passed');
+console.log('WTODailyA authoritative projection tests passed');

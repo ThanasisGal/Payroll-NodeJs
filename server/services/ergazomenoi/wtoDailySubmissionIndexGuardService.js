@@ -34,7 +34,7 @@ async function getWtoDailySubmissionIndexState({ loader = () => ErgazomenoiErgan
 }
 async function assertWtoDailySubmissionIndexesReady(options) {
     const state = await getWtoDailySubmissionIndexState(options);
-    if (!state.ready) { const error = new Error('Οι indexes ασφαλούς WTODayilyA υποβολής δεν είναι διαθέσιμοι.');
+    if (!state.ready) { const error = new Error('Οι indexes ασφαλούς WTODailyA υποβολής δεν είναι διαθέσιμοι.');
         error.code = 'WTODAILY_INDEXES_NOT_READY'; error.statusCode = 503; throw error; }
     return state;
 }
