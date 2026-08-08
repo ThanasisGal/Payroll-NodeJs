@@ -7,6 +7,10 @@ const routeSource = fs.readFileSync(
     path.join(__dirname, '..', '..', 'routes', 'usersRoute.js'),
     'utf8'
 );
+const postCheckWritePlan = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'services', 'ergazomenoi', 'apasxoliseisWeeklyPostCheckWritePlanService.js'),
+    'utf8'
+);
 
 assert.ok(routeSource.includes("router.get('/api/prodhlomena-oraria/review'"));
 assert.ok(routeSource.includes('erganhController.getProdhlomenaOrariaForReview'));
@@ -59,7 +63,7 @@ assert.ok(source.includes('normalizeLegacyDeviation({'));
 assert.ok(source.includes('deviationPolicyVersion: deviationPreview.policyVersion'));
 const cleanupFilterStart = source.indexOf('const deviationsCleanupFilter = {');
 const cleanupFilterEnd = source.indexOf(
-    'await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter);',
+    'await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter,',
     cleanupFilterStart
 );
 assert.ok(cleanupFilterStart >= 0 && cleanupFilterEnd > cleanupFilterStart);
@@ -111,9 +115,9 @@ assert.strictEqual(
     (calculationSource.match(/checkIncompleteCardPairAgainstDeclared\(/g) || []).length,
     0
 );
-assert.ok(/resolveCardPairVerification\(\s*row\s*\)/.test(postCheckSource));
-assert.ok(postCheckSource.includes('buildPartialVerifiedCardUpdate(row).update'));
-assert.ok(!postCheckSource.includes('buildIncompleteCardSafeUpdate()'));
+assert.ok(/resolveCardPairVerification\(\s*row\s*\)/.test(postCheckWritePlan));
+assert.ok(postCheckWritePlan.includes('buildPartialVerifiedCardUpdate(row).update'));
+assert.ok(!postCheckWritePlan.includes('buildIncompleteCardSafeUpdate()'));
 
 const payrollIntervalsStart = source.indexOf(
     'function getPayrollCalculationIntervals(rec, ergazomenos = null)'
@@ -142,8 +146,8 @@ assert.ok(atomicSource.includes('startOfWeekMondayUtc(requestedPeriodStart)'));
 assert.ok(atomicSource.includes('endOfWeekSundayUtc(requestedPeriodEnd)'));
 assert.ok(atomicSource.includes('validationPeriodStart: requestedPeriodStart'));
 assert.ok(atomicSource.includes('validationPeriodEnd: requestedPeriodEnd'));
-assert.ok(atomicSource.includes('presentationStart: requestedPeriodStart'));
-assert.ok(atomicSource.includes('presentationEnd: requestedPeriodEnd'));
+assert.ok(atomicSource.includes('presentationStart: includeContextGroups ? analysisPeriodStart : requestedPeriodStart'));
+assert.ok(atomicSource.includes('presentationEnd: includeContextGroups ? analysisPeriodEnd : requestedPeriodEnd'));
 assert.ok(atomicSource.includes('$gte: analysisPeriodStart'));
 assert.ok(atomicSource.includes('$lte: analysisPeriodEnd'));
 

@@ -6009,6 +6009,7 @@ async function loadHrReviewQueue() {
     }
 
     try {
+        await loadEmploymentPeriodControl(branch);
         currentPolicyPreviewBaseParams = new URLSearchParams(params);
         currentRepoTransferDecisionsByProposalId = new Map();
         const result = await fetchPolicyPreviewGrouping(params);
@@ -6550,6 +6551,88 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
     });
 }
 
+let currentEmploymentPeriodControl = null;
+
+const employmentPeriodModeLabels = Object.freeze({
+    NORMAL: 'Ανοικτή',
+    LOCKED: 'Κλειδωμένη',
+    CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'
+});
+
+function renderEmploymentPeriodControl(state) {
+    currentEmploymentPeriodControl = state || null;
+    const panel = document.getElementById('employmentPeriodControlPanel');
+    if (!panel) return;
+    panel.classList.remove('d-none');
+    const mode = String(state?.effective_mode || '');
+    document.getElementById('employmentPeriodControlStatus').textContent =
+        employmentPeriodModeLabels[mode] || 'Απαιτείται έλεγχος';
+    document.getElementById('employmentPeriodControlDeadline').textContent =
+        formatPolicyPreviewDate(state?.deadline);
+    const actions = state?.allowed_actions || {};
+    document.getElementById('lockEmploymentPeriodBtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && actions.lock_period === true && state?.index_readiness?.ready === true)
+    );
+    document.getElementById('unlockEmploymentPeriodBtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && actions.unlock_period === true && state?.index_readiness?.ready === true)
+    );
+    const message = document.getElementById('employmentPeriodControlMessage');
+    if (message) {
+        message.textContent = state?.index_readiness?.ready === false
+            ? 'Η μεταβολή κατάστασης περιόδου δεν είναι προσωρινά διαθέσιμη.'
+            : mode === 'CORRECTIVE_ONLY'
+              ? 'Οι κανονικές μεταβολές έχουν απενεργοποιηθεί μετά την προθεσμία.'
+              : '';
+    }
+}
+
+async function loadEmploymentPeriodControl(ypokatasthma) {
+    const response = await fetch(`/api/prodhlomena-oraria/review/period-control/current?ypokatasthma=${encodeURIComponent(ypokatasthma)}`, {
+        headers: { Accept: 'application/json', 'CSRF-Token': csrfToken }
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || 'Δεν ήταν δυνατή η ανάκτηση της κατάστασης περιόδου.');
+    renderEmploymentPeriodControl(payload);
+    return payload;
+}
+
+async function transitionEmploymentPeriod(action) {
+    const unlocking = action === 'unlock';
+    const confirmation = await Swal.fire({
+        icon: 'warning',
+        title: unlocking ? 'Ξεκλείδωμα περιόδου' : 'Κλείδωμα περιόδου',
+        text: unlocking
+            ? 'Η ενέργεια αφορά ολόκληρη την περίοδο και δεν ξεκλειδώνει χειροκίνητα κλειδωμένες ημερήσιες εγγραφές.'
+            : 'Μετά το κλείδωμα δεν επιτρέπονται κανονικές μεταβολές στην περίοδο.',
+        input: 'textarea',
+        inputLabel: 'Αιτιολογία',
+        inputPlaceholder: 'Συμπληρώστε υποχρεωτική αιτιολογία',
+        showCancelButton: true,
+        confirmButtonText: unlocking ? 'Ξεκλείδωμα περιόδου' : 'Κλείδωμα περιόδου',
+        cancelButtonText: 'Ακύρωση',
+        inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.'
+    });
+    if (!confirmation.isConfirmed) return;
+    const branch = String(
+        document.getElementById('ypokatasthma_stathera_advanced')?.value ||
+        getHrSelectedBranch() || ''
+    ).trim();
+    const response = await fetch(`/api/prodhlomena-oraria/review/period-control/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({
+            ypokatasthma: branch,
+            reason: String(confirmation.value || '').trim(),
+            request_id: `period-${action}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            expected_version: Number(currentEmploymentPeriodControl?.version || 0)
+        })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || 'Η μεταβολή κατάστασης περιόδου απέτυχε.');
+    await loadEmploymentPeriodControl(branch);
+    await Swal.fire({ icon: 'success', title: 'Κατάσταση περιόδου', text: payload.message });
+}
+
 async function loadResults() {
     try {
         const advancedBranch = String(
@@ -6565,6 +6648,8 @@ async function loadResults() {
             advancedBranch.includes(',');
         branchValidation?.classList.toggle('d-none', !invalidBranch);
         if (invalidBranch) return;
+
+        await loadEmploymentPeriodControl(advancedBranch);
 
         currentAtomicRepoTransferProjection = null;
         currentPolicyPreviewRowsById = new Map();
@@ -7637,6 +7722,12 @@ document.addEventListener('DOMContentLoaded', initReviewMoveByEnter);
 document.addEventListener('DOMContentLoaded', ensureScenarioReviewFilterControl);
 document.addEventListener('DOMContentLoaded', ensureReviewCardElevation);
 document.addEventListener('DOMContentLoaded', bindHrReviewEvents);
+document.getElementById('lockEmploymentPeriodBtn')?.addEventListener('click', () => {
+    transitionEmploymentPeriod('lock').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('unlockEmploymentPeriodBtn')?.addEventListener('click', () => {
+    transitionEmploymentPeriod('unlock').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
 document.getElementById('searchBtn')?.addEventListener('click', loadResults);

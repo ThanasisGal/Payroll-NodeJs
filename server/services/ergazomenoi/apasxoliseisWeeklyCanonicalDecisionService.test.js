@@ -115,6 +115,32 @@ function changed(path, value) {
         decisionModel: store, indexReadinessGuard: indexesReady }),
     (error) => error.code === 'CONFLICTING_APPLICABLE_DECISIONS');
 
+    const periodLockedStore = model(); let canonicalCreates = 0;
+    periodLockedStore.create = async () => { canonicalCreates++; };
+    await assert.rejects(() => recordWeeklyCanonicalDecision({ session,
+        command: { ...commands.card, request_id: 'request-period-locked' }, currentInput: baseInput,
+        decisionModel: periodLockedStore, indexReadinessGuard: indexesReady,
+        mutationRunner: async () => { const error = new Error('locked'); error.code = 'PERIOD_CONTROL_STATE_CONFLICT'; throw error; }
+    }), (error) => error.code === 'PERIOD_CONTROL_STATE_CONFLICT');
+    assert.equal(canonicalCreates, 0);
+
+    const rollbackStore = model(); let stagedCanonicalRecord = null;
+    rollbackStore.create = async (records, options) => {
+        assert.ok(Array.isArray(records)); assert.ok(options.session);
+        stagedCanonicalRecord = { _id: 'staged-canonical', ...records[0] };
+        return [stagedCanonicalRecord];
+    };
+    await assert.rejects(() => recordWeeklyCanonicalDecision({ session,
+        command: { ...commands.card, request_id: 'request-period-commit-race' }, currentInput: baseInput,
+        decisionModel: rollbackStore, indexReadinessGuard: indexesReady,
+        mutationRunner: async (write) => {
+            await write({ id: 'period-transaction' });
+            const error = new Error('transaction rolled back'); error.code = 'PERIOD_CONTROL_STATE_CONFLICT'; throw error;
+        }
+    }), (error) => error.code === 'PERIOD_CONTROL_STATE_CONFLICT');
+    assert.ok(stagedCanonicalRecord);
+    assert.equal(rollbackStore.records.length, 0);
+
     await assert.rejects(() => recordWeeklyCanonicalDecision({ session,
         command: { ...commands.card, request_id: 'request-index-missing' }, currentInput: baseInput,
         decisionModel: model(), indexReadinessGuard: async () => {
@@ -173,5 +199,5 @@ function changed(path, value) {
         command: { ...commands.repo, decision_payload: { ...commands.repo.decision_payload, applied_execution_id: 'execution-1' } },
         currentInput: appliedInput }));
 
-    console.log('weekly canonical decision service tests passed (33 contracts)');
+    console.log('weekly canonical decision service tests passed (39 contracts)');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

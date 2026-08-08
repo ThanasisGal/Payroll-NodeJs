@@ -1358,6 +1358,21 @@ router.get(
 router.get('/api/prodhlomena-oraria/review', checkAuth, requireEmploymentReviewAccess, erganhController.getProdhlomenaOrariaForReview);
 
 router.get(
+    '/api/prodhlomena-oraria/review/period-control/current',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getEmploymentReviewPeriodControl
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/period-control/:action(lock|unlock)',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.transitionEmploymentReviewPeriodControl
+);
+
+router.get(
     '/api/prodhlomena-oraria/policies/catalog',
     checkAuth,
     requireEmploymentReviewAccess,

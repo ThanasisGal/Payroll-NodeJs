@@ -77,6 +77,23 @@
                     </div>
                 </div>
 
+                <div id="employmentPeriodControlPanel" class="alert alert-light border d-none mb-3" aria-live="polite">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div>
+                            <span class="fw-semibold">Κατάσταση περιόδου:</span>
+                            <span id="employmentPeriodControlStatus">Απαιτείται έλεγχος</span>
+                            <span class="mx-2">·</span>
+                            <span class="fw-semibold">Προθεσμία:</span>
+                            <span id="employmentPeriodControlDeadline">-</span>
+                        </div>
+                        <div id="employmentPeriodControlActions" class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-danger btn-sm d-none" id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm d-none" id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>
+                        </div>
+                    </div>
+                    <div id="employmentPeriodControlMessage" class="small text-muted mt-1"></div>
+                </div>
+
                 <div class="employment-review-scroll-container employment-review-scroll-container--minimal">
                     <div id="hrReviewStatus" class="hr-review-status mt-3" aria-live="polite">
                         Επιλέξτε παράρτημα και πατήστε «Έναρξη ελέγχου».

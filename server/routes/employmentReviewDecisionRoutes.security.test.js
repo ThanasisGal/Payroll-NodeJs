@@ -16,6 +16,7 @@ function routeBlock(route, occurrence = 0) {
 
 const readRoutes = [
     '/api/prodhlomena-oraria/review',
+    '/api/prodhlomena-oraria/review/period-control/current',
     '/api/prodhlomena-oraria/review/:id/audit',
     '/api/prodhlomena-oraria/review/canonical-decisions/current',
     '/api/prodhlomena-oraria/review/canonical-decisions'
@@ -28,6 +29,7 @@ for (const route of readRoutes) {
 }
 
 const mutationRoutes = [
+    ['/api/prodhlomena-oraria/review/period-control/:action(lock|unlock)', 0],
     ['/api/prodhlomena-oraria/review/policies/apply-execution', 0],
     ['/api/prodhlomena-oraria/review/policies/approvals', 1],
     ['/api/prodhlomena-oraria/review/policies/approvals/:approvalId/revoke', 0],

@@ -471,7 +471,6 @@ async function run() {
         'DECISION_ALREADY_APPLIED',
         'RUNTIME_DISABLED',
         'INDEXES_NOT_READY',
-        'NOT_AUTHORIZED',
         'STALE_DECISION',
         'ALREADY_APPLIED'
     ]) {

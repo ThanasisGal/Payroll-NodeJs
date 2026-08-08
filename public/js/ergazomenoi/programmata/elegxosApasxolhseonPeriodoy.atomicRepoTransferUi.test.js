@@ -2401,6 +2401,13 @@ async function testLightweightHrLoadingRequests() {
     const projection = readyProjection();
     sandbox.fetch = async (url, options = {}) => {
         urls.push({ url: String(url), method: options.method || 'GET' });
+        if (String(url).startsWith('/api/prodhlomena-oraria/review/period-control/current?')) {
+            return {
+                ok: true,
+                json: async () => ({ success: true, effective_mode: 'NORMAL', deadline: '2026-08-31',
+                    version: 0, allowed_actions: {}, index_readiness: { ready: false } })
+            };
+        }
         if (String(url).startsWith('/api/prodhlomena-oraria/review/policies/preview?')) {
             return {
                 ok: true,
@@ -2418,9 +2425,10 @@ async function testLightweightHrLoadingRequests() {
     };
     vm.runInContext('currentHrReviewLoading = false; currentHrReviewLoaded = false', sandbox);
     await sandbox.loadHrReviewQueue();
-    assert.strictEqual(urls.length, 2);
-    assert.ok(urls[0].url.startsWith('/api/prodhlomena-oraria/review/policies/preview?'));
-    assert.ok(urls[1].url.startsWith('/api/prodhlomena-oraria/review/repo-transfer-decisions/current?'));
+    assert.strictEqual(urls.length, 3);
+    assert.ok(urls[0].url.startsWith('/api/prodhlomena-oraria/review/period-control/current?'));
+    assert.ok(urls[1].url.startsWith('/api/prodhlomena-oraria/review/policies/preview?'));
+    assert.ok(urls[2].url.startsWith('/api/prodhlomena-oraria/review/repo-transfer-decisions/current?'));
     assert.ok(urls.every((call) => call.method === 'GET'));
     const allUrls = urls.map((call) => call.url).join('\n');
     assert.ok(!allUrls.includes('/api/prodhlomena-oraria/review?'));

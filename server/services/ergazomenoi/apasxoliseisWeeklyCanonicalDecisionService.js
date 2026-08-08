@@ -285,6 +285,7 @@ async function recordWeeklyCanonicalDecision({
     currentInput,
     decisionModel = DecisionModel,
     indexReadinessGuard = assertWeeklyCanonicalDecisionIndexesReady,
+    mutationRunner = null,
     now = new Date()
 }) {
     const validated = validateDecisionCommand({ session, command, currentInput });
@@ -325,7 +326,15 @@ async function recordWeeklyCanonicalDecision({
         created_at: now
     };
     try {
-        return { record: await decisionModel.create(record), idempotent: false };
+        const createRecord = async (dbSession = null) => {
+            if (!dbSession) return decisionModel.create(record);
+            const created = await decisionModel.create([record], { session: dbSession });
+            return Array.isArray(created) ? created[0] : created;
+        };
+        const created = typeof mutationRunner === 'function'
+            ? await mutationRunner((dbSession) => createRecord(dbSession))
+            : await createRecord();
+        return { record: created, idempotent: false };
     } catch (error) {
         if (!isDuplicateKey(error)) throw error;
         return classifyConcurrentDuplicate({ decisionModel, validated });

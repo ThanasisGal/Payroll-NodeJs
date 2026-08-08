@@ -20,7 +20,7 @@ function reconstruction(fingerprint = 'a'.repeat(64)) {
         snapshot: {
             snapshot_version: 'weekly-repo-transfer-decision-snapshot:v1', proposal_id: command.proposal_id,
             canonical_group_key: 'safe-key', ypokatasthma: '0001', employee_id: '507f191e810c19729de860eb',
-            employee_kodikos: '001', week_start: '2026-06-14', week_end: '2026-06-20',
+            employee_kodikos: '001', week_start: '2026-06-15', week_end: '2026-06-21',
             source: { prodhlomena_oraria_id: SOURCE }, target: { prodhlomena_oraria_id: TARGET }
         }
     };
@@ -209,6 +209,56 @@ async function run() {
     const result = await createWeeklyRepoTransferDecision({ session, payload: command, decisionModel: model, reconstruct: async () => { calls++; return reconstruction(); } });
     assert.strictEqual(result.idempotent, false); assert.strictEqual(calls, 2); assert.strictEqual(model.records.length, 1);
     assert.strictEqual(model.records[0].decision_code, 'APPROVE_PROPOSAL');
+    let guardedContext = null;
+    await createWeeklyRepoTransferDecision({
+        session,
+        payload: { ...command, request_id: 'request-period-guard' },
+        decisionModel: fakeModel(),
+        reconstruct: async () => reconstruction(),
+        periodGuard: async (context) => { guardedContext = context; }
+    });
+    assert.deepStrictEqual(guardedContext, {
+        ypokatasthma: '0001', week_start: '2026-06-15', week_end: '2026-06-21'
+    });
+    let blockedCreate = false;
+    const periodBlockedModel = fakeModel();
+    periodBlockedModel.create = async () => { blockedCreate = true; };
+    await assert.rejects(() => createWeeklyRepoTransferDecision({
+        session,
+        payload: { ...command, request_id: 'request-period-blocked' },
+        decisionModel: periodBlockedModel,
+        reconstruct: async () => reconstruction(),
+        periodGuard: async () => { const error = new Error('locked'); error.code = 'PERIOD_CONTROL_LOCKED'; error.statusCode = 409; throw error; }
+    }), (error) => error.code === 'PERIOD_CONTROL_LOCKED');
+    assert.strictEqual(blockedCreate, false);
+    let repoDecisionCreates = 0;
+    const repoPeriodRaceModel = fakeModel();
+    repoPeriodRaceModel.create = async () => { repoDecisionCreates++; };
+    await assert.rejects(() => createWeeklyRepoTransferDecision({
+        session, payload: { ...command, request_id: 'request-repo-period-race' },
+        decisionModel: repoPeriodRaceModel, reconstruct: async () => reconstruction(),
+        periodGuard: async () => ({ token: { exists: true, stored_status: 'OPEN', version: 1 } }),
+        mutationRunner: async () => { const error = new Error('locked'); error.code = 'PERIOD_CONTROL_STATE_CONFLICT'; throw error; }
+    }), (error) => error.code === 'PERIOD_CONTROL_STATE_CONFLICT');
+    assert.strictEqual(repoDecisionCreates, 0);
+    let stagedRepoDecision = null;
+    const repoRollbackModel = fakeModel();
+    repoRollbackModel.create = async (records, options) => {
+        assert.ok(Array.isArray(records)); assert.ok(options.session);
+        stagedRepoDecision = { _id: 'staged-repo-decision', ...records[0] };
+        return [stagedRepoDecision];
+    };
+    await assert.rejects(() => createWeeklyRepoTransferDecision({
+        session, payload: { ...command, request_id: 'request-repo-commit-race' },
+        decisionModel: repoRollbackModel, reconstruct: async () => reconstruction(),
+        periodGuard: async () => ({ token: { exists: true, stored_status: 'OPEN', version: 1 } }),
+        mutationRunner: async (write) => {
+            await write({ id: 'period-transaction' });
+            const error = new Error('transaction rolled back'); error.code = 'PERIOD_CONTROL_STATE_CONFLICT'; throw error;
+        }
+    }), (error) => error.code === 'PERIOD_CONTROL_STATE_CONFLICT');
+    assert.ok(stagedRepoDecision);
+    assert.strictEqual(repoRollbackModel.records.length, 0);
     const retry = await createWeeklyRepoTransferDecision({ session, payload: command, decisionModel: model, reconstruct: async () => { throw new Error('retry must not reconstruct'); } });
     assert.strictEqual(retry.idempotent, true); assert.strictEqual(model.records.length, 1);
     await assert.rejects(() => createWeeklyRepoTransferDecision({ session, payload: { ...command, request_id: 'request-0002' }, decisionModel: model, reconstruct: async () => reconstruction() }), (error) => error.statusCode === 409);

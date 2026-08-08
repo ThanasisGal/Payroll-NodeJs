@@ -35,17 +35,18 @@ test('canonical repo diagnostics use the existing in-memory HR decision result',
     assert.ok(plannerSource.includes('repoStateReasons.size > 0'));
 });
 
-test('post-check persistence blocks remain structurally unchanged', () => {
+test('post-check persistence payloads remain unchanged inside the period fence', () => {
     assert.ok(plannerSource.includes(
         'update: { $set: protectedUpdate.sanitizedUpdate }'
     ));
     assert.ok(postCheckSource.includes(
-        'await ProdhlomenaOrariaModel.bulkWrite(chunk, { ordered: false })'
+        'ProdhlomenaOrariaModel.bulkWrite(chunk, { ordered: false, session })'
     ));
     assert.ok(postCheckSource.includes(
-        'await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter)'
+        'await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter, session ? { session } : undefined)'
     ));
     assert.ok(postCheckSource.includes('await ProdhlomenaOrariaDeviationsModel.insertMany('));
+    assert.ok(postCheckSource.includes('work: ({ session }) => replaceDeviations(session)'));
     const persistedDeviation = postCheckSource.slice(
         postCheckSource.indexOf('await ProdhlomenaOrariaDeviationsModel.insertMany(')
     );

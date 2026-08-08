@@ -78,7 +78,8 @@ function commandIdentity(command) {
 }
 function presentation(record, currentFingerprint = null) { return { id: String(record._id || ''), proposal_id: record.proposal_id, decision_code: record.decision_code, decision_status: record.decision_status, notes: record.notes || '', ypokatasthma: record.ypokatasthma, employee_kodikos: record.employee_kodikos, week_start: record.week_start, week_end: record.week_end, created_by_user_name: record.created_by_user_name, created_at: record.created_at, is_current: Boolean(currentFingerprint && record.snapshot_fingerprint === currentFingerprint) }; }
 
-async function createWeeklyRepoTransferDecision({ session, payload, decisionModel = DecisionModel, approvalModel = PolicyApprovalModel, reconstruct = reconstructWeeklyRepoTransferDecision }) {
+async function createWeeklyRepoTransferDecision({ session, payload, decisionModel = DecisionModel, approvalModel = PolicyApprovalModel,
+    reconstruct = reconstructWeeklyRepoTransferDecision, periodGuard, mutationRunner }) {
     const scope = scopeFromSession(session); const command = validateCommand(payload);
     const normalizedCommandIdentity = commandIdentity(command);
     const retry = await decisionModel.findOne({
@@ -92,6 +93,13 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
     }
     const initial = await reconstruct({ scope, command });
     const final = await reconstruct({ scope, command });
+    if (typeof periodGuard === 'function') {
+        await periodGuard({
+            ypokatasthma: final.snapshot?.ypokatasthma || final.group?.ypokatasthma,
+            week_start: final.snapshot?.week_start,
+            week_end: final.snapshot?.week_end
+        });
+    }
     if (initial.fingerprint !== final.fingerprint) throw errorWithStatus('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο πριν καταγράψετε απόφαση.', 409);
     if (command.decision_code !== 'APPROVE_PROPOSAL' &&
         final.group?.decision_grain === 'ATOMIC_LINKED_SET') {
@@ -145,7 +153,17 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
         source_prodhlomena_oraria_id: snapshot.source.prodhlomena_oraria_id, target_prodhlomena_oraria_id: snapshot.target.prodhlomena_oraria_id,
         created_by_user_id: scope.created_by_user_id, created_by_user_name: scope.created_by_user_name, created_by_user_role: scope.created_by_user_role
     };
-    try { const created = await decisionModel.create(record); return { decision: presentation(created, final.fingerprint), idempotent: false }; }
+    try {
+        const createRecord = async (dbSession = null) => {
+            if (!dbSession) return decisionModel.create(record);
+            const created = await decisionModel.create([record], { session: dbSession });
+            return Array.isArray(created) ? created[0] : created;
+        };
+        const created = typeof mutationRunner === 'function'
+            ? await mutationRunner((dbSession) => createRecord(dbSession))
+            : await createRecord();
+        return { decision: presentation(created, final.fingerprint), idempotent: false };
+    }
     catch (error) {
         if (!isDuplicateKey(error)) throw error;
         const racedRetry = await decisionModel.findOne({ team: scope.team, company_kod: scope.company_kod, request_id: command.request_id }).lean();

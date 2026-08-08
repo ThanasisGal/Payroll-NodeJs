@@ -42,7 +42,8 @@ test('manual review rejects protected identity conflicts through HTTP 409', () =
 
 test('manual review keeps safe nonidentity updates and its existing audit flow', () => {
     assert.ok(manual.includes('const permittedUpdates = { ...protectedManualUpdate.sanitizedUpdate }'));
-    assert.ok(manual.includes('ProdhlomenaOrariaAuditModel.create({'));
+    assert.ok(manual.includes('ProdhlomenaOrariaAuditModel.create([{'));
+    assert.ok(manual.includes('}], { session })'));
     assert.ok(manual.includes('oldValues,'));
     assert.ok(manual.includes('newValues'));
 });
