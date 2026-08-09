@@ -39,7 +39,9 @@ function authoritativeSubmissionPeriod(submission = {}) {
 
 async function finalizeEmploymentPeriod({ session: userSession, scope: input, reason, requestId, snapshotInput, now = new Date(),
     periodControlModel = PeriodControlModel, frozenModel = FrozenModel, auditModel = LifecycleAuditModel,
-    indexGuard = assertPeriodLifecycleIndexesReady, transactionRunner = transaction }) {
+    indexGuard = assertPeriodLifecycleIndexesReady, transactionRunner = transaction,
+    historicalFingerprintResolver = (options) => require('./apasxoliseisHistoricalPeriodReconstructionService')
+        .calculateHistoricalFingerprints(options) }) {
     const scope = normalizeScope(input); const by = actor(userSession); const cleanReason = requiredText(reason,
         'PERIOD_FINALIZE_REASON_REQUIRED', 'Απαιτείται αιτιολογία οριστικοποίησης.');
     const cleanRequestId = requiredText(requestId, 'INVALID_PERIOD_FINALIZE_REQUEST_ID', 'Μη έγκυρο αναγνωριστικό αιτήματος.');
@@ -52,9 +54,21 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
         if (!control || control.status !== 'LOCKED') throw periodError('PERIOD_FINALIZE_REQUIRES_LOCKED', 409, 'Η περίοδος πρέπει πρώτα να κλειδωθεί.');
         if (control.active_calculation_id) throw periodError('PERIOD_CONTROL_CALCULATION_IN_PROGRESS', 409, 'Δεν είναι δυνατή η οριστικοποίηση όσο εκτελείται Υπολογισμός Απασχολήσεων.');
         if (control.frozen_snapshot_id) throw periodError('PERIOD_ALREADY_FINALIZED', 409, 'Η περίοδος έχει ήδη οριστικοποιηθεί.');
+        if (control.historical_reconstruction_status === 'COMPLETED') {
+            const currentFingerprints = await historicalFingerprintResolver({ scope, session: dbSession });
+            if (currentFingerprints.dependency_fingerprint !== control.historical_dependency_fingerprint) {
+                throw periodError('HISTORICAL_RECONSTRUCTION_STALE_CANNOT_FINALIZE', 409,
+                    'Η παρωχημένη ιστορική ανακατασκευή πρέπει πρώτα να επανεκτιμηθεί.');
+            }
+        }
+        const baselineOrigin = control.historical_reconstruction_status === 'COMPLETED'
+            ? 'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE' : 'NORMAL';
         const documents = await frozenModel.create([{ ...scope, ...built, frozen_snapshot: built.snapshot,
             finalized_at: now, finalized_by_user_id: by.user_id, finalized_by_user_name: by.user_name,
-            finalized_by_user_role: by.role, finalize_reason: cleanReason, request_id: cleanRequestId, created_at: now }], { session: dbSession });
+            finalized_by_user_role: by.role, finalize_reason: cleanReason, request_id: cleanRequestId,
+            baseline_origin: baselineOrigin,
+            historical_reconstruction_version: Number(control.historical_reconstruction_version || 0),
+            created_at: now }], { session: dbSession });
         const frozen = documents[0];
         const updated = await periodControlModel.findOneAndUpdate({ ...scope, status: 'LOCKED', version: control.version,
             active_calculation_id: { $in: ['', null] }, frozen_snapshot_id: null }, { $set: {
@@ -67,7 +81,9 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
         if (!updated) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409, 'Η κατάσταση της περιόδου άλλαξε.');
         await auditModel.create([{ ...scope, event_type: 'FINALIZE', actor_user_id: by.user_id,
             actor_user_name: by.user_name, actor_user_role: by.role, reason: cleanReason,
-            reference_id: String(frozen._id), details: { fingerprint: built.frozen_snapshot_fingerprint }, occurred_at: now }], { session: dbSession });
+            reference_id: String(frozen._id), details: { fingerprint: built.frozen_snapshot_fingerprint,
+                baseline_origin: baselineOrigin,
+                historical_reconstruction_version: Number(control.historical_reconstruction_version || 0) }, occurred_at: now }], { session: dbSession });
         return { idempotent: false, snapshot: frozen, control: updated };
     });
 }

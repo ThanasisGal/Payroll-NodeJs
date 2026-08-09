@@ -6565,10 +6565,16 @@ const employmentPeriodModeLabels = Object.freeze({
     NORMAL: 'Ανοικτή',
     LOCKED: 'Κλειδωμένη',
     FINALIZED: 'Οριστικοποιημένη περίοδος',
+    HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ BASELINE',
+    HISTORICAL_RECONSTRUCTED: 'ΑΝΑΚΑΤΑΣΚΕΥΑΣΜΕΝΗ ΕΚΠΡΟΘΕΣΜΗ ΠΕΡΙΟΔΟΣ',
+    HISTORICAL_RECONSTRUCTION_STALE: 'ΑΝΑΚΑΤΑΣΚΕΥΗ ΠΟΥ ΑΠΑΙΤΕΙ ΕΠΑΝΕΚΤΙΜΗΣΗ',
     CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'
 });
 const employmentSubmissionTimelinessLabels = Object.freeze({
     NOT_SUBMITTED: 'Δεν έχει συνδεθεί', TIMELY: 'Εμπρόθεσμη', LATE: 'Εκπρόθεσμη'
+});
+const employmentCriticalRoleLabels = Object.freeze({
+    A: 'Διαχειριστής', S: 'Επόπτης', HR: 'Υπεύθυνος Ανθρώπινου Δυναμικού'
 });
 const correctiveDeltaLabels = Object.freeze({
     ores_ergasias_apologistika: 'Ώρες εργασίας', ores_prostheths_ergasias_apologistika: 'Πρόσθετη εργασία',
@@ -6590,6 +6596,12 @@ function renderEmploymentPeriodControl(state) {
         employmentPeriodModeLabels[mode] || 'Απαιτείται έλεγχος';
     document.getElementById('employmentPeriodControlDeadline').textContent =
         formatPolicyPreviewDate(state?.deadline);
+    document.getElementById('employmentPeriodDeadlineState').textContent =
+        state?.past_deadline ? 'ΕΚΠΡΟΘΕΣΜΗ' : 'ΕΝΤΟΣ ΠΡΟΘΕΣΜΙΑΣ';
+    const historical = state?.historical_reconstruction || {};
+    document.getElementById('employmentHistoricalReconstructionStatus').textContent = historical.version
+        ? `v${historical.version} · ${historical.dependency_status || historical.status || '-'} · ${historical.started_by_user_name || '-'} (${employmentCriticalRoleLabels[historical.started_by_user_role] || historical.started_by_user_role || '-'})`
+        : '-';
     document.getElementById('employmentPeriodFinalizedAt').textContent =
         formatPolicyPreviewDate(state?.finalized_at) || '-';
     document.getElementById('employmentPeriodSubmission').textContent =
@@ -6599,6 +6611,12 @@ function renderEmploymentPeriodControl(state) {
     document.getElementById('lockEmploymentPeriodBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.lock_period === true && state?.index_readiness?.ready === true)
     );
+    const historicalAction = actions.historical_reconstruct === true || actions.historical_reassess === true;
+    const historicalButton = document.getElementById('historicalReconstructionBtn');
+    historicalButton?.classList.toggle('d-none', !(userCanReviewEdit() && historicalAction));
+    if (historicalButton) historicalButton.textContent = actions.historical_reassess === true
+        ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου'
+        : 'Ανακατασκευή Εκπρόθεσμης Περιόδου';
     document.getElementById('unlockEmploymentPeriodBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.unlock_period === true && state?.index_readiness?.ready === true)
     );
@@ -6627,10 +6645,48 @@ function renderEmploymentPeriodControl(state) {
     if (message) {
         message.textContent = state?.index_readiness?.ready === false
             ? 'Η μεταβολή κατάστασης περιόδου δεν είναι προσωρινά διαθέσιμη.'
-            : mode === 'CORRECTIVE_ONLY'
-              ? 'Οι κανονικές μεταβολές έχουν απενεργοποιηθεί μετά την προθεσμία.'
+            : mode === 'HISTORICAL_RECONSTRUCTION_REQUIRED'
+              ? 'Η κανονική εκτέλεση παραμένει κλειστή μέχρι ρητή εξουσιοδότηση ιστορικής ανακατασκευής.'
+              : mode === 'HISTORICAL_RECONSTRUCTION_STALE'
+                ? 'Τα πραγματικά δεδομένα της προηγούμενης περιόδου άλλαξαν. Απαιτείται επανεκτίμηση.'
+                : mode === 'CORRECTIVE_ONLY'
+                  ? 'Οι κανονικές μεταβολές έχουν απενεργοποιηθεί μετά την προθεσμία.'
               : '';
     }
+}
+
+async function runHistoricalReconstruction() {
+    const state = currentEmploymentPeriodControl;
+    const reassess = state?.allowed_actions?.historical_reassess === true;
+    const confirmation = await Swal.fire({ icon: 'warning',
+        title: reassess ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου' : 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
+        html: '<p>Η περίοδος έχει λήξει.</p><p>Η ενέργεια επιτρέπεται μόνο για ανακατασκευή ιστορικού αποτελέσματος και δεν αλλάζει την πραγματική ημερομηνία ούτε την εμπρόθεσμη / εκπρόθεσμη κατάσταση της περιόδου.</p><p>Η ενέργεια θα καταγραφεί με χρήστη, ημερομηνία και αιτιολογία.</p>',
+        input: 'textarea', inputLabel: 'Υποχρεωτική αιτιολογία', showCancelButton: true,
+        confirmButtonText: reassess ? 'Επανεκτίμηση' : 'Ανακατασκευή', cancelButtonText: 'Ακύρωση',
+        inputValidator: value => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
+    if (!confirmation.isConfirmed) return;
+    const branch = currentCorrectiveBranch();
+    const requestId = `historical-reconstruction-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const authorized = await fetch('/api/prodhlomena-oraria/review/period-control/historical-reconstruction/authorize', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({ ypokatasthma: branch, reason: String(confirmation.value).trim(),
+            request_id: requestId, confirmation: true })
+    });
+    const authorization = await authorized.json();
+    if (!authorized.ok || !authorization.success) throw new Error(authorization.message || 'Η εξουσιοδότηση απέτυχε.');
+    const response = await fetch('/ergazomenoi/programmata/calcApasxolhseisPeriodoy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({ apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
+            eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
+            ypokatasthmata_stathera: branch, proorh_proseleysh: 0, proorhApoxorhsh_stathera: 0,
+            historical_reconstruction_request_id: requestId })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || 'Η ιστορική ανακατασκευή απέτυχε.');
+    await loadEmploymentPeriodControl(branch);
+    await loadResults();
+    await Swal.fire({ icon: 'success', title: 'Ιστορική ανακατασκευή ολοκληρώθηκε',
+        text: `Έκδοση ${authorization.historical_reconstruction_version}` });
 }
 
 function currentCorrectiveBranch() {
@@ -7962,6 +8018,9 @@ document.addEventListener('DOMContentLoaded', ensureReviewCardElevation);
 document.addEventListener('DOMContentLoaded', bindHrReviewEvents);
 document.getElementById('lockEmploymentPeriodBtn')?.addEventListener('click', () => {
     transitionEmploymentPeriod('lock').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('historicalReconstructionBtn')?.addEventListener('click', () => {
+    runHistoricalReconstruction().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('unlockEmploymentPeriodBtn')?.addEventListener('click', () => {
     transitionEmploymentPeriod('unlock').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
