@@ -71,7 +71,7 @@ test('generic restore does not create or supersede repo-transfer executions', ()
 });
 
 test('schedule import reads existing rows once and prefetches protection once for the batch', () => {
-    assert.equal((scheduleImport.match(/ProdhlomenaOrariaModel\.find\(\{/g) || []).length, 1);
+    assert.equal((scheduleImport.match(/prodhlomenaModel\.find\(\{/g) || []).length, 1);
     assert.equal((scheduleImport.match(/loadAppliedProtectionForRows\(existingRows\)/g) || []).length, 1);
     assert.ok(scheduleImport.includes('preparedRecords.map(({ filter }) => filter)'));
 });

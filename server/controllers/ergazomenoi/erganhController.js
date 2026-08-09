@@ -5088,7 +5088,11 @@ class erganhController {
             console.log(`[lhpshOrarionApoErganh] Αποθηκεύτηκε τοπικά: ${savePath}`);
 
             // 8. Επεξεργασία xlsx ← ΠΡΩΤΑ
-            await processOrariaXlsx(savePath, req.session.yearInUse);
+            await processOrariaXlsx(savePath, req.session.yearInUse, {
+                team: selectedTeam,
+                company_kod: String(selectedCompany),
+                ypokatasthma: selectedPararthma
+            });
 
             // 7β. ✅ Αποθήκευση στο S3 ← ΜΕΤΑ με το επεξεργασμένο αρχείο
             try {
@@ -5237,7 +5241,12 @@ class erganhController {
                 selectedPararthma,
                 apoHmeromhnia,
                 eosHmeromhnia,
-                s3Key
+                s3Key,
+                authorizedScope: {
+                    team: userTeam,
+                    company_kod: String(companyId),
+                    ypokatasthma: selectedPararthma
+                }
             }, {
                 store: (buffer, key) => uploadBufferToS3(
                     buffer,
@@ -13828,7 +13837,7 @@ async function downloadOrariaToBuffer(
     }
 }
 
-async function processOrariaXlsx(filePath, sessionTeam, sessionYearInUse) {
+async function processOrariaXlsx(filePath, sessionYearInUse, authorizedScope) {
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
@@ -13950,7 +13959,7 @@ async function processOrariaXlsx(filePath, sessionTeam, sessionYearInUse) {
     // ============================================================
     // 4) Αποθήκευση στο ProdhlomenaOrariaModel
     // ============================================================
-    await saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse);
+    await saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorizedScope);
 }
 
 // ============================================================
@@ -14007,7 +14016,7 @@ function normalizeYpokatasthma(value) {
     return s.padStart(4, '0');
 }
 
-async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
+async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorizedScope, dependencies = {}) {
     const CHUNK_SIZE = 1000; // ops ανά bulkWrite
     const PARALLEL_CHUNKS = 5; // πόσα bulkWrites τρέχουν παράλληλα
 
@@ -14029,31 +14038,31 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
 
     // -------- 2) Φόρτωσε εργαζόμενους ΜΙΑ φορά --------
     const uniqueAfms = [...new Set(rows.map((r) => r.afm).filter(Boolean))];
-    const ergazomenoiList = await ErgazomenoiModel.find({
-        afm: mongoose.trusted({ $in: uniqueAfms })
-    }).lean();
-
-    const ergazomenoiMap = {};
-    ergazomenoiList.forEach((e) => {
-        ergazomenoiMap[e.afm] = e;
+    const employeeModel = dependencies.ergazomenoiModel || ErgazomenoiModel;
+    const prodhlomenaModel = dependencies.prodhlomenaModel || ProdhlomenaOrariaModel;
+    const argiesModel = dependencies.argiesModel || ArgiesModel;
+    const {
+        AMBIGUOUS_SCOPE_CODE,
+        OUTSIDE_SCOPE_CODE,
+        assertEmployeeWriteScope,
+        loadScopedErganiEmployees
+    } = require('../../services/ergazomenoi/erganiImportedEmployeeScopeService');
+    const employeeResolution = await loadScopedErganiEmployees({
+        employeeModel,
+        afms: uniqueAfms,
+        scope: authorizedScope
     });
 
     // -------- 3) Φόρτωσε ΟΛΕΣ τις Αργίες των (team, company_kod, etos) ΜΙΑ φορά --------
-    const teamCompanyPairs = new Set();
-    ergazomenoiList.forEach((e) => {
-        if (e.team && e.company_kod) {
-            teamCompanyPairs.add(`${e.team}|${e.company_kod}`);
-        }
-    });
-
-    const argiesOr = [...teamCompanyPairs].map((pair) => {
-        const [team, company_kod] = pair.split('|');
-        return { team, company_kod, etos: String(sessionYearInUse) };
-    });
+    const argiesOr = [{
+        team: employeeResolution.scope.team,
+        company_kod: employeeResolution.scope.company_kod,
+        etos: String(sessionYearInUse)
+    }];
 
     let argiesList = [];
     if (argiesOr.length > 0) {
-        argiesList = await ArgiesModel.find({ $or: mongoose.trusted(argiesOr) }).lean();
+        argiesList = await argiesModel.find({ $or: mongoose.trusted(argiesOr) }).lean();
     }
 
     // Map: "team|company_kod|<timestamp ημερομηνίας UTC>" -> perigrafh
@@ -14072,6 +14081,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
 
     // -------- 4) Προετοίμασε τα records --------
     const preparedRecords = [];
+    const diagnostics = [];
     let i = 0;
 
     while (i < rows.length) {
@@ -14092,11 +14102,23 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
             continue;
         }
 
-        const ergazomenos = ergazomenoiMap[current.afm];
-        if (!ergazomenos) {
+        if (current.ypokatasthma !== employeeResolution.scope.ypokatasthma) {
+            diagnostics.push({ code: OUTSIDE_SCOPE_CODE, afm: current.afm, rowNumber: current.rowNumber });
             i++;
             continue;
         }
+        if (employeeResolution.ambiguousAfms.has(current.afm)) {
+            diagnostics.push({ code: AMBIGUOUS_SCOPE_CODE, afm: current.afm, rowNumber: current.rowNumber });
+            i++;
+            continue;
+        }
+        const ergazomenos = employeeResolution.resolved.get(current.afm);
+        if (!ergazomenos) {
+            diagnostics.push({ code: OUTSIDE_SCOPE_CODE, afm: current.afm, rowNumber: current.rowNumber });
+            i++;
+            continue;
+        }
+        assertEmployeeWriteScope(ergazomenos, employeeResolution.scope);
 
         // ✅ Αργία βάσει της τρέχουσας ημερομηνίας του Εργάνη_Τελικό
         const argiaKey = `${ergazomenos.team}|${ergazomenos.company_kod}|${hmeromhnia.getTime()}`;
@@ -14107,9 +14129,9 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
         let isRepo = current.kathgoria === 'ΑΝ';
 
         const record = {
-            team: ergazomenos.team,
-            company_kod: ergazomenos.company_kod,
-            ypokatasthma: current.ypokatasthma,
+            team: employeeResolution.scope.team,
+            company_kod: employeeResolution.scope.company_kod,
+            ypokatasthma: employeeResolution.scope.ypokatasthma,
             kodikos: ergazomenos.kodikos,
             hmeromhnia: hmeromhnia,
             kathgoria_ergasias: current.kathgoria,
@@ -14220,10 +14242,10 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
 
     if (preparedRecords.length === 0) {
         console.log('[saveTelikoToProdhlomena] Δεν υπάρχουν εγγραφές προς αποθήκευση');
-        return;
+        return { bulkOps: [], diagnostics };
     }
 
-    const existingRows = await ProdhlomenaOrariaModel.find({
+    const existingRows = await prodhlomenaModel.find({
         $or: mongoose.trusted(preparedRecords.map(({ filter }) => filter))
     })
         .select(
@@ -14279,7 +14301,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
     for (let k = 0; k < chunks.length; k += PARALLEL_CHUNKS) {
         const batch = chunks.slice(k, k + PARALLEL_CHUNKS);
         const results = await Promise.all(
-            batch.map((chunk) => ProdhlomenaOrariaModel.bulkWrite(chunk, { ordered: false }))
+            batch.map((chunk) => prodhlomenaModel.bulkWrite(chunk, { ordered: false }))
         );
         results.forEach((r) => {
             totalUpserted += r.upsertedCount || 0;
@@ -14291,6 +14313,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
         `[saveTelikoToProdhlomena] ✅ ${totalUpserted} inserted, ${totalModified} updated ` +
             `(records: ${bulkOps.length}, chunks: ${chunks.length}, parallel: ${PARALLEL_CHUNKS})`
     );
+    return { bulkOps, diagnostics };
 }
 
 async function prepareKartesXlsx(xlsxBuffer, apoHmeromhnia) {
@@ -14768,7 +14791,7 @@ async function downloadPrepareStoreAndPersistCards(options, dependencies = {}) {
     }
 
     try {
-        await persist(prepared.persistencePayload);
+        await persist(prepared.persistencePayload, { authorizedScope: options.authorizedScope });
     } catch (_error) {
         throw createErganhScheduleError(ERGANH_CARDS_CODES.databaseFailed);
     }
@@ -14813,6 +14836,13 @@ function buildKartesPersistencePayload(sheetTeliko) {
 async function saveKartesPayloadToMongo(rows, dependencies = {}) {
     const ergazomenoiModel = dependencies.ergazomenoiModel || ErgazomenoiModel;
     const prodhlomenaModel = dependencies.prodhlomenaModel || ProdhlomenaOrariaModel;
+    const authorizedScope = dependencies.authorizedScope;
+    const {
+        AMBIGUOUS_SCOPE_CODE,
+        OUTSIDE_SCOPE_CODE,
+        assertEmployeeWriteScope,
+        loadScopedErganiEmployees
+    } = require('../../services/ergazomenoi/erganiImportedEmployeeScopeService');
 
     // -------- 2) Group κατά (afm + hmeromhnia) --------
     const groups = new Map();
@@ -14850,25 +14880,35 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
 
     // -------- 3) Φόρτωσε ergazomenoi με ΜΙΑ query --------
     const uniqueAfms = [...new Set([...groups.values()].map((g) => g.afm))];
-    const ergazomenoiList = await ergazomenoiModel.find({
-        afm: mongoose.trusted({ $in: uniqueAfms })
-    }).lean();
-
-    const ergazomenoiMap = {};
-    ergazomenoiList.forEach((e) => {
-        ergazomenoiMap[e.afm] = e;
+    const employeeResolution = await loadScopedErganiEmployees({
+        employeeModel: ergazomenoiModel,
+        afms: uniqueAfms,
+        scope: authorizedScope
     });
 
     // -------- 4) Φτιάξε bulk ops --------
     const bulkOps = [];
     let skippedNoErg = 0;
+    const diagnostics = [];
 
     for (const g of groups.values()) {
-        const ergazomenos = ergazomenoiMap[g.afm];
-        if (!ergazomenos) {
+        if (g.ypokatasthma !== employeeResolution.scope.ypokatasthma) {
+            diagnostics.push({ code: OUTSIDE_SCOPE_CODE, afm: g.afm });
             skippedNoErg++;
             continue;
         }
+        if (employeeResolution.ambiguousAfms.has(g.afm)) {
+            diagnostics.push({ code: AMBIGUOUS_SCOPE_CODE, afm: g.afm });
+            skippedNoErg++;
+            continue;
+        }
+        const ergazomenos = employeeResolution.resolved.get(g.afm);
+        if (!ergazomenos) {
+            diagnostics.push({ code: OUTSIDE_SCOPE_CODE, afm: g.afm });
+            skippedNoErg++;
+            continue;
+        }
+        assertEmployeeWriteScope(ergazomenos, employeeResolution.scope);
 
         const update = {
             ypokatasthma: g.ypokatasthma,
@@ -14905,9 +14945,9 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
         bulkOps.push({
             updateOne: {
                 filter: {
-                    team: ergazomenos.team,
-                    company_kod: ergazomenos.company_kod,
-                    ypokatasthma: g.ypokatasthma,
+                    team: employeeResolution.scope.team,
+                    company_kod: employeeResolution.scope.company_kod,
+                    ypokatasthma: employeeResolution.scope.ypokatasthma,
                     kodikos: ergazomenos.kodikos,
                     hmeromhnia: g.hmeromhnia
                 },
@@ -14929,7 +14969,7 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
         console.log('[saveKartesTelikoToMongo] Δεν υπάρχουν εγγραφές προς ενημέρωση');
     }
 
-    return bulkOps;
+    return { bulkOps, diagnostics };
 }
 
 async function downloadKartesXlsxToBuffer(
@@ -15149,6 +15189,7 @@ Object.defineProperty(erganhController, '__scheduleDownloadTestHooks', {
         optionTextContainsExactBranchCode,
         resolveErganhBranchOption,
         runErganhScheduleCriticalStep,
+        saveTelikoToProdhlomena,
         sanitizeErganhPathname,
         selectErganhScheduleBranch,
         selectors: ERGANH_SCHEDULE_SELECTORS
