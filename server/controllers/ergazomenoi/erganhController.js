@@ -221,6 +221,9 @@ const {
     loadWeeklyRepoTransferDecisionBatch
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService');
 const { applyWeeklyRepoTransfer } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyService');
+const {
+    runPossibleLeaveRepoAutoRuntime
+} = require('../../services/ergazomenoi/apasxoliseisPossibleLeaveRepoAutoRuntimeService');
 const { validateApplySession } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService');
 const { getWeeklyRepoTransferApplyRuntimeState } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
 const { assertWeeklyRepoTransferApplyIndexesReady } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
@@ -284,6 +287,7 @@ const {
     runWithPeriodWriteFence,
     acquirePeriodCalculationOwnership,
     runWithPeriodCalculationWriteFence,
+    fencePeriodCalculationForWrite,
     releasePeriodCalculationOwnership,
     transitionPeriodControl,
     isDateInsideEmploymentPeriod,
@@ -995,9 +999,32 @@ function checkRepoAdeiaAstheneiaApologistika(context) {
     const declaredHours = Number(rec.ores_ergasias || 0);
     const cardsHours = Number(rec.cards_ores_ergasias || 0);
 
-    const update = {
-        astheneia_apologistika: false
-    };
+    const update = { astheneia_apologistika: false };
+
+    const hasAuthoritativeLeave = rec.adeia === true ||
+        String(rec.kathgoria_adeias || '').trim() !== '' ||
+        Number(rec.ores_apoysias || 0) > 0 || rec.hr_declared_leave === true;
+    if (hasAuthoritativeLeave) {
+        update.repo_apologistika = false;
+        update.adeia_apologistika = true;
+        update.kathgoria_adeias_apologistika = String(rec.kathgoria_adeias || '').trim();
+        return update;
+    }
+
+    if (rec.astheneia === true) {
+        update.repo_apologistika = false;
+        update.adeia_apologistika = false;
+        update.kathgoria_adeias_apologistika = '';
+        update.astheneia_apologistika = true;
+        return update;
+    }
+
+    if (rec.argia === true || rec.argia_apologistika === true) {
+        update.repo_apologistika = false;
+        update.adeia_apologistika = false;
+        update.kathgoria_adeias_apologistika = '';
+        return update;
+    }
 
     // ΡΕΠΟ / ΜΗ ΕΡΓΑΣΙΑ και δεν υπάρχουν κάρτες
     if ((rec.repo === true || declaredHours === 0) && cardsHours === 0) {
@@ -1010,8 +1037,8 @@ function checkRepoAdeiaAstheneiaApologistika(context) {
     // Έχει προδηλωμένη εργασία αλλά δεν υπάρχουν κάρτες
     if (declaredHours !== 0 && cardsHours === 0) {
         update.repo_apologistika = false;
-        update.adeia_apologistika = true;
-        update.kathgoria_adeias_apologistika = 'ΑΔΑΛ';
+        update.adeia_apologistika = false;
+        update.kathgoria_adeias_apologistika = 'POSSIBLE_LEAVE';
         return update;
     }
 
@@ -3696,7 +3723,8 @@ function reviewApologistikoDisplay(row = {}) {
         return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
     }
 
-    if (reviewLeaveProvenance(row) === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE) {
+    if ([LEAVE_PROVENANCE.POSSIBLE_LEAVE, LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE]
+        .includes(reviewLeaveProvenance(row))) {
         return { text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ', type: 'adeia_suggestion' };
     }
 
@@ -8968,6 +8996,7 @@ class erganhController {
                     .select(
                         '_id kodikos ypokatasthma hmeromhnia repo argia is_locked ' +
                             'kathgoria_ergasias_apologistika repo_apologistika ' +
+                            'adeia kathgoria_adeias ores_apoysias hr_declared_leave astheneia astheneia_apologistika argia_apologistika ' +
                             'ores_ergasias cards_ores_ergasias ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 ' +
@@ -9011,7 +9040,8 @@ class erganhController {
                     company_kod: companyId,
                     ypokatasthma,
                     loadedRowIds
-                }))
+                })),
+                includeExecutions: true
             });
             const appliedProtectionReasonsByWeek = new Map();
 
@@ -9159,6 +9189,90 @@ class erganhController {
                 calculationId: calculationOwnership.calculationId
             });
 
+            let automaticRepoTransfer = {
+                enabled: false,
+                approvalQueries: 0,
+                executionQueries: 0,
+                applied: 0,
+                results: []
+            };
+            const automaticRuntime = getWeeklyRepoTransferApplyRuntimeState();
+            if (automaticRuntime.enabled) {
+                validateApplySession(req.session);
+                await assertWeeklyRepoTransferApplyIndexesReady();
+                const activeReusableApprovals = await listActiveReusablePolicyDecisionRecords({
+                    session: req.session,
+                    ypokatasthma: selectedYpokatasthma
+                });
+                const autoRangeStart = startOfWeekMondayUtc(apoDate);
+                const autoRangeEnd = endOfWeekSundayUtc(eosDate);
+                const autoFilter = {
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    ypokatasthma: selectedYpokatasthma,
+                    hmeromhnia: mongoose.trusted({ $gte: autoRangeStart, $lte: autoRangeEnd })
+                };
+                const autoRows = await ProdhlomenaOrariaModel.find(autoFilter)
+                        .select(ATOMIC_REPO_TRANSFER_ROW_FIELDS)
+                        .sort({ kodikos: 1, hmeromhnia: 1, _id: 1 })
+                        .lean();
+                const appliedAutoExecutions = appliedProtectionContext.executions || [];
+                const atomicProjection = await buildAtomicRepoTransferPolicyPreviewProjection({
+                    sessionTeam,
+                    companyId,
+                    fullPeriodFilter: {
+                        team: sessionTeam,
+                        company_kod: companyId,
+                        ypokatasthma: selectedYpokatasthma
+                    },
+                    requestedPeriodStart: apoDate,
+                    requestedPeriodEnd: eosDate,
+                    authoritativeAsOfDate: req.session.appDate,
+                    holidayByDateKey: noCardsDisplayContext.argiesByDateKey,
+                    holidayContextResolved: noCardsDisplayContext.argiesByDateKey instanceof Map,
+                    reusableApprovals: activeReusableApprovals,
+                    includeContextGroups: true
+                });
+                const runtimeResult = await runPossibleLeaveRepoAutoRuntime({
+                    rows: autoRows,
+                    groups: atomicProjection.groups,
+                    approvals: activeReusableApprovals,
+                    appliedExecutions: appliedAutoExecutions,
+                    createDecision: async ({ command }) => {
+                        const created = await createWeeklyRepoTransferDecision({
+                            session: req.session,
+                            payload: command,
+                            mutationRunner: (write) => runWithPeriodCalculationWriteFence({
+                                scope: periodControlScope,
+                                calculationId: calculationOwnership.calculationId,
+                                work: ({ session }) => write(session)
+                            })
+                        });
+                        return created.decision;
+                    },
+                    applyDecision: async ({ decision_id, request_id, authorization_metadata }) => {
+                        const applied = await applyWeeklyRepoTransfer({
+                            session: req.session,
+                            payload: { decision_id, request_id },
+                            authorizationMetadata: authorization_metadata,
+                            periodFence: ({ session }) => fencePeriodCalculationForWrite({
+                                scope: periodControlScope,
+                                calculationId: calculationOwnership.calculationId,
+                                session
+                            })
+                        });
+                        return applied.execution;
+                    }
+                });
+                automaticRepoTransfer = {
+                    enabled: true,
+                    approvalQueries: 1,
+                    executionQueries: 0,
+                    applied: runtimeResult.results.filter((item) => item.status === 'AUTO_APPLIED').length,
+                    results: runtimeResult.results
+                };
+            }
+
             console.log(
                 `[calcApasxolhseisPeriodoy] ✅ Checked: ${prodhlomena.length}, Updated: ${totalModified}, RepoPostCheckUpdated: ${weeklyRepoPostCheck.recordsUpdated}, RepoDeviations: ${weeklyRepoPostCheck.deviations.length}`
             );
@@ -9178,6 +9292,7 @@ class erganhController {
                     recordsChecked: weeklyRepoPostCheck.recordsChecked,
                     recordsUpdated: weeklyRepoPostCheck.recordsUpdated,
                     deviationsCount: weeklyRepoPostCheck.deviations.length,
+                    automaticRepoTransfer,
                     deviationsSaved: weeklyRepoPostCheck.deviationsSaved || 0,
                     compensationBreakdowns: weeklyRepoPostCheck.compensationBreakdowns,
                     deviations: weeklyRepoPostCheck.deviations

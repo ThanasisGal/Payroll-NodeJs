@@ -28,6 +28,13 @@ const compensationBreakdownSchema = new Schema({
     amounts: compensationAmountsSchema,
     accumulationRule: String
 }, { _id: false, strict: 'throw' });
+const authorizationMetadataSchema = new Schema({
+    authority: String, rule: String, rule_version: String,
+    automatic_resolution_reason: String, original_approval_id: String,
+    original_approving_user: String, original_approval_timestamp: Date,
+    source_id: String, target_id: String, week_start: String, week_end: String,
+    atomic_pair_identity: String
+}, { _id: false, strict: 'throw' });
 const SNAPSHOT_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika','ores_pragmatikhs_ergasias_apologistika','ores_adeias_pistomenes_apologistika','ores_argias_pistomenes_apologistika','compensation_breakdown_apologistika']);
 const snapshotFieldTypes = Object.freeze({
     kathgoria_ergasias_apologistika: String, repo_apologistika: Boolean,
@@ -64,6 +71,7 @@ const WeeklyRepoTransferExecutionSchema = new Schema({
     created_by_user_name: immutable(String, { trim: true }), created_by_user_role: immutable(String, { trim: true }),
     execution_status: immutable(String, { enum: ['APPLIED'] }),
     before_snapshot: immutable(beforeSnapshotSchema), after_snapshot: immutable(afterSnapshotSchema),
+    authorization_metadata: { type: authorizationMetadataSchema, default: null, immutable: true },
     applied_at: immutable(Date), created_at: immutable(Date, { default: Date.now })
 }, {
     collection: 'Apasxoliseis_Weekly_Repo_Transfer_Executions',

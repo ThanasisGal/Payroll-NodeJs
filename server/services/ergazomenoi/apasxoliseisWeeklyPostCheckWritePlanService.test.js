@@ -416,4 +416,25 @@ assert.deepEqual(result.compensationBreakdowns, {
 });
 assert.deepEqual(result.diagnostics, []);
 
-console.log('weekly post-check pure write-plan contract tests passed (16 contracts)');
+const possibleRows = week([7, 7, 7, 7, 7, 0, 0]);
+Object.assign(possibleRows[5], { kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+    kathgoria_ergasias_apologistika: '', cards_ores_ergasias: 0,
+    cards_apo_ora_01: '', cards_eos_ora_01: '', adeia_apologistika: false,
+    kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' });
+result = plan(possibleRows, { noCardsDisplayContext: {
+    argiesByDateKey: new Map(), leaveByEmployeeDateKey: new Map()
+} });
+update = updateFor(result, '2026-08-08');
+assert.notEqual(update.kathgoria_adeias_apologistika, 'ΑΔΑΛ');
+
+const actualLeaveRows = week([7, 7, 7, 7, 7, 0, 0]);
+Object.assign(actualLeaveRows[5], { kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+    kathgoria_ergasias_apologistika: '', cards_ores_ergasias: 0,
+    cards_apo_ora_01: '', cards_eos_ora_01: '', adeia: true,
+    kathgoria_adeias: 'ΑΔΑΛ', adeia_apologistika: true,
+    kathgoria_adeias_apologistika: 'ΑΔΑΛ' });
+result = plan(actualLeaveRows);
+update = updateFor(result, '2026-08-08');
+assert.ok(!Object.hasOwn(update, 'kathgoria_adeias_apologistika'));
+
+console.log('weekly post-check pure write-plan contract tests passed (18 contracts)');

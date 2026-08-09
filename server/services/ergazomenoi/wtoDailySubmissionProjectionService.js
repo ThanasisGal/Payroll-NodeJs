@@ -42,6 +42,10 @@ function validateTime(value, label) {
 }
 
 function resolveType(row) {
+    if (row.adeia_apologistika !== true &&
+        clean(row.kathgoria_adeias_apologistika).toUpperCase() === 'POSSIBLE_LEAVE') {
+        return null;
+    }
     const apologistikaCategory = clean(row.kathgoria_ergasias_apologistika).toUpperCase();
     const apologistikaRule = TYPE_RULES[apologistikaCategory];
     if (!apologistikaRule && (row.adeia_apologistika === true || row.astheneia_apologistika === true)) {

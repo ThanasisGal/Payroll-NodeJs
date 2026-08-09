@@ -44,6 +44,10 @@ const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
     SOURCE_VERSION: WEEKLY_REPO_DEVIATION_SOURCE_VERSION
 } = require('./apasxoliseisWeeklyRepoDeviationPreviewService');
+const {
+    LEAVE_PROVENANCE,
+    classifyLeaveProvenance
+} = require('./apasxoliseisLeaveProvenanceService');
 
 function clampDateStartUtc(value) {
     const date = new Date(value);
@@ -240,17 +244,18 @@ function buildWeeklyRepoPostCheckWritePlan({
                     pragmatikaRepo += 1;
                 } else if (!hasUnresolvedCardPair && declaredNonWork && oresErgasiasIsZero && cardsOresIsNonZero) {
                     update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
-                } else if (!hasUnresolvedCardPair && isNoCardDeclaredWorkRow(row)) {
+                } else if (!hasUnresolvedCardPair && isNoCardDeclaredWorkRow(row) &&
+                    classifyLeaveProvenance(row) !== LEAVE_PROVENANCE.HR_DECLARED_LEAVE) {
                     const noCardsDisplayStatus = resolveNoCardsDisplayStatus(row, noCardsDisplayContext);
                     update.apologistiko_biblio = false;
                     update.kathgoria_ergasias_apologistika = '';
                     update.ores_ergasias_apologistika = isMisthotosEmployee(dailyProfile)
                         ? Number(row.ores_ergasias || 0) : 0;
                     update.ores_apoysias_apologistika = 0;
-                    update.adeia_apologistika = noCardsDisplayStatus === 'ΑΔΕΙΑ';
+                    update.adeia_apologistika = false;
                     update.argia = noCardsDisplayStatus === 'ΑΡΓΙΑ';
                     update.kathgoria_adeias_apologistika =
-                        noCardsDisplayStatus === 'ΑΔΕΙΑ' ? 'ΑΔΑΛ' : '';
+                        noCardsDisplayStatus === 'ΑΔΕΙΑ' ? 'POSSIBLE_LEAVE' : '';
                 }
 
                 const rowDateKey = dateKeyUtc(row.hmeromhnia);

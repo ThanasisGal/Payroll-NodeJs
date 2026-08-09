@@ -255,6 +255,19 @@ async function runWithPeriodCalculationWriteFence({ scope: input, calculationId,
         throw error;
     }
 }
+async function fencePeriodCalculationForWrite({ scope: input, calculationId, session,
+    periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady }) {
+    const scope = normalizeScope(input);
+    const ownerId = normalizeCalculationId(calculationId);
+    if (!session) throw new TypeError('Transaction session is required.');
+    if (typeof indexGuard === 'function') await indexGuard();
+    const record = await periodControlModel.findOneAndUpdate({
+        ...filterForScope(scope), status: 'OPEN', active_calculation_id: ownerId
+    }, { $inc: { write_fence_version: 1 }, $set: { updated_at: new Date() } }, { new: true, session });
+    if (!record) throw periodError('PERIOD_CONTROL_CALCULATION_OWNERSHIP_LOST', 409,
+        'Ο Υπολογισμός Απασχολήσεων δεν κατέχει πλέον την περίοδο.');
+    return record;
+}
 async function releasePeriodCalculationOwnership({ scope: input, calculationId,
     periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
     transactionRunner = runTransaction }) {
@@ -396,5 +409,6 @@ module.exports = { MODES, periodError, dateOnly, calculatePeriodDeadline, normal
     isDateInsideEmploymentPeriod, isWeekAllowedForEmploymentPeriod,
     isPastDeadline, resolveEffectiveMode, projectPeriodControl, getPeriodControl, stateToken,
     assertNormalPeriod, fencePeriodForWrite, runWithPeriodWriteFence,
+    fencePeriodCalculationForWrite,
     acquirePeriodCalculationOwnership, runWithPeriodCalculationWriteFence,
     releasePeriodCalculationOwnership, transitionPeriodControl };

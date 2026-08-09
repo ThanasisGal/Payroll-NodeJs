@@ -30,7 +30,8 @@ const EXECUTION_PROTECTION_FIELDS = Object.freeze([
     'before_snapshot',
     'after_snapshot',
     'applied_at',
-    'created_at'
+    'created_at',
+    'authorization_metadata'
 ]);
 
 function deepFreeze(value) {
@@ -110,7 +111,7 @@ function trustServerGeneratedInOperators(value) {
     return value;
 }
 
-function mergeProtectionContexts(contexts) {
+function mergeProtectionContexts(contexts, executions = null) {
     const entriesByRowId = {};
     const diagnostics = [];
     const diagnosticKeys = new Set();
@@ -139,12 +140,14 @@ function mergeProtectionContexts(contexts) {
             });
         }
     }
-    return deepFreeze({ entriesByRowId, diagnostics, hasConflicts });
+    return deepFreeze({ entriesByRowId, diagnostics, hasConflicts,
+        ...(Array.isArray(executions) ? { executions } : {}) });
 }
 
 async function loadAppliedRepoTransferProtectionContext({
     scopes,
-    executionModel = ExecutionModel
+    executionModel = ExecutionModel,
+    includeExecutions = false
 } = {}) {
     const normalizedScopes = normalizeScopes(scopes);
     const query = buildAppliedExecutionQuery(normalizedScopes);
@@ -171,7 +174,7 @@ async function loadAppliedRepoTransferProtectionContext({
             loadedRowIds: scope.loadedRowIds
         })
     );
-    return mergeProtectionContexts(contexts);
+    return mergeProtectionContexts(contexts, includeExecutions ? executions : null);
 }
 
 module.exports = {

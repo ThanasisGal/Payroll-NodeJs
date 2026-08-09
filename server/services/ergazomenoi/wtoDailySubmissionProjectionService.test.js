@@ -72,6 +72,12 @@ const pureSicknessRow = row({ kathgoria_ergasias_apologistika: '', astheneia_apo
     apo_ora_01_apologistika: '', eos_ora_01_apologistika: '' });
 assert.throws(() => payloadFor([pureLeaveRow]), (error) => code(error) === 'WTODAILY_NO_SUBMITTABLE_ROWS');
 assert.throws(() => payloadFor([pureSicknessRow]), (error) => code(error) === 'WTODAILY_NO_SUBMITTABLE_ROWS');
+const possibleLeaveRow = row({ kathgoria_ergasias_apologistika: '',
+    kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE', adeia_apologistika: false,
+    apo_ora_01_apologistika: '', eos_ora_01_apologistika: '',
+    cards_apo_ora_01: '', cards_eos_ora_01: '' });
+assert.throws(() => payloadFor([possibleLeaveRow]),
+    (error) => code(error) === 'WTODAILY_NO_SUBMITTABLE_ROWS');
 assert.throws(() => payloadFor([row({ apologistiko_biblio: false })]),
     (error) => code(error) === 'WTODAILY_NO_SUBMITTABLE_ROWS');
 assert.deepStrictEqual(analytics(payloadFor([row({ adeia_apologistika: true })])),
