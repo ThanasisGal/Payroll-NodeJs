@@ -30,14 +30,14 @@ assert.strictEqual(isDateInsideEmploymentPeriod({ ...july, date: '2026-08-01' })
 const scope = normalizeScope({ team: 'THA', company_kod: 'c', ypokatasthma: '0', period_start: '2026-06-01', period_end: '2026-06-30' });
 const deadline = calculatePeriodDeadline(scope.period_end);
 assert.strictEqual(resolveEffectiveMode({ storedStatus: 'OPEN', deadline, now: new Date('2026-07-31T20:59:00Z') }), 'NORMAL');
-assert.strictEqual(resolveEffectiveMode({ storedStatus: 'OPEN', deadline, now: new Date('2026-07-31T21:00:00Z') }), 'CORRECTIVE_ONLY');
+assert.strictEqual(resolveEffectiveMode({ storedStatus: 'OPEN', deadline, now: new Date('2026-07-31T21:00:00Z') }), 'HISTORICAL_RECONSTRUCTION_REQUIRED');
 assert.strictEqual(resolveEffectiveMode({ storedStatus: 'LOCKED', deadline, now: new Date('2026-07-31') }), 'LOCKED');
 assert.strictEqual(resolveEffectiveMode({ storedStatus: 'FINALIZED', deadline, now: new Date('2026-07-31') }), 'FINALIZED');
-assert.strictEqual(resolveEffectiveMode({ storedStatus: 'OPEN', deadline, now: new Date('2026-08-01') }), 'CORRECTIVE_ONLY');
-assert.strictEqual(resolveEffectiveMode({ storedStatus: 'LOCKED', deadline, now: new Date('2026-08-01') }), 'CORRECTIVE_ONLY');
-assert.strictEqual(resolveEffectiveMode({ storedStatus: 'FINALIZED', deadline, now: new Date('2026-08-01') }), 'CORRECTIVE_ONLY');
+assert.strictEqual(resolveEffectiveMode({ storedStatus: 'OPEN', deadline, now: new Date('2026-08-01') }), 'HISTORICAL_RECONSTRUCTION_REQUIRED');
+assert.strictEqual(resolveEffectiveMode({ storedStatus: 'LOCKED', deadline, now: new Date('2026-08-01') }), 'LOCKED');
+assert.strictEqual(resolveEffectiveMode({ storedStatus: 'FINALIZED', deadline, now: new Date('2026-08-01') }), 'FINALIZED');
 assert.strictEqual(projectPeriodControl({ scope, now: new Date('2026-07-01') }).effective_mode, 'NORMAL');
-assert.strictEqual(projectPeriodControl({ scope, now: new Date('2026-08-01') }).effective_mode, 'CORRECTIVE_ONLY');
+assert.strictEqual(projectPeriodControl({ scope, now: new Date('2026-08-01') }).effective_mode, 'HISTORICAL_RECONSTRUCTION_REQUIRED');
 const serviceSource = fs.readFileSync(__filename.replace('.test.js', '.js'), 'utf8');
 assert.ok(serviceSource.includes('session.withTransaction'));
 assert.ok(serviceSource.includes('status: previousStatus, version: beforeVersion'));
@@ -65,11 +65,11 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-06-29', week_end: '2026-07-05' }), true);
     await assertNormalPeriod({ scope: julyScope, now: new Date('2026-07-15'), periodControlModel: fake().model });
     await assert.rejects(() => assertNormalPeriod({ scope: julyScope, now: new Date('2026-07-15'), periodControlModel: fake({ status: 'LOCKED', version: 1, deadline: new Date('2026-08-31') }).model }), (error) => error.code === 'PERIOD_CONTROL_LOCKED');
-    await assert.rejects(() => assertNormalPeriod({ scope: julyScope, now: new Date('2026-09-01'), periodControlModel: fake().model }), (error) => error.code === 'PERIOD_CONTROL_CORRECTIVE_ONLY');
+    await assert.rejects(() => assertNormalPeriod({ scope: julyScope, now: new Date('2026-09-01'), periodControlModel: fake().model }), (error) => error.code === 'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED');
     const empty = fake();
     const normal = await assertNormalPeriod({ scope, now: new Date('2026-07-01'), periodControlModel: empty.model });
     assert.strictEqual(normal.token.exists, false);
-    await assert.rejects(() => assertNormalPeriod({ scope, now: new Date('2026-08-01'), periodControlModel: empty.model }), (error) => error.code === 'PERIOD_CONTROL_CORRECTIVE_ONLY');
+    await assert.rejects(() => assertNormalPeriod({ scope, now: new Date('2026-08-01'), periodControlModel: empty.model }), (error) => error.code === 'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED');
 
     const store = fake();
     const locked = await transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'Οριστικοποίηση ελέγχου', requestId: 'period-lock-001', now: new Date('2026-07-01'), expectedVersion: 0, periodControlModel: store.model, auditModel: store.audit, indexGuard: async () => ({ ready: true }) });
@@ -85,7 +85,7 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     assert.strictEqual(store.audits.length, 2);
     assert.strictEqual(store.record.locked_at, null);
     await assert.rejects(() => transitionPeriodControl({ session, scope, action: 'LOCK', reason: '', requestId: 'period-lock-003', now: new Date('2026-07-01'), periodControlModel: store.model, auditModel: store.audit }), (error) => error.code === 'PERIOD_CONTROL_REASON_REQUIRED');
-    await assert.rejects(() => transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'late', requestId: 'period-lock-004', now: new Date('2026-08-01'), periodControlModel: store.model, auditModel: store.audit }), (error) => error.code === 'PERIOD_CONTROL_CORRECTIVE_ONLY');
+    await assert.rejects(() => transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'late', requestId: 'period-lock-004', now: new Date('2026-08-01'), periodControlModel: store.model, auditModel: store.audit }), (error) => error.code === 'HISTORICAL_RECONSTRUCTION_REQUIRED');
     for (const role of ['U', 'C', 'V']) {
         await assert.rejects(() => transitionPeriodControl({ session: { ...session, userRole: role }, scope, action: 'LOCK', reason: 'x', requestId: `period-role-${role}-01`, now: new Date('2026-07-01'), periodControlModel: store.model, auditModel: store.audit }), (error) => error.statusCode === 403);
     }

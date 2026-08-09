@@ -19,6 +19,12 @@ const schema = new Schema({
     finalized_by_user_role: immutableRequired(String, { trim: true, enum: ['A', 'S', 'HR'] }),
     finalize_reason: immutableRequired(String, { trim: true, maxlength: 2000 }),
     request_id: immutableRequired(String, { trim: true }),
+    baseline_origin: immutableRequired(String, {
+        trim: true,
+        enum: ['NORMAL', 'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE'],
+        default: 'NORMAL'
+    }),
+    historical_reconstruction_version: immutableRequired(Number, { min: 0, default: 0 }),
     created_at: immutableRequired(Date, { default: Date.now })
 }, {
     collection: 'Apasxoliseis_Period_Frozen_Snapshots', versionKey: false,

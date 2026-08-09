@@ -270,8 +270,13 @@ const {
     buildPartialVerifiedCardUpdate
 } = require('../../services/ergazomenoi/apasxoliseisIncompleteCardSafetyService');
 const {
-    isCriticalEmploymentDecisionRoleAllowed
+    isCriticalEmploymentDecisionRoleAllowed,
+    assertCriticalEmploymentDecisionRole
 } = require('../../services/ergazomenoi/apasxoliseisCriticalActionAuthorizationService');
+const {
+    authorizeHistoricalReconstruction,
+    completeHistoricalReconstruction
+} = require('../../services/ergazomenoi/apasxoliseisHistoricalPeriodReconstructionService');
 const {
     resolveCardPairVerification
 } = require('../../services/ergazomenoi/apasxoliseisCardPairResolverService');
@@ -6650,11 +6655,26 @@ class erganhController {
                     reason: latestCorrective.reason, has_delta: Boolean(latestCorrective.corrective_delta),
                     payroll_postings: correctivePosting } : null,
                 version: state.version,
+                historical_reconstruction: {
+                    status: state.historical_reconstruction_status,
+                    version: state.historical_reconstruction_version,
+                    started_at: state.historical_reconstruction_started_at,
+                    completed_at: state.historical_reconstruction_completed_at,
+                    started_by_user_name: state.historical_reconstruction_started_by_user_name,
+                    started_by_user_role: state.historical_reconstruction_started_by_user_role,
+                    reason: state.historical_reconstruction_reason,
+                    dependency_window_start: state.historical_dependency_window_start,
+                    dependency_window_end: state.historical_dependency_window_end,
+                    dependency_status: state.dependency_status
+                },
                 allowed_actions: {
                     calculate: state.can_calculate,
                     record_decision: state.can_record_decision,
                     repo_transfer: state.can_repo_transfer,
                     manual_edit: state.can_manual_edit,
+                    historical_reconstruct: state.can_historical_reconstruct,
+                    historical_reassess: state.can_historical_reassess,
+                    historical_calculate: state.can_historical_calculate,
                     lock_period: state.effective_mode === 'NORMAL',
                     unlock_period: state.can_unlock_period,
                     finalize_period: state.can_finalize && lifecycleIndexReadiness.ready,
@@ -6682,6 +6702,23 @@ class erganhController {
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false, code: error.code,
                 message: error.statusCode && error.statusCode < 500 ? error.message : 'Δεν ήταν δυνατή η ανάκτηση της κατάστασης περιόδου.' });
+        }
+    };
+
+    static authorizeEmploymentReviewHistoricalReconstruction = async (req, res) => {
+        try {
+            const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
+            const result = await authorizeHistoricalReconstruction({ session: req.session, scope,
+                reason: req.body?.reason, requestId: req.body?.request_id,
+                confirmation: req.body?.confirmation === true });
+            return res.status(result.idempotent ? 200 : 201).json({ success: true,
+                idempotent: result.idempotent,
+                historical_reconstruction_version: result.record.historical_reconstruction_version,
+                request_id: result.record.last_historical_reconstruction_request_id,
+                message: 'Η ιστορική ανακατασκευή εξουσιοδοτήθηκε και μπορεί να εκτελεστεί.' });
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ success: false, code: error.code,
+                message: error.statusCode ? error.message : 'Η εξουσιοδότηση ιστορικής ανακατασκευής απέτυχε.' });
         }
     };
 
@@ -8824,7 +8861,10 @@ class erganhController {
                 error.statusCode = 409;
                 throw error;
             }
-            calculationOwnership = await acquirePeriodCalculationOwnership({ scope: periodControlScope });
+            const historicalRequestId = String(req.body?.historical_reconstruction_request_id || '').trim();
+            if (historicalRequestId) assertCriticalEmploymentDecisionRole(req.session);
+            calculationOwnership = await acquirePeriodCalculationOwnership({ scope: periodControlScope,
+                historicalRequestId });
 
             const proorhProseleyshMinutes = parseInt(proorh_proseleysh || 0, 10) || 0;
             const proorhApoxorhshMinutes = parseInt(proorhApoxorhsh_stathera || 0, 10) || 0;
@@ -9286,6 +9326,11 @@ class erganhController {
                 `[calcApasxolhseisPeriodoy] ✅ Checked: ${prodhlomena.length}, Updated: ${totalModified}, RepoPostCheckUpdated: ${weeklyRepoPostCheck.recordsUpdated}, RepoDeviations: ${weeklyRepoPostCheck.deviations.length}`
             );
 
+            if (calculationOwnership.historical) {
+                await completeHistoricalReconstruction({ scope: periodControlScope,
+                    calculationId: calculationOwnership.calculationId,
+                    requestId: calculationOwnership.historicalRequestId });
+            }
             await releasePeriodCalculationOwnership({
                 scope: periodControlScope,
                 calculationId: calculationOwnership.calculationId

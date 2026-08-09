@@ -98,6 +98,29 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
         periodControlModel: activeCalculation.period, frozenModel: activeCalculation.frozen, auditModel: activeCalculation.audit,
         indexGuard: guard, transactionRunner: runner }), (error) => error.code === 'PERIOD_CONTROL_CALCULATION_IN_PROGRESS');
 
+    const historicalFinalized = stores({ historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: 2, historical_dependency_fingerprint: 'd'.repeat(64) });
+    await finalizeEmploymentPeriod({ session: allowed, scope, reason: 'Ιστορική οριστικοποίηση',
+        requestId: 'historical-finalize-request', snapshotInput,
+        periodControlModel: historicalFinalized.period, frozenModel: historicalFinalized.frozen,
+        auditModel: historicalFinalized.audit, indexGuard: guard, transactionRunner: runner,
+        historicalFingerprintResolver: async () => ({ dependency_fingerprint: 'd'.repeat(64) }) });
+    assert.strictEqual(historicalFinalized.frozenRecord.baseline_origin,
+        'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE');
+    assert.strictEqual(historicalFinalized.frozenRecord.historical_reconstruction_version, 2);
+    const immutableHistoricalFingerprint = historicalFinalized.frozenRecord.frozen_snapshot_fingerprint;
+    assert.strictEqual(historicalFinalized.control.frozen_snapshot_fingerprint, immutableHistoricalFingerprint);
+
+    const staleHistorical = stores({ historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: 1, historical_dependency_fingerprint: 'a'.repeat(64) });
+    await assert.rejects(() => finalizeEmploymentPeriod({ session: allowed, scope, reason: 'stale',
+        requestId: 'historical-stale-finalize', snapshotInput,
+        periodControlModel: staleHistorical.period, frozenModel: staleHistorical.frozen,
+        auditModel: staleHistorical.audit, indexGuard: guard, transactionRunner: runner,
+        historicalFingerprintResolver: async () => ({ dependency_fingerprint: 'b'.repeat(64) }) }),
+    error => error.code === 'HISTORICAL_RECONSTRUCTION_STALE_CANNOT_FINALIZE');
+    assert.strictEqual(staleHistorical.frozenRecord, null);
+
     const correctionStore = stores({ status: 'FINALIZED', frozen_snapshot_id: '507f1f77bcf86cd799439012',
         frozen_snapshot_fingerprint: 'a'.repeat(64) });
     const correction = await openCorrectiveCase({ session: allowed, scope, reason: 'Λάθος κάρτα', caseId: 'case-1',

@@ -1372,6 +1372,10 @@ router.post(
     erganhController.transitionEmploymentReviewPeriodControl
 );
 
+router.post('/api/prodhlomena-oraria/review/period-control/historical-reconstruction/authorize',
+    checkAuth, requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.authorizeEmploymentReviewHistoricalReconstruction);
+
 router.post('/api/prodhlomena-oraria/review/period-control/finalize', checkAuth,
     requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
     erganhController.finalizeEmploymentReviewPeriod);

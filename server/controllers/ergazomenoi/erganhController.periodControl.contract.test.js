@@ -10,7 +10,8 @@ const view = fs.readFileSync(path.join(__dirname, '../../../views/ergazomenoi/pr
 const browser = fs.readFileSync(path.join(__dirname, '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8');
 const policyExecution = fs.readFileSync(path.join(__dirname, '../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyExecutionService.js'), 'utf8');
 
-assert.match(controller, /calculationOwnership = await acquirePeriodCalculationOwnership\(\{ scope: periodControlScope \}\)/);
+assert.match(controller, /calculationOwnership = await acquirePeriodCalculationOwnership\(\{ scope: periodControlScope,[\s\S]*historicalRequestId \}\)/);
+assert.match(controller, /completeHistoricalReconstruction\(\{ scope: periodControlScope,[\s\S]*calculationId: calculationOwnership\.calculationId/);
 assert.match(controller, /runWithPeriodCalculationWriteFence\(\{[\s\S]*calculationId: calculationOwnership\.calculationId[\s\S]*ProdhlomenaOrariaModel\.bulkWrite\(chunk, \{/);
 assert.match(controller, /runWeeklyRepoPostCheck\(\{[\s\S]*calculationId: calculationOwnership\.calculationId/);
 assert.match(controller, /replaceDeviations[\s\S]*deleteMany\(deviationsCleanupFilter[\s\S]*insertMany[\s\S]*runWithPeriodCalculationWriteFence/);
@@ -37,8 +38,9 @@ assert.ok(view.includes('Ξεκλείδωμα περιόδου'));
 assert.ok(browser.includes("NORMAL: 'Ανοικτή'"));
 assert.ok(browser.includes("LOCKED: 'Κλειδωμένη'"));
 assert.ok(browser.includes("CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'"));
+assert.ok(browser.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ BASELINE'"));
 assert.ok(browser.includes('δεν ξεκλειδώνει χειροκίνητα κλειδωμένες ημερήσιες εγγραφές'));
 assert.ok(browser.includes("transitionEmploymentPeriod('unlock')"));
 assert.ok(browser.includes("/period-control/${action}"));
 assert.ok(!/apologistiko_biblio[\s\S]{0,80}(PERIOD_CONTROL|periodControl)/.test(controller));
-console.log('erganhController period control contract tests: 32/32 PASS');
+console.log('erganhController period control contract tests: PASS');
