@@ -68,6 +68,14 @@ function setRepoTransferPermissions({ decision, apply, manageReusable } = {}) {
 }
 
 setRepoTransferPermissions({ decision: true, apply: true, manageReusable: true });
+elementsById.set('hrReviewWorkspace', {
+    classList: { contains: (name) => name === 'd-none' ? false : false }
+});
+elementsById.set('advancedReviewWorkspace', {
+    classList: { contains: (name) => name === 'd-none' ? true : false }
+});
+elementsById.set('hr_apo_hmeromhnia', { value: '2026-07-01' });
+elementsById.set('hr_eos_hmeromhnia', { value: '2026-07-31' });
 
 function proposedValues({ category, repo, hours, intervals = [] }) {
     const values = {
@@ -2128,6 +2136,82 @@ function testEmploymentReviewFinalUiContract() {
     assert.ok(!viewSource.includes('id="currentUserRole"'));
 }
 
+function testSharedLifecyclePanelAndActiveWorkspaceScopeContract() {
+    const lifecycleIds = [
+        'employmentPeriodControlPanel',
+        'lockEmploymentPeriodBtn',
+        'historicalReconstructionBtn',
+        'unlockEmploymentPeriodBtn',
+        'finalizeEmploymentPeriodBtn',
+        'submitFinalWTODayilyABtn',
+        'openCorrectivePayrollBtn',
+        'calculateCorrectivePayrollBtn',
+        'closeCorrectivePayrollBtn',
+        'postCorrectivePayrollBtn'
+    ];
+    lifecycleIds.forEach((id) => {
+        assert.strictEqual((viewSource.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id);
+    });
+    const panelIndex = viewSource.indexOf('id="employmentPeriodControlPanel"');
+    const simpleIndex = viewSource.indexOf('id="hrReviewWorkspace"');
+    const advancedIndex = viewSource.indexOf('id="advancedReviewWorkspace"');
+    assert.ok(panelIndex >= 0 && panelIndex < simpleIndex && panelIndex < advancedIndex);
+    assert.ok(source.includes('await loadEmploymentPeriodControl(advancedBranch)'));
+    assert.ok(source.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ BASELINE'"));
+    assert.ok(source.includes("state?.past_deadline ? 'ΕΚΠΡΟΘΕΣΜΗ' : 'ΕΝΤΟΣ ΠΡΟΘΕΣΜΙΑΣ'"));
+    assert.ok(source.includes("actions.historical_reconstruct === true || actions.historical_reassess === true"));
+    assert.ok(source.includes('body: JSON.stringify({ apo_hmeromhnia: scope.apo_hmeromhnia'));
+    assert.ok(source.includes('eos_hmeromhnia: scope.eos_hmeromhnia'));
+    assert.ok(source.includes("if (scope.workspace === 'ADVANCED') await loadResults();"));
+    assert.ok(source.includes('else await loadHrReviewQueue();'));
+    assert.ok(source.includes('const branch = getActiveEmploymentReviewScope().ypokatasthma'));
+    assert.ok(source.includes('return getActiveEmploymentReviewScope().ypokatasthma'));
+
+    const workspace = (hidden) => ({
+        classList: { contains: (name) => name === 'd-none' && hidden }
+    });
+    const setValue = (id, value) => elementsById.set(id, { value });
+    try {
+        elementsById.set('advancedReviewWorkspace', workspace(false));
+        elementsById.set('hrReviewWorkspace', workspace(true));
+        setValue('apo_hmeromhnia', '2026-06-01');
+        setValue('eos_hmeromhnia', '2026-06-30');
+        setValue('ypokatasthma_stathera_advanced', '0000');
+        setValue('hr_apo_hmeromhnia', '1999-01-01');
+        setValue('hr_eos_hmeromhnia', '1999-01-31');
+        setValue('ypokatasthmata_stathera', 'STALE');
+        let scope = sandbox.getActiveEmploymentReviewScope();
+        assert.strictEqual(scope.workspace, 'ADVANCED');
+        assert.strictEqual(scope.apo_hmeromhnia, '2026-06-01');
+        assert.strictEqual(scope.eos_hmeromhnia, '2026-06-30');
+        assert.strictEqual(scope.ypokatasthma, '0000');
+
+        elementsById.set('advancedReviewWorkspace', workspace(true));
+        elementsById.set('hrReviewWorkspace', workspace(false));
+        setValue('hr_apo_hmeromhnia', '2026-07-01');
+        setValue('hr_eos_hmeromhnia', '2026-07-31');
+        setValue('ypokatasthmata_stathera', '0001');
+        setValue('apo_hmeromhnia', '1999-02-01');
+        setValue('eos_hmeromhnia', '1999-02-28');
+        setValue('ypokatasthma_stathera_advanced', 'STALE');
+        scope = sandbox.getActiveEmploymentReviewScope();
+        assert.strictEqual(scope.workspace, 'SIMPLE');
+        assert.strictEqual(scope.apo_hmeromhnia, '2026-07-01');
+        assert.strictEqual(scope.eos_hmeromhnia, '2026-07-31');
+        assert.strictEqual(scope.ypokatasthma, '0001');
+
+        setValue('hr_eos_hmeromhnia', '');
+        assert.throws(() => sandbox.getActiveEmploymentReviewScope(), /πλήρως επιλεγμένα/);
+    } finally {
+        elementsById.set('hrReviewWorkspace', workspace(false));
+        elementsById.set('advancedReviewWorkspace', workspace(true));
+        setValue('hr_apo_hmeromhnia', '2026-07-01');
+        setValue('hr_eos_hmeromhnia', '2026-07-31');
+        ['apo_hmeromhnia', 'eos_hmeromhnia', 'ypokatasthma_stathera_advanced']
+            .forEach((id) => elementsById.delete(id));
+    }
+}
+
 function testCorrectiveDropdownAndPageShellContract() {
     const repositionStart = dropdownHelperSource.indexOf('const reposition = () => {');
     const repositionEnd = dropdownHelperSource.indexOf('requestAnimationFrame(reposition)', repositionStart);
@@ -2902,6 +2986,7 @@ const tests = [
     testOpenAndCompletedPartialWeekMessagesStayDistinct,
     testWeeklyDeviationPresentationUsesMondaySundayPolicy,
     testEmploymentReviewFinalUiContract,
+    testSharedLifecyclePanelAndActiveWorkspaceScopeContract,
     testCorrectiveDropdownAndPageShellContract,
     testEmploymentReviewBranchActionLayoutContract,
     testRoleScopedRenderedEjs,

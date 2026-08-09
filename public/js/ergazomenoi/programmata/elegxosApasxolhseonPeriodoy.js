@@ -6090,10 +6090,12 @@ function bindHrReviewEvents() {
         await window.EmploymentReviewBranches?.preselectAdvancedBranch?.();
         document.getElementById('hrReviewWorkspace')?.classList.add('d-none');
         document.getElementById('advancedReviewWorkspace')?.classList.remove('d-none');
+        resetEmploymentPeriodControlForWorkspaceSwitch();
     });
     document.getElementById('showMinimalReviewBtn')?.addEventListener('click', async () => {
         document.getElementById('advancedReviewWorkspace')?.classList.add('d-none');
         document.getElementById('hrReviewWorkspace')?.classList.remove('d-none');
+        resetEmploymentPeriodControlForWorkspaceSwitch();
         if (currentHrReviewLoaded) await loadHrReviewQueue();
     });
 }
@@ -6561,6 +6563,49 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
 let currentEmploymentPeriodControl = null;
 
+function resetEmploymentPeriodControlForWorkspaceSwitch() {
+    currentEmploymentPeriodControl = null;
+    document.getElementById('employmentPeriodControlPanel')?.classList.add('d-none');
+}
+
+function getActiveEmploymentReviewScope() {
+    const advancedWorkspace = document.getElementById('advancedReviewWorkspace');
+    const simpleWorkspace = document.getElementById('hrReviewWorkspace');
+    const advancedActive = Boolean(advancedWorkspace && !advancedWorkspace.classList.contains('d-none'));
+    const simpleActive = Boolean(simpleWorkspace && !simpleWorkspace.classList.contains('d-none'));
+
+    if (advancedActive === simpleActive) {
+        throw new Error('Δεν είναι δυνατός ο ασφαλής προσδιορισμός της ενεργής προβολής ελέγχου.');
+    }
+
+    const workspace = advancedActive ? 'ADVANCED' : 'SIMPLE';
+    const apoHmeromhnia = String(document.getElementById(
+        advancedActive ? 'apo_hmeromhnia' : 'hr_apo_hmeromhnia'
+    )?.value || '').trim();
+    const eosHmeromhnia = String(document.getElementById(
+        advancedActive ? 'eos_hmeromhnia' : 'hr_eos_hmeromhnia'
+    )?.value || '').trim();
+    const ypokatasthma = String(
+        advancedActive
+            ? document.getElementById('ypokatasthma_stathera_advanced')?.value ||
+              document.getElementById('ypokatasthma')?.tomselect?.getValue?.() ||
+              document.getElementById('ypokatasthma')?.value || ''
+            : getHrSelectedBranch()
+    ).trim();
+
+    if (!apoHmeromhnia || !eosHmeromhnia || !ypokatasthma ||
+        ypokatasthma.toUpperCase() === 'ALL' || ypokatasthma.includes(',')) {
+        throw new Error('Η ενεργή περίοδος και το παράρτημα πρέπει να είναι πλήρως επιλεγμένα.');
+    }
+
+    return Object.freeze({
+        workspace,
+        apo_hmeromhnia: apoHmeromhnia,
+        eos_hmeromhnia: eosHmeromhnia,
+        ypokatasthma
+    });
+}
+
 const employmentPeriodModeLabels = Object.freeze({
     NORMAL: 'Ανοικτή',
     LOCKED: 'Κλειδωμένη',
@@ -6657,6 +6702,7 @@ function renderEmploymentPeriodControl(state) {
 
 async function runHistoricalReconstruction() {
     const state = currentEmploymentPeriodControl;
+    const scope = getActiveEmploymentReviewScope();
     const reassess = state?.allowed_actions?.historical_reassess === true;
     const confirmation = await Swal.fire({ icon: 'warning',
         title: reassess ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου' : 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
@@ -6665,7 +6711,7 @@ async function runHistoricalReconstruction() {
         confirmButtonText: reassess ? 'Επανεκτίμηση' : 'Ανακατασκευή', cancelButtonText: 'Ακύρωση',
         inputValidator: value => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
     if (!confirmation.isConfirmed) return;
-    const branch = currentCorrectiveBranch();
+    const branch = scope.ypokatasthma;
     const requestId = `historical-reconstruction-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const authorized = await fetch('/api/prodhlomena-oraria/review/period-control/historical-reconstruction/authorize', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
@@ -6676,21 +6722,22 @@ async function runHistoricalReconstruction() {
     if (!authorized.ok || !authorization.success) throw new Error(authorization.message || 'Η εξουσιοδότηση απέτυχε.');
     const response = await fetch('/ergazomenoi/programmata/calcApasxolhseisPeriodoy', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
-        body: JSON.stringify({ apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
-            eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
+        body: JSON.stringify({ apo_hmeromhnia: scope.apo_hmeromhnia,
+            eos_hmeromhnia: scope.eos_hmeromhnia,
             ypokatasthmata_stathera: branch, proorh_proseleysh: 0, proorhApoxorhsh_stathera: 0,
             historical_reconstruction_request_id: requestId })
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η ιστορική ανακατασκευή απέτυχε.');
     await loadEmploymentPeriodControl(branch);
-    await loadResults();
+    if (scope.workspace === 'ADVANCED') await loadResults();
+    else await loadHrReviewQueue();
     await Swal.fire({ icon: 'success', title: 'Ιστορική ανακατασκευή ολοκληρώθηκε',
         text: `Έκδοση ${authorization.historical_reconstruction_version}` });
 }
 
 function currentCorrectiveBranch() {
-    return String(document.getElementById('ypokatasthma_stathera_advanced')?.value || getHrSelectedBranch() || '').trim();
+    return getActiveEmploymentReviewScope().ypokatasthma;
 }
 
 async function calculateCorrectivePayroll() {
@@ -6798,7 +6845,7 @@ async function runEmploymentPeriodLifecycleAction(kind) {
         confirmButtonText: corrective ? 'Άνοιγμα διορθωτικής μισθοδοσίας' : 'Οριστικοποίηση περιόδου',
         cancelButtonText: 'Ακύρωση', inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
     if (!confirmation.isConfirmed) return;
-    const branch = String(document.getElementById('ypokatasthma_stathera_advanced')?.value || getHrSelectedBranch() || '').trim();
+    const branch = getActiveEmploymentReviewScope().ypokatasthma;
     const suffix = corrective ? 'corrective/open' : 'finalize';
     const response = await fetch(`/api/prodhlomena-oraria/review/period-control/${suffix}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
@@ -6841,7 +6888,12 @@ async function submitFinalWTODayilyA() {
 }
 
 async function loadEmploymentPeriodControl(ypokatasthma) {
-    const response = await fetch(`/api/prodhlomena-oraria/review/period-control/current?ypokatasthma=${encodeURIComponent(ypokatasthma)}`, {
+    const scope = getActiveEmploymentReviewScope();
+    const requestedBranch = String(ypokatasthma || '').trim();
+    if (requestedBranch && requestedBranch !== scope.ypokatasthma) {
+        throw new Error('Το παράρτημα της ενέργειας δεν αντιστοιχεί στην ενεργή προβολή ελέγχου.');
+    }
+    const response = await fetch(`/api/prodhlomena-oraria/review/period-control/current?ypokatasthma=${encodeURIComponent(scope.ypokatasthma)}`, {
         headers: { Accept: 'application/json', 'CSRF-Token': csrfToken }
     });
     const payload = await response.json();
@@ -6867,10 +6919,7 @@ async function transitionEmploymentPeriod(action) {
         inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.'
     });
     if (!confirmation.isConfirmed) return;
-    const branch = String(
-        document.getElementById('ypokatasthma_stathera_advanced')?.value ||
-        getHrSelectedBranch() || ''
-    ).trim();
+    const branch = getActiveEmploymentReviewScope().ypokatasthma;
     const response = await fetch(`/api/prodhlomena-oraria/review/period-control/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
