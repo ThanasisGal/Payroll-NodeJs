@@ -241,7 +241,8 @@ async function acquirePeriodCalculationOwnership({ scope: input, now = new Date(
         return await transactionRunner(async (session) => {
             const ownershipFilter = {
                 ...filterForScope(scope), status: 'OPEN',
-                $or: [{ active_calculation_id: '' }, { active_calculation_id: null }, { active_calculation_id: { $exists: false } }]
+                $or: [{ active_calculation_id: '' }, { active_calculation_id: null },
+                    { active_calculation_id: mongoose.trusted({ $exists: false }) }]
             };
             if (overdue) Object.assign(ownershipFilter, { historical_reconstruction_status: 'AUTHORIZED',
                 last_historical_reconstruction_request_id: String(historicalRequestId).trim() });

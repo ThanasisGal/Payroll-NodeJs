@@ -18,8 +18,8 @@
 
     <% if (canRecordRepoTransferDecision) { %>
     <div id="employmentPeriodControlPanel" class="alert alert-light border d-none mb-3" aria-live="polite">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <div>
+        <div class="employment-period-control-layout d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="employment-period-control-summary">
                 <span class="fw-semibold">Κατάσταση περιόδου:</span>
                 <span id="employmentPeriodControlStatus">Απαιτείται έλεγχος</span>
                 <span class="mx-2">·</span>
@@ -40,7 +40,7 @@
                 <span class="fw-semibold">Πρωτόκολλο:</span>
                 <span id="employmentPeriodProtocol">-</span>
             </div>
-            <div id="employmentPeriodControlActions" class="d-flex gap-2">
+            <div id="employmentPeriodControlActions" class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-outline-danger btn-sm d-none" id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
                 <button type="button" class="btn btn-warning btn-sm d-none" id="historicalReconstructionBtn">Ανακατασκευή Εκπρόθεσμης Περιόδου</button>
                 <button type="button" class="btn btn-outline-warning btn-sm d-none" id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>

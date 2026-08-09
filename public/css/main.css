@@ -14374,12 +14374,45 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-page-shell {
     --employment-review-bottom-clearance: 3.25rem;
-    width: 94% !important;
-    max-width: none;
-    margin-left: 3%;
-    margin-right: 3%;
+    width: 100% !important;
+    max-width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    margin-right: 0;
     padding-bottom: 0.5rem;
     overflow: visible;
+    box-sizing: border-box;
+}
+
+.employment-review-page-shell > #employmentPeriodControlPanel,
+.employment-review-page-shell > #hrReviewWorkspace,
+.employment-review-page-shell > #advancedReviewWorkspace,
+.employment-review-card,
+.review-card-body,
+.employment-review-scroll-container,
+.results-table-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+#employmentPeriodControlPanel {
+    overflow-wrap: anywhere;
+}
+
+.employment-period-control-layout,
+.employment-period-control-summary {
+    min-width: 0;
+}
+
+.employment-period-control-summary {
+    flex: 1 1 24rem;
+}
+
+#employmentPeriodControlActions {
+    flex: 0 1 auto;
+    max-width: 100%;
 }
 
 .employment-review-card {
@@ -14704,6 +14737,7 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-scroll-container--advanced {
     --employment-review-viewport-offset: 28.75rem;
+    overflow-x: auto;
 }
 
 .employment-review-scroll-container .results-table-wrapper {
@@ -14792,6 +14826,35 @@ body.loader-active > *:not(.app-loader) {
     color: #ffffff;
     border-color: #495057;
     background-clip: padding-box;
+}
+
+.historical-reconstruction-swal {
+    width: min(720px, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
+    padding: 1rem 1.25rem 1.15rem;
+}
+
+.historical-reconstruction-swal .swal2-title {
+    padding: 0.5rem 1rem 0;
+}
+
+.historical-reconstruction-swal__content {
+    margin: 0.5rem 0 0;
+}
+
+.historical-reconstruction-swal__content p {
+    margin-bottom: 0.5rem;
+}
+
+.historical-reconstruction-swal__reason {
+    min-height: 6rem;
+    max-height: 7.5rem;
+    margin: 0.75rem auto 0;
+    resize: vertical;
+}
+
+.historical-reconstruction-swal .swal2-actions {
+    margin-top: 0.9rem;
 }
 
 @media (max-width: 991.98px) {
