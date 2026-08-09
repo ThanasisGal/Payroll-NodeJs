@@ -136,14 +136,13 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
         if (current?.status === 'FINALIZED' || current?.frozen_snapshot_id) throw reconstructionError('PERIOD_CONTROL_FINALIZED', 409, 'Η οριστικοποιημένη περίοδος δέχεται μόνο διορθωτική επανεκτίμηση.');
         if (current?.status === 'LOCKED') throw reconstructionError('PERIOD_CONTROL_LOCKED', 409, 'Η περίοδος είναι κλειδωμένη.');
         if (current?.active_calculation_id) throw reconstructionError('PERIOD_CONTROL_CALCULATION_IN_PROGRESS', 409, 'Υπάρχει υπολογισμός σε εξέλιξη.');
-        if (current?.last_historical_reconstruction_request_id === cleanRequestId) {
+        if (current?.last_historical_reconstruction_request_id === cleanRequestId &&
+            ['AUTHORIZED', 'COMPLETED'].includes(current?.historical_reconstruction_status)) {
             if (current.last_historical_reconstruction_command_identity !== identity) throw reconstructionError('HISTORICAL_RECONSTRUCTION_REQUEST_CONFLICT', 409, 'Το request_id έχει διαφορετική εντολή.');
             return { record: current, idempotent: true };
         }
-        if (current?.historical_reconstruction_status === 'AUTHORIZED') {
-            throw reconstructionError('HISTORICAL_RECONSTRUCTION_IN_PROGRESS', 409,
-                'Υπάρχει ήδη εξουσιοδοτημένη ιστορική ανακατασκευή σε εξέλιξη.');
-        }
+        const abandonedAuthorization = current?.historical_reconstruction_status === 'AUTHORIZED'
+            ? current : null;
         let staleDetails = null;
         if (current?.historical_reconstruction_status === 'COMPLETED') {
             const fingerprints = await fingerprintResolver({ scope, session: dbSession });
@@ -160,20 +159,33 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
         const deadline = new Date(Date.UTC(dateOnly(scope.period_end).getUTCFullYear(), dateOnly(scope.period_end).getUTCMonth() + 2, 0));
         const filter = current ? { ...scope, status: 'OPEN', version: current.version,
             active_calculation_id: { $in: ['', null] } } : { ...scope, _id: { $exists: false } };
-        const set = { historical_reconstruction_status: 'AUTHORIZED', historical_reconstruction_version: nextVersion,
-            historical_reconstruction_started_at: now, historical_reconstruction_started_by_user_id: by.user_id,
-            historical_reconstruction_started_by_user_name: by.user_name,
-            historical_reconstruction_started_by_user_role: by.role, historical_reconstruction_completed_at: null,
-            historical_reconstruction_reason: cleanReason,
+        const set = { historical_reconstruction_status: 'AUTHORIZED',
+            historical_reconstruction_pending_version: nextVersion,
+            historical_reconstruction_pending_started_at: now,
+            historical_reconstruction_pending_by_user_id: by.user_id,
+            historical_reconstruction_pending_by_user_name: by.user_name,
+            historical_reconstruction_pending_by_user_role: by.role,
+            historical_reconstruction_pending_reason: cleanReason,
             last_historical_reconstruction_request_id: cleanRequestId,
             last_historical_reconstruction_command_identity: identity, updated_at: now };
         let updated;
         if (!current) {
             const docs = await periodControlModel.create([{ ...scope, status: 'OPEN', deadline, ...set,
+                historical_reconstruction_version: 0,
                 version: 1, write_fence_version: 0, created_at: now }], { session: dbSession }); updated = docs[0];
         } else updated = await periodControlModel.findOneAndUpdate(filter, { $set: set, $inc: { version: 1 } }, { new: true, session: dbSession });
         if (!updated) throw reconstructionError('HISTORICAL_RECONSTRUCTION_CONFLICT', 409, 'Η κατάσταση της περιόδου άλλαξε.');
         const auditDocuments = [];
+        if (abandonedAuthorization) auditDocuments.push({ ...scope,
+            event_type: 'HISTORICAL_RECONSTRUCTION_FAILED',
+            actor_user_id: abandonedAuthorization.historical_reconstruction_pending_by_user_id,
+            actor_user_name: abandonedAuthorization.historical_reconstruction_pending_by_user_name,
+            actor_user_role: abandonedAuthorization.historical_reconstruction_pending_by_user_role,
+            reason: abandonedAuthorization.historical_reconstruction_pending_reason || 'AUTHORIZATION_SUPERSEDED',
+            reference_id: abandonedAuthorization.last_historical_reconstruction_request_id,
+            details: { pending_reconstruction_version:
+                abandonedAuthorization.historical_reconstruction_pending_version,
+            error_code: 'AUTHORIZATION_SUPERSEDED' }, occurred_at: now });
         if (staleDetails) auditDocuments.push({ ...scope,
             event_type: 'HISTORICAL_RECONSTRUCTION_STALE', actor_user_id: by.user_id,
             actor_user_name: by.user_name, actor_user_role: by.role, reason: cleanReason,
@@ -204,9 +216,27 @@ async function completeHistoricalReconstruction({ scope, calculationId, requestI
             last_historical_reconstruction_request_id: requestId }).session(dbSession).lean();
         if (!current) throw reconstructionError('HISTORICAL_RECONSTRUCTION_OWNERSHIP_LOST', 409, 'Η εξουσιοδότηση ανακατασκευής δεν είναι πλέον ενεργή.');
         const fingerprints = await calculateHistoricalFingerprints({ scope, prodhlomenaModel, session: dbSession });
+        const completedVersion = Number(current.historical_reconstruction_pending_version || 0);
+        if (completedVersion !== Number(current.historical_reconstruction_version || 0) + 1) {
+            throw reconstructionError('HISTORICAL_RECONSTRUCTION_VERSION_CONFLICT', 409,
+                'Η έκδοση της ανακατασκευής έχει αλλάξει.');
+        }
         const updated = await periodControlModel.findOneAndUpdate({ ...scope, status: 'OPEN', version: current.version,
-            historical_reconstruction_status: 'AUTHORIZED', active_calculation_id: calculationId }, { $set: {
+            historical_reconstruction_status: 'AUTHORIZED', active_calculation_id: calculationId,
+            historical_reconstruction_pending_version: completedVersion }, { $set: {
             historical_reconstruction_status: 'COMPLETED', historical_reconstruction_completed_at: now,
+            historical_reconstruction_version: completedVersion,
+            historical_reconstruction_pending_version: 0,
+            historical_reconstruction_started_at: current.historical_reconstruction_pending_started_at,
+            historical_reconstruction_started_by_user_id: current.historical_reconstruction_pending_by_user_id,
+            historical_reconstruction_started_by_user_name: current.historical_reconstruction_pending_by_user_name,
+            historical_reconstruction_started_by_user_role: current.historical_reconstruction_pending_by_user_role,
+            historical_reconstruction_reason: current.historical_reconstruction_pending_reason,
+            historical_reconstruction_pending_started_at: null,
+            historical_reconstruction_pending_by_user_id: null,
+            historical_reconstruction_pending_by_user_name: '',
+            historical_reconstruction_pending_by_user_role: '',
+            historical_reconstruction_pending_reason: '',
             historical_source_fingerprint: fingerprints.source_fingerprint,
             historical_dependency_fingerprint: fingerprints.dependency_fingerprint,
             historical_dependency_window_start: fingerprints.dependency_window_start,
@@ -215,18 +245,18 @@ async function completeHistoricalReconstruction({ scope, calculationId, requestI
         }, $inc: { version: 1 } }, { new: true, session: dbSession });
         if (!updated) throw reconstructionError('HISTORICAL_RECONSTRUCTION_CONFLICT', 409, 'Η ανακατασκευή άλλαξε ταυτόχρονα.');
         await auditModel.create([{ ...scope, event_type: 'HISTORICAL_RECONSTRUCTION_CALCULATION',
-            actor_user_id: current.historical_reconstruction_started_by_user_id,
-            actor_user_name: current.historical_reconstruction_started_by_user_name,
-            actor_user_role: current.historical_reconstruction_started_by_user_role,
-            reason: current.historical_reconstruction_reason, reference_id: requestId,
-            details: { reconstruction_version: current.historical_reconstruction_version,
+            actor_user_id: current.historical_reconstruction_pending_by_user_id,
+            actor_user_name: current.historical_reconstruction_pending_by_user_name,
+            actor_user_role: current.historical_reconstruction_pending_by_user_role,
+            reason: current.historical_reconstruction_pending_reason, reference_id: requestId,
+            details: { reconstruction_version: completedVersion,
                 calculation_id: calculationId }, occurred_at: now }, { ...scope,
             event_type: 'HISTORICAL_RECONSTRUCTION_COMPLETE',
-            actor_user_id: current.historical_reconstruction_started_by_user_id,
-            actor_user_name: current.historical_reconstruction_started_by_user_name,
-            actor_user_role: current.historical_reconstruction_started_by_user_role,
-            reason: current.historical_reconstruction_reason, reference_id: requestId,
-            details: { reconstruction_version: current.historical_reconstruction_version,
+            actor_user_id: current.historical_reconstruction_pending_by_user_id,
+            actor_user_name: current.historical_reconstruction_pending_by_user_name,
+            actor_user_role: current.historical_reconstruction_pending_by_user_role,
+            reason: current.historical_reconstruction_pending_reason, reference_id: requestId,
+            details: { reconstruction_version: completedVersion,
                 source_fingerprint: fingerprints.source_fingerprint,
                 dependency_fingerprint: fingerprints.dependency_fingerprint,
                 result_fingerprint: fingerprints.result_fingerprint,
@@ -236,7 +266,54 @@ async function completeHistoricalReconstruction({ scope, calculationId, requestI
     });
 }
 
+async function failHistoricalReconstruction({ scope, requestId, calculationId = '', errorCode = '',
+    now = new Date(), periodControlModel = PeriodControlModel, auditModel = LifecycleAuditModel,
+    transactionRunner = transaction }) {
+    const cleanRequestId = String(requestId || '').trim();
+    return transactionRunner(async (dbSession) => {
+        const current = await periodControlModel.findOne({ ...scope, status: 'OPEN',
+            historical_reconstruction_status: 'AUTHORIZED',
+            last_historical_reconstruction_request_id: cleanRequestId }).session(dbSession).lean();
+        if (!current) return { recovered: false };
+        const activeCalculationId = String(current.active_calculation_id || '');
+        if ((calculationId && activeCalculationId !== calculationId) ||
+            (!calculationId && activeCalculationId)) return { recovered: false };
+        const completedVersion = Number(current.historical_reconstruction_version || 0);
+        const restoredStatus = completedVersion > 0 ? 'COMPLETED' : '';
+        const filter = { ...scope, status: 'OPEN', version: current.version,
+            historical_reconstruction_status: 'AUTHORIZED',
+            historical_reconstruction_pending_version: current.historical_reconstruction_pending_version,
+            last_historical_reconstruction_request_id: cleanRequestId,
+            active_calculation_id: activeCalculationId };
+        const updated = await periodControlModel.findOneAndUpdate(filter, { $set: {
+            historical_reconstruction_status: restoredStatus,
+            historical_reconstruction_pending_version: 0,
+            historical_reconstruction_pending_started_at: null,
+            historical_reconstruction_pending_by_user_id: null,
+            historical_reconstruction_pending_by_user_name: '',
+            historical_reconstruction_pending_by_user_role: '',
+            historical_reconstruction_pending_reason: '',
+            last_historical_reconstruction_request_id: '',
+            last_historical_reconstruction_command_identity: '',
+            active_calculation_id: '', active_calculation_started_at: null, updated_at: now
+        }, $inc: { version: 1, write_fence_version: activeCalculationId ? 1 : 0 } },
+        { new: true, session: dbSession });
+        if (!updated) throw reconstructionError('HISTORICAL_RECONSTRUCTION_RECOVERY_CONFLICT', 409,
+            'Η κατάσταση της ανακατασκευής άλλαξε κατά την επαναφορά.');
+        await auditModel.create([{ ...scope, event_type: 'HISTORICAL_RECONSTRUCTION_FAILED',
+            actor_user_id: current.historical_reconstruction_pending_by_user_id,
+            actor_user_name: current.historical_reconstruction_pending_by_user_name,
+            actor_user_role: current.historical_reconstruction_pending_by_user_role,
+            reason: current.historical_reconstruction_pending_reason || 'CALCULATION_FAILED',
+            reference_id: cleanRequestId,
+            details: { pending_reconstruction_version: current.historical_reconstruction_pending_version,
+                calculation_id: activeCalculationId, error_code: String(errorCode || '') },
+            occurred_at: now }], { session: dbSession });
+        return { recovered: true, record: updated };
+    });
+}
+
 module.exports = { FINGERPRINT_VERSION, SOURCE_FIELDS, DEPENDENCY_FIELDS, RESULT_FIELDS,
     dependencyWindow, fingerprintRows, projectionForHistoricalState, isPastDeadline,
     calculateHistoricalFingerprints, authorizeHistoricalReconstruction,
-    completeHistoricalReconstruction, reconstructionError };
+    completeHistoricalReconstruction, failHistoricalReconstruction, reconstructionError };

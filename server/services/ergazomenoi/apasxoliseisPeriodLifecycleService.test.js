@@ -3,6 +3,7 @@
 const assert = require('assert');
 const { finalizeEmploymentPeriod, linkEmploymentPeriodSubmission, openCorrectiveCase,
     saveCorrectiveResult, closeCorrectiveCase } = require('./apasxoliseisPeriodLifecycleService');
+const { transitionPeriodControl } = require('./apasxoliseisPeriodControlService');
 
 const scope = { team: 'T', company_kod: '507f1f77bcf86cd799439099', ypokatasthma: '0001',
     period_start: '2026-06-01', period_end: '2026-06-30' };
@@ -55,7 +56,9 @@ function stores(controlInput = {}) {
                 return { ...item };
             }
         },
-        audit: { async create(documents) { audits.push(...documents); return documents; } },
+        audit: { async create(documents) {
+            audits.push(...(Array.isArray(documents) ? documents : [documents])); return documents;
+        } },
         get control() { return control; }, get frozenRecord() { return frozen; }, audits, cases
     };
 }
@@ -111,6 +114,24 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
     const immutableHistoricalFingerprint = historicalFinalized.frozenRecord.frozen_snapshot_fingerprint;
     assert.strictEqual(historicalFinalized.control.frozen_snapshot_fingerprint, immutableHistoricalFingerprint);
 
+    const reconstructedFlow = stores({ status: 'OPEN', historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: 1, historical_dependency_fingerprint: 'c'.repeat(64) });
+    const lockedReconstructed = await transitionPeriodControl({ session: allowed, scope, action: 'LOCK',
+        reason: 'Ολοκλήρωση ελέγχου ανακατασκευής', requestId: 'historical-lock-e2e-01',
+        now: new Date('2026-08-02'), expectedVersion: 2, periodControlModel: reconstructedFlow.period,
+        auditModel: reconstructedFlow.audit, indexGuard: guard, transactionRunner: runner,
+        historicalFingerprintResolver: async () => ({ dependency_fingerprint: 'c'.repeat(64) }) });
+    assert.strictEqual(lockedReconstructed.state.stored_status, 'LOCKED');
+    await finalizeEmploymentPeriod({ session: allowed, scope, reason: 'Ιστορική οριστικοποίηση',
+        requestId: 'historical-finalize-e2e-01', snapshotInput,
+        periodControlModel: reconstructedFlow.period, frozenModel: reconstructedFlow.frozen,
+        auditModel: reconstructedFlow.audit, indexGuard: guard, transactionRunner: runner,
+        historicalFingerprintResolver: async () => ({ dependency_fingerprint: 'c'.repeat(64) }) });
+    assert.strictEqual(reconstructedFlow.control.status, 'FINALIZED');
+    assert.strictEqual(reconstructedFlow.frozenRecord.baseline_origin,
+        'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE');
+    assert.strictEqual(reconstructedFlow.frozenRecord.historical_reconstruction_version, 1);
+
     const staleHistorical = stores({ historical_reconstruction_status: 'COMPLETED',
         historical_reconstruction_version: 1, historical_dependency_fingerprint: 'a'.repeat(64) });
     await assert.rejects(() => finalizeEmploymentPeriod({ session: allowed, scope, reason: 'stale',
@@ -120,6 +141,14 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
         historicalFingerprintResolver: async () => ({ dependency_fingerprint: 'b'.repeat(64) }) }),
     error => error.code === 'HISTORICAL_RECONSTRUCTION_STALE_CANNOT_FINALIZE');
     assert.strictEqual(staleHistorical.frozenRecord, null);
+    const staleOpen = stores({ status: 'OPEN', historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: 1, historical_dependency_fingerprint: 'a'.repeat(64) });
+    await assert.rejects(() => transitionPeriodControl({ session: allowed, scope, action: 'LOCK',
+        reason: 'stale lock', requestId: 'historical-stale-lock-01', now: new Date('2026-08-02'),
+        expectedVersion: 2, periodControlModel: staleOpen.period, auditModel: staleOpen.audit,
+        indexGuard: guard, transactionRunner: runner,
+        historicalFingerprintResolver: async () => ({ dependency_fingerprint: 'b'.repeat(64) }) }),
+    error => error.code === 'HISTORICAL_RECONSTRUCTION_STALE_CANNOT_FINALIZE');
 
     const correctionStore = stores({ status: 'FINALIZED', frozen_snapshot_id: '507f1f77bcf86cd799439012',
         frozen_snapshot_fingerprint: 'a'.repeat(64) });

@@ -8,7 +8,8 @@ const {
     projectionForHistoricalState,
     authorizeHistoricalReconstruction,
     calculateHistoricalFingerprints,
-    completeHistoricalReconstruction
+    completeHistoricalReconstruction,
+    failHistoricalReconstruction
 } = require('./apasxoliseisHistoricalPeriodReconstructionService');
 const { normalizeScope, calculatePeriodDeadline, projectPeriodControl,
     acquirePeriodCalculationOwnership } = require('./apasxoliseisPeriodControlService');
@@ -58,18 +59,37 @@ assert.strictEqual(finalized.effective_mode, 'FINALIZED');
 assert.strictEqual(finalized.can_historical_reconstruct, false);
 assert.strictEqual(finalized.can_corrective, true);
 
+function matches(record, filter = {}) {
+    if (!record) return false;
+    for (const [key, expected] of Object.entries(filter)) {
+        if (key === '$or') {
+            if (!expected.some(condition => matches(record, condition))) return false;
+            continue;
+        }
+        if (key === '_id' && expected?.$exists === false) continue;
+        const actual = record[key];
+        if (expected && expected.$exists !== undefined) {
+            if ((actual !== undefined) !== expected.$exists) return false;
+            continue;
+        }
+        if (expected && Array.isArray(expected.$in)) {
+            if (!expected.$in.includes(actual ?? '')) return false;
+        } else if (expected instanceof Date) {
+            if (new Date(actual).getTime() !== expected.getTime()) return false;
+        } else if (expected !== undefined && String(actual ?? '') !== String(expected ?? '')) return false;
+    }
+    return true;
+}
 function store(initial = null) {
     let record = initial ? { ...initial } : null;
     const audits = [];
-    const query = () => ({ session() { return this; }, lean: async () => record ? { ...record } : null });
+    const query = filter => ({ session() { return this; }, lean: async () => matches(record, filter) ? { ...record } : null });
     return { model: {
         findOne: query,
         async create(values) { const value = Array.isArray(values) ? values[0] : values;
             record = { _id: 'control', ...value }; return Array.isArray(values) ? [{ ...record }] : { ...record }; },
         async findOneAndUpdate(filter, update) {
-            if (!record || (filter.version !== undefined && filter.version !== record.version) ||
-                (filter.status && filter.status !== record.status) ||
-                (filter.historical_reconstruction_status && filter.historical_reconstruction_status !== record.historical_reconstruction_status)) return null;
+            if (!matches(record, filter)) return null;
             record = { ...record, ...(update.$set || {}) };
             for (const [key, amount] of Object.entries(update.$inc || {})) record[key] = Number(record[key] || 0) + amount;
             return { ...record };
@@ -86,7 +106,8 @@ const transactionRunner = work => work({ id: 'transaction' });
             scope: juneScope, reason: 'Ιστορική ανακατασκευή', requestId: `historical-${role}-0001`,
             confirmation: true, now: new Date('2026-08-01'), periodControlModel: s.model,
             auditModel: s.audit, transactionRunner });
-        assert.strictEqual(result.record.historical_reconstruction_version, 1);
+        assert.strictEqual(result.record.historical_reconstruction_version, 0);
+        assert.strictEqual(result.record.historical_reconstruction_pending_version, 1);
         assert.strictEqual(s.audits[0].event_type, 'HISTORICAL_RECONSTRUCTION_OPEN');
     }
     await assert.rejects(() => authorizeHistoricalReconstruction({ session: { ...user, userRole: 'U' },
@@ -107,7 +128,7 @@ const transactionRunner = work => work({ id: 'transaction' });
     error => error.code === 'HISTORICAL_RECONSTRUCTION_NOT_OVERDUE');
 
     const replayStore = store();
-    const command = { session: user, scope: juneScope, reason: 'reason', requestId: 'historical-replay-01',
+    const command = { session: user, scope: mayScope, reason: 'reason', requestId: 'historical-replay-01',
         confirmation: true, now: new Date('2026-08-01'), periodControlModel: replayStore.model,
         auditModel: replayStore.audit, transactionRunner };
     await authorizeHistoricalReconstruction(command);
@@ -115,10 +136,13 @@ const transactionRunner = work => work({ id: 'transaction' });
     assert.strictEqual(replay.idempotent, true);
     assert.strictEqual(replayStore.audits.length, 1);
 
-    replayStore.record.historical_reconstruction_status = 'COMPLETED';
+    Object.assign(replayStore.record, { historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: 1, historical_reconstruction_pending_version: 0,
+        historical_dependency_fingerprint: 'old' });
     const reassess = await authorizeHistoricalReconstruction({ ...command, requestId: 'historical-reassess-02',
         reason: 'dependency changed', fingerprintResolver: async () => ({ dependency_fingerprint: 'changed' }) });
-    assert.strictEqual(reassess.record.historical_reconstruction_version, 2);
+    assert.strictEqual(reassess.record.historical_reconstruction_version, 1);
+    assert.strictEqual(reassess.record.historical_reconstruction_pending_version, 2);
     assert.strictEqual(replayStore.audits.at(-1).event_type, 'HISTORICAL_RECONSTRUCTION_REASSESS');
     assert.strictEqual(replayStore.audits.at(-2).event_type, 'HISTORICAL_RECONSTRUCTION_STALE');
 
@@ -158,10 +182,81 @@ const transactionRunner = work => work({ id: 'transaction' });
         now: new Date('2026-08-02'), periodControlModel: replayStore.model,
         auditModel: replayStore.audit, prodhlomenaModel, transactionRunner });
     assert.strictEqual(completion.record.historical_reconstruction_status, 'COMPLETED');
+    assert.strictEqual(completion.record.historical_reconstruction_version, 2);
     assert.strictEqual(completion.record.historical_dependency_fingerprint, originalMayDependency);
     assert.strictEqual(JSON.stringify(factRows), sourceBeforeCompletion);
     assert.deepStrictEqual(replayStore.audits.slice(-2).map(audit => audit.event_type),
         ['HISTORICAL_RECONSTRUCTION_CALCULATION', 'HISTORICAL_RECONSTRUCTION_COMPLETE']);
+
+    const failedFirst = store();
+    const firstCommand = { session: user, scope: juneScope, reason: 'first failure',
+        requestId: 'historical-failure-first-01', confirmation: true, now: new Date('2026-08-01'),
+        periodControlModel: failedFirst.model, auditModel: failedFirst.audit, transactionRunner };
+    await authorizeHistoricalReconstruction(firstCommand);
+    const beforeOwnershipRecovery = await failHistoricalReconstruction({ scope: juneScope,
+        requestId: firstCommand.requestId, errorCode: 'FAILED_BEFORE_OWNERSHIP',
+        periodControlModel: failedFirst.model, auditModel: failedFirst.audit, transactionRunner });
+    assert.strictEqual(beforeOwnershipRecovery.recovered, true);
+    assert.strictEqual(beforeOwnershipRecovery.record.historical_reconstruction_status, '');
+    assert.strictEqual(beforeOwnershipRecovery.record.historical_reconstruction_version, 0);
+    assert.strictEqual(beforeOwnershipRecovery.record.historical_reconstruction_pending_version, 0);
+    assert.strictEqual(failedFirst.audits.at(-1).event_type, 'HISTORICAL_RECONSTRUCTION_FAILED');
+    assert.ok(!failedFirst.audits.some(audit => audit.event_type === 'HISTORICAL_RECONSTRUCTION_COMPLETE'));
+
+    const retry = await authorizeHistoricalReconstruction({ ...firstCommand,
+        requestId: 'historical-failure-first-retry-01' });
+    failedFirst.record.active_calculation_id = 'historical-first-retry-calculation';
+    const retryComplete = await completeHistoricalReconstruction({ scope: juneScope,
+        calculationId: 'historical-first-retry-calculation', requestId: retry.record.last_historical_reconstruction_request_id,
+        periodControlModel: failedFirst.model, auditModel: failedFirst.audit,
+        prodhlomenaModel, transactionRunner });
+    assert.strictEqual(retryComplete.record.historical_reconstruction_version, 1);
+
+    const completedV1Fingerprints = {
+        historical_source_fingerprint: retryComplete.record.historical_source_fingerprint,
+        historical_dependency_fingerprint: retryComplete.record.historical_dependency_fingerprint,
+        historical_result_fingerprint: retryComplete.record.historical_result_fingerprint
+    };
+    failedFirst.record.active_calculation_id = '';
+    const reassessment = await authorizeHistoricalReconstruction({ ...firstCommand,
+        requestId: 'historical-failure-reassess-01', reason: 'stale reassessment',
+        fingerprintResolver: async () => ({ dependency_fingerprint: 'changed-again' }) });
+    assert.strictEqual(reassessment.record.historical_reconstruction_version, 1);
+    failedFirst.record.active_calculation_id = 'historical-reassess-failed-calculation';
+    const reassessRecovery = await failHistoricalReconstruction({ scope: juneScope,
+        requestId: reassessment.record.last_historical_reconstruction_request_id,
+        calculationId: 'historical-reassess-failed-calculation', errorCode: 'FAILED_AFTER_OWNERSHIP',
+        periodControlModel: failedFirst.model, auditModel: failedFirst.audit, transactionRunner });
+    assert.strictEqual(reassessRecovery.record.historical_reconstruction_status, 'COMPLETED');
+    assert.strictEqual(reassessRecovery.record.historical_reconstruction_version, 1);
+    for (const [field, value] of Object.entries(completedV1Fingerprints)) {
+        assert.strictEqual(reassessRecovery.record[field], value);
+    }
+    const staleAfterFailure = projectionForHistoricalState({ record: reassessRecovery.record,
+        pastDeadline: true, dependencyFingerprint: 'changed-again' });
+    assert.strictEqual(staleAfterFailure, 'HISTORICAL_RECONSTRUCTION_STALE');
+
+    failedFirst.record.active_calculation_id = '';
+    const reassessRetry = await authorizeHistoricalReconstruction({ ...firstCommand,
+        requestId: 'historical-failure-reassess-retry-01', reason: 'retry stale reassessment',
+        fingerprintResolver: async () => ({ dependency_fingerprint: 'changed-again' }) });
+    failedFirst.record.active_calculation_id = 'historical-reassess-retry-calculation';
+    const reassessRetryComplete = await completeHistoricalReconstruction({ scope: juneScope,
+        calculationId: 'historical-reassess-retry-calculation',
+        requestId: reassessRetry.record.last_historical_reconstruction_request_id,
+        periodControlModel: failedFirst.model, auditModel: failedFirst.audit,
+        prodhlomenaModel, transactionRunner });
+    assert.strictEqual(reassessRetryComplete.record.historical_reconstruction_version, 2);
+
+    const abandoned = store();
+    await authorizeHistoricalReconstruction({ ...firstCommand, requestId: 'historical-abandoned-old-01',
+        periodControlModel: abandoned.model, auditModel: abandoned.audit });
+    const superseded = await authorizeHistoricalReconstruction({ ...firstCommand,
+        requestId: 'historical-abandoned-new-01', periodControlModel: abandoned.model,
+        auditModel: abandoned.audit });
+    assert.strictEqual(superseded.record.historical_reconstruction_version, 0);
+    assert.strictEqual(superseded.record.historical_reconstruction_pending_version, 1);
+    assert.ok(abandoned.audits.some(audit => audit.details?.error_code === 'AUTHORIZATION_SUPERSEDED'));
 
     const ownershipStore = store({ ...juneScope, status: 'OPEN', deadline: calculatePeriodDeadline(juneScope.period_end),
         version: 2, write_fence_version: 0, active_calculation_id: '',

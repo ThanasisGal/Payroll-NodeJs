@@ -26,6 +26,14 @@ const schema = new Schema({
         default: ''
     },
     historical_reconstruction_version: { type: Number, min: 0, default: 0 },
+    historical_reconstruction_pending_version: { type: Number, min: 0, default: 0 },
+    historical_reconstruction_pending_started_at: { type: Date, default: null },
+    historical_reconstruction_pending_by_user_id: { type: Schema.Types.ObjectId, default: null },
+    historical_reconstruction_pending_by_user_name: { type: String, trim: true, default: '' },
+    historical_reconstruction_pending_by_user_role: {
+        type: String, trim: true, enum: ['', 'A', 'S', 'HR'], default: ''
+    },
+    historical_reconstruction_pending_reason: { type: String, trim: true, maxlength: 2000, default: '' },
     historical_reconstruction_started_at: { type: Date, default: null },
     historical_reconstruction_started_by_user_id: { type: Schema.Types.ObjectId, default: null },
     historical_reconstruction_started_by_user_name: { type: String, trim: true, default: '' },
@@ -82,6 +90,10 @@ schema.pre('validate', function validateHistoricalReconstruction() {
         !this.historical_result_fingerprint
     )) {
         this.invalidate('historical_reconstruction_status', 'Completed historical reconstruction requires fingerprints and a version.');
+    }
+    if (this.historical_reconstruction_status === 'AUTHORIZED' &&
+        this.historical_reconstruction_pending_version !== this.historical_reconstruction_version + 1) {
+        this.invalidate('historical_reconstruction_pending_version', 'Authorized reconstruction requires the next completed version.');
     }
 });
 

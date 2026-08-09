@@ -96,6 +96,8 @@ function projectPeriodControl({ scope, record = null, now = new Date(), dependen
         submission_timeliness: record?.submission_timeliness || 'NOT_SUBMITTED',
         historical_reconstruction_status: record?.historical_reconstruction_status || '',
         historical_reconstruction_version: Number(record?.historical_reconstruction_version || 0),
+        historical_reconstruction_pending_version:
+            Number(record?.historical_reconstruction_pending_version || 0),
         historical_reconstruction_started_at: record?.historical_reconstruction_started_at || null,
         historical_reconstruction_started_by_user_name: record?.historical_reconstruction_started_by_user_name || '',
         historical_reconstruction_started_by_user_role: record?.historical_reconstruction_started_by_user_role || '',

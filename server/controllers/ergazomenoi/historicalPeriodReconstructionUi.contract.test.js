@@ -23,6 +23,9 @@ for (const text of [
 assert.ok(frontend.includes('historical_reconstruction_request_id: requestId'));
 assert.ok(frontend.includes("'/ergazomenoi/programmata/calcApasxolhseisPeriodoy'"));
 assert.ok(controller.includes('completeHistoricalReconstruction'));
+assert.ok(controller.includes('failHistoricalReconstruction'));
+assert.ok(controller.includes("['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(state.effective_mode)"));
+assert.ok(controller.includes("errorCode: error?.code || 'HISTORICAL_RECONSTRUCTION_CALCULATION_FAILED'"));
 assert.ok(controller.includes('assertCriticalEmploymentDecisionRole(req.session)'));
 assert.ok(routes.includes('/period-control/historical-reconstruction/authorize'));
 assert.ok(routes.includes('requireCriticalEmploymentDecisionRole'));

@@ -275,7 +275,8 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisCriticalActionAuthorizationService');
 const {
     authorizeHistoricalReconstruction,
-    completeHistoricalReconstruction
+    completeHistoricalReconstruction,
+    failHistoricalReconstruction
 } = require('../../services/ergazomenoi/apasxoliseisHistoricalPeriodReconstructionService');
 const {
     resolveCardPairVerification
@@ -6658,6 +6659,7 @@ class erganhController {
                 historical_reconstruction: {
                     status: state.historical_reconstruction_status,
                     version: state.historical_reconstruction_version,
+                    pending_version: state.historical_reconstruction_pending_version,
                     started_at: state.historical_reconstruction_started_at,
                     completed_at: state.historical_reconstruction_completed_at,
                     started_by_user_name: state.historical_reconstruction_started_by_user_name,
@@ -6675,7 +6677,7 @@ class erganhController {
                     historical_reconstruct: state.can_historical_reconstruct,
                     historical_reassess: state.can_historical_reassess,
                     historical_calculate: state.can_historical_calculate,
-                    lock_period: state.effective_mode === 'NORMAL',
+                    lock_period: ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(state.effective_mode),
                     unlock_period: state.can_unlock_period,
                     finalize_period: state.can_finalize && lifecycleIndexReadiness.ready,
                     submit_final_wtodailya: state.stored_status === 'FINALIZED' &&
@@ -6713,7 +6715,7 @@ class erganhController {
                 confirmation: req.body?.confirmation === true });
             return res.status(result.idempotent ? 200 : 201).json({ success: true,
                 idempotent: result.idempotent,
-                historical_reconstruction_version: result.record.historical_reconstruction_version,
+                historical_reconstruction_version: result.record.historical_reconstruction_pending_version,
                 request_id: result.record.last_historical_reconstruction_request_id,
                 message: 'Η ιστορική ανακατασκευή εξουσιοδοτήθηκε και μπορεί να εκτελεστεί.' });
         } catch (error) {
@@ -8819,6 +8821,7 @@ class erganhController {
     static calcApasxolhseisPeriodoy = async (req, res) => {
         let calculationOwnership = null;
         let periodControlScope = null;
+        let historicalRequestId = '';
         try {
             const {
                 effectiveTeam: sessionTeam,
@@ -8861,7 +8864,7 @@ class erganhController {
                 error.statusCode = 409;
                 throw error;
             }
-            const historicalRequestId = String(req.body?.historical_reconstruction_request_id || '').trim();
+            historicalRequestId = String(req.body?.historical_reconstruction_request_id || '').trim();
             if (historicalRequestId) assertCriticalEmploymentDecisionRole(req.session);
             calculationOwnership = await acquirePeriodCalculationOwnership({ scope: periodControlScope,
                 historicalRequestId });
@@ -9356,6 +9359,25 @@ class erganhController {
             console.error('[calcApasxolhseisPeriodoy] ❌', error);
 
             let responseError = error;
+            if (historicalRequestId && periodControlScope) {
+                try {
+                    const recovery = await failHistoricalReconstruction({
+                        scope: periodControlScope,
+                        requestId: historicalRequestId,
+                        calculationId: calculationOwnership?.historical
+                            ? calculationOwnership.calculationId
+                            : '',
+                        errorCode: error?.code || 'HISTORICAL_RECONSTRUCTION_CALCULATION_FAILED'
+                    });
+                    if (recovery.recovered) calculationOwnership = null;
+                } catch (recoveryError) {
+                    console.error('[calcApasxolhseisPeriodoy] historical recovery failed ❌', {
+                        calculationError: error?.code || error?.message,
+                        recoveryError: recoveryError?.code || recoveryError?.message
+                    });
+                    responseError = recoveryError;
+                }
+            }
             if (calculationOwnership) {
                 try {
                     await releasePeriodCalculationOwnership({

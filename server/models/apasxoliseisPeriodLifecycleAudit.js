@@ -10,7 +10,7 @@ const schema = new Schema({
         'CORRECTIVE_CLOSE', 'CORRECTIVE_PAYROLL_POST', 'SUBMISSION_NEEDED_DETERMINATION',
         'HISTORICAL_RECONSTRUCTION_OPEN', 'HISTORICAL_RECONSTRUCTION_CALCULATION',
         'HISTORICAL_RECONSTRUCTION_COMPLETE', 'HISTORICAL_RECONSTRUCTION_REASSESS',
-        'HISTORICAL_RECONSTRUCTION_STALE'
+        'HISTORICAL_RECONSTRUCTION_STALE', 'HISTORICAL_RECONSTRUCTION_FAILED'
     ] }), actor_user_id: immutableRequired(Schema.Types.ObjectId),
     actor_user_name: immutableRequired(String, { trim: true }),
     actor_user_role: immutableRequired(String, { trim: true, enum: ['A', 'S', 'HR'] }),
