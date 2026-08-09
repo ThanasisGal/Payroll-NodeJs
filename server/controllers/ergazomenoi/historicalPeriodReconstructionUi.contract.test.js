@@ -21,6 +21,9 @@ for (const text of [
     'ΕΝΤΟΣ ΠΡΟΘΕΣΜΙΑΣ'
 ]) assert.ok(`${view}\n${frontend}`.includes(text), `missing UI contract: ${text}`);
 assert.ok(frontend.includes('historical_reconstruction_request_id: requestId'));
+assert.ok(frontend.includes("popup: 'historical-reconstruction-swal'"));
+assert.ok(frontend.includes("input: 'historical-reconstruction-swal__reason'"));
+assert.ok(frontend.includes("inputValidator: value => String(value || '').trim()"));
 assert.ok(frontend.includes("'/ergazomenoi/programmata/calcApasxolhseisPeriodoy'"));
 assert.ok(controller.includes('completeHistoricalReconstruction'));
 assert.ok(controller.includes('failHistoricalReconstruction'));

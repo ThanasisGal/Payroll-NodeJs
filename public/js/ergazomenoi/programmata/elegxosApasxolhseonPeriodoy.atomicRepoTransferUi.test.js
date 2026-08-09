@@ -2086,9 +2086,9 @@ function testEmploymentReviewFinalUiContract() {
     assert.ok(viewSource.includes('container-fluid mt-3 employment-review-page-shell'));
     assert.ok(!/id="hrReviewWorkspace"[^>]*employment-review-page-shell/.test(viewSource));
     assert.ok(!/employment-review-page-shell[^"']*\bw-70\b|\bw-70\b[^"']*employment-review-page-shell/.test(viewSource));
-    assert.ok(cssSource.includes('width: 94% !important'));
-    assert.ok(cssSource.includes('margin-left: 3%'));
-    assert.ok(cssSource.includes('margin-right: 3%'));
+    assert.ok(cssSource.includes('width: 100% !important'));
+    assert.ok(cssSource.includes('max-width: 100%'));
+    assert.ok(cssSource.includes('min-width: 0'));
     assert.ok(!/\.employment-review-card\s*\{[^}]*?(?:width|margin-(?:left|right)|--employment-review-(?:width|right))/s.test(cssSource));
     assert.ok(/@media \(max-width: 991\.98px\)[\s\S]*?\.employment-review-page-shell[\s\S]*?width:\s*100%[\s\S]*?margin-left:\s*0[\s\S]*?margin-right:\s*0/.test(cssSource));
     const shellCssStart = cssSource.indexOf('.employment-review-page-shell {');
@@ -2229,9 +2229,31 @@ function testCorrectiveDropdownAndPageShellContract() {
     const shellMarkup = viewSource.match(/<div class="[^"]*employment-review-page-shell[^"]*">/)?.[0] || '';
     assert.ok(shellMarkup.includes('employment-review-page-shell'));
     assert.ok(!shellMarkup.includes('w-70'));
-    assert.ok(cssSource.includes('width: 94% !important'));
+    assert.ok(cssSource.includes('width: 100% !important'));
     assert.ok(!/\.hr-review-card\s*\{[^}]*max-width/s.test(cssSource));
     assert.ok(!/#hrReviewStartBtn\s*\{/s.test(cssSource));
+}
+
+function testResponsiveSharedShellAndCompactHistoricalModalContract() {
+    assert.ok(viewSource.includes('employment-period-control-layout'));
+    assert.ok(viewSource.includes('employment-period-control-summary'));
+    assert.ok(/id="employmentPeriodControlActions" class="[^"]*flex-wrap/.test(viewSource));
+    assert.ok(cssSource.includes('.employment-review-page-shell > #employmentPeriodControlPanel,'));
+    assert.ok(cssSource.includes('.employment-review-page-shell > #hrReviewWorkspace,'));
+    assert.ok(cssSource.includes('.employment-review-page-shell > #advancedReviewWorkspace,'));
+    assert.ok(/\.employment-review-page-shell\s*\{[^}]*width:\s*100%\s*!important[^}]*max-width:\s*100%[^}]*min-width:\s*0[^}]*box-sizing:\s*border-box/s.test(cssSource));
+    assert.ok(/#employmentPeriodControlActions\s*\{[^}]*max-width:\s*100%/s.test(cssSource));
+    assert.ok(/\.employment-review-scroll-container--advanced\s*\{[^}]*overflow-x:\s*auto/s.test(cssSource));
+    assert.ok(/\.employment-review-scroll-container #resultsTable\s*\{[^}]*min-width:\s*89\.25rem/s.test(cssSource));
+
+    const reconstructionStart = source.indexOf('async function runHistoricalReconstruction()');
+    const reconstructionEnd = source.indexOf('function currentCorrectiveBranch()', reconstructionStart);
+    const reconstructionSource = source.slice(reconstructionStart, reconstructionEnd);
+    assert.ok(reconstructionSource.includes("popup: 'historical-reconstruction-swal'"));
+    assert.ok(reconstructionSource.includes("input: 'historical-reconstruction-swal__reason'"));
+    assert.ok(reconstructionSource.includes("inputValidator: value => String(value || '').trim()"));
+    assert.ok(/\.historical-reconstruction-swal\s*\{[^}]*width:\s*min\(720px, calc\(100vw - 2rem\)\)[^}]*max-width:\s*calc\(100vw - 2rem\)/s.test(cssSource));
+    assert.ok(/\.historical-reconstruction-swal__reason\s*\{[^}]*min-height:\s*6rem[^}]*max-height:\s*7\.5rem/s.test(cssSource));
 }
 
 function testEmploymentReviewBranchActionLayoutContract() {
@@ -2261,7 +2283,7 @@ function testEmploymentReviewBranchActionLayoutContract() {
     assert.ok(!/(?:position\s*:\s*absolute|transform\s*:|translate\s*:)/.test(actionCss));
     assert.ok(!/#hrReviewStartBtn\s*\{/s.test(cssSource));
 
-    assert.ok(cssSource.includes('width: 94% !important'));
+    assert.ok(cssSource.includes('width: 100% !important'));
     assert.ok(cssSource.includes('.hr-review-card {\n    width: 100%;'));
     assert.ok(dropdownHelperSource.includes("ddEl.classList.add('place-below', 'maxh-limited')"));
     assert.ok(viewSource.includes('id="hrReviewStartBtn"'));
@@ -2989,6 +3011,7 @@ const tests = [
     testSharedLifecyclePanelAndActiveWorkspaceScopeContract,
     testCorrectiveDropdownAndPageShellContract,
     testEmploymentReviewBranchActionLayoutContract,
+    testResponsiveSharedShellAndCompactHistoricalModalContract,
     testRoleScopedRenderedEjs,
     testHrQueueClassification,
     testMinimalRenderingAndTerminology,

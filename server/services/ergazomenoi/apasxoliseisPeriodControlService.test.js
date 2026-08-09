@@ -2,6 +2,8 @@
 
 const assert = require('assert');
 const fs = require('fs');
+const mongoose = require('mongoose');
+const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const {
     calculatePeriodDeadline, normalizeScope, resolveEffectiveMode, projectPeriodControl,
     assertNormalPeriod, runWithPeriodWriteFence, transitionPeriodControl, isDateInsideEmploymentPeriod,
@@ -41,6 +43,22 @@ assert.strictEqual(projectPeriodControl({ scope, now: new Date('2026-08-01') }).
 const serviceSource = fs.readFileSync(__filename.replace('.test.js', '.js'), 'utf8');
 assert.ok(serviceSource.includes('session.withTransaction'));
 assert.ok(serviceSource.includes('status: previousStatus, version: beforeVersion'));
+
+mongoose.set('sanitizeFilter', true);
+const unsafeMissingFieldQuery = PeriodControlModel.findOneAndUpdate({
+    $or: [{ active_calculation_id: '' }, { active_calculation_id: null },
+        { active_calculation_id: { $exists: false } }]
+}, { $set: { active_calculation_id: 'calculation-cast-regression' } });
+unsafeMissingFieldQuery._castConditions();
+assert.ok(unsafeMissingFieldQuery.error() instanceof mongoose.Error.CastError);
+const trustedMissingFieldQuery = PeriodControlModel.findOneAndUpdate({
+    $or: [{ active_calculation_id: '' }, { active_calculation_id: null },
+        { active_calculation_id: mongoose.trusted({ $exists: false }) }]
+}, { $set: { active_calculation_id: 'calculation-cast-regression' } });
+trustedMissingFieldQuery._castConditions();
+assert.strictEqual(trustedMissingFieldQuery.error(), undefined);
+assert.strictEqual(trustedMissingFieldQuery.getFilter().$or[2]
+    .active_calculation_id.$exists, false);
 
 function fake(initial = null, options = {}) {
     let record = initial ? { ...initial } : null;
@@ -149,6 +167,10 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
             if (!record) return false;
             if (filter.status !== undefined && record.status !== filter.status) return false;
             if (filter.version !== undefined && record.version !== filter.version) return false;
+            if (filter.historical_reconstruction_status !== undefined &&
+                record.historical_reconstruction_status !== filter.historical_reconstruction_status) return false;
+            if (filter.last_historical_reconstruction_request_id !== undefined &&
+                record.last_historical_reconstruction_request_id !== filter.last_historical_reconstruction_request_id) return false;
             if (filter.active_calculation_id !== undefined && record.active_calculation_id !== filter.active_calculation_id) return false;
             if (filter.$or && !filter.$or.some((condition) => {
                 const expected = condition.active_calculation_id;
@@ -182,6 +204,49 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     const indexGuard = async () => ({ ready: true });
     const baseRecord = { ...scope, status: 'OPEN', deadline, version: 1, write_fence_version: 0,
         active_calculation_id: '', active_calculation_started_at: null };
+    for (const [label, activeValue] of [['empty', ''], ['null', null], ['missing', undefined]]) {
+        const eligibleRecord = { ...baseRecord };
+        if (activeValue === undefined) delete eligibleRecord.active_calculation_id;
+        else eligibleRecord.active_calculation_id = activeValue;
+        const eligible = ownershipStore(eligibleRecord);
+        const eligibleOwner = await acquirePeriodCalculationOwnership({ scope,
+            calculationId: `calculation-${label}-owner`, now: new Date('2026-07-01'),
+            periodControlModel: eligible.model, indexGuard, transactionRunner });
+        assert.strictEqual(eligibleOwner.calculationId, `calculation-${label}-owner`);
+        assert.strictEqual(eligible.record.active_calculation_id, `calculation-${label}-owner`);
+    }
+
+    const occupied = ownershipStore({ ...baseRecord, active_calculation_id: 'calculation-existing-owner' });
+    await assert.rejects(() => acquirePeriodCalculationOwnership({ scope,
+        calculationId: 'calculation-takeover-owner', now: new Date('2026-07-01'),
+        periodControlModel: occupied.model, indexGuard, transactionRunner }),
+    (error) => error.code === 'PERIOD_CONTROL_CALCULATION_IN_PROGRESS');
+    assert.strictEqual(occupied.record.active_calculation_id, 'calculation-existing-owner');
+
+    const lockedOwnership = ownershipStore({ ...baseRecord, status: 'LOCKED' });
+    await assert.rejects(() => acquirePeriodCalculationOwnership({ scope,
+        calculationId: 'calculation-locked-owner', now: new Date('2026-07-01'),
+        periodControlModel: lockedOwnership.model, indexGuard, transactionRunner }),
+    (error) => error.code === 'PERIOD_CONTROL_LOCKED');
+
+    const historicalRecord = { ...baseRecord,
+        historical_reconstruction_status: 'AUTHORIZED',
+        last_historical_reconstruction_request_id: 'historical-authorized-request' };
+    const historicalOwnership = ownershipStore(historicalRecord);
+    const historicalOwner = await acquirePeriodCalculationOwnership({ scope,
+        calculationId: 'historical-authorized-owner',
+        historicalRequestId: 'historical-authorized-request', now: new Date('2026-08-01'),
+        periodControlModel: historicalOwnership.model, indexGuard, transactionRunner });
+    assert.strictEqual(historicalOwner.historical, true);
+
+    const wrongHistoricalRequest = ownershipStore(historicalRecord);
+    await assert.rejects(() => acquirePeriodCalculationOwnership({ scope,
+        calculationId: 'historical-wrong-request-owner',
+        historicalRequestId: 'historical-wrong-request', now: new Date('2026-08-01'),
+        periodControlModel: wrongHistoricalRequest.model, indexGuard, transactionRunner }),
+    (error) => error.code === 'PERIOD_CONTROL_STATE_CONFLICT');
+    assert.strictEqual(wrongHistoricalRequest.record.active_calculation_id, '');
+
     const owned = ownershipStore(baseRecord);
     const owner = await acquirePeriodCalculationOwnership({ scope, calculationId: 'calculation-owner-0001',
         now: new Date('2026-07-01'), periodControlModel: owned.model, indexGuard, transactionRunner });

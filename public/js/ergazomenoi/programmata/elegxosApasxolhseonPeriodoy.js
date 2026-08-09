@@ -6708,6 +6708,11 @@ async function runHistoricalReconstruction() {
         title: reassess ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου' : 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
         html: '<p>Η περίοδος έχει λήξει.</p><p>Η ενέργεια επιτρέπεται μόνο για ανακατασκευή ιστορικού αποτελέσματος και δεν αλλάζει την πραγματική ημερομηνία ούτε την εμπρόθεσμη / εκπρόθεσμη κατάσταση της περιόδου.</p><p>Η ενέργεια θα καταγραφεί με χρήστη, ημερομηνία και αιτιολογία.</p>',
         input: 'textarea', inputLabel: 'Υποχρεωτική αιτιολογία', showCancelButton: true,
+        customClass: {
+            popup: 'historical-reconstruction-swal',
+            htmlContainer: 'historical-reconstruction-swal__content',
+            input: 'historical-reconstruction-swal__reason'
+        },
         confirmButtonText: reassess ? 'Επανεκτίμηση' : 'Ανακατασκευή', cancelButtonText: 'Ακύρωση',
         inputValidator: value => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
     if (!confirmation.isConfirmed) return;
