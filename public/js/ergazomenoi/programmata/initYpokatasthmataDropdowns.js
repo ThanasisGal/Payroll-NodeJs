@@ -1,10 +1,6 @@
 import { initTomDropdown } from '../../dropdown-item.js';
 
-const SIMPLE_ID = 'ypokatasthmata';
-const ADVANCED_ID = 'ypokatasthma';
-const IDS = [SIMPLE_ID, ADVANCED_ID];
-let lastAdvancedBranch = '';
-let syncQueue = Promise.resolve();
+const REVIEW_BRANCH_ID = 'ypokatasthma';
 
 function normalizedBranch(value) {
     const branch = String(value || '').trim();
@@ -59,23 +55,7 @@ async function setBranch(id, value, silent = true) {
     return appliedBranch === branch;
 }
 
-async function syncBranch(sourceId, targetId, expectedBranch) {
-    if (currentBranch(sourceId) !== expectedBranch) return;
-    if (sourceId === ADVANCED_ID && expectedBranch) {
-        lastAdvancedBranch = expectedBranch;
-    }
-    await setBranch(targetId, expectedBranch, true);
-}
-
-function queueBranchSync(sourceId, targetId) {
-    const expectedBranch = currentBranch(sourceId);
-    syncQueue = syncQueue.then(() =>
-        syncBranch(sourceId, targetId, expectedBranch)
-    );
-    return syncQueue;
-}
-
-function bindSync(id, targetId) {
+function bindBranch(id) {
     const select = document.getElementById(id);
     const tom = tomFor(id);
     if (!select || !tom || select.__employmentReviewBranchSyncBound) return;
@@ -83,12 +63,10 @@ function bindSync(id, targetId) {
     select.addEventListener('change', () => {
         const hidden = hiddenFor(id);
         if (hidden) hidden.value = normalizedBranch(tom.getValue?.());
-        void queueBranchSync(id, targetId);
     });
     tom.on('clear', () => {
         const hidden = hiddenFor(id);
         if (hidden) hidden.value = '';
-        void queueBranchSync(id, targetId);
     });
 }
 
@@ -107,45 +85,19 @@ function initialize(id) {
     });
 }
 
-async function preselectAdvancedBranch() {
-    await syncQueue;
-    const simple = currentBranch(SIMPLE_ID);
-    const fallback = simple || lastAdvancedBranch || currentBranch(ADVANCED_ID);
-    if (fallback) {
-        await setBranch(ADVANCED_ID, fallback, true);
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        if (currentBranch(ADVANCED_ID) !== fallback) {
-            await setBranch(ADVANCED_ID, fallback, true);
-        }
-    }
-    return fallback;
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
-    IDS.forEach(initialize);
-    bindSync(SIMPLE_ID, ADVANCED_ID);
-    bindSync(ADVANCED_ID, SIMPLE_ID);
-
-    const initialSimple = normalizedBranch(hiddenFor(SIMPLE_ID)?.value);
-    const initialAdvanced = normalizedBranch(hiddenFor(ADVANCED_ID)?.value);
-    if (initialSimple) {
-        await setBranch(SIMPLE_ID, initialSimple, true);
-        await setBranch(ADVANCED_ID, initialSimple, true);
-    } else if (initialAdvanced) {
-        await setBranch(ADVANCED_ID, initialAdvanced, true);
-        await setBranch(SIMPLE_ID, initialAdvanced, true);
-    }
+    initialize(REVIEW_BRANCH_ID);
+    bindBranch(REVIEW_BRANCH_ID);
+    const initialBranch = normalizedBranch(hiddenFor(REVIEW_BRANCH_ID)?.value);
+    if (initialBranch) await setBranch(REVIEW_BRANCH_ID, initialBranch, true);
 
     window.EmploymentReviewBranches = {
-        preselectAdvancedBranch,
         currentBranch,
         setBranch,
         diagnostics() {
             return {
-                simple: currentBranch(SIMPLE_ID),
-                advanced: currentBranch(ADVANCED_ID),
-                simpleInitialized: Boolean(tomFor(SIMPLE_ID)),
-                advancedInitialized: Boolean(tomFor(ADVANCED_ID))
+                branch: currentBranch(REVIEW_BRANCH_ID),
+                initialized: Boolean(tomFor(REVIEW_BRANCH_ID))
             };
         }
     };

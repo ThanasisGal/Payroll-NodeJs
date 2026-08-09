@@ -22,6 +22,10 @@ const cssPath = path.join(__dirname, '..', '..', '..', 'css', 'main.css');
 const cssSource = fs.readFileSync(cssPath, 'utf8');
 const dropdownHelperPath = path.join(__dirname, '..', '..', '..', 'js', 'dropdown-item.js');
 const dropdownHelperSource = fs.readFileSync(dropdownHelperPath, 'utf8');
+const branchDropdownSource = fs.readFileSync(
+    path.join(__dirname, 'initYpokatasthmataDropdowns.js'),
+    'utf8'
+);
 const elementsById = new Map();
 let fetchCalls = 0;
 const documentStub = {
@@ -1046,7 +1050,7 @@ function testOnlyCurrentDecisionDisablesButtons() {
     vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
     vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: { decision_code: 'APPROVE_PROPOSAL', created_at: '2026-06-20', created_by_user_name: 'HR', is_current: true }, history: [] }]])", sandbox);
     const currentHtml = render(readyProjection());
-    assert.strictEqual((currentHtml.match(/atomic-repo-transfer-decision-btn[^>]+disabled/g) || []).length, 3);
+    assert.strictEqual((currentHtml.match(/atomic-repo-transfer-decision-btn/g) || []).length, 0);
     vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: null, history: [{ decision_code: 'REJECT_PROPOSAL', created_at: '2026-06-19', created_by_user_name: 'HR', is_current: false }] }]])", sandbox);
     const staleOnlyHtml = render(readyProjection());
     assert.strictEqual((staleOnlyHtml.match(/atomic-repo-transfer-decision-btn[^>]+disabled/g) || []).length, 0);
@@ -1091,9 +1095,9 @@ function testCurrentAndPreviousHistoryAreEscaped() {
     vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
     vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: { decision_code: 'APPROVE_PROPOSAL', created_by_user_name: '<b>HR</b>', notes: '<img src=x>', is_current: true }, history: [{ decision_code: 'APPROVE_PROPOSAL', is_current: true }, { decision_code: 'REJECT_PROPOSAL', created_by_user_name: '<script>x</script>', notes: '<svg>', is_current: false }], history_count: 2 }]])", sandbox);
     const html = render(readyProjection());
-    assert.ok(html.includes('Προηγούμενες καταγεγραμμένες αποφάσεις'));
-    assert.ok(html.includes('&lt;b&gt;HR&lt;/b&gt;'));
-    assert.ok(html.includes('&lt;script&gt;x&lt;/script&gt;'));
+    assert.ok(!html.includes('Προηγούμενες καταγεγραμμένες αποφάσεις'));
+    assert.ok(!html.includes('&lt;b&gt;HR&lt;/b&gt;'));
+    assert.ok(!html.includes('&lt;script&gt;x&lt;/script&gt;'));
     assert.ok(!html.includes('<script>'));
     assert.ok(!html.includes('<img src=x>'));
     assert.ok(!html.includes('<svg>'));
@@ -1126,19 +1130,19 @@ function testApplyPresentationStatesAndSafetyContract() {
     Object.entries(states).forEach(([applyState, text]) => {
         vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: '${applyState}', can_apply: ${applyState === 'READY_TO_APPLY'}, apply_allowed: ${applyState === 'READY_TO_APPLY'}, current_decision: { id: '507f191e810c19729de860ea', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', is_current: true }, history: [] }]])`, sandbox);
         const html = render(readyProjection());
-        assert.ok(html.includes(text));
+        assert.strictEqual(html.includes(text), applyState === 'READY_TO_APPLY');
         assert.strictEqual(html.includes('atomic-repo-transfer-apply-btn'), applyState === 'READY_TO_APPLY');
     });
     vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'ALREADY_APPLIED', current_execution: { applied_at: '2026-07-15T10:00:00.000Z' }, current_decision: { id: '507f191e810c19729de860ea', decision_code: 'APPROVE_PROPOSAL', is_current: true }, history: [] }]])", sandbox);
     const applied = render(readyProjection());
-    assert.ok(applied.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(!applied.includes('Η πρόταση εφαρμόστηκε'));
     assert.ok(!applied.includes('atomic-repo-transfer-apply-btn'));
     vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'ALREADY_APPLIED', current_execution: { applied_at: '2026-07-16T11:00:00.000Z', created_by_user_name: '<Executor>' }, current_decision: null, history: [{ decision_code: 'APPROVE_PROPOSAL', created_by_user_name: '<HR>', is_current: false }] }]])", sandbox);
     const appliedWithoutCurrent = render(readyProjection());
-    assert.ok(appliedWithoutCurrent.includes('Η πρόταση εφαρμόστηκε'));
-    assert.ok(appliedWithoutCurrent.includes('16/07/2026'));
+    assert.ok(!appliedWithoutCurrent.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(!appliedWithoutCurrent.includes('16/07/2026'));
     assert.ok(!appliedWithoutCurrent.includes('atomic-repo-transfer-apply-btn'));
-    assert.ok(appliedWithoutCurrent.includes('&lt;HR&gt;'));
+    assert.ok(!appliedWithoutCurrent.includes('&lt;HR&gt;'));
     assert.ok(!appliedWithoutCurrent.includes('<HR>'));
     for (const code of ['REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']) {
         vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'NOT_APPROVED', current_decision: { decision_code: '${code}', is_current: true }, history: [] }]])`, sandbox);
@@ -1163,7 +1167,7 @@ function testImmediatePostApplyRefreshKeepsBadgeForTemporaryOldGroup() {
     vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
     vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { proposal_id: 'atomic-group-1', current_decision: null, current_execution: { applied_at: '2026-07-15T10:00:00.000Z', execution_status: 'APPLIED' }, apply_state: 'ALREADY_APPLIED', apply_allowed: false, history: [{ decision_code: 'APPROVE_PROPOSAL', is_current: false }] }]])", sandbox);
     const html = render(readyProjection());
-    assert.ok(html.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(!html.includes('Η πρόταση εφαρμόστηκε'));
     assert.ok(!html.includes('atomic-repo-transfer-apply-btn'));
     vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
 }
@@ -1301,17 +1305,15 @@ function testDiagnostics() {
     const visibleText = getVisibleText(html);
 
     assertContains(html, [
-        'Περιπτώσεις χωρίς αυτόματη πρόταση',
-        'Για τις παρακάτω περιπτώσεις δεν δημιουργήθηκε ασφαλής πρόταση μεταφοράς ρεπό:',
-        '8 περιπτώσεις: Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.',
-        '7 περιπτώσεις: Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.',
-        '6 περιπτώσεις: Η προτεινόμενη αλλαγή δεν αποκαθιστά τον απαιτούμενο αριθμό ρεπό.',
+        'Εκκρεμότητες που απαιτούν ενέργεια',
         '5 περιπτώσεις: Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
         '4 περιπτώσεις: Η περίπτωση εκ περιτροπής απασχόλησης δεν δρομολογήθηκε στην απαιτούμενη πολιτική v2.',
-        '3 περιπτώσεις: Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
         '1 περίπτωση: Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
         'μηδενικές συνολικές ώρες αλλά περιέχει στοιχεία καρτών'
     ]);
+    assert.ok(!html.includes('Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.'));
+    assert.ok(!html.includes('Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.'));
+    assert.ok(!html.includes('Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.'));
 
     assert.ok(!visibleText.includes('Διαγνωστικοί κωδικοί'));
     Object.keys(projection.reason_counts).forEach((code) => {
@@ -1320,12 +1322,8 @@ function testDiagnostics() {
     assert.ok(!visibleText.includes('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'));
 
     const orderedLabels = [
-        '8 περιπτώσεις:',
-        '7 περιπτώσεις:',
-        '6 περιπτώσεις:',
         '5 περιπτώσεις:',
         '4 περιπτώσεις:',
-        '3 περιπτώσεις:',
         '1 περίπτωση:'
     ];
     orderedLabels.reduce((previousIndex, label) => {
@@ -1345,10 +1343,7 @@ function testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering() {
 
     assert.ok(!visibleText.includes('FUTURE_PRIVATE_DIAGNOSTIC'));
     assert.ok(visibleText.includes('3 περιπτώσεις: Άλλη περίπτωση που χρειάζεται έλεγχο.'));
-    assert.ok(
-        visibleText.indexOf('Άλλη περίπτωση που χρειάζεται έλεγχο.') <
-            visibleText.indexOf('Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.')
-    );
+    assert.ok(!visibleText.includes('Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.'));
 }
 
 function testPartialFamilyDiagnosticsHaveSpecificGreekLabels() {
@@ -1392,7 +1387,7 @@ function testEmptyProjection() {
     projection.summary.decision_units_count = 0;
     const html = render(projection);
 
-    assertContains(html, ['Δεν δημιουργήθηκε αυτόματη πρόταση.']);
+    assert.strictEqual(html, '');
     assert.ok(!getVisibleText(html).includes('Χρειάζεται έλεγχο'));
     assert.ok(!getVisibleText(html).includes('Πρόταση προς έλεγχο από HR'));
 }
@@ -1433,7 +1428,7 @@ function testScopedSemanticButtonCss() {
 
 function testEmployeeWeekEvaluationLabel() {
     const html = render(readyProjection());
-    assert.ok(html.includes('Εβδομάδες εργαζομένων που αξιολογήθηκαν'));
+    assert.ok(!html.includes('Εβδομάδες εργαζομένων που αξιολογήθηκαν'));
     assert.ok(!html.includes('Εβδομάδες που ελέγχθηκαν'));
 }
 
@@ -1541,12 +1536,10 @@ function testPolicyDecisionAccordionIsCompactAndDecisionOnly() {
 
     sandbox.renderPolicyPreviewGroups(grouping);
 
-    assert.ok(container.innerHTML.includes('policy-preview-main-accordion'));
-    assert.ok(container.innerHTML.includes('3 εγγραφές χρειάζονται απόφαση'));
-    assert.ok(container.innerHTML.includes('17 τεχνικές εκκρεμότητες'));
-    assert.ok(container.innerHTML.includes('2 ολοκληρώθηκαν αυτόματα'));
-    assert.ok(container.innerHTML.includes('Τεχνικές εκκρεμότητες πολιτικής'));
-    assert.ok(container.innerHTML.includes('Δεν απαιτούν απόφαση HR'));
+    assert.ok(container.innerHTML.includes('employment-review-pending-summary'));
+    assert.ok(!container.innerHTML.includes('17 τεχνικές εκκρεμότητες'));
+    assert.ok(!container.innerHTML.includes('2 ολοκληρώθηκαν αυτόματα'));
+    assert.ok(!container.innerHTML.includes('Τεχνικές εκκρεμότητες πολιτικής'));
     assert.ok(!container.innerHTML.includes('Αυτόματα OK'));
     assert.strictEqual((container.innerHTML.match(/Απόφαση ελέγχου/g) || []).length, 1);
     assert.ok(container.innerHTML.includes('Καταγραφή ως ελεγμένο'));
@@ -2048,8 +2041,7 @@ function testOpenAndCompletedPartialWeekMessagesStayDistinct() {
     const pendingHtml = sandbox.renderAtomicRepoTransferDiagnosticEntries({
         OPEN_WEEK_PENDING_COMPLETION: 1
     });
-    assert.ok(pendingHtml.includes('Αναμονή ολοκλήρωσης'));
-    assert.ok(!pendingHtml.includes('Χρειάζεται απόφαση HR'));
+    assert.strictEqual(pendingHtml, '');
 }
 
 function testWeeklyDeviationPresentationUsesMondaySundayPolicy() {
@@ -2820,15 +2812,7 @@ function testAtomicReusablePendingResolvedAndConflictUi() {
         }
     });
     const resolved = render(resolvedProjection);
-    assertContains(resolved, [
-        'Εγκρίθηκε βάσει παλιότερης απόφασης HR',
-        'HR User',
-        'Χωρίς λήξη',
-        'Έκδοση επαναχρησιμοποιήσιμου αποτυπώματος: 5',
-        'Ανάκληση πολιτικής',
-        'data-approval-id="approval-v5"',
-        'απαιτείται νέα καταγεγραμμένη απόφαση για την τρέχουσα πρόταση'
-    ]);
+    assert.strictEqual(resolved, '');
     assert.ok(!resolved.includes('atomic-repo-transfer-decision-btn'));
     assert.ok(!resolved.includes('atomic-repo-transfer-reusable-btn'));
     assert.ok(!resolved.includes('atomic-repo-transfer-apply-btn'));
@@ -2950,6 +2934,100 @@ async function testAtomicReusableConfirmationUsesApproveProposalLabel() {
     } finally {
         sandbox.Swal = savedSwal;
     }
+}
+
+function testUnifiedEmploymentReviewWorkspaceContract() {
+    assert.strictEqual((viewSource.match(/id="employmentReviewWorkspace"/g) || []).length, 1);
+    assert.ok(!viewSource.includes('id="hrReviewWorkspace"'));
+    assert.ok(!viewSource.includes('id="advancedReviewWorkspace"'));
+    assert.strictEqual((viewSource.match(/employment-review-card z-depth-5/g) || []).length, 1);
+    ['Έναρξη ελέγχου', 'Αναλυτική προβολή', 'Επιστροφή στον απλό έλεγχο']
+        .forEach((text) => assert.ok(!viewSource.includes(text)));
+    ['apo_hmeromhnia', 'eos_hmeromhnia', 'ypokatasthma', 'kodikos',
+        'only_apologistiko', 'only_nyxta', 'only_argia', 'only_yperergasia',
+        'scenarioRequiresReviewOnly', 'searchBtn', 'exportExcelBtn', 'exportPdfBtn',
+        'resultsTable']
+        .forEach((id) => assert.strictEqual((viewSource.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id));
+    assertContains(viewSource, ['Εξαγωγή Excel', 'Εξαγωγή PDF', 'Μόνο προς έλεγχο']);
+    assert.ok(!viewSource.includes('Export Excel'));
+    assert.ok(!viewSource.includes('Export PDF'));
+}
+
+function testMinimalWorkspaceEjsContract() {
+    testUnifiedEmploymentReviewWorkspaceContract();
+    assert.ok(viewSource.includes('initYpokatasthmataDropdowns.js'));
+    assert.ok(!viewSource.includes('id="ypokatasthmata"'));
+    assert.ok(!branchDropdownSource.includes('SIMPLE_ID'));
+    assert.ok(branchDropdownSource.includes("const REVIEW_BRANCH_ID = 'ypokatasthma'"));
+}
+
+function testEmploymentReviewScrollContainerContract() {
+    assert.ok(/\.employment-review-page-shell\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)[^}]*overflow:\s*hidden/s.test(cssSource));
+    assert.ok(/\.employment-review-card\s*\{[^}]*display:\s*flex[^}]*height:\s*100%[^}]*min-height:\s*0[^}]*overflow:\s*hidden/s.test(cssSource));
+    assert.ok(/\.review-card-body\s*\{[^}]*display:\s*flex[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*hidden/s.test(cssSource));
+    assert.ok(/\.employment-review-scroll-container\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*auto/s.test(cssSource));
+    assert.ok(!cssSource.includes('--employment-review-viewport-offset'));
+    assert.ok(/\.employment-review-scroll-container #resultsTable\s*\{[^}]*min-width:\s*89\.25rem/s.test(cssSource));
+    assert.ok(/\.employment-review-scroll-container #resultsTable thead th\s*\{[^}]*position:\s*sticky/s.test(cssSource));
+    const colgroupMarkup = viewSource.match(/<colgroup class="employment-review-results-columns">[\s\S]*?<\/colgroup>/)?.[0] || '';
+    assert.strictEqual((colgroupMarkup.match(/<col\b/g) || []).length, 13);
+}
+
+function testEmploymentReviewFinalUiContract() {
+    testUnifiedEmploymentReviewWorkspaceContract();
+    assert.strictEqual((viewSource.match(/id="employmentPeriodControlPanel"/g) || []).length, 1);
+    assert.ok(viewSource.indexOf('id="employmentPeriodControlPanel"') < viewSource.indexOf('id="employmentReviewWorkspace"'));
+    assert.ok(source.includes("workspace: 'UNIFIED'"));
+    assert.ok(source.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ'"));
+    assert.ok(!sandbox.renderAtomicRepoTransferSummary({ summary: { weeks_evaluated: 200 } }).includes('200'));
+}
+
+function testSharedLifecyclePanelAndActiveWorkspaceScopeContract() {
+    const lifecycleIds = ['employmentPeriodControlPanel', 'lockEmploymentPeriodBtn',
+        'historicalReconstructionBtn', 'unlockEmploymentPeriodBtn', 'finalizeEmploymentPeriodBtn',
+        'submitFinalWTODayilyABtn', 'openCorrectivePayrollBtn', 'calculateCorrectivePayrollBtn',
+        'closeCorrectivePayrollBtn', 'postCorrectivePayrollBtn'];
+    lifecycleIds.forEach((id) => assert.strictEqual((viewSource.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id));
+    assert.ok(!viewSource.includes('Η XML ενέργεια αποτελεί προεπισκόπηση'));
+    assert.ok(!source.includes('Η κανονική εκτέλεση παραμένει κλειστή'));
+    assert.ok(source.includes("document.getElementById('employmentHistoricalReconstructionMeta')?.classList.toggle"));
+    const setValue = (id, value) => elementsById.set(id, { value });
+    setValue('apo_hmeromhnia', '2026-06-01'); setValue('eos_hmeromhnia', '2026-06-30');
+    setValue('ypokatasthma_stathera_advanced', '0000');
+    const scope = sandbox.getActiveEmploymentReviewScope();
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(scope)), { workspace: 'UNIFIED', apo_hmeromhnia: '2026-06-01', eos_hmeromhnia: '2026-06-30', ypokatasthma: '0000' });
+}
+
+function testEmploymentReviewBranchActionLayoutContract() {
+    testUnifiedEmploymentReviewWorkspaceContract();
+    assert.ok(viewSource.includes('class="col-md-4 employment-review-advanced-branch"'));
+    assert.ok(viewSource.includes('employment-review-search-actions'));
+    assert.ok(!viewSource.includes('id="hrReviewStartBtn"'));
+}
+
+function testResponsiveSharedShellAndCompactHistoricalModalContract() {
+    assert.ok(/\.historical-reconstruction-swal\s*\{[^}]*width:\s*min\(600px, calc\(100vw - 2rem\)\)[^}]*max-width:\s*min\(620px, calc\(100vw - 2rem\)\)/s.test(cssSource));
+    assert.ok(/\.historical-reconstruction-swal__reason\s*\{[^}]*min-height:\s*4\.5rem[^}]*height:\s*5rem[^}]*max-height:\s*5\.625rem/s.test(cssSource));
+    assert.ok(source.includes("popup: 'historical-reconstruction-swal'"));
+    assert.ok(source.includes("input: 'historical-reconstruction-swal__reason'"));
+    assert.ok(source.includes('Η περίοδος έχει λήξει. Η ανακατασκευή δεν αλλάζει την εκπρόθεσμη κατάστασή της'));
+    assert.ok(source.includes("inputValidator: value => String(value || '').trim()"));
+}
+
+function testRoleScopedRenderedEjs() {
+    ['A', 'S', 'HR'].forEach((role) => {
+        const html = renderViewForRole(role);
+        assert.strictEqual((html.match(/id="employmentReviewWorkspace"/g) || []).length, 1);
+        assert.ok(html.includes('id="resultsTable"'));
+        assert.ok(html.includes('id="ypokatasthma"'));
+        assert.ok(!html.includes('id="hrReviewWorkspace"'));
+        assert.ok(!html.includes('id="advancedReviewWorkspace"'));
+        assert.deepStrictEqual(duplicateIds(html), [], `${role} rendered duplicate IDs`);
+    });
+    const unknown = renderViewForRole('UNKNOWN');
+    assert.ok(!unknown.includes('id="employmentReviewWorkspace"'));
+    assert.ok(unknown.includes('Δεν έχετε δικαίωμα χρήσης του ελέγχου απασχολήσεων.'));
+    assert.deepStrictEqual(duplicateIds(unknown), []);
 }
 
 const tests = [

@@ -14373,20 +14373,23 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-page-shell {
-    --employment-review-bottom-clearance: 3.25rem;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.5rem;
     width: 100% !important;
     max-width: 100%;
     min-width: 0;
+    height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) - 1.5rem);
+    max-height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) - 1.5rem);
     margin-left: 0;
     margin-right: 0;
-    padding-bottom: 0.5rem;
-    overflow: visible;
+    padding-bottom: 0;
+    overflow: hidden;
     box-sizing: border-box;
 }
 
 .employment-review-page-shell > #employmentPeriodControlPanel,
-.employment-review-page-shell > #hrReviewWorkspace,
-.employment-review-page-shell > #advancedReviewWorkspace,
+.employment-review-page-shell > #employmentReviewWorkspace,
 .employment-review-card,
 .review-card-body,
 .employment-review-scroll-container,
@@ -14398,6 +14401,8 @@ body.loader-active > *:not(.app-loader) {
 }
 
 #employmentPeriodControlPanel {
+    margin: 0;
+    padding: 0.55rem 0.75rem;
     overflow-wrap: anywhere;
 }
 
@@ -14408,6 +14413,7 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-period-control-summary {
     flex: 1 1 24rem;
+    line-height: 1.35;
 }
 
 #employmentPeriodControlActions {
@@ -14416,7 +14422,62 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-card {
-    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.employment-review-workspace {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.employment-review-card > .card-header,
+.employment-review-card > .card-footer {
+    flex: 0 0 auto;
+}
+
+.employment-review-card > .card-header {
+    padding-block: 0.45rem;
+}
+
+.employment-review-card > .card-header h3 {
+    font-size: 1.2rem;
+}
+
+.employment-review-card > .card-footer {
+    padding-block: 0.45rem;
+}
+
+.review-card-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.55rem 0.75rem;
+}
+
+.review-filters-sticky {
+    flex: 0 0 auto;
+}
+
+.review-filters-sticky .row.form-group {
+    margin-bottom: 0.4rem !important;
+    row-gap: 0.35rem !important;
+}
+
+.employment-review-search-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.45rem;
+}
+
+.employment-review-search-actions .btn {
+    margin-left: 0 !important;
 }
 
 .hr-review-filters {
@@ -14726,18 +14787,17 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-scroll-container {
-    --employment-review-viewport-offset: 20.25rem;
     --employment-review-table-sticky-top: 0px;
-    max-height: max(10rem, calc(100vh - var(--employment-review-viewport-offset)));
-    max-height: max(10rem, calc(100dvh - var(--employment-review-viewport-offset)));
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
     overflow: auto;
     overscroll-behavior-y: contain;
     scrollbar-gutter: stable;
 }
 
-.employment-review-scroll-container--advanced {
-    --employment-review-viewport-offset: 28.75rem;
-    overflow-x: auto;
+.employment-review-actionable-summary:empty {
+    display: none;
 }
 
 .employment-review-scroll-container .results-table-wrapper {
@@ -14829,32 +14889,44 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .historical-reconstruction-swal {
-    width: min(720px, calc(100vw - 2rem));
-    max-width: calc(100vw - 2rem);
-    padding: 1rem 1.25rem 1.15rem;
+    width: min(600px, calc(100vw - 2rem));
+    max-width: min(620px, calc(100vw - 2rem));
+    box-sizing: border-box;
+    padding: 0.65rem 1rem 0.8rem;
+    overflow: visible;
+}
+
+.historical-reconstruction-swal .swal2-icon {
+    width: 3rem;
+    height: 3rem;
+    margin: 0.45rem auto 0;
+    font-size: 0.75rem;
 }
 
 .historical-reconstruction-swal .swal2-title {
-    padding: 0.5rem 1rem 0;
+    padding: 0.25rem 0.5rem 0;
+    margin: 0;
+    font-size: 1.35rem;
 }
 
 .historical-reconstruction-swal__content {
-    margin: 0.5rem 0 0;
+    margin: 0.35rem 0 0;
 }
 
 .historical-reconstruction-swal__content p {
-    margin-bottom: 0.5rem;
+    margin: 0;
 }
 
 .historical-reconstruction-swal__reason {
-    min-height: 6rem;
-    max-height: 7.5rem;
-    margin: 0.75rem auto 0;
+    min-height: 4.5rem;
+    height: 5rem;
+    max-height: 5.625rem;
+    margin: 0.45rem auto 0;
     resize: vertical;
 }
 
 .historical-reconstruction-swal .swal2-actions {
-    margin-top: 0.9rem;
+    margin-top: 0.55rem;
 }
 
 @media (max-width: 991.98px) {

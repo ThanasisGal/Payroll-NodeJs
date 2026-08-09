@@ -32,13 +32,13 @@ assert.match(policyExecution, /runPolicyPreviewApplyExecutionLocked[\s\S]*return
 assert.doesNotMatch(policyExecution.slice(policyExecution.indexOf('async function runPolicyPreviewApplyExecutionLocked')), /model\.bulkWrite|writer\(/);
 assert.match(routes, /period-control\/current'[\s\S]*checkAuth[\s\S]*requireEmploymentReviewAccess/);
 assert.match(routes, /period-control\/:action\(lock\|unlock\)'[\s\S]*requireCriticalEmploymentDecisionRole/);
-assert.ok(view.includes('Κατάσταση περιόδου'));
+assert.ok(view.includes('Κατάσταση:'));
 assert.ok(view.includes('Κλείδωμα περιόδου'));
 assert.ok(view.includes('Ξεκλείδωμα περιόδου'));
 assert.ok(browser.includes("NORMAL: 'Ανοικτή'"));
-assert.ok(browser.includes("LOCKED: 'Κλειδωμένη'"));
+assert.ok(browser.includes("LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'"));
 assert.ok(browser.includes("CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'"));
-assert.ok(browser.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ BASELINE'"));
+assert.ok(browser.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ'"));
 assert.ok(browser.includes('δεν ξεκλειδώνει χειροκίνητα κλειδωμένες ημερήσιες εγγραφές'));
 assert.ok(browser.includes("transitionEmploymentPeriod('unlock')"));
 assert.ok(browser.includes("/period-control/${action}"));

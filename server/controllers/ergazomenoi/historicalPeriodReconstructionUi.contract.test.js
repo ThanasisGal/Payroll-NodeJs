@@ -17,8 +17,7 @@ for (const text of [
     'Ανακατασκευή Εκπρόθεσμης Περιόδου',
     'Επανεκτίμηση Ανακατασκευασμένης Περιόδου',
     'ΑΝΑΚΑΤΑΣΚΕΥΑΣΜΕΝΗ ΕΚΠΡΟΘΕΣΜΗ ΠΕΡΙΟΔΟΣ',
-    'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ BASELINE',
-    'ΕΝΤΟΣ ΠΡΟΘΕΣΜΙΑΣ'
+    'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ'
 ]) assert.ok(`${view}\n${frontend}`.includes(text), `missing UI contract: ${text}`);
 assert.ok(frontend.includes('historical_reconstruction_request_id: requestId'));
 assert.ok(frontend.includes("popup: 'historical-reconstruction-swal'"));

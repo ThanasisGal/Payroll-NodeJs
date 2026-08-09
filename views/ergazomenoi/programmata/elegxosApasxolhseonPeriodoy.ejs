@@ -17,28 +17,31 @@
     <meta name="csrf-token" content="<%= csrfToken %>" />
 
     <% if (canRecordRepoTransferDecision) { %>
-    <div id="employmentPeriodControlPanel" class="alert alert-light border d-none mb-3" aria-live="polite">
+    <div id="employmentPeriodControlPanel" class="alert alert-light border d-none" aria-live="polite">
         <div class="employment-period-control-layout d-flex flex-wrap align-items-center justify-content-between gap-2">
             <div class="employment-period-control-summary">
-                <span class="fw-semibold">Κατάσταση περιόδου:</span>
+                <span class="fw-semibold">Κατάσταση:</span>
                 <span id="employmentPeriodControlStatus">Απαιτείται έλεγχος</span>
                 <span class="mx-2">·</span>
                 <span class="fw-semibold">Προθεσμία:</span>
                 <span id="employmentPeriodControlDeadline">-</span>
-                <span class="mx-2">·</span>
-                <span id="employmentPeriodDeadlineState">-</span>
-                <span class="mx-2">·</span>
-                <span class="fw-semibold">Ανακατασκευή:</span>
-                <span id="employmentHistoricalReconstructionStatus">-</span>
-                <span class="mx-2">·</span>
-                <span class="fw-semibold">Ημερομηνία οριστικοποίησης:</span>
-                <span id="employmentPeriodFinalizedAt">-</span>
-                <span class="mx-2">·</span>
-                <span class="fw-semibold">Υποβολή:</span>
-                <span id="employmentPeriodSubmission">Δεν έχει συνδεθεί</span>
-                <span class="mx-2">·</span>
-                <span class="fw-semibold">Πρωτόκολλο:</span>
-                <span id="employmentPeriodProtocol">-</span>
+                <span id="employmentPeriodDeadlineState" class="d-none"></span>
+                <span id="employmentHistoricalReconstructionMeta" class="d-none">
+                    <span class="mx-2">·</span><span class="fw-semibold">Ανακατασκευή:</span>
+                    <span id="employmentHistoricalReconstructionStatus"></span>
+                </span>
+                <span id="employmentPeriodFinalizedMeta" class="d-none">
+                    <span class="mx-2">·</span><span class="fw-semibold">Ημερομηνία οριστικοποίησης:</span>
+                    <span id="employmentPeriodFinalizedAt"></span>
+                </span>
+                <span id="employmentPeriodSubmissionMeta" class="d-none">
+                    <span class="mx-2">·</span><span class="fw-semibold">Υποβολή:</span>
+                    <span id="employmentPeriodSubmission"></span>
+                </span>
+                <span id="employmentPeriodProtocolMeta" class="d-none">
+                    <span class="mx-2">·</span><span class="fw-semibold">Πρωτόκολλο:</span>
+                    <span id="employmentPeriodProtocol"></span>
+                </span>
             </div>
             <div id="employmentPeriodControlActions" class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-outline-danger btn-sm d-none" id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
@@ -61,94 +64,7 @@
             <span>Διορθωμένο αποτέλεσμα</span>
         </div>
         <div id="employmentPeriodCorrectiveSummary" class="small mt-2 d-none"></div>
-        <div class="small text-muted mt-2">Η XML ενέργεια αποτελεί προεπισκόπηση / προσωρινή καταχώριση. Η τελική υποβολή γίνεται μέσω REST μόνο για επιλέξιμη οριστικοποιημένη περίοδο.</div>
     </div>
-
-    <section id="hrReviewWorkspace" class="hr-review-workspace">
-        <div class="card shadow-sm rounded-4 hr-review-card employment-review-card z-depth-5">
-            <div class="card-header text-center">
-                <h3 class="mb-0">Έλεγχος Απασχολήσεων</h3>
-            </div>
-            <div class="card-body">
-                <div class="hr-review-filters employment-review-filter-grid">
-                    <div class="employment-review-date-filter">
-                        <label for="hr_apo_hmeromhnia" class="form-label">Από ημερομηνία</label>
-                        <input
-                            type="date"
-                            id="hr_apo_hmeromhnia"
-                            class="form-control"
-                            value="<%= dateInputValue(periodRec?.apo) %>"
-                        />
-                    </div>
-                    <div class="employment-review-date-filter">
-                        <label for="hr_eos_hmeromhnia" class="form-label">Έως ημερομηνία</label>
-                        <input
-                            type="date"
-                            id="hr_eos_hmeromhnia"
-                            class="form-control"
-                            value="<%= dateInputValue(periodRec?.eos) %>"
-                        />
-                    </div>
-                    <div class="employment-review-branch-control">
-                        <label for="ypokatasthmata" class="form-label">Παράρτημα</label>
-                        <input
-                            type="hidden"
-                            name="ypokatasthmata_stathera"
-                            id="ypokatasthmata_stathera"
-                            value=""
-                            readonly
-                        />
-                        <select
-                            id="ypokatasthmata"
-                            name="ypokatasthmata"
-                            class="tom-dropdown selectpicker-dropdown-normal left-align"
-                            aria-label="Παράρτημα"
-                            data-api="/api/dropdown/erganh/ypokatasthmata?company=<%= companyInUse || '' %>"
-                            single
-                            data-target-input="ypokatasthmata_stathera"
-                            data-preselect="ypokatasthmata_stathera"
-                            data-dropdown-direction="down"
-                            data-preload-all="true"
-                            data-pad-length="4"
-                            data-xrhsh-related="false"
-                            data-team-related="false"
-                            data-company-related="false"
-                            data-mhnas-related="false"
-                            placeholder="Επιλέξτε παράρτημα">
-                        </select>
-                    </div>
-                    <div class="employment-review-start-action d-grid">
-                        <button type="button" class="btn rounded-4 employment-review-action-btn employment-review-action-secondary" id="hrReviewStartBtn">
-                            Έναρξη ελέγχου
-                        </button>
-                    </div>
-                </div>
-
-                <div class="employment-review-scroll-container employment-review-scroll-container--minimal">
-                    <div id="hrReviewStatus" class="hr-review-status mt-3" aria-live="polite">
-                        Επιλέξτε παράρτημα και πατήστε «Έναρξη ελέγχου».
-                    </div>
-                    <div id="hrReviewProgress" class="hr-review-progress d-none" aria-live="polite"></div>
-                    <div id="hrReviewPendingContainer" class="hr-review-pending-container"></div>
-                    <div id="hrReviewCompletedContainer" class="hr-review-completed-container"></div>
-
-                    <% if (canUseAdvancedEmploymentReview) { %>
-                        <div class="hr-review-workspace-switch mt-4">
-                            <button type="button" class="btn employment-review-action-btn employment-review-action-secondary" id="showAdvancedReviewBtn">
-                                Αναλυτική προβολή
-                            </button>
-                        </div>
-                    <% } %>
-                </div>
-            </div>
-            <div class="card-footer employment-review-actions">
-                <a class="btn btn-secondary rounded-4 employment-review-return-btn" href="/mainapp">
-                    <i class="bi bi-chevron-double-left"></i>
-                    Επιστροφή
-                </a>
-            </div>
-        </div>
-    </section>
     <% } else { %>
         <div class="alert alert-warning text-center" role="alert">
             Δεν έχετε δικαίωμα χρήσης του ελέγχου απασχολήσεων.
@@ -156,10 +72,10 @@
     <% } %>
 
     <% if (canUseAdvancedEmploymentReview) { %>
-    <section id="advancedReviewWorkspace" class="d-none">
+    <section id="employmentReviewWorkspace" class="employment-review-workspace">
     <div class="card shadow-sm rounded-4 employment-review-card z-depth-5">
         <div class="card-header text-center">
-            <h3 class="mb-0">Έλεγχος Απασχολήσεων Από Κάρτες Εργασίας ΕΡΓΑΝΗ ΙΙ</h3>
+            <h3 class="mb-0">Έλεγχος Απασχολήσεων</h3>
         </div>
 
         <div class="card-body review-card-body">
@@ -196,7 +112,7 @@
                         <select
                             id="ypokatasthma"
                             class="tom-dropdown selectpicker-dropdown-normal left-align move-by-enter"
-                            aria-label="Παράρτημα αναλυτικής προβολής"
+                            aria-label="Παράρτημα"
                             data-api="/api/dropdown/erganh/ypokatasthmata?company=<%= companyInUse || '' %>"
                             data-target-input="ypokatasthma_stathera_advanced"
                             data-preselect="ypokatasthma_stathera_advanced"
@@ -277,12 +193,17 @@
                             value=""
                         />
                     </div>
+                    <div class="col-auto d-flex align-items-center gap-2">
+                        <label for="scenarioRequiresReviewOnly" class="col-form-label label-font-size mb-0">
+                            Μόνο προς έλεγχο
+                        </label>
+                        <input type="checkbox" class="form-check-input custom-checkbox checkbox-class mt-0"
+                            id="scenarioRequiresReviewOnly" name="scenarioRequiresReviewOnly" />
+                    </div>
+                    <div id="scenarioRequiresReviewOnlyNotice" class="col-12 small text-muted d-none"></div>
                 </div>
 
-                <div class="mb-4">
-                    <button type="button" class="btn rounded-4 me-2 employment-review-action-btn employment-review-action-secondary" id="showMinimalReviewBtn">
-                        Επιστροφή στον απλό έλεγχο
-                    </button>
+                <div class="employment-review-search-actions">
                     <button type="button" class="btn btn-brown rounded-4" id="searchBtn">
                         <i class="bi bi-search"></i>
                         Αναζήτηση
@@ -290,18 +211,18 @@
 
                     <button type="button" class="btn btn-brown rounded-4 ms-2" id="exportExcelBtn">
                         <i class="bi bi-file-earmark-excel"></i>
-                        Export Excel
+                        Εξαγωγή Excel
                     </button>
 
                     <button type="button" class="btn btn-brown rounded-4 ms-2" id="exportPdfBtn">
                         <i class="bi bi-file-earmark-pdf"></i>
-                        Export PDF
+                        Εξαγωγή PDF
                     </button>
                 </div>
             </div>
 
-            <div class="employment-review-scroll-container employment-review-scroll-container--advanced">
-                <div id="policyPreviewGroupsContainer" class="mb-3"></div>
+            <div class="employment-review-scroll-container">
+                <div id="policyPreviewGroupsContainer" class="employment-review-actionable-summary"></div>
 
                 <div class="table-responsive results-table-wrapper">
                     <table class="table table-bordered table-hover align-middle" id="resultsTable">
@@ -326,10 +247,10 @@
                             <th>Παράρτημα</th>
                             <th>Κωδικός</th>
                             <!-- <th>Εργαζόμενος</th> -->
-                            <th>Προδηλωμένο</th>
                             <th>Κάρτες</th>
                             <th>Απολογιστικό</th>
                             <th>Ώρες</th>
+                            <th>Απουσίες</th>
                             <th>Νύχτα</th>
                             <th>Αργία</th>
                             <th>Πρόσθ.</th>
@@ -345,7 +266,7 @@
         </div>
 
         <div class="card-footer">
-            <a class="btn btn-brown rounded-4" href="/mainapp">
+            <a class="btn btn-secondary rounded-4 employment-review-return-btn" href="/mainapp">
                 <i class="bi bi-chevron-double-left"></i>
                 Επιστροφή
             </a>
@@ -359,7 +280,7 @@
                     <div class="d-flex align-items-center gap-2">
                         <h5 class="modal-title mb-0">Λεπτομέρειες Απασχόλησης</h5>
                         <span id="detailsLockBadge" class="review-lock-badge d-none">
-                            🔒 LOCKED
+                            🔒 ΚΛΕΙΔΩΜΕΝΟ
                         </span>
                     </div>
 
