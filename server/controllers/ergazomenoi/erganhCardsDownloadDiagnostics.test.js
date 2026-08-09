@@ -183,7 +183,8 @@ function orchestrationOptions() {
     return {
         username: 'user', password: 'password', selectedPararthma: '0000',
         apoHmeromhnia: '01/06/2026', eosHmeromhnia: '30/06/2026',
-        s3Key: 'xlsx/team/company/Apasxolhseis_Apo_Kartes/JUNE.xlsx'
+        s3Key: 'xlsx/team/company/Apasxolhseis_Apo_Kartes/JUNE.xlsx',
+        authorizedScope: { team: 'T', company_kod: 'C', ypokatasthma: '0000' }
     };
 }
 
@@ -255,7 +256,8 @@ test('retry persistence produces deterministic idempotent update filters without
     const prepared = await prepareKartesXlsx(source, '01/06/2026');
     const writes = [];
     const dependencies = {
-        ergazomenoiModel: { find: () => ({ lean: async () => [{ afm: '123456789', team: 'T', company_kod: 'C', kodikos: 'E' }] }) },
+        authorizedScope: orchestrationOptions().authorizedScope,
+        ergazomenoiModel: { find: () => ({ lean: async () => [{ afm: '123456789', team: 'T', company_kod: 'C', ypokatasthma: '0000', kodikos: 'E' }] }) },
         prodhlomenaModel: { bulkWrite: async (ops) => { writes.push(ops); return { matchedCount: 1, modifiedCount: 1 }; } }
     };
     await saveKartesPayloadToMongo(prepared.persistencePayload, dependencies);
