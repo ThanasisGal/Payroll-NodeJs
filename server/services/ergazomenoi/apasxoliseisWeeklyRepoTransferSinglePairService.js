@@ -280,21 +280,24 @@ function isProvisionalAutoCalculatedLeave({
         (paidLeaveHoursState.kind === 'POSITIVE' &&
             declaredHours !== null &&
             numbersMatch(paidLeaveHoursState.value, declaredHours));
+    const leaveProvenance = classifyLeaveProvenance(row);
     const autoLeaveMarker =
+        leaveProvenance === LEAVE_PROVENANCE.POSSIBLE_LEAVE ||
         facts.leave.adeia_apologistika ||
         apologistikaState.category === 'ΑΔΕΙΑ' ||
         facts.leave.kathgoria_adeias_apologistika === 'ΑΔΑΛ';
     const compatibleCalculatedCategory = ['', 'ΑΔΕΙΑ'].includes(
         apologistikaState.category
     );
-    const compatibleLeaveCategory = ['', 'ΑΔΑΛ'].includes(
+    const compatibleLeaveCategory = ['', 'ΑΔΑΛ', 'POSSIBLE_LEAVE'].includes(
         facts.leave.kathgoria_adeias_apologistika
     );
     const blockingSickness =
         toBoolean(row.astheneia) || facts.apologistika.existingFlags.astheneia_apologistika;
 
     return (
-        classifyLeaveProvenance(row) === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE &&
+        [LEAVE_PROVENANCE.POSSIBLE_LEAVE, LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE]
+            .includes(leaveProvenance) &&
         facts.declared.isDeclaredWork &&
         cardHours === 0 &&
         blockingSickness === false &&

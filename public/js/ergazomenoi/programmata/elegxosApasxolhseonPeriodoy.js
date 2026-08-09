@@ -2460,6 +2460,7 @@ function attachScenarioClassifications(rows = [], scenarioByProdhlomenaId = new 
 
 function isAutoCalculatedLeavePresentation(row = {}) {
     const provenance = String(row.leave_provenance || '').trim();
+    if (provenance === 'POSSIBLE_LEAVE') return true;
     if (provenance === 'AUTO_CALCULATED_LEAVE') return true;
     if (provenance === 'HR_DECLARED_LEAVE') return false;
     if (row.is_auto_calculated_leave === true) return true;
@@ -5850,6 +5851,9 @@ function renderAppliedRepoTransferHistory() {
                             Εβδομάδα ${escapeHtml(formatPolicyPreviewDate(history.week_start))}
                             –${escapeHtml(formatPolicyPreviewDate(history.week_end))}
                         </div>
+                        ${history.automatic_resolution?.authority === 'BASED_ON_REUSABLE_HR_APPROVAL'
+                            ? '<div class="alert alert-info py-1 mt-2 mb-1"><strong>Αυτόματη μεταφορά ρεπό</strong><br>Βάσει παλαιότερης έγκρισης HR</div>'
+                            : ''}
                         <div>
                             ${escapeHtml(formatPolicyPreviewDate(history.source.hmeromhnia))}
                             → ${escapeHtml(formatAppliedRepoTransferResult(history.source.result))}
@@ -5900,6 +5904,8 @@ function renderHrCompletedCases() {
                 STALE_DECISION: 'Τα δεδομένα έχουν αλλάξει μετά την έγκριση και απαιτείται νέος έλεγχος.'
             };
             const approved = decision.decision_code === 'APPROVE_PROPOSAL';
+            const automaticReusable = group.automatic_resolution?.authority ===
+                'BASED_ON_REUSABLE_HR_APPROVAL';
             const inheritedReusable = group.status === 'RESOLVED_BY_POLICY' &&
                 group.reusable_decision?.approval_id;
             const applyAction = state.apply_state === 'ALREADY_APPLIED' && state.current_execution
@@ -5915,8 +5921,10 @@ function renderHrCompletedCases() {
                     <div>${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(formatPolicyPreviewDate(group.last_date))}</div>
                     ${decision.created_by_user_name ? `<div>Καταχώριση: ${escapeHtml(decision.created_by_user_name)}</div>` : ''}
                     ${decision.notes ? `<div>Σημείωση: ${escapeHtml(decision.notes)}</div>` : ''}
-                    ${inheritedReusable ? renderAtomicReusableDecision(group) : ''}
-                    ${applyAction}
+                    ${automaticReusable
+                        ? '<div class="alert alert-info py-2"><strong>Αυτόματη μεταφορά ρεπό</strong><br>Βάσει παλαιότερης έγκρισης HR</div>'
+                        : inheritedReusable ? renderAtomicReusableDecision(group) : ''}
+                    ${automaticReusable ? '' : applyAction}
                 </li>
             `;
         })
@@ -7055,6 +7063,13 @@ function renderEditableApologistikaRows(row) {
 }
 
 function renderApologistikaFields(row) {
+    const possibleLeave = isAutoCalculatedLeavePresentation(row);
+    const displayRow = possibleLeave
+        ? { ...row, adeia_apologistika: false,
+            kathgoria_adeias_apologistika:
+                String(row.kathgoria_adeias_apologistika || '').trim() === 'POSSIBLE_LEAVE'
+                    ? 'POSSIBLE_LEAVE' : '' }
+        : row;
     const numberFields = [
         ['Ώρες εργασίας', 'ores_ergasias_apologistika'],
         ['Ώρες απουσίας', 'ores_apoysias_apologistika'],
@@ -7087,6 +7102,7 @@ function renderApologistikaFields(row) {
     ];
 
     return `
+        ${possibleLeave ? '<div class="alert alert-warning py-2"><strong>Κατάσταση:</strong> ΠΙΘΑΝΗ ΑΔΕΙΑ</div>' : ''}
         <div class="row g-2">
             ${numberFields
                 .map(
@@ -7127,7 +7143,7 @@ function renderApologistikaFields(row) {
                                 class="form-check-input custom-checkbox checkbox-class apologistika-checkbox-field"
                                 id="edit_${field}"
                                 data-field="${field}"
-                                ${row[field] ? 'checked' : ''}
+                                ${displayRow[field] ? 'checked' : ''}
                             />
                         </div>
                     `
@@ -7143,7 +7159,7 @@ function renderApologistikaFields(row) {
                         type="hidden"
                         name="edit_kathgoria_adeias_apologistika_hidden"
                         id="edit_kathgoria_adeias_apologistika_hidden"
-                        value="${row.kathgoria_adeias_apologistika || ''}"
+                        value="${displayRow.kathgoria_adeias_apologistika || ''}"
                     />
 
                     <select

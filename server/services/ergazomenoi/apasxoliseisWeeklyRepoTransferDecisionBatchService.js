@@ -73,7 +73,8 @@ function executionPresentation(execution) {
         decision_id: String(execution.decision_id || ''),
         execution_status: execution.execution_status,
         applied_at: execution.applied_at || null,
-        created_by_user_name: execution.created_by_user_name || ''
+        created_by_user_name: execution.created_by_user_name || '',
+        authorization_metadata: execution.authorization_metadata || null
     } : null;
 }
 function appliedHistoryPresentation(decision, execution, employee = null) {
@@ -124,7 +125,9 @@ function appliedHistoryPresentation(decision, execution, employee = null) {
                 target.proposed_values?.repo_apologistika === true
         },
         applied_at: execution.applied_at || null,
-        applied_by_user_name: text(execution.created_by_user_name, 200)
+        applied_by_user_name: text(execution.created_by_user_name, 200),
+        ...(execution.authorization_metadata
+            ? { automatic_resolution: execution.authorization_metadata } : {})
     };
 }
 function applyCapability({ applyState, runtimeEnabled, indexReady, context = null }) {
@@ -299,7 +302,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
               decision_id: mongoose.trusted({ $in: periodDecisionIds })
           }).select(
               '_id decision_id proposal_id execution_status applied_at created_by_user_name ' +
-              'source_prodhlomena_oraria_id target_prodhlomena_oraria_id after_snapshot'
+              'source_prodhlomena_oraria_id target_prodhlomena_oraria_id after_snapshot authorization_metadata'
           ).lean()
         : [];
     const executionByDecisionId = new Map(executions.map((execution) => [String(execution.decision_id), execution]));

@@ -130,6 +130,24 @@ assert.ok(CURRENT_GUARD_FIELDS.includes('ores_apoysias'));
     );
 }
 
+{
+    const rows = sixWorkdaysWithAutoLeave();
+    Object.assign(rows[6], {
+        adeia_apologistika: false,
+        kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE'
+    });
+    assert.strictEqual(classifyLeaveProvenance(rows[6]), LEAVE_PROVENANCE.POSSIBLE_LEAVE);
+    const proposal = buildWeeklyRepoTransferSinglePairProposal({
+        weekRows: rows,
+        employmentProfile: profile
+    });
+    assert.strictEqual(proposal.proposal_status, 'READY');
+    const target = proposal.items.find((item) => item.role === 'TARGET_BECOMES_REPO');
+    assert.strictEqual(target.proposed_values.repo_apologistika, true);
+    assert.strictEqual(target.proposed_values.adeia_apologistika, false);
+    assert.strictEqual(target.proposed_values.kathgoria_adeias_apologistika, '');
+}
+
 for (const marker of [
     { adeia: true },
     { kathgoria_adeias: 'HR' },
