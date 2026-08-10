@@ -46,7 +46,6 @@ function tom(input) {
 }
 
 for (const [id, hiddenId] of [
-    ['ypokatasthmata', 'ypokatasthmata_stathera'],
     ['ypokatasthma', 'ypokatasthma_stathera_advanced']
 ]) {
     elements.set(id, {
@@ -97,37 +96,27 @@ vm.runInContext(source, sandbox, { filename: sourcePath });
 (async () => {
     assert.strictEqual(typeof domReady, 'function');
     await domReady();
-    assert.strictEqual(initCount, 2, 'simple and advanced controls initialize once');
+    assert.strictEqual(initCount, 1, 'the unified branch control initializes once');
     assert.strictEqual(
         JSON.stringify(sandbox.window.EmploymentReviewBranches.diagnostics()),
         JSON.stringify({
-            simple: '',
-            advanced: '',
-            simpleInitialized: true,
-            advancedInitialized: true
+            branch: '',
+            initialized: true
         })
     );
 
-    const simple = elements.get('ypokatasthmata').tomselect;
-    const advanced = elements.get('ypokatasthma').tomselect;
-    simple.addOption({ value: '0000', label: '0000 - ΕΔΡΑ' });
-    simple.setValue('0000', false);
+    const branch = elements.get('ypokatasthma').tomselect;
+    branch.addOption({ value: '0001', label: '0001 - ΥΠΟΚΑΤΑΣΤΗΜΑ' });
+    branch.setValue('0001', false);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    assert.strictEqual(advanced.getValue(), '0000');
-    assert.strictEqual(elements.get('ypokatasthma_stathera_advanced').value, '0000');
-    assert.strictEqual(advanced.options['0000'].label, '0000 - ΕΔΡΑ');
+    assert.strictEqual(branch.getValue(), '0001');
+    assert.strictEqual(elements.get('ypokatasthma_stathera_advanced').value, '0001');
 
-    advanced.addOption({ value: '0001', label: '0001 - ΥΠΟΚΑΤΑΣΤΗΜΑ' });
-    advanced.setValue('0001', false);
+    branch.clear(false);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    assert.strictEqual(simple.getValue(), '0001');
-    assert.strictEqual(elements.get('ypokatasthmata_stathera').value, '0001');
-
-    advanced.clear(false);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    assert.strictEqual(simple.getValue(), '');
-    assert.strictEqual(elements.get('ypokatasthmata_stathera').value, '');
-    assert.ok(fetchCount <= 2, 'guarded sync must not loop or duplicate initialization');
+    assert.strictEqual(branch.getValue(), '');
+    assert.strictEqual(elements.get('ypokatasthma_stathera_advanced').value, '');
+    assert.strictEqual(fetchCount, 0, 'no duplicate-control synchronization request is needed');
 
     assert.ok(view.includes('id="ypokatasthma_stathera_advanced"'));
     assert.ok(view.includes('id="ypokatasthma"'));
@@ -136,7 +125,7 @@ vm.runInContext(source, sandbox, { filename: sourcePath });
     assert.ok(view.includes('data-pad-length="4"'));
     assert.ok(!/<select[^>]+id="ypokatasthma"[^>]+multiple/s.test(view));
     assert.ok(source.includes("branch.toUpperCase() === 'ALL'"));
-    console.log('PASS employment review branch TomDropdown initialization and sync');
+    console.log('PASS unified employment review branch TomDropdown initialization');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

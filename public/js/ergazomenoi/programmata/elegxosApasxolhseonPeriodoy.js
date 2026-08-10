@@ -366,34 +366,34 @@ function scenarioLabel(decision = {}) {
     if (!code) return '';
     if (decision.requires_review === true) return 'ΠΡΟΣ ΕΛΕΓΧΟ';
 
-    return scenarioCodeLabels[code] || code;
+    return scenarioCodeLabels[code] || 'Απαιτείται έλεγχος';
 }
 
 function scenarioTitle(decision = {}) {
     const code = String(decision.scenario_code || '').trim();
-    const label = scenarioCodeLabels[code] || code;
+    const label = scenarioCodeLabels[code] || 'Απαιτείται έλεγχος';
 
     if (!code) return '';
 
-    return `${label} / ${code}`;
+    return label;
 }
 
 function scenarioConfidenceLabel(confidence) {
     const key = String(confidence || '').trim();
 
-    return scenarioConfidenceLabels[key] || key;
+    return scenarioConfidenceLabels[key] || (key ? 'Δεν έχει προσδιοριστεί' : '');
 }
 
 function scenarioDecisionStatusLabel(status) {
     const key = String(status || '').trim();
 
-    return scenarioDecisionStatusLabels[key] || key;
+    return scenarioDecisionStatusLabels[key] || (key ? 'Απαιτείται έλεγχος' : '');
 }
 
 function scenarioReasonLabel(reason) {
     const key = String(reason || '').trim();
 
-    return scenarioReasonLabels[key] || key;
+    return scenarioReasonLabels[key] || reviewHrReasonLabel(key);
 }
 
 function buildRepoTransferReviewRowStates() {
@@ -664,14 +664,10 @@ function renderScenarioList(items = [], labelFn = (value) => value) {
     const listItems = (Array.isArray(items) ? items : [])
         .map((item) => String(item || '').trim())
         .filter(Boolean)
-        .map(
-            (item) => `
-                <li>
-                    ${escapeHtml(labelFn(item))}
-                    <small class="text-muted">(${escapeHtml(item)})</small>
-                </li>
-            `
-        );
+        .map((item) => labelFn(item))
+        .filter(Boolean)
+        .filter((label, index, labels) => labels.indexOf(label) === index)
+        .map((label) => `<li>${escapeHtml(label)}</li>`);
 
     if (listItems.length === 0) return '';
 
@@ -853,13 +849,13 @@ function renderScenarioDetailsSection(row) {
     if (!decision) return '';
 
     const code = String(decision.scenario_code || '').trim();
-    const label = scenarioCodeLabels[code] || code || '-';
+    const label = scenarioCodeLabels[code] || (code ? 'Απαιτείται έλεγχος' : '-');
     const confidence = scenarioConfidenceLabel(decision.confidence);
     const status = scenarioDecisionStatusLabel(decision.decision_status);
     const reviewText =
         decision.requires_review === true ? 'ΠΡΟΣ ΕΛΕΓΧΟ' : 'Δεν απαιτείται έλεγχος';
     const reasonsHtml = renderScenarioList(decision.reasons, scenarioReasonLabel);
-    const warningsHtml = renderScenarioList(decision.warnings);
+    const warningsHtml = renderScenarioList(decision.warnings, scenarioReasonLabel);
     const proposedUpdatesHtml = renderScenarioProposedUpdates(decision.proposed_updates);
     const factsSummaryHtml = renderScenarioFactsSummary(row.scenarioFactsSummary);
 
@@ -869,7 +865,6 @@ function renderScenarioDetailsSection(row) {
 
             <div class="review-scenario-summary">
                 <span class="review-badge">${escapeHtml(label)}</span>
-                ${code ? `<span class="review-badge">${escapeHtml(code)}</span>` : ''}
                 ${confidence ? `<span class="review-badge">Βεβαιότητα αντιστοίχισης: ${escapeHtml(confidence)}</span>` : ''}
                 ${status ? `<span class="review-badge">Κατάσταση: ${escapeHtml(status)}</span>` : ''}
                 <span class="review-badge">${escapeHtml(reviewText)}</span>
@@ -1189,22 +1184,6 @@ function ensureReviewTableStructure() {
     const table = document.getElementById('resultsTable');
 
     if (!table) return;
-
-    table.querySelectorAll('thead tr').forEach((tr) => {
-        const headers = Array.from(tr.children);
-
-        if (headers.some((th) => th.dataset.autoColumn === 'apoysies')) return;
-
-        const hoursHeader = headers.find((th) => th.textContent.trim() === 'Ώρες');
-
-        if (!hoursHeader) return;
-
-        const th = document.createElement('th');
-        th.dataset.autoColumn = 'apoysies';
-        th.textContent = 'Απουσίες';
-
-        hoursHeader.after(th);
-    });
 
     if (!document.getElementById('reviewDynamicCellStyles')) {
         const style = document.createElement('style');
@@ -1802,10 +1781,6 @@ function ensureReviewTableStructure() {
                 }
             }
 
-            .review-card-body.review-filters-active .results-table-wrapper {
-                max-height: calc(100vh - 430px - 4rem);
-            }
-
             .review-hours-note {
                 display: block;
                 margin-top: 2px;
@@ -1967,19 +1942,17 @@ function renderDeviationProfileCell(dev) {
 
 function renderDeviationNoteCell(dev) {
     if (dev.status === 'OPEN_WEEK_PENDING_COMPLETION') {
-        return `
-            <span class="badge text-bg-info">Αναμονή ολοκλήρωσης</span>
-            <div class="small mt-1">
-                Η εβδομάδα ${escapeHtml(formatDate(dev.week_apo || dev.weekStart))}–${escapeHtml(formatDate(dev.week_eos || dev.weekEnd))}
-                δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.
-            </div>
-        `;
+        return '';
     }
+
+    const humanNote = dev.note && !looksLikeInternalReviewCode(dev.note)
+        ? String(dev.note)
+        : '';
 
     if (dev.is_legacy_policy === true) {
         return `
             <span class="badge text-bg-secondary">Ιστορική εγγραφή παλιάς πολιτικής</span>
-            ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
+            ${humanNote ? `<div class="small mt-1">${escapeHtml(humanNote)}</div>` : ''}
         `;
     }
 
@@ -2000,7 +1973,7 @@ function renderDeviationNoteCell(dev) {
                 Η εβδομάδα απαιτεί απόφαση HR επειδή άλλαξαν κρίσιμοι όροι εργασίας.
             </small>
             ${excessText}
-            ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
+            ${humanNote ? `<div class="small mt-1">${escapeHtml(humanNote)}</div>` : ''}
         `;
     }
 
@@ -2012,25 +1985,15 @@ function renderDeviationNoteCell(dev) {
               formatDate(dev.seventh_day_date)
           )}</div>`
         : '';
-    const sixthDayReasonLabels = {
-        MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE:
-            'Λείπει ή δεν είναι έγκυρο το ποσοστό προσαύξησης 6ης ημέρας.',
-        ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION:
-            'Το ποσοστό προσαύξησης 6ης ημέρας είναι μηδενικό χωρίς έγκυρη εξαίρεση.',
-        SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC:
-            'Δεν μπορεί να επιλεγεί με ασφάλεια η ημερομηνία της 6ης ημέρας.'
-    };
-    const sixthDayDecisionText = Array.isArray(dev.sixth_seventh_day_reasons)
-        ? dev.sixth_seventh_day_reasons
-              .map((reason) => sixthDayReasonLabels[reason] || reason)
-              .filter(Boolean)
-              .map(
-                  (reason) =>
-                      `<div class="small text-warning-emphasis">${escapeHtml(reason)}</div>`
-              )
-              .join('')
+    const reasonMessages = reviewHrReasonMessages([
+        ...(Array.isArray(dev.sixth_seventh_day_reasons) ? dev.sixth_seventh_day_reasons : []),
+        ...(Array.isArray(dev.repo_transfer_reasons) ? dev.repo_transfer_reasons : []),
+        ...(Array.isArray(dev.canonical_reasons) ? dev.canonical_reasons : [])
+    ]);
+    const sixthDayDecisionText = renderReviewHrReasonList(reasonMessages);
+    const noteText = humanNote
+        ? `<div>${escapeHtml(humanNote)}</div>`
         : '';
-    const noteText = dev.note ? `<div>${escapeHtml(dev.note)}</div>` : '';
 
     return sixthDayText || seventhDayText || sixthDayDecisionText || noteText
         ? `${sixthDayText}${seventhDayText}${sixthDayDecisionText}${noteText}`
@@ -2044,6 +2007,10 @@ function hasProfileChangeDeviation(deviations = []) {
     );
 }
 
+function isHrVisibleDeviation(deviation = {}) {
+    return String(deviation.status || '').trim() !== 'OPEN_WEEK_PENDING_COMPLETION';
+}
+
 function hasAdeiaSuggestion(row) {
     return hasMeaningfulValue(row?.kathgoria_adeias_apologistika);
 }
@@ -2053,14 +2020,17 @@ function hasAdeiaSuggestionInRows(rows = []) {
 }
 
 function appendEmployeeDeviationRows(tbody, deviations, groupId) {
-    if (!Array.isArray(deviations) || deviations.length === 0) return;
+    const visibleDeviations = Array.isArray(deviations)
+        ? deviations.filter(isHrVisibleDeviation)
+        : [];
+    if (visibleDeviations.length === 0) return;
 
     const wrapperTr = document.createElement('tr');
     wrapperTr.classList.add('employee-deviation-row');
     wrapperTr.classList.add('d-none');
     wrapperTr.dataset.groupId = groupId;
 
-    const rowsHtml = deviations
+    const rowsHtml = visibleDeviations
         .map(
             (dev) => `
                 <tr
@@ -2084,12 +2054,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
                     <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
                     <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
-                    <td>${renderDeviationNoteCell(dev)}${
-                        dev.repo_transfer_status === 'NEEDS_REVIEW' &&
-                        Array.isArray(dev.repo_transfer_reasons) && dev.repo_transfer_reasons.length
-                            ? `<div class="small text-muted mt-1">${escapeHtml(dev.repo_transfer_reasons.join(', '))}</div>`
-                            : ''
-                    }${dev.status === 'NEEDS_HR_DECISION'
+                    <td>${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION'
                         ? `<div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary canonical-decision-open"
                             data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
                             data-ypokatasthma="${escapeHtml(dev.ypokatasthma || '')}"
@@ -2118,7 +2083,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                             <th class="text-end">Πραγματικές ημέρες εργασίας</th>
                             <th class="text-end">6η ημέρα</th>
                             <th class="text-end">7η ημέρα/παράβαση</th>
-                            <th>Profile</th>
+                            <th>Τύπος απασχόλησης</th>
                             <th>Σχόλιο</th>
                         </tr>
                     </thead>
@@ -2149,9 +2114,9 @@ const canonicalStatusLabels = {
 
 const canonicalReasonLabels = {
     PROFILE_CHANGED_INSIDE_WEEK: 'Αλλαγή όρων εργασίας μέσα στην εβδομάδα',
-    CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση στοιχείων κάρτας',
+    CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.',
     CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC:
-        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι δύο ημέρες ανάπαυσης/ρεπό της εβδομάδας',
+        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό της εβδομάδας και απαιτείται έλεγχος.',
     CANONICAL_DECISION_STALE:
         'Η προηγούμενη απόφαση χρειάζεται επανέλεγχο επειδή άλλαξαν τα δεδομένα',
     CANONICAL_DECISION_CONFLICT: 'Υπάρχουν αντικρουόμενες αποφάσεις',
@@ -2209,7 +2174,7 @@ function canonicalStatusLabel(value) {
 }
 
 function canonicalReasonLabel(value) {
-    return canonicalReasonLabels[String(value || '').trim()] || 'Απαιτείται πρόσθετος έλεγχος';
+    return reviewHrReasonLabel(value);
 }
 
 function canonicalDecisionTypeLabel(value) {
@@ -2933,7 +2898,7 @@ function getPolicyPreviewScopeLabel(scope) {
 
     if (key === 'page') return 'Τρέχουσα σελίδα';
 
-    return key || '-';
+    return key ? 'Απαιτείται έλεγχος της περίπτωσης.' : '-';
 }
 
 function formatPolicyPreviewDate(value) {
@@ -2976,7 +2941,7 @@ function sanitizePolicyPreviewCode(value) {
 
 function formatPolicyPreviewUnknownCode(value) {
     const key = sanitizePolicyPreviewCode(value);
-    return key ? `Μη χαρτογραφημένο αποτέλεσμα (${key})` : '-';
+    return key ? 'Απαιτείται έλεγχος της περίπτωσης.' : '-';
 }
 
 function getPolicyPreviewPolicyLabel(policyCode) {
@@ -3386,13 +3351,13 @@ function renderPolicyPreviewApprovalHistoryResults() {
                                     <td>${escapeHtml(formatPolicyPreviewDateTime(record.created_at))}</td>
                                     <td>${escapeHtml(getPolicyPreviewDecisionLabel(record.decision_type))}</td>
                                     <td>${escapeHtml(record.created_by_user_name || '-')}</td>
-                                    <td title="${escapeHtml(record.group_id || '')}">${escapeHtml(
+                                    <td>${escapeHtml(
                                         getPolicyPreviewStatusLabel(record.status).label
                                     )}</td>
-                                    <td title="${escapeHtml(record.policy_code || '')}">${escapeHtml(
+                                    <td>${escapeHtml(
                                         getPolicyPreviewPolicyLabel(record.policy_code)
                                     )}</td>
-                                    <td title="${escapeHtml(record.scenario_code || '')}">${escapeHtml(
+                                    <td>${escapeHtml(
                                         getPolicyPreviewScenarioLabel(record.scenario_code)
                                     )}</td>
                                     <td>${escapeHtml(counts.items)}</td>
@@ -3518,9 +3483,6 @@ function showPolicyPreviewApprovalHistoryDetails(record = {}) {
                     <tr><th>Κατάσταση</th><td>${escapeHtml(
                         getPolicyPreviewDecisionStatusLabel(record.decision_status)
                     )}</td></tr>
-                    <tr><th>ID ομάδας</th><td><span class="small text-muted">${escapeHtml(
-                        record.group_id || '-'
-                    )}</span></td></tr>
                     <tr><th>Χρήστης</th><td>${escapeHtml(
                         record.created_by_user_name || '-'
                     )}</td></tr>
@@ -3530,24 +3492,16 @@ function showPolicyPreviewApprovalHistoryDetails(record = {}) {
                     <tr><th>Περίοδος</th><td>${escapeHtml(
                         formatPolicyPreviewDate(record.apo_hmeromhnia)
                     )} – ${escapeHtml(formatPolicyPreviewDate(record.eos_hmeromhnia))}</td></tr>
-                    <tr><th>Πολιτική</th><td title="${escapeHtml(
-                        record.policy_code || ''
-                    )}">${escapeHtml(getPolicyPreviewPolicyLabel(record.policy_code))}</td></tr>
-                    <tr><th>Σενάριο</th><td title="${escapeHtml(
-                        record.scenario_code || ''
-                    )}">${escapeHtml(getPolicyPreviewScenarioLabel(record.scenario_code))}</td></tr>
-                    <tr><th>Ενέργεια</th><td title="${escapeHtml(
-                        record.action_type || ''
-                    )}">${escapeHtml(getPolicyPreviewActionLabel(record.action_type))}</td></tr>
-                    <tr><th>Αιτιολογία</th><td title="${escapeHtml(
-                        record.reason_code || ''
-                    )}">${escapeHtml(getPolicyPreviewReasonLabel(record.reason_code))}</td></tr>
+                    <tr><th>Πολιτική</th><td>${escapeHtml(getPolicyPreviewPolicyLabel(record.policy_code))}</td></tr>
+                    <tr><th>Σενάριο</th><td>${escapeHtml(getPolicyPreviewScenarioLabel(record.scenario_code))}</td></tr>
+                    <tr><th>Ενέργεια</th><td>${escapeHtml(getPolicyPreviewActionLabel(record.action_type))}</td></tr>
+                    <tr><th>Αιτιολογία</th><td>${escapeHtml(getPolicyPreviewReasonLabel(record.reason_code))}</td></tr>
                     <tr><th>Εγγραφές</th><td>${escapeHtml(counts.items)}</td></tr>
                     <tr><th>Εργαζόμενοι</th><td>${escapeHtml(counts.employees)}</td></tr>
                     <tr><th>Σημειώσεις</th><td>${escapeHtml(record.notes || '-')}</td></tr>
                 </tbody>
             </table>
-            <div class="fw-semibold mb-1">Snapshot εγγραφών</div>
+            <div class="fw-semibold mb-1">Αποτύπωση εγγραφών</div>
             <div class="table-responsive policy-preview-history-details-items">
                 <table class="table table-sm table-bordered align-middle mb-0">
                     <thead class="table-light">
@@ -3588,9 +3542,9 @@ function showPolicyPreviewApprovalHistoryDetails(record = {}) {
             </div>
             ${
                 items.length > visibleItems.length
-                    ? `<div class="small text-muted mt-1">Εμφανίζονται τα πρώτα ${escapeHtml(
+                    ? `<div class="small text-muted mt-1">Εμφανίζονται οι πρώτες ${escapeHtml(
                           visibleItems.length
-                      )} από ${escapeHtml(items.length)} items.</div>`
+                      )} από ${escapeHtml(items.length)} εγγραφές.</div>`
                     : ''
             }
         </div>
@@ -3732,6 +3686,7 @@ function getPolicyPreviewApplyDryRunFieldActionLabel(action) {
 function formatPolicyPreviewDryRunReason(reason) {
     const text = String(reason || '').trim();
     if (!text) return '-';
+    if (looksLikeInternalReviewCode(text)) return reviewHrUnknownReasonLabel;
 
     const exactTranslations = {
         'Δεν υπάρχουν proposed_values για αξιολόγηση.':
@@ -4008,9 +3963,7 @@ function showPolicyPreviewApplyDryRunDetails(approval = {}) {
                               <span>Ημ/νία: ${escapeHtml(
                                   formatPolicyPreviewDate(item.hmeromhnia)
                               )}</span>
-                              <span class="badge text-bg-light border" title="${escapeHtml(
-                                  item.status || ''
-                              )}">${escapeHtml(
+                              <span class="badge text-bg-light border">${escapeHtml(
                                   getPolicyPreviewApplyDryRunItemStatusLabel(item.status)
                               )}</span>
                           </div>
@@ -4414,7 +4367,7 @@ function renderPolicyPreviewStatusBadge(status) {
     const statusLabel = getPolicyPreviewStatusLabel(statusCode);
 
     return `
-        <span class="badge ${escapeHtml(statusLabel.badgeClass)}" title="${escapeHtml(statusCode)}">
+        <span class="badge ${escapeHtml(statusLabel.badgeClass)}">
             ${escapeHtml(statusLabel.label)}
         </span>
     `;
@@ -4821,16 +4774,12 @@ function getAtomicRepoTransferCount(source, key) {
 function renderAtomicRepoTransferSummary(projection = {}) {
     const summary = projection.summary || {};
     const entries = [
-        ['Εβδομάδες εργαζομένων που αξιολογήθηκαν', 'weeks_evaluated'],
-        ['Προτάσεις', 'groups_count'],
-        ['Συνδεδεμένες προτάσεις', 'decision_units_count'],
-        ['Προτάσεις προς έλεγχο από HR', 'ready_count'],
-        ['Εργαζόμενοι', 'employees_count'],
-        ['Περιπτώσεις προς διερεύνηση', 'review_outcomes_count'],
-        ['Εργαζόμενοι προς διερεύνηση', 'review_outcome_employees_count'],
-        ['Χωρίς ασφαλή πρόταση', 'not_available_count'],
-        ['Περιπτώσεις με μη έγκυρα στοιχεία', 'invalid_projection_count']
-    ];
+        ['Μεταφορές ρεπό προς απόφαση', 'ready_count'],
+        ['Περιπτώσεις προς ανθρώπινη διερεύνηση', 'review_outcomes_count'],
+        ['Τεχνικές εκκρεμότητες που εμποδίζουν εργασία', 'invalid_projection_count']
+    ].filter(([, key]) => getAtomicRepoTransferCount(summary, key) > 0);
+
+    if (entries.length === 0) return '';
 
     return `
         <div class="atomic-repo-transfer-summary" aria-label="Σύνοψη προτάσεων μεταφοράς ρεπό">
@@ -5003,7 +4952,7 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
     MULTIPLE_SOURCE_CANDIDATES:
         'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
     MULTIPLE_TARGET_CANDIDATES:
-        'Βρέθηκαν περισσότερες από μία προδηλωμένες ημέρες χωρίς κάρτες. Απαιτείται έλεγχος πριν επιλεγεί ημέρα ρεπό.',
+        'Βρέθηκαν περισσότερες από μία πιθανές ημέρες για τη μεταφορά του ρεπό και απαιτείται επιλογή.',
     REPO_LIMIT_EXCEEDED:
         'Η αλλαγή θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ρεπό της εβδομάδας.',
     TARGET_LOCKED: 'Η προτεινόμενη ημέρα ρεπό είναι κλειδωμένη.',
@@ -5049,7 +4998,72 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Τα στοιχεία εκτείνονται σε περισσότερες από μία φυσικές εβδομάδες.'
 });
 
+const atomicRepoTransferDiagnosticCategories = Object.freeze({
+    NO_SOURCE_CANDIDATE: 'INFORMATIONAL_INTERNAL',
+    OPEN_WEEK_PENDING_COMPLETION: 'INFORMATIONAL_INTERNAL',
+    PARTIAL_WEEK_OUTSIDE_FILTER_RANGE: 'INFORMATIONAL_INTERNAL',
+    CROSS_MONTH_REPO_TRANSFER_NOT_ALLOWED: 'INFORMATIONAL_INTERNAL',
+    REPO_DEFICIT_REMAINS: 'INFORMATIONAL_INTERNAL',
+    NO_TARGET_CANDIDATE: 'INFORMATIONAL_INTERNAL',
+    NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS: 'INFORMATIONAL_INTERNAL',
+    PROFILE_CHANGED_INSIDE_WEEK: 'HUMAN_REVIEW_REQUIRED',
+    MULTIPLE_SOURCE_CANDIDATES: 'HUMAN_REVIEW_REQUIRED',
+    MULTIPLE_TARGET_CANDIDATES: 'HUMAN_REVIEW_REQUIRED',
+    TARGET_LOCKED: 'ACTION_REQUIRED',
+    SOURCE_LOCKED: 'ACTION_REQUIRED',
+    TARGET_MANUAL_OVERRIDE: 'HUMAN_REVIEW_REQUIRED',
+    SOURCE_MANUAL_OVERRIDE: 'HUMAN_REVIEW_REQUIRED',
+    INCOMPLETE_CARD_INTERVAL: 'ACTION_REQUIRED',
+    SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT: 'HUMAN_REVIEW_REQUIRED',
+    SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION: 'HUMAN_REVIEW_REQUIRED',
+    MIXED_WORK_AND_HOURLY_LEAVE: 'HUMAN_REVIEW_REQUIRED',
+    MIXED_WORK_AND_SICKNESS: 'HUMAN_REVIEW_REQUIRED'
+});
+
+function getAtomicRepoTransferDiagnosticCategory(code) {
+    return atomicRepoTransferDiagnosticCategories[String(code || '').trim()] || 'ACTION_REQUIRED';
+}
+
 const atomicRepoTransferUnknownDiagnosticLabel = 'Άλλη περίπτωση που χρειάζεται έλεγχο.';
+
+const reviewHrUnknownReasonLabel = 'Απαιτείται έλεγχος της περίπτωσης.';
+
+function looksLikeInternalReviewCode(value) {
+    return /^[A-Z][A-Z0-9_]+_[A-Z0-9_]+$/.test(String(value || '').trim());
+}
+
+function reviewHrReasonLabel(reason) {
+    const code = String(reason || '').trim();
+    if (!code) return '';
+    return canonicalReasonLabels[code] ||
+        atomicRepoTransferDiagnosticLabels[code] ||
+        reviewHrUnknownReasonLabel;
+}
+
+function reviewHrReasonMessages(reasons = []) {
+    const messages = [];
+    const seen = new Set();
+
+    reasons.forEach((reason) => {
+        const code = String(reason || '').trim();
+        if (!code || getAtomicRepoTransferDiagnosticCategory(code) === 'INFORMATIONAL_INTERNAL') {
+            return;
+        }
+        const message = reviewHrReasonLabel(code);
+        if (!message || seen.has(message)) return;
+        seen.add(message);
+        messages.push(message);
+    });
+
+    return messages;
+}
+
+function renderReviewHrReasonList(messages = []) {
+    if (!Array.isArray(messages) || messages.length === 0) return '';
+    return `<ul class="small text-warning-emphasis mb-0 ps-3">${messages
+        .map((message) => `<li>${escapeHtml(message)}</li>`)
+        .join('')}</ul>`;
+}
 
 function getOpenTrailingWeekDiagnosticLabel() {
     const periodEnd = String(
@@ -5089,9 +5103,11 @@ function getAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
             code,
             count: Number(rawCount),
             label: getAtomicRepoTransferDiagnosticLabel(code),
-            pendingCompletion: code === 'OPEN_WEEK_PENDING_COMPLETION'
+            category: getAtomicRepoTransferDiagnosticCategory(code)
         }))
-        .filter(({ count }) => Number.isFinite(count) && count > 0)
+        .filter(({ count, category }) =>
+            Number.isFinite(count) && count > 0 && category !== 'INFORMATIONAL_INTERNAL'
+        )
         .sort((left, right) => {
             if (right.count !== left.count) return right.count - left.count;
             return left.label.localeCompare(right.label, 'el');
@@ -5105,21 +5121,12 @@ function renderAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
 
     return `
         <div class="atomic-repo-transfer-diagnostic-summary">
-            <div class="fw-semibold">Περιπτώσεις χωρίς αυτόματη πρόταση</div>
-            <div class="small text-muted">
-                Για τις παρακάτω περιπτώσεις δεν δημιουργήθηκε ασφαλής πρόταση μεταφοράς ρεπό:
-            </div>
+            <div class="fw-semibold">Εκκρεμότητες που απαιτούν ενέργεια</div>
             <div class="atomic-repo-transfer-diagnostic-list">
                 ${entries
-                    .map(({ count, label, pendingCompletion }) => {
+                    .map(({ count, label }) => {
                         const countLabel = count === 1 ? 'περίπτωση' : 'περιπτώσεις';
-                        return `<div class="atomic-repo-transfer-diagnostic-message${
-                            pendingCompletion ? ' atomic-repo-transfer-pending-message' : ''
-                        }">${
-                            pendingCompletion
-                                ? '<span class="badge text-bg-info me-2">Αναμονή ολοκλήρωσης</span>'
-                                : ''
-                        }${escapeHtml(count)} ${countLabel}: ${escapeHtml(label)}</div>`;
+                        return `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(count)} ${countLabel}: ${escapeHtml(label)}</div>`;
                     })
                     .join('')}
             </div>
@@ -5529,12 +5536,12 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
                 if (status) {
                     status.className = 'hr-review-status hr-review-error-state';
                     status.textContent =
-                        'Η απόφαση καταγράφηκε, αλλά η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Έναρξη ελέγχου».';
+                        'Η απόφαση καταγράφηκε, αλλά η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Αναζήτηση».';
                 }
                 await Swal.fire({
                     icon: 'warning',
                     title: 'Η απόφαση καταγράφηκε',
-                    text: 'Η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Έναρξη ελέγχου» για να δείτε την τρέχουσα κατάσταση.'
+                    text: 'Η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Αναζήτηση» για να δείτε την τρέχουσα κατάσταση.'
                 });
                 return;
             }
@@ -6048,7 +6055,6 @@ async function loadHrReviewQueue() {
 }
 
 function bindHrReviewEvents() {
-    document.getElementById('hrReviewStartBtn')?.addEventListener('click', loadHrReviewQueue);
     document.getElementById('hrReviewPendingContainer')?.addEventListener('click', async (event) => {
         const button = event.target.closest?.(
             '.hr-review-decision-btn, .hr-review-reusable-btn'
@@ -6085,25 +6091,17 @@ function bindHrReviewEvents() {
         if (!group) return;
         await submitRepoTransferApply(group, String(button.dataset.decisionId || ''), button);
     });
-    document.getElementById('showAdvancedReviewBtn')?.addEventListener('click', async () => {
-        if (!userCanUseAdvancedEmploymentReview()) return;
-        await window.EmploymentReviewBranches?.preselectAdvancedBranch?.();
-        document.getElementById('hrReviewWorkspace')?.classList.add('d-none');
-        document.getElementById('advancedReviewWorkspace')?.classList.remove('d-none');
-        resetEmploymentPeriodControlForWorkspaceSwitch();
-    });
-    document.getElementById('showMinimalReviewBtn')?.addEventListener('click', async () => {
-        document.getElementById('advancedReviewWorkspace')?.classList.add('d-none');
-        document.getElementById('hrReviewWorkspace')?.classList.remove('d-none');
-        resetEmploymentPeriodControlForWorkspaceSwitch();
-        if (currentHrReviewLoaded) await loadHrReviewQueue();
-    });
 }
 
 function renderAtomicRepoTransferProjection(projection) {
     if (!projection) return '';
 
-    const groups = Array.isArray(projection.groups) ? projection.groups : [];
+    const groups = Array.isArray(projection.groups)
+        ? projection.groups.filter((group) => {
+              const state = currentRepoTransferDecisionsByProposalId.get(String(group?.group_id || ''));
+              return state?.can_apply === true || !isHrReviewGroupCompleted(group);
+          })
+        : [];
     const reviewOutcomes = Array.isArray(projection.review_outcomes)
         ? projection.review_outcomes
         : [];
@@ -6217,11 +6215,7 @@ function renderAtomicRepoTransferProjection(projection) {
     }).join('');
     const groupsHtml = groups.length
         ? groups.map((group, index) => renderAtomicRepoTransferGroup(group, index)).join('')
-        : reviewOutcomes.length ? '' : `
-            <div class="atomic-repo-transfer-empty">
-                Δεν δημιουργήθηκε αυτόματη πρόταση.
-            </div>
-        `;
+        : '';
     const groupSafetyHtml = groups.length ? `
         <div class="atomic-repo-transfer-main-warning">
             <div>Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές και εφαρμόζεται μόνο ως σύνολο.</div>
@@ -6238,6 +6232,11 @@ function renderAtomicRepoTransferProjection(projection) {
             Δεν έχει δημιουργηθεί πρόταση μεταφοράς ή εφαρμογής.
         </div>
     ` : '';
+
+    if (groups.length === 0 && reviewOutcomes.length === 0 &&
+        getAtomicRepoTransferDiagnosticEntries(projection.reason_counts || {}).length === 0) {
+        return '';
+    }
 
     return `
         <section class="atomic-repo-transfer-section" aria-labelledby="atomicRepoTransferTitle">
@@ -6454,35 +6453,25 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
             </details>
         `
         : '';
-    const showHistory = currentPolicyPreviewApprovalTotal > 0;
-    const showDryRun =
-        getPolicyPreviewApplyDryRunSummaryValue(
-            currentPolicyPreviewApplyDryRun?.summary,
-            'approvals_found'
-        ) > 0;
     const repoTransferDecisionCount = Array.isArray(currentAtomicRepoTransferProjection?.groups)
         ? currentAtomicRepoTransferProjection.groups.filter(
               (group) => !isHrReviewGroupCompleted(group)
           ).length
         : 0;
-    const outerExpanded = Boolean(options.expandedGroupId || options.expandPolicyAccordion);
+    const atomicHtml = renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection);
+
+    if (!atomicHtml && decisionGroups.length === 0 &&
+        !(userCanManageReusablePolicyApproval() && inheritedApprovalGroups.length > 0) &&
+        !currentPolicyPreviewApprovalsError) {
+        container.innerHTML = '';
+        return;
+    }
 
     container.innerHTML = `
-        <details class="card border rounded policy-preview-card policy-preview-main-accordion" ${outerExpanded ? 'open' : ''}>
-            <summary class="policy-preview-main-summary">
-                <span class="fw-semibold">Αποφάσεις Ελέγχου Πολιτικών</span>
-                ${renderPolicyPreviewGroupingSummary(
-                    grouping,
-                    decisionGroups.map(({ group }) => group),
-                    diagnosticGroups.map(({ group }) => group),
-                    repoTransferDecisionCount,
-                    inheritedApprovalGroups.map(({ group }) => group)
-                )}
-                <span class="policy-preview-main-toggle-label">Άνοιγμα / κλείσιμο</span>
-            </summary>
-            <div class="card-body policy-preview-main-content">
-                ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
-                ${renderAppliedRepoTransferHistory()}
+        <section class="card border rounded policy-preview-card employment-review-pending-summary"
+            aria-label="Πραγματικές εκκρεμότητες ελέγχου">
+            <div class="card-body policy-preview-main-content py-2">
+                ${atomicHtml}
                 ${
                     currentPolicyPreviewApprovalsError
                         ? `<div class="alert alert-warning py-1 px-2 small mb-2">${escapeHtml(
@@ -6490,14 +6479,11 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                           )}</div>`
                         : ''
                 }
-                ${showHistory ? renderPolicyPreviewApprovalHistorySection() : ''}
-                ${showDryRun ? renderPolicyPreviewApplyDryRunSection() : ''}
-                <div class="fw-semibold mb-2">Αποφάσεις που εκκρεμούν</div>
+                ${decisionGroups.length ? '<div class="fw-semibold mb-2">Αποφάσεις που εκκρεμούν</div>' : ''}
                 ${decisionGroupsHtml}
-                ${inheritedApprovalGroupsHtml}
-                ${diagnosticGroupsHtml}
+                ${userCanManageReusablePolicyApproval() ? inheritedApprovalGroupsHtml : ''}
             </div>
-        </details>
+        </section>
     `;
 
     bindAtomicRepoTransferEvents(container);
@@ -6563,34 +6549,13 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
 let currentEmploymentPeriodControl = null;
 
-function resetEmploymentPeriodControlForWorkspaceSwitch() {
-    currentEmploymentPeriodControl = null;
-    document.getElementById('employmentPeriodControlPanel')?.classList.add('d-none');
-}
-
 function getActiveEmploymentReviewScope() {
-    const advancedWorkspace = document.getElementById('advancedReviewWorkspace');
-    const simpleWorkspace = document.getElementById('hrReviewWorkspace');
-    const advancedActive = Boolean(advancedWorkspace && !advancedWorkspace.classList.contains('d-none'));
-    const simpleActive = Boolean(simpleWorkspace && !simpleWorkspace.classList.contains('d-none'));
-
-    if (advancedActive === simpleActive) {
-        throw new Error('Δεν είναι δυνατός ο ασφαλής προσδιορισμός της ενεργής προβολής ελέγχου.');
-    }
-
-    const workspace = advancedActive ? 'ADVANCED' : 'SIMPLE';
-    const apoHmeromhnia = String(document.getElementById(
-        advancedActive ? 'apo_hmeromhnia' : 'hr_apo_hmeromhnia'
-    )?.value || '').trim();
-    const eosHmeromhnia = String(document.getElementById(
-        advancedActive ? 'eos_hmeromhnia' : 'hr_eos_hmeromhnia'
-    )?.value || '').trim();
+    const apoHmeromhnia = String(document.getElementById('apo_hmeromhnia')?.value || '').trim();
+    const eosHmeromhnia = String(document.getElementById('eos_hmeromhnia')?.value || '').trim();
     const ypokatasthma = String(
-        advancedActive
-            ? document.getElementById('ypokatasthma_stathera_advanced')?.value ||
-              document.getElementById('ypokatasthma')?.tomselect?.getValue?.() ||
-              document.getElementById('ypokatasthma')?.value || ''
-            : getHrSelectedBranch()
+        document.getElementById('ypokatasthma_stathera_advanced')?.value ||
+        document.getElementById('ypokatasthma')?.tomselect?.getValue?.() ||
+        document.getElementById('ypokatasthma')?.value || ''
     ).trim();
 
     if (!apoHmeromhnia || !eosHmeromhnia || !ypokatasthma ||
@@ -6599,7 +6564,7 @@ function getActiveEmploymentReviewScope() {
     }
 
     return Object.freeze({
-        workspace,
+        workspace: 'UNIFIED',
         apo_hmeromhnia: apoHmeromhnia,
         eos_hmeromhnia: eosHmeromhnia,
         ypokatasthma
@@ -6608,9 +6573,9 @@ function getActiveEmploymentReviewScope() {
 
 const employmentPeriodModeLabels = Object.freeze({
     NORMAL: 'Ανοικτή',
-    LOCKED: 'Κλειδωμένη',
+    LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ',
     FINALIZED: 'Οριστικοποιημένη περίοδος',
-    HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ BASELINE',
+    HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ',
     HISTORICAL_RECONSTRUCTED: 'ΑΝΑΚΑΤΑΣΚΕΥΑΣΜΕΝΗ ΕΚΠΡΟΘΕΣΜΗ ΠΕΡΙΟΔΟΣ',
     HISTORICAL_RECONSTRUCTION_STALE: 'ΑΝΑΚΑΤΑΣΚΕΥΗ ΠΟΥ ΑΠΑΙΤΕΙ ΕΠΑΝΕΚΤΙΜΗΣΗ',
     CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'
@@ -6641,17 +6606,22 @@ function renderEmploymentPeriodControl(state) {
         employmentPeriodModeLabels[mode] || 'Απαιτείται έλεγχος';
     document.getElementById('employmentPeriodControlDeadline').textContent =
         formatPolicyPreviewDate(state?.deadline);
-    document.getElementById('employmentPeriodDeadlineState').textContent =
-        state?.past_deadline ? 'ΕΚΠΡΟΘΕΣΜΗ' : 'ΕΝΤΟΣ ΠΡΟΘΕΣΜΙΑΣ';
+    document.getElementById('employmentPeriodDeadlineState')?.classList.add('d-none');
     const historical = state?.historical_reconstruction || {};
-    document.getElementById('employmentHistoricalReconstructionStatus').textContent = historical.version
-        ? `v${historical.version} · ${historical.dependency_status || historical.status || '-'} · ${historical.started_by_user_name || '-'} (${employmentCriticalRoleLabels[historical.started_by_user_role] || historical.started_by_user_role || '-'})`
-        : '-';
-    document.getElementById('employmentPeriodFinalizedAt').textContent =
-        formatPolicyPreviewDate(state?.finalized_at) || '-';
-    document.getElementById('employmentPeriodSubmission').textContent =
-        employmentSubmissionTimelinessLabels[state?.submission_timeliness] || 'Δεν έχει συνδεθεί';
-    document.getElementById('employmentPeriodProtocol').textContent = state?.submission_protocol || '-';
+    const reconstructionVisible = Number(historical.version) > 0;
+    document.getElementById('employmentHistoricalReconstructionMeta')?.classList.toggle('d-none', !reconstructionVisible);
+    document.getElementById('employmentHistoricalReconstructionStatus').textContent = reconstructionVisible
+        ? `v${historical.version}` : '';
+    const finalizedAt = formatPolicyPreviewDate(state?.finalized_at);
+    document.getElementById('employmentPeriodFinalizedMeta')?.classList.toggle('d-none', !finalizedAt);
+    document.getElementById('employmentPeriodFinalizedAt').textContent = finalizedAt || '';
+    const submissionVisible = state?.submission_timeliness && state.submission_timeliness !== 'NOT_SUBMITTED';
+    document.getElementById('employmentPeriodSubmissionMeta')?.classList.toggle('d-none', !submissionVisible);
+    document.getElementById('employmentPeriodSubmission').textContent = submissionVisible
+        ? employmentSubmissionTimelinessLabels[state.submission_timeliness] || '' : '';
+    const protocol = String(state?.submission_protocol || '').trim();
+    document.getElementById('employmentPeriodProtocolMeta')?.classList.toggle('d-none', !protocol);
+    document.getElementById('employmentPeriodProtocol').textContent = protocol;
     const actions = state?.allowed_actions || {};
     document.getElementById('lockEmploymentPeriodBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.lock_period === true && state?.index_readiness?.ready === true)
@@ -6690,9 +6660,7 @@ function renderEmploymentPeriodControl(state) {
     if (message) {
         message.textContent = state?.index_readiness?.ready === false
             ? 'Η μεταβολή κατάστασης περιόδου δεν είναι προσωρινά διαθέσιμη.'
-            : mode === 'HISTORICAL_RECONSTRUCTION_REQUIRED'
-              ? 'Η κανονική εκτέλεση παραμένει κλειστή μέχρι ρητή εξουσιοδότηση ιστορικής ανακατασκευής.'
-              : mode === 'HISTORICAL_RECONSTRUCTION_STALE'
+            : mode === 'HISTORICAL_RECONSTRUCTION_STALE'
                 ? 'Τα πραγματικά δεδομένα της προηγούμενης περιόδου άλλαξαν. Απαιτείται επανεκτίμηση.'
                 : mode === 'CORRECTIVE_ONLY'
                   ? 'Οι κανονικές μεταβολές έχουν απενεργοποιηθεί μετά την προθεσμία.'
@@ -6706,7 +6674,7 @@ async function runHistoricalReconstruction() {
     const reassess = state?.allowed_actions?.historical_reassess === true;
     const confirmation = await Swal.fire({ icon: 'warning',
         title: reassess ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου' : 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
-        html: '<p>Η περίοδος έχει λήξει.</p><p>Η ενέργεια επιτρέπεται μόνο για ανακατασκευή ιστορικού αποτελέσματος και δεν αλλάζει την πραγματική ημερομηνία ούτε την εμπρόθεσμη / εκπρόθεσμη κατάσταση της περιόδου.</p><p>Η ενέργεια θα καταγραφεί με χρήστη, ημερομηνία και αιτιολογία.</p>',
+        html: '<p>Η περίοδος έχει λήξει. Η ανακατασκευή δεν αλλάζει την εκπρόθεσμη κατάστασή της και καταγράφεται με χρήστη, ημερομηνία και αιτιολογία.</p>',
         input: 'textarea', inputLabel: 'Υποχρεωτική αιτιολογία', showCancelButton: true,
         customClass: {
             popup: 'historical-reconstruction-swal',
@@ -6735,8 +6703,7 @@ async function runHistoricalReconstruction() {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η ιστορική ανακατασκευή απέτυχε.');
     await loadEmploymentPeriodControl(branch);
-    if (scope.workspace === 'ADVANCED') await loadResults();
-    else await loadHrReviewQueue();
+    await loadResults();
     await Swal.fire({ icon: 'success', title: 'Ιστορική ανακατασκευή ολοκληρώθηκε',
         text: `Έκδοση ${authorization.historical_reconstruction_version}` });
 }
