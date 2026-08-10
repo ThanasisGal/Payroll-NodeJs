@@ -1372,7 +1372,7 @@ function testPartialFamilyDiagnosticsHaveSpecificGreekLabels() {
     reasonCodes.forEach((code) => assert.ok(!visibleText.includes(code)));
     assert.ok(!visibleText.includes('Άλλη περίπτωση που χρειάζεται έλεγχο.'));
     [
-        'περισσότερες από μία προδηλωμένες ημέρες χωρίς κάρτες',
+        'περισσότερες από μία πιθανές ημέρες για τη μεταφορά του ρεπό',
         'θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ρεπό',
         'ημέρα ρεπό είναι κλειδωμένη',
         'τύπος απασχόλησης δεν αναγνωρίζεται',
@@ -2971,6 +2971,40 @@ function testEmploymentReviewScrollContainerContract() {
     assert.ok(/\.employment-review-scroll-container #resultsTable thead th\s*\{[^}]*position:\s*sticky/s.test(cssSource));
     const colgroupMarkup = viewSource.match(/<colgroup class="employment-review-results-columns">[\s\S]*?<\/colgroup>/)?.[0] || '';
     assert.strictEqual((colgroupMarkup.match(/<col\b/g) || []).length, 13);
+    const tableHeadMarkup = (viewSource.match(/id="resultsTable"[\s\S]*?<thead[\s\S]*?<tr>([\s\S]*?)<\/tr>/)?.[1] || '')
+        .replace(/<!--[\s\S]*?-->/g, '');
+    const headers = Array.from(tableHeadMarkup.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g))
+        .map((match) => getVisibleText(match[1]));
+    assert.deepStrictEqual(headers, ['Ημ/νία', 'Παράρτημα', 'Κωδικός', 'Προδηλωμένο',
+        'Κάρτες', 'Απολογιστικό', 'Ώρες', 'Απουσίες', 'Νύχτα', 'Αργία',
+        'Πρόσθ.', 'Υπερεργ.', 'Υπερωρ.']);
+    assert.ok(!/createElement\(['"]th['"]\)[\s\S]{0,400}Απουσίες/.test(source));
+}
+
+function testWeeklyHrReasonPresentationIsGreekAndSafe() {
+    const messages = sandbox.reviewHrReasonMessages([
+        'CARD_VERIFICATION_PENDING',
+        'MULTIPLE_TARGET_CANDIDATES',
+        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+        'CARD_VERIFICATION_PENDING',
+        'OPEN_WEEK_PENDING_COMPLETION',
+        'NO_SOURCE_CANDIDATE',
+        'UNKNOWN_INTERNAL_REASON_CODE'
+    ]);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(messages)), [
+        'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.',
+        'Βρέθηκαν περισσότερες από μία πιθανές ημέρες για τη μεταφορά του ρεπό και απαιτείται επιλογή.',
+        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό της εβδομάδας και απαιτείται έλεγχος.',
+        'Απαιτείται έλεγχος της περίπτωσης.'
+    ]);
+    const html = sandbox.renderReviewHrReasonList(messages);
+    ['CARD_VERIFICATION_PENDING', 'MULTIPLE_TARGET_CANDIDATES',
+        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', 'UNKNOWN_INTERNAL_REASON_CODE',
+        'OPEN_WEEK_PENDING_COMPLETION', 'NO_SOURCE_CANDIDATE']
+        .forEach((code) => assert.ok(!getVisibleText(html).includes(code)));
+    assert.strictEqual((html.match(/<li>/g) || []).length, 4);
+    assert.strictEqual(sandbox.looksLikeInternalReviewCode('PDF'), false);
+    assert.strictEqual(sandbox.looksLikeInternalReviewCode('ΕΡΓΑΝΗ II'), false);
 }
 
 function testEmploymentReviewFinalUiContract() {
@@ -3081,6 +3115,7 @@ const tests = [
     testRevokedReusableHistoryDoesNotBlockNewApproval,
     testMinimalWorkspaceEjsContract,
     testEmploymentReviewScrollContainerContract,
+    testWeeklyHrReasonPresentationIsGreekAndSafe,
     testAllKnownBackendGroupingCodesHaveGreekLabels,
     testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct,
     testOpenAndCompletedPartialWeekMessagesStayDistinct,

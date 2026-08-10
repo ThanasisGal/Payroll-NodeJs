@@ -11,6 +11,10 @@ const view = fs.readFileSync(
 );
 const css = fs.readFileSync(path.join(root, 'public/css/main.css'), 'utf8');
 const bootstrapCss = fs.readFileSync(path.join(root, 'public/css/bootstrap.min.css'), 'utf8');
+const reviewJs = fs.readFileSync(
+    path.join(root, 'public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'),
+    'utf8'
+);
 const renderedView = ejs.render(view, {
     userRole: 'HR',
     csrfToken: 'test-token',
@@ -27,7 +31,15 @@ function fixture() {
 
 async function loadOperationalState(page) {
     await page.setContent(fixture(), { waitUntil: 'domcontentloaded' });
+    await page.addScriptTag({ content: reviewJs });
     await page.evaluate(() => {
+        const beforeHeaders = Array.from(document.querySelectorAll('#resultsTable > thead th'))
+            .map((header) => header.textContent.trim());
+        window.reviewTableHeadersBefore = beforeHeaders;
+        ensureReviewTableStructure();
+        window.reviewTableHeadersAfter = Array.from(
+            document.querySelectorAll('#resultsTable > thead th')
+        ).map((header) => header.textContent.trim());
         document.getElementById('employmentPeriodControlPanel').classList.remove('d-none');
         document.getElementById('employmentPeriodControlStatus').textContent =
             'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ';
@@ -40,7 +52,56 @@ async function loadOperationalState(page) {
             { length: 13 },
             (_unused, cell) => `<td>${cell === 0 ? `0${(index % 9) + 1}/06/2026` : `Στοιχείο ${index + 1}-${cell + 1}`}</td>`
         ).join('')}</tr>`).join('');
+        appendEmployeeTotalsRow(body, {
+            ores_ergasias_apologistika: 40,
+            ores_apoysias_apologistika: 0,
+            ores_nyxtas_apologistika: 0,
+            ores_argion_prosayxhsh_apologistika: 0,
+            ores_argion_ergasia_apologistika: 0,
+            ores_prostheths_ergasias_apologistika: 0,
+            yperergasia: 0,
+            nomimiYperoria: 0,
+            paranomiYperoria: 0
+        }, 'geometry-test');
+        appendEmployeeDeviationRows(body, [{
+            kodikos: '001',
+            week_apo: '2026-06-01',
+            week_eos: '2026-06-07',
+            expected_repo: 2,
+            actual_repo: 1,
+            resolved_repo: 2,
+            actual_workdays: 6,
+            sixth_day_count: 1,
+            seventh_day_count: 0,
+            effective_typos_apasxolhshs: '0',
+            effective_weekly_workdays: 5,
+            effective_expected_repo: 2,
+            status: 'NEEDS_HR_DECISION',
+            repo_transfer_status: 'NEEDS_REVIEW',
+            repo_transfer_reasons: ['MULTIPLE_TARGET_CANDIDATES'],
+            canonical_reasons: [
+                'CARD_VERIFICATION_PENDING',
+                'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
+            ]
+        }], 'geometry-test');
+        body.querySelector('.employee-deviation-row')?.classList.remove('d-none');
     });
+}
+
+async function renderedTableContract(page) {
+    return page.evaluate(() => ({
+        before: window.reviewTableHeadersBefore,
+        after: window.reviewTableHeadersAfter,
+        colCount: document.querySelectorAll('#resultsTable > colgroup > col').length,
+        dailyCellCounts: Array.from(document.querySelectorAll('#resultsTable > tbody > tr:not(.employee-deviation-row)'))
+            .map((row) => row.cells.length),
+        subtotalLogicalColumns: Array.from(
+            document.querySelector('.employee-subtotal-row')?.cells || []
+        ).reduce((total, cell) => total + cell.colSpan, 0),
+        weeklyHeaders: Array.from(document.querySelectorAll('.employee-deviation-row table thead th'))
+            .map((header) => header.textContent.trim()),
+        weeklyVisibleText: document.querySelector('.employee-deviation-row')?.innerText || ''
+    }));
 }
 
 async function geometry(page) {
@@ -104,6 +165,29 @@ async function modalGeometry(page) {
         for (const [width, height] of [[1366, 768], [1440, 900], [1648, 900], [1648, 920], [1920, 1080]]) {
             await page.setViewportSize({ width, height });
             await loadOperationalState(page);
+            const tableContract = await renderedTableContract(page);
+            const expectedHeaders = ['Ημ/νία', 'Παράρτημα', 'Κωδικός', 'Προδηλωμένο',
+                'Κάρτες', 'Απολογιστικό', 'Ώρες', 'Απουσίες', 'Νύχτα', 'Αργία',
+                'Πρόσθ.', 'Υπερεργ.', 'Υπερωρ.'];
+            assert.deepStrictEqual(tableContract.before, expectedHeaders);
+            assert.deepStrictEqual(tableContract.after, expectedHeaders);
+            assert.strictEqual(tableContract.colCount, 13);
+            assert.ok(tableContract.dailyCellCounts.slice(0, 80).every((count) => count === 13));
+            assert.strictEqual(tableContract.subtotalLogicalColumns, 13);
+            assert.strictEqual(tableContract.after.filter((text) => text === 'Απουσίες').length, 1);
+            assert.strictEqual(tableContract.after.filter((text) => text === 'Προδηλωμένο').length, 1);
+            assert.ok(tableContract.weeklyHeaders.includes('Τύπος απασχόλησης'));
+            assert.ok(!tableContract.weeklyHeaders.includes('Profile'));
+            [
+                'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.',
+                'Βρέθηκαν περισσότερες από μία πιθανές ημέρες για τη μεταφορά του ρεπό και απαιτείται επιλογή.',
+                'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό της εβδομάδας και απαιτείται έλεγχος.'
+            ].forEach((message) => assert.ok(tableContract.weeklyVisibleText.includes(message)));
+            [
+                'CARD_VERIFICATION_PENDING',
+                'MULTIPLE_TARGET_CANDIDATES',
+                'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
+            ].forEach((code) => assert.ok(!tableContract.weeklyVisibleText.includes(code)));
             const result = await geometry(page);
             measurements.push({ viewport: `${width}x${height}`, ...result });
             assert.ok(result.lifecycle && result.pending && result.cardFooter);

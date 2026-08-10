@@ -366,34 +366,34 @@ function scenarioLabel(decision = {}) {
     if (!code) return '';
     if (decision.requires_review === true) return 'ΠΡΟΣ ΕΛΕΓΧΟ';
 
-    return scenarioCodeLabels[code] || code;
+    return scenarioCodeLabels[code] || 'Απαιτείται έλεγχος';
 }
 
 function scenarioTitle(decision = {}) {
     const code = String(decision.scenario_code || '').trim();
-    const label = scenarioCodeLabels[code] || code;
+    const label = scenarioCodeLabels[code] || 'Απαιτείται έλεγχος';
 
     if (!code) return '';
 
-    return `${label} / ${code}`;
+    return label;
 }
 
 function scenarioConfidenceLabel(confidence) {
     const key = String(confidence || '').trim();
 
-    return scenarioConfidenceLabels[key] || key;
+    return scenarioConfidenceLabels[key] || (key ? 'Δεν έχει προσδιοριστεί' : '');
 }
 
 function scenarioDecisionStatusLabel(status) {
     const key = String(status || '').trim();
 
-    return scenarioDecisionStatusLabels[key] || key;
+    return scenarioDecisionStatusLabels[key] || (key ? 'Απαιτείται έλεγχος' : '');
 }
 
 function scenarioReasonLabel(reason) {
     const key = String(reason || '').trim();
 
-    return scenarioReasonLabels[key] || key;
+    return scenarioReasonLabels[key] || reviewHrReasonLabel(key);
 }
 
 function buildRepoTransferReviewRowStates() {
@@ -853,13 +853,13 @@ function renderScenarioDetailsSection(row) {
     if (!decision) return '';
 
     const code = String(decision.scenario_code || '').trim();
-    const label = scenarioCodeLabels[code] || code || '-';
+    const label = scenarioCodeLabels[code] || (code ? 'Απαιτείται έλεγχος' : '-');
     const confidence = scenarioConfidenceLabel(decision.confidence);
     const status = scenarioDecisionStatusLabel(decision.decision_status);
     const reviewText =
         decision.requires_review === true ? 'ΠΡΟΣ ΕΛΕΓΧΟ' : 'Δεν απαιτείται έλεγχος';
     const reasonsHtml = renderScenarioList(decision.reasons, scenarioReasonLabel);
-    const warningsHtml = renderScenarioList(decision.warnings);
+    const warningsHtml = renderScenarioList(decision.warnings, scenarioReasonLabel);
     const proposedUpdatesHtml = renderScenarioProposedUpdates(decision.proposed_updates);
     const factsSummaryHtml = renderScenarioFactsSummary(row.scenarioFactsSummary);
 
@@ -869,7 +869,6 @@ function renderScenarioDetailsSection(row) {
 
             <div class="review-scenario-summary">
                 <span class="review-badge">${escapeHtml(label)}</span>
-                ${code ? `<span class="review-badge">${escapeHtml(code)}</span>` : ''}
                 ${confidence ? `<span class="review-badge">Βεβαιότητα αντιστοίχισης: ${escapeHtml(confidence)}</span>` : ''}
                 ${status ? `<span class="review-badge">Κατάσταση: ${escapeHtml(status)}</span>` : ''}
                 <span class="review-badge">${escapeHtml(reviewText)}</span>
@@ -1189,22 +1188,6 @@ function ensureReviewTableStructure() {
     const table = document.getElementById('resultsTable');
 
     if (!table) return;
-
-    table.querySelectorAll('thead tr').forEach((tr) => {
-        const headers = Array.from(tr.children);
-
-        if (headers.some((th) => th.dataset.autoColumn === 'apoysies')) return;
-
-        const hoursHeader = headers.find((th) => th.textContent.trim() === 'Ώρες');
-
-        if (!hoursHeader) return;
-
-        const th = document.createElement('th');
-        th.dataset.autoColumn = 'apoysies';
-        th.textContent = 'Απουσίες';
-
-        hoursHeader.after(th);
-    });
 
     if (!document.getElementById('reviewDynamicCellStyles')) {
         const style = document.createElement('style');
@@ -2008,25 +1991,15 @@ function renderDeviationNoteCell(dev) {
               formatDate(dev.seventh_day_date)
           )}</div>`
         : '';
-    const sixthDayReasonLabels = {
-        MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE:
-            'Λείπει ή δεν είναι έγκυρο το ποσοστό προσαύξησης 6ης ημέρας.',
-        ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION:
-            'Το ποσοστό προσαύξησης 6ης ημέρας είναι μηδενικό χωρίς έγκυρη εξαίρεση.',
-        SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC:
-            'Δεν μπορεί να επιλεγεί με ασφάλεια η ημερομηνία της 6ης ημέρας.'
-    };
-    const sixthDayDecisionText = Array.isArray(dev.sixth_seventh_day_reasons)
-        ? dev.sixth_seventh_day_reasons
-              .map((reason) => sixthDayReasonLabels[reason] || reason)
-              .filter(Boolean)
-              .map(
-                  (reason) =>
-                      `<div class="small text-warning-emphasis">${escapeHtml(reason)}</div>`
-              )
-              .join('')
+    const reasonMessages = reviewHrReasonMessages([
+        ...(Array.isArray(dev.sixth_seventh_day_reasons) ? dev.sixth_seventh_day_reasons : []),
+        ...(Array.isArray(dev.repo_transfer_reasons) ? dev.repo_transfer_reasons : []),
+        ...(Array.isArray(dev.canonical_reasons) ? dev.canonical_reasons : [])
+    ]);
+    const sixthDayDecisionText = renderReviewHrReasonList(reasonMessages);
+    const noteText = dev.note && !looksLikeInternalReviewCode(dev.note)
+        ? `<div>${escapeHtml(dev.note)}</div>`
         : '';
-    const noteText = dev.note ? `<div>${escapeHtml(dev.note)}</div>` : '';
 
     return sixthDayText || seventhDayText || sixthDayDecisionText || noteText
         ? `${sixthDayText}${seventhDayText}${sixthDayDecisionText}${noteText}`
@@ -2080,12 +2053,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
                     <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
                     <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
-                    <td>${renderDeviationNoteCell(dev)}${
-                        dev.repo_transfer_status === 'NEEDS_REVIEW' &&
-                        Array.isArray(dev.repo_transfer_reasons) && dev.repo_transfer_reasons.length
-                            ? `<div class="small text-muted mt-1">${escapeHtml(dev.repo_transfer_reasons.join(', '))}</div>`
-                            : ''
-                    }${dev.status === 'NEEDS_HR_DECISION'
+                    <td>${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION'
                         ? `<div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary canonical-decision-open"
                             data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
                             data-ypokatasthma="${escapeHtml(dev.ypokatasthma || '')}"
@@ -2114,7 +2082,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                             <th class="text-end">Πραγματικές ημέρες εργασίας</th>
                             <th class="text-end">6η ημέρα</th>
                             <th class="text-end">7η ημέρα/παράβαση</th>
-                            <th>Profile</th>
+                            <th>Τύπος απασχόλησης</th>
                             <th>Σχόλιο</th>
                         </tr>
                     </thead>
@@ -2145,9 +2113,9 @@ const canonicalStatusLabels = {
 
 const canonicalReasonLabels = {
     PROFILE_CHANGED_INSIDE_WEEK: 'Αλλαγή όρων εργασίας μέσα στην εβδομάδα',
-    CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση στοιχείων κάρτας',
+    CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.',
     CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC:
-        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι δύο ημέρες ανάπαυσης/ρεπό της εβδομάδας',
+        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό της εβδομάδας και απαιτείται έλεγχος.',
     CANONICAL_DECISION_STALE:
         'Η προηγούμενη απόφαση χρειάζεται επανέλεγχο επειδή άλλαξαν τα δεδομένα',
     CANONICAL_DECISION_CONFLICT: 'Υπάρχουν αντικρουόμενες αποφάσεις',
@@ -2205,7 +2173,7 @@ function canonicalStatusLabel(value) {
 }
 
 function canonicalReasonLabel(value) {
-    return canonicalReasonLabels[String(value || '').trim()] || 'Απαιτείται πρόσθετος έλεγχος';
+    return reviewHrReasonLabel(value);
 }
 
 function canonicalDecisionTypeLabel(value) {
@@ -4995,7 +4963,7 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
     MULTIPLE_SOURCE_CANDIDATES:
         'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
     MULTIPLE_TARGET_CANDIDATES:
-        'Βρέθηκαν περισσότερες από μία προδηλωμένες ημέρες χωρίς κάρτες. Απαιτείται έλεγχος πριν επιλεγεί ημέρα ρεπό.',
+        'Βρέθηκαν περισσότερες από μία πιθανές ημέρες για τη μεταφορά του ρεπό και απαιτείται επιλογή.',
     REPO_LIMIT_EXCEEDED:
         'Η αλλαγή θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ρεπό της εβδομάδας.',
     TARGET_LOCKED: 'Η προτεινόμενη ημέρα ρεπό είναι κλειδωμένη.',
@@ -5068,6 +5036,45 @@ function getAtomicRepoTransferDiagnosticCategory(code) {
 }
 
 const atomicRepoTransferUnknownDiagnosticLabel = 'Άλλη περίπτωση που χρειάζεται έλεγχο.';
+
+const reviewHrUnknownReasonLabel = 'Απαιτείται έλεγχος της περίπτωσης.';
+
+function looksLikeInternalReviewCode(value) {
+    return /^[A-Z][A-Z0-9_]+_[A-Z0-9_]+$/.test(String(value || '').trim());
+}
+
+function reviewHrReasonLabel(reason) {
+    const code = String(reason || '').trim();
+    if (!code) return '';
+    return canonicalReasonLabels[code] ||
+        atomicRepoTransferDiagnosticLabels[code] ||
+        reviewHrUnknownReasonLabel;
+}
+
+function reviewHrReasonMessages(reasons = []) {
+    const messages = [];
+    const seen = new Set();
+
+    reasons.forEach((reason) => {
+        const code = String(reason || '').trim();
+        if (!code || getAtomicRepoTransferDiagnosticCategory(code) === 'INFORMATIONAL_INTERNAL') {
+            return;
+        }
+        const message = reviewHrReasonLabel(code);
+        if (!message || seen.has(message)) return;
+        seen.add(message);
+        messages.push(message);
+    });
+
+    return messages;
+}
+
+function renderReviewHrReasonList(messages = []) {
+    if (!Array.isArray(messages) || messages.length === 0) return '';
+    return `<ul class="small text-warning-emphasis mb-0 ps-3">${messages
+        .map((message) => `<li>${escapeHtml(message)}</li>`)
+        .join('')}</ul>`;
+}
 
 function getOpenTrailingWeekDiagnosticLabel() {
     const periodEnd = String(
