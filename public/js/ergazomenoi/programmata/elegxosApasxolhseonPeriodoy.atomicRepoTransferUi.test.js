@@ -243,14 +243,140 @@ function testPersistedRepoCategoryOverridesDerivedLeave() {
 
     const derived = sandbox.resolveReviewApologistikoPresentation({
         kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
         cards_ores_ergasias: 0,
         noCardsDisplayStatus: 'ΑΔΕΙΑ',
         kathgoria_ergasias_apologistika: '',
-        repo_apologistika: false
+        repo_apologistika: false,
+        adeia: false,
+        kathgoria_adeias: '',
+        ores_apoysias: 0,
+        adeia_apologistika: false,
+        kathgoria_adeias_apologistika: ''
     }, { apologistikoText: '' });
-    assert.strictEqual(derived.text, 'ΑΔΕΙΑ');
-    assert.strictEqual(derived.className, 'cell-no-card-adeia');
+    assert.strictEqual(derived.text, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+    assert.strictEqual(derived.className, 'cell-adeia-suggestion');
     assert.strictEqual(derived.source, 'derived');
+}
+
+function testPossibleLeaveResolverAndModalPresentationContract() {
+    const derivedRow = {
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 0,
+        noCardsDisplayStatus: 'ΑΔΕΙΑ',
+        adeia: false,
+        kathgoria_adeias: '',
+        ores_apoysias: 0,
+        adeia_apologistika: false,
+        kathgoria_adeias_apologistika: ''
+    };
+    assert.strictEqual(
+        sandbox.resolvePossibleLeavePresentationState(derivedRow),
+        'DERIVED_POSSIBLE_LEAVE'
+    );
+    const derivedHtml = sandbox.renderApologistikaFields(derivedRow);
+    assert.ok(getVisibleText(derivedHtml).includes('ΠΙΘΑΝΗ ΑΔΕΙΑ'));
+    assert.ok(derivedHtml.includes('data-derived-possible-leave="true"'));
+    assert.ok(derivedHtml.includes('data-presentation-value="POSSIBLE_LEAVE"'));
+    assert.ok(derivedHtml.includes('id="edit_kathgoria_adeias_apologistika_hidden"\n                        value=""'));
+    assert.ok(!/id="edit_adeia_apologistika"[^>]*checked/s.test(derivedHtml));
+
+    const persistedRow = {
+        ...derivedRow,
+        kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE'
+    };
+    assert.strictEqual(
+        sandbox.resolvePossibleLeavePresentationState(persistedRow),
+        'PERSISTED_POSSIBLE_LEAVE'
+    );
+    const persistedHtml = sandbox.renderApologistikaFields(persistedRow);
+    assert.ok(getVisibleText(persistedHtml).includes('ΠΙΘΑΝΗ ΑΔΕΙΑ'));
+    assert.ok(persistedHtml.includes('value="POSSIBLE_LEAVE"'));
+    assert.ok(!/id="edit_adeia_apologistika"[^>]*checked/s.test(persistedHtml));
+
+    const confirmedRow = {
+        ...derivedRow,
+        adeia: true,
+        adeia_apologistika: true,
+        kathgoria_adeias: 'ΚΑΝΟΝΙΚΗ',
+        kathgoria_adeias_apologistika: 'ΚΑΝΟΝΙΚΗ',
+        leave_provenance: 'HR_DECLARED_LEAVE'
+    };
+    assert.strictEqual(
+        sandbox.resolvePossibleLeavePresentationState(confirmedRow),
+        'CONFIRMED_LEAVE'
+    );
+    assert.strictEqual(
+        sandbox.resolveReviewApologistikoPresentation(confirmedRow, {}).text,
+        'ΑΔΕΙΑ'
+    );
+}
+
+function testPossibleLeaveValidationAndTomSelectCheckboxContract() {
+    const errors = sandbox.validateReviewSave({
+        adeia_apologistika: true,
+        kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE',
+        repo_apologistika: false
+    });
+    assert.ok(errors.some((error) => error.includes(
+        'Η ΠΙΘΑΝΗ ΑΔΕΙΑ δεν αποτελεί επιβεβαιωμένη άδεια'
+    )));
+
+    const listeners = {};
+    const select = { dataset: { api: '/test' }, tomselect: null };
+    const hidden = {
+        value: '',
+        dataset: {
+            derivedPossibleLeave: 'true',
+            presentationValue: 'POSSIBLE_LEAVE'
+        }
+    };
+    const checkbox = {
+        checked: true,
+        addEventListener: (name, handler) => { listeners[name] = handler; }
+    };
+    elementsById.set('edit_kathgoria_adeias_apologistika', select);
+    elementsById.set('edit_kathgoria_adeias_apologistika_hidden', hidden);
+    elementsById.set('edit_adeia_apologistika', checkbox);
+
+    let config;
+    const instance = {
+        options: [],
+        value: '',
+        addOption(option) { this.options.push(option); },
+        setValue(value) { this.value = value; },
+        clear() { this.value = ''; }
+    };
+    sandbox.TomSelect = function (_select, options) {
+        config = options;
+        options.onInitialize.call(instance);
+        return instance;
+    };
+
+    sandbox.initModalKathgoriaAdeiasTomSelect();
+    assert.strictEqual(instance.value, 'POSSIBLE_LEAVE');
+    assert.strictEqual(instance.options[0].label, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+    assert.strictEqual(checkbox.checked, false);
+    assert.strictEqual(hidden.value, '');
+
+    config.onChange.call(instance, 'POSSIBLE_LEAVE');
+    assert.strictEqual(checkbox.checked, false);
+    config.onChange.call(instance, 'ΚΑΝΟΝΙΚΗ');
+    assert.strictEqual(checkbox.checked, true);
+    assert.strictEqual(hidden.value, 'ΚΑΝΟΝΙΚΗ');
+
+    hidden.value = 'POSSIBLE_LEAVE';
+    hidden.dataset.presentationValue = 'POSSIBLE_LEAVE';
+    checkbox.checked = true;
+    listeners.change();
+    assert.strictEqual(hidden.value, '');
+    assert.strictEqual(instance.value, '');
+
+    delete sandbox.TomSelect;
+    ['edit_kathgoria_adeias_apologistika',
+        'edit_kathgoria_adeias_apologistika_hidden',
+        'edit_adeia_apologistika'].forEach((id) => elementsById.delete(id));
 }
 
 function testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation() {
@@ -3137,6 +3263,8 @@ const tests = [
     testWeeklyResolutionShowsRepoAndSixthDayFacts,
     testSixthDayCardsBadgeShowsApplicableRate,
     testPersistedRepoCategoryOverridesDerivedLeave,
+    testPossibleLeaveResolverAndModalPresentationContract,
+    testPossibleLeaveValidationAndTomSelectCheckboxContract,
     testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation,
     testContractualEmploymentTypeWinsOverOperationalPhaseForRestDisplay,
     testPersistedAnWithCardsIsNotBlanketRepoPresentation,

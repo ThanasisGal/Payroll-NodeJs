@@ -16,7 +16,11 @@ assert.match(calculation, /hasAuthoritativeLeave[\s\S]*update\.adeia_apologistik
 assert.match(ui, /Κατάσταση:<\/strong> ΠΙΘΑΝΗ ΑΔΕΙΑ/);
 assert.match(ui, /adeia_apologistika: false/);
 assert.match(ui, /data-api="\/api\/dropdown\/ergazomenoi\/kathgoria_adeias"/);
-assert.match(ui, /\? 'POSSIBLE_LEAVE' : ''/);
+assert.match(ui, /function resolvePossibleLeavePresentationState\(row = \{\}\)/);
+assert.match(ui, /DERIVED_POSSIBLE_LEAVE/);
+assert.match(ui, /PERSISTED_POSSIBLE_LEAVE/);
+assert.match(ui, /data-derived-possible-leave/);
+assert.match(ui, /Η ΠΙΘΑΝΗ ΑΔΕΙΑ δεν αποτελεί επιβεβαιωμένη άδεια/);
 assert.ok(!(controller + ui).includes(['review', 'classification', 'apologistika'].join('_')));
 const calc = controller.slice(controller.indexOf('static calcApasxolhseisPeriodoy = async'),
     controller.indexOf('static getCalcApasxolhseisPeriodoyProgress'));

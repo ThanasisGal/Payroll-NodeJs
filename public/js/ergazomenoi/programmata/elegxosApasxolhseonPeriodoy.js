@@ -2426,10 +2426,19 @@ function attachScenarioClassifications(rows = [], scenarioByProdhlomenaId = new 
     });
 }
 
-function isAutoCalculatedLeavePresentation(row = {}) {
+const possibleLeavePresentationStates = Object.freeze({
+    NONE: 'NONE',
+    DERIVED: 'DERIVED_POSSIBLE_LEAVE',
+    PERSISTED: 'PERSISTED_POSSIBLE_LEAVE',
+    LEGACY: 'LEGACY_AUTO_CALCULATED_POSSIBLE_LEAVE',
+    CONFIRMED: 'CONFIRMED_LEAVE'
+});
+
+function matchesLegacyAutoCalculatedLeavePresentation(row = {}) {
     const provenance = String(row.leave_provenance || '').trim();
-    if (provenance === 'POSSIBLE_LEAVE') return true;
-    if (provenance === 'AUTO_CALCULATED_LEAVE') return true;
+    if (provenance === 'POSSIBLE_LEAVE' || provenance === 'AUTO_CALCULATED_LEAVE') {
+        return true;
+    }
     if (provenance === 'HR_DECLARED_LEAVE') return false;
     if (row.is_auto_calculated_leave === true) return true;
 
@@ -2451,6 +2460,61 @@ function isAutoCalculatedLeavePresentation(row = {}) {
         !hasMeaningfulValue(row.kathgoria_adeias) &&
         num(row.ores_apoysias) === 0
     );
+}
+
+function resolvePossibleLeavePresentationState(row = {}) {
+    const persistedLeaveCategory = String(
+        row.kathgoria_adeias_apologistika || ''
+    ).trim();
+    const declaredLeaveCategory = String(row.kathgoria_adeias || '').trim();
+    const provenance = String(row.leave_provenance || '').trim();
+
+    if (persistedLeaveCategory === 'POSSIBLE_LEAVE') {
+        return possibleLeavePresentationStates.PERSISTED;
+    }
+
+    if (matchesLegacyAutoCalculatedLeavePresentation(row)) {
+        return possibleLeavePresentationStates.LEGACY;
+    }
+
+    const hasConfirmedLeave =
+        provenance === 'HR_DECLARED_LEAVE' ||
+        row.adeia === true ||
+        row.adeia_apologistika === true ||
+        hasMeaningfulValue(declaredLeaveCategory) ||
+        (hasMeaningfulValue(persistedLeaveCategory) &&
+            persistedLeaveCategory !== 'POSSIBLE_LEAVE') ||
+        num(row.ores_apoysias) > 0 ||
+        num(row.ores_apoysias_apologistika) > 0 ||
+        num(row.ores_adeias_pistomenes_apologistika) > 0;
+
+    if (hasConfirmedLeave) {
+        return possibleLeavePresentationStates.CONFIRMED;
+    }
+
+    const declaredCategory = String(
+        row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
+    ).trim();
+    const hasDeclaredWork =
+        declaredCategory === 'ΕΡΓ' &&
+        (num(row.ores_ergasias) > 0 ||
+            [1, 2, 3].some((number) => {
+                const pair = pairNo(number);
+                return (
+                    hasMeaningfulValue(row[`apo_ora_${pair}`]) ||
+                    hasMeaningfulValue(row[`eos_ora_${pair}`])
+                );
+            }));
+    const hasCards = num(row.cards_ores_ergasias) > 0 || hasValidCardInterval(row);
+    const noCardsDisplayStatus = String(
+        row.noCardsDisplayStatus || row.no_cards_display_status || ''
+    ).trim();
+
+    if (hasDeclaredWork && !hasCards && noCardsDisplayStatus === 'ΑΔΕΙΑ') {
+        return possibleLeavePresentationStates.DERIVED;
+    }
+
+    return possibleLeavePresentationStates.NONE;
 }
 
 function resolveReviewIsFullTimePresentation(row = {}) {
@@ -2490,6 +2554,7 @@ function resolveReviewIsFullTimePresentation(row = {}) {
 }
 
 function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
+    const possibleLeaveState = resolvePossibleLeavePresentationState(row);
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
     ).trim();
@@ -2539,11 +2604,23 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
         };
     }
 
-    if (isAutoCalculatedLeavePresentation(row)) {
+    if (
+        possibleLeaveState === possibleLeavePresentationStates.DERIVED ||
+        possibleLeaveState === possibleLeavePresentationStates.PERSISTED ||
+        possibleLeaveState === possibleLeavePresentationStates.LEGACY
+    ) {
         return {
             text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
             className: 'cell-adeia-suggestion',
             source: 'derived'
+        };
+    }
+
+    if (possibleLeaveState === possibleLeavePresentationStates.CONFIRMED) {
+        return {
+            text: 'ΑΔΕΙΑ',
+            className: 'cell-no-card-adeia',
+            source: 'persisted'
         };
     }
 
@@ -7446,12 +7523,16 @@ function renderEditableApologistikaRows(row) {
 }
 
 function renderApologistikaFields(row) {
-    const possibleLeave = isAutoCalculatedLeavePresentation(row);
+    const possibleLeaveState = resolvePossibleLeavePresentationState(row);
+    const possibleLeave = [
+        possibleLeavePresentationStates.DERIVED,
+        possibleLeavePresentationStates.PERSISTED,
+        possibleLeavePresentationStates.LEGACY
+    ].includes(possibleLeaveState);
+    const derivedPossibleLeave = possibleLeaveState === possibleLeavePresentationStates.DERIVED;
     const displayRow = possibleLeave
         ? { ...row, adeia_apologistika: false,
-            kathgoria_adeias_apologistika:
-                String(row.kathgoria_adeias_apologistika || '').trim() === 'POSSIBLE_LEAVE'
-                    ? 'POSSIBLE_LEAVE' : '' }
+            kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' }
         : row;
     const numberFields = [
         ['Ώρες εργασίας', 'ores_ergasias_apologistika'],
@@ -7542,7 +7623,9 @@ function renderApologistikaFields(row) {
                         type="hidden"
                         name="edit_kathgoria_adeias_apologistika_hidden"
                         id="edit_kathgoria_adeias_apologistika_hidden"
-                        value="${displayRow.kathgoria_adeias_apologistika || ''}"
+                        value="${derivedPossibleLeave ? '' : (displayRow.kathgoria_adeias_apologistika || '')}"
+                        data-derived-possible-leave="${derivedPossibleLeave ? 'true' : 'false'}"
+                        data-presentation-value="${displayRow.kathgoria_adeias_apologistika || ''}"
                     />
 
                     <select
@@ -7555,6 +7638,7 @@ function renderApologistikaFields(row) {
                         data-preselect="edit_kathgoria_adeias_apologistika_hidden"
                         data-preload-all="true"
                         data-pad-length="6">
+                        ${possibleLeave ? '<option value="POSSIBLE_LEAVE" selected>ΠΙΘΑΝΗ ΑΔΕΙΑ</option>' : ''}
                     </select>
                 </div>
         </div>
@@ -7813,6 +7897,15 @@ function validateReviewSave(updates) {
 
     if (updates.adeia_apologistika === true && !updates.kathgoria_adeias_apologistika) {
         errors.push('Όταν υπάρχει Άδεια, πρέπει να συμπληρωθεί Κατηγορία άδειας απολογιστικά.');
+    }
+
+    if (
+        updates.adeia_apologistika === true &&
+        updates.kathgoria_adeias_apologistika === 'POSSIBLE_LEAVE'
+    ) {
+        errors.push(
+            'Η ΠΙΘΑΝΗ ΑΔΕΙΑ δεν αποτελεί επιβεβαιωμένη άδεια. Επιλέξτε πραγματική κατηγορία άδειας.'
+        );
     }
 
     if (updates.repo_apologistika === true && updates.adeia_apologistika === true) {
@@ -8219,6 +8312,9 @@ function initModalKathgoriaAdeiasTomSelect() {
         return;
     }
 
+    const categoryLabel = (value, fallback = '') =>
+        value === 'POSSIBLE_LEAVE' ? 'ΠΙΘΑΝΗ ΑΔΕΙΑ' : (fallback || value);
+
     const tomSelect = new TomSelect(select, {
         valueField: 'value',
         labelField: 'label',
@@ -8247,10 +8343,10 @@ function initModalKathgoriaAdeiasTomSelect() {
                 const options = rawOptions.map((item) => {
                     const value = item.value || item.kodikos || item.id || '';
 
-                    const label =
+                    const label = categoryLabel(value,
                         item.label ||
                         item.text ||
-                        `${item.kodikos || value} - ${item.perigrafh || ''}`;
+                        `${item.kodikos || value} - ${item.perigrafh || ''}`);
 
                     return {
                         ...item,
@@ -8267,36 +8363,60 @@ function initModalKathgoriaAdeiasTomSelect() {
         },
 
         onInitialize: function () {
-            const value = hidden.value || '';
+            const value = hidden.dataset.presentationValue || hidden.value || '';
 
             if (value) {
                 this.addOption({
                     value,
-                    label: value
+                    label: categoryLabel(value)
                 });
 
                 this.setValue(value, true);
 
                 if (adeiaCheckbox) {
-                    adeiaCheckbox.checked = true;
+                    adeiaCheckbox.checked = value !== 'POSSIBLE_LEAVE';
                 }
             }
         },
 
         onChange: function (value) {
             hidden.value = value || '';
+            hidden.dataset.derivedPossibleLeave = 'false';
+            hidden.dataset.presentationValue = value || '';
 
             if (adeiaCheckbox) {
-                adeiaCheckbox.checked = !!value;
+                adeiaCheckbox.checked = Boolean(value) && value !== 'POSSIBLE_LEAVE';
             }
         }
     });
 
     if (adeiaCheckbox) {
         adeiaCheckbox.addEventListener('change', () => {
+            if (
+                adeiaCheckbox.checked &&
+                (hidden.value === 'POSSIBLE_LEAVE' ||
+                    hidden.dataset.presentationValue === 'POSSIBLE_LEAVE')
+            ) {
+                hidden.value = '';
+                hidden.dataset.derivedPossibleLeave = 'false';
+                hidden.dataset.presentationValue = '';
+                tomSelect.clear(true);
+                return;
+            }
+
             if (!adeiaCheckbox.checked) {
                 hidden.value = '';
-                tomSelect.clear(true);
+                if (hidden.dataset.derivedPossibleLeave === 'true') {
+                    hidden.dataset.presentationValue = 'POSSIBLE_LEAVE';
+                    tomSelect.addOption({
+                        value: 'POSSIBLE_LEAVE',
+                        label: 'ΠΙΘΑΝΗ ΑΔΕΙΑ'
+                    });
+                    tomSelect.setValue('POSSIBLE_LEAVE', true);
+                } else {
+                    hidden.dataset.presentationValue = '';
+                    tomSelect.clear(true);
+                }
             }
         });
     }

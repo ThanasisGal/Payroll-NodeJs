@@ -51,6 +51,21 @@ async function loadOperationalState(page) {
             ores_ergasias: 8,
             cards_ores_ergasias: 8,
             effective_is_full_time: true
+        }, {
+            _id: 'derived-possible-leave-row',
+            kodikos: '001', ypokatasthma: '0001', eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΧΡΗΣΤΗΣ',
+            hmeromhnia: '2026-06-04', kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+            cards_ores_ergasias: 0, noCardsDisplayStatus: 'ΑΔΕΙΑ', adeia: false,
+            kathgoria_adeias: '', ores_apoysias: 0, adeia_apologistika: false,
+            kathgoria_adeias_apologistika: '', effective_is_full_time: true
+        }, {
+            _id: 'confirmed-leave-row',
+            kodikos: '001', ypokatasthma: '0001', eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΧΡΗΣΤΗΣ',
+            hmeromhnia: '2026-06-05', kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+            cards_ores_ergasias: 0, noCardsDisplayStatus: 'ΑΔΕΙΑ', adeia: true,
+            kathgoria_adeias: 'ΚΑΝΟΝΙΚΗ', adeia_apologistika: true,
+            kathgoria_adeias_apologistika: 'ΚΑΝΟΝΙΚΗ', leave_provenance: 'HR_DECLARED_LEAVE',
+            effective_is_full_time: true
         }];
         currentReviewDeviations = [{
             kodikos: '001', week_apo: '2026-06-01', week_eos: '2026-06-07',
@@ -132,6 +147,12 @@ async function renderedTableContract(page) {
         weeklyHeaders: Array.from(document.querySelectorAll('.employee-deviation-row table thead th'))
             .map((header) => header.textContent.trim()),
         weeklyVisibleText: document.querySelector('.employee-deviation-row')?.innerText || '',
+        possibleLeaveCell: document.querySelector(
+            '#resultsTable tr[data-date="2026-06-04"]'
+        )?.cells?.[5]?.innerText?.trim() || '',
+        confirmedLeaveCell: document.querySelector(
+            '#resultsTable tr[data-date="2026-06-05"]'
+        )?.cells?.[5]?.innerText?.trim() || '',
         scenarioVisibleText: document.getElementById('scenarioDetailsTestHost')?.innerText || '',
         openWeekRenderedText: window.openWeekRenderedText || '',
         weeklyRowCount: document.querySelectorAll('.employee-deviation-row tbody > tr').length
@@ -156,6 +177,71 @@ async function actionableIssueInteraction(page) {
             '#resultsTable .employee-deviation-row tbody > tr[data-week-start="2026-06-01"]'
         ).evaluate((row) => row.classList.contains('actionable-issue-target-highlight'))
     };
+}
+
+async function canonicalDecisionButtonStyles(page) {
+    const button = page.locator('#resultsTable .canonical-decision-open');
+    const normal = await button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, color: style.color };
+    });
+    await button.hover();
+    await page.waitForTimeout(250);
+    const hover = await button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, color: style.color };
+    });
+    return { text: (await button.innerText()).trim(), normal, hover };
+}
+
+async function possibleLeaveModalContract(page) {
+    return page.evaluate(async () => {
+        let mutationCount = 0;
+        window.fetch = async (_url, options = {}) => {
+            if (String(options.method || 'GET').toUpperCase() !== 'GET') mutationCount++;
+            return { json: async () => ({ results: [] }) };
+        };
+        window.bootstrap = {
+            Modal: class {
+                constructor(element) { this.element = element; }
+                show() {
+                    this.element.classList.add('show');
+                    this.element.style.display = 'block';
+                }
+                static getInstance() { return null; }
+            }
+        };
+        showDetailsModal({
+            _id: 'possible-leave-row',
+            kodikos: '0005',
+            ypokatasthma: '0001',
+            eponymo: 'ΚΑΡΝΑΒΑΤΟΠΟΥΛΟΥ',
+            onoma: 'ΣΩΤΗΡΙΑ',
+            hmeromhnia: '2026-06-04',
+            kathgoria_ergasias: 'ΕΡΓ',
+            ores_ergasias: 8,
+            cards_ores_ergasias: 0,
+            noCardsDisplayStatus: 'ΑΔΕΙΑ',
+            adeia: false,
+            kathgoria_adeias: '',
+            ores_apoysias: 0,
+            adeia_apologistika: false,
+            kathgoria_adeias_apologistika: ''
+        });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        const modal = document.getElementById('detailsModal');
+        const hidden = document.getElementById('edit_kathgoria_adeias_apologistika_hidden');
+        return {
+            visibleText: modal.innerText,
+            categoryOption: document.querySelector(
+                '#edit_kathgoria_adeias_apologistika option:checked'
+            )?.textContent?.trim() || '',
+            leaveChecked: document.getElementById('edit_adeia_apologistika')?.checked,
+            persistedValue: hidden?.value,
+            derived: hidden?.dataset?.derivedPossibleLeave,
+            mutationCount
+        };
+    });
 }
 
 async function geometry(page) {
@@ -233,6 +319,8 @@ async function modalGeometry(page) {
             assert.ok(tableContract.weeklyHeaders.includes('Τύπος απασχόλησης'));
             assert.ok(!tableContract.weeklyHeaders.includes('Profile'));
             assert.strictEqual(tableContract.weeklyRowCount, 1);
+            assert.strictEqual(tableContract.possibleLeaveCell, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+            assert.strictEqual(tableContract.confirmedLeaveCell, 'ΑΔΕΙΑ');
             assert.ok(!tableContract.openWeekRenderedText.includes('Αναμονή ολοκλήρωσης'));
             assert.ok(!tableContract.openWeekRenderedText.includes(
                 'δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή'
@@ -269,6 +357,13 @@ async function modalGeometry(page) {
                 .forEach((text) => assert.ok(issueInteraction.panelText.includes(text), text));
             assert.strictEqual(issueInteraction.employeeExpanded, 'true');
             assert.strictEqual(issueInteraction.weeklyHighlighted, true);
+            const actionButton = await canonicalDecisionButtonStyles(page);
+            assert.strictEqual(actionButton.text, 'Καταγραφή απόφασης');
+            assert.strictEqual(actionButton.normal.background, 'rgb(207, 226, 255)');
+            assert.strictEqual(actionButton.normal.color, 'rgb(8, 66, 152)');
+            assert.strictEqual(actionButton.hover.background, 'rgb(13, 110, 253)');
+            assert.strictEqual(actionButton.hover.color, 'rgb(255, 255, 255)');
+            await page.evaluate(() => window.scrollTo(0, 0));
             const result = await geometry(page);
             measurements.push({ viewport: `${width}x${height}`, ...result });
             assert.ok(result.lifecycle && result.pending && result.cardFooter);
@@ -279,6 +374,17 @@ async function modalGeometry(page) {
             if (width <= 1440) assert.strictEqual(result.tableHorizontalScroll, true,
                 `${width}x${height}: table must scroll horizontally inside its wrapper`);
         }
+
+        await page.setViewportSize({ width: 1366, height: 768 });
+        await loadOperationalState(page);
+        const possibleLeaveModal = await possibleLeaveModalContract(page);
+        assert.ok(possibleLeaveModal.visibleText.includes('ΠΙΘΑΝΗ ΑΔΕΙΑ'));
+        assert.ok(!possibleLeaveModal.visibleText.includes('POSSIBLE_LEAVE'));
+        assert.strictEqual(possibleLeaveModal.categoryOption, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+        assert.strictEqual(possibleLeaveModal.leaveChecked, false);
+        assert.strictEqual(possibleLeaveModal.persistedValue, '');
+        assert.strictEqual(possibleLeaveModal.derived, 'true');
+        assert.strictEqual(possibleLeaveModal.mutationCount, 0);
 
         for (const [width, height] of [[1366, 768], [1648, 920], [1920, 1080]]) {
             await page.setViewportSize({ width, height });
