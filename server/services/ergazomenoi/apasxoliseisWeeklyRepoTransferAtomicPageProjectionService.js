@@ -35,6 +35,27 @@ const INPUT_REASON = Object.freeze({
     DATE_RANGE_EXCEEDS_LIMIT: 'ATOMIC_DATE_RANGE_EXCEEDS_LIMIT'
 });
 
+const INFORMATIONAL_ISSUE_CODES = new Set([
+    'NO_SOURCE_CANDIDATE',
+    'OPEN_WEEK_PENDING_COMPLETION',
+    'PARTIAL_WEEK_OUTSIDE_FILTER_RANGE',
+    'NO_TARGET_CANDIDATE',
+    'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+]);
+
+const HUMAN_REVIEW_ISSUE_CODES = new Set([
+    'PROFILE_CHANGED_INSIDE_WEEK',
+    'CARD_VERIFICATION_PENDING',
+    'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+    'MULTIPLE_SOURCE_CANDIDATES',
+    'MULTIPLE_TARGET_CANDIDATES',
+    'REPO_DEFICIT_REMAINS',
+    'REPO_LIMIT_EXCEEDED',
+    'SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC',
+    'SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT',
+    'SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'
+]);
+
 function isPlainObject(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const prototype = Object.getPrototypeOf(value);
@@ -135,6 +156,21 @@ function bucketIdentity(row, rowDateKey) {
     };
 }
 
+function inputDiagnostic(reason, identity = {}) {
+    return {
+        reason,
+        team: primitiveString(identity.team),
+        company_kod: primitiveString(identity.companyKod ?? identity.company_kod),
+        ypokatasthma: primitiveString(identity.ypokatasthma, 100),
+        employee_kodikos: primitiveString(
+            identity.employeeKodikos ?? identity.employee_kodikos,
+            100
+        ),
+        week_start: dateKeyUtc(identity.weekStart ?? identity.week_start),
+        week_end: dateKeyUtc(identity.weekEnd ?? identity.week_end)
+    };
+}
+
 function buildWeeklyRepoTransferAtomicInputs({
     rows = [],
     periodStart = null,
@@ -148,6 +184,7 @@ function buildWeeklyRepoTransferAtomicInputs({
 } = {}) {
     const weeklyInputs = [];
     const inputReasonCodes = [];
+    const inputDiagnostics = [];
 
     const rangeDiagnostic = getAtomicPeriodRangeDiagnostic({
         periodStart: validationPeriodStart,
@@ -155,7 +192,7 @@ function buildWeeklyRepoTransferAtomicInputs({
     });
     if (rangeDiagnostic) {
         inputReasonCodes.push(rangeDiagnostic);
-        return { weeklyInputs, inputReasonCodes };
+        return { weeklyInputs, inputReasonCodes, inputDiagnostics };
     }
     const periodStartKey = dateKeyUtc(periodStart);
     const periodEndKey = dateKeyUtc(periodEnd);
@@ -178,16 +215,19 @@ function buildWeeklyRepoTransferAtomicInputs({
         .forEach((bucket) => {
             if (asOfDateKey && bucket.weekEnd >= asOfDateKey) {
                 inputReasonCodes.push(INPUT_REASON.OPEN_WEEK);
+                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.OPEN_WEEK, bucket));
                 return;
             }
             if (bucket.weekEnd > periodEndKey) {
                 inputReasonCodes.push(INPUT_REASON.PARTIAL_WEEK);
+                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.PARTIAL_WEEK, bucket));
                 return;
             }
 
             const dateKeys = bucket.rows.map((entry) => entry.dateKey);
             if (new Set(dateKeys).size !== dateKeys.length) {
                 inputReasonCodes.push(INPUT_REASON.DUPLICATE_DATE);
+                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.DUPLICATE_DATE, bucket));
                 return;
             }
 
@@ -199,6 +239,7 @@ function buildWeeklyRepoTransferAtomicInputs({
                 expectedDateKeys.some((dateKey) => !dateKeys.includes(dateKey))
             ) {
                 inputReasonCodes.push(INPUT_REASON.INCOMPLETE_WEEK);
+                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.INCOMPLETE_WEEK, bucket));
                 return;
             }
 
@@ -215,6 +256,7 @@ function buildWeeklyRepoTransferAtomicInputs({
                     : null;
             if (!isPlainObject(employmentProfile)) {
                 inputReasonCodes.push(INPUT_REASON.PROFILE_NOT_RESOLVED);
+                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.PROFILE_NOT_RESOLVED, bucket));
                 return;
             }
 
@@ -225,11 +267,12 @@ function buildWeeklyRepoTransferAtomicInputs({
                     .map((entry) => entry.row),
                 employmentProfile,
                 holidayByDateKey,
-                existingAuditCountByRowKey
+                existingAuditCountByRowKey,
+                diagnosticContext: inputDiagnostic(null, bucket)
             });
         });
 
-    return { weeklyInputs, inputReasonCodes };
+    return { weeklyInputs, inputReasonCodes, inputDiagnostics };
 }
 
 function incrementCounts(target, values) {
@@ -262,6 +305,122 @@ function scopedEmployeeIdentity({
     return parts[0] && parts[1] && parts[3]
         ? [parts[0], parts[1], parts[2] || '', parts[3]].join('|')
         : null;
+}
+
+function issueCategory(issueCode) {
+    return HUMAN_REVIEW_ISSUE_CODES.has(issueCode)
+        ? 'HUMAN_REVIEW_REQUIRED'
+        : 'ACTION_REQUIRED';
+}
+
+function isActionableIssueCode(issueCode) {
+    const code = primitiveString(issueCode, 160);
+    return Boolean(code && !INFORMATIONAL_ISSUE_CODES.has(code));
+}
+
+function weeklyCaseContext(weeklyInput = {}, projection = {}) {
+    const rows = Array.isArray(weeklyInput.weekRows) ? weeklyInput.weekRows : [];
+    const firstRow = rows[0] || {};
+    const identity = weeklyInput.diagnosticContext || {};
+    const weekStart = dateKeyUtc(identity.week_start || startOfWeekMondayUtc(firstRow.hmeromhnia));
+    const weekEnd = dateKeyUtc(identity.week_end || (weekStart && addDaysDateKey(weekStart, 6)));
+    const relatedDates = rows.map((row) => dateKeyUtc(row?.hmeromhnia)).filter(Boolean).sort();
+    const rowIds = rows
+        .map((row) => primitiveString(row?._id ?? row?.id, 100))
+        .filter(Boolean);
+    const cardIntervals = rows.flatMap((row) => [1, 2, 3].map((index) => {
+        const pair = String(index).padStart(2, '0');
+        const from = primitiveString(row?.[`cards_apo_ora_${pair}`], 20);
+        const to = primitiveString(row?.[`cards_eos_ora_${pair}`], 20);
+        return from || to ? { date: dateKeyUtc(row?.hmeromhnia), from, to } : null;
+    }).filter(Boolean));
+    const cardHours = rows.reduce((total, row) => {
+        const value = Number(String(row?.cards_ores_ergasias ?? '').replace(',', '.'));
+        return total + (Number.isFinite(value) ? value : 0);
+    }, 0);
+
+    return {
+        team: primitiveString(identity.team ?? firstRow.team),
+        company_kod: primitiveString(identity.company_kod ?? firstRow.company_kod),
+        ypokatasthma: primitiveString(identity.ypokatasthma ?? firstRow.ypokatasthma, 100),
+        employee_kodikos: primitiveString(
+            identity.employee_kodikos ?? firstRow.kodikos,
+            100
+        ),
+        week_start: weekStart,
+        week_end: weekEnd,
+        related_dates: relatedDates,
+        row_ids: rowIds,
+        card_hours: Number(cardHours.toFixed(4)),
+        card_intervals: cardIntervals,
+        weekly_repo_facts: isPlainObject(projection.repo_resolution)
+            ? clonePlain(projection.repo_resolution)
+            : null,
+        sixth_seventh_day_facts: isPlainObject(projection.repo_resolution?.sixth_seventh_day)
+            ? clonePlain(projection.repo_resolution.sixth_seventh_day)
+            : null
+    };
+}
+
+function actionableCaseIdentity(issueCase = {}) {
+    return JSON.stringify([
+        issueCase.team || '',
+        issueCase.company_kod || '',
+        issueCase.ypokatasthma || '',
+        issueCase.employee_kodikos || '',
+        issueCase.week_start || '',
+        issueCase.week_end || '',
+        issueCase.source?.hmeromhnia || issueCase.source_date || '',
+        issueCase.target?.hmeromhnia || issueCase.target_date || ''
+    ]);
+}
+
+function buildActionableIssueGroups({ inputDiagnostics = [], weeklyIssueCases = [], reviewOutcomes = [] } = {}) {
+    const groups = new Map();
+    const addCase = (issueCode, issueCase) => {
+        const code = primitiveString(issueCode, 160);
+        if (!isActionableIssueCode(code) || !isPlainObject(issueCase)) return;
+        if (!groups.has(code)) groups.set(code, new Map());
+        groups.get(code).set(actionableCaseIdentity(issueCase), clonePlain(issueCase));
+    };
+
+    (Array.isArray(inputDiagnostics) ? inputDiagnostics : []).forEach((diagnostic) => {
+        if (!diagnostic?.employee_kodikos || !diagnostic?.week_start) return;
+        addCase(diagnostic.reason, diagnostic);
+    });
+    (Array.isArray(weeklyIssueCases) ? weeklyIssueCases : []).forEach(({ reasons, issueCase }) => {
+        [...new Set(Array.isArray(reasons) ? reasons : [])]
+            .forEach((reason) => addCase(reason, issueCase));
+    });
+    (Array.isArray(reviewOutcomes) ? reviewOutcomes : []).forEach((outcome) => {
+        const reasons = Array.isArray(outcome?.blocked_target_reasons) &&
+            outcome.blocked_target_reasons.length
+            ? outcome.blocked_target_reasons
+            : [outcome?.outcome_code];
+        [...new Set(reasons)].forEach((reason) => addCase(reason, outcome));
+    });
+
+    return [...groups.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([issueCode, casesByIdentity]) => {
+            const cases = [...casesByIdentity.values()].sort((left, right) =>
+                String(left.week_start || '').localeCompare(String(right.week_start || '')) ||
+                String(left.ypokatasthma || '').localeCompare(String(right.ypokatasthma || '')) ||
+                String(left.employee_kodikos || '').localeCompare(
+                    String(right.employee_kodikos || ''),
+                    'el',
+                    { numeric: true, sensitivity: 'base' }
+                ) || actionableCaseIdentity(left).localeCompare(actionableCaseIdentity(right))
+            );
+            const employees = new Set(cases.map(scopedEmployeeIdentity).filter(Boolean));
+            return {
+                issue_code: issueCode,
+                category: issueCategory(issueCode),
+                count: cases.length,
+                employees_count: employees.size,
+                cases
+            };
+        });
 }
 
 function cloneAtomicGroup(group) {
@@ -303,7 +462,7 @@ function compareGroups(left, right) {
 }
 
 function buildWeeklyRepoTransferAtomicPageProjection(
-    { weeklyInputs = [], inputReasonCodes = [] } = {},
+    { weeklyInputs = [], inputReasonCodes = [], inputDiagnostics = [] } = {},
     {
         singleWeekProjectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection,
         presentationStart = null,
@@ -323,6 +482,7 @@ function buildWeeklyRepoTransferAtomicPageProjection(
     const warningCounts = {};
     const groupsById = new Map();
     const reviewOutcomes = [];
+    const weeklyIssueCases = [];
     const groupEmployeeIdentities = new Set();
     const summary = {
         weeks_evaluated: Array.isArray(weeklyInputs) ? weeklyInputs.length : 0,
@@ -348,6 +508,13 @@ function buildWeeklyRepoTransferAtomicPageProjection(
         });
         incrementCounts(reasonCounts, projection?.reasons);
         incrementCounts(warningCounts, projection?.warnings);
+        weeklyIssueCases.push({
+            reasons: [
+                ...(Array.isArray(projection?.reasons) ? projection.reasons : []),
+                ...(Array.isArray(projection?.warnings) ? projection.warnings : [])
+            ],
+            issueCase: weeklyCaseContext(weeklyInput, projection)
+        });
         (Array.isArray(projection?.review_outcomes) ? projection.review_outcomes : [])
             .forEach((outcome) => reviewOutcomes.push(clonePlain(outcome)));
 
@@ -460,6 +627,16 @@ function buildWeeklyRepoTransferAtomicPageProjection(
     summary.employees_count = employees.size;
     summary.review_outcomes_count = sortedReviewOutcomes.length;
     summary.review_outcome_employees_count = reviewEmployeeIdentities.size;
+    const actionableIssueGroups = buildActionableIssueGroups({
+        inputDiagnostics,
+        weeklyIssueCases,
+        reviewOutcomes: sortedReviewOutcomes
+    });
+    summary.actionable_issue_groups_count = actionableIssueGroups.length;
+    summary.actionable_issue_cases_count = actionableIssueGroups.reduce(
+        (total, issueGroup) => total + issueGroup.count,
+        0
+    );
 
     return deepFreeze({
         version: 1,
@@ -469,6 +646,7 @@ function buildWeeklyRepoTransferAtomicPageProjection(
         reason_counts: sortedCounts(reasonCounts),
         warning_counts: sortedCounts(warningCounts),
         review_outcomes: sortedReviewOutcomes,
+        actionable_issue_groups: actionableIssueGroups,
         groups
     });
 }
@@ -492,5 +670,6 @@ module.exports = {
     MAX_ATOMIC_PERIOD_DAYS,
     getAtomicPeriodRangeDiagnostic,
     buildCompanyWideUniqueEmployeeByKodikos,
-    isEmployeeCompatibleWithBranch
+    isEmployeeCompatibleWithBranch,
+    buildActionableIssueGroups
 };

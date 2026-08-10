@@ -52,7 +52,18 @@ async function loadOperationalState(page) {
             cards_ores_ergasias: 8,
             effective_is_full_time: true
         }];
-        currentReviewDeviations = [];
+        currentReviewDeviations = [{
+            kodikos: '001', week_apo: '2026-06-01', week_eos: '2026-06-07',
+            expected_repo: 2, actual_repo: 1, resolved_repo: 2, actual_workdays: 6,
+            sixth_day_count: 1, seventh_day_count: 0,
+            effective_typos_apasxolhshs: '0', effective_weekly_workdays: 5,
+            effective_expected_repo: 2, status: 'NEEDS_HR_DECISION',
+            repo_transfer_status: 'NEEDS_REVIEW',
+            repo_transfer_reasons: ['MULTIPLE_TARGET_CANDIDATES'],
+            canonical_reasons: ['CARD_VERIFICATION_PENDING',
+                'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', 'UNKNOWN_PRIVATE_REASON_CODE'],
+            note: 'Πραγματική ανθρώπινη σημείωση.'
+        }];
         currentPendingDeviationWeeks = [{
             kodikos: '001',
             status: 'OPEN_WEEK_PENDING_COMPLETION',
@@ -68,52 +79,28 @@ async function loadOperationalState(page) {
         document.getElementById('employmentPeriodControlDeadline').textContent = '31/07/2026';
         document.getElementById('historicalReconstructionBtn').classList.remove('d-none');
         const summary = document.getElementById('policyPreviewGroupsContainer');
-        summary.innerHTML = '<div class="employment-review-pending-summary"><strong>4 μεταφορές ρεπό προς απόφαση</strong></div>';
         const body = document.querySelector('#resultsTable tbody');
-        body.innerHTML = Array.from({ length: 80 }, (_, index) => `<tr>${Array.from(
+        body.insertAdjacentHTML('beforeend', Array.from({ length: 80 }, (_, index) => `<tr class="geometry-filler-row">${Array.from(
             { length: 13 },
             (_unused, cell) => `<td>${cell === 0 ? `0${(index % 9) + 1}/06/2026` : `Στοιχείο ${index + 1}-${cell + 1}`}</td>`
-        ).join('')}</tr>`).join('');
-        appendEmployeeTotalsRow(body, {
-            ores_ergasias_apologistika: 40,
-            ores_apoysias_apologistika: 0,
-            ores_nyxtas_apologistika: 0,
-            ores_argion_prosayxhsh_apologistika: 0,
-            ores_argion_ergasia_apologistika: 0,
-            ores_prostheths_ergasias_apologistika: 0,
-            yperergasia: 0,
-            nomimiYperoria: 0,
-            paranomiYperoria: 0
-        }, 'geometry-test');
-        appendEmployeeDeviationRows(body, [{
-            kodikos: '001',
-            status: 'OPEN_WEEK_PENDING_COMPLETION',
-            week_apo: '2026-06-01',
-            week_eos: '2026-06-07'
-        }, {
-            kodikos: '001',
-            week_apo: '2026-06-01',
-            week_eos: '2026-06-07',
-            expected_repo: 2,
-            actual_repo: 1,
-            resolved_repo: 2,
-            actual_workdays: 6,
-            sixth_day_count: 1,
-            seventh_day_count: 0,
-            effective_typos_apasxolhshs: '0',
-            effective_weekly_workdays: 5,
-            effective_expected_repo: 2,
-            status: 'NEEDS_HR_DECISION',
-            repo_transfer_status: 'NEEDS_REVIEW',
-            repo_transfer_reasons: ['MULTIPLE_TARGET_CANDIDATES'],
-            canonical_reasons: [
-                'CARD_VERIFICATION_PENDING',
-                'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
-                'UNKNOWN_PRIVATE_REASON_CODE'
-            ],
-            note: 'Πραγματική ανθρώπινη σημείωση.'
-        }], 'geometry-test');
-        body.querySelector('.employee-deviation-row')?.classList.remove('d-none');
+        ).join('')}</tr>`).join(''));
+        currentAtomicRepoTransferProjection = {
+            actionable_issue_groups: [{
+                issue_code: 'MULTIPLE_TARGET_CANDIDATES',
+                category: 'HUMAN_REVIEW_REQUIRED',
+                count: 1,
+                employees_count: 1,
+                cases: [{
+                    team: 'team-a', company_kod: 'company-a', ypokatasthma: '0001',
+                    employee_kodikos: '001', week_start: '2026-06-01',
+                    week_end: '2026-06-07', related_dates: ['2026-06-03']
+                }]
+            }]
+        };
+        summary.innerHTML = renderActionableIssueGroups(
+            currentAtomicRepoTransferProjection.actionable_issue_groups
+        );
+        bindActionableIssueEvents(summary);
         const scenarioDetails = document.createElement('div');
         scenarioDetails.id = 'scenarioDetailsTestHost';
         scenarioDetails.innerHTML = renderScenarioDetailsSection({
@@ -135,7 +122,9 @@ async function renderedTableContract(page) {
         before: window.reviewTableHeadersBefore,
         after: window.reviewTableHeadersAfter,
         colCount: document.querySelectorAll('#resultsTable > colgroup > col').length,
-        dailyCellCounts: Array.from(document.querySelectorAll('#resultsTable > tbody > tr:not(.employee-deviation-row)'))
+        dailyCellCounts: Array.from(document.querySelectorAll(
+            '#resultsTable > tbody > tr.employee-detail-row, #resultsTable > tbody > tr.geometry-filler-row'
+        ))
             .map((row) => row.cells.length),
         subtotalLogicalColumns: Array.from(
             document.querySelector('.employee-subtotal-row')?.cells || []
@@ -147,6 +136,26 @@ async function renderedTableContract(page) {
         openWeekRenderedText: window.openWeekRenderedText || '',
         weeklyRowCount: document.querySelectorAll('.employee-deviation-row tbody > tr').length
     }));
+}
+
+async function actionableIssueInteraction(page) {
+    const summary = page.locator('.actionable-issue-summary');
+    await summary.click();
+    const expanded = await summary.getAttribute('aria-expanded');
+    const panel = page.locator('.actionable-issue-panel');
+    const panelText = await panel.innerText();
+    await page.locator('.actionable-issue-open-case').click();
+    return {
+        expanded,
+        panelVisible: await panel.isVisible(),
+        panelText,
+        employeeExpanded: await page.locator(
+            '#resultsTable .employee-group-row[data-employee-kodikos="001"]'
+        ).getAttribute('aria-expanded'),
+        weeklyHighlighted: await page.locator(
+            '#resultsTable .employee-deviation-row tbody > tr[data-week-start="2026-06-01"]'
+        ).evaluate((row) => row.classList.contains('actionable-issue-target-highlight'))
+    };
 }
 
 async function geometry(page) {
@@ -250,6 +259,16 @@ async function modalGeometry(page) {
             ['CARD_VERIFICATION_PENDING', 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
                 'UNKNOWN_PRIVATE_REASON_CODE']
                 .forEach((code) => assert.ok(!tableContract.scenarioVisibleText.includes(code)));
+            const issueInteraction = await actionableIssueInteraction(page);
+            assert.strictEqual(issueInteraction.expanded, 'true');
+            assert.strictEqual(issueInteraction.panelVisible, true);
+            ['Γιατί εμφανίζεται αυτή η εκκρεμότητα',
+                'Τι προτείνεται να κάνει ο Υπεύθυνος Ανθρώπινου Δυναμικού',
+                '001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ', '01/06/2026–07/06/2026',
+                'Άνοιγμα στον πίνακα']
+                .forEach((text) => assert.ok(issueInteraction.panelText.includes(text), text));
+            assert.strictEqual(issueInteraction.employeeExpanded, 'true');
+            assert.strictEqual(issueInteraction.weeklyHighlighted, true);
             const result = await geometry(page);
             measurements.push({ viewport: `${width}x${height}`, ...result });
             assert.ok(result.lifecycle && result.pending && result.cardFooter);

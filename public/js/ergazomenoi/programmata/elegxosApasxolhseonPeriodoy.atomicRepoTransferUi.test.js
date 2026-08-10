@@ -650,23 +650,18 @@ function testNoTargetFallbackIsInformationalOnly() {
             runtime_apply_supported: false
         }]
     });
-    assertContains(html, [
+    assertContains(getVisibleText(html), [
         'Έλεγχος Μεταφοράς Ρεπό',
-        'Δεν βρέθηκε προδηλωμένη ημέρα εργασίας χωρίς κάρτες',
-        'Πιθανή αιτία προς διερεύνηση από το HR',
+        'Μη προγραμματισμένη εργασία χωρίς ημέρα αντιστάθμισης',
+        'Βρέθηκε πραγματική εργασία, αλλά δεν βρέθηκε κατάλληλη ημέρα',
         'άδεια ή απουσία',
-        'Δεν έχει δημιουργηθεί πρόταση εφαρμογής',
-        'Δεν υπάρχει target ημερομηνία',
-        'Χρειάζεται περαιτέρω έλεγχο',
-        'Εργαζόμενος:',
-        '001',
+        'Εργαζόμενος 001',
         'Εβδομάδα:',
         '05/07/2026',
         '11/07/2026',
-        'Ώρες καρτών:',
         '4,50',
-        'Προτείνεται αναγνώριση ως',
-        'Περιπτώσεις προς διερεύνηση'
+        'Άνοιγμα στον πίνακα',
+        'Εκκρεμότητες που απαιτούν ενέργεια'
     ]);
     const visibleText = getVisibleText(html);
     assert.ok(!visibleText.includes('δύο συνδεδεμένες αλλαγές'));
@@ -722,8 +717,7 @@ function testBlockedTargetOutcomeIsDistinctAndReadOnly() {
         }]
     });
     const visible = getVisibleText(html);
-    assert.ok(visible.includes('Βρέθηκε προδηλωμένη ημέρα χωρίς κάρτες'));
-    assert.ok(visible.includes('Η προτεινόμενη ημέρα ρεπό είναι κλειδωμένη.'));
+    assert.ok(visible.includes('Η πιθανή ημέρα ρεπό είναι κλειδωμένη'));
     assert.ok(!visible.includes('Δεν βρέθηκε προδηλωμένη ημέρα'));
     assert.ok(!visible.includes('άδεια ή απουσία'));
     assert.ok(!visible.includes('TARGET_LOCKED'));
@@ -750,7 +744,6 @@ function testCardConflictedTargetOutcomeIsSpecificAndReadOnly() {
     assert.ok(visible.includes(
         'Η προδηλωμένη ημέρα έχει μηδενικές συνολικές ώρες καρτών αλλά περιέχει πλήρες διάστημα κάρτας.'
     ));
-    assert.ok(visible.includes('Δεν έχει επιλεγεί ασφαλής ημέρα-στόχος'));
     assert.ok(!visible.includes('Δεν βρέθηκε προδηλωμένη ημέρα'));
     assert.ok(!visible.includes('άδεια ή απουσία'));
     assert.ok(!visible.includes('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'));
@@ -804,7 +797,7 @@ function testBlockedTargetCandidateDetailsAreSafeAndScoped() {
         }]
     });
     const visible = getVisibleText(html);
-    assert.ok(visible.includes('Βρέθηκαν 2 υποψήφιες ημέρες'));
+    assert.ok(visible.includes('Πιθανές ημέρες: 2'));
     assert.ok(visible.includes('08/07/2026 — ΕΡΓ'));
     assert.ok(visible.includes('10/07/2026 — &lt;ΕΡΓ&gt;'));
     assert.ok(visible.includes('Η προδηλωμένη ημέρα περιέχει ελλιπές ζεύγος εισόδου–εξόδου κάρτας.'));
@@ -828,7 +821,7 @@ function testBlockedTargetCandidateDetailsAreSafeAndScoped() {
             }]
         }]
     });
-    assert.ok(getVisibleText(singular).includes('Βρέθηκε μία υποψήφια ημέρα'));
+    assert.ok(getVisibleText(singular).includes('Πιθανές ημέρες: 1'));
     assert.ok(getVisibleText(singular).includes(
         'Η ημέρα περιέχει ζεύγος κάρτας με ίδια ώρα εισόδου και εξόδου.'
     ));
@@ -851,6 +844,7 @@ function testBlockedTargetCandidateDetailsAreSafeAndScoped() {
 function testGroupsAndReviewOutcomesRenderSeparateSafetyMessages() {
     const projection = readyProjection({ targetCategory: 'ΜΕ' });
     projection.review_outcomes = [{
+        outcome_code: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
         employee_kodikos: '002',
         week_start: '2026-07-05',
         week_end: '2026-07-11',
@@ -861,8 +855,8 @@ function testGroupsAndReviewOutcomesRenderSeparateSafetyMessages() {
     assertContains(html, [
         'δύο συνδεδεμένες αλλαγές',
         'εφαρμόζεται μόνο ως σύνολο',
-        'Οι παρακάτω περιπτώσεις χρειάζονται διερεύνηση από το HR',
-        'Δεν έχει δημιουργηθεί πρόταση μεταφοράς ή εφαρμογής',
+        'Εκκρεμότητες που απαιτούν ενέργεια',
+        'Άνοιγμα στον πίνακα',
         'Συνδεδεμένη πρόταση μεταφοράς ρεπό',
         'Μη προγραμματισμένη εργασία χωρίς ημέρα αντιστάθμισης'
     ]);
@@ -1300,15 +1294,30 @@ function testDiagnostics() {
         NO_TARGET_CANDIDATE: 3,
         MULTIPLE_SOURCE_CANDIDATES: 1
     };
+    projection.actionable_issue_groups = [
+        ['INCOMPLETE_EMPLOYEE_WEEK', 5],
+        ['ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED', 4],
+        ['MULTIPLE_SOURCE_CANDIDATES', 1]
+    ].map(([issue_code, count]) => ({
+        issue_code,
+        category: 'ACTION_REQUIRED',
+        count,
+        employees_count: 1,
+        cases: Array.from({ length: count }, (_, index) => ({
+            team: 'team-a', company_kod: 'company-a', ypokatasthma: '0001',
+            employee_kodikos: '001', week_start: `2026-07-${String(index + 1).padStart(2, '0')}`,
+            week_end: `2026-07-${String(index + 7).padStart(2, '0')}`
+        }))
+    }));
     projection.warning_counts = { TARGET_ZERO_HOURS_WITH_CARD_INTERVALS: 1 };
     const html = render(projection);
     const visibleText = getVisibleText(html);
 
-    assertContains(html, [
+    assertContains(visibleText, [
         'Εκκρεμότητες που απαιτούν ενέργεια',
-        '5 περιπτώσεις: Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
-        '4 περιπτώσεις: Η περίπτωση εκ περιτροπής απασχόλησης δεν δρομολογήθηκε στην απαιτούμενη πολιτική v2.',
-        '1 περίπτωση: Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
+        '5 περιπτώσεις — Ελλιπή στοιχεία εβδομάδας εργαζομένου',
+        '4 περιπτώσεις — Η περίπτωση εκ περιτροπής απασχόλησης χρειάζεται έλεγχο',
+        '1 περίπτωση — Πολλαπλές πιθανές ημέρες εργασίας σε δηλωμένο ρεπό',
         'μηδενικές συνολικές ώρες αλλά περιέχει στοιχεία καρτών'
     ]);
     assert.ok(!html.includes('Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.'));
@@ -1321,16 +1330,6 @@ function testDiagnostics() {
     });
     assert.ok(!visibleText.includes('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'));
 
-    const orderedLabels = [
-        '5 περιπτώσεις:',
-        '4 περιπτώσεις:',
-        '1 περίπτωση:'
-    ];
-    orderedLabels.reduce((previousIndex, label) => {
-        const currentIndex = visibleText.indexOf(label);
-        assert.ok(currentIndex > previousIndex, `Unexpected diagnostic order for: ${label}`);
-        return currentIndex;
-    }, -1);
 }
 
 function testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering() {
@@ -1339,10 +1338,21 @@ function testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering() {
         FUTURE_PRIVATE_DIAGNOSTIC: 3,
         NO_TARGET_CANDIDATE: 3
     };
+    projection.actionable_issue_groups = ['UNKNOWN_A', 'UNKNOWN_B'].map(
+        (issue_code, index) => ({
+            issue_code,
+            category: 'ACTION_REQUIRED',
+            count: 1,
+            employees_count: 1,
+            cases: [{ employee_kodikos: `00${index + 1}`, week_start: '2026-07-06', week_end: '2026-07-12' }]
+        })
+    );
     const visibleText = getVisibleText(render(projection));
 
     assert.ok(!visibleText.includes('FUTURE_PRIVATE_DIAGNOSTIC'));
-    assert.ok(visibleText.includes('3 περιπτώσεις: Άλλη περίπτωση που χρειάζεται έλεγχο.'));
+    assert.strictEqual((visibleText.match(/1 περίπτωση — Απαιτείται περαιτέρω έλεγχος/g) || []).length, 2);
+    assert.ok(!visibleText.includes('UNKNOWN_A'));
+    assert.ok(!visibleText.includes('UNKNOWN_B'));
     assert.ok(!visibleText.includes('Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.'));
 }
 
@@ -1368,15 +1378,24 @@ function testPartialFamilyDiagnosticsHaveSpecificGreekLabels() {
     projection.reason_counts = Object.fromEntries(
         reasonCodes.map((code, index) => [code, index + 1])
     );
+    projection.actionable_issue_groups = reasonCodes.map((issue_code, index) => ({
+        issue_code,
+        category: 'ACTION_REQUIRED',
+        count: index + 1,
+        employees_count: 1,
+        cases: Array.from({ length: index + 1 }, () => ({
+            employee_kodikos: '001', week_start: '2026-07-06', week_end: '2026-07-12'
+        }))
+    }));
     const visibleText = getVisibleText(render(projection));
     reasonCodes.forEach((code) => assert.ok(!visibleText.includes(code)));
     assert.ok(!visibleText.includes('Άλλη περίπτωση που χρειάζεται έλεγχο.'));
     [
-        'περισσότερες από μία πιθανές ημέρες για τη μεταφορά του ρεπό',
-        'θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ρεπό',
-        'ημέρα ρεπό είναι κλειδωμένη',
-        'τύπος απασχόλησης δεν αναγνωρίζεται',
-        'περισσότερες από μία φυσικές εβδομάδες'
+        'Πολλαπλές πιθανές ημέρες μεταφοράς ρεπό',
+        'Η προτεινόμενη αλλαγή θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ανάπαυσης',
+        'Η πιθανή ημέρα ρεπό είναι κλειδωμένη',
+        'Ο τύπος απασχόλησης δεν αναγνωρίζεται',
+        'Τα στοιχεία εκτείνονται σε περισσότερες από μία φυσικές εβδομάδες'
     ].forEach((label) => assert.ok(visibleText.includes(label), label));
 }
 
@@ -2038,9 +2057,11 @@ function testOpenAndCompletedPartialWeekMessagesStayDistinct() {
         sandbox.getAtomicRepoTransferDiagnosticLabel('PARTIAL_WEEK_OUTSIDE_FILTER_RANGE'),
         'Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.'
     );
-    const pendingHtml = sandbox.renderAtomicRepoTransferDiagnosticEntries({
-        OPEN_WEEK_PENDING_COMPLETION: 1
-    });
+    const pendingHtml = sandbox.renderActionableIssueGroups([{
+        issue_code: 'OPEN_WEEK_PENDING_COMPLETION',
+        count: 1,
+        cases: [{ employee_kodikos: '001', week_start: '2026-06-29', week_end: '2026-07-05' }]
+    }]);
     assert.strictEqual(pendingHtml, '');
 }
 

@@ -2044,6 +2044,9 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                                 : ''
                     }"
                     data-week-policy="${dev.is_legacy_policy === true ? 'LEGACY' : 'MONDAY_SUNDAY'}"
+                    data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
+                    data-week-start="${escapeHtml(String(dev.week_apo || dev.weekStart || '').slice(0, 10))}"
+                    data-week-end="${escapeHtml(String(dev.week_eos || dev.weekEnd || '').slice(0, 10))}"
                 >
                     <td>${formatDate(dev.week_apo || dev.weekStart)}</td>
                     <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
@@ -2716,6 +2719,8 @@ function renderReviewRows(rows = [], deviations = []) {
             const groupTr = document.createElement('tr');
             groupTr.classList.add('table-secondary', 'employee-group-row', 'collapsed');
             groupTr.dataset.groupId = groupId;
+            groupTr.dataset.employeeKodikos = String(row.kodikos || '').trim();
+            groupTr.dataset.ypokatasthma = String(row.ypokatasthma || '').trim();
             groupTr.style.cursor = 'pointer';
             groupTr.tabIndex = 0;
             groupTr.setAttribute('role', 'button');
@@ -2753,6 +2758,9 @@ function renderReviewRows(rows = [], deviations = []) {
         tr.classList.add('employee-detail-row');
         tr.classList.add('d-none');
         tr.dataset.groupId = currentGroupId;
+        tr.dataset.employeeKodikos = String(row.kodikos || '').trim();
+        tr.dataset.rowId = rowIdentityKey(row._id || row.id);
+        tr.dataset.date = String(row.hmeromhnia || '').slice(0, 10);
 
         if (row.is_locked) {
             tr.classList.add('row-locked');
@@ -3822,7 +3830,7 @@ function renderPolicyPreviewApplyDryRunApprovals() {
                                         formatPolicyPreviewDateTime(approval.created_at)
                                     )}</td>
                                     <td>${escapeHtml(approval.created_by_user_name || '-')}</td>
-                                    <td title="${escapeHtml(approval.group_id || '')}">${escapeHtml(
+                                    <td>${escapeHtml(
                                         getPolicyPreviewApplyDryRunGroupLabel(approval.group_id)
                                     )}</td>
                                     <td title="${escapeHtml(approval.notes || '')}">${escapeHtml(
@@ -3980,17 +3988,10 @@ function showPolicyPreviewApplyDryRunDetails(approval = {}) {
         <div class="text-start">
             <table class="table table-sm table-bordered align-middle mb-2">
                 <tbody>
-                    <tr><th>ID έγκρισης</th><td>${escapeHtml(
-                        approval.approval_id || '-'
-                    )}</td></tr>
-                    <tr><th>Ομάδα</th><td title="${escapeHtml(
-                        approval.group_id || ''
-                    )}">${escapeHtml(
+                    <tr><th>Ομάδα</th><td>${escapeHtml(
                         getPolicyPreviewApplyDryRunGroupLabel(approval.group_id)
                     )}</td></tr>
-                    <tr><th>Τύπος απόφασης</th><td title="${escapeHtml(
-                        approval.decision_type || ''
-                    )}">${escapeHtml(
+                    <tr><th>Τύπος απόφασης</th><td>${escapeHtml(
                         getPolicyPreviewDecisionLabel(approval.decision_type)
                     )}</td></tr>
                     <tr><th>Ημερομηνία</th><td>${escapeHtml(
@@ -4776,7 +4777,7 @@ function renderAtomicRepoTransferSummary(projection = {}) {
     const entries = [
         ['Μεταφορές ρεπό προς απόφαση', 'ready_count'],
         ['Περιπτώσεις προς ανθρώπινη διερεύνηση', 'review_outcomes_count'],
-        ['Τεχνικές εκκρεμότητες που εμποδίζουν εργασία', 'invalid_projection_count']
+        ['Περιπτώσεις που χρειάζονται έλεγχο', 'invalid_projection_count']
     ].filter(([, key]) => getAtomicRepoTransferCount(summary, key) > 0);
 
     if (entries.length === 0) return '';
@@ -5114,19 +5115,258 @@ function getAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
         });
 }
 
-function renderAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
-    const entries = getAtomicRepoTransferDiagnosticEntries(reasonCounts);
+const actionableIssuePresentationCatalog = Object.freeze({
+    PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY: {
+        title: 'Μη προγραμματισμένη εργασία χωρίς ημέρα αντιστάθμισης',
+        explanation: 'Βρέθηκε πραγματική εργασία, αλλά δεν βρέθηκε κατάλληλη ημέρα της ίδιας εβδομάδας για αντιστάθμιση.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα και τις κάρτες της συγκεκριμένης εβδομάδας.'
+    },
+    PARTIAL_OFFSET_TARGET_BLOCKED: {
+        title: 'Η πιθανή ημέρα αντιστάθμισης έχει εμπόδιο',
+        explanation: 'Βρέθηκε πιθανή ημέρα αντιστάθμισης, αλλά τα στοιχεία της δεν επιτρέπουν ασφαλή αυτόματη επιλογή.',
+        recommendedAction: 'Ελέγξτε την ημέρα, το πρόγραμμα και τις κάρτες πριν αποφασίσετε.'
+    },
+    MULTIPLE_TARGET_CANDIDATES: {
+        title: 'Πολλαπλές πιθανές ημέρες μεταφοράς ρεπό',
+        explanation: 'Βρέθηκαν περισσότερες από μία ημέρες που θα μπορούσαν να χρησιμοποιηθούν ως αντισταθμιστικό ρεπό.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα και τις κάρτες της εβδομάδας και επιλέξτε τη σωστή ημέρα.'
+    },
+    MULTIPLE_SOURCE_CANDIDATES: {
+        title: 'Πολλαπλές πιθανές ημέρες εργασίας σε δηλωμένο ρεπό',
+        explanation: 'Περισσότερες από μία ημέρες μπορούν να θεωρηθούν ως η ημέρα εργασίας που απαιτεί μεταφορά ρεπό.',
+        recommendedAction: 'Ελέγξτε τις κάρτες και το πρόγραμμα της εβδομάδας και επιλέξτε την πραγματική ημέρα εργασίας.'
+    },
+    REPO_DEFICIT_REMAINS: {
+        title: 'Δεν αποκαθίστανται τα απαιτούμενα ρεπό',
+        explanation: 'Η προτεινόμενη μεταφορά δεν αποκαθιστά τον απαιτούμενο αριθμό ημερών ανάπαυσης της εβδομάδας.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα, τις πραγματικές ημέρες εργασίας και τα ρεπό της εβδομάδας.'
+    },
+    REPO_LIMIT_EXCEEDED: {
+        title: 'Υπέρβαση επιτρεπόμενων ρεπό εβδομάδας',
+        explanation: 'Η προτεινόμενη αλλαγή θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ανάπαυσης.',
+        recommendedAction: 'Ελέγξτε ποιες ημέρες πρέπει να παραμείνουν εργασία και ποιες ανάπαυση.'
+    },
+    PROFILE_CHANGED_INSIDE_WEEK: {
+        title: 'Αλλαγή όρων εργασίας μέσα στην εβδομάδα',
+        explanation: 'Οι όροι εργασίας του εργαζομένου άλλαξαν μέσα στην ίδια εβδομάδα και δεν μπορεί να χρησιμοποιηθεί αυτόματα ένα ενιαίο προφίλ.',
+        recommendedAction: 'Ελέγξτε ποιο προφίλ εργασίας πρέπει να χρησιμοποιηθεί για την εβδομάδα και καταγράψτε την αντίστοιχη απόφαση.'
+    },
+    CARD_VERIFICATION_PENDING: {
+        title: 'Απαιτείται επιβεβαίωση στοιχείων κάρτας',
+        explanation: 'Τα διαθέσιμα στοιχεία της κάρτας εργασίας δεν επαρκούν για ασφαλή αυτόματη απόφαση.',
+        recommendedAction: 'Ελέγξτε και, όπου χρειάζεται, διορθώστε ή επιβεβαιώστε τα στοιχεία της κάρτας εργασίας.'
+    },
+    INCOMPLETE_CARD_INTERVAL: {
+        title: 'Ελλιπή στοιχεία εισόδου και εξόδου κάρτας',
+        explanation: 'Υπάρχει χτύπημα κάρτας χωρίς το αντίστοιχο ζεύγος εισόδου ή εξόδου.',
+        recommendedAction: 'Ελέγξτε τα χτυπήματα κάρτας της ημέρας και συμπληρώστε τη σωστή πληροφορία στην αρμόδια ροή.'
+    },
+    CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC: {
+        title: 'Δεν προσδιορίζονται με βεβαιότητα οι ημέρες ανάπαυσης',
+        explanation: 'Τα διαθέσιμα στοιχεία δεν επιτρέπουν ασφαλή επιλογή των ημερών ανάπαυσης της εβδομάδας.',
+        recommendedAction: 'Ελέγξτε τις ημέρες της εβδομάδας και καταγράψτε τη σωστή επιλογή στην υπάρχουσα ενέργεια απόφασης.'
+    },
+    INCOMPLETE_EMPLOYEE_WEEK: {
+        title: 'Ελλιπή στοιχεία εβδομάδας εργαζομένου',
+        explanation: 'Δεν υπάρχουν επαρκή στοιχεία για όλες τις ημέρες της συγκεκριμένης εβδομάδας.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα και τα διαθέσιμα ημερήσια στοιχεία της εβδομάδας.'
+    },
+    EMPLOYMENT_PROFILE_NOT_RESOLVED: {
+        title: 'Δεν προσδιορίστηκαν οι όροι εργασίας της εβδομάδας',
+        explanation: 'Δεν ήταν δυνατό να προσδιοριστούν με ασφάλεια οι όροι εργασίας που ισχύουν για τη συγκεκριμένη εβδομάδα.',
+        recommendedAction: 'Ελέγξτε τα στοιχεία απασχόλησης και το ιστορικό όρων του εργαζομένου.'
+    },
+    ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED: {
+        title: 'Η περίπτωση εκ περιτροπής απασχόλησης χρειάζεται έλεγχο',
+        explanation: 'Η συγκεκριμένη εβδομάδα εκ περιτροπής απασχόλησης δεν μπορεί να αξιολογηθεί με ασφάλεια αυτόματα.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα, τις κάρτες και τις συμβατικές ημέρες εργασίας της εβδομάδας.'
+    },
+    TARGET_LOCKED: {
+        title: 'Η πιθανή ημέρα ρεπό είναι κλειδωμένη',
+        explanation: 'Η ημέρα που θα μπορούσε να χρησιμοποιηθεί ως ρεπό δεν είναι διαθέσιμη για αλλαγή.',
+        recommendedAction: 'Ελέγξτε την κλειδωμένη ημέρα και επιλέξτε την κατάλληλη υπάρχουσα ενέργεια.'
+    },
+    SOURCE_LOCKED: {
+        title: 'Η ημέρα εργασίας είναι κλειδωμένη',
+        explanation: 'Η ημέρα εργασίας που συνδέεται με την περίπτωση δεν είναι διαθέσιμη για αλλαγή.',
+        recommendedAction: 'Ελέγξτε την κλειδωμένη ημέρα πριν καταγράψετε απόφαση.'
+    },
+    SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC: {
+        title: 'Δεν προσδιορίζεται με βεβαιότητα η 6η ημέρα',
+        explanation: 'Περισσότερες από μία ημέρες μπορούν να χαρακτηριστούν ως 6η ημέρα εργασίας.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα και τις κάρτες ολόκληρης της εβδομάδας.'
+    },
+    SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION: {
+        title: 'Εντοπίστηκε εργασία κατά την 7η συνεχόμενη ημέρα',
+        explanation: 'Τα πραγματικά στοιχεία δείχνουν απασχόληση και κατά την 7η συνεχόμενη ημέρα της εβδομάδας.',
+        recommendedAction: 'Ελέγξτε άμεσα το πρόγραμμα, τις κάρτες και τους όρους εργασίας της εβδομάδας.'
+    }
+});
 
-    if (entries.length === 0) return '';
+const unknownActionableIssuePresentation = Object.freeze({
+    title: 'Απαιτείται περαιτέρω έλεγχος',
+    explanation: 'Το σύστημα δεν μπόρεσε να καταλήξει με ασφάλεια σε αυτόματη απόφαση για τη συγκεκριμένη εβδομάδα.',
+    recommendedAction: 'Ελέγξτε το πρόγραμμα, τις κάρτες και τα στοιχεία της συγκεκριμένης εβδομάδας.'
+});
+
+function actionableIssuePresentation(issueCode) {
+    const code = String(issueCode || '').trim();
+    if (actionableIssuePresentationCatalog[code]) {
+        return actionableIssuePresentationCatalog[code];
+    }
+    const knownExplanation = atomicRepoTransferDiagnosticLabels[code];
+    return knownExplanation
+        ? {
+              title: knownExplanation,
+              explanation: knownExplanation,
+              recommendedAction: 'Ελέγξτε το πρόγραμμα, τις κάρτες και τα στοιχεία της συγκεκριμένης εβδομάδας.'
+          }
+        : unknownActionableIssuePresentation;
+}
+
+function resolveActionableIssueGroups(projection = {}) {
+    if (Array.isArray(projection.actionable_issue_groups)) {
+        return projection.actionable_issue_groups;
+    }
+    const groups = new Map();
+    (Array.isArray(projection.review_outcomes) ? projection.review_outcomes : [])
+        .forEach((outcome) => {
+            const issueCodes = Array.isArray(outcome?.blocked_target_reasons) &&
+                outcome.blocked_target_reasons.length
+                ? outcome.blocked_target_reasons
+                : [outcome?.outcome_code];
+            [...new Set(issueCodes)].forEach((issueCode) => {
+                const code = String(issueCode || '').trim();
+                if (!code || getAtomicRepoTransferDiagnosticCategory(code) === 'INFORMATIONAL_INTERNAL') {
+                    return;
+                }
+                if (!groups.has(code)) groups.set(code, []);
+                groups.get(code).push(outcome);
+            });
+        });
+    return [...groups.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([issueCode, cases]) => ({
+            issue_code: issueCode,
+            category: getAtomicRepoTransferDiagnosticCategory(issueCode),
+            count: cases.length,
+            employees_count: new Set(cases.map((issueCase) =>
+                `${issueCase.team || ''}|${issueCase.company_kod || ''}|${issueCase.ypokatasthma || ''}|${issueCase.employee_kodikos || ''}`
+            )).size,
+            cases
+        }));
+}
+
+function actionableIssueEmployeeLabel(issueCase = {}) {
+    const code = String(issueCase.employee_kodikos || '').trim();
+    const branch = String(issueCase.ypokatasthma || '').trim();
+    const row = currentReviewRows.find(
+        (candidate) => String(candidate?.kodikos || '').trim() === code &&
+            (!branch || String(candidate?.ypokatasthma || '').trim() === branch)
+    );
+    const name = `${row?.eponymo || ''} ${row?.onoma || ''}`.trim();
+    return name ? `${code} — ${name}` : `Εργαζόμενος ${code || 'χωρίς διαθέσιμο κωδικό'}`;
+}
+
+function actionableIssueRelatedDates(issueCase = {}) {
+    const dates = new Set([
+        issueCase.source?.hmeromhnia,
+        issueCase.target?.hmeromhnia,
+        issueCase.source_date,
+        issueCase.target_date,
+        ...(Array.isArray(issueCase.related_dates) ? issueCase.related_dates : []),
+        ...(Array.isArray(issueCase.blocked_target_candidates)
+            ? issueCase.blocked_target_candidates.map((candidate) => candidate?.hmeromhnia)
+            : [])
+    ].filter(Boolean));
+    return [...dates].sort().map(formatPolicyPreviewDate);
+}
+
+function renderActionableIssueCase(issueCase = {}, issueCode, groupIndex, caseIndex) {
+    const dates = actionableIssueRelatedDates(issueCase);
+    const weekStart = formatPolicyPreviewDate(issueCase.week_start);
+    const weekEnd = formatPolicyPreviewDate(issueCase.week_end);
+    const sourceHours = issueCase.source?.cards_ores_ergasias ?? issueCase.card_hours;
+    const candidateCount = Array.isArray(issueCase.blocked_target_candidates)
+        ? issueCase.blocked_target_candidates.length
+        : Number(issueCase.target_candidates_count || 0);
+    const guidance = (Array.isArray(issueCase.investigation_guidance)
+        ? issueCase.investigation_guidance
+        : [])
+        .filter((value) => ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'].includes(value))
+        .map((value) => value === 'ΑΔΕΙΑ' ? 'άδεια' : 'απουσία');
+    const finding = actionableIssuePresentation(issueCode).explanation;
+    const blockedCandidates = (Array.isArray(issueCase.blocked_target_candidates)
+        ? issueCase.blocked_target_candidates
+        : []).filter((candidate) => /^\d{4}-\d{2}-\d{2}$/.test(
+        String(candidate?.hmeromhnia || '')
+    ));
+    return `
+        <article class="actionable-issue-case" data-actionable-group-index="${escapeHtml(groupIndex)}"
+            data-actionable-case-index="${escapeHtml(caseIndex)}">
+            <div class="fw-semibold">${escapeHtml(actionableIssueEmployeeLabel(issueCase))}</div>
+            <div><span class="text-muted">Τι βρέθηκε:</span> ${escapeHtml(finding)}</div>
+            ${issueCase.week_start ? `<div><span class="text-muted">Εβδομάδα:</span> ${escapeHtml(weekStart)}–${escapeHtml(weekEnd)}</div>` : ''}
+            ${dates.length ? `<div><span class="text-muted">Σχετικές ημέρες:</span> ${escapeHtml(dates.join(', '))}</div>` : ''}
+            ${Number.isFinite(Number(sourceHours)) ? `<div><span class="text-muted">Ώρες κάρτας:</span> ${escapeHtml(formatAtomicRepoTransferHours(sourceHours))}</div>` : ''}
+            ${candidateCount > 0 ? `<div><span class="text-muted">Πιθανές ημέρες:</span> ${escapeHtml(candidateCount)}</div>` : ''}
+            ${guidance.length ? `<div><span class="text-muted">Τι χρειάζεται:</span> Ελέγξτε αν υπάρχει ${escapeHtml(guidance.join(' ή '))}.</div>` : ''}
+            ${blockedCandidates.length ? `<div class="mt-1"><span class="text-muted">Υποψήφιες ημέρες:</span><ul class="mb-0">${blockedCandidates.map((candidate) =>
+                `<li>${escapeHtml(formatPolicyPreviewDate(candidate.hmeromhnia))}${candidate.current_category ? ` — ${escapeHtml(candidate.current_category)}` : ''}${(Array.isArray(candidate.blocker_reasons) ? candidate.blocker_reasons : []).map((reason) =>
+                    `<div>${escapeHtml(reviewHrReasonLabel(reason))}</div>`
+                ).join('')}</li>`
+            ).join('')}</ul></div>` : ''}
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary actionable-issue-open-case"
+                    data-actionable-group-index="${escapeHtml(groupIndex)}"
+                    data-actionable-case-index="${escapeHtml(caseIndex)}">Άνοιγμα στον πίνακα</button>
+                <span class="small text-muted actionable-issue-navigation-feedback" aria-live="polite"></span>
+            </div>
+        </article>
+    `;
+}
+
+function renderActionableIssueGroups(issueGroups = []) {
+    const groups = (Array.isArray(issueGroups) ? issueGroups : []).filter(
+        (group) => Number(group?.count) > 0 && Array.isArray(group?.cases) &&
+            getAtomicRepoTransferDiagnosticCategory(group?.issue_code) !==
+                'INFORMATIONAL_INTERNAL'
+    );
+
+    if (groups.length === 0) return '';
 
     return `
         <div class="atomic-repo-transfer-diagnostic-summary">
             <div class="fw-semibold">Εκκρεμότητες που απαιτούν ενέργεια</div>
-            <div class="atomic-repo-transfer-diagnostic-list">
-                ${entries
-                    .map(({ count, label }) => {
-                        const countLabel = count === 1 ? 'περίπτωση' : 'περιπτώσεις';
-                        return `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(count)} ${countLabel}: ${escapeHtml(label)}</div>`;
+            <div class="actionable-issue-groups">
+                ${groups
+                    .map((group, groupIndex) => {
+                        const presentation = actionableIssuePresentation(group.issue_code);
+                        const panelId = `actionableIssuePanel-${groupIndex}`;
+                        const countLabel = Number(group.count) === 1 ? 'περίπτωση' : 'περιπτώσεις';
+                        return `<div class="actionable-issue-group">
+                            <button type="button" class="actionable-issue-summary" aria-expanded="false"
+                                aria-controls="${panelId}" data-actionable-group-index="${escapeHtml(groupIndex)}">
+                                <span><strong>${escapeHtml(group.count)} ${countLabel}</strong> — ${escapeHtml(presentation.title)}</span>
+                                <span aria-hidden="true" class="actionable-issue-chevron">▸</span>
+                            </button>
+                            <div class="actionable-issue-panel d-none" id="${panelId}">
+                                <div class="actionable-issue-guidance">
+                                    <div><strong>Γιατί εμφανίζεται αυτή η εκκρεμότητα:</strong> ${escapeHtml(presentation.explanation)}</div>
+                                    <div><strong>Τι προτείνεται να κάνει ο Υπεύθυνος Ανθρώπινου Δυναμικού:</strong> ${escapeHtml(presentation.recommendedAction)}</div>
+                                </div>
+                                <div class="actionable-issue-cases">
+                                    ${group.cases.map((issueCase, caseIndex) =>
+                                        renderActionableIssueCase(
+                                            issueCase,
+                                            group.issue_code,
+                                            groupIndex,
+                                            caseIndex
+                                        )
+                                    ).join('')}
+                                </div>
+                            </div>
+                        </div>`;
                     })
                     .join('')}
             </div>
@@ -5146,7 +5386,7 @@ function renderAtomicRepoTransferDiagnostics(projection = {}) {
     }
 
     if (
-        getAtomicRepoTransferDiagnosticEntries(reasonCounts).length === 0 &&
+        resolveActionableIssueGroups(projection).length === 0 &&
         warningMessages.length === 0
     ) {
         return '';
@@ -5154,7 +5394,7 @@ function renderAtomicRepoTransferDiagnostics(projection = {}) {
 
     return `
         <div class="atomic-repo-transfer-diagnostics">
-            ${renderAtomicRepoTransferDiagnosticEntries(reasonCounts)}
+            ${renderActionableIssueGroups(resolveActionableIssueGroups(projection))}
             ${warningMessages
                 .map(
                     (message) =>
@@ -5375,7 +5615,87 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
     `;
 }
 
+function highlightActionableIssueTarget(target) {
+    target.classList.remove('actionable-issue-target-highlight');
+    target.classList.add('actionable-issue-target-highlight');
+    target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    window.setTimeout(() => target.classList.remove('actionable-issue-target-highlight'), 3000);
+}
+
+function openActionableIssueInTable(issueCase = {}, feedback = null) {
+    const employeeKodikos = String(issueCase.employee_kodikos || '').trim();
+    const ypokatasthma = String(issueCase.ypokatasthma || '').trim();
+    const groupRow = [...document.querySelectorAll('#resultsTable .employee-group-row')]
+        .find((row) =>
+            String(row.dataset.employeeKodikos || '') === employeeKodikos &&
+            (!ypokatasthma || String(row.dataset.ypokatasthma || '') === ypokatasthma)
+        );
+    if (!groupRow) {
+        if (feedback) feedback.textContent = 'Η περίπτωση δεν είναι ορατή με τα τρέχοντα φίλτρα.';
+        return false;
+    }
+
+    setEmployeeGroupExpanded(groupRow, true);
+    const weekStart = String(issueCase.week_start || '').slice(0, 10);
+    const weekEnd = String(issueCase.week_end || '').slice(0, 10);
+    const weeklyTarget = [...document.querySelectorAll(
+        '#resultsTable .employee-deviation-row tbody > tr[data-employee-kodikos]'
+    )].find((row) =>
+        String(row.dataset.employeeKodikos || '') === employeeKodikos &&
+        (!weekStart || String(row.dataset.weekStart || '') === weekStart) &&
+        (!weekEnd || String(row.dataset.weekEnd || '') === weekEnd)
+    );
+    const rowId = String(
+        issueCase.source?.prodhlomena_oraria_id ||
+        issueCase.target?.prodhlomena_oraria_id ||
+        issueCase.source_row_id ||
+        issueCase.target_row_id ||
+        ''
+    ).trim();
+    const date = String(
+        issueCase.source?.hmeromhnia || issueCase.target?.hmeromhnia ||
+        issueCase.source_date || issueCase.target_date || ''
+    ).slice(0, 10);
+    const dailyTarget = [...document.querySelectorAll('#resultsTable .employee-detail-row')]
+        .find((row) =>
+            String(row.dataset.employeeKodikos || '') === employeeKodikos &&
+            ((rowId && String(row.dataset.rowId || '') === rowId) ||
+                (!rowId && date && String(row.dataset.date || '') === date))
+        );
+    const target = weeklyTarget || dailyTarget || groupRow;
+    highlightActionableIssueTarget(target);
+    if (feedback) feedback.textContent = target === groupRow && (weekStart || rowId || date)
+        ? 'Ανοίχτηκε ο εργαζόμενος· η συγκεκριμένη γραμμή δεν είναι ορατή με τα τρέχοντα φίλτρα.'
+        : '';
+    return true;
+}
+
+function bindActionableIssueEvents(container) {
+    container.querySelectorAll('.actionable-issue-summary').forEach((button) => {
+        button.addEventListener('click', () => {
+            const panel = document.getElementById(button.getAttribute('aria-controls'));
+            if (!panel) return;
+            const willOpen = panel.classList.contains('d-none');
+            panel.classList.toggle('d-none', !willOpen);
+            button.setAttribute('aria-expanded', String(willOpen));
+        });
+    });
+    container.querySelectorAll('.actionable-issue-open-case').forEach((button) => {
+        button.addEventListener('click', () => {
+            const groupIndex = Number(button.dataset.actionableGroupIndex);
+            const caseIndex = Number(button.dataset.actionableCaseIndex);
+            const issueCase = currentAtomicRepoTransferProjection
+                ?.actionable_issue_groups?.[groupIndex]?.cases?.[caseIndex];
+            const feedback = button.parentElement?.querySelector(
+                '.actionable-issue-navigation-feedback'
+            );
+            if (issueCase) openActionableIssueInTable(issueCase, feedback);
+        });
+    });
+}
+
 function bindAtomicRepoTransferEvents(container) {
+    bindActionableIssueEvents(container);
     container.querySelectorAll('.atomic-repo-transfer-toggle').forEach((button) => {
         button.addEventListener('click', () => {
             const targetId = button.dataset.atomicTargetId;
@@ -6226,15 +6546,9 @@ function renderAtomicRepoTransferProjection(projection) {
             επιβεβαιώσει ότι επιτρέπεται η ασφαλής εφαρμογή.
         </div>
     ` : '';
-    const reviewSafetyHtml = reviewOutcomes.length ? `
-        <div class="atomic-repo-transfer-main-warning">
-            Οι παρακάτω περιπτώσεις χρειάζονται διερεύνηση από το HR.
-            Δεν έχει δημιουργηθεί πρόταση μεταφοράς ή εφαρμογής.
-        </div>
-    ` : '';
+    const hasActionableIssues = resolveActionableIssueGroups(projection).length > 0;
 
-    if (groups.length === 0 && reviewOutcomes.length === 0 &&
-        getAtomicRepoTransferDiagnosticEntries(projection.reason_counts || {}).length === 0) {
+    if (groups.length === 0 && !hasActionableIssues) {
         return '';
     }
 
@@ -6249,16 +6563,8 @@ function renderAtomicRepoTransferProjection(projection) {
                         <span class="atomic-repo-transfer-readonly-badge">Ροή έγκρισης HR</span>
                     </div>
                     ${groupSafetyHtml}
-                    ${reviewSafetyHtml}
                     ${renderAtomicRepoTransferSummary(projection)}
                     ${renderAtomicRepoTransferDiagnostics(projection)}
-                    ${reviewOutcomes.length
-                        ? `<div class="fw-semibold mt-3 mb-2">Περιπτώσεις προς διερεύνηση</div>
-                           <div class="atomic-repo-transfer-groups">${reviewOutcomesHtml}</div>`
-                        : ''}
-                    ${groups.length && reviewOutcomes.length
-                        ? '<div class="fw-semibold mt-3 mb-2">Συνδεδεμένες προτάσεις</div>'
-                        : ''}
                     <div class="atomic-repo-transfer-groups">${groupsHtml}</div>
                 </div>
             </div>
@@ -6411,7 +6717,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
         ? `
             <details class="policy-preview-diagnostics-accordion mt-2">
                 <summary>
-                    Τεχνικές εκκρεμότητες πολιτικής
+                    Περιπτώσεις χωρίς διαθέσιμη ενέργεια HR
                     <span class="badge text-bg-secondary ms-1">${escapeHtml(
                         diagnosticGroups.reduce(
                             (total, entry) => total + Number(entry.group?.count || 0),
