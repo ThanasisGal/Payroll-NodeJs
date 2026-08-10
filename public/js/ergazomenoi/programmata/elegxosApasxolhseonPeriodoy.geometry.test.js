@@ -40,6 +40,28 @@ async function loadOperationalState(page) {
         window.reviewTableHeadersAfter = Array.from(
             document.querySelectorAll('#resultsTable > thead th')
         ).map((header) => header.textContent.trim());
+        currentReviewRows = [{
+            _id: 'render-current-row',
+            kodikos: '001',
+            ypokatasthma: '0001',
+            eponymo: 'ΔΟΚΙΜΗ',
+            onoma: 'ΧΡΗΣΤΗΣ',
+            hmeromhnia: '2026-06-03',
+            kathgoria_ergasias: 'ΕΡΓ',
+            ores_ergasias: 8,
+            cards_ores_ergasias: 8,
+            effective_is_full_time: true
+        }];
+        currentReviewDeviations = [];
+        currentPendingDeviationWeeks = [{
+            kodikos: '001',
+            status: 'OPEN_WEEK_PENDING_COMPLETION',
+            week_apo: '2026-06-01',
+            week_eos: '2026-06-07'
+        }];
+        currentLegacyDeviations = [];
+        renderCurrentReviewRows();
+        window.openWeekRenderedText = document.querySelector('#resultsTable tbody')?.innerText || '';
         document.getElementById('employmentPeriodControlPanel').classList.remove('d-none');
         document.getElementById('employmentPeriodControlStatus').textContent =
             'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ';
@@ -65,6 +87,11 @@ async function loadOperationalState(page) {
         }, 'geometry-test');
         appendEmployeeDeviationRows(body, [{
             kodikos: '001',
+            status: 'OPEN_WEEK_PENDING_COMPLETION',
+            week_apo: '2026-06-01',
+            week_eos: '2026-06-07'
+        }, {
+            kodikos: '001',
             week_apo: '2026-06-01',
             week_eos: '2026-06-07',
             expected_repo: 2,
@@ -81,10 +108,25 @@ async function loadOperationalState(page) {
             repo_transfer_reasons: ['MULTIPLE_TARGET_CANDIDATES'],
             canonical_reasons: [
                 'CARD_VERIFICATION_PENDING',
-                'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
-            ]
+                'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+                'UNKNOWN_PRIVATE_REASON_CODE'
+            ],
+            note: 'Πραγματική ανθρώπινη σημείωση.'
         }], 'geometry-test');
         body.querySelector('.employee-deviation-row')?.classList.remove('d-none');
+        const scenarioDetails = document.createElement('div');
+        scenarioDetails.id = 'scenarioDetailsTestHost';
+        scenarioDetails.innerHTML = renderScenarioDetailsSection({
+            scenarioDecision: {
+                scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW',
+                confidence: 'HIGH',
+                decision_status: 'NEEDS_REVIEW',
+                requires_review: true,
+                reasons: ['CARD_VERIFICATION_PENDING', 'UNKNOWN_PRIVATE_REASON_CODE'],
+                warnings: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
+            }
+        });
+        document.body.appendChild(scenarioDetails);
     });
 }
 
@@ -100,7 +142,10 @@ async function renderedTableContract(page) {
         ).reduce((total, cell) => total + cell.colSpan, 0),
         weeklyHeaders: Array.from(document.querySelectorAll('.employee-deviation-row table thead th'))
             .map((header) => header.textContent.trim()),
-        weeklyVisibleText: document.querySelector('.employee-deviation-row')?.innerText || ''
+        weeklyVisibleText: document.querySelector('.employee-deviation-row')?.innerText || '',
+        scenarioVisibleText: document.getElementById('scenarioDetailsTestHost')?.innerText || '',
+        openWeekRenderedText: window.openWeekRenderedText || '',
+        weeklyRowCount: document.querySelectorAll('.employee-deviation-row tbody > tr').length
     }));
 }
 
@@ -178,6 +223,11 @@ async function modalGeometry(page) {
             assert.strictEqual(tableContract.after.filter((text) => text === 'Προδηλωμένο').length, 1);
             assert.ok(tableContract.weeklyHeaders.includes('Τύπος απασχόλησης'));
             assert.ok(!tableContract.weeklyHeaders.includes('Profile'));
+            assert.strictEqual(tableContract.weeklyRowCount, 1);
+            assert.ok(!tableContract.openWeekRenderedText.includes('Αναμονή ολοκλήρωσης'));
+            assert.ok(!tableContract.openWeekRenderedText.includes(
+                'δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή'
+            ));
             [
                 'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.',
                 'Βρέθηκαν περισσότερες από μία πιθανές ημέρες για τη μεταφορά του ρεπό και απαιτείται επιλογή.',
@@ -188,6 +238,18 @@ async function modalGeometry(page) {
                 'MULTIPLE_TARGET_CANDIDATES',
                 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
             ].forEach((code) => assert.ok(!tableContract.weeklyVisibleText.includes(code)));
+            assert.ok(tableContract.weeklyVisibleText.includes('Απαιτείται έλεγχος της περίπτωσης.'));
+            assert.ok(tableContract.weeklyVisibleText.includes('Πραγματική ανθρώπινη σημείωση.'));
+            assert.ok(tableContract.scenarioVisibleText.includes(
+                'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.'
+            ));
+            assert.ok(tableContract.scenarioVisibleText.includes(
+                'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό της εβδομάδας και απαιτείται έλεγχος.'
+            ));
+            assert.ok(tableContract.scenarioVisibleText.includes('Απαιτείται έλεγχος της περίπτωσης.'));
+            ['CARD_VERIFICATION_PENDING', 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+                'UNKNOWN_PRIVATE_REASON_CODE']
+                .forEach((code) => assert.ok(!tableContract.scenarioVisibleText.includes(code)));
             const result = await geometry(page);
             measurements.push({ viewport: `${width}x${height}`, ...result });
             assert.ok(result.lifecycle && result.pending && result.cardFooter);

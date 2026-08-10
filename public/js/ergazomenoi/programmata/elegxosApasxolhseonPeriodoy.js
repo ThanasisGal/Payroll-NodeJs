@@ -664,14 +664,10 @@ function renderScenarioList(items = [], labelFn = (value) => value) {
     const listItems = (Array.isArray(items) ? items : [])
         .map((item) => String(item || '').trim())
         .filter(Boolean)
-        .map(
-            (item) => `
-                <li>
-                    ${escapeHtml(labelFn(item))}
-                    <small class="text-muted">(${escapeHtml(item)})</small>
-                </li>
-            `
-        );
+        .map((item) => labelFn(item))
+        .filter(Boolean)
+        .filter((label, index, labels) => labels.indexOf(label) === index)
+        .map((label) => `<li>${escapeHtml(label)}</li>`);
 
     if (listItems.length === 0) return '';
 
@@ -1946,19 +1942,17 @@ function renderDeviationProfileCell(dev) {
 
 function renderDeviationNoteCell(dev) {
     if (dev.status === 'OPEN_WEEK_PENDING_COMPLETION') {
-        return `
-            <span class="badge text-bg-info">Αναμονή ολοκλήρωσης</span>
-            <div class="small mt-1">
-                Η εβδομάδα ${escapeHtml(formatDate(dev.week_apo || dev.weekStart))}–${escapeHtml(formatDate(dev.week_eos || dev.weekEnd))}
-                δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.
-            </div>
-        `;
+        return '';
     }
+
+    const humanNote = dev.note && !looksLikeInternalReviewCode(dev.note)
+        ? String(dev.note)
+        : '';
 
     if (dev.is_legacy_policy === true) {
         return `
             <span class="badge text-bg-secondary">Ιστορική εγγραφή παλιάς πολιτικής</span>
-            ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
+            ${humanNote ? `<div class="small mt-1">${escapeHtml(humanNote)}</div>` : ''}
         `;
     }
 
@@ -1979,7 +1973,7 @@ function renderDeviationNoteCell(dev) {
                 Η εβδομάδα απαιτεί απόφαση HR επειδή άλλαξαν κρίσιμοι όροι εργασίας.
             </small>
             ${excessText}
-            ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
+            ${humanNote ? `<div class="small mt-1">${escapeHtml(humanNote)}</div>` : ''}
         `;
     }
 
@@ -1997,8 +1991,8 @@ function renderDeviationNoteCell(dev) {
         ...(Array.isArray(dev.canonical_reasons) ? dev.canonical_reasons : [])
     ]);
     const sixthDayDecisionText = renderReviewHrReasonList(reasonMessages);
-    const noteText = dev.note && !looksLikeInternalReviewCode(dev.note)
-        ? `<div>${escapeHtml(dev.note)}</div>`
+    const noteText = humanNote
+        ? `<div>${escapeHtml(humanNote)}</div>`
         : '';
 
     return sixthDayText || seventhDayText || sixthDayDecisionText || noteText
@@ -2013,6 +2007,10 @@ function hasProfileChangeDeviation(deviations = []) {
     );
 }
 
+function isHrVisibleDeviation(deviation = {}) {
+    return String(deviation.status || '').trim() !== 'OPEN_WEEK_PENDING_COMPLETION';
+}
+
 function hasAdeiaSuggestion(row) {
     return hasMeaningfulValue(row?.kathgoria_adeias_apologistika);
 }
@@ -2022,14 +2020,17 @@ function hasAdeiaSuggestionInRows(rows = []) {
 }
 
 function appendEmployeeDeviationRows(tbody, deviations, groupId) {
-    if (!Array.isArray(deviations) || deviations.length === 0) return;
+    const visibleDeviations = Array.isArray(deviations)
+        ? deviations.filter(isHrVisibleDeviation)
+        : [];
+    if (visibleDeviations.length === 0) return;
 
     const wrapperTr = document.createElement('tr');
     wrapperTr.classList.add('employee-deviation-row');
     wrapperTr.classList.add('d-none');
     wrapperTr.dataset.groupId = groupId;
 
-    const rowsHtml = deviations
+    const rowsHtml = visibleDeviations
         .map(
             (dev) => `
                 <tr
@@ -2897,7 +2898,7 @@ function getPolicyPreviewScopeLabel(scope) {
 
     if (key === 'page') return 'Τρέχουσα σελίδα';
 
-    return key || '-';
+    return key ? 'Απαιτείται έλεγχος της περίπτωσης.' : '-';
 }
 
 function formatPolicyPreviewDate(value) {
@@ -2940,7 +2941,7 @@ function sanitizePolicyPreviewCode(value) {
 
 function formatPolicyPreviewUnknownCode(value) {
     const key = sanitizePolicyPreviewCode(value);
-    return key ? `Μη χαρτογραφημένο αποτέλεσμα (${key})` : '-';
+    return key ? 'Απαιτείται έλεγχος της περίπτωσης.' : '-';
 }
 
 function getPolicyPreviewPolicyLabel(policyCode) {
@@ -3350,13 +3351,13 @@ function renderPolicyPreviewApprovalHistoryResults() {
                                     <td>${escapeHtml(formatPolicyPreviewDateTime(record.created_at))}</td>
                                     <td>${escapeHtml(getPolicyPreviewDecisionLabel(record.decision_type))}</td>
                                     <td>${escapeHtml(record.created_by_user_name || '-')}</td>
-                                    <td title="${escapeHtml(record.group_id || '')}">${escapeHtml(
+                                    <td>${escapeHtml(
                                         getPolicyPreviewStatusLabel(record.status).label
                                     )}</td>
-                                    <td title="${escapeHtml(record.policy_code || '')}">${escapeHtml(
+                                    <td>${escapeHtml(
                                         getPolicyPreviewPolicyLabel(record.policy_code)
                                     )}</td>
-                                    <td title="${escapeHtml(record.scenario_code || '')}">${escapeHtml(
+                                    <td>${escapeHtml(
                                         getPolicyPreviewScenarioLabel(record.scenario_code)
                                     )}</td>
                                     <td>${escapeHtml(counts.items)}</td>
@@ -3482,9 +3483,6 @@ function showPolicyPreviewApprovalHistoryDetails(record = {}) {
                     <tr><th>Κατάσταση</th><td>${escapeHtml(
                         getPolicyPreviewDecisionStatusLabel(record.decision_status)
                     )}</td></tr>
-                    <tr><th>ID ομάδας</th><td><span class="small text-muted">${escapeHtml(
-                        record.group_id || '-'
-                    )}</span></td></tr>
                     <tr><th>Χρήστης</th><td>${escapeHtml(
                         record.created_by_user_name || '-'
                     )}</td></tr>
@@ -3494,24 +3492,16 @@ function showPolicyPreviewApprovalHistoryDetails(record = {}) {
                     <tr><th>Περίοδος</th><td>${escapeHtml(
                         formatPolicyPreviewDate(record.apo_hmeromhnia)
                     )} – ${escapeHtml(formatPolicyPreviewDate(record.eos_hmeromhnia))}</td></tr>
-                    <tr><th>Πολιτική</th><td title="${escapeHtml(
-                        record.policy_code || ''
-                    )}">${escapeHtml(getPolicyPreviewPolicyLabel(record.policy_code))}</td></tr>
-                    <tr><th>Σενάριο</th><td title="${escapeHtml(
-                        record.scenario_code || ''
-                    )}">${escapeHtml(getPolicyPreviewScenarioLabel(record.scenario_code))}</td></tr>
-                    <tr><th>Ενέργεια</th><td title="${escapeHtml(
-                        record.action_type || ''
-                    )}">${escapeHtml(getPolicyPreviewActionLabel(record.action_type))}</td></tr>
-                    <tr><th>Αιτιολογία</th><td title="${escapeHtml(
-                        record.reason_code || ''
-                    )}">${escapeHtml(getPolicyPreviewReasonLabel(record.reason_code))}</td></tr>
+                    <tr><th>Πολιτική</th><td>${escapeHtml(getPolicyPreviewPolicyLabel(record.policy_code))}</td></tr>
+                    <tr><th>Σενάριο</th><td>${escapeHtml(getPolicyPreviewScenarioLabel(record.scenario_code))}</td></tr>
+                    <tr><th>Ενέργεια</th><td>${escapeHtml(getPolicyPreviewActionLabel(record.action_type))}</td></tr>
+                    <tr><th>Αιτιολογία</th><td>${escapeHtml(getPolicyPreviewReasonLabel(record.reason_code))}</td></tr>
                     <tr><th>Εγγραφές</th><td>${escapeHtml(counts.items)}</td></tr>
                     <tr><th>Εργαζόμενοι</th><td>${escapeHtml(counts.employees)}</td></tr>
                     <tr><th>Σημειώσεις</th><td>${escapeHtml(record.notes || '-')}</td></tr>
                 </tbody>
             </table>
-            <div class="fw-semibold mb-1">Snapshot εγγραφών</div>
+            <div class="fw-semibold mb-1">Αποτύπωση εγγραφών</div>
             <div class="table-responsive policy-preview-history-details-items">
                 <table class="table table-sm table-bordered align-middle mb-0">
                     <thead class="table-light">
@@ -3552,9 +3542,9 @@ function showPolicyPreviewApprovalHistoryDetails(record = {}) {
             </div>
             ${
                 items.length > visibleItems.length
-                    ? `<div class="small text-muted mt-1">Εμφανίζονται τα πρώτα ${escapeHtml(
+                    ? `<div class="small text-muted mt-1">Εμφανίζονται οι πρώτες ${escapeHtml(
                           visibleItems.length
-                      )} από ${escapeHtml(items.length)} items.</div>`
+                      )} από ${escapeHtml(items.length)} εγγραφές.</div>`
                     : ''
             }
         </div>
@@ -3696,6 +3686,7 @@ function getPolicyPreviewApplyDryRunFieldActionLabel(action) {
 function formatPolicyPreviewDryRunReason(reason) {
     const text = String(reason || '').trim();
     if (!text) return '-';
+    if (looksLikeInternalReviewCode(text)) return reviewHrUnknownReasonLabel;
 
     const exactTranslations = {
         'Δεν υπάρχουν proposed_values για αξιολόγηση.':
@@ -3972,9 +3963,7 @@ function showPolicyPreviewApplyDryRunDetails(approval = {}) {
                               <span>Ημ/νία: ${escapeHtml(
                                   formatPolicyPreviewDate(item.hmeromhnia)
                               )}</span>
-                              <span class="badge text-bg-light border" title="${escapeHtml(
-                                  item.status || ''
-                              )}">${escapeHtml(
+                              <span class="badge text-bg-light border">${escapeHtml(
                                   getPolicyPreviewApplyDryRunItemStatusLabel(item.status)
                               )}</span>
                           </div>
@@ -4378,7 +4367,7 @@ function renderPolicyPreviewStatusBadge(status) {
     const statusLabel = getPolicyPreviewStatusLabel(statusCode);
 
     return `
-        <span class="badge ${escapeHtml(statusLabel.badgeClass)}" title="${escapeHtml(statusCode)}">
+        <span class="badge ${escapeHtml(statusLabel.badgeClass)}">
             ${escapeHtml(statusLabel.label)}
         </span>
     `;

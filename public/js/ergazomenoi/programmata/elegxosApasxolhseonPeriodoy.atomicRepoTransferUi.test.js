@@ -1983,7 +1983,7 @@ function testAllKnownBackendGroupingCodesHaveGreekLabels() {
     });
 
     const unmapped = sandbox.getPolicyPreviewPolicyLabel('CUSTOM_<script>_CODE');
-    assert.strictEqual(unmapped, 'Μη χαρτογραφημένο αποτέλεσμα (CUSTOM_script_CODE)');
+    assert.strictEqual(unmapped, 'Απαιτείται έλεγχος της περίπτωσης.');
     assert.ok(!unmapped.includes('<'));
 }
 
@@ -3007,6 +3007,54 @@ function testWeeklyHrReasonPresentationIsGreekAndSafe() {
     assert.strictEqual(sandbox.looksLikeInternalReviewCode('ΕΡΓΑΝΗ II'), false);
 }
 
+function testOpenWeekAndDeviationNotesStayHrSafe() {
+    assert.strictEqual(sandbox.isHrVisibleDeviation({
+        status: 'OPEN_WEEK_PENDING_COMPLETION'
+    }), false);
+    assert.strictEqual(sandbox.renderDeviationNoteCell({
+        status: 'OPEN_WEEK_PENDING_COMPLETION',
+        week_apo: '2026-08-10',
+        week_eos: '2026-08-16'
+    }), '');
+
+    const humanNote = 'Επιβεβαιώστε την πραγματική ημέρα ανάπαυσης.';
+    const legacyHuman = sandbox.renderDeviationNoteCell({
+        is_legacy_policy: true,
+        note: humanNote
+    });
+    assert.ok(legacyHuman.includes(humanNote));
+    assert.ok(!sandbox.renderDeviationNoteCell({
+        is_legacy_policy: true,
+        note: 'UNKNOWN_PRIVATE_REASON_CODE'
+    }).includes('UNKNOWN_PRIVATE_REASON_CODE'));
+    assert.ok(!sandbox.renderDeviationNoteCell({
+        profile_changed_inside_week: true,
+        note: 'UNKNOWN_PRIVATE_REASON_CODE'
+    }).includes('UNKNOWN_PRIVATE_REASON_CODE'));
+}
+
+function testScenarioDetailsNeverExposeReasonCodes() {
+    const html = sandbox.renderScenarioDetailsSection({
+        scenarioDecision: {
+            scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW',
+            confidence: 'HIGH',
+            decision_status: 'NEEDS_REVIEW',
+            requires_review: true,
+            reasons: ['CARD_VERIFICATION_PENDING', 'UNKNOWN_PRIVATE_REASON_CODE'],
+            warnings: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
+        }
+    });
+    const visibleText = getVisibleText(html);
+    assertContains(visibleText, [
+        'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.',
+        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό της εβδομάδας και απαιτείται έλεγχος.',
+        'Απαιτείται έλεγχος της περίπτωσης.'
+    ]);
+    ['CARD_VERIFICATION_PENDING', 'UNKNOWN_PRIVATE_REASON_CODE',
+        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
+        .forEach((code) => assert.ok(!visibleText.includes(code)));
+}
+
 function testEmploymentReviewFinalUiContract() {
     testUnifiedEmploymentReviewWorkspaceContract();
     assert.strictEqual((viewSource.match(/id="employmentPeriodControlPanel"/g) || []).length, 1);
@@ -3116,6 +3164,8 @@ const tests = [
     testMinimalWorkspaceEjsContract,
     testEmploymentReviewScrollContainerContract,
     testWeeklyHrReasonPresentationIsGreekAndSafe,
+    testOpenWeekAndDeviationNotesStayHrSafe,
+    testScenarioDetailsNeverExposeReasonCodes,
     testAllKnownBackendGroupingCodesHaveGreekLabels,
     testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct,
     testOpenAndCompletedPartialWeekMessagesStayDistinct,
