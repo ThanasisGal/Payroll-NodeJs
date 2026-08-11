@@ -149,12 +149,42 @@ function testScenarioExposesStableRuleBranch() {
     assert.strictEqual(decision.rule_branch, decision.scenario_code);
 }
 
+function testAnyCardEvidenceContract() {
+    const cases = [
+        ['start only', { cards_apo_ora_01: '14:51', cards_eos_ora_01: '' }],
+        ['end only', { cards_apo_ora_01: '', cards_eos_ora_01: '22:51' }],
+        ['invalid non-empty', { cards_apo_ora_01: 'invalid', cards_eos_ora_01: '' }],
+        ['zero length', { cards_apo_ora_01: '14:51', cards_eos_ora_01: '14:51' }]
+    ];
+
+    cases.forEach(([label, cardFields]) => {
+        const facts = buildApasxoliseisScenarioFacts({
+            hmeromhnia: '2026-06-14',
+            kathgoria_ergasias: 'ΕΡΓ',
+            ores_ergasias: 8,
+            cards_ores_ergasias: 0,
+            ...cardFields
+        });
+        assert.strictEqual(facts.cards.hasAnyCardEvidence, true, label);
+        assert.strictEqual(facts.cards.hasCards, false, label);
+    });
+
+    const noCards = buildApasxoliseisScenarioFacts({
+        hmeromhnia: '2026-06-11',
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 0
+    });
+    assert.strictEqual(noCards.cards.hasAnyCardEvidence, false);
+}
+
 function run() {
     testProductionUnscheduledDayIsResolvedWithoutHrReview();
     testProductionUnscheduledHolidayWorkIsResolvedWithoutHrReview();
     testIncompleteApologistikaStillRequireReview();
     testUnsafeBlankDaysRemainUnknown();
     testScenarioExposesStableRuleBranch();
+    testAnyCardEvidenceContract();
     console.log('apasxoliseis scenario matcher tests passed');
 }
 

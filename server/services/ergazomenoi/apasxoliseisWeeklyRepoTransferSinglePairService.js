@@ -625,6 +625,17 @@ function targetExclusions(info) {
             )
     );
     if (blockingCriticalWarnings.length > 0) reasons.push('TARGET_CONFLICTING_FACTS');
+    if (info.cardHours === 0 && info.facts.cards.hasAnyCardEvidence) {
+        if (info.facts.cards.hasInvalidCardTimeValue) {
+            reasons.push('TARGET_INVALID_CARD_TIME_VALUE');
+        } else if (info.facts.cards.hasZeroLengthCardInterval) {
+            reasons.push('TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL');
+        } else if (info.facts.cards.incompleteCardPairs.length > 0) {
+            reasons.push('TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR');
+        } else {
+            reasons.push('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS');
+        }
+    }
     if (
         !info.provisionalAutoCalculatedLeave &&
         info.apologistikaState.category &&
@@ -1036,6 +1047,26 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         sixth_day: sixthSeventhDay.sixthDay || null,
         seventh_day: sixthSeventhDay.seventhDay || null
     };
+
+    const hasUnresolvedRawCardEvidence = rowInfos.some(
+        (info) =>
+            info.facts.cards.incompleteCardPairs.length > 0 ||
+            info.facts.cards.hasInvalidCardTimeValue
+    );
+    if (
+        hasUnresolvedRawCardEvidence &&
+        (sixthSeventhDay.reasons || []).includes('CARD_VERIFICATION_PENDING')
+    ) {
+        return buildResult({
+            ...base,
+            status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['CARD_VERIFICATION_PENDING'],
+            warnings: [...new Set(sixthSeventhDay.warnings || [])],
+            counts,
+            source: rowReference(cleanSources[0], 'ΕΡΓ'),
+            target: rowReference(cleanTargets[0], targetCategory)
+        });
+    }
 
     if (counts.predicted_final_repo !== repoLimit) {
         const warnings = [...new Set(targetWarnings(cleanTargets[0]))].sort();

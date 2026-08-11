@@ -3,6 +3,9 @@ const { CompaniesModel } = require('../../models/companies');
 const { ArgiesModel } = require('../../models/stathera_arxeia');
 const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const {
+    buildApasxoliseisScenarioFacts
+} = require('./apasxoliseisScenarioFactsService');
+const {
     dateKeyUtc,
     addDaysUtc,
     endOfWeekSundayUtc
@@ -76,10 +79,12 @@ function resolveNoCardsDisplayStatus(
     row = {},
     { argiesByDateKey = new Map(), companyFlags = {} } = {}
 ) {
+    const cardFacts = buildApasxoliseisScenarioFacts(row).cards;
     if (
         String(row.kathgoria_ergasias || '').trim() !== 'ΕΡΓ' ||
         isZeroHours(row.ores_ergasias) ||
-        !isZeroHours(row.cards_ores_ergasias)
+        !isZeroHours(row.cards_ores_ergasias) ||
+        cardFacts.hasAnyCardEvidence
     ) {
         return '';
     }

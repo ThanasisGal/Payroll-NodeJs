@@ -20,6 +20,9 @@ const schema = new Schema({
     last_transition_command_identity: { type: String, trim: true, default: '' },
     active_calculation_id: { type: String, trim: true, default: '' },
     active_calculation_started_at: { type: Date, default: null },
+    successful_calculation_version: { type: Number, min: 0, default: 0 },
+    last_successful_calculation_id: { type: String, trim: true, default: '' },
+    last_successful_calculation_at: { type: Date, default: null },
     historical_reconstruction_status: {
         type: String,
         enum: ['', 'AUTHORIZED', 'COMPLETED'],

@@ -289,9 +289,9 @@ function testSourceIntervalPositionsAndZeroLengthClearing() {
     const invalidExtraPairRows = fullTimeWeek();
     invalidExtraPairRows[1].cards_apo_ora_02 = 'invalid';
     invalidExtraPairRows[1].cards_eos_ora_02 = 'invalid';
-    assertInvalid(
+    assertNotAvailable(
         build(invalidExtraPairRows),
-        'SOURCE_CARD_INTERVALS_NOT_MATERIALIZABLE'
+        'CARD_VERIFICATION_PENDING'
     );
 }
 
@@ -315,14 +315,17 @@ function testSourceCardHourNormalizationAndAuthority() {
     });
 }
 
-function testTargetCardAnomaliesAlwaysClearWorkFields() {
+function testTargetCardAnomaliesAreNotAvailable() {
     const cases = [
-        { cards_apo_ora_01: '09:00', cards_eos_ora_01: '09:00' },
-        { cards_apo_ora_01: '09:00', cards_eos_ora_01: '09:15' },
-        { cards_apo_ora_01: '09:00', cards_eos_ora_01: '' }
+        [{ cards_apo_ora_01: '09:00', cards_eos_ora_01: '09:00' },
+            'TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL'],
+        [{ cards_apo_ora_01: '09:00', cards_eos_ora_01: '09:15' },
+            'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'],
+        [{ cards_apo_ora_01: '09:00', cards_eos_ora_01: '' },
+            'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR']
     ];
 
-    cases.forEach((targetCards) => {
+    cases.forEach(([targetCards, reason]) => {
         const rows = fullTimeWeek();
         Object.assign(rows[4], targetCards, {
             cards_ores_ergasias: 0,
@@ -331,9 +334,7 @@ function testTargetCardAnomaliesAlwaysClearWorkFields() {
             eos_ora_02_apologistika: '00:00'
         });
         const result = build(rows);
-        assertReadyContract(result, dateKey(1), dateKey(4), 'ΑΝ');
-        assert.ok(result.warnings.length > 0);
-        assert.deepStrictEqual(result.items[1].proposed_values, expectedClearedTarget('ΑΝ'));
+        assertNotAvailable(result, reason);
     });
 }
 
@@ -516,10 +517,10 @@ function testV2InvalidResultsPreserveVersions() {
     const invalidIntervals = partTimeWeek();
     invalidIntervals[2].cards_apo_ora_02 = 'invalid';
     invalidIntervals[2].cards_eos_ora_02 = 'invalid';
-    assertV2Invalid(
-        buildV2(invalidIntervals),
-        'SOURCE_CARD_INTERVALS_NOT_MATERIALIZABLE'
-    );
+    const invalidIntervalResult = buildV2(invalidIntervals);
+    assertNotAvailable(invalidIntervalResult, 'CARD_VERIFICATION_PENDING');
+    assert.strictEqual(invalidIntervalResult.scenario_version, 'repo-transfer-single-pair:v4');
+    assert.strictEqual(invalidIntervalResult.proposal_version, PROPOSAL_VERSION_V2);
 
     const validRows = partTimeWeek();
     const validAnalysis = require(
@@ -712,7 +713,7 @@ function run() {
     testSemanticOrderWhenTargetComesFirst();
     testSourceIntervalPositionsAndZeroLengthClearing();
     testSourceCardHourNormalizationAndAuthority();
-    testTargetCardAnomaliesAlwaysClearWorkFields();
+    testTargetCardAnomaliesAreNotAvailable();
     testProposalClearsProvisionalAutoLeaveFieldsWithoutMutatingRows();
     testSourceProposalClearsLeaveButPreservesHolidayPayrollFields();
     testSourceProposalPreservesCompatibleCalculatedShapeAndBookFlag();

@@ -5,19 +5,24 @@ function userCanReviewEdit() {
 }
 
 function userCanRecordRepoTransferDecision() {
-    return document.getElementById('canRecordRepoTransferDecision')?.value === '1';
+    return document.getElementById('canRecordRepoTransferDecision')?.value === '1' &&
+        canRecordEmploymentDecisionForCurrentPeriod();
 }
 
 function userCanRecordCanonicalDecision() {
-    return document.getElementById('canRecordRepoTransferDecision')?.value === '1';
+    return document.getElementById('canRecordRepoTransferDecision')?.value === '1' &&
+        canRecordEmploymentDecisionForCurrentPeriod();
 }
 
 function userCanManageReusablePolicyApproval() {
-    return document.getElementById('canManageReusablePolicyApproval')?.value === '1';
+    return document.getElementById('canManageReusablePolicyApproval')?.value === '1' &&
+        canRecordEmploymentDecisionForCurrentPeriod();
 }
 
 function userCanApplyRepoTransferDecision() {
-    return document.getElementById('canApplyRepoTransferDecision')?.value === '1';
+    return document.getElementById('canApplyRepoTransferDecision')?.value === '1' &&
+        hasAuthoritativeEmploymentCalculation() &&
+        currentEmploymentPeriodControl?.allowed_actions?.repo_transfer === true;
 }
 
 function num(value) {
@@ -306,6 +311,7 @@ let currentHrPendingGroups = [];
 let currentHrCompletedGroups = [];
 let currentHrReviewLoaded = false;
 let currentHrReviewLoading = false;
+let currentPreCalculationDataIssueGroups = [];
 const currentApprovalHistoryFilters = {
     decisionType: '',
     userName: '',
@@ -950,6 +956,70 @@ function hasValidCardInterval(row = {}) {
     });
 }
 
+function hasAnyCardEvidence(row = {}) {
+    return (
+        num(row.cards_ores_ergasias) > 0 ||
+        [1, 2, 3].some((n) => {
+            const p = pairNo(n);
+            return (
+                String(row[`cards_apo_ora_${p}`] ?? '').trim() !== '' ||
+                String(row[`cards_eos_ora_${p}`] ?? '').trim() !== ''
+            );
+        })
+    );
+}
+
+function resolveCardEvidenceIssue(row = {}) {
+    const pairs = [1, 2, 3].map((n) => {
+        const p = pairNo(n);
+        const rawStart = String(row[`cards_apo_ora_${p}`] ?? '').trim();
+        const rawEnd = String(row[`cards_eos_ora_${p}`] ?? '').trim();
+        return {
+            pair: p,
+            rawStart,
+            rawEnd,
+            startMinutes: rawStart ? timeToMinutes(rawStart) : null,
+            endMinutes: rawEnd ? timeToMinutes(rawEnd) : null
+        };
+    });
+    const invalid = pairs.find((pair) =>
+        (pair.rawStart && pair.startMinutes === null) ||
+        (pair.rawEnd && pair.endMinutes === null)
+    );
+    if (invalid) {
+        return {
+            code: 'INVALID_CARD_EVIDENCE',
+            status: 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ',
+            finding: 'Βρέθηκε μη έγκυρη μη κενή τιμή στα στοιχεία της κάρτας εργασίας.',
+            guidance: 'Ελέγξτε και διορθώστε το μη έγκυρο στοιχείο της κάρτας εργασίας.'
+        };
+    }
+    const orphan = pairs.find((pair) => Boolean(pair.rawStart) !== Boolean(pair.rawEnd));
+    if (orphan) {
+        const finding = orphan.rawStart
+            ? `Υπάρχει χτύπημα εισόδου ${orphan.rawStart} χωρίς αντίστοιχο χτύπημα εξόδου.`
+            : `Υπάρχει χτύπημα εξόδου ${orphan.rawEnd} χωρίς αντίστοιχο χτύπημα εισόδου.`;
+        return {
+            code: 'ORPHAN_CARD_PUNCH',
+            status: 'ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ',
+            finding,
+            guidance: 'Ελέγξτε τα στοιχεία της κάρτας εργασίας και συμπληρώστε ή διορθώστε το ορφανό χτύπημα.'
+        };
+    }
+    const zeroLength = pairs.find((pair) =>
+        pair.rawStart && pair.rawEnd && pair.startMinutes === pair.endMinutes
+    );
+    if (zeroLength) {
+        return {
+            code: 'ZERO_LENGTH_CARD_EVIDENCE',
+            status: 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ',
+            finding: `Η είσοδος και η έξοδος της κάρτας έχουν την ίδια ώρα (${zeroLength.rawStart}).`,
+            guidance: 'Ελέγξτε και διορθώστε τα στοιχεία της κάρτας εργασίας.'
+        };
+    }
+    return null;
+}
+
 function yperoriaCellClass(row) {
     if (sumParanomiYperoria(row) > 0) return 'cell-paranomi-yperoria';
     if (sumNomimiYperoria(row) > 0) return 'cell-nomimi-yperoria';
@@ -964,7 +1034,9 @@ function timeToMinutes(value) {
 
     const [hh, mm] = v.split(':').map(Number);
 
-    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+    if (Number.isNaN(hh) || Number.isNaN(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+        return null;
+    }
 
     return hh * 60 + mm;
 }
@@ -2044,6 +2116,9 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                                 : ''
                     }"
                     data-week-policy="${dev.is_legacy_policy === true ? 'LEGACY' : 'MONDAY_SUNDAY'}"
+                    data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
+                    data-week-start="${escapeHtml(String(dev.week_apo || dev.weekStart || '').slice(0, 10))}"
+                    data-week-end="${escapeHtml(String(dev.week_eos || dev.weekEnd || '').slice(0, 10))}"
                 >
                     <td>${formatDate(dev.week_apo || dev.weekStart)}</td>
                     <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
@@ -2054,7 +2129,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
                     <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
                     <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
-                    <td>${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION'
+                    <td>${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && canRecordCanonicalEmploymentDecision()
                         ? `<div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary canonical-decision-open"
                             data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
                             data-ypokatasthma="${escapeHtml(dev.ypokatasthma || '')}"
@@ -2271,6 +2346,14 @@ function canonicalDecisionPayload(context, type) {
 }
 
 async function openCanonicalDecisionPanel(scope) {
+    if (!canRecordCanonicalEmploymentDecision()) {
+        await Swal.fire({
+            icon: 'info',
+            title: 'Καταγραφή απόφασης',
+            text: 'Η καταγραφή απόφασης είναι διαθέσιμη μετά την ολοκλήρωση του Υπολογισμού Απασχολήσεων ή της Ανακατασκευής της περιόδου.'
+        });
+        return;
+    }
     const modalElement = document.getElementById('canonicalDecisionModal');
     const container = document.getElementById('canonicalDecisionContainer');
     if (!modalElement || !container) return;
@@ -2423,10 +2506,19 @@ function attachScenarioClassifications(rows = [], scenarioByProdhlomenaId = new 
     });
 }
 
-function isAutoCalculatedLeavePresentation(row = {}) {
+const possibleLeavePresentationStates = Object.freeze({
+    NONE: 'NONE',
+    DERIVED: 'DERIVED_POSSIBLE_LEAVE',
+    PERSISTED: 'PERSISTED_POSSIBLE_LEAVE',
+    LEGACY: 'LEGACY_AUTO_CALCULATED_POSSIBLE_LEAVE',
+    CONFIRMED: 'CONFIRMED_LEAVE'
+});
+
+function matchesLegacyAutoCalculatedLeavePresentation(row = {}) {
     const provenance = String(row.leave_provenance || '').trim();
-    if (provenance === 'POSSIBLE_LEAVE') return true;
-    if (provenance === 'AUTO_CALCULATED_LEAVE') return true;
+    if (provenance === 'POSSIBLE_LEAVE' || provenance === 'AUTO_CALCULATED_LEAVE') {
+        return true;
+    }
     if (provenance === 'HR_DECLARED_LEAVE') return false;
     if (row.is_auto_calculated_leave === true) return true;
 
@@ -2448,6 +2540,61 @@ function isAutoCalculatedLeavePresentation(row = {}) {
         !hasMeaningfulValue(row.kathgoria_adeias) &&
         num(row.ores_apoysias) === 0
     );
+}
+
+function resolvePossibleLeavePresentationState(row = {}) {
+    const persistedLeaveCategory = String(
+        row.kathgoria_adeias_apologistika || ''
+    ).trim();
+    const declaredLeaveCategory = String(row.kathgoria_adeias || '').trim();
+    const provenance = String(row.leave_provenance || '').trim();
+
+    if (persistedLeaveCategory === 'POSSIBLE_LEAVE') {
+        return possibleLeavePresentationStates.PERSISTED;
+    }
+
+    if (matchesLegacyAutoCalculatedLeavePresentation(row)) {
+        return possibleLeavePresentationStates.LEGACY;
+    }
+
+    const hasConfirmedLeave =
+        provenance === 'HR_DECLARED_LEAVE' ||
+        row.adeia === true ||
+        row.adeia_apologistika === true ||
+        hasMeaningfulValue(declaredLeaveCategory) ||
+        (hasMeaningfulValue(persistedLeaveCategory) &&
+            persistedLeaveCategory !== 'POSSIBLE_LEAVE') ||
+        num(row.ores_apoysias) > 0 ||
+        num(row.ores_apoysias_apologistika) > 0 ||
+        num(row.ores_adeias_pistomenes_apologistika) > 0;
+
+    if (hasConfirmedLeave) {
+        return possibleLeavePresentationStates.CONFIRMED;
+    }
+
+    const declaredCategory = String(
+        row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
+    ).trim();
+    const hasDeclaredWork =
+        declaredCategory === 'ΕΡΓ' &&
+        (num(row.ores_ergasias) > 0 ||
+            [1, 2, 3].some((number) => {
+                const pair = pairNo(number);
+                return (
+                    hasMeaningfulValue(row[`apo_ora_${pair}`]) ||
+                    hasMeaningfulValue(row[`eos_ora_${pair}`])
+                );
+            }));
+    const hasCards = hasAnyCardEvidence(row);
+    const noCardsDisplayStatus = String(
+        row.noCardsDisplayStatus || row.no_cards_display_status || ''
+    ).trim();
+
+    if (hasDeclaredWork && !hasCards && noCardsDisplayStatus === 'ΑΔΕΙΑ') {
+        return possibleLeavePresentationStates.DERIVED;
+    }
+
+    return possibleLeavePresentationStates.NONE;
 }
 
 function resolveReviewIsFullTimePresentation(row = {}) {
@@ -2487,6 +2634,7 @@ function resolveReviewIsFullTimePresentation(row = {}) {
 }
 
 function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
+    const possibleLeaveState = resolvePossibleLeavePresentationState(row);
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
     ).trim();
@@ -2536,21 +2684,49 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
         };
     }
 
-    if (isAutoCalculatedLeavePresentation(row)) {
+    if (possibleLeaveState === possibleLeavePresentationStates.CONFIRMED) {
         return {
-            text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
-            className: 'cell-adeia-suggestion',
-            source: 'derived'
+            text: 'ΑΔΕΙΑ',
+            className: 'cell-no-card-adeia',
+            source: 'persisted'
         };
     }
 
-    if (persistedCategory) {
+    if (
+        persistedCategory &&
+        ![
+            possibleLeavePresentationStates.DERIVED,
+            possibleLeavePresentationStates.PERSISTED,
+            possibleLeavePresentationStates.LEGACY
+        ].includes(possibleLeaveState)
+    ) {
         return {
             text: derived.apologistikoText || persistedCategory,
             className: isApologistikoIntervalPresent(row)
                 ? 'cell-apologistiko'
                 : '',
             source: 'persisted'
+        };
+    }
+
+    const cardEvidenceIssue = resolveCardEvidenceIssue(row);
+    if (cardEvidenceIssue) {
+        return {
+            text: cardEvidenceIssue.status,
+            className: 'cell-adeia-suggestion',
+            source: 'derived_card_quality'
+        };
+    }
+
+    if (
+        possibleLeaveState === possibleLeavePresentationStates.DERIVED ||
+        possibleLeaveState === possibleLeavePresentationStates.PERSISTED ||
+        possibleLeaveState === possibleLeavePresentationStates.LEGACY
+    ) {
+        return {
+            text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
+            className: 'cell-adeia-suggestion',
+            source: 'derived'
         };
     }
 
@@ -2716,6 +2892,8 @@ function renderReviewRows(rows = [], deviations = []) {
             const groupTr = document.createElement('tr');
             groupTr.classList.add('table-secondary', 'employee-group-row', 'collapsed');
             groupTr.dataset.groupId = groupId;
+            groupTr.dataset.employeeKodikos = String(row.kodikos || '').trim();
+            groupTr.dataset.ypokatasthma = String(row.ypokatasthma || '').trim();
             groupTr.style.cursor = 'pointer';
             groupTr.tabIndex = 0;
             groupTr.setAttribute('role', 'button');
@@ -2753,6 +2931,9 @@ function renderReviewRows(rows = [], deviations = []) {
         tr.classList.add('employee-detail-row');
         tr.classList.add('d-none');
         tr.dataset.groupId = currentGroupId;
+        tr.dataset.employeeKodikos = String(row.kodikos || '').trim();
+        tr.dataset.rowId = rowIdentityKey(row._id || row.id);
+        tr.dataset.date = String(row.hmeromhnia || '').slice(0, 10);
 
         if (row.is_locked) {
             tr.classList.add('row-locked');
@@ -3822,7 +4003,7 @@ function renderPolicyPreviewApplyDryRunApprovals() {
                                         formatPolicyPreviewDateTime(approval.created_at)
                                     )}</td>
                                     <td>${escapeHtml(approval.created_by_user_name || '-')}</td>
-                                    <td title="${escapeHtml(approval.group_id || '')}">${escapeHtml(
+                                    <td>${escapeHtml(
                                         getPolicyPreviewApplyDryRunGroupLabel(approval.group_id)
                                     )}</td>
                                     <td title="${escapeHtml(approval.notes || '')}">${escapeHtml(
@@ -3980,17 +4161,10 @@ function showPolicyPreviewApplyDryRunDetails(approval = {}) {
         <div class="text-start">
             <table class="table table-sm table-bordered align-middle mb-2">
                 <tbody>
-                    <tr><th>ID έγκρισης</th><td>${escapeHtml(
-                        approval.approval_id || '-'
-                    )}</td></tr>
-                    <tr><th>Ομάδα</th><td title="${escapeHtml(
-                        approval.group_id || ''
-                    )}">${escapeHtml(
+                    <tr><th>Ομάδα</th><td>${escapeHtml(
                         getPolicyPreviewApplyDryRunGroupLabel(approval.group_id)
                     )}</td></tr>
-                    <tr><th>Τύπος απόφασης</th><td title="${escapeHtml(
-                        approval.decision_type || ''
-                    )}">${escapeHtml(
+                    <tr><th>Τύπος απόφασης</th><td>${escapeHtml(
                         getPolicyPreviewDecisionLabel(approval.decision_type)
                     )}</td></tr>
                     <tr><th>Ημερομηνία</th><td>${escapeHtml(
@@ -4776,7 +4950,7 @@ function renderAtomicRepoTransferSummary(projection = {}) {
     const entries = [
         ['Μεταφορές ρεπό προς απόφαση', 'ready_count'],
         ['Περιπτώσεις προς ανθρώπινη διερεύνηση', 'review_outcomes_count'],
-        ['Τεχνικές εκκρεμότητες που εμποδίζουν εργασία', 'invalid_projection_count']
+        ['Περιπτώσεις που χρειάζονται έλεγχο', 'invalid_projection_count']
     ].filter(([, key]) => getAtomicRepoTransferCount(summary, key) > 0);
 
     if (entries.length === 0) return '';
@@ -5114,24 +5288,343 @@ function getAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
         });
 }
 
-function renderAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
-    const entries = getAtomicRepoTransferDiagnosticEntries(reasonCounts);
+const actionableIssuePresentationCatalog = Object.freeze({
+    PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY: {
+        title: 'Μη προγραμματισμένη εργασία χωρίς ημέρα αντιστάθμισης',
+        explanation: 'Βρέθηκε πραγματική εργασία, αλλά δεν βρέθηκε κατάλληλη ημέρα της ίδιας εβδομάδας για αντιστάθμιση.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα και τις κάρτες της συγκεκριμένης εβδομάδας.'
+    },
+    PARTIAL_OFFSET_TARGET_BLOCKED: {
+        title: 'Η πιθανή ημέρα αντιστάθμισης έχει εμπόδιο',
+        explanation: 'Βρέθηκε πιθανή ημέρα αντιστάθμισης, αλλά τα στοιχεία της δεν επιτρέπουν ασφαλή αυτόματη επιλογή.',
+        recommendedAction: 'Ελέγξτε την ημέρα, το πρόγραμμα και τις κάρτες πριν αποφασίσετε.'
+    },
+    MULTIPLE_TARGET_CANDIDATES: {
+        title: 'Πολλαπλές πιθανές ημέρες μεταφοράς ρεπό',
+        explanation: 'Βρέθηκαν περισσότερες από μία ημέρες που θα μπορούσαν να χρησιμοποιηθούν ως αντισταθμιστικό ρεπό.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα και τις κάρτες της εβδομάδας και επιλέξτε τη σωστή ημέρα.'
+    },
+    MULTIPLE_SOURCE_CANDIDATES: {
+        title: 'Πολλαπλές πιθανές ημέρες εργασίας σε δηλωμένο ρεπό',
+        explanation: 'Περισσότερες από μία ημέρες μπορούν να θεωρηθούν ως η ημέρα εργασίας που απαιτεί μεταφορά ρεπό.',
+        recommendedAction: 'Ελέγξτε τις κάρτες και το πρόγραμμα της εβδομάδας και επιλέξτε την πραγματική ημέρα εργασίας.'
+    },
+    REPO_DEFICIT_REMAINS: {
+        title: 'Δεν αποκαθίστανται τα απαιτούμενα ρεπό',
+        explanation: 'Η προτεινόμενη μεταφορά δεν αποκαθιστά τον απαιτούμενο αριθμό ημερών ανάπαυσης της εβδομάδας.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα, τις πραγματικές ημέρες εργασίας και τα ρεπό της εβδομάδας.'
+    },
+    REPO_LIMIT_EXCEEDED: {
+        title: 'Υπέρβαση επιτρεπόμενων ρεπό εβδομάδας',
+        explanation: 'Η προτεινόμενη αλλαγή θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ανάπαυσης.',
+        recommendedAction: 'Ελέγξτε ποιες ημέρες πρέπει να παραμείνουν εργασία και ποιες ανάπαυση.'
+    },
+    PROFILE_CHANGED_INSIDE_WEEK: {
+        title: 'Αλλαγή όρων εργασίας μέσα στην εβδομάδα',
+        explanation: 'Οι όροι εργασίας του εργαζομένου άλλαξαν μέσα στην ίδια εβδομάδα και δεν μπορεί να χρησιμοποιηθεί αυτόματα ένα ενιαίο προφίλ.',
+        recommendedAction: 'Ελέγξτε ποιο προφίλ εργασίας πρέπει να χρησιμοποιηθεί για την εβδομάδα και καταγράψτε την αντίστοιχη απόφαση.'
+    },
+    CARD_VERIFICATION_PENDING: {
+        title: 'Απαιτείται επιβεβαίωση στοιχείων κάρτας',
+        explanation: 'Τα διαθέσιμα στοιχεία της κάρτας εργασίας δεν επαρκούν για ασφαλή αυτόματη απόφαση.',
+        recommendedAction: 'Ελέγξτε και, όπου χρειάζεται, διορθώστε ή επιβεβαιώστε τα στοιχεία της κάρτας εργασίας.'
+    },
+    INCOMPLETE_CARD_INTERVAL: {
+        title: 'Ελλιπή στοιχεία εισόδου και εξόδου κάρτας',
+        explanation: 'Υπάρχει χτύπημα κάρτας χωρίς το αντίστοιχο ζεύγος εισόδου ή εξόδου.',
+        recommendedAction: 'Ελέγξτε τα χτυπήματα κάρτας της ημέρας και συμπληρώστε τη σωστή πληροφορία στην αρμόδια ροή.'
+    },
+    CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC: {
+        title: 'Δεν προσδιορίζονται με βεβαιότητα οι ημέρες ανάπαυσης',
+        explanation: 'Τα διαθέσιμα στοιχεία δεν επιτρέπουν ασφαλή επιλογή των ημερών ανάπαυσης της εβδομάδας.',
+        recommendedAction: 'Ελέγξτε τις ημέρες της εβδομάδας και καταγράψτε τη σωστή επιλογή στην υπάρχουσα ενέργεια απόφασης.'
+    },
+    INCOMPLETE_EMPLOYEE_WEEK: {
+        title: 'Ελλιπή στοιχεία εβδομάδας εργαζομένου',
+        explanation: 'Δεν υπάρχουν επαρκή στοιχεία για όλες τις ημέρες της συγκεκριμένης εβδομάδας.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα και τα διαθέσιμα ημερήσια στοιχεία της εβδομάδας.'
+    },
+    EMPLOYMENT_PROFILE_NOT_RESOLVED: {
+        title: 'Δεν προσδιορίστηκαν οι όροι εργασίας της εβδομάδας',
+        explanation: 'Δεν ήταν δυνατό να προσδιοριστούν με ασφάλεια οι όροι εργασίας που ισχύουν για τη συγκεκριμένη εβδομάδα.',
+        recommendedAction: 'Ελέγξτε τα στοιχεία απασχόλησης και το ιστορικό όρων του εργαζομένου.'
+    },
+    ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED: {
+        title: 'Η περίπτωση εκ περιτροπής απασχόλησης χρειάζεται έλεγχο',
+        explanation: 'Η συγκεκριμένη εβδομάδα εκ περιτροπής απασχόλησης δεν μπορεί να αξιολογηθεί με ασφάλεια αυτόματα.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα, τις κάρτες και τις συμβατικές ημέρες εργασίας της εβδομάδας.'
+    },
+    TARGET_LOCKED: {
+        title: 'Η πιθανή ημέρα ρεπό είναι κλειδωμένη',
+        explanation: 'Η ημέρα που θα μπορούσε να χρησιμοποιηθεί ως ρεπό δεν είναι διαθέσιμη για αλλαγή.',
+        recommendedAction: 'Ελέγξτε την κλειδωμένη ημέρα και επιλέξτε την κατάλληλη υπάρχουσα ενέργεια.'
+    },
+    SOURCE_LOCKED: {
+        title: 'Η ημέρα εργασίας είναι κλειδωμένη',
+        explanation: 'Η ημέρα εργασίας που συνδέεται με την περίπτωση δεν είναι διαθέσιμη για αλλαγή.',
+        recommendedAction: 'Ελέγξτε την κλειδωμένη ημέρα πριν καταγράψετε απόφαση.'
+    },
+    SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC: {
+        title: 'Δεν προσδιορίζεται με βεβαιότητα η 6η ημέρα',
+        explanation: 'Περισσότερες από μία ημέρες μπορούν να χαρακτηριστούν ως 6η ημέρα εργασίας.',
+        recommendedAction: 'Ελέγξτε το πρόγραμμα και τις κάρτες ολόκληρης της εβδομάδας.'
+    },
+    SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION: {
+        title: 'Εντοπίστηκε εργασία κατά την 7η συνεχόμενη ημέρα',
+        explanation: 'Τα πραγματικά στοιχεία δείχνουν απασχόληση και κατά την 7η συνεχόμενη ημέρα της εβδομάδας.',
+        recommendedAction: 'Ελέγξτε άμεσα το πρόγραμμα, τις κάρτες και τους όρους εργασίας της εβδομάδας.'
+    }
+});
 
-    if (entries.length === 0) return '';
+const unknownActionableIssuePresentation = Object.freeze({
+    title: 'Απαιτείται περαιτέρω έλεγχος',
+    explanation: 'Το σύστημα δεν μπόρεσε να καταλήξει με ασφάλεια σε αυτόματη απόφαση για τη συγκεκριμένη εβδομάδα.',
+    recommendedAction: 'Ελέγξτε το πρόγραμμα, τις κάρτες και τα στοιχεία της συγκεκριμένης εβδομάδας.'
+});
+
+function actionableIssuePresentation(issueCode) {
+    const code = String(issueCode || '').trim();
+    if (actionableIssuePresentationCatalog[code]) {
+        return actionableIssuePresentationCatalog[code];
+    }
+    const knownExplanation = atomicRepoTransferDiagnosticLabels[code];
+    return knownExplanation
+        ? {
+              title: knownExplanation,
+              explanation: knownExplanation,
+              recommendedAction: 'Ελέγξτε το πρόγραμμα, τις κάρτες και τα στοιχεία της συγκεκριμένης εβδομάδας.'
+          }
+        : unknownActionableIssuePresentation;
+}
+
+function resolveActionableIssueGroups(projection = {}) {
+    if (Array.isArray(projection.actionable_issue_groups)) {
+        return projection.actionable_issue_groups;
+    }
+    const groups = new Map();
+    (Array.isArray(projection.review_outcomes) ? projection.review_outcomes : [])
+        .forEach((outcome) => {
+            const issueCodes = Array.isArray(outcome?.blocked_target_reasons) &&
+                outcome.blocked_target_reasons.length
+                ? outcome.blocked_target_reasons
+                : [outcome?.outcome_code];
+            [...new Set(issueCodes)].forEach((issueCode) => {
+                const code = String(issueCode || '').trim();
+                if (!code || getAtomicRepoTransferDiagnosticCategory(code) === 'INFORMATIONAL_INTERNAL') {
+                    return;
+                }
+                if (!groups.has(code)) groups.set(code, []);
+                groups.get(code).push(outcome);
+            });
+        });
+    return [...groups.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([issueCode, cases]) => ({
+            issue_code: issueCode,
+            category: getAtomicRepoTransferDiagnosticCategory(issueCode),
+            count: cases.length,
+            employees_count: new Set(cases.map((issueCase) =>
+                `${issueCase.team || ''}|${issueCase.company_kod || ''}|${issueCase.ypokatasthma || ''}|${issueCase.employee_kodikos || ''}`
+            )).size,
+            cases
+        }));
+}
+
+function actionableIssueEmployeeLabel(issueCase = {}) {
+    const code = String(issueCase.employee_kodikos || '').trim();
+    const branch = String(issueCase.ypokatasthma || '').trim();
+    const row = currentReviewRows.find(
+        (candidate) => String(candidate?.kodikos || '').trim() === code &&
+            (!branch || String(candidate?.ypokatasthma || '').trim() === branch)
+    );
+    const name = `${row?.eponymo || ''} ${row?.onoma || ''}`.trim();
+    return name ? `${code} — ${name}` : `Εργαζόμενος ${code || 'χωρίς διαθέσιμο κωδικό'}`;
+}
+
+function actionableIssueRelatedDates(issueCase = {}) {
+    const dates = new Set([
+        issueCase.source?.hmeromhnia,
+        issueCase.target?.hmeromhnia,
+        issueCase.source_date,
+        issueCase.target_date,
+        ...(Array.isArray(issueCase.related_dates) ? issueCase.related_dates : []),
+        ...(Array.isArray(issueCase.blocked_target_candidates)
+            ? issueCase.blocked_target_candidates.map((candidate) => candidate?.hmeromhnia)
+            : [])
+    ].filter(Boolean));
+    return [...dates].sort().map(formatPolicyPreviewDate);
+}
+
+function renderActionableIssueCase(issueCase = {}, issueCode, groupIndex, caseIndex) {
+    const dates = actionableIssueRelatedDates(issueCase);
+    const weekStart = formatPolicyPreviewDate(issueCase.week_start);
+    const weekEnd = formatPolicyPreviewDate(issueCase.week_end);
+    const sourceHours = issueCase.source?.cards_ores_ergasias ?? issueCase.card_hours;
+    const candidateCount = Array.isArray(issueCase.blocked_target_candidates)
+        ? issueCase.blocked_target_candidates.length
+        : Number(issueCase.target_candidates_count || 0);
+    const guidance = (Array.isArray(issueCase.investigation_guidance)
+        ? issueCase.investigation_guidance
+        : [])
+        .filter((value) => ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'].includes(value))
+        .map((value) => value === 'ΑΔΕΙΑ' ? 'άδεια' : 'απουσία');
+    const finding = actionableIssuePresentation(issueCode).explanation;
+    const blockedCandidates = (Array.isArray(issueCase.blocked_target_candidates)
+        ? issueCase.blocked_target_candidates
+        : []).filter((candidate) => /^\d{4}-\d{2}-\d{2}$/.test(
+        String(candidate?.hmeromhnia || '')
+    ));
+    return `
+        <article class="actionable-issue-case" data-actionable-group-index="${escapeHtml(groupIndex)}"
+            data-actionable-case-index="${escapeHtml(caseIndex)}">
+            <div class="fw-semibold">${escapeHtml(actionableIssueEmployeeLabel(issueCase))}</div>
+            <div><span class="text-muted">Τι βρέθηκε:</span> ${escapeHtml(finding)}</div>
+            ${issueCase.week_start ? `<div><span class="text-muted">Εβδομάδα:</span> ${escapeHtml(weekStart)}–${escapeHtml(weekEnd)}</div>` : ''}
+            ${dates.length ? `<div><span class="text-muted">Σχετικές ημέρες:</span> ${escapeHtml(dates.join(', '))}</div>` : ''}
+            ${Number.isFinite(Number(sourceHours)) ? `<div><span class="text-muted">Ώρες κάρτας:</span> ${escapeHtml(formatAtomicRepoTransferHours(sourceHours))}</div>` : ''}
+            ${candidateCount > 0 ? `<div><span class="text-muted">Πιθανές ημέρες:</span> ${escapeHtml(candidateCount)}</div>` : ''}
+            ${guidance.length ? `<div><span class="text-muted">Τι χρειάζεται:</span> Ελέγξτε αν υπάρχει ${escapeHtml(guidance.join(' ή '))}.</div>` : ''}
+            ${blockedCandidates.length ? `<div class="mt-1"><span class="text-muted">Υποψήφιες ημέρες:</span><ul class="mb-0">${blockedCandidates.map((candidate) =>
+                `<li>${escapeHtml(formatPolicyPreviewDate(candidate.hmeromhnia))}${candidate.current_category ? ` — ${escapeHtml(candidate.current_category)}` : ''}${(Array.isArray(candidate.blocker_reasons) ? candidate.blocker_reasons : []).map((reason) =>
+                    `<div>${escapeHtml(reviewHrReasonLabel(reason))}</div>`
+                ).join('')}</li>`
+            ).join('')}</ul></div>` : ''}
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary actionable-issue-open-case"
+                    data-actionable-group-index="${escapeHtml(groupIndex)}"
+                    data-actionable-case-index="${escapeHtml(caseIndex)}">Άνοιγμα στον πίνακα</button>
+                <span class="small text-muted actionable-issue-navigation-feedback" aria-live="polite"></span>
+            </div>
+        </article>
+    `;
+}
+
+function renderActionableIssueGroups(issueGroups = []) {
+    const groups = (Array.isArray(issueGroups) ? issueGroups : []).filter(
+        (group) => Number(group?.count) > 0 && Array.isArray(group?.cases) &&
+            getAtomicRepoTransferDiagnosticCategory(group?.issue_code) !==
+                'INFORMATIONAL_INTERNAL'
+    );
+
+    if (groups.length === 0) return '';
 
     return `
         <div class="atomic-repo-transfer-diagnostic-summary">
             <div class="fw-semibold">Εκκρεμότητες που απαιτούν ενέργεια</div>
-            <div class="atomic-repo-transfer-diagnostic-list">
-                ${entries
-                    .map(({ count, label }) => {
-                        const countLabel = count === 1 ? 'περίπτωση' : 'περιπτώσεις';
-                        return `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(count)} ${countLabel}: ${escapeHtml(label)}</div>`;
+            <div class="actionable-issue-groups">
+                ${groups
+                    .map((group, groupIndex) => {
+                        const presentation = actionableIssuePresentation(group.issue_code);
+                        const panelId = `actionableIssuePanel-${groupIndex}`;
+                        const countLabel = Number(group.count) === 1 ? 'περίπτωση' : 'περιπτώσεις';
+                        return `<div class="actionable-issue-group">
+                            <button type="button" class="actionable-issue-summary" aria-expanded="false"
+                                aria-controls="${panelId}" data-actionable-group-index="${escapeHtml(groupIndex)}">
+                                <span><strong>${escapeHtml(group.count)} ${countLabel}</strong> — ${escapeHtml(presentation.title)}</span>
+                                <span aria-hidden="true" class="actionable-issue-chevron">▸</span>
+                            </button>
+                            <div class="actionable-issue-panel d-none" id="${panelId}">
+                                <div class="actionable-issue-guidance">
+                                    <div><strong>Γιατί εμφανίζεται αυτή η εκκρεμότητα:</strong> ${escapeHtml(presentation.explanation)}</div>
+                                    <div><strong>Τι προτείνεται να κάνει ο Υπεύθυνος Ανθρώπινου Δυναμικού:</strong> ${escapeHtml(presentation.recommendedAction)}</div>
+                                </div>
+                                <div class="actionable-issue-cases">
+                                    ${group.cases.map((issueCase, caseIndex) =>
+                                        renderActionableIssueCase(
+                                            issueCase,
+                                            group.issue_code,
+                                            groupIndex,
+                                            caseIndex
+                                        )
+                                    ).join('')}
+                                </div>
+                            </div>
+                        </div>`;
                     })
                     .join('')}
             </div>
         </div>
     `;
+}
+
+function buildPreCalculationDataIssueGroups(rows = []) {
+    const groupsByCode = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+        const issue = resolveCardEvidenceIssue(row);
+        if (!issue) return;
+        const groupCode = issue.code === 'ORPHAN_CARD_PUNCH'
+            ? issue.code
+            : 'INVALID_CARD_EVIDENCE';
+        if (!groupsByCode.has(groupCode)) {
+            groupsByCode.set(groupCode, {
+                issue_code: groupCode,
+                title: issue.code === 'ORPHAN_CARD_PUNCH'
+                    ? 'Ορφανό χτύπημα κάρτας'
+                    : 'Άκυρα στοιχεία κάρτας',
+                cases: []
+            });
+        }
+        groupsByCode.get(groupCode).cases.push({
+            prodhlomena_oraria_id: String(row._id || row.id || ''),
+            employee_kodikos: String(row.kodikos || ''),
+            employee_name: String(
+                row.employeeName || `${row.eponymo || ''} ${row.onoma || ''}`
+            ).trim(),
+            source_date: String(row.hmeromhnia || '').slice(0, 10),
+            finding: issue.finding,
+            guidance: issue.guidance
+        });
+    });
+    return [...groupsByCode.values()]
+        .map((group) => ({ ...group, count: group.cases.length }))
+        .sort((left, right) => left.title.localeCompare(right.title, 'el'));
+}
+
+function renderPreCalculationDataIssues(rows = []) {
+    const container = document.getElementById('policyPreviewGroupsContainer');
+    if (!container) return;
+    currentPreCalculationDataIssueGroups = buildPreCalculationDataIssueGroups(rows);
+    if (currentPreCalculationDataIssueGroups.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = `
+        <section class="card border rounded employment-review-pending-summary"
+            aria-label="Εκκρεμότητες δεδομένων πριν τον υπολογισμό">
+            <div class="card-body py-2">
+                <div class="fw-semibold">Εκκρεμότητες δεδομένων πριν τον υπολογισμό</div>
+                <div class="small text-muted mb-2">Ελέγξτε την ποιότητα των δεδομένων πριν εκτελέσετε τον υπολογισμό ή την ανακατασκευή της περιόδου.</div>
+                <div class="actionable-issue-groups">
+                    ${currentPreCalculationDataIssueGroups.map((group, groupIndex) => {
+                        const panelId = `preCalculationDataIssuePanel-${groupIndex}`;
+                        const countLabel = group.count === 1 ? 'περίπτωση' : 'περιπτώσεις';
+                        return `<div class="actionable-issue-group">
+                            <button type="button" class="actionable-issue-summary" aria-expanded="false"
+                                aria-controls="${panelId}" data-actionable-group-index="${groupIndex}">
+                                <span><strong>${group.count} ${countLabel}</strong> — ${escapeHtml(group.title)}</span>
+                                <span aria-hidden="true" class="actionable-issue-chevron">▸</span>
+                            </button>
+                            <div class="actionable-issue-panel d-none" id="${panelId}">
+                                <div class="actionable-issue-cases">${group.cases.map((issueCase, caseIndex) => `
+                                    <article class="actionable-issue-case">
+                                        <div class="fw-semibold">${escapeHtml(actionableIssueEmployeeLabel(issueCase))}</div>
+                                        <div>${escapeHtml(formatPolicyPreviewDate(issueCase.source_date))}</div>
+                                        <div><span class="text-muted">Τι βρέθηκε:</span> ${escapeHtml(issueCase.finding)}</div>
+                                        <div><span class="text-muted">Τι πρέπει να γίνει:</span> ${escapeHtml(issueCase.guidance)}</div>
+                                        <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-primary actionable-issue-open-case"
+                                                data-issue-source="pre-calculation" data-actionable-group-index="${groupIndex}"
+                                                data-actionable-case-index="${caseIndex}">Άνοιγμα στον πίνακα</button>
+                                            <span class="small text-muted actionable-issue-navigation-feedback" aria-live="polite"></span>
+                                        </div>
+                                    </article>`).join('')}</div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        </section>`;
+    bindActionableIssueEvents(container);
 }
 
 function renderAtomicRepoTransferDiagnostics(projection = {}) {
@@ -5146,7 +5639,7 @@ function renderAtomicRepoTransferDiagnostics(projection = {}) {
     }
 
     if (
-        getAtomicRepoTransferDiagnosticEntries(reasonCounts).length === 0 &&
+        resolveActionableIssueGroups(projection).length === 0 &&
         warningMessages.length === 0
     ) {
         return '';
@@ -5154,7 +5647,7 @@ function renderAtomicRepoTransferDiagnostics(projection = {}) {
 
     return `
         <div class="atomic-repo-transfer-diagnostics">
-            ${renderAtomicRepoTransferDiagnosticEntries(reasonCounts)}
+            ${renderActionableIssueGroups(resolveActionableIssueGroups(projection))}
             ${warningMessages
                 .map(
                     (message) =>
@@ -5375,7 +5868,89 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
     `;
 }
 
+function highlightActionableIssueTarget(target) {
+    target.classList.remove('actionable-issue-target-highlight');
+    target.classList.add('actionable-issue-target-highlight');
+    target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    window.setTimeout(() => target.classList.remove('actionable-issue-target-highlight'), 3000);
+}
+
+function openActionableIssueInTable(issueCase = {}, feedback = null) {
+    const employeeKodikos = String(issueCase.employee_kodikos || '').trim();
+    const ypokatasthma = String(issueCase.ypokatasthma || '').trim();
+    const groupRow = [...document.querySelectorAll('#resultsTable .employee-group-row')]
+        .find((row) =>
+            String(row.dataset.employeeKodikos || '') === employeeKodikos &&
+            (!ypokatasthma || String(row.dataset.ypokatasthma || '') === ypokatasthma)
+        );
+    if (!groupRow) {
+        if (feedback) feedback.textContent = 'Η περίπτωση δεν είναι ορατή με τα τρέχοντα φίλτρα.';
+        return false;
+    }
+
+    setEmployeeGroupExpanded(groupRow, true);
+    const weekStart = String(issueCase.week_start || '').slice(0, 10);
+    const weekEnd = String(issueCase.week_end || '').slice(0, 10);
+    const weeklyTarget = [...document.querySelectorAll(
+        '#resultsTable .employee-deviation-row tbody > tr[data-employee-kodikos]'
+    )].find((row) =>
+        String(row.dataset.employeeKodikos || '') === employeeKodikos &&
+        (!weekStart || String(row.dataset.weekStart || '') === weekStart) &&
+        (!weekEnd || String(row.dataset.weekEnd || '') === weekEnd)
+    );
+    const rowId = String(
+        issueCase.source?.prodhlomena_oraria_id ||
+        issueCase.target?.prodhlomena_oraria_id ||
+        issueCase.source_row_id ||
+        issueCase.target_row_id ||
+        ''
+    ).trim();
+    const date = String(
+        issueCase.source?.hmeromhnia || issueCase.target?.hmeromhnia ||
+        issueCase.source_date || issueCase.target_date || ''
+    ).slice(0, 10);
+    const dailyTarget = [...document.querySelectorAll('#resultsTable .employee-detail-row')]
+        .find((row) =>
+            String(row.dataset.employeeKodikos || '') === employeeKodikos &&
+            ((rowId && String(row.dataset.rowId || '') === rowId) ||
+                (!rowId && date && String(row.dataset.date || '') === date))
+        );
+    const target = weeklyTarget || dailyTarget || groupRow;
+    highlightActionableIssueTarget(target);
+    if (feedback) feedback.textContent = target === groupRow && (weekStart || rowId || date)
+        ? 'Ανοίχτηκε ο εργαζόμενος· η συγκεκριμένη γραμμή δεν είναι ορατή με τα τρέχοντα φίλτρα.'
+        : '';
+    return true;
+}
+
+function bindActionableIssueEvents(container) {
+    container.querySelectorAll('.actionable-issue-summary').forEach((button) => {
+        button.addEventListener('click', () => {
+            const panel = document.getElementById(button.getAttribute('aria-controls'));
+            if (!panel) return;
+            const willOpen = panel.classList.contains('d-none');
+            panel.classList.toggle('d-none', !willOpen);
+            button.setAttribute('aria-expanded', String(willOpen));
+        });
+    });
+    container.querySelectorAll('.actionable-issue-open-case').forEach((button) => {
+        button.addEventListener('click', () => {
+            const groupIndex = Number(button.dataset.actionableGroupIndex);
+            const caseIndex = Number(button.dataset.actionableCaseIndex);
+            const issueCase = button.dataset.issueSource === 'pre-calculation'
+                ? currentPreCalculationDataIssueGroups?.[groupIndex]?.cases?.[caseIndex]
+                : currentAtomicRepoTransferProjection
+                    ?.actionable_issue_groups?.[groupIndex]?.cases?.[caseIndex];
+            const feedback = button.parentElement?.querySelector(
+                '.actionable-issue-navigation-feedback'
+            );
+            if (issueCase) openActionableIssueInTable(issueCase, feedback);
+        });
+    });
+}
+
 function bindAtomicRepoTransferEvents(container) {
+    bindActionableIssueEvents(container);
     container.querySelectorAll('.atomic-repo-transfer-toggle').forEach((button) => {
         button.addEventListener('click', () => {
             const targetId = button.dataset.atomicTargetId;
@@ -6024,7 +6599,19 @@ async function loadHrReviewQueue() {
     }
 
     try {
-        await loadEmploymentPeriodControl(branch);
+        const periodControl = await loadEmploymentPeriodControl(branch);
+        if (!hasAuthoritativeEmploymentCalculation(periodControl)) {
+            currentHrReviewLoaded = false;
+            currentHrReviewProjection = null;
+            currentAtomicRepoTransferProjection = null;
+            currentHrPendingGroups = [];
+            currentHrCompletedGroups = [];
+            if (status) {
+                status.className = 'hr-review-status hr-review-empty-state';
+                status.textContent = 'Οι εκκρεμότητες HR ενεργοποιούνται μετά από επιτυχημένο Υπολογισμό Απασχολήσεων ή Ανακατασκευή Εκπρόθεσμης Περιόδου.';
+            }
+            return;
+        }
         currentPolicyPreviewBaseParams = new URLSearchParams(params);
         currentRepoTransferDecisionsByProposalId = new Map();
         const result = await fetchPolicyPreviewGrouping(params);
@@ -6226,15 +6813,9 @@ function renderAtomicRepoTransferProjection(projection) {
             επιβεβαιώσει ότι επιτρέπεται η ασφαλής εφαρμογή.
         </div>
     ` : '';
-    const reviewSafetyHtml = reviewOutcomes.length ? `
-        <div class="atomic-repo-transfer-main-warning">
-            Οι παρακάτω περιπτώσεις χρειάζονται διερεύνηση από το HR.
-            Δεν έχει δημιουργηθεί πρόταση μεταφοράς ή εφαρμογής.
-        </div>
-    ` : '';
+    const hasActionableIssues = resolveActionableIssueGroups(projection).length > 0;
 
-    if (groups.length === 0 && reviewOutcomes.length === 0 &&
-        getAtomicRepoTransferDiagnosticEntries(projection.reason_counts || {}).length === 0) {
+    if (groups.length === 0 && !hasActionableIssues) {
         return '';
     }
 
@@ -6249,16 +6830,8 @@ function renderAtomicRepoTransferProjection(projection) {
                         <span class="atomic-repo-transfer-readonly-badge">Ροή έγκρισης HR</span>
                     </div>
                     ${groupSafetyHtml}
-                    ${reviewSafetyHtml}
                     ${renderAtomicRepoTransferSummary(projection)}
                     ${renderAtomicRepoTransferDiagnostics(projection)}
-                    ${reviewOutcomes.length
-                        ? `<div class="fw-semibold mt-3 mb-2">Περιπτώσεις προς διερεύνηση</div>
-                           <div class="atomic-repo-transfer-groups">${reviewOutcomesHtml}</div>`
-                        : ''}
-                    ${groups.length && reviewOutcomes.length
-                        ? '<div class="fw-semibold mt-3 mb-2">Συνδεδεμένες προτάσεις</div>'
-                        : ''}
                     <div class="atomic-repo-transfer-groups">${groupsHtml}</div>
                 </div>
             </div>
@@ -6411,7 +6984,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
         ? `
             <details class="policy-preview-diagnostics-accordion mt-2">
                 <summary>
-                    Τεχνικές εκκρεμότητες πολιτικής
+                    Περιπτώσεις χωρίς διαθέσιμη ενέργεια HR
                     <span class="badge text-bg-secondary ms-1">${escapeHtml(
                         diagnosticGroups.reduce(
                             (total, entry) => total + Number(entry.group?.count || 0),
@@ -6548,6 +7121,21 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 }
 
 let currentEmploymentPeriodControl = null;
+
+function hasAuthoritativeEmploymentCalculation(state = currentEmploymentPeriodControl) {
+    return state?.calculation?.authoritative_result === true &&
+        String(state?.effective_mode || '') !== 'HISTORICAL_RECONSTRUCTION_STALE';
+}
+
+function canRecordCanonicalEmploymentDecision(state = currentEmploymentPeriodControl) {
+    return document.getElementById('canRecordRepoTransferDecision')?.value === '1' &&
+        canRecordEmploymentDecisionForCurrentPeriod(state);
+}
+
+function canRecordEmploymentDecisionForCurrentPeriod(state = currentEmploymentPeriodControl) {
+    return hasAuthoritativeEmploymentCalculation(state) &&
+        state?.allowed_actions?.record_decision === true;
+}
 
 function getActiveEmploymentReviewScope() {
     const apoHmeromhnia = String(document.getElementById('apo_hmeromhnia')?.value || '').trim();
@@ -6924,11 +7512,14 @@ async function loadResults() {
         branchValidation?.classList.toggle('d-none', !invalidBranch);
         if (invalidBranch) return;
 
-        await loadEmploymentPeriodControl(advancedBranch);
+        const periodControl = await loadEmploymentPeriodControl(advancedBranch);
+        const hasAuthoritativeResult = hasAuthoritativeEmploymentCalculation(periodControl);
 
         currentAtomicRepoTransferProjection = null;
         currentPolicyPreviewRowsById = new Map();
-        renderPolicyPreviewGroups(null, { loading: true });
+        currentPreCalculationDataIssueGroups = [];
+        if (hasAuthoritativeResult) renderPolicyPreviewGroups(null, { loading: true });
+        else document.getElementById('policyPreviewGroupsContainer')?.replaceChildren();
 
         const params = new URLSearchParams({
             apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
@@ -6979,7 +7570,7 @@ async function loadResults() {
         currentApprovalHistoryFilters.searchText = '';
 
         const rows = payload.rows || [];
-        if (payload.finalized !== true) {
+        if (payload.finalized !== true && hasAuthoritativeResult) {
             try {
                 const scenarioRows = await fetchScenarioClassifications(params);
                 const scenarioByProdhlomenaId = buildScenarioClassificationsMap(scenarioRows);
@@ -7019,6 +7610,11 @@ async function loadResults() {
                 }
                 correctiveSummary.classList.remove('d-none');
             } else correctiveSummary.classList.add('d-none');
+        }
+
+        if (payload.finalized !== true && !hasAuthoritativeResult) {
+            renderPreCalculationDataIssues(rows);
+            return;
         }
 
         if (payload.finalized !== true) {
@@ -7140,12 +7736,19 @@ function renderEditableApologistikaRows(row) {
 }
 
 function renderApologistikaFields(row) {
-    const possibleLeave = isAutoCalculatedLeavePresentation(row);
+    const possibleLeaveState = resolvePossibleLeavePresentationState(row);
+    const possibleLeave = [
+        possibleLeavePresentationStates.DERIVED,
+        possibleLeavePresentationStates.PERSISTED,
+        possibleLeavePresentationStates.LEGACY
+    ].includes(possibleLeaveState);
+    const derivedPossibleLeave = possibleLeaveState === possibleLeavePresentationStates.DERIVED;
+    const cardEvidenceIssue = possibleLeaveState === possibleLeavePresentationStates.CONFIRMED
+        ? null
+        : resolveCardEvidenceIssue(row);
     const displayRow = possibleLeave
         ? { ...row, adeia_apologistika: false,
-            kathgoria_adeias_apologistika:
-                String(row.kathgoria_adeias_apologistika || '').trim() === 'POSSIBLE_LEAVE'
-                    ? 'POSSIBLE_LEAVE' : '' }
+            kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' }
         : row;
     const numberFields = [
         ['Ώρες εργασίας', 'ores_ergasias_apologistika'],
@@ -7179,6 +7782,7 @@ function renderApologistikaFields(row) {
     ];
 
     return `
+        ${cardEvidenceIssue ? `<div class="alert alert-warning py-2"><strong>Κατάσταση:</strong> ${escapeHtml(cardEvidenceIssue.status)}<div class="small mt-1">${escapeHtml(cardEvidenceIssue.code === 'ORPHAN_CARD_PUNCH' ? 'Βρέθηκε ορφανό χτύπημα κάρτας. Απαιτείται έλεγχος ή συμπλήρωση της αντίστοιχης κίνησης πριν ολοκληρωθεί με ασφάλεια ο υπολογισμός.' : cardEvidenceIssue.finding)}</div><div class="small mt-1">${escapeHtml(cardEvidenceIssue.guidance)}</div></div>` : ''}
         ${possibleLeave ? '<div class="alert alert-warning py-2"><strong>Κατάσταση:</strong> ΠΙΘΑΝΗ ΑΔΕΙΑ</div>' : ''}
         <div class="row g-2">
             ${numberFields
@@ -7236,7 +7840,9 @@ function renderApologistikaFields(row) {
                         type="hidden"
                         name="edit_kathgoria_adeias_apologistika_hidden"
                         id="edit_kathgoria_adeias_apologistika_hidden"
-                        value="${displayRow.kathgoria_adeias_apologistika || ''}"
+                        value="${derivedPossibleLeave ? '' : (displayRow.kathgoria_adeias_apologistika || '')}"
+                        data-derived-possible-leave="${derivedPossibleLeave ? 'true' : 'false'}"
+                        data-presentation-value="${displayRow.kathgoria_adeias_apologistika || ''}"
                     />
 
                     <select
@@ -7249,6 +7855,7 @@ function renderApologistikaFields(row) {
                         data-preselect="edit_kathgoria_adeias_apologistika_hidden"
                         data-preload-all="true"
                         data-pad-length="6">
+                        ${possibleLeave ? '<option value="POSSIBLE_LEAVE" selected>ΠΙΘΑΝΗ ΑΔΕΙΑ</option>' : ''}
                     </select>
                 </div>
         </div>
@@ -7507,6 +8114,15 @@ function validateReviewSave(updates) {
 
     if (updates.adeia_apologistika === true && !updates.kathgoria_adeias_apologistika) {
         errors.push('Όταν υπάρχει Άδεια, πρέπει να συμπληρωθεί Κατηγορία άδειας απολογιστικά.');
+    }
+
+    if (
+        updates.adeia_apologistika === true &&
+        updates.kathgoria_adeias_apologistika === 'POSSIBLE_LEAVE'
+    ) {
+        errors.push(
+            'Η ΠΙΘΑΝΗ ΑΔΕΙΑ δεν αποτελεί επιβεβαιωμένη άδεια. Επιλέξτε πραγματική κατηγορία άδειας.'
+        );
     }
 
     if (updates.repo_apologistika === true && updates.adeia_apologistika === true) {
@@ -7913,6 +8529,9 @@ function initModalKathgoriaAdeiasTomSelect() {
         return;
     }
 
+    const categoryLabel = (value, fallback = '') =>
+        value === 'POSSIBLE_LEAVE' ? 'ΠΙΘΑΝΗ ΑΔΕΙΑ' : (fallback || value);
+
     const tomSelect = new TomSelect(select, {
         valueField: 'value',
         labelField: 'label',
@@ -7941,10 +8560,10 @@ function initModalKathgoriaAdeiasTomSelect() {
                 const options = rawOptions.map((item) => {
                     const value = item.value || item.kodikos || item.id || '';
 
-                    const label =
+                    const label = categoryLabel(value,
                         item.label ||
                         item.text ||
-                        `${item.kodikos || value} - ${item.perigrafh || ''}`;
+                        `${item.kodikos || value} - ${item.perigrafh || ''}`);
 
                     return {
                         ...item,
@@ -7961,36 +8580,60 @@ function initModalKathgoriaAdeiasTomSelect() {
         },
 
         onInitialize: function () {
-            const value = hidden.value || '';
+            const value = hidden.dataset.presentationValue || hidden.value || '';
 
             if (value) {
                 this.addOption({
                     value,
-                    label: value
+                    label: categoryLabel(value)
                 });
 
                 this.setValue(value, true);
 
                 if (adeiaCheckbox) {
-                    adeiaCheckbox.checked = true;
+                    adeiaCheckbox.checked = value !== 'POSSIBLE_LEAVE';
                 }
             }
         },
 
         onChange: function (value) {
             hidden.value = value || '';
+            hidden.dataset.derivedPossibleLeave = 'false';
+            hidden.dataset.presentationValue = value || '';
 
             if (adeiaCheckbox) {
-                adeiaCheckbox.checked = !!value;
+                adeiaCheckbox.checked = Boolean(value) && value !== 'POSSIBLE_LEAVE';
             }
         }
     });
 
     if (adeiaCheckbox) {
         adeiaCheckbox.addEventListener('change', () => {
+            if (
+                adeiaCheckbox.checked &&
+                (hidden.value === 'POSSIBLE_LEAVE' ||
+                    hidden.dataset.presentationValue === 'POSSIBLE_LEAVE')
+            ) {
+                hidden.value = '';
+                hidden.dataset.derivedPossibleLeave = 'false';
+                hidden.dataset.presentationValue = '';
+                tomSelect.clear(true);
+                return;
+            }
+
             if (!adeiaCheckbox.checked) {
                 hidden.value = '';
-                tomSelect.clear(true);
+                if (hidden.dataset.derivedPossibleLeave === 'true') {
+                    hidden.dataset.presentationValue = 'POSSIBLE_LEAVE';
+                    tomSelect.addOption({
+                        value: 'POSSIBLE_LEAVE',
+                        label: 'ΠΙΘΑΝΗ ΑΔΕΙΑ'
+                    });
+                    tomSelect.setValue('POSSIBLE_LEAVE', true);
+                } else {
+                    hidden.dataset.presentationValue = '';
+                    tomSelect.clear(true);
+                }
             }
         });
     }

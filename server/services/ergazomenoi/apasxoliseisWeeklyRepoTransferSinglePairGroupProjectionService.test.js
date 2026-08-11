@@ -413,16 +413,13 @@ function testNonReadyProposalPaths() {
     assertNotAvailable(build(fullTimeWeek().slice(0, 6)), 'INCOMPLETE_WEEK_DATA');
 }
 
-function testTargetWarningsArePreserved() {
+function testTargetCardEvidenceIsNotAvailable() {
     const rows = fullTimeWeek();
     rows[4].cards_apo_ora_01 = '09:00';
     rows[4].cards_eos_ora_01 = '09:15';
     const result = build(rows);
 
-    assertReady(result);
-    assert.deepStrictEqual(result.warnings, ['TARGET_ZERO_HOURS_WITH_CARD_INTERVALS']);
-    assert.deepStrictEqual(result.groups[0].warnings, result.warnings);
-    assert.notStrictEqual(result.groups[0].warnings, result.warnings);
+    assertNotAvailable(result, 'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS');
 }
 
 function testMissingAndDuplicateIdsDoNotCreateGroups() {
@@ -670,7 +667,7 @@ function run() {
     testStableGroupIdentity();
     testSplitShiftIntervalsArePreservedInProjection();
     testNonReadyProposalPaths();
-    testTargetWarningsArePreserved();
+    testTargetCardEvidenceIsNotAvailable();
     testMissingAndDuplicateIdsDoNotCreateGroups();
     testInputImmutability();
     testOutputOwnershipAndFreeze();

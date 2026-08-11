@@ -300,7 +300,9 @@ function testValidFullTimeAndPartTimeWeeks() {
         not_available_count: 0,
         invalid_projection_count: 0,
         review_outcomes_count: 0,
-        review_outcome_employees_count: 0
+        review_outcome_employees_count: 0,
+        actionable_issue_groups_count: 0,
+        actionable_issue_cases_count: 0
     });
     assert.strictEqual(fullTime.groups.length, 1);
     assert.deepStrictEqual(
@@ -622,7 +624,7 @@ function testWarningsAndResponseComposition() {
     const atomic = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [weeklyInput(rows)]
     });
-    assert.strictEqual(atomic.warning_counts.TARGET_ZERO_HOURS_WITH_CARD_INTERVALS, 1);
+    assert.strictEqual(atomic.reason_counts.TARGET_ZERO_HOURS_WITH_CARD_INTERVALS, 1);
 
     const grouping = { version: 1, scope: 'page', summary: { groups_count: 0 }, groups: [] };
     const baseResponse = {
@@ -727,6 +729,107 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
     assert.strictEqual(combined.summary.review_outcomes_count, 1);
     assert.strictEqual(combined.summary.review_outcome_employees_count, 1);
     assert.strictEqual(combined.summary.employees_count, 2);
+}
+
+function testActionableIssueGroupingAndInputIdentity() {
+    const diagnostics = Array.from({ length: 12 }, (_, index) => ({
+        reason: 'INCOMPLETE_EMPLOYEE_WEEK',
+        team: 'team-a',
+        company_kod: 'company-a',
+        ypokatasthma: '0001',
+        employee_kodikos: String((index % 3) + 1).padStart(3, '0'),
+        week_start: dateKey('2026-01-05', index * 7),
+        week_end: dateKey('2026-01-11', index * 7)
+    }));
+    diagnostics.push(
+        { ...diagnostics[0], reason: 'UNKNOWN_A' },
+        { ...diagnostics[0], reason: 'UNKNOWN_B' },
+        { ...diagnostics[0], reason: 'NO_SOURCE_CANDIDATE' },
+        { ...diagnostics[0], reason: 'OPEN_WEEK_PENDING_COMPLETION' }
+    );
+    const projection = buildWeeklyRepoTransferAtomicPageProjection({
+        inputReasonCodes: diagnostics.map((diagnostic) => diagnostic.reason),
+        inputDiagnostics: diagnostics
+    });
+    const incomplete = projection.actionable_issue_groups.find(
+        (group) => group.issue_code === 'INCOMPLETE_EMPLOYEE_WEEK'
+    );
+    assert.strictEqual(incomplete.count, 12);
+    assert.strictEqual(incomplete.employees_count, 3);
+    assert.deepStrictEqual(incomplete.cases[0], diagnostics[0]);
+    assert.deepStrictEqual(
+        projection.actionable_issue_groups
+            .filter((group) => group.issue_code.startsWith('UNKNOWN_'))
+            .map((group) => group.issue_code),
+        ['UNKNOWN_A', 'UNKNOWN_B']
+    );
+    assert.ok(!projection.actionable_issue_groups.some(
+        (group) => ['NO_SOURCE_CANDIDATE', 'OPEN_WEEK_PENDING_COMPLETION']
+            .includes(group.issue_code)
+    ));
+
+    const incompleteInput = buildWeeklyRepoTransferAtomicInputs({
+        rows: fullTimeWeek('2026-07-06', '005').slice(0, 4),
+        periodStart: '2026-07-06',
+        periodEnd: '2026-07-12',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(incompleteInput.inputReasonCodes, [INPUT_REASON.INCOMPLETE_WEEK]);
+    assert.deepStrictEqual(incompleteInput.inputDiagnostics, [{
+        reason: INPUT_REASON.INCOMPLETE_WEEK,
+        team: 'team-a',
+        company_kod: 'company-a',
+        ypokatasthma: '0001',
+        employee_kodikos: '005',
+        week_start: '2026-07-06',
+        week_end: '2026-07-12'
+    }]);
+}
+
+function testReviewOutcomeFeedsActionableCaseWithoutMutation() {
+    const outcome = {
+        outcome_code: 'PARTIAL_OFFSET_TARGET_BLOCKED',
+        team: 'team-a',
+        company_kod: 'company-a',
+        ypokatasthma: '0001',
+        employee_kodikos: '009',
+        week_start: '2026-07-06',
+        week_end: '2026-07-12',
+        source: {
+            prodhlomena_oraria_id: 'source-row',
+            hmeromhnia: '2026-07-07',
+            cards_ores_ergasias: 7.5
+        },
+        blocked_target_candidates: [{
+            prodhlomena_oraria_id: 'target-row',
+            hmeromhnia: '2026-07-10',
+            blocker_reasons: ['TARGET_LOCKED']
+        }],
+        blocked_target_reasons: ['TARGET_LOCKED'],
+        investigation_guidance: ['ΑΔΕΙΑ']
+    };
+    const before = JSON.stringify(outcome);
+    const projection = buildWeeklyRepoTransferAtomicPageProjection(
+        { weeklyInputs: [weeklyInput(fullTimeWeek('2026-07-06', '009'))] },
+        { singleWeekProjectionBuilder: () => ({
+            projection_status: 'NOT_AVAILABLE',
+            reasons: ['NO_TARGET_CANDIDATE'],
+            warnings: [],
+            repo_resolution: { actual_workdays: 6, sixth_day_count: 1 },
+            review_outcomes: [outcome],
+            groups: []
+        }) }
+    );
+    const group = projection.actionable_issue_groups.find(
+        (entry) => entry.issue_code === 'TARGET_LOCKED'
+    );
+    assert.strictEqual(group.count, 1);
+    assert.strictEqual(group.employees_count, 1);
+    assert.deepStrictEqual(group.cases[0], outcome);
+    assert.strictEqual(group.cases[0].source.hmeromhnia, '2026-07-07');
+    assert.strictEqual(group.cases[0].source.cards_ores_ergasias, 7.5);
+    assert.strictEqual(group.cases[0].blocked_target_candidates.length, 1);
+    assert.strictEqual(JSON.stringify(outcome), before);
 }
 
 function testAtomicReusableApprovalResolvesOnlyMetadata() {
@@ -837,6 +940,8 @@ function run() {
     testDeterminismOwnershipAndInputPreservation();
     testWarningsAndResponseComposition();
     testReviewOutcomeSummaryIdentityAndSorting();
+    testActionableIssueGroupingAndInputIdentity();
+    testReviewOutcomeFeedsActionableCaseWithoutMutation();
     testAtomicReusableApprovalResolvesOnlyMetadata();
     testAtomicPreviewOverlapKeepsEveryGroupPending();
     console.log('apasxoliseis weekly repo transfer atomic page projection tests passed');
