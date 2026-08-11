@@ -59,8 +59,16 @@ const sandbox = {
 
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox, { filename: sourcePath });
+vm.runInContext(`currentEmploymentPeriodControl = {
+    effective_mode: 'NORMAL', calculation: { authoritative_result: true },
+    allowed_actions: { record_decision: true, repo_transfer: true }
+}`, sandbox);
 
 function setRepoTransferPermissions({ decision, apply, manageReusable } = {}) {
+    vm.runInContext(`currentEmploymentPeriodControl = {
+        effective_mode: 'NORMAL', calculation: { authoritative_result: true },
+        allowed_actions: { record_decision: true, repo_transfer: true }
+    }`, sandbox);
     if (decision === undefined) elementsById.delete('canRecordRepoTransferDecision');
     else elementsById.set('canRecordRepoTransferDecision', { value: decision ? '1' : '0' });
     if (apply === undefined) elementsById.delete('canApplyRepoTransferDecision');
@@ -1997,6 +2005,10 @@ function decisionReadyProjection() {
 
 function setHrDecisionState(projection = decisionReadyProjection()) {
     vm.runInContext(`
+        currentEmploymentPeriodControl = {
+            effective_mode: 'NORMAL', calculation: { authoritative_result: true },
+            allowed_actions: { record_decision: true, repo_transfer: true }
+        };
         currentHrReviewProjection = ${JSON.stringify(projection)};
         currentAtomicRepoTransferProjection = currentHrReviewProjection;
         currentHrReviewLoaded = true;
@@ -2752,6 +2764,33 @@ function testPreAndPostCalculationWorkflowGating() {
         historical_reconstruction: { status: 'COMPLETED', version: 1 },
         calculation: { authoritative_result: true }
     }), false);
+    assert.strictEqual(sandbox.canRecordCanonicalEmploymentDecision({
+        effective_mode: 'NORMAL', calculation: { authoritative_result: false },
+        allowed_actions: { record_decision: true }
+    }), false);
+    assert.strictEqual(sandbox.canRecordCanonicalEmploymentDecision({
+        effective_mode: 'NORMAL', calculation: { authoritative_result: true },
+        allowed_actions: { record_decision: true }
+    }), true);
+    assert.strictEqual(sandbox.canRecordCanonicalEmploymentDecision({
+        effective_mode: 'NORMAL', calculation: { authoritative_result: true },
+        allowed_actions: { record_decision: false }
+    }), false);
+    assert.strictEqual(sandbox.canRecordCanonicalEmploymentDecision({
+        effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
+        calculation: { authoritative_result: true },
+        allowed_actions: { record_decision: true }
+    }), false);
+
+    const weeklyRendererStart = source.indexOf('function appendEmployeeDeviationRows(');
+    const weeklyRendererEnd = source.indexOf('const canonicalApplicabilityLabels', weeklyRendererStart);
+    const weeklyRendererSource = source.slice(weeklyRendererStart, weeklyRendererEnd);
+    assert.ok(weeklyRendererSource.includes(
+        "dev.status === 'NEEDS_HR_DECISION' && canRecordCanonicalEmploymentDecision()"
+    ));
+    assert.ok(source.includes(
+        'Ελέγξτε την ποιότητα των δεδομένων πριν εκτελέσετε τον υπολογισμό ή την ανακατασκευή της περιόδου.'
+    ));
 
     const container = minimalElement();
     elementsById.set('policyPreviewGroupsContainer', container);
@@ -2767,6 +2806,39 @@ function testPreAndPostCalculationWorkflowGating() {
     assert.ok(!container.innerHTML.includes('Εκκρεμότητες που απαιτούν ενέργεια'));
     assert.ok(!container.innerHTML.includes('Καταγραφή απόφασης'));
     elementsById.delete('policyPreviewGroupsContainer');
+}
+
+async function testPreCalculationCanonicalDecisionEntryGuard() {
+    const savedSwal = sandbox.Swal;
+    const savedFetch = sandbox.fetch;
+    let message = '';
+    let networkCalls = 0;
+    try {
+        vm.runInContext(`currentEmploymentPeriodControl = {
+            effective_mode: 'NORMAL', calculation: { authoritative_result: false },
+            allowed_actions: { record_decision: true }
+        }`, sandbox);
+        sandbox.Swal = { fire: async (options) => { message = options.text; return {}; } };
+        sandbox.fetch = async () => { networkCalls++; throw new Error('Unexpected network call'); };
+        await sandbox.openCanonicalDecisionPanel({ employee_kodikos: '0004' });
+        assert.strictEqual(networkCalls, 0);
+        assert.ok(message.includes('μετά την ολοκλήρωση του Υπολογισμού Απασχολήσεων'));
+
+        vm.runInContext(`currentEmploymentPeriodControl = {
+            effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
+            calculation: { authoritative_result: true },
+            allowed_actions: { record_decision: true }
+        }`, sandbox);
+        await sandbox.openCanonicalDecisionPanel({ employee_kodikos: '0004' });
+        assert.strictEqual(networkCalls, 0);
+    } finally {
+        vm.runInContext(`currentEmploymentPeriodControl = {
+            effective_mode: 'NORMAL', calculation: { authoritative_result: true },
+            allowed_actions: { record_decision: true, repo_transfer: true }
+        }`, sandbox);
+        sandbox.Swal = savedSwal;
+        sandbox.fetch = savedFetch;
+    }
 }
 
 async function testHrDecisionPresentationAndLocalRerender() {
@@ -3417,6 +3489,7 @@ const tests = [
     testStaleNoticesDoNotLeakIntoOtherStates,
     testMinimalSafetySourceContracts,
     testPreAndPostCalculationWorkflowGating,
+    testPreCalculationCanonicalDecisionEntryGuard,
     testLightweightHrLoadingRequests,
     testHrDecisionPresentationAndLocalRerender,
     testHrDecisionCancelAndEmptyNoteDoNotPost,

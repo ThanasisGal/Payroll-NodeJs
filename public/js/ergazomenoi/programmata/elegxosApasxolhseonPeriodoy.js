@@ -5,19 +5,24 @@ function userCanReviewEdit() {
 }
 
 function userCanRecordRepoTransferDecision() {
-    return document.getElementById('canRecordRepoTransferDecision')?.value === '1';
+    return document.getElementById('canRecordRepoTransferDecision')?.value === '1' &&
+        canRecordEmploymentDecisionForCurrentPeriod();
 }
 
 function userCanRecordCanonicalDecision() {
-    return document.getElementById('canRecordRepoTransferDecision')?.value === '1';
+    return document.getElementById('canRecordRepoTransferDecision')?.value === '1' &&
+        canRecordEmploymentDecisionForCurrentPeriod();
 }
 
 function userCanManageReusablePolicyApproval() {
-    return document.getElementById('canManageReusablePolicyApproval')?.value === '1';
+    return document.getElementById('canManageReusablePolicyApproval')?.value === '1' &&
+        canRecordEmploymentDecisionForCurrentPeriod();
 }
 
 function userCanApplyRepoTransferDecision() {
-    return document.getElementById('canApplyRepoTransferDecision')?.value === '1';
+    return document.getElementById('canApplyRepoTransferDecision')?.value === '1' &&
+        hasAuthoritativeEmploymentCalculation() &&
+        currentEmploymentPeriodControl?.allowed_actions?.repo_transfer === true;
 }
 
 function num(value) {
@@ -2124,7 +2129,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
                     <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
                     <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
-                    <td>${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION'
+                    <td>${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && canRecordCanonicalEmploymentDecision()
                         ? `<div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary canonical-decision-open"
                             data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
                             data-ypokatasthma="${escapeHtml(dev.ypokatasthma || '')}"
@@ -2341,6 +2346,14 @@ function canonicalDecisionPayload(context, type) {
 }
 
 async function openCanonicalDecisionPanel(scope) {
+    if (!canRecordCanonicalEmploymentDecision()) {
+        await Swal.fire({
+            icon: 'info',
+            title: 'Καταγραφή απόφασης',
+            text: 'Η καταγραφή απόφασης είναι διαθέσιμη μετά την ολοκλήρωση του Υπολογισμού Απασχολήσεων ή της Ανακατασκευής της περιόδου.'
+        });
+        return;
+    }
     const modalElement = document.getElementById('canonicalDecisionModal');
     const container = document.getElementById('canonicalDecisionContainer');
     if (!modalElement || !container) return;
@@ -5580,7 +5593,7 @@ function renderPreCalculationDataIssues(rows = []) {
             aria-label="Εκκρεμότητες δεδομένων πριν τον υπολογισμό">
             <div class="card-body py-2">
                 <div class="fw-semibold">Εκκρεμότητες δεδομένων πριν τον υπολογισμό</div>
-                <div class="small text-muted mb-2">Ελέγξτε την ποιότητα των δεδομένων πριν εκτελέσετε τον Υπολογισμό Απασχολήσεων.</div>
+                <div class="small text-muted mb-2">Ελέγξτε την ποιότητα των δεδομένων πριν εκτελέσετε τον υπολογισμό ή την ανακατασκευή της περιόδου.</div>
                 <div class="actionable-issue-groups">
                     ${currentPreCalculationDataIssueGroups.map((group, groupIndex) => {
                         const panelId = `preCalculationDataIssuePanel-${groupIndex}`;
@@ -7112,6 +7125,16 @@ let currentEmploymentPeriodControl = null;
 function hasAuthoritativeEmploymentCalculation(state = currentEmploymentPeriodControl) {
     return state?.calculation?.authoritative_result === true &&
         String(state?.effective_mode || '') !== 'HISTORICAL_RECONSTRUCTION_STALE';
+}
+
+function canRecordCanonicalEmploymentDecision(state = currentEmploymentPeriodControl) {
+    return document.getElementById('canRecordRepoTransferDecision')?.value === '1' &&
+        canRecordEmploymentDecisionForCurrentPeriod(state);
+}
+
+function canRecordEmploymentDecisionForCurrentPeriod(state = currentEmploymentPeriodControl) {
+    return hasAuthoritativeEmploymentCalculation(state) &&
+        state?.allowed_actions?.record_decision === true;
 }
 
 function getActiveEmploymentReviewScope() {

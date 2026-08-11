@@ -33,6 +33,11 @@ async function loadOperationalState(page) {
     await page.setContent(fixture(), { waitUntil: 'domcontentloaded' });
     await page.addScriptTag({ content: reviewJs });
     await page.evaluate(() => {
+        currentEmploymentPeriodControl = {
+            effective_mode: 'NORMAL',
+            calculation: { authoritative_result: true },
+            allowed_actions: { record_decision: true }
+        };
         const beforeHeaders = Array.from(document.querySelectorAll('#resultsTable > thead th'))
             .map((header) => header.textContent.trim());
         window.reviewTableHeadersBefore = beforeHeaders;
@@ -192,6 +197,36 @@ async function canonicalDecisionButtonStyles(page) {
         return { background: style.backgroundColor, color: style.color };
     });
     return { text: (await button.innerText()).trim(), normal, hover };
+}
+
+async function canonicalDecisionGatingContract(page) {
+    return page.evaluate(async () => {
+        const renderWith = (state) => {
+            currentEmploymentPeriodControl = state;
+            renderCurrentReviewRows();
+            return document.querySelectorAll('#resultsTable .canonical-decision-open').length;
+        };
+        const preCalculation = renderWith({
+            effective_mode: 'NORMAL', calculation: { authoritative_result: false },
+            allowed_actions: { record_decision: true }
+        });
+        const postCalculation = renderWith({
+            effective_mode: 'NORMAL', calculation: { authoritative_result: true },
+            allowed_actions: { record_decision: true }
+        });
+        const stale = renderWith({
+            effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
+            calculation: { authoritative_result: true },
+            allowed_actions: { record_decision: true }
+        });
+        currentEmploymentPeriodControl = {
+            effective_mode: 'NORMAL', calculation: { authoritative_result: true },
+            allowed_actions: { record_decision: true }
+        };
+        renderCurrentReviewRows();
+        document.querySelector('#resultsTable .employee-group-row')?.click();
+        return { preCalculation, postCalculation, stale };
+    });
 }
 
 async function possibleLeaveModalContract(page) {
@@ -357,6 +392,12 @@ async function modalGeometry(page) {
                 .forEach((text) => assert.ok(issueInteraction.panelText.includes(text), text));
             assert.strictEqual(issueInteraction.employeeExpanded, 'true');
             assert.strictEqual(issueInteraction.weeklyHighlighted, true);
+            const decisionGating = await canonicalDecisionGatingContract(page);
+            assert.deepStrictEqual(decisionGating, {
+                preCalculation: 0,
+                postCalculation: 1,
+                stale: 0
+            });
             const actionButton = await canonicalDecisionButtonStyles(page);
             assert.strictEqual(actionButton.text, 'Καταγραφή απόφασης');
             assert.strictEqual(actionButton.normal.background, 'rgb(207, 226, 255)');
