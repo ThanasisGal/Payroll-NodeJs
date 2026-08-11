@@ -19,6 +19,10 @@ const expectedCoverage = [
     'ergazomenoi/genika/alles_parathrhseis'
 ];
 
+const productionObfuscationContracts = [
+    'ergazomenoi/programmata/elegxosApasxolhseonPeriodoy'
+];
+
 function walkFiles(directory, extension) {
     return fs.readdirSync(directory, { withFileTypes: true })
         .flatMap((entry) => {
@@ -202,6 +206,24 @@ for (const key of expectedCoverage) {
         expectedOutputs.production,
         `public/min.js/${key}.js`,
         `Unexpected production artifact mapping for ${sourcePath}`
+    );
+}
+
+for (const key of productionObfuscationContracts) {
+    const sourcePath = `public/js/${key}.js`;
+    const expectedOutputs = outputPathsFor(sourcePath);
+    const minified = fs.readFileSync(path.join(repositoryRoot, expectedOutputs.build), 'utf8');
+    const production = fs.readFileSync(path.join(repositoryRoot, expectedOutputs.production), 'utf8');
+
+    assert.notStrictEqual(
+        production,
+        minified,
+        `${expectedOutputs.production} must contain the production obfuscation output, not the terser-only build artifact`
+    );
+    assert.match(
+        production,
+        /document\[['"]querySelector['"]\]/,
+        `${expectedOutputs.production} is missing the expected CSP-safe production obfuscation shape`
     );
 }
 
