@@ -1,6 +1,5 @@
 'use strict';
 
-const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const {
     APPLICABILITY,
@@ -96,15 +95,8 @@ function resolveWeeklyCanonicalDecisionAnalysis({
         const classifications = payload.classification_by_date || {};
         if (!Array.isArray(automaticAnalysis.canonicalRepoDayIdentities) ||
             automaticAnalysis.canonicalRepoDayIdentities.length !== 2) {
-            const selectedIdentities = Object.entries(classifications)
-                .filter(([, classification]) => ['SIXTH', 'SEVENTH'].includes(
-                    String(classification || '').toUpperCase()))
-                .map(([date]) => dateKeyUtc(date));
-            if (selectedIdentities.length !== 2 || new Set(selectedIdentities).size !== 2) {
-                return { analysis: blocked(automaticAnalysis,
-                    'CANONICAL_DECISION_CLASSIFICATION_INVALID'), ...resolved, decision: record };
-            }
-            analyzerOptions.canonicalRepoDayIdentitiesOverride = selectedIdentities;
+            return { analysis: blocked(automaticAnalysis,
+                'CANONICAL_DECISION_CLASSIFICATION_INVALID'), ...resolved, decision: record };
         }
         analyzerOptions.classificationByDateOverride = payload.classification_by_date;
     } else return { analysis: blocked(automaticAnalysis, 'CANONICAL_DECISION_OUTCOME_NOT_CONSUMABLE'),

@@ -50,6 +50,7 @@ function snapshot(category, repo) {
     return {
         kathgoria_ergasias_apologistika: category,
         repo_apologistika: repo,
+        apologistiko_biblio: repo,
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_apoysias_apologistika: 0,
@@ -124,6 +125,7 @@ function protectedCurrent(category, repo, extra = {}) {
     return {
         kathgoria_ergasias_apologistika: category,
         repo_apologistika: repo,
+        apologistiko_biblio: repo,
         ...extra
     };
 }
@@ -135,9 +137,25 @@ function diagnosticCodes(value) {
 test('exports stable protected identity fields and exact snapshot field count', () => {
     assert.deepStrictEqual(IDENTITY_FIELDS, [
         'kathgoria_ergasias_apologistika',
-        'repo_apologistika'
+        'repo_apologistika',
+        'apologistiko_biblio'
     ]);
-    assert.strictEqual(SNAPSHOT_FIELDS.length, 16);
+    assert.strictEqual(SNAPSHOT_FIELDS.length, 17);
+});
+
+test('legacy applied snapshots remain protected without silently inventing book state', () => {
+    const legacy = execution();
+    for (const phase of ['before_snapshot', 'after_snapshot']) {
+        delete legacy[phase].source.apologistiko_biblio;
+        delete legacy[phase].target.apologistiko_biblio;
+    }
+    const context = buildAppliedRepoTransferProtectionContext({
+        executions: [legacy], scope: SCOPE, loadedRowIds: [IDS.source, IDS.target]
+    });
+    assert.strictEqual(context.entriesByRowId[IDS.source].state, PROTECTION_STATE.PROTECTED);
+    assert.strictEqual(Object.hasOwn(
+        context.entriesByRowId[IDS.source].protectedValues, 'apologistiko_biblio'
+    ), false);
 });
 
 test('valid APPLIED source creates SOURCE protection from after snapshot', () => {
@@ -147,7 +165,8 @@ test('valid APPLIED source creates SOURCE protection from after snapshot', () =>
     assert.strictEqual(entry.role, ROLE.SOURCE);
     assert.deepStrictEqual(entry.protectedValues, {
         kathgoria_ergasias_apologistika: 'ΕΡΓ',
-        repo_apologistika: false
+        repo_apologistika: false,
+        apologistiko_biblio: false
     });
 });
 
@@ -156,7 +175,8 @@ test('valid APPLIED target creates TARGET ΑΝ protection from after snapshot', 
     assert.strictEqual(entry.role, ROLE.TARGET);
     assert.deepStrictEqual(entry.protectedValues, {
         kathgoria_ergasias_apologistika: 'ΑΝ',
-        repo_apologistika: true
+        repo_apologistika: true,
+        apologistiko_biblio: true
     });
 });
 
@@ -414,7 +434,7 @@ test('protected SOURCE both matching identity fields are removed', () => {
         protectionContext: context()
     });
     assert.deepStrictEqual(result.sanitizedUpdate, {});
-    assert.strictEqual(result.removedIdentityFields.length, 2);
+    assert.strictEqual(result.removedIdentityFields.length, 3);
 });
 
 test('protected TARGET ΑΝ matching identity fields are removed', () => {
@@ -437,7 +457,7 @@ test('protected TARGET ΜΕ matching identity fields are removed', () => {
         update: protectedCurrent('ΜΕ', true),
         protectionContext: context([value])
     });
-    assert.strictEqual(result.removedIdentityFields.length, 2);
+    assert.strictEqual(result.removedIdentityFields.length, 3);
 });
 
 for (const testCase of [
@@ -465,10 +485,11 @@ test('one matching and one conflicting identity field are classified separately'
     const result = sanitizeAppliedRepoTransferUpdate({
         rowId: IDS.target,
         currentRow: protectedCurrent('ΑΝ', true),
-        update: protectedCurrent('ΑΝ', false),
+        update: protectedCurrent('ΑΝ', false, { apologistiko_biblio: true }),
         protectionContext: context()
     });
-    assert.deepStrictEqual(result.removedIdentityFields, ['kathgoria_ergasias_apologistika']);
+    assert.deepStrictEqual(result.removedIdentityFields,
+        ['apologistiko_biblio', 'kathgoria_ergasias_apologistika']);
     assert.deepStrictEqual(result.blockedIdentityFields, ['repo_apologistika']);
 });
 
@@ -585,7 +606,7 @@ test('current mismatch plus matching proposal does not restore identity', () => 
         protectionContext: context()
     });
     assert.deepStrictEqual(result.sanitizedUpdate, { ores_ergasias_apologistika: 3 });
-    assert.strictEqual(result.removedIdentityFields.length, 2);
+    assert.strictEqual(result.removedIdentityFields.length, 3);
     assert.ok(result.diagnostics.includes(
         DIAGNOSTIC.CURRENT_IDENTITY_DIFFERS_FROM_APPLIED_EXECUTION
     ));

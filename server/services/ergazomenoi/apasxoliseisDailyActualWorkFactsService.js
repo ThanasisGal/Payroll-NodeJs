@@ -25,6 +25,9 @@ const {
 const {
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
+const {
+    resolveSafeStartOnlyOrphan
+} = require('./apasxoliseisAttendanceDerivedScheduleService');
 
 function nonNegativeNumber(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -46,9 +49,12 @@ function categoryOf(row = {}) {
     ).trim().toUpperCase();
 }
 
-function resolveDailyActualWorkFacts(row = {}) {
+function resolveDailyActualWorkFacts(row = {}, {
+    calculatedWorkHoursAuthoritative = false
+} = {}) {
     const declared = nonNegativeNumber(row.ores_ergasias);
     const cards = nonNegativeNumber(row.cards_ores_ergasias);
+    const calculatedWork = nonNegativeNumber(row.ores_ergasias_apologistika);
     const explicitHourlyLeave = nonNegativeNumber(
         row.explicit_hourly_leave_hours ?? row.ores_apoysias
     );
@@ -61,6 +67,11 @@ function resolveDailyActualWorkFacts(row = {}) {
     const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
     const cardVerification = resolveCardPairVerification(row);
+    const safeOrphan = cardVerification.hasUnresolvedCardEvidence
+        ? resolveSafeStartOnlyOrphan(row, {
+              flexibleArrivalMinutes: row.evelikth_proselefsh ?? row.effective_evelikth_proselefsh
+          })
+        : null;
     const hasCompleteCardEvidence = cardVerification.hasCompleteCardEvidence;
     const hasIncompleteCardInterval = cardVerification.hasUnresolvedCardEvidence;
     const verificationFacts = {
@@ -89,6 +100,15 @@ function resolveDailyActualWorkFacts(row = {}) {
     // Τα πλήρη ζεύγη παραμένουν αποδεδειγμένος χρόνος ακόμη κι όταν άλλο
     // ζεύγος της ημέρας είναι ελλιπές. Το ανεξακρίβωτο τμήμα δεν
     // συμπληρώνεται και δεν μετατρέπεται σε εργασία, άδεια, αργία ή ρεπό.
+    if (hasIncompleteCardInterval && safeOrphan) {
+        const actualWorkHours = safeOrphan.durationMinutes / 60;
+        return Object.freeze({ category: 'ΕΡΓ', declaredWorkHours: declared.value,
+            cardHours: cards.value, hasCompleteCardEvidence: false, ...verificationFacts,
+            cardVerificationStatus: 'SAFE_AUTO_RESOLVED', actualWorkHours,
+            leaveHours: 0, holidayCreditedHours: 0, sicknessHours: 0,
+            countsAsActualWorkDay: true, reasons: [],
+            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL, safeOrphan.diagnostic] });
+    }
     if (hasIncompleteCardInterval) {
         const verifiedActualWorkHours = hasCompleteCardEvidence
             ? cardVerification.verifiedHours
@@ -113,12 +133,22 @@ function resolveDailyActualWorkFacts(row = {}) {
     let leaveHours = 0;
     let holidayCreditedHours = 0;
     let sicknessHours = 0;
+    // Τα πλήρη ζεύγη καρτών αποδεικνύουν την παρουσία. Όταν η ημερήσια
+    // φάση έχει ήδη παράγει θετικές απολογιστικές ώρες, εκείνες είναι το
+    // δεσμευτικό αριθμητικό αποτέλεσμα μετά την εφαρμογή διαλείμματος.
+    const effectiveWorkedHours =
+        cards.value > 0 && calculatedWork.ok && (
+            calculatedWorkHoursAuthoritative === true || row.is_locked === true ||
+            calculatedWork.value > 0
+        )
+            ? calculatedWork.value
+            : cards.value;
     if (leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE) {
         leaveHours = declared.value;
     } else if (category === 'ΕΡΓ') {
-        actualWorkHours = cards.value;
+        actualWorkHours = effectiveWorkedHours;
     } else if (category === 'ΑΔΕΙΑ') {
-        actualWorkHours = cards.value;
+        actualWorkHours = effectiveWorkedHours;
         if (explicitHourlyLeave.value > 0) {
             leaveHours = explicitHourlyLeave.value;
             if (leaveHours + cards.value > declared.value + 0.02) {
@@ -133,19 +163,19 @@ function resolveDailyActualWorkFacts(row = {}) {
             warnings.push(WARNING.MIXED_WORK_AND_HOURLY_LEAVE);
         }
     } else if (category === 'ΑΡΓΙΑ') {
-        actualWorkHours = cards.value;
-        holidayCreditedHours = Math.max(declared.value - cards.value, 0);
+        actualWorkHours = effectiveWorkedHours;
+        holidayCreditedHours = Math.max(declared.value - actualWorkHours, 0);
         if (cards.value > declared.value) {
             warnings.push(WARNING.HOLIDAY_CARD_HOURS_EXCEED_DECLARED_HOURS);
         }
     } else if (category === 'ΑΣΘΕΝΕΙΑ') {
-        actualWorkHours = cards.value;
-        sicknessHours = Math.max(declared.value - cards.value, 0);
+        actualWorkHours = effectiveWorkedHours;
+        sicknessHours = Math.max(declared.value - actualWorkHours, 0);
         if (actualWorkHours > 0 && sicknessHours > 0) {
             warnings.push(WARNING.MIXED_WORK_AND_SICKNESS);
         }
     } else if (category === 'ΑΝ' || category === 'ΜΕ') {
-        actualWorkHours = cards.value;
+        actualWorkHours = effectiveWorkedHours;
     } else {
         reasons.push(REASON.UNSUPPORTED_DAILY_CATEGORY);
     }

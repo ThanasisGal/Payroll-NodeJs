@@ -33,7 +33,7 @@ const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     'pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
     'nomimoOromisthio pragmatikoOromisthio ' +
     'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
-    'dialleima_entos_ektos_orarioy dialleima_se_lepta';
+    'dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh';
 
 const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +

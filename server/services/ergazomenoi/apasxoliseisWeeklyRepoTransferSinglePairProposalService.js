@@ -18,9 +18,11 @@ const {
 const {
     resolveCurrentApologistikaDisplayCategory
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
+const { buildDurationAnchoredInterval, resolveApologistikoArrivalDecision } =
+    require('./apasxoliseisAttendanceDerivedScheduleService');
 
-const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v4';
-const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v4';
+const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v5';
+const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v5';
 const CHOICE_CODE = 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR';
 
 const PROPOSAL_STATUS = Object.freeze({
@@ -48,6 +50,7 @@ const APOLOGISTIKA_INTERVAL_FIELDS = Object.freeze([
 
 const REQUIRED_WEEKLY_REPO_FIELDS = Object.freeze([
     'repo_apologistika',
+    'apologistiko_biblio',
     'kathgoria_ergasias_apologistika',
     'ores_pragmatikhs_ergasias_apologistika',
     'ores_adeias_pistomenes_apologistika',
@@ -57,6 +60,7 @@ const REQUIRED_WEEKLY_REPO_FIELDS = Object.freeze([
 
 const REQUIRED_SOURCE_WORK_FIELDS = Object.freeze([
     'kathgoria_ergasias_apologistika',
+    'apologistiko_biblio',
     ...APOLOGISTIKA_INTERVAL_FIELDS.flat(),
     'ores_ergasias_apologistika',
     'ores_pragmatikhs_ergasias_apologistika',
@@ -293,7 +297,7 @@ function findReferencedRow(weekRows, reference, role) {
     return { row: matches[0] };
 }
 
-function materializeSourceValues(row) {
+function materializeSourceValues(row, targetRow = {}, employmentProfile = {}) {
     const facts = buildApasxoliseisScenarioFacts(row);
     const hasCalculatedIntervals = facts.apologistika.currentApologistikaIntervals.some(
         (interval) => interval.isComplete && !interval.isZeroLength
@@ -323,9 +327,19 @@ function materializeSourceValues(row) {
         : cardHours;
     if (!Number.isFinite(sourceHours) || sourceHours <= 0) return { invalidHours: true };
 
+    const firstCardArrival = facts.cards.cardIntervalsRaw.find((interval) => interval.start)?.start;
+    const targetDeclaredStart = buildApasxoliseisScenarioFacts(targetRow).declared
+        .declaredIntervals.find((interval) => interval.isComplete && !interval.isZeroLength)?.start;
+    const transferred = firstCardArrival && targetDeclaredStart
+        ? buildDurationAnchoredInterval({ row: targetRow, actualArrival: firstCardArrival }) : null;
+    const arrivalDecision = transferred ? resolveApologistikoArrivalDecision({
+        declaredStart: targetDeclaredStart, actualArrival: firstCardArrival,
+        flexibleArrivalMinutes: employmentProfile.evelikth_proselefsh
+    }) : null;
     const proposedValues = {
         kathgoria_ergasias_apologistika: 'ΕΡΓ',
         repo_apologistika: false,
+        apologistiko_biblio: arrivalDecision?.resolved ? arrivalDecision.requiresBook : true,
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_apoysias_apologistika: 0
@@ -337,6 +351,14 @@ function materializeSourceValues(row) {
         proposedValues[startField] = materializable ? interval.start : '';
         proposedValues[endField] = materializable ? interval.end : '';
     });
+    if (transferred) {
+        proposedValues.apo_ora_01_apologistika = transferred.start;
+        proposedValues.eos_ora_01_apologistika = transferred.end;
+        proposedValues.apo_ora_02_apologistika = '';
+        proposedValues.eos_ora_02_apologistika = '';
+        proposedValues.apo_ora_03_apologistika = '';
+        proposedValues.eos_ora_03_apologistika = '';
+    }
     proposedValues.ores_ergasias_apologistika = sourceHours;
     proposedValues.ores_pragmatikhs_ergasias_apologistika = sourceHours;
     proposedValues.ores_adeias_pistomenes_apologistika = 0;
@@ -350,6 +372,7 @@ function materializeTargetValues(targetCategory) {
     return {
         kathgoria_ergasias_apologistika: targetCategory,
         repo_apologistika: true,
+        apologistiko_biblio: true,
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_ergasias_apologistika: 0,
@@ -376,6 +399,7 @@ function buildWeeklyRepoTransferSinglePairProposal({
     employmentProfile = {},
     holidayByDateKey = new Map(),
     existingAuditCountByRowKey = new Map(),
+    sameRunDailyCalculatedRowIds = new Set(),
     contractVersion = 'v1'
 } = {}, dependencies = {}) {
     if (!['v1', 'v2'].includes(contractVersion)) {
@@ -393,7 +417,8 @@ function buildWeeklyRepoTransferSinglePairProposal({
         weekRows,
         employmentProfile,
         holidayByDateKey,
-        existingAuditCountByRowKey
+        existingAuditCountByRowKey,
+        sameRunDailyCalculatedRowIds
     });
 
     if (analysis.eligibility_status !== ELIGIBILITY_STATUS.ELIGIBLE) {
@@ -523,7 +548,9 @@ function buildWeeklyRepoTransferSinglePairProposal({
         return invalidResult(analysis, 'DUPLICATE_PAIR_RECORD_ID', policy.metadata, versions);
     }
 
-    const sourceMaterialization = materializeSourceValues(sourceMatch.row);
+    const sourceMaterialization = materializeSourceValues(
+        sourceMatch.row, targetMatch.row, employmentProfile
+    );
     if (!sourceMaterialization) {
         return invalidResult(
             analysis,
@@ -612,6 +639,8 @@ function buildWeeklyRepoTransferSinglePairProposal({
 
 module.exports = {
     buildWeeklyRepoTransferSinglePairProposal,
+    materializeSourceValues,
+    materializeTargetValues,
     PROPOSAL_STATUS,
     PROPOSAL_VERSION,
     PROPOSAL_VERSION_V2,

@@ -1,9 +1,10 @@
 const { ROW_FIELDS, fingerprintSnapshot, reconstructWeeklyRepoTransferDecision } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const { applyError, validateApplyCommand, commandIdentity, validateApplySession } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
+const { PROPOSAL_VERSION, PROPOSAL_VERSION_V2 } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
 
-const APPLY_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika','ores_pragmatikhs_ergasias_apologistika','ores_adeias_pistomenes_apologistika','ores_argias_pistomenes_apologistika','compensation_breakdown_apologistika']);
+const APPLY_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','apologistiko_biblio','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika','ores_pragmatikhs_ergasias_apologistika','ores_adeias_pistomenes_apologistika','ores_argias_pistomenes_apologistika','compensation_breakdown_apologistika']);
 const APPLY_FIELD_TYPES = Object.freeze({
-    kathgoria_ergasias_apologistika: 'string', repo_apologistika: 'boolean',
+    kathgoria_ergasias_apologistika: 'string', repo_apologistika: 'boolean', apologistiko_biblio: 'boolean',
     adeia_apologistika: 'boolean', kathgoria_adeias_apologistika: 'string',
     ores_apoysias_apologistika: 'number', apo_ora_01_apologistika: 'string',
     eos_ora_01_apologistika: 'string', apo_ora_02_apologistika: 'string',
@@ -63,6 +64,9 @@ async function preflightWeeklyRepoTransferApply({ session, payload, executionMod
     if (decision.decision_code !== 'APPROVE_PROPOSAL' || decision.decision_status !== 'RECORDED') throw applyError('DECISION_NOT_APPROVED', 409);
     if (await lean(executionModel.findOne({ team: scope.team, company_kod: scope.company_kod, decision_id: command.decision_id }))) throw applyError('DECISION_ALREADY_APPLIED', 409);
     const immutableSnapshot = decision.canonical_snapshot;
+    if (![PROPOSAL_VERSION, PROPOSAL_VERSION_V2].includes(immutableSnapshot?.proposal_version)) {
+        throw applyError('LEGACY_RECORDED_DECISION_REQUIRES_REAPPROVAL', 409);
+    }
     const reconstructionCommand = { proposal_id: immutableSnapshot.proposal_id, expected_source_id: immutableSnapshot.source.prodhlomena_oraria_id, expected_target_id: immutableSnapshot.target.prodhlomena_oraria_id, expected_proposal_version: immutableSnapshot.proposal_version, expected_choice_code: immutableSnapshot.choice_code };
     const rebuilt = await reconstruct({ scope, command: reconstructionCommand });
     if (rebuilt.fingerprint !== decision.snapshot_fingerprint || fingerprint(immutableSnapshot) !== decision.snapshot_fingerprint) throw applyError('STALE_FINGERPRINT', 409);

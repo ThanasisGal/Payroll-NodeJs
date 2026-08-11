@@ -59,8 +59,8 @@ function canonicalWeek({ seventhDate, hours, intervals }) {
     const rows = dates.map((date, index) => row(date, 7, [['10:00', '17:00']], index >= 5));
     const seventhIndex = seventhDate === 'SUNDAY' ? 6 : 5;
     rows[seventhIndex] = row(dates[seventhIndex], hours, intervals, true);
-    if (seventhIndex === 6) rows[5] = row(saturday, 7, [['10:00', '17:00']], true);
-    if (seventhIndex === 5) rows[6] = row(sunday, 7, [['10:00', '17:00']], true);
+    if (seventhIndex === 6) rows[5] = row(saturday, 8, [['10:00', '18:00']], true);
+    if (seventhIndex === 5) rows[6] = row(sunday, 8, [['10:00', '18:00']], true);
 
     const analysis = analyzeWeeklySixthSeventhDay({
         weekRows: rows,

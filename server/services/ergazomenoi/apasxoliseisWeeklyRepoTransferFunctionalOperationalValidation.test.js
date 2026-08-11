@@ -80,15 +80,15 @@ const COMMAND = Object.freeze({
     request_id: 'validation-request-0001'
 });
 const EMPLOYMENT_FIXTURES = Object.freeze([
-    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v4', targetCategory: 'ΑΝ', workdays: 5, dailyHours: 8 }),
-    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v4', targetCategory: 'ΜΕ', workdays: 5, dailyHours: 4 }),
-    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v4', targetCategory: 'ΜΕ', workdays: 5, dailyHours: 4 }),
+    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v5', targetCategory: 'ΑΝ', workdays: 5, dailyHours: 8 }),
+    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v5', targetCategory: 'ΜΕ', workdays: 5, dailyHours: 4 }),
+    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v5', targetCategory: 'ΜΕ', workdays: 5, dailyHours: 4 }),
     Object.freeze({
         name: 'MERIKH_REDUCED_DAYS_AND_HOURS',
         family: 'PARTIAL_FAMILY',
         typos_apasxolhshs: 'MERIKH',
         contractVersion: 'v2',
-        proposalVersion: 'repo-transfer-single-pair-proposal:v4',
+        proposalVersion: 'repo-transfer-single-pair-proposal:v5',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS', workdays: 5,
         dailyHours: 4
@@ -98,7 +98,7 @@ const EMPLOYMENT_FIXTURES = Object.freeze([
         family: 'PARTIAL_FAMILY',
         typos_apasxolhshs: 'EK_PERITROPHS',
         contractVersion: 'v2',
-        proposalVersion: 'repo-transfer-single-pair-proposal:v4',
+        proposalVersion: 'repo-transfer-single-pair-proposal:v5',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS', workdays: 5,
         dailyHours: 4
@@ -117,6 +117,7 @@ function applyValues(repo = false, category = '') {
     return Object.fromEntries(APPLY_FIELDS.map((field) => {
         if (field === 'compensation_breakdown_apologistika') return [field, null];
         if (field === 'repo_apologistika') return [field, repo];
+        if (field === 'apologistiko_biblio') return [field, repo];
         if (field === 'adeia_apologistika') return [field, false];
         if (field === 'kathgoria_ergasias_apologistika') return [field, category];
         if (field.includes('ores_')) return [field, 0];

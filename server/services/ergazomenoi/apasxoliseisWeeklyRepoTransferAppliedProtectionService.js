@@ -26,12 +26,14 @@ const ROLE = Object.freeze({
 
 const IDENTITY_FIELDS = Object.freeze([
     'kathgoria_ergasias_apologistika',
-    'repo_apologistika'
+    'repo_apologistika',
+    'apologistiko_biblio'
 ]);
 
 const SNAPSHOT_FIELD_TYPES = Object.freeze({
     kathgoria_ergasias_apologistika: 'string',
     repo_apologistika: 'boolean',
+    apologistiko_biblio: 'boolean',
     adeia_apologistika: 'boolean',
     kathgoria_adeias_apologistika: 'string',
     ores_apoysias_apologistika: 'number',
@@ -49,6 +51,9 @@ const SNAPSHOT_FIELD_TYPES = Object.freeze({
 });
 
 const SNAPSHOT_FIELDS = Object.freeze(Object.keys(SNAPSHOT_FIELD_TYPES));
+const LEGACY_SNAPSHOT_FIELDS = Object.freeze(
+    SNAPSHOT_FIELDS.filter((field) => field !== 'apologistiko_biblio')
+);
 const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i;
 
 function isPlainObject(value) {
@@ -116,14 +121,17 @@ function validDateValue(value) {
 function validSnapshot(snapshot, { nullable = false } = {}) {
     if (!isPlainObject(snapshot)) return false;
     const keys = Object.keys(snapshot);
+    const fields = keys.length === LEGACY_SNAPSHOT_FIELDS.length &&
+        !Object.hasOwn(snapshot, 'apologistiko_biblio')
+        ? LEGACY_SNAPSHOT_FIELDS : SNAPSHOT_FIELDS;
     if (
-        keys.length !== SNAPSHOT_FIELDS.length ||
+        keys.length !== fields.length ||
         keys.some((field) => !Object.hasOwn(SNAPSHOT_FIELD_TYPES, field)) ||
-        SNAPSHOT_FIELDS.some((field) => !Object.hasOwn(snapshot, field))
+        fields.some((field) => !Object.hasOwn(snapshot, field))
     ) {
         return false;
     }
-    return SNAPSHOT_FIELDS.every((field) => {
+    return fields.every((field) => {
         const value = snapshot[field];
         const expected = SNAPSHOT_FIELD_TYPES[field];
         if (value === null) return nullable || expected === 'object_or_null';
@@ -268,7 +276,9 @@ function executionEvidence(execution, scope) {
         protectedValues: {
             kathgoria_ergasias_apologistika:
                 sourceAfter.kathgoria_ergasias_apologistika,
-            repo_apologistika: sourceAfter.repo_apologistika
+            repo_apologistika: sourceAfter.repo_apologistika,
+            ...(typeof sourceAfter.apologistiko_biblio === 'boolean'
+                ? { apologistiko_biblio: sourceAfter.apologistiko_biblio } : {})
         }
     };
     const target = {
@@ -279,7 +289,9 @@ function executionEvidence(execution, scope) {
         protectedValues: {
             kathgoria_ergasias_apologistika:
                 targetAfter.kathgoria_ergasias_apologistika,
-            repo_apologistika: targetAfter.repo_apologistika
+            repo_apologistika: targetAfter.repo_apologistika,
+            ...(typeof targetAfter.apologistiko_biblio === 'boolean'
+                ? { apologistiko_biblio: targetAfter.apologistiko_biblio } : {})
         }
     };
     const signature = JSON.stringify({
@@ -476,7 +488,7 @@ function sanitizeAppliedRepoTransferUpdate({
         currentRow !== undefined &&
         (
             !isPlainObject(currentRow) ||
-            IDENTITY_FIELDS.some(
+            Object.keys(entry.protectedValues).some(
                 (field) => currentRow[field] !== entry.protectedValues[field]
             )
         )
@@ -484,7 +496,7 @@ function sanitizeAppliedRepoTransferUpdate({
         diagnostics.push(DIAGNOSTIC.CURRENT_IDENTITY_DIFFERS_FROM_APPLIED_EXECUTION);
     }
 
-    for (const field of IDENTITY_FIELDS) {
+    for (const field of Object.keys(entry.protectedValues)) {
         if (!Object.hasOwn(safeUpdate, field)) continue;
         if (safeUpdate[field] === entry.protectedValues[field]) removed.push(field);
         else {

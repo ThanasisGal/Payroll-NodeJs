@@ -925,6 +925,57 @@ function testAtomicPreviewOverlapKeepsEveryGroupPending() {
     });
 }
 
+function testSameRunDailyContextReachesRepoTransferAnalyzer() {
+    const cases = [
+        { start: '2026-06-08', sourceDay: 2, targetDay: 3 },
+        { start: '2026-06-22', sourceDay: 2, targetDay: 4 }
+    ];
+    const inputs = cases.map(({ start, sourceDay, targetDay }) => {
+        const rows = fullTimeWeek(start, '0004');
+        rows[1] = workRow(start, 1, '0004');
+        rows[4] = workRow(start, 4, '0004');
+        rows[sourceDay] = workRow(start, sourceDay, '0004', {
+            kathgoria_ergasias: 'ΑΝ',
+            kathgoria_ergasias_apologistika: 'ΕΡΓ',
+            repo_apologistika: false,
+            ores_ergasias_apologistika: 7.5,
+            ores_pragmatikhs_ergasias_apologistika: 7.5,
+            apo_ora_01_apologistika: '15:00',
+            eos_ora_01_apologistika: '22:30'
+        });
+        rows[targetDay] = workRow(start, targetDay, '0004', {
+            cards_ores_ergasias: 0,
+            cards_apo_ora_01: '',
+            cards_eos_ora_01: ''
+        });
+        rows[6] = workRow(start, 6, '0004', {
+            kathgoria_ergasias: 'ΑΝ',
+            ores_ergasias: 0,
+            cards_ores_ergasias: 0,
+            cards_apo_ora_01: '',
+            cards_eos_ora_01: ''
+        });
+        return weeklyInput(rows);
+    });
+    const expectedPairs = [
+        ['2026-06-10', '2026-06-11'],
+        ['2026-06-24', '2026-06-26']
+    ];
+    inputs.forEach((input, index) => {
+        const result = buildWeeklyRepoTransferAtomicPageProjection(
+            { weeklyInputs: [input] },
+            { sameRunDailyCalculatedRowIds: new Set([String(input.weekRows[2]._id)]) }
+        );
+
+        assert.strictEqual(result.groups.length, 1);
+        assert.deepStrictEqual(
+            result.groups[0].items.map((item) => item.hmeromhnia),
+            expectedPairs[index]
+        );
+        assert.strictEqual(result.reason_counts.SOURCE_ALREADY_PROCESSED, undefined);
+    });
+}
+
 function run() {
     testCompleteWeekInputConstruction();
     testOpenTrailingWeekIsDistinctFromCompletedPartialFilter();
@@ -944,6 +995,7 @@ function run() {
     testReviewOutcomeFeedsActionableCaseWithoutMutation();
     testAtomicReusableApprovalResolvesOnlyMetadata();
     testAtomicPreviewOverlapKeepsEveryGroupPending();
+    testSameRunDailyContextReachesRepoTransferAnalyzer();
     console.log('apasxoliseis weekly repo transfer atomic page projection tests passed');
 }
 

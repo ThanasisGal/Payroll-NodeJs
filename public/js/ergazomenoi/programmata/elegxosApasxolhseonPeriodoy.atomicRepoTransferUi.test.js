@@ -1585,16 +1585,16 @@ function testRepoTransferStatusAndSafeMarkup() {
 function testScopedSemanticButtonCss() {
     assert.ok(cssSource.includes('#policyPreviewGroupsContainer .btn.btn-primary'));
     assert.ok(cssSource.includes('--policy-preview-button-bg: #cfe2ff;'));
-    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #9ec5fe;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #0d6efd;'));
     assert.ok(cssSource.includes('--policy-preview-button-bg: #d1e7dd;'));
-    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #a3cfbb;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #198754;'));
     assert.ok(cssSource.includes('--policy-preview-button-bg: #fff3cd;'));
-    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #ffe69c;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #ffc107;'));
     assert.ok(cssSource.includes('--policy-preview-button-bg: #f8d7da;'));
-    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #f1aeb5;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #dc3545;'));
     assert.ok(cssSource.includes('--policy-preview-button-bg: #e2e3e5;'));
-    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #c4c8cb;'));
-    assert.ok(cssSource.includes('color: #000000 !important;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #6c757d;'));
+    assert.ok(cssSource.includes('color: #ffffff !important;'));
     assert.ok(cssSource.includes('#policyPreviewGroupsContainer .btn:focus-visible'));
     assert.ok(cssSource.includes('#policyPreviewGroupsContainer .btn:disabled'));
     assert.ok(cssSource.includes('cursor: not-allowed;'));

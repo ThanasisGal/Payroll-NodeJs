@@ -22,6 +22,8 @@ function workRow(offset, overrides = {}) {
         hmeromhnia: dateKey(offset),
         kathgoria_ergasias: 'ΕΡΓ',
         ores_ergasias: 8,
+        apo_ora_01: '14:51',
+        eos_ora_01: '22:51',
         cards_ores_ergasias: 8,
         cards_apo_ora_01: '09:00',
         cards_eos_ora_01: '17:00',
@@ -119,7 +121,8 @@ function analyze(rows, profile = { typos_apasxolhshs: 'PLHRHS'}, contexts = {}) 
         weekRows: rows,
         employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
-        existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map()
+        existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map(),
+        sameRunDailyCalculatedRowIds: contexts.sameRunDailyCalculatedRowIds || new Set()
     });
 }
 
@@ -428,7 +431,7 @@ function testMultipleTargets() {
     assertReason(analyze(rows), 'MULTIPLE_TARGET_CANDIDATES');
 }
 
-function testIncompleteCardEvidenceIsNotACleanTargetAndStillBlocksReview() {
+function testSafeOrphanElsewhereDoesNotBlockDeterministicPair() {
     const rows = fullTimeWeek({ sourceDay: 2, targetDay: 3, existingRepoDay: 0 });
     rows.forEach((row, offset) => {
         row.hmeromhnia = `2026-06-${String(8 + offset).padStart(2, '0')}`;
@@ -447,8 +450,10 @@ function testIncompleteCardEvidenceIsNotACleanTargetAndStillBlocksReview() {
     assert.strictEqual(result.source.hmeromhnia, '2026-06-10');
     assert.strictEqual(result.target.hmeromhnia, '2026-06-11');
     assert.ok(!result.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
-    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(result.reasons.includes('CARD_VERIFICATION_PENDING'));
+    assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
+    assert.ok(!result.reasons.includes('CARD_VERIFICATION_PENDING'));
+    assert.ok(result.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
+    assert.ok(result.warnings.includes('SAFE_START_ONLY_ORPHAN_DERIVED'));
     assert.strictEqual(result.can_auto_apply, false);
 }
 
@@ -458,6 +463,21 @@ function testNoTarget() {
     const result = analyze(rows);
     assert.strictEqual(result.eligibility_status, 'NOT_APPLICABLE');
     assertReason(result, 'NO_TARGET_CANDIDATE');
+}
+
+function testSevenActualDaysForbidsRepoTransferBeforeCandidateAnalysis() {
+    const rows = fullTimeWeek();
+    rows.forEach((row, index) => Object.assign(row, {
+        kathgoria_ergasias: index >= 5 ? 'ΑΝ' : 'ΕΡΓ',
+        repo: index >= 5,
+        cards_ores_ergasias: 7,
+        cards_apo_ora_01: '10:00',
+        cards_eos_ora_01: '17:00'
+    }));
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NOT_APPLICABLE');
+    assert.ok(result.reasons.includes('SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'));
+    assert.strictEqual(result.counts.actual_workdays_before_repo_transfer, 7);
 }
 
 function testExactRepoCount() {
@@ -808,6 +828,22 @@ function testProvisionalAutoSourceBlockingStates() {
     );
 }
 
+function testSameRunDailyCalculationDoesNotLookPreviouslyApplied() {
+    const rows = materializeAutoSource(fullTimeWeek(), 1);
+    rows[1].ores_ergasias_apologistika = 6.37;
+    rows[1].ores_pragmatikhs_ergasias_apologistika = 6.37;
+    rows[1].apo_ora_01_apologistika = '15:15';
+    rows[1].eos_ora_01_apologistika = '23:15';
+
+    const withoutExecutionContext = analyze(rows);
+    assertReason(withoutExecutionContext, 'SOURCE_ALREADY_PROCESSED');
+
+    const sameRun = analyze(rows, undefined, {
+        sameRunDailyCalculatedRowIds: new Set(['row-1'])
+    });
+    assertEligible(sameRun, dateKey(1), dateKey(4), 'ΑΝ');
+}
+
 function testApologistikoBiblioIsNotEligibilityProvenance() {
     [true, false].forEach((apologistikoBiblio) => {
         const sourceRows = materializeAutoSource(fullTimeWeek(), 1, {
@@ -948,7 +984,7 @@ function testValidSixDayFullTimeRemainsV1RepoTransfer() {
         hmeres_ergasias_ebdomadas: 6
     });
     assertEligible(result, dateKey(1), dateKey(4), 'ΑΝ');
-    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v5');
     assert.deepStrictEqual(result.reasons, []);
     assert.deepStrictEqual(result.counts, {
         source_candidates: 1,
@@ -1180,8 +1216,9 @@ function run() {
     testSourceExclusions();
     testMultipleSources();
     testMultipleTargets();
-    testIncompleteCardEvidenceIsNotACleanTargetAndStillBlocksReview();
+    testSafeOrphanElsewhereDoesNotBlockDeterministicPair();
     testNoTarget();
+    testSevenActualDaysForbidsRepoTransferBeforeCandidateAnalysis();
     testExactRepoCount();
     testAutoCalculatedLeavePriorityRegression();
     testBlankZeroUnscheduledProductionSourceRegression();
@@ -1193,6 +1230,7 @@ function run() {
     testRealShapeOptionalHolidayAndAutoSourceFixture();
     testNonHolidayAutoSourceFixture();
     testProvisionalAutoSourceBlockingStates();
+    testSameRunDailyCalculationDoesNotLookPreviouslyApplied();
     testApologistikoBiblioIsNotEligibilityProvenance();
     testKnownAutoDerivedPayrollFieldsAreNotManualMarkers();
     testArbitraryIntervalOffsetsRemainBlocked();

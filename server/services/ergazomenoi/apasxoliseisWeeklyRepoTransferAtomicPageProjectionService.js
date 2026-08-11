@@ -467,7 +467,8 @@ function buildWeeklyRepoTransferAtomicPageProjection(
         singleWeekProjectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection,
         presentationStart = null,
         presentationEnd = null,
-        reusableApprovals = []
+        reusableApprovals = [],
+        sameRunDailyCalculatedRowIds = new Set()
     } = {}
 ) {
     const presentationStartKey = dateKeyUtc(presentationStart);
@@ -502,6 +503,7 @@ function buildWeeklyRepoTransferAtomicPageProjection(
             employmentProfile: weeklyInput?.employmentProfile,
             holidayByDateKey: weeklyInput?.holidayByDateKey,
             existingAuditCountByRowKey: weeklyInput?.existingAuditCountByRowKey,
+            sameRunDailyCalculatedRowIds,
             contractVersion: resolveRepoTransferContractVersion(
                 weeklyInput?.employmentProfile
             )

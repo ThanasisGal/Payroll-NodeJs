@@ -11627,7 +11627,8 @@ body.loader-active > *:not(.app-loader) {
 #policyPreviewGroupsContainer .btn.policy-preview-details-btn {
     --policy-preview-button-bg: #cfe2ff;
     --policy-preview-button-border: #9ec5fe;
-    --policy-preview-button-hover-bg: #9ec5fe;
+    --policy-preview-button-color: #084298;
+    --policy-preview-button-hover-bg: #0d6efd;
 }
 
 #policyPreviewGroupsContainer .btn.btn-success,
@@ -11635,7 +11636,8 @@ body.loader-active > *:not(.app-loader) {
 #policyPreviewGroupsContainer .btn.policy-preview-decision-success {
     --policy-preview-button-bg: #d1e7dd;
     --policy-preview-button-border: #a3cfbb;
-    --policy-preview-button-hover-bg: #a3cfbb;
+    --policy-preview-button-color: #0f5132;
+    --policy-preview-button-hover-bg: #198754;
 }
 
 #policyPreviewGroupsContainer .btn.btn-warning,
@@ -11643,7 +11645,8 @@ body.loader-active > *:not(.app-loader) {
 #policyPreviewGroupsContainer .btn.policy-preview-decision-warning {
     --policy-preview-button-bg: #fff3cd;
     --policy-preview-button-border: #ffe69c;
-    --policy-preview-button-hover-bg: #ffe69c;
+    --policy-preview-button-color: #664d03;
+    --policy-preview-button-hover-bg: #ffc107;
 }
 
 #policyPreviewGroupsContainer .btn.btn-danger,
@@ -11651,7 +11654,8 @@ body.loader-active > *:not(.app-loader) {
 #policyPreviewGroupsContainer .btn.policy-preview-decision-danger {
     --policy-preview-button-bg: #f8d7da;
     --policy-preview-button-border: #f1aeb5;
-    --policy-preview-button-hover-bg: #f1aeb5;
+    --policy-preview-button-color: #842029;
+    --policy-preview-button-hover-bg: #dc3545;
 }
 
 #policyPreviewGroupsContainer .btn.btn-secondary,
@@ -11659,13 +11663,14 @@ body.loader-active > *:not(.app-loader) {
 #policyPreviewGroupsContainer .btn.policy-preview-decision-secondary {
     --policy-preview-button-bg: #e2e3e5;
     --policy-preview-button-border: #c4c8cb;
-    --policy-preview-button-hover-bg: #c4c8cb;
+    --policy-preview-button-color: #41464b;
+    --policy-preview-button-hover-bg: #6c757d;
 }
 
 #policyPreviewGroupsContainer .btn[class*='btn-'],
 #policyPreviewGroupsContainer .btn.policy-preview-details-btn,
 #policyPreviewGroupsContainer .btn[class*='policy-preview-decision-'] {
-    color: #000000 !important;
+    color: var(--policy-preview-button-color, #212529) !important;
     background-color: var(--policy-preview-button-bg) !important;
     border-color: var(--policy-preview-button-border) !important;
 }
@@ -11679,13 +11684,13 @@ body.loader-active > *:not(.app-loader) {
 #policyPreviewGroupsContainer .btn[class*='policy-preview-decision-']:hover:not(:disabled),
 #policyPreviewGroupsContainer .btn[class*='policy-preview-decision-']:focus:not(:disabled),
 #policyPreviewGroupsContainer .btn[class*='policy-preview-decision-']:active:not(:disabled) {
-    color: #000000 !important;
+    color: #ffffff !important;
     background-color: var(--policy-preview-button-hover-bg) !important;
-    border-color: var(--policy-preview-button-border) !important;
+    border-color: var(--policy-preview-button-hover-bg) !important;
 }
 
 #policyPreviewGroupsContainer .btn:focus-visible {
-    color: #000000 !important;
+    color: #ffffff !important;
     outline: 3px solid #212529;
     outline-offset: 2px;
     box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3);
@@ -11694,7 +11699,7 @@ body.loader-active > *:not(.app-loader) {
 #policyPreviewGroupsContainer .btn:disabled,
 #policyPreviewGroupsContainer .btn.disabled,
 #policyPreviewGroupsContainer .btn[aria-disabled='true'] {
-    color: #000000 !important;
+    color: var(--policy-preview-button-color, #212529) !important;
     background-color: var(--policy-preview-button-bg) !important;
     border-color: var(--policy-preview-button-border) !important;
     opacity: 0.6;
@@ -11704,7 +11709,7 @@ body.loader-active > *:not(.app-loader) {
 #policyPreviewGroupsContainer .btn:disabled:hover,
 #policyPreviewGroupsContainer .btn.disabled:hover,
 #policyPreviewGroupsContainer .btn[aria-disabled='true']:hover {
-    color: #000000 !important;
+    color: var(--policy-preview-button-color, #212529) !important;
     background-color: var(--policy-preview-button-bg) !important;
 }
 
@@ -14772,61 +14777,81 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-action-btn {
-    color: #212529;
     opacity: 1;
 }
 
+.employment-review-action-primary {
+    color: #084298;
+    background: var(--bs-primary-bg-subtle, #cfe2ff);
+    border-color: #9ec5fe;
+}
+
 .employment-review-action-secondary {
+    color: #41464b;
     background: var(--bs-secondary-bg-subtle, #e9ecef);
     border-color: #ced4da;
 }
 
 .employment-review-action-success {
+    color: #0f5132;
     background: var(--bs-success-bg-subtle, #d1e7dd);
     border-color: #a3cfbb;
 }
 
 .employment-review-action-danger {
+    color: #842029;
     background: var(--bs-danger-bg-subtle, #f8d7da);
     border-color: #f1aeb5;
 }
 
 .employment-review-action-warning {
+    color: #664d03;
     background: var(--bs-warning-bg-subtle, #fff3cd);
     border-color: #ffe69c;
 }
 
+.employment-review-action-primary:hover,
+.employment-review-action-primary:focus {
+    color: #ffffff;
+    background: #0d6efd;
+    border-color: #0d6efd;
+}
+
 .employment-review-action-secondary:hover,
 .employment-review-action-secondary:focus {
-    color: #212529;
-    background: #dee2e6;
-    border-color: #adb5bd;
+    color: #ffffff;
+    background: #6c757d;
+    border-color: #6c757d;
 }
 
 .employment-review-action-success:hover,
 .employment-review-action-success:focus {
-    color: #212529;
-    background: #badbcc;
-    border-color: #75b798;
+    color: #ffffff;
+    background: #198754;
+    border-color: #198754;
 }
 
 .employment-review-action-danger:hover,
 .employment-review-action-danger:focus {
-    color: #212529;
-    background: #f1aeb5;
-    border-color: #ea868f;
+    color: #ffffff;
+    background: #dc3545;
+    border-color: #dc3545;
 }
 
 .employment-review-action-warning:hover,
 .employment-review-action-warning:focus {
-    color: #212529;
-    background: #ffe69c;
-    border-color: #ffda6a;
+    color: #ffffff;
+    background: #ffc107;
+    border-color: #ffc107;
 }
 
 .employment-review-action-btn:disabled {
-    color: #212529;
     opacity: 0.65;
+}
+
+.employment-review-action-primary:disabled {
+    color: #084298;
+    background: var(--bs-primary-bg-subtle, #cfe2ff);
 }
 
 .employment-review-action-secondary:disabled {
@@ -14983,12 +15008,79 @@ body.loader-active > *:not(.app-loader) {
     background-clip: padding-box;
 }
 
-.historical-reconstruction-swal {
-    width: min(600px, calc(100vw - 2rem));
-    max-width: min(620px, calc(100vw - 2rem));
+.custom-swal-popup.historical-reconstruction-swal {
+    width: min(600px, calc(100vw - 2rem)) !important;
+    max-width: min(620px, calc(100vw - 2rem)) !important;
     box-sizing: border-box;
     padding: 0.65rem 1rem 0.8rem;
     overflow: visible;
+}
+
+.swal2-popup.employment-review-swal-popup .swal2-html-container,
+.swal2-popup.employment-review-swal-popup .employment-review-swal-html-container,
+.swal2-popup.employment-review-swal-popup .swal2-input,
+.swal2-popup.employment-review-swal-popup .swal2-textarea,
+.swal2-popup.employment-review-swal-popup .swal2-validation-message,
+.swal2-popup.employment-review-swal-popup .swal2-input-label {
+    font-size: 0.85rem !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.class-info,
+.employment-review-swal-popup .swal2-confirm.class-normal {
+    color: #084298 !important;
+    background-color: #cfe2ff !important;
+    border-color: #9ec5fe !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.class-success {
+    color: #0f5132 !important;
+    background-color: #d1e7dd !important;
+    border-color: #a3cfbb !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.class-warning {
+    color: #664d03 !important;
+    background-color: #fff3cd !important;
+    border-color: #ffe69c !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.class-error,
+.employment-review-swal-popup .swal2-confirm.class-danger {
+    color: #842029 !important;
+    background-color: #f8d7da !important;
+    border-color: #f1aeb5 !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.class-info:hover,
+.employment-review-swal-popup .swal2-confirm.class-info:focus,
+.employment-review-swal-popup .swal2-confirm.class-normal:hover,
+.employment-review-swal-popup .swal2-confirm.class-normal:focus {
+    color: #ffffff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.class-success:hover,
+.employment-review-swal-popup .swal2-confirm.class-success:focus {
+    color: #ffffff !important;
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.class-warning:hover,
+.employment-review-swal-popup .swal2-confirm.class-warning:focus {
+    color: #ffffff !important;
+    background-color: #ffc107 !important;
+    border-color: #ffc107 !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.class-error:hover,
+.employment-review-swal-popup .swal2-confirm.class-error:focus,
+.employment-review-swal-popup .swal2-confirm.class-danger:hover,
+.employment-review-swal-popup .swal2-confirm.class-danger:focus {
+    color: #ffffff !important;
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
 }
 
 .historical-reconstruction-swal .swal2-icon {
@@ -15013,6 +15105,10 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .historical-reconstruction-swal__reason {
+    display: block;
+    width: 96% !important;
+    max-width: 96% !important;
+    box-sizing: border-box;
     min-height: 4.5rem;
     height: 5rem;
     max-height: 5.625rem;

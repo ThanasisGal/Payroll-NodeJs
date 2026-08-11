@@ -25,7 +25,6 @@ function classifyLeaveProvenance(row = {}) {
     const hasBaseLeaveMarker =
         truthy(row.adeia) ||
         text(row.kathgoria_adeias) !== '' ||
-        (number(row.ores_apoysias) ?? 0) > 0 ||
         truthy(row.hr_declared_leave);
 
     if (hasBaseLeaveMarker) return LEAVE_PROVENANCE.HR_DECLARED_LEAVE;

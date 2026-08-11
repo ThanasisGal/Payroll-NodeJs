@@ -35,9 +35,9 @@ const authorizationMetadataSchema = new Schema({
     source_id: String, target_id: String, week_start: String, week_end: String,
     atomic_pair_identity: String
 }, { _id: false, strict: 'throw' });
-const SNAPSHOT_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika','ores_pragmatikhs_ergasias_apologistika','ores_adeias_pistomenes_apologistika','ores_argias_pistomenes_apologistika','compensation_breakdown_apologistika']);
+const SNAPSHOT_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','apologistiko_biblio','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika','ores_pragmatikhs_ergasias_apologistika','ores_adeias_pistomenes_apologistika','ores_argias_pistomenes_apologistika','compensation_breakdown_apologistika']);
 const snapshotFieldTypes = Object.freeze({
-    kathgoria_ergasias_apologistika: String, repo_apologistika: Boolean,
+    kathgoria_ergasias_apologistika: String, repo_apologistika: Boolean, apologistiko_biblio: Boolean,
     adeia_apologistika: Boolean, kathgoria_adeias_apologistika: String,
     ores_apoysias_apologistika: Number, apo_ora_01_apologistika: String,
     eos_ora_01_apologistika: String, apo_ora_02_apologistika: String,

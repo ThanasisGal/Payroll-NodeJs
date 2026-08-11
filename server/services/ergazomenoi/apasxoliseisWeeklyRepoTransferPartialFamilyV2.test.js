@@ -117,7 +117,7 @@ function assertEquivalentPartialPolicy(rows, profile = {}) {
     assertEquivalentPartialPolicy(rows);
     const result = analyze(rows, 'EK_PERITROPHS');
     assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v5');
     assert.strictEqual(result.source.semantic_target_category, 'ΕΡΓ');
     assert.strictEqual(result.target.semantic_target_category, 'ΜΕ');
     assert.strictEqual(result.counts.existing_actual_repo, 0);
@@ -146,7 +146,7 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             mo_oron_hmerhsias_ergasias: 4
         });
         assert.strictEqual(result.eligibility_status, 'ELIGIBLE', type);
-        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
+        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v5');
         assert.strictEqual(result.employee.typos_apasxolhshs, type);
         assert.strictEqual(result.employee.effective_expected_weekly_repo, 3);
         assert.strictEqual(result.counts.predicted_final_repo, 3);
@@ -665,7 +665,7 @@ for (const invalidHours of [0, '0', '', null, -1, NaN, Infinity, 'invalid']) {
     });
     assert.strictEqual(projection.projection_status, 'READY');
     assert.ok(projection.groups[0].group_key.includes(
-        'proposal_version=repo-transfer-single-pair-proposal:v4'
+        'proposal_version=repo-transfer-single-pair-proposal:v5'
     ));
 }
 

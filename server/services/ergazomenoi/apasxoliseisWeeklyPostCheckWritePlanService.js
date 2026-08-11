@@ -31,6 +31,7 @@ const {
 const {
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
+const { resolveSafeStartOnlyOrphan } = require('./apasxoliseisAttendanceDerivedScheduleService');
 const {
     buildDailyCompensationBreakdown
 } = require('./apasxoliseisDailyCompensationBreakdownService');
@@ -111,6 +112,20 @@ function isMisthotosEmployee(profile = {}) {
     return String(profile.typos_ergazomenon || '').trim() === 'Μ';
 }
 
+function buildSeventhDayAttendanceUpdate(row = {}) {
+    const verification = resolveCardPairVerification(row);
+    const update = { apologistiko_biblio: true };
+    for (let pairIndex = 1; pairIndex <= 3; pairIndex += 1) {
+        const pairNumber = String(pairIndex).padStart(2, '0');
+        const pair = verification.completePairs.find(
+            (candidate) => candidate.pairNumber === pairNumber
+        );
+        update[`apo_ora_${pairNumber}_apologistika`] = pair?.start || '';
+        update[`eos_ora_${pairNumber}_apologistika`] = pair?.end || '';
+    }
+    return update;
+}
+
 /**
  * Builds the exact Phase-C post-check Mongo write plan. `rows` must be the rows
  * reloaded after the first calculation-stage ProdhlomenaOraria bulkWrite.
@@ -130,6 +145,7 @@ function buildWeeklyRepoPostCheckWritePlan({
     appliedProtectionContext,
     appliedProtectionReasonsByWeek = new Map(),
     canonicalDecisionsByWeek = new Map(),
+    sameRunDailyCalculatedRowIds = new Set(),
     buildWeeklyIllegalOvertimeUpdate
 }) {
     if (typeof buildWeeklyIllegalOvertimeUpdate !== 'function') {
@@ -179,8 +195,19 @@ function buildWeeklyRepoPostCheckWritePlan({
                 ? analyzeWeeklySixthSeventhDay({
                       weekRows,
                       effectiveProfile,
-                      hourlyRate: effectiveProfile.pragmatikoOromisthio
-                })
+                      hourlyRate: effectiveProfile.pragmatikoOromisthio,
+                      calculatedWorkHoursAuthoritative: true,
+                      allowDeclaredRepoIdentityOverride: true,
+                      canonicalRepoDayIdentitiesOverride: (() => {
+                          const identities = weekRows
+                              .filter((row) => sameRunDailyCalculatedRowIds.has(String(row._id)) &&
+                                  (row.repo === true ||
+                                      String(row.kathgoria_ergasias || '').trim() === 'ΑΝ' ||
+                                      String(row.kathgoria_ergasias || '').trim() === 'ΜΕ'))
+                              .map((row) => dateKeyUtc(row.hmeromhnia));
+                          return [1, 2].includes(identities.length) ? identities : null;
+                      })()
+                  })
                 : { status: 'READY', reasons: [], sixthDay: null, seventhDay: null };
             const decisionKey = weeklyCanonicalDecisionGroupKey({
                 ypokatasthma: erg.ypokatasthma,
@@ -196,7 +223,8 @@ function buildWeeklyRepoPostCheckWritePlan({
                     team: sessionTeam, company_kod: companyId, employee: erg, week, weekRows,
                     effectiveProfile, profileHistory: istorikoRows,
                     automaticAnalysis: automaticSixthSeventhAnalysis,
-                    appliedProtectionContext
+                    appliedProtectionContext,
+                    calculatedWorkHoursAuthoritative: true
                 });
                 sixthSeventhAnalysis = resolveWeeklyCanonicalDecisionAnalysis({
                     automaticAnalysis: automaticSixthSeventhAnalysis,
@@ -223,7 +251,13 @@ function buildWeeklyRepoPostCheckWritePlan({
                 const dailyProfile = getEffectiveRepoProfileForDate(day, istorikoRows, erg);
                 const isFullTimeProfile = resolveFullTimeFromWorkTerms(dailyProfile) === true;
                 const update = {};
-                const hasUnresolvedCardPair = resolveCardPairVerification(row).hasUnresolvedCardEvidence;
+                const rawUnresolvedCardPair = resolveCardPairVerification(row).hasUnresolvedCardEvidence;
+                const safeOrphan = rawUnresolvedCardPair
+                    ? resolveSafeStartOnlyOrphan(row, {
+                          flexibleArrivalMinutes: dailyProfile.evelikth_proselefsh
+                      })
+                    : null;
+                const hasUnresolvedCardPair = rawUnresolvedCardPair && !safeOrphan;
                 const repoCountState = resolveCanonicalRepoDayCountState({
                     row,
                     dailyProfile,
@@ -261,6 +295,9 @@ function buildWeeklyRepoPostCheckWritePlan({
                 const rowDateKey = dateKeyUtc(row.hmeromhnia);
                 const isSixthDay = sixthSeventhAnalysis?.sixthDay?.hmeromhnia === rowDateKey;
                 const isSeventhDay = sixthSeventhAnalysis?.seventhDay?.hmeromhnia === rowDateKey;
+                if (isSeventhDay) {
+                    Object.assign(update, buildSeventhDayAttendanceUpdate(row));
+                }
                 const weeklyIllegalOvertimeHours = isSixthDay
                     ? sixthSeventhAnalysis.sixthDay.illegalOvertimeHours
                     : isSeventhDay ? sixthSeventhAnalysis.seventhDay.illegalOvertimeHours : 0;
@@ -283,6 +320,7 @@ function buildWeeklyRepoPostCheckWritePlan({
                     weeklyIllegalOvertimeHours,
                     sixthDayMandatoryRatePercent: dailyProfile.pososto_prosayxhshs_6hs_hmeras,
                     companyRules: companyPolicyRules,
+                    calculatedWorkHoursAuthoritative: true,
                     blockingReasons:
                         week.isFullWeek && sixthSeventhAnalysis.status === 'NEEDS_HR_DECISION'
                             ? sixthSeventhAnalysis.reasons : []
@@ -386,4 +424,4 @@ function buildWeeklyRepoPostCheckWritePlan({
     return { bulkOps, deviations, diagnostics, compensationBreakdowns };
 }
 
-module.exports = { buildWeeklyRepoPostCheckWritePlan };
+module.exports = { buildWeeklyRepoPostCheckWritePlan, buildSeventhDayAttendanceUpdate };

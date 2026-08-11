@@ -4,12 +4,13 @@ const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecu
 const { fingerprintSnapshot } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const { commandIdentity } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
 const { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, validateCurrentApplyValues, validateProposed, preflightWeeklyRepoTransferApply } = require('./apasxoliseisWeeklyRepoTransferApplyPreflightService');
+const { PROPOSAL_VERSION } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
 const SOURCE = '507f1f77bcf86cd799439012', TARGET = '507f1f77bcf86cd799439013', DECISION = '507f1f77bcf86cd799439011';
 const session = { userTeam: 'team', companyInUse: 'company', userId: '507f191e810c19729de860ea', userName: 'Actor', userStatus: 'A', userRole: 'A' };
 const payload = { decision_id: DECISION, request_id: 'request-0001' };
-const values = Object.fromEntries(APPLY_FIELDS.map((field) => [field, field === 'compensation_breakdown_apologistika' ? null : field === 'repo_apologistika' || field === 'adeia_apologistika' ? false : field.includes('ores_') ? 0 : '']));
+const values = Object.fromEntries(APPLY_FIELDS.map((field) => [field, field === 'compensation_breakdown_apologistika' ? null : ['repo_apologistika','adeia_apologistika','apologistiko_biblio'].includes(field) ? false : field.includes('ores_') ? 0 : '']));
 const currentValues = { ...values, cards_ores_ergasias: 8, cards_apo_ora_01: '08:00', kathgoria_ergasias: 'ΕΡΓ', ores_nyxtas_apologistika: 1 };
-function snapshot(proposalVersion = 'repo-transfer-single-pair-proposal:v1') { return { proposal_id: 'proposal', proposal_version: proposalVersion, choice_code: 'choice', team: 'team', company_kod: 'company', ypokatasthma: 'branch', employee_id: '507f191e810c19729de860eb', employee_kodikos: '001', week_start: '2026-07-12', week_end: '2026-07-18', source: { prodhlomena_oraria_id: SOURCE, hmeromhnia: '2026-07-13', current_values: { ...currentValues }, proposed_values: { ...values, kathgoria_ergasias_apologistika: 'ΕΡΓ' }, lock_state: false }, target: { prodhlomena_oraria_id: TARGET, hmeromhnia: '2026-07-14', current_values: { ...currentValues }, proposed_values: { ...values, kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true }, lock_state: false } }; }
+function snapshot(proposalVersion = PROPOSAL_VERSION) { return { proposal_id: 'proposal', proposal_version: proposalVersion, choice_code: 'choice', team: 'team', company_kod: 'company', ypokatasthma: 'branch', employee_id: '507f191e810c19729de860eb', employee_kodikos: '001', week_start: '2026-07-12', week_end: '2026-07-18', source: { prodhlomena_oraria_id: SOURCE, hmeromhnia: '2026-07-13', current_values: { ...currentValues }, proposed_values: { ...values, kathgoria_ergasias_apologistika: 'ΕΡΓ' }, lock_state: false }, target: { prodhlomena_oraria_id: TARGET, hmeromhnia: '2026-07-14', current_values: { ...currentValues }, proposed_values: { ...values, kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true }, lock_state: false } }; }
 function setup(change = () => {}) { const snap = snapshot(); const decision = { _id: DECISION, decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', canonical_snapshot: snap, proposal_id: 'proposal', team: 'team', company_kod: 'company', ypokatasthma: 'branch', employee_id: snap.employee_id, employee_kodikos: '001', week_start: new Date('2026-07-12'), week_end: new Date('2026-07-18'), source_prodhlomena_oraria_id: SOURCE, target_prodhlomena_oraria_id: TARGET }; decision.snapshot_fingerprint = fingerprintSnapshot(snap); const rebuilt = JSON.parse(JSON.stringify(snap)); change({ snap, decision, rebuilt }); return { decision, rebuilt }; }
 function model(decision, executions = []) { return { decisionModel: { findOne: () => ({ lean: async () => decision }) }, executionModel: { findOne(filter) { return { lean: async () => executions.find((row) => Object.entries(filter).every(([key,value]) => String(row[key]) === String(value))) || null }; } } }; }
 async function run(change, code, executions = []) { const { decision, rebuilt } = setup(change); const models = model(decision, executions); const action = () => preflightWeeklyRepoTransferApply({ session, payload, ...models, reconstruct: async () => ({ snapshot: rebuilt, fingerprint: decision.snapshot_fingerprint }) }); if (code) return assert.rejects(action, (error) => error.code === code); return action(); }
@@ -43,27 +44,17 @@ function modelValidation(record) { try { return new ExecutionModel(record).valid
     for (const [field, value] of [['apo_ora_02_apologistika', {}],['repo_apologistika', 'false'],['ores_ergasias_apologistika', '8'],['ores_ergasias_apologistika', NaN],['ores_ergasias_apologistika', Infinity]]) assert.throws(() => validateCurrentApplyValues({ ...values, [field]: value }), (error) => error.code === 'INVALID_CURRENT_VALUE');
     const accepted = await run(); assert.strictEqual(accepted.plan.source.id, SOURCE);
     {
-        const v2 = setup();
-        v2.decision.canonical_snapshot = snapshot('repo-transfer-single-pair-proposal:v2');
-        v2.decision.snapshot_fingerprint = fingerprintSnapshot(v2.decision.canonical_snapshot);
-        let reconstructionCommand;
-        const acceptedV2 = await preflightWeeklyRepoTransferApply({
-            session,
-            payload,
-            ...model(v2.decision),
-            reconstruct: async ({ command }) => {
-                reconstructionCommand = command;
-                return {
-                    snapshot: v2.decision.canonical_snapshot,
-                    fingerprint: v2.decision.snapshot_fingerprint
-                };
-            }
-        });
-        assert.strictEqual(acceptedV2.plan.source.id, SOURCE);
-        assert.strictEqual(
-            reconstructionCommand.expected_proposal_version,
-            'repo-transfer-single-pair-proposal:v2'
-        );
+        const legacy = setup();
+        legacy.decision.canonical_snapshot = snapshot('repo-transfer-single-pair-proposal:v4');
+        delete legacy.decision.canonical_snapshot.source.proposed_values.apologistiko_biblio;
+        delete legacy.decision.canonical_snapshot.target.proposed_values.apologistiko_biblio;
+        legacy.decision.snapshot_fingerprint = fingerprintSnapshot(legacy.decision.canonical_snapshot);
+        let reconstructionCalls = 0;
+        await assert.rejects(() => preflightWeeklyRepoTransferApply({ session, payload,
+            ...model(legacy.decision), reconstruct: async () => { reconstructionCalls += 1; } }),
+        (error) => error.code === 'LEGACY_RECORDED_DECISION_REQUIRES_REAPPROVAL' &&
+            error.statusCode === 409);
+        assert.strictEqual(reconstructionCalls, 0);
     }
     assert.strictEqual(CURRENT_GUARD_FIELDS.length, 57); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
     for (const field of ['cards_ores_ergasias','cards_apo_ora_01','kathgoria_ergasias','ores_nyxtas_apologistika']) { assert.strictEqual(accepted.plan.source.expected_current[field], currentValues[field]); assert.strictEqual(accepted.plan.target.expected_current[field], currentValues[field]); }
