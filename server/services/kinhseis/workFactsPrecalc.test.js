@@ -279,8 +279,8 @@ test('real weekly analysis flows through work-facts payload into target-only car
             paranomiYperoriaHours: 0
         });
         orariaByDate.set(date, {
-            kathgoria_ergasias: index >= 5 ? 'ΑΝ' : 'ΕΡΓ',
-            repo: index >= 5,
+            kathgoria_ergasias: index === 1 || index === 5 ? 'ΑΝ' : 'ΕΡΓ',
+            repo: index === 1 || index === 5,
             ores_ergasias: 8,
             cards_ores_ergasias: hours[index],
             cards_apo_ora_01: '09:00',
@@ -332,7 +332,7 @@ test('real weekly analysis flows through work-facts payload into target-only car
     assert.deepEqual(payload.weeklyCarryOverDifferences[0].breakdown, {
         yperergasia: 1,
         yperoria: 0.5,
-        sixthDay: 0,
+        sixthDay: 7,
         otherWeekly: 0
     });
     assert.deepEqual(

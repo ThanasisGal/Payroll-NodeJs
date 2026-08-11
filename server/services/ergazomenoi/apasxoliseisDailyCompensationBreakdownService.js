@@ -49,9 +49,10 @@ function buildDailyCompensationBreakdown({
     weeklyIllegalOvertimeHours = 0,
     sixthDayMandatoryRatePercent = null,
     companyRules = [],
-    blockingReasons = []
+    blockingReasons = [],
+    calculatedWorkHoursAuthoritative = false
 } = {}) {
-    const facts = resolveDailyActualWorkFacts(row);
+    const facts = resolveDailyActualWorkFacts(row, { calculatedWorkHoursAuthoritative });
     const paidRate = hourlyRateOrNull(paidHourlyRate);
     const legalRate = hourlyRateOrNull(legalHourlyRate);
     const actualWorkHours = numberOrZero(facts.actualWorkHours);

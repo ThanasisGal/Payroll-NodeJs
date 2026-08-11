@@ -49,11 +49,14 @@ function normalizeAppliedAtomicRepoTransfer({ weekRows = [], protectionContext }
 
 function buildWeeklyCanonicalDecisionSnapshotInput({
     team, company_kod, employee = {}, week, weekRows = [], effectiveProfile = {},
-    profileHistory = [], automaticAnalysis = {}, appliedProtectionContext
+    profileHistory = [], automaticAnalysis = {}, appliedProtectionContext,
+    calculatedWorkHoursAuthoritative = false
 } = {}) {
     const rows = [...weekRows].sort((a, b) => dateKeyUtc(a.hmeromhnia).localeCompare(dateKeyUtc(b.hmeromhnia)));
     const actualFacts = Object.fromEntries(rows.map((row) => [
-        dateKeyUtc(row.hmeromhnia), resolveDailyActualWorkFacts(row)
+        dateKeyUtc(row.hmeromhnia), resolveDailyActualWorkFacts(row, {
+            calculatedWorkHoursAuthoritative
+        })
     ]));
     const currentRepoIdentities = resolveCurrentRepoCandidateIdentities({
         weekRows: rows, effectiveProfile

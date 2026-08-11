@@ -91,6 +91,45 @@ const cardFacts = facts('ΕΡΓ', 8, 8, {
 assert.strictEqual(cardFacts.cardHours, 8);
 assert.strictEqual(cardFacts.hasCompleteCardEvidence, true);
 
+const breakAdjustedFacts = facts('ΕΡΓ', 8, 419 / 60, {
+    cards_apo_ora_01: '15:41',
+    cards_eos_ora_01: '22:40',
+    ores_ergasias_apologistika: 6.48
+});
+assert.strictEqual(breakAdjustedFacts.cardHours, 419 / 60);
+assert.strictEqual(breakAdjustedFacts.hasCompleteCardEvidence, true);
+assert.strictEqual(breakAdjustedFacts.actualWorkHours, 6.48);
+assert.strictEqual(breakAdjustedFacts.countsAsActualWorkDay, true);
+
+const zeroCalculatedRow = {
+    kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+    cards_ores_ergasias: 6.98,
+    cards_apo_ora_01: '15:41', cards_eos_ora_01: '22:40',
+    ores_ergasias_apologistika: 0
+};
+assert.strictEqual(
+    resolveDailyActualWorkFacts(zeroCalculatedRow).actualWorkHours,
+    6.98,
+    'pre-calculation callers retain the card-hours fallback'
+);
+assert.strictEqual(
+    resolveDailyActualWorkFacts(zeroCalculatedRow, {
+        calculatedWorkHoursAuthoritative: true
+    }).actualWorkHours,
+    0,
+    'post-daily callers preserve a calculated zero'
+);
+assert.strictEqual(
+    resolveDailyActualWorkFacts({
+        ...zeroCalculatedRow,
+        is_locked: true,
+        locked_by: 'HR',
+        locked_at: new Date('2026-06-17T12:00:00.000Z')
+    }).actualWorkHours,
+    0,
+    'locked HR ownership preserves a manual calculated zero'
+);
+
 const incompleteCardFacts = facts('ΕΡΓ', 8, 8, {
     cards_apo_ora_01: '09:00',
     cards_eos_ora_01: ''

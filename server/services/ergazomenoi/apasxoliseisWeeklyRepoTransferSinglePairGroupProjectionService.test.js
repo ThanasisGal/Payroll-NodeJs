@@ -125,7 +125,7 @@ function assertSafetyContract(group) {
     assert.strictEqual(group.employees_count, 1);
     assert.deepStrictEqual(group.pair_contract, {
         choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR',
-        proposal_version: 'repo-transfer-single-pair-proposal:v4',
+        proposal_version: 'repo-transfer-single-pair-proposal:v5',
         policy_versions: {
             weekly_repo: 'foundation:v3',
             source_work: 'foundation:v3'
@@ -255,7 +255,7 @@ function testStableGroupIdentity() {
         'group_type=ATOMIC_PAIRED_PROPOSAL|' +
             'scenario=REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR|' +
             'choice=TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR|' +
-            'proposal_version=repo-transfer-single-pair-proposal:v4|' +
+            'proposal_version=repo-transfer-single-pair-proposal:v5|' +
             'employee=001|week=2026-07-06:2026-07-12|source=row-1|target=row-4'
     );
     assert.match(first.groups[0].group_id, /^policy-preview-paired-group-[a-f0-9]{16}$/);
@@ -302,6 +302,7 @@ function testSplitShiftIntervalsArePreservedInProjection() {
     const twoIntervalValues = {
         kathgoria_ergasias_apologistika: 'ΕΡΓ',
         repo_apologistika: false,
+        apologistiko_biblio: true,
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_apoysias_apologistika: 0,

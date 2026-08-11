@@ -150,8 +150,7 @@ assert.ok(CURRENT_GUARD_FIELDS.includes('ores_apoysias'));
 
 for (const marker of [
     { adeia: true },
-    { kathgoria_adeias: 'HR' },
-    { ores_apoysias: 8 }
+    { kathgoria_adeias: 'HR' }
 ]) {
     const rows = sixWorkdaysWithAutoLeave();
     Object.assign(rows[6], marker);
@@ -165,6 +164,15 @@ for (const marker of [
     });
     assert.notStrictEqual(analysis.eligibility_status, 'ELIGIBLE');
     assert.ok(analysis.reasons.includes('TARGET_LEAVE_OR_SICKNESS'));
+}
+
+{
+    const rows = sixWorkdaysWithAutoLeave();
+    Object.assign(rows[6], { ores_apoysias: 8 });
+    assert.notStrictEqual(
+        classifyLeaveProvenance(rows[6]),
+        LEAVE_PROVENANCE.HR_DECLARED_LEAVE
+    );
 }
 
 {

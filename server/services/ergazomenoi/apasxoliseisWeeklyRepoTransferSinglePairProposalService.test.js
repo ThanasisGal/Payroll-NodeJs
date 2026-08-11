@@ -105,6 +105,7 @@ function expectedClearedTarget(category) {
     return {
         kathgoria_ergasias_apologistika: category,
         repo_apologistika: true,
+        apologistiko_biblio: true,
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_ergasias_apologistika: 0,
@@ -124,7 +125,7 @@ function expectedClearedTarget(category) {
 
 function assertReadyContract(result, sourceDate, targetDate, targetCategory) {
     assert.strictEqual(result.scenario_code, 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR');
-    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v5');
     assert.strictEqual(result.proposal_version, PROPOSAL_VERSION);
     assert.strictEqual(result.proposal_status, PROPOSAL_STATUS.READY);
     assert.strictEqual(result.choice_code, CHOICE_CODE);
@@ -185,6 +186,7 @@ function testValidFullTimeProposal() {
         proposed_values: {
             kathgoria_ergasias_apologistika: 'ΕΡΓ',
             repo_apologistika: false,
+            apologistiko_biblio: true,
             adeia_apologistika: false,
             kathgoria_adeias_apologistika: '',
             ores_apoysias_apologistika: 0,
@@ -249,6 +251,7 @@ function testSourceIntervalPositionsAndZeroLengthClearing() {
     assert.deepStrictEqual(twoIntervals.items[0].proposed_values, {
         kathgoria_ergasias_apologistika: 'ΕΡΓ',
         repo_apologistika: false,
+        apologistiko_biblio: true,
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_apoysias_apologistika: 0,
@@ -362,12 +365,7 @@ function testProposalClearsProvisionalAutoLeaveFieldsWithoutMutatingRows() {
     assert.strictEqual(JSON.stringify(rows), before);
     assert.strictEqual(rows[4].adeia_apologistika, true);
     assert.strictEqual(rows[4].kathgoria_ergasias_apologistika, 'ΑΔΕΙΑ');
-    assert.ok(
-        !Object.prototype.hasOwnProperty.call(
-            result.items[1].proposed_values,
-            'apologistiko_biblio'
-        )
-    );
+    assert.strictEqual(result.items[1].proposed_values.apologistiko_biblio, true);
 }
 
 function testSourceProposalClearsLeaveButPreservesHolidayPayrollFields() {
@@ -412,7 +410,7 @@ function testSourceProposalClearsLeaveButPreservesHolidayPayrollFields() {
         'ores_argion_ergasia_apologistika',
         'kyriakes_apologistika'
     ].forEach((field) => assert.ok(!Object.prototype.hasOwnProperty.call(values, field), field));
-    assert.ok(!Object.prototype.hasOwnProperty.call(values, 'apologistiko_biblio'));
+    assert.strictEqual(typeof values.apologistiko_biblio, 'boolean');
     assert.strictEqual(JSON.stringify(rows), before);
 }
 
@@ -442,13 +440,8 @@ function testSourceProposalPreservesCompatibleCalculatedShapeAndBookFlag() {
     assert.strictEqual(sourceValues.apo_ora_01_apologistika, '08:01');
     assert.strictEqual(sourceValues.eos_ora_01_apologistika, '16:01');
     assert.strictEqual(sourceValues.ores_ergasias_apologistika, 7.47);
-    assert.ok(!Object.prototype.hasOwnProperty.call(sourceValues, 'apologistiko_biblio'));
-    assert.ok(
-        !Object.prototype.hasOwnProperty.call(
-            result.items[1].proposed_values,
-            'apologistiko_biblio'
-        )
-    );
+    assert.strictEqual(typeof sourceValues.apologistiko_biblio, 'boolean');
+    assert.strictEqual(result.items[1].proposed_values.apologistiko_biblio, true);
     assert.strictEqual(JSON.stringify(rows), before);
     assert.strictEqual(rows[1].apologistiko_biblio, true);
     assert.strictEqual(rows[4].apologistiko_biblio, true);
@@ -502,7 +495,7 @@ function testMissingAndDuplicateIds() {
 function testV2InvalidResultsPreserveVersions() {
     const assertV2Invalid = (result, reason) => {
         assertInvalid(result, reason);
-        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
+        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v5');
         assert.strictEqual(result.proposal_version, PROPOSAL_VERSION_V2);
     };
 
@@ -519,7 +512,7 @@ function testV2InvalidResultsPreserveVersions() {
     invalidIntervals[2].cards_eos_ora_02 = 'invalid';
     const invalidIntervalResult = buildV2(invalidIntervals);
     assertNotAvailable(invalidIntervalResult, 'CARD_VERIFICATION_PENDING');
-    assert.strictEqual(invalidIntervalResult.scenario_version, 'repo-transfer-single-pair:v4');
+    assert.strictEqual(invalidIntervalResult.scenario_version, 'repo-transfer-single-pair:v5');
     assert.strictEqual(invalidIntervalResult.proposal_version, PROPOSAL_VERSION_V2);
 
     const validRows = partTimeWeek();
@@ -582,7 +575,7 @@ function testV2InvalidResultsPreserveVersions() {
     delete v1MissingSource[1]._id;
     const v1Result = build(v1MissingSource);
     assertInvalid(v1Result, 'MISSING_SOURCE_RECORD_ID');
-    assert.strictEqual(v1Result.scenario_version, 'repo-transfer-single-pair:v4');
+    assert.strictEqual(v1Result.scenario_version, 'repo-transfer-single-pair:v5');
     assert.strictEqual(v1Result.proposal_version, PROPOSAL_VERSION);
 }
 

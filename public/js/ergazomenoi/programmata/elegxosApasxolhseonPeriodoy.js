@@ -15,12 +15,15 @@ function mergeEmploymentReviewSwalClasses(...classNames) {
 
 function employmentReviewSwal(options = {}) {
     const customClass = options.customClass || {};
-    const semanticConfirmClass = customClass.confirmButton || {
+    const semanticConfirmClass = /(?:^|\s)class-(?:success|error|danger|info|warning|normal)(?:\s|$)/
+        .test(String(customClass.confirmButton || ''))
+        ? ''
+        : ({
         success: 'class-success',
         error: 'class-error',
         info: 'class-info',
         warning: 'class-warning'
-    }[options.icon] || 'class-warning';
+    }[options.icon] || 'class-warning');
     const cancelButtonClass = options.showCancelButton === true || customClass.cancelButton
         ? mergeEmploymentReviewSwalClasses(
             customClass.cancelButton || 'class-normal',
@@ -46,6 +49,7 @@ function employmentReviewSwal(options = {}) {
                 customClass.htmlContainer
             ),
             confirmButton: mergeEmploymentReviewSwalClasses(
+                customClass.confirmButton,
                 semanticConfirmClass,
                 'custom-confirm-button',
                 'custom-swal-button'
@@ -751,7 +755,7 @@ function renderScenarioProposedUpdates(proposedUpdates = {}) {
                         ? `
                             <button
                                 type="button"
-                                class="btn btn-sm btn-outline-primary"
+                                class="btn btn-sm employment-review-action-btn employment-review-action-primary"
                                 id="fillScenarioProposedUpdatesBtn">
                                 Γέμισμα πεδίων από πρόταση
                             </button>
@@ -2185,7 +2189,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
                     <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
                     <td>${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && canRecordCanonicalEmploymentDecision()
-                        ? `<div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary canonical-decision-open"
+                        ? `<div class="mt-2"><button type="button" class="btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary"
                             data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
                             data-ypokatasthma="${escapeHtml(dev.ypokatasthma || '')}"
                             data-week-start="${escapeHtml(String(dev.week_apo || dev.weekStart || '').slice(0, 10))}">Καταγραφή απόφασης</button></div>`
@@ -2371,7 +2375,7 @@ function renderCanonicalDecisionEditor(context) {
         <div class="canonical-decision-input d-none" data-type="CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC"><div class="mb-2">Επιλέξτε ακριβώς δύο έγκυρες ημέρες ανάπαυσης/ρεπό:</div>${repoDates || '<span class="text-muted">Δεν υπάρχουν διαθέσιμες ημέρες ανάπαυσης/ρεπό.</span>'}</div>
         <div class="canonical-decision-input d-none" data-type="CLASSIFICATION_BY_DATE"><div class="small text-muted mb-2">Η επιλογή θα ελεγχθεί από το σύστημα ώστε η εβδομαδιαία ταξινόμηση να είναι πλήρης και συνεπής.</div>${classifications}</div>
         <label class="form-label mt-3">Σημειώσεις</label><textarea class="form-control form-control-sm" id="canonicalDecisionNotes" maxlength="2000"></textarea>
-        <button class="btn btn-primary btn-sm mt-3" type="submit">Καταγραφή απόφασης</button>
+        <button class="btn btn-sm mt-3 employment-review-action-btn employment-review-action-primary" type="submit">Καταγραφή απόφασης</button>
         <div id="canonicalDecisionFeedback" class="small mt-2"></div>
     </form>`;
 }
@@ -2619,8 +2623,6 @@ function resolvePossibleLeavePresentationState(row = {}) {
         hasMeaningfulValue(declaredLeaveCategory) ||
         (hasMeaningfulValue(persistedLeaveCategory) &&
             persistedLeaveCategory !== 'POSSIBLE_LEAVE') ||
-        num(row.ores_apoysias) > 0 ||
-        num(row.ores_apoysias_apologistika) > 0 ||
         num(row.ores_adeias_pistomenes_apologistika) > 0;
 
     if (hasConfirmedLeave) {
@@ -5828,7 +5830,7 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
         : !isCurrentApproval ? '' : !canApply
         ? `<div class="small text-muted mt-2">${escapeHtml(applyMessages[applyState] || 'Η εγκεκριμένη πρόταση δεν είναι διαθέσιμη για εφαρμογή.')}</div>`
         : `<div class="mt-2">
-               <button type="button" class="btn btn-sm policy-preview-decision-success atomic-repo-transfer-apply-btn" data-atomic-group-index="${escapeHtml(index)}" data-decision-id="${escapeHtml(recordedDecision?.id || '')}">Εφαρμογή εγκεκριμένης μεταφοράς</button>
+               <button type="button" class="btn btn-sm policy-preview-decision-success atomic-repo-transfer-apply-btn employment-review-action-btn employment-review-action-success" data-atomic-group-index="${escapeHtml(index)}" data-decision-id="${escapeHtml(recordedDecision?.id || '')}">Εφαρμογή εγκεκριμένης μεταφοράς</button>
            </div>`;
     const olderDecisions = Array.isArray(decisionState?.history)
         ? decisionState.history.filter((decision) => decision?.is_current !== true)
@@ -5847,10 +5849,11 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
         : '';
     const decisionButtons = !isResolvedByReusable && userCanRecordRepoTransferDecision() ? Object.entries(decisionLabels).map(([code, label]) => {
         const style = code === 'APPROVE_PROPOSAL' ? 'policy-preview-decision-success' : code === 'REJECT_PROPOSAL' ? 'policy-preview-decision-danger' : 'policy-preview-decision-warning';
-        return `<button type="button" class="btn btn-sm ${style} atomic-repo-transfer-decision-btn" data-atomic-group-index="${escapeHtml(index)}" data-decision-code="${escapeHtml(code)}" ${recordedDecision || !hasSpecificBranch ? 'disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
+        const semanticStyle = code === 'APPROVE_PROPOSAL' ? 'employment-review-action-success' : code === 'REJECT_PROPOSAL' ? 'employment-review-action-danger' : 'employment-review-action-warning';
+        return `<button type="button" class="btn btn-sm ${style} atomic-repo-transfer-decision-btn employment-review-action-btn ${semanticStyle}" data-atomic-group-index="${escapeHtml(index)}" data-decision-code="${escapeHtml(code)}" ${recordedDecision || !hasSpecificBranch ? 'disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
     }).join('') : '';
     const reusableApprovalButton = canOfferAtomicReusable
-        ? `<button type="button" class="btn btn-sm btn-outline-success atomic-repo-transfer-reusable-btn" data-atomic-group-index="${escapeHtml(index)}">Έγκριση πρότασης για μελλοντική εφαρμογή</button>`
+        ? `<button type="button" class="btn btn-sm atomic-repo-transfer-reusable-btn employment-review-action-btn employment-review-action-success" data-atomic-group-index="${escapeHtml(index)}">Έγκριση πρότασης για μελλοντική εφαρμογή</button>`
         : '';
     const reusableDiagnosticHtml = blockingReusableDiagnostics.length
         ? `<div class="atomic-repo-transfer-group-warnings mt-2">${blockingReusableDiagnostics
@@ -6418,7 +6421,7 @@ function renderHrPendingCase() {
             : '';
         const reusableAction = userCanManageReusablePolicyApproval() &&
             hasSpecificBranch && blockingReusableDiagnostics.length === 0
-            ? `<button type="button" class="btn btn-outline-success hr-review-reusable-btn employment-review-action-btn">Έγκριση πρότασης για μελλοντική εφαρμογή</button>`
+            ? `<button type="button" class="btn hr-review-reusable-btn employment-review-action-btn employment-review-action-success">Έγκριση πρότασης για μελλοντική εφαρμογή</button>`
             : '';
         const decisionActions = userCanRecordRepoTransferDecision()
             ? `<div class="hr-review-decision-actions">
@@ -6548,7 +6551,7 @@ function renderHrCompletedCases() {
             const applyAction = state.apply_state === 'ALREADY_APPLIED' && state.current_execution
                 ? `<div class="mt-2"><span class="badge text-bg-success">Εφαρμόστηκε</span> ${escapeHtml(formatPolicyPreviewDateTime(state.current_execution.applied_at))}${state.current_execution.created_by_user_name ? ` · ${escapeHtml(state.current_execution.created_by_user_name)}` : ''}</div>`
                 : approved && state.can_apply === true && userCanApplyRepoTransferDecision()
-                ? `<button type="button" class="btn btn-sm policy-preview-decision-success hr-review-apply-btn mt-2" data-group-id="${escapeHtml(String(group.group_id || ''))}" data-decision-id="${escapeHtml(decision.id || '')}">Εφαρμογή εγκεκριμένης μεταφοράς</button>`
+                ? `<button type="button" class="btn btn-sm policy-preview-decision-success hr-review-apply-btn employment-review-action-btn employment-review-action-success mt-2" data-group-id="${escapeHtml(String(group.group_id || ''))}" data-decision-id="${escapeHtml(decision.id || '')}">Εφαρμογή εγκεκριμένης μεταφοράς</button>`
                 : approved
                 ? `<div class="small text-muted mt-2">${escapeHtml(applyMessages[state.apply_state] || 'Η εγκεκριμένη πρόταση δεν είναι διαθέσιμη για εφαρμογή.')}</div>`
                 : '';
@@ -7994,7 +7997,7 @@ function renderAuditRow(audit) {
                     ? `
                         <button
                             type="button"
-                            class="btn btn-sm btn-warning mt-2 restore-audit-btn"
+                            class="btn btn-sm mt-2 restore-audit-btn employment-review-action-btn employment-review-action-warning"
                             data-audit-id="${audit._id}">
                             <i class="bi bi-arrow-counterclockwise"></i>
                             Επαναφορά
@@ -8248,7 +8251,7 @@ function showDetailsModal(row) {
                 ${
                     userCanReviewEdit()
                         ? `
-                            <button class="btn btn-success" id="saveRecordBtn">
+                            <button class="btn employment-review-action-btn employment-review-action-success" id="saveRecordBtn">
                                 <i class="bi bi-save"></i> Αποθήκευση
                             </button>
                         `
@@ -8258,7 +8261,7 @@ function showDetailsModal(row) {
                 ${
                     row.is_locked && userCanReviewEdit()
                         ? `
-                            <button class="btn btn-warning" id="unlockRecordBtn">
+                            <button class="btn employment-review-action-btn employment-review-action-warning" id="unlockRecordBtn">
                                 <i class="bi bi-unlock"></i> Ξεκλείδωμα
                             </button>
                         `

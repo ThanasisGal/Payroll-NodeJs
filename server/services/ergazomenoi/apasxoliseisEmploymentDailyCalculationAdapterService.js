@@ -1,5 +1,10 @@
 'use strict';
 
+const {
+    buildAutoAttendanceReset,
+    resolveSafeStartOnlyOrphan
+} = require('./apasxoliseisAttendanceDerivedScheduleService');
+
 function assertOperations(operations, names) {
     for (const name of names) if (typeof operations?.[name] !== 'function') {
         throw new TypeError(`Missing authoritative daily operation: ${name}`);
@@ -22,9 +27,30 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
     const context = { rec: calculationRow, ergazomenos: effectiveEmployee, argiesDateSet,
         proorhProseleyshMinutes, proorhApoxorhshMinutes,
         evelikthProselefshMinutes: parseInt(effectiveEmployee?.evelikth_proselefsh || 0, 10) || 0 };
-    const update = {};
-    const unresolved = operations.resolveCardPairVerification(calculationRow).hasUnresolvedCardEvidence;
-    if (unresolved) Object.assign(update, operations.buildPartialVerifiedCardUpdate(calculationRow).update);
+    if (calculationRow.is_locked === true) {
+        return Object.freeze({ calculationRow, update: {}, unresolved: false,
+            rawCardEvidenceUnresolved: false, safeOrphan: null, manualOwnership: 'LOCKED_HR_ROW',
+            context, workingRow: calculationRow });
+    }
+    const update = buildAutoAttendanceReset();
+    const verification = operations.resolveCardPairVerification(calculationRow);
+    const safeOrphan = verification.hasUnresolvedCardEvidence
+        ? resolveSafeStartOnlyOrphan(calculationRow, {
+              flexibleArrivalMinutes: context.evelikthProselefshMinutes
+          })
+        : null;
+    const unresolved = verification.hasUnresolvedCardEvidence && !safeOrphan;
+    if (safeOrphan) Object.assign(update, {
+        apologistiko_biblio: safeOrphan.requiresBook,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        apo_ora_01_apologistika: safeOrphan.start,
+        eos_ora_01_apologistika: safeOrphan.end,
+        apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
+        apo_ora_03_apologistika: '', eos_ora_03_apologistika: '',
+        ores_ergasias_apologistika: Number((safeOrphan.durationMinutes / 60).toFixed(2)),
+        ores_pragmatikhs_ergasias_apologistika: Number((safeOrphan.durationMinutes / 60).toFixed(2))
+    });
+    else if (unresolved) Object.assign(update, operations.buildPartialVerifiedCardUpdate(calculationRow).update);
     else {
         const splitUpdate = operations.checkBrokenProgramVsBrokenCards(context);
         Object.assign(update, splitUpdate);
@@ -35,7 +61,8 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
         Object.assign(update, operations.checkBrokenProgramVsContinuousCards(context));
         Object.assign(update, operations.checkNoDeclaredScheduleCards(context));
     }
-    return Object.freeze({ calculationRow, update, unresolved, context,
+    return Object.freeze({ calculationRow, update, unresolved, rawCardEvidenceUnresolved:
+        verification.hasUnresolvedCardEvidence, safeOrphan, context,
         workingRow: { ...calculationRow, ...update } });
 }
 
@@ -44,6 +71,10 @@ function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesD
     assertOperations(operations, DAILY_OPERATIONS);
     const preliminary = buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
         proorhProseleyshMinutes, proorhApoxorhshMinutes, operations });
+    if (preliminary.manualOwnership) {
+        return Object.freeze({ ...preliminary, update: {}, sanitizedUpdate: {},
+            protectionDiagnostics: [] });
+    }
     const update = { ...preliminary.update };
     const workingContext = { ...preliminary.context, rec: preliminary.workingRow };
     Object.assign(update, operations.checkNightHours(workingContext));

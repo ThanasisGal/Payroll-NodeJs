@@ -13,7 +13,7 @@ const {
     resolveFullTimeFromWorkTerms
 } = require('./apasxoliseisReviewEmploymentProfileService');
 
-const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v2';
+const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v3';
 const STATUS = Object.freeze({ READY: 'READY', NOT_APPLICABLE: 'NOT_APPLICABLE', NEEDS_HR_DECISION: 'NEEDS_HR_DECISION' });
 const ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES = new Set(['0009']);
 
@@ -30,12 +30,16 @@ function resolveSeventhDayIllegalOvertimeHours(day) {
 
 function selectSixthDay(candidates) {
     const cardProvenCandidates = candidates
-        .filter((day) => day.cardHours > 0)
+        .filter((day) => day.cardHours > 0 ||
+            day.cardVerificationStatus === 'SAFE_AUTO_RESOLVED')
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
     const standardCandidates = cardProvenCandidates.filter(
         (day) => day.actualWorkHours > 5 && day.actualWorkHours <= 8
     );
-    const day = standardCandidates[standardCandidates.length - 1] || null;
+    const day = [...standardCandidates].sort((a, b) => {
+        const distance = Math.abs(a.actualWorkHours - 8) - Math.abs(b.actualWorkHours - 8);
+        return distance || b.hmeromhnia.localeCompare(a.hmeromhnia);
+    })[0] || null;
 
     if (day) {
         return { day, warnings: [] };
@@ -61,9 +65,15 @@ function selectSixthDay(candidates) {
     return { day: null, reason: 'SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC' };
 }
 
+function isSixthDayEligible(day) {
+    return (day.cardHours > 0 || day.cardVerificationStatus === 'SAFE_AUTO_RESOLVED') &&
+        day.actualWorkHours > 5 && day.actualWorkHours <= 8;
+}
+
 function resolveCanonicalRepoDayIdentities({
     weekRows = [],
-    effectiveProfile = {}
+    effectiveProfile = {},
+    allowedRepoIdentityCounts = [2]
 } = {}) {
     const fullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
     const explicitRepoCategories = [...new Set(
@@ -92,13 +102,14 @@ function resolveCanonicalRepoDayIdentities({
         .map(({ identity }) => identity)
         .sort();
 
-    if (diagnostics.length > 0 || identities.length !== 2) {
+    if (diagnostics.length > 0 || !allowedRepoIdentityCounts.includes(identities.length)) {
         return Object.freeze({
             ok: false,
             canonicalRepoDayIdentities: Object.freeze([]),
             reasons: Object.freeze([
                 ...(diagnostics.length > 0 ? diagnostics : []),
-                ...(identities.length !== 2 ? ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'] : [])
+                ...(!allowedRepoIdentityCounts.includes(identities.length)
+                    ? ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'] : [])
             ])
         });
     }
@@ -121,7 +132,8 @@ function decisionFailure(reason, base = {}) {
     return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION,
         reasons: [reason], warnings: base.warnings || [], dailyFacts: base.dailyFacts || [],
         canonicalRepoDayIdentities: base.canonicalRepoDayIdentities || [],
-        sixthDayRepoIdentity: null, remainingRepoIdentity: null, sixthDay: null, seventhDay: null });
+        sixthDayIdentity: null, sixthDayRepoIdentity: null,
+        remainingRepoIdentity: null, sixthDay: null, seventhDay: null });
 }
 
 function analyzeWeeklySixthSeventhDay({
@@ -129,7 +141,9 @@ function analyzeWeeklySixthSeventhDay({
     effectiveProfile = {},
     hourlyRate = null,
     canonicalRepoDayIdentitiesOverride = null,
-    classificationByDateOverride = null
+    allowDeclaredRepoIdentityOverride = false,
+    classificationByDateOverride = null,
+    calculatedWorkHoursAuthoritative = false
 } = {}) {
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const dates = rows.map((row) => dateKeyUtc(row?.hmeromhnia));
@@ -158,13 +172,16 @@ function analyzeWeeklySixthSeventhDay({
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [], dailyFacts: [] });
     }
     const dailyFacts = rows
-        .map((row) => ({ hmeromhnia: dateKeyUtc(row.hmeromhnia), ...resolveDailyActualWorkFacts(row) }))
+        .map((row) => ({
+            hmeromhnia: dateKeyUtc(row.hmeromhnia),
+            ...resolveDailyActualWorkFacts(row, { calculatedWorkHoursAuthoritative })
+        }))
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
     const factReasons = [...new Set(dailyFacts.flatMap((day) => day.reasons))];
     if (factReasons.length > 0) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: factReasons, warnings: [], dailyFacts });
     }
-    if (dailyFacts.some((day) => day.cardVerificationStatus !== 'READY')) {
+    if (dailyFacts.some((day) => !['READY', 'SAFE_AUTO_RESOLVED'].includes(day.cardVerificationStatus))) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,
@@ -181,14 +198,27 @@ function analyzeWeeklySixthSeventhDay({
     }
     const repoIdentityResolution = resolveCanonicalRepoDayIdentities({
         weekRows: rows,
-        effectiveProfile
+        effectiveProfile,
+        allowedRepoIdentityCounts: [2]
     });
     let canonicalRepoDayIdentities;
     if (canonicalRepoDayIdentitiesOverride !== null) {
+        const overrideFullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
+        const overrideExpectedRepoCategory = overrideFullTime === null
+            ? null
+            : (overrideFullTime ? 'ΑΝ' : 'ΜΕ');
         const override = [...new Set((Array.isArray(canonicalRepoDayIdentitiesOverride)
             ? canonicalRepoDayIdentitiesOverride : []).map(dateKeyUtc).filter(Boolean))].sort();
-        const candidates = resolveCurrentRepoCandidateIdentities({ weekRows: rows, effectiveProfile });
-        if (override.length !== 2 || override.some((identity) => !dates.includes(identity)) ||
+        const candidates = allowDeclaredRepoIdentityOverride
+            ? rows.filter((row) => row?.repo === true ||
+                ['ΑΝ', 'ΜΕ'].includes(String(row?.kathgoria_ergasias || '').trim()) ||
+                resolveEffectiveRepoState({ row, mode: EFFECTIVE_REPO_MODE.CURRENT,
+                    expectedRepoCategory: overrideExpectedRepoCategory }).effectiveRepo === true)
+                .map((row) => dateKeyUtc(row.hmeromhnia)).filter(Boolean).sort()
+            : resolveCurrentRepoCandidateIdentities({ weekRows: rows, effectiveProfile });
+        const allowedRepoIdentityCounts = [1, 2];
+        if (!allowedRepoIdentityCounts.includes(override.length) ||
+            override.some((identity) => !dates.includes(identity)) ||
             override.some((identity) => !candidates.includes(identity))) {
             return decisionFailure('CANONICAL_DECISION_REPO_IDENTITIES_INVALID', {
                 dailyFacts, warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))]
@@ -203,6 +233,7 @@ function analyzeWeeklySixthSeventhDay({
             warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))],
             dailyFacts,
             canonicalRepoDayIdentities: [],
+            sixthDayIdentity: null,
             sixthDayRepoIdentity: null,
             remainingRepoIdentity: null,
             sixthDay: null,
@@ -214,23 +245,31 @@ function analyzeWeeklySixthSeventhDay({
     const workedRepoDays = actualDays.filter((day) =>
         canonicalRepoDayIdentities.includes(day.hmeromhnia)
     );
-    const sixthCandidates = workedRepoDays;
+    const sixthCandidates = actualDays;
     let selected = selectSixthDay(sixthCandidates);
     if (!selected.day) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: [selected.reason], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, canonicalRepoDayIdentities, sixthDayRepoIdentity: null, remainingRepoIdentity: null, sixthDay: null, seventhDay: null });
+        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: [selected.reason], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, canonicalRepoDayIdentities, sixthDayIdentity: null, sixthDayRepoIdentity: null, remainingRepoIdentity: null, sixthDay: null, seventhDay: null });
     }
-    let sixthDayRepoIdentity = selected.day.hmeromhnia;
-    let remainingRepoIdentity = canonicalRepoDayIdentities.find(
-        (identity) => identity !== sixthDayRepoIdentity
-    ) || null;
-    let seventhDay = remainingRepoIdentity
-        ? actualDays.find((day) => day.hmeromhnia === remainingRepoIdentity) || null
-        : null;
+    let sixthDayIdentity = selected.day.hmeromhnia;
+    let sixthDayRepoIdentity = canonicalRepoDayIdentities.includes(sixthDayIdentity)
+        ? sixthDayIdentity : null;
+    let seventhDayCandidates = actualDays.length >= 7
+        ? workedRepoDays.filter((day) => day.hmeromhnia !== sixthDayIdentity) : [];
+    let seventhDay = seventhDayCandidates.length === 1 ? seventhDayCandidates[0] : null;
+    let remainingRepoIdentity = sixthDayRepoIdentity
+        ? canonicalRepoDayIdentities.find((identity) => identity !== sixthDayIdentity) || null
+        : seventhDay?.hmeromhnia || null;
+    if (classificationByDateOverride === null && actualDays.length >= 7 &&
+        seventhDayCandidates.length !== 1) {
+        return decisionFailure('SEVENTH_DAY_IDENTITY_NOT_DETERMINISTIC', {
+            dailyFacts, canonicalRepoDayIdentities
+        });
+    }
     if (classificationByDateOverride !== null) {
         const map = classificationByDateOverride && typeof classificationByDateOverride === 'object' &&
             !Array.isArray(classificationByDateOverride) ? classificationByDateOverride : {};
         const finalClassifications = Object.fromEntries(dates.map((date) => [date,
-            date === sixthDayRepoIdentity ? 'SIXTH' :
+            date === sixthDayIdentity ? 'SIXTH' :
                 seventhDay?.hmeromhnia === date ? 'SEVENTH' : 'NORMAL']));
         for (const [rawDate, rawClassification] of Object.entries(map)) {
             const date = dateKeyUtc(rawDate);
@@ -245,22 +284,26 @@ function analyzeWeeklySixthSeventhDay({
         const sixthDates = dates.filter((date) => finalClassifications[date] === 'SIXTH');
         const seventhDates = dates.filter((date) => finalClassifications[date] === 'SEVENTH');
         const humanSixth = sixthDates[0];
-        const humanRemaining = canonicalRepoDayIdentities.find((identity) => identity !== humanSixth);
-        const expectedSeventh = actualDays.some((day) => day.hmeromhnia === humanRemaining)
-            ? humanRemaining : null;
-        if (sixthDates.length !== 1 || !canonicalRepoDayIdentities.includes(humanSixth) ||
-            !actualDays.some((day) => day.hmeromhnia === humanSixth) ||
-            seventhDates.length !== (expectedSeventh ? 1 : 0) ||
-            (expectedSeventh && seventhDates[0] !== expectedSeventh)) {
+        const humanSixthDay = actualDays.find((day) => day.hmeromhnia === humanSixth);
+        const humanSeventh = seventhDates[0] || null;
+        const requiresSeventh = actualDays.length >= 7;
+        if (sixthDates.length !== 1 || !humanSixthDay || !isSixthDayEligible(humanSixthDay) ||
+            seventhDates.length !== (requiresSeventh ? 1 : 0) ||
+            (requiresSeventh && (humanSeventh === humanSixth ||
+                !workedRepoDays.some((day) => day.hmeromhnia === humanSeventh)))) {
             return decisionFailure('CANONICAL_DECISION_CLASSIFICATION_INVALID', {
                 dailyFacts, canonicalRepoDayIdentities
             });
         }
-        selected = { day: actualDays.find((day) => day.hmeromhnia === humanSixth), warnings: [] };
-        sixthDayRepoIdentity = humanSixth;
-        remainingRepoIdentity = humanRemaining;
-        seventhDay = expectedSeventh
-            ? actualDays.find((day) => day.hmeromhnia === expectedSeventh) : null;
+        selected = { day: humanSixthDay, warnings: [] };
+        sixthDayIdentity = humanSixth;
+        sixthDayRepoIdentity = canonicalRepoDayIdentities.includes(humanSixth)
+            ? humanSixth : null;
+        seventhDay = humanSeventh
+            ? actualDays.find((day) => day.hmeromhnia === humanSeventh) : null;
+        remainingRepoIdentity = sixthDayRepoIdentity
+            ? canonicalRepoDayIdentities.find((identity) => identity !== humanSixth) || null
+            : seventhDay?.hmeromhnia || null;
     }
     const sixthDayHours = Math.min(selected.day.actualWorkHours, 8);
     const illegalOvertimeHours = Math.max(selected.day.actualWorkHours - 8, 0);
@@ -291,6 +334,7 @@ function analyzeWeeklySixthSeventhDay({
             warnings: classificationWarnings,
             dailyFacts,
             canonicalRepoDayIdentities,
+            sixthDayIdentity,
             sixthDayRepoIdentity,
             remainingRepoIdentity,
             sixthDay: sixthDayWithoutAmounts,
@@ -317,6 +361,7 @@ function analyzeWeeklySixthSeventhDay({
             warnings: classificationWarnings,
             dailyFacts,
             canonicalRepoDayIdentities,
+            sixthDayIdentity,
             sixthDayRepoIdentity,
             remainingRepoIdentity,
             sixthDay: sixthDayWithRate,
@@ -346,6 +391,7 @@ function analyzeWeeklySixthSeventhDay({
         premiumRateSource: effectiveProfile.source || null,
         dailyFacts,
         canonicalRepoDayIdentities,
+        sixthDayIdentity,
         sixthDayRepoIdentity,
         remainingRepoIdentity,
         sixthDay: {

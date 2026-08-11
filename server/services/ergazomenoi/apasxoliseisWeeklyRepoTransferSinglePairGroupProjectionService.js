@@ -334,6 +334,7 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
     employmentProfile = {},
     holidayByDateKey = new Map(),
     existingAuditCountByRowKey = new Map(),
+    sameRunDailyCalculatedRowIds = new Set(),
     contractVersion = 'v1'
 } = {}) {
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
@@ -341,6 +342,7 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
         employmentProfile,
         holidayByDateKey,
         existingAuditCountByRowKey,
+        sameRunDailyCalculatedRowIds,
         contractVersion
     });
 

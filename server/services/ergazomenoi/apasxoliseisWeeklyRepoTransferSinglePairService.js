@@ -24,10 +24,11 @@ const {
     dateKeyUtc,
     startOfWeekMondayUtc
 } = require('../../utils/date/mondaySundayWeek');
+const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
 
 const SCENARIO_CODE = 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR';
-const SCENARIO_VERSION = 'repo-transfer-single-pair:v4';
-const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v4';
+const SCENARIO_VERSION = 'repo-transfer-single-pair:v5';
+const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v5';
 
 const ELIGIBILITY_STATUS = Object.freeze({
     ELIGIBLE: 'ELIGIBLE',
@@ -517,6 +518,12 @@ function buildRowInfo(row, contexts) {
         dateKey
     );
     const manualOverride = row.is_locked === true || existingAuditCount > 0;
+    const sameRunDailyCalculatedRowIds =
+        contexts.sameRunDailyCalculatedRowIds instanceof Set
+            ? contexts.sameRunDailyCalculatedRowIds
+            : new Set();
+    const sameRunDailyCalculated = sameRunDailyCalculatedRowIds.has(rowKey) ||
+        sameRunDailyCalculatedRowIds.has(dateKey);
     const criticalWarnings = [
         ...(facts.warnings.missingCriticalFacts || []),
         ...(facts.warnings.conflictingFacts || [])
@@ -535,12 +542,14 @@ function buildRowInfo(row, contexts) {
         toBoolean(row.astheneia) || facts.apologistika.existingFlags.astheneia_apologistika;
     const blockingManualOrAuditedState = manualOverride;
     const apologistikaState = inspectApologistikaState(row, facts);
-    const provisionalAutoCalculatedSourceWork = isProvisionalAutoCalculatedSourceWork({
+    const provisionalAutoCalculatedSourceWork = sameRunDailyCalculated ||
+        isProvisionalAutoCalculatedSourceWork({
         row,
         facts,
         cardHours,
         holidayState,
         manualOverride,
+        sameRunDailyCalculated,
         apologistikaState,
         employmentProfile: contexts.employmentProfile
     });
@@ -558,6 +567,7 @@ function buildRowInfo(row, contexts) {
         leaveProvenance,
         provisionalAutoCalculatedLeave,
         provisionalAutoCalculatedSourceWork,
+        sameRunDailyCalculated,
         blockingSickness,
         blockingManualOrAuditedState,
         apologistikaState
@@ -732,7 +742,11 @@ function buildResult({
             source_candidates: counts.source_candidates ?? 0,
             target_candidates: counts.target_candidates ?? 0,
             existing_actual_repo: counts.existing_actual_repo ?? null,
-            predicted_final_repo: counts.predicted_final_repo ?? null
+            predicted_final_repo: counts.predicted_final_repo ?? null,
+            ...(counts.actual_workdays_before_repo_transfer !== undefined
+                ? { actual_workdays_before_repo_transfer:
+                    counts.actual_workdays_before_repo_transfer }
+                : {})
         },
         weekly_resolution: counts.sixth_seventh_day
             ? {
@@ -865,9 +879,18 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         buildRowInfo(row, {
             holidayByDateKey,
             existingAuditCountByRowKey,
+            sameRunDailyCalculatedRowIds: input.sameRunDailyCalculatedRowIds,
             employmentProfile: profile
         })
     );
+    const preTransferActualWorkDays = rows.filter(
+        (row) => resolveDailyActualWorkFacts(row).countsAsActualWorkDay
+    ).length;
+    if (preTransferActualWorkDays === 7) {
+        return buildResult({ ...base, status: ELIGIBILITY_STATUS.NOT_APPLICABLE,
+            reasons: ['SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'],
+            counts: { actual_workdays_before_repo_transfer: 7 } });
+    }
     const sourceCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
     const targetCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
     const potentialSources = rowInfos.filter((info) => {
@@ -941,10 +964,17 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         });
     }
 
+    const rowForRepoIdentity = (info) => info.sameRunDailyCalculated
+        ? {
+              ...info.row,
+              kathgoria_ergasias_apologistika: '',
+              repo_apologistika: false
+          }
+        : info.row;
     const currentRepoStates = rowInfos.map((info) => ({
         info,
         state: resolveEffectiveRepoState({
-            row: info.row,
+            row: rowForRepoIdentity(info),
             mode: EFFECTIVE_REPO_MODE.CURRENT,
             expectedRepoCategory: targetCategory
         })
@@ -970,13 +1000,13 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         repo_apologistika: true
     };
     const sourceProposedState = resolveEffectiveRepoState({
-        row: cleanSources[0].row,
+        row: rowForRepoIdentity(cleanSources[0]),
         mode: EFFECTIVE_REPO_MODE.PROPOSED,
         expectedRepoCategory: targetCategory,
         proposedValues: sourceProposedValues
     });
     const targetProposedState = resolveEffectiveRepoState({
-        row: cleanTargets[0].row,
+        row: rowForRepoIdentity(cleanTargets[0]),
         mode: EFFECTIVE_REPO_MODE.PROPOSED,
         expectedRepoCategory: targetCategory,
         proposedValues: targetProposedValues
@@ -1032,7 +1062,19 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
     });
     const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
         weekRows: sixthDayProjectionRows,
-        effectiveProfile: profile
+        effectiveProfile: profile,
+        allowDeclaredRepoIdentityOverride: true,
+        canonicalRepoDayIdentitiesOverride:
+            input.sameRunDailyCalculatedRowIds instanceof Set &&
+            input.sameRunDailyCalculatedRowIds.size > 0
+                ? sixthDayProjectionRows
+                      .filter((row) => resolveEffectiveRepoState({
+                          row,
+                          mode: EFFECTIVE_REPO_MODE.CURRENT,
+                          expectedRepoCategory: targetCategory
+                      }).effectiveRepo === true)
+                      .map((row) => dateKeyUtc(row.hmeromhnia))
+                : null
     });
     counts.actual_workdays = Array.isArray(sixthSeventhDay.dailyFacts)
         ? sixthSeventhDay.dailyFacts.filter((day) => day.countsAsActualWorkDay).length
@@ -1123,7 +1165,10 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         });
     }
 
-    const warnings = [...new Set(targetWarnings(cleanTargets[0]))].sort();
+    const warnings = [...new Set([
+        ...targetWarnings(cleanTargets[0]),
+        ...(sixthSeventhDay.warnings || [])
+    ])].sort();
     return buildResult({
         ...base,
         status: ELIGIBILITY_STATUS.ELIGIBLE,
@@ -1260,6 +1305,7 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
         buildRowInfo(row, {
             holidayByDateKey: input.holidayByDateKey || new Map(),
             existingAuditCountByRowKey: input.existingAuditCountByRowKey || new Map(),
+            sameRunDailyCalculatedRowIds: input.sameRunDailyCalculatedRowIds || new Set(),
             employmentProfile: profile
         })
     );

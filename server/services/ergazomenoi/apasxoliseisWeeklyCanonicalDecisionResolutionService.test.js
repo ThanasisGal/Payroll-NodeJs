@@ -110,12 +110,33 @@ const ambiguousClassification = record(base.input, 'CLASSIFICATION_BY_DATE', {
 result = resolveWeeklyCanonicalDecisionAnalysis({ automaticAnalysis: base.analysis,
     snapshotInput: base.input, decisionRecords: [ambiguousClassification], weekRows: base.weekRows,
     effectiveProfile: profile, employee: profile });
+assert.equal(result.analysis.status, 'NEEDS_HR_DECISION');
+assert.ok(result.analysis.reasons.includes('CANONICAL_DECISION_CLASSIFICATION_INVALID'));
+
+const nonRepoSixthRows = rows([7, 7.9, 7, 7, 7, 7.8, 7.7]);
+const nonRepoSixthAutomatic = analyzeWeeklySixthSeventhDay({
+    weekRows: nonRepoSixthRows, effectiveProfile: profile, hourlyRate: 10
+});
+assert.deepEqual(nonRepoSixthAutomatic.canonicalRepoDayIdentities, [
+    '2026-08-08', '2026-08-09'
+]);
+assert.ok(nonRepoSixthAutomatic.reasons.includes('SEVENTH_DAY_IDENTITY_NOT_DETERMINISTIC'));
+const nonRepoSixthContext = context(nonRepoSixthRows, nonRepoSixthAutomatic);
+const explicitNonRepoClassification = record(nonRepoSixthContext.input, 'CLASSIFICATION_BY_DATE', {
+    classification_by_date: { '2026-08-04': 'SIXTH', '2026-08-08': 'SEVENTH' }
+});
+result = resolveWeeklyCanonicalDecisionAnalysis({
+    automaticAnalysis: nonRepoSixthContext.analysis,
+    snapshotInput: nonRepoSixthContext.input,
+    decisionRecords: [explicitNonRepoClassification],
+    weekRows: nonRepoSixthRows,
+    effectiveProfile: profile,
+    employee: profile
+});
 assert.equal(result.analysis.status, 'READY');
-assert.equal(result.analysis.sixthDay.hmeromhnia, '2026-08-08');
-assert.equal(result.analysis.sixthDay.sixthDayHours, 8);
-assert.equal(result.analysis.sixthDay.illegalOvertimeHours, 1);
-assert.equal(result.analysis.seventhDay.hmeromhnia, '2026-08-09');
-assert.equal(result.analysis.seventhDay.illegalOvertimeHours, 7);
+assert.equal(result.analysis.sixthDayIdentity, '2026-08-04');
+assert.equal(result.analysis.sixthDayRepoIdentity, null);
+assert.equal(result.analysis.seventhDay.hmeromhnia, '2026-08-08');
 
 const profileBase = blockedContext(rows(), ['PROFILE_CHANGED_INSIDE_WEEK']);
 const oldProfile = record(profileBase.input, 'PROFILE_CHANGED_INSIDE_WEEK', {

@@ -325,6 +325,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         proposed_update_fields: [
             'repo_apologistika',
             'kathgoria_ergasias_apologistika',
+            'apologistiko_biblio',
             'adeia_apologistika',
             'kathgoria_adeias_apologistika',
             'ores_apoysias_apologistika',
@@ -378,6 +379,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         allowed_parameters_schema: {},
         proposed_update_fields: [
             'kathgoria_ergasias_apologistika',
+            'apologistiko_biblio',
             'apo_ora_01_apologistika',
             'eos_ora_01_apologistika',
             'apo_ora_02_apologistika',
@@ -442,6 +444,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         },
         proposed_update_fields: [
             'kathgoria_ergasias_apologistika',
+            'apologistiko_biblio',
             'apo_ora_01_apologistika',
             'eos_ora_01_apologistika',
             'apo_ora_02_apologistika',

@@ -37,6 +37,39 @@ assert.strictEqual(result.accumulationRule, 'BASE_ONCE_PREMIUMS_CUMULATIVE');
 
 result = buildDailyCompensationBreakdown({
     row: {
+        ...row,
+        cards_ores_ergasias: 419 / 60,
+        cards_apo_ora_01: '15:41',
+        cards_eos_ora_01: '22:40',
+        ores_ergasias_apologistika: 6.48
+    },
+    paidHourlyRate: 10,
+    legalHourlyRate: 8,
+    weeklyIllegalOvertimeHours: 6.48
+});
+assert.strictEqual(result.hours.actualWorkHours, 6.48);
+assert.strictEqual(result.hours.illegalOvertimeHours, 6.48);
+assert.strictEqual(result.amounts.baseActualWorkAmount, 64.8);
+
+result = buildDailyCompensationBreakdown({
+    row: {
+        ...row,
+        cards_ores_ergasias: 6.98,
+        cards_apo_ora_01: '15:41',
+        cards_eos_ora_01: '22:40',
+        ores_ergasias_apologistika: 0,
+        ores_nyxtas_apologistika: 0,
+        ores_argion_prosayxhsh_apologistika: 0
+    },
+    paidHourlyRate: 10,
+    legalHourlyRate: 8,
+    calculatedWorkHoursAuthoritative: true
+});
+assert.strictEqual(result.hours.actualWorkHours, 0);
+assert.strictEqual(result.amounts.baseActualWorkAmount, 0);
+
+result = buildDailyCompensationBreakdown({
+    row: {
         company_kod: 'COMPANY-1',
         hmeromhnia: '2026-08-01',
         kathgoria_ergasias: 'ΕΡΓ',

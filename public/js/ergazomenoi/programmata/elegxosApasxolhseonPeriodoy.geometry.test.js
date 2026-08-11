@@ -59,18 +59,39 @@ async function loadOperationalState(page) {
         }, {
             _id: 'derived-possible-leave-row',
             kodikos: '001', ypokatasthma: '0001', eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΧΡΗΣΤΗΣ',
-            hmeromhnia: '2026-06-04', kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+            hmeromhnia: '2026-06-02', kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
             cards_ores_ergasias: 0, noCardsDisplayStatus: 'ΑΔΕΙΑ', adeia: false,
             kathgoria_adeias: '', ores_apoysias: 0, adeia_apologistika: false,
-            kathgoria_adeias_apologistika: '', effective_is_full_time: true
+            kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE', effective_is_full_time: true
         }, {
             _id: 'confirmed-leave-row',
             kodikos: '001', ypokatasthma: '0001', eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΧΡΗΣΤΗΣ',
-            hmeromhnia: '2026-06-05', kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
-            cards_ores_ergasias: 0, noCardsDisplayStatus: 'ΑΔΕΙΑ', adeia: true,
+            hmeromhnia: '2026-06-08', kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+            cards_apo_ora_01: '12:00', cards_eos_ora_01: '20:00', cards_ores_ergasias: 8,
+            noCardsDisplayStatus: '', adeia: true,
             kathgoria_adeias: 'ΚΑΝΟΝΙΚΗ', adeia_apologistika: true,
             kathgoria_adeias_apologistika: 'ΚΑΝΟΝΙΚΗ', leave_provenance: 'HR_DECLARED_LEAVE',
             effective_is_full_time: true
+        }, ...[
+            ['2026-06-01', '14:12', '22:22', 8.166666666666666, 0.33],
+            ['2026-06-05', '14:37', '22:10', 7.55, 0.95],
+            ['2026-06-06', '14:37', '22:54', 8.283333333333333, 0.22],
+            ['2026-06-07', '14:39', '22:49', 8.166666666666666, 0.33]
+        ].map(([date, start, end, cardHours, absenceHours]) => ({
+            _id: `atlas-residual-${date}`,
+            kodikos: '001', ypokatasthma: '0001', eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΧΡΗΣΤΗΣ',
+            hmeromhnia: date, kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+            cards_apo_ora_01: start, cards_eos_ora_01: end,
+            cards_ores_ergasias: cardHours, ores_apoysias_apologistika: absenceHours,
+            adeia: false, kathgoria_adeias: '', adeia_apologistika: false,
+            kathgoria_adeias_apologistika: '', effective_is_full_time: true
+        })), {
+            _id: 'orphan-card-row',
+            kodikos: '001', ypokatasthma: '0001', eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΧΡΗΣΤΗΣ',
+            hmeromhnia: '2026-06-14', kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+            cards_apo_ora_01: '14:51', cards_eos_ora_01: '', cards_ores_ergasias: 0,
+            adeia: false, kathgoria_adeias: '', adeia_apologistika: false,
+            kathgoria_adeias_apologistika: '', effective_is_full_time: true
         }];
         currentReviewDeviations = [{
             kodikos: '001', week_apo: '2026-06-01', week_eos: '2026-06-07',
@@ -153,10 +174,19 @@ async function renderedTableContract(page) {
             .map((header) => header.textContent.trim()),
         weeklyVisibleText: document.querySelector('.employee-deviation-row')?.innerText || '',
         possibleLeaveCell: document.querySelector(
-            '#resultsTable tr[data-date="2026-06-04"]'
+            '#resultsTable tr[data-date="2026-06-02"]'
         )?.cells?.[5]?.innerText?.trim() || '',
         confirmedLeaveCell: document.querySelector(
-            '#resultsTable tr[data-date="2026-06-05"]'
+            '#resultsTable tr[data-date="2026-06-08"]'
+        )?.cells?.[5]?.innerText?.trim() || '',
+        atlasResidualCells: ['2026-06-01', '2026-06-05', '2026-06-06', '2026-06-07']
+            .map((date) => ({
+                date,
+                text: document.querySelector(`#resultsTable tr[data-date="${date}"]`)
+                    ?.cells?.[5]?.innerText?.trim() || ''
+            })),
+        orphanCardCell: document.querySelector(
+            '#resultsTable tr[data-date="2026-06-14"]'
         )?.cells?.[5]?.innerText?.trim() || '',
         scenarioVisibleText: document.getElementById('scenarioDetailsTestHost')?.innerText || '',
         openWeekRenderedText: window.openWeekRenderedText || '',
@@ -197,6 +227,30 @@ async function canonicalDecisionButtonStyles(page) {
         return { background: style.backgroundColor, color: style.color };
     });
     return { text: (await button.innerText()).trim(), normal, hover };
+}
+
+async function lifecycleDangerButtonStyles(page) {
+    const button = page.locator('#lockEmploymentPeriodBtn');
+    await button.evaluate((element) => element.classList.remove('d-none'));
+    const normal = await button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+            background: style.backgroundColor,
+            border: style.borderColor,
+            color: style.color
+        };
+    });
+    await button.hover();
+    await page.waitForTimeout(250);
+    const hover = await button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+            background: style.backgroundColor,
+            border: style.borderColor,
+            color: style.color
+        };
+    });
+    return { normal, hover };
 }
 
 async function canonicalDecisionGatingContract(page) {
@@ -313,10 +367,17 @@ async function modalGeometry(page) {
             '<div class="swal2-html-container custom-html-container employment-review-swal-html-container historical-reconstruction-swal__content"><p>Η περίοδος έχει λήξει. Η ανακατασκευή δεν αλλάζει την εκπρόθεσμη κατάστασή της και καταγράφεται με χρήστη, ημερομηνία και αιτιολογία.</p></div>' +
             '<label>Υποχρεωτική αιτιολογία</label>' +
             '<textarea class="swal2-textarea historical-reconstruction-swal__reason"></textarea>' +
-            '<div class="swal2-actions"><button class="custom-confirm-button custom-swal-button">Ανακατασκευή</button><button class="custom-cancel-button custom-swal-button">Ακύρωση</button></div>';
+            '<div class="swal2-actions"><button class="swal2-confirm class-warning custom-confirm-button custom-swal-button">Ανακατασκευή</button><button class="custom-cancel-button custom-swal-button">Ακύρωση</button></div>';
         document.body.appendChild(popup);
     });
-    return page.evaluate(() => {
+    const confirmButton = page.locator('.historical-reconstruction-swal .swal2-confirm');
+    const confirmNormal = await confirmButton.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, border: style.borderColor, color: style.color };
+    });
+    await confirmButton.hover();
+    await page.waitForTimeout(250);
+    return page.evaluate((confirmNormalStyle) => {
         const popup = document.querySelector('.historical-reconstruction-swal');
         const textarea = popup.querySelector('textarea');
         const htmlContainer = popup.querySelector('.swal2-html-container');
@@ -333,6 +394,11 @@ async function modalGeometry(page) {
             contentWidth: contentRect.width,
             textareaRatio: textareaRect.width / contentRect.width,
             bodyFontSize: getComputedStyle(htmlContainer).fontSize,
+            confirmNormal: confirmNormalStyle,
+            confirmHover: (() => {
+                const style = getComputedStyle(popup.querySelector('.swal2-confirm'));
+                return { background: style.backgroundColor, border: style.borderColor, color: style.color };
+            })(),
             commonClasses: {
                 popup: popup.classList.contains('custom-swal-popup'),
                 title: popup.querySelector('.swal2-title').classList.contains('custom-title'),
@@ -344,7 +410,7 @@ async function modalGeometry(page) {
             textareaVisible: Boolean(textarea),
             buttonsVisible: popup.querySelectorAll('button').length === 2
         };
-    });
+    }, confirmNormal);
 }
 
 (async () => {
@@ -371,6 +437,9 @@ async function modalGeometry(page) {
             assert.strictEqual(tableContract.weeklyRowCount, 1);
             assert.strictEqual(tableContract.possibleLeaveCell, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
             assert.strictEqual(tableContract.confirmedLeaveCell, 'ΑΔΕΙΑ');
+            tableContract.atlasResidualCells.forEach(({ date, text }) =>
+                assert.notStrictEqual(text, 'ΑΔΕΙΑ', `${date}: residual absence is not confirmed leave`));
+            assert.strictEqual(tableContract.orphanCardCell, 'ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ');
             assert.ok(!tableContract.openWeekRenderedText.includes('Αναμονή ολοκλήρωσης'));
             assert.ok(!tableContract.openWeekRenderedText.includes(
                 'δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή'
@@ -419,6 +488,17 @@ async function modalGeometry(page) {
             assert.strictEqual(actionButton.normal.color, 'rgb(8, 66, 152)');
             assert.strictEqual(actionButton.hover.background, 'rgb(13, 110, 253)');
             assert.strictEqual(actionButton.hover.color, 'rgb(255, 255, 255)');
+            const lifecycleDangerButton = await lifecycleDangerButtonStyles(page);
+            assert.deepStrictEqual(lifecycleDangerButton.normal, {
+                background: 'rgb(248, 215, 218)',
+                border: 'rgb(241, 174, 181)',
+                color: 'rgb(132, 32, 41)'
+            });
+            assert.deepStrictEqual(lifecycleDangerButton.hover, {
+                background: 'rgb(220, 53, 69)',
+                border: 'rgb(220, 53, 69)',
+                color: 'rgb(255, 255, 255)'
+            });
             await page.evaluate(() => window.scrollTo(0, 0));
             const result = await geometry(page);
             measurements.push({ viewport: `${width}x${height}`, ...result });
@@ -454,6 +534,16 @@ async function modalGeometry(page) {
             assert.ok(modal.textareaRatio >= 0.94 && modal.textareaRatio <= 0.96,
                 `${width}x${height}: textarea ratio ${modal.textareaRatio}`);
             assert.strictEqual(modal.bodyFontSize, '13.6px');
+            assert.deepStrictEqual(modal.confirmNormal, {
+                background: 'rgb(255, 243, 205)',
+                border: 'rgb(255, 230, 156)',
+                color: 'rgb(102, 77, 3)'
+            });
+            assert.deepStrictEqual(modal.confirmHover, {
+                background: 'rgb(255, 193, 7)',
+                border: 'rgb(255, 193, 7)',
+                color: 'rgb(255, 255, 255)'
+            });
             assert.deepStrictEqual(modal.commonClasses, {
                 popup: true, title: true, html: true, confirm: true
             });

@@ -176,7 +176,7 @@ function decisionFor(rows, decisionType, decisionPayload, overrides = {}) {
 }
 
 // Input rows deliberately represent the post-first-stage/reload boundary.
-const sixthRows = week([7, 7, 7, 7, 7, 9, 0]);
+const sixthRows = week([4, 4, 4, 4, 4, 9, 0]);
 let result = plan(sixthRows);
 let update = updateFor(result, '2026-08-08');
 assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 8);
@@ -188,6 +188,9 @@ result = plan(seventhRows);
 update = updateFor(result, '2026-08-09');
 assert.deepEqual(ILLEGAL_FIELDS.map((field) => update[field]), [0, 0, 10, 0]);
 assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 10);
+assert.equal(update.apologistiko_biblio, true);
+assert.equal(update.apo_ora_01_apologistika, '10:00');
+assert.equal(update.eos_ora_01_apologistika, '20:00');
 OVERLAPPING_LEGAL_FIELDS.forEach((field) => assert.equal(update[field], 0));
 
 const overlayRows = week([7, 7, 7, 7, 7, 7, 4], { 6: ['22:00', '02:00'] });
@@ -252,7 +255,7 @@ let deviation = onlyDeviation(result);
 assert.equal(deviation.status, 'NEEDS_HR_DECISION');
 assert.ok(deviation.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
 
-const humanRepoRows = week([7, 7, 7, 7, 7, 9, 7]);
+const humanRepoRows = week([7, 7, 7, 7, 7, 8, 7]);
 Object.assign(humanRepoRows[4], { kathgoria_ergasias: 'ΑΝ',
     kathgoria_ergasias_apologistika: 'ΑΝ', repo: true, repo_apologistika: true });
 const humanRepoDecision = decisionFor(humanRepoRows,
@@ -263,26 +266,34 @@ result = plan(humanRepoRows, {
     canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([humanRepoDecision])
 });
 update = updateFor(result, '2026-08-08');
-assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 0);
-assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 9);
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 8);
+assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 0);
 update = updateFor(result, '2026-08-09');
-assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7);
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 0);
 deviation = onlyDeviation(result);
 assert.ok(!Array.isArray(deviation.reasons) ||
     !deviation.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
 
-const classificationDecision = decisionFor(humanRepoRows, 'CLASSIFICATION_BY_DATE', {
-    classification_by_date: { '2026-08-08': 'SIXTH', '2026-08-09': 'SEVENTH' }
+const classificationRows = week([7, 7.9, 7.5, 7, 7, 7.8, 7.7]);
+classificationRows[5].cards_eos_ora_01 = '17:48';
+const classificationDecision = decisionFor(classificationRows, 'CLASSIFICATION_BY_DATE', {
+    classification_by_date: {
+        '2026-08-04': 'NORMAL',
+        '2026-08-05': 'SIXTH',
+        '2026-08-08': 'SEVENTH'
+    }
 });
-result = plan(humanRepoRows, {
+result = plan(classificationRows, {
     canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([classificationDecision])
 });
+update = updateFor(result, '2026-08-05');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7.5);
+assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 0);
+const automaticCandidateUpdate = updateFor(result, '2026-08-04');
+assert.equal(automaticCandidateUpdate.compensation_breakdown_apologistika.hours.sixthDayHours, 0);
 update = updateFor(result, '2026-08-08');
-assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 8);
-assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 1);
-update = updateFor(result, '2026-08-09');
-assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 7);
-assert.equal(ILLEGAL_FIELDS.reduce((sum, field) => sum + update[field], 0), 7);
+assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 7.8);
+assert.equal(ILLEGAL_FIELDS.reduce((sum, field) => sum + update[field], 0), 7.8);
 OVERLAPPING_LEGAL_FIELDS.forEach((field) => assert.equal(update[field], 0));
 
 const staleDecision = { ...decisionFor(ambiguousRows,
@@ -437,4 +448,36 @@ result = plan(actualLeaveRows);
 update = updateFor(result, '2026-08-08');
 assert.ok(!Object.hasOwn(update, 'kathgoria_adeias_apologistika'));
 
-console.log('weekly post-check pure write-plan contract tests passed (18 contracts)');
+// Sequencing contract: Phase C consumes only the rows reloaded after Phase B.
+// An already-applied repo transfer is therefore part of the effective input.
+const appliedSequencingRows = week([7, 7, 8, 7, 7, 7, 0]);
+Object.assign(appliedSequencingRows[2], {
+    kathgoria_ergasias: 'ΑΝ', repo: true,
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: false
+});
+Object.assign(appliedSequencingRows[6], {
+    kathgoria_ergasias: 'ΕΡΓ', repo: false, ores_ergasias: 8,
+    kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true,
+    apologistiko_biblio: true
+});
+result = plan(appliedSequencingRows);
+update = updateFor(result, '2026-08-05');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 8);
+
+// A proposal which has not been applied is not an input to Phase C. The raw
+// target must not be materialized as repo/book by the post-check write plan.
+const unapprovedSequencingRows = structuredClone(appliedSequencingRows);
+Object.assign(unapprovedSequencingRows[2], {
+    kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true
+});
+Object.assign(unapprovedSequencingRows[6], {
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: false,
+    apologistiko_biblio: false
+});
+result = plan(unapprovedSequencingRows);
+const unapprovedTargetUpdate = updateFor(result, '2026-08-09');
+assert.notEqual(unapprovedTargetUpdate.repo_apologistika, true);
+assert.notEqual(unapprovedTargetUpdate.kathgoria_ergasias_apologistika, 'ΑΝ');
+assert.notEqual(unapprovedTargetUpdate.apologistiko_biblio, true);
+
+console.log('weekly post-check pure write-plan contract tests passed (20 contracts)');

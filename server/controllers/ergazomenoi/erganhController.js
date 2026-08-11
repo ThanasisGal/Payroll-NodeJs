@@ -124,6 +124,11 @@ const {
     buildApasxoliseisScenarioFacts
 } = require('../../services/ergazomenoi/apasxoliseisScenarioFactsService');
 const {
+    resolveApologistikoArrivalDecision,
+    buildDurationAnchoredInterval,
+    totalDeclaredDailyMinutes
+} = require('../../services/ergazomenoi/apasxoliseisAttendanceDerivedScheduleService');
+const {
     matchApasxoliseisScenarioFacts
 } = require('../../services/ergazomenoi/apasxoliseisScenarioMatcherService');
 const {
@@ -475,7 +480,7 @@ function calculateNightMinutes(apoOra, eosOra) {
 }
 
 function checkEarlyOrLateCard(context, pairNo) {
-    const { rec, proorhProseleyshMinutes, evelikthProselefshMinutes } = context;
+    const { rec, evelikthProselefshMinutes } = context;
 
     const apoField = `apo_ora_0${pairNo}`;
     const eosField = `eos_ora_0${pairNo}`;
@@ -483,22 +488,21 @@ function checkEarlyOrLateCard(context, pairNo) {
     const apoApologField = `apo_ora_0${pairNo}_apologistika`;
     const eosApologField = `eos_ora_0${pairNo}_apologistika`;
 
-    const cardApo = timeToMinutesSafe(rec[cardApoField]);
-    const programApo = timeToMinutesSafe(rec[apoField]);
+    const decision = resolveApologistikoArrivalDecision({
+        declaredStart: rec[apoField], actualArrival: rec[cardApoField],
+        flexibleArrivalMinutes: evelikthProselefshMinutes
+    });
 
-    if (cardApo === null || programApo === null) return {};
-
-    const earlyLimit = programApo - proorhProseleyshMinutes;
-    const lateLimit = programApo + evelikthProselefshMinutes;
-
-    if (cardApo < earlyLimit || cardApo > lateLimit) {
-        const programDuration = durationMinutesSafe(rec[apoField], rec[eosField]);
-        const apologistikoEos = minutesToTimeSafe(cardApo + programDuration);
+    if (decision.resolved && decision.requiresBook) {
+        const anchored = buildDurationAnchoredInterval({ row: rec, actualArrival: rec[cardApoField] });
+        if (!anchored) return {};
 
         return {
             apologistiko_biblio: true,
-            [apoApologField]: rec[cardApoField] || '',
-            [eosApologField]: apologistikoEos
+            apo_ora_01_apologistika: anchored.start,
+            eos_ora_01_apologistika: anchored.end,
+            apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
+            apo_ora_03_apologistika: '', eos_ora_03_apologistika: ''
         };
     }
 
@@ -542,7 +546,7 @@ function getRawDeclaredIntervals(rec) {
 }
 
 function checkBrokenProgramVsBrokenCards(context) {
-    const { rec, proorhProseleyshMinutes, evelikthProselefshMinutes } = context;
+    const { rec, evelikthProselefshMinutes } = context;
 
     const declaredIntervals = getRawDeclaredIntervals(rec);
     const cardIntervals = getRawCardIntervals(rec);
@@ -565,48 +569,25 @@ function checkBrokenProgramVsBrokenCards(context) {
 
     if (matchedIntervals.length <= 1) return {};
 
-    const hasDeviation = matchedIntervals.some(({ declaredInterval, cardInterval }) => {
-        const earlyLimit = declaredInterval.start - proorhProseleyshMinutes;
-        const lateStartLimit = declaredInterval.start + evelikthProselefshMinutes;
-
-        return (
-            cardInterval.start < earlyLimit ||
-            cardInterval.start > lateStartLimit ||
-            cardInterval.end > declaredInterval.end
-        );
-    });
+    const hasDeviation = matchedIntervals.some(({ declaredInterval, cardInterval }) =>
+        resolveApologistikoArrivalDecision({ declaredStart: declaredInterval.apo,
+            actualArrival: cardInterval.apo,
+            flexibleArrivalMinutes: evelikthProselefshMinutes }).requiresBook);
 
     if (!hasDeviation) return {};
 
-    const update = {
+    const firstArrival = matchedIntervals[0].cardInterval.apo;
+    const anchored = buildDurationAnchoredInterval({ row: rec, actualArrival: firstArrival });
+    if (!anchored) return {};
+    return {
         apologistiko_biblio: true,
-        apo_ora_01_apologistika: '',
-        eos_ora_01_apologistika: '',
+        apo_ora_01_apologistika: anchored.start,
+        eos_ora_01_apologistika: anchored.end,
         apo_ora_02_apologistika: '',
         eos_ora_02_apologistika: '',
         apo_ora_03_apologistika: '',
         eos_ora_03_apologistika: ''
     };
-
-    for (const { declaredInterval, cardInterval } of matchedIntervals) {
-        const p = String(declaredInterval.index).padStart(2, '0');
-        const apoApologField = `apo_ora_${p}_apologistika`;
-        const eosApologField = `eos_ora_${p}_apologistika`;
-        const declaredDuration = Math.max(0, declaredInterval.end - declaredInterval.start);
-        const earlyLimit = declaredInterval.start - proorhProseleyshMinutes;
-        const lateStartLimit = declaredInterval.start + evelikthProselefshMinutes;
-        const segmentNeedsDurationAnchor =
-            cardInterval.start < earlyLimit ||
-            cardInterval.start > lateStartLimit ||
-            cardInterval.end > declaredInterval.end;
-
-        update[apoApologField] = cardInterval.apo || '';
-        update[eosApologField] = segmentNeedsDurationAnchor
-            ? minutesToTimeSafe(cardInterval.start + declaredDuration)
-            : cardInterval.eos || '';
-    }
-
-    return update;
 }
 
 function checkContinuousVsBrokenCards(context) {
@@ -1009,7 +990,7 @@ function checkRepoAdeiaAstheneiaApologistika(context) {
 
     const hasAuthoritativeLeave = rec.adeia === true ||
         String(rec.kathgoria_adeias || '').trim() !== '' ||
-        Number(rec.ores_apoysias || 0) > 0 || rec.hr_declared_leave === true;
+        rec.hr_declared_leave === true;
     if (hasAuthoritativeLeave) {
         update.repo_apologistika = false;
         update.adeia_apologistika = true;
@@ -1581,7 +1562,8 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     holidayByDateKey,
     holidayContextResolved,
     reusableApprovals = [],
-    includeContextGroups = false
+    includeContextGroups = false,
+    sameRunDailyCalculatedRowIds = new Set()
 }) {
     const rangeDiagnostic = getAtomicPeriodRangeDiagnostic({
         periodStart: requestedPeriodStart,
@@ -1755,7 +1737,8 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     return buildWeeklyRepoTransferAtomicPageProjection(builtInputs, {
         presentationStart: includeContextGroups ? analysisPeriodStart : requestedPeriodStart,
         presentationEnd: includeContextGroups ? analysisPeriodEnd : requestedPeriodEnd,
-        reusableApprovals
+        reusableApprovals,
+        sameRunDailyCalculatedRowIds
     });
 }
 
@@ -1801,6 +1784,7 @@ async function runWeeklyRepoPostCheck({
     noCardsDisplayContext = {},
     appliedProtectionContext,
     appliedProtectionReasonsByWeek = new Map(),
+    sameRunDailyCalculatedRowIds = new Set(),
     periodControlScope = null,
     calculationId = null
 }) {
@@ -2017,6 +2001,7 @@ async function runWeeklyRepoPostCheck({
         appliedProtectionContext,
         appliedProtectionReasonsByWeek,
         canonicalDecisionsByWeek,
+        sameRunDailyCalculatedRowIds,
         buildWeeklyIllegalOvertimeUpdate
     });
     const bulkOps = writePlan.bulkOps;
@@ -2105,16 +2090,7 @@ async function runWeeklyRepoPostCheck({
 }
 
 function getDailyDeclaredMinutes(rec) {
-    const declaredFromIntervals =
-        durationMinutesSafe(rec.apo_ora_01, rec.eos_ora_01) +
-        durationMinutesSafe(rec.apo_ora_02, rec.eos_ora_02) +
-        durationMinutesSafe(rec.apo_ora_03, rec.eos_ora_03);
-
-    if (declaredFromIntervals > 0) {
-        return declaredFromIntervals;
-    }
-
-    return Math.round((Number(rec.ores_ergasias) || 0) * 60);
+    return totalDeclaredDailyMinutes(rec);
 }
 
 function isPartTimeEmployee(ergazomenos) {
@@ -9180,6 +9156,7 @@ class erganhController {
             }
 
             const bulkOps = [];
+            const sameRunDailyCalculatedRowIds = new Set();
 
             for (const rec of prodhlomena) {
                 const ergazomenos = employeesByKodikos.get(rec.kodikos);
@@ -9213,6 +9190,8 @@ class erganhController {
                     }
                 }
                 if (Object.keys(dailyPlan.sanitizedUpdate).length === 0) continue;
+
+                sameRunDailyCalculatedRowIds.add(String(rec._id));
 
                 bulkOps.push({
                     updateOne: {
@@ -9255,7 +9234,8 @@ class erganhController {
                 appliedProtectionContext,
                 appliedProtectionReasonsByWeek,
                 periodControlScope,
-                calculationId: calculationOwnership.calculationId
+                calculationId: calculationOwnership.calculationId,
+                sameRunDailyCalculatedRowIds
             });
 
             let automaticRepoTransfer = {
@@ -9300,7 +9280,8 @@ class erganhController {
                     holidayByDateKey: noCardsDisplayContext.argiesByDateKey,
                     holidayContextResolved: noCardsDisplayContext.argiesByDateKey instanceof Map,
                     reusableApprovals: activeReusableApprovals,
-                    includeContextGroups: true
+                    includeContextGroups: true,
+                    sameRunDailyCalculatedRowIds
                 });
                 const runtimeResult = await runPossibleLeaveRepoAutoRuntime({
                     rows: autoRows,

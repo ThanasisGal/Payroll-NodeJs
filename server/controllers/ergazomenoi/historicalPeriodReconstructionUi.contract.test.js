@@ -62,6 +62,11 @@ for (const options of [
     { icon: 'info', title: 'Κατάσταση περιόδου', text: 'Ενημερωτικό μήνυμα' },
     {
         icon: 'warning',
+        title: 'Εφαρμογή πρότασης',
+        customClass: { confirmButton: 'text-black' }
+    },
+    {
+        icon: 'warning',
         title: 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
         html: '<p>Περιγραφή</p>',
         input: 'textarea',
@@ -85,14 +90,18 @@ assert.match(renderedOptions[0].customClass.confirmButton, /(?:^|\s)class-succes
 assert.match(renderedOptions[1].customClass.confirmButton, /(?:^|\s)class-error(?:\s|$)/);
 assert.match(renderedOptions[2].customClass.confirmButton, /(?:^|\s)class-info(?:\s|$)/);
 assert.match(renderedOptions[3].customClass.confirmButton, /(?:^|\s)class-warning(?:\s|$)/);
-assert.match(renderedOptions[3].customClass.popup, /(?:^|\s)historical-reconstruction-swal(?:\s|$)/);
-assert.match(renderedOptions[3].customClass.htmlContainer, /(?:^|\s)historical-reconstruction-swal__content(?:\s|$)/);
-assert.match(renderedOptions[3].customClass.cancelButton, /(?:^|\s)custom-cancel-button(?:\s|$)/);
-assert.strictEqual(renderedOptions[3].customClass.input, 'historical-reconstruction-swal__reason');
+assert.match(renderedOptions[3].customClass.confirmButton, /(?:^|\s)text-black(?:\s|$)/);
+assert.match(renderedOptions[4].customClass.confirmButton, /(?:^|\s)class-warning(?:\s|$)/);
+assert.match(renderedOptions[4].customClass.popup, /(?:^|\s)historical-reconstruction-swal(?:\s|$)/);
+assert.match(renderedOptions[4].customClass.htmlContainer, /(?:^|\s)historical-reconstruction-swal__content(?:\s|$)/);
+assert.match(renderedOptions[4].customClass.cancelButton, /(?:^|\s)custom-cancel-button(?:\s|$)/);
+assert.strictEqual(renderedOptions[4].customClass.input, 'historical-reconstruction-swal__reason');
 
 assert.match(stylesheet, /\.swal2-popup\.employment-review-swal-popup[\s\S]*?font-size:\s*0\.85rem\s*!important;/);
 assert.match(stylesheet, /\.custom-swal-popup\.historical-reconstruction-swal\s*\{[\s\S]*?width:\s*min\(600px,\s*calc\(100vw - 2rem\)\)\s*!important;/);
 assert.match(stylesheet, /\.historical-reconstruction-swal__reason\s*\{[\s\S]*?width:\s*96%\s*!important;[\s\S]*?max-width:\s*96%\s*!important;[\s\S]*?box-sizing:\s*border-box;/);
+assert.match(stylesheet, /\.employment-review-action-danger\s*\{[\s\S]*?background:\s*var\(--bs-danger-bg-subtle,\s*#f8d7da\);[\s\S]*?border-color:\s*#f1aeb5;/);
+assert.match(stylesheet, /\.employment-review-action-danger:hover,[\s\S]*?color:\s*#ffffff;[\s\S]*?background:\s*#dc3545;/);
 
 for (const viewportWidth of [1366, 1648, 1920]) {
     const popupWidth = Math.min(600, viewportWidth - 32);

@@ -22,6 +22,7 @@ function snapshot(category, repo) {
     return {
         kathgoria_ergasias_apologistika: category,
         repo_apologistika: repo,
+        apologistiko_biblio: repo,
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_apoysias_apologistika: 0,

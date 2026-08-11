@@ -44,15 +44,15 @@
                 </span>
             </div>
             <div id="employmentPeriodControlActions" class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-outline-danger btn-sm d-none" id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
-                <button type="button" class="btn btn-warning btn-sm d-none" id="historicalReconstructionBtn">Ανακατασκευή Εκπρόθεσμης Περιόδου</button>
-                <button type="button" class="btn btn-outline-warning btn-sm d-none" id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>
-                <button type="button" class="btn btn-outline-success btn-sm d-none" id="finalizeEmploymentPeriodBtn">Οριστικοποίηση περιόδου</button>
-                <button type="button" class="btn btn-success btn-sm d-none" id="submitFinalWTODayilyABtn">Τελική υποβολή Απολογιστικού Πίνακα στο ΕΡΓΑΝΗ</button>
-                <button type="button" class="btn btn-outline-primary btn-sm d-none" id="openCorrectivePayrollBtn">Άνοιγμα διορθωτικής μισθοδοσίας</button>
-                <button type="button" class="btn btn-outline-primary btn-sm d-none" id="calculateCorrectivePayrollBtn">Καταχώρηση διορθωτικών στοιχείων και υπολογισμός</button>
-                <button type="button" class="btn btn-outline-dark btn-sm d-none" id="closeCorrectivePayrollBtn">Κλείσιμο διορθωτικής μισθοδοσίας</button>
-                <button type="button" class="btn btn-outline-success btn-sm d-none" id="postCorrectivePayrollBtn">Καταχώριση διορθωτικής μισθοδοσίας</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-danger" id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-warning" id="historicalReconstructionBtn">Ανακατασκευή Εκπρόθεσμης Περιόδου</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-warning" id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="finalizeEmploymentPeriodBtn">Οριστικοποίηση περιόδου</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="submitFinalWTODayilyABtn">Τελική υποβολή Απολογιστικού Πίνακα στο ΕΡΓΑΝΗ</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-primary" id="openCorrectivePayrollBtn">Άνοιγμα διορθωτικής μισθοδοσίας</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-primary" id="calculateCorrectivePayrollBtn">Καταχώρηση διορθωτικών στοιχείων και υπολογισμός</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-secondary" id="closeCorrectivePayrollBtn">Κλείσιμο διορθωτικής μισθοδοσίας</button>
+                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="postCorrectivePayrollBtn">Καταχώριση διορθωτικής μισθοδοσίας</button>
             </div>
         </div>
         <div id="employmentPeriodControlMessage" class="small text-muted mt-1"></div>
@@ -298,7 +298,7 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <button type="button" class="btn employment-review-action-btn employment-review-action-secondary" data-bs-dismiss="modal">
                         Κλείσιμο
                     </button>
                 </div>
@@ -345,7 +345,7 @@
                     <div class="text-muted">Φόρτωση τρέχουσας κατάστασης…</div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Κλείσιμο</button>
+                    <button type="button" class="btn employment-review-action-btn employment-review-action-secondary" data-bs-dismiss="modal">Κλείσιμο</button>
                 </div>
             </div>
         </div>
