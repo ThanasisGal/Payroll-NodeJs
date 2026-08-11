@@ -195,7 +195,7 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
             actor_user_name: by.user_name, actor_user_role: by.role, reason: cleanReason,
             reference_id: cleanRequestId, details: { reconstruction_version: nextVersion,
                 command_identity: identity }, occurred_at: now });
-        await auditModel.create(auditDocuments, { session: dbSession });
+        await auditModel.create(auditDocuments, { session: dbSession, ordered: true });
             return { record: updated, idempotent: false };
         });
     } catch (error) {
@@ -262,7 +262,8 @@ async function completeHistoricalReconstruction({ scope, calculationId, requestI
                 dependency_fingerprint: fingerprints.dependency_fingerprint,
                 result_fingerprint: fingerprints.result_fingerprint,
                 dependency_window_start: fingerprints.dependency_window_start,
-                dependency_window_end: fingerprints.dependency_window_end }, occurred_at: now }], { session: dbSession });
+                dependency_window_end: fingerprints.dependency_window_end }, occurred_at: now }],
+        { session: dbSession, ordered: true });
         return { record: updated, fingerprints };
     });
 }
