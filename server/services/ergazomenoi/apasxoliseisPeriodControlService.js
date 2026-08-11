@@ -83,6 +83,18 @@ function projectPeriodControl({ scope, record = null, now = new Date(), dependen
     const normal = effectiveMode === MODES.NORMAL;
     const reconstructed = effectiveMode === MODES.HISTORICAL_RECONSTRUCTED;
     const pastDeadline = isPastDeadline(deadline, now);
+    const normalCalculationCompleted =
+        Number(record?.successful_calculation_version || 0) > 0 &&
+        Boolean(record?.last_successful_calculation_at);
+    const historicalCalculationCompleted =
+        reconstructed &&
+        record?.historical_reconstruction_status === 'COMPLETED' &&
+        Number(record?.historical_reconstruction_version || 0) >= 1;
+    const hasAuthoritativeCalculationResult =
+        effectiveMode === MODES.FINALIZED ||
+        historicalCalculationCompleted ||
+        ([MODES.NORMAL, MODES.LOCKED].includes(effectiveMode) &&
+            normalCalculationCompleted);
     return Object.freeze({
         scope, exists: Boolean(record), stored_status: storedStatus, effective_mode: effectiveMode,
         deadline: deadline.toISOString().slice(0, 10), past_deadline: pastDeadline,
@@ -108,9 +120,14 @@ function projectPeriodControl({ scope, record = null, now = new Date(), dependen
         historical_dependency_fingerprint: record?.historical_dependency_fingerprint || '',
         current_dependency_fingerprint: dependencyFingerprint,
         dependency_status: reconstructed ? 'CURRENT' : effectiveMode === MODES.HISTORICAL_RECONSTRUCTION_STALE ? 'STALE' : '',
+        successful_calculation_version: Number(record?.successful_calculation_version || 0),
+        last_successful_calculation_id: record?.last_successful_calculation_id || '',
+        last_successful_calculation_at: record?.last_successful_calculation_at || null,
+        has_authoritative_calculation_result: hasAuthoritativeCalculationResult,
         can_calculate: normal, can_historical_calculate: pastDeadline &&
             record?.historical_reconstruction_status === 'AUTHORIZED',
-        can_record_decision: normal || reconstructed, can_repo_transfer: normal || reconstructed,
+        can_record_decision: (normal || reconstructed) && hasAuthoritativeCalculationResult,
+        can_repo_transfer: (normal || reconstructed) && hasAuthoritativeCalculationResult,
         can_manual_edit: normal || reconstructed, can_unlock_period: effectiveMode === MODES.LOCKED,
         can_finalize: storedStatus === 'LOCKED',
         can_historical_reconstruct: effectiveMode === MODES.HISTORICAL_RECONSTRUCTION_REQUIRED,
@@ -321,15 +338,26 @@ async function fencePeriodCalculationForWrite({ scope: input, calculationId, ses
         'Ο Υπολογισμός Απασχολήσεων δεν κατέχει πλέον την περίοδο.');
     return record;
 }
-async function releasePeriodCalculationOwnership({ scope: input, calculationId,
+async function releasePeriodCalculationOwnership({ scope: input, calculationId, successful = false,
     periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
     transactionRunner = runTransaction }) {
     const scope = normalizeScope(input);
     const ownerId = normalizeCalculationId(calculationId);
     if (typeof indexGuard === 'function') await indexGuard();
     return transactionRunner(async (session) => {
+        const completedAt = new Date();
+        const update = { $set: {
+            active_calculation_id: '', active_calculation_started_at: null, updated_at: completedAt
+        } };
+        if (successful) {
+            Object.assign(update.$set, {
+                last_successful_calculation_id: ownerId,
+                last_successful_calculation_at: completedAt
+            });
+            update.$inc = { successful_calculation_version: 1, version: 1 };
+        }
         const record = await periodControlModel.findOneAndUpdate({ ...filterForScope(scope), active_calculation_id: ownerId },
-            { $set: { active_calculation_id: '', active_calculation_started_at: null, updated_at: new Date() } },
+            update,
             { new: true, session });
         if (!record) throw periodError('PERIOD_CONTROL_CALCULATION_OWNERSHIP_LOST', 409,
             'Δεν ήταν δυνατή η ασφαλής απελευθέρωση του Υπολογισμού Απασχολήσεων.');

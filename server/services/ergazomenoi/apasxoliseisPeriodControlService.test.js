@@ -40,6 +40,19 @@ assert.strictEqual(resolveEffectiveMode({ storedStatus: 'LOCKED', deadline, now:
 assert.strictEqual(resolveEffectiveMode({ storedStatus: 'FINALIZED', deadline, now: new Date('2026-08-01') }), 'FINALIZED');
 assert.strictEqual(projectPeriodControl({ scope, now: new Date('2026-07-01') }).effective_mode, 'NORMAL');
 assert.strictEqual(projectPeriodControl({ scope, now: new Date('2026-08-01') }).effective_mode, 'HISTORICAL_RECONSTRUCTION_REQUIRED');
+const reconstructedRecord = {
+    status: 'OPEN', deadline: new Date('2026-07-31'),
+    historical_reconstruction_status: 'COMPLETED', historical_reconstruction_version: 1,
+    historical_dependency_fingerprint: 'a'.repeat(64)
+};
+const reconstructedProjection = projectPeriodControl({ scope, record: reconstructedRecord,
+    now: new Date('2026-08-01'), dependencyFingerprint: 'a'.repeat(64) });
+assert.strictEqual(reconstructedProjection.effective_mode, 'HISTORICAL_RECONSTRUCTED');
+assert.strictEqual(reconstructedProjection.has_authoritative_calculation_result, true);
+const staleProjection = projectPeriodControl({ scope, record: reconstructedRecord,
+    now: new Date('2026-08-01'), dependencyFingerprint: 'b'.repeat(64) });
+assert.strictEqual(staleProjection.effective_mode, 'HISTORICAL_RECONSTRUCTION_STALE');
+assert.strictEqual(staleProjection.has_authoritative_calculation_result, false);
 const serviceSource = fs.readFileSync(__filename.replace('.test.js', '.js'), 'utf8');
 assert.ok(serviceSource.includes('session.withTransaction'));
 assert.ok(serviceSource.includes('status: previousStatus, version: beforeVersion'));
@@ -265,9 +278,14 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     });
     assert.deepStrictEqual(committedStages, ['first-chunk', 'next-chunk', 'post-check', 'deviations']);
     await releasePeriodCalculationOwnership({ scope, calculationId: owner.calculationId,
-        periodControlModel: owned.model, indexGuard, transactionRunner });
+        successful: true, periodControlModel: owned.model, indexGuard, transactionRunner });
+    assert.strictEqual(owned.record.successful_calculation_version, 1);
+    assert.strictEqual(owned.record.last_successful_calculation_id, owner.calculationId);
+    assert.ok(owned.record.last_successful_calculation_at instanceof Date);
+    assert.strictEqual(projectPeriodControl({ scope, record: owned.record,
+        now: new Date('2026-07-01') }).has_authoritative_calculation_result, true);
     const lockAfterRelease = await transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'completed calculation',
-        requestId: 'period-owner-lock-02', now: new Date('2026-07-01'), expectedVersion: 1,
+        requestId: 'period-owner-lock-02', now: new Date('2026-07-01'), expectedVersion: 2,
         periodControlModel: owned.model, auditModel: owned.audit, indexGuard, transactionRunner });
     assert.strictEqual(lockAfterRelease.state.stored_status, 'LOCKED');
 
@@ -290,6 +308,9 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     await releasePeriodCalculationOwnership({ scope, calculationId: failedOwner.calculationId,
         periodControlModel: failedCalculation.model, indexGuard, transactionRunner });
     assert.strictEqual(failedCalculation.record.status, 'OPEN');
+    assert.strictEqual(failedCalculation.record.successful_calculation_version, undefined);
+    assert.strictEqual(projectPeriodControl({ scope, record: failedCalculation.record,
+        now: new Date('2026-07-01') }).has_authoritative_calculation_result, false);
     await acquirePeriodCalculationOwnership({ scope, calculationId: 'calculation-owner-retry', now: new Date('2026-07-02'),
         periodControlModel: failedCalculation.model, indexGuard, transactionRunner });
 

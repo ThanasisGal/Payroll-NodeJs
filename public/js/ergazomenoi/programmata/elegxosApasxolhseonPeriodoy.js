@@ -306,6 +306,7 @@ let currentHrPendingGroups = [];
 let currentHrCompletedGroups = [];
 let currentHrReviewLoaded = false;
 let currentHrReviewLoading = false;
+let currentPreCalculationDataIssueGroups = [];
 const currentApprovalHistoryFilters = {
     decisionType: '',
     userName: '',
@@ -963,6 +964,57 @@ function hasAnyCardEvidence(row = {}) {
     );
 }
 
+function resolveCardEvidenceIssue(row = {}) {
+    const pairs = [1, 2, 3].map((n) => {
+        const p = pairNo(n);
+        const rawStart = String(row[`cards_apo_ora_${p}`] ?? '').trim();
+        const rawEnd = String(row[`cards_eos_ora_${p}`] ?? '').trim();
+        return {
+            pair: p,
+            rawStart,
+            rawEnd,
+            startMinutes: rawStart ? timeToMinutes(rawStart) : null,
+            endMinutes: rawEnd ? timeToMinutes(rawEnd) : null
+        };
+    });
+    const invalid = pairs.find((pair) =>
+        (pair.rawStart && pair.startMinutes === null) ||
+        (pair.rawEnd && pair.endMinutes === null)
+    );
+    if (invalid) {
+        return {
+            code: 'INVALID_CARD_EVIDENCE',
+            status: 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ',
+            finding: 'Βρέθηκε μη έγκυρη μη κενή τιμή στα στοιχεία της κάρτας εργασίας.',
+            guidance: 'Ελέγξτε και διορθώστε το μη έγκυρο στοιχείο της κάρτας εργασίας.'
+        };
+    }
+    const orphan = pairs.find((pair) => Boolean(pair.rawStart) !== Boolean(pair.rawEnd));
+    if (orphan) {
+        const finding = orphan.rawStart
+            ? `Υπάρχει χτύπημα εισόδου ${orphan.rawStart} χωρίς αντίστοιχο χτύπημα εξόδου.`
+            : `Υπάρχει χτύπημα εξόδου ${orphan.rawEnd} χωρίς αντίστοιχο χτύπημα εισόδου.`;
+        return {
+            code: 'ORPHAN_CARD_PUNCH',
+            status: 'ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ',
+            finding,
+            guidance: 'Ελέγξτε τα στοιχεία της κάρτας εργασίας και συμπληρώστε ή διορθώστε το ορφανό χτύπημα.'
+        };
+    }
+    const zeroLength = pairs.find((pair) =>
+        pair.rawStart && pair.rawEnd && pair.startMinutes === pair.endMinutes
+    );
+    if (zeroLength) {
+        return {
+            code: 'ZERO_LENGTH_CARD_EVIDENCE',
+            status: 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ',
+            finding: `Η είσοδος και η έξοδος της κάρτας έχουν την ίδια ώρα (${zeroLength.rawStart}).`,
+            guidance: 'Ελέγξτε και διορθώστε τα στοιχεία της κάρτας εργασίας.'
+        };
+    }
+    return null;
+}
+
 function yperoriaCellClass(row) {
     if (sumParanomiYperoria(row) > 0) return 'cell-paranomi-yperoria';
     if (sumNomimiYperoria(row) > 0) return 'cell-nomimi-yperoria';
@@ -977,7 +1029,9 @@ function timeToMinutes(value) {
 
     const [hh, mm] = v.split(':').map(Number);
 
-    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+    if (Number.isNaN(hh) || Number.isNaN(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+        return null;
+    }
 
     return hh * 60 + mm;
 }
@@ -2617,6 +2671,40 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
         };
     }
 
+    if (possibleLeaveState === possibleLeavePresentationStates.CONFIRMED) {
+        return {
+            text: 'ΑΔΕΙΑ',
+            className: 'cell-no-card-adeia',
+            source: 'persisted'
+        };
+    }
+
+    if (
+        persistedCategory &&
+        ![
+            possibleLeavePresentationStates.DERIVED,
+            possibleLeavePresentationStates.PERSISTED,
+            possibleLeavePresentationStates.LEGACY
+        ].includes(possibleLeaveState)
+    ) {
+        return {
+            text: derived.apologistikoText || persistedCategory,
+            className: isApologistikoIntervalPresent(row)
+                ? 'cell-apologistiko'
+                : '',
+            source: 'persisted'
+        };
+    }
+
+    const cardEvidenceIssue = resolveCardEvidenceIssue(row);
+    if (cardEvidenceIssue) {
+        return {
+            text: cardEvidenceIssue.status,
+            className: 'cell-adeia-suggestion',
+            source: 'derived_card_quality'
+        };
+    }
+
     if (
         possibleLeaveState === possibleLeavePresentationStates.DERIVED ||
         possibleLeaveState === possibleLeavePresentationStates.PERSISTED ||
@@ -2626,24 +2714,6 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
             text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
             className: 'cell-adeia-suggestion',
             source: 'derived'
-        };
-    }
-
-    if (possibleLeaveState === possibleLeavePresentationStates.CONFIRMED) {
-        return {
-            text: 'ΑΔΕΙΑ',
-            className: 'cell-no-card-adeia',
-            source: 'persisted'
-        };
-    }
-
-    if (persistedCategory) {
-        return {
-            text: derived.apologistikoText || persistedCategory,
-            className: isApologistikoIntervalPresent(row)
-                ? 'cell-apologistiko'
-                : '',
-            source: 'persisted'
         };
     }
 
@@ -5464,6 +5534,86 @@ function renderActionableIssueGroups(issueGroups = []) {
     `;
 }
 
+function buildPreCalculationDataIssueGroups(rows = []) {
+    const groupsByCode = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+        const issue = resolveCardEvidenceIssue(row);
+        if (!issue) return;
+        const groupCode = issue.code === 'ORPHAN_CARD_PUNCH'
+            ? issue.code
+            : 'INVALID_CARD_EVIDENCE';
+        if (!groupsByCode.has(groupCode)) {
+            groupsByCode.set(groupCode, {
+                issue_code: groupCode,
+                title: issue.code === 'ORPHAN_CARD_PUNCH'
+                    ? 'Ορφανό χτύπημα κάρτας'
+                    : 'Άκυρα στοιχεία κάρτας',
+                cases: []
+            });
+        }
+        groupsByCode.get(groupCode).cases.push({
+            prodhlomena_oraria_id: String(row._id || row.id || ''),
+            employee_kodikos: String(row.kodikos || ''),
+            employee_name: String(
+                row.employeeName || `${row.eponymo || ''} ${row.onoma || ''}`
+            ).trim(),
+            source_date: String(row.hmeromhnia || '').slice(0, 10),
+            finding: issue.finding,
+            guidance: issue.guidance
+        });
+    });
+    return [...groupsByCode.values()]
+        .map((group) => ({ ...group, count: group.cases.length }))
+        .sort((left, right) => left.title.localeCompare(right.title, 'el'));
+}
+
+function renderPreCalculationDataIssues(rows = []) {
+    const container = document.getElementById('policyPreviewGroupsContainer');
+    if (!container) return;
+    currentPreCalculationDataIssueGroups = buildPreCalculationDataIssueGroups(rows);
+    if (currentPreCalculationDataIssueGroups.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = `
+        <section class="card border rounded employment-review-pending-summary"
+            aria-label="Εκκρεμότητες δεδομένων πριν τον υπολογισμό">
+            <div class="card-body py-2">
+                <div class="fw-semibold">Εκκρεμότητες δεδομένων πριν τον υπολογισμό</div>
+                <div class="small text-muted mb-2">Ελέγξτε την ποιότητα των δεδομένων πριν εκτελέσετε τον Υπολογισμό Απασχολήσεων.</div>
+                <div class="actionable-issue-groups">
+                    ${currentPreCalculationDataIssueGroups.map((group, groupIndex) => {
+                        const panelId = `preCalculationDataIssuePanel-${groupIndex}`;
+                        const countLabel = group.count === 1 ? 'περίπτωση' : 'περιπτώσεις';
+                        return `<div class="actionable-issue-group">
+                            <button type="button" class="actionable-issue-summary" aria-expanded="false"
+                                aria-controls="${panelId}" data-actionable-group-index="${groupIndex}">
+                                <span><strong>${group.count} ${countLabel}</strong> — ${escapeHtml(group.title)}</span>
+                                <span aria-hidden="true" class="actionable-issue-chevron">▸</span>
+                            </button>
+                            <div class="actionable-issue-panel d-none" id="${panelId}">
+                                <div class="actionable-issue-cases">${group.cases.map((issueCase, caseIndex) => `
+                                    <article class="actionable-issue-case">
+                                        <div class="fw-semibold">${escapeHtml(actionableIssueEmployeeLabel(issueCase))}</div>
+                                        <div>${escapeHtml(formatPolicyPreviewDate(issueCase.source_date))}</div>
+                                        <div><span class="text-muted">Τι βρέθηκε:</span> ${escapeHtml(issueCase.finding)}</div>
+                                        <div><span class="text-muted">Τι πρέπει να γίνει:</span> ${escapeHtml(issueCase.guidance)}</div>
+                                        <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-primary actionable-issue-open-case"
+                                                data-issue-source="pre-calculation" data-actionable-group-index="${groupIndex}"
+                                                data-actionable-case-index="${caseIndex}">Άνοιγμα στον πίνακα</button>
+                                            <span class="small text-muted actionable-issue-navigation-feedback" aria-live="polite"></span>
+                                        </div>
+                                    </article>`).join('')}</div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        </section>`;
+    bindActionableIssueEvents(container);
+}
+
 function renderAtomicRepoTransferDiagnostics(projection = {}) {
     const reasonCounts = projection.reason_counts || {};
     const warningCounts = projection.warning_counts || {};
@@ -5774,8 +5924,10 @@ function bindActionableIssueEvents(container) {
         button.addEventListener('click', () => {
             const groupIndex = Number(button.dataset.actionableGroupIndex);
             const caseIndex = Number(button.dataset.actionableCaseIndex);
-            const issueCase = currentAtomicRepoTransferProjection
-                ?.actionable_issue_groups?.[groupIndex]?.cases?.[caseIndex];
+            const issueCase = button.dataset.issueSource === 'pre-calculation'
+                ? currentPreCalculationDataIssueGroups?.[groupIndex]?.cases?.[caseIndex]
+                : currentAtomicRepoTransferProjection
+                    ?.actionable_issue_groups?.[groupIndex]?.cases?.[caseIndex];
             const feedback = button.parentElement?.querySelector(
                 '.actionable-issue-navigation-feedback'
             );
@@ -6434,7 +6586,19 @@ async function loadHrReviewQueue() {
     }
 
     try {
-        await loadEmploymentPeriodControl(branch);
+        const periodControl = await loadEmploymentPeriodControl(branch);
+        if (!hasAuthoritativeEmploymentCalculation(periodControl)) {
+            currentHrReviewLoaded = false;
+            currentHrReviewProjection = null;
+            currentAtomicRepoTransferProjection = null;
+            currentHrPendingGroups = [];
+            currentHrCompletedGroups = [];
+            if (status) {
+                status.className = 'hr-review-status hr-review-empty-state';
+                status.textContent = 'Οι εκκρεμότητες HR ενεργοποιούνται μετά από επιτυχημένο Υπολογισμό Απασχολήσεων ή Ανακατασκευή Εκπρόθεσμης Περιόδου.';
+            }
+            return;
+        }
         currentPolicyPreviewBaseParams = new URLSearchParams(params);
         currentRepoTransferDecisionsByProposalId = new Map();
         const result = await fetchPolicyPreviewGrouping(params);
@@ -6945,6 +7109,11 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
 let currentEmploymentPeriodControl = null;
 
+function hasAuthoritativeEmploymentCalculation(state = currentEmploymentPeriodControl) {
+    return state?.calculation?.authoritative_result === true &&
+        String(state?.effective_mode || '') !== 'HISTORICAL_RECONSTRUCTION_STALE';
+}
+
 function getActiveEmploymentReviewScope() {
     const apoHmeromhnia = String(document.getElementById('apo_hmeromhnia')?.value || '').trim();
     const eosHmeromhnia = String(document.getElementById('eos_hmeromhnia')?.value || '').trim();
@@ -7320,11 +7489,14 @@ async function loadResults() {
         branchValidation?.classList.toggle('d-none', !invalidBranch);
         if (invalidBranch) return;
 
-        await loadEmploymentPeriodControl(advancedBranch);
+        const periodControl = await loadEmploymentPeriodControl(advancedBranch);
+        const hasAuthoritativeResult = hasAuthoritativeEmploymentCalculation(periodControl);
 
         currentAtomicRepoTransferProjection = null;
         currentPolicyPreviewRowsById = new Map();
-        renderPolicyPreviewGroups(null, { loading: true });
+        currentPreCalculationDataIssueGroups = [];
+        if (hasAuthoritativeResult) renderPolicyPreviewGroups(null, { loading: true });
+        else document.getElementById('policyPreviewGroupsContainer')?.replaceChildren();
 
         const params = new URLSearchParams({
             apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
@@ -7375,7 +7547,7 @@ async function loadResults() {
         currentApprovalHistoryFilters.searchText = '';
 
         const rows = payload.rows || [];
-        if (payload.finalized !== true) {
+        if (payload.finalized !== true && hasAuthoritativeResult) {
             try {
                 const scenarioRows = await fetchScenarioClassifications(params);
                 const scenarioByProdhlomenaId = buildScenarioClassificationsMap(scenarioRows);
@@ -7415,6 +7587,11 @@ async function loadResults() {
                 }
                 correctiveSummary.classList.remove('d-none');
             } else correctiveSummary.classList.add('d-none');
+        }
+
+        if (payload.finalized !== true && !hasAuthoritativeResult) {
+            renderPreCalculationDataIssues(rows);
+            return;
         }
 
         if (payload.finalized !== true) {
@@ -7543,6 +7720,9 @@ function renderApologistikaFields(row) {
         possibleLeavePresentationStates.LEGACY
     ].includes(possibleLeaveState);
     const derivedPossibleLeave = possibleLeaveState === possibleLeavePresentationStates.DERIVED;
+    const cardEvidenceIssue = possibleLeaveState === possibleLeavePresentationStates.CONFIRMED
+        ? null
+        : resolveCardEvidenceIssue(row);
     const displayRow = possibleLeave
         ? { ...row, adeia_apologistika: false,
             kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' }
@@ -7579,6 +7759,7 @@ function renderApologistikaFields(row) {
     ];
 
     return `
+        ${cardEvidenceIssue ? `<div class="alert alert-warning py-2"><strong>Κατάσταση:</strong> ${escapeHtml(cardEvidenceIssue.status)}<div class="small mt-1">${escapeHtml(cardEvidenceIssue.code === 'ORPHAN_CARD_PUNCH' ? 'Βρέθηκε ορφανό χτύπημα κάρτας. Απαιτείται έλεγχος ή συμπλήρωση της αντίστοιχης κίνησης πριν ολοκληρωθεί με ασφάλεια ο υπολογισμός.' : cardEvidenceIssue.finding)}</div><div class="small mt-1">${escapeHtml(cardEvidenceIssue.guidance)}</div></div>` : ''}
         ${possibleLeave ? '<div class="alert alert-warning py-2"><strong>Κατάσταση:</strong> ΠΙΘΑΝΗ ΑΔΕΙΑ</div>' : ''}
         <div class="row g-2">
             ${numberFields

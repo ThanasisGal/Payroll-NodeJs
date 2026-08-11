@@ -283,20 +283,25 @@ function testPossibleLeaveResolverAndModalPresentationContract() {
     assert.ok(!/id="edit_adeia_apologistika"[^>]*checked/s.test(derivedHtml));
 
     [
-        { cards_apo_ora_01: '14:51', cards_eos_ora_01: '' },
-        { cards_apo_ora_01: '', cards_eos_ora_01: '22:51' },
-        { cards_apo_ora_01: 'invalid', cards_eos_ora_01: '' },
-        { cards_apo_ora_01: '14:51', cards_eos_ora_01: '14:51' }
-    ].forEach((cardEvidence) => {
+        [{ cards_apo_ora_01: '14:51', cards_eos_ora_01: '' }, 'ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ'],
+        [{ cards_apo_ora_01: '', cards_eos_ora_01: '22:51' }, 'ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ'],
+        [{ cards_apo_ora_01: 'invalid', cards_eos_ora_01: '' }, 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ'],
+        [{ cards_apo_ora_01: '14:51', cards_eos_ora_01: '14:51' }, 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ']
+    ].forEach(([cardEvidence, expectedStatus]) => {
         const unsafeRow = { ...derivedRow, ...cardEvidence };
         assert.strictEqual(
             sandbox.resolvePossibleLeavePresentationState(unsafeRow),
             'NONE'
         );
-        assert.notStrictEqual(
+        assert.strictEqual(
             sandbox.resolveReviewApologistikoPresentation(unsafeRow, {}).text,
-            'ΠΙΘΑΝΗ ΑΔΕΙΑ'
+            expectedStatus
         );
+        const unsafeHtml = sandbox.renderApologistikaFields(unsafeRow);
+        assert.ok(getVisibleText(unsafeHtml).includes(expectedStatus));
+        assert.ok(!getVisibleText(unsafeHtml).includes('ΠΙΘΑΝΗ ΑΔΕΙΑ'));
+        assert.ok(!unsafeHtml.includes('value="POSSIBLE_LEAVE"'));
+        assert.ok(!/id="edit_adeia_apologistika"[^>]*checked/s.test(unsafeHtml));
     });
 
     const persistedRow = {
@@ -2667,7 +2672,8 @@ async function testLightweightHrLoadingRequests() {
             return {
                 ok: true,
                 json: async () => ({ success: true, effective_mode: 'NORMAL', deadline: '2026-08-31',
-                    version: 0, allowed_actions: {}, index_readiness: { ready: false } })
+                    version: 0, calculation: { authoritative_result: true },
+                    allowed_actions: {}, index_readiness: { ready: false } })
             };
         }
         if (String(url).startsWith('/api/prodhlomena-oraria/review/policies/preview?')) {
@@ -2699,6 +2705,68 @@ async function testLightweightHrLoadingRequests() {
     assert.ok(!allUrls.includes('/review/policies/apply-dry-run'));
     ['hrReviewStartBtn', 'hr_apo_hmeromhnia', 'hr_eos_hmeromhnia', 'ypokatasthmata_stathera'].forEach((id) => elementsById.delete(id));
     clearMinimalRenderElements();
+}
+
+function testPreAndPostCalculationWorkflowGating() {
+    const loadResultsStart = source.indexOf('async function loadResults()');
+    const loadResultsEnd = source.indexOf('function pairNo(n)', loadResultsStart);
+    const loadResultsSource = source.slice(loadResultsStart, loadResultsEnd);
+    assert.ok(loadResultsSource.includes(
+        'if (payload.finalized !== true && !hasAuthoritativeResult)'
+    ));
+    assert.ok(loadResultsSource.includes('renderPreCalculationDataIssues(rows);'));
+    assert.ok(loadResultsSource.includes(
+        'if (payload.finalized !== true && hasAuthoritativeResult)'
+    ));
+    assert.ok(loadResultsSource.indexOf('renderPreCalculationDataIssues(rows);') <
+        loadResultsSource.indexOf('fetchPolicyPreviewGrouping(params)'));
+
+    const provisionalState = {
+        effective_mode: 'NORMAL',
+        calculation: { authoritative_result: false },
+        rows: [{ id: 'not-authoritative' }],
+        reason_counts: { MULTIPLE_TARGET_CANDIDATES: 1 },
+        actionable_issue_groups: [{ issue_code: 'MULTIPLE_TARGET_CANDIDATES' }]
+    };
+    assert.strictEqual(sandbox.hasAuthoritativeEmploymentCalculation(provisionalState), false);
+    assert.strictEqual(sandbox.hasAuthoritativeEmploymentCalculation({
+        effective_mode: 'HISTORICAL_RECONSTRUCTION_REQUIRED',
+        historical_reconstruction: { status: 'AUTHORIZED', version: 0 },
+        calculation: { authoritative_result: false }
+    }), false);
+    assert.strictEqual(sandbox.hasAuthoritativeEmploymentCalculation({
+        effective_mode: 'HISTORICAL_RECONSTRUCTION_REQUIRED',
+        historical_reconstruction: { status: 'FAILED', version: 0 },
+        calculation: { authoritative_result: false }
+    }), false);
+    assert.strictEqual(sandbox.hasAuthoritativeEmploymentCalculation({
+        effective_mode: 'NORMAL', calculation: { authoritative_result: true }
+    }), true);
+    assert.strictEqual(sandbox.hasAuthoritativeEmploymentCalculation({
+        effective_mode: 'HISTORICAL_RECONSTRUCTED',
+        historical_reconstruction: { status: 'COMPLETED', version: 1 },
+        calculation: { authoritative_result: true }
+    }), true);
+    assert.strictEqual(sandbox.hasAuthoritativeEmploymentCalculation({
+        effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
+        historical_reconstruction: { status: 'COMPLETED', version: 1 },
+        calculation: { authoritative_result: true }
+    }), false);
+
+    const container = minimalElement();
+    elementsById.set('policyPreviewGroupsContainer', container);
+    sandbox.renderPreCalculationDataIssues([{
+        _id: 'orphan-row', kodikos: '0004', eponymo: 'ΤΣΙΤΟΓΛΟΥ', onoma: 'ΧΡΗΣΤΟΣ',
+        hmeromhnia: '2026-06-14', cards_ores_ergasias: 0,
+        cards_apo_ora_01: '14:51', cards_eos_ora_01: ''
+    }]);
+    assert.ok(container.innerHTML.includes('Εκκρεμότητες δεδομένων πριν τον υπολογισμό'));
+    assert.ok(container.innerHTML.includes('Ορφανό χτύπημα κάρτας'));
+    assert.ok(container.innerHTML.includes('0004'));
+    assert.ok(container.innerHTML.includes('14:51'));
+    assert.ok(!container.innerHTML.includes('Εκκρεμότητες που απαιτούν ενέργεια'));
+    assert.ok(!container.innerHTML.includes('Καταγραφή απόφασης'));
+    elementsById.delete('policyPreviewGroupsContainer');
 }
 
 async function testHrDecisionPresentationAndLocalRerender() {
@@ -3348,6 +3416,7 @@ const tests = [
     testMinimalStaleDecisionRemainsPending,
     testStaleNoticesDoNotLeakIntoOtherStates,
     testMinimalSafetySourceContracts,
+    testPreAndPostCalculationWorkflowGating,
     testLightweightHrLoadingRequests,
     testHrDecisionPresentationAndLocalRerender,
     testHrDecisionCancelAndEmptyNoteDoNotPost,

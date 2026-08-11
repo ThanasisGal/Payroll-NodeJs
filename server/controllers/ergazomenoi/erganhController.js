@@ -6669,6 +6669,11 @@ class erganhController {
                     dependency_window_end: state.historical_dependency_window_end,
                     dependency_status: state.dependency_status
                 },
+                calculation: {
+                    successful_version: state.successful_calculation_version,
+                    completed_at: state.last_successful_calculation_at,
+                    authoritative_result: state.has_authoritative_calculation_result
+                },
                 allowed_actions: {
                     calculate: state.can_calculate,
                     record_decision: state.can_record_decision,
@@ -8914,6 +8919,17 @@ class erganhController {
             console.log(`[calcApasxolhseisPeriodoy] Εργαζόμενοι: ${ergazomenoi.length}`);
 
             if (ergazomenoi.length === 0) {
+                if (calculationOwnership.historical) {
+                    await completeHistoricalReconstruction({ scope: periodControlScope,
+                        calculationId: calculationOwnership.calculationId,
+                        requestId: calculationOwnership.historicalRequestId });
+                }
+                await releasePeriodCalculationOwnership({
+                    scope: periodControlScope,
+                    calculationId: calculationOwnership.calculationId,
+                    successful: true
+                });
+                calculationOwnership = null;
                 return res.json({
                     success: true,
                     message: 'Δεν βρέθηκαν εργαζόμενοι για τα κριτήρια επιλογής.',
@@ -9337,7 +9353,8 @@ class erganhController {
             }
             await releasePeriodCalculationOwnership({
                 scope: periodControlScope,
-                calculationId: calculationOwnership.calculationId
+                calculationId: calculationOwnership.calculationId,
+                successful: true
             });
             calculationOwnership = null;
             return res.json({

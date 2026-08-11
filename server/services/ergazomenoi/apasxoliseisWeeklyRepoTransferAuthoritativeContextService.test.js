@@ -7,7 +7,8 @@ const {
     buildArgiesByDateKey,
     getProfileDateForDeviation,
     getWeeklyRepoProfileInfo,
-    buildNoCardsDisplayContext
+    buildNoCardsDisplayContext,
+    resolveNoCardsDisplayStatus
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const { ROW_FIELDS } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const {
@@ -58,6 +59,24 @@ function testHolidayContexts() {
     ).get('2026-06-16');
     assert.strictEqual(open.companyOperatesOnHoliday, true);
     assert.strictEqual(open.blocksRepoTransfer, false);
+}
+
+function testNoCardsDisplayRequiresNoCardEvidence() {
+    const base = {
+        hmeromhnia: '2026-06-14',
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 0
+    };
+    assert.strictEqual(resolveNoCardsDisplayStatus(base), 'ΑΔΕΙΑ');
+    [
+        { cards_apo_ora_01: '14:51', cards_eos_ora_01: '' },
+        { cards_apo_ora_01: '', cards_eos_ora_01: '22:51' },
+        { cards_apo_ora_01: 'invalid', cards_eos_ora_01: '' },
+        { cards_apo_ora_01: '14:51', cards_eos_ora_01: '14:51' }
+    ].forEach((cardEvidence) => {
+        assert.strictEqual(resolveNoCardsDisplayStatus({ ...base, ...cardEvidence }), '');
+    });
 }
 
 function testCanonicalWeeklyProfile() {
@@ -343,6 +362,7 @@ async function testTeamScopedCompanyResolution() {
 async function run() {
     testRowFieldEquivalence();
     testHolidayContexts();
+    testNoCardsDisplayRequiresNoCardEvidence();
     testProfileDateForDeviationPrecedenceAndFallbacks();
     testCanonicalWeeklyProfile();
     testContractualWeeklyRepoResolution();
