@@ -86,6 +86,7 @@ function matches(record, filter = {}) {
 function store(initial = null) {
     let record = initial ? { ...initial } : null;
     const audits = [];
+    const auditOptions = [];
     const query = filter => ({ session() { return this; }, lean: async () => matches(record, filter) ? { ...record } : null });
     return { model: {
         findOne: query,
@@ -97,8 +98,10 @@ function store(initial = null) {
             for (const [key, amount] of Object.entries(update.$inc || {})) record[key] = Number(record[key] || 0) + amount;
             return { ...record };
         }
-    }, audit: { async create(values) { audits.push(...(Array.isArray(values) ? values : [values])); } },
-    get record() { return record; }, audits };
+    }, audit: { async create(values, options) {
+        audits.push(...(Array.isArray(values) ? values : [values]));
+        auditOptions.push(options);
+    } }, get record() { return record; }, audits, auditOptions };
 }
 const transactionRunner = work => work({ id: 'transaction' });
 
@@ -279,10 +282,15 @@ function castFingerprintDateSelector(dateSelector) {
         auditModel: replayStore.audit, prodhlomenaModel, transactionRunner });
     assert.strictEqual(completion.record.historical_reconstruction_status, 'COMPLETED');
     assert.strictEqual(completion.record.historical_reconstruction_version, 2);
+    assert.strictEqual(completion.record.historical_reconstruction_pending_version, 0);
+    assert.strictEqual(completion.record.active_calculation_id,
+        'historical-calculation-complete-01');
     assert.strictEqual(completion.record.historical_dependency_fingerprint, originalMayDependency);
     assert.strictEqual(JSON.stringify(factRows), sourceBeforeCompletion);
     assert.deepStrictEqual(replayStore.audits.slice(-2).map(audit => audit.event_type),
         ['HISTORICAL_RECONSTRUCTION_CALCULATION', 'HISTORICAL_RECONSTRUCTION_COMPLETE']);
+    assert.strictEqual(replayStore.auditOptions.at(-1).ordered, true);
+    assert.strictEqual(replayStore.auditOptions.at(-1).session.id, 'transaction');
 
     const failedFirst = store();
     const firstCommand = { session: user, scope: juneScope, reason: 'first failure',
@@ -353,6 +361,10 @@ function castFingerprintDateSelector(dateSelector) {
     assert.strictEqual(superseded.record.historical_reconstruction_version, 0);
     assert.strictEqual(superseded.record.historical_reconstruction_pending_version, 1);
     assert.ok(abandoned.audits.some(audit => audit.details?.error_code === 'AUTHORIZATION_SUPERSEDED'));
+    assert.deepStrictEqual(abandoned.audits.slice(-2).map(audit => audit.event_type),
+        ['HISTORICAL_RECONSTRUCTION_FAILED', 'HISTORICAL_RECONSTRUCTION_OPEN']);
+    assert.strictEqual(abandoned.auditOptions.at(-1).ordered, true);
+    assert.strictEqual(abandoned.auditOptions.at(-1).session.id, 'transaction');
 
     const ownershipStore = store({ ...juneScope, status: 'OPEN', deadline: calculatePeriodDeadline(juneScope.period_end),
         version: 2, write_fence_version: 0, active_calculation_id: '',
