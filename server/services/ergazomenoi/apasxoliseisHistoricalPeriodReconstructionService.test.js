@@ -3,6 +3,7 @@
 const assert = require('assert');
 const mongoose = require('mongoose');
 const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
+const { ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
 const {
     SOURCE_FIELDS,
     dependencyWindow,
@@ -109,6 +110,12 @@ function castAuthorizationSelector(activeCalculationSelector) {
     return { error: query.error(), filter: query.getFilter() };
 }
 
+function castFingerprintDateSelector(dateSelector) {
+    const query = ProdhlomenaOrariaModel.find({ ...juneScope, hmeromhnia: dateSelector });
+    query._castConditions();
+    return { error: query.error(), filter: query.getFilter() };
+}
+
 (async () => {
     const previousSanitizeFilter = mongoose.get('sanitizeFilter');
     mongoose.set('sanitizeFilter', true);
@@ -124,6 +131,37 @@ function castAuthorizationSelector(activeCalculationSelector) {
         const trustedNull = castAuthorizationSelector(mongoose.trusted({ $in: ['', null] }));
         assert.strictEqual(trustedNull.error, undefined);
         assert.ok(trustedNull.filter.active_calculation_id.$in.includes(null));
+
+        const periodStart = new Date('2026-06-01T00:00:00.000Z');
+        const periodEnd = new Date('2026-06-30T00:00:00.000Z');
+        const untrustedRange = castFingerprintDateSelector({ $gte: periodStart, $lte: periodEnd });
+        assert.ok(untrustedRange.error instanceof mongoose.Error.CastError);
+        assert.strictEqual(untrustedRange.error.path, 'hmeromhnia');
+
+        const trustedRange = castFingerprintDateSelector(
+            mongoose.trusted({ $gte: periodStart, $lte: periodEnd }));
+        assert.strictEqual(trustedRange.error, undefined);
+        assert.strictEqual(trustedRange.filter.hmeromhnia.$gte.getTime(), periodStart.getTime());
+        assert.strictEqual(trustedRange.filter.hmeromhnia.$lte.getTime(), periodEnd.getTime());
+
+        const castFilters = [];
+        const castingProdhlomenaModel = { find(filter) {
+            const query = ProdhlomenaOrariaModel.find(filter);
+            query._castConditions();
+            if (query.error()) throw query.error();
+            castFilters.push(query.getFilter());
+            return { select() { return this; }, sort() { return this; }, session() { return this; },
+                async lean() { return []; } };
+        } };
+        const fingerprints = await calculateHistoricalFingerprints({ scope: juneScope,
+            prodhlomenaModel: castingProdhlomenaModel });
+        assert.strictEqual(castFilters.length, 2);
+        for (const filter of castFilters) {
+            assert.strictEqual(filter.hmeromhnia.$gte.getTime(), periodStart.getTime());
+            assert.strictEqual(filter.hmeromhnia.$lte.getTime(), periodEnd.getTime());
+        }
+        assert.strictEqual(fingerprints.source_fingerprint, fingerprintRows([], SOURCE_FIELDS));
+        assert.strictEqual(fingerprints.result_fingerprint, fingerprintRows([]));
     } finally {
         mongoose.set('sanitizeFilter', previousSanitizeFilter);
     }

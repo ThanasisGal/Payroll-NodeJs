@@ -99,7 +99,8 @@ async function transaction(work) {
 async function loadRows({ scope, start, end, fields, prodhlomenaModel = ProdhlomenaOrariaModel, session = null }) {
     if (!start || !end) return [];
     let query = prodhlomenaModel.find({ team: scope.team, company_kod: scope.company_kod,
-        ypokatasthma: scope.ypokatasthma, hmeromhnia: { $gte: start, $lte: end } })
+        ypokatasthma: scope.ypokatasthma,
+        hmeromhnia: mongoose.trusted({ $gte: start, $lte: end }) })
         .select(fields.join(' ')).sort({ kodikos: 1, hmeromhnia: 1, _id: 1 });
     if (session && typeof query.session === 'function') query = query.session(session);
     return typeof query.lean === 'function' ? query.lean() : query;
