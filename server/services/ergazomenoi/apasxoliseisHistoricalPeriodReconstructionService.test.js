@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('assert');
+const mongoose = require('mongoose');
+const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const {
     SOURCE_FIELDS,
     dependencyWindow,
@@ -99,7 +101,63 @@ function store(initial = null) {
 }
 const transactionRunner = work => work({ id: 'transaction' });
 
+function castAuthorizationSelector(activeCalculationSelector) {
+    const query = PeriodControlModel.findOneAndUpdate({ ...juneScope, status: 'OPEN', version: 2,
+        active_calculation_id: activeCalculationSelector }, { $set: {
+        historical_reconstruction_status: 'AUTHORIZED' } }, { new: true });
+    query._castConditions();
+    return { error: query.error(), filter: query.getFilter() };
+}
+
 (async () => {
+    const previousSanitizeFilter = mongoose.get('sanitizeFilter');
+    mongoose.set('sanitizeFilter', true);
+    try {
+        const untrusted = castAuthorizationSelector({ $in: ['', null] });
+        assert.ok(untrusted.error instanceof mongoose.Error.CastError);
+        assert.strictEqual(untrusted.error.path, 'active_calculation_id');
+
+        const trustedEmpty = castAuthorizationSelector(mongoose.trusted({ $in: ['', null] }));
+        assert.strictEqual(trustedEmpty.error, undefined);
+        assert.deepStrictEqual(trustedEmpty.filter.active_calculation_id.$in, ['', null]);
+
+        const trustedNull = castAuthorizationSelector(mongoose.trusted({ $in: ['', null] }));
+        assert.strictEqual(trustedNull.error, undefined);
+        assert.ok(trustedNull.filter.active_calculation_id.$in.includes(null));
+    } finally {
+        mongoose.set('sanitizeFilter', previousSanitizeFilter);
+    }
+
+    for (const activeCalculationId of ['', null]) {
+        const existing = store({ ...juneScope, status: 'OPEN',
+            deadline: calculatePeriodDeadline(juneScope.period_end), version: 2,
+            write_fence_version: 0, active_calculation_id: activeCalculationId,
+            historical_reconstruction_status: '', historical_reconstruction_version: 0,
+            historical_reconstruction_pending_version: 0 });
+        const result = await authorizeHistoricalReconstruction({ session: user, scope: juneScope,
+            reason: 'sanitizeFilter authorization', requestId: `historical-selector-${activeCalculationId === null ? 'null' : 'empty'}-01`,
+            confirmation: true, now: new Date('2026-08-01'), periodControlModel: existing.model,
+            auditModel: existing.audit, transactionRunner });
+        assert.strictEqual(result.record.historical_reconstruction_status, 'AUTHORIZED');
+        assert.strictEqual(result.record.historical_reconstruction_version, 0);
+        assert.strictEqual(result.record.historical_reconstruction_pending_version, 1);
+        assert.strictEqual(result.record.version, 3);
+        assert.strictEqual(existing.audits[0].event_type, 'HISTORICAL_RECONSTRUCTION_OPEN');
+    }
+
+    const active = store({ ...juneScope, status: 'OPEN',
+        deadline: calculatePeriodDeadline(juneScope.period_end), version: 2,
+        write_fence_version: 0, active_calculation_id: 'actual-calculation-id',
+        historical_reconstruction_status: '', historical_reconstruction_version: 0,
+        historical_reconstruction_pending_version: 0 });
+    await assert.rejects(() => authorizeHistoricalReconstruction({ session: user, scope: juneScope,
+        reason: 'must fail closed', requestId: 'historical-selector-active-01', confirmation: true,
+        now: new Date('2026-08-01'), periodControlModel: active.model, auditModel: active.audit,
+        transactionRunner }), error => error.code === 'PERIOD_CONTROL_CALCULATION_IN_PROGRESS');
+    assert.strictEqual(active.record.historical_reconstruction_status, '');
+    assert.strictEqual(active.record.version, 2);
+    assert.strictEqual(active.audits.length, 0);
+
     for (const role of ['A', 'S', 'HR']) {
         const s = store();
         const result = await authorizeHistoricalReconstruction({ session: { ...user, userRole: role },

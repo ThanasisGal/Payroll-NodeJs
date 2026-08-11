@@ -158,7 +158,7 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
         const eventType = nextVersion === 1 ? 'HISTORICAL_RECONSTRUCTION_OPEN' : 'HISTORICAL_RECONSTRUCTION_REASSESS';
         const deadline = new Date(Date.UTC(dateOnly(scope.period_end).getUTCFullYear(), dateOnly(scope.period_end).getUTCMonth() + 2, 0));
         const filter = current ? { ...scope, status: 'OPEN', version: current.version,
-            active_calculation_id: { $in: ['', null] } } : { ...scope, _id: { $exists: false } };
+            active_calculation_id: mongoose.trusted({ $in: ['', null] }) } : { ...scope, _id: { $exists: false } };
         const set = { historical_reconstruction_status: 'AUTHORIZED',
             historical_reconstruction_pending_version: nextVersion,
             historical_reconstruction_pending_started_at: now,
