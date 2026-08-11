@@ -14983,12 +14983,21 @@ body.loader-active > *:not(.app-loader) {
     background-clip: padding-box;
 }
 
-.historical-reconstruction-swal {
-    width: min(600px, calc(100vw - 2rem));
-    max-width: min(620px, calc(100vw - 2rem));
+.custom-swal-popup.historical-reconstruction-swal {
+    width: min(600px, calc(100vw - 2rem)) !important;
+    max-width: min(620px, calc(100vw - 2rem)) !important;
     box-sizing: border-box;
     padding: 0.65rem 1rem 0.8rem;
     overflow: visible;
+}
+
+.swal2-popup.employment-review-swal-popup .swal2-html-container,
+.swal2-popup.employment-review-swal-popup .employment-review-swal-html-container,
+.swal2-popup.employment-review-swal-popup .swal2-input,
+.swal2-popup.employment-review-swal-popup .swal2-textarea,
+.swal2-popup.employment-review-swal-popup .swal2-validation-message,
+.swal2-popup.employment-review-swal-popup .swal2-input-label {
+    font-size: 0.85rem !important;
 }
 
 .historical-reconstruction-swal .swal2-icon {
@@ -15013,6 +15022,10 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .historical-reconstruction-swal__reason {
+    display: block;
+    width: 96% !important;
+    max-width: 96% !important;
+    box-sizing: border-box;
     min-height: 4.5rem;
     height: 5rem;
     max-height: 5.625rem;

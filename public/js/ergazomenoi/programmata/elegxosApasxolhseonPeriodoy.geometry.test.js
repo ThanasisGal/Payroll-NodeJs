@@ -307,26 +307,41 @@ async function geometry(page) {
 async function modalGeometry(page) {
     await page.evaluate(() => {
         const popup = document.createElement('div');
-        popup.className = 'swal2-popup historical-reconstruction-swal';
+        popup.className = 'swal2-popup custom-swal-popup employment-review-swal-popup historical-reconstruction-swal';
         popup.innerHTML = '<div class="swal2-icon">!</div>' +
-            '<h2 class="swal2-title">Ανακατασκευή Εκπρόθεσμης Περιόδου</h2>' +
-            '<div class="swal2-html-container historical-reconstruction-swal__content"><p>Η περίοδος έχει λήξει. Η ανακατασκευή δεν αλλάζει την εκπρόθεσμη κατάστασή της και καταγράφεται με χρήστη, ημερομηνία και αιτιολογία.</p></div>' +
+            '<h2 class="swal2-title custom-title">Ανακατασκευή Εκπρόθεσμης Περιόδου</h2>' +
+            '<div class="swal2-html-container custom-html-container employment-review-swal-html-container historical-reconstruction-swal__content"><p>Η περίοδος έχει λήξει. Η ανακατασκευή δεν αλλάζει την εκπρόθεσμη κατάστασή της και καταγράφεται με χρήστη, ημερομηνία και αιτιολογία.</p></div>' +
             '<label>Υποχρεωτική αιτιολογία</label>' +
             '<textarea class="swal2-textarea historical-reconstruction-swal__reason"></textarea>' +
-            '<div class="swal2-actions"><button>Ανακατασκευή</button><button>Ακύρωση</button></div>';
+            '<div class="swal2-actions"><button class="custom-confirm-button custom-swal-button">Ανακατασκευή</button><button class="custom-cancel-button custom-swal-button">Ακύρωση</button></div>';
         document.body.appendChild(popup);
     });
     return page.evaluate(() => {
         const popup = document.querySelector('.historical-reconstruction-swal');
+        const textarea = popup.querySelector('textarea');
+        const htmlContainer = popup.querySelector('.swal2-html-container');
         const rect = popup.getBoundingClientRect();
+        const textareaRect = textarea.getBoundingClientRect();
+        const contentRect = htmlContainer.getBoundingClientRect();
         return {
             width: rect.width,
             height: rect.height,
             viewportHeight: innerHeight,
             overflow: popup.scrollHeight > popup.clientHeight,
+            horizontalOverflow: popup.scrollWidth > popup.clientWidth,
+            textareaWidth: textareaRect.width,
+            contentWidth: contentRect.width,
+            textareaRatio: textareaRect.width / contentRect.width,
+            bodyFontSize: getComputedStyle(htmlContainer).fontSize,
+            commonClasses: {
+                popup: popup.classList.contains('custom-swal-popup'),
+                title: popup.querySelector('.swal2-title').classList.contains('custom-title'),
+                html: htmlContainer.classList.contains('custom-html-container'),
+                confirm: popup.querySelector('.swal2-actions button').classList.contains('custom-swal-button')
+            },
             titleVisible: Boolean(popup.querySelector('.swal2-title')),
             textVisible: Boolean(popup.querySelector('p')),
-            textareaVisible: Boolean(popup.querySelector('textarea')),
+            textareaVisible: Boolean(textarea),
             buttonsVisible: popup.querySelectorAll('button').length === 2
         };
     });
@@ -435,6 +450,13 @@ async function modalGeometry(page) {
             assert.ok(modal.width <= 620, `${width}x${height}: modal width ${modal.width}`);
             assert.ok(modal.height < modal.viewportHeight);
             assert.strictEqual(modal.overflow, false);
+            assert.strictEqual(modal.horizontalOverflow, false);
+            assert.ok(modal.textareaRatio >= 0.94 && modal.textareaRatio <= 0.96,
+                `${width}x${height}: textarea ratio ${modal.textareaRatio}`);
+            assert.strictEqual(modal.bodyFontSize, '13.6px');
+            assert.deepStrictEqual(modal.commonClasses, {
+                popup: true, title: true, html: true, confirm: true
+            });
             assert.ok(modal.titleVisible && modal.textVisible && modal.textareaVisible && modal.buttonsVisible);
         }
     } finally {

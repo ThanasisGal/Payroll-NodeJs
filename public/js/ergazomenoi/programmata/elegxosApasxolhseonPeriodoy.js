@@ -1,5 +1,60 @@
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
+const employmentReviewSwalCommonClasses = Object.freeze({
+    title: 'custom-title',
+    popup: 'custom-swal-popup employment-review-swal-popup',
+    htmlContainer: 'custom-html-container employment-review-swal-html-container'
+});
+
+function mergeEmploymentReviewSwalClasses(...classNames) {
+    return [...new Set(classNames
+        .flatMap(value => String(value || '').trim().split(/\s+/))
+        .filter(Boolean))]
+        .join(' ');
+}
+
+function employmentReviewSwal(options = {}) {
+    const customClass = options.customClass || {};
+    const semanticConfirmClass = customClass.confirmButton || {
+        success: 'class-success',
+        error: 'class-error',
+        info: 'class-info',
+        warning: 'class-warning'
+    }[options.icon] || 'class-warning';
+    const cancelButtonClass = options.showCancelButton === true || customClass.cancelButton
+        ? mergeEmploymentReviewSwalClasses(
+            customClass.cancelButton || 'class-normal',
+            'custom-cancel-button',
+            'custom-swal-button'
+        )
+        : undefined;
+
+    return Swal.fire({
+        ...options,
+        customClass: {
+            ...customClass,
+            title: mergeEmploymentReviewSwalClasses(
+                employmentReviewSwalCommonClasses.title,
+                customClass.title
+            ),
+            popup: mergeEmploymentReviewSwalClasses(
+                employmentReviewSwalCommonClasses.popup,
+                customClass.popup
+            ),
+            htmlContainer: mergeEmploymentReviewSwalClasses(
+                employmentReviewSwalCommonClasses.htmlContainer,
+                customClass.htmlContainer
+            ),
+            confirmButton: mergeEmploymentReviewSwalClasses(
+                semanticConfirmClass,
+                'custom-confirm-button',
+                'custom-swal-button'
+            ),
+            ...(cancelButtonClass ? { cancelButton: cancelButtonClass } : {})
+        }
+    });
+}
+
 function userCanReviewEdit() {
     return document.getElementById('canReviewEdit')?.value === '1';
 }
@@ -815,7 +870,7 @@ function fillScenarioProposedUpdates(row) {
     }
 
     if (filledCount > 0 && window.Swal?.fire) {
-        Swal.fire({
+        employmentReviewSwal({
             icon: 'info',
             title: 'Πρόταση σεναρίου',
             text: `Συμπληρώθηκαν ${filledCount} πεδίο/πεδία στο modal. Η αποθήκευση δεν έγινε αυτόματα.`
@@ -2347,7 +2402,7 @@ function canonicalDecisionPayload(context, type) {
 
 async function openCanonicalDecisionPanel(scope) {
     if (!canRecordCanonicalEmploymentDecision()) {
-        await Swal.fire({
+        await employmentReviewSwal({
             icon: 'info',
             title: 'Καταγραφή απόφασης',
             text: 'Η καταγραφή απόφασης είναι διαθέσιμη μετά την ολοκλήρωση του Υπολογισμού Απασχολήσεων ή της Ανακατασκευής της περιόδου.'
@@ -3731,7 +3786,7 @@ function showPolicyPreviewApprovalHistoryDetails(record = {}) {
         </div>
     `;
 
-    Swal.fire({
+    employmentReviewSwal({
         title: 'Λεπτομέρειες καταγεγραμμένης απόφασης',
         html,
         width: '72rem',
@@ -3750,7 +3805,7 @@ function openPolicyPreviewGroupFromHistory(root, groupId) {
     );
 
     if (!normalizedGroupId || !groupCard) {
-        Swal.fire({
+        employmentReviewSwal({
             icon: 'info',
             title: 'Η ομάδα δεν είναι διαθέσιμη',
             text: 'Η ομάδα δεν υπάρχει στην τρέχουσα σελίδα αποτελεσμάτων.'
@@ -4187,7 +4242,7 @@ function showPolicyPreviewApplyDryRunDetails(approval = {}) {
         </div>
     `;
 
-    Swal.fire({
+    employmentReviewSwal({
         title: 'Λεπτομέρειες προεπισκόπησης εφαρμογής',
         html,
         width: '78rem',
@@ -4313,7 +4368,7 @@ async function getPolicyPreviewCsrfToken() {
 }
 
 async function revokePolicyPreviewApproval(approvalId) {
-    const confirmation = await Swal.fire({
+    const confirmation = await employmentReviewSwal({
         icon: 'warning',
         title: 'Ανάκληση επαναχρησιμοποιήσιμης πολιτικής',
         text: 'Η πολιτική δεν θα εφαρμόζεται σε μελλοντικές περιπτώσεις.',
@@ -4354,7 +4409,7 @@ async function revokePolicyPreviewApproval(approvalId) {
             renderHrReviewWorkspace();
         }
     }
-    await Swal.fire({ icon: 'success', title: 'Η πολιτική ανακλήθηκε' });
+    await employmentReviewSwal({ icon: 'success', title: 'Η πολιτική ανακλήθηκε' });
 }
 
 async function confirmPolicyPreviewDecision(group, decisionType, options = {}) {
@@ -4371,7 +4426,7 @@ async function confirmPolicyPreviewDecision(group, decisionType, options = {}) {
         decisionType === 'APPROVE_PREFILL'
             ? 'Η πρόταση θα χαρακτηριστεί ως εγκεκριμένη για μελλοντική εφαρμογή, αλλά δεν θα εφαρμοστεί τώρα καμία αλλαγή στα Προδηλωμένα.'
             : 'Η απόφαση θα καταγραφεί στο ιστορικό approval/audit. Δεν θα εφαρμοστεί καμία αλλαγή στα Προδηλωμένα.';
-    const result = await Swal.fire({
+    const result = await employmentReviewSwal({
         icon: 'warning',
         title: 'Καταγραφή απόφασης ελέγχου',
         html: `
@@ -4479,7 +4534,7 @@ async function submitPolicyPreviewDecision(group, decisionType, options = {}) {
                 expandedGroupId: group.group_id
             });
 
-            await Swal.fire({
+            await employmentReviewSwal({
                 icon: 'info',
                 title: 'Η απόφαση έχει ήδη καταγραφεί',
                 text: 'Υπάρχει ήδη ίδια καταγεγραμμένη απόφαση για αυτή την ομάδα.'
@@ -4526,7 +4581,7 @@ async function submitPolicyPreviewDecision(group, decisionType, options = {}) {
             });
         }
 
-        await Swal.fire({
+        await employmentReviewSwal({
             icon: 'success',
             title: 'Επιτυχία',
             text: payload.message || 'Η απόφαση καταγράφηκε επιτυχώς.'
@@ -4800,7 +4855,7 @@ function showPolicyPreviewItemDetails(item = {}) {
     `;
 
     if (window.Swal?.fire) {
-        Swal.fire({
+        employmentReviewSwal({
             title: 'Πλήρη στοιχεία εγγραφής',
             html,
             confirmButtonText: 'Κλείσιμο',
@@ -5968,7 +6023,7 @@ function bindAtomicRepoTransferEvents(container) {
             const group = currentAtomicRepoTransferProjection?.groups?.[Number(button.dataset.atomicGroupIndex)];
             if (!group) return;
             try { await submitRepoTransferDecision(group, String(button.dataset.decisionCode || '')); }
-            catch (error) { await Swal.fire({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' }); }
+            catch (error) { await employmentReviewSwal({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' }); }
         });
     });
     container.querySelectorAll('.atomic-repo-transfer-reusable-btn').forEach((button) => {
@@ -5982,7 +6037,7 @@ function bindAtomicRepoTransferEvents(container) {
                     forceAtomicReuse: true
                 });
             } catch (error) {
-                await Swal.fire({
+                await employmentReviewSwal({
                     icon: 'error',
                     title: 'Δεν καταγράφηκε η επαναχρησιμοποιήσιμη έγκριση',
                     text: error.message || 'Παρουσιάστηκε σφάλμα.'
@@ -6089,7 +6144,7 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
               cancelButtonText: 'Άκυρο'
           }
         : { icon: 'warning', title: labels[decisionCode], html: '<div class="text-start"><div>Η απόφαση αφορά και τις δύο συνδεδεμένες αλλαγές της πρότασης.</div><div class="mt-2">Δεν θα εφαρμοστεί καμία αλλαγή στα Προδηλωμένα.</div></div>', input: 'textarea', inputLabel: 'Προαιρετικές σημειώσεις', inputAttributes: { maxlength: '2000' }, showCancelButton: true, confirmButtonText: 'Καταγραφή απόφασης', cancelButtonText: 'Άκυρο' };
-    const confirmation = await Swal.fire(confirmationOptions);
+    const confirmation = await employmentReviewSwal(confirmationOptions);
     if (!confirmation.isConfirmed) return;
     repoTransferDecisionSubmitting.add(proposalId);
     try {
@@ -6113,7 +6168,7 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
                     status.textContent =
                         'Η απόφαση καταγράφηκε, αλλά η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Αναζήτηση».';
                 }
-                await Swal.fire({
+                await employmentReviewSwal({
                     icon: 'warning',
                     title: 'Η απόφαση καταγράφηκε',
                     text: 'Η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Αναζήτηση» για να δείτε την τρέχουσα κατάσταση.'
@@ -6122,11 +6177,11 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
             }
             classifyHrReviewGroups();
             renderHrReviewWorkspace();
-            await Swal.fire({ icon: 'success', title: 'Η απόφαση καταγράφηκε' });
+            await employmentReviewSwal({ icon: 'success', title: 'Η απόφαση καταγράφηκε' });
         } else {
             await refreshRepoTransferDecisions();
             renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
-            await Swal.fire({ icon: 'success', title: 'Η απόφαση καταγράφηκε', text: 'Η απόφαση αφορά ολόκληρη τη συνδεδεμένη πρόταση. Δεν έγινε αλλαγή στα Προδηλωμένα.' });
+            await employmentReviewSwal({ icon: 'success', title: 'Η απόφαση καταγράφηκε', text: 'Η απόφαση αφορά ολόκληρη τη συνδεδεμένη πρόταση. Δεν έγινε αλλαγή στα Προδηλωμένα.' });
         }
     } finally { repoTransferDecisionSubmitting.delete(proposalId); }
 }
@@ -6150,7 +6205,7 @@ async function submitRepoTransferApply(group, decisionId, button) {
         const end = String(proposedSource[`eos_ora_${pair}_apologistika`] || '').trim();
         return start && end ? `${start}–${end}` : '';
     }).filter(Boolean);
-    const confirmation = await Swal.fire({
+    const confirmation = await employmentReviewSwal({
         icon: 'warning', title: 'Εφαρμογή εγκεκριμένης μεταφοράς ρεπό',
         html: `<div class="text-start">
             <div><strong>Εργαζόμενος:</strong> ${escapeHtml(employee)}</div>
@@ -6179,7 +6234,7 @@ async function submitRepoTransferApply(group, decisionId, button) {
     repoTransferApplyRequestIds.set(decisionId, requestId);
     let responseReceived = false;
     try {
-        Swal.fire({ title: 'Εφαρμογή εγκεκριμένης μεταφοράς…', allowOutsideClick: false, allowEscapeKey: false, didOpen: () => Swal.showLoading() });
+        employmentReviewSwal({ title: 'Εφαρμογή εγκεκριμένης μεταφοράς…', allowOutsideClick: false, allowEscapeKey: false, didOpen: () => Swal.showLoading() });
         const token = await getPolicyPreviewCsrfToken();
         let response;
         try {
@@ -6198,7 +6253,7 @@ async function submitRepoTransferApply(group, decisionId, button) {
     } catch (error) {
         Swal.close();
         if (responseReceived) repoTransferApplyRequestIds.delete(decisionId);
-        await Swal.fire({ icon: 'error', title: 'Δεν εφαρμόστηκε η πρόταση', text: String(error.message || 'Η εφαρμογή δεν ολοκληρώθηκε.') });
+        await employmentReviewSwal({ icon: 'error', title: 'Δεν εφαρμόστηκε η πρόταση', text: String(error.message || 'Η εφαρμογή δεν ολοκληρώθηκε.') });
         const state = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || ''));
         if (state?.can_apply === true && state?.apply_state === 'READY_TO_APPLY') button.disabled = false;
         repoTransferApplySubmitting.delete(decisionId);
@@ -6220,9 +6275,9 @@ async function submitRepoTransferApply(group, decisionId, button) {
             classifyHrReviewGroups();
             renderHrReviewWorkspace();
         }
-        await Swal.fire({ icon: 'success', title: 'Η μεταφορά ρεπό εφαρμόστηκε επιτυχώς.', text: payload.message || '' });
+        await employmentReviewSwal({ icon: 'success', title: 'Η μεταφορά ρεπό εφαρμόστηκε επιτυχώς.', text: payload.message || '' });
     } catch {
-        await Swal.fire({
+        await employmentReviewSwal({
             icon: 'warning',
             title: 'Απαιτείται ανανέωση κατάστασης',
             text: 'Ο server δέχθηκε το αίτημα, αλλά η προβολή δεν επιβεβαίωσε την ολοκλήρωση. Ανανεώστε τη σελίδα πριν από οποιαδήποτε νέα ενέργεια.'
@@ -6661,7 +6716,7 @@ function bindHrReviewEvents() {
                 await submitRepoTransferDecision(group, String(button.dataset.decisionCode || ''), { mode: 'hr' });
             }
         } catch (error) {
-            await Swal.fire({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' });
+            await employmentReviewSwal({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' });
         }
     });
     document.getElementById('hrReviewCompletedContainer')?.addEventListener('click', async (event) => {
@@ -7101,7 +7156,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                 await submitPolicyPreviewDecision(group, decisionType);
             } catch (error) {
                 console.error('[submitPolicyPreviewDecision]', error);
-                await Swal.fire({
+                await employmentReviewSwal({
                     icon: 'error',
                     title: 'Σφάλμα',
                     text: error.message || 'Δεν ήταν δυνατή η καταγραφή της απόφασης.'
@@ -7114,7 +7169,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
             try {
                 await revokePolicyPreviewApproval(button.dataset.approvalId);
             } catch (error) {
-                Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message });
+                employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
             }
         });
     });
@@ -7260,7 +7315,7 @@ async function runHistoricalReconstruction() {
     const state = currentEmploymentPeriodControl;
     const scope = getActiveEmploymentReviewScope();
     const reassess = state?.allowed_actions?.historical_reassess === true;
-    const confirmation = await Swal.fire({ icon: 'warning',
+    const confirmation = await employmentReviewSwal({ icon: 'warning',
         title: reassess ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου' : 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
         html: '<p>Η περίοδος έχει λήξει. Η ανακατασκευή δεν αλλάζει την εκπρόθεσμη κατάστασή της και καταγράφεται με χρήστη, ημερομηνία και αιτιολογία.</p>',
         input: 'textarea', inputLabel: 'Υποχρεωτική αιτιολογία', showCancelButton: true,
@@ -7292,7 +7347,7 @@ async function runHistoricalReconstruction() {
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η ιστορική ανακατασκευή απέτυχε.');
     await loadEmploymentPeriodControl(branch);
     await loadResults();
-    await Swal.fire({ icon: 'success', title: 'Ιστορική ανακατασκευή ολοκληρώθηκε',
+    await employmentReviewSwal({ icon: 'success', title: 'Ιστορική ανακατασκευή ολοκληρώθηκε',
         text: `Έκδοση ${authorization.historical_reconstruction_version}` });
 }
 
@@ -7303,7 +7358,7 @@ function currentCorrectiveBranch() {
 async function calculateCorrectivePayroll() {
     const state = currentEmploymentPeriodControl;
     if (!state?.corrective_case?.case_id) throw new Error('Δεν υπάρχει ενεργή διορθωτική μισθοδοσία.');
-    const result = await Swal.fire({
+    const result = await employmentReviewSwal({
         title: 'Καταχώρηση διορθωτικών στοιχείων',
         html: '<label class="form-label" for="correctiveEmployee">Κωδικός εργαζομένου</label>' +
             '<input id="correctiveEmployee" class="swal2-input" autocomplete="off">' +
@@ -7345,13 +7400,13 @@ async function calculateCorrectivePayroll() {
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Ο διορθωτικός υπολογισμός απέτυχε.');
     await loadEmploymentPeriodControl(currentCorrectiveBranch());
     await loadResults();
-    await Swal.fire({ icon: 'success', title: 'Διορθωτική διαφορά', text: payload.message });
+    await employmentReviewSwal({ icon: 'success', title: 'Διορθωτική διαφορά', text: payload.message });
 }
 
 async function postCorrectivePayroll() {
     const state = currentEmploymentPeriodControl;
     if (state?.corrective_case?.status !== 'CLOSED') throw new Error('Η διορθωτική υπόθεση πρέπει πρώτα να κλείσει.');
-    const result = await Swal.fire({ title: 'Καταχώριση διορθωτικής μισθοδοσίας',
+    const result = await employmentReviewSwal({ title: 'Καταχώριση διορθωτικής μισθοδοσίας',
         html: '<label class="form-label" for="postingEmployee">Κωδικός εργαζομένου</label>' +
             '<input id="postingEmployee" class="swal2-input" autocomplete="off">' +
             '<label class="form-label" for="postingEarningsType">Τύπος αποδοχών</label>' +
@@ -7372,7 +7427,7 @@ async function postCorrectivePayroll() {
             reason: result.value.reason,
             request_id: `corrective-payroll-${Date.now()}-${Math.random().toString(16).slice(2)}` }) });
     const payload = await response.json(); if (!response.ok || !payload.success) throw new Error(payload.message || 'Η καταχώριση απέτυχε.');
-    await Swal.fire({ icon: 'success', title: 'Διορθωτική μισθοδοσία',
+    await employmentReviewSwal({ icon: 'success', title: 'Διορθωτική μισθοδοσία',
         html: `Συμψηφισμός: ${payload.offset_applied}<br>Παρακράτηση: ${payload.withholding_amount}<br>` +
             `Πληρωτέα διαφορά: ${payload.payable_now}<br>Νέος α/α μισθοδοσίας: ${payload.aa_misthodosias}` });
     await loadEmploymentPeriodControl(currentCorrectiveBranch());
@@ -7380,7 +7435,7 @@ async function postCorrectivePayroll() {
 
 async function closeCorrectivePayroll() {
     const state = currentEmploymentPeriodControl;
-    const confirmation = await Swal.fire({ title: 'Κλείσιμο διορθωτικής μισθοδοσίας', input: 'textarea',
+    const confirmation = await employmentReviewSwal({ title: 'Κλείσιμο διορθωτικής μισθοδοσίας', input: 'textarea',
         inputLabel: 'Αιτιολογία', showCancelButton: true, confirmButtonText: 'Κλείσιμο', cancelButtonText: 'Ακύρωση',
         inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
     if (!confirmation.isConfirmed) return;
@@ -7392,12 +7447,12 @@ async function closeCorrectivePayroll() {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Το κλείσιμο απέτυχε.');
     await loadEmploymentPeriodControl(currentCorrectiveBranch());
-    await Swal.fire({ icon: 'success', title: 'Διορθωμένη μισθοδοσία', text: payload.message });
+    await employmentReviewSwal({ icon: 'success', title: 'Διορθωμένη μισθοδοσία', text: payload.message });
 }
 
 async function runEmploymentPeriodLifecycleAction(kind) {
     const corrective = kind === 'corrective';
-    const confirmation = await Swal.fire({ icon: 'warning',
+    const confirmation = await employmentReviewSwal({ icon: 'warning',
         title: corrective ? 'Άνοιγμα διορθωτικής μισθοδοσίας' : 'Οριστικοποίηση περιόδου',
         text: corrective ? 'Το αρχικό οριστικοποιημένο αποτέλεσμα θα παραμείνει αμετάβλητο.' :
             'Θα δημιουργηθεί παγωμένο ιστορικό αποτέλεσμα που δεν ανακατασκευάζεται από μελλοντικές πολιτικές.',
@@ -7415,13 +7470,13 @@ async function runEmploymentPeriodLifecycleAction(kind) {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η ενέργεια απέτυχε.');
     await loadEmploymentPeriodControl(branch);
-    await Swal.fire({ icon: 'success', title: corrective ? 'Διορθωτική μισθοδοσία σε εξέλιξη' : 'Οριστικοποιημένη περίοδος', text: payload.message });
+    await employmentReviewSwal({ icon: 'success', title: corrective ? 'Διορθωτική μισθοδοσία σε εξέλιξη' : 'Οριστικοποιημένη περίοδος', text: payload.message });
 }
 
 async function submitFinalWTODayilyA() {
     const state = currentEmploymentPeriodControl;
     const summary = state?.final_submission_summary || {};
-    const confirmation = await Swal.fire({ icon: 'warning',
+    const confirmation = await employmentReviewSwal({ icon: 'warning',
         title: 'Οριστική υποβολή στο ΕΡΓΑΝΗ',
         html: `<div class="text-start"><div><strong>Περίοδος:</strong> ${escapeHtml(summary.period_start || '')} – ${escapeHtml(summary.period_end || '')}</div>` +
             `<div><strong>Παράρτημα:</strong> ${escapeHtml(summary.branch || '')}</div>` +
@@ -7443,7 +7498,7 @@ async function submitFinalWTODayilyA() {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η τελική υποβολή απέτυχε.');
     await loadEmploymentPeriodControl(currentCorrectiveBranch());
-    await Swal.fire({ icon: 'success', title: payload.idempotent ? 'Ήδη υποβλημένο' : 'Οριστική υποβολή ολοκληρώθηκε',
+    await employmentReviewSwal({ icon: 'success', title: payload.idempotent ? 'Ήδη υποβλημένο' : 'Οριστική υποβολή ολοκληρώθηκε',
         text: `Πρωτόκολλο: ${payload.protocol || '-'}` });
 }
 
@@ -7464,7 +7519,7 @@ async function loadEmploymentPeriodControl(ypokatasthma) {
 
 async function transitionEmploymentPeriod(action) {
     const unlocking = action === 'unlock';
-    const confirmation = await Swal.fire({
+    const confirmation = await employmentReviewSwal({
         icon: 'warning',
         title: unlocking ? 'Ξεκλείδωμα περιόδου' : 'Κλείδωμα περιόδου',
         text: unlocking
@@ -7493,7 +7548,7 @@ async function transitionEmploymentPeriod(action) {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η μεταβολή κατάστασης περιόδου απέτυχε.');
     await loadEmploymentPeriodControl(branch);
-    await Swal.fire({ icon: 'success', title: 'Κατάσταση περιόδου', text: payload.message });
+    await employmentReviewSwal({ icon: 'success', title: 'Κατάσταση περιόδου', text: payload.message });
 }
 
 async function loadResults() {
@@ -7547,7 +7602,7 @@ async function loadResults() {
             renderPolicyPreviewGroups(null, {
                 error: payload.message || 'Αποτυχία ανάκτησης δεδομένων.'
             });
-            Swal.fire({
+            employmentReviewSwal({
                 icon: 'warning',
                 title: 'Σφάλμα',
                 text: payload.message || 'Αποτυχία ανάκτησης δεδομένων.'
@@ -7681,7 +7736,7 @@ async function loadResults() {
             error: error.message || 'Αποτυχία ανάκτησης δεδομένων.'
         });
 
-        Swal.fire({
+        employmentReviewSwal({
             icon: 'error',
             title: 'Σφάλμα',
             text: error.message
@@ -8018,7 +8073,7 @@ function renderAuditValues(oldValues = {}, newValues = {}) {
 
 async function restoreFromAudit(recordId, auditId) {
     try {
-        const result = await Swal.fire({
+        const result = await employmentReviewSwal({
             icon: 'warning',
             title: 'Επαναφορά εγγραφής',
             text: 'Θέλετε σίγουρα να επαναφέρετε τις προηγούμενες τιμές;',
@@ -8046,7 +8101,7 @@ async function restoreFromAudit(recordId, auditId) {
         const payload = await response.json();
 
         if (!payload.success) {
-            Swal.fire({
+            employmentReviewSwal({
                 icon: 'error',
                 title: 'Σφάλμα',
                 text: payload.message || 'Αποτυχία επαναφοράς.'
@@ -8055,7 +8110,7 @@ async function restoreFromAudit(recordId, auditId) {
             return;
         }
 
-        Swal.fire({
+        employmentReviewSwal({
             icon: 'success',
             title: 'Επιτυχία',
             text: payload.message || 'Η επαναφορά ολοκληρώθηκε.'
@@ -8070,7 +8125,7 @@ async function restoreFromAudit(recordId, auditId) {
     } catch (error) {
         console.error(error);
 
-        Swal.fire({
+        employmentReviewSwal({
             icon: 'error',
             title: 'Σφάλμα',
             text: error.message
@@ -8289,7 +8344,7 @@ function showDetailsModal(row) {
             const validationErrors = validateReviewSave(updates);
 
             if (validationErrors.length > 0) {
-                Swal.fire({
+                employmentReviewSwal({
                     icon: 'warning',
                     title: 'Έλεγχος πεδίων',
                     html: validationErrors.map((x) => `<div>${x}</div>`).join('')
@@ -8301,7 +8356,7 @@ function showDetailsModal(row) {
             const reason = document.getElementById('edit_reason')?.value || '';
 
             if (!reason.trim()) {
-                Swal.fire({
+                employmentReviewSwal({
                     icon: 'warning',
                     title: 'Αιτιολογία',
                     text: 'Παρακαλώ συμπληρώστε αιτιολογία αλλαγής.'
@@ -8327,7 +8382,7 @@ function showDetailsModal(row) {
             const payload = await response.json();
 
             if (!payload.success) {
-                Swal.fire({
+                employmentReviewSwal({
                     icon: 'error',
                     title: 'Σφάλμα',
                     text: payload.message || 'Αποτυχία αποθήκευσης.'
@@ -8336,7 +8391,7 @@ function showDetailsModal(row) {
                 return;
             }
 
-            Swal.fire({
+            employmentReviewSwal({
                 icon: 'success',
                 title: 'Επιτυχία',
                 text: payload.message || 'Η εγγραφή αποθηκεύτηκε.'
@@ -8348,7 +8403,7 @@ function showDetailsModal(row) {
         } catch (error) {
             console.error(error);
 
-            Swal.fire({
+            employmentReviewSwal({
                 icon: 'error',
                 title: 'Σφάλμα',
                 text: error.message
@@ -8361,7 +8416,7 @@ function showDetailsModal(row) {
             const reason = document.getElementById('edit_reason')?.value || '';
 
             if (!reason.trim()) {
-                Swal.fire({
+                employmentReviewSwal({
                     icon: 'warning',
                     title: 'Αιτιολογία',
                     text: 'Παρακαλώ συμπληρώστε αιτιολογία ξεκλειδώματος.'
@@ -8384,7 +8439,7 @@ function showDetailsModal(row) {
             const payload = await response.json();
 
             if (!payload.success) {
-                Swal.fire({
+                employmentReviewSwal({
                     icon: 'error',
                     title: 'Σφάλμα',
                     text: payload.message || 'Αποτυχία ξεκλειδώματος.'
@@ -8393,7 +8448,7 @@ function showDetailsModal(row) {
                 return;
             }
 
-            Swal.fire({
+            employmentReviewSwal({
                 icon: 'success',
                 title: 'Επιτυχία',
                 text: payload.message || 'Η εγγραφή ξεκλειδώθηκε.'
@@ -8408,7 +8463,7 @@ function showDetailsModal(row) {
         } catch (error) {
             console.error(error);
 
-            Swal.fire({
+            employmentReviewSwal({
                 icon: 'error',
                 title: 'Σφάλμα',
                 text: error.message
@@ -8466,7 +8521,7 @@ async function exportPdf() {
         }
     } catch (error) {
         console.error(error);
-        Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message });
+        employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
     }
 }
 
@@ -8681,31 +8736,31 @@ document.addEventListener('DOMContentLoaded', ensureScenarioReviewFilterControl)
 document.addEventListener('DOMContentLoaded', ensureReviewCardElevation);
 document.addEventListener('DOMContentLoaded', bindHrReviewEvents);
 document.getElementById('lockEmploymentPeriodBtn')?.addEventListener('click', () => {
-    transitionEmploymentPeriod('lock').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    transitionEmploymentPeriod('lock').catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('historicalReconstructionBtn')?.addEventListener('click', () => {
-    runHistoricalReconstruction().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    runHistoricalReconstruction().catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('unlockEmploymentPeriodBtn')?.addEventListener('click', () => {
-    transitionEmploymentPeriod('unlock').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    transitionEmploymentPeriod('unlock').catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('finalizeEmploymentPeriodBtn')?.addEventListener('click', () => {
-    runEmploymentPeriodLifecycleAction('finalize').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    runEmploymentPeriodLifecycleAction('finalize').catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('submitFinalWTODayilyABtn')?.addEventListener('click', () => {
-    submitFinalWTODayilyA().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    submitFinalWTODayilyA().catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('openCorrectivePayrollBtn')?.addEventListener('click', () => {
-    runEmploymentPeriodLifecycleAction('corrective').catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    runEmploymentPeriodLifecycleAction('corrective').catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('calculateCorrectivePayrollBtn')?.addEventListener('click', () => {
-    calculateCorrectivePayroll().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    calculateCorrectivePayroll().catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('closeCorrectivePayrollBtn')?.addEventListener('click', () => {
-    closeCorrectivePayroll().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    closeCorrectivePayroll().catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('postCorrectivePayrollBtn')?.addEventListener('click', () => {
-    postCorrectivePayroll().catch((error) => Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+    postCorrectivePayroll().catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
