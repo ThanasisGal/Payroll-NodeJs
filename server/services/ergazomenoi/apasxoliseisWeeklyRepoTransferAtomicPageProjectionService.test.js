@@ -624,7 +624,7 @@ function testWarningsAndResponseComposition() {
     const atomic = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [weeklyInput(rows)]
     });
-    assert.strictEqual(atomic.warning_counts.TARGET_ZERO_HOURS_WITH_CARD_INTERVALS, 1);
+    assert.strictEqual(atomic.reason_counts.TARGET_ZERO_HOURS_WITH_CARD_INTERVALS, 1);
 
     const grouping = { version: 1, scope: 'page', summary: { groups_count: 0 }, groups: [] };
     const baseResponse = {

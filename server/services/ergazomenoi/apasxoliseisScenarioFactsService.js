@@ -200,6 +200,13 @@ function buildApasxoliseisScenarioFacts(row, context = {}) {
             return toTrimmedString(rawValue) !== '' && normalizeTimeValue(rawValue) === null;
         })
     );
+    const hasAnyCardEvidence =
+        cardHours > 0 ||
+        CARD_INTERVAL_FIELDS.some(([startField, endField]) =>
+            [startField, endField].some(
+                (field) => toTrimmedString(sourceRow[field]) !== ''
+            )
+        );
     const existingAuditCount = Math.max(
         Number.parseInt(String(context.existingAuditCount ?? 0), 10) || 0,
         0
@@ -221,6 +228,7 @@ function buildApasxoliseisScenarioFacts(row, context = {}) {
         cardIntervalsRaw,
         cardIntervalsNormalized,
         hasCards: cardIntervalsNormalized.length > 0 || cardHours > 0,
+        hasAnyCardEvidence,
         hasZeroLengthCardInterval: cardIntervalsRaw.some((interval) => interval.isZeroLength),
         hasInvalidCardTimeValue,
         cardHours,

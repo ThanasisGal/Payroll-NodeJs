@@ -260,31 +260,26 @@ function testRotationalIsNotApplicable() {
     assertReason(result, 'ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED');
 }
 
-function testZeroLengthTargetRemainsEligible() {
+function testZeroLengthTargetRequiresCardVerification() {
     const rows = fullTimeWeek();
     rows[4].cards_apo_ora_01 = '09:00';
     rows[4].cards_eos_ora_01 = '09:00';
     const result = analyze(rows);
-    assertEligible(result, dateKey(1), dateKey(4), 'ΑΝ');
-    assert.deepStrictEqual(result.warnings, ['TARGET_ZERO_HOURS_WITH_CARD_INTERVALS']);
+    assertReason(result, 'TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL');
 }
 
-function testTargetCardAnomaliesRemainEligibleWithWarnings() {
+function testTargetCardAnomaliesAreExcluded() {
     const completeRows = fullTimeWeek();
     completeRows[4].cards_apo_ora_01 = '09:00';
     completeRows[4].cards_eos_ora_01 = '09:15';
     const complete = analyze(completeRows);
-    assertEligible(complete, dateKey(1), dateKey(4), 'ΑΝ');
-    assert.deepStrictEqual(complete.warnings, ['TARGET_ZERO_HOURS_WITH_CARD_INTERVALS']);
+    assertReason(complete, 'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS');
 
     const incompleteRows = fullTimeWeek();
     incompleteRows[4].cards_apo_ora_01 = '09:00';
     incompleteRows[4].cards_eos_ora_01 = '';
     const incomplete = analyze(incompleteRows);
-    assertEligible(incomplete, dateKey(1), dateKey(4), 'ΑΝ');
-    assert.deepStrictEqual(incomplete.warnings, [
-        'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'
-    ]);
+    assertReason(incomplete, 'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR');
 }
 
 function testSundaySourceAndTargetRemainEligible() {
@@ -431,6 +426,30 @@ function testMultipleTargets() {
         cards_eos_ora_01: ''
     });
     assertReason(analyze(rows), 'MULTIPLE_TARGET_CANDIDATES');
+}
+
+function testIncompleteCardEvidenceIsNotACleanTargetAndStillBlocksReview() {
+    const rows = fullTimeWeek({ sourceDay: 2, targetDay: 3, existingRepoDay: 0 });
+    rows.forEach((row, offset) => {
+        row.hmeromhnia = `2026-06-${String(8 + offset).padStart(2, '0')}`;
+    });
+    Object.assign(rows[6], {
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '14:51',
+        cards_eos_ora_01: ''
+    });
+
+    const result = analyze(rows);
+    assert.strictEqual(result.counts.source_candidates, 1);
+    assert.strictEqual(result.counts.target_candidates, 1);
+    assert.strictEqual(result.source.hmeromhnia, '2026-06-10');
+    assert.strictEqual(result.target.hmeromhnia, '2026-06-11');
+    assert.ok(!result.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('CARD_VERIFICATION_PENDING'));
+    assert.strictEqual(result.can_auto_apply, false);
 }
 
 function testNoTarget() {
@@ -1152,8 +1171,8 @@ function run() {
     testValidPartTimeAndCountsMeAndAnAsRepo();
     testCanonicalCurrentProposedRepoStateAndIsolation();
     testRotationalIsNotApplicable();
-    testZeroLengthTargetRemainsEligible();
-    testTargetCardAnomaliesRemainEligibleWithWarnings();
+    testZeroLengthTargetRequiresCardVerification();
+    testTargetCardAnomaliesAreExcluded();
     testSundaySourceAndTargetRemainEligible();
     testExpectedAndConflictingApologistikaCategories();
     testInvalidApologistikaNumericValuesNeedReview();
@@ -1161,6 +1180,7 @@ function run() {
     testSourceExclusions();
     testMultipleSources();
     testMultipleTargets();
+    testIncompleteCardEvidenceIsNotACleanTargetAndStillBlocksReview();
     testNoTarget();
     testExactRepoCount();
     testAutoCalculatedLeavePriorityRegression();

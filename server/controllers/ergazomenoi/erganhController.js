@@ -7371,6 +7371,7 @@ class erganhController {
                         declared_hours: facts.declared.declaredHours,
                         card_hours: facts.cards.cardHours,
                         has_cards: facts.cards.hasCards,
+                        has_any_card_evidence: facts.cards.hasAnyCardEvidence,
                         has_zero_length_card_interval: facts.cards.hasZeroLengthCardInterval,
                         is_holiday: facts.holiday.isHoliday,
                         is_mandatory_holiday: facts.holiday.isMandatoryHoliday,

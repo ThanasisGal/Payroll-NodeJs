@@ -950,6 +950,19 @@ function hasValidCardInterval(row = {}) {
     });
 }
 
+function hasAnyCardEvidence(row = {}) {
+    return (
+        num(row.cards_ores_ergasias) > 0 ||
+        [1, 2, 3].some((n) => {
+            const p = pairNo(n);
+            return (
+                String(row[`cards_apo_ora_${p}`] ?? '').trim() !== '' ||
+                String(row[`cards_eos_ora_${p}`] ?? '').trim() !== ''
+            );
+        })
+    );
+}
+
 function yperoriaCellClass(row) {
     if (sumParanomiYperoria(row) > 0) return 'cell-paranomi-yperoria';
     if (sumNomimiYperoria(row) > 0) return 'cell-nomimi-yperoria';
@@ -2505,7 +2518,7 @@ function resolvePossibleLeavePresentationState(row = {}) {
                     hasMeaningfulValue(row[`eos_ora_${pair}`])
                 );
             }));
-    const hasCards = num(row.cards_ores_ergasias) > 0 || hasValidCardInterval(row);
+    const hasCards = hasAnyCardEvidence(row);
     const noCardsDisplayStatus = String(
         row.noCardsDisplayStatus || row.no_cards_display_status || ''
     ).trim();

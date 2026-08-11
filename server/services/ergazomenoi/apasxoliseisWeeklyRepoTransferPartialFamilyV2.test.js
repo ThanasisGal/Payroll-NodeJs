@@ -437,9 +437,9 @@ for (const invalidTimes of [
         employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
-    assert.ok(v1.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+    assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
     assert.strictEqual(v2.eligibility_status, v1.eligibility_status);
-    assert.ok(v2.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+    assert.strictEqual(v2.target.hmeromhnia, date(2));
 }
 
 {
@@ -464,12 +464,9 @@ for (const invalidTimes of [
         employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
-    assert.strictEqual(v1.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(v1.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+    assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
     assert.strictEqual(v2.eligibility_status, v1.eligibility_status);
-    assert.ok(v2.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
-    assert.strictEqual(v2.target, null);
-    assert.strictEqual(v2.semantic_proposal, null);
+    assert.strictEqual(v2.target.hmeromhnia, date(2));
 }
 
 {

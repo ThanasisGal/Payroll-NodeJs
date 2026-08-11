@@ -282,6 +282,23 @@ function testPossibleLeaveResolverAndModalPresentationContract() {
     assert.ok(derivedHtml.includes('id="edit_kathgoria_adeias_apologistika_hidden"\n                        value=""'));
     assert.ok(!/id="edit_adeia_apologistika"[^>]*checked/s.test(derivedHtml));
 
+    [
+        { cards_apo_ora_01: '14:51', cards_eos_ora_01: '' },
+        { cards_apo_ora_01: '', cards_eos_ora_01: '22:51' },
+        { cards_apo_ora_01: 'invalid', cards_eos_ora_01: '' },
+        { cards_apo_ora_01: '14:51', cards_eos_ora_01: '14:51' }
+    ].forEach((cardEvidence) => {
+        const unsafeRow = { ...derivedRow, ...cardEvidence };
+        assert.strictEqual(
+            sandbox.resolvePossibleLeavePresentationState(unsafeRow),
+            'NONE'
+        );
+        assert.notStrictEqual(
+            sandbox.resolveReviewApologistikoPresentation(unsafeRow, {}).text,
+            'ΠΙΘΑΝΗ ΑΔΕΙΑ'
+        );
+    });
+
     const persistedRow = {
         ...derivedRow,
         kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE'
