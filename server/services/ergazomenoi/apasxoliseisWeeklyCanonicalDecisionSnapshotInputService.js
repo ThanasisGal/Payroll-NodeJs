@@ -2,7 +2,7 @@
 
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
-const { POLICY_VERSION, resolveCurrentRepoCandidateIdentities } =
+const { POLICY_VERSION, resolveSafeHumanRepoCandidateIdentities } =
     require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 
 const SOURCE_VERSION = 'weekly-post-check-canonical-decision-input:v1';
@@ -58,7 +58,7 @@ function buildWeeklyCanonicalDecisionSnapshotInput({
             calculatedWorkHoursAuthoritative
         })
     ]));
-    const currentRepoIdentities = resolveCurrentRepoCandidateIdentities({
+    const currentRepoIdentities = resolveSafeHumanRepoCandidateIdentities({
         weekRows: rows, effectiveProfile
     });
     return {
@@ -91,11 +91,17 @@ function weeklyCanonicalDecisionGroupKey({ ypokatasthma, employee_kodikos, week_
 
 function groupWeeklyCanonicalDecisions(records = []) {
     const result = new Map();
+    const reusable = [];
     for (const record of records) {
+        if (record?.reuse_scope === 'FUTURE_IDENTICAL') {
+            reusable.push(record);
+            continue;
+        }
         const key = weeklyCanonicalDecisionGroupKey(record);
         if (!result.has(key)) result.set(key, []);
         result.get(key).push(record);
     }
+    if (reusable.length) result.set('__REUSABLE__', reusable);
     return result;
 }
 

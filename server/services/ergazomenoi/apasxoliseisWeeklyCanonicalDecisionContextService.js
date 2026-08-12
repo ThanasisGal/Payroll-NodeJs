@@ -47,7 +47,8 @@ const HISTORY_SELECT_FIELDS = [
 ].join(' ');
 const ALLOWED_COMMAND_FIELDS = new Set([
     'ypokatasthma', 'employee_kodikos', 'week_start', 'request_id',
-    'decision_type', 'decision_payload', 'notes'
+    'decision_type', 'decision_payload', 'notes', 'reuse_scope',
+    'reuse_effective_from', 'reuse_effective_to'
 ]);
 
 function fail(message, statusCode = 400, code = 'INVALID_CANONICAL_DECISION_CONTEXT') {
@@ -155,7 +156,11 @@ function safeDecisionProjection(record) {
             role: record.created_by_user_role || ''
         },
         created_at: record.created_at,
-        snapshot_fingerprint: record.snapshot_fingerprint
+        snapshot_fingerprint: record.snapshot_fingerprint,
+        reuse_scope: record.reuse_scope || 'ONE_TIME',
+        reuse_status: record.reuse_status || 'NOT_APPLICABLE',
+        reuse_effective_from: record.reuse_effective_from || null,
+        reuse_effective_to: record.reuse_effective_to || null
     };
 }
 
@@ -165,7 +170,10 @@ function supportedActions(reasons = [], context = {}) {
         profile: values.has('PROFILE_CHANGED_INSIDE_WEEK'),
         card_documentary: values.has('CARD_VERIFICATION_PENDING'),
         repo_identities: values.has('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC') &&
-            context.appliedExecutions.length === 0,
+            context.appliedExecutions.length === 0 &&
+            (context.currentRepoCandidateDates || []).length >= 2,
+        repo_identities_unavailable: values.has('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC') &&
+            (context.currentRepoCandidateDates || []).length < 2,
         classification_by_date: values.has('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC')
     };
 }
@@ -228,11 +236,16 @@ async function loadWeeklyCanonicalDecisionContext({
         employee_kodikos: employeeCode, week_start: week.start, week_end: week.end,
         execution_status: 'APPLIED'
     };
-    const decisionQuery = {
-        team, company_kod: company, ypokatasthma: branch,
-        employee_kodikos: employeeCode, week_start: week.start, week_end: week.end,
-        decision_status: 'RECORDED'
-    };
+    const decisionQuery = { team, company_kod: company, ypokatasthma: branch,
+        decision_status: 'RECORDED', $or: mongoose.trusted([
+            { employee_kodikos: employeeCode, week_start: week.start, week_end: week.end },
+            { reuse_scope: 'FUTURE_IDENTICAL', reuse_status: 'ACTIVE',
+                reuse_effective_from: mongoose.trusted({ $lte: week.end }),
+                $or: mongoose.trusted([
+                    { reuse_effective_to: mongoose.trusted({ $gte: week.start }) },
+                    { reuse_effective_to: null }
+                ]) }
+        ]) };
     const [appliedExecutions, decisionRecords] = await Promise.all([
         sortedLean(Execution.find(executionQuery), { applied_at: -1 }, 20),
         sortedLean(Decision.find(decisionQuery), { created_at: -1 }, MAX_DECISION_HISTORY)
@@ -306,7 +319,10 @@ function assertBoundedDecisionCommand(body = {}) {
         request_id: text(body.request_id, 100),
         decision_type: text(body.decision_type, 100),
         decision_payload: payload,
-        notes: text(body.notes, 2000)
+        notes: text(body.notes, 2000),
+        reuse_scope: text(body.reuse_scope, 30),
+        reuse_effective_from: text(body.reuse_effective_from, 10),
+        reuse_effective_to: text(body.reuse_effective_to, 10)
     };
 }
 
@@ -369,6 +385,14 @@ function projectCurrentContext(context, indexReadiness) {
             seventhDay: resolution.analysis?.seventhDay || null
         },
         supported_actions: context.supportedActions,
+        reusable_actions: {
+            CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC: { eligible: true, reason: '' },
+            CLASSIFICATION_BY_DATE: { eligible: true, reason: '' },
+            CARD_VERIFICATION_PENDING: { eligible: false,
+                reason: 'Η τεκμηρίωση ή διόρθωση κάρτας αφορά μόνο τη συγκεκριμένη εβδομάδα.' },
+            PROFILE_CHANGED_INSIDE_WEEK: { eligible: false,
+                reason: 'Η επιλογή ιστορικού προφίλ αφορά μόνο τον συγκεκριμένο εργαζόμενο.' }
+        },
         profile_candidates: context.profileCandidates,
         current_repo_candidate_dates: context.currentRepoCandidateDates,
         week_rows: context.rows.map((row) => ({ id: text(row._id, 100),

@@ -103,8 +103,16 @@ async function loadOperationalState(page) {
             repo_transfer_reasons: ['MULTIPLE_TARGET_CANDIDATES'],
             canonical_reasons: ['CARD_VERIFICATION_PENDING',
                 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', 'UNKNOWN_PRIVATE_REASON_CODE'],
-            note: 'Πραγματική ανθρώπινη σημείωση.'
+            canonical_identical_group_key: 'geometry-identical-group',
+            canonical_identical_group_count: 2,
+            note: 'Πραγματική ανθρώπινη σημείωση με αρκετά μεγάλο περιεχόμενο ώστε να επιβεβαιώνεται ότι το σχόλιο αναδιπλώνεται σε πολλές γραμμές χωρίς να μεγαλώνει ανεξέλεγκτα το συνολικό πλάτος του εβδομαδιαίου πίνακα.'
         }];
+        currentReviewDeviations.push(...Array.from({ length: 8 }, (_, index) => ({
+            ...currentReviewDeviations[0],
+            week_apo: `2026-07-${String(index + 1).padStart(2, '0')}`,
+            week_eos: `2026-07-${String(index + 7).padStart(2, '0')}`,
+            canonical_identical_group_key: '', canonical_identical_group_count: 1
+        })));
         currentPendingDeviationWeeks = [{
             kodikos: '001',
             status: 'OPEN_WEEK_PENDING_COMPLETION',
@@ -136,6 +144,13 @@ async function loadOperationalState(page) {
                     employee_kodikos: '001', week_start: '2026-06-01',
                     week_end: '2026-06-07', related_dates: ['2026-06-03']
                 }]
+            }, {
+                issue_code: 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+                category: 'HUMAN_REVIEW_REQUIRED', count: 2, employees_count: 1,
+                cases: [{ team: 'team-a', company_kod: 'company-a', ypokatasthma: '0001',
+                    employee_kodikos: '001', week_start: '2026-06-01', week_end: '2026-06-07' },
+                { team: 'team-a', company_kod: 'company-a', ypokatasthma: '0001',
+                    employee_kodikos: '001', week_start: '2026-06-01', week_end: '2026-06-07' }]
             }]
         };
         summary.innerHTML = renderActionableIssueGroups(
@@ -195,12 +210,38 @@ async function renderedTableContract(page) {
 }
 
 async function actionableIssueInteraction(page) {
-    const summary = page.locator('.actionable-issue-summary');
+    const summary = page.locator('.actionable-issue-summary').first();
     await summary.click();
     const expanded = await summary.getAttribute('aria-expanded');
-    const panel = page.locator('.actionable-issue-panel');
+    const panel = page.locator('.actionable-issue-panel').first();
     const panelText = await panel.innerText();
-    await page.locator('.actionable-issue-open-case').click();
+    const before = await page.evaluate(() => {
+        const rect = (selector) => {
+            const value = document.querySelector(selector).getBoundingClientRect();
+            return { top: value.top, bottom: value.bottom };
+        };
+        const container = document.querySelector('.employment-review-scroll-container');
+        return { filters: rect('.review-filters-sticky'), card: rect('.employment-review-card'),
+            container: rect('.employment-review-scroll-container'), pageY: window.scrollY,
+            scrollTop: container.scrollTop, scrollLeft: container.scrollLeft };
+    });
+    await page.locator('.actionable-issue-open-case').first().click();
+    const after = await page.evaluate(() => {
+        const rect = (selector) => {
+            const value = document.querySelector(selector).getBoundingClientRect();
+            return { top: value.top, bottom: value.bottom };
+        };
+        const container = document.querySelector('.employment-review-scroll-container');
+        const target = document.querySelector(
+            '#resultsTable .employee-deviation-row tbody > tr[data-week-start="2026-06-01"]'
+        );
+        const targetRect = target.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        return { filters: rect('.review-filters-sticky'), card: rect('.employment-review-card'),
+            container: rect('.employment-review-scroll-container'), pageY: window.scrollY,
+            scrollTop: container.scrollTop, scrollLeft: container.scrollLeft,
+            targetVisible: targetRect.bottom > containerRect.top && targetRect.top < containerRect.bottom };
+    });
     return {
         expanded,
         panelVisible: await panel.isVisible(),
@@ -210,12 +251,96 @@ async function actionableIssueInteraction(page) {
         ).getAttribute('aria-expanded'),
         weeklyHighlighted: await page.locator(
             '#resultsTable .employee-deviation-row tbody > tr[data-week-start="2026-06-01"]'
-        ).evaluate((row) => row.classList.contains('actionable-issue-target-highlight'))
+        ).evaluate((row) => row.classList.contains('actionable-issue-target-highlight')),
+        before,
+        after
     };
 }
 
+async function groupedCanonicalDecisionButtonStyles(page) {
+    const summary = page.locator('.actionable-issue-summary').nth(1);
+    if (await summary.getAttribute('aria-expanded') !== 'true') await summary.click();
+    const button = page.locator('.canonical-identical-group .canonical-decision-open');
+    const read = () => button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { classes: element.className, background: style.backgroundColor,
+            border: style.borderColor, color: style.color };
+    });
+    const normal = await read();
+    await button.hover();
+    await page.waitForTimeout(250);
+    return { normal, hover: await read() };
+}
+
+async function weeklyDeviationStickyInteraction(page) {
+    return page.evaluate(() => {
+        const container = document.querySelector('.employment-review-scroll-container');
+        const subtotal = document.querySelector('#resultsTable .employee-subtotal-row:not(.d-none) > td');
+        const title = document.querySelector('#resultsTable .weekly-deviation-section-title');
+        const header = document.querySelector('#resultsTable .weekly-deviation-table > thead > tr > th');
+        const firstHeader = header;
+        const firstData = document.querySelector('#resultsTable .weekly-deviation-table > tbody > tr > td');
+        const card = document.querySelector('.employment-review-card');
+        const filters = document.querySelector('.review-filters-sticky');
+        const rect = (element) => {
+            const value = element.getBoundingClientRect();
+            return { top: value.top, bottom: value.bottom, left: value.left, height: value.height };
+        };
+        const headerStyle = getComputedStyle(header);
+        const headerCells = [...document.querySelectorAll(
+            '#resultsTable .weekly-deviation-table > thead > tr > th'
+        )];
+        const fixed = () => ({ subtotal: rect(subtotal), title: rect(title), header: rect(header),
+            card: rect(card), filters: rect(filters), container: rect(container), pageY: window.scrollY,
+            scrollTop: container.scrollTop, scrollLeft: container.scrollLeft,
+            columnDelta: rect(firstHeader).left - rect(firstData).left });
+        const containerTop = container.getBoundingClientRect().top;
+        const desiredSubtotalTop = containerTop +
+            parseFloat(getComputedStyle(container).getPropertyValue('--employment-review-subtotal-sticky-top'));
+        container.scrollTop += subtotal.getBoundingClientRect().top - desiredSubtotalTop + 40;
+        const verticalBefore = fixed();
+        container.scrollTop += 100;
+        const verticalAfter = fixed();
+        const horizontalBefore = fixed();
+        container.scrollLeft = Math.min(180, container.scrollWidth - container.clientWidth);
+        const horizontalAfter = fixed();
+        return { verticalBefore, verticalAfter, horizontalBefore, horizontalAfter,
+            headerStyle: { position: headerStyle.position, fontSize: headerStyle.fontSize,
+                lineHeight: headerStyle.lineHeight, whiteSpace: headerStyle.whiteSpace,
+                overflowWrap: headerStyle.overflowWrap, verticalAlign: headerStyle.verticalAlign },
+            headerCellsReadable: headerCells.every((cell) =>
+                cell.getBoundingClientRect().height >= parseFloat(getComputedStyle(cell).lineHeight) &&
+                cell.scrollWidth <= cell.clientWidth + 1),
+            headerTexts: headerCells.map((cell) => cell.innerText.trim()) };
+    });
+}
+
+async function weeklyDeviationColumnWidths(page) {
+    return page.evaluate(() => {
+        const table = document.querySelector('#resultsTable .weekly-deviation-table');
+        const typeCell = table.querySelector(':scope > tbody > tr > .weekly-deviation-employment-type');
+        const commentCell = table.querySelector(':scope > tbody > tr > .weekly-deviation-comment');
+        const commentStyle = getComputedStyle(commentCell);
+        const lineHeight = parseFloat(commentStyle.lineHeight) ||
+            parseFloat(commentStyle.fontSize) * 1.2;
+        return {
+            tableClientWidth: table.clientWidth,
+            tableScrollWidth: table.scrollWidth,
+            typeWidth: typeCell.getBoundingClientRect().width,
+            commentWidth: commentCell.getBoundingClientRect().width,
+            commentHeight: commentCell.getBoundingClientRect().height,
+            commentLineHeight: lineHeight,
+            commentWhiteSpace: commentStyle.whiteSpace,
+            commentOverflowWrap: commentStyle.overflowWrap,
+            commentScrollWidth: commentCell.scrollWidth,
+            commentClientWidth: commentCell.clientWidth,
+            commentText: commentCell.innerText
+        };
+    });
+}
+
 async function canonicalDecisionButtonStyles(page) {
-    const button = page.locator('#resultsTable .canonical-decision-open');
+    const button = page.locator('#resultsTable .canonical-decision-open').first();
     const normal = await button.evaluate((element) => {
         const style = getComputedStyle(element);
         return { background: style.backgroundColor, color: style.color };
@@ -434,7 +559,7 @@ async function modalGeometry(page) {
             assert.strictEqual(tableContract.after.filter((text) => text === 'Προδηλωμένο').length, 1);
             assert.ok(tableContract.weeklyHeaders.includes('Τύπος απασχόλησης'));
             assert.ok(!tableContract.weeklyHeaders.includes('Profile'));
-            assert.strictEqual(tableContract.weeklyRowCount, 1);
+            assert.strictEqual(tableContract.weeklyRowCount, 9);
             assert.strictEqual(tableContract.possibleLeaveCell, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
             assert.strictEqual(tableContract.confirmedLeaveCell, 'ΑΔΕΙΑ');
             tableContract.atlasResidualCells.forEach(({ date, text }) =>
@@ -455,7 +580,7 @@ async function modalGeometry(page) {
                 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
             ].forEach((code) => assert.ok(!tableContract.weeklyVisibleText.includes(code)));
             assert.ok(tableContract.weeklyVisibleText.includes('Απαιτείται έλεγχος της περίπτωσης.'));
-            assert.ok(tableContract.weeklyVisibleText.includes('Πραγματική ανθρώπινη σημείωση.'));
+            assert.ok(tableContract.weeklyVisibleText.includes('Πραγματική ανθρώπινη σημείωση'));
             assert.ok(tableContract.scenarioVisibleText.includes(
                 'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.'
             ));
@@ -476,14 +601,73 @@ async function modalGeometry(page) {
                 .forEach((text) => assert.ok(issueInteraction.panelText.includes(text), text));
             assert.strictEqual(issueInteraction.employeeExpanded, 'true');
             assert.strictEqual(issueInteraction.weeklyHighlighted, true);
+            assert.deepStrictEqual(issueInteraction.after.filters, issueInteraction.before.filters);
+            assert.deepStrictEqual(issueInteraction.after.card, issueInteraction.before.card);
+            assert.deepStrictEqual(issueInteraction.after.container, issueInteraction.before.container);
+            assert.strictEqual(issueInteraction.after.pageY, issueInteraction.before.pageY);
+            assert.strictEqual(issueInteraction.after.scrollLeft, issueInteraction.before.scrollLeft);
+            assert.strictEqual(issueInteraction.after.targetVisible, true);
+            measurements.push({ viewport: `${width}x${height}`, actionableInteraction: issueInteraction });
+            const weeklySticky = await weeklyDeviationStickyInteraction(page);
+            const closeTo = (left, right, label) => assert.ok(Math.abs(left - right) <= 1,
+                `${label}: ${left} != ${right}`);
+            closeTo(weeklySticky.verticalBefore.subtotal.top,
+                weeklySticky.verticalAfter.subtotal.top, 'subtotal sticky top');
+            closeTo(weeklySticky.verticalBefore.title.top,
+                weeklySticky.verticalAfter.title.top, 'weekly title sticky top');
+            closeTo(weeklySticky.verticalBefore.header.top,
+                weeklySticky.verticalAfter.header.top, 'weekly header sticky top');
+            assert.deepStrictEqual(weeklySticky.headerStyle, {
+                position: 'sticky', fontSize: '11.52px', lineHeight: '13.248px',
+                whiteSpace: 'normal', overflowWrap: 'anywhere', verticalAlign: 'middle'
+            });
+            assert.strictEqual(weeklySticky.headerCellsReadable, true);
+            assert.deepStrictEqual(weeklySticky.headerTexts, [
+                'Από', 'Έως', 'Αναμενόμενα ρεπό', 'Πραγματικά ρεπό',
+                'Προτεινόμενα/επιλυμένα ρεπό', 'Πραγματικές ημέρες εργασίας',
+                '6η ημέρα', '7η ημέρα/παράβαση', 'Τύπος απασχόλησης', 'Σχόλιο'
+            ]);
+            assert.ok(weeklySticky.verticalAfter.title.top >= weeklySticky.verticalAfter.subtotal.bottom - 1);
+            assert.ok(weeklySticky.verticalAfter.header.top >= weeklySticky.verticalAfter.title.bottom - 1);
+            assert.strictEqual(weeklySticky.horizontalAfter.pageY, weeklySticky.horizontalBefore.pageY);
+            assert.strictEqual(weeklySticky.horizontalAfter.card.left, weeklySticky.horizontalBefore.card.left);
+            assert.strictEqual(weeklySticky.horizontalAfter.filters.left, weeklySticky.horizontalBefore.filters.left);
+            closeTo(weeklySticky.horizontalBefore.columnDelta,
+                weeklySticky.horizontalAfter.columnDelta, 'weekly column alignment');
+            assert.ok(weeklySticky.horizontalAfter.scrollLeft > weeklySticky.horizontalBefore.scrollLeft ||
+                weeklySticky.horizontalAfter.scrollLeft === 0);
+            measurements.push({ viewport: `${width}x${height}`, weeklySticky });
+            const weeklyColumns = await weeklyDeviationColumnWidths(page);
+            assert.ok(weeklyColumns.typeWidth <= weeklyColumns.tableClientWidth * 0.17);
+            assert.ok(weeklyColumns.commentWidth <= weeklyColumns.tableClientWidth * 0.21);
+            assert.ok(weeklyColumns.commentHeight > weeklyColumns.commentLineHeight * 2,
+                JSON.stringify(weeklyColumns));
+            assert.strictEqual(weeklyColumns.commentWhiteSpace, 'normal');
+            assert.strictEqual(weeklyColumns.commentOverflowWrap, 'anywhere');
+            assert.ok(weeklyColumns.commentScrollWidth <= weeklyColumns.commentClientWidth + 1);
+            assert.ok(weeklyColumns.tableScrollWidth <= weeklyColumns.tableClientWidth + 1);
+            measurements.push({ viewport: `${width}x${height}`, weeklyColumns });
+            const groupedButton = await groupedCanonicalDecisionButtonStyles(page);
+            assert.ok(groupedButton.normal.classes.includes('employment-review-action-btn'));
+            assert.ok(groupedButton.normal.classes.includes('employment-review-action-primary'));
+            assert.deepStrictEqual(groupedButton.normal, {
+                classes: 'btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary',
+                background: 'rgb(207, 226, 255)', border: 'rgb(158, 197, 254)',
+                color: 'rgb(8, 66, 152)'
+            });
+            assert.deepStrictEqual(groupedButton.hover, {
+                classes: 'btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary',
+                background: 'rgb(13, 110, 253)', border: 'rgb(13, 110, 253)',
+                color: 'rgb(255, 255, 255)'
+            });
             const decisionGating = await canonicalDecisionGatingContract(page);
             assert.deepStrictEqual(decisionGating, {
                 preCalculation: 0,
-                postCalculation: 1,
+                postCalculation: 9,
                 stale: 0
             });
             const actionButton = await canonicalDecisionButtonStyles(page);
-            assert.strictEqual(actionButton.text, 'Καταγραφή απόφασης');
+            assert.strictEqual(actionButton.text, 'Απόφαση για την ομάδα');
             assert.strictEqual(actionButton.normal.background, 'rgb(207, 226, 255)');
             assert.strictEqual(actionButton.normal.color, 'rgb(8, 66, 152)');
             assert.strictEqual(actionButton.hover.background, 'rgb(13, 110, 253)');

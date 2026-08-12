@@ -207,7 +207,8 @@ const {
     listActiveReusablePolicyDecisionRecords
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService');
 const {
-    applyReusablePolicyDecisionsToPreviewRows
+    applyReusablePolicyDecisionsToPreviewRows,
+    groupWeeklyReusableCases
 } = require('../../services/ergazomenoi/apasxoliseisReusablePolicyDecisionService');
 const {
     runPolicyPreviewApplyDryRun
@@ -257,7 +258,8 @@ const {
     safeDecisionProjection
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionContextService');
 const {
-    recordWeeklyCanonicalDecision
+    recordWeeklyCanonicalDecision,
+    buildCanonicalWeeklyDecisionSnapshot
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionService');
 const {
     getWeeklyCanonicalDecisionIndexState
@@ -1973,14 +1975,18 @@ async function runWeeklyRepoPostCheck({
     })
         .lean();
 
-    const canonicalDecisionQuery = {
-        team: sessionTeam,
-        company_kod: companyId,
-        employee_kodikos: mongoose.trusted({ $in: kodikoi }),
-        week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
-        week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) }),
-        decision_status: 'RECORDED'
-    };
+    const canonicalDecisionQuery = { team: sessionTeam, company_kod: companyId,
+        decision_status: 'RECORDED', $or: mongoose.trusted([
+            { employee_kodikos: mongoose.trusted({ $in: kodikoi }),
+                week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
+                week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) }) },
+            { reuse_scope: 'FUTURE_IDENTICAL', reuse_status: 'ACTIVE',
+                reuse_effective_from: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
+                $or: mongoose.trusted([
+                    { reuse_effective_to: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) }) },
+                    { reuse_effective_to: null }
+                ]) }
+        ]) };
     if (selectedYpokatasthma) canonicalDecisionQuery.ypokatasthma = selectedYpokatasthma;
     const canonicalDecisionsByWeek = groupWeeklyCanonicalDecisions(
         await ApasxoliseisWeeklyCanonicalDecisionModel.find(canonicalDecisionQuery)
@@ -4381,8 +4387,15 @@ async function getReviewRowsForExport(req) {
             decision_status: 'RECORDED',
             ...(String(req.query.ypokatasthma || '').trim()
                 ? { ypokatasthma: String(req.query.ypokatasthma).trim().padStart(4, '0') } : {}),
-            employee_kodikos: mongoose.trusted({ $in: kodikoi }),
-            ...decisionRangeFilter
+            $or: mongoose.trusted([
+                { employee_kodikos: mongoose.trusted({ $in: kodikoi }), ...decisionRangeFilter },
+                { reuse_scope: 'FUTURE_IDENTICAL', reuse_status: 'ACTIVE',
+                    reuse_effective_from: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
+                    $or: mongoose.trusted([
+                        { reuse_effective_to: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) }) },
+                        { reuse_effective_to: null }
+                    ]) }
+            ])
         }).sort({ created_at: -1 }).lean()
             : Promise.resolve([])
     ]);
@@ -4449,7 +4462,10 @@ async function getReviewRowsForExport(req) {
             week_start: naturalWeekStart,
             week_end: naturalWeekEnd
         });
-        const records = canonicalDecisionsByWeek.get(decisionKey) || [];
+        const records = [
+            ...(canonicalDecisionsByWeek.get(decisionKey) || []),
+            ...(canonicalDecisionsByWeek.get('__REUSABLE__') || [])
+        ];
         if (!records.length || automaticAnalysis.status !== 'NEEDS_HR_DECISION') continue;
         const matchingExecutions = executions.filter((execution) =>
             String(execution.employee_kodikos || '') === String(firstRow.kodikos || '') &&
@@ -5965,7 +5981,49 @@ class erganhController {
                     onoma: erg.onoma || ''
                 };
             };
-            const enrichedDeviations = deviationPreview.deviations.map(withEmployeeNames);
+            let enrichedDeviations = deviationPreview.deviations.map(withEmployeeNames);
+            const weeklyReusableCases = [];
+            for (const deviation of enrichedDeviations) {
+                if (deviation.status !== 'NEEDS_HR_DECISION' ||
+                    !(deviation.reasons || []).includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC')) continue;
+                const employee = ergByKodikos.get(String(deviation.kodikos || '')) || {};
+                const weekStart = startOfWeekMondayUtc(deviation.week_apo || deviation.weekStart);
+                const weekEnd = endOfWeekSundayUtc(deviation.week_eos || deviation.weekEnd);
+                const weekRows = deviationContextRows.filter((row) =>
+                    String(row.kodikos || '') === String(deviation.kodikos || '') &&
+                    dateKeyUtc(row.hmeromhnia) >= dateKeyUtc(weekStart) &&
+                    dateKeyUtc(row.hmeromhnia) <= dateKeyUtc(weekEnd));
+                const weekContext = { naturalWeekStart: weekStart, naturalWeekEnd: weekEnd,
+                    weekStart, weekEnd, isFullWeek: weekRows.length === 7 };
+                const weeklyProfile = getWeeklyRepoProfileInfo({ week: weekContext,
+                    istorikoRows: istorikoRowsByKodikos.get(String(deviation.kodikos || '')) || [],
+                    ergazomenos: employee });
+                const automatic = analyzeWeeklySixthSeventhDay({ weekRows,
+                    effectiveProfile: weeklyProfile.effectiveProfile || {} });
+                if (automatic.status !== 'NEEDS_HR_DECISION' ||
+                    !(automatic.reasons || []).includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC')) continue;
+                const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
+                    team: req.session.userTeam, company_kod: req.session.companyInUse,
+                    employee, week: weekContext, weekRows,
+                    effectiveProfile: weeklyProfile.effectiveProfile || {},
+                    profileHistory: istorikoRowsByKodikos.get(String(deviation.kodikos || '')) || [],
+                    automaticAnalysis: automatic
+                });
+                weeklyReusableCases.push({ decision_type: 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+                    snapshot_result: buildCanonicalWeeklyDecisionSnapshot(snapshotInput),
+                    case: { employee_kodikos: deviation.kodikos,
+                        week_start: dateKeyUtc(weekStart), week_end: dateKeyUtc(weekEnd) } });
+            }
+            const weeklyGroups = groupWeeklyReusableCases(weeklyReusableCases);
+            const groupByCase = new Map();
+            weeklyGroups.forEach((group) => group.cases.forEach((item) =>
+                groupByCase.set(`${item.employee_kodikos}|${item.week_start}`, group)));
+            enrichedDeviations = enrichedDeviations.map((deviation) => {
+                const group = groupByCase.get(`${deviation.kodikos}|${dateKeyUtc(deviation.week_apo || deviation.weekStart)}`);
+                return group ? { ...deviation, canonical_identical_group_key: group.group_key,
+                    canonical_identical_group_count: group.count,
+                    canonical_identical_employees_count: group.employees_count } : deviation;
+            });
             const pendingDeviationWeeks = deviationPreview.pendingWeeks.map(withEmployeeNames);
             const reviewRows = attachSixthDayPresentationToRows(
                 enrichedRows,

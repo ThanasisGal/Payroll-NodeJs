@@ -654,8 +654,32 @@ function renderCurrentReviewRows() {
         ...currentPendingDeviationWeeks,
         ...currentLegacyDeviations
     ]);
+    updateWeeklyDeviationStickyMetrics();
     updateScenarioReviewFilterNotice();
     updateReviewFilterLayoutState();
+}
+
+function updateWeeklyDeviationStickyMetrics() {
+    const scrollContainer = document.querySelector('.employment-review-scroll-container');
+    if (!scrollContainer) return;
+    const mainHeaderHeight = document.querySelector(
+        '.employment-review-scroll-container #resultsTable > thead'
+    )?.getBoundingClientRect().height || 0;
+    const visibleSubtotal = document.querySelector(
+        '#resultsTable .employee-subtotal-row:not(.d-none)'
+    );
+    const visibleSectionTitle = document.querySelector(
+        '#resultsTable .employee-deviation-row:not(.d-none) .weekly-deviation-section-title'
+    );
+    scrollContainer.style.setProperty(
+        '--employment-review-subtotal-sticky-top', `${mainHeaderHeight}px`
+    );
+    scrollContainer.style.setProperty(
+        '--employment-review-subtotal-height', `${visibleSubtotal?.getBoundingClientRect().height || 0}px`
+    );
+    scrollContainer.style.setProperty(
+        '--employment-review-weekly-title-height', `${visibleSectionTitle?.getBoundingClientRect().height || 0}px`
+    );
 }
 
 function bindReviewFilterChangeListeners() {
@@ -2187,12 +2211,15 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end">${escapeHtml(dev.actual_workdays ?? '-')}</td>
                     <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
                     <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
-                    <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
-                    <td>${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && canRecordCanonicalEmploymentDecision()
-                        ? `<div class="mt-2"><button type="button" class="btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary"
+                    <td class="weekly-deviation-employment-type">${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
+                    <td class="weekly-deviation-comment">${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && canRecordCanonicalEmploymentDecision()
+                        ? `<div class="mt-2">${Number(dev.canonical_identical_group_count || 0) > 1
+                            ? `<div class="small fw-semibold mb-1">${escapeHtml(dev.canonical_identical_group_count)} όμοιες περιπτώσεις</div>` : ''}<button type="button" class="btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary"
                             data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
                             data-ypokatasthma="${escapeHtml(dev.ypokatasthma || '')}"
-                            data-week-start="${escapeHtml(String(dev.week_apo || dev.weekStart || '').slice(0, 10))}">Καταγραφή απόφασης</button></div>`
+                            data-identical-group-count="${escapeHtml(dev.canonical_identical_group_count || 1)}"
+                            data-identical-group-key="${escapeHtml(dev.canonical_identical_group_key || '')}"
+                            data-week-start="${escapeHtml(String(dev.week_apo || dev.weekStart || '').slice(0, 10))}">${Number(dev.canonical_identical_group_count || 0) > 1 ? 'Απόφαση για την ομάδα' : 'Καταγραφή απόφασης'}</button></div>`
                         : ''}</td>
                 </tr>
             `
@@ -2201,12 +2228,18 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
 
     wrapperTr.innerHTML = `
         <td colspan="13" class="p-2 bg-warning-subtle">
-            <div class="fw-bold mb-1">
+            <div class="fw-bold weekly-deviation-section-title">
                 Αποκλίσεις εβδομαδιαίων ρεπό
                 <span class="badge text-bg-light border ms-1">Εβδομάδα Δευτέρα–Κυριακή</span>
             </div>
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered mb-0 bg-white">
+            <div class="weekly-deviation-table-shell">
+                <table class="table table-sm table-bordered mb-0 bg-white weekly-deviation-table">
+                    <colgroup>
+                        <col span="2" class="weekly-deviation-date-column">
+                        <col span="6" class="weekly-deviation-number-column">
+                        <col class="weekly-deviation-employment-type-column">
+                        <col class="weekly-deviation-comment-column">
+                    </colgroup>
                     <thead class="table-light">
                         <tr>
                             <th>Από</th>
@@ -2217,8 +2250,8 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                             <th class="text-end">Πραγματικές ημέρες εργασίας</th>
                             <th class="text-end">6η ημέρα</th>
                             <th class="text-end">7η ημέρα/παράβαση</th>
-                            <th>Τύπος απασχόλησης</th>
-                            <th>Σχόλιο</th>
+                            <th class="weekly-deviation-employment-type">Τύπος απασχόλησης</th>
+                            <th class="weekly-deviation-comment">Σχόλιο</th>
                         </tr>
                     </thead>
                     <tbody>${rowsHtml}</tbody>
@@ -2368,12 +2401,23 @@ function renderCanonicalDecisionEditor(context) {
         <select class="form-select canonical-classification" data-date="${escapeHtml(row.date)}">
         <option value="NORMAL">Κανονική ημέρα</option><option value="SIXTH">6η ημέρα</option><option value="SEVENTH">7η ημέρα</option></select></div>`).join('');
     return `<form id="canonicalDecisionForm">
+        ${context.supported_actions?.repo_identities_unavailable ? '<div class="alert alert-warning py-2">Δεν υπάρχουν τουλάχιστον δύο ασφαλείς υποψήφιες ημέρες ανάπαυσης. Η συγκεκριμένη επιλογή δεν είναι διαθέσιμη.</div>' : ''}
         <label class="form-label">Τύπος απόφασης</label>
         <select class="form-select form-select-sm mb-3" id="canonicalDecisionType">${options.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join('')}</select>
         <div class="canonical-decision-input" data-type="PROFILE_CHANGED_INSIDE_WEEK"><label class="form-label">Επιλογή προφίλ εργασίας</label><select class="form-select form-select-sm" id="canonicalProfileCandidate">${profiles}</select></div>
         <div class="canonical-decision-input d-none" data-type="CARD_VERIFICATION_PENDING"><div class="alert alert-warning py-2">Η απόφαση είναι μόνο τεκμηριωτική. Η διόρθωση των στοιχείων κάρτας απαιτείται πριν επιλυθεί ο υπολογισμός.</div><label class="form-label">Αναφορά τεκμηρίου/διόρθωσης</label><input class="form-control form-control-sm" id="canonicalCardEvidence" maxlength="500"></div>
         <div class="canonical-decision-input d-none" data-type="CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC"><div class="mb-2">Επιλέξτε ακριβώς δύο έγκυρες ημέρες ανάπαυσης/ρεπό:</div>${repoDates || '<span class="text-muted">Δεν υπάρχουν διαθέσιμες ημέρες ανάπαυσης/ρεπό.</span>'}</div>
         <div class="canonical-decision-input d-none" data-type="CLASSIFICATION_BY_DATE"><div class="small text-muted mb-2">Η επιλογή θα ελεγχθεί από το σύστημα ώστε η εβδομαδιαία ταξινόμηση να είναι πλήρης και συνεπής.</div>${classifications}</div>
+        <fieldset class="mt-3" id="canonicalDecisionReuseScope">
+            <legend class="form-label mb-2">Εμβέλεια απόφασης</legend>
+            <div class="form-check"><input class="form-check-input" type="radio" name="canonicalReuseScope" id="canonicalReuseOneTime" value="ONE_TIME" checked><label class="form-check-label" for="canonicalReuseOneTime">Μόνο για αυτή την εβδομάδα</label></div>
+            <div class="form-check"><input class="form-check-input" type="radio" name="canonicalReuseScope" id="canonicalReuseFuture" value="FUTURE_IDENTICAL"><label class="form-check-label" for="canonicalReuseFuture">Και για μελλοντικές ίδιες περιπτώσεις</label></div>
+            <div id="canonicalReuseExplanation" class="small text-muted mt-1"></div>
+            <div id="canonicalReuseDates" class="row g-2 mt-1 d-none">
+                <div class="col-sm-6"><label class="form-label" for="canonicalReuseFrom">Ισχύει από</label><input class="form-control form-control-sm" type="date" id="canonicalReuseFrom" value="${escapeHtml(context.reuse_effective_from_default || '')}"></div>
+                <div class="col-sm-6"><label class="form-label" for="canonicalReuseTo">Ισχύει έως <span class="text-muted">(προαιρετικό)</span></label><input class="form-control form-control-sm" type="date" id="canonicalReuseTo"></div>
+            </div>
+        </fieldset>
         <label class="form-label mt-3">Σημειώσεις</label><textarea class="form-control form-control-sm" id="canonicalDecisionNotes" maxlength="2000"></textarea>
         <button class="btn btn-sm mt-3 employment-review-action-btn employment-review-action-primary" type="submit">Καταγραφή απόφασης</button>
         <div id="canonicalDecisionFeedback" class="small mt-2"></div>
@@ -2427,17 +2471,45 @@ async function openCanonicalDecisionPanel(scope) {
         const current = await currentResponse.json();
         const history = await historyResponse.json();
         if (!currentResponse.ok || !current.success) throw new Error(current.message || 'Αποτυχία φόρτωσης.');
+        current.reuse_effective_from_default = document.getElementById('apo_hmeromhnia')?.value ||
+            currentPolicyPreviewBaseParams?.get('apo_hmeromhnia') || current.scope.week_start;
+        current.identical_group_count = Number(scope.identicalGroupCount || scope.identical_group_count || 1);
+        current.identical_group_key = String(scope.identicalGroupKey || scope.identical_group_key || '');
+        current.is_identical_group = current.identical_group_count > 1 && Boolean(current.identical_group_key);
         container.innerHTML = `<div class="row g-3"><div class="col-lg-6">
             <div><strong>${escapeHtml(current.employee?.kodikos || '')} ${escapeHtml(current.employee?.eponymo || '')} ${escapeHtml(current.employee?.onoma || '')}</strong></div>
             <div>Εβδομάδα: ${escapeHtml(formatDate(current.scope.week_start))}–${escapeHtml(formatDate(current.scope.week_end))}</div>
             <div class="mt-2"><span class="badge text-bg-warning">${escapeHtml(canonicalStatusLabel(current.canonical.status))}</span></div>
             <div class="small mt-2">${(current.canonical.reasons || []).map((reason) => `<div>${escapeHtml(canonicalReasonLabel(reason))}</div>`).join('')}</div>
             <div class="alert alert-light border mt-3">${escapeHtml(canonicalApplicabilityLabels[current.applicability] || 'Απαιτείται έλεγχος')}</div>
+            ${current.is_identical_group ? `<div class="alert alert-info">${escapeHtml(current.identical_group_count)} όμοιες περιπτώσεις. Η απόφαση ομάδας θα αποθηκευτεί ως ένας επαναχρησιμοποιήσιμος κανόνας.</div>` : ''}
         </div><div class="col-lg-6">${renderCanonicalDecisionEditor(current)}</div></div>
         <hr><h6>Ιστορικό αποφάσεων</h6><div class="small text-muted mb-2">Οι καταχωρημένες αποφάσεις διατηρούνται στο ιστορικό.</div>${renderCanonicalDecisionHistory(history.records || [])}`;
         const typeSelect = document.getElementById('canonicalDecisionType');
-        const showType = () => document.querySelectorAll('.canonical-decision-input').forEach((node) => node.classList.toggle('d-none', node.dataset.type !== typeSelect?.value));
+        const showType = () => {
+            document.querySelectorAll('.canonical-decision-input').forEach((node) => node.classList.toggle('d-none', node.dataset.type !== typeSelect?.value));
+            const eligibility = current.reusable_actions?.[typeSelect?.value] || { eligible: false,
+                reason: 'Ο συγκεκριμένος τύπος απόφασης δεν μπορεί να επαναχρησιμοποιηθεί με ασφάλεια.' };
+            const future = document.getElementById('canonicalReuseFuture');
+            const oneTime = document.getElementById('canonicalReuseOneTime');
+            const explanation = document.getElementById('canonicalReuseExplanation');
+            if (future) future.disabled = !eligibility.eligible;
+            if (current.is_identical_group && eligibility.eligible) {
+                future.checked = true;
+                if (oneTime) oneTime.disabled = true;
+            } else {
+                if (oneTime) oneTime.disabled = false;
+                if (!eligibility.eligible && oneTime) oneTime.checked = true;
+            }
+            if (explanation) explanation.textContent = eligibility.eligible
+                ? 'Ο κανόνας θα εφαρμοστεί μόνο όταν όλες οι συνθήκες της εβδομάδας είναι πραγματικά ίδιες.'
+                : eligibility.reason;
+            document.getElementById('canonicalReuseDates')?.classList.toggle('d-none',
+                !eligibility.eligible || !future?.checked);
+        };
         typeSelect?.addEventListener('change', showType); showType();
+        document.querySelectorAll('input[name="canonicalReuseScope"]').forEach((radio) =>
+            radio.addEventListener('change', showType));
         document.getElementById('canonicalDecisionForm')?.addEventListener('submit', async (event) => {
             event.preventDefault();
             const feedback = document.getElementById('canonicalDecisionFeedback');
@@ -2452,13 +2524,20 @@ async function openCanonicalDecisionPanel(scope) {
                         week_start: current.scope.week_start,
                         request_id: canonicalDecisionRequestId(), decision_type: type,
                         decision_payload: canonicalDecisionPayload(current, type),
+                        reuse_scope: document.querySelector('input[name="canonicalReuseScope"]:checked')?.value || 'ONE_TIME',
+                        reuse_effective_from: document.getElementById('canonicalReuseFuture')?.checked
+                            ? document.getElementById('canonicalReuseFrom')?.value : '',
+                        reuse_effective_to: document.getElementById('canonicalReuseFuture')?.checked
+                            ? document.getElementById('canonicalReuseTo')?.value : '',
                         notes: document.getElementById('canonicalDecisionNotes')?.value || '' })
                 });
                 const result = await response.json();
                 if (!response.ok || !result.success) throw new Error(result.message || 'Η καταγραφή απέτυχε.');
                 feedback.className = 'small mt-2 text-success';
                 feedback.textContent = `${result.message} Η επανεκτέλεση υπολογισμού γίνεται από το υπάρχον κουμπί.`;
-                setTimeout(() => openCanonicalDecisionPanel(current.scope), 500);
+                setTimeout(() => openCanonicalDecisionPanel({ ...current.scope,
+                    identical_group_count: current.identical_group_count,
+                    identical_group_key: current.identical_group_key }), 500);
             } catch (error) {
                 feedback.className = 'small mt-2 text-danger'; feedback.textContent = error.message;
             }
@@ -2888,6 +2967,7 @@ function setEmployeeGroupExpanded(groupTr, expanded) {
          tr.employee-subtotal-row[data-group-id="${groupId}"],
          tr.employee-deviation-row[data-group-id="${groupId}"]`
     ).forEach((row) => row.classList.toggle('d-none', !expanded));
+    updateWeeklyDeviationStickyMetrics();
 }
 
 function toggleEmployeeGroupAccordion(groupTr) {
@@ -5547,13 +5627,68 @@ function renderActionableIssueCase(issueCase = {}, issueCode, groupIndex, caseIn
                 ).join('')}</li>`
             ).join('')}</ul></div>` : ''}
             <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                <button type="button" class="btn btn-sm btn-outline-primary actionable-issue-open-case"
+                <button type="button" class="btn btn-sm actionable-issue-open-case employment-review-action-btn employment-review-action-primary"
                     data-actionable-group-index="${escapeHtml(groupIndex)}"
                     data-actionable-case-index="${escapeHtml(caseIndex)}">Άνοιγμα στον πίνακα</button>
                 <span class="small text-muted actionable-issue-navigation-feedback" aria-live="polite"></span>
             </div>
         </article>
     `;
+}
+
+function canonicalGroupingForActionableCase(issueCase = {}) {
+    const employeeKodikos = String(issueCase.employee_kodikos || '').trim();
+    const weekStart = String(issueCase.week_start || '').slice(0, 10);
+    if (!employeeKodikos || !weekStart) return null;
+    return currentReviewDeviations.find((deviation) =>
+        String(deviation?.kodikos || '').trim() === employeeKodikos &&
+        String(deviation?.week_apo || deviation?.weekStart || '').slice(0, 10) === weekStart
+    ) || null;
+}
+
+function renderCanonicalActionableCases(group = {}, groupIndex) {
+    const cases = (Array.isArray(group.cases) ? group.cases : []).map((issueCase, caseIndex) => {
+        const grouping = canonicalGroupingForActionableCase(issueCase);
+        return { issueCase, caseIndex, grouping };
+    });
+    const displayGroups = new Map();
+    cases.forEach((item) => {
+        const groupKey = String(item.grouping?.canonical_identical_group_key || '').trim();
+        const count = Number(item.grouping?.canonical_identical_group_count || 1);
+        const displayKey = groupKey && count > 1
+            ? `group:${groupKey}`
+            : `single:${item.caseIndex}`;
+        if (!displayGroups.has(displayKey)) displayGroups.set(displayKey, []);
+        displayGroups.get(displayKey).push(item);
+    });
+
+    return [...displayGroups.values()].map((items) => {
+        const representative = items[0];
+        const grouping = representative.grouping || {};
+        const identicalCount = Number(grouping.canonical_identical_group_count || 1);
+        const identicalGroupKey = String(grouping.canonical_identical_group_key || '').trim();
+        if (!identicalGroupKey || identicalCount <= 1) {
+            return renderActionableIssueCase(
+                representative.issueCase,
+                group.issue_code,
+                groupIndex,
+                representative.caseIndex
+            );
+        }
+        const members = items.map(({ issueCase }) =>
+            `<li><strong>${escapeHtml(issueCase.employee_kodikos || '')}</strong> — ${escapeHtml(formatPolicyPreviewDate(issueCase.week_start))}–${escapeHtml(formatPolicyPreviewDate(issueCase.week_end))}</li>`
+        ).join('');
+        return `<article class="actionable-issue-case canonical-identical-group">
+            <div class="fw-semibold">${escapeHtml(identicalCount)} όμοιες περιπτώσεις</div>
+            <ul class="mb-2">${members}</ul>
+            <button type="button" class="btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary"
+                data-employee-kodikos="${escapeHtml(representative.issueCase.employee_kodikos || '')}"
+                data-ypokatasthma="${escapeHtml(representative.issueCase.ypokatasthma || '')}"
+                data-identical-group-count="${escapeHtml(identicalCount)}"
+                data-identical-group-key="${escapeHtml(identicalGroupKey)}"
+                data-week-start="${escapeHtml(String(representative.issueCase.week_start || '').slice(0, 10))}">Απόφαση για την ομάδα</button>
+        </article>`;
+    }).join('');
 }
 
 function renderActionableIssueGroups(issueGroups = []) {
@@ -5586,7 +5721,9 @@ function renderActionableIssueGroups(issueGroups = []) {
                                     <div><strong>Τι προτείνεται να κάνει ο Υπεύθυνος Ανθρώπινου Δυναμικού:</strong> ${escapeHtml(presentation.recommendedAction)}</div>
                                 </div>
                                 <div class="actionable-issue-cases">
-                                    ${group.cases.map((issueCase, caseIndex) =>
+                                    ${group.issue_code === 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
+                                        ? renderCanonicalActionableCases(group, groupIndex)
+                                        : group.cases.map((issueCase, caseIndex) =>
                                         renderActionableIssueCase(
                                             issueCase,
                                             group.issue_code,
@@ -5669,7 +5806,7 @@ function renderPreCalculationDataIssues(rows = []) {
                                         <div><span class="text-muted">Τι βρέθηκε:</span> ${escapeHtml(issueCase.finding)}</div>
                                         <div><span class="text-muted">Τι πρέπει να γίνει:</span> ${escapeHtml(issueCase.guidance)}</div>
                                         <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                                            <button type="button" class="btn btn-sm btn-outline-primary actionable-issue-open-case"
+                                            <button type="button" class="btn btn-sm actionable-issue-open-case employment-review-action-btn employment-review-action-primary"
                                                 data-issue-source="pre-calculation" data-actionable-group-index="${groupIndex}"
                                                 data-actionable-case-index="${caseIndex}">Άνοιγμα στον πίνακα</button>
                                             <span class="small text-muted actionable-issue-navigation-feedback" aria-live="polite"></span>
@@ -5929,7 +6066,23 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
 function highlightActionableIssueTarget(target) {
     target.classList.remove('actionable-issue-target-highlight');
     target.classList.add('actionable-issue-target-highlight');
-    target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    const scrollContainer = target.closest('.employment-review-scroll-container');
+    if (scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const stickyHeaderHeight = document.querySelector(
+            '.employment-review-scroll-container #resultsTable > thead'
+        )?.getBoundingClientRect().height || 0;
+        const visibleTop = containerRect.top + stickyHeaderHeight;
+        const visibleBottom = containerRect.bottom;
+        const previousScrollLeft = scrollContainer.scrollLeft;
+        if (targetRect.top < visibleTop) {
+            scrollContainer.scrollTop += targetRect.top - visibleTop - 8;
+        } else if (targetRect.bottom > visibleBottom) {
+            scrollContainer.scrollTop += targetRect.bottom - visibleBottom + 8;
+        }
+        scrollContainer.scrollLeft = previousScrollLeft;
+    }
     window.setTimeout(() => target.classList.remove('actionable-issue-target-highlight'), 3000);
 }
 
@@ -6004,6 +6157,9 @@ function bindActionableIssueEvents(container) {
             );
             if (issueCase) openActionableIssueInTable(issueCase, feedback);
         });
+    });
+    container.querySelectorAll('.canonical-decision-open').forEach((button) => {
+        button.addEventListener('click', () => openCanonicalDecisionPanel(button.dataset));
     });
 }
 

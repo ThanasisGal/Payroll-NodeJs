@@ -215,7 +215,10 @@ function buildWeeklyRepoPostCheckWritePlan({
                 week_start: week.naturalWeekStart,
                 week_end: week.naturalWeekEnd
             });
-            const decisionRecords = canonicalDecisionsByWeek.get(decisionKey) || [];
+            const decisionRecords = [
+                ...(canonicalDecisionsByWeek.get(decisionKey) || []),
+                ...(canonicalDecisionsByWeek.get('__REUSABLE__') || [])
+            ];
             let sixthSeventhAnalysis = automaticSixthSeventhAnalysis;
             if (weekFullyInsideEmployment && decisionRecords.length > 0 &&
                 automaticSixthSeventhAnalysis.status === 'NEEDS_HR_DECISION') {
