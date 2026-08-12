@@ -3,10 +3,14 @@
 const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const {
     APPLICABILITY,
+    buildCanonicalWeeklyDecisionSnapshot,
     selectedProfileFingerprint,
     resolvePreloadedWeeklyCanonicalDecision
 } = require('./apasxoliseisWeeklyCanonicalDecisionService');
 const { analyzeWeeklySixthSeventhDay } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
+const {
+    findApplicableWeeklyReusableDecision
+} = require('./apasxoliseisReusablePolicyDecisionService');
 
 function blocked(automaticAnalysis, reason, extra = {}) {
     return Object.freeze({ ...automaticAnalysis, ...extra, status: 'NEEDS_HR_DECISION',
@@ -55,11 +59,21 @@ function resolveWeeklyCanonicalDecisionAnalysis({
     employee = {},
     profileHistory = []
 } = {}) {
-    if (!decisionRecords.length || automaticAnalysis?.status !== 'NEEDS_HR_DECISION') {
+    if (automaticAnalysis?.status !== 'NEEDS_HR_DECISION') {
         return { analysis: automaticAnalysis, applicability: APPLICABILITY.NOT_FOUND, decision: null };
     }
-    const resolved = resolvePreloadedWeeklyCanonicalDecision({ currentInput: snapshotInput,
+    const oneTimeResolved = resolvePreloadedWeeklyCanonicalDecision({ currentInput: snapshotInput,
         records: decisionRecords });
+    let resolved = oneTimeResolved;
+    if (oneTimeResolved.applicability !== APPLICABILITY.APPLICABLE &&
+        oneTimeResolved.applicability !== APPLICABILITY.CONFLICT) {
+        const snapshotResult = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
+        const reusableResolved = findApplicableWeeklyReusableDecision({ snapshotResult,
+            rules: decisionRecords });
+        if (reusableResolved.applicability !== APPLICABILITY.NOT_FOUND) resolved = {
+            ...reusableResolved, current_fingerprint: snapshotResult.fingerprint
+        };
+    }
     if (resolved.applicability === APPLICABILITY.STALE) return {
         analysis: blocked(automaticAnalysis, 'CANONICAL_DECISION_STALE'), ...resolved, decision: resolved.record
     };

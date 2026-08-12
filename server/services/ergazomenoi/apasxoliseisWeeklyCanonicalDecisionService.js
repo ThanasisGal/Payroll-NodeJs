@@ -9,6 +9,12 @@ const {
 const {
     assertWeeklyCanonicalDecisionIndexesReady
 } = require('./apasxoliseisWeeklyCanonicalDecisionIndexGuardService');
+const {
+    REUSE_SCOPE,
+    REUSE_STATUS,
+    utcDateKey,
+    buildWeeklyReusableDecisionRule
+} = require('./apasxoliseisReusablePolicyDecisionService');
 
 const SNAPSHOT_VERSION = 'weekly-canonical-human-decision-snapshot:v1';
 const DECISION_SCHEMA_VERSION = 'weekly-canonical-human-decision:v2';
@@ -223,19 +229,39 @@ function validateDecisionCommand({ session, command = {}, currentInput = {} }) {
     const requestId = text(command.request_id, 100);
     if (!REQUEST_ID_PATTERN.test(requestId)) throw fail('Μη έγκυρο request_id.');
     const decisionPayload = validateDecisionPayload(decisionType, command.decision_payload, snapshotResult);
+    const reuseScope = text(command.reuse_scope || REUSE_SCOPE.ONE_TIME, 30).toUpperCase();
+    if (!Object.values(REUSE_SCOPE).includes(reuseScope)) throw fail('Μη έγκυρο εύρος επαναχρησιμοποίησης.');
+    let reusable = null; let reuseEffectiveFrom = null; let reuseEffectiveTo = null;
+    if (reuseScope === REUSE_SCOPE.FUTURE_IDENTICAL) {
+        reusable = buildWeeklyReusableDecisionRule({ snapshotResult, decisionType,
+            decisionPayload });
+        if (!reusable.eligible) throw fail(reusable.reason, 400, reusable.reason_code);
+        reuseEffectiveFrom = utcDateKey(command.reuse_effective_from);
+        reuseEffectiveTo = utcDateKey(command.reuse_effective_to);
+        if (!reuseEffectiveFrom) throw fail('Απαιτείται έγκυρη ημερομηνία έναρξης ισχύος.');
+        if (reuseEffectiveTo && reuseEffectiveTo < reuseEffectiveFrom) {
+            throw fail('Η ημερομηνία λήξης δεν μπορεί να προηγείται της έναρξης.');
+        }
+    }
     const normalized = { decision_type: decisionType, decision_payload: decisionPayload,
-        notes: text(command.notes, 2000), request_id: requestId };
+        notes: text(command.notes, 2000), request_id: requestId, reuse_scope: reuseScope,
+        reuse_effective_from: reuseEffectiveFrom, reuse_effective_to: reuseEffectiveTo };
     return { actor, snapshotResult, command: normalized,
+        reusable,
         payloadFingerprint: fingerprint(decisionPayload), commandIdentity: fingerprint({
             scope_key: snapshotResult.scope.scope_key, snapshot_fingerprint: snapshotResult.fingerprint,
-            decision_type: decisionType, decision_payload: decisionPayload, notes: normalized.notes
+            decision_type: decisionType, decision_payload: decisionPayload, notes: normalized.notes,
+            reuse_scope: reuseScope, reuse_effective_from: reuseEffectiveFrom,
+            reuse_effective_to: reuseEffectiveTo
         }) };
 }
 function queryLean(query) { return query && typeof query.lean === 'function' ? query.lean() : query; }
 function sameLogicalDecision(record, validated) {
     return record.snapshot_fingerprint === validated.snapshotResult.fingerprint &&
         record.decision_type === validated.command.decision_type &&
-        record.decision_payload_fingerprint === validated.payloadFingerprint;
+        record.decision_payload_fingerprint === validated.payloadFingerprint &&
+        text(record.reuse_scope || REUSE_SCOPE.ONE_TIME, 30).toUpperCase() ===
+            validated.command.reuse_scope;
 }
 function isDuplicateKey(error) {
     return error?.code === 11000 || error?.name === 'MongoServerError' && error?.code === 11000;
@@ -321,6 +347,15 @@ async function recordWeeklyCanonicalDecision({
         decision_schema_version: DECISION_SCHEMA_VERSION,
         policy_version: validated.snapshotResult.snapshot.policy_version,
         source_version: validated.snapshotResult.snapshot.source_version,
+        reuse_scope: validated.command.reuse_scope,
+        reuse_status: validated.reusable ? REUSE_STATUS.ACTIVE : REUSE_STATUS.NOT_APPLICABLE,
+        reuse_fingerprint: validated.reusable?.fingerprint || '',
+        reuse_match_criteria: validated.reusable?.criteria || null,
+        reusable_decision_payload: validated.reusable?.decision_payload || null,
+        reuse_effective_from: validated.command.reuse_effective_from
+            ? new Date(`${validated.command.reuse_effective_from}T00:00:00.000Z`) : null,
+        reuse_effective_to: validated.command.reuse_effective_to
+            ? new Date(`${validated.command.reuse_effective_to}T00:00:00.000Z`) : null,
         notes: validated.command.notes, created_by_user_id: validated.actor.user_id,
         created_by_user_name: validated.actor.user_name, created_by_user_role: validated.actor.role,
         created_at: now

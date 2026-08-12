@@ -128,6 +128,23 @@ function resolveCurrentRepoCandidateIdentities({ weekRows = [], effectiveProfile
     }).effectiveRepo === true).map((row) => dateKeyUtc(row.hmeromhnia)).filter(Boolean).sort();
 }
 
+function resolveSafeHumanRepoCandidateIdentities({ weekRows = [], effectiveProfile = {} } = {}) {
+    const fullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
+    const expectedRepoCategory = fullTime === null ? null : (fullTime ? 'ΑΝ' : 'ΜΕ');
+    return weekRows.filter((row) => {
+        if (row?.is_locked === true) return false;
+        const effectiveRepo = resolveEffectiveRepoState({
+            row, mode: EFFECTIVE_REPO_MODE.CURRENT, expectedRepoCategory
+        }).effectiveRepo === true;
+        const declaredRepo = row?.repo === true ||
+            ['ΑΝ', 'ΜΕ'].includes(String(row?.kathgoria_ergasias || '').trim());
+        const facts = resolveDailyActualWorkFacts(row);
+        const safeNonWorkDay = facts.countsAsActualWorkDay === false &&
+            facts.cardVerificationStatus === 'READY';
+        return effectiveRepo || declaredRepo || safeNonWorkDay;
+    }).map((row) => dateKeyUtc(row.hmeromhnia)).filter(Boolean).sort();
+}
+
 function decisionFailure(reason, base = {}) {
     return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION,
         reasons: [reason], warnings: base.warnings || [], dailyFacts: base.dailyFacts || [],
@@ -215,7 +232,7 @@ function analyzeWeeklySixthSeventhDay({
                 resolveEffectiveRepoState({ row, mode: EFFECTIVE_REPO_MODE.CURRENT,
                     expectedRepoCategory: overrideExpectedRepoCategory }).effectiveRepo === true)
                 .map((row) => dateKeyUtc(row.hmeromhnia)).filter(Boolean).sort()
-            : resolveCurrentRepoCandidateIdentities({ weekRows: rows, effectiveProfile });
+            : resolveSafeHumanRepoCandidateIdentities({ weekRows: rows, effectiveProfile });
         const allowedRepoIdentityCounts = [1, 2];
         if (!allowedRepoIdentityCounts.includes(override.length) ||
             override.some((identity) => !dates.includes(identity)) ||
@@ -423,6 +440,7 @@ module.exports = {
     resolveSeventhDayIllegalOvertimeHours,
     resolveCanonicalRepoDayIdentities,
     resolveCurrentRepoCandidateIdentities,
+    resolveSafeHumanRepoCandidateIdentities,
     selectSixthDay,
     analyzeWeeklySixthSeventhDay
 };

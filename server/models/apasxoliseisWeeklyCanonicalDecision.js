@@ -41,6 +41,17 @@ const WeeklyCanonicalDecisionSchema = new Schema({
     decision_schema_version: immutableRequired(String, { trim: true }),
     policy_version: { type: String, trim: true, default: '', immutable: true },
     source_version: { type: String, trim: true, default: '', immutable: true },
+    reuse_scope: immutableRequired(String, { enum: ['ONE_TIME', 'FUTURE_IDENTICAL'], default: 'ONE_TIME' }),
+    reuse_status: immutableRequired(String, { enum: ['NOT_APPLICABLE', 'ACTIVE', 'REVOKED'], default: 'NOT_APPLICABLE' }),
+    reuse_fingerprint: { type: String, trim: true, maxlength: 64, default: '', immutable: true },
+    reuse_match_criteria: { type: Schema.Types.Mixed, default: null, immutable: true },
+    reusable_decision_payload: { type: Schema.Types.Mixed, default: null, immutable: true },
+    reuse_effective_from: { type: Date, default: null, immutable: true },
+    reuse_effective_to: { type: Date, default: null },
+    revoked_at: { type: Date, default: null },
+    revoked_by_user_id: { type: Schema.Types.ObjectId, default: null },
+    revoked_by_user_name: { type: String, trim: true, maxlength: 150, default: '' },
+    revoke_reason: { type: String, trim: true, maxlength: 1000, default: '' },
     source: { type: String, trim: true, default: 'WEEKLY_CANONICAL_HUMAN_DECISION', immutable: true },
     notes: { type: String, trim: true, maxlength: 2000, default: '', immutable: true },
 
@@ -85,6 +96,10 @@ WeeklyCanonicalDecisionSchema.index({
     snapshot_fingerprint: 1,
     decision_status: 1,
     created_at: -1
+});
+WeeklyCanonicalDecisionSchema.index({
+    team: 1, company_kod: 1, ypokatasthma: 1,
+    reuse_scope: 1, reuse_status: 1, reuse_fingerprint: 1, created_at: -1
 });
 WeeklyCanonicalDecisionSchema.index({
     team: 1,

@@ -11622,6 +11622,7 @@ body.loader-active > *:not(.app-loader) {
 
 #policyPreviewGroupsContainer .btn.btn-primary,
 #policyPreviewGroupsContainer .btn.btn-outline-primary,
+#policyPreviewGroupsContainer .btn.employment-review-action-primary,
 #policyPreviewGroupsContainer .btn.policy-preview-decision-primary,
 #policyPreviewGroupsContainer .btn.policy-preview-decision-info,
 #policyPreviewGroupsContainer .btn.policy-preview-details-btn {
@@ -11633,6 +11634,7 @@ body.loader-active > *:not(.app-loader) {
 
 #policyPreviewGroupsContainer .btn.btn-success,
 #policyPreviewGroupsContainer .btn.btn-outline-success,
+#policyPreviewGroupsContainer .btn.employment-review-action-success,
 #policyPreviewGroupsContainer .btn.policy-preview-decision-success {
     --policy-preview-button-bg: #d1e7dd;
     --policy-preview-button-border: #a3cfbb;
@@ -11642,6 +11644,7 @@ body.loader-active > *:not(.app-loader) {
 
 #policyPreviewGroupsContainer .btn.btn-warning,
 #policyPreviewGroupsContainer .btn.btn-outline-warning,
+#policyPreviewGroupsContainer .btn.employment-review-action-warning,
 #policyPreviewGroupsContainer .btn.policy-preview-decision-warning {
     --policy-preview-button-bg: #fff3cd;
     --policy-preview-button-border: #ffe69c;
@@ -11651,6 +11654,7 @@ body.loader-active > *:not(.app-loader) {
 
 #policyPreviewGroupsContainer .btn.btn-danger,
 #policyPreviewGroupsContainer .btn.btn-outline-danger,
+#policyPreviewGroupsContainer .btn.employment-review-action-danger,
 #policyPreviewGroupsContainer .btn.policy-preview-decision-danger {
     --policy-preview-button-bg: #f8d7da;
     --policy-preview-button-border: #f1aeb5;
@@ -11660,6 +11664,7 @@ body.loader-active > *:not(.app-loader) {
 
 #policyPreviewGroupsContainer .btn.btn-secondary,
 #policyPreviewGroupsContainer .btn.btn-outline-secondary,
+#policyPreviewGroupsContainer .btn.employment-review-action-secondary,
 #policyPreviewGroupsContainer .btn.policy-preview-decision-secondary {
     --policy-preview-button-bg: #e2e3e5;
     --policy-preview-button-border: #c4c8cb;
@@ -14908,12 +14913,92 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-scroll-container {
     --employment-review-table-sticky-top: 0px;
+    --employment-review-subtotal-sticky-top: 0px;
+    --employment-review-subtotal-height: 0px;
+    --employment-review-weekly-title-height: 0px;
     flex: 1 1 auto;
     min-height: 0;
     max-height: none;
     overflow: auto;
     overscroll-behavior-y: contain;
     scrollbar-gutter: stable;
+}
+
+.employment-review-scroll-container #resultsTable .employee-subtotal-row:not(.d-none) > td {
+    position: sticky;
+    top: var(--employment-review-subtotal-sticky-top);
+    z-index: 18;
+    background-color: #f1f3f5 !important;
+    background-clip: padding-box;
+}
+
+.employment-review-scroll-container #resultsTable .employee-deviation-row > td {
+    padding: 0.5rem;
+    background-color: var(--bs-warning-bg-subtle, #fff3cd) !important;
+}
+
+.employment-review-scroll-container .weekly-deviation-section-title {
+    position: sticky;
+    top: calc(var(--employment-review-subtotal-sticky-top) + var(--employment-review-subtotal-height));
+    z-index: 17;
+    min-height: 2rem;
+    padding: 0.35rem 0.5rem;
+    background-color: var(--bs-warning-bg-subtle, #fff3cd);
+    box-shadow: inset 0 -1px 0 #ffe69c;
+    background-clip: padding-box;
+}
+
+.employment-review-scroll-container .weekly-deviation-table-shell {
+    width: 100%;
+    overflow: visible;
+}
+
+.employment-review-scroll-container .weekly-deviation-table {
+    width: 100%;
+    min-width: 100%;
+    table-layout: fixed;
+}
+
+.employment-review-scroll-container .weekly-deviation-date-column {
+    width: 8%;
+}
+
+.employment-review-scroll-container .weekly-deviation-number-column {
+    width: 8%;
+}
+
+.employment-review-scroll-container .weekly-deviation-employment-type-column {
+    width: 16%;
+}
+
+.employment-review-scroll-container .weekly-deviation-comment-column {
+    width: 20%;
+}
+
+.employment-review-scroll-container #resultsTable .weekly-deviation-table .weekly-deviation-employment-type,
+.employment-review-scroll-container #resultsTable .weekly-deviation-table .weekly-deviation-comment {
+    max-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    vertical-align: top;
+}
+
+.employment-review-scroll-container #resultsTable .weekly-deviation-table > thead > tr > th {
+    position: sticky;
+    top: calc(var(--employment-review-subtotal-sticky-top) + var(--employment-review-subtotal-height) + var(--employment-review-weekly-title-height));
+    z-index: 16;
+    padding: 0.3rem 0.25rem;
+    background-color: #f8f9fa !important;
+    color: #212529;
+    font-size: 0.72rem;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    vertical-align: middle;
+    background-clip: padding-box;
+    box-shadow: inset 0 -1px 0 #dee2e6;
 }
 
 .employment-review-actionable-summary:empty {

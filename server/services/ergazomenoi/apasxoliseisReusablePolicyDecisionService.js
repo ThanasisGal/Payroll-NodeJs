@@ -18,6 +18,12 @@ const REUSABLE_DECISION_TYPES = new Set([
     'APPROVE_PREFILL', 'MARK_OK', 'MARK_REVIEWED', 'REJECT_PROPOSAL'
 ]);
 
+const WEEKLY_REUSABLE_CRITERIA_VERSION = 6;
+const WEEKLY_REUSABLE_DECISION_TYPES = new Set([
+    'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+    'CLASSIFICATION_BY_DATE'
+]);
+
 function asArray(value) {
     return Array.isArray(value) ? value : [];
 }
@@ -272,6 +278,176 @@ function utcDateKey(value) {
     return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
 }
 
+function weeklyDayIndex(dateValue, weekStartValue) {
+    const date = utcDateKey(dateValue);
+    const weekStart = utcDateKey(weekStartValue);
+    if (!date || !weekStart) return null;
+    const offset = (new Date(`${date}T00:00:00.000Z`) -
+        new Date(`${weekStart}T00:00:00.000Z`)) / 86400000;
+    return Number.isInteger(offset) && offset >= 0 && offset <= 6 ? offset : null;
+}
+
+function weeklyCardEvidenceClass(row = {}) {
+    const intervals = asArray(row.card_intervals);
+    const hasPartialInterval = intervals.some((interval) =>
+        Boolean(String(interval?.from || '').trim()) !== Boolean(String(interval?.to || '').trim()));
+    if (hasPartialInterval) return 'INCOMPLETE_CARD_EVIDENCE';
+    const hasCompleteInterval = intervals.some((interval) =>
+        Boolean(String(interval?.from || '').trim()) && Boolean(String(interval?.to || '').trim()));
+    return hasCompleteInterval || Number(row.card_hours || 0) > 0
+        ? 'COMPLETE_CARD_EVIDENCE' : 'NO_CARD_EVIDENCE';
+}
+
+function buildWeeklyReusableCaseCriteria(snapshotResult = {}, decisionType = '') {
+    const snapshot = asObject(snapshotResult.snapshot || snapshotResult);
+    const scope = asObject(snapshot.scope);
+    const profile = asObject(snapshot.effective_profile);
+    const rowsByIndex = Array(7).fill(null);
+    asArray(snapshot.weekly_rows).forEach((row) => {
+        const index = weeklyDayIndex(row.date, scope.week_start);
+        if (index !== null) rowsByIndex[index] = row;
+    });
+    const expectedWorkDays = Number(profile.hmeres_ergasias_ebdomadas);
+    return stableValue({
+        version: WEEKLY_REUSABLE_CRITERIA_VERSION,
+        decision_grain: 'MONDAY_SUNDAY_WEEK',
+        team: normalize(scope.team, ''),
+        company_kod: normalize(scope.company_kod, ''),
+        ypokatasthma: normalizeBranch(scope.ypokatasthma),
+        weekly_case_type: normalize(decisionType, ''),
+        canonical_reasons: asArray(snapshot.canonical_reasons).map((value) => normalize(value, '')).sort(),
+        policy_version: normalize(snapshot.policy_version, ''),
+        source_version: normalize(snapshot.source_version, ''),
+        employment_type: stableValue({
+            kathestos_apasxolhshs: normalize(profile.kathestos_apasxolhshs, ''),
+            typos_apasxolhshs: normalize(profile.typos_apasxolhshs, ''),
+            typos_ebdomadas: normalize(profile.typos_ebdomadas, ''),
+            typos_ergazomenon: normalize(profile.typos_ergazomenon, ''),
+            weekly_work_days: Number.isFinite(expectedWorkDays) ? expectedWorkDays : null
+        }),
+        expected_repo_count: Number.isFinite(expectedWorkDays) ? Math.max(0, 7 - expectedWorkDays) : null,
+        declared_day_structure: rowsByIndex.map((row) => row ? {
+            category: normalize(row.declared_category, ''), repo: row.declared_repo === true
+        } : null),
+        actual_work_structure: rowsByIndex.map((row) => row ? {
+            repo: row.current_repo === true,
+            has_actual_work: Number(row.actual_hours || 0) > 0
+        } : null),
+        card_evidence_structure: rowsByIndex.map((row) => row ? weeklyCardEvidenceClass(row) : 'NO_ROW')
+    });
+}
+
+function normalizeWeeklyReusableDecisionPayload(decisionType, payload = {}, weekStart) {
+    const normalizedType = normalize(decisionType, '');
+    if (normalizedType === 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC') {
+        const source = asObject(payload);
+        if (String(source.applied_execution_id || '').trim()) return null;
+        const positions = asArray(source.current_repo_identities)
+            .map((date) => weeklyDayIndex(date, weekStart)).sort((a, b) => a - b);
+        return positions.length === 2 && positions.every((position) => position !== null) &&
+            new Set(positions).size === 2 ? { repo_day_positions: positions } : null;
+    }
+    if (normalizedType === 'CLASSIFICATION_BY_DATE') {
+        const entries = Object.entries(asObject(payload.classification_by_date)).map(([date, value]) => ({
+            day_position: weeklyDayIndex(date, weekStart), classification: normalize(value, '')
+        })).sort((left, right) => left.day_position - right.day_position);
+        return entries.length > 0 && entries.every((entry) => entry.day_position !== null)
+            ? { classifications_by_day_position: entries } : null;
+    }
+    return null;
+}
+
+function buildWeeklyReusableDecisionRule({ snapshotResult = {}, decisionType = '', decisionPayload = {} } = {}) {
+    const normalizedType = normalize(decisionType, '');
+    if (!WEEKLY_REUSABLE_DECISION_TYPES.has(normalizedType)) return {
+        eligible: false,
+        reason_code: normalizedType === 'CARD_VERIFICATION_PENDING'
+            ? 'UNIQUE_CARD_EVIDENCE' : 'EMPLOYEE_SPECIFIC_DECISION',
+        reason: normalizedType === 'CARD_VERIFICATION_PENDING'
+            ? 'Η διόρθωση ή τεκμηρίωση κάρτας αφορά μόνο τη συγκεκριμένη περίπτωση.'
+            : 'Η απόφαση εξαρτάται από συγκεκριμένο ιστορικό ή ανθρώπινο τεκμήριο.'
+    };
+    const scope = asObject(snapshotResult.scope || snapshotResult.snapshot?.scope);
+    const reusablePayload = normalizeWeeklyReusableDecisionPayload(
+        normalizedType, decisionPayload, scope.week_start
+    );
+    if (!reusablePayload) return { eligible: false, reason_code: 'DECISION_NOT_SAFELY_RELATIVE',
+        reason: 'Η απόφαση δεν μπορεί να μετατραπεί με ασφάλεια σε σχετική εβδομαδιαία επιλογή.' };
+    const criteria = buildWeeklyReusableCaseCriteria(snapshotResult, normalizedType);
+    if (!criteria.policy_version || !criteria.source_version ||
+        criteria.employment_type.weekly_work_days === null) {
+        return { eligible: false, reason_code: 'INCOMPLETE_WEEKLY_EQUIVALENCE_CONTEXT',
+            reason: 'Λείπουν απαραίτητα στοιχεία για ασφαλή αντιστοίχιση μελλοντικών εβδομάδων.' };
+    }
+    return { eligible: true, reason_code: '', reason: '', criteria,
+        fingerprint: buildReusableDecisionFingerprint(criteria), decision_payload: reusablePayload };
+}
+
+function dateAtWeeklyPosition(weekStart, position) {
+    const start = utcDateKey(weekStart);
+    if (!start || !Number.isInteger(position) || position < 0 || position > 6) return null;
+    const date = new Date(`${start}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + position);
+    return date.toISOString().slice(0, 10);
+}
+
+function materializeWeeklyReusableDecisionPayload(rule = {}, weekStart) {
+    const source = asObject(rule.reusable_decision_payload);
+    if (normalize(rule.decision_type, '') === 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC') {
+        const dates = asArray(source.repo_day_positions)
+            .map((position) => dateAtWeeklyPosition(weekStart, position));
+        return dates.length === 2 && dates.every(Boolean)
+            ? { current_repo_identities: dates, applied_execution_id: null } : null;
+    }
+    if (normalize(rule.decision_type, '') === 'CLASSIFICATION_BY_DATE') {
+        const entries = asArray(source.classifications_by_day_position).map((entry) => [
+            dateAtWeeklyPosition(weekStart, entry?.day_position), normalize(entry?.classification, '')
+        ]);
+        return entries.length > 0 && entries.every(([date]) => Boolean(date))
+            ? { classification_by_date: Object.fromEntries(entries) } : null;
+    }
+    return null;
+}
+
+function findApplicableWeeklyReusableDecision({ snapshotResult = {}, rules = [] } = {}) {
+    const scope = asObject(snapshotResult.scope || snapshotResult.snapshot?.scope);
+    const weekStart = utcDateKey(scope.week_start);
+    const weekEnd = utcDateKey(scope.week_end);
+    const matches = asArray(rules).filter((rule) => {
+        if (normalize(rule.reuse_scope, '') !== REUSE_SCOPE.FUTURE_IDENTICAL ||
+            normalize(rule.reuse_status, '') !== REUSE_STATUS.ACTIVE ||
+            normalize(rule.decision_status, '') !== 'RECORDED') return false;
+        const from = utcDateKey(rule.reuse_effective_from);
+        const to = utcDateKey(rule.reuse_effective_to);
+        if (!weekStart || !weekEnd || !from || weekEnd < from || to && weekStart > to) return false;
+        const criteria = buildWeeklyReusableCaseCriteria(snapshotResult, rule.decision_type);
+        return buildReusableDecisionFingerprint(criteria) === String(rule.reuse_fingerprint || '');
+    }).map((rule) => ({ rule, payload: materializeWeeklyReusableDecisionPayload(rule, weekStart) }))
+        .filter((match) => match.payload);
+    if (matches.length > 1) return { applicability: 'CONFLICT', records: matches.map(({ rule }) => rule) };
+    if (!matches.length) return { applicability: 'NOT_FOUND', record: null };
+    return { applicability: 'APPLICABLE', record: { ...matches[0].rule,
+        decision_payload: matches[0].payload }, reusable: true };
+}
+
+function groupWeeklyReusableCases(cases = []) {
+    const groups = new Map();
+    asArray(cases).forEach((entry) => {
+        const decisionType = normalize(entry?.decision_type, '');
+        if (!WEEKLY_REUSABLE_DECISION_TYPES.has(decisionType) || !entry?.snapshot_result) return;
+        const criteria = buildWeeklyReusableCaseCriteria(entry.snapshot_result, decisionType);
+        const groupKey = buildReusableDecisionFingerprint(criteria);
+        if (!groups.has(groupKey)) groups.set(groupKey, { group_key: groupKey,
+            decision_type: decisionType, criteria, cases: [] });
+        groups.get(groupKey).cases.push(entry.case);
+    });
+    return [...groups.values()].map((group) => ({ ...group,
+        count: group.cases.length,
+        employees_count: new Set(group.cases.map((item) => normalize(item?.employee_kodikos, '')))
+            .size
+    }));
+}
+
 function isRuleEffectiveForRow(rule = {}, row = {}) {
     const rowDate = utcDateKey(row.hmeromhnia);
     const fromDate = utcDateKey(rule.reuse_effective_from);
@@ -430,5 +606,15 @@ module.exports = {
     getReusableDecisionEligibility,
     utcDateKey,
     isRuleEffectiveForRow,
+    WEEKLY_REUSABLE_CRITERIA_VERSION,
+    WEEKLY_REUSABLE_DECISION_TYPES,
+    weeklyDayIndex,
+    buildWeeklyReusableCaseCriteria,
+    normalizeWeeklyReusableDecisionPayload,
+    buildWeeklyReusableDecisionRule,
+    dateAtWeeklyPosition,
+    materializeWeeklyReusableDecisionPayload,
+    findApplicableWeeklyReusableDecision,
+    groupWeeklyReusableCases,
     applyReusablePolicyDecisionsToPreviewRows
 };

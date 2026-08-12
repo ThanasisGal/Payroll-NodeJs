@@ -23,7 +23,7 @@ assert.ok(new Model({ ...record, decision_type: 'UNKNOWN' }).validateSync()?.err
 assert.equal(Model.schema.options.collection, 'Apasxoliseis_Weekly_Canonical_Decisions');
 assert.equal(Model.schema.options.autoIndex, false);
 assert.equal(Model.schema.options.autoCreate, false);
-assert.equal(Model.schema.indexes().length, 4);
+assert.equal(Model.schema.indexes().length, 5);
 const uniqueIndexes = Model.schema.indexes().filter(([, options]) => options.unique === true);
 assert.deepEqual(uniqueIndexes.map(([, options]) => options.name), [
     'unique_weekly_canonical_decision_request',
