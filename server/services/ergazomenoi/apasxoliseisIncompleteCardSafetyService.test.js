@@ -63,7 +63,7 @@ const unverified = buildPartialVerifiedCardUpdate({
     cards_eos_ora_02: '20:00'
 });
 assert.strictEqual(unverified.verificationStatus, 'UNVERIFIED');
-assert.strictEqual(unverified.update.kathgoria_ergasias_apologistika, '');
+assert.strictEqual(unverified.update.kathgoria_ergasias_apologistika, 'ΕΡΓ');
 assert.strictEqual(unverified.update.ores_ergasias_apologistika, 0);
 assert.strictEqual(unverified.update.ores_pragmatikhs_ergasias_apologistika, 0);
 

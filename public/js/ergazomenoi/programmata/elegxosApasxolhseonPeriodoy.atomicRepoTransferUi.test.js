@@ -267,6 +267,32 @@ function testPersistedRepoCategoryOverridesDerivedLeave() {
     assert.strictEqual(derived.source, 'derived');
 }
 
+function testStage1DailyClassificationPresentationPriority() {
+    const possible = { kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+        cards_ores_ergasias: 0, noCardsDisplayStatus: 'ΑΔΕΙΑ',
+        kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' };
+    const storedLeave = sandbox.resolveReviewApologistikoPresentation({ ...possible,
+        is_locked: true, adeia_apologistika: true,
+        kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' }, {});
+    assert.strictEqual(storedLeave.text, 'ΑΔΕΙΑ');
+    assert.strictEqual(storedLeave.source, 'persisted_stage1');
+    assert.strictEqual(sandbox.resolveReviewApologistikoPresentation({ ...possible,
+        astheneia_apologistika: true, adeia_apologistika: false,
+        kathgoria_adeias_apologistika: 'ΑΔΑΣ' }, {}).text, 'ΑΣΘΕΝΕΙΑ');
+    const storedAbsence = sandbox.resolveReviewApologistikoPresentation({ ...possible,
+        apousia_apologistika: true, kathgoria_adeias_apologistika: '' }, {});
+    assert.strictEqual(storedAbsence.text, 'ΑΠΟΥΣΙΑ');
+    assert.ok(storedAbsence.className.includes('cell-stage1-absence'));
+    assert.ok(!storedLeave.className.includes('cell-stage1-absence'));
+    assert.match(source, /\.cell-stage1-absence\s*\{[^}]*color:\s*#dc3545\s*!important/s);
+    assert.strictEqual(sandbox.resolveReviewApologistikoPresentation(possible, {}).text,
+        'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+    assert.notStrictEqual(sandbox.resolveReviewApologistikoPresentation(possible, {}).text,
+        'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.notStrictEqual(sandbox.resolveReviewApologistikoPresentation({ ...possible,
+        effective_is_full_time: false }, {}).text, 'ΜΗ ΕΡΓΑΣΙΑ');
+}
+
 function testPossibleLeaveResolverAndModalPresentationContract() {
     const derivedRow = {
         kathgoria_ergasias: 'ΕΡΓ',
@@ -2781,6 +2807,16 @@ function testPreAndPostCalculationWorkflowGating() {
         calculation: { authoritative_result: true },
         allowed_actions: { record_decision: true }
     }), false);
+    assert.strictEqual(sandbox.canRecordCanonicalEmploymentDecision({
+        effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
+        calculation: { authoritative_result: false },
+        allowed_actions: {
+            record_decision: false,
+            record_stale_canonical_decision: true,
+            calculate: false,
+            repo_transfer: false
+        }
+    }), true);
 
     const weeklyRendererStart = source.indexOf('function appendEmployeeDeviationRows(');
     const weeklyRendererEnd = source.indexOf('const canonicalApplicabilityLabels', weeklyRendererStart);
@@ -3337,6 +3373,38 @@ function testOpenWeekAndDeviationNotesStayHrSafe() {
     }).includes('UNKNOWN_PRIVATE_REASON_CODE'));
 }
 
+function testWeeklyDeviationUsesAuthoritativePresentationReasons() {
+    const resolvedHtml = sandbox.renderDeviationNoteCell({
+        status: 'READY',
+        sixth_day_date: '2026-06-14',
+        presentation_reasons: ['CARD_VERIFICATION_PENDING'],
+        repo_transfer_reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
+    });
+    const resolvedText = getVisibleText(resolvedHtml);
+    assert.ok(resolvedText.includes('6η ημέρα: Κυ 14/06/2026'));
+    assert.ok(resolvedText.includes(
+        'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.'));
+    assert.ok(!resolvedText.includes(
+        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό'));
+
+    const unresolvedText = getVisibleText(sandbox.renderDeviationNoteCell({
+        status: 'NEEDS_HR_DECISION',
+        presentation_reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
+    }));
+    assert.ok(unresolvedText.includes(
+        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό'));
+
+    const staleText = getVisibleText(sandbox.renderDeviationNoteCell({
+        status: 'NEEDS_HR_DECISION',
+        presentation_reasons: [
+            'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+            'CANONICAL_DECISION_STALE'
+        ]
+    }));
+    assert.ok(staleText.includes(
+        'Η προηγούμενη απόφαση χρειάζεται επανέλεγχο επειδή άλλαξαν τα δεδομένα'));
+}
+
 function testScenarioDetailsNeverExposeReasonCodes() {
     const html = sandbox.renderScenarioDetailsSection({
         scenarioDecision: {
@@ -3420,6 +3488,7 @@ const tests = [
     testWeeklyResolutionShowsRepoAndSixthDayFacts,
     testSixthDayCardsBadgeShowsApplicableRate,
     testPersistedRepoCategoryOverridesDerivedLeave,
+    testStage1DailyClassificationPresentationPriority,
     testPossibleLeaveResolverAndModalPresentationContract,
     testPossibleLeaveValidationAndTomSelectCheckboxContract,
     testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation,
@@ -3471,6 +3540,7 @@ const tests = [
     testEmploymentReviewScrollContainerContract,
     testWeeklyHrReasonPresentationIsGreekAndSafe,
     testOpenWeekAndDeviationNotesStayHrSafe,
+    testWeeklyDeviationUsesAuthoritativePresentationReasons,
     testScenarioDetailsNeverExposeReasonCodes,
     testAllKnownBackendGroupingCodesHaveGreekLabels,
     testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct,

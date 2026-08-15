@@ -67,6 +67,66 @@ assert.strictEqual(correctedOrphan.rawCardEvidenceUnresolved, false);
 assert.strictEqual(correctedOrphan.safeOrphan, null);
 assert.strictEqual(correctedOrphan.sanitizedUpdate.normal_attendance_rule_applied, true);
 assert.strictEqual(correctedAttendanceRuleCalls, 3);
+const canonicalAbsenceRecalculation = buildEmploymentDailyCalculationUpdate({
+    row: { _id: 'canonical-absence', apousia_apologistika: true,
+        ores_ergasias: 8, hmeres_apoysias_apologistika: 1,
+        ores_apoysias_apologistika: 8 },
+    effectiveEmployee: {}, argiesDateSet: new Set(), weeklyState: {},
+    operations: { ...operations,
+        checkOresApoysias: () => ({ ores_apoysias_apologistika: 2 }) }
+});
+assert.strictEqual(canonicalAbsenceRecalculation.sanitizedUpdate
+    .ores_apoysias_base_apologistika, 2);
+assert.strictEqual(canonicalAbsenceRecalculation.sanitizedUpdate
+    .ores_apoysias_apologistika, 8);
+assert.strictEqual(canonicalAbsenceRecalculation.sanitizedUpdate
+    .hmeres_apoysias_apologistika, 1);
+const reusableResolution = {
+    automaticReusableApplied: true, policyVersion: 'orphan-card-continuous:v1',
+    orphanType: 'START_ONLY', proposal: { start: '14:51', end: '22:51', durationHours: 8 },
+    apologistikoBookUpdate: false,
+    approvedUpdates: { kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        apo_ora_01_apologistika: '14:51', eos_ora_01_apologistika: '22:51',
+        ores_ergasias_apologistika: 8, ores_pragmatikhs_ergasias_apologistika: 8,
+        apologistiko_biblio: false }
+};
+const autoReused = buildEmploymentDailyCalculationUpdate({ row: { _id: 'reused' },
+    effectiveEmployee: {}, argiesDateSet: new Set(), weeklyState: {},
+    operations: { ...operations,
+        resolveCardPairVerification: () => ({ hasUnresolvedCardEvidence: true }) },
+    orphanReusableResolution: reusableResolution });
+assert.strictEqual(autoReused.unresolved, false);
+assert.strictEqual(autoReused.sanitizedUpdate.apo_ora_01_apologistika, '14:51');
+assert.strictEqual(autoReused.sanitizedUpdate.orphan_card_resolution.automatically_reused, true);
+const unsafeReuse = buildEmploymentDailyCalculationUpdate({ row: { _id: 'unsafe' },
+    effectiveEmployee: {}, argiesDateSet: new Set(), weeklyState: {},
+    operations: { ...operations,
+        resolveCardPairVerification: () => ({ hasUnresolvedCardEvidence: true }) },
+    orphanReusableResolution: { ...reusableResolution, automaticReusableApplied: false } });
+assert.strictEqual(unsafeReuse.unresolved, true);
+assert.strictEqual(unsafeReuse.sanitizedUpdate.orphan_card_resolution, undefined);
+const directApprovedResolution = {
+    eligible: true, canApprove: true, policyVersion: 'orphan-card-continuous:v1',
+    orphanType: 'START_ONLY', proposal: { start: '14:51', end: '22:30', durationHours: 7.65 },
+    apologistikoBookUpdate: false,
+    approvedUpdates: { kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        apo_ora_01_apologistika: '14:51', eos_ora_01_apologistika: '22:30',
+        ores_ergasias_apologistika: 7.65, ores_pragmatikhs_ergasias_apologistika: 7.65,
+        apologistiko_biblio: false }
+};
+const directApproved = buildEmploymentDailyCalculationUpdate({
+    row: { _id: 'direct-approved', cards_apo_ora_01: '14:51', cards_eos_ora_01: '' },
+    effectiveEmployee: {}, argiesDateSet: new Set(), weeklyState: null,
+    operations: { ...operations,
+        resolveCardPairVerification: () => ({ hasUnresolvedCardEvidence: true }) },
+    orphanApprovedResolution: directApprovedResolution
+});
+assert.strictEqual(directApproved.unresolved, false);
+assert.strictEqual(directApproved.sanitizedUpdate.apo_ora_01_apologistika, '14:51');
+assert.strictEqual(directApproved.sanitizedUpdate.eos_ora_01_apologistika, '22:30');
+assert.strictEqual(directApproved.sanitizedUpdate.orphan_card_resolution.automatically_reused, false);
+assert.strictEqual(directApproved.sanitizedUpdate.overwork, undefined,
+    'weekly-dependent fields must not be fabricated without weeklyState');
 for (const required of ['normalize', 'verify', 'broken-program-cards', 'early-late', 'continuous-broken',
     'broken-continuous', 'no-schedule', 'night', 'sunday-holiday', 'repo-leave', 'absence', 'overtime', 'protection']) {
     assert.ok(calls.some((call) => call.name === required), required);

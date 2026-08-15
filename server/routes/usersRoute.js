@@ -1530,12 +1530,51 @@ router.get(
     erganhController.exportProdhlomenaOrariaReviewPdf
 );
 
+router.get(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getWeeklyHrWorkflowStage1
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/complete',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.completeWeeklyHrWorkflowStage1
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/bulk-complete',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.completeWeeklyHrWorkflowStage1Bulk
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/bulk-classify-days',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.saveWeeklyHrStage1DailyClassificationsBulk
+);
+
 router.patch(
     '/api/prodhlomena-oraria/review/:id',
     checkAuth,
     requireEmploymentReviewAccess,
     requireCriticalEmploymentDecisionRole,
     erganhController.updateProdhlomenaOrariaReviewRecord
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/:id/orphan-resolution/preview',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.previewProdhlomenaOrariaOrphanResolution
 );
 
 router.get(

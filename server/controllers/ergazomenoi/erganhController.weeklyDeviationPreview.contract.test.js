@@ -21,6 +21,13 @@ assert.ok(source.includes('rows: deviationContextRows'));
 assert.ok(source.includes('holidayByDateKey:'));
 assert.ok(source.includes('existingAuditCountByRowKey:'));
 assert.ok(source.includes('deviationAuditCountByRowKey'));
+assert.ok(source.includes('const weeklyCanonicalDecisionsByWeek = groupWeeklyCanonicalDecisions('));
+assert.ok(source.includes('resolveCanonicalAnalysis: ({'));
+assert.ok(source.includes('return resolveWeeklyCanonicalDecisionAnalysis({'));
+assert.ok(source.includes("reuse_scope: 'FUTURE_IDENTICAL'"));
+assert.ok(source.includes("execution_status: 'APPLIED'"));
+assert.ok(source.includes('CANONICAL_EMPLOYEE_PROFILE_FIELDS'));
+assert.ok(source.includes('.select(CANONICAL_HISTORY_SELECT_FIELDS)'));
 assert.ok(source.includes('external_break_minutes:'));
 assert.ok(source.includes('eidikh_kathgoria_ergazomenoy:'));
 const deviationSelectStart = source.indexOf(
@@ -56,9 +63,13 @@ for (const field of [
         `missing ${field}`
     );
 }
-assert.ok(source.includes('asOfDate: req.session.appDate'));
+assert.ok(source.includes('asOfDate: resolveWeeklyRepoPreviewAsOfDate({'));
+assert.ok(source.includes('sessionAppDate: req.session.appDate'));
+assert.ok(source.includes('periodControl: reviewPeriodControl'));
 assert.ok(source.includes('$gte: startOfWeekMondayUtc(requestedPeriodStart)'));
 assert.ok(source.includes('$lte: endOfWeekSundayUtc(requestedPeriodEnd)'));
+assert.ok(source.includes('ProdhlomenaOrariaModel.find(filter)'));
+assert.ok(source.includes('ProdhlomenaOrariaModel.find(deviationContextFilter)'));
 assert.ok(source.includes('pendingDeviationWeeks'));
 assert.ok(source.includes('legacyDeviations'));
 assert.ok(source.includes('normalizeLegacyDeviation({'));

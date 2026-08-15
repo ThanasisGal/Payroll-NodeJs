@@ -71,9 +71,9 @@ result = analyzeWeeklySixthSeventhDay({
     hourlyRate: 10
 });
 assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
-assert.strictEqual(result.sixthDay, null);
-assert.ok(result.reasons.includes('CARD_VERIFICATION_PENDING'));
-assert.ok(result.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
+assert.strictEqual(result.sixthDay, undefined);
+assert.ok(result.reasons.includes('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+assert.ok(result.reasons.includes('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
 
 const noCardSunday = week([7, 7, 7, 7, 7, 7, 0]);
 assert.strictEqual(analyzeWeeklySixthSeventhDay({

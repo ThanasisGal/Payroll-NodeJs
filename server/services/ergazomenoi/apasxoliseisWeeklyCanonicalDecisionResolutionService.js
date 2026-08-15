@@ -57,7 +57,8 @@ function resolveWeeklyCanonicalDecisionAnalysis({
     weekRows = [],
     effectiveProfile = {},
     employee = {},
-    profileHistory = []
+    profileHistory = [],
+    isCalculatedWorkHoursAuthoritativeForRow = null
 } = {}) {
     if (automaticAnalysis?.status !== 'NEEDS_HR_DECISION') {
         return { analysis: automaticAnalysis, applicability: APPLICABILITY.NOT_FOUND, decision: null };
@@ -116,7 +117,9 @@ function resolveWeeklyCanonicalDecisionAnalysis({
     } else return { analysis: blocked(automaticAnalysis, 'CANONICAL_DECISION_OUTCOME_NOT_CONSUMABLE'),
         ...resolved, decision: record };
     const analysis = analyzeWeeklySixthSeventhDay({ weekRows, effectiveProfile: profile,
-        hourlyRate: profile.pragmatikoOromisthio, ...analyzerOptions });
+        hourlyRate: profile.pragmatikoOromisthio,
+        isCalculatedWorkHoursAuthoritativeForRow,
+        ...analyzerOptions });
     return { analysis, ...resolved, decision: record, effectiveProfile: profile };
 }
 

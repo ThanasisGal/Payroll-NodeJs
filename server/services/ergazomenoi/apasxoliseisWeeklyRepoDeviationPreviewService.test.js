@@ -4,7 +4,8 @@ const {
     STATUS,
     normalizeLegacyDeviation,
     buildWeeklyRepoDeviationPreview,
-    attachSixthDayPresentationToRows
+    attachSixthDayPresentationToRows,
+    resolveWeeklyRepoPreviewAsOfDate
 } = require('./apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
     analyzeWeeklyRepoTransferForEmploymentContract
@@ -19,6 +20,18 @@ const {
     buildWeeklyRepoTransferSinglePairGroupProjection
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
 const productionFixtures = require('./fixtures/weeklyRepoTransferProductionRegressionFixtures');
+const {
+    buildWeeklyCanonicalDecisionSnapshotInput
+} = require('./apasxoliseisWeeklyCanonicalDecisionSnapshotInputService');
+const {
+    buildCanonicalWeeklyDecisionSnapshot
+} = require('./apasxoliseisWeeklyCanonicalDecisionService');
+const {
+    resolveWeeklyCanonicalDecisionAnalysis
+} = require('./apasxoliseisWeeklyCanonicalDecisionResolutionService');
+const {
+    buildWeeklyReusableDecisionRule
+} = require('./apasxoliseisReusablePolicyDecisionService');
 
 function rows(start, count = 7, overrides = {}) {
     return Array.from({ length: count }, (_, offset) => {
@@ -177,6 +190,34 @@ function testOpenTrailingWeekIsPendingNotDeviation() {
     assert.strictEqual(result.pendingWeeks[0].complete, false);
     assert.strictEqual(result.pendingWeeks[0].weekStart, '2026-06-29');
     assert.strictEqual(result.pendingWeeks[0].weekEnd, '2026-07-05');
+}
+
+function testCompletedHistoricalReconstructionEvaluatesCrossMonthWeek() {
+    const historicalAsOf = resolveWeeklyRepoPreviewAsOfDate({
+        sessionAppDate: '2026-06-30',
+        periodEnd: '2026-06-30',
+        periodControl: {
+            historical_reconstruction_status: 'COMPLETED',
+            historical_reconstruction_completed_at: '2026-08-12T11:23:27.960Z'
+        }
+    });
+    assert.strictEqual(historicalAsOf, '2026-08-12');
+    const contextRows = rows('2026-06-29');
+    assert.deepStrictEqual(
+        contextRows.slice(2).map((row) => row.hmeromhnia),
+        ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05']
+    );
+    const result = buildWeeklyRepoDeviationPreview({
+        rows: contextRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: historicalAsOf,
+        resolveWeeklyProfile: fiveDayProfile
+    });
+    assert.strictEqual(result.pendingWeeks.length, 0);
+    assert.strictEqual(result.deviations.length, 1);
+    assert.strictEqual(result.deviations[0].weekStart, '2026-06-29');
+    assert.strictEqual(result.deviations[0].weekEnd, '2026-07-05');
 }
 
 function repoTransferWeek({ applied = false } = {}) {
@@ -618,11 +659,160 @@ function testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow() {
     assert.strictEqual(reviewRows[2].is_sixth_day, false);
 }
 
+function canonicalJunePreview({ decisionMode = 'NONE' } = {}) {
+    const dates = ['08', '09', '10', '11', '12', '13', '14'];
+    const cards = [
+        ['12:37', '22:18'], ['15:12', '22:17'], ['15:15', '22:07'], ['', ''],
+        ['13:35', '23:07'], ['15:44', '22:35'], ['14:51', '']
+    ];
+    const hours = [9.18, 6.58, 6.37, 0, 9.03, 6.35, 8];
+    const weekRows = dates.map((day, index) => ({
+        _id: `june-preview-${day}`,
+        team: 'THA',
+        company_kod: 'company',
+        ypokatasthma: '0000',
+        kodikos: '0004',
+        hmeromhnia: `2026-06-${day}`,
+        kathgoria_ergasias: day === '10' ? 'ΑΝ' : 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: day === '10' ? 'ΕΡΓ' : '',
+        repo: day === '10',
+        repo_apologistika: false,
+        ores_ergasias: day === '10' ? 0 : 8,
+        ores_ergasias_apologistika: hours[index],
+        cards_ores_ergasias: index === 6 ? 0 : hours[index] > 0 ? hours[index] + 0.5 : 0,
+        cards_apo_ora_01: cards[index][0],
+        cards_eos_ora_01: cards[index][1],
+        apo_ora_01: day === '14' ? '14:51' : '',
+        eos_ora_01: day === '14' ? '22:51' : '',
+        ...(day === '14' ? { orphan_card_resolution: {
+            status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
+        } } : {})
+    }));
+    const employee = {
+        _id: '507f191e810c19729de860eb',
+        kodikos: '0004',
+        ypokatasthma: '0000',
+        hmeres_ergasias_ebdomadas: 5,
+        ores_ergasias_ebdomadas: 40,
+        mo_oron_hmerhsias_ergasias: 8,
+        typos_apasxolhshs: '0',
+        pososto_prosayxhshs_6hs_hmeras: 0,
+        eidikh_kathgoria_ergazomenoy: '0009',
+        pragmatikoOromisthio: 10,
+        source: 'CURRENT_EMPLOYEE_FALLBACK'
+    };
+    return buildWeeklyRepoDeviationPreview({
+        rows: weekRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: () => ({
+            repoResolutionReason: null,
+            effectiveProfile: employee
+        }),
+        resolveDailyProfile: () => ({ fullTime: true }),
+        isFullTimeProfile: (dailyProfile) => dailyProfile.fullTime === true,
+        resolveCanonicalAnalysis: decisionMode === 'NONE' ? undefined : ({
+            base,
+            weekRows: currentRows,
+            effectiveProfile,
+            automaticAnalysis
+        }) => {
+            const week = {
+                naturalWeekStart: base.weekStart,
+                naturalWeekEnd: base.weekEnd,
+                weekStart: base.weekStart,
+                weekEnd: base.weekEnd,
+                isFullWeek: true
+            };
+            const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
+                team: 'THA', company_kod: 'company', employee, week,
+                weekRows: currentRows, effectiveProfile, profileHistory: [], automaticAnalysis,
+                appliedProtectionContext: { entriesByRowId: {} }
+            });
+            const snapshot = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
+            const payload = {
+                current_repo_identities: ['2026-06-10', '2026-06-11'],
+                applied_execution_id: null
+            };
+            let record = {
+                team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+                employee_kodikos: '0004', week_start: new Date('2026-06-08'),
+                week_end: new Date('2026-06-14'), decision_status: 'RECORDED',
+                decision_type: 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+                decision_payload: payload, snapshot_fingerprint: snapshot.fingerprint,
+                request_id: 'weekly-preview-test'
+            };
+            if (decisionMode === 'STALE') record.snapshot_fingerprint = '0'.repeat(64);
+            if (decisionMode === 'REUSABLE') {
+                const reusable = buildWeeklyReusableDecisionRule({
+                    snapshotResult: snapshot,
+                    decisionType: record.decision_type,
+                    decisionPayload: payload
+                });
+                assert.strictEqual(reusable.eligible, true);
+                record = {
+                    ...record,
+                    employee_kodikos: '',
+                    reuse_scope: 'FUTURE_IDENTICAL',
+                    reuse_status: 'ACTIVE',
+                    reuse_effective_from: new Date('2026-06-01'),
+                    reuse_effective_to: null,
+                    reuse_fingerprint: reusable.fingerprint,
+                    reusable_decision_payload: reusable.decision_payload
+                };
+            }
+            return resolveWeeklyCanonicalDecisionAnalysis({
+                automaticAnalysis, snapshotInput, decisionRecords: [record],
+                weekRows: currentRows, effectiveProfile, employee, profileHistory: []
+            });
+        }
+    });
+}
+
+function testCanonicalDecisionIsConsumedByWeeklyProjection() {
+    const unresolved = canonicalJunePreview().deviations[0];
+    assert.strictEqual(unresolved.canonical_decision_applicability, 'NOT_FOUND');
+    assert.strictEqual(unresolved.status, STATUS.NEEDS_HR_DECISION);
+    assert.ok(unresolved.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+    assert.ok(unresolved.presentation_reasons.includes(
+        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+
+    for (const decisionMode of ['ONE_TIME', 'REUSABLE']) {
+        const resolved = canonicalJunePreview({ decisionMode }).deviations[0];
+        assert.strictEqual(resolved.canonical_decision_applicability, 'APPLICABLE');
+        assert.strictEqual(resolved.status, STATUS.READY);
+        assert.ok(!resolved.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+        assert.ok(!resolved.presentation_reasons.includes(
+            'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+        assert.strictEqual(resolved.actual_repo, 2);
+        assert.strictEqual(resolved.resolved_repo, 2);
+        assert.deepEqual(resolved.resolved_repo_identities,
+            ['2026-06-10', '2026-06-11']);
+        assert.strictEqual(resolved.requires_new_hr_decision, false);
+        assert.strictEqual(resolved.actual_workdays, 6);
+        assert.strictEqual(resolved.sixth_day_date, '2026-06-09');
+        assert.strictEqual(resolved.sixth_day_count, 1);
+        assert.strictEqual(resolved.sixth_day_premium_rate, 0);
+        assert.strictEqual(resolved.seventh_day_count, 0);
+    }
+
+    const stale = canonicalJunePreview({ decisionMode: 'STALE' }).deviations[0];
+    assert.strictEqual(stale.canonical_decision_applicability, 'STALE');
+    assert.strictEqual(stale.status, STATUS.NEEDS_HR_DECISION);
+    assert.ok(stale.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+    assert.ok(stale.reasons.includes('CANONICAL_DECISION_STALE'));
+    assert.ok(stale.presentation_reasons.includes(
+        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+    assert.ok(stale.presentation_reasons.includes('CANONICAL_DECISION_STALE'));
+}
+
 testSundayAndMondayUseDifferentBuckets();
 testCompletedMondaySundayRanges();
 testDepartureWeekDoesNotCreateWeeklyPolicyChecks();
 testContractualProfileControlsExpectedRepo();
 testOpenTrailingWeekIsPendingNotDeviation();
+testCompletedHistoricalReconstructionEvaluatesCrossMonthWeek();
 testRepoTransferLifecycleUsesEffectiveFinalRows();
 testCanonicalCurrentRepoStateAndApprovalIsolation();
 testLegacyPersistedRangeIsExplicit();
@@ -630,5 +820,6 @@ testDeviationAndAtomicUseTheSameContractSelector();
 testDeviationAndAtomicContextParity();
 testSixthDaySurvivesMissingRepoTransferSource();
 testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow();
+testCanonicalDecisionIsConsumedByWeeklyProjection();
 
 console.log('weekly repo deviation Monday-Sunday preview tests passed');

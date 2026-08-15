@@ -50,9 +50,15 @@ const { savePdfFromBase64, deletePdf } = require('../../utils/pdfHandler');
 const { addPdfUrlsToErgazomenos } = require('../../utils/s3UrlHelper');
 const { getUserContext } = require('../../utils/userContext');
 const {
+    getOrarioTermsForDate,
     resolveEmploymentTypeFromFormData,
-    buildCanonicalWorkTermsSnapshotFields
+    buildCanonicalWorkTermsSnapshotFields,
+    resolveWorkTermsPeriodIntent,
+    getPreviousUtcDate
 } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const {
+    buildBreakConfigurationHistoryChange
+} = require('../../utils/ergazomenoi/resolveBreakConfigurationForDate');
 const {
     generatePresignedUrl,
     downloadS3UriToTempFile,
@@ -423,7 +429,11 @@ function parseCorrectivePayrollWithholdingRate(value) {
     return number;
 }
 
-function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {}) {
+function buildIstorikoWorkTermsSnapshot(
+    formData = {},
+    fallbackErgazomenos = {},
+    options = {}
+) {
     const hmeres = toNumberOrNull(formData.hmeres_ergasias_ebdomadas);
     const weeklyHours = toNumberOrNull(formData.ores_ergasias_ebdomadas);
     const averageDailyHours =
@@ -437,12 +447,7 @@ function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {})
 
     const orarioApo = toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo);
     const orarioEos = toDateOrNull(formData.hmeromhnia_allaghs_orarioy_eos);
-
-    // Τα παρακάτω δύο πεδία είναι ΑΠΟΚΛΕΙΣΤΙΚΑ για την ισχύ των όρων εργασίας.
-    // Δεν αντικαθιστούν τα hmeromhnia_allaghs_orarioy_* που χρησιμοποιούνται
-    // για τον ορισμό/δημιουργία των εβδομαδιαίων ωραρίων.
-    const oroiApo = toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) || orarioApo;
-    const oroiEos = toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null;
+    const termsIntent = resolveWorkTermsPeriodIntent(formData, options);
 
     return {
         // Ημερομηνίες περιόδου ωραρίων.
@@ -452,8 +457,8 @@ function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {})
 
         // Ημερομηνίες ισχύος όρων εργασίας.
         // Αυτές διαβάζει ο απολογιστικός υπολογισμός για 5ήμερο/6ήμερο/40h/30h.
-        hmeromhnia_isxyos_oron_ergasias_apo: oroiApo,
-        hmeromhnia_isxyos_oron_ergasias_eos: oroiEos,
+        hmeromhnia_isxyos_oron_ergasias_apo: termsIntent.effectiveFrom,
+        hmeromhnia_isxyos_oron_ergasias_eos: termsIntent.effectiveTo,
 
         // Snapshot όρων εργασίας.
         hmeres_ergasias_ebdomadas: hmeres,
@@ -463,21 +468,41 @@ function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {})
         employment_profile_source: formData.employment_profile_source || 'ERGOMENOI_CONTROLLER',
 
         // Flag ότι η εγγραφή μπορεί να χρησιμοποιηθεί από τον απολογιστικό υπολογισμό.
-        afora_allagh_oron_ergasias: Boolean(oroiApo || hmeres || weeklyHours || averageDailyHours)
+        afora_allagh_oron_ergasias: termsIntent.isTermsChange
     };
 }
 
-function getIstorikoDateIdentity(formData = {}) {
+async function loadOrarioTermsHistoryForSnapshot({ team, company_kod, kodikos,
+    formData = {}, fallbackErgazomenos = {} }) {
+    const rows = await IstorikoProslhpseonAllagonModel.find({
+        team, company_kod, kodikos
+    }).sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1,
+        hmeromhnia_allaghs_orarioy_apo: 1 }).lean();
+    const pending = buildIstorikoWorkTermsSnapshot(formData, fallbackErgazomenos);
+    const pendingStart = pending.hmeromhnia_isxyos_oron_ergasias_apo?.getTime();
+    const withoutReplacedVersion = pendingStart
+        ? rows.filter((row) => {
+              const existingStart = toDateOrNull(
+                  row.hmeromhnia_isxyos_oron_ergasias_apo ||
+                  row.hmeromhnia_allaghs_orarioy_apo
+              );
+              return existingStart?.getTime() !== pendingStart;
+          })
+        : rows;
+    return pending.afora_allagh_oron_ergasias
+        ? [...withoutReplacedVersion, pending]
+        : withoutReplacedVersion;
+}
+
+function getIstorikoDateIdentity(formData = {}, options = {}) {
+    const termsIntent = resolveWorkTermsPeriodIntent(formData, options);
     return {
         hmeromhnia_proslhpshs: toDateOrNull(formData.hmeromhnia_proslhpshs),
         hmeromhnia_allaghs_symbashs: toDateOrNull(formData.hmeromhnia_allaghs_symbashs),
         hmeromhnia_allaghs_orarioy_apo: toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo),
         hmeromhnia_allaghs_orarioy_eos: toDateOrNull(formData.hmeromhnia_allaghs_orarioy_eos),
-        hmeromhnia_isxyos_oron_ergasias_apo:
-            toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) ||
-            toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo),
-        hmeromhnia_isxyos_oron_ergasias_eos:
-            toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null,
+        hmeromhnia_isxyos_oron_ergasias_apo: termsIntent.effectiveFrom,
+        hmeromhnia_isxyos_oron_ergasias_eos: termsIntent.effectiveTo,
         hmeromhnia_lhxhs_symbashs: toDateOrNull(formData.hmeromhnia_lhxhs_symbashs),
         hmeromhnia_apoxorhshs: toDateOrNull(formData.hmeromhnia_apoxorhshs)
     };
@@ -889,16 +914,21 @@ class ergazomenoiController {
 
             const kodikos = ergazomenos.kodikos;
 
-            const buildUpdateData = (data = {}) => ({
+            const buildUpdateData = (data = {}) => {
+                // Η άμεση συντήρηση υπάρχοντος history row διορθώνει persisted
+                // history data· δεν είναι producer νέας μεταβολής από τη φόρμα εργαζομένου.
+                const isTermsChange = data.afora_allagh_oron_ergasias === true;
+                return ({
                 hmeromhnia_proslhpshs: toDateOrNull(data.hmeromhnia_proslhpshs),
                 hmeromhnia_allaghs_symbashs: toDateOrNull(data.hmeromhnia_allaghs_symbashs),
                 hmeromhnia_allaghs_orarioy_apo: toDateOrNull(data.hmeromhnia_allaghs_orarioy_apo),
                 hmeromhnia_allaghs_orarioy_eos: toDateOrNull(data.hmeromhnia_allaghs_orarioy_eos),
-                hmeromhnia_isxyos_oron_ergasias_apo:
-                    toDateOrNull(data.hmeromhnia_isxyos_oron_ergasias_apo) ||
-                    toDateOrNull(data.hmeromhnia_allaghs_orarioy_apo),
-                hmeromhnia_isxyos_oron_ergasias_eos:
-                    toDateOrNull(data.hmeromhnia_isxyos_oron_ergasias_eos) || null,
+                hmeromhnia_isxyos_oron_ergasias_apo: isTermsChange
+                    ? toDateOrNull(data.hmeromhnia_isxyos_oron_ergasias_apo)
+                    : null,
+                hmeromhnia_isxyos_oron_ergasias_eos: isTermsChange
+                    ? toDateOrNull(data.hmeromhnia_isxyos_oron_ergasias_eos)
+                    : null,
                 hmeromhnia_lhxhs_symbashs: toDateOrNull(data.hmeromhnia_lhxhs_symbashs),
                 hmeromhnia_apoxorhshs: toDateOrNull(data.hmeromhnia_apoxorhshs),
 
@@ -915,14 +945,9 @@ class ergazomenoiController {
                         ? toNumberOrNull(data.pososto_prosayxhshs_6hs_hmeras)
                         : toNumberOrNull(ergazomenos.pososto_prosayxhshs_6hs_hmeras),
                 employment_profile_source: data.employment_profile_source || 'ERGOMENOI_CONTROLLER',
-                afora_allagh_oron_ergasias:
-                    data.afora_allagh_oron_ergasias === true ||
-                    data.afora_allagh_oron_ergasias === 'true' ||
-                    Boolean(
-                        data.hmeromhnia_isxyos_oron_ergasias_apo ||
-                        data.hmeromhnia_allaghs_orarioy_apo
-                    )
+                afora_allagh_oron_ergasias: isTermsChange
             });
+            };
 
             for (const update of updates) {
                 const { _id, state, data = {} } = update;
@@ -1287,6 +1312,16 @@ class ergazomenoiController {
             reason: 'INVALID_CORRECTIVE_PAYROLL_WITHHOLDING_RATE',
             message: 'Το ποσοστό παρακράτησης διορθωτικής μισθοδοσίας πρέπει να είναι από 0 έως 100 με έως 2 δεκαδικά.' });
         formData.corrective_payroll_withholding_rate_percent = correctiveWithholdingRate;
+        const initialTermsIntent = resolveWorkTermsPeriodIntent(formData, {
+            initialEmployment: true
+        });
+        if (!initialTermsIntent.valid) {
+            return res.status(400).json({
+                success: false,
+                reason: 'MISSING_WORK_TERMS_EFFECTIVE_FROM',
+                message: 'Η αρχική ισχύς όρων εργασίας απαιτεί ημερομηνία έναρξης.'
+            });
+        }
 
         // ============================================================================
         // ✅ AUTO ENABLE E7N / MA_222
@@ -1407,12 +1442,8 @@ class ergazomenoiController {
             // Ημερομηνίες ισχύος όρων εργασίας.
             // Διατηρούνται και στο ErgazomenoiModel ως current snapshot,
             // ενώ το αναλυτικό/ιστορικό διάστημα αποθηκεύεται στο Istoriko.
-            hmeromhnia_isxyos_oron_ergasias_apo:
-                formData.hmeromhnia_isxyos_oron_ergasias_apo ||
-                formData.hmeromhnia_allaghs_orarioy_apo ||
-                null,
-            hmeromhnia_isxyos_oron_ergasias_eos:
-                formData.hmeromhnia_isxyos_oron_ergasias_eos || null,
+            hmeromhnia_isxyos_oron_ergasias_apo: initialTermsIntent.effectiveFrom,
+            hmeromhnia_isxyos_oron_ergasias_eos: null,
 
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
@@ -1858,6 +1889,13 @@ class ergazomenoiController {
         const orarioDateRangeValidation = validateOrarioDateRangeFields(formData);
 
         if (orarioDateRangeValidation.valid) {
+            const orarioTermsHistory = await loadOrarioTermsHistoryForSnapshot({
+                team: sessionUserTeam,
+                company_kod: sessionCompanyInUse,
+                kodikos: aa_kod.toString().padStart(4, '0'),
+                formData,
+                fallbackErgazomenos: savedErgazomenos
+            });
             function createOrarioData(i1) {
                 const { kathgoriaErgasias, getTimeValue, getHourMetricValue } =
                     normalizeTemporaryOrarioValue(formData, i1);
@@ -1867,6 +1905,9 @@ class ergazomenoiController {
                     company_kod: sessionCompanyInUse,
                     kodikos: aa_kod.toString().padStart(4, '0'),
                     hmeromhnia: formData[`hmeromhnia_${i1}`],
+                    kathestos_apasxolhshs_hmeras: String(getOrarioTermsForDate(
+                        formData[`hmeromhnia_${i1}`], orarioTermsHistory, savedErgazomenos
+                    ).typos_apasxolhshs || ''),
                     kathgoria_ergasias: kathgoriaErgasias,
                     apo_ora_01: getTimeValue(`apo_ora_01_${i1}`),
                     eos_ora_01: getTimeValue(`eos_ora_01_${i1}`),
@@ -1949,7 +1990,7 @@ class ergazomenoiController {
             // Snapshot όρων εργασίας κατά την αρχική εισαγωγή εργαζόμενου.
             // Αυτά τα πεδία είναι απαραίτητα για να μη διαβάζει ο απολογιστικός
             // υπολογισμός μόνο την τρέχουσα εικόνα του εργαζόμενου.
-            ...buildIstorikoWorkTermsSnapshot(formData),
+            ...buildIstorikoWorkTermsSnapshot(formData, {}, { initialEmployment: true }),
 
             misthologiko_klimakio: formData.misthologiko_klimakio,
 
@@ -3314,6 +3355,20 @@ class ergazomenoiController {
             objectId: mongoose.Types.ObjectId
         });
         if (!scopedAccess) return;
+        const currentEmployeeForBreak = await ErgazomenoiModel.findOne(
+            scopedAccess.employeeScope
+        ).select('dialleima_entos_ektos_orarioy dialleima_se_lepta').lean();
+        let breakHistoryChange;
+        try {
+            breakHistoryChange = buildBreakConfigurationHistoryChange({
+                formData,
+                currentEmployee: currentEmployeeForBreak || {}
+            });
+        } catch (error) {
+            return res.status(error.statusCode || 400).json({ success: false,
+                reason: error.code || 'INVALID_BREAK_CONFIGURATION_EFFECTIVE_DATE',
+                message: error.message });
+        }
         const sixthDayPremiumRate = parseSixthDayPremiumRate(
             formData.pososto_prosayxhshs_6hs_hmeras
         );
@@ -3331,6 +3386,14 @@ class ergazomenoiController {
             reason: 'INVALID_CORRECTIVE_PAYROLL_WITHHOLDING_RATE',
             message: 'Το ποσοστό παρακράτησης διορθωτικής μισθοδοσίας πρέπει να είναι από 0 έως 100 με έως 2 δεκαδικά.' });
         formData.corrective_payroll_withholding_rate_percent = correctiveWithholdingRate;
+        const termsIntent = resolveWorkTermsPeriodIntent(formData);
+        if (!termsIntent.valid) {
+            return res.status(400).json({
+                success: false,
+                reason: 'MISSING_WORK_TERMS_EFFECTIVE_FROM',
+                message: 'Η αλλαγή όρων εργασίας απαιτεί ρητή ημερομηνία έναρξης.'
+            });
+        }
         const { employeeScope, employeeCode: kodikosErgazomenoy } = scopedAccess;
 
         formData.team = omadaErgasias;
@@ -3341,7 +3404,7 @@ class ergazomenoiController {
         // ✅ 1) ΑΝΑΓΝΩΣΗ ΙΣΤΟΡΙΚΟΥ
         // =========================================================================
         try {
-            const existRecord = await IstorikoProslhpseonAllagonModel.findOne({
+            const historyIdentity = {
                 team: omadaErgasias,
                 company_kod: kodikosEtaireias,
                 kodikos: kodikosErgazomenoy,
@@ -3349,7 +3412,16 @@ class ergazomenoiController {
                 // Περιλαμβάνει πλέον και τις ημερομηνίες αλλαγής ωραρίου, ώστε μία
                 // αλλαγή 5ήμερο->6ήμερο ή 40h->30h να μη θεωρηθεί ίδιο ιστορικό record.
                 ...getIstorikoDateIdentity(formData)
-            });
+            };
+            const existRecord = breakHistoryChange.changed
+                ? await IstorikoProslhpseonAllagonModel.findOne({
+                    team: omadaErgasias,
+                    company_kod: kodikosEtaireias,
+                    kodikos: kodikosErgazomenoy,
+                    afora_allagh_dialleimatos: true,
+                    hmeromhnia_isxyos_dialleimatos_apo: breakHistoryChange.effectiveFrom
+                }) || await IstorikoProslhpseonAllagonModel.findOne(historyIdentity)
+                : await IstorikoProslhpseonAllagonModel.findOne(historyIdentity);
 
             recExist = !!existRecord;
             existingIstorikoRecord = existRecord;
@@ -3422,12 +3494,12 @@ class ergazomenoiController {
             // Ημερομηνίες ισχύος όρων εργασίας.
             // Διατηρούνται και στο ErgazomenoiModel ως current snapshot,
             // ενώ το αναλυτικό/ιστορικό διάστημα αποθηκεύεται στο Istoriko.
-            hmeromhnia_isxyos_oron_ergasias_apo:
-                formData.hmeromhnia_isxyos_oron_ergasias_apo ||
-                formData.hmeromhnia_allaghs_orarioy_apo ||
-                null,
-            hmeromhnia_isxyos_oron_ergasias_eos:
-                formData.hmeromhnia_isxyos_oron_ergasias_eos || null,
+            ...(termsIntent.isTermsChange
+                ? {
+                    hmeromhnia_isxyos_oron_ergasias_apo: termsIntent.effectiveFrom,
+                    hmeromhnia_isxyos_oron_ergasias_eos: null
+                }
+                : {}),
 
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
@@ -3750,6 +3822,13 @@ class ergazomenoiController {
         // =========================================================================
         // ✅ 6) ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ (Upsert ανά ημέρα)
         // =========================================================================
+        const orarioTermsHistory = await loadOrarioTermsHistoryForSnapshot({
+            team: formData.team,
+            company_kod: formData.company_kod,
+            kodikos: formData.kodikosHidden,
+            formData,
+            fallbackErgazomenos: updatedErgazomenos
+        });
         function createOrarioData(i1) {
             const { kathgoriaErgasias, getTimeValue, getHourMetricValue } =
                 normalizeTemporaryOrarioValue(formData, i1);
@@ -3759,6 +3838,9 @@ class ergazomenoiController {
                 company_kod: formData.company_kod,
                 kodikos: formData.kodikosHidden,
                 hmeromhnia: formData[`hmeromhnia_${i1}`],
+                kathestos_apasxolhshs_hmeras: String(getOrarioTermsForDate(
+                    formData[`hmeromhnia_${i1}`], orarioTermsHistory, updatedErgazomenos
+                ).typos_apasxolhshs || ''),
                 // kathgoria_ergasias: kathgoriaErgasias,
                 kathgoria_ergasias: kathgoriaErgasias,
                 apo_ora_01: getTimeValue(`apo_ora_01_${i1}`),
@@ -3833,6 +3915,8 @@ class ergazomenoiController {
                 },
                 {
                     $set: {
+                        kathestos_apasxolhshs_hmeras:
+                            orarioData.kathestos_apasxolhshs_hmeras,
                         kathgoria_ergasias: orarioData.kathgoria_ergasias,
                         apo_ora_01: orarioData.apo_ora_01,
                         eos_ora_01: orarioData.eos_ora_01,
@@ -3907,9 +3991,8 @@ class ergazomenoiController {
         // =========================================================================
         {
             const istorikoIdentity = getIstorikoDateIdentity(formData);
-            const effectiveApo =
-                toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) ||
-                toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo);
+            const workTermsSnapshot = buildIstorikoWorkTermsSnapshot(formData);
+            const effectiveApo = workTermsSnapshot.hmeromhnia_isxyos_oron_ergasias_apo;
 
             const filteredDataIstoriko = {
                 team: formData.team,
@@ -3935,16 +4018,18 @@ class ergazomenoiController {
                 hmeromhnia_allaghs_orarioy_eos: toDateOrNull(
                     formData.hmeromhnia_allaghs_orarioy_eos
                 ),
-                hmeromhnia_isxyos_oron_ergasias_apo: effectiveApo,
+                hmeromhnia_isxyos_oron_ergasias_apo:
+                    workTermsSnapshot.hmeromhnia_isxyos_oron_ergasias_apo,
                 hmeromhnia_isxyos_oron_ergasias_eos:
-                    toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null,
+                    workTermsSnapshot.hmeromhnia_isxyos_oron_ergasias_eos,
                 hmeromhnia_lhxhs_symbashs: toDateOrNull(formData.hmeromhnia_lhxhs_symbashs),
                 hmeromhnia_apoxorhshs: toDateOrNull(formData.hmeromhnia_apoxorhshs),
                 afora_proslhpsh:
                     formData.hmeromhnia_proslhpshs === formData.hmeromhnia_allaghs_symbashs,
 
                 // Snapshot όρων εργασίας για τη συγκεκριμένη μεταβολή.
-                ...buildIstorikoWorkTermsSnapshot(formData),
+                ...workTermsSnapshot,
+                ...(breakHistoryChange.changed ? breakHistoryChange.snapshot : {}),
 
                 misthologiko_klimakio: formData.misthologiko_klimakio,
                 symbash: formData.symbash,
@@ -3981,7 +4066,10 @@ class ergazomenoiController {
                 }
             });
 
+            let historySession = null;
             try {
+                historySession = await mongoose.connection.startSession();
+                await historySession.withTransaction(async () => {
                 if (recExist && existingIstorikoRecord?._id) {
                     // ------------------------------------------------------------
                     // Διόρθωση υπάρχουσας ιστορικής εγγραφής.
@@ -3991,7 +4079,7 @@ class ergazomenoiController {
                     await IstorikoProslhpseonAllagonModel.findByIdAndUpdate(
                         existingIstorikoRecord._id,
                         { $set: updateFieldsIstoriko },
-                        { returnDocument: 'after' }
+                        { returnDocument: 'after', session: historySession }
                     );
                 } else {
                     // ------------------------------------------------------------
@@ -4000,11 +4088,9 @@ class ergazomenoiController {
                     // που είναι ανοιχτή ή επικαλύπτει τη νέα ημερομηνία έναρξης.
                     // ------------------------------------------------------------
                     if (effectiveApo) {
-                        const previousEos = new Date(effectiveApo);
-                        previousEos.setUTCDate(previousEos.getUTCDate() - 1);
-                        previousEos.setUTCHours(0, 0, 0, 0);
+                        const previousEos = getPreviousUtcDate(effectiveApo);
 
-                        if (previousEos.getTime() < effectiveApo.getTime()) {
+                        if (previousEos && previousEos.getTime() < effectiveApo.getTime()) {
                             await IstorikoProslhpseonAllagonModel.findOneAndUpdate(
                                 {
                                     team: formData.team,
@@ -4036,7 +4122,8 @@ class ergazomenoiController {
                                 },
                                 {
                                     sort: { hmeromhnia_isxyos_oron_ergasias_apo: -1 },
-                                    returnDocument: 'after'
+                                    returnDocument: 'after',
+                                    session: historySession
                                 }
                             );
                         }
@@ -4060,15 +4147,18 @@ class ergazomenoiController {
                                 updatedAt: Date.now()
                             }
                         },
-                        { returnDocument: 'after', upsert: true }
+                        { returnDocument: 'after', upsert: true, session: historySession }
                     );
                 }
+                });
             } catch (error) {
                 console.error('❌ Σφάλμα κατά την ενημέρωση ιστορικού:', error);
                 return res.status(500).json({
                     success: false,
                     errorMessage: 'Σφάλμα κατά την ενημέρωση ιστορικού'
                 });
+            } finally {
+                if (historySession) await historySession.endSession();
             }
         }
 

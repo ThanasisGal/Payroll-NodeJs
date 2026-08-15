@@ -6,8 +6,11 @@ const mongoose = require('mongoose');
 const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const {
     calculatePeriodDeadline, normalizeScope, resolveEffectiveMode, projectPeriodControl,
-    assertNormalPeriod, runWithPeriodWriteFence, transitionPeriodControl, isDateInsideEmploymentPeriod,
-    isWeekAllowedForEmploymentPeriod, acquirePeriodCalculationOwnership,
+    assertNormalPeriod, assertReviewReadablePeriod, assertCanonicalDecisionPeriod,
+    runWithPeriodWriteFence, runWithStaleCanonicalDecisionWriteFence,
+    runWithStaleOrphanResolutionWriteFence,
+    transitionPeriodControl, isDateInsideEmploymentPeriod,
+    isWeekAllowedForEmploymentPeriod, hasFullNaturalWeekCoverage, acquirePeriodCalculationOwnership,
     runWithPeriodCalculationWriteFence, releasePeriodCalculationOwnership
 } = require('./apasxoliseisPeriodControlService');
 
@@ -19,7 +22,7 @@ assert.strictEqual(key(calculatePeriodDeadline('2026-12-31')), '2027-01-31');
 assert.strictEqual(key(calculatePeriodDeadline(new Date('2026-06-30T23:59:59.999Z'))), '2026-07-31');
 
 const july = { period_start: '2026-07-01', period_end: '2026-07-31' };
-assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-06-29', week_end: '2026-07-05' }), true);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-06-29', week_end: '2026-07-05' }), false);
 assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-07-06', week_end: '2026-07-12' }), true);
 assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-07-27', week_end: '2026-08-02' }), false);
 assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-06-22', week_end: '2026-06-28' }), false);
@@ -30,6 +33,42 @@ assert.strictEqual(isDateInsideEmploymentPeriod({ ...july, date: '2026-07-31' })
 assert.strictEqual(isDateInsideEmploymentPeriod({ ...july, date: '2026-08-01' }), false);
 
 const scope = normalizeScope({ team: 'THA', company_kod: 'c', ypokatasthma: '0', period_start: '2026-06-01', period_end: '2026-06-30' });
+const juneCrossMonth = { period_start: '2026-06-01', period_end: '2026-06-30',
+    week_start: '2026-06-29', week_end: '2026-07-05' };
+const reconstructedWeek = { ...juneCrossMonth, period_control: {
+    effective_mode: 'HISTORICAL_RECONSTRUCTED', historical_reconstruction_status: 'COMPLETED'
+}, historical_as_of: '2026-08-12', authoritative_row_dates: [
+    '2026-06-29', '2026-06-30', '2026-07-01', '2026-07-02',
+    '2026-07-03', '2026-07-04', '2026-07-05'
+] };
+assert.strictEqual(isWeekAllowedForEmploymentPeriod(reconstructedWeek), true);
+const staleCompletedWeek = { ...reconstructedWeek,
+    period_control: { effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
+        historical_reconstruction_status: 'COMPLETED' },
+    allow_stale_completed_context: true };
+assert.strictEqual(isWeekAllowedForEmploymentPeriod(staleCompletedWeek), true);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...staleCompletedWeek,
+    allow_stale_completed_context: false }), false);
+assert.strictEqual(hasFullNaturalWeekCoverage({ week_start: '2026-06-29',
+    week_end: '2026-07-05', authoritative_row_dates: reconstructedWeek.authoritative_row_dates }), true);
+assert.strictEqual(hasFullNaturalWeekCoverage({ week_start: '2026-06-29',
+    week_end: '2026-07-05', authoritative_row_dates:
+        reconstructedWeek.authoritative_row_dates.slice(0, 6) }), false);
+assert.strictEqual(hasFullNaturalWeekCoverage({ week_start: '2026-06-30',
+    week_end: '2026-07-06', authoritative_row_dates: reconstructedWeek.authoritative_row_dates }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...reconstructedWeek,
+    period_control: { effective_mode: 'NORMAL', historical_reconstruction_status: 'COMPLETED' } }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...reconstructedWeek,
+    period_control: { effective_mode: 'HISTORICAL_RECONSTRUCTED', historical_reconstruction_status: 'AUTHORIZED' } }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...reconstructedWeek,
+    authoritative_row_dates: reconstructedWeek.authoritative_row_dates.slice(0, 6) }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...reconstructedWeek,
+    historical_as_of: '2026-07-04' }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...reconstructedWeek,
+    week_start: '2026-06-30', week_end: '2026-07-06' }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...reconstructedWeek, ...july }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ period_start: '2026-06-01', period_end: '2026-06-30',
+    week_start: '2026-06-22', week_end: '2026-06-28' }), true);
 const deadline = calculatePeriodDeadline(scope.period_end);
 assert.strictEqual(resolveEffectiveMode({ storedStatus: 'OPEN', deadline, now: new Date('2026-07-31T20:59:00Z') }), 'NORMAL');
 assert.strictEqual(resolveEffectiveMode({ storedStatus: 'OPEN', deadline, now: new Date('2026-07-31T21:00:00Z') }), 'HISTORICAL_RECONSTRUCTION_REQUIRED');
@@ -53,6 +92,8 @@ const staleProjection = projectPeriodControl({ scope, record: reconstructedRecor
     now: new Date('2026-08-01'), dependencyFingerprint: 'b'.repeat(64) });
 assert.strictEqual(staleProjection.effective_mode, 'HISTORICAL_RECONSTRUCTION_STALE');
 assert.strictEqual(staleProjection.has_authoritative_calculation_result, false);
+assert.strictEqual(staleProjection.can_record_decision, false);
+assert.strictEqual(staleProjection.can_record_stale_canonical_decision, true);
 const serviceSource = fs.readFileSync(__filename.replace('.test.js', '.js'), 'utf8');
 assert.ok(serviceSource.includes('session.withTransaction'));
 assert.ok(serviceSource.includes('status: previousStatus, version: beforeVersion'));
@@ -93,7 +134,7 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
 
 (async () => {
     const julyScope = normalizeScope({ team: 'THA', company_kod: 'c', ypokatasthma: '0', ...july });
-    assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-06-29', week_end: '2026-07-05' }), true);
+    assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-06-29', week_end: '2026-07-05' }), false);
     await assertNormalPeriod({ scope: julyScope, now: new Date('2026-07-15'), periodControlModel: fake().model });
     await assert.rejects(() => assertNormalPeriod({ scope: julyScope, now: new Date('2026-07-15'), periodControlModel: fake({ status: 'LOCKED', version: 1, deadline: new Date('2026-08-31') }).model }), (error) => error.code === 'PERIOD_CONTROL_LOCKED');
     await assert.rejects(() => assertNormalPeriod({ scope: julyScope, now: new Date('2026-09-01'), periodControlModel: fake().model }), (error) => error.code === 'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED');
@@ -101,6 +142,62 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     const normal = await assertNormalPeriod({ scope, now: new Date('2026-07-01'), periodControlModel: empty.model });
     assert.strictEqual(normal.token.exists, false);
     await assert.rejects(() => assertNormalPeriod({ scope, now: new Date('2026-08-01'), periodControlModel: empty.model }), (error) => error.code === 'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED');
+
+    const staleStateResolver = async () => staleProjection;
+    const staleReadable = await assertReviewReadablePeriod({ scope,
+        stateResolver: staleStateResolver });
+    assert.strictEqual(staleReadable.state.effective_mode, 'HISTORICAL_RECONSTRUCTION_STALE');
+    const staleDecisionAccess = await assertCanonicalDecisionPeriod({ scope,
+        stateResolver: staleStateResolver });
+    assert.strictEqual(staleDecisionAccess.state.can_record_stale_canonical_decision, true);
+    await assert.rejects(() => assertReviewReadablePeriod({ scope,
+        stateResolver: async () => ({ ...staleProjection,
+            effective_mode: 'HISTORICAL_RECONSTRUCTION_REQUIRED' }) }),
+    (error) => error.code === 'PERIOD_CONTROL_REVIEW_NOT_AVAILABLE');
+    await assert.rejects(() => assertCanonicalDecisionPeriod({ scope,
+        stateResolver: async () => ({ ...staleProjection,
+            can_record_stale_canonical_decision: false }) }),
+    (error) => error.code === 'PERIOD_CONTROL_STALE_CANONICAL_DECISION_NOT_ALLOWED');
+
+    let staleCanonicalWrites = 0;
+    const staleFenceStore = fake({ ...reconstructedRecord, version: 9,
+        write_fence_version: 2, active_calculation_id: '' });
+    const staleFenceResult = await runWithStaleCanonicalDecisionWriteFence({
+        scope, expectedToken: { exists: true, stored_status: 'OPEN', version: 9 },
+        now: new Date('2026-08-14'), periodControlModel: staleFenceStore.model,
+        indexGuard: async () => ({ ready: true }),
+        fingerprintResolver: async () => ({ dependency_fingerprint: 'b'.repeat(64) }),
+        transactionRunner: async (work) => work({ id: 'stale-canonical-session' }),
+        work: ({ session }) => {
+            assert.strictEqual(session.id, 'stale-canonical-session');
+            staleCanonicalWrites += 1;
+            return 'canonical-only';
+        }
+    });
+    assert.strictEqual(staleFenceResult.result, 'canonical-only');
+    assert.strictEqual(staleFenceResult.state.effective_mode, 'HISTORICAL_RECONSTRUCTION_STALE');
+    assert.strictEqual(staleFenceResult.state.historical_reconstruction_status, 'COMPLETED');
+    assert.strictEqual(staleFenceResult.state.historical_reconstruction_version, 1);
+    assert.strictEqual(staleCanonicalWrites, 1);
+    let staleOrphanWrites = 0;
+    const staleOrphanStore = fake({ ...reconstructedRecord, version: 10,
+        write_fence_version: 4, active_calculation_id: '' });
+    const staleOrphanResult = await runWithStaleOrphanResolutionWriteFence({
+        scope, expectedToken: { exists: true, stored_status: 'OPEN', version: 10 },
+        now: new Date('2026-08-14'), periodControlModel: staleOrphanStore.model,
+        indexGuard: async () => ({ ready: true }),
+        fingerprintResolver: async () => ({ dependency_fingerprint: 'b'.repeat(64) }),
+        transactionRunner: async (work) => work({ id: 'stale-orphan-session' }),
+        work: ({ session, state }) => {
+            assert.strictEqual(session.id, 'stale-orphan-session');
+            assert.strictEqual(state.effective_mode, 'HISTORICAL_RECONSTRUCTION_STALE');
+            staleOrphanWrites += 1;
+            return 'orphan-only';
+        }
+    });
+    assert.strictEqual(staleOrphanResult.result, 'orphan-only');
+    assert.strictEqual(staleOrphanResult.state.historical_reconstruction_status, 'COMPLETED');
+    assert.strictEqual(staleOrphanWrites, 1);
 
     const store = fake();
     const locked = await transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'Οριστικοποίηση ελέγχου', requestId: 'period-lock-001', now: new Date('2026-07-01'), expectedVersion: 0, periodControlModel: store.model, auditModel: store.audit, indexGuard: async () => ({ ready: true }) });

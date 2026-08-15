@@ -151,17 +151,84 @@ function buildCanonicalWorkTermsSnapshotFields(formData = {}, fallbackErgazomeno
 }
 
 function getEffectiveTermsApo(record = {}) {
-    return (
-        normalizeDateOnly(record.hmeromhnia_isxyos_oron_ergasias_apo) ||
-        normalizeDateOnly(record.hmeromhnia_allaghs_orarioy_apo)
-    );
+    if (Object.prototype.hasOwnProperty.call(
+        record,
+        'hmeromhnia_isxyos_oron_ergasias_apo'
+    )) {
+        return normalizeDateOnly(record.hmeromhnia_isxyos_oron_ergasias_apo);
+    }
+
+    return normalizeDateOnly(record.hmeromhnia_allaghs_orarioy_apo);
 }
 
 function getEffectiveTermsEos(record = {}) {
-    return (
-        normalizeDateOnly(record.hmeromhnia_isxyos_oron_ergasias_eos) ||
-        normalizeDateOnly(record.hmeromhnia_allaghs_orarioy_eos)
-    );
+    if (Object.prototype.hasOwnProperty.call(
+        record,
+        'hmeromhnia_isxyos_oron_ergasias_eos'
+    )) {
+        // Explicit null is authoritative: the terms period remains open-ended.
+        return normalizeDateOnly(record.hmeromhnia_isxyos_oron_ergasias_eos);
+    }
+
+    // Backward compatibility only for legacy documents where the terms-end
+    // field is genuinely absent, not explicitly null.
+    return normalizeDateOnly(record.hmeromhnia_allaghs_orarioy_eos);
+}
+
+const AUTHORITATIVE_WORK_TERMS_MUTATION_CODES = Object.freeze(['007', '008', '014', '015']);
+
+function normalizeMutationCodes(value) {
+    let values = value;
+    if (typeof values === 'string') {
+        const trimmed = values.trim();
+        if (!trimmed) return [];
+        try {
+            values = JSON.parse(trimmed);
+        } catch {
+            values = trimmed.split(',');
+        }
+    }
+    if (!Array.isArray(values)) values = [values];
+
+    return [...new Set(values.map((item) => {
+        const raw = item && typeof item === 'object'
+            ? item.kodikos ?? item.code ?? item.value
+            : item;
+        const digits = String(raw ?? '').trim();
+        return /^\d{1,3}$/.test(digits) ? digits.padStart(3, '0') : '';
+    }).filter(Boolean))];
+}
+
+function isExplicitWorkTermsChange(formData = {}, { initialEmployment = false } = {}) {
+    if (initialEmployment) return true;
+    const mutationCodes = normalizeMutationCodes(formData.typos_metabolhs);
+    return mutationCodes.some((code) => AUTHORITATIVE_WORK_TERMS_MUTATION_CODES.includes(code));
+}
+
+function resolveWorkTermsPeriodIntent(formData = {}, options = {}) {
+    const isTermsChange = isExplicitWorkTermsChange(formData, options);
+    const effectiveFrom = !isTermsChange
+        ? null
+        : options.initialEmployment
+            ? normalizeDateOnly(
+                formData.hmeromhnia_isxyos_oron_ergasias_apo ||
+                formData.hmeromhnia_proslhpshs
+            )
+            : normalizeDateOnly(formData.hmeromhnia_metabolhs);
+    return {
+        isTermsChange,
+        effectiveFrom,
+        // Μία authoritative κατάσταση ισχύει μέχρι την επόμενη πραγματική μεταβολή.
+        effectiveTo: null,
+        valid: !isTermsChange || Boolean(effectiveFrom)
+    };
+}
+
+function getPreviousUtcDate(value) {
+    const date = normalizeDateOnly(value);
+    if (!date) return null;
+    date.setUTCDate(date.getUTCDate() - 1);
+    return date;
 }
 
 function buildFallbackTerms(ergazomenos = {}) {
@@ -262,8 +329,15 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
         // Για παλιές εγγραφές χωρίς flag, επιτρέπουμε fallback αν έχουν ημερομηνίες.
         const hasNewTermsDates = Boolean(row.hmeromhnia_isxyos_oron_ergasias_apo);
         const hasLegacyDates = Boolean(row.hmeromhnia_allaghs_orarioy_apo);
-        const isTermsChange =
-            row.afora_allagh_oron_ergasias === true || hasNewTermsDates || hasLegacyDates;
+        // Το explicit false είναι authoritative: πρόκειται για schedule-only history row.
+        // Legacy rows χωρίς flag κρατούν το παλιό date-based fallback.
+        const hasExplicitFlag = Object.prototype.hasOwnProperty.call(
+            row,
+            'afora_allagh_oron_ergasias'
+        );
+        const isTermsChange = hasExplicitFlag
+            ? row.afora_allagh_oron_ergasias === true
+            : hasNewTermsDates || hasLegacyDates;
 
         if (!isTermsChange) return false;
 
@@ -284,8 +358,22 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
     matchingRows.sort((a, b) => {
         const dateA = getEffectiveTermsApo(a);
         const dateB = getEffectiveTermsApo(b);
+        const effectiveDifference = (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+        if (effectiveDifference) return effectiveDifference;
 
-        return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+        // Secondary safety only. Equal valid effective starts must not depend on
+        // engine sort stability; this does not repair invalid overlapping ranges.
+        for (const field of ['updatedAt', 'createdAt']) {
+            const parsedA = a[field] ? new Date(a[field]) : null;
+            const parsedB = b[field] ? new Date(b[field]) : null;
+            const timeA = parsedA && !Number.isNaN(parsedA.getTime()) ? parsedA.getTime() : 0;
+            const timeB = parsedB && !Number.isNaN(parsedB.getTime()) ? parsedB.getTime() : 0;
+            if (timeA !== timeB) return timeB - timeA;
+        }
+        const aaDifference = Number.parseInt(b.aa_eggrafhs, 10) -
+            Number.parseInt(a.aa_eggrafhs, 10);
+        if (Number.isFinite(aaDifference) && aaDifference) return aaDifference;
+        return String(b._id || '').localeCompare(String(a._id || ''));
     });
 
     return buildTermsFromHistoryRecord(matchingRows[0], ergazomenos);
@@ -300,5 +388,10 @@ module.exports = {
     buildCanonicalWorkTermsSnapshotFields,
     normalizeDateOnly,
     getEffectiveTermsApo,
-    getEffectiveTermsEos
+    getEffectiveTermsEos,
+    isExplicitWorkTermsChange,
+    resolveWorkTermsPeriodIntent,
+    normalizeMutationCodes,
+    AUTHORITATIVE_WORK_TERMS_MUTATION_CODES,
+    getPreviousUtcDate
 };

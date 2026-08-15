@@ -31,13 +31,15 @@ const {
 const {
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
-const { resolveSafeStartOnlyOrphan } = require('./apasxoliseisAttendanceDerivedScheduleService');
 const {
     buildDailyCompensationBreakdown
 } = require('./apasxoliseisDailyCompensationBreakdownService');
 const {
     sanitizeAppliedRepoTransferUpdate
 } = require('./apasxoliseisWeeklyRepoTransferAppliedProtectionService');
+const {
+    applyCardDerivedAbsenceMetrics
+} = require('./apasxoliseisStage1DailyClassificationBulkService');
 const {
     isWeekFullyWithinEmploymentPeriod
 } = require('./apasxoliseisEmploymentPeriodScopeService');
@@ -66,7 +68,7 @@ function asDateOnlyUtc(value, endOfDay = false) {
     return endOfDay ? clampDateEndUtc(value) : clampDateStartUtc(value);
 }
 
-function getWeekRangesInsidePeriod(apoDate, eosDate) {
+function getWeekRangesInsidePeriod(apoDate, eosDate, { fullNaturalWeekContext = false } = {}) {
     const periodStart = clampDateStartUtc(apoDate);
     const periodEnd = clampDateEndUtc(eosDate);
     const ranges = [];
@@ -75,9 +77,11 @@ function getWeekRangesInsidePeriod(apoDate, eosDate) {
     while (cursor.getTime() <= periodEnd.getTime()) {
         const naturalWeekStart = startOfWeekMondayUtc(cursor);
         const naturalWeekEnd = endOfWeekSundayUtc(cursor);
-        const weekStart = naturalWeekStart.getTime() < periodStart.getTime()
+        const weekStart = fullNaturalWeekContext ? naturalWeekStart
+            : naturalWeekStart.getTime() < periodStart.getTime()
             ? periodStart : naturalWeekStart;
-        const weekEnd = naturalWeekEnd.getTime() > periodEnd.getTime()
+        const weekEnd = fullNaturalWeekContext ? naturalWeekEnd
+            : naturalWeekEnd.getTime() > periodEnd.getTime()
             ? periodEnd : naturalWeekEnd;
         ranges.push({
             naturalWeekStart,
@@ -146,6 +150,7 @@ function buildWeeklyRepoPostCheckWritePlan({
     appliedProtectionReasonsByWeek = new Map(),
     canonicalDecisionsByWeek = new Map(),
     sameRunDailyCalculatedRowIds = new Set(),
+    fullNaturalWeekContext = false,
     buildWeeklyIllegalOvertimeUpdate
 }) {
     if (typeof buildWeeklyIllegalOvertimeUpdate !== 'function') {
@@ -165,7 +170,9 @@ function buildWeeklyRepoPostCheckWritePlan({
         needsHrDecision: 0,
         daysWithRejectedCompanyRule: 0
     };
-    const weekRanges = getWeekRangesInsidePeriod(apoDate, eosDate);
+    const writablePeriodStart = clampDateStartUtc(apoDate);
+    const writablePeriodEnd = clampDateEndUtc(eosDate);
+    const weekRanges = getWeekRangesInsidePeriod(apoDate, eosDate, { fullNaturalWeekContext });
 
     for (const erg of employees) {
         const istorikoRows = istorikoRowsByKodikos.get(String(erg.kodikos)) || [];
@@ -191,12 +198,14 @@ function buildWeeklyRepoPostCheckWritePlan({
                 const row = rowsByEmployeeAndDate.get(`${erg.kodikos}|${dateKeyUtc(day)}`);
                 if (row) weekRows.push(row);
             }
+            const isCalculatedWorkHoursAuthoritativeForRow = (row) =>
+                sameRunDailyCalculatedRowIds.has(String(row?._id));
             const automaticSixthSeventhAnalysis = weekFullyInsideEmployment
                 ? analyzeWeeklySixthSeventhDay({
                       weekRows,
                       effectiveProfile,
                       hourlyRate: effectiveProfile.pragmatikoOromisthio,
-                      calculatedWorkHoursAuthoritative: true,
+                      isCalculatedWorkHoursAuthoritativeForRow,
                       allowDeclaredRepoIdentityOverride: true,
                       canonicalRepoDayIdentitiesOverride: (() => {
                           const identities = weekRows
@@ -227,7 +236,7 @@ function buildWeeklyRepoPostCheckWritePlan({
                     effectiveProfile, profileHistory: istorikoRows,
                     automaticAnalysis: automaticSixthSeventhAnalysis,
                     appliedProtectionContext,
-                    calculatedWorkHoursAuthoritative: true
+                    isCalculatedWorkHoursAuthoritativeForRow
                 });
                 sixthSeventhAnalysis = resolveWeeklyCanonicalDecisionAnalysis({
                     automaticAnalysis: automaticSixthSeventhAnalysis,
@@ -236,7 +245,8 @@ function buildWeeklyRepoPostCheckWritePlan({
                     weekRows,
                     effectiveProfile,
                     employee: erg,
-                    profileHistory: istorikoRows
+                    profileHistory: istorikoRows,
+                    isCalculatedWorkHoursAuthoritativeForRow
                 }).analysis;
             }
             const canonicalBlockingReasons =
@@ -247,20 +257,22 @@ function buildWeeklyRepoPostCheckWritePlan({
             for (let day = clampDateStartUtc(week.weekStart); day <= week.weekEnd; day = addDaysUtc(day, 1)) {
                 const row = rowsByEmployeeAndDate.get(`${erg.kodikos}|${dateKeyUtc(day)}`);
                 if (!row) continue;
+                const rowDate = asDateOnlyUtc(row.hmeromhnia);
+                const writableRow = rowDate >= writablePeriodStart && rowDate <= writablePeriodEnd;
 
                 const kathgoriaErgasias = String(row.kathgoria_ergasias || '').trim();
                 const oresErgasiasIsZero = isZeroHours(row.ores_ergasias);
                 const cardsOresIsNonZero = isNonZeroHours(row.cards_ores_ergasias);
                 const dailyProfile = getEffectiveRepoProfileForDate(day, istorikoRows, erg);
                 const isFullTimeProfile = resolveFullTimeFromWorkTerms(dailyProfile) === true;
-                const update = {};
+                const update = {
+                    kathestos_apasxolhshs_hmeras: String(
+                        dailyProfile.typos_apasxolhshs ?? dailyProfile.kathestos_apasxolhshs ?? ''
+                    ).trim()
+                };
                 const rawUnresolvedCardPair = resolveCardPairVerification(row).hasUnresolvedCardEvidence;
-                const safeOrphan = rawUnresolvedCardPair
-                    ? resolveSafeStartOnlyOrphan(row, {
-                          flexibleArrivalMinutes: dailyProfile.evelikth_proselefsh
-                      })
-                    : null;
-                const hasUnresolvedCardPair = rawUnresolvedCardPair && !safeOrphan;
+                const hasUnresolvedCardPair = rawUnresolvedCardPair &&
+                    row.orphan_card_resolution?.status !== 'HR_APPROVED';
                 const repoCountState = resolveCanonicalRepoDayCountState({
                     row,
                     dailyProfile,
@@ -323,7 +335,8 @@ function buildWeeklyRepoPostCheckWritePlan({
                     weeklyIllegalOvertimeHours,
                     sixthDayMandatoryRatePercent: dailyProfile.pososto_prosayxhshs_6hs_hmeras,
                     companyRules: companyPolicyRules,
-                    calculatedWorkHoursAuthoritative: true,
+                    calculatedWorkHoursAuthoritative:
+                        isCalculatedWorkHoursAuthoritativeForRow(row),
                     blockingReasons:
                         week.isFullWeek && sixthSeventhAnalysis.status === 'NEEDS_HR_DECISION'
                             ? sixthSeventhAnalysis.reasons : []
@@ -338,10 +351,11 @@ function buildWeeklyRepoPostCheckWritePlan({
                     compensationBreakdowns.daysWithRejectedCompanyRule += 1;
                 }
 
+                const absenceSafeUpdate = applyCardDerivedAbsenceMetrics(row, update);
                 const protectedUpdate = sanitizeAppliedRepoTransferUpdate({
                     rowId: row._id,
                     currentRow: row,
-                    update,
+                    update: absenceSafeUpdate,
                     protectionContext: appliedProtectionContext
                 });
                 for (const reason of protectedUpdate.diagnostics) repoStateReasons.add(reason);
@@ -353,7 +367,7 @@ function buildWeeklyRepoPostCheckWritePlan({
                         reasons: [...protectedUpdate.diagnostics]
                     });
                 }
-                if (Object.keys(protectedUpdate.sanitizedUpdate).length > 0 && row.is_locked !== true) {
+                if (writableRow && Object.keys(protectedUpdate.sanitizedUpdate).length > 0 && row.is_locked !== true) {
                     bulkOps.push({
                         updateOne: {
                             filter: { _id: row._id },
@@ -371,7 +385,9 @@ function buildWeeklyRepoPostCheckWritePlan({
                 weeklyProfileInfo.profileChangedInsideWeek === true ||
                 canonicalBlockingReasons.includes('PROFILE_CHANGED_INSIDE_WEEK');
 
-            if (week.isFullWeek && weekFullyInsideEmployment &&
+            const owningPeriodWeek = week.naturalWeekStart >= writablePeriodStart &&
+                week.naturalWeekStart <= writablePeriodEnd;
+            if (owningPeriodWeek && week.isFullWeek && weekFullyInsideEmployment &&
                 (weeklyProfileInfo.repoResolutionReason ||
                     Number(pragmatikaRepo) !== Number(expectedWeeklyRepo) ||
                     repoStateReasons.size > 0 || canonicalBlockingReasons.length > 0)) {

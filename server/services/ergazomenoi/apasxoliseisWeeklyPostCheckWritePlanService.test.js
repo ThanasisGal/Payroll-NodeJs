@@ -7,7 +7,8 @@ const {
     OVERLAPPING_LEGAL_FIELDS
 } = require('./apasxoliseisWeeklyIllegalOvertimeMappingService');
 const { analyzeWeeklySixthSeventhDay } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
-const { buildCanonicalWeeklyDecisionSnapshot, fingerprint } =
+const { buildCanonicalWeeklyDecisionSnapshot, fingerprint,
+    resolvePreloadedWeeklyCanonicalDecision } =
     require('./apasxoliseisWeeklyCanonicalDecisionService');
 const { buildWeeklyCanonicalDecisionSnapshotInput, groupWeeklyCanonicalDecisions } =
     require('./apasxoliseisWeeklyCanonicalDecisionSnapshotInputService');
@@ -240,7 +241,9 @@ blockedRows[5].cards_eos_ora_01 = '';
 result = plan(blockedRows);
 update = updateFor(result, '2026-08-08');
 assert.equal(update.compensation_breakdown_apologistika.status, 'NEEDS_HR_DECISION');
-assert.ok(update.compensation_breakdown_apologistika.reasons.includes('CARD_VERIFICATION_PENDING'));
+assert.ok(update.compensation_breakdown_apologistika.reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'
+));
 assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 0);
 
 const ambiguousRows = week([7, 7, 7, 7, 7, 7, 0]);
@@ -306,6 +309,37 @@ result = plan(ambiguousRows, {
 deviation = onlyDeviation(result);
 assert.ok(deviation.reasons.includes('CANONICAL_DECISION_STALE'));
 
+// A genuine Stage-1 daily classification change remains stale; row-level calculation
+// authoritativeness must not make an obsolete HR decision applicable again.
+const dataChangedRowsBefore = structuredClone(ambiguousRows);
+const dataChangedDecision = decisionFor(dataChangedRowsBefore,
+    'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', {
+        current_repo_identities: ['2026-08-08', '2026-08-09'], applied_execution_id: null
+    });
+const dataChangedRowsAfter = structuredClone(dataChangedRowsBefore);
+Object.assign(dataChangedRowsAfter[6], {
+    astheneia_apologistika: true,
+    kathgoria_ergasias_apologistika: 'ΑΣΘΕΝΕΙΑ',
+    ores_ergasias_apologistika: 0,
+    is_locked: true
+});
+const dataChangedProfile = getWeeklyRepoProfileInfo({
+    week: { naturalWeekStart: new Date('2026-08-03'), naturalWeekEnd: new Date('2026-08-09') },
+    istorikoRows: [], ergazomenos: employee()
+}).effectiveProfile;
+const dataChangedAutomatic = analyzeWeeklySixthSeventhDay({
+    weekRows: dataChangedRowsBefore, effectiveProfile: dataChangedProfile
+});
+const dataChangedCurrentInput = buildWeeklyCanonicalDecisionSnapshotInput({
+    team: 'THA', company_kod: 'company', employee: employee(),
+    week: { naturalWeekStart: new Date('2026-08-03'), naturalWeekEnd: new Date('2026-08-09') },
+    weekRows: dataChangedRowsAfter, effectiveProfile: dataChangedProfile,
+    automaticAnalysis: dataChangedAutomatic, appliedProtectionContext: { entriesByRowId: {} }
+});
+assert.equal(resolvePreloadedWeeklyCanonicalDecision({
+    currentInput: dataChangedCurrentInput, records: [dataChangedDecision]
+}).applicability, 'STALE');
+
 const pendingRows = week([7, 7, 7, 7, 7, 0, 0]);
 pendingRows[0].cards_eos_ora_01 = '';
 result = plan(pendingRows);
@@ -315,9 +349,11 @@ assert.equal(deviation.actual_repo, 2);
 assert.equal(deviation.missing_repo, 0);
 assert.equal(deviation.excess_repo, 0);
 assert.equal(deviation.status, 'NEEDS_HR_DECISION');
-assert.deepEqual(deviation.reasons, ['CARD_VERIFICATION_PENDING']);
+assert.deepEqual(deviation.reasons, ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION']);
 update = updateFor(result, '2026-08-03');
-assert.ok(update.compensation_breakdown_apologistika.reasons.includes('CARD_VERIFICATION_PENDING'));
+assert.ok(update.compensation_breakdown_apologistika.reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'
+));
 assert.ok(deviation.reasons.every((reason) =>
     update.compensation_breakdown_apologistika.reasons.includes(reason)
 ));
@@ -480,4 +516,111 @@ assert.notEqual(unapprovedTargetUpdate.repo_apologistika, true);
 assert.notEqual(unapprovedTargetUpdate.kathgoria_ergasias_apologistika, 'ΑΝ');
 assert.notEqual(unapprovedTargetUpdate.apologistiko_biblio, true);
 
-console.log('weekly post-check pure write-plan contract tests passed (20 contracts)');
+// A completed historical June reconstruction analyzes the complete natural week,
+// but its write partition remains strictly inside the June payroll period.
+const crossMonthCardHours = [0, 9.1167, 4.2333, 4.5, 8.8167, 7.9, 6.9333];
+const crossMonthDeclaredHours = [8, 0, 8, 0, 8, 8, 8];
+const crossMonthRows = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date('2026-06-29T00:00:00.000Z');
+    date.setUTCDate(date.getUTCDate() + index);
+    const cardHours = crossMonthCardHours[index];
+    return row(date, crossMonthDeclaredHours[index], index === 3,
+        ['08:00', '16:00'], {
+        _id: `cross-${index + 1}`, hmeromhnia: date, kodikos: 'D1',
+        cards_ores_ergasias: cardHours,
+        cards_apo_ora_01: cardHours > 0 ? '08:00' : '',
+        cards_eos_ora_01: cardHours > 0 ? '16:00' : '',
+        ores_ergasias_apologistika: index === 1 ? 8.62 : 0
+    });
+});
+const crossWeek = { naturalWeekStart: new Date('2026-06-29'),
+    naturalWeekEnd: new Date('2026-07-05'), weekStart: new Date('2026-06-29'),
+    weekEnd: new Date('2026-07-05'), isFullWeek: true };
+const crossEmployee = employee();
+const crossProfile = getWeeklyRepoProfileInfo({ week: crossWeek,
+    istorikoRows: [], ergazomenos: crossEmployee }).effectiveProfile;
+const crossAutomatic = analyzeWeeklySixthSeventhDay({ weekRows: crossMonthRows,
+    effectiveProfile: crossProfile, hourlyRate: crossProfile.pragmatikoOromisthio });
+assert.equal(crossAutomatic.status, 'NEEDS_HR_DECISION');
+const crossSnapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({ team: 'THA',
+    company_kod: 'company', employee: crossEmployee, week: crossWeek,
+    weekRows: crossMonthRows, effectiveProfile: crossProfile, profileHistory: [],
+    automaticAnalysis: crossAutomatic, appliedProtectionContext: { entriesByRowId: {} } });
+const crossSnapshot = buildCanonicalWeeklyDecisionSnapshot(crossSnapshotInput);
+const crossSameRunIds = new Set(['cross-1', 'cross-2']);
+const crossRowAuthority = (item) => crossSameRunIds.has(String(item._id));
+const crossCalculationAutomatic = analyzeWeeklySixthSeventhDay({
+    weekRows: crossMonthRows, effectiveProfile: crossProfile,
+    hourlyRate: crossProfile.pragmatikoOromisthio,
+    isCalculatedWorkHoursAuthoritativeForRow: crossRowAuthority,
+    allowDeclaredRepoIdentityOverride: true
+});
+assert.equal(crossCalculationAutomatic.status, 'NEEDS_HR_DECISION');
+const crossCalculationInput = buildWeeklyCanonicalDecisionSnapshotInput({
+    team: 'THA', company_kod: 'company', employee: crossEmployee, week: crossWeek,
+    weekRows: crossMonthRows, effectiveProfile: crossProfile, profileHistory: [],
+    automaticAnalysis: crossCalculationAutomatic,
+    appliedProtectionContext: { entriesByRowId: {} },
+    isCalculatedWorkHoursAuthoritativeForRow: crossRowAuthority
+});
+const crossCalculationSnapshot = buildCanonicalWeeklyDecisionSnapshot(crossCalculationInput);
+assert.equal(crossCalculationSnapshot.fingerprint, crossSnapshot.fingerprint);
+const crossDecision = { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+    employee_kodikos: 'D1', week_start: new Date('2026-06-29'),
+    week_end: new Date('2026-07-05'), decision_status: 'RECORDED',
+    snapshot_fingerprint: crossSnapshot.fingerprint,
+    decision_type: 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
+    decision_payload: { current_repo_identities: ['2026-06-30', '2026-07-02'],
+        applied_execution_id: null },
+    decision_payload_fingerprint: fingerprint({ current_repo_identities:
+        ['2026-06-30', '2026-07-02'], applied_execution_id: null }),
+    created_at: new Date('2026-08-14') };
+assert.equal(resolvePreloadedWeeklyCanonicalDecision({
+    currentInput: crossCalculationInput,
+    records: [crossDecision]
+}).applicability, 'APPLICABLE');
+const crossPlan = buildWeeklyRepoPostCheckWritePlan({ sessionTeam: 'THA', companyId: 'company',
+    apoDate: new Date('2026-06-01T00:00:00.000Z'),
+    eosDate: new Date('2026-06-30T23:59:59.999Z'), employees: [crossEmployee],
+    rows: crossMonthRows, istorikoRowsByKodikos: new Map(), companyPolicyRules: [],
+    postCheckArgiesDateSet: new Set(), noCardsDisplayContext: {},
+    appliedProtectionContext: { entriesByRowId: {} }, appliedProtectionReasonsByWeek: new Map(),
+    canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([crossDecision]),
+    sameRunDailyCalculatedRowIds: new Set(['cross-1', 'cross-2']),
+    fullNaturalWeekContext: true, buildWeeklyIllegalOvertimeUpdate: illegalUpdate });
+assert.deepStrictEqual(crossPlan.bulkOps.map(({ updateOne }) => updateOne.filter._id).sort(),
+    ['cross-1', 'cross-2']);
+const crossDeviation = crossPlan.deviations.find((item) =>
+    item.weekStart === '2026-06-29');
+assert.ok(crossDeviation);
+assert.ok(!crossDeviation.reasons?.includes('INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'));
+assert.ok(!crossDeviation.reasons?.includes('CANONICAL_DECISION_STALE'));
+assert.ok(!crossDeviation.reasons?.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+
+// July reuses the same owner-June decision as read context, but can write only July rows
+// and does not create a second deviation/decision ownership entry for the overlapping week.
+const julyPlan = buildWeeklyRepoPostCheckWritePlan({ sessionTeam: 'THA', companyId: 'company',
+    apoDate: new Date('2026-07-01T00:00:00.000Z'),
+    eosDate: new Date('2026-07-31T23:59:59.999Z'), employees: [crossEmployee],
+    rows: crossMonthRows, istorikoRowsByKodikos: new Map(), companyPolicyRules: [],
+    postCheckArgiesDateSet: new Set(), noCardsDisplayContext: {},
+    appliedProtectionContext: { entriesByRowId: {} }, appliedProtectionReasonsByWeek: new Map(),
+    canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([crossDecision]),
+    sameRunDailyCalculatedRowIds: new Set(['cross-3', 'cross-4', 'cross-5', 'cross-6', 'cross-7']),
+    fullNaturalWeekContext: true, buildWeeklyIllegalOvertimeUpdate: illegalUpdate });
+assert.deepStrictEqual(julyPlan.bulkOps.map(({ updateOne }) => updateOne.filter._id).sort(),
+    ['cross-3', 'cross-4', 'cross-5', 'cross-6', 'cross-7']);
+assert.ok(!julyPlan.deviations.some((item) =>
+    item.weekStart === '2026-06-29'));
+
+const normalJunePlan = buildWeeklyRepoPostCheckWritePlan({ sessionTeam: 'THA', companyId: 'company',
+    apoDate: new Date('2026-06-01T00:00:00.000Z'),
+    eosDate: new Date('2026-06-30T23:59:59.999Z'), employees: [crossEmployee],
+    rows: crossMonthRows, istorikoRowsByKodikos: new Map(), companyPolicyRules: [],
+    postCheckArgiesDateSet: new Set(), noCardsDisplayContext: {},
+    appliedProtectionContext: { entriesByRowId: {} }, appliedProtectionReasonsByWeek: new Map(),
+    canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([crossDecision]),
+    fullNaturalWeekContext: false, buildWeeklyIllegalOvertimeUpdate: illegalUpdate });
+assert.ok(!normalJunePlan.deviations.some((item) => item.weekStart === '2026-06-29'));
+
+console.log('weekly post-check pure write-plan contract tests passed (25 contracts)');

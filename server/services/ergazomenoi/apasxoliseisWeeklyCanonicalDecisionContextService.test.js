@@ -7,7 +7,9 @@ const {
     loadWeeklyCanonicalDecisionContext,
     assertBoundedDecisionCommand,
     validateCommandForCurrentContext,
-    projectCurrentContext
+    projectCurrentContext,
+    CANONICAL_EMPLOYEE_PROFILE_FIELDS,
+    HISTORY_SELECT_FIELDS
 } = require('./apasxoliseisWeeklyCanonicalDecisionContextService');
 const {
     recordWeeklyCanonicalDecision
@@ -18,6 +20,11 @@ const {
 const {
     buildCanonicalWeeklyDecisionSnapshot
 } = require('./apasxoliseisWeeklyCanonicalDecisionService');
+
+for (const field of ['nomimoOromisthio', 'pragmatikoOromisthio']) {
+    assert.ok(CANONICAL_EMPLOYEE_PROFILE_FIELDS.split(/\s+/).includes(field));
+    assert.ok(HISTORY_SELECT_FIELDS.split(/\s+/).includes(field));
+}
 
 function query(value) {
     return {
@@ -36,6 +43,7 @@ function model({ one = null, many = [] } = {}) {
 
 function decisionStore() {
     const records = [];
+    const findFilters = [];
     const matches = (row, filter) => Object.entries(filter).every(([key, value]) => {
         if (['week_start', 'week_end'].includes(key)) {
             return new Date(row[key]).getTime() === new Date(value).getTime();
@@ -43,9 +51,15 @@ function decisionStore() {
         return row[key] === value;
     });
     return {
-        records,
+        records, findFilters,
         findOne(filter) { return query(records.find((row) => matches(row, filter)) || null); },
-        find() { return query([...records]); },
+        find(filter = {}) {
+            findFilters.push(filter);
+            const scoped = filter.$or?.[0];
+            if (scoped && (new Date(scoped.week_start).getUTCHours() !== 0 ||
+                new Date(scoped.week_end).getUTCHours() !== 0)) return query([]);
+            return query([...records]);
+        },
         async create(record) { const saved = { _id: `decision-${records.length + 1}`, ...record };
             records.push(saved); return saved; }
     };
@@ -90,13 +104,29 @@ const session = { userTeam: 'THA', companyInUse: 'company', userStatus: 'A', use
         employee_kodikos: 'E2', week_start: '2026-08-03', models });
     assert.equal(context.rows.length, 7);
     assert.equal(context.automaticAnalysis.status, 'NEEDS_HR_DECISION');
-    assert.ok(context.automaticAnalysis.reasons.includes('CARD_VERIFICATION_PENDING'));
+    assert.ok(context.automaticAnalysis.reasons.includes(
+        'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
     assert.equal(context.snapshotInput.team, 'THA');
     assert.match(context.snapshot.fingerprint, /^[a-f0-9]{64}$/);
     assert.equal(context.resolution.applicability, 'NOT_FOUND');
     assert.equal(context.supportedActions.card_documentary, true);
     assert.equal(context.profileCandidates.length, 1);
     assert.equal(buildProfileCandidates(employee, []).length, 1);
+    const approvedOrphanRows = rows.map((row, index) => index === 5 ? {
+        ...row,
+        orphan_card_resolution: {
+            status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
+        }
+    } : row);
+    const approvedOrphanContext = await loadWeeklyCanonicalDecisionContext({
+        session,
+        ypokatasthma: '0000',
+        employee_kodikos: 'E2',
+        week_start: '2026-08-03',
+        models: { ...models, rowModel: model({ many: approvedOrphanRows }) }
+    });
+    assert.ok(!approvedOrphanContext.automaticAnalysis.reasons.includes(
+        'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
     const irrelevantHistory = { _id: 'old', hmeromhnia_isxyos_oron_ergasias_apo: '2025-01-01',
         hmeromhnia_isxyos_oron_ergasias_eos: '2025-01-31' };
     const withPeriodNoise = buildWeeklyCanonicalDecisionSnapshotInput({
@@ -126,8 +156,15 @@ const session = { userTeam: 'THA', companyInUse: 'company', userStatus: 'A', use
     assert.equal(afterRecord.resolution.applicability, 'APPLICABLE');
     assert.equal(afterRecord.resolution.documentaryOnly, true);
     assert.equal(afterRecord.resolution.analysis.status, 'NEEDS_HR_DECISION');
-    assert.ok(afterRecord.resolution.analysis.reasons.includes('CARD_VERIFICATION_PENDING'));
+    assert.ok(afterRecord.resolution.analysis.reasons.includes(
+        'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
     assert.equal(store.records.length, 1);
+    const recordedWeekFilter = store.findFilters.at(-1).$or[0];
+    assert.equal(new Date(recordedWeekFilter.week_start).toISOString(), '2026-08-03T00:00:00.000Z');
+    assert.equal(new Date(recordedWeekFilter.week_end).toISOString(), '2026-08-09T00:00:00.000Z');
+    const activeProjection = projectCurrentContext(afterRecord, { ready: true });
+    assert.equal(activeProjection.applicability, 'APPLICABLE');
+    assert.equal(activeProjection.applicable_decision.decision_payload.evidence_reference, 'ticket-1');
     for (const forged of ['snapshot_fingerprint', 'canonical_status', 'canonical_reasons',
         'effective_profile', 'actual_work_facts', 'applied_atomic_repo_transfer']) {
         assert.throws(() => assertBoundedDecisionCommand({ ...cardBody, [forged]: 'forged' }),

@@ -395,8 +395,10 @@ async function canonicalDecisionGatingContract(page) {
         });
         const stale = renderWith({
             effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
-            calculation: { authoritative_result: true },
-            allowed_actions: { record_decision: true }
+            calculation: { authoritative_result: false },
+            allowed_actions: { record_decision: false,
+                record_stale_canonical_decision: true,
+                calculate: false, repo_transfer: false }
         });
         currentEmploymentPeriodControl = {
             effective_mode: 'NORMAL', calculation: { authoritative_result: true },
@@ -664,7 +666,7 @@ async function modalGeometry(page) {
             assert.deepStrictEqual(decisionGating, {
                 preCalculation: 0,
                 postCalculation: 9,
-                stale: 0
+                stale: 9
             });
             const actionButton = await canonicalDecisionButtonStyles(page);
             assert.strictEqual(actionButton.text, 'Απόφαση για την ομάδα');

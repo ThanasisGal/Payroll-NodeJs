@@ -56,6 +56,9 @@ function buildDailyOrarioTermsForPeriod({
             mo_oron_hmerhsias_ergasias: terms.mo_oron_hmerhsias_ergasias,
 
             typos_apasxolhshs: terms.typos_apasxolhshs,
+            kathestos_apasxolhshs_hmeras: ['0', '1', '2'].includes(
+                String(terms.typos_apasxolhshs ?? terms.kathestos_apasxolhshs ?? '').trim()
+            ) ? String(terms.typos_apasxolhshs ?? terms.kathestos_apasxolhshs).trim() : '',
             typos_ebdomadas: terms.typos_ebdomadas,
 
             // Νέα πεδία ισχύος όρων εργασίας.

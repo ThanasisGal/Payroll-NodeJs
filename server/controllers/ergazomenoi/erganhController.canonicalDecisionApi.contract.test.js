@@ -13,8 +13,11 @@ const browser = fs.readFileSync(path.join(__dirname,
 for (const method of ['getWeeklyCanonicalDecisionCurrent', 'getWeeklyCanonicalDecisions',
     'createWeeklyCanonicalDecision']) assert.ok(controller.includes(`static ${method}`));
 assert.ok(controller.includes('loadWeeklyCanonicalDecisionContext({'));
-assert.ok(controller.includes('validateCommandForCurrentContext({ session: req.session, body, context })'));
-assert.ok(controller.includes('recordWeeklyCanonicalDecision({'));
+assert.ok(controller.includes('validateCommand({ session: req.session, body, context })'));
+assert.ok(controller.includes('recordDecision({'));
+assert.ok(controller.includes('assertActiveEmploymentReviewCanonicalDecisionPeriod'));
+assert.ok(controller.includes('runWithStaleCanonicalDecisionWriteFence'));
+assert.ok(browser.includes('record_stale_canonical_decision'));
 assert.ok(controller.includes("error?.code === 'CANONICAL_DECISION_INDEXES_NOT_READY' ? 503"));
 assert.ok(view.includes('id="canonicalDecisionModal"'));
 assert.ok(browser.includes('Καταγραφή απόφασης'));
@@ -23,7 +26,8 @@ assert.ok(browser.includes('Η απόφαση είναι μόνο τεκμηρι
 assert.ok(browser.includes('canonicalApplicabilityLabels'));
 assert.ok(browser.includes('current_repo_candidate_dates'));
 assert.ok(browser.includes('profile_candidates'));
-assert.ok(browser.includes('Η επανεκτέλεση υπολογισμού γίνεται από το υπάρχον κουμπί'));
+assert.ok(browser.includes('Η αποθηκευμένη απόφαση εμφανίζεται πλέον στην τρέχουσα εβδομάδα.'));
+assert.ok(browser.includes('Η απόφαση αποθηκεύτηκε, αλλά απέτυχε η ανανέωση της προβολής.'));
 assert.ok(!browser.includes('record decision + calculation'));
 assert.ok(!view.includes('canonical κατάσταση'));
 for (const phrase of ['Authoritative profile', 'candidate ημερομην', 'server-side',

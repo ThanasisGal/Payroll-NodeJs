@@ -322,7 +322,20 @@ async function authorizeCalculation(req, res, next) {
                     ypokatasthma = raw.padStart(4, '0');
                     await assertYpokatasthma(req.programmataAccessScope, ypokatasthma);
                 }
-                freezeScope(req, req.programmataAccessScope, { dateRange: range, ypokatasthma });
+                const requestedEmployeeCode = req.body?.kodikos;
+                let boundedEmployeeCode = '';
+                if (requestedEmployeeCode !== undefined && String(requestedEmployeeCode).trim() !== '') {
+                    const rawEmployeeCode = String(requestedEmployeeCode).trim();
+                    if (!/^\d{1,4}$/.test(rawEmployeeCode)) throw accessError(400);
+                    boundedEmployeeCode = rawEmployeeCode.padStart(4, '0');
+                    await assertEmployees(req.programmataAccessScope, [boundedEmployeeCode], ypokatasthma);
+                }
+                freezeScope(req, req.programmataAccessScope, {
+                    dateRange: range,
+                    ypokatasthma,
+                    employeeCode: boundedEmployeeCode,
+                    employeeCodes: boundedEmployeeCode ? Object.freeze([boundedEmployeeCode]) : Object.freeze([])
+                });
                 return next();
             } catch (error) {
                 return sendError(res, error);

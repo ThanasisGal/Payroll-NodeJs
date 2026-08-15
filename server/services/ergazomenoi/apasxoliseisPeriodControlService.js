@@ -46,7 +46,16 @@ function isDateInsideEmploymentPeriod({ period_start, period_end, date } = {}) {
     const candidate = dateOnly(date, 'ημερομηνία μεταβολής');
     return candidate >= scope.period_start && candidate <= scope.period_end;
 }
-function isWeekAllowedForEmploymentPeriod({ period_start, period_end, week_start, week_end } = {}) {
+function isWeekAllowedForEmploymentPeriod({
+    period_start,
+    period_end,
+    week_start,
+    week_end,
+    period_control: periodControl = null,
+    historical_as_of: historicalAsOf = null,
+    authoritative_row_dates: authoritativeRowDates = [],
+    allow_stale_completed_context: allowStaleCompletedContext = false
+} = {}) {
     const scope = normalizeScope({ team: '_', company_kod: '_', ypokatasthma: '_', period_start, period_end });
     const start = dateOnly(week_start, 'έναρξη εβδομάδας');
     const end = dateOnly(week_end, 'λήξη εβδομάδας');
@@ -54,8 +63,52 @@ function isWeekAllowedForEmploymentPeriod({ period_start, period_end, week_start
     const naturalEnd = endOfWeekSundayUtc(start);
     if (start.toISOString().slice(0, 10) !== naturalStart.toISOString().slice(0, 10) ||
         end.toISOString().slice(0, 10) !== naturalEnd.toISOString().slice(0, 10)) return false;
-    if (end > scope.period_end) return false;
-    return start >= scope.period_start || (start <= scope.period_start && scope.period_start <= end);
+    // Weekly policy ownership belongs exclusively to the payroll period containing Monday.
+    if (start < scope.period_start || start > scope.period_end) return false;
+    if (end <= scope.period_end) return true;
+
+    const completedHistoricalMode = periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTED ||
+        (allowStaleCompletedContext === true &&
+            periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTION_STALE);
+    if (!completedHistoricalMode ||
+        periodControl?.historical_reconstruction_status !== 'COMPLETED') return false;
+
+    let asOf;
+    try { asOf = dateOnly(historicalAsOf, 'ιστορικό όριο ανακατασκευής'); }
+    catch (_error) { return false; }
+    if (end > asOf) return false;
+
+    const expectedDates = new Set();
+    for (let offset = 0; offset < 7; offset += 1) {
+        const date = new Date(start); date.setUTCDate(date.getUTCDate() + offset);
+        expectedDates.add(date.toISOString().slice(0, 10));
+    }
+    const loadedDates = new Set((Array.isArray(authoritativeRowDates) ? authoritativeRowDates : [])
+        .map((value) => {
+            try { return dateOnly(value, 'ημερήσια εγγραφή').toISOString().slice(0, 10); }
+            catch (_error) { return ''; }
+        }).filter(Boolean));
+    return loadedDates.size === 7 && [...expectedDates].every((date) => loadedDates.has(date));
+}
+function hasFullNaturalWeekCoverage({ week_start, week_end, authoritative_row_dates = [] } = {}) {
+    let start; let end;
+    try {
+        start = dateOnly(week_start, 'έναρξη εβδομάδας');
+        end = dateOnly(week_end, 'λήξη εβδομάδας');
+    } catch (_error) { return false; }
+    if (start.getUTCDay() !== 1 || end.getUTCDay() !== 0 ||
+        (end.getTime() - start.getTime()) / 86400000 !== 6) return false;
+    const expected = new Set();
+    for (let offset = 0; offset < 7; offset += 1) {
+        const date = new Date(start); date.setUTCDate(date.getUTCDate() + offset);
+        expected.add(date.toISOString().slice(0, 10));
+    }
+    const actual = new Set((Array.isArray(authoritative_row_dates) ? authoritative_row_dates : [])
+        .map((value) => {
+            try { return dateOnly(value, 'ημερήσια εγγραφή').toISOString().slice(0, 10); }
+            catch (_error) { return ''; }
+        }).filter(Boolean));
+    return actual.size === 7 && [...expected].every((date) => actual.has(date));
 }
 function isPastDeadline(deadline, now = new Date()) {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -127,6 +180,12 @@ function projectPeriodControl({ scope, record = null, now = new Date(), dependen
         can_calculate: normal, can_historical_calculate: pastDeadline &&
             record?.historical_reconstruction_status === 'AUTHORIZED',
         can_record_decision: (normal || reconstructed) && hasAuthoritativeCalculationResult,
+        can_record_stale_canonical_decision:
+            effectiveMode === MODES.HISTORICAL_RECONSTRUCTION_STALE &&
+            storedStatus === 'OPEN' &&
+            record?.historical_reconstruction_status === 'COMPLETED' &&
+            Number(record?.historical_reconstruction_version || 0) >= 1 &&
+            !record?.active_calculation_id,
         can_repo_transfer: (normal || reconstructed) && hasAuthoritativeCalculationResult,
         can_manual_edit: normal || reconstructed, can_unlock_period: effectiveMode === MODES.LOCKED,
         can_finalize: storedStatus === 'LOCKED',
@@ -172,6 +231,126 @@ async function assertNormalPeriod({ scope, now = new Date(), expectedToken = nul
         'Απαιτείται ρητή ανακατασκευή ή επανεκτίμηση της εκπρόθεσμης περιόδου.');
     if (state.effective_mode === MODES.CORRECTIVE_ONLY) throw periodError('PERIOD_CONTROL_CORRECTIVE_ONLY', 409, 'Η περίοδος επιτρέπει μόνο διορθωτική μισθοδοσία.');
     return { state, token: stateToken(state) };
+}
+async function assertReviewReadablePeriod({ scope, now = new Date(), expectedToken = null,
+    periodControlModel = PeriodControlModel, stateResolver = getPeriodControl }) {
+    const state = await stateResolver({ scope, now, periodControlModel });
+    if (expectedToken && (state.exists !== expectedToken.exists ||
+        state.stored_status !== expectedToken.stored_status || state.version !== expectedToken.version)) {
+        throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+            'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    }
+    if (![MODES.NORMAL, MODES.HISTORICAL_RECONSTRUCTED,
+        MODES.HISTORICAL_RECONSTRUCTION_STALE].includes(state.effective_mode)) {
+        throw periodError('PERIOD_CONTROL_REVIEW_NOT_AVAILABLE', 409,
+            'Απαιτείται ρητή ανακατασκευή πριν από την ανάγνωση του εβδομαδιαίου ελέγχου.');
+    }
+    return { state, token: stateToken(state) };
+}
+async function assertCanonicalDecisionPeriod({ scope, now = new Date(), expectedToken = null,
+    periodControlModel = PeriodControlModel, stateResolver = getPeriodControl }) {
+    const readable = await assertReviewReadablePeriod({
+        scope, now, expectedToken, periodControlModel, stateResolver
+    });
+    const { state } = readable;
+    if (state.effective_mode === MODES.HISTORICAL_RECONSTRUCTION_STALE) {
+        if (state.can_record_stale_canonical_decision !== true) {
+            throw periodError('PERIOD_CONTROL_STALE_CANONICAL_DECISION_NOT_ALLOWED', 409,
+                'Η παρωχημένη ανακατασκευή δεν διαθέτει ασφαλές ολοκληρωμένο ιστορικό πλαίσιο.');
+        }
+    } else if (state.can_record_decision !== true) {
+        throw periodError('PERIOD_CONTROL_CANONICAL_DECISION_NOT_ALLOWED', 409,
+            'Δεν υπάρχει authoritative αποτέλεσμα για την καταγραφή απόφασης.');
+    }
+    return readable;
+}
+async function fenceStaleCanonicalDecisionWrite({ scope: input, expectedToken, now = new Date(), session,
+    periodControlModel = PeriodControlModel,
+    fingerprintResolver = require('./apasxoliseisHistoricalPeriodReconstructionService')
+        .calculateHistoricalFingerprints }) {
+    if (!session) throw periodError('PERIOD_CONTROL_TRANSACTION_REQUIRED', 503,
+        'Δεν είναι διαθέσιμη η ασφαλής καταγραφή απόφασης.');
+    const scope = normalizeScope(input);
+    if (expectedToken?.exists !== true) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const filter = {
+        ...filterForScope(scope), status: 'OPEN', version: Number(expectedToken.version),
+        historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: mongoose.trusted({ $gte: 1 }),
+        $or: mongoose.trusted([
+            { active_calculation_id: '' }, { active_calculation_id: null },
+            { active_calculation_id: mongoose.trusted({ $exists: false }) }
+        ])
+    };
+    const record = await periodControlModel.findOneAndUpdate(filter, {
+        $inc: { write_fence_version: 1 }, $set: { updated_at: now }
+    }, { new: true, session });
+    if (!record) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const plain = record?.toObject ? record.toObject() : record;
+    const dependencyFingerprint = (await fingerprintResolver({ scope, session })).dependency_fingerprint;
+    const state = projectPeriodControl({ scope, record: plain, now, dependencyFingerprint });
+    if (state.effective_mode !== MODES.HISTORICAL_RECONSTRUCTION_STALE ||
+        state.can_record_stale_canonical_decision !== true) {
+        throw periodError('PERIOD_CONTROL_STALE_CANONICAL_DECISION_NOT_ALLOWED', 409,
+            'Η περίοδος δεν επιτρέπει προπαρασκευαστική canonical HR απόφαση.');
+    }
+    return { state, token: stateToken(state) };
+}
+async function runWithStaleCanonicalDecisionWriteFence({ scope, expectedToken, now = new Date(), work,
+    periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
+    transactionRunner = runTransaction, fingerprintResolver }) {
+    if (typeof work !== 'function') throw new TypeError('Canonical-decision write callback is required.');
+    if (typeof indexGuard === 'function') await indexGuard();
+    return transactionRunner(async (session) => {
+        const fenced = await fenceStaleCanonicalDecisionWrite({
+            scope, expectedToken, now, session, periodControlModel, fingerprintResolver
+        });
+        return { result: await work({ session, state: fenced.state, token: fenced.token }), ...fenced };
+    });
+}
+async function fenceStaleOrphanResolutionWrite({ scope, expectedToken, now = new Date(), session,
+    periodControlModel = PeriodControlModel,
+    fingerprintResolver = require('./apasxoliseisHistoricalPeriodReconstructionService')
+        .calculateHistoricalFingerprints }) {
+    if (!session) throw periodError('PERIOD_CONTROL_TRANSACTION_REQUIRED', 503,
+        'Δεν είναι διαθέσιμη η ασφαλής επίλυση ορφανού χτυπήματος.');
+    const normalized = normalizeScope(scope);
+    if (expectedToken?.exists !== true) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const record = await periodControlModel.findOneAndUpdate({
+        ...filterForScope(normalized), status: 'OPEN', version: Number(expectedToken.version),
+        historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: mongoose.trusted({ $gte: 1 }),
+        $or: mongoose.trusted([
+            { active_calculation_id: '' }, { active_calculation_id: null },
+            { active_calculation_id: mongoose.trusted({ $exists: false }) }
+        ])
+    }, { $inc: { write_fence_version: 1 }, $set: { updated_at: now } }, { new: true, session });
+    if (!record) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const dependencyFingerprint = (await fingerprintResolver({ scope: normalized, session }))
+        .dependency_fingerprint;
+    const state = projectPeriodControl({ scope: normalized,
+        record: record?.toObject ? record.toObject() : record, now, dependencyFingerprint });
+    if (state.effective_mode !== MODES.HISTORICAL_RECONSTRUCTION_STALE ||
+        state.historical_reconstruction_status !== 'COMPLETED') {
+        throw periodError('PERIOD_CONTROL_STALE_ORPHAN_RESOLUTION_NOT_ALLOWED', 409,
+            'Η περίοδος δεν επιτρέπει επίλυση ορφανού χτυπήματος.');
+    }
+    return { state, token: stateToken(state) };
+}
+async function runWithStaleOrphanResolutionWriteFence({ scope, expectedToken, now = new Date(), work,
+    periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
+    transactionRunner = runTransaction, fingerprintResolver }) {
+    if (typeof work !== 'function') throw new TypeError('Orphan-resolution write callback is required.');
+    if (typeof indexGuard === 'function') await indexGuard();
+    return transactionRunner(async (session) => {
+        const fenced = await fenceStaleOrphanResolutionWrite({
+            scope, expectedToken, now, session, periodControlModel, fingerprintResolver
+        });
+        return { result: await work({ session, state: fenced.state, token: fenced.token }), ...fenced };
+    });
 }
 async function fencePeriodForWrite({ scope: input, expectedToken = null, now = new Date(), session,
     periodControlModel = PeriodControlModel }) {
@@ -499,9 +678,12 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
 }
 
 module.exports = { MODES, periodError, dateOnly, calculatePeriodDeadline, normalizeScope,
-    isDateInsideEmploymentPeriod, isWeekAllowedForEmploymentPeriod,
+    isDateInsideEmploymentPeriod, isWeekAllowedForEmploymentPeriod, hasFullNaturalWeekCoverage,
     isPastDeadline, resolveEffectiveMode, projectPeriodControl, getPeriodControl, stateToken,
-    assertNormalPeriod, fencePeriodForWrite, runWithPeriodWriteFence,
+    assertNormalPeriod, assertReviewReadablePeriod, assertCanonicalDecisionPeriod,
+    fencePeriodForWrite, runWithPeriodWriteFence,
+    fenceStaleCanonicalDecisionWrite, runWithStaleCanonicalDecisionWriteFence,
+    fenceStaleOrphanResolutionWrite, runWithStaleOrphanResolutionWriteFence,
     fencePeriodCalculationForWrite,
     acquirePeriodCalculationOwnership, runWithPeriodCalculationWriteFence,
     releasePeriodCalculationOwnership, transitionPeriodControl };

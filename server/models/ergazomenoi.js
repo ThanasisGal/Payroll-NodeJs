@@ -350,6 +350,7 @@ const ProdhlomenaOrariaSchema = new Schema(
         ypokatasthma: { type: String, trim: true },
         kodikos: { type: String, trim: true },
         hmeromhnia: { type: Date },
+        kathestos_apasxolhshs_hmeras: { type: String, trim: true, default: '' },
         kathgoria_ergasias: { type: String, trim: true },
         apo_ora_01: { type: String },
         eos_ora_01: { type: String },
@@ -378,6 +379,7 @@ const ProdhlomenaOrariaSchema = new Schema(
         cards_eos_ora_03: { type: String },
         check_ergasia: { type: Boolean, default: false },
         cards_ores_ergasias: { type: Number, default: 0 },
+        orphan_card_resolution: { type: Schema.Types.Mixed, default: null },
         apo_ora_01_apologistika: { type: String },
         eos_ora_01_apologistika: { type: String },
         apo_ora_02_apologistika: { type: String },
@@ -411,7 +413,10 @@ const ProdhlomenaOrariaSchema = new Schema(
         adeia_apologistika: { type: Boolean, default: false },
         kathgoria_adeias_apologistika: { type: String, trim: true },
         astheneia_apologistika: { type: Boolean, default: false },
+        apousia_apologistika: { type: Boolean, default: false },
         kyriakes_apologistika: { type: Boolean, default: false },
+        hmeres_apoysias_apologistika: { type: Number, default: 0 },
+        ores_apoysias_base_apologistika: { type: Number, default: 0 },
         ores_apoysias_apologistika: { type: Number, default: 0 },
         apo_ora_yperories: { type: String },
         eos_ora_yperories: { type: String },
@@ -765,6 +770,13 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
             default: false
         },
 
+        // Month-effective snapshot διαλείμματος. Η ημερομηνία είναι πάντα
+        // πρώτη ημέρα μήνα και δεν συνδέεται με το schedule end.
+        afora_allagh_dialleimatos: { type: Boolean, default: false },
+        hmeromhnia_isxyos_dialleimatos_apo: { type: Date },
+        dialleima_se_lepta: { type: Number, default: 0 },
+        dialleima_entos_ektos_orarioy: { type: Boolean, default: false },
+
         pososto_prosayxhshs_6hs_hmeras: {
             type: Number,
             min: 0
@@ -848,6 +860,14 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
     {
         collection: 'Istoriko_Proslhpseon_Allagon'
     }
+);
+
+IstorikoProslhpseonAllagonSchema.index(
+    { team: 1, company_kod: 1, kodikos: 1, hmeromhnia_isxyos_dialleimatos_apo: 1 },
+    { unique: true, partialFilterExpression: {
+        afora_allagh_dialleimatos: true,
+        hmeromhnia_isxyos_dialleimatos_apo: { $type: 'date' }
+    }, name: 'uniq_employee_month_effective_break' }
 );
 
 const IstorikoProslhpseonAllagonModel = model(

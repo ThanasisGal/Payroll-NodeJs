@@ -76,9 +76,11 @@ function buildPartialVerifiedCardUpdate(row = {}) {
     });
     const update = buildIncompleteCardSafeUpdate();
     const hasVerifiedWork = verification.hasCompleteCardEvidence;
+    const hasRealCardPunch = verification.completePairs.length > 0 ||
+        verification.unresolvedPairs.length > 0;
 
     update.apologistiko_biblio = false;
-    update.kathgoria_ergasias_apologistika = hasVerifiedWork ? 'ΕΡΓ' : '';
+    update.kathgoria_ergasias_apologistika = hasRealCardPunch ? 'ΕΡΓ' : '';
     update.ores_ergasias_apologistika = Number(
         verification.verifiedHours.toFixed(2)
     );

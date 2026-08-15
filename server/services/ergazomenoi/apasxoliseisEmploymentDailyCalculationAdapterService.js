@@ -1,9 +1,11 @@
 'use strict';
 
 const {
-    buildAutoAttendanceReset,
-    resolveSafeStartOnlyOrphan
+    buildAutoAttendanceReset
 } = require('./apasxoliseisAttendanceDerivedScheduleService');
+const {
+    applyCardDerivedAbsenceMetrics
+} = require('./apasxoliseisStage1DailyClassificationBulkService');
 
 function assertOperations(operations, names) {
     for (const name of names) if (typeof operations?.[name] !== 'function') {
@@ -21,7 +23,8 @@ const DAILY_OPERATIONS = Object.freeze([...PRELIMINARY_OPERATIONS, 'checkNightHo
     'calculateAdditionalAndOverworkForDay', 'sanitizeAppliedRepoTransferUpdate']);
 
 function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
-    proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, operations }) {
+    proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, operations,
+    orphanReusableResolution = null, orphanApprovedResolution = null }) {
     assertOperations(operations, PRELIMINARY_OPERATIONS);
     const calculationRow = operations.normalizeZeroLengthCardPairs(row);
     const context = { rec: calculationRow, ergazomenos: effectiveEmployee, argiesDateSet,
@@ -34,24 +37,28 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
     }
     const update = buildAutoAttendanceReset();
     const verification = operations.resolveCardPairVerification(calculationRow);
-    const safeOrphan = verification.hasUnresolvedCardEvidence
-        ? resolveSafeStartOnlyOrphan(calculationRow, {
-              flexibleArrivalMinutes: context.evelikthProselefshMinutes
-          })
-        : null;
+    const directApprovedOrphan = orphanApprovedResolution?.eligible === true &&
+        orphanApprovedResolution?.canApprove === true && orphanApprovedResolution?.approvedUpdates
+        ? orphanApprovedResolution : null;
+    const safeOrphan = directApprovedOrphan ||
+        (orphanReusableResolution?.automaticReusableApplied === true
+            ? orphanReusableResolution : null);
     const unresolved = verification.hasUnresolvedCardEvidence && !safeOrphan;
-    if (safeOrphan) Object.assign(update, {
-        apologistiko_biblio: safeOrphan.requiresBook,
-        kathgoria_ergasias_apologistika: 'ΕΡΓ',
-        apo_ora_01_apologistika: safeOrphan.start,
-        eos_ora_01_apologistika: safeOrphan.end,
-        apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
-        apo_ora_03_apologistika: '', eos_ora_03_apologistika: '',
-        ores_ergasias_apologistika: Number((safeOrphan.durationMinutes / 60).toFixed(2)),
-        ores_pragmatikhs_ergasias_apologistika: Number((safeOrphan.durationMinutes / 60).toFixed(2))
+    if (safeOrphan) Object.assign(update, safeOrphan.approvedUpdates, {
+        orphan_card_resolution: {
+            status: 'HR_APPROVED', policy_version: safeOrphan.policyVersion,
+            orphan_type: safeOrphan.orphanType, approved_start: safeOrphan.proposal.start,
+            approved_end: safeOrphan.proposal.end,
+            approved_hours: safeOrphan.proposal.workDurationHours ??
+                safeOrphan.proposal.durationHours,
+            apologistiko_book_update: safeOrphan.apologistikoBookUpdate,
+            reuse_scope: directApprovedOrphan ? 'ONE_TIME' : 'FUTURE_IDENTICAL',
+            automatically_reused: !directApprovedOrphan,
+            rest_risk_acknowledged: false, rest_conflicts: [], raw_cards_preserved: true
+        }
     });
-    else if (unresolved) Object.assign(update, operations.buildPartialVerifiedCardUpdate(calculationRow).update);
-    else {
+    if (unresolved) Object.assign(update, operations.buildPartialVerifiedCardUpdate(calculationRow).update);
+    else if (!safeOrphan) {
         const splitUpdate = operations.checkBrokenProgramVsBrokenCards(context);
         Object.assign(update, splitUpdate);
         if (Object.keys(splitUpdate).length === 0) for (let pair = 1; pair <= 3; pair += 1) {
@@ -67,10 +74,12 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
 }
 
 function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesDateSet, weeklyState,
-    appliedProtectionContext, proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, operations }) {
+    appliedProtectionContext, proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, operations,
+    orphanReusableResolution = null, orphanApprovedResolution = null }) {
     assertOperations(operations, DAILY_OPERATIONS);
     const preliminary = buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
-        proorhProseleyshMinutes, proorhApoxorhshMinutes, operations });
+        proorhProseleyshMinutes, proorhApoxorhshMinutes, operations, orphanReusableResolution,
+        orphanApprovedResolution });
     if (preliminary.manualOwnership) {
         return Object.freeze({ ...preliminary, update: {}, sanitizedUpdate: {},
             protectionDiagnostics: [] });
@@ -85,6 +94,7 @@ function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesD
     }
     if (weeklyState) Object.assign(update,
         operations.calculateAdditionalAndOverworkForDay(workingContext, weeklyState));
+    Object.assign(update, applyCardDerivedAbsenceMetrics(row, update));
     const protectedUpdate = operations.sanitizeAppliedRepoTransferUpdate({ rowId: row._id,
         currentRow: row, update, protectionContext: appliedProtectionContext });
     return Object.freeze({ ...preliminary, update,

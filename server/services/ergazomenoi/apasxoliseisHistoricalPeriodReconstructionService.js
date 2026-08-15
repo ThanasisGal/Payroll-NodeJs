@@ -4,10 +4,11 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const LifecycleAuditModel = require('../../models/apasxoliseisPeriodLifecycleAudit');
+const ApasxoliseisWeeklyCanonicalDecisionModel = require('../../models/apasxoliseisWeeklyCanonicalDecision');
 const { ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
 const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
-const { startOfWeekMondayUtc } = require('../../utils/date/mondaySundayWeek');
+const { startOfWeekMondayUtc, endOfWeekSundayUtc } = require('../../utils/date/mondaySundayWeek');
 
 const FINGERPRINT_VERSION = 'HISTORICAL_PERIOD_FACTS_V1';
 const SOURCE_FIELDS = Object.freeze([
@@ -30,6 +31,12 @@ const RESULT_FIELDS = Object.freeze([...DEPENDENCY_FIELDS,
     'ores_yperergasias_apologistika', 'ores_nominhs_yperorias_apologistika',
     'ores_paranomhs_yperorias_apologistika', 'ores_nyxtas_apologistika',
     'ores_argion_prosayxhsh_apologistika', 'kyriakes_apologistika'
+]);
+const CANONICAL_DECISION_DEPENDENCY_FIELDS = Object.freeze([
+    'team', 'company_kod', 'ypokatasthma', 'employee_kodikos', 'employee_id',
+    'week_start', 'week_end', 'snapshot_version', 'snapshot_fingerprint',
+    'decision_type', 'decision_payload_fingerprint', 'decision_status',
+    'policy_version', 'source_version', 'reuse_scope', 'reuse_status', 'created_at'
 ]);
 
 function reconstructionError(code, statusCode, message) {
@@ -72,6 +79,21 @@ function fingerprintRows(rows = [], fields = DEPENDENCY_FIELDS) {
     return crypto.createHash('sha256').update(JSON.stringify({ version: FINGERPRINT_VERSION,
         rows: canonicalize(normalized) })).digest('hex');
 }
+function fingerprintHistoricalDependencies(rows = [], canonicalDecisions = []) {
+    const rowFingerprint = fingerprintRows(rows, DEPENDENCY_FIELDS);
+    if (!canonicalDecisions.length) return rowFingerprint;
+    const normalizedDecisions = canonicalDecisions
+        .map((row) => selectFields(row, CANONICAL_DECISION_DEPENDENCY_FIELDS))
+        .sort((a, b) => [String(a.employee_kodikos || ''), String(a.week_start || ''),
+            String(a.week_end || ''), String(a._id || '')].join('|').localeCompare(
+            [String(b.employee_kodikos || ''), String(b.week_start || ''),
+                String(b.week_end || ''), String(b._id || '')].join('|')));
+    return crypto.createHash('sha256').update(JSON.stringify({
+        version: `${FINGERPRINT_VERSION}:CANONICAL_WEEKLY_DECISIONS_V1`,
+        row_dependency_fingerprint: rowFingerprint,
+        canonical_decisions: canonicalize(normalizedDecisions)
+    })).digest('hex');
+}
 function projectionForHistoricalState({ record, pastDeadline, dependencyFingerprint }) {
     if (!pastDeadline || record?.status === 'FINALIZED') return null;
     if (record?.historical_reconstruction_status === 'COMPLETED') {
@@ -105,17 +127,32 @@ async function loadRows({ scope, start, end, fields, prodhlomenaModel = Prodhlom
     if (session && typeof query.session === 'function') query = query.session(session);
     return typeof query.lean === 'function' ? query.lean() : query;
 }
-async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = ProdhlomenaOrariaModel, session = null }) {
+async function loadCanonicalDecisionDependencies({ scope, start, end,
+    canonicalDecisionModel = ApasxoliseisWeeklyCanonicalDecisionModel, session = null }) {
+    let query = canonicalDecisionModel.find({ team: scope.team, company_kod: scope.company_kod,
+        ypokatasthma: scope.ypokatasthma, decision_status: 'RECORDED',
+        week_start: mongoose.trusted({ $lte: end }), week_end: mongoose.trusted({ $gte: start }) })
+        .select(CANONICAL_DECISION_DEPENDENCY_FIELDS.join(' '))
+        .sort({ employee_kodikos: 1, week_start: 1, week_end: 1, _id: 1 });
+    if (session && typeof query.session === 'function') query = query.session(session);
+    return typeof query.lean === 'function' ? query.lean() : query;
+}
+async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = ProdhlomenaOrariaModel,
+    canonicalDecisionModel = ApasxoliseisWeeklyCanonicalDecisionModel, session = null }) {
     const periodStart = dateOnly(scope.period_start), periodEnd = dateOnly(scope.period_end);
     const window = dependencyWindow(periodStart);
-    const [sourceRows, dependencyRows, resultRows] = await Promise.all([
+    const weeklyContextStart = startOfWeekMondayUtc(periodStart);
+    const weeklyContextEnd = endOfWeekSundayUtc(periodEnd);
+    const [sourceRows, dependencyRows, resultRows, canonicalDecisions] = await Promise.all([
         loadRows({ scope, start: periodStart, end: periodEnd, fields: SOURCE_FIELDS, prodhlomenaModel, session }),
         loadRows({ scope, start: window.start, end: window.end, fields: DEPENDENCY_FIELDS, prodhlomenaModel, session }),
-        loadRows({ scope, start: periodStart, end: periodEnd, fields: RESULT_FIELDS, prodhlomenaModel, session })
+        loadRows({ scope, start: periodStart, end: periodEnd, fields: RESULT_FIELDS, prodhlomenaModel, session }),
+        loadCanonicalDecisionDependencies({ scope, start: weeklyContextStart, end: weeklyContextEnd,
+            canonicalDecisionModel, session })
     ]);
     return Object.freeze({ dependency_window_start: window.start, dependency_window_end: window.end,
         source_fingerprint: fingerprintRows(sourceRows, SOURCE_FIELDS),
-        dependency_fingerprint: fingerprintRows(dependencyRows, DEPENDENCY_FIELDS),
+        dependency_fingerprint: fingerprintHistoricalDependencies(dependencyRows, canonicalDecisions),
         result_fingerprint: fingerprintRows(resultRows, RESULT_FIELDS) });
 }
 async function authorizeHistoricalReconstruction({ session: userSession, scope, reason, requestId,
@@ -210,13 +247,16 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
 }
 async function completeHistoricalReconstruction({ scope, calculationId, requestId, now = new Date(),
     periodControlModel = PeriodControlModel, auditModel = LifecycleAuditModel,
-    prodhlomenaModel = ProdhlomenaOrariaModel, transactionRunner = transaction }) {
+    prodhlomenaModel = ProdhlomenaOrariaModel,
+    canonicalDecisionModel = ApasxoliseisWeeklyCanonicalDecisionModel,
+    transactionRunner = transaction }) {
     return transactionRunner(async (dbSession) => {
         const current = await periodControlModel.findOne({ ...scope, status: 'OPEN',
             historical_reconstruction_status: 'AUTHORIZED', active_calculation_id: calculationId,
             last_historical_reconstruction_request_id: requestId }).session(dbSession).lean();
         if (!current) throw reconstructionError('HISTORICAL_RECONSTRUCTION_OWNERSHIP_LOST', 409, 'Η εξουσιοδότηση ανακατασκευής δεν είναι πλέον ενεργή.');
-        const fingerprints = await calculateHistoricalFingerprints({ scope, prodhlomenaModel, session: dbSession });
+        const fingerprints = await calculateHistoricalFingerprints({ scope, prodhlomenaModel,
+            canonicalDecisionModel, session: dbSession });
         const completedVersion = Number(current.historical_reconstruction_pending_version || 0);
         if (completedVersion !== Number(current.historical_reconstruction_version || 0) + 1) {
             throw reconstructionError('HISTORICAL_RECONSTRUCTION_VERSION_CONFLICT', 409,
@@ -316,6 +356,7 @@ async function failHistoricalReconstruction({ scope, requestId, calculationId = 
 }
 
 module.exports = { FINGERPRINT_VERSION, SOURCE_FIELDS, DEPENDENCY_FIELDS, RESULT_FIELDS,
-    dependencyWindow, fingerprintRows, projectionForHistoricalState, isPastDeadline,
+    CANONICAL_DECISION_DEPENDENCY_FIELDS, dependencyWindow, fingerprintRows,
+    fingerprintHistoricalDependencies, projectionForHistoricalState, isPastDeadline,
     calculateHistoricalFingerprints, authorizeHistoricalReconstruction,
     completeHistoricalReconstruction, failHistoricalReconstruction, reconstructionError };

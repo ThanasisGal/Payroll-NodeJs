@@ -53,6 +53,10 @@ const {
 const {
     buildPayrollCalculationUnitsPreview
 } = require('../../services/kinhseis/payrollCalculationUnitsPreviewService');
+const {
+    buildEffectiveAbsenceDaysAggregationExpression,
+    buildEffectiveAbsenceHoursAggregationExpression
+} = require('../../services/ergazomenoi/apasxoliseisStage1DailyClassificationBulkService');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -747,7 +751,7 @@ class kinhseisController {
                         total_ores_ergasias_prodhlomenes: { $sum: '$ores_ergasias' },
                         total_ores_nyxtas: { $sum: '$ores_nyxtas_apologistika' },
                         total_ores_apoysias: {
-                            $sum: { $ifNull: ['$ores_apoysias_apologistika', 0] }
+                            $sum: buildEffectiveAbsenceHoursAggregationExpression()
                         },
                         total_ores_argion: { $sum: '$ores_argion_prosayxhsh_apologistika' },
                         total_ores_yperergasias: { $sum: '$ores_yperergasias_apologistika' },
@@ -898,21 +902,10 @@ class kinhseisController {
                     $group: {
                         _id: null,
                         total_hmeres_apoysias: {
-                            $sum: {
-                                $cond: [
-                                    {
-                                        $gt: [
-                                            { $ifNull: ['$ores_apoysias_apologistika', 0] },
-                                            0
-                                        ]
-                                    },
-                                    1,
-                                    0
-                                ]
-                            }
+                            $sum: buildEffectiveAbsenceDaysAggregationExpression()
                         },
                         total_ores_apoysias: {
-                            $sum: { $ifNull: ['$ores_apoysias_apologistika', 0] }
+                            $sum: buildEffectiveAbsenceHoursAggregationExpression()
                         }
                     }
                 },
