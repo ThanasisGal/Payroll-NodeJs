@@ -28,6 +28,17 @@ const STATUS = Object.freeze({
     OPEN_WEEK_PENDING_COMPLETION: 'OPEN_WEEK_PENDING_COMPLETION',
     NEEDS_HR_DECISION: 'NEEDS_HR_DECISION'
 });
+const RESOLVED_REPO_TRANSFER_CANDIDATE_REASONS = new Set([
+    'TARGET_LOCKED',
+    'TARGET_LEAVE_OR_SICKNESS',
+    'TARGET_ALREADY_PROCESSED',
+    'TARGET_CONFLICTING_REPO_STATE',
+    'SOURCE_LOCKED',
+    'SOURCE_LEAVE_OR_SICKNESS',
+    'SOURCE_INVALID_CARD_EVIDENCE',
+    'SOURCE_ALREADY_PROCESSED',
+    'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'
+]);
 
 function finiteZero(value) {
     const parsed = Number(String(value ?? 0).replace(',', '.'));
@@ -309,9 +320,17 @@ function buildWeeklyRepoDeviationPreview({
             ).length;
             const sixthSeventhDayNeedsDecision =
                 authoritativeSixthSeventhDay.status === 'NEEDS_HR_DECISION';
+            const requiresNewHrDecision =
+                canonicalResolution?.applicability !== 'APPLICABLE' &&
+                sixthSeventhDayNeedsDecision;
+            const suppressResolvedCandidateReason =
+                authoritativeSixthSeventhDay.status === STATUS.READY &&
+                requiresNewHrDecision === false;
             const presentationReasons = [...new Set([
                 ...(authoritativeSixthSeventhDay.reasons || []),
-                ...(repoTransfer.reasons || [])
+                ...(repoTransfer.reasons || []).filter((reason) =>
+                    !(suppressResolvedCandidateReason &&
+                        RESOLVED_REPO_TRANSFER_CANDIDATE_REASONS.has(reason)))
             ])].filter((reason) =>
                 !(
                     canonicalResolution?.applicability === 'APPLICABLE' &&
@@ -341,9 +360,7 @@ function buildWeeklyRepoDeviationPreview({
                     ? resolvedCanonicalRepoIdentities.length
                     : resolution?.resolved_repo ?? actualRepo,
                 resolved_repo_identities: [...resolvedCanonicalRepoIdentities],
-                requires_new_hr_decision:
-                    canonicalResolution?.applicability !== 'APPLICABLE' &&
-                    sixthSeventhDayNeedsDecision,
+                requires_new_hr_decision: requiresNewHrDecision,
                 // Η ταξινόμηση 6ης/7ης ημέρας είναι ανεξάρτητη από το αν
                 // υπάρχει ασφαλές ζεύγος μεταφοράς ρεπό. Το αποτέλεσμα της
                 // μεταφοράς δεν επιτρέπεται να μηδενίζει την άμεση πολιτική.
