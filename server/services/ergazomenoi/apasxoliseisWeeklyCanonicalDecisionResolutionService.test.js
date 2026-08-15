@@ -130,12 +130,23 @@ const juneWeek = { naturalWeekStart: '2026-06-08', naturalWeekEnd: '2026-06-14',
 const juneAutomatic = analyzeWeeklySixthSeventhDay({
     weekRows: actualJuneRows, effectiveProfile: juneProfile, hourlyRate: 10
 });
+assert.equal(juneAutomatic.status, 'READY');
+assert.equal(juneAutomatic.sixthDay.hmeromhnia, '2026-06-14');
+const historicalJuneAutomatic = { ...juneAutomatic,
+    status: 'NEEDS_HR_DECISION',
+    reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'],
+    canonicalRepoDayIdentities: [], sixthDay: null, seventhDay: null };
+const historicalJuneInput = buildWeeklyCanonicalDecisionSnapshotInput({
+    team: 'THA', company_kod: 'company', employee: juneProfile, week: juneWeek,
+    weekRows: actualJuneRows, effectiveProfile: juneProfile, profileHistory: [],
+    automaticAnalysis: historicalJuneAutomatic, appliedProtectionContext: { entriesByRowId: {} }
+});
 const juneInput = buildWeeklyCanonicalDecisionSnapshotInput({
     team: 'THA', company_kod: 'company', employee: juneProfile, week: juneWeek,
     weekRows: actualJuneRows, effectiveProfile: juneProfile, profileHistory: [],
     automaticAnalysis: juneAutomatic, appliedProtectionContext: { entriesByRowId: {} }
 });
-const juneDecision = record(juneInput, 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', {
+const juneDecision = record(historicalJuneInput, 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', {
     current_repo_identities: ['2026-06-10', '2026-06-11'], applied_execution_id: null
 }, { employee_kodikos: '0004', week_start: new Date('2026-06-08'),
     week_end: new Date('2026-06-14') });

@@ -264,7 +264,6 @@ function buildWeeklyRepoDeviationPreview({
                 effectiveProfile
             });
             const canonicalResolution =
-                sixthSeventhDay.status === STATUS.NEEDS_HR_DECISION &&
                 typeof resolveCanonicalAnalysis === 'function'
                     ? resolveCanonicalAnalysis({
                           base,

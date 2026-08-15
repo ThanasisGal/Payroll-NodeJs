@@ -43,15 +43,23 @@ const week = { naturalWeekStart: '2026-06-29', naturalWeekEnd: '2026-07-05',
 const automatic = analyzeWeeklySixthSeventhDay({
     weekRows: rows, effectiveProfile: employee, hourlyRate: 10
 });
-assert.equal(automatic.status, 'NEEDS_HR_DECISION');
-assert.ok(automatic.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+assert.equal(automatic.status, 'READY');
+assert.equal(automatic.sixthDay.hmeromhnia, '2026-07-05');
+assert.equal(automatic.seventhDay, null);
+
+const historicalAutomatic = { ...automatic,
+    status: 'NEEDS_HR_DECISION',
+    reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'],
+    canonicalRepoDayIdentities: [],
+    sixthDay: null,
+    seventhDay: null };
 
 const storedInput = buildWeeklyCanonicalDecisionSnapshotInput({
     team: 'THA', company_kod: 'company', employee: {
         ...employee, pososto_prosayxhshs_6hs_hmeras: null
     }, week, weekRows: rows, effectiveProfile: {
         ...employee, pososto_prosayxhshs_6hs_hmeras: null
-    }, profileHistory: [], automaticAnalysis: automatic,
+    }, profileHistory: [], automaticAnalysis: historicalAutomatic,
     appliedProtectionContext: { entriesByRowId: {} }
 });
 const storedSnapshot = buildCanonicalWeeklyDecisionSnapshot(storedInput);

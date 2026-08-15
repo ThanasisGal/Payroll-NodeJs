@@ -60,20 +60,31 @@ function resolveWeeklyCanonicalDecisionAnalysis({
     profileHistory = [],
     isCalculatedWorkHoursAuthoritativeForRow = null
 } = {}) {
-    if (automaticAnalysis?.status !== 'NEEDS_HR_DECISION') {
-        return { analysis: automaticAnalysis, applicability: APPLICABILITY.NOT_FOUND, decision: null };
-    }
-    const oneTimeResolved = resolvePreloadedWeeklyCanonicalDecision({ currentInput: snapshotInput,
+    const compatibilityInput = automaticAnalysis?.status === 'NEEDS_HR_DECISION'
+        ? snapshotInput
+        : {
+              ...snapshotInput,
+              canonical_status: 'NEEDS_HR_DECISION',
+              canonical_reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
+          };
+    const oneTimeResolved = resolvePreloadedWeeklyCanonicalDecision({ currentInput: compatibilityInput,
         records: decisionRecords });
     let resolved = oneTimeResolved;
     if (oneTimeResolved.applicability !== APPLICABILITY.APPLICABLE &&
         oneTimeResolved.applicability !== APPLICABILITY.CONFLICT) {
-        const snapshotResult = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
+        const snapshotResult = buildCanonicalWeeklyDecisionSnapshot(compatibilityInput);
         const reusableResolved = findApplicableWeeklyReusableDecision({ snapshotResult,
             rules: decisionRecords });
         if (reusableResolved.applicability !== APPLICABILITY.NOT_FOUND) resolved = {
             ...reusableResolved, current_fingerprint: snapshotResult.fingerprint
         };
+    }
+    if (automaticAnalysis?.status !== 'NEEDS_HR_DECISION' &&
+        !(resolved.applicability === APPLICABILITY.APPLICABLE &&
+            resolved.record?.decision_type === 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC')) {
+        return { analysis: automaticAnalysis, ...resolved,
+            decision: resolved.applicability === APPLICABILITY.NOT_FOUND
+                ? null : resolved.record || null };
     }
     if (resolved.applicability === APPLICABILITY.STALE) return {
         analysis: blocked(automaticAnalysis, 'CANONICAL_DECISION_STALE'), ...resolved, decision: resolved.record

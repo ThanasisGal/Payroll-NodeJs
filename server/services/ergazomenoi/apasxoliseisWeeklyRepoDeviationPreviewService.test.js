@@ -674,7 +674,9 @@ function canonicalJunePreview({ decisionMode = 'NONE' } = {}) {
         kodikos: '0004',
         hmeromhnia: `2026-06-${day}`,
         kathgoria_ergasias: day === '10' ? 'ΑΝ' : 'ΕΡΓ',
-        kathgoria_ergasias_apologistika: day === '10' ? 'ΕΡΓ' : '',
+        kathgoria_ergasias_apologistika: day === '10' ? 'ΕΡΓ' :
+            day === '11' ? 'ΑΣΘΕΝΕΙΑ' : '',
+        astheneia_apologistika: day === '11',
         repo: day === '10',
         repo_apologistika: false,
         ores_ergasias: day === '10' ? 0 : 8,
@@ -730,7 +732,12 @@ function canonicalJunePreview({ decisionMode = 'NONE' } = {}) {
                 weekRows: currentRows, effectiveProfile, profileHistory: [], automaticAnalysis,
                 appliedProtectionContext: { entriesByRowId: {} }
             });
-            const snapshot = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
+            const historicalSnapshotInput = {
+                ...snapshotInput,
+                canonical_status: 'NEEDS_HR_DECISION',
+                canonical_reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
+            };
+            const snapshot = buildCanonicalWeeklyDecisionSnapshot(historicalSnapshotInput);
             const payload = {
                 current_repo_identities: ['2026-06-10', '2026-06-11'],
                 applied_execution_id: null
@@ -741,6 +748,7 @@ function canonicalJunePreview({ decisionMode = 'NONE' } = {}) {
                 week_end: new Date('2026-06-14'), decision_status: 'RECORDED',
                 decision_type: 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
                 decision_payload: payload, snapshot_fingerprint: snapshot.fingerprint,
+                canonical_snapshot: snapshot.snapshot,
                 request_id: 'weekly-preview-test'
             };
             if (decisionMode === 'STALE') record.snapshot_fingerprint = '0'.repeat(64);
@@ -773,10 +781,12 @@ function canonicalJunePreview({ decisionMode = 'NONE' } = {}) {
 function testCanonicalDecisionIsConsumedByWeeklyProjection() {
     const unresolved = canonicalJunePreview().deviations[0];
     assert.strictEqual(unresolved.canonical_decision_applicability, 'NOT_FOUND');
-    assert.strictEqual(unresolved.status, STATUS.NEEDS_HR_DECISION);
-    assert.ok(unresolved.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
-    assert.ok(unresolved.presentation_reasons.includes(
-        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+    assert.strictEqual(unresolved.status, STATUS.READY);
+    assert.ok(!unresolved.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+    assert.strictEqual(unresolved.requires_new_hr_decision, false);
+    assert.strictEqual(unresolved.sixth_day_date, '2026-06-14');
+    assert.strictEqual(unresolved.seventh_day_date, null);
+    assert.strictEqual(unresolved.sixth_day_count, 1);
 
     for (const decisionMode of ['ONE_TIME', 'REUSABLE']) {
         const resolved = canonicalJunePreview({ decisionMode }).deviations[0];
@@ -791,7 +801,7 @@ function testCanonicalDecisionIsConsumedByWeeklyProjection() {
             ['2026-06-10', '2026-06-11']);
         assert.strictEqual(resolved.requires_new_hr_decision, false);
         assert.strictEqual(resolved.actual_workdays, 6);
-        assert.strictEqual(resolved.sixth_day_date, '2026-06-09');
+        assert.strictEqual(resolved.sixth_day_date, '2026-06-14');
         assert.strictEqual(resolved.sixth_day_count, 1);
         assert.strictEqual(resolved.sixth_day_premium_rate, 0);
         assert.strictEqual(resolved.seventh_day_count, 0);
@@ -799,12 +809,10 @@ function testCanonicalDecisionIsConsumedByWeeklyProjection() {
 
     const stale = canonicalJunePreview({ decisionMode: 'STALE' }).deviations[0];
     assert.strictEqual(stale.canonical_decision_applicability, 'STALE');
-    assert.strictEqual(stale.status, STATUS.NEEDS_HR_DECISION);
-    assert.ok(stale.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
-    assert.ok(stale.reasons.includes('CANONICAL_DECISION_STALE'));
-    assert.ok(stale.presentation_reasons.includes(
-        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
-    assert.ok(stale.presentation_reasons.includes('CANONICAL_DECISION_STALE'));
+    assert.strictEqual(stale.status, STATUS.READY);
+    assert.strictEqual(stale.requires_new_hr_decision, false);
+    assert.strictEqual(stale.sixth_day_date, '2026-06-14');
+    assert.strictEqual(stale.seventh_day_date, null);
 }
 
 testSundayAndMondayUseDifferentBuckets();

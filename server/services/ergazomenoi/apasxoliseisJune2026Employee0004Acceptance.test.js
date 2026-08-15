@@ -73,6 +73,10 @@ const effectiveA = weekA.map((item) => item.hmeromhnia === '2026-06-10'
 const sixthA = analyzeWeeklySixthSeventhDay({ weekRows: effectiveA,
     effectiveProfile: PROFILE });
 assert.equal(sixthA.status, 'READY');
+assert.equal(sixthA.sixthDay.hmeromhnia, '2026-06-14');
+assert.equal(sixthA.sixthDay.sixthDayHours, 8);
+assert.equal(sixthA.seventhDay, null);
+assert.ok(!sixthA.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
 const approvedOrphanDay = sixthA.dailyFacts.find((day) => day.hmeromhnia === '2026-06-14');
 assert.equal(approvedOrphanDay.actualWorkHours, 8);
 assert.equal(approvedOrphanDay.cardVerificationStatus, 'HR_APPROVED_ORPHAN');

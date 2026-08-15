@@ -42,6 +42,10 @@ assert.ok(source.includes('canonical-identical-group'));
 assert.match(source, /canonical-identical-group[\s\S]{0,900}data-identical-group-count=[\s\S]{0,400}data-identical-group-key=/);
 assert.match(source, /bindActionableIssueEvents[\s\S]{0,1800}querySelectorAll\('\.canonical-decision-open'\)/);
 assert.match(source, /dev\.status === 'NEEDS_HR_DECISION' && dev\.requires_new_hr_decision !== false && canRecordCanonicalEmploymentDecision\(\)/);
+const shouldRenderDecisionButton = (dev) =>
+    dev.status === 'NEEDS_HR_DECISION' && dev.requires_new_hr_decision !== false;
+assert.equal(shouldRenderDecisionButton({ status: 'READY',
+    requires_new_hr_decision: false, canonical_decision_applicability: 'STALE' }), false);
 assert.ok(!source.includes('btn btn-sm btn-outline-primary actionable-issue-open-case'));
 assert.ok(source.includes('actionable-issue-open-case employment-review-action-btn employment-review-action-primary'));
 assert.ok(!source.includes("target.scrollIntoView({ behavior: 'smooth', block: 'center'"));

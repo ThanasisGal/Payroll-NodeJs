@@ -63,7 +63,7 @@ assert.deepStrictEqual(
         { employeeCode: '0005', week: '2026-06-01/2026-06-07', eligibility: 'ELIGIBLE' },
         { employeeCode: '0002', week: '2026-06-15/2026-06-21', eligibility: 'ELIGIBLE' },
         { employeeCode: '0002', week: '2026-06-22/2026-06-28', eligibility: 'ELIGIBLE' },
-        { employeeCode: '0003', week: '2026-06-01/2026-06-07', eligibility: 'NOT_APPLICABLE' }
+        { employeeCode: '0003', week: '2026-06-01/2026-06-07', eligibility: 'NEEDS_REVIEW' }
     ]
 );
 for (const outcome of outcomes.slice(0, 3)) {
@@ -73,6 +73,7 @@ for (const outcome of outcomes.slice(0, 3)) {
     assert.strictEqual(outcome.sixthDayStatus, 'READY');
     assert.strictEqual(outcome.seventhDay, null);
 }
+assert.ok(outcomes[3].reasons.includes('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
 assert.deepStrictEqual(
     outcomes.slice(0, 3).map(({ source, target, sixthDay }) => ({
         source,
@@ -81,11 +82,11 @@ assert.deepStrictEqual(
     })),
     [
         // Μετά τη μεταφορά ρεπό, η 6η ημέρα επιλέγεται από τις έξι
-        // πραγματικές ημέρες εργασίας: πρώτα η πλησιέστερη στις 8 ώρες
-        // μέσα στο (5, 8], και μόνο σε ισοβαθμία ο chronological tie-break.
-        { source: '2026-06-02', target: '2026-06-04', sixthDay: '2026-06-01' },
-        { source: '2026-06-15', target: '2026-06-17', sixthDay: '2026-06-16' },
-        { source: '2026-06-22', target: '2026-06-24', sixthDay: '2026-06-26' }
+        // πραγματικές ημέρες εργασίας: η χρονολογικά τελευταία
+        // κανονική υποψηφιότητα μέσα στο (5, 8].
+        { source: '2026-06-02', target: '2026-06-04', sixthDay: '2026-06-07' },
+        { source: '2026-06-15', target: '2026-06-17', sixthDay: '2026-06-21' },
+        { source: '2026-06-22', target: '2026-06-24', sixthDay: '2026-06-28' }
     ]
 );
 assert.ok(

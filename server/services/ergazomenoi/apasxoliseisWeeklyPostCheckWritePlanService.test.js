@@ -161,17 +161,23 @@ function decisionFor(rows, decisionType, decisionPayload, overrides = {}) {
         istorikoRows: [], ergazomenos: sourceEmployee }).effectiveProfile;
     const automaticAnalysis = analyzeWeeklySixthSeventhDay({ weekRows: rows,
         effectiveProfile, hourlyRate: effectiveProfile.pragmatikoOromisthio });
+    const snapshotAnalysis = automaticAnalysis.status === 'NEEDS_HR_DECISION'
+        ? automaticAnalysis
+        : { ...automaticAnalysis, status: 'NEEDS_HR_DECISION',
+            reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'],
+            canonicalRepoDayIdentities: [], sixthDay: null, seventhDay: null };
     const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
         team: 'THA', company_kod: 'company', employee: sourceEmployee,
         week: decisionWeek,
-        weekRows: rows, effectiveProfile, profileHistory: [], automaticAnalysis,
+        weekRows: rows, effectiveProfile, profileHistory: [], automaticAnalysis: snapshotAnalysis,
         appliedProtectionContext: overrides.appliedProtectionContext || { entriesByRowId: {} }
     });
     const snapshot = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
     return { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
         employee_kodikos: 'D1', week_start: new Date('2026-08-03'),
         week_end: new Date('2026-08-09'), decision_status: 'RECORDED',
-        snapshot_fingerprint: snapshot.fingerprint, decision_type: decisionType,
+        snapshot_fingerprint: snapshot.fingerprint, canonical_snapshot: snapshot.snapshot,
+        decision_type: decisionType,
         decision_payload: decisionPayload, decision_payload_fingerprint: fingerprint(decisionPayload),
         created_at: new Date('2026-08-10') };
 }
@@ -255,8 +261,11 @@ Object.assign(ambiguousRows[6], {
 });
 result = plan(ambiguousRows);
 let deviation = onlyDeviation(result);
-assert.equal(deviation.status, 'NEEDS_HR_DECISION');
-assert.ok(deviation.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+assert.equal(deviation.status, undefined);
+assert.equal(deviation.reasons, undefined);
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.status, 'READY');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7);
 
 const humanRepoRows = week([7, 7, 7, 7, 7, 8, 7]);
 Object.assign(humanRepoRows[4], { kathgoria_ergasias: 'ΑΝ',
@@ -307,7 +316,10 @@ result = plan(ambiguousRows, {
     canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([staleDecision])
 });
 deviation = onlyDeviation(result);
-assert.ok(deviation.reasons.includes('CANONICAL_DECISION_STALE'));
+assert.equal(deviation.status, undefined);
+assert.equal(deviation.reasons, undefined);
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.status, 'READY');
 
 // A genuine Stage-1 daily classification change remains stale; row-level calculation
 // authoritativeness must not make an obsolete HR decision applicable again.
@@ -334,7 +346,9 @@ const dataChangedCurrentInput = buildWeeklyCanonicalDecisionSnapshotInput({
     team: 'THA', company_kod: 'company', employee: employee(),
     week: { naturalWeekStart: new Date('2026-08-03'), naturalWeekEnd: new Date('2026-08-09') },
     weekRows: dataChangedRowsAfter, effectiveProfile: dataChangedProfile,
-    automaticAnalysis: dataChangedAutomatic, appliedProtectionContext: { entriesByRowId: {} }
+    automaticAnalysis: { ...dataChangedAutomatic, status: 'NEEDS_HR_DECISION',
+        reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'] },
+    appliedProtectionContext: { entriesByRowId: {} }
 });
 assert.equal(resolvePreloadedWeeklyCanonicalDecision({
     currentInput: dataChangedCurrentInput, records: [dataChangedDecision]
@@ -497,8 +511,8 @@ Object.assign(appliedSequencingRows[6], {
     apologistiko_biblio: true
 });
 result = plan(appliedSequencingRows);
-update = updateFor(result, '2026-08-05');
-assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 8);
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7);
 
 // A proposal which has not been applied is not an input to Phase C. The raw
 // target must not be materialized as repo/book by the post-check write plan.
@@ -541,11 +555,15 @@ const crossProfile = getWeeklyRepoProfileInfo({ week: crossWeek,
     istorikoRows: [], ergazomenos: crossEmployee }).effectiveProfile;
 const crossAutomatic = analyzeWeeklySixthSeventhDay({ weekRows: crossMonthRows,
     effectiveProfile: crossProfile, hourlyRate: crossProfile.pragmatikoOromisthio });
-assert.equal(crossAutomatic.status, 'NEEDS_HR_DECISION');
+assert.equal(crossAutomatic.status, 'READY');
+const historicalCrossAutomatic = { ...crossAutomatic, status: 'NEEDS_HR_DECISION',
+    reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'],
+    canonicalRepoDayIdentities: [], sixthDay: null, seventhDay: null };
 const crossSnapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({ team: 'THA',
     company_kod: 'company', employee: crossEmployee, week: crossWeek,
     weekRows: crossMonthRows, effectiveProfile: crossProfile, profileHistory: [],
-    automaticAnalysis: crossAutomatic, appliedProtectionContext: { entriesByRowId: {} } });
+    automaticAnalysis: historicalCrossAutomatic,
+    appliedProtectionContext: { entriesByRowId: {} } });
 const crossSnapshot = buildCanonicalWeeklyDecisionSnapshot(crossSnapshotInput);
 const crossSameRunIds = new Set(['cross-1', 'cross-2']);
 const crossRowAuthority = (item) => crossSameRunIds.has(String(item._id));
@@ -555,11 +573,15 @@ const crossCalculationAutomatic = analyzeWeeklySixthSeventhDay({
     isCalculatedWorkHoursAuthoritativeForRow: crossRowAuthority,
     allowDeclaredRepoIdentityOverride: true
 });
-assert.equal(crossCalculationAutomatic.status, 'NEEDS_HR_DECISION');
+assert.equal(crossCalculationAutomatic.status, 'READY');
+const historicalCrossCalculationAutomatic = { ...crossCalculationAutomatic,
+    status: 'NEEDS_HR_DECISION',
+    reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'],
+    canonicalRepoDayIdentities: [], sixthDay: null, seventhDay: null };
 const crossCalculationInput = buildWeeklyCanonicalDecisionSnapshotInput({
     team: 'THA', company_kod: 'company', employee: crossEmployee, week: crossWeek,
     weekRows: crossMonthRows, effectiveProfile: crossProfile, profileHistory: [],
-    automaticAnalysis: crossCalculationAutomatic,
+    automaticAnalysis: historicalCrossCalculationAutomatic,
     appliedProtectionContext: { entriesByRowId: {} },
     isCalculatedWorkHoursAuthoritativeForRow: crossRowAuthority
 });
@@ -568,7 +590,7 @@ assert.equal(crossCalculationSnapshot.fingerprint, crossSnapshot.fingerprint);
 const crossDecision = { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
     employee_kodikos: 'D1', week_start: new Date('2026-06-29'),
     week_end: new Date('2026-07-05'), decision_status: 'RECORDED',
-    snapshot_fingerprint: crossSnapshot.fingerprint,
+    snapshot_fingerprint: crossSnapshot.fingerprint, canonical_snapshot: crossSnapshot.snapshot,
     decision_type: 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
     decision_payload: { current_repo_identities: ['2026-06-30', '2026-07-02'],
         applied_execution_id: null },
