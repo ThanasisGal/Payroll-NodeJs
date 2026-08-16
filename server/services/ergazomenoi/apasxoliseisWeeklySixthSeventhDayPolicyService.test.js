@@ -102,16 +102,22 @@ assert.strictEqual(analyzeWeeklySixthSeventhDay({
 }).sixthDay.hmeromhnia, '2026-07-31');
 
 const productionSevenDayExample = week([8.60, 7.97, 6.48, 7.32, 7.42, 8.12, 6.78]);
-Object.assign(productionSevenDayExample[1], { kathgoria_ergasias: 'ΑΝ', repo: true });
+productionSevenDayExample.forEach((day) => Object.assign(day, {
+    kathgoria_ergasias: 'ΕΡΓ', repo: false
+}));
+Object.assign(productionSevenDayExample[2], { kathgoria_ergasias: 'ΑΝ', repo: true });
 Object.assign(productionSevenDayExample[6], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
-result = analyzeWeeklySixthSeventhDay({
+const singleWorkedRepoResult = analyzeWeeklySixthSeventhDay({
     weekRows: productionSevenDayExample,
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
 });
-assert.strictEqual(result.sixthDay.hmeromhnia, '2026-07-28');
-assert.strictEqual(result.sixthDay.actualWorkHours, 7.97);
-assert.strictEqual(result.seventhDay.hmeromhnia, '2026-08-01');
+result = singleWorkedRepoResult;
+assert.strictEqual(result.status, 'READY');
+assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-02');
+assert.strictEqual(result.sixthDay.actualWorkHours, 6.78);
+assert.strictEqual(result.seventhDay.hmeromhnia, '2026-07-29');
+assert.strictEqual(result.seventhDay.actualWorkHours, 6.48);
 
 const incompleteInterval = week([7, 7, 7, 7, 7, 7, 0]);
 incompleteInterval[5].cards_eos_ora_01 = '';
@@ -245,7 +251,14 @@ for (const rate of [null, '', -1, 'invalid']) {
     assert.strictEqual(result.sixthDay.value, null);
 }
 
-result = analyze([7, 7, 7, 7, 7, 8, 9]);
+const singleWorkedRepoSeventh = week([7, 7, 7, 7, 7, 8, 9]);
+Object.assign(singleWorkedRepoSeventh[5], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
+result = analyzeWeeklySixthSeventhDay({
+    weekRows: singleWorkedRepoSeventh,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 },
+    hourlyRate: 10
+});
 assert.strictEqual(result.seventhDay.hmeromhnia, '2026-08-02');
 assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
 assert.ok(result.warnings.includes('SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'));
@@ -255,6 +268,7 @@ assert.strictEqual(result.seventhDay.severity, 'SERIOUS_VIOLATION');
 assert.strictEqual(result.seventhDay.classification, 'SEVENTH_DAY_ILLEGAL_OVERTIME');
 
 const declaredAboveActual = week([7, 7, 7, 7, 7, 7, 7]);
+Object.assign(declaredAboveActual[5], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
 declaredAboveActual[6].ores_ergasias = 10;
 const declaredAboveActualResult = analyzeWeeklySixthSeventhDay({
     weekRows: declaredAboveActual,
@@ -268,6 +282,7 @@ assert.strictEqual(declaredAboveActualResult.seventhDay.actualWorkHours, 7);
 assert.strictEqual(declaredAboveActualResult.seventhDay.illegalOvertimeHours, 7);
 
 const sameActualDifferentDeclared = week([7, 7, 7, 7, 7, 7, 7]);
+Object.assign(sameActualDifferentDeclared[5], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
 sameActualDifferentDeclared[6].ores_ergasias = 3;
 const sameActualDifferentDeclaredResult = analyzeWeeklySixthSeventhDay({
     weekRows: sameActualDifferentDeclared,
@@ -321,7 +336,7 @@ employee0004RegressionWeek.forEach((day, index) => {
     day.hmeromhnia = date.toISOString().slice(0, 10);
     day.ores_ergasias = [8.60, 7.97, 6.48, 7.32, 7.42, 8.12, 6.78][index];
 });
-Object.assign(employee0004RegressionWeek[1], { kathgoria_ergasias: 'ΑΝ', repo: true });
+Object.assign(employee0004RegressionWeek[1], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
 Object.assign(employee0004RegressionWeek[2], { kathgoria_ergasias: 'ΑΝ', repo: true });
 Object.assign(employee0004RegressionWeek[5], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
 Object.assign(employee0004RegressionWeek[6], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
@@ -329,6 +344,7 @@ Object.assign(employee0004RegressionWeek[6], {
     cards_apo_ora_01: '15:40',
     cards_eos_ora_01: '22:57',
     cards_ores_ergasias: 7.28,
+    ores_ergasias_apologistika: 6.78,
     ores_nyxtas_apologistika: 0.45,
     ores_argion_prosayxhsh_apologistika: 6.78
 });
@@ -342,7 +358,9 @@ const regressionInput = {
 };
 const firstRegressionResult = analyzeWeeklySixthSeventhDay(regressionInput);
 const secondRegressionResult = analyzeWeeklySixthSeventhDay(regressionInput);
-assert.strictEqual(firstRegressionResult.sixthDay.hmeromhnia, '2026-06-16');
+assert.strictEqual(firstRegressionResult.status, 'READY');
+assert.strictEqual(firstRegressionResult.sixthDay.hmeromhnia, '2026-06-21');
+assert.strictEqual(firstRegressionResult.sixthDay.sixthDayHours, 6.78);
 assert.strictEqual(firstRegressionResult.seventhDay.hmeromhnia, '2026-06-17');
 assert.strictEqual(firstRegressionResult.seventhDay.actualWorkHours, 6.48);
 assert.strictEqual(firstRegressionResult.seventhDay.illegalOvertimeHours, 6.48);
@@ -386,10 +404,10 @@ const unchangedProfileSeventhDay = analyze(
     [7, 7, 7, 7, 7, 7, 9],
     { profile_changed_inside_week: false }
 );
-assert.strictEqual(unchangedProfileSeventhDay.status, 'READY');
-assert.strictEqual(unchangedProfileSeventhDay.sixthDay.hmeromhnia, '2026-08-01');
-assert.strictEqual(unchangedProfileSeventhDay.seventhDay.hmeromhnia, '2026-08-02');
-assert.strictEqual(unchangedProfileSeventhDay.seventhDay.illegalOvertimeHours, 9);
+assert.strictEqual(unchangedProfileSeventhDay.status, 'NEEDS_HR_DECISION');
+assert.ok(unchangedProfileSeventhDay.reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
+assert.strictEqual(unchangedProfileSeventhDay.seventhDay, null);
 
 // C3.4: the two current canonical repo identities drive the handoff from the
 // selected sixth day to the complementary remaining repo.
@@ -403,16 +421,20 @@ assert.strictEqual(basicIdentity.remainingRepoIdentity, '2026-08-02');
 assert.strictEqual(basicIdentity.seventhDay, null);
 
 const bothReposWorked = analyze([7, 7, 7, 7, 7, 8, 9]);
-assert.strictEqual(bothReposWorked.sixthDayRepoIdentity, '2026-08-01');
-assert.strictEqual(bothReposWorked.remainingRepoIdentity, '2026-08-02');
-assert.strictEqual(bothReposWorked.seventhDay.hmeromhnia, '2026-08-02');
+assert.strictEqual(bothReposWorked.status, 'NEEDS_HR_DECISION');
+assert.deepStrictEqual(bothReposWorked.reasons, [
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'
+]);
+assert.strictEqual(bothReposWorked.sixthDay, null);
+assert.strictEqual(bothReposWorked.seventhDay, null);
 
 // Reverse chronological trap: Sunday is selected as sixth by the existing
 // standard-candidate tie-break, so the earlier Saturday identity is seventh.
 const reverseChronological = analyze([7, 7, 7, 7, 7, 9, 7]);
-assert.strictEqual(reverseChronological.sixthDayRepoIdentity, '2026-08-02');
-assert.strictEqual(reverseChronological.remainingRepoIdentity, '2026-08-01');
-assert.strictEqual(reverseChronological.seventhDay.hmeromhnia, '2026-08-01');
+assert.strictEqual(reverseChronological.status, 'NEEDS_HR_DECISION');
+assert.ok(reverseChronological.reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
+assert.strictEqual(reverseChronological.seventhDay, null);
 
 const transferredRepoWeek = week([7, 7, 7, 7, 7, 7, 7]);
 Object.assign(transferredRepoWeek[4], {
@@ -436,24 +458,18 @@ const transferredRepoResult = analyzeWeeklySixthSeventhDay({
     hourlyRate: 10
 });
 assert.deepStrictEqual(transferredRepoResult.canonicalRepoDayIdentities, [
-    '2026-07-31',
+    '2026-08-01',
     '2026-08-02'
 ]);
-assert.ok(!transferredRepoResult.canonicalRepoDayIdentities.includes('2026-08-01'));
-assert.strictEqual(transferredRepoResult.sixthDayRepoIdentity, '2026-08-02');
-assert.strictEqual(transferredRepoResult.remainingRepoIdentity, '2026-07-31');
-assert.strictEqual(transferredRepoResult.seventhDay.hmeromhnia, '2026-07-31');
-assert.notStrictEqual(transferredRepoResult.sixthDayRepoIdentity, '2026-08-01');
-assert.notStrictEqual(transferredRepoResult.remainingRepoIdentity, '2026-08-01');
-assert.notStrictEqual(transferredRepoResult.seventhDay.hmeromhnia, '2026-08-01');
+assert.strictEqual(transferredRepoResult.status, 'NEEDS_HR_DECISION');
+assert.ok(transferredRepoResult.reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
+assert.strictEqual(transferredRepoResult.sixthDay, null);
+assert.strictEqual(transferredRepoResult.seventhDay, null);
 
 const changedSixthSelection = analyze([7, 7, 7, 7, 7, 7, 9]);
-assert.strictEqual(changedSixthSelection.sixthDayRepoIdentity, '2026-08-01');
-assert.strictEqual(changedSixthSelection.remainingRepoIdentity, '2026-08-02');
-assert.notStrictEqual(
-    changedSixthSelection.remainingRepoIdentity,
-    reverseChronological.remainingRepoIdentity
-);
+assert.strictEqual(changedSixthSelection.status, 'NEEDS_HR_DECISION');
+assert.strictEqual(changedSixthSelection.seventhDay, null);
 
 const nonRepoLastOccurrence = week([7, 7, 7, 7, 7, 7, 7]);
 Object.assign(nonRepoLastOccurrence[2], { kathgoria_ergasias: 'ΑΝ', repo: true });
@@ -466,7 +482,8 @@ const nonRepoLastResult = analyzeWeeklySixthSeventhDay({
     hourlyRate: 10
 });
 assert.strictEqual(nonRepoLastResult.status, 'NEEDS_HR_DECISION');
-assert.ok(nonRepoLastResult.reasons.includes('SEVENTH_DAY_IDENTITY_NOT_DETERMINISTIC'));
+assert.ok(nonRepoLastResult.reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
 assert.strictEqual(nonRepoLastResult.seventhDay, null);
 
 const ambiguousRepoWeek = week([7, 7, 7, 7, 7, 7, 7]);
@@ -510,10 +527,10 @@ assert.deepStrictEqual(invalidHumanClassification.reasons, [
     'CANONICAL_DECISION_CLASSIFICATION_INVALID'
 ]);
 
-assert.strictEqual(bothReposWorked.seventhDay.illegalOvertimeHours, 9);
-assert.strictEqual(bothReposWorked.seventhDay.classification, 'SEVENTH_DAY_ILLEGAL_OVERTIME');
-assert.strictEqual(bothReposWorked.seventhDay.severity, 'SERIOUS_VIOLATION');
-assert.strictEqual(Object.hasOwn(bothReposWorked.seventhDay, 'sixthDayHours'), false);
+assert.strictEqual(singleWorkedRepoResult.seventhDay.illegalOvertimeHours, 6.48);
+assert.strictEqual(singleWorkedRepoResult.seventhDay.classification, 'SEVENTH_DAY_ILLEGAL_OVERTIME');
+assert.strictEqual(singleWorkedRepoResult.seventhDay.severity, 'SERIOUS_VIOLATION');
+assert.strictEqual(Object.hasOwn(singleWorkedRepoResult.seventhDay, 'sixthDayHours'), false);
 
 // With exactly six actual workdays, the latest standard candidate is SIXTH.
 const sixActualNonRepoSixth = analyze([7, 7.9, 7, 7, 7, 7, 0]);
@@ -573,11 +590,10 @@ assert.strictEqual(humanDifferentRepoSixth.sixthDay.sixthDayHours, 7.6);
 assert.strictEqual(humanDifferentRepoSixth.sixthDayRepoIdentity, '2026-08-01');
 
 const sevenActualRepoSixth = analyze([7, 7, 7, 7, 7, 7.9, 7.8]);
-assert.strictEqual(sevenActualRepoSixth.status, 'READY');
-assert.strictEqual(sevenActualRepoSixth.sixthDayIdentity, '2026-08-01');
-assert.strictEqual(sevenActualRepoSixth.sixthDayRepoIdentity, '2026-08-01');
-assert.strictEqual(sevenActualRepoSixth.seventhDay.hmeromhnia, '2026-08-02');
-assert.strictEqual(sevenActualRepoSixth.remainingRepoIdentity, '2026-08-02');
+assert.strictEqual(sevenActualRepoSixth.status, 'NEEDS_HR_DECISION');
+assert.ok(sevenActualRepoSixth.reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
+assert.strictEqual(sevenActualRepoSixth.seventhDay, null);
 
 const ambiguousNonRepoRows = week([7, 7.9, 7, 7, 7, 7.8, 7.7]);
 const sevenActualNonRepoSixth = analyzeWeeklySixthSeventhDay({
@@ -586,7 +602,7 @@ const sevenActualNonRepoSixth = analyzeWeeklySixthSeventhDay({
 });
 assert.strictEqual(sevenActualNonRepoSixth.status, 'NEEDS_HR_DECISION');
 assert.deepStrictEqual(sevenActualNonRepoSixth.reasons, [
-    'SEVENTH_DAY_IDENTITY_NOT_DETERMINISTIC'
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'
 ]);
 assert.strictEqual(sevenActualNonRepoSixth.seventhDay, null);
 
@@ -625,5 +641,30 @@ const nonActualSixth = analyzeWeeklySixthSeventhDay({
 });
 assert.strictEqual(nonActualSixth.status, 'NEEDS_HR_DECISION');
 assert.ok(nonActualSixth.reasons.includes('CANONICAL_DECISION_CLASSIFICATION_INVALID'));
+
+for (const [name, nonActualUpdate] of [
+    ['clean repo', { kathgoria_ergasias: 'ΑΝ', repo: true, cards_ores_ergasias: 0,
+        cards_apo_ora_01: '', cards_eos_ora_01: '' }],
+    ['HR sickness', { kathgoria_ergasias: 'ΕΡΓ', repo: false,
+        astheneia_apologistika: true, cards_ores_ergasias: 0,
+        cards_apo_ora_01: '', cards_eos_ora_01: '' }],
+    ['HR leave', { kathgoria_ergasias: 'ΕΡΓ', repo: false,
+        adeia_apologistika: true, cards_ores_ergasias: 0,
+        cards_apo_ora_01: '', cards_eos_ora_01: '' }],
+    ['HR absence', { kathgoria_ergasias: 'ΕΡΓ', repo: false,
+        apousia_apologistika: true, cards_ores_ergasias: 0,
+        cards_apo_ora_01: '', cards_eos_ora_01: '' }]
+]) {
+    const fixtureRows = week([7, 7, 7, 7, 7, 7, 0]);
+    Object.assign(fixtureRows[6], nonActualUpdate);
+    const fixtureResult = analyzeWeeklySixthSeventhDay({
+        weekRows: fixtureRows,
+        effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+            pososto_prosayxhshs_6hs_hmeras: 40 }
+    });
+    assert.strictEqual(fixtureResult.status, 'READY', name);
+    assert.strictEqual(fixtureResult.dailyFacts[6].countsAsActualWorkDay, false, name);
+    assert.strictEqual(fixtureResult.seventhDay, null, name);
+}
 
 console.log('weekly sixth/seventh-day policy tests passed');

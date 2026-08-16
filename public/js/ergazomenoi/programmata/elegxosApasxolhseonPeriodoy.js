@@ -1321,6 +1321,26 @@ function renderSixthDayCardsBadge(row = {}) {
     return `<span class="badge text-bg-warning d-block mt-1 review-sixth-day-badge">6η ημέρα · ${escapeHtml(rateLabel)}</span>`;
 }
 
+function renderSeventhDayBadges(row = {}) {
+    if (row.is_seventh_day !== true || row.seventh_day_severity !== 'SERIOUS_VIOLATION') {
+        return '';
+    }
+    return '<div class="mt-1 review-seventh-day-badges">' +
+        '<span class="badge text-bg-warning me-1">7η ημέρα εργασίας</span>' +
+        '<span class="badge text-bg-danger">ΣΟΒΑΡΗ ΠΑΡΑΒΑΣΗ</span></div>';
+}
+
+function renderWeeklySeventhDayValue(deviation = {}) {
+    if (
+        Number(deviation.actual_workdays) === 7 &&
+        deviation.status === 'NEEDS_HR_DECISION' &&
+        !deviation.seventh_day_date
+    ) {
+        return 'Εκκρεμεί';
+    }
+    return deviation.seventh_day_count ?? 0;
+}
+
 function employeeGroupKey(row) {
     // return [row.ypokatasthma || '', row.kodikos || ''].join('|');
     return String(row.kodikos || '').trim();
@@ -2249,7 +2269,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end">${escapeHtml(dev.resolved_repo ?? dev.actual_repo ?? '-')}</td>
                     <td class="text-end">${escapeHtml(dev.actual_workdays ?? '-')}</td>
                     <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
-                    <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
+                    <td class="text-end">${escapeHtml(renderWeeklySeventhDayValue(dev))}</td>
                     <td class="weekly-deviation-employment-type">${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
                     <td class="weekly-deviation-comment">${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && dev.requires_new_hr_decision !== false && canRecordCanonicalEmploymentDecision()
                         ? `<div class="mt-2">${Number(dev.canonical_identical_group_count || 0) > 1
@@ -2323,6 +2343,8 @@ const canonicalReasonLabels = {
     CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.',
     CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC:
         'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό της εβδομάδας και απαιτείται έλεγχος.',
+    WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION:
+        'Δύο προδηλωμένες ημέρες ανάπαυσης έχουν πραγματική εργασία. Απαιτείται ταξινόμηση 6ης/7ης ημέρας.',
     CANONICAL_DECISION_STALE:
         'Η προηγούμενη απόφαση χρειάζεται επανέλεγχο επειδή άλλαξαν τα δεδομένα',
     CANONICAL_DECISION_CONFLICT: 'Υπάρχουν αντικρουόμενες αποφάσεις',
@@ -3270,6 +3292,7 @@ function renderReviewRows(rows = [], deviations = []) {
             <td data-review-cell="apologistiko"${tdClass(rowPresentation.apologistiko.className)}>
                 ${rowPresentation.apologistiko.text}
                 ${renderDeclaredRepoWithCardsBadge(row)}
+                ${renderSeventhDayBadges(row)}
                 ${renderApprovedOrphanAuditBadge(row)}
                 ${renderScenarioBadge(row, rowPresentation.badgeState)}
             </td>
@@ -3346,6 +3369,7 @@ function updateAuthoritativeReviewDailyRow(authoritativeRecord) {
     });
     cell.className = presentation.className || '';
     cell.innerHTML = `${presentation.text}${renderDeclaredRepoWithCardsBadge(row)}` +
+        renderSeventhDayBadges(row) +
         renderApprovedOrphanAuditBadge(row) +
         renderScenarioBadge(row, {});
     detailRow.classList.toggle('row-locked', row.is_locked === true);
@@ -5305,7 +5329,12 @@ function renderAtomicRepoTransferResolution(group = {}) {
         ['Προτεινόμενα/επιλυμένα ρεπό', resolution.resolved_repo],
         ['Πραγματικές ημέρες εργασίας', resolution.actual_workdays],
         ['6η ημέρα εργασίας', resolution.sixth_day_count],
-        ['7η ημέρα/παράβαση', resolution.seventh_day_count]
+        ['7η ημέρα/παράβαση', renderWeeklySeventhDayValue({
+            actual_workdays: resolution.actual_workdays,
+            status: resolution.sixth_seventh_day_status || resolution.status,
+            seventh_day_date: resolution.seventh_day_date,
+            seventh_day_count: resolution.seventh_day_count
+        })]
     ];
     if (fields.every(([, value]) => value === null || value === undefined)) return '';
     return `

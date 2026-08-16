@@ -56,11 +56,11 @@ function canonicalWeek({ seventhDate, hours, intervals }) {
     });
     const saturday = dates[5];
     const sunday = dates[6];
-    const rows = dates.map((date, index) => row(date, 7, [['10:00', '17:00']], index >= 5));
+    const rows = dates.map((date) => row(date, 7, [['10:00', '17:00']], false));
     const seventhIndex = seventhDate === 'SUNDAY' ? 6 : 5;
     rows[seventhIndex] = row(dates[seventhIndex], hours, intervals, true);
-    if (seventhIndex === 6) rows[5] = row(saturday, 8, [['10:00', '18:00']], true);
-    if (seventhIndex === 5) rows[6] = row(sunday, 8, [['10:00', '18:00']], true);
+    if (seventhIndex === 6) rows[5] = row(saturday, 8, [['10:00', '18:00']], false);
+    if (seventhIndex === 5) rows[6] = row(sunday, 8, [['10:00', '18:00']], false);
 
     const analysis = analyzeWeeklySixthSeventhDay({
         weekRows: rows,
@@ -92,7 +92,10 @@ const cases = [
     { name: 'H overnight date crossing into Sunday', seventhDate: 'SATURDAY', hours: 4,
         intervals: [['22:00', '02:00']], expected: [0, 2, 0, 2] },
     { name: 'I more than eight hours', seventhDate: 'SATURDAY', hours: 10,
-        intervals: [['10:00', '20:00']], expected: [10, 0, 0, 0] }
+        intervals: [['10:00', '20:00']], expected: [10, 0, 0, 0] },
+    { name: 'J authoritative fractional total crossing night boundary',
+        seventhDate: 'SATURDAY', hours: 6.48,
+        intervals: [['15:41', '22:40']], expected: [5.81, 0.67, 0, 0] }
 ];
 
 for (const scenario of cases) {
@@ -113,7 +116,8 @@ for (const scenario of cases) {
     );
     const actual = Object.values(ILLEGAL_FIELDS).map((field) => mapped[field]);
     assert.deepEqual(actual, scenario.expected, `${scenario.name}: illegal overlay buckets`);
-    assert.ok(Math.abs(actual.reduce((sum, value) => sum + value, 0) - scenario.hours) <= 0.02,
+    assert.equal(Number(actual.reduce((sum, value) => sum + value, 0).toFixed(2)),
+        scenario.hours,
         `${scenario.name}: illegal-hour conservation`);
     OVERLAPPING_LEGAL_FIELDS.forEach((field) => {
         assert.equal(mapped[field], 0, `${scenario.name}: ${field} leakage`);

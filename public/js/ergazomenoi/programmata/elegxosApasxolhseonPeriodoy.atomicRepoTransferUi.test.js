@@ -2822,7 +2822,7 @@ function testPreAndPostCalculationWorkflowGating() {
     const weeklyRendererEnd = source.indexOf('const canonicalApplicabilityLabels', weeklyRendererStart);
     const weeklyRendererSource = source.slice(weeklyRendererStart, weeklyRendererEnd);
     assert.ok(weeklyRendererSource.includes(
-        "dev.status === 'NEEDS_HR_DECISION' && canRecordCanonicalEmploymentDecision()"
+        "dev.status === 'NEEDS_HR_DECISION' && dev.requires_new_hr_decision !== false && canRecordCanonicalEmploymentDecision()"
     ));
     assert.ok(source.includes(
         'Ελέγξτε την ποιότητα των δεδομένων πριν εκτελέσετε τον υπολογισμό ή την ανακατασκευή της περιόδου.'

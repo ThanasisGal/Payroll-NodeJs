@@ -27,5 +27,16 @@ const sixthDayMapping = buildWeeklyIllegalOvertimePersistenceMapping(classified,
     clearOverlappingLegal: false
 });
 OVERLAPPING_LEGAL_FIELDS.forEach((field) => assert.ok(!(field in sixthDayMapping)));
+const reconciled = buildWeeklyIllegalOvertimePersistenceMapping(
+    { normal: 5.82, night: 0.67, holiday: 0, holidayNight: 0 },
+    { authoritativeTotalHours: 6.48 }
+);
+assert.strictEqual(reconciled.ores_paranomhs_yperorias_apologistika, 5.81);
+assert.strictEqual(reconciled.ores_paranomhs_yperorias_nyxtas_apologistika, 0.67);
+assert.strictEqual(
+    Number((reconciled.ores_paranomhs_yperorias_apologistika +
+        reconciled.ores_paranomhs_yperorias_nyxtas_apologistika).toFixed(2)),
+    6.48
+);
 
 console.log('weekly illegal overtime persistence mapping tests passed');

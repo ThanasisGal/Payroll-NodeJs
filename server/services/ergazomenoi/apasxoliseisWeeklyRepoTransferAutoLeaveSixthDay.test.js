@@ -198,14 +198,11 @@ for (const marker of [
         weekRows: rows,
         effectiveProfile: profile
     });
-    assert.strictEqual(analysis.status, 'READY');
-    assert.ok(analysis.sixthDay);
-    assert.ok(analysis.seventhDay);
-    assert.ok(
-        analysis.warnings.includes(
-            'SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'
-        )
-    );
+    assert.strictEqual(analysis.status, 'NEEDS_HR_DECISION');
+    assert.ok(analysis.reasons.includes(
+        'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
+    assert.strictEqual(analysis.sixthDay, null);
+    assert.strictEqual(analysis.seventhDay, null);
 }
 
 {

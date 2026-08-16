@@ -51,5 +51,12 @@ assert.ok(source.includes('actionable-issue-open-case employment-review-action-b
 assert.ok(!source.includes("target.scrollIntoView({ behavior: 'smooth', block: 'center'"));
 assert.ok(source.includes("target.closest('.employment-review-scroll-container')"));
 assert.ok(source.includes('scrollContainer.scrollLeft = previousScrollLeft'));
+assert.ok(source.includes('function renderSeventhDayBadges'));
+assert.ok(source.includes('7η ημέρα εργασίας'));
+assert.ok(source.includes('ΣΟΒΑΡΗ ΠΑΡΑΒΑΣΗ'));
+assert.match(source, /is_seventh_day !== true[\s\S]{0,100}SERIOUS_VIOLATION/);
+assert.ok(source.includes('badge text-bg-danger'));
+assert.ok(source.includes('function renderWeeklySeventhDayValue'));
+assert.match(source, /Number\(deviation\.actual_workdays\) === 7[\s\S]{0,160}NEEDS_HR_DECISION[\s\S]{0,160}Εκκρεμεί/);
 
-console.log('weekly canonical decision UI tests passed (34 contracts)');
+console.log('weekly canonical decision UI tests passed (41 contracts)');
