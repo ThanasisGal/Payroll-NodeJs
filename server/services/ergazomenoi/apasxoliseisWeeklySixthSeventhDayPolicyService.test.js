@@ -235,21 +235,57 @@ result = analyze([7, 7, 7, 7, 7, 7, 0], {
 });
 assert.strictEqual(result.sixthDay.value, 70);
 assert.strictEqual(result.sixthDay.premiumRate, 0);
+assert.strictEqual(result.premiumRateSource, 'POLICY');
+result = analyze([7, 7, 7, 7, 7, 7, 0], {
+    pososto_prosayxhshs_6hs_hmeras: null,
+    eidikh_kathgoria_ergazomenoy: '0009'
+});
+assert.strictEqual(result.status, 'READY');
+assert.strictEqual(result.sixthDay.premiumRate, 0);
+assert.strictEqual(result.premiumRateSource, 'POLICY');
 result = analyze([7, 7, 7, 7, 7, 7, 0], {
     pososto_prosayxhshs_6hs_hmeras: 0,
     eidikh_kathgoria_ergazomenoy: '0001'
 });
-assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
-assert.ok(result.reasons.includes('ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'));
+assert.strictEqual(result.status, 'READY');
+assert.strictEqual(result.sixthDay.premiumRate, 40);
+assert.strictEqual(result.premiumRateSource, 'DEFAULT');
 assert.strictEqual(analyze([7, 7, 7, 7, 7, 7, 0], { pososto_prosayxhshs_6hs_hmeras: 12.5 }).sixthDay.value, 78.75);
 for (const rate of [null, '', -1, 'invalid']) {
     result = analyze([7, 7, 7, 7, 7, 7, 0], { pososto_prosayxhshs_6hs_hmeras: rate });
-    assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
-    assert.ok(result.reasons.includes('MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
+    assert.strictEqual(result.status, 'READY');
+    assert.ok(!result.reasons.includes('MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
     assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
-    assert.strictEqual(result.sixthDay.premiumRate, null);
-    assert.strictEqual(result.sixthDay.value, null);
+    assert.strictEqual(result.sixthDay.premiumRate, 40);
+    assert.strictEqual(result.premiumRateSource, 'DEFAULT');
+    assert.strictEqual(result.sixthDay.value, 98);
 }
+
+const employeePremium = analyze([7, 7, 7, 7, 7, 7, 0], {
+    pososto_prosayxhshs_6hs_hmeras: 55, source: 'ERGAZOMENOI'
+});
+assert.strictEqual(employeePremium.sixthDay.premiumRate, 55);
+assert.strictEqual(employeePremium.premiumRateSource, 'EMPLOYEE');
+
+const contractPremium = analyze([7, 7, 7, 7, 7, 7, 0], {
+    pososto_prosayxhshs_6hs_hmeras: 50, source: 'ISTORIKO', istorikoId: 'history-1'
+});
+assert.strictEqual(contractPremium.sixthDay.premiumRate, 50);
+assert.strictEqual(contractPremium.premiumRateSource, 'CONTRACT');
+
+const policyPremium = analyzeWeeklySixthSeventhDay({
+    weekRows: week([7, 7, 7, 7, 7, 7, 0]),
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: null },
+    companyKod: 'company',
+    companyPolicyRules: [{ _id: 'sixth-policy', company_kod: 'company',
+        policy_code: 'SIXTH_DAY_PREMIUM', status: 'ACTIVE', rate_percent: 60,
+        version: 'v1', justification: 'documented', legal_basis_type: 'CONTRACT',
+        legal_basis_reference: 'contract-1', effective_from: '2026-07-01' }]
+});
+assert.strictEqual(policyPremium.status, 'READY');
+assert.strictEqual(policyPremium.sixthDay.premiumRate, 60);
+assert.strictEqual(policyPremium.premiumRateSource, 'POLICY');
 
 const singleWorkedRepoSeventh = week([7, 7, 7, 7, 7, 8, 9]);
 Object.assign(singleWorkedRepoSeventh[5], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
@@ -371,8 +407,9 @@ for (const noLongerExempt of ['0018', '0020', '0021']) {
         pososto_prosayxhshs_6hs_hmeras: 0,
         eidikh_kathgoria_ergazomenoy: noLongerExempt
     });
-    assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
-    assert.ok(result.reasons.includes('ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'));
+    assert.strictEqual(result.status, 'READY');
+    assert.strictEqual(result.sixthDay.premiumRate, 40);
+    assert.strictEqual(result.premiumRateSource, 'DEFAULT');
 }
 
 result = analyze([7, 7, 7, 7, 7, 7, 0], {
@@ -666,5 +703,39 @@ for (const [name, nonActualUpdate] of [
     assert.strictEqual(fixtureResult.dailyFacts[6].countsAsActualWorkDay, false, name);
     assert.strictEqual(fixtureResult.seventhDay, null, name);
 }
+
+const hireTuesdaySixWorkdays = week([0, 8, 8, 8, 8, 8, 8]).slice(1);
+const hireTuesdayDates = hireTuesdaySixWorkdays.map((row) => row.hmeromhnia);
+const hireTuesdayAnalysis = analyzeWeeklySixthSeventhDay({
+    weekRows: hireTuesdaySixWorkdays,
+    expectedDateKeys: hireTuesdayDates,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 }
+});
+assert.strictEqual(hireTuesdayAnalysis.status, 'READY');
+assert.strictEqual(hireTuesdayAnalysis.dailyFacts.length, 6);
+assert.strictEqual(hireTuesdayAnalysis.sixthDay.hmeromhnia, '2026-08-02');
+assert.strictEqual(hireTuesdayAnalysis.seventhDay, null);
+
+const hireSaturdayTwoWorkdays = week([0, 0, 0, 0, 0, 8, 8]).slice(5);
+const hireSaturdayAnalysis = analyzeWeeklySixthSeventhDay({
+    weekRows: hireSaturdayTwoWorkdays,
+    expectedDateKeys: hireSaturdayTwoWorkdays.map((row) => row.hmeromhnia),
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 }
+});
+assert.strictEqual(hireSaturdayAnalysis.status, 'NOT_APPLICABLE');
+assert.strictEqual(hireSaturdayAnalysis.dailyFacts.length, 2);
+assert.strictEqual(hireSaturdayAnalysis.sixthDay, null);
+
+const mismatchedEmploymentSlice = analyzeWeeklySixthSeventhDay({
+    weekRows: hireSaturdayTwoWorkdays,
+    expectedDateKeys: ['2026-07-31', ...hireSaturdayTwoWorkdays.map((row) => row.hmeromhnia)],
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 }
+});
+assert.strictEqual(mismatchedEmploymentSlice.status, 'NEEDS_HR_DECISION');
+assert.ok(mismatchedEmploymentSlice.reasons.includes(
+    'INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'));
 
 console.log('weekly sixth/seventh-day policy tests passed');

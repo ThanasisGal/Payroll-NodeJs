@@ -73,6 +73,8 @@ module.exports = {
             return f;
         },
         sort: { eponymo: 1, onoma: 1, kodikos: 1 },
+        select: 'kodikos eponymo onoma afm ypokatasthma team company_kod energos archived',
+        strictPreselectScope: true,
         mapItem: (item) => {
             const kodikos = cleanQueryValue(item.kodikos);
             const eponymo = cleanQueryValue(item.eponymo).toUpperCase();

@@ -14611,6 +14611,10 @@ body.loader-active > *:not(.app-loader) {
     width: calc(100% - 2rem);
 }
 
+#reviewEmployee + .ts-wrapper {
+    width: 99.75%;
+}
+
 .employment-review-start-action {
     grid-column: 5;
     align-self: end;
@@ -14884,6 +14888,24 @@ body.loader-active > *:not(.app-loader) {
     padding: 0.35rem 0.45rem;
 }
 
+/* Stage 1 shares the page's single vertical scroller. Keep its review-scope
+ * actions visible while the HR examines the weekly rows below them. */
+.weekly-hr-stage1-bulk-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 14;
+    background: var(--bs-body-bg, #fff);
+}
+
+.weekly-hr-stage1-bulk-toolbar .weekly-hr-bulk-complete {
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    min-height: 1.8rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .weekly-hr-stage1-day {
     padding: 0.2rem;
     border-radius: 0.4rem;
@@ -14934,6 +14956,51 @@ body.loader-active > *:not(.app-loader) {
 
 .hr-review-workspace-switch {
     text-align: right;
+}
+
+/* Keep the employment-review stage accordion on Bootstrap's normal document flow.
+ * The legacy global .accordion-button rule above uses negative margins and an
+ * oversized width for older accordions, which would otherwise stack these
+ * four stage headers on top of one another. */
+#employmentReviewStagesAccordion {
+    width: 100%;
+    min-width: 0;
+}
+
+#employmentReviewStagesAccordion > .accordion-item,
+#employmentReviewStagesAccordion > .accordion-item > .accordion-header,
+#employmentReviewStagesAccordion > .accordion-item > .accordion-collapse {
+    position: static;
+    width: 100%;
+    min-width: 0;
+}
+
+#employmentReviewStagesAccordion > .accordion-item > .accordion-header {
+    margin: 0;
+}
+
+#employmentReviewStagesAccordion > .accordion-item > .accordion-header > .accordion-button {
+    position: relative;
+    width: 100% !important;
+    min-width: 0;
+    height: auto;
+    min-height: 3rem;
+    margin: 0 !important;
+    padding: 0.75rem 3rem 0.75rem 1rem;
+    justify-content: flex-start !important;
+    font-size: clamp(0.875rem, 1vw, 1rem);
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+#employmentReviewStagesAccordion .workflow-stage-header {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
 }
 
 .employment-review-scroll-container {
@@ -15152,6 +15219,23 @@ body.loader-active > *:not(.app-loader) {
     color: #664d03 !important;
     background-color: #fff3cd !important;
     border-color: #ffe69c !important;
+}
+
+.employment-review-swal-popup .swal2-confirm.weekly-hr-stage1-bulk-confirm {
+    width: auto;
+    min-width: 12rem;
+    height: auto;
+    padding: 0.625rem 1rem;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 420px) {
+    .employment-review-swal-popup .swal2-confirm.weekly-hr-stage1-bulk-confirm {
+        min-width: 0;
+        max-width: 100%;
+        white-space: normal;
+    }
 }
 
 .employment-review-swal-popup .swal2-confirm.class-error,

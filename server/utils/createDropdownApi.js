@@ -42,7 +42,9 @@ function createDropdownApi(model, options = {}) {
         },
         sort = null,
         baseUrl = '',
-        preselectSort = null
+        preselectSort = null,
+        strictPreselectScope = false,
+        select = null
     } = options;
 
     return async (req, res) => {
@@ -63,6 +65,7 @@ function createDropdownApi(model, options = {}) {
 
                 const withExtra = await model
                     .findOne(withExtraQuery)
+                    .select(select || {})
                     .sort(preselectSort || {})
                     .lean()
                     .exec();
@@ -71,8 +74,13 @@ function createDropdownApi(model, options = {}) {
                     return res.json({ items: [mapItem(withExtra, padLength)] });
                 }
 
+                if (strictPreselectScope && Object.keys(extraQuery).length) {
+                    return res.json({ items: [] });
+                }
+
                 const any = await model
                     .findOne({ [pk]: value })
+                    .select(select || {})
                     .sort(preselectSort || {})
                     .lean()
                     .exec();
@@ -116,7 +124,7 @@ function createDropdownApi(model, options = {}) {
             const sortObj = sort || { [pk]: 1 };
 
             const [results, count] = await Promise.all([
-                model.find(finalQuery).sort(sortObj).skip(skip).limit(limit).lean().exec(),
+                model.find(finalQuery).select(select || {}).sort(sortObj).skip(skip).limit(limit).lean().exec(),
 
                 model.countDocuments(finalQuery).exec()
             ]);

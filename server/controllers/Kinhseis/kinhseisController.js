@@ -34,6 +34,9 @@ const { ErgazomenoiModel, OrariaModel, ProdhlomenaOrariaModel } = Models_D;
 // Το ApoysiesModel δεν χρησιμοποιείται πλέον στις Απασχολήσεις.
 // Οι ώρες απουσίας διαβάζονται από ProdhlomenaOrariaModel.ores_apoysias_apologistika.
 const { ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
+const {
+    buildHrSelectableLeaveCategoryQuery
+} = require('../../services/ergazomenoi/apasxoliseisHrLeaveCategoryPolicyService');
 const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
 const {
     generateAndSaveWorkFactsForEmployeePeriod,
@@ -2476,7 +2479,9 @@ class kinhseisController {
 
     static get_Kathgories_Adeion = async (req, res) => {
         try {
-            const results = await KathgoriesAdeiasModel.find().sort({ aa: 1 }).lean();
+            const results = await KathgoriesAdeiasModel.find(
+                buildHrSelectableLeaveCategoryQuery()
+            ).sort({ aa: 1 }).lean();
             res.json(results);
         } catch (error) {
             console.error('Σφάλμα στο get_Kathgories_Adeion:', error);

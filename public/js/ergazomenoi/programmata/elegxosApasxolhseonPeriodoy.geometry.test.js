@@ -559,7 +559,7 @@ async function modalGeometry(page) {
             assert.strictEqual(tableContract.subtotalLogicalColumns, 13);
             assert.strictEqual(tableContract.after.filter((text) => text === 'Απουσίες').length, 1);
             assert.strictEqual(tableContract.after.filter((text) => text === 'Προδηλωμένο').length, 1);
-            assert.ok(tableContract.weeklyHeaders.includes('Τύπος απασχόλησης'));
+            assert.ok(tableContract.weeklyHeaders.includes('Καθεστώς'));
             assert.ok(!tableContract.weeklyHeaders.includes('Profile'));
             assert.strictEqual(tableContract.weeklyRowCount, 9);
             assert.strictEqual(tableContract.possibleLeaveCell, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
@@ -625,9 +625,11 @@ async function modalGeometry(page) {
             });
             assert.strictEqual(weeklySticky.headerCellsReadable, true);
             assert.deepStrictEqual(weeklySticky.headerTexts, [
-                'Από', 'Έως', 'Αναμενόμενα ρεπό', 'Πραγματικά ρεπό',
-                'Προτεινόμενα/επιλυμένα ρεπό', 'Πραγματικές ημέρες εργασίας',
-                '6η ημέρα', '7η ημέρα/παράβαση', 'Τύπος απασχόλησης', 'Σχόλιο'
+                'Από', 'Έως', 'Καθεστώς', 'Συμβατικές ημέρες εργασίας',
+                'Αναμενόμενες ημέρες ανάπαυσης / μη εργασίας',
+                'Πραγματικές ημέρες εργασίας',
+                'Τελικές ημέρες ανάπαυσης / μη εργασίας',
+                '6η ημέρα', '7η ημέρα / παράβαση', 'Σχόλιο'
             ]);
             assert.ok(weeklySticky.verticalAfter.title.top >= weeklySticky.verticalAfter.subtotal.bottom - 1);
             assert.ok(weeklySticky.verticalAfter.header.top >= weeklySticky.verticalAfter.title.bottom - 1);
@@ -702,7 +704,7 @@ async function modalGeometry(page) {
         const possibleLeaveModal = await possibleLeaveModalContract(page);
         assert.ok(possibleLeaveModal.visibleText.includes('ΠΙΘΑΝΗ ΑΔΕΙΑ'));
         assert.ok(!possibleLeaveModal.visibleText.includes('POSSIBLE_LEAVE'));
-        assert.strictEqual(possibleLeaveModal.categoryOption, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+        assert.strictEqual(possibleLeaveModal.categoryOption, '');
         assert.strictEqual(possibleLeaveModal.leaveChecked, false);
         assert.strictEqual(possibleLeaveModal.persistedValue, '');
         assert.strictEqual(possibleLeaveModal.derived, 'true');

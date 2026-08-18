@@ -3,6 +3,9 @@ const Models = require('../models/stathera_arxeia');
 const Models_Companies = require('../models/companies');
 const Models_Symbaseon = require('../models/symbaseis');
 const Models_Ergazomenon = require('../models/ergazomenoi');
+const {
+    buildHrSelectableLeaveCategoryQuery
+} = require('../services/ergazomenoi/apasxoliseisHrLeaveCategoryPolicyService');
 
 const {
     PerifereiesModel,
@@ -1162,7 +1165,9 @@ class genikaAPIsController {
 
     static getKathgoriesAdeias = async (req, res) => {
         try {
-            const kathgoriesAdeias = await KathgoriesAdeiasModel.find();
+            const kathgoriesAdeias = await KathgoriesAdeiasModel.find(
+                buildHrSelectableLeaveCategoryQuery()
+            );
             res.json(kathgoriesAdeias);
         } catch (error) {
             res.status(500).send(error.message);

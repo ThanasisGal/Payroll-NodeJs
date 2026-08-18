@@ -37,5 +37,17 @@ async function failure(options, code) { const h = harness(options); await assert
     await failure({ targetGuardField: 'ores_nominhs_yperorias_nyxtas_apologistika', targetGuardValue: 1 }, 'TARGET_STALE');
     const capabilityThrow = await failure({ capabilityThrow: true }, 'TRANSACTIONS_UNAVAILABLE'); assert.strictEqual(capabilityThrow.startSessionCalls, 0);
     const periodRace = await failure({ periodLocksBeforeWrite: true }, 'PERIOD_CONTROL_STATE_CONFLICT'); assert.strictEqual(periodRace.updateCalls, 0);
+    // Production regression identity, read-only fixture: 0009 / 08→09-06-2026.
+    // The canonical writer must change only the fixed apologistika apply set.
+    const juneTarget = { ...plan().target, id: '6a7c515e6aeaefb3c8764c7c',
+        date: '2026-06-09', after: { ...plan().target.after,
+            kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true } };
+    const juneUpdate = updateDocument(juneTarget);
+    assert.strictEqual(juneUpdate.$set.kathgoria_ergasias_apologistika, 'ΑΝ');
+    assert.strictEqual(juneUpdate.$set.repo_apologistika, true);
+    for (const rawField of ['repo', 'kathgoria_ergasias', 'apo_ora_01',
+        'eos_ora_01', 'cards_apo_ora_01', 'cards_eos_ora_01']) {
+        assert.ok(!Object.hasOwn(juneUpdate.$set, rawField), rawField);
+    }
     console.log('weekly repo-transfer atomic writer tests passed');
 })().catch((error) => { console.error(error); process.exit(1); });

@@ -52,6 +52,11 @@ function deepFreeze(value) {
     return value;
 }
 
+function isCanonicalStage2NonWork(row = {}) {
+    return row.apologistiko_biblio === true && row.repo_apologistika === false &&
+        String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΜΕ';
+}
+
 function resolveWeeklyHrWorkflow({
     weekRows = [],
     effectiveProfile = {},
@@ -63,7 +68,8 @@ function resolveWeeklyHrWorkflow({
     confirmed_absence_dates = [],
     repo_resolution_completed = false,
     selected_repo_transfers = [],
-    remaining_possible_leave_review_completed = false
+    remaining_possible_leave_review_completed = false,
+    expected_date_keys = null
 } = {}) {
     const rows = Array.isArray(weekRows) ? [...weekRows] : [];
     const orderedRows = rows.slice().sort((left, right) =>
@@ -72,18 +78,21 @@ function resolveWeeklyHrWorkflow({
     const dates = orderedRows.map((row) => dateKeyUtc(row?.hmeromhnia));
     const weekStart = dates[0] ? dateKeyUtc(startOfWeekMondayUtc(dates[0])) : null;
     const weekEnd = weekStart ? dateKeyUtc(endOfWeekSundayUtc(weekStart)) : null;
-    const expectedDates = weekStart
+    const naturalWeekDates = weekStart
         ? Array.from({ length: 7 }, (_, index) => {
               const date = new Date(`${weekStart}T00:00:00.000Z`);
               date.setUTCDate(date.getUTCDate() + index);
               return date.toISOString().slice(0, 10);
           })
         : [];
+    const expectedDates = Array.isArray(expected_date_keys)
+        ? uniqueDateKeys(expected_date_keys) : naturalWeekDates;
     const blockingReasons = [];
     const warnings = [];
 
-    if (orderedRows.length !== 7 || dates.some((date) => !date) ||
-        new Set(dates).size !== 7 || expectedDates.some((date) => !dates.includes(date))) {
+    if (orderedRows.length !== expectedDates.length || dates.some((date) => !date) ||
+        new Set(dates).size !== expectedDates.length ||
+        expectedDates.some((date) => !dates.includes(date))) {
         blockingReasons.push('INCOMPLETE_NATURAL_WEEK');
     }
 
@@ -133,9 +142,10 @@ function resolveWeeklyHrWorkflow({
         const dailyProfile = effectiveProfilesByDate?.[date] || profile;
         const fullTimeForDate = resolveFullTimeFromWorkTerms(dailyProfile);
         return Object.freeze({ date,
-            candidate_kind: fullTimeForDate === false ? 'NON_WORK' : 'REST_REPO',
+            candidate_kind: fullTimeForDate === false
+                ? 'POSSIBLE_LEAVE_RESIDUAL' : 'REST_REPO',
             label: fullTimeForDate === false
-                ? 'Προς εξέταση ως ΜΗ ΕΡΓΑΣΙΑ'
+                ? 'Προς τελική εξέταση ως ΠΙΘΑΝΗ ΑΔΕΙΑ'
                 : 'Προς εξέταση ως ΑΝΑΠΑΥΣΗ / ΡΕΠΟ' });
     });
 
@@ -158,6 +168,8 @@ function resolveWeeklyHrWorkflow({
     const restingRepoDays = orderedRows.filter((row) => {
         const date = dateKeyUtc(row.hmeromhnia);
         if (classifiedDateSet.has(date)) return false;
+        // Το canonical NON_WORK του Stage 2 είναι ρητά μη εργασία, όχι repo identity.
+        if (isCanonicalStage2NonWork(row)) return false;
         const dailyProfile = effectiveProfilesByDate?.[date] || profile;
         const dailyFullTime = resolveFullTimeFromWorkTerms(dailyProfile);
         const dailyExpectedRepoCategory = dailyFullTime === null
@@ -186,12 +198,16 @@ function resolveWeeklyHrWorkflow({
     const sourceRows = orderedRows.filter(sourceEligible);
     const targetRows = leave_classification_completed === true
         ? orderedRows.filter((row) =>
-              !classifiedDateSet.has(dateKeyUtc(row.hmeromhnia)) && targetEligible(row))
+              !classifiedDateSet.has(dateKeyUtc(row.hmeromhnia)) &&
+              resolveFullTimeFromWorkTerms(
+                  effectiveProfilesByDate?.[dateKeyUtc(row.hmeromhnia)] || profile
+              ) !== false &&
+              targetEligible(row))
         : [];
-    const knownRepoIdentityDays = [...new Set([
-        ...restingRepoDays,
-        ...workedDeclaredRepoDays
-    ])].sort();
+    // Δηλωμένο ρεπό με πραγματική εργασία είναι πιθανή πηγή μεταφοράς,
+    // όχι πραγματοποιημένη ημέρα ανάπαυσης. Μόνο οι ημέρες χωρίς πραγματική
+    // εργασία καλύπτουν το συμβατικό πλήθος ανάπαυσης.
+    const knownRepoIdentityDays = [...new Set(restingRepoDays)].sort();
     const unresolvedRepoIdentityCountBefore = Number.isSafeInteger(expectedRepoCount)
         ? Math.max(expectedRepoCount - knownRepoIdentityDays.length, 0)
         : null;

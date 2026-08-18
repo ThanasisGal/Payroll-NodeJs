@@ -64,6 +64,56 @@ function stageSchema(dependencyField = '') {
 }
 
 const stage1Schema = stageSchema();
+stage1Schema.add({
+    effective_fingerprint: {
+        type: String,
+        trim: true,
+        default: '',
+        validate: {
+            validator: (value) => value === '' || FINGERPRINT_PATTERN.test(value),
+            message: 'effective_fingerprint must be an empty value or a SHA-256 hex digest.'
+        }
+    }
+});
+const stage1PeriodSliceSchema = new Schema({
+    period_start: { type: Date, required: true },
+    period_end: { type: Date, required: true },
+    actionable_dates: { type: [Date], required: true, default: undefined },
+    context_only_dates: { type: [Date], required: true, default: undefined },
+    status: {
+        type: String, enum: STAGE_STATUS, required: true, default: 'OPEN',
+        validate: {
+            validator: function completedSliceHasAttribution(value) {
+                return value !== 'COMPLETED' || (
+                    FINGERPRINT_PATTERN.test(this.completion_fingerprint || '') &&
+                    FINGERPRINT_PATTERN.test(this.context_fingerprint || '') &&
+                    this.completed_at instanceof Date && this.completed_by_user_id &&
+                    String(this.completed_by_user_name || '').trim() !== '' &&
+                    ['A', 'S', 'HR'].includes(this.completed_by_user_role)
+                );
+            },
+            message: 'COMPLETED period slice requires fingerprints and actor attribution.'
+        }
+    },
+    context_fingerprint: {
+        type: String, trim: true, required: true, match: FINGERPRINT_PATTERN
+    },
+    completion_fingerprint: {
+        type: String, trim: true, default: '',
+        validate: { validator: (value) => value === '' || FINGERPRINT_PATTERN.test(value) }
+    },
+    effective_fingerprint: {
+        type: String, trim: true, default: '',
+        validate: { validator: (value) => value === '' || FINGERPRINT_PATTERN.test(value) }
+    },
+    completed_at: { type: Date, default: null },
+    completed_by_user_id: { type: Schema.Types.ObjectId, default: null },
+    completed_by_user_name: { type: String, trim: true, maxlength: 150, default: '' },
+    completed_by_user_role: { type: String, enum: ['', 'A', 'S', 'HR'], default: '' },
+    reason_or_notes: { type: String, trim: true, maxlength: 2000, default: '' },
+    version: { type: Number, required: true, min: 1, default: 1 }
+}, { _id: false });
+stage1Schema.add({ period_slices: { type: [stage1PeriodSliceSchema], default: undefined } });
 const stage2Schema = stageSchema('depends_on_stage1_fingerprint');
 const stage3Schema = stageSchema('depends_on_stage2_fingerprint');
 const finalStageSchema = stageSchema('depends_on_stage3_fingerprint');

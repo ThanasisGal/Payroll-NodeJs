@@ -12,6 +12,11 @@ const {
 const {
     resolveFullTimeFromWorkTerms
 } = require('./apasxoliseisReviewEmploymentProfileService');
+const {
+    COMMON_RATE_PERCENT,
+    POLICY_CODE,
+    resolveCompanyPolicyRate
+} = require('./apasxoliseisCompanyPolicyRuleService');
 
 const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v3';
 const STATUS = Object.freeze({ READY: 'READY', NOT_APPLICABLE: 'NOT_APPLICABLE', NEEDS_HR_DECISION: 'NEEDS_HR_DECISION' });
@@ -21,6 +26,40 @@ function validRate(value) {
     if (value === null || value === undefined || String(value).trim() === '') return null;
     const rate = Number(String(value).replace(',', '.').trim());
     return Number.isFinite(rate) && rate >= 0 ? rate : null;
+}
+
+function resolveSixthDayPremiumRate({
+    effectiveProfile = {},
+    companyKod = '',
+    atDate = null,
+    companyPolicyRules = []
+} = {}) {
+    const configuredRate = validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
+    const specialCategory = String(
+        effectiveProfile.eidikh_kathgoria_ergazomenoy ||
+        effectiveProfile.eidikh_periptosh || ''
+    ).trim().padStart(4, '0');
+    if (ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES.has(specialCategory)) {
+        return Object.freeze({ rate: 0, source: 'POLICY', policy: null });
+    }
+    if (configuredRate !== null && configuredRate > 0) {
+        const historical = Boolean(effectiveProfile.istorikoId) ||
+            /ISTORIKO|HISTORY/i.test(String(
+                effectiveProfile.employment_profile_source || effectiveProfile.source || ''));
+        return Object.freeze({ rate: configuredRate,
+            source: historical ? 'CONTRACT' : 'EMPLOYEE', policy: null });
+    }
+    const policy = resolveCompanyPolicyRate({
+        companyKod,
+        policyCode: POLICY_CODE.SIXTH_DAY_PREMIUM,
+        atDate,
+        commonRatePercent: COMMON_RATE_PERCENT[POLICY_CODE.SIXTH_DAY_PREMIUM],
+        mandatoryFloorRatePercent: COMMON_RATE_PERCENT[POLICY_CODE.SIXTH_DAY_PREMIUM],
+        companyRules: companyPolicyRules
+    });
+    return Object.freeze({ rate: policy.ratePercent,
+        source: policy.source === 'DOCUMENTED_COMPANY_RULE' ? 'POLICY' : 'DEFAULT',
+        policy });
 }
 
 function resolveSeventhDayIllegalOvertimeHours(day) {
@@ -176,6 +215,9 @@ function decisionFailure(reason, base = {}) {
 function analyzeWeeklySixthSeventhDay({
     weekRows = [],
     effectiveProfile = {},
+    expectedDateKeys = null,
+    companyKod = '',
+    companyPolicyRules = [],
     hourlyRate = null,
     canonicalRepoDayIdentitiesOverride = null,
     allowDeclaredRepoIdentityOverride = false,
@@ -186,12 +228,33 @@ function analyzeWeeklySixthSeventhDay({
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const dates = rows.map((row) => dateKeyUtc(row?.hmeromhnia));
     const range = dates[0] ? getMondaySundayWeekRange(dates[0]) : null;
+    const expectedDates = Array.isArray(expectedDateKeys)
+        ? [...new Set(expectedDateKeys.map(dateKeyUtc).filter(Boolean))].sort()
+        : null;
+    const validExpectedSlice = expectedDates === null || (
+        expectedDates.length > 0 &&
+        expectedDates.length <= 7 &&
+        expectedDates.every((date) =>
+            getMondaySundayWeekRange(date)?.weekStartKey === range?.weekStartKey) &&
+        expectedDates.every((date, index) => index === 0 ||
+            new Date(`${date}T00:00:00.000Z`).getTime() -
+                new Date(`${expectedDates[index - 1]}T00:00:00.000Z`).getTime() === 86400000)
+    );
+    const requiredDates = expectedDates || (range
+        ? Array.from({ length: 7 }, (_, index) => {
+              const date = new Date(`${range.weekStartKey}T00:00:00.000Z`);
+              date.setUTCDate(date.getUTCDate() + index);
+              return dateKeyUtc(date);
+          })
+        : []);
     if (
-        rows.length !== 7 ||
+        !validExpectedSlice ||
+        rows.length !== requiredDates.length ||
         dates.some((date) => !date) ||
-        new Set(dates).size !== 7 ||
+        new Set(dates).size !== requiredDates.length ||
         !range ||
-        dates.some((date) => getMondaySundayWeekRange(date)?.weekStartKey !== range.weekStartKey)
+        dates.some((date) => getMondaySundayWeekRange(date)?.weekStartKey !== range.weekStartKey) ||
+        requiredDates.some((date) => !dates.includes(date))
     ) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'], warnings: [], dailyFacts: [] });
     }
@@ -407,49 +470,13 @@ function analyzeWeeklySixthSeventhDay({
         ...(selected.warnings || []),
         ...(seventhDay ? ['SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'] : [])
     ])];
-    const premiumRate = validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
-    if (premiumRate === null) {
-        return Object.freeze({
-            policyVersion: POLICY_VERSION,
-            status: STATUS.NEEDS_HR_DECISION,
-            reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'],
-            warnings: classificationWarnings,
-            dailyFacts,
-            canonicalRepoDayIdentities,
-            sixthDayIdentity,
-            sixthDayRepoIdentity,
-            remainingRepoIdentity,
-            sixthDay: sixthDayWithoutAmounts,
-            seventhDay
-        });
-    }
+    const premiumResolution = resolveSixthDayPremiumRate({ effectiveProfile,
+        companyKod, atDate: selected.day.hmeromhnia, companyPolicyRules });
+    const premiumRate = premiumResolution.rate;
     const sixthDayWithRate = {
         ...sixthDayWithoutAmounts,
         premiumRate
     };
-    const specialCategory = String(
-        effectiveProfile.eidikh_kathgoria_ergazomenoy ||
-        effectiveProfile.eidikh_periptosh ||
-        ''
-    ).trim().padStart(4, '0');
-    if (
-        premiumRate === 0 &&
-        !ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES.has(specialCategory)
-    ) {
-        return Object.freeze({
-            policyVersion: POLICY_VERSION,
-            status: STATUS.NEEDS_HR_DECISION,
-            reasons: ['ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'],
-            warnings: classificationWarnings,
-            dailyFacts,
-            canonicalRepoDayIdentities,
-            sixthDayIdentity,
-            sixthDayRepoIdentity,
-            remainingRepoIdentity,
-            sixthDay: sixthDayWithRate,
-            seventhDay
-        });
-    }
     const rate = Number(String(hourlyRate).replace(',', '.'));
     const baseAmount = Number.isFinite(rate) && rate >= 0
         ? Number((sixthDayHours * rate).toFixed(2))
@@ -470,7 +497,8 @@ function analyzeWeeklySixthSeventhDay({
         warnings: classificationWarnings,
         week: { start: range.weekStartKey, end: range.weekEndKey },
         premiumRate,
-        premiumRateSource: effectiveProfile.source || null,
+        premiumRateSource: premiumResolution.source,
+        premiumRatePolicy: premiumResolution.policy,
         dailyFacts,
         canonicalRepoDayIdentities,
         sixthDayIdentity,
@@ -502,6 +530,7 @@ module.exports = {
     STATUS,
     ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES,
     validRate,
+    resolveSixthDayPremiumRate,
     resolveSeventhDayIllegalOvertimeHours,
     resolveCanonicalRepoDayIdentities,
     resolveCurrentRepoCandidateIdentities,

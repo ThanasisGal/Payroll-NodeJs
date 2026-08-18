@@ -43,6 +43,10 @@ assert.equal(completed.workflow.leave_classification_completed, true);
 assert.deepEqual(completed.workflow.confirmed_leave_days, [dates[2]]);
 assert.deepEqual(completed.confirmed_absence_dates, []);
 assert.ok(completed.workflow.unclassified_possible_leave_days.includes(dates[1]));
+const effective = buildWeeklyHrWorkflowProjection({ weekRows: rows,
+    effectiveProfile: profile, persistedStage1State: { status: 'COMPLETED',
+        completion_fingerprint: 'a'.repeat(64), effective_fingerprint: fingerprint } });
+assert.equal(effective.stage1_status, 'COMPLETED');
 const stale = buildWeeklyHrWorkflowProjection({ weekRows: rows, effectiveProfile: profile,
     persistedStage1State: { status: 'COMPLETED', completion_fingerprint: 'a'.repeat(64) } });
 assert.equal(stale.stage1_status, 'STALE');

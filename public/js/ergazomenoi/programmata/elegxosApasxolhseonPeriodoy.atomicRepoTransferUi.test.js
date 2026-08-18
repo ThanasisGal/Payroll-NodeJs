@@ -229,6 +229,60 @@ function testSixthDayCardsBadgeShowsApplicableRate() {
     assert.strictEqual(sandbox.renderSixthDayCardsBadge({}), '');
 }
 
+function testSixthDayCardsBadgeUsesWeeklyLifecycleRateIncludingZero() {
+    const setLifecycle = (premiumRate) => vm.runInContext(`
+        weeklyHrStage1Payloads.clear();
+        weeklyHrStage1Payloads.set('0025:2026-06-08', {
+            scope: { employee_kodikos: '0025', ypokatasthma: '0000' },
+            lifecycle_projection: { stages: { stage4: { final_weekly_analysis: {
+                sixthDay: { hmeromhnia: '2026-06-14', premiumRate: ${premiumRate} }
+            } } } }
+        });
+    `, sandbox);
+    setLifecycle(0);
+    assertContains(sandbox.renderSixthDayCardsBadge({
+        kodikos: '0025', ypokatasthma: '0000', hmeromhnia: '2026-06-14'
+    }), ['6η ημέρα', '0%']);
+    setLifecycle(40);
+    assertContains(sandbox.renderSixthDayCardsBadge({
+        kodikos: '0025', ypokatasthma: '0000', hmeromhnia: '2026-06-14'
+    }), ['6η ημέρα', '40%']);
+    vm.runInContext('weeklyHrStage1Payloads.clear();', sandbox);
+}
+
+function testCompletedSingleDayNoActionHidesPossibleLeaveOnlyFromPresentation() {
+    vm.runInContext(`
+        weeklyHrStage1Payloads.clear();
+        weeklyHrStage1Payloads.set('0022:2026-06-01', {
+            scope: { employee_kodikos: '0022', ypokatasthma: '0000' },
+            lifecycle_projection: {
+                requires_hr_action: false,
+                total_pending_count: 0,
+                employment_date_scope: { employment_owned_dates: ['2026-06-01'] },
+                stages: {
+                    stage1: { business_status: 'COMPLETED' },
+                    stage2: { business_status: 'COMPLETED' },
+                    stage3: { business_status: 'COMPLETED' },
+                    stage4: { business_status: 'COMPLETED' }
+                }
+            }
+        });
+    `, sandbox);
+    const row0022 = { kodikos: '0022', ypokatasthma: '0000',
+        hmeromhnia: '2026-06-01', cards_ores_ergasias: 0,
+        ores_pragmatikhs_ergasias_apologistika: 0,
+        kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' };
+    const completed = sandbox.resolveReviewApologistikoPresentation(row0022,
+        { apologistikoText: '' });
+    assert.ok(!completed.text.includes('ΠΙΘΑΝΗ ΑΔΕΙΑ'));
+    vm.runInContext(`weeklyHrStage1Payloads.get('0022:2026-06-01')
+        .lifecycle_projection.requires_hr_action = true;`, sandbox);
+    const actionable = sandbox.resolveReviewApologistikoPresentation(row0022,
+        { apologistikoText: '' });
+    assert.strictEqual(actionable.text, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+    vm.runInContext('weeklyHrStage1Payloads.clear();', sandbox);
+}
+
 function getVisibleText(html) {
     return String(html || '')
         .replace(/<[^>]*>/g, ' ')
@@ -349,6 +403,7 @@ function testPossibleLeaveResolverAndModalPresentationContract() {
     const persistedHtml = sandbox.renderApologistikaFields(persistedRow);
     assert.ok(getVisibleText(persistedHtml).includes('ΠΙΘΑΝΗ ΑΔΕΙΑ'));
     assert.ok(persistedHtml.includes('value="POSSIBLE_LEAVE"'));
+    assert.ok(!persistedHtml.includes('<option value="POSSIBLE_LEAVE"'));
     assert.ok(!/id="edit_adeia_apologistika"[^>]*checked/s.test(persistedHtml));
 
     const confirmedRow = {
@@ -411,13 +466,14 @@ function testPossibleLeaveValidationAndTomSelectCheckboxContract() {
     };
 
     sandbox.initModalKathgoriaAdeiasTomSelect();
-    assert.strictEqual(instance.value, 'POSSIBLE_LEAVE');
-    assert.strictEqual(instance.options[0].label, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+    assert.strictEqual(instance.value, '');
+    assert.strictEqual(instance.options.length, 0);
     assert.strictEqual(checkbox.checked, false);
     assert.strictEqual(hidden.value, '');
 
     config.onChange.call(instance, 'POSSIBLE_LEAVE');
     assert.strictEqual(checkbox.checked, false);
+    assert.strictEqual(hidden.value, '');
     config.onChange.call(instance, 'ΚΑΝΟΝΙΚΗ');
     assert.strictEqual(checkbox.checked, true);
     assert.strictEqual(hidden.value, 'ΚΑΝΟΝΙΚΗ');
@@ -428,6 +484,15 @@ function testPossibleLeaveValidationAndTomSelectCheckboxContract() {
     listeners.change();
     assert.strictEqual(hidden.value, '');
     assert.strictEqual(instance.value, '');
+
+    assert.strictEqual(sandbox.isHrSelectableLeaveCategoryOption({
+        value: 'POSSIBLE_LEAVE', label: 'ΠΙΘΑΝΗ ΑΔΕΙΑ'
+    }), false);
+    assert.strictEqual(sandbox.isHrSelectableLeaveCategoryOption({
+        value: 'ΑΔΚΑΝ', label: 'ΑΔΚΑΝ - Κανονική άδεια'
+    }), true);
+    assert.ok(!sandbox.stage1LeaveCategoryOptions('POSSIBLE_LEAVE')
+        .includes('POSSIBLE_LEAVE'));
 
     delete sandbox.TomSelect;
     ['edit_kathgoria_adeias_apologistika',
@@ -3284,11 +3349,12 @@ function testUnifiedEmploymentReviewWorkspaceContract() {
     ['Έναρξη ελέγχου', 'Αναλυτική προβολή', 'Επιστροφή στον απλό έλεγχο']
         .forEach((text) => assert.ok(!viewSource.includes(text)));
     ['apo_hmeromhnia', 'eos_hmeromhnia', 'ypokatasthma', 'kodikos',
-        'only_apologistiko', 'only_nyxta', 'only_argia', 'only_yperergasia',
-        'scenarioRequiresReviewOnly', 'searchBtn', 'exportExcelBtn', 'exportPdfBtn',
+        'reviewEmployee', 'searchBtn', 'exportExcelBtn', 'exportPdfBtn',
         'resultsTable']
         .forEach((id) => assert.strictEqual((viewSource.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id));
-    assertContains(viewSource, ['Εξαγωγή Excel', 'Εξαγωγή PDF', 'Μόνο προς έλεγχο']);
+    assertContains(viewSource, ['Εξαγωγή Excel', 'Εξαγωγή PDF', 'Εργαζόμενος']);
+    ['only_apologistiko', 'only_nyxta', 'only_argia', 'only_yperergasia',
+        'scenarioRequiresReviewOnly'].forEach((id) => assert.ok(!viewSource.includes(`id="${id}"`)));
     assert.ok(!viewSource.includes('Export Excel'));
     assert.ok(!viewSource.includes('Export PDF'));
 }
@@ -3487,6 +3553,8 @@ function testRoleScopedRenderedEjs() {
 const tests = [
     testWeeklyResolutionShowsRepoAndSixthDayFacts,
     testSixthDayCardsBadgeShowsApplicableRate,
+    testSixthDayCardsBadgeUsesWeeklyLifecycleRateIncludingZero,
+    testCompletedSingleDayNoActionHidesPossibleLeaveOnlyFromPresentation,
     testPersistedRepoCategoryOverridesDerivedLeave,
     testStage1DailyClassificationPresentationPriority,
     testPossibleLeaveResolverAndModalPresentationContract,

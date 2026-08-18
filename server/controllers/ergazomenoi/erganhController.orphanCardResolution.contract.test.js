@@ -16,6 +16,12 @@ assert.match(controller, /ORPHAN_REST_RISK_ACKNOWLEDGEMENT_REQUIRED/);
 assert.match(controller, /raw_cards_preserved:\s*true/);
 assert.match(controller, /reusable_decision_rule:\s*[\s\S]*approvedOrphanResolution\.reusableDecisionRule/);
 assert.match(controller, /runWithStaleOrphanResolutionWriteFence/);
+assert.match(controller,
+    /const periodAccess = orphanResolutionCommand[\s\S]*assertActiveEmploymentReviewOrphanResolutionPeriod[\s\S]*assertActiveEmploymentReviewPeriodNormal/);
+assert.match(controller,
+    /const periodFence = staleOrphanResolution[\s\S]*runWithStaleOrphanResolutionWriteFence[\s\S]*runWithPeriodWriteFence/);
+assert.match(controller,
+    /periodFence\([\s\S]*ProdhlomenaOrariaModel\.updateOne\([\s\S]*createOrphanReusablePolicyDecisionRecord\([\s\S]*ProdhlomenaOrariaAuditModel\.create\(/);
 assert.match(controller, /buildStaleOrphanResolutionWriteSet\(\{/);
 assert.match(controller, /buildApprovedOrphanDailyDerivedUpdate\(\{/);
 assert.match(controller, /Object\.assign\(cleanUpdates, dailyDerived\.derivedUpdate\)/);
@@ -25,6 +31,20 @@ assert.doesNotMatch(controller,
 assert.match(controller, /rowFilter\.updatedAt\s*=\s*oldRecord\.updatedAt/);
 assert.match(controller, /createOrphanReusablePolicyDecisionRecord\(\{/);
 assert.match(controller, /previewProdhlomenaOrariaOrphanResolution/);
+const previewHandler = controller.slice(
+    controller.indexOf('static previewProdhlomenaOrariaOrphanResolution'),
+    controller.indexOf('static updateProdhlomenaOrariaReviewRecord')
+);
+assert.match(previewHandler, /buildApprovedOrphanDerivedPreview\(\{/);
+assert.match(previewHandler, /derived_preview:\s*derivedPreview/);
+assert.match(previewHandler, /preview\.requiresRiskAcknowledgement === true/);
+assert.match(previewHandler,
+    /resolveOrphanCardResolution\(\{ \.\.\.resolutionInput, riskAcknowledged: true \}\)/);
+assert.match(previewHandler, /return res\.json\(\{ success: true, preview, derived_preview:/);
+assert.match(previewHandler, /loadAppliedProtectionForRows\(\[row\]\)/);
+assert.match(previewHandler, /buildNoCardsDisplayContext\(\{/);
+assert.doesNotMatch(previewHandler,
+    /\.save\(|\.updateOne\(|\.findOneAndUpdate\(|\.bulkWrite\(|\.create\(/);
 const reviewHandler = controller.slice(
     controller.indexOf('static getProdhlomenaOrariaForReview'),
     controller.indexOf('static getApasxoliseisPolicyCatalog')
@@ -38,10 +58,13 @@ assert.doesNotMatch(controller, /approvedUpdates\.cards_(?:apo|eos)_ora/);
 assert.match(frontend, /Απόφαση ορφανού χτυπήματος/);
 assert.match(frontend, /orphanRestRiskAcknowledged/);
 assert.match(frontend, /Μόνο για αυτή την περίπτωση/);
-assert.match(frontend, /Και για μελλοντικές ίδιες περιπτώσεις/);
+assert.match(frontend,
+    /Χρήση και σε μελλοντικές όμοιες περιπτώσεις του ίδιου παραρτήματος/);
 assert.match(frontend, /renderApprovedOrphanAuditBadge\(row\)/);
 assert.match(frontend, /orphan_resolution:\s*orphanResolution/);
 assert.match(frontend, /orphan-resolution\/preview/);
 assert.match(frontend, /bindOrphanResolutionManualPreview/);
+assert.match(frontend, /applyOrphanDerivedPreview/);
+assert.match(frontend, /initializeOrphanResolutionPreview/);
 
 console.log('orphan card resolution controller/UI contracts passed');

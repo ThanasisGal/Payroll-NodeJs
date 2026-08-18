@@ -6,9 +6,11 @@ const {
     resolveOrphanCardResolution
 } = require('../../services/ergazomenoi/apasxoliseisOrphanCardResolutionService');
 
-const { buildApprovedOrphanDailyDerivedUpdate, buildStaleOrphanResolutionWriteSet,
+const { buildApprovedOrphanDailyDerivedUpdate, buildApprovedOrphanDerivedPreview,
+    buildStaleOrphanResolutionWriteSet,
     getPayrollCalculationIntervals, getPayrollDailyWorkMinutes,
-    calculateAdditionalAndOverworkForDay } =
+    calculateAdditionalAndOverworkForDay, ORPHAN_DERIVED_PREVIEW_FIELDS,
+    ORPHAN_WEEKLY_DEPENDENT_FIELDS } =
     erganhController.__orphanDailyCalculationTestHooks;
 
 function row(overrides = {}) {
@@ -66,6 +68,40 @@ assert.strictEqual(manual.result.derivedUpdate.ores_apoysias_apologistika, 0.35)
 assert.strictEqual(manual.result.derivedUpdate.ores_nyxtas_apologistika, 0.5);
 assert.strictEqual(manual.result.derivedUpdate.ores_argion_prosayxhsh_apologistika, 7.65);
 
+const splitRow = row({ apo_ora_01: '08:00', eos_ora_01: '12:00',
+    apo_ora_02: '16:00', eos_ora_02: '20:00' });
+const splitManual = calculate(splitRow, { start: '08:15', end: '17:45' },
+    { dialleima_entos_ektos_orarioy: false, dialleima_se_lepta: 30 });
+assert.strictEqual(splitManual.approval.proposal.durationSource, 'HR_MANUAL_SPLIT_INTERVAL');
+assert.strictEqual(splitManual.approval.proposal.manualIntervalMatchesRule, false);
+assert.strictEqual(splitManual.approval.reuseScope, 'ONE_TIME');
+assert.strictEqual(splitManual.approval.reusableDecisionRule, null);
+assert.strictEqual(splitManual.result.derivedUpdate.ores_ergasias_apologistika, 9);
+assert.strictEqual(splitManual.result.derivedUpdate.ores_nyxtas_apologistika, 0);
+assert.strictEqual(splitManual.result.derivedUpdate.ores_argion_prosayxhsh_apologistika, 9);
+
+const riskRow = row();
+const riskContextRows = [{ _id: 'previous', hmeromhnia: new Date('2026-06-13T00:00:00Z'),
+    cards_apo_ora_01: '23:00', cards_eos_ora_01: '08:00' }, riskRow];
+const riskEffectiveEmployee = { hmeres_ergasias_ebdomadas: 5,
+    ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8,
+    dialleima_entos_ektos_orarioy: true, dialleima_se_lepta: 30 };
+const riskPreview = resolveOrphanCardResolution({ row: riskRow,
+    contextRows: riskContextRows, effectiveEmployee: riskEffectiveEmployee,
+    riskAcknowledged: false });
+assert.strictEqual(riskPreview.eligible, true);
+assert.strictEqual(riskPreview.rest.hasViolation, true);
+assert.strictEqual(riskPreview.canApprove, false);
+assert.strictEqual(riskPreview.approvedUpdates, null);
+const riskCalculationPreview = resolveOrphanCardResolution({ row: riskRow,
+    contextRows: riskContextRows, effectiveEmployee: riskEffectiveEmployee,
+    riskAcknowledged: true });
+const riskDerivedPreview = buildApprovedOrphanDerivedPreview({ row: riskRow,
+    effectiveEmployee: riskEffectiveEmployee, argiesDateSet: new Set(),
+    approvedOrphanResolution: riskCalculationPreview });
+assert.strictEqual(riskDerivedPreview.fields.ores_ergasias_apologistika, 8);
+assert.strictEqual(riskPreview.canApprove, false);
+
 const endOnlyRow = row({ cards_apo_ora_01: '', cards_eos_ora_01: '22:51' });
 const endOnly = calculate(endOnlyRow, { start: '14:51', end: '22:51' });
 assert.strictEqual(endOnly.approval.orphanType, 'END_ONLY');
@@ -84,6 +120,26 @@ assert.strictEqual(external.result.derivedUpdate.ores_nyxtas_apologistika, 1.35)
 assert.strictEqual(external.result.derivedUpdate.ores_argion_prosayxhsh_apologistika, 8);
 assert.strictEqual(getPayrollDailyWorkMinutes(external.result.workingRow,
     { dialleima_entos_ektos_orarioy: false, dialleima_se_lepta: 30 }), 480);
+const externalPreview = buildApprovedOrphanDerivedPreview({
+    row: original,
+    effectiveEmployee: { hmeres_ergasias_ebdomadas: 5,
+        ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8,
+        dialleima_entos_ektos_orarioy: false, dialleima_se_lepta: 30 },
+    argiesDateSet: new Set(), approvedOrphanResolution: external.approval
+});
+const simulatedFinalUpdate = {
+    ...external.approval.approvedUpdates,
+    ...external.result.derivedUpdate
+};
+for (const field of ORPHAN_DERIVED_PREVIEW_FIELDS) {
+    assert.deepStrictEqual(externalPreview.fields[field],
+        Object.prototype.hasOwnProperty.call(simulatedFinalUpdate, field)
+            ? simulatedFinalUpdate[field] : original[field], field);
+}
+assert.deepStrictEqual(externalPreview.weekly_dependent_fields,
+    ORPHAN_WEEKLY_DEPENDENT_FIELDS);
+assert.strictEqual(externalPreview.calculation_source,
+    'buildApprovedOrphanDailyDerivedUpdate');
 
 const weeklyRow = { ...external.result.workingRow, eos_ora_01_apologistika: '00:21' };
 const weeklyEmployee = { hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,

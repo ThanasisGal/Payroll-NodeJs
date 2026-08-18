@@ -10,13 +10,17 @@ const { assertWeeklyHrWorkflowIndexesReady } = require(
 
 const BULK_STAGE1_CONCURRENCY = 12;
 const BULK_REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:._-]{7,99}$/;
+const ALLOWED_STAGE1_SCOPE_FIELDS = new Set([
+    'ypokatasthma', 'employee_id', 'week_start', 'week_end', 'period_start', 'period_end'
+]);
 
 function bulkError(code, statusCode, message) {
     return Object.assign(new Error(message), { code, statusCode });
 }
 
 function childRequestId(bulkRequestId, scope = {}) {
-    const material = [bulkRequestId, scope.employee_id, scope.week_start, scope.week_end].join('|');
+    const material = [bulkRequestId, scope.employee_id, scope.week_start, scope.week_end,
+        scope.period_start || '', scope.period_end || ''].join('|');
     const digest = crypto.createHash('sha256').update(material).digest('hex');
     return `stage1-bulk:${digest}`;
 }
@@ -59,9 +63,17 @@ async function completeWeeklyHrWorkflowStage1Bulk({
     await indexGuard();
 
     const results = await mapWithConcurrency(scopes, concurrency, async (scope) => {
+        const forbiddenFields = Object.keys(scope || {}).filter((field) =>
+            !ALLOWED_STAGE1_SCOPE_FIELDS.has(field));
+        if (forbiddenFields.length) return { scope: {}, status: 'FAILED',
+            code: 'STAGE1_COMPLETION_SCOPE_FIELDS_NOT_ALLOWED',
+            message: 'Το αίτημα ολοκλήρωσης Stage 1 περιέχει μη επιτρεπτά πεδία.' };
         const safeScope = { ypokatasthma: String(scope?.ypokatasthma || ''),
             employee_id: String(scope?.employee_id || ''), week_start: String(scope?.week_start || ''),
-            week_end: String(scope?.week_end || '') };
+            week_end: String(scope?.week_end || ''),
+            ...(scope?.period_start && scope?.period_end ? {
+                period_start: String(scope.period_start), period_end: String(scope.period_end)
+            } : {}) };
         try {
             const completion = await completeOne({ scope: safeScope, actor,
                 reason_or_notes: reason,

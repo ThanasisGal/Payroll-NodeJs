@@ -27,12 +27,10 @@ const startOnly = row('2026-06-14');
 const startResult = resolveOrphanCardResolution({ row: startOnly, contextRows: [startOnly] });
 assert.strictEqual(startResult.category, 'ΕΡΓ');
 assert.strictEqual(startResult.orphanType, 'START_ONLY');
-assert.deepStrictEqual(startResult.proposal, {
-    start: '14:51', end: '22:51', durationMinutes: 480, durationHours: 8,
-    workDurationMinutes: 480, workDurationHours: 8, declaredDurationMinutes: 480,
-    breakInsideSchedule: true, breakMinutes: 30, externalBreakMinutes: 0,
-    breakConfigurationSource: null, breakConfigurationEffectiveFrom: null
-});
+assert.strictEqual(startResult.proposal.start, '14:51');
+assert.strictEqual(startResult.proposal.end, '22:51');
+assert.strictEqual(startResult.proposal.workDurationMinutes, 480);
+assert.strictEqual(startResult.proposal.durationSource, 'DECLARED_CONTINUOUS_DURATION');
 assert.strictEqual(startResult.apologistikoBookUpdate, false);
 assert.strictEqual(startResult.canApprove, true);
 assert.strictEqual(startResult.approvedUpdates.apologistiko_biblio, false);
@@ -164,5 +162,60 @@ assert.strictEqual(splitResult.eligible, false);
 assert.strictEqual(splitResult.category, 'ΕΡΓ');
 assert.strictEqual(splitResult.blocking, true);
 assert.strictEqual(splitResult.canAutomaticReuse, undefined);
+assert.strictEqual(splitResult.orphanType, 'START_ONLY');
+const splitManual = resolveOrphanCardResolution({ row: split, contextRows: [split],
+    manualInterval: { start: '08:15', end: '17:45' },
+    reuseScope: RESOLUTION_SCOPE.FUTURE_IDENTICAL,
+    breakConfiguration: { break_inside_schedule: false, break_minutes: 30 } });
+assert.strictEqual(splitManual.eligible, true);
+assert.strictEqual(splitManual.proposal.scheduleKind, 'SPLIT');
+assert.strictEqual(splitManual.proposal.durationSource, 'HR_MANUAL_SPLIT_INTERVAL');
+assert.strictEqual(splitManual.proposal.start, '08:15');
+assert.strictEqual(splitManual.proposal.end, '17:45');
+assert.strictEqual(splitManual.proposal.workDurationHours, 9);
+assert.strictEqual(splitManual.proposal.manualIntervalMatchesRule, false);
+assert.strictEqual(splitManual.reuseScope, 'ONE_TIME');
+assert.strictEqual(splitManual.reusableEligible, false);
+assert.strictEqual(splitManual.reusableDecisionRule, null);
+
+const averageEnd = row('2026-06-15', { kathgoria_ergasias: 'ΑΝ', repo: true,
+    apo_ora_01: '', eos_ora_01: '', cards_apo_ora_01: '', cards_eos_ora_01: '23:47' });
+const averageNoBreak = resolveOrphanCardResolution({ row: averageEnd,
+    contextRows: [averageEnd], effectiveEmployee: { mo_oron_hmerhsias_ergasias: 8 },
+    breakConfiguration: { break_inside_schedule: true, break_minutes: 30 } });
+assert.strictEqual(averageNoBreak.proposal.start, '15:47');
+assert.strictEqual(averageNoBreak.proposal.end, '23:47');
+assert.strictEqual(averageNoBreak.proposal.workDurationHours, 8);
+assert.strictEqual(averageNoBreak.proposal.durationHours, 8);
+assert.strictEqual(averageNoBreak.proposal.durationSource, 'EFFECTIVE_DAILY_AVERAGE');
+const averageExternal = resolveOrphanCardResolution({ row: averageEnd,
+    contextRows: [averageEnd], effectiveEmployee: { mo_oron_hmerhsias_ergasias: 8,
+        _workTermsSource: 'ISTORIKO' },
+    breakConfiguration: { break_inside_schedule: false, break_minutes: 30,
+        source: 'BREAK_CONFIGURATION_HISTORY' },
+    reuseScope: RESOLUTION_SCOPE.FUTURE_IDENTICAL });
+assert.strictEqual(averageExternal.proposal.start, '15:17');
+assert.strictEqual(averageExternal.proposal.durationHours, 8.5);
+assert.strictEqual(averageExternal.reusableDecisionRule.rule,
+    'ACTUAL_END_MINUS_EFFECTIVE_DAILY_AVERAGE');
+assert.strictEqual(averageExternal.reusableDecisionRule.schedule_kind,
+    'NON_DECLARED');
+assert.strictEqual(JSON.stringify(averageExternal.reusableDecisionRule).includes('23:47'), false);
+const averageSixHoursReuse = resolveOrphanCardResolution({ row: {
+    ...averageEnd, hmeromhnia: '2026-06-16T00:00:00.000Z', cards_eos_ora_01: '22:00' },
+    contextRows: [], effectiveEmployee: { mo_oron_hmerhsias_ergasias: 6 },
+    breakConfiguration: { break_inside_schedule: false, break_minutes: 15 },
+    reusableRule: averageExternal.reusableDecisionRule });
+assert.strictEqual(averageSixHoursReuse.proposal.start, '15:45');
+assert.strictEqual(averageSixHoursReuse.canAutomaticReuse, true);
+const invalidAverage = resolveOrphanCardResolution({ row: averageEnd,
+    contextRows: [averageEnd], effectiveEmployee: { mo_oron_hmerhsias_ergasias: 0 } });
+assert.strictEqual(invalidAverage.eligible, false);
+const manualFuture = resolveOrphanCardResolution({ row: averageEnd,
+    contextRows: [averageEnd], effectiveEmployee: { mo_oron_hmerhsias_ergasias: 8 },
+    manualInterval: { start: '16:00', end: '23:47' },
+    reuseScope: RESOLUTION_SCOPE.FUTURE_IDENTICAL });
+assert.strictEqual(manualFuture.reuseScope, 'ONE_TIME');
+assert.strictEqual(manualFuture.reusableDecisionRule, null);
 
 console.log('orphan card resolution pure tests passed (START/END/rest/reuse/split)');

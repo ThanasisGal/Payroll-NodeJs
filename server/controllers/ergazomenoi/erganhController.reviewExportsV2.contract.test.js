@@ -8,17 +8,17 @@ const { buildReviewExportProjection } = require('../../services/ergazomenoi/apas
 
 const controller = fs.readFileSync(path.join(__dirname, 'erganhController.js'), 'utf8');
 
-test('Excel/PDF parity contract uses the same pure projection', () => {
+test('Excel και τα δύο PDF καταναλώνουν την ίδια πλήρη προβολή αναφοράς', () => {
     assert.match(controller, /buildReviewExportProjection\(\{/);
-    assert.match(controller, /static exportProdhlomenaOrariaReviewExcel[\s\S]*getReviewRowsForExport\(req\)/);
-    assert.match(controller, /static exportProdhlomenaOrariaReviewPdf[\s\S]*getReviewRowsForExport\(req\)/);
-    assert.match(controller, /buildReviewExportProjection\(\{[\s\S]*findingsOnly: true/);
+    assert.match(controller, /buildEmploymentReviewReportForRequest\(req\)/);
+    assert.match(controller, /buildEmploymentReviewReportProjection\(\{/);
+    assert.match(controller, /static exportProdhlomenaOrariaReviewExcel[\s\S]*sendEmploymentReviewWorkbook\(req, res\)/);
+    assert.match(controller, /static exportProdhlomenaOrariaReviewPdf[\s\S]*sendEmploymentReviewPdf\(req, res\)/);
+    assert.match(controller, /static exportProdhlomenaOrariaReviewAuditDossierPdf[\s\S]*sendEmploymentReviewPdf\(req, res, \{ dossier: true \}\)/);
+    assert.match(controller, /buildReviewExportProjection\(\{[\s\S]*findingsOnly: false/);
     assert.match(controller, /buildAtomicRepoTransferPolicyPreviewProjection\(\{/);
     assert.match(controller, /includeContextGroups: true/);
-    assert.match(controller, /buildReviewExportProjection\(\{[\s\S]*atomicGroupProjection,[\s\S]*findingsOnly: true/);
-    assert.match(controller, /Πολιτική v2 — εβδομάδα Δευτέρα έως Κυριακή/);
-    assert.match(controller, /policy_status: row\.policy\?\.statusLabel \|\| ''/);
-    assert.match(controller, /\[row\.policy\?\.statusLabel, row\.policy\?\.severity\]/);
+    assert.match(controller, /buildReviewExportProjection\(\{[\s\S]*atomicGroupProjection,[\s\S]*findingsOnly: false/);
 });
 
 test('Excel render/content smoke test contains all 22 original plus 15 v2 headers', async () => {

@@ -45,9 +45,11 @@ vm.runInContext(fs.readFileSync(path.join(__dirname,
     '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8'), sandbox);
 const html = sandbox.renderOrphanCardResolutionSection(modalRow);
 assert.match(html, /Απόφαση ορφανού χτυπήματος/);
-assert.match(html, /START_ONLY/);
+assert.match(html, /Μόνο είσοδος/);
+assert.doesNotMatch(html, />START_ONLY<|>END_ONLY</);
 assert.match(html, /14:51–23:21/);
-assert.match(html, /Gross span/);
+assert.match(html, /Συνολική διάρκεια διαστήματος/);
+assert.doesNotMatch(html, /Gross span|orphan περίπτωση|>Flags</);
 assert.strictEqual(sandbox.prefillOrphanResolutionProposal(modalRow), true);
 assert.strictEqual(elements.get('edit_apo_ora_01_apologistika').value, '14:51');
 assert.strictEqual(elements.get('edit_eos_ora_01_apologistika').value, '23:21');

@@ -48,6 +48,9 @@ const staleCompletedWeek = { ...reconstructedWeek,
     allow_stale_completed_context: true };
 assert.strictEqual(isWeekAllowedForEmploymentPeriod(staleCompletedWeek), true);
 assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...staleCompletedWeek,
+    authoritative_row_dates: ['2026-06-30', '2026-07-01', '2026-07-02'],
+    required_authoritative_dates: ['2026-06-30', '2026-07-01', '2026-07-02'] }), true);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...staleCompletedWeek,
     allow_stale_completed_context: false }), false);
 assert.strictEqual(hasFullNaturalWeekCoverage({ week_start: '2026-06-29',
     week_end: '2026-07-05', authoritative_row_dates: reconstructedWeek.authoritative_row_dates }), true);

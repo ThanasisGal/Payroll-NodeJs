@@ -778,8 +778,14 @@ function buildOrphanReusableCriteria(rule = {}) {
     const scheduleKind = toTrimmedString(rule.schedule_kind, 20).toUpperCase();
     const policyVersion = toTrimmedString(rule.policy_version, 100);
     const relativeRule = toTrimmedString(rule.rule, 100).toUpperCase();
-    if (!policyVersion || !['START_ONLY', 'END_ONLY'].includes(orphanType) ||
-        scheduleKind !== 'CONTINUOUS' || !relativeRule) {
+    const validRule = (scheduleKind === 'CONTINUOUS' && [
+        'ACTUAL_START_PLUS_DECLARED_DURATION',
+        'ACTUAL_END_MINUS_DECLARED_DURATION'
+    ].includes(relativeRule)) ||
+        (scheduleKind === 'NON_DECLARED' &&
+            orphanType === 'END_ONLY' &&
+            relativeRule === 'ACTUAL_END_MINUS_EFFECTIVE_DAILY_AVERAGE');
+    if (!policyVersion || !['START_ONLY', 'END_ONLY'].includes(orphanType) || !validRule) {
         throw validationError('Μη έγκυρος επαναχρησιμοποιήσιμος κανόνας ορφανού χτυπήματος.');
     }
     return { version: 6, decision_grain: 'DAILY_ORPHAN_CARD', policy_code:

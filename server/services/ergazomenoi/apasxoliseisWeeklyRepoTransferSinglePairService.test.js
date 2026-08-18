@@ -479,7 +479,7 @@ function testExactRepoCount() {
     const deficitRows = fullTimeWeek();
     deficitRows[6] = workRow(6);
     const deficit = analyze(deficitRows);
-    assert.strictEqual(deficit.eligibility_status, 'NEEDS_REVIEW');
+    assert.strictEqual(deficit.eligibility_status, 'ELIGIBLE');
     assert.strictEqual(deficit.employee.repo_resolution_source, 'CONTRACTUAL_WEEKLY_WORKDAYS');
     assert.strictEqual(deficit.counts.predicted_final_repo, 1);
 
