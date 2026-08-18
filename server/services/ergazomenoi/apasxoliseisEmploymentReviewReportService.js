@@ -572,7 +572,12 @@ function pdfFooterLines(pageNumber, pageCount) {
         `Τηλ. 2421056825 • Κιν. 6972012650 • eMail: support@WebPayrollSolutions.com • Σελίδα ${pageNumber} / ${pageCount}`
     ];
 }
-function addFooters(doc, fonts, report) {
+function dossierFooterLine() {
+    const currentYear = new Date().getFullYear();
+    return `(c) 2009 - ${currentYear} Copyright: WebPayrollSolutions.com • Ιωλκού 266α Βόλος • ` +
+        'Τηλ. 2421056825 • Κιν. 6972012650 • eMail: support@WebPayrollSolutions.com';
+}
+function addFooters(doc, fonts, report, { dossier = false } = {}) {
     const range = doc.bufferedPageRange();
     for (let index = range.start; index < range.start + range.count; index += 1) {
         doc.switchToPage(index);
@@ -583,13 +588,200 @@ function addFooters(doc, fonts, report) {
         doc.page.margins.bottom = 0;
         doc.save().lineWidth(0.35).strokeColor('#b9b1aa')
             .moveTo(left, doc.page.height - 36).lineTo(left + width, doc.page.height - 36).stroke().restore();
-        doc.font(fonts.regular).fontSize(6.8).fillColor('#666666')
-            .text(firstLine, left, doc.page.height - 32,
-                { width, align: 'center', lineBreak: false })
-            .text(secondLine, left, doc.page.height - 22,
-                { width, align: 'center', lineBreak: false });
+        if (dossier) {
+            const pageWidth = 90;
+            doc.font(fonts.regular).fontSize(6.1).fillColor('#666666')
+                .text(dossierFooterLine(), left, doc.page.height - 27,
+                    { width: width - pageWidth, align: 'center', lineBreak: false })
+                .text(`Σελίδα ${index + 1} / ${range.count}`, left + width - pageWidth,
+                    doc.page.height - 27, { width: pageWidth, align: 'right', lineBreak: false });
+        } else {
+            doc.font(fonts.regular).fontSize(6.8).fillColor('#666666')
+                .text(firstLine, left, doc.page.height - 32,
+                    { width, align: 'center', lineBreak: false })
+                .text(secondLine, left, doc.page.height - 22,
+                    { width, align: 'center', lineBreak: false });
+        }
         doc.page.margins.bottom = bottomMargin;
     }
+}
+
+function codeDescription(code, description) {
+    const normalizedCode = text(code);
+    const normalizedDescription = text(description);
+    if (!normalizedCode) return normalizedDescription || '—';
+    return normalizedDescription ? `${normalizedCode} - ${normalizedDescription}` : normalizedCode;
+}
+
+function branchDescription(metadata = {}) {
+    const base = codeDescription(metadata.branch, metadata.branchDescription);
+    const address = metadata.branchAddress || {};
+    const streetLine = [text(address.street), text(address.number)].filter(Boolean).join(' ');
+    const localityLine = [text(address.postalCode), text(address.cityDescription)].filter(Boolean).join(' ');
+    const fullAddress = [streetLine, localityLine].filter(Boolean).join(', ');
+    return fullAddress ? `${base} (${fullAddress})` : base;
+}
+
+function relationshipRange(employee) {
+    const starts = employee.weeks.map((week) => week.sliceStart).filter(Boolean).sort();
+    const ends = employee.weeks.map((week) => week.sliceEnd).filter(Boolean).sort();
+    const rowDates = employee.rows.map((row) => row.date).filter(Boolean).sort();
+    return { start: starts[0] || rowDates[0] || '',
+        end: ends.at(-1) || rowDates.at(-1) || '' };
+}
+
+function dossierDecisionReason(value) {
+    const reason = text(value);
+    return /(?:Stage|Στάδιο)\s*[1-4]|\bAutomatic\b|\bNo action\b|lifecycle/i.test(reason)
+        ? '' : reason;
+}
+
+function buildDossierHistoryEntries(employee) {
+    const entries = [];
+    const rowsByDate = new Map(employee.rows.map((row) => [row.date, row]));
+    const reportDates = new Set(rowsByDate.keys());
+    const transferKeys = new Set();
+    employee.weeks.forEach((week) => {
+        week.repoDecisions.forEach((decision) => {
+            const source = rowsByDate.get(decision.sourceDate);
+            const target = rowsByDate.get(decision.targetDate);
+            if (!source || !target || !decision.sourceDate || !decision.targetDate ||
+                number(source.values.ores_ergasias_apologistika) <= 0 || target.repo !== true) return;
+            transferKeys.add(`${decision.sourceDate}|${decision.targetDate}`);
+            const decisionReason = dossierDecisionReason(decision.reason);
+            const reason = decisionReason ? ` Η καταγεγραμμένη αιτιολογία ήταν: ${decisionReason}.` : '';
+            entries.push({ date: decision.sourceDate, order: 10,
+                heading: `${dateLabel(decision.sourceDate)} → ${dateLabel(decision.targetDate)}`,
+                text: `Στις ${dateLabel(decision.sourceDate)} υπήρχε προδηλωμένο ρεπό, όμως από τα ` +
+                    `authoritative στοιχεία προέκυψε πραγματική απασχόληση. Για τον λόγο αυτό το ρεπό ` +
+                    `μεταφέρθηκε στις ${dateLabel(decision.targetDate)}, όπου δεν προέκυψε πραγματική ` +
+                    `απασχόληση βάσει καρτών.${reason} Η ${dateLabel(decision.sourceDate)} διατηρήθηκε ` +
+                    `ως ημέρα εργασίας και η ${dateLabel(decision.targetDate)} χαρακτηρίστηκε τελικά ` +
+                    'ως ΑΝΑΠΑΥΣΗ / ΡΕΠΟ.' });
+        });
+        if (!week.repoDecisions.length) {
+            const weekRows = employee.rows.filter((row) => row.weekStart === week.weekStart);
+            const sources = weekRows.filter((row) =>
+                ['ΑΝ', 'ΜΕ'].includes(text(row.source.kathgoria_ergasias_original)) &&
+                number(row.values.ores_ergasias_apologistika) > 0 && Boolean(row.cards));
+            const targets = weekRows.filter((row) => row.repo === true && Boolean(row.declared) &&
+                !row.cards && number(row.values.ores_ergasias_apologistika) === 0);
+            if (sources.length === 1 && targets.length === 1) {
+                const source = sources[0]; const target = targets[0];
+                const key = `${source.date}|${target.date}`;
+                if (!transferKeys.has(key)) entries.push({ date: source.date, order: 10,
+                    heading: `${dateLabel(source.date)} → ${dateLabel(target.date)}`,
+                    text: `Στις ${dateLabel(source.date)} υπήρχε προδηλωμένο ρεπό, όμως από τις ` +
+                        `κάρτες εργασίας προέκυψε πραγματική απασχόληση. Στις ${dateLabel(target.date)} ` +
+                        'υπήρχε προδηλωμένη εργασία χωρίς πραγματική απασχόληση και η ημέρα κατέληξε ' +
+                        'απολογιστικά σε ΑΝΑΠΑΥΣΗ / ΡΕΠΟ. Από τα τελικά απολογιστικά στοιχεία της ' +
+                        `εβδομάδας προκύπτει μεταφορά του ρεπό από την ${dateLabel(source.date)} ` +
+                        `στην ${dateLabel(target.date)}.` });
+            }
+        }
+    });
+    employee.rows.forEach((row) => {
+        const matchingDecision = employee.weeks.flatMap((week) => week.stage3Decisions)
+            .find((decision) => decision.date === row.date);
+        const decisionReason = dossierDecisionReason(matchingDecision?.reason);
+        const reason = decisionReason
+            ? ` Η καταγεγραμμένη αιτιολογία ήταν: ${decisionReason}.` : '';
+        if (row.leave || row.sickness || row.absence) {
+            const result = row.sickness ? 'ΑΣΘΕΝΕΙΑ' : row.absence ? 'ΑΠΟΥΣΙΑ' : 'ΑΔΕΙΑ';
+            const category = row.leaveCategory ? ` με κατηγορία ${row.leaveCategory}` : '';
+            entries.push({ date: row.date, order: 20, heading: dateLabel(row.date),
+                text: `Η ημέρα χαρακτηρίστηκε τελικά ως ${result}${category}.${reason}` });
+        }
+        if (row.classification === 'ΜΕ' && row.apologistikoBook) {
+            const employmentPhrase = row.employmentStatus === 'ΜΕΡΙΚΗ' ? 'μερικής'
+                : row.employmentStatus === 'ΕΚ ΠΕΡΙΤΡΟΠΗΣ' ? 'εκ περιτροπής'
+                    : text(row.employmentStatus).toLowerCase();
+            entries.push({ date: row.date, order: 30, heading: dateLabel(row.date),
+                text: `Για τη συγκεκριμένη ημέρα ίσχυε καθεστώς ${employmentPhrase} ` +
+                    'απασχόλησης. Δεν προέκυψε πραγματική απασχόληση βάσει καρτών και η ημέρα ' +
+                    'επιλύθηκε ως ΜΗ ΕΡΓΑΣΙΑ. Η εγγραφή καταχωρίστηκε στο απολογιστικό βιβλίο ' +
+                    'με τελικό χαρακτηρισμό ΜΕ.' });
+        }
+        if (row.orphan) {
+            const detected = row.orphan.type === 'START_ONLY'
+                ? 'χτύπημα εισόδου χωρίς αντίστοιχο χτύπημα εξόδου'
+                : 'χτύπημα εξόδου χωρίς αντίστοιχο χτύπημα εισόδου';
+            const approved = row.orphan.approvedInterval
+                ? ` Μετά από έλεγχο εγκρίθηκε απολογιστικό διάστημα ${row.orphan.approvedInterval}.` : '';
+            const finalHours = number(row.values.ores_ergasias_apologistika).toFixed(2);
+            const details = [`Η τελική διάρκεια εργασίας υπολογίστηκε σε ${finalHours} ώρες`];
+            if (number(row.values.ores_nyxtas_apologistika)) details.push(
+                `οι ώρες νύχτας σε ${number(row.values.ores_nyxtas_apologistika).toFixed(2)}`);
+            if (row.sunday || row.holiday) details.push('ενημερώθηκαν τα στοιχεία Κυριακής/αργίας');
+            entries.push({ date: row.date, order: 40, heading: dateLabel(row.date),
+                text: `Εντοπίστηκε ${detected}.${approved} ${details.join(' και ')}.` });
+        }
+    });
+    employee.weeks.forEach((week) => {
+        if (week.sixthDay && reportDates.has(week.sixthDay)) entries.push({ date: week.sixthDay, order: 50,
+            heading: dateLabel(week.sixthDay),
+            text: `Με βάση τις πραγματικές ημέρες απασχόλησης της εβδομάδας, η ` +
+                `${dateLabel(week.sixthDay)} αναγνωρίστηκε ως 6η ημέρα εργασίας. ` +
+                `Εφαρμόστηκε προσαύξηση 6ης ημέρας ${number(week.sixthDayRate)}%.` });
+        if (week.seventhDay && reportDates.has(week.seventhDay)) entries.push({ date: week.seventhDay, order: 60,
+            heading: dateLabel(week.seventhDay),
+            text: `Με βάση τις πραγματικές ημέρες απασχόλησης της εβδομάδας, η ` +
+                `${dateLabel(week.seventhDay)} αναγνωρίστηκε ως 7η ημέρα εργασίας.` });
+        const severeDate = [week.seventhDay, week.sixthDay, week.weekEnd]
+            .find((date) => reportDates.has(date));
+        if (week.severeReasons.length && severeDate) entries.push({ date: severeDate,
+            order: 70, heading: `${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)}`,
+            text: `Κατά τον τελικό εβδομαδιαίο έλεγχο διαπιστώθηκε σοβαρή παράβαση: ` +
+                `${week.severeReasons.join(', ')}.` });
+    });
+    return entries.sort((left, right) => left.date.localeCompare(right.date) || left.order - right.order);
+}
+
+function writeDossierHistory(doc, employee, fonts) {
+    const left = doc.page.margins.left;
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    ensureSpace(doc, 40);
+    doc.moveDown(0.65).font(fonts.bold).fontSize(10).fillColor('#4f392a')
+        .text('Β. Αναλυτικό ιστορικό ελέγχου', left, doc.y, { width });
+    const entries = buildDossierHistoryEntries(employee);
+    entries.forEach((entry) => {
+        doc.font(fonts.regular).fontSize(7.5);
+        const bodyHeight = doc.heightOfString(entry.text, { width: width - 14, lineGap: 1 });
+        ensureSpace(doc, bodyHeight + 24);
+        doc.moveDown(0.35).font(fonts.bold).fontSize(8).fillColor('#4f392a')
+            .text(entry.heading, left, doc.y, { width });
+        doc.moveDown(0.1).font(fonts.regular).fontSize(7.5).fillColor('#222222')
+            .text(entry.text, left + 8, doc.y, { width: width - 8, lineGap: 1 });
+    });
+}
+
+function writeDossierCover(doc, report, fonts) {
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const company = codeDescription(report.metadata.companyCode, report.metadata.companyName);
+    const branch = branchDescription(report.metadata);
+    doc.y = 105;
+    doc.font(fonts.bold).fontSize(22).fillColor('#4f392a')
+        .text('ΦΑΚΕΛΟΣ ΕΛΕΓΧΟΥ ΑΠΑΣΧΟΛΗΣΗΣ', { width, align: 'center' });
+    doc.moveDown(2.2).font(fonts.regular).fontSize(11).fillColor('#222222');
+    [
+        `Εταιρεία: ${company}`,
+        `Παράρτημα: ${branch}`,
+        `Περίοδος: ${dateLabel(report.metadata.periodStart)} – ${dateLabel(report.metadata.periodEnd)}`,
+        `Χρήση: ${text(report.metadata.usage) || dateKeyUtc(report.metadata.periodStart).slice(0, 4)}`,
+        `Ημερομηνία δημιουργίας: ${dateLabel(report.generatedAt)}`
+    ].forEach((line) => { doc.text(line, { width, align: 'center' }); doc.moveDown(0.55); });
+    const brandingTextY = doc.page.height - 105;
+    const logoPath = path.resolve(__dirname, '../../../public/img/wps2.png');
+    if (fs.existsSync(logoPath)) {
+        const logoWidth = 100;
+        const logo = doc.openImage(logoPath);
+        const logoHeight = logoWidth * logo.height / logo.width;
+        doc.image(logo, (doc.page.width - logoWidth) / 2,
+            brandingTextY - logoHeight - 6, { width: logoWidth });
+    }
+    doc.y = brandingTextY;
+    doc.font(fonts.regular).fontSize(9).fillColor('#7a6c62')
+        .text('WebPayrollSolutions.com', { width, align: 'center' });
 }
 function dailyFlags(row) {
     return [row.apologistikoBook ? 'Απολογιστικό βιβλίο: ΝΑΙ' : '', row.repo ? 'Ρεπό' : '',
@@ -830,14 +1022,14 @@ function writeDailyAnalysis(doc, rows, fonts, heading = 'Απολογιστικ�
 function buildEmploymentReviewPdf(report, { dossier = false } = {}) {
     const fonts = createPdf({ landscape: true });
     const { doc } = fonts;
-    writeHeader(doc, report, fonts, dossier ? 'ΦΑΚΕΛΟΣ ΕΛΕΓΧΟΥ ΑΠΑΣΧΟΛΗΣΗΣ' : 'ΕΛΕΓΧΟΣ ΑΠΑΣΧΟΛΗΣΕΩΝ');
-    doc.font(fonts.bold).fontSize(10).text('Σύνοψη');
-    doc.font(fonts.regular).fontSize(8).text(
-        `Εργαζόμενοι: ${report.summary.employeeCount}   Εκκρεμότητες: ${report.summary.pendingCount}   ` +
-        `6ες ημέρες: ${report.summary.sixthDays}   7ες ημέρες: ${report.summary.seventhDays}   ` +
-        `Παραβάσεις: ${report.summary.severeViolations}`
-    );
     if (!dossier) {
+        writeHeader(doc, report, fonts, 'ΕΛΕΓΧΟΣ ΑΠΑΣΧΟΛΗΣΕΩΝ');
+        doc.font(fonts.bold).fontSize(10).text('Σύνοψη');
+        doc.font(fonts.regular).fontSize(8).text(
+            `Εργαζόμενοι: ${report.summary.employeeCount}   Εκκρεμότητες: ${report.summary.pendingCount}   ` +
+            `6ες ημέρες: ${report.summary.sixthDays}   7ες ημέρες: ${report.summary.seventhDays}   ` +
+            `Παραβάσεις: ${report.summary.severeViolations}`
+        );
         report.employees.forEach((employee, index) => {
             if (index > 0) doc.addPage();
             doc.moveDown(0.7).font(fonts.bold).fontSize(11).fillColor('#4f392a')
@@ -850,84 +1042,27 @@ function buildEmploymentReviewPdf(report, { dossier = false } = {}) {
         });
         writePeriodSummary(doc, report, fonts);
     } else {
+        writeDossierCover(doc, report, fonts);
         report.employees.forEach((employee) => {
             doc.addPage();
             doc.font(fonts.bold).fontSize(14).fillColor('#4f392a').text(`${employee.employeeCode} — ${employee.employeeName}`);
-            const dates = employee.rows.map((row) => row.date).sort();
+            const relationship = relationshipRange(employee);
+            const specialCategoryDescription = report.metadata.specialCategoryDescriptions?.[
+                employee.specialCategory
+            ] || '';
             doc.font(fonts.regular).fontSize(8).fillColor('#222222').text(
-                `Διάστημα σχέσης στην περίοδο: ${dateLabel(dates[0])}–${dateLabel(dates.at(-1))}   Παράρτημα: ${employee.branch}\n` +
-                `Καθεστώς απασχόλησης: ${employee.periodEmploymentStatus}   Ειδική κατηγορία: ${employee.specialCategory || '—'}\n` +
+                `Διάστημα σχέσης στην περίοδο: ${dateLabel(relationship.start)}–${dateLabel(relationship.end)}   ` +
+                `Παράρτημα: ${branchDescription({ ...report.metadata, branch: employee.branch })}\n` +
+                `Καθεστώς απασχόλησης: ${employee.periodEmploymentStatus}   ` +
+                `Ειδική κατηγορία: ${codeDescription(employee.specialCategory,
+                    specialCategoryDescription)}\n` +
                 `Εβδομαδιαίες ημέρες/ώρες: ${employee.weeklyWorkdays || '—'} / ${employee.weeklyHours || '—'}   ` +
-                `Ποσοστό 6ης ημέρας: ${employee.sixthDayRate === null ? 'κανονική πολιτική' : `${employee.sixthDayRate}%`}   ` +
-                `Πηγή προφίλ: ${employee.profileSource || '—'}`
+                (employee.sixthDayRate === null ? '' : `Ποσοστό 6ης ημέρας: ${employee.sixthDayRate}%`)
             );
             doc.moveDown(0.5).font(fonts.bold).fontSize(10).text('Α. Ημερήσιο ημερολόγιο');
             writeCompactDailyTable(doc, employee.rows, fonts);
             writeTotalsGrid(doc, employee, fonts, 'Σύνολα εργαζομένου');
-            ensureSpace(doc, 55);
-            doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('Β. Στάδιο 1 — Χαρακτηρισμός αδειών');
-            doc.font(fonts.regular).fontSize(7.5);
-            employee.weeks.forEach((week) => {
-                doc.font(fonts.bold).text(`${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)}`);
-                doc.font(fonts.regular);
-                week.stage1Decisions.forEach((decision) => doc.text(
-                    `${dateLabel(decision.date)} — Αρχική κατάσταση: ${decision.initial || '—'} — ` +
-                    `Τελικό αποτέλεσμα: ${decision.result} — Πηγή: ${decision.source}` +
-                    `${decision.reason ? ` — Αιτιολογία: ${decision.reason}` : ''}`));
-            });
-            ensureSpace(doc, 55);
-            doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('Γ. Στάδιο 2 — Μεταφορά ρεπό');
-            doc.font(fonts.regular).fontSize(7.5);
-            employee.weeks.forEach((week) => {
-                doc.font(fonts.bold).text(`${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)}`);
-                doc.font(fonts.regular);
-                if (!week.repoDecisions.length) doc.text('Δεν εφαρμόστηκε μεταφορά ρεπό.');
-                week.repoDecisions.forEach((decision) => doc.text(
-                    `Εφαρμόζεται — ${dateLabel(decision.sourceDate)} → ${dateLabel(decision.targetDate)} — ` +
-                    `Αποτέλεσμα: ${decision.result} — Πηγή: ${decision.source}` +
-                    `${decision.reason ? ` — Αιτιολογία: ${decision.reason}` : ''}`));
-            });
-            ensureSpace(doc, 55);
-            doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('Δ. Στάδιο 3 — Υπόλοιπες πιθανές άδειες');
-            doc.font(fonts.regular).fontSize(7.5);
-            const stage3Decisions = employee.weeks.flatMap((week) => week.stage3Decisions);
-            if (!stage3Decisions.length) doc.text('Δεν καταγράφηκε απόφαση για υπόλοιπη πιθανή άδεια.');
-            stage3Decisions.forEach((decision) => doc.text(
-                `${dateLabel(decision.date)} — ${decision.initial} → ${decision.result}` +
-                `${decision.leaveCategory ? ` — Κατηγορία άδειας: ${decision.leaveCategory}` : ''} — ` +
-                `Πηγή: ${decision.source}${decision.reason ? ` — Αιτιολογία: ${decision.reason}` : ''}` +
-                `${decision.decidedAt ? ` — Χρόνος: ${new Date(decision.decidedAt).toISOString()}` : ''}` +
-                `${decision.actor ? ` — Χρήστης: ${decision.actor}` : ''}`));
-            ensureSpace(doc, 80);
-            doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('Ε. Στάδιο 4 — Τελικός εβδομαδιαίος έλεγχος');
-            doc.font(fonts.regular).fontSize(7.5);
-            employee.weeks.forEach((week) => doc.text(
-                `${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)} — ` +
-                `Διάστημα σχέσης: ${dateLabel(week.sliceStart)}–${dateLabel(week.sliceEnd)} — ` +
-                `Ημέρες εργασίας: ${week.workdays} — Ρεπό: ${week.repos} — ` +
-                `6η ημέρα: ${week.sixthDay ? `${dateLabel(week.sixthDay)} / ${week.sixthDayRate ?? 0}%` : 'Όχι'} — ` +
-                `7η ημέρα: ${week.seventhDay ? dateLabel(week.seventhDay) : 'Όχι'} — ` +
-                `Νύχτα: ${week.totals.ores_nyxtas_apologistika.toFixed(2)} — ` +
-                `Κυριακές/αργίες: ${week.sundays}/${week.holidays} — ` +
-                `Πρόσθετη: ${week.totals.ores_prostheths_ergasias_apologistika.toFixed(2)} — ` +
-                `Υπερεργασία: ${week.totals.ores_yperergasias_apologistika.toFixed(2)} — ` +
-                `Νόμιμη υπερωρία: ${week.totals.ores_nominhs_yperorias_apologistika.toFixed(2)} — ` +
-                `Παράνομη υπερωρία: ${week.totals.ores_paranomhs_yperorias_apologistika.toFixed(2)} — ` +
-                `Σοβαρές παραβάσεις: ${week.severeReasons.length ? week.severeReasons.join(', ') : 'Καμία'} — ` +
-                `Τελική κατάσταση: ${week.status || '—'}`));
-            const orphans = employee.rows.filter((row) => row.orphan);
-            if (orphans.length) {
-                ensureSpace(doc, 55);
-                doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('ΣΤ. Ορφανά χτυπήματα');
-                doc.font(fonts.regular).fontSize(7.5);
-                orphans.forEach((row) => doc.text(`${dateLabel(row.date)} — ${row.orphan.label} — Πραγματικό χτύπημα: ${row.orphan.rawPunch || '—'} — ` +
-                    `Κατάσταση: ${row.orphan.status} — Εγκεκριμένο διάστημα: ${row.orphan.approvedInterval || '—'} — ` +
-                    `Εμβέλεια απόφασης: ${row.orphan.reuseScope || '—'} — ${row.orphan.restResult} — ` +
-                    `Επιβεβαίωση κινδύνου: ${row.orphan.riskRequired ? (row.orphan.riskAcknowledged ? 'Δόθηκε' : 'Απαιτήθηκε, δεν καταγράφεται ως δοθείσα') : 'Δεν απαιτήθηκε'} — ` +
-                    `Τελικά στοιχεία: εργασία ${row.values.ores_ergasias_apologistika.toFixed(2)}, ` +
-                    `νύχτα ${row.values.ores_nyxtas_apologistika.toFixed(2)}, ` +
-                    `Κυριακή/αργία ${row.sunday || row.holiday ? 'ΝΑΙ' : 'ΟΧΙ'}`));
-            }
+            writeDossierHistory(doc, employee, fonts);
         });
         writePeriodSummary(doc, report, fonts);
         doc.addPage();
@@ -945,7 +1080,7 @@ function buildEmploymentReviewPdf(report, { dossier = false } = {}) {
                 `${week.employeeCode} ${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)} ${stage.stage}: ${stage.fingerprint}`))
         ].join('\n'));
     }
-    addFooters(doc, fonts, report);
+    addFooters(doc, fonts, report, { dossier });
     return doc;
 }
 
@@ -953,4 +1088,5 @@ module.exports = { REPORT_SCHEMA_VERSION, DAILY_NUMBER_FIELDS, TOTAL_NUMBER_FIEL
     authoritativeDailyState,
     buildEmploymentReviewReportProjection, buildEmploymentReviewWorkbook,
     buildEmploymentReviewPdf, dailyAnalysis, dateLabel, orphanLabel, pdfFooterLines,
-    employmentStatusLabel, presentationLeaveCategory };
+    employmentStatusLabel, presentationLeaveCategory, dossierFooterLine,
+    buildDossierHistoryEntries, codeDescription, branchDescription, relationshipRange };

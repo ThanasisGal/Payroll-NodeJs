@@ -2,6 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const {
     buildEmploymentReviewReportProjection,
     buildEmploymentReviewWorkbook,
@@ -12,7 +16,10 @@ const {
     TOTAL_NUMBER_FIELDS,
     COUNT_FIELDS,
     pdfFooterLines,
-    employmentStatusLabel
+    employmentStatusLabel,
+    dossierFooterLine,
+    buildDossierHistoryEntries,
+    branchDescription
 } = require('./apasxoliseisEmploymentReviewReportService');
 
 function row(overrides = {}) {
@@ -252,6 +259,145 @@ test('το κοινό PDF footer χρησιμοποιεί δυναμικό έτ�
     assert.match(lines.join(' '), /Κιν\. 6972012650/);
     assert.match(lines.join(' '), /support@WebPayrollSolutions\.com/);
     assert.match(lines[1], /Σελίδα 2 \/ 7$/);
+});
+
+test('το dossier footer είναι μία γραμμή με δυναμικό έτος', () => {
+    const footer = dossierFooterLine();
+    assert.equal(footer.includes('\n'), false);
+    assert.match(footer, new RegExp(`^\\(c\\) 2009 - ${new Date().getFullYear()} Copyright:`));
+    assert.match(footer, /WebPayrollSolutions\.com.*Ιωλκού 266α Βόλος.*support@WebPayrollSolutions\.com/);
+});
+
+test('η πρώτη σελίδα dossier είναι αποκλειστικά εξώφυλλο και οι εργαζόμενοι αρχίζουν από τη δεύτερη', async () => {
+    const report = fixture();
+    Object.assign(report.metadata, { companyCode: '0004', companyName: 'ΔΟΚΙΜΑΣΤΙΚΗ ΕΤΑΙΡΕΙΑ',
+        branchDescription: 'ΕΔΡΑ', branchAddress: { street: 'ΦΙΛΕΛΛΗΝΩΝ', number: '2',
+            postalCode: '38221', cityCode: '91070201', cityDescription: 'ΒΟΛΟΣ' }, usage: '2026' });
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'employment-dossier-cover-'));
+    const pdfPath = path.join(directory, 'dossier.pdf');
+    const noLogoPdfPath = path.join(directory, 'dossier-no-logo.pdf');
+    const doc = buildEmploymentReviewPdf(report, { dossier: true });
+    const output = fs.createWriteStream(pdfPath); doc.pipe(output); doc.end();
+    await new Promise((resolve, reject) => { output.on('finish', resolve); output.on('error', reject); });
+    const originalExistsSync = fs.existsSync;
+    fs.existsSync = (candidate) => String(candidate).endsWith('/public/img/wps2.png')
+        ? false : originalExistsSync(candidate);
+    let noLogoDoc;
+    try {
+        noLogoDoc = buildEmploymentReviewPdf(report, { dossier: true });
+    } finally {
+        fs.existsSync = originalExistsSync;
+    }
+    const noLogoOutput = fs.createWriteStream(noLogoPdfPath); noLogoDoc.pipe(noLogoOutput); noLogoDoc.end();
+    await new Promise((resolve, reject) => {
+        noLogoOutput.on('finish', resolve); noLogoOutput.on('error', reject);
+    });
+    execFileSync('pdfseparate', [pdfPath, path.join(directory, 'page-%d.pdf')]);
+    const first = execFileSync('pdftotext', ['-layout', path.join(directory, 'page-1.pdf'), '-'],
+        { encoding: 'utf8' });
+    const second = execFileSync('pdftotext', ['-layout', path.join(directory, 'page-2.pdf'), '-'],
+        { encoding: 'utf8' });
+    assert.match(first, /ΦΑΚΕΛΟΣ ΕΛΕΓΧΟΥ ΑΠΑΣΧΟΛΗΣΗΣ/);
+    assert.match(first, /Εταιρεία: 0004 - ΔΟΚΙΜΑΣΤΙΚΗ ΕΤΑΙΡΕΙΑ/);
+    assert.match(first, /Παράρτημα: 0000 - ΕΔΡΑ \(ΦΙΛΕΛΛΗΝΩΝ 2, 38221 ΒΟΛΟΣ\)/);
+    assert.match(first, /WebPayrollSolutions\.com/);
+    assert.doesNotMatch(first, /91070201/);
+    assert.doesNotMatch(first, /Α\. Ημερήσιο ημερολόγιο|0009 —/);
+    assert.match(second, /0009 —/);
+    assert.match(second, /Παράρτημα: 0000 - ΕΔΡΑ \(ΦΙΛΕΛΛΗΝΩΝ 2, 38221 ΒΟΛΟΣ\)/);
+    assert.doesNotMatch(second, /91070201/);
+    assert.match(second, /Α\. Ημερήσιο ημερολόγιο/);
+    const pages = execFileSync('pdfinfo', [pdfPath], { encoding: 'utf8' }).match(/^Pages:\s+(\d+)/m)?.[1];
+    const noLogoPages = execFileSync('pdfinfo', [noLogoPdfPath], { encoding: 'utf8' })
+        .match(/^Pages:\s+(\d+)/m)?.[1];
+    assert.equal(pages, noLogoPages);
+    fs.rmSync(directory, { recursive: true, force: true });
+});
+
+test('το αναλυτικό ιστορικό περιέχει μόνο ουσιαστικά canonical γεγονότα σε φυσική γλώσσα', () => {
+    const report = fixture();
+    const orphanEntries = buildDossierHistoryEntries(
+        report.employees.find((employee) => employee.employeeCode === '0009'));
+    assert.ok(orphanEntries.some((entry) => /without corresponding|orphan/i.test(entry.text)) === false);
+    assert.ok(orphanEntries.some((entry) => /χτύπημα εισόδου χωρίς αντίστοιχο χτύπημα εξόδου/.test(entry.text)));
+    const sixthEntries = buildDossierHistoryEntries(
+        report.employees.find((employee) => employee.employeeCode === '0025'));
+    assert.ok(sixthEntries.some((entry) => /6η ημέρα εργασίας.*0%/.test(entry.text)));
+    const allText = report.employees.flatMap(buildDossierHistoryEntries)
+        .map((entry) => entry.text).join('\n');
+    assert.doesNotMatch(allText, /Stage [1-4]|Στάδιο [1-4]|No action|Automatic/);
+});
+
+test('deterministic ανακατασκευή μεταφοράς δηλώνεται ως συμπέρασμα των τελικών στοιχείων', () => {
+    const rows = [
+        row({ kodikos: '0001', hmeromhnia: new Date('2026-06-01T00:00:00.000Z'),
+            kathgoria_ergasias_original: 'ΑΝ', kathgoria_ergasias: 'ΑΝ',
+            kathgoria_ergasias_apologistika: 'ΕΡΓ',
+            cards_apo_ora_01: '08:12', cards_eos_ora_01: '16:16',
+            orphan_card_resolution_preview: null, orphan_card_resolution: null }),
+        row({ kodikos: '0001', hmeromhnia: new Date('2026-06-02T00:00:00.000Z'),
+            kathgoria_ergasias: 'ΕΡΓ', kathgoria_ergasias_apologistika: 'ΑΝ',
+            repo_apologistika: true, apologistiko_biblio: true,
+            apo_ora_01: '08:00', eos_ora_01: '16:00', cards_apo_ora_01: '', cards_eos_ora_01: '',
+            apo_ora_01_apologistika: '', eos_ora_01_apologistika: '',
+            ores_ergasias_apologistika: 0, ores_pragmatikhs_ergasias_apologistika: 0,
+            orphan_card_resolution_preview: null, orphan_card_resolution: null })
+    ];
+    const report = buildEmploymentReviewReportProjection({ rows });
+    const entries = buildDossierHistoryEntries(report.employees[0]);
+    assert.equal(entries.filter((entry) => entry.heading.includes('→')).length, 1);
+    assert.match(entries[0].heading, /01\/06\/2026 → 02\/06\/2026/);
+    assert.match(entries[0].text, /προδηλωμένο ρεπό.*κάρτες εργασίας.*ΑΝΑΠΑΥΣΗ \/ ΡΕΠΟ/);
+    assert.match(entries[0].text, /Από τα τελικά απολογιστικά στοιχεία.*προκύπτει μεταφορά/);
+    assert.doesNotMatch(entries[0].text, /Για τον λόγο αυτό το ρεπό μεταφέρθηκε/);
+});
+
+test('persisted repo-transfer επιτρέπει βεβαιωμένη διατύπωση μεταφοράς', () => {
+    const rows = [
+        row({ kodikos: '0001', hmeromhnia: new Date('2026-06-01T00:00:00.000Z'),
+            kathgoria_ergasias_original: 'ΑΝ', cards_apo_ora_01: '08:12', cards_eos_ora_01: '16:16',
+            orphan_card_resolution_preview: null, orphan_card_resolution: null }),
+        row({ kodikos: '0001', hmeromhnia: new Date('2026-06-02T00:00:00.000Z'),
+            kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true,
+            ores_ergasias_apologistika: 0, cards_apo_ora_01: '', cards_eos_ora_01: '',
+            orphan_card_resolution_preview: null, orphan_card_resolution: null })
+    ];
+    const report = buildEmploymentReviewReportProjection({ rows, repoTransferDecisions: [{
+        employee_kodikos: '0001', week_start: new Date('2026-06-01T00:00:00.000Z'),
+        decision_code: 'APPROVE', canonical_snapshot: {
+            source: { hmeromhnia: new Date('2026-06-01T00:00:00.000Z') },
+            target: { hmeromhnia: new Date('2026-06-02T00:00:00.000Z') }
+        }
+    }] });
+    const history = buildDossierHistoryEntries(report.employees[0]).map((entry) => entry.text).join('\n');
+    assert.match(history, /Για τον λόγο αυτό το ρεπό μεταφέρθηκε στις 02\/06\/2026/);
+    assert.doesNotMatch(history, /Από τα τελικά απολογιστικά στοιχεία.*προκύπτει μεταφορά/);
+});
+
+test('η διεύθυνση παραρτήματος παραλείπει καθαρά όσα address fields λείπουν', () => {
+    assert.equal(branchDescription({ branch: '0000', branchDescription: 'ΕΔΡΑ', branchAddress: {
+        street: 'ΦΙΛΕΛΛΗΝΩΝ', number: '2', postalCode: '38221',
+        cityCode: '91070201', cityDescription: 'ΒΟΛΟΣ'
+    } }), '0000 - ΕΔΡΑ (ΦΙΛΕΛΛΗΝΩΝ 2, 38221 ΒΟΛΟΣ)');
+    assert.equal(branchDescription({ branch: '0000', branchDescription: 'ΕΔΡΑ', branchAddress: {
+        street: 'ΦΙΛΕΛΛΗΝΩΝ', cityDescription: 'ΒΟΛΟΣ'
+    } }), '0000 - ΕΔΡΑ (ΦΙΛΕΛΛΗΝΩΝ, ΒΟΛΟΣ)');
+    assert.equal(branchDescription({ branch: '0000', branchDescription: 'ΕΔΡΑ', branchAddress: {
+        street: 'ΦΙΛΕΛΛΗΝΩΝ', number: '2', postalCode: '38221', cityCode: '91070201'
+    } }), '0000 - ΕΔΡΑ (ΦΙΛΕΛΛΗΝΩΝ 2, 38221)');
+});
+
+test('εσωτερική ορολογία stage σε persisted αιτιολογία δεν διαρρέει στο dossier', () => {
+    const report = buildEmploymentReviewReportProjection({ rows: [row({
+        kodikos: '0041', hmeromhnia: new Date('2026-06-27T00:00:00.000Z'),
+        apousia_apologistika: true, kathgoria_ergasias_apologistika: 'ΜΕ',
+        orphan_card_resolution_preview: null, orphan_card_resolution: null
+    })], workflowAudits: [{ employee_kodikos: '0041',
+        week_start: new Date('2026-06-22T00:00:00.000Z'), action: 'STAGE3_DAILY_RESOLVED',
+        final_classification: 'ABSENCE', reason_or_notes: 'Τελική εξέταση στο Στάδιο 3' }] });
+    const history = buildDossierHistoryEntries(report.employees[0]).map((entry) => entry.text).join('\n');
+    assert.match(history, /ΑΠΟΥΣΙΑ/);
+    assert.doesNotMatch(history, /Stage [1-4]|Στάδιο [1-4]/);
 });
 
 test('0014: το ημερήσιο καθεστώς ακολουθεί αποκλειστικά το date-effective profile και η περίοδος είναι μικτή', () => {

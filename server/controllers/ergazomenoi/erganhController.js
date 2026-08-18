@@ -437,7 +437,7 @@ const Models_B = require('../../models/privileges');
 const Models_C = require('../../models/companies');
 const Models_D = require('../../models/ergazomenoi');
 
-const { ArgiesModel, PeriodsModel } = Models_A;
+const { ArgiesModel, PeriodsModel, EidikesKathgoriesModel, PoleisModel } = Models_A;
 
 const { UserPrivilegesModel } = Models_B;
 
@@ -5161,6 +5161,22 @@ async function buildEmploymentReviewReportForRequest(req) {
     } catch (_) {
         periodControl = null;
     }
+    const branchCode = String(req.query.ypokatasthma || '').trim().padStart(4, '0');
+    const specialCategoryCodes = [...new Set(rows.map((row) =>
+        String(row.effective_special_category || row.eidikh_kathgoria_ergazomenoy || '').trim()
+    ).filter(Boolean))];
+    const [company, branch, specialCategories] = await Promise.all([
+        CompaniesModel.findOne({ _id: req.session.companyInUse, team: req.session.userTeam })
+            .select('kod eponymia').lean(),
+        YpokatasthmataModel.findOne({ team: req.session.userTeam,
+            companykod_object: String(req.session.companyInUse || ''), kodikos: branchCode })
+            .select('kodikos perigrafh odos arithmos tk polh').lean(),
+        specialCategoryCodes.length ? EidikesKathgoriesModel.find({
+            kodikos: mongoose.trusted({ $in: specialCategoryCodes })
+        }).select('kodikos perigrafh').lean() : []
+    ]);
+    const branchCity = branch?.polh ? await PoleisModel.findOne({ kodikos: branch.polh })
+        .select('kodikos perigrafh').lean() : null;
     return buildEmploymentReviewReportProjection({
         rows,
         workflowStates: rows.__workflowStates || [],
@@ -5168,12 +5184,21 @@ async function buildEmploymentReviewReportForRequest(req) {
         lifecycleByWeek: rows.__lifecycleByWeek || new Map(),
         repoTransferDecisions: rows.__repoTransferDecisions || [],
         metadata: {
-            companyName: req.session.companyDescription || req.session.companyKodikos ||
-                String(req.session.companyInUse || ''),
-            companyCode: req.session.companyKodikos || '',
-            branch: String(req.query.ypokatasthma || '').trim().padStart(4, '0'),
+            companyName: company?.eponymia || req.session.companyDescription ||
+                req.session.companyKodikos || String(req.session.companyInUse || ''),
+            companyCode: company?.kod || req.session.companyKodikos || '',
+            branch: branchCode,
+            branchDescription: branch?.perigrafh || '',
+            branchAddress: {
+                street: branch?.odos || '', number: branch?.arithmos || '',
+                postalCode: branch?.tk || '', cityCode: branch?.polh || '',
+                cityDescription: branchCity?.perigrafh || ''
+            },
+            specialCategoryDescriptions: Object.fromEntries(specialCategories.map((item) =>
+                [String(item.kodikos || '').trim(), String(item.perigrafh || '').trim()])),
             periodStart: rows.__periodStart || req.query.apo_hmeromhnia,
             periodEnd: rows.__periodEnd || req.query.eos_hmeromhnia,
+            usage: req.session.yearInUse || '',
             periodStatus: periodControl?.stored_status || '',
             periodVersion: periodControl?.version || periodControl?.period_control_version || '',
             reconstructionStatus: periodControl?.historical_reconstruction_status || '',
