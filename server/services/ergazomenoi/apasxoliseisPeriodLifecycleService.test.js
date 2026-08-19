@@ -25,12 +25,21 @@ function query(value) { return { session() { return this; }, async lean() { retu
 function stores(controlInput = {}) {
     let control = { ...scope, status: 'LOCKED', version: 2, active_calculation_id: '',
         frozen_snapshot_id: null, frozen_snapshot_fingerprint: '', ...controlInput };
+    if (Object.prototype.hasOwnProperty.call(controlInput, 'active_calculation_id') &&
+        controlInput.active_calculation_id === undefined) delete control.active_calculation_id;
     let frozen = null; const audits = []; const cases = [];
     return {
         period: {
             findOne() { return query(control ? { ...control } : null); },
             async findOneAndUpdate(filter, update) {
                 if (!control || control.status !== filter.status || (filter.version !== undefined && control.version !== filter.version)) return null;
+                if (filter.$or && !filter.$or.some((condition) => {
+                    const expected = condition.active_calculation_id;
+                    if (expected && expected.$exists === false) {
+                        return !Object.prototype.hasOwnProperty.call(control, 'active_calculation_id');
+                    }
+                    return control.active_calculation_id === expected;
+                })) return null;
                 control = { ...control, ...update.$set }; return { ...control };
             }
         },
@@ -92,6 +101,13 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
         const store = stores();
         await finalizeEmploymentPeriod({ session: { ...allowed, userRole: role }, scope, reason: 'x', requestId: `finalize-${role}-request`, snapshotInput,
             periodControlModel: store.period, frozenModel: store.frozen, auditModel: store.audit, indexGuard: guard, transactionRunner: runner });
+    }
+    for (const [label, activeCalculationId] of [['empty', ''], ['null', null], ['missing', undefined]]) {
+        const store = stores({ active_calculation_id: activeCalculationId });
+        await finalizeEmploymentPeriod({ session: allowed, scope, reason: 'x', requestId: `finalize-${label}-calculation-id`, snapshotInput,
+            periodControlModel: store.period, frozenModel: store.frozen, auditModel: store.audit,
+            indexGuard: guard, transactionRunner: runner });
+        assert.strictEqual(store.control.status, 'FINALIZED');
     }
     await assert.rejects(() => finalizeEmploymentPeriod({ session: allowed, scope, reason: 'x', requestId: 'finalize-open-request', snapshotInput,
         periodControlModel: stores({ status: 'OPEN' }).period, frozenModel: stores().frozen, auditModel: stores().audit,

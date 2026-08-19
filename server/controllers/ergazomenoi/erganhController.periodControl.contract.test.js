@@ -87,6 +87,11 @@ assert.match(browser, /inputValue: unlocking \? undefined :\s*'Ολοκλήρω�
 assert.match(browser, /unlocking \? \{\} : \{ confirmButton: 'employment-period-lock-confirm' \}/);
 assert.match(stylesheet,
     /\.employment-review-swal-popup \.swal2-confirm\.employment-period-lock-confirm\s*\{[\s\S]*?min-width:\s*10\.5rem;[\s\S]*?white-space:\s*nowrap;/);
+assert.match(browser, /inputValue: corrective \? undefined :\s*'Οριστικοποίηση περιόδου μετά την ολοκλήρωση του ελέγχου απασχολήσεων, την επιτυχή ανακατασκευή και το κλείδωμα της περιόδου\.'/);
+assert.match(browser,
+    /customClass: corrective \? \{\} : \{ confirmButton: 'employment-period-finalize-confirm' \}/);
+assert.match(stylesheet,
+    /\.employment-review-swal-popup \.swal2-confirm\.employment-period-finalize-confirm\s*\{[\s\S]*?min-width:\s*12\.5rem;[\s\S]*?white-space:\s*nowrap;/);
 assert.ok(browser.includes("transitionEmploymentPeriod('unlock')"));
 assert.ok(browser.includes("/period-control/${action}"));
 assert.ok(!/apologistiko_biblio[\s\S]{0,80}(PERIOD_CONTROL|periodControl)/.test(controller));

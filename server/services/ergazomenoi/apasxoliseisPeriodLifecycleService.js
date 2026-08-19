@@ -82,7 +82,10 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
             created_at: now }], { session: dbSession });
         const frozen = documents[0];
         const updated = await periodControlModel.findOneAndUpdate({ ...scope, status: 'LOCKED', version: control.version,
-            active_calculation_id: { $in: ['', null] }, frozen_snapshot_id: null }, { $set: {
+            $or: [
+                { active_calculation_id: '' }, { active_calculation_id: null },
+                { active_calculation_id: mongoose.trusted({ $exists: false }) }
+            ], frozen_snapshot_id: null }, { $set: {
             status: 'FINALIZED', frozen_snapshot_id: frozen._id,
             frozen_snapshot_fingerprint: built.frozen_snapshot_fingerprint, finalized_at: now,
             finalized_by_user_id: by.user_id, finalized_by_user_name: by.user_name,

@@ -15370,6 +15370,11 @@ body.loader-active > *:not(.app-loader) {
     white-space: nowrap;
 }
 
+.employment-review-swal-popup .swal2-confirm.employment-period-finalize-confirm {
+    min-width: 12.5rem;
+    white-space: nowrap;
+}
+
 @media (max-width: 420px) {
     .employment-review-swal-popup .swal2-confirm.weekly-hr-stage1-bulk-confirm {
         min-width: 0;

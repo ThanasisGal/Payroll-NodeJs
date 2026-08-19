@@ -8209,7 +8209,10 @@ async function runEmploymentPeriodLifecycleAction(kind) {
         text: corrective ? 'Το αρχικό οριστικοποιημένο αποτέλεσμα θα παραμείνει αμετάβλητο.' :
             'Θα δημιουργηθεί παγωμένο ιστορικό αποτέλεσμα που δεν ανακατασκευάζεται από μελλοντικές πολιτικές.',
         input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
+        inputValue: corrective ? undefined :
+            'Οριστικοποίηση περιόδου μετά την ολοκλήρωση του ελέγχου απασχολήσεων, την επιτυχή ανακατασκευή και το κλείδωμα της περιόδου.',
         confirmButtonText: corrective ? 'Άνοιγμα διορθωτικής μισθοδοσίας' : 'Οριστικοποίηση περιόδου',
+        customClass: corrective ? {} : { confirmButton: 'employment-period-finalize-confirm' },
         cancelButtonText: 'Ακύρωση', inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
     if (!confirmation.isConfirmed) return;
     const branch = getActiveEmploymentReviewScope().ypokatasthma;

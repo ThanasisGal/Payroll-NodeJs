@@ -8258,9 +8258,20 @@ class erganhController {
                 idempotent: result.idempotent, status: 'FINALIZED',
                 message: 'Η περίοδος οριστικοποιήθηκε και το ιστορικό αποτέλεσμα πάγωσε.',
                 frozen_snapshot_fingerprint: result.snapshot.frozen_snapshot_fingerprint });
-        } catch (error) { return res.status(error.statusCode || 500).json({ success: false,
+        } catch (error) {
+            console.error('[finalizeEmploymentReviewPeriod]', {
+                name: error?.name,
+                code: error?.code,
+                message: error?.message,
+                stack: error?.stack,
+                ypokatasthma: req.body?.ypokatasthma,
+                request_id: req.body?.request_id,
+                reason: req.body?.reason
+            });
+            return res.status(error.statusCode || 500).json({ success: false,
             code: error.code, period_hr_readiness: error.period_hr_readiness,
-            message: error.statusCode ? error.message : 'Η οριστικοποίηση περιόδου απέτυχε.' }); }
+            message: error.statusCode ? error.message : 'Η οριστικοποίηση περιόδου απέτυχε.' });
+        }
     };
 
     static submitFinalWTODayilyA = async (req, res) => {
