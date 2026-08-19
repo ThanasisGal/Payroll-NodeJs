@@ -338,6 +338,27 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
         if (activeValue === undefined) delete eligibleRecord.active_calculation_id;
         else eligibleRecord.active_calculation_id = activeValue;
         const eligible = ownershipStore(eligibleRecord);
+        const result = await transitionPeriodControl({ session, scope, action: 'LOCK',
+            reason: `Lock with ${label} calculation owner`, requestId: `period-lock-${label}-owner`,
+            now: new Date('2026-07-01'), expectedVersion: 1,
+            periodControlModel: eligible.model, auditModel: eligible.audit,
+            indexGuard: async () => ({ ready: true }) });
+        assert.strictEqual(result.state.stored_status, 'LOCKED');
+    }
+    const activeLockOwner = ownershipStore({ ...baseRecord,
+        active_calculation_id: 'active-calculation-id' });
+    await assert.rejects(() => transitionPeriodControl({ session, scope, action: 'LOCK',
+        reason: 'Lock with active calculation owner', requestId: 'period-lock-active-owner',
+        now: new Date('2026-07-01'), expectedVersion: 1,
+        periodControlModel: activeLockOwner.model, auditModel: activeLockOwner.audit,
+        indexGuard: async () => ({ ready: true }) }),
+    (error) => error.code === 'PERIOD_CONTROL_CALCULATION_IN_PROGRESS');
+    assert.strictEqual(activeLockOwner.record.status, 'OPEN');
+    for (const [label, activeValue] of [['empty', ''], ['null', null], ['missing', undefined]]) {
+        const eligibleRecord = { ...baseRecord };
+        if (activeValue === undefined) delete eligibleRecord.active_calculation_id;
+        else eligibleRecord.active_calculation_id = activeValue;
+        const eligible = ownershipStore(eligibleRecord);
         const eligibleOwner = await acquirePeriodCalculationOwnership({ scope,
             calculationId: `calculation-${label}-owner`, now: new Date('2026-07-01'),
             periodControlModel: eligible.model, indexGuard, transactionRunner });

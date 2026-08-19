@@ -83,6 +83,7 @@ assert.ok(browser.includes("LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'"));
 assert.ok(browser.includes("CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'"));
 assert.ok(browser.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ'"));
 assert.ok(browser.includes('δεν ξεκλειδώνει χειροκίνητα κλειδωμένες ημερήσιες εγγραφές'));
+assert.match(browser, /inputValue: unlocking \? undefined :\s*'Ολοκλήρωση ελέγχου απασχολήσεων και κλείδωμα περιόδου μετά την επιτυχή ανακατασκευή και ολοκλήρωση όλων των ελέγχων\.'/);
 assert.match(browser, /unlocking \? \{\} : \{ confirmButton: 'employment-period-lock-confirm' \}/);
 assert.match(stylesheet,
     /\.employment-review-swal-popup \.swal2-confirm\.employment-period-lock-confirm\s*\{[\s\S]*?min-width:\s*10\.5rem;[\s\S]*?white-space:\s*nowrap;/);

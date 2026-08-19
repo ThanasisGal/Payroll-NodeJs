@@ -8280,6 +8280,8 @@ async function transitionEmploymentPeriod(action) {
         input: 'textarea',
         inputLabel: 'Αιτιολογία',
         inputPlaceholder: 'Συμπληρώστε υποχρεωτική αιτιολογία',
+        inputValue: unlocking ? undefined :
+            'Ολοκλήρωση ελέγχου απασχολήσεων και κλείδωμα περιόδου μετά την επιτυχή ανακατασκευή και ολοκλήρωση όλων των ελέγχων.',
         showCancelButton: true,
         confirmButtonText: unlocking ? 'Ξεκλείδωμα περιόδου' : 'Κλείδωμα περιόδου',
         cancelButtonText: 'Ακύρωση',

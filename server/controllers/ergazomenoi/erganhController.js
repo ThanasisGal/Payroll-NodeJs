@@ -8514,6 +8514,18 @@ class erganhController {
             });
         } catch (error) {
             const status = error.code === 'PERIOD_CONTROL_INDEXES_NOT_READY' ? 503 : error.statusCode || 500;
+            if (status >= 500) {
+                console.error('[transitionEmploymentReviewPeriodControl]', {
+                    action: String(req.params.action || '').toUpperCase(),
+                    ypokatasthma: req.body?.ypokatasthma,
+                    expected_version: req.body?.expected_version,
+                    request_id: req.body?.request_id,
+                    error_name: error.name,
+                    error_code: error.code,
+                    error_message: error.message,
+                    error_stack: error.stack
+                });
+            }
             return res.status(status).json({ success: false, code: error.code,
                 period_hr_readiness: error.period_hr_readiness,
                 message: status < 500 || status === 503 ? error.message : 'Η μεταβολή κατάστασης περιόδου απέτυχε.' });

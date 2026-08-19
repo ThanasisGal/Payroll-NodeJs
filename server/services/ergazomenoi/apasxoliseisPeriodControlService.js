@@ -815,7 +815,8 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
                 last_transition_command_identity: commandIdentity, updated_at: at, version: afterVersion };
         const transitionFilter = { ...filterForScope(scope), status: previousStatus, version: beforeVersion };
         if (action === 'LOCK') transitionFilter.$or = [
-            { active_calculation_id: '' }, { active_calculation_id: null }, { active_calculation_id: { $exists: false } }
+            { active_calculation_id: '' }, { active_calculation_id: null },
+            { active_calculation_id: mongoose.trusted({ $exists: false }) }
         ];
         updated = await periodControlModel.findOneAndUpdate(transitionFilter, { $set: set }, { new: true, ...(dbSession ? { session: dbSession } : {}) });
         if (!updated) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409, 'Η κατάσταση της περιόδου άλλαξε.');
