@@ -15,6 +15,8 @@ const scope = { team: 'T', company_kod: 'C', ypokatasthma: '0001',
 const daily = [{ _id: 'row1', kodikos: '001', ypokatasthma: '0001', hmeromhnia: new Date('2026-06-03'),
     apologistiko_biblio: true, kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8, cards_ores_ergasias: 8,
     cards_apo_ora_01: '09:00', cards_eos_ora_01: '17:00',
+    orphan_card_resolution: { status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1',
+        approved_start: '09:00', approved_end: '17:00', raw_cards_preserved: true },
     ores_ergasias_apologistika: 8, ores_yperergasias_apologistika: 1,
     ores_nominhs_yperorias_apologistika: 0.5, ores_paranomhs_yperorias_apologistika: 0.25,
     ores_nyxtas_apologistika: 2, ores_argion_prosayxhsh_apologistika: 1,
@@ -53,6 +55,8 @@ assert.strictEqual(one.snapshot.employees[0].afm, '123456789');
 assert.strictEqual(one.snapshot.daily_results[0].apologistiko_biblio, true);
 assert.strictEqual(one.snapshot.daily_results[0].cards_apo_ora_01, '09:00');
 assert.strictEqual(one.snapshot.daily_results[0].cards_eos_ora_01, '17:00');
+assert.deepStrictEqual(one.snapshot.daily_results[0].orphan_card_resolution,
+    daily[0].orphan_card_resolution);
 assert.strictEqual(one.snapshot.policy_context.policy_version, 'v7');
 assert.strictEqual(one.snapshot.employees[0].pososto_prosayxhshs_6hs_hmeras, 40);
 assert.strictEqual(one.snapshot.canonical_decisions[0].request_id, 'e2');

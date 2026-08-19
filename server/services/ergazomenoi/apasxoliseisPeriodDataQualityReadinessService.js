@@ -39,6 +39,12 @@ function buildPeriodDataQualityReadiness({ rows = [] } = {}) {
         unresolved_cases: Object.freeze(unresolvedCases) });
 }
 
+function projectPeriodDataQualityReadiness(readiness = {}, storedStatus = 'OPEN') {
+    if (storedStatus !== 'FINALIZED') return readiness;
+    return Object.freeze({ ready: true, reason_code: null, unresolved_count: 0,
+        unresolved_cases: Object.freeze([]) });
+}
+
 function assertPeriodDataQualityReady(readiness, action = '') {
     if (readiness?.ready !== false) return readiness;
     const count = Number(readiness.unresolved_count || 0);
@@ -53,4 +59,5 @@ function assertPeriodDataQualityReady(readiness, action = '') {
 }
 
 module.exports = { REASON_CODE, issueForRow, buildPeriodDataQualityReadiness,
+    projectPeriodDataQualityReadiness,
     assertPeriodDataQualityReady };

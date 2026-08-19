@@ -33,9 +33,11 @@ function sourceFunction(name) {
     throw new Error(`Δεν ολοκληρώθηκε η ${name}`);
 }
 
-const helpers = new Function(`${sourceFunction('compareLifecyclePendingItems')}
+const helpers = new Function(`${sourceFunction('escapeHtml')}
+${sourceFunction('compareLifecyclePendingItems')}
 ${sourceFunction('derivePeriodLifecyclePresentation')}
 ${sourceFunction('employeeGroupLifecycleBadge')}
+${sourceFunction('employeeGroupHeaderContent')}
 ${sourceFunction('stage4ReviewRows')}
 ${sourceFunction('isEmployeeLifecycleFullyCompleted')}
 ${sourceFunction('isEmployeeVisibleInGeneralReview')}
@@ -44,7 +46,7 @@ ${sourceFunction('isReviewLifecycleRecordVisible')}
 ${sourceFunction('filterReviewLifecycleGroups')}
 ${sourceFunction('filterGeneralReviewRows')}
 ${sourceFunction('renderReviewNoPendingEmployees')}
-return { derivePeriodLifecyclePresentation, employeeGroupLifecycleBadge, stage4ReviewRows,
+return { derivePeriodLifecyclePresentation, employeeGroupLifecycleBadge, employeeGroupHeaderContent, stage4ReviewRows,
     isEmployeeLifecycleFullyCompleted,
     filterGeneralReviewRows, visibleWeeklyHrPayloads,
     filterReviewLifecycleGroups,
@@ -70,6 +72,15 @@ function payload(employeeKodikos, statuses, pendingCounts = {}) {
 test('ολοκληρωμένος κύκλος ζωής εμφανίζεται ως ολοκληρωμένος στο Στάδιο 4', () => {
     const badge = helpers.employeeGroupLifecycleBadge('0014', '0000', [payload('0014', {})]);
     assert.match(badge, /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
+});
+
+test('το header εργαζομένου Σταδίου 4 περιέχει παράρτημα, κωδικό, όνομα και status', () => {
+    const badge = helpers.employeeGroupLifecycleBadge('0003', '0000', [payload('0003', {})]);
+    const header = helpers.employeeGroupHeaderContent({ ypokatasthma: '0000', kodikos: '0003',
+        employeeName: 'ΘΕΟΔΩΡΟΥ ΘΕΟΔΩΡΟΣ' }, badge);
+    for (const expected of ['0000', '0003', 'ΘΕΟΔΩΡΟΥ ΘΕΟΔΩΡΟΣ', 'ΟΛΟΚΛΗΡΩΜΕΝΟ']) {
+        assert.match(header, new RegExp(expected));
+    }
 });
 
 test('requires_hr_action εμφανίζεται ως απαίτηση ενέργειας στο Στάδιο 4', () => {

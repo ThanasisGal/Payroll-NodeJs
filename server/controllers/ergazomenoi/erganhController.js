@@ -383,7 +383,8 @@ const {
 const { buildPeriodHrReadiness, collectPeriodWideUiProjections } = require(
     '../../services/ergazomenoi/apasxoliseisPeriodHrReadinessService'
 );
-const { buildPeriodDataQualityReadiness, assertPeriodDataQualityReady } = require(
+const { buildPeriodDataQualityReadiness, projectPeriodDataQualityReadiness,
+    assertPeriodDataQualityReady } = require(
     '../../services/ergazomenoi/apasxoliseisPeriodDataQualityReadinessService'
 );
 const {
@@ -1230,7 +1231,9 @@ async function buildEmploymentReviewPeriodControlProjection(req, {
     const finalSubmissionIndexReadiness = await getWtoDailySubmissionIndexState();
     const periodReadiness = await loadEmploymentPeriodReadiness(req, scope);
     const periodHrReadiness = periodReadiness.hr;
-    const periodDataQualityReadiness = periodReadiness.data_quality;
+    const periodDataQualityReadiness = projectPeriodDataQualityReadiness(
+        periodReadiness.data_quality, state.stored_status
+    );
     const finalSnapshot = state.stored_status === 'FINALIZED' && state.frozen_snapshot_id
         ? await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
               _id: state.frozen_snapshot_id,
@@ -6624,7 +6627,7 @@ class erganhController {
                         const projected = projectFrozenReview(frozenDocument.frozen_snapshot, { kodikos });
                         const corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
                             ...frozenScope,
-                            status: { $in: ['ACTIVE', 'CLOSED'] }
+                            status: mongoose.trusted({ $in: ['ACTIVE', 'CLOSED'] })
                         })
                             .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
                             .sort({ opened_at: -1 })
@@ -6639,8 +6642,17 @@ class erganhController {
                             ? frozenEmployeeCodes.filter((value) => value === requestedEmployeeCode)
                             : frozenEmployeeCodes.slice(skip, skip + limitNum);
                         const frozenPageCodeSet = new Set(frozenPageCodes);
+                        const frozenEmployeesByCode = new Map(
+                            (frozenDocument.frozen_snapshot.employees || []).map((employee) => [
+                                String(employee.kodikos || '').trim(), employee
+                            ])
+                        );
                         const rows = projected.rows.filter((row) =>
-                            frozenPageCodeSet.has(String(row.kodikos || '').trim()));
+                            frozenPageCodeSet.has(String(row.kodikos || '').trim()))
+                            .map((row) => {
+                                const employee = frozenEmployeesByCode.get(String(row.kodikos || '').trim()) || {};
+                                return { ...row, eponymo: employee.eponymo || '', onoma: employee.onoma || '' };
+                            });
                         return res.json({ success: true, source: projected.source, finalized: true,
                             period_control: await periodControlProjectionPromise,
                             frozen_snapshot_fingerprint: frozenDocument.frozen_snapshot_fingerprint,

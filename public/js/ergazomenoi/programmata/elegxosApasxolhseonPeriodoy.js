@@ -3367,6 +3367,16 @@ function employeeGroupLifecycleBadge(employeeKodikos, ypokatasthma, lifecyclePay
         'ΟΛΟΚΛΗΡΩΜΕΝΟ</span>';
 }
 
+function employeeGroupHeaderContent(row = {}, lifecycleBadge = '') {
+    const employeeName = String(
+        row.employeeName || `${row.eponymo || ''} ${row.onoma || ''}`
+    ).trim();
+    return `${escapeHtml(row.ypokatasthma || '')}
+        | ${escapeHtml(row.kodikos || '')}
+        | ${escapeHtml(employeeName)}
+        ${lifecycleBadge}`;
+}
+
 function renderReviewRows(rows = [], deviations = []) {
     ensureReviewTableStructure();
 
@@ -3423,13 +3433,7 @@ function renderReviewRows(rows = [], deviations = []) {
 
             groupTr.innerHTML = `
                 <td colspan="13" class="fw-bold">
-                    ${row.ypokatasthma || ''}
-                    |
-                    ${row.kodikos || ''}
-                    |
-                    ${row.eponymo || ''}
-                    ${row.onoma || ''}
-                    ${lifecycleBadge}
+                    ${employeeGroupHeaderContent(row, lifecycleBadge)}
                 </td>
             `;
 

@@ -92,6 +92,10 @@ assert.match(browser,
     /customClass: corrective \? \{\} : \{ confirmButton: 'employment-period-finalize-confirm' \}/);
 assert.match(stylesheet,
     /\.employment-review-swal-popup \.swal2-confirm\.employment-period-finalize-confirm\s*\{[\s\S]*?min-width:\s*12\.5rem;[\s\S]*?white-space:\s*nowrap;/);
+assert.match(controller,
+    /const corrective = await ApasxoliseisPeriodCorrectiveCaseModel\.findOne\(\{\s*\.\.\.frozenScope,\s*status: mongoose\.trusted\(\{ \$in: \['ACTIVE', 'CLOSED'\] \}\)\s*\}\)/);
+assert.match(controller,
+    /projectPeriodDataQualityReadiness\(\s*periodReadiness\.data_quality, state\.stored_status\s*\)/);
 assert.ok(browser.includes("transitionEmploymentPeriod('unlock')"));
 assert.ok(browser.includes("/period-control/${action}"));
 assert.ok(!/apologistiko_biblio[\s\S]{0,80}(PERIOD_CONTROL|periodControl)/.test(controller));

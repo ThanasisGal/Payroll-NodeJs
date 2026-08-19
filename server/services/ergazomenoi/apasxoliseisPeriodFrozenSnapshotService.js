@@ -15,6 +15,7 @@ const DAILY_FIELDS = Object.freeze([
     'eos_ora_02_apologistika', 'apo_ora_03_apologistika', 'eos_ora_03_apologistika',
     'cards_apo_ora_01', 'cards_eos_ora_01', 'cards_apo_ora_02', 'cards_eos_ora_02',
     'cards_apo_ora_03', 'cards_eos_ora_03', 'cards_ores_ergasias',
+    'orphan_card_resolution',
     'ores_ergasias_apologistika', 'ores_pragmatikhs_ergasias_apologistika',
     'ores_apoysias_apologistika', 'ores_adeias_pistomenes_apologistika',
     'ores_argias_pistomenes_apologistika', 'ores_nyxtas_apologistika',
