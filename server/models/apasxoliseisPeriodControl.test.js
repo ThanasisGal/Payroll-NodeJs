@@ -23,4 +23,25 @@ assert.strictEqual(Control.schema.path('last_successful_calculation_at').options
 assert.strictEqual(Audit.schema.options.autoIndex, false);
 assert.strictEqual(Audit.schema.options.autoCreate, false);
 assert.strictEqual(Audit.schema.path('reason').options.immutable, true);
-console.log('apasxoliseisPeriodControl model tests: 16/16 PASS');
+const reconstructedAudit = new Audit({
+    team: 'THA',
+    company_kod: 'company-id',
+    ypokatasthma: '0000',
+    period_start: new Date('2026-06-01T00:00:00.000Z'),
+    period_end: new Date('2026-06-30T00:00:00.000Z'),
+    previous_status: 'OPEN',
+    new_status: 'LOCKED',
+    effective_mode_before: 'HISTORICAL_RECONSTRUCTED',
+    effective_mode_after: 'LOCKED',
+    actor_user_id: '507f1f77bcf86cd799439011',
+    actor_user_name: 'HR User',
+    actor_user_role: 'HR',
+    reason: 'Period lock',
+    request_id: 'period-lock-request-001',
+    command_identity: 'command-identity',
+    transitioned_at: new Date('2026-08-19T19:22:00.000Z'),
+    version_before: 6,
+    version_after: 7
+});
+assert.strictEqual(reconstructedAudit.validateSync(), undefined);
+console.log('apasxoliseisPeriodControl model tests: 17/17 PASS');

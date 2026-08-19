@@ -310,11 +310,12 @@ const bulkSandbox = {
     employmentReviewSwal: async (options) => options.input === 'textarea'
         ? { isConfirmed: true, value: editedReason ?? options.inputValue }
         : { isConfirmed: true },
-    fetch: async (_url, options) => { submittedReasons.push(
-        JSON.parse(options.body).reason_or_notes);
-        return { ok: true, json: async () => ({ success: true, requested_count: 1,
-            completed_count: 1, already_completed_count: 0, failed_count: 0,
-            blocked_count: 0, results: [] }) }; },
+    stage1BulkCompletionScopes: (items) => items.map((item) => item.scope),
+    submitWeeklyHrStage1BulkCompletion: async ({ reason }) => {
+        submittedReasons.push(reason);
+        return { success: true, requested_count: 1, completed_count: 1,
+            already_completed_count: 0, failed_count: 0, blocked_count: 0, results: [] };
+    },
     csrfToken: 'csrf', crypto: { randomUUID: () => 'request-id' },
     refreshWeeklyHrStage1Scope: async () => {}, weeklyHrStage1Key: () => 'week-1',
     renderWeeklyHrStage1BulkResult: () => ({ needsReview: 0, text: 'ok', html: '' }),

@@ -52,9 +52,24 @@ const helperStart = source.indexOf('const workflowStageNames');
 const helperEnd = source.indexOf('function renderWeeklyHrStage3');
 const stage2Container = { innerHTML: '' };
 const stage2Collapse = { className: 'accordion-collapse collapse' };
+const stageItems = Object.fromEntries(['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'].map((key) => {
+    const button = { disabled: false, setAttribute(name, value) { this[name] = value; } };
+    const header = { innerHTML: '' };
+    const collapse = {};
+    return [key, { button, header, collapse, querySelector(selector) {
+        return selector === '.accordion-button' ? button
+            : selector === '[data-workflow-stage-header]' ? header
+                : selector === '.accordion-collapse' ? collapse : null;
+    } }];
+}));
 const sandbox = {
     document: { getElementById: (id) => id === 'policyPreviewGroupsContainer'
-        ? stage2Container : id === 'employmentReviewStage2Collapse' ? stage2Collapse : null },
+        ? stage2Container : id === 'employmentReviewStage2Collapse' ? stage2Collapse : null,
+    querySelector: (selector) => {
+        const match = selector.match(/^\[data-workflow-stage="(STAGE[1-4])"\]$/);
+        return match ? stageItems[match[1]] : null;
+    } },
+    bootstrap: { Collapse: { getOrCreateInstance: () => ({ hide() {}, show() {} }) } },
     escapeHtml: (value) => String(value ?? ''),
     formatStage1DateKey: (value) => String(value || ''),
     getPolicyPreviewReasonLabel: (value) => String(value || ''),
@@ -62,7 +77,9 @@ const sandbox = {
     atomicRepoTransferDiagnosticLabels: {},
     formatPolicyPreviewUnknownCode: (value) => String(value || '')
 };
-vm.runInNewContext(`${source.slice(helperStart, helperEnd)}\nthis.derive = derivePeriodLifecyclePresentation;`, sandbox);
+vm.runInNewContext(`${source.slice(helperStart, helperEnd)}\n` +
+    'this.derive = derivePeriodLifecyclePresentation;' +
+    'this.applyBadges = applyEmploymentReviewWorkflowStageBadges;', sandbox);
 const stage = (business_status, pending_count = 0) => ({ business_status, pending_count,
     pending_dates: [], pending_reasons: [] });
 const lifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
@@ -79,6 +96,21 @@ assert.equal(lifecycle.stages.STAGE2.presentation_status, 'ACTIVE');
 assert.equal(lifecycle.stages.STAGE3.presentation_status, 'LOCKED');
 assert.equal(lifecycle.stages.STAGE3.enabled, false);
 assert.equal(lifecycle.stages.STAGE4.presentation_status, 'LOCKED');
+
+sandbox.applyBadges({ ...lifecycle, stages: { ...lifecycle.stages,
+    STAGE1: { ...lifecycle.stages.STAGE1, presentation_status: 'STALE' } } });
+assert.match(stageItems.STAGE1.header.innerHTML, /ΑΠΑΙΤΕΙ ΕΠΑΝΕΛΕΓΧΟ/);
+assert.match(stageItems.STAGE3.header.innerHTML, /ΚΛΕΙΔΩΜΕΝΟ/);
+const completedAfterRefresh = sandbox.derive([]);
+sandbox.applyBadges(completedAfterRefresh);
+for (const item of Object.values(stageItems)) {
+    assert.match(item.header.innerHTML, /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
+    assert.doesNotMatch(item.header.innerHTML,
+        /ΑΠΑΙΤΕΙ ΕΠΑΝΕΛΕΓΧΟ|ΚΛΕΙΔΩΜΕΝΟ/);
+}
+assert.equal(completedAfterRefresh.current_stage, null);
+assert.equal(completedAfterRefresh.requires_hr_action, false);
+assert.equal(completedAfterRefresh.total_pending_count, 0);
 
 const unsortedStage3 = sandbox.derive([
     [['2026-06-09', '2026-06-10'], 'week-2'],

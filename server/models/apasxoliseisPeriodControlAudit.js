@@ -2,6 +2,16 @@
 
 const { Schema, model } = require('mongoose');
 
+const EFFECTIVE_MODES = [
+    'NORMAL',
+    'LOCKED',
+    'FINALIZED',
+    'HISTORICAL_RECONSTRUCTION_REQUIRED',
+    'HISTORICAL_RECONSTRUCTED',
+    'HISTORICAL_RECONSTRUCTION_STALE',
+    'CORRECTIVE_ONLY'
+];
+
 const schema = new Schema({
     team: { type: String, trim: true, required: true, immutable: true },
     company_kod: { type: String, trim: true, required: true, immutable: true },
@@ -10,8 +20,8 @@ const schema = new Schema({
     period_end: { type: Date, required: true, immutable: true },
     previous_status: { type: String, enum: ['OPEN', 'LOCKED'], required: true, immutable: true },
     new_status: { type: String, enum: ['OPEN', 'LOCKED'], required: true, immutable: true },
-    effective_mode_before: { type: String, enum: ['NORMAL', 'LOCKED', 'CORRECTIVE_ONLY'], required: true, immutable: true },
-    effective_mode_after: { type: String, enum: ['NORMAL', 'LOCKED', 'CORRECTIVE_ONLY'], required: true, immutable: true },
+    effective_mode_before: { type: String, enum: EFFECTIVE_MODES, required: true, immutable: true },
+    effective_mode_after: { type: String, enum: EFFECTIVE_MODES, required: true, immutable: true },
     actor_user_id: { type: Schema.Types.ObjectId, required: true, immutable: true },
     actor_user_name: { type: String, trim: true, required: true, immutable: true },
     actor_user_role: { type: String, enum: ['A', 'S', 'HR'], required: true, immutable: true },

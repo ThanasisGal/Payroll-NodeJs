@@ -8098,8 +8098,7 @@ async function runHistoricalReconstruction() {
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η ιστορική ανακατασκευή απέτυχε.');
-    await loadEmploymentPeriodControl(branch);
-    await loadResults();
+    await refreshAndAutoRevalidateStage1AfterHistoricalReassessment();
     await employmentReviewSwal({ icon: 'success', title: 'Ιστορική ανακατασκευή ολοκληρώθηκε',
         text: `Έκδοση ${authorization.historical_reconstruction_version}` });
 }
@@ -8284,6 +8283,7 @@ async function transitionEmploymentPeriod(action) {
         showCancelButton: true,
         confirmButtonText: unlocking ? 'Ξεκλείδωμα περιόδου' : 'Κλείδωμα περιόδου',
         cancelButtonText: 'Ακύρωση',
+        customClass: unlocking ? {} : { confirmButton: 'employment-period-lock-confirm' },
         inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.'
     });
     if (!confirmation.isConfirmed) return;
@@ -8557,6 +8557,68 @@ function isWeeklyHrStage1Eligible(payload) {
         payload?.write_enabled === true;
 }
 
+function isSafeStage1StaleAutoRevalidation(payload, dataQualityReadiness = {}) {
+    const lifecycle = payload?.lifecycle_projection;
+    const stages = lifecycle?.stages || {};
+    const stage1 = stages.stage1 || {};
+    const previews = lifecycle?.stage1_no_classification_preview_items || [];
+    const hasUnresolvedOrphan = weeklyHrOrphanRows(payload).length > 0;
+    return dataQualityReadiness?.ready === true &&
+        lifecycle?.requires_hr_action === true &&
+        stage1.business_status === 'STALE' &&
+        Number(stage1.pending_count || 0) === 0 &&
+        (stage1.pending_dates || []).length === 0 &&
+        (stage1.blockers || []).length === 0 &&
+        previews.every((item) => item?.safe === true) &&
+        ['stage2', 'stage3', 'stage4'].every((key) =>
+            stages[key]?.business_status === 'COMPLETED') &&
+        !hasUnresolvedOrphan &&
+        isWeeklyHrStage1Eligible(payload);
+}
+
+function stage1BulkCompletionScopes(payloads = []) {
+    return payloads.map((payload) => payload?.scope).filter(Boolean)
+        .map(({ ypokatasthma, employee_id, week_start, week_end,
+            period_start, period_end }) => ({ ypokatasthma, employee_id,
+            week_start, week_end, ...(period_start && period_end
+                ? { period_start, period_end } : {}) }));
+}
+
+async function submitWeeklyHrStage1BulkCompletion({ scopes, reason, requestPrefix }) {
+    const response = await fetch(
+        '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/bulk-complete', {
+            method: 'POST', headers: { 'Content-Type': 'application/json',
+                'CSRF-Token': csrfToken },
+            body: JSON.stringify({ reason_or_notes: String(reason).trim(),
+                bulk_request_id: `${requestPrefix}:${crypto.randomUUID()}`, scopes })
+        });
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error(result.message ||
+        'Αποτυχία μαζικής ολοκλήρωσης.');
+    return result;
+}
+
+async function refreshAndAutoRevalidateStage1AfterHistoricalReassessment() {
+    await loadResults();
+    const dataQualityReadiness = currentEmploymentPeriodControl
+        ?.period_data_quality_readiness || {};
+    const safePayloads = [...weeklyHrStage1Payloads.values()].filter((payload) =>
+        isSafeStage1StaleAutoRevalidation(payload, dataQualityReadiness));
+    if (!safePayloads.length) return { attempted: false, completed_count: 0 };
+    const scopes = stage1BulkCompletionScopes(safePayloads);
+    let result;
+    try {
+        result = await submitWeeklyHrStage1BulkCompletion({ scopes,
+            reason: 'Αυτόματη επανεπικύρωση Stage 1 μετά από ιστορική επανεκτίμηση. Δεν προέκυψαν νέες ενεργές ημερομηνίες ή ανάγκη ανθρώπινης απόφασης.',
+            requestPrefix: 'stage1-auto-revalidate' });
+        return { attempted: true, completed_count: Number(result.completed_count || 0) +
+            Number(result.already_completed_count || 0), result };
+    } finally {
+        // Η τελική UI κατάσταση προέρχεται πάντα από δεύτερη authoritative Αναζήτηση.
+        await loadResults();
+    }
+}
+
 function weeklyHrStage1BusinessStatus(payload) {
     return payload?.lifecycle_projection?.stages?.stage1?.business_status ||
         payload?.stage1_status || 'OPEN';
@@ -8758,6 +8820,31 @@ function derivePeriodLifecyclePresentation(payloads = []) {
     };
 }
 
+function applyEmploymentReviewWorkflowStageBadges(lifecycle) {
+    Object.values(lifecycle.stages).forEach((stage) => {
+        const item = document.querySelector(`[data-workflow-stage="${stage.stage}"]`);
+        const button = item?.querySelector('.accordion-button');
+        const header = item?.querySelector('[data-workflow-stage-header]');
+        const collapseElement = item?.querySelector('.accordion-collapse');
+        if (!button || !header || !collapseElement) return;
+        const status = stage.presentation_status;
+        const pendingText = status === 'LOCKED' ? '' :
+            ` <span class="small ms-2">${stage.pending_count} εκκρεμότητες</span>`;
+        header.innerHTML = `${escapeHtml(workflowStageNames[stage.stage])}
+            <span class="badge ${workflowStageStatusClasses[status]} ms-2">${escapeHtml(
+                workflowStageStatusLabels[status])}</span>${pendingText}`;
+        button.disabled = status === 'LOCKED';
+        button.setAttribute('aria-disabled', status === 'LOCKED' ? 'true' : 'false');
+        if (status === 'LOCKED') {
+            bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false }).hide();
+        }
+    });
+    const activeStage = lifecycle.current_stage
+        ? document.querySelector(`[data-workflow-stage="${lifecycle.current_stage}"] .accordion-collapse`)
+        : null;
+    if (activeStage) bootstrap.Collapse.getOrCreateInstance(activeStage, { toggle: false }).show();
+}
+
 function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     const container = document.getElementById('policyPreviewGroupsContainer');
     const stage = lifecycle?.stages?.STAGE2;
@@ -8914,41 +9001,20 @@ function updateEmploymentReviewWorkflowPresentation() {
     const summary = document.getElementById('employmentReviewWorkflowSummary');
     if (!payloads.length) {
         summary?.classList.add('d-none');
-        return lifecycle;
-    }
-    const currentLabel = lifecycle.current_stage
-        ? workflowStageNames[lifecycle.current_stage] : 'Όλα τα στάδια ολοκληρωμένα';
-    showPartialWeekToastOnce(lifecycle.trailing_partial_weeks);
-    if (summary) {
-        summary.innerHTML = `<div class="d-flex flex-wrap gap-3 small">
-            <span><strong>Τρέχον Στάδιο:</strong> ${escapeHtml(currentLabel)}</span>
-            <span><strong>Συνολικές εκκρεμότητες τρέχουσας σελίδας:</strong> ${escapeHtml(lifecycle.total_pending_count)}</span>
-            <span><strong>Απαιτείται ενέργεια στην τρέχουσα σελίδα:</strong> ${lifecycle.requires_hr_action ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
-        </div>`;
-        summary.classList.remove('d-none');
-    }
-    Object.values(lifecycle.stages).forEach((stage) => {
-        const item = document.querySelector(`[data-workflow-stage="${stage.stage}"]`);
-        const button = item?.querySelector('.accordion-button');
-        const header = item?.querySelector('[data-workflow-stage-header]');
-        const collapseElement = item?.querySelector('.accordion-collapse');
-        if (!button || !header || !collapseElement) return;
-        const status = stage.presentation_status;
-        const pendingText = status === 'LOCKED' ? '' :
-            ` <span class="small ms-2">${stage.pending_count} εκκρεμότητες</span>`;
-        header.innerHTML = `${escapeHtml(workflowStageNames[stage.stage])}
-            <span class="badge ${workflowStageStatusClasses[status]} ms-2">${escapeHtml(
-                workflowStageStatusLabels[status])}</span>${pendingText}`;
-        button.disabled = status === 'LOCKED';
-        button.setAttribute('aria-disabled', status === 'LOCKED' ? 'true' : 'false');
-        if (status === 'LOCKED') {
-            bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false }).hide();
+    } else {
+        const currentLabel = lifecycle.current_stage
+            ? workflowStageNames[lifecycle.current_stage] : 'Όλα τα στάδια ολοκληρωμένα';
+        showPartialWeekToastOnce(lifecycle.trailing_partial_weeks);
+        if (summary) {
+            summary.innerHTML = `<div class="d-flex flex-wrap gap-3 small">
+                <span><strong>Τρέχον Στάδιο:</strong> ${escapeHtml(currentLabel)}</span>
+                <span><strong>Συνολικές εκκρεμότητες τρέχουσας σελίδας:</strong> ${escapeHtml(lifecycle.total_pending_count)}</span>
+                <span><strong>Απαιτείται ενέργεια στην τρέχουσα σελίδα:</strong> ${lifecycle.requires_hr_action ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
+            </div>`;
+            summary.classList.remove('d-none');
         }
-    });
-    const activeStage = lifecycle.current_stage
-        ? document.querySelector(`[data-workflow-stage="${lifecycle.current_stage}"] .accordion-collapse`)
-        : null;
-    if (activeStage) bootstrap.Collapse.getOrCreateInstance(activeStage, { toggle: false }).show();
+    }
+    applyEmploymentReviewWorkflowStageBadges(lifecycle);
     renderWeeklyHrStage3(lifecycle);
     return lifecycle;
 }
@@ -9327,21 +9393,11 @@ async function completeWeeklyHrStage1BulkFromUi() {
     weeklyHrStage1BulkSubmitting = true;
     updateWeeklyHrStage1BulkToolbar();
     try {
-        const scopes = selectedKeys.map((key) => weeklyHrStage1Scopes.get(key)).filter(Boolean)
-            .map(({ ypokatasthma, employee_id, week_start, week_end,
-                period_start, period_end }) => ({ ypokatasthma, employee_id,
-                week_start, week_end, ...(period_start && period_end
-                    ? { period_start, period_end } : {}) }));
-        const response = await fetch(
-            '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/bulk-complete', {
-                method: 'POST', headers: { 'Content-Type': 'application/json',
-                    'CSRF-Token': csrfToken },
-                body: JSON.stringify({ reason_or_notes: String(prompt.value).trim(),
-                    bulk_request_id: `stage1-bulk-ui:${crypto.randomUUID()}`, scopes })
-            });
-        const result = await response.json();
-        if (!response.ok || !result.success) throw new Error(result.message ||
-            'Αποτυχία μαζικής ολοκλήρωσης.');
+        const scopes = stage1BulkCompletionScopes(selectedKeys
+            .map((key) => ({ scope: weeklyHrStage1Scopes.get(key) })).filter((item) =>
+                item.scope));
+        const result = await submitWeeklyHrStage1BulkCompletion({ scopes,
+            reason: String(prompt.value).trim(), requestPrefix: 'stage1-bulk-ui' });
         (result.results || []).forEach((item) => {
             if (['COMPLETED', 'ALREADY_COMPLETED'].includes(item.status)) {
                 weeklyHrStage1Selected.delete(weeklyHrStage1Key(item.scope));
