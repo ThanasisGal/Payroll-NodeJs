@@ -175,6 +175,10 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
     const profileChangedInsideWeek =
         new Set(profiles.map(profileSignature)).size > 1 ||
         profileSignature(first) !== profileSignature(sundayProfile);
+    const profilesByDate = Object.fromEntries(profiles.map((profile, index) => {
+        const date = addDaysUtc(clampDateStartUtc(week.weekStart), index);
+        return [date.toISOString().slice(0, 10), profile];
+    }));
     const effective = {
         ...sundayProfile,
         profile_changed_inside_week: profileChangedInsideWeek
@@ -197,10 +201,7 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
         effectiveProfileDate: getProfileDateForDeviation(effective, sunday),
         previousProfile: first,
         previousProfileDate: getProfileDateForDeviation(first, week.weekStart),
-        profilesByDate: Object.fromEntries(profiles.map((profile, index) => {
-            const date = addDaysUtc(clampDateStartUtc(week.weekStart), index);
-            return [date.toISOString().slice(0, 10), profile];
-        }))
+        profilesByDate
     };
 }
 

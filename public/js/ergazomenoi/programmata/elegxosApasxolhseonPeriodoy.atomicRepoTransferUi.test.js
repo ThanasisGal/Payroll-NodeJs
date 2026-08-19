@@ -1015,6 +1015,34 @@ function testCardConflictedTargetOutcomeIsSpecificAndReadOnly() {
 }
 
 function testBlockedTargetCandidateDetailsAreSafeAndScoped() {
+    vm.runInContext(`currentReviewRows = [{
+        _id: '0009-target', kodikos: '0009', ypokatasthma: '0000',
+        hmeromhnia: '2026-06-09', kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true
+    }]`, sandbox);
+    assert.strictEqual(vm.runInContext(`getBlockedTargetCandidateDiagnosticLabel(
+        'TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY',
+        { prodhlomena_oraria_id: '0009-target', hmeromhnia: '2026-06-09' },
+        { employee_kodikos: '0009', ypokatasthma: '0000' }
+    )`, sandbox),
+    '09/06/2026: Προδηλωμένη εργασία χωρίς κάρτες — ' +
+        'απολογιστικά χαρακτηρίστηκε ΑΝΑΠΑΥΣΗ / ΡΕΠΟ.');
+    const presentationOnlyCase = {
+        employee_kodikos: '0009', ypokatasthma: '0000',
+        pending_count: 0, requires_hr_action: false, status: 'COMPLETED'
+    };
+    const presentationOnlyCandidate = {
+        prodhlomena_oraria_id: '0009-target', hmeromhnia: '2026-06-09',
+        blocker_reasons: ['TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY']
+    };
+    const presentationOnlyBefore = structuredClone({
+        presentationOnlyCase, presentationOnlyCandidate
+    });
+    sandbox.renderActionableBlockedTargetCandidate(
+        presentationOnlyCandidate, presentationOnlyCase
+    );
+    assert.deepStrictEqual({ presentationOnlyCase, presentationOnlyCandidate },
+        presentationOnlyBefore);
     const html = render({
         summary: { review_outcomes_count: 1 },
         groups: [],
@@ -1025,8 +1053,14 @@ function testBlockedTargetCandidateDetailsAreSafeAndScoped() {
                 'TARGET_INVALID_CARD_HOURS_VALUE',
                 'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'
             ],
-            blocked_target_candidates_count: 2,
+            blocked_target_candidates_count: 3,
             blocked_target_candidates: [
+                {
+                    prodhlomena_oraria_id: '0009-target',
+                    hmeromhnia: '2026-06-09',
+                    current_category: 'ΕΡΓ',
+                    blocker_reasons: ['TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY']
+                },
                 {
                     prodhlomena_oraria_id: 'must-not-render-1',
                     hmeromhnia: '2026-07-08',
@@ -1044,7 +1078,13 @@ function testBlockedTargetCandidateDetailsAreSafeAndScoped() {
         }]
     });
     const visible = getVisibleText(html);
-    assert.ok(visible.includes('Πιθανές ημέρες: 2'));
+    assert.ok(visible.includes('Πιθανές ημέρες: 3'));
+    assert.ok(visible.includes(
+        '09/06/2026: Προδηλωμένη εργασία χωρίς κάρτες — απολογιστικά χαρακτηρίστηκε ΑΝΑΠΑΥΣΗ / ΡΕΠΟ.'
+    ));
+    assert.ok(!visible.includes(
+        'Η προδηλωμένη ημέρα χωρίς κάρτες έχει διαφορετική απολογιστική κατηγορία.'
+    ));
     assert.ok(visible.includes('08/07/2026 — ΕΡΓ'));
     assert.ok(visible.includes('10/07/2026 — &lt;ΕΡΓ&gt;'));
     assert.ok(visible.includes('Η προδηλωμένη ημέρα περιέχει ελλιπές ζεύγος εισόδου–εξόδου κάρτας.'));
@@ -2819,10 +2859,10 @@ function testPreAndPostCalculationWorkflowGating() {
     ));
     assert.ok(loadResultsSource.includes('renderPreCalculationDataIssues(rows);'));
     assert.ok(loadResultsSource.includes(
-        'if (payload.finalized !== true && hasAuthoritativeResult)'
+        'currentPolicyPreviewBaseParams = hasAuthoritativeResult && payload.finalized !== true'
     ));
-    assert.ok(loadResultsSource.indexOf('renderPreCalculationDataIssues(rows);') <
-        loadResultsSource.indexOf('fetchPolicyPreviewGrouping(params)'));
+    assert.ok(!loadResultsSource.includes('fetchPolicyPreviewGrouping(params)'));
+    assert.ok(source.includes('async function loadPolicyPreviewOnDemand()'));
 
     const provisionalState = {
         effective_mode: 'NORMAL',

@@ -12,6 +12,8 @@ const { buildEmploymentPeriodFrozenSnapshot } = require('./apasxoliseisPeriodFro
 const { buildCorrectiveDelta, correctionSubmissionCapability,
     normalizeCorrectionCommands, reconstructCorrectedHistoricalResult } = require('./apasxoliseisPeriodCorrectiveService');
 const { assertPeriodLifecycleIndexesReady } = require('./apasxoliseisPeriodLifecycleIndexGuardService');
+const { assertPeriodHrReady } = require('./apasxoliseisPeriodHrReadinessService');
+const { assertPeriodDataQualityReady } = require('./apasxoliseisPeriodDataQualityReadinessService');
 
 function actor(session = {}) {
     const role = assertCriticalEmploymentDecisionRole(session); const id = String(session.userId || '').trim();
@@ -40,6 +42,8 @@ function authoritativeSubmissionPeriod(submission = {}) {
 async function finalizeEmploymentPeriod({ session: userSession, scope: input, reason, requestId, snapshotInput, now = new Date(),
     periodControlModel = PeriodControlModel, frozenModel = FrozenModel, auditModel = LifecycleAuditModel,
     indexGuard = assertPeriodLifecycleIndexesReady, transactionRunner = transaction,
+    periodHrReadinessResolver = null,
+    periodDataQualityReadinessResolver = null,
     historicalFingerprintResolver = (options) => require('./apasxoliseisHistoricalPeriodReconstructionService')
         .calculateHistoricalFingerprints(options) }) {
     const scope = normalizeScope(input); const by = actor(userSession); const cleanReason = requiredText(reason,
@@ -54,6 +58,13 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
         if (!control || control.status !== 'LOCKED') throw periodError('PERIOD_FINALIZE_REQUIRES_LOCKED', 409, 'Η περίοδος πρέπει πρώτα να κλειδωθεί.');
         if (control.active_calculation_id) throw periodError('PERIOD_CONTROL_CALCULATION_IN_PROGRESS', 409, 'Δεν είναι δυνατή η οριστικοποίηση όσο εκτελείται Υπολογισμός Απασχολήσεων.');
         if (control.frozen_snapshot_id) throw periodError('PERIOD_ALREADY_FINALIZED', 409, 'Η περίοδος έχει ήδη οριστικοποιηθεί.');
+        if (typeof periodHrReadinessResolver === 'function') {
+            assertPeriodHrReady(await periodHrReadinessResolver({ scope, session: dbSession }), 'FINALIZE');
+        }
+        if (typeof periodDataQualityReadinessResolver === 'function') {
+            assertPeriodDataQualityReady(
+                await periodDataQualityReadinessResolver({ scope, session: dbSession }), 'FINALIZE');
+        }
         if (control.historical_reconstruction_status === 'COMPLETED') {
             const currentFingerprints = await historicalFingerprintResolver({ scope, session: dbSession });
             if (currentFingerprints.dependency_fingerprint !== control.historical_dependency_fingerprint) {

@@ -704,7 +704,8 @@ function buildResult({
     counts = {},
     source = null,
     target = null,
-    semanticProposal = null
+    semanticProposal = null,
+    presentationContext = null
 }) {
     return deepFreeze({
         scenario_code: SCENARIO_CODE,
@@ -763,7 +764,8 @@ function buildResult({
             : null,
         source,
         target,
-        semantic_proposal: semanticProposal
+        semantic_proposal: semanticProposal,
+        ...(presentationContext ? { presentation_context: presentationContext } : {})
     });
 }
 
@@ -950,6 +952,10 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
 
     if (cleanTargets.length !== 1) {
         const unsafeReasons = potentialTargets.flatMap(targetExclusions);
+        const blockedTargetCandidates = potentialTargets.map((info) => ({
+            ...rowReference(info, null),
+            blocker_reasons: [...new Set(targetExclusions(info))].sort()
+        }));
         return buildResult({
             ...base,
             status:
@@ -960,7 +966,10 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
                 cleanTargets.length > 1 ? 'MULTIPLE_TARGET_CANDIDATES' : 'NO_TARGET_CANDIDATE',
                 ...unsafeReasons
             ],
-            counts
+            counts,
+            presentationContext: {
+                blocked_target_candidates: blockedTargetCandidates
+            }
         });
     }
 

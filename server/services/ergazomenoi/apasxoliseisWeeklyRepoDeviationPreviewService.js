@@ -243,8 +243,12 @@ function buildWeeklyRepoDeviationPreview({
             effectiveProfile
         });
         const expectedRepo = expectedRepoResolution.effectiveExpectedWeeklyRepo;
-        const profileReason =
+        const reportedProfileReason =
             weeklyProfile.repoResolutionReason || expectedRepoResolution.reason || null;
+        const profileReason = reportedProfileReason === 'PROFILE_CHANGED_INSIDE_WEEK' &&
+            expectedRepoResolution.ok
+            ? null
+            : reportedProfileReason;
         const effectiveRepoStates = uniqueRows.map((row) => {
             const dailyProfile =
                 typeof resolveDailyProfile === 'function'
@@ -356,6 +360,22 @@ function buildWeeklyRepoDeviationPreview({
                     reason === 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
                 )
             );
+            const repoTransferBlockedTargetCandidates = (
+                repoTransfer.semantic_proposal?.blocked_target_candidates ||
+                repoTransfer.presentation_context?.blocked_target_candidates || []
+            ).map((candidate) => {
+                const candidateId = String(candidate.prodhlomena_oraria_id || '').trim();
+                const candidateDate = dateKeyUtc(candidate.hmeromhnia);
+                const row = uniqueRows.find((item) =>
+                    (candidateId && String(item._id || item.id || '').trim() === candidateId) ||
+                    dateKeyUtc(item.hmeromhnia) === candidateDate
+                ) || {};
+                return {
+                    ...candidate,
+                    apologistika_category: row.kathgoria_ergasias_apologistika || '',
+                    repo_apologistika: row.repo_apologistika === true
+                };
+            });
             deviations.push({
                 ...base,
                 status:
@@ -399,6 +419,8 @@ function buildWeeklyRepoDeviationPreview({
                     canonicalResolution?.decision?.request_id || null,
                 repo_transfer_status: repoTransfer.eligibility_status,
                 repo_transfer_reasons: [...(repoTransfer.reasons || [])],
+                repo_transfer_blocked_target_candidates:
+                    repoTransferBlockedTargetCandidates,
                 repo_transfer_source_available:
                     !repoTransfer.reasons.includes('NO_SOURCE_CANDIDATE'),
                 repo_transfer_target_available:

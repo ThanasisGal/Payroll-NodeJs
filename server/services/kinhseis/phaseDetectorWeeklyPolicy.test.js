@@ -212,15 +212,15 @@ test('missing rows after week completion require HR decision instead of remainin
     assert.equal(analyses[0].asOfDate, '2026-07-10');
 });
 
-test('work-facts weekly path fails closed after an in-week profile change', () => {
+test('work-facts weekly path accepts a deterministic in-week profile change', () => {
     const { dailyRows, orariaByDate } = buildWeek({ changedProfile: true });
     const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
         asOfDate: '2026-06-15'
     });
 
     result.forEach((day) => {
-        assert.equal(day.weeklyComplianceStatus, 'NEEDS_HR_DECISION');
-        assert.deepEqual(day.weeklyComplianceReasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
+        assert.equal(day.weeklyComplianceStatus, 'NOT_APPLICABLE');
+        assert.deepEqual(day.weeklyComplianceReasons, []);
         assert.equal(day.isSixthDay, false);
         assert.equal(day.isSeventhDay, false);
     });

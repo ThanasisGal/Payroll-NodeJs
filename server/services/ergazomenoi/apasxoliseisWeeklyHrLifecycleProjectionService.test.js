@@ -60,6 +60,40 @@ assert.equal(lifecycle0004.stages.stage2.pending_count, 0);
 assert.equal(lifecycle0004.stages.stage2.stage2_applicability, 'NOT_APPLICABLE');
 assert.deepEqual(lifecycle0004.stages.stage4.final_weekly_analysis, direct0004);
 
+const resolvedChangedProfiles = Object.fromEntries(employee0004.map((row, index) => [
+    row.hmeromhnia,
+    { istorikoId: index === 0 ? '0003' : '0004' }
+]));
+const lifecycleResolvedProfileChange = buildWeeklyHrLifecycleProjection({
+    weekRows: employee0004,
+    effectiveProfile: {
+        ...profile,
+        profile_changed_inside_week: true,
+        date_effective_profiles_by_date: resolvedChangedProfiles
+    }
+});
+assert.equal(lifecycleResolvedProfileChange.stages.stage4.business_status, 'COMPLETED');
+assert.ok(!lifecycleResolvedProfileChange.stages.stage4.pending_reasons.includes(
+    'PROFILE_CHANGED_INSIDE_WEEK'
+));
+
+const lifecycleUnresolvedDailyProfile = buildWeeklyHrLifecycleProjection({
+    weekRows: employee0004,
+    effectiveProfile: {
+        ...profile,
+        profile_changed_inside_week: true,
+        date_effective_profiles_by_date: {
+            [employee0004[0].hmeromhnia]: { istorikoId: '0003' },
+            [employee0004[1].hmeromhnia]: null
+        }
+    }
+});
+assert.equal(lifecycleUnresolvedDailyProfile.stages.stage4.business_status, 'BLOCKED');
+assert.deepEqual(
+    lifecycleUnresolvedDailyProfile.stages.stage4.pending_reasons,
+    ['UNRESOLVED_DAILY_EMPLOYMENT_PROFILE']
+);
+
 const employee0001 = week('0001');
 employee0001[1] = possibleLeave(employee0001[1]);
 const lifecycle0001 = buildWeeklyHrLifecycleProjection({ weekRows: employee0001,
@@ -419,14 +453,23 @@ const completedJuneCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMon
     periodScope: { period_start: '2026-06-01', period_end: '2026-06-30' },
     persistedStage1State: { status: 'OPEN', version: 4, period_slices: [{
         period_start: '2026-06-01', period_end: '2026-06-30', status: 'COMPLETED',
-        context_fingerprint: juneCross.stages.stage1.current_context_fingerprint,
+        context_fingerprint: 'f'.repeat(64),
         completion_fingerprint: juneCross.stages.stage1.current_completion_fingerprint,
         effective_fingerprint: juneCross.stages.stage1.current_completion_fingerprint,
         version: 1 }] } });
 assert.equal(completedJuneCross.stages.stage1.business_status, 'COMPLETED');
 assert.deepEqual(completedJuneCross.stages.stage3.pending_dates, []);
-assert.deepEqual(completedJuneCross.stages.stage3.stage2_automatic_resolved_dates,
+assert.deepEqual(completedJuneCross.stages.stage3.stage2_automatic_resolved_dates, []);
+assert.equal(completedJuneCross.trailing_partial_week.active, true);
+assert.equal(completedJuneCross.trailing_partial_week.title, 'ΜΕΡΙΚΗ ΕΒΔΟΜΑΔΑ ΠΕΡΙΟΔΟΥ');
+assert.deepEqual(completedJuneCross.deferred_weekly_dates, ['2026-06-29']);
+assert.deepEqual(completedJuneCross.trailing_partial_week.deferred_weekly_dates,
     ['2026-06-29']);
+assert.equal(completedJuneCross.stages.stage2.weekly_review_deferred, true);
+assert.equal(completedJuneCross.stages.stage2.pending_count, 0);
+assert.equal(completedJuneCross.stages.stage4.weekly_review_deferred, true);
+assert.equal(completedJuneCross.stages.stage4.final_weekly_analysis_available, false);
+assert.equal(completedJuneCross.stages.stage4.final_weekly_analysis, null);
 const julyCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMonth,
     effectiveProfile: profile, scope: crossScope,
     periodScope: { period_start: '2026-07-01', period_end: '2026-07-31' },
@@ -438,6 +481,24 @@ const julyCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMonth,
         version: 1 }] } });
 assert.deepEqual(julyCross.stages.stage1.pending_dates, ['2026-07-01']);
 assert.equal(julyCross.stages.stage1.business_status, 'OPEN');
+assert.equal(julyCross.trailing_partial_week, null);
+assert.deepEqual(julyCross.deferred_weekly_dates, []);
+assert.equal(julyCross.stages.stage2.weekly_review_deferred, false);
+const completedJulyCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMonth,
+    effectiveProfile: profile, scope: crossScope,
+    periodScope: { period_start: '2026-07-01', period_end: '2026-07-31' },
+    persistedStage1State: { status: 'OPEN', version: 5, period_slices: [{
+        period_start: '2026-07-01', period_end: '2026-07-31', status: 'COMPLETED',
+        context_fingerprint: julyCross.stages.stage1.current_context_fingerprint,
+        completion_fingerprint: julyCross.stages.stage1.current_completion_fingerprint,
+        effective_fingerprint: julyCross.stages.stage1.current_completion_fingerprint,
+        version: 1 }] } });
+assert.equal(completedJulyCross.trailing_partial_week, null);
+assert.deepEqual(completedJulyCross.deferred_weekly_dates, []);
+assert.equal(completedJulyCross.stages.stage2.weekly_review_deferred, false);
+assert.notEqual(completedJulyCross.stages.stage4.final_weekly_analysis, null);
+assert.ok(completedJulyCross.stages.stage3.stage2_automatic_resolved_dates.includes(
+    '2026-06-29'));
 
 const contextOnlyStage2 = week('0004', '2026-06-29');
 Object.assign(contextOnlyStage2[2], { kathgoria_ergasias: 'ΑΝ', repo: true,

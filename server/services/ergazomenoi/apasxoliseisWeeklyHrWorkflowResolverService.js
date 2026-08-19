@@ -101,7 +101,10 @@ function resolveWeeklyHrWorkflow({
             ? effectiveProfile : {}),
         profile_changed_inside_week:
             profile_changed_inside_week === true ||
-            effectiveProfile?.profile_changed_inside_week === true
+            effectiveProfile?.profile_changed_inside_week === true,
+        ...(effectiveProfilesByDate && Object.keys(effectiveProfilesByDate).length > 0
+            ? { date_effective_profiles_by_date: effectiveProfilesByDate }
+            : {})
     };
     const expectedRepoResolution = resolveEffectiveExpectedWeeklyRepo({
         weekRows: orderedRows,

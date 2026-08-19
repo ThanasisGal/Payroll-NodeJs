@@ -423,9 +423,9 @@ const mixedProfileSixthDay = analyze(
     [7, 7, 7, 7, 7, 7, 0],
     { profile_changed_inside_week: true }
 );
-assert.strictEqual(mixedProfileSixthDay.status, 'NEEDS_HR_DECISION');
-assert.deepStrictEqual(mixedProfileSixthDay.reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
-assert.strictEqual(mixedProfileSixthDay.sixthDay, null);
+assert.strictEqual(mixedProfileSixthDay.status, 'READY');
+assert.deepStrictEqual(mixedProfileSixthDay.reasons, []);
+assert.strictEqual(mixedProfileSixthDay.sixthDay.hmeromhnia, '2026-08-01');
 assert.strictEqual(mixedProfileSixthDay.seventhDay, null);
 
 const mixedProfileSeventhDay = analyze(
@@ -433,8 +433,8 @@ const mixedProfileSeventhDay = analyze(
     { profile_changed_inside_week: true }
 );
 assert.strictEqual(mixedProfileSeventhDay.status, 'NEEDS_HR_DECISION');
-assert.deepStrictEqual(mixedProfileSeventhDay.reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
-assert.strictEqual(mixedProfileSeventhDay.sixthDay, null);
+assert.ok(mixedProfileSeventhDay.reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
 assert.strictEqual(mixedProfileSeventhDay.seventhDay, null);
 
 const unchangedProfileSeventhDay = analyze(
@@ -445,6 +445,22 @@ assert.strictEqual(unchangedProfileSeventhDay.status, 'NEEDS_HR_DECISION');
 assert.ok(unchangedProfileSeventhDay.reasons.includes(
     'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
 assert.strictEqual(unchangedProfileSeventhDay.seventhDay, null);
+
+const unresolvedDailyProfile = analyze(
+    [7, 7, 7, 7, 7, 7, 0],
+    {
+        profile_changed_inside_week: true,
+        date_effective_profiles_by_date: {
+            '2026-07-27': { istorikoId: '0003' },
+            '2026-07-28': null
+        }
+    }
+);
+assert.strictEqual(unresolvedDailyProfile.status, 'NEEDS_HR_DECISION');
+assert.deepStrictEqual(
+    unresolvedDailyProfile.reasons,
+    ['UNRESOLVED_DAILY_EMPLOYMENT_PROFILE']
+);
 
 // C3.4: the two current canonical repo identities drive the handoff from the
 // selected sixth day to the complementary remaining repo.

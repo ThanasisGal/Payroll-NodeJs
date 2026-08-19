@@ -203,6 +203,22 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     assert.strictEqual(staleOrphanWrites, 1);
 
     const store = fake();
+    const pendingStore = fake();
+    await assert.rejects(() => transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'pending guard',
+        requestId: 'period-pending-lock-001', now: new Date('2026-07-01'), expectedVersion: 0,
+        periodControlModel: pendingStore.model, auditModel: pendingStore.audit,
+        indexGuard: async () => ({ ready: true }), periodHrReadinessResolver: async () => ({
+            ready: false, total_pending_count: 1, pending_cases: [{ employee_kodikos: '999' }]
+        }) }), (error) => error.code === 'PERIOD_HAS_PENDING_HR_ACTIONS');
+    assert.strictEqual(pendingStore.record, null);
+    const dataQualityStore = fake();
+    await assert.rejects(() => transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'data quality',
+        requestId: 'period-data-quality-001', now: new Date('2026-07-01'), expectedVersion: 0,
+        periodControlModel: dataQualityStore.model, auditModel: dataQualityStore.audit,
+        indexGuard: async () => ({ ready: true }), periodDataQualityReadinessResolver: async () => ({
+            ready: false, unresolved_count: 1, unresolved_cases: [{ employee_kodikos: '0003' }]
+        }) }), (error) => error.code === 'PERIOD_HAS_UNRESOLVED_DATA_QUALITY_ISSUES');
+    assert.strictEqual(dataQualityStore.record, null);
     const locked = await transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'Οριστικοποίηση ελέγχου', requestId: 'period-lock-001', now: new Date('2026-07-01'), expectedVersion: 0, periodControlModel: store.model, auditModel: store.audit, indexGuard: async () => ({ ready: true }) });
     assert.strictEqual(locked.state.stored_status, 'LOCKED');
     assert.strictEqual(store.audits.length, 1);

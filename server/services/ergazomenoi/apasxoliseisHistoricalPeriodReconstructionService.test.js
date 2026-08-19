@@ -198,6 +198,20 @@ function castFingerprintDateSelector(dateSelector) {
         assert.strictEqual(existing.audits[0].event_type, 'HISTORICAL_RECONSTRUCTION_OPEN');
     }
 
+    const dataQualityBlocked = store({ ...juneScope, status: 'OPEN',
+        deadline: calculatePeriodDeadline(juneScope.period_end), version: 2,
+        write_fence_version: 0, active_calculation_id: '',
+        historical_reconstruction_status: '', historical_reconstruction_version: 0,
+        historical_reconstruction_pending_version: 0 });
+    await assert.rejects(() => authorizeHistoricalReconstruction({ session: user, scope: juneScope,
+        reason: 'data quality guard', requestId: 'historical-data-quality-01', confirmation: true,
+        now: new Date('2026-08-01'), periodControlModel: dataQualityBlocked.model,
+        auditModel: dataQualityBlocked.audit, transactionRunner,
+        periodDataQualityReadinessResolver: async () => ({ ready: false, unresolved_count: 1 }) }),
+    (error) => error.code === 'PERIOD_HAS_UNRESOLVED_DATA_QUALITY_ISSUES');
+    assert.strictEqual(dataQualityBlocked.record.historical_reconstruction_status, '');
+    assert.strictEqual(dataQualityBlocked.audits.length, 0);
+
     const active = store({ ...juneScope, status: 'OPEN',
         deadline: calculatePeriodDeadline(juneScope.period_end), version: 2,
         write_fence_version: 0, active_calculation_id: 'actual-calculation-id',

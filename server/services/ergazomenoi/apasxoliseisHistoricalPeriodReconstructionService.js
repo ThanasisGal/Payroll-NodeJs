@@ -9,6 +9,7 @@ const { ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
 const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
 const { startOfWeekMondayUtc, endOfWeekSundayUtc } = require('../../utils/date/mondaySundayWeek');
+const { assertPeriodDataQualityReady } = require('./apasxoliseisPeriodDataQualityReadinessService');
 
 const FINGERPRINT_VERSION = 'HISTORICAL_PERIOD_FACTS_V1';
 const SOURCE_FIELDS = Object.freeze([
@@ -158,6 +159,7 @@ async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = Prodh
 async function authorizeHistoricalReconstruction({ session: userSession, scope, reason, requestId,
     confirmation, now = new Date(), periodControlModel = PeriodControlModel,
     auditModel = LifecycleAuditModel, transactionRunner = transaction,
+    periodDataQualityReadinessResolver = null,
     fingerprintResolver = calculateHistoricalFingerprints }) {
     const by = actor(userSession); const cleanReason = String(reason || '').trim();
     const cleanRequestId = String(requestId || '').trim();
@@ -174,6 +176,11 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
         if (current?.status === 'FINALIZED' || current?.frozen_snapshot_id) throw reconstructionError('PERIOD_CONTROL_FINALIZED', 409, 'Η οριστικοποιημένη περίοδος δέχεται μόνο διορθωτική επανεκτίμηση.');
         if (current?.status === 'LOCKED') throw reconstructionError('PERIOD_CONTROL_LOCKED', 409, 'Η περίοδος είναι κλειδωμένη.');
         if (current?.active_calculation_id) throw reconstructionError('PERIOD_CONTROL_CALCULATION_IN_PROGRESS', 409, 'Υπάρχει υπολογισμός σε εξέλιξη.');
+        if (typeof periodDataQualityReadinessResolver === 'function') {
+            assertPeriodDataQualityReady(
+                await periodDataQualityReadinessResolver({ scope, session: dbSession }),
+                'HISTORICAL_RECONSTRUCTION');
+        }
         if (current?.last_historical_reconstruction_request_id === cleanRequestId &&
             ['AUTHORIZED', 'COMPLETED'].includes(current?.historical_reconstruction_status)) {
             if (current.last_historical_reconstruction_command_identity !== identity) throw reconstructionError('HISTORICAL_RECONSTRUCTION_REQUEST_CONFLICT', 409, 'Το request_id έχει διαφορετική εντολή.');

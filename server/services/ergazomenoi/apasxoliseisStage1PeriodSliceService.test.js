@@ -55,6 +55,11 @@ assert.equal(resolveStage1PeriodSliceStatus({
     current_context_fingerprint: 'f'.repeat(64),
     current_completion_fingerprint: juneFingerprints.completion_fingerprint,
     persisted_slice: stage1.period_slices[0]
+}), 'COMPLETED');
+assert.equal(resolveStage1PeriodSliceStatus({
+    current_context_fingerprint: juneFingerprints.context_fingerprint,
+    current_completion_fingerprint: 'e'.repeat(64),
+    persisted_slice: stage1.period_slices[0]
 }), 'STALE');
 
 const changedJulyRows = rows();
@@ -62,6 +67,11 @@ changedJulyRows[4].kathgoria_adeias_apologistika = 'POSSIBLE_LEAVE';
 const changed = buildStage1PeriodSliceFingerprints({ weekRows: changedJulyRows, slice: june });
 assert.notEqual(changed.context_fingerprint, juneFingerprints.context_fingerprint);
 assert.equal(changed.completion_fingerprint, juneFingerprints.completion_fingerprint);
+assert.equal(resolveStage1PeriodSliceStatus({
+    current_context_fingerprint: changed.context_fingerprint,
+    current_completion_fingerprint: changed.completion_fingerprint,
+    persisted_slice: stage1.period_slices[0]
+}), 'COMPLETED');
 
 assert.throws(() => deriveStage1PeriodSlice({ weekRows: weekRows.slice(0, 2),
     week_start: '2026-06-29', week_end: '2026-07-05',

@@ -401,14 +401,7 @@ const changedHistory = {
 result = plan(profileRows, {
     istorikoRowsByKodikos: new Map([['D1', [changedHistory]]])
 });
-deviation = onlyDeviation(result);
-assert.equal(deviation.expected_repo, 1);
-assert.equal(deviation.actual_repo, 1);
-assert.equal(deviation.missing_repo, 0);
-assert.equal(deviation.excess_repo, 0);
-assert.equal(deviation.status, 'NEEDS_HR_DECISION');
-assert.deepEqual(deviation.reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
-assert.equal(deviation.deviation_type, 'PROFILE_CHANGED_INSIDE_WEEK');
+assert.equal(result.deviations.length, 0);
 
 result = plan(ambiguousRows, {
     appliedProtectionReasonsByWeek: new Map([[

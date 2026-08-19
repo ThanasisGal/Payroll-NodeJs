@@ -67,9 +67,6 @@ function findStage1PeriodSlice(stage1 = {}, period_start, period_end) {
 function resolveStage1PeriodSliceStatus({ current_context_fingerprint,
     current_completion_fingerprint, persisted_slice } = {}) {
     if (!persisted_slice || persisted_slice.status !== 'COMPLETED') return 'OPEN';
-    if (String(persisted_slice.context_fingerprint || '') !== String(current_context_fingerprint || '')) {
-        return 'STALE';
-    }
     const applicable = String(persisted_slice.effective_fingerprint ||
         persisted_slice.completion_fingerprint || '');
     return applicable === String(current_completion_fingerprint || '') ? 'COMPLETED' : 'STALE';

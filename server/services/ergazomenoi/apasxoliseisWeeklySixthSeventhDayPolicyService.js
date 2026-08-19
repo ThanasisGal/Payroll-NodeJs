@@ -258,11 +258,25 @@ function analyzeWeeklySixthSeventhDay({
     ) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'], warnings: [], dailyFacts: [] });
     }
-    if (effectiveProfile.profile_changed_inside_week === true) {
+    const dailyProfilesByDate = effectiveProfile.date_effective_profiles_by_date;
+    const unresolvedProfileDates = dailyProfilesByDate === null ||
+        dailyProfilesByDate === undefined
+        ? []
+        : requiredDates.filter((date) => {
+              const hasExplicitProfile = dailyProfilesByDate instanceof Map
+                  ? dailyProfilesByDate.has(date)
+                  : Object.prototype.hasOwnProperty.call(dailyProfilesByDate, date);
+              if (!hasExplicitProfile) return false;
+              const profile = dailyProfilesByDate instanceof Map
+                  ? dailyProfilesByDate.get(date)
+                  : dailyProfilesByDate[date];
+              return !profile || typeof profile !== 'object' || Array.isArray(profile);
+          });
+    if (unresolvedProfileDates.length > 0) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,
-            reasons: ['PROFILE_CHANGED_INSIDE_WEEK'],
+            reasons: ['UNRESOLVED_DAILY_EMPLOYMENT_PROFILE'],
             warnings: [],
             dailyFacts: [],
             sixthDay: null,

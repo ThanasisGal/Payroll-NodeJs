@@ -162,18 +162,15 @@ function testContractualProfileControlsExpectedRepo() {
         resolveWeeklyProfile: () => ({
             expectedWeeklyRepo: null,
             repoResolutionReason: 'PROFILE_CHANGED_INSIDE_WEEK',
-            effectiveProfile: { profile_changed_inside_week: true }
+            effectiveProfile: {
+                hmeres_ergasias_ebdomadas: 5,
+                profile_changed_inside_week: true
+            }
         })
     });
-    assert.strictEqual(changed.deviations[0].status, STATUS.NEEDS_HR_DECISION);
-    assert.deepStrictEqual(changed.deviations[0].reasons, ['PROFILE_CHANGED_INSIDE_WEEK']);
-    assert.strictEqual(changed.deviations[0].sixth_seventh_day_status, 'NEEDS_HR_DECISION');
-    assert.deepStrictEqual(
-        changed.deviations[0].sixth_seventh_day_reasons,
-        ['PROFILE_CHANGED_INSIDE_WEEK']
-    );
-    assert.strictEqual(changed.deviations[0].sixth_day_count, 0);
-    assert.strictEqual(changed.deviations[0].seventh_day_count, 0);
+    assert.ok(!changed.deviations[0].sixth_seventh_day_reasons.includes(
+        'PROFILE_CHANGED_INSIDE_WEEK'
+    ));
 }
 
 function testOpenTrailingWeekIsPendingNotDeviation() {
@@ -523,6 +520,43 @@ function testSixthDaySurvivesMissingRepoTransferSource() {
     assert.strictEqual(deviation.seventh_day_count, 0);
     assert.strictEqual(deviation.sixth_day_date, '2026-06-07');
     assert.strictEqual(deviation.sixth_day_premium_rate, 40);
+}
+
+function testBlockedTargetPresentationContextIsCarriedToWeeklyDeviation() {
+    const weekRows = rows('2026-06-08').map((row, index) => ({
+        ...row, _id: `0009-${index}`, kodikos: '0009',
+        team: 'THA', company_kod: '0004', ypokatasthma: '0000'
+    }));
+    Object.assign(weekRows[0], {
+        kathgoria_ergasias: 'ΑΝ', repo: true,
+        cards_ores_ergasias: 8, cards_apo_ora_01: '09:00', cards_eos_ora_01: '17:00'
+    });
+    Object.assign(weekRows[1], {
+        kathgoria_ergasias: 'ΕΡΓ', cards_ores_ergasias: 0,
+        cards_apo_ora_01: '', cards_eos_ora_01: '',
+        kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true,
+        ores_ergasias_apologistika: 0
+    });
+    const preview = buildWeeklyRepoDeviationPreview({
+        rows: weekRows,
+        periodStart: '2026-06-01', periodEnd: '2026-06-30', asOfDate: '2026-06-30',
+        resolveWeeklyProfile: () => ({
+            expectedWeeklyRepo: 0,
+            effectiveProfile: { hmeres_ergasias_ebdomadas: 5, typos_apasxolhshs: '0' }
+        })
+    });
+    const deviation = preview.deviations[0];
+    assert.ok(deviation.presentation_reasons.includes(
+        'TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY'));
+    assert.deepStrictEqual(deviation.repo_transfer_blocked_target_candidates
+        .filter((candidate) => candidate.hmeromhnia === '2026-06-09')
+        .map((candidate) => ({
+            hmeromhnia: candidate.hmeromhnia,
+            apologistika_category: candidate.apologistika_category,
+            repo_apologistika: candidate.repo_apologistika
+        })), [{
+        hmeromhnia: '2026-06-09', apologistika_category: 'ΑΝ', repo_apologistika: true
+    }]);
 }
 
 function testDeviationAndAtomicContextParity() {
@@ -931,6 +965,7 @@ testLegacyPersistedRangeIsExplicit();
 testDeviationAndAtomicUseTheSameContractSelector();
 testDeviationAndAtomicContextParity();
 testSixthDaySurvivesMissingRepoTransferSource();
+testBlockedTargetPresentationContextIsCarriedToWeeklyDeviation();
 testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow();
 testSingleWorkedDeclaredRepoResolvesSeventhDayWithoutHrDecision();
 testCanonicalDecisionIsConsumedByWeeklyProjection();

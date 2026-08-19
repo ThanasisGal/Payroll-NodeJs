@@ -121,6 +121,9 @@ const {
 } = require('../../utils/erganh/erganiRestClient');
 const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
 const {
+    loadEmploymentReviewRequestContext
+} = require('../../services/ergazomenoi/apasxoliseisEmploymentReviewRequestContextService');
+const {
     buildApasxoliseisScenarioFacts
 } = require('../../services/ergazomenoi/apasxoliseisScenarioFactsService');
 const {
@@ -377,6 +380,12 @@ const {
 const {
     buildWeeklyHrLifecycleProjection
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
+const { buildPeriodHrReadiness, collectPeriodWideUiProjections } = require(
+    '../../services/ergazomenoi/apasxoliseisPeriodHrReadinessService'
+);
+const { buildPeriodDataQualityReadiness, assertPeriodDataQualityReady } = require(
+    '../../services/ergazomenoi/apasxoliseisPeriodDataQualityReadinessService'
+);
 const {
     getWeeklyHrWorkflowIndexState,
     assertWeeklyHrWorkflowIndexesReady
@@ -1178,6 +1187,220 @@ async function activeEmploymentReviewPeriodScope(req, branchOverride = '') {
         period_start: period.apo,
         period_end: period.eos
     };
+}
+
+async function loadEmploymentPeriodReadiness(req, scope) {
+    const loaded = await collectPeriodWideUiProjections({ loadPage: async ({ page, limit }) => {
+        const periodRequest = Object.create(req);
+        periodRequest._skipPeriodHrReadiness = true;
+        periodRequest.query = { apo_hmeromhnia: dateKeyUtc(scope.period_start),
+            eos_hmeromhnia: dateKeyUtc(scope.period_end), ypokatasthma: scope.ypokatasthma,
+            page: String(page), limit: String(limit) };
+        let payload;
+        let statusCode = 200;
+        const periodResponse = { status(code) { statusCode = code; return this; },
+            json(value) { payload = value; return value; } };
+        await erganhController.getProdhlomenaOrariaForReview(periodRequest, periodResponse);
+        if (statusCode >= 400 || !payload?.success) throw Object.assign(
+            new Error(payload?.message || 'Η period-wide projection απέτυχε.'),
+            { code: payload?.code, statusCode });
+        return payload;
+    } });
+    return Object.freeze({ hr: buildPeriodHrReadiness(loaded),
+        data_quality: buildPeriodDataQualityReadiness(loaded) });
+}
+
+async function loadEmploymentPeriodHrReadiness(req, scope) {
+    return (await loadEmploymentPeriodReadiness(req, scope)).hr;
+}
+
+async function buildEmploymentReviewPeriodControlProjection(req, {
+    scope: preloadedScope = null,
+    state: preloadedState = null,
+    branchOverride = ''
+} = {}) {
+    const scope = preloadedScope || await activeEmploymentReviewPeriodScope(req, branchOverride);
+    const [state, indexReadiness, latestCorrective] = await Promise.all([
+        preloadedState ? Promise.resolve(preloadedState) : getPeriodControl({ scope }),
+        getPeriodControlIndexState(),
+        ApasxoliseisPeriodCorrectiveCaseModel.findOne({ ...scope }).sort({ opened_at: -1 })
+            .select('case_id status opened_at reason corrective_delta corrected_result_fingerprint').lean()
+    ]);
+    const lifecycleIndexReadiness = await getPeriodLifecycleIndexState();
+    const finalSubmissionIndexReadiness = await getWtoDailySubmissionIndexState();
+    const periodReadiness = await loadEmploymentPeriodReadiness(req, scope);
+    const periodHrReadiness = periodReadiness.hr;
+    const periodDataQualityReadiness = periodReadiness.data_quality;
+    const finalSnapshot = state.stored_status === 'FINALIZED' && state.frozen_snapshot_id
+        ? await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
+              _id: state.frozen_snapshot_id,
+              ...scope,
+              frozen_snapshot_fingerprint: state.frozen_snapshot_fingerprint
+          })
+              .select('frozen_snapshot')
+              .lean()
+        : null;
+    const finalRows = finalSnapshot?.frozen_snapshot?.daily_results || [];
+    let finalProjection = null;
+    let finalProjectionError = null;
+    if (finalSnapshot?.frozen_snapshot) {
+        try {
+            finalProjection = buildWtoDailySubmissionProjection({
+                rows: finalRows,
+                employees: finalSnapshot.frozen_snapshot.employees,
+                branch: scope.ypokatasthma,
+                periodStart: scope.period_start,
+                periodEnd: scope.period_end
+            });
+        } catch (error) {
+            finalProjectionError = { code: error.code, message: error.message };
+        }
+    }
+    const finalEmployeeCount = new Set(
+        (finalProjection?.employees || []).map((row) => row.f_afm)
+    ).size;
+    const correctivePosting = latestCorrective?.status === 'CLOSED'
+        ? await ApasxoliseisCorrectivePayrollPostingModel.find({
+              ...scope,
+              case_id: latestCorrective.case_id
+          })
+              .select('employee_kodikos typos_apodoxon corrective_aa_misthodosias gross_corrective_delta offset_applied withholding_amount payable_now carry_forward_created posting_status')
+              .lean()
+        : [];
+
+    return {
+        success: true,
+        status: state.stored_status,
+        effective_mode: state.effective_mode,
+        deadline: state.deadline,
+        past_deadline: state.past_deadline,
+        locked_at: state.locked_at,
+        locked_by_user_name: state.locked_by_user_name,
+        locked_by_user_role: state.locked_by_user_role,
+        finalized_at: state.finalized_at,
+        finalized_by_user_name: state.finalized_by_user_name,
+        submitted_at: state.submitted_at,
+        submission_protocol: state.submission_protocol,
+        submission_status: state.submission_status,
+        submission_timeliness: state.submission_timeliness,
+        corrective_case: latestCorrective ? {
+            case_id: latestCorrective.case_id,
+            status: latestCorrective.status,
+            opened_at: latestCorrective.opened_at,
+            reason: latestCorrective.reason,
+            has_delta: Boolean(latestCorrective.corrective_delta),
+            payroll_postings: correctivePosting
+        } : null,
+        version: state.version,
+        historical_reconstruction: {
+            status: state.historical_reconstruction_status,
+            version: state.historical_reconstruction_version,
+            pending_version: state.historical_reconstruction_pending_version,
+            started_at: state.historical_reconstruction_started_at,
+            completed_at: state.historical_reconstruction_completed_at,
+            started_by_user_name: state.historical_reconstruction_started_by_user_name,
+            started_by_user_role: state.historical_reconstruction_started_by_user_role,
+            reason: state.historical_reconstruction_reason,
+            dependency_window_start: state.historical_dependency_window_start,
+            dependency_window_end: state.historical_dependency_window_end,
+            dependency_status: state.dependency_status
+        },
+        calculation: {
+            successful_version: state.successful_calculation_version,
+            completed_at: state.last_successful_calculation_at,
+            authoritative_result: state.has_authoritative_calculation_result
+        },
+        allowed_actions: {
+            calculate: state.can_calculate,
+            record_decision: state.can_record_decision,
+            record_stale_canonical_decision: state.can_record_stale_canonical_decision,
+            repo_transfer: state.can_repo_transfer,
+            manual_edit: state.can_manual_edit,
+            historical_reconstruct: state.can_historical_reconstruct && periodDataQualityReadiness.ready,
+            historical_reassess: state.can_historical_reassess && periodDataQualityReadiness.ready,
+            historical_calculate: state.can_historical_calculate && periodDataQualityReadiness.ready,
+            lock_period: ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(state.effective_mode) &&
+                periodHrReadiness.ready && periodDataQualityReadiness.ready,
+            unlock_period: state.can_unlock_period,
+            finalize_period: state.can_finalize && lifecycleIndexReadiness.ready && periodHrReadiness.ready &&
+                periodDataQualityReadiness.ready,
+            submit_final_wtodailya: state.stored_status === 'FINALIZED' &&
+                !state.past_deadline && Boolean(finalSnapshot?.frozen_snapshot) &&
+                lifecycleIndexReadiness.ready && finalSubmissionIndexReadiness.ready &&
+                Boolean(finalProjection) && !state.submission_reference,
+            open_corrective: state.can_corrective && lifecycleIndexReadiness.ready,
+            corrective: state.can_corrective,
+            post_corrective_payroll: latestCorrective?.status === 'CLOSED' &&
+                Boolean(latestCorrective.corrected_result_fingerprint) && lifecycleIndexReadiness.ready
+        },
+        final_submission_summary: {
+            branch: scope.ypokatasthma,
+            period_start: scope.period_start.toISOString().slice(0, 10),
+            period_end: scope.period_end.toISOString().slice(0, 10),
+            employees_count: finalEmployeeCount,
+            employee_days_count: finalProjection?.employees?.length || 0,
+            validation_error: finalProjectionError
+        },
+        period_hr_readiness: periodHrReadiness,
+        period_data_quality_readiness: periodDataQualityReadiness,
+        index_readiness: indexReadiness,
+        lifecycle_index_readiness: lifecycleIndexReadiness,
+        final_submission_index_readiness: finalSubmissionIndexReadiness
+    };
+}
+
+function buildEmploymentReviewScenarioClassifications(rows = [], {
+    argiesByDateKey = new Map(),
+    companyFlags = {},
+    team = '',
+    companyId = ''
+} = {}) {
+    return rows.map((row) => {
+        const argiaRec = argiesByDateKey.get(dateKeyUtc(row.hmeromhnia));
+        const isHoliday = Boolean(argiaRec);
+        const facts = buildApasxoliseisScenarioFacts({
+            ...row,
+            team: row.team || team,
+            company_kod: row.company_kod || companyId
+        }, {
+            holiday: {
+                isHoliday,
+                isMandatoryHoliday: argiaRec?.ypoxreotikh_argia === true,
+                isOptionalHoliday: isHoliday && argiaRec?.ypoxreotikh_argia !== true,
+                description: argiaRec?.description || ''
+            },
+            companyFlags: {
+                companyWorksOnMandatoryHoliday:
+                    companyFlags.apasxolhsh_kata_tis_argies === true,
+                companyWorksOnOptionalHoliday:
+                    companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true
+            }
+        });
+        const decision = matchApasxoliseisScenarioFacts(facts);
+
+        return {
+            prodhlomena_oraria_id: facts.identity.prodhlomena_oraria_id,
+            team: facts.identity.team,
+            company_kod: facts.identity.company_kod,
+            ypokatasthma: facts.identity.ypokatasthma,
+            kodikos: facts.identity.kodikos,
+            hmeromhnia: facts.identity.hmeromhnia,
+            facts_summary: {
+                declared_category: facts.declared.kathgoria_ergasias,
+                declared_hours: facts.declared.declaredHours,
+                card_hours: facts.cards.cardHours,
+                has_cards: facts.cards.hasCards,
+                has_any_card_evidence: facts.cards.hasAnyCardEvidence,
+                has_zero_length_card_interval: facts.cards.hasZeroLengthCardInterval,
+                is_holiday: facts.holiday.isHoliday,
+                is_mandatory_holiday: facts.holiday.isMandatoryHoliday,
+                is_optional_holiday: facts.holiday.isOptionalHoliday,
+                is_locked: facts.review.is_locked,
+                has_manual_override: facts.review.hasManualOverride
+            },
+            decision
+        };
+    });
 }
 
 async function assertActiveEmploymentReviewPeriodNormal(req, branchOverride = '', expectedToken = null, requiredRange = null) {
@@ -3810,7 +4033,10 @@ async function buildReviewPhaseContextByKodikos({
     kodikoi = [],
     ypokatasthma = '',
     periodStart,
-    periodEnd
+    periodEnd,
+    employeesByKodikos = new Map(),
+    historyByKodikos = new Map(),
+    dailyRowsByKodikos = new Map()
 }) {
     const phaseContextByKodikos = new Map();
 
@@ -3821,10 +4047,13 @@ async function buildReviewPhaseContextByKodikos({
     const apo = dateKeyUtc(periodStart);
     const eos = dateKeyUtc(periodEnd);
 
-    await Promise.all(
-        kodikoi.map(async (kodikos) => {
+    let nextEmployeeIndex = 0;
+    const workers = Array.from({ length: Math.min(6, kodikoi.length) }, async () => {
+        while (nextEmployeeIndex < kodikoi.length) {
+            const kodikos = kodikoi[nextEmployeeIndex];
+            nextEmployeeIndex += 1;
             const key = String(kodikos || '').trim();
-            if (!key) return;
+            if (!key) continue;
 
             try {
                 const phaseContext = await phaseDetectorService.detectPayrollPhasesForDateRange({
@@ -3833,7 +4062,15 @@ async function buildReviewPhaseContextByKodikos({
                     kodikos: key,
                     ypokatasthma,
                     apo,
-                    eos
+                    eos,
+                    preloadedContext: {
+                        employee: employeesByKodikos.get(key),
+                        contractHistoryRows: (historyByKodikos.get(key) || [])
+                            .filter((row) => row.hmeromhnia_allaghs_symbashs),
+                        workTermsHistoryRows: (historyByKodikos.get(key) || [])
+                            .filter((row) => row.afora_allagh_oron_ergasias === true),
+                        dailyRows: dailyRowsByKodikos.get(key) || []
+                    }
                 });
                 phaseContextByKodikos.set(key, phaseContext);
             } catch (error) {
@@ -3843,8 +4080,9 @@ async function buildReviewPhaseContextByKodikos({
                     error.message
                 );
             }
-        })
-    );
+        }
+    });
+    await Promise.all(workers);
 
     return phaseContextByKodikos;
 }
@@ -4349,7 +4587,7 @@ async function applyEmploymentDepartureScopeToFilters({
 
 const REVIEW_SELECT_FIELDS =
     'team company_kod updatedAt kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_apoysias_base_apologistika ' +
-    'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
+    'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias explicit_hourly_leave_hours hr_declared_leave argia argia_apologistika perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
 
 function weeklyHrApiError(code, statusCode, message) {
     return Object.assign(new Error(message), { code, statusCode });
@@ -4427,7 +4665,140 @@ async function loadWeeklyHrContext({ req, input, session = null }) {
     ]));
     return { base, employee, rows, week, employmentDateScope,
         effectiveProfile: profile.effectiveProfile, effectiveProfilesByDate,
-        companyPolicyRules };
+        histories, companyPolicyRules };
+}
+
+function buildWeeklyHrDailyPresentation(rows, effectiveProfile, effectiveProfilesByDate) {
+    return rows.map((row) => {
+        const rowDate = dateKeyUtc(row.hmeromhnia);
+        const dailyProfile = effectiveProfilesByDate[rowDate] || effectiveProfile;
+        const employmentType = normalizeReviewEmploymentType(
+            dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
+        );
+        const actualFacts = resolveStage3DailyActualWorkFacts(row);
+        const intervals = (prefix) => [1, 2, 3].map((index) => ({
+            start: String(row?.[`${prefix}apo_ora_0${index}`] || ''),
+            end: String(row?.[`${prefix}eos_ora_0${index}`] || '')
+        })).filter((item) => item.start || item.end);
+        return {
+            date: rowDate,
+            employment_type: employmentType,
+            employment_label: employmentType === '0' ? 'Πλήρης'
+                : employmentType === '1' ? 'Μερική'
+                    : employmentType === '2' ? 'Εκ περιτροπής / Μερική' : 'Άγνωστο',
+            declared_intervals: intervals(''),
+            declared_hours: actualFacts.declaredWorkHours,
+            actual_work_hours: actualFacts.actualWorkHours,
+            card_intervals: intervals('cards_'),
+            card_hours: actualFacts.cardHours,
+            current_apologistiko_classification:
+                row.apousia_apologistika === true ? 'ΑΠΟΥΣΙΑ'
+                    : row.astheneia_apologistika === true ? 'ΑΣΘΕΝΕΙΑ'
+                        : row.adeia_apologistika === true ? 'ΑΔΕΙΑ'
+                            : String(row.kathgoria_ergasias_apologistika ||
+                                row.kathgoria_adeias_apologistika || '')
+        };
+    });
+}
+
+function weeklyHrLoadedStateKey(employeeId, weekStart) {
+    return `${String(employeeId)}|${dateKeyUtc(weekStart)}`;
+}
+
+function isWeeklyHrRelevantReviewRow(row = {}) {
+    return String(row.kathgoria_adeias_apologistika || '').trim() !== '' ||
+        row.adeia_apologistika === true || row.astheneia_apologistika === true ||
+        row.apousia_apologistika === true;
+}
+
+function buildWeeklyHrPayloadFromLoadedContext({
+    team,
+    company_kod,
+    ypokatasthma,
+    employee,
+    weekStart,
+    weekEnd,
+    periodStart,
+    periodEnd,
+    loadedRows,
+    histories,
+    state,
+    indexState,
+    companyPolicyRules
+}) {
+    const crossesPeriodBoundary = dateKeyUtc(weekStart) < dateKeyUtc(periodStart) ||
+        dateKeyUtc(weekEnd) > dateKeyUtc(periodEnd);
+    const effectivePeriodStart = crossesPeriodBoundary ? periodStart : weekStart;
+    const effectivePeriodEnd = crossesPeriodBoundary ? periodEnd : weekEnd;
+    const employmentDateScope = deriveEmploymentOwnedDateScope({
+        natural_week_start: dateKeyUtc(weekStart),
+        natural_week_end: dateKeyUtc(weekEnd),
+        period_start: dateKeyUtc(effectivePeriodStart),
+        period_end: dateKeyUtc(effectivePeriodEnd),
+        hire_date: employee.hmeromhnia_proslhpshs,
+        departure_date: employee.hmeromhnia_apoxorhshs
+    });
+    const expectedDates = employmentDateScope?.employment_owned_dates || [];
+    const expectedDateSet = new Set(expectedDates);
+    const rows = loadedRows.filter((row) => expectedDateSet.has(dateKeyUtc(row.hmeromhnia)));
+    if (!expectedDates.length || rows.length !== expectedDates.length) return null;
+    const effectiveProfile = getWeeklyRepoProfileInfo({
+        week: {
+            weekStart: new Date(`${expectedDates[0]}T00:00:00.000Z`),
+            weekEnd: new Date(`${expectedDates.at(-1)}T00:00:00.000Z`),
+            naturalWeekEnd: new Date(`${expectedDates.at(-1)}T00:00:00.000Z`)
+        },
+        istorikoRows: histories,
+        ergazomenos: employee
+    }).effectiveProfile;
+    const effectiveProfilesByDate = Object.fromEntries(rows.map((row) => [
+        dateKeyUtc(row.hmeromhnia),
+        getDailyRepoProfileInfo({ row, istorikoRows: histories, ergazomenos: employee }).profile
+    ]));
+    const projection = buildWeeklyHrWorkflowProjection({
+        weekRows: rows,
+        effectiveProfile,
+        effectiveProfilesByDate,
+        persistedStage1State: state?.stage1 || null,
+        indexState,
+        expected_date_keys: expectedDates
+    });
+    const periodScope = crossesPeriodBoundary
+        ? { period_start: dateKeyUtc(periodStart), period_end: dateKeyUtc(periodEnd) }
+        : null;
+    const lifecycleProjection = buildWeeklyHrLifecycleProjection({
+        weekRows: rows.map((row) => ({ ...row, team, company_kod })),
+        effectiveProfile,
+        effectiveProfilesByDate,
+        persistedStage1State: state?.stage1 || null,
+        persistedStage3State: state?.stage3 || null,
+        scope: {
+            team, company_kod, ypokatasthma, employee_id: employee._id,
+            employee_kodikos: employee.kodikos, week_start: weekStart, week_end: weekEnd
+        },
+        periodScope,
+        employmentDateScope,
+        companyPolicyRules
+    });
+    return {
+        success: true,
+        scope: {
+            team, company_kod, ypokatasthma,
+            employee_id: String(employee._id), employee_kodikos: employee.kodikos,
+            week_start: dateKeyUtc(weekStart), week_end: dateKeyUtc(weekEnd),
+            ...(periodScope || {})
+        },
+        employee_name: `${employee.eponymo || ''} ${employee.onoma || ''}`.trim(),
+        rows,
+        stage1_daily_presentation: buildWeeklyHrDailyPresentation(
+            rows, effectiveProfile, effectiveProfilesByDate
+        ),
+        stage1: state?.stage1 || null,
+        ...projection,
+        period_slice: lifecycleProjection.stages.stage1.period_slice,
+        stage1_status: lifecycleProjection.stages.stage1.persisted_status,
+        lifecycle_projection: lifecycleProjection
+    };
 }
 
 async function loadWeeklyHrStage3DecisionContext({ req, input, session = null }) {
@@ -6221,16 +6592,26 @@ class erganhController {
             } = req.query;
 
             const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-            const limitNum = Math.min(Math.max(parseInt(limit, 10) || 5000, 10), 10000);
+            const requestedEmployeeCode = String(kodikos || '').trim();
+            const limitNum = requestedEmployeeCode
+                ? 1
+                : Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
             const skip = (pageNum - 1) * limitNum;
 
             let reviewPeriodControl = null;
+            let periodControlProjectionPromise = Promise.resolve(null);
             if (apo_hmeromhnia && eos_hmeromhnia && ypokatasthma) {
                 const frozenScope = await activeEmploymentReviewPeriodScope(req, ypokatasthma);
                 const samePeriod = dateKeyUtc(frozenScope.period_start) === String(apo_hmeromhnia).slice(0, 10) &&
                     dateKeyUtc(frozenScope.period_end) === String(eos_hmeromhnia).slice(0, 10);
+                const frozenState = await getPeriodControl({ scope: frozenScope });
+                periodControlProjectionPromise = req._skipPeriodHrReadiness === true
+                    ? Promise.resolve(null)
+                    : buildEmploymentReviewPeriodControlProjection(req, {
+                        scope: frozenScope,
+                        state: frozenState
+                    });
                 if (samePeriod) {
-                    const frozenState = await getPeriodControl({ scope: frozenScope });
                     reviewPeriodControl = frozenState;
                     if (frozenState.stored_status === 'FINALIZED' && frozenState.frozen_snapshot_id) {
                         const frozenDocument = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
@@ -6251,11 +6632,24 @@ class erganhController {
                         const correctivePostings = corrective ?
                             await ApasxoliseisCorrectivePayrollPostingModel.find({ ...frozenScope,
                                 case_id: corrective.case_id }).lean() : [];
-                        const rows = projected.rows.slice(skip, skip + limitNum);
+                        const frozenEmployeeCodes = [...new Set(projected.rows
+                            .map((row) => String(row.kodikos || '').trim()).filter(Boolean))]
+                            .sort((left, right) => left.localeCompare(right, 'el', { numeric: true }));
+                        const frozenPageCodes = requestedEmployeeCode
+                            ? frozenEmployeeCodes.filter((value) => value === requestedEmployeeCode)
+                            : frozenEmployeeCodes.slice(skip, skip + limitNum);
+                        const frozenPageCodeSet = new Set(frozenPageCodes);
+                        const rows = projected.rows.filter((row) =>
+                            frozenPageCodeSet.has(String(row.kodikos || '').trim()));
                         return res.json({ success: true, source: projected.source, finalized: true,
+                            period_control: await periodControlProjectionPromise,
                             frozen_snapshot_fingerprint: frozenDocument.frozen_snapshot_fingerprint,
-                            page: pageNum, limit: limitNum, total: projected.total,
-                            totalPages: Math.ceil(projected.total / limitNum), rows,
+                            page: pageNum, limit: limitNum, total: rows.length,
+                            totalEmployees: frozenEmployeeCodes.length,
+                            totalPages: Math.max(Math.ceil(frozenEmployeeCodes.length / limitNum), 1),
+                            employeeCodes: frozenPageCodes,
+                            pagination_scope: 'EMPLOYEES', rows,
+                            summary_scope: 'CURRENT_EMPLOYEE_PAGE',
                             deviations: projected.deviations, payroll_results: projected.payroll_results,
                             corrective: corrective ? {
                                 case_id: corrective.case_id,
@@ -6437,11 +6831,18 @@ class erganhController {
                 ])
             );
 
-            const [rows, total, deviationContextRows] = await Promise.all([
-                ProdhlomenaOrariaModel.find(filter)
+            const requestContext = await loadEmploymentReviewRequestContext({
+                selectedEmployeeCode: requestedEmployeeCode,
+                page: pageNum,
+                limit: limitNum,
+                employeeCodeLoader: () => ProdhlomenaOrariaModel.distinct('kodikos', filter),
+                dailyRowsLoader: (employeeCodes) => {
+                    filter.kodikos = mongoose.trusted({ $in: employeeCodes });
+                    return ProdhlomenaOrariaModel.find(filter)
                     .select(
-                        'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                        'team company_kod ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                            'apo_ora_01_break eos_ora_01_break apo_ora_02_break eos_ora_02_break apo_ora_03_break eos_ora_03_break ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
                             'orphan_card_resolution ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
@@ -6461,23 +6862,24 @@ class erganhController {
                             'is_locked locked_by locked_at unlocked_by unlocked_at'
                     )
                     .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
-                    .skip(skip)
-                    .limit(limitNum)
-                    .lean(),
-                ProdhlomenaOrariaModel.countDocuments(filter),
-                requestedPeriodStart && requestedPeriodEnd
+                    .lean();
+                },
+                dependencyRowsLoader: (employeeCodes) => {
+                    deviationContextFilter.kodikos = mongoose.trusted({ $in: employeeCodes });
+                    return requestedPeriodStart && requestedPeriodEnd
                     ? ProdhlomenaOrariaModel.find(deviationContextFilter)
-                          .select(
-                                  'team company_kod ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
-                                  'repo repo_apologistika adeia kathgoria_adeias ores_apoysias explicit_hourly_leave_hours hr_declared_leave adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika argia argia_apologistika ' +
-                                  'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
-                                  'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
-                                  'ores_ergasias ores_ergasias_apologistika ores_apoysias_apologistika cards_ores_ergasias orphan_card_resolution is_locked'
-                          )
+                          .select(REVIEW_SELECT_FIELDS)
                           .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
                           .lean()
-                    : []
-            ]);
+                    : Promise.resolve([]);
+                }
+            });
+            const {
+                dailyRows: rows,
+                dependencyRows: deviationContextRows,
+                totalEmployees,
+                employeeCodes
+            } = requestContext;
 
             const kodikoiRows = [
                 ...new Set(
@@ -6613,19 +7015,30 @@ class erganhController {
 
             if (kodikos && String(kodikos).trim() !== '') {
                 deviationsFilter.kodikos = String(kodikos).trim();
+            } else {
+                deviationsFilter.kodikos = mongoose.trusted({ $in: employeeCodes });
             }
 
             const deviations = await ProdhlomenaOrariaDeviationsModel.find(deviationsFilter)
                 .sort({ ypokatasthma: 1, kodikos: 1, week_apo: 1 })
                 .lean();
 
+            const reviewDailyRowsByKodikos = new Map();
+            deviationContextRows.forEach((row) => {
+                const key = String(row.kodikos || '').trim();
+                if (!reviewDailyRowsByKodikos.has(key)) reviewDailyRowsByKodikos.set(key, []);
+                reviewDailyRowsByKodikos.get(key).push(row);
+            });
             const phaseContextByKodikos = await buildReviewPhaseContextByKodikos({
                 team: sessionTeam,
                 company_kod: companyId,
                 kodikoi: kodikoiRows,
                 ypokatasthma: String(ypokatasthma || '').trim(),
                 periodStart: reviewPeriodStart,
-                periodEnd: reviewPeriodEnd
+                periodEnd: reviewPeriodEnd,
+                employeesByKodikos: ergByKodikos,
+                historyByKodikos: istorikoRowsByKodikos,
+                dailyRowsByKodikos: reviewDailyRowsByKodikos
             });
 
             const noCardsDisplayContext =
@@ -6639,6 +7052,12 @@ class erganhController {
                           periodEnd: reviewPeriodEnd
                       })
                     : {};
+            const scenarioClassifications = buildEmploymentReviewScenarioClassifications(rows, {
+                argiesByDateKey: noCardsDisplayContext.argiesByDateKey || new Map(),
+                companyFlags: noCardsDisplayContext.companyFlags || {},
+                team: sessionTeam,
+                companyId
+            });
             const deviationAuditRows = deviationContextRows.length
                 ? await ProdhlomenaOrariaAuditModel.find({
                       team: sessionTeam,
@@ -6712,6 +7131,7 @@ class erganhController {
                               team: sessionTeam,
                               company_kod: companyId,
                               execution_status: 'APPLIED',
+                              employee_kodikos: mongoose.trusted({ $in: kodikoiRows }),
                               ...(String(ypokatasthma || '').trim()
                                   ? {
                                         ypokatasthma: String(ypokatasthma)
@@ -7020,6 +7440,91 @@ class erganhController {
                 rowsWithOrphanPreview,
                 enrichedDeviations
             );
+            const relevantWeeklyEmployeeCodes = new Set(
+                reviewRows.filter(isWeeklyHrRelevantReviewRow)
+                    .map((row) => String(row.kodikos || '').trim())
+                    .filter(Boolean)
+            );
+            const weeklyEmployeeIds = [...relevantWeeklyEmployeeCodes]
+                .map((employeeCode) => ergByKodikos.get(employeeCode)?._id)
+                .filter(Boolean);
+            const cleanReviewBranch = String(ypokatasthma || '').trim().padStart(4, '0');
+            const [weeklyWorkflowStates, companyPolicyRules, weeklyIndexState] =
+                weeklyEmployeeIds.length && reviewPeriodStart && reviewPeriodEnd
+                    ? await Promise.all([
+                        ApasxoliseisWeeklyHrWorkflowStateModel.find({
+                            team: sessionTeam,
+                            company_kod: companyId,
+                            ypokatasthma: cleanReviewBranch,
+                            employee_id: mongoose.trusted({ $in: weeklyEmployeeIds }),
+                            week_start: mongoose.trusted({
+                                $lte: endOfWeekSundayUtc(reviewPeriodEnd)
+                            }),
+                            week_end: mongoose.trusted({
+                                $gte: startOfWeekMondayUtc(reviewPeriodStart)
+                            })
+                        }).lean(),
+                        ApasxoliseisCompanyPolicyRuleModel.find({
+                            team: sessionTeam,
+                            company_kod: companyId,
+                            policy_code: 'SIXTH_DAY_PREMIUM',
+                            status: 'ACTIVE',
+                            effective_from: mongoose.trusted({
+                                $lte: endOfWeekSundayUtc(reviewPeriodEnd)
+                            }),
+                            $or: mongoose.trusted([
+                                { effective_to: mongoose.trusted({
+                                    $gte: startOfWeekMondayUtc(reviewPeriodStart)
+                                }) },
+                                { effective_to: null }
+                            ])
+                        }).lean(),
+                        getWeeklyHrWorkflowIndexState()
+                    ])
+                    : [[], [], { ready: false }];
+            const weeklyStateByEmployeeAndWeek = new Map(weeklyWorkflowStates.map((state) => [
+                weeklyHrLoadedStateKey(state.employee_id, state.week_start), state
+            ]));
+            const weeklyRowsByEmployeeAndWeek = new Map();
+            deviationContextRows.forEach((row) => {
+                const employeeCode = String(row.kodikos || '').trim();
+                if (!relevantWeeklyEmployeeCodes.has(employeeCode)) return;
+                const weekStart = startOfWeekMondayUtc(row.hmeromhnia);
+                const key = `${employeeCode}|${dateKeyUtc(weekStart)}`;
+                if (!weeklyRowsByEmployeeAndWeek.has(key)) weeklyRowsByEmployeeAndWeek.set(key, []);
+                weeklyRowsByEmployeeAndWeek.get(key).push(row);
+            });
+            const weeklyHrProjections = [];
+            for (const [key, loadedRows] of weeklyRowsByEmployeeAndWeek) {
+                const [employeeCode, weekStartKey] = key.split('|');
+                const employee = ergByKodikos.get(employeeCode);
+                if (!employee) continue;
+                const weekStart = new Date(`${weekStartKey}T00:00:00.000Z`);
+                const weekEnd = endOfWeekSundayUtc(weekStart);
+                const payload = buildWeeklyHrPayloadFromLoadedContext({
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    ypokatasthma: cleanReviewBranch,
+                    employee,
+                    weekStart,
+                    weekEnd,
+                    periodStart: reviewPeriodStart,
+                    periodEnd: reviewPeriodEnd,
+                    loadedRows,
+                    histories: istorikoRowsByKodikos.get(employeeCode) || [],
+                    state: weeklyStateByEmployeeAndWeek.get(
+                        weeklyHrLoadedStateKey(employee._id, weekStart)
+                    ) || null,
+                    indexState: weeklyIndexState,
+                    companyPolicyRules
+                });
+                if (payload) weeklyHrProjections.push(payload);
+            }
+            weeklyHrProjections.sort((left, right) =>
+                String(left.scope.employee_kodikos).localeCompare(
+                    String(right.scope.employee_kodikos), 'el', { numeric: true }
+                ) || String(left.scope.week_start).localeCompare(String(right.scope.week_start))
+            );
             const legacyDeviations = deviations
                 .filter((deviation) => {
                     const employee =
@@ -7052,11 +7557,18 @@ class erganhController {
 
             return res.json({
                 success: true,
+                period_control: await periodControlProjectionPromise,
                 page: pageNum,
                 limit: limitNum,
-                total,
-                totalPages: Math.ceil(total / limitNum),
+                total: rows.length,
+                totalEmployees,
+                totalPages: Math.max(Math.ceil(totalEmployees / limitNum), 1),
+                employeeCodes,
+                pagination_scope: 'EMPLOYEES',
                 rows: reviewRows,
+                scenario_classifications: scenarioClassifications,
+                weekly_hr_projections: weeklyHrProjections,
+                summary_scope: 'CURRENT_EMPLOYEE_PAGE',
                 deviations: enrichedDeviations,
                 pendingDeviationWeeks,
                 legacyDeviations,
@@ -7177,6 +7689,7 @@ class erganhController {
                 eos_hmeromhnia,
                 ypokatasthma,
                 kodikos,
+                employee_codes,
                 page = 1,
                 limit = 50,
                 policy_code,
@@ -7184,7 +7697,9 @@ class erganhController {
             } = req.query;
 
             const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-            const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+            const limitNum = employee_codes
+                ? Math.min(Math.max(parseInt(limit, 10) || 50, 1), 5000)
+                : Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
             const skip = (pageNum - 1) * limitNum;
             const filter = {
                 team: sessionTeam,
@@ -7235,6 +7750,10 @@ class erganhController {
 
             if (kodikos && String(kodikos).trim() !== '') {
                 filter.kodikos = String(kodikos).trim();
+            } else if (employee_codes && String(employee_codes).trim() !== '') {
+                const employeeCodes = String(employee_codes).split(',')
+                    .map((value) => value.trim()).filter(Boolean).slice(0, 100);
+                filter.kodikos = mongoose.trusted({ $in: employeeCodes });
             }
 
             const { descriptors: lifecycleDescriptors } =
@@ -7694,106 +8213,10 @@ class erganhController {
 
     static getEmploymentReviewPeriodControl = async (req, res) => {
         try {
-            const scope = await activeEmploymentReviewPeriodScope(req, req.query?.ypokatasthma);
-            const [state, indexReadiness, latestCorrective] = await Promise.all([
-                getPeriodControl({ scope }),
-                getPeriodControlIndexState(),
-                ApasxoliseisPeriodCorrectiveCaseModel.findOne({ ...scope }).sort({ opened_at: -1 })
-                    .select('case_id status opened_at reason corrective_delta corrected_result_fingerprint').lean()
-            ]);
-            const lifecycleIndexReadiness = await getPeriodLifecycleIndexState();
-            const finalSubmissionIndexReadiness = await getWtoDailySubmissionIndexState();
-            const finalSnapshot = state.stored_status === 'FINALIZED' && state.frozen_snapshot_id
-                ? await ApasxoliseisPeriodFrozenSnapshotModel.findOne({ _id: state.frozen_snapshot_id,
-                    ...scope, frozen_snapshot_fingerprint: state.frozen_snapshot_fingerprint })
-                    .select('frozen_snapshot').lean() : null;
-            const finalRows = finalSnapshot?.frozen_snapshot?.daily_results || [];
-            let finalProjection = null;
-            let finalProjectionError = null;
-            if (finalSnapshot?.frozen_snapshot) {
-                try {
-                    finalProjection = buildWtoDailySubmissionProjection({ rows: finalRows,
-                        employees: finalSnapshot.frozen_snapshot.employees,
-                        branch: scope.ypokatasthma, periodStart: scope.period_start,
-                        periodEnd: scope.period_end });
-                } catch (error) { finalProjectionError = { code: error.code, message: error.message }; }
-            }
-            const finalEmployeeCount = new Set((finalProjection?.employees || []).map((row) => row.f_afm)).size;
-            const correctivePosting = latestCorrective?.status === 'CLOSED' ?
-                await ApasxoliseisCorrectivePayrollPostingModel.find({ ...scope, case_id: latestCorrective.case_id })
-                    .select('employee_kodikos typos_apodoxon corrective_aa_misthodosias gross_corrective_delta offset_applied withholding_amount payable_now carry_forward_created posting_status').lean() : [];
-            return res.json({
-                success: true,
-                status: state.stored_status,
-                effective_mode: state.effective_mode,
-                deadline: state.deadline,
-                past_deadline: state.past_deadline,
-                locked_at: state.locked_at,
-                locked_by_user_name: state.locked_by_user_name,
-                locked_by_user_role: state.locked_by_user_role,
-                finalized_at: state.finalized_at,
-                finalized_by_user_name: state.finalized_by_user_name,
-                submitted_at: state.submitted_at,
-                submission_protocol: state.submission_protocol,
-                submission_status: state.submission_status,
-                submission_timeliness: state.submission_timeliness,
-                corrective_case: latestCorrective ? { case_id: latestCorrective.case_id,
-                    status: latestCorrective.status, opened_at: latestCorrective.opened_at,
-                    reason: latestCorrective.reason, has_delta: Boolean(latestCorrective.corrective_delta),
-                    payroll_postings: correctivePosting } : null,
-                version: state.version,
-                historical_reconstruction: {
-                    status: state.historical_reconstruction_status,
-                    version: state.historical_reconstruction_version,
-                    pending_version: state.historical_reconstruction_pending_version,
-                    started_at: state.historical_reconstruction_started_at,
-                    completed_at: state.historical_reconstruction_completed_at,
-                    started_by_user_name: state.historical_reconstruction_started_by_user_name,
-                    started_by_user_role: state.historical_reconstruction_started_by_user_role,
-                    reason: state.historical_reconstruction_reason,
-                    dependency_window_start: state.historical_dependency_window_start,
-                    dependency_window_end: state.historical_dependency_window_end,
-                    dependency_status: state.dependency_status
-                },
-                calculation: {
-                    successful_version: state.successful_calculation_version,
-                    completed_at: state.last_successful_calculation_at,
-                    authoritative_result: state.has_authoritative_calculation_result
-                },
-                allowed_actions: {
-                    calculate: state.can_calculate,
-                    record_decision: state.can_record_decision,
-                    record_stale_canonical_decision:
-                        state.can_record_stale_canonical_decision,
-                    repo_transfer: state.can_repo_transfer,
-                    manual_edit: state.can_manual_edit,
-                    historical_reconstruct: state.can_historical_reconstruct,
-                    historical_reassess: state.can_historical_reassess,
-                    historical_calculate: state.can_historical_calculate,
-                    lock_period: ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(state.effective_mode),
-                    unlock_period: state.can_unlock_period,
-                    finalize_period: state.can_finalize && lifecycleIndexReadiness.ready,
-                    submit_final_wtodailya: state.stored_status === 'FINALIZED' &&
-                        !state.past_deadline && Boolean(finalSnapshot?.frozen_snapshot) &&
-                        lifecycleIndexReadiness.ready && finalSubmissionIndexReadiness.ready &&
-                        Boolean(finalProjection) && !state.submission_reference,
-                    open_corrective: state.can_corrective && lifecycleIndexReadiness.ready,
-                    corrective: state.can_corrective,
-                    post_corrective_payroll: latestCorrective?.status === 'CLOSED' &&
-                        Boolean(latestCorrective.corrected_result_fingerprint) && lifecycleIndexReadiness.ready
-                },
-                final_submission_summary: {
-                    branch: scope.ypokatasthma,
-                    period_start: scope.period_start.toISOString().slice(0, 10),
-                    period_end: scope.period_end.toISOString().slice(0, 10),
-                    employees_count: finalEmployeeCount,
-                    employee_days_count: finalProjection?.employees?.length || 0,
-                    validation_error: finalProjectionError
-                },
-                index_readiness: indexReadiness,
-                lifecycle_index_readiness: lifecycleIndexReadiness,
-                final_submission_index_readiness: finalSubmissionIndexReadiness
+            const projection = await buildEmploymentReviewPeriodControlProjection(req, {
+                branchOverride: req.query?.ypokatasthma
             });
+            return res.json(projection);
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false, code: error.code,
                 message: error.statusCode && error.statusCode < 500 ? error.message : 'Δεν ήταν δυνατή η ανάκτηση της κατάστασης περιόδου.' });
@@ -7803,9 +8226,12 @@ class erganhController {
     static authorizeEmploymentReviewHistoricalReconstruction = async (req, res) => {
         try {
             const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
+            let periodReadinessPromise;
+            const periodReadiness = () => periodReadinessPromise ||= loadEmploymentPeriodReadiness(req, scope);
             const result = await authorizeHistoricalReconstruction({ session: req.session, scope,
                 reason: req.body?.reason, requestId: req.body?.request_id,
-                confirmation: req.body?.confirmation === true });
+                confirmation: req.body?.confirmation === true,
+                periodDataQualityReadinessResolver: async () => (await periodReadiness()).data_quality });
             return res.status(result.idempotent ? 200 : 201).json({ success: true,
                 idempotent: result.idempotent,
                 historical_reconstruction_version: result.record.historical_reconstruction_pending_version,
@@ -7821,15 +8247,20 @@ class erganhController {
         try {
             const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
             const snapshotInput = await loadEmploymentPeriodFrozenSnapshotInput(req, scope);
+            let periodReadinessPromise;
+            const periodReadiness = () => periodReadinessPromise ||= loadEmploymentPeriodReadiness(req, scope);
             const result = await finalizeEmploymentPeriod({ session: req.session, scope,
                 reason: req.body?.reason, requestId: req.body?.request_id, snapshotInput,
-                indexGuard: assertPeriodLifecycleIndexesReady });
+                indexGuard: assertPeriodLifecycleIndexesReady,
+                periodHrReadinessResolver: async () => (await periodReadiness()).hr,
+                periodDataQualityReadinessResolver: async () => (await periodReadiness()).data_quality });
             return res.status(result.idempotent ? 200 : 201).json({ success: true,
                 idempotent: result.idempotent, status: 'FINALIZED',
                 message: 'Η περίοδος οριστικοποιήθηκε και το ιστορικό αποτέλεσμα πάγωσε.',
                 frozen_snapshot_fingerprint: result.snapshot.frozen_snapshot_fingerprint });
         } catch (error) { return res.status(error.statusCode || 500).json({ success: false,
-            code: error.code, message: error.statusCode ? error.message : 'Η οριστικοποίηση περιόδου απέτυχε.' }); }
+            code: error.code, period_hr_readiness: error.period_hr_readiness,
+            message: error.statusCode ? error.message : 'Η οριστικοποίηση περιόδου απέτυχε.' }); }
     };
 
     static submitFinalWTODayilyA = async (req, res) => {
@@ -8058,6 +8489,8 @@ class erganhController {
     static transitionEmploymentReviewPeriodControl = async (req, res) => {
         try {
             const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
+            let periodReadinessPromise;
+            const periodReadiness = () => periodReadinessPromise ||= loadEmploymentPeriodReadiness(req, scope);
             const result = await transitionPeriodControl({
                 session: req.session,
                 scope,
@@ -8065,7 +8498,9 @@ class erganhController {
                 reason: req.body?.reason,
                 requestId: req.body?.request_id,
                 expectedVersion: req.body?.expected_version,
-                indexGuard: assertPeriodControlIndexesReady
+                indexGuard: assertPeriodControlIndexesReady,
+                periodHrReadinessResolver: async () => (await periodReadiness()).hr,
+                periodDataQualityReadinessResolver: async () => (await periodReadiness()).data_quality
             });
             return res.status(result.idempotent ? 200 : 201).json({
                 success: true,
@@ -8080,6 +8515,7 @@ class erganhController {
         } catch (error) {
             const status = error.code === 'PERIOD_CONTROL_INDEXES_NOT_READY' ? 503 : error.statusCode || 500;
             return res.status(status).json({ success: false, code: error.code,
+                period_hr_readiness: error.period_hr_readiness,
                 message: status < 500 || status === 503 ? error.message : 'Η μεταβολή κατάστασης περιόδου απέτυχε.' });
         }
     };
@@ -8301,6 +8737,7 @@ class erganhController {
                 eos_hmeromhnia,
                 ypokatasthma,
                 kodikos,
+                employee_codes,
                 page = 1,
                 limit = 50
             } = req.query;
@@ -8357,6 +8794,10 @@ class erganhController {
 
             if (kodikos && String(kodikos).trim() !== '') {
                 filter.kodikos = String(kodikos).trim();
+            } else if (employee_codes && String(employee_codes).trim() !== '') {
+                const employeeCodes = String(employee_codes).split(',')
+                    .map((value) => value.trim()).filter(Boolean).slice(0, 100);
+                filter.kodikos = mongoose.trusted({ $in: employeeCodes });
             }
 
             const [rows, total] = await Promise.all([
@@ -8406,50 +8847,11 @@ class erganhController {
                           periodEnd
                       })
                     : { companyFlags: {}, argiesByDateKey: new Map() };
-            const argiesByDateKey = scenarioContext.argiesByDateKey || new Map();
-            const companyFlags = scenarioContext.companyFlags || {};
-
-            const classificationRows = rows.map((row) => {
-                const argiaRec = argiesByDateKey.get(dateKeyUtc(row.hmeromhnia));
-                const isHoliday = Boolean(argiaRec);
-                const facts = buildApasxoliseisScenarioFacts(row, {
-                    holiday: {
-                        isHoliday,
-                        isMandatoryHoliday: argiaRec?.ypoxreotikh_argia === true,
-                        isOptionalHoliday: isHoliday && argiaRec?.ypoxreotikh_argia !== true,
-                        description: argiaRec?.description || ''
-                    },
-                    companyFlags: {
-                        companyWorksOnMandatoryHoliday:
-                            companyFlags.apasxolhsh_kata_tis_argies === true,
-                        companyWorksOnOptionalHoliday:
-                            companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true
-                    }
-                });
-                const decision = matchApasxoliseisScenarioFacts(facts);
-
-                return {
-                    prodhlomena_oraria_id: facts.identity.prodhlomena_oraria_id,
-                    team: facts.identity.team,
-                    company_kod: facts.identity.company_kod,
-                    ypokatasthma: facts.identity.ypokatasthma,
-                    kodikos: facts.identity.kodikos,
-                    hmeromhnia: facts.identity.hmeromhnia,
-                    facts_summary: {
-                        declared_category: facts.declared.kathgoria_ergasias,
-                        declared_hours: facts.declared.declaredHours,
-                        card_hours: facts.cards.cardHours,
-                        has_cards: facts.cards.hasCards,
-                        has_any_card_evidence: facts.cards.hasAnyCardEvidence,
-                        has_zero_length_card_interval: facts.cards.hasZeroLengthCardInterval,
-                        is_holiday: facts.holiday.isHoliday,
-                        is_mandatory_holiday: facts.holiday.isMandatoryHoliday,
-                        is_optional_holiday: facts.holiday.isOptionalHoliday,
-                        is_locked: facts.review.is_locked,
-                        has_manual_override: facts.review.hasManualOverride
-                    },
-                    decision
-                };
+            const classificationRows = buildEmploymentReviewScenarioClassifications(rows, {
+                argiesByDateKey: scenarioContext.argiesByDateKey || new Map(),
+                companyFlags: scenarioContext.companyFlags || {},
+                team: sessionTeam,
+                companyId
             });
 
             return res.json({
@@ -9946,6 +10348,9 @@ class erganhController {
                 employeeCode: scopedEmployeeCode
             });
             if (historicalRequestId) assertCriticalEmploymentDecisionRole(req.session);
+            if (historicalRequestId) assertPeriodDataQualityReady(
+                (await loadEmploymentPeriodReadiness(req, periodControlScope)).data_quality,
+                'HISTORICAL_RECONSTRUCTION');
             calculationOwnership = await acquirePeriodCalculationOwnership({ scope: periodControlScope,
                 historicalRequestId });
 
@@ -10587,67 +10992,20 @@ class erganhController {
                 week_start: context.week.start, week_end: context.week.end
             }).lean();
             const indexState = await getWeeklyHrWorkflowIndexState();
-            const projection = buildWeeklyHrWorkflowProjection({ weekRows: context.rows,
-                effectiveProfile: context.effectiveProfile,
-                effectiveProfilesByDate: context.effectiveProfilesByDate,
-                persistedStage1State: state?.stage1 || null, indexState,
-                expected_date_keys:
-                    context.employmentDateScope?.employment_owned_dates || null });
-            const periodScope = req.query.period_start && req.query.period_end
-                ? { period_start: req.query.period_start, period_end: req.query.period_end } : null;
-            const lifecycleProjection = buildWeeklyHrLifecycleProjection({
-                weekRows: context.rows.map((row) => ({ ...row,
-                    team: context.base.team,
-                    company_kod: context.base.company_kod })),
-                effectiveProfile: context.effectiveProfile,
-                effectiveProfilesByDate: context.effectiveProfilesByDate,
-                persistedStage1State: state?.stage1 || null,
-                persistedStage3State: state?.stage3 || null,
-                scope: { ...context.base, employee_id: context.employee._id,
-                    employee_kodikos: context.employee.kodikos,
-                    week_start: context.week.start, week_end: context.week.end },
-                periodScope,
-                employmentDateScope: context.employmentDateScope,
+            const payload = buildWeeklyHrPayloadFromLoadedContext({
+                ...context.base,
+                employee: context.employee,
+                weekStart: context.week.start,
+                weekEnd: context.week.end,
+                periodStart: req.query.period_start || context.week.start,
+                periodEnd: req.query.period_end || context.week.end,
+                loadedRows: context.rows,
+                histories: context.histories,
+                state,
+                indexState,
                 companyPolicyRules: context.companyPolicyRules
             });
-            const stage1DailyPresentation = context.rows.map((row) => {
-                const rowDate = dateKeyUtc(row.hmeromhnia);
-                const dailyProfile = context.effectiveProfilesByDate[rowDate] ||
-                    context.effectiveProfile;
-                const employmentType = normalizeReviewEmploymentType(
-                    dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
-                );
-                const actualFacts = resolveStage3DailyActualWorkFacts(row);
-                const intervals = (prefix) => [1, 2, 3].map((index) => ({
-                    start: String(row?.[`${prefix}apo_ora_0${index}`] || ''),
-                    end: String(row?.[`${prefix}eos_ora_0${index}`] || '')
-                })).filter((item) => item.start || item.end);
-                return { date: rowDate, employment_type: employmentType,
-                    employment_label: employmentType === '0' ? 'Πλήρης'
-                        : employmentType === '1' ? 'Μερική'
-                            : employmentType === '2' ? 'Εκ περιτροπής / Μερική' : 'Άγνωστο',
-                    declared_intervals: intervals(''),
-                    declared_hours: actualFacts.declaredWorkHours,
-                    actual_work_hours: actualFacts.actualWorkHours,
-                    card_intervals: intervals('cards_'),
-                    card_hours: actualFacts.cardHours,
-                    current_apologistiko_classification:
-                        row.apousia_apologistika === true ? 'ΑΠΟΥΣΙΑ'
-                            : row.astheneia_apologistika === true ? 'ΑΣΘΕΝΕΙΑ'
-                                : row.adeia_apologistika === true ? 'ΑΔΕΙΑ'
-                                    : String(row.kathgoria_ergasias_apologistika ||
-                                        row.kathgoria_adeias_apologistika || '') };
-            });
-            return res.json({ success: true, scope: { ...context.base,
-                employee_id: String(context.employee._id), employee_kodikos: context.employee.kodikos,
-                week_start: context.week.startKey, week_end: context.week.endKey,
-                ...(periodScope || {}) },
-                employee_name: `${context.employee.eponymo || ''} ${context.employee.onoma || ''}`.trim(),
-                rows: context.rows, stage1_daily_presentation: stage1DailyPresentation,
-                stage1: state?.stage1 || null, ...projection,
-                period_slice: lifecycleProjection.stages.stage1.period_slice,
-                stage1_status: lifecycleProjection.stages.stage1.persisted_status,
-                lifecycle_projection: lifecycleProjection });
+            return res.json(payload);
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'WEEKLY_HR_WORKFLOW_READ_FAILED',

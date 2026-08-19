@@ -273,7 +273,12 @@ async function loadWeeklyCanonicalDecisionContext({
     });
     const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
     const automaticAnalysis = analyzeWeeklySixthSeventhDay({
-        weekRows: rows, effectiveProfile, hourlyRate: effectiveProfile.pragmatikoOromisthio
+        weekRows: rows,
+        effectiveProfile: {
+            ...effectiveProfile,
+            date_effective_profiles_by_date: weeklyProfileInfo.profilesByDate
+        },
+        hourlyRate: effectiveProfile.pragmatikoOromisthio
     });
     const appliedProtectionContext = buildAppliedProtectionContext(appliedExecutions,
         { team, company_kod: company, ypokatasthma: branch }, rows);

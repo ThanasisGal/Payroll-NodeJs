@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const ExcelJS = require('exceljs');
+const JSZip = require('jszip');
 const { execFileSync } = require('node:child_process');
 const {
     buildEmploymentReviewReportProjection,
@@ -19,7 +21,12 @@ const {
     employmentStatusLabel,
     dossierFooterLine,
     buildDossierHistoryEntries,
-    branchDescription
+    branchDescription,
+    COMPACT_DAILY_XLSX_COLUMNS,
+    COMPACT_DAILY_NUMERIC_KEYS,
+    OVERTIME_COMPONENTS,
+    overtimeValues,
+    buildCompactDailyXlsxRows
 } = require('./apasxoliseisEmploymentReviewReportService');
 
 function row(overrides = {}) {
@@ -144,11 +151,7 @@ test('0009 / 09-06: η τελική Stage-2 προβολή εξάγεται ως
 
     const workbook = buildEmploymentReviewWorkbook(report);
     const exported = workbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ').getRow(2);
-    assert.equal(exported.getCell('classification').value, 'ΑΝ');
-    assert.equal(exported.getCell('classificationLabel').value, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
-    assert.equal(exported.getCell('repo').value, 'ΝΑΙ');
-    assert.equal(exported.getCell('apologistikoBook').value, 'ΝΑΙ');
-    assert.notEqual(exported.getCell('classification').value, 'ΕΡΓ');
+    assert.equal(exported.getCell('workCategories').value, 'Προδ.: ΕΡΓ\nΑπολ.: ΑΝ');
 });
 
 test('μερική/εκ περιτροπής Stage-2 ημέρα εξάγεται ως ΜΗ ΕΡΓΑΣΙΑ και όχι ΡΕΠΟ', () => {
@@ -169,14 +172,13 @@ test('μερική/εκ περιτροπής Stage-2 ημέρα εξάγεται
     assert.equal(report.daily[0].apologistikoBook, true);
 });
 
-test('το XLSX διατηρεί όλα τα απολογιστικά αριθμητικά πεδία ως αριθμούς με 0.00', () => {
+test('το XLSX διατηρεί τις αυτόνομες στήλες G–M ως αριθμούς με 0.00', () => {
     const workbook = buildEmploymentReviewWorkbook(fixture());
     const sheet = workbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
-    for (const [field] of DAILY_NUMBER_FIELDS) {
-        assert.equal(sheet.getColumn(field).numFmt, '0.00', field);
-        assert.equal(typeof sheet.getRow(2).getCell(field).value, 'number', field);
+    for (const key of COMPACT_DAILY_NUMERIC_KEYS) {
+        assert.equal(sheet.getColumn(key).numFmt, '0.00', key);
+        assert.equal(typeof sheet.getRow(2).getCell(key).value, 'number', key);
     }
-    assert.equal(sheet.getColumn('sixthDayRate').numFmt, '0.00');
 });
 
 test('η ανάλυση PDF παραλείπει μηδενικά αριθμητικά αλλά διατηρεί τις βασικές canonical καταστάσεις', () => {
@@ -203,16 +205,73 @@ test('η ανάλυση PDF παραλείπει μηδενικά αριθμητ
 test('το βιβλίο έχει το φύλλο συνόλων ανά εργαζόμενο, γενικό σύνολο και διατηρεί το 0%', async () => {
     const workbook = buildEmploymentReviewWorkbook(fixture());
     assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), [
-        'ΣΥΝΟΨΗ', 'ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ', 'ΣΥΝΟΛΑ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ',
+        'ΣΥΝΟΨΗ', 'ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ', 'ΑΝΑΚΕΦΑΛΑΙΩΣΗ', 'ΣΥΝΟΛΑ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ',
         'ΑΠΟΦΑΣΕΙΣ ΣΤΑΔΙΩΝ', 'ΕΒΔΟΜΑΔΙΑΙΟΣ ΕΛΕΓΧΟΣ', 'ΙΧΝΗΛΑΣΙΜΟΤΗΤΑ'
     ]);
     const sheet = workbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
-    assert.ok(sheet.getColumn('sixth').values.includes('ΝΑΙ'));
-    assert.ok(sheet.getColumn('sixthDayRate').values.includes(0));
+    assert.ok(sheet.getColumn('sixthDayHours').values.some((value) => Number(value) > 0));
     const totals = workbook.getWorksheet('ΣΥΝΟΛΑ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ');
     assert.equal(totals.getRow(totals.rowCount).getCell('employeeCode').value, 'ΓΕΝΙΚΟ ΣΥΝΟΛΟ');
-    TOTAL_NUMBER_FIELDS.forEach(([field]) => assert.equal(totals.getColumn(field).numFmt, '0.00'));
+    TOTAL_NUMBER_FIELDS.filter(([field]) => !Object.values(OVERTIME_COMPONENTS).flat().includes(field))
+        .forEach(([field]) => assert.equal(totals.getColumn(field).numFmt, '0.00'));
     assert.ok((await workbook.xlsx.writeBuffer()).byteLength > 1000);
+});
+
+test('η ανακεφαλαίωση έχει μία row ανά εργαζόμενο και πλήρη overtime ανάλυση πέντε γραμμών', () => {
+    const rows = [
+        row({ kodikos: '0001', employeeName: 'ΠΡΩΤΟΣ',
+            ores_yperergasias_apologistika: 1, ores_yperergasias_nyxtas_apologistika: 2,
+            ores_yperergasias_argion_apologistika: 3, ores_yperergasias_argion_nyxtas_apologistika: 4,
+            ores_nominhs_yperorias_apologistika: 0.1, ores_nominhs_yperorias_nyxtas_apologistika: 0.2,
+            ores_nominhs_yperorias_argion_apologistika: 0.3,
+            ores_nominhs_yperorias_argion_nyxtas_apologistika: 0.4,
+            ores_paranomhs_yperorias_apologistika: 1.1,
+            ores_paranomhs_yperorias_nyxtas_apologistika: 1.2,
+            ores_paranomhs_yperorias_argion_apologistika: 1.3,
+            ores_paranomhs_yperorias_argion_nyxtas_apologistika: 1.4,
+            orphan_card_resolution_preview: null, orphan_card_resolution: null }),
+        row({ kodikos: '0002', employeeName: 'ΔΕΥΤΕΡΟΣ',
+            ores_yperergasias_apologistika: 0.5, ores_yperergasias_nyxtas_apologistika: 0.6,
+            ores_yperergasias_argion_apologistika: 0.7,
+            ores_yperergasias_argion_nyxtas_apologistika: 0.8,
+            ores_nominhs_yperorias_apologistika: 1.5, ores_nominhs_yperorias_nyxtas_apologistika: 1.6,
+            ores_nominhs_yperorias_argion_apologistika: 1.7,
+            ores_nominhs_yperorias_argion_nyxtas_apologistika: 1.8,
+            ores_paranomhs_yperorias_apologistika: 2.5,
+            ores_paranomhs_yperorias_nyxtas_apologistika: 2.6,
+            ores_paranomhs_yperorias_argion_apologistika: 2.7,
+            ores_paranomhs_yperorias_argion_nyxtas_apologistika: 2.8,
+            orphan_card_resolution_preview: null, orphan_card_resolution: null })
+    ];
+    const report = buildEmploymentReviewReportProjection({ rows });
+    const sheet = buildEmploymentReviewWorkbook(report).getWorksheet('ΣΥΝΟΛΑ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ');
+    assert.equal(sheet.rowCount, report.employees.length + 2);
+    assert.equal(sheet.getColumn('overwork').header, 'Υπερεργασία');
+    assert.equal(sheet.getColumn('legalOvertime').header, 'Νόμιμη Υπερωρία');
+    assert.equal(sheet.getColumn('illegalOvertime').header, 'Παράνομη Υπερωρία');
+    const parse = (value) => String(value).split('\n').map((line) => Number(line.split(': ')[1]));
+    report.employees.forEach((employee, employeeIndex) => {
+        const recapRow = sheet.getRow(employeeIndex + 2);
+        assert.equal(recapRow.getCell('employeeCode').value, employee.employeeCode);
+        assert.equal(recapRow.height, 60);
+        assert.equal(recapRow.alignment.wrapText, true);
+        for (const [key, fields] of Object.entries(OVERTIME_COMPONENTS)) {
+            const values = parse(recapRow.getCell(key).value);
+            assert.equal(values.length, 5);
+            assert.deepEqual(values.slice(1), fields.map((field) => employee.totals[field]));
+            assert.equal(values[0], Number(values.slice(1).reduce((sum, value) => sum + value, 0).toFixed(2)));
+        }
+    });
+    const generalRow = sheet.getRow(sheet.rowCount);
+    for (const [key, fields] of Object.entries(OVERTIME_COMPONENTS)) {
+        const values = parse(generalRow.getCell(key).value);
+        assert.equal(values.length, 5);
+        assert.deepEqual(values.slice(1), fields.map((field) => report.summary.totals[field]));
+        values.slice(1).forEach((value, componentIndex) => assert.equal(value,
+            Number(report.employees.reduce((sum, employee) =>
+                sum + employee.totals[fields[componentIndex]], 0).toFixed(2))));
+        assert.equal(values[0], Number(values.slice(1).reduce((sum, value) => sum + value, 0).toFixed(2)));
+    }
 });
 
 test('τα σύνολα εργαζομένου είναι SUM των daily values και τα γενικά SUM των εργαζομένων', () => {
@@ -251,14 +310,15 @@ test('τα δύο PDF δημιουργούνται χωρίς μεταβολή �
     assert.deepEqual(report.daily.map((item) => item.source), before);
 });
 
-test('το κοινό PDF footer χρησιμοποιεί δυναμικό έτος και διατηρεί την αρίθμηση σελίδων', () => {
+test('το απλό PDF footer είναι μία γραμμή με δυναμικό έτος και δεξιά αρίθμηση', () => {
     const lines = pdfFooterLines(2, 7);
-    assert.match(lines[0], new RegExp(`^\\(c\\) 2009 - ${new Date().getFullYear()}  Copyright: WebPayrollSolutions\\.com`));
+    assert.match(lines[0], new RegExp(`^© 2009 - ${new Date().getFullYear()} Copyright: WebPayrollSolutions\\.com`));
+    assert.equal(lines.some((line) => /\r|\n/.test(line)), false);
     assert.match(lines.join(' '), /Ιωλκού 266α Βόλος/);
     assert.match(lines.join(' '), /Τηλ\. 2421056825/);
     assert.match(lines.join(' '), /Κιν\. 6972012650/);
     assert.match(lines.join(' '), /support@WebPayrollSolutions\.com/);
-    assert.match(lines[1], /Σελίδα 2 \/ 7$/);
+    assert.equal(lines[1], 'Σελίδα 2 / 7');
 });
 
 test('το dossier footer είναι μία γραμμή με δυναμικό έτος', () => {
@@ -421,9 +481,9 @@ test('0014: το ημερήσιο καθεστώς ακολουθεί αποκλ
     assert.equal(report.employees[0].periodEmploymentStatus, 'ΜΙΚΤΟ ΚΑΤΑ ΤΗΝ ΠΕΡΙΟΔΟ');
 
     const sheet = buildEmploymentReviewWorkbook(report).getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
-    assert.equal(sheet.getColumn('employmentStatus').values[2], 'ΜΕΡΙΚΗ');
-    assert.equal(sheet.getColumn('employmentStatus').values[3], 'ΠΛΗΡΗΣ');
-    assert.equal(sheet.getColumn('employmentStatus').values[4], 'ΠΛΗΡΗΣ');
+    assert.equal(sheet.getColumn('dateStatus').values[2], '14/06/2026\nΜΕΡΙΚΗ');
+    assert.equal(sheet.getColumn('dateStatus').values[3], '15/06/2026\nΠΛΗΡΗΣ');
+    assert.equal(sheet.getColumn('dateStatus').values[4], '16/06/2026\nΠΛΗΡΗΣ');
 });
 
 test('POSSIBLE_LEAVE είναι μόνο internal workflow state στο PDF/XLSX projection', () => {
@@ -449,8 +509,296 @@ test('POSSIBLE_LEAVE είναι μόνο internal workflow state στο PDF/XLSX
         { label: '', book: false, repo: false, leaveCategory: 'ΑΔΑΣ' }
     ]);
     const sheet = buildEmploymentReviewWorkbook(report).getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
-    assert.equal(sheet.getColumn('leaveCategory').values[2], '');
-    assert.equal(sheet.getColumn('leaveCategory').values[3], '');
-    assert.equal(sheet.getColumn('leaveCategory').values[4], 'ΑΔΚΑΝ');
-    assert.equal(sheet.getColumn('leaveCategory').values[5], 'ΑΔΑΣ');
+    const allText = [...sheet._rows].filter(Boolean).flatMap((row) => row.values)
+        .filter((value) => typeof value === 'string').join('\n');
+    assert.doesNotMatch(allText, /POSSIBLE_LEAVE/);
+});
+
+test('το ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ έχει 16 capped στήλες, λογική κεφαλίδα και μία row ανά ημερομηνία', () => {
+    const report = fixture();
+    const sheet = buildEmploymentReviewWorkbook(report).getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
+    assert.equal(sheet.columnCount, 16);
+    assert.equal(sheet.getRow(1).height, 34);
+    assert.equal(sheet.getRow(1).alignment.wrapText, true);
+    assert.equal(sheet.getRow(1).alignment.horizontal, 'center');
+    assert.deepEqual(sheet.columns.map((column) => column.width),
+        COMPACT_DAILY_XLSX_COLUMNS.map(([, , width]) => width));
+    assert.ok(sheet.columns.every((column) => column.width <= 28));
+    const dailyRows = buildCompactDailyXlsxRows(report).filter((item) => item.rowType === 'daily');
+    assert.equal(dailyRows.length, report.daily.length);
+    assert.equal(sheet.rowCount, report.daily.length + (2 * report.employees.length) + 6);
+    assert.deepEqual(sheet.views, [{ state: 'frozen', xSplit: 1, ySplit: 1 }]);
+});
+
+test('το ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ έχει A4 landscape print setup μίας σελίδας σε πλάτος', () => {
+    const workbook = buildEmploymentReviewWorkbook(fixture());
+    const sheet = workbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
+    assert.equal(sheet.pageSetup.paperSize, 9);
+    assert.equal(sheet.pageSetup.orientation, 'landscape');
+    assert.equal(sheet.pageSetup.fitToPage, true);
+    assert.equal(sheet.pageSetup.fitToWidth, 1);
+    assert.equal(sheet.pageSetup.fitToHeight, 0);
+    assert.equal(sheet.pageSetup.printArea, `A1:P${sheet.rowCount}`);
+    assert.equal(sheet.pageSetup.printTitlesRow, '1:1');
+    assert.equal(sheet.pageSetup.showGridLines, false);
+    assert.equal(sheet.pageSetup.showRowColHeaders, false);
+    assert.equal(sheet.pageSetup.horizontalCentered, true);
+    assert.deepEqual(sheet.pageSetup.margins,
+        { left: 0.22, right: 0.22, top: 0.38, bottom: 0.38, header: 0.17, footer: 0.17 });
+});
+
+test('το ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ εφαρμόζει διακριτική WPS παλέτα χωρίς αλλαγή διαστάσεων', async () => {
+    const rows = [
+        row({ kodikos: '0001', hmeromhnia: new Date('2026-06-01T00:00:00.000Z'),
+            ores_apoysias_apologistika: 1, ores_ergasias_apologistika: 8,
+            ores_yperergasias_apologistika: 1, ores_nominhs_yperorias_apologistika: 0.5,
+            policy: { classification: 'SIXTH', sixthDayRate: 0 },
+            orphan_card_resolution_preview: null, orphan_card_resolution: null }),
+        row({ kodikos: '0001', hmeromhnia: new Date('2026-06-02T00:00:00.000Z'),
+            ores_ergasias_apologistika: 6, ores_paranomhs_yperorias_apologistika: 0.75,
+            policy: { classification: 'SEVENTH' },
+            orphan_card_resolution_preview: null, orphan_card_resolution: null })
+    ];
+    const workbook = buildEmploymentReviewWorkbook(buildEmploymentReviewReportProjection({ rows }));
+    const sheet = workbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
+    assert.equal(sheet.getRow(1).fill.fgColor.argb, 'FF55645B');
+    assert.equal(sheet.getRow(1).font.color.argb, 'FFFFFFFF');
+    assert.equal(sheet.getRow(2).fill, undefined);
+    assert.equal(sheet.getCell('A3').fill.fgColor.argb, 'FFF4F6F4');
+    assert.equal(sheet.getCell('H2').fill.fgColor.argb, 'FFFDECEC');
+    assert.equal(sheet.getCell('L2').fill.fgColor.argb, 'FFFFF2CC');
+    assert.equal(sheet.getCell('N2').fill.fgColor.argb, 'FFFFF3E0');
+    assert.equal(sheet.getCell('O2').fill.fgColor.argb, 'FFE8F3EC');
+    assert.equal(sheet.getCell('M3').fill.fgColor.argb, 'FFFCE8E6');
+    assert.equal(sheet.getCell('P3').fill.fgColor.argb, 'FFFBE9E9');
+    assert.equal(sheet.getRow(4).fill.fgColor.argb, 'FFE3EBE6');
+    assert.equal(sheet.getRow(5).fill.fgColor.argb, 'FF3F5B50');
+    assert.deepEqual(sheet.columns.map((column) => column.width),
+        COMPACT_DAILY_XLSX_COLUMNS.map(([, , width]) => width));
+    assert.deepEqual(sheet._rows.slice(0, 5).map((item) => item && item.height).filter(Boolean),
+        [34, 60, 60, 60, 60]);
+    const persistedWorkbook = new ExcelJS.Workbook();
+    await persistedWorkbook.xlsx.load(await workbook.xlsx.writeBuffer());
+    const persistedSheet = persistedWorkbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
+    assert.equal(persistedSheet.getCell('L2').fill.fgColor.argb, 'FFFFF2CC');
+    assert.equal(persistedSheet.getCell('M3').fill.fgColor.argb, 'FFFCE8E6');
+    assert.equal(persistedSheet.getCell('P3').fill.fgColor.argb, 'FFFBE9E9');
+});
+
+test('η ανακεφαλαίωση βρίσκεται στο ορατό ημερήσιο φύλλο, εντός printArea και μετά από page break', async () => {
+    const report = fixture();
+    const workbook = buildEmploymentReviewWorkbook(report);
+    const sheet = workbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
+    const title = 'ΑΝΑΚΕΦΑΛΑΙΩΣΗ ΣΥΝΟΛΩΝ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ';
+    const titleRow = sheet._rows.find((row) => row?.getCell(1).value === title)?.number;
+    assert.ok(titleRow, 'ο τίτλος πρέπει να υπάρχει στο ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
+    const existingGeneralRow = 1 + report.daily.length + report.employees.length + 1;
+    assert.equal(titleRow, existingGeneralRow + 2);
+    assert.equal(sheet.getCell(`A${existingGeneralRow}`).value, 'ΓΕΝΙΚΟ ΣΥΝΟΛΟ ΠΕΡΙΟΔΟΥ');
+    assert.equal(sheet.getCell(`A${titleRow + 1}`).value, 'Κωδικός');
+    const firstEmployeeRow = titleRow + 2;
+    const lastEmployeeRow = firstEmployeeRow + report.employees.length - 1;
+    const recapGeneralRow = lastEmployeeRow + 1;
+    assert.equal(sheet.getCell(`A${firstEmployeeRow}`).value, report.employees[0].employeeCode);
+    assert.equal(sheet.getCell(`A${lastEmployeeRow}`).value,
+        report.employees[report.employees.length - 1].employeeCode);
+    assert.equal(sheet.getCell(`A${recapGeneralRow}`).value, 'ΓΕΝΙΚΟ ΣΥΝΟΛΟ');
+    assert.equal(recapGeneralRow, sheet.rowCount);
+    assert.equal(sheet.pageSetup.printArea, `A1:P${recapGeneralRow}`);
+    assert.ok(sheet.rowBreaks.some((item) => item.id === titleRow - 1));
+    assert.equal(sheet.getCell(`A${titleRow}`).isMerged, true);
+    assert.equal(sheet.getCell(`O${titleRow}`).isMerged, true);
+    assert.equal(sheet.getCell(`P${titleRow}`).isMerged, false);
+    const recapCodes = [];
+    for (let rowNumber = 1; rowNumber < titleRow; rowNumber += 1) {
+        for (const column of ['J', 'K', 'L', 'M', 'N', 'O', 'P']) {
+            assert.equal(sheet.getCell(`${column}${rowNumber}`).isMerged, false,
+                `${column}${rowNumber} δεν πρέπει να είναι merged`);
+        }
+    }
+    for (let rowNumber = titleRow + 1; rowNumber <= recapGeneralRow; rowNumber += 1) {
+        assert.equal(sheet.getCell(`J${rowNumber}`).isMerged, true);
+        assert.equal(sheet.getCell(`K${rowNumber}`).isMerged, true);
+        assert.equal(sheet.getCell(`L${rowNumber}`).isMerged, true);
+        assert.equal(sheet.getCell(`M${rowNumber}`).isMerged, true);
+        assert.equal(sheet.getCell(`N${rowNumber}`).isMerged, true);
+        assert.equal(sheet.getCell(`O${rowNumber}`).isMerged, true);
+        assert.equal(sheet.getCell(`P${rowNumber}`).isMerged, false);
+        assert.equal(sheet.getCell(`P${rowNumber}`).value, null);
+    }
+    for (let rowNumber = firstEmployeeRow; rowNumber <= lastEmployeeRow; rowNumber += 1) {
+        recapCodes.push(sheet.getCell(`A${rowNumber}`).value);
+        for (const column of ['J', 'L', 'N']) {
+            assert.equal(String(sheet.getCell(`${column}${rowNumber}`).value).split('\n').length, 5);
+            assert.equal(sheet.getCell(`${column}${rowNumber}`).font.size,
+                sheet.getCell(`I${rowNumber}`).font.size);
+            assert.equal(sheet.getCell(`${column}${rowNumber}`).alignment.wrapText, true);
+            assert.equal(sheet.getCell(`${column}${rowNumber}`).alignment.vertical, 'top');
+        }
+    }
+    assert.deepEqual(recapCodes, report.employees.map((employee) => employee.employeeCode));
+    for (const column of ['J', 'L', 'N']) {
+        assert.equal(String(sheet.getCell(`${column}${recapGeneralRow}`).value).split('\n').length, 5);
+        assert.equal(sheet.getCell(`${column}${recapGeneralRow}`).font.size,
+            sheet.getCell(`I${recapGeneralRow}`).font.size);
+    }
+    const compactGeneral = buildCompactDailyXlsxRows(report).find((row) => row.rowType === 'generalTotal');
+    ['C', 'D', 'E', 'F', 'G', 'H', 'I'].forEach((column, index) => {
+        const keys = ['actualWork', 'absenceHours', 'nightHours', 'holidayWorkHours',
+            'additionalWork', 'sixthDayHours', 'seventhDayHours'];
+        assert.equal(sheet.getCell(`${column}${recapGeneralRow}`).value, compactGeneral[keys[index]]);
+    });
+    const zip = await JSZip.loadAsync(await workbook.xlsx.writeBuffer());
+    const dailySheetXml = await zip.file('xl/worksheets/sheet2.xml').async('string');
+    assert.match(dailySheetXml, new RegExp(`<rowBreaks[^>]*>.*<brk id="${titleRow - 1}"[^>]*/>`));
+});
+
+test('και τα δύο visible φύλλα χρησιμοποιούν το εγκεκριμένο PDF footer με native αρίθμηση', async () => {
+    const workbook = buildEmploymentReviewWorkbook(fixture());
+    const currentYear = new Date().getFullYear();
+    const copyrightLine = `(c) 2009 - ${currentYear} Copyright: WebPayrollSolutions.com • Ιωλκού 266α Βόλος`;
+    const contactLine = 'Τηλ. 2421056825 • Κιν. 6972012650 • eMail: support@WebPayrollSolutions.com';
+    for (const name of ['ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ', 'ΑΝΑΚΕΦΑΛΑΙΩΣΗ']) {
+        const footer = workbook.getWorksheet(name).headerFooter.oddFooter;
+        assert.match(footer, /&P/);
+        assert.match(footer, /&N/);
+        assert.match(footer, /&C/);
+        assert.match(footer, /&R/);
+        assert.ok(footer.includes(copyrightLine));
+        assert.ok(footer.includes(contactLine));
+        assert.doesNotMatch(footer, /\r|\n/);
+        assert.doesNotMatch(footer, /Σελίδα \d+ \/ \d+/);
+    }
+    const persisted = new ExcelJS.Workbook();
+    await persisted.xlsx.load(await workbook.xlsx.writeBuffer());
+    for (const name of ['ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ', 'ΑΝΑΚΕΦΑΛΑΙΩΣΗ']) {
+        assert.match(persisted.getWorksheet(name).headerFooter.oddFooter, /Σελίδα &P \/ &N/);
+    }
+});
+
+test('δύο φύλλα είναι visible και το ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ ανοίγει ως active worksheet', () => {
+    const workbook = buildEmploymentReviewWorkbook(fixture());
+    const visible = workbook.worksheets.filter((sheet) => sheet.state === 'visible');
+    assert.deepEqual(visible.map((sheet) => sheet.name), ['ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ', 'ΑΝΑΚΕΦΑΛΑΙΩΣΗ']);
+    assert.ok(workbook.worksheets.filter((sheet) => !visible.includes(sheet))
+        .every((sheet) => sheet.state === 'hidden'));
+    const dailyIndex = workbook.worksheets.indexOf(workbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ'));
+    assert.equal(workbook.views[0].activeTab, dailyIndex);
+    assert.equal(workbook.views[0].firstSheet, dailyIndex);
+});
+
+test('το ορατό ΑΝΑΚΕΦΑΛΑΙΩΣΗ έχει δυναμικές authoritative rows και ανεξάρτητη εκτύπωση', async () => {
+    const report = fixture();
+    const workbook = buildEmploymentReviewWorkbook(report);
+    const sheet = workbook.getWorksheet('ΑΝΑΚΕΦΑΛΑΙΩΣΗ');
+    const headers = ['Κωδικός', 'Εργαζόμενος', 'Πραγματική εργασία', 'Απουσία',
+        'Νύχτα', 'Αργίες', 'Πρόσθετη εργασία', '6η ημέρα', '7η ημέρα',
+        'Υπερεργασία', 'Νόμιμη Υπερωρία', 'Παράνομη Υπερωρία'];
+    assert.equal(sheet.getCell('A1').value, 'ΑΝΑΚΕΦΑΛΑΙΩΣΗ ΣΥΝΟΛΩΝ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ');
+    assert.equal(sheet.getCell('A1').isMerged, true);
+    assert.equal(sheet.getCell('L1').isMerged, true);
+    assert.deepEqual(sheet.getRow(2).values.slice(1), headers);
+    assert.equal(sheet.rowCount, report.employees.length + 3);
+    assert.deepEqual(sheet.views, [{ state: 'frozen', ySplit: 2 }]);
+    assert.deepEqual(sheet.columns.map((column) => column.width),
+        [10, 28, 16, 12, 12, 12, 16, 11, 11, 24, 24, 24]);
+
+    const totalFields = [
+        'ores_pragmatikhs_ergasias_apologistika', 'ores_apoysias_apologistika',
+        'ores_nyxtas_apologistika', 'ores_argion_ergasia_apologistika',
+        'ores_prostheths_ergasias_apologistika'
+    ];
+    report.employees.forEach((employee, index) => {
+        const row = sheet.getRow(index + 3);
+        assert.equal(row.getCell('A').value, employee.employeeCode);
+        assert.equal(row.getCell('B').value, employee.employeeName);
+        assert.deepEqual(row.values.slice(3, 8), totalFields.map((field) => employee.totals[field]));
+        for (const column of ['J', 'K', 'L']) {
+            assert.equal(String(row.getCell(column).value).split('\n').length, 5);
+            assert.equal(row.getCell(column).font.size, row.getCell('I').font.size);
+            assert.equal(row.getCell(column).alignment.wrapText, true);
+            assert.equal(row.getCell(column).alignment.vertical, 'top');
+        }
+    });
+    const generalRow = sheet.getRow(sheet.rowCount);
+    assert.equal(generalRow.getCell('A').value, 'ΓΕΝΙΚΟ ΣΥΝΟΛΟ');
+    assert.deepEqual(generalRow.values.slice(3, 8),
+        totalFields.map((field) => report.summary.totals[field]));
+    for (const column of ['J', 'K', 'L']) {
+        assert.equal(String(generalRow.getCell(column).value).split('\n').length, 5);
+        assert.equal(generalRow.getCell(column).font.size, generalRow.getCell('I').font.size);
+    }
+    assert.equal(sheet.pageSetup.paperSize, 9);
+    assert.equal(sheet.pageSetup.orientation, 'landscape');
+    assert.equal(sheet.pageSetup.fitToPage, true);
+    assert.equal(sheet.pageSetup.fitToWidth, 1);
+    assert.equal(sheet.pageSetup.fitToHeight, 0);
+    assert.equal(sheet.pageSetup.printArea, `A1:L${sheet.rowCount}`);
+    assert.equal(sheet.pageSetup.printTitlesRow, '2:2');
+    assert.equal(sheet.pageSetup.showGridLines, false);
+    assert.equal(sheet.pageSetup.showRowColHeaders, false);
+
+    const persisted = new ExcelJS.Workbook();
+    await persisted.xlsx.load(await workbook.xlsx.writeBuffer());
+    const persistedSheet = persisted.getWorksheet('ΑΝΑΚΕΦΑΛΑΙΩΣΗ');
+    assert.equal(persistedSheet.pageSetup.printArea, `A1:L${persistedSheet.rowCount}`);
+    assert.equal(persistedSheet.pageSetup.printTitlesRow, '2:2');
+});
+
+test('οι N–P έχουν πέντε γραμμές και totals ίσα με τα τέσσερα authoritative components', () => {
+    const source = row({ kodikos: '0042', hmeromhnia: new Date('2026-06-20T00:00:00.000Z'),
+        ores_yperergasias_apologistika: 1, ores_yperergasias_nyxtas_apologistika: 2,
+        ores_yperergasias_argion_apologistika: 3, ores_yperergasias_argion_nyxtas_apologistika: 4,
+        ores_nominhs_yperorias_apologistika: 0.1, ores_nominhs_yperorias_nyxtas_apologistika: 0.2,
+        ores_nominhs_yperorias_argion_apologistika: 0.3,
+        ores_nominhs_yperorias_argion_nyxtas_apologistika: 0.4,
+        ores_paranomhs_yperorias_apologistika: 1.1,
+        ores_paranomhs_yperorias_nyxtas_apologistika: 1.2,
+        ores_paranomhs_yperorias_argion_apologistika: 1.3,
+        ores_paranomhs_yperorias_argion_nyxtas_apologistika: 1.4,
+        orphan_card_resolution_preview: null, orphan_card_resolution: null });
+    const report = buildEmploymentReviewReportProjection({ rows: [source] });
+    const rows = buildCompactDailyXlsxRows(report);
+    for (const [key, fields] of Object.entries(OVERTIME_COMPONENTS)) {
+        assert.equal(rows[0][key].split('\n').length, 5);
+        const expected = fields.reduce((sum, field) => sum + Number(source[field]), 0);
+        assert.equal(overtimeValues(report.daily[0].values, fields).total, Number(expected.toFixed(2)));
+        assert.match(rows[0][key], new RegExp(`^Σύνολο: ${expected.toFixed(2)}`));
+        assert.equal(rows[1][key], rows[0][key]);
+        assert.equal(rows[2][key], rows[1][key]);
+    }
+});
+
+test('inline employee/general totals ισούνται με daily sums και οι 6η/7η ώρες απαιτούν authoritative flag', () => {
+    const rows = [
+        row({ kodikos: '0001', hmeromhnia: new Date('2026-06-01T00:00:00.000Z'),
+            ores_ergasias_apologistika: 8, policy: { classification: 'SIXTH', sixthDayRate: 0 },
+            ores_yperergasias_apologistika: 1, ores_nominhs_yperorias_nyxtas_apologistika: 0.5,
+            orphan_card_resolution_preview: null, orphan_card_resolution: null }),
+        row({ kodikos: '0001', hmeromhnia: new Date('2026-06-02T00:00:00.000Z'),
+            ores_ergasias_apologistika: 7, policy: { classification: 'NORMAL' },
+            orphan_card_resolution_preview: null, orphan_card_resolution: null }),
+        row({ kodikos: '0002', hmeromhnia: new Date('2026-06-07T00:00:00.000Z'),
+            ores_ergasias_apologistika: 6, policy: { classification: 'SEVENTH' },
+            ores_yperergasias_argion_apologistika: 2,
+            ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0.75,
+            orphan_card_resolution_preview: null, orphan_card_resolution: null })
+    ];
+    const report = buildEmploymentReviewReportProjection({ rows });
+    const output = buildCompactDailyXlsxRows(report);
+    const employeeTotals = output.filter((item) => item.rowType === 'employeeTotal');
+    const general = output.find((item) => item.rowType === 'generalTotal');
+    assert.deepEqual(output.filter((item) => item.rowType === 'daily')
+        .map((item) => [item.sixthDayHours, item.seventhDayHours]), [[8, 0], [0, 0], [0, 6]]);
+    for (const key of COMPACT_DAILY_NUMERIC_KEYS) assert.equal(general[key],
+        Number(employeeTotals.reduce((sum, item) => sum + item[key], 0).toFixed(2)), key);
+    for (const key of Object.keys(OVERTIME_COMPONENTS)) {
+        assert.equal(general[key].split('\n').length, 5);
+        const parse = (value) => String(value).split('\n').map((line) => Number(line.split(': ')[1]));
+        const generalValues = parse(general[key]);
+        const employeeValues = employeeTotals.map((item) => parse(item[key]));
+        generalValues.forEach((value, index) => assert.equal(value,
+            Number(employeeValues.reduce((sum, components) => sum + components[index], 0).toFixed(2)),
+            `${key}/${index}`));
+    }
 });

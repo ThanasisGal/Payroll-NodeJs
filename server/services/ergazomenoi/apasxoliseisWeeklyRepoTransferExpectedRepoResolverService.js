@@ -6,7 +6,8 @@ const REPO_RESOLUTION_SOURCE = Object.freeze({
 
 const REPO_RESOLUTION_REASON = Object.freeze({
     INVALID_EFFECTIVE_WEEKLY_WORKDAYS: 'INVALID_EFFECTIVE_WEEKLY_WORKDAYS',
-    PROFILE_CHANGED_INSIDE_WEEK: 'PROFILE_CHANGED_INSIDE_WEEK'
+    PROFILE_CHANGED_INSIDE_WEEK: 'PROFILE_CHANGED_INSIDE_WEEK',
+    UNRESOLVED_DAILY_EMPLOYMENT_PROFILE: 'UNRESOLVED_DAILY_EMPLOYMENT_PROFILE'
 });
 
 const DECLARED_INTERVAL_FIELDS = Object.freeze([
@@ -89,10 +90,34 @@ function diagnostic(reason, scheduledDays, effectiveWeeklyWorkdays = null) {
     });
 }
 
+function unresolvedDateEffectiveProfileDates(dateKeys = [], profilesByDate) {
+    if (profilesByDate === null || profilesByDate === undefined) return [];
+    return [...new Set(dateKeys.filter(Boolean))].filter((date) => {
+        const hasExplicitProfile = profilesByDate instanceof Map
+            ? profilesByDate.has(date)
+            : Object.prototype.hasOwnProperty.call(profilesByDate, date);
+        if (!hasExplicitProfile) return false;
+        const profile = profilesByDate instanceof Map
+            ? profilesByDate.get(date)
+            : profilesByDate[date];
+        return !profile || typeof profile !== 'object' || Array.isArray(profile);
+    });
+}
+
 function resolveEffectiveExpectedWeeklyRepo({ weekRows = [], effectiveProfile = {} } = {}) {
     const scheduledDays = scheduledWorkDays(weekRows);
-    if (effectiveProfile.profile_changed_inside_week === true) {
-        return diagnostic(REPO_RESOLUTION_REASON.PROFILE_CHANGED_INSIDE_WEEK, scheduledDays);
+    const dateKeys = weekRows.map((row) => {
+        const date = new Date(row?.hmeromhnia);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+    });
+    if (unresolvedDateEffectiveProfileDates(
+        dateKeys,
+        effectiveProfile.date_effective_profiles_by_date
+    ).length > 0) {
+        return diagnostic(
+            REPO_RESOLUTION_REASON.UNRESOLVED_DAILY_EMPLOYMENT_PROFILE,
+            scheduledDays
+        );
     }
 
     const workdays = profileInteger(effectiveProfile.hmeres_ergasias_ebdomadas);
@@ -116,5 +141,6 @@ module.exports = {
     REPO_RESOLUTION_REASON,
     isScheduledWorkDay,
     scheduledWorkDays,
+    unresolvedDateEffectiveProfileDates,
     resolveEffectiveExpectedWeeklyRepo
 };

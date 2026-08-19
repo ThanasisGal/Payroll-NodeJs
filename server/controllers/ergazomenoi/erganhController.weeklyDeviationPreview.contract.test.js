@@ -38,7 +38,10 @@ const deviationSelectEnd = source.indexOf(
     deviationSelectStart
 );
 assert.ok(deviationSelectStart >= 0 && deviationSelectEnd > deviationSelectStart);
-const deviationSelect = source.slice(deviationSelectStart, deviationSelectEnd);
+const reviewSelectStart = source.indexOf('const REVIEW_SELECT_FIELDS =');
+const reviewSelectEnd = source.indexOf(';', reviewSelectStart);
+const deviationSelect = source.slice(deviationSelectStart, deviationSelectEnd) +
+    source.slice(reviewSelectStart, reviewSelectEnd);
 for (const field of [
     'adeia',
     'kathgoria_adeias',

@@ -1286,7 +1286,8 @@ async function detectPayrollPhases({
     includeWeeklyAnalysisContext = false,
     asOfDate = null,
     asOfDateSource = '',
-    clock = () => new Date()
+    clock = () => new Date(),
+    preloadedContext = null
 }) {
     const warnings = [];
     const hasExplicitPeriodRange = Boolean(periodApoOverride || periodEosOverride);
@@ -1304,7 +1305,7 @@ async function detectPayrollPhases({
         throw error;
     }
 
-    const employee = await ErgazomenoiModel.findOne({
+    const employee = preloadedContext?.employee || await ErgazomenoiModel.findOne({
         team,
         company_kod,
         kodikos
@@ -1371,12 +1372,20 @@ async function detectPayrollPhases({
         return emptyPayload;
     }
 
-    const contractHistoryRows = await loadContractStatusHistory({
-        team,
-        company_kod,
-        kodikos,
-        periodEos: analysisTo
-    });
+    const contractHistoryRows = Array.isArray(preloadedContext?.contractHistoryRows)
+        ? preloadedContext.contractHistoryRows.filter((row) => {
+            const date = normalizeDateOnly(row.hmeromhnia_allaghs_symbashs);
+            return date && date <= analysisTo;
+        }).sort((left, right) =>
+            (normalizeDateOnly(left.hmeromhnia_allaghs_symbashs)?.getTime() || 0) -
+                (normalizeDateOnly(right.hmeromhnia_allaghs_symbashs)?.getTime() || 0) ||
+            new Date(left.createdAt || 0).getTime() - new Date(right.createdAt || 0).getTime())
+        : await loadContractStatusHistory({
+            team,
+            company_kod,
+            kodikos,
+            periodEos: analysisTo
+        });
     const contractStatusIntervals = buildContractStatusIntervals({
         historyRows: contractHistoryRows,
         employee,
@@ -1385,14 +1394,31 @@ async function detectPayrollPhases({
         warnings
     });
 
-    const istorikoRows = await getIstorikoOronErgasiasForPeriod({
-        team,
-        company_kod,
-        kodikos,
-        aa_eggrafhs: employee.aa_eggrafhs,
-        periodApo: analysisFrom,
-        periodEos: analysisTo
-    });
+    const istorikoRows = Array.isArray(preloadedContext?.workTermsHistoryRows)
+        ? preloadedContext.workTermsHistoryRows.filter((row) => {
+            const currentStart = normalizeDateOnly(row.hmeromhnia_isxyos_oron_ergasias_apo);
+            const currentEnd = normalizeDateOnly(row.hmeromhnia_isxyos_oron_ergasias_eos);
+            if (currentStart) {
+                return currentStart <= analysisTo && (!currentEnd || currentEnd >= analysisFrom);
+            }
+            const legacyStart = normalizeDateOnly(row.hmeromhnia_allaghs_orarioy_apo);
+            const legacyEnd = normalizeDateOnly(row.hmeromhnia_allaghs_orarioy_eos);
+            return legacyStart && legacyStart <= analysisTo &&
+                (!legacyEnd || legacyEnd >= analysisFrom);
+        }).sort((left, right) =>
+            (normalizeDateOnly(left.hmeromhnia_isxyos_oron_ergasias_apo)?.getTime() || 0) -
+                (normalizeDateOnly(right.hmeromhnia_isxyos_oron_ergasias_apo)?.getTime() || 0) ||
+            (normalizeDateOnly(left.hmeromhnia_allaghs_orarioy_apo)?.getTime() || 0) -
+                (normalizeDateOnly(right.hmeromhnia_allaghs_orarioy_apo)?.getTime() || 0) ||
+            new Date(left.createdAt || 0).getTime() - new Date(right.createdAt || 0).getTime())
+        : await getIstorikoOronErgasiasForPeriod({
+            team,
+            company_kod,
+            kodikos,
+            aa_eggrafhs: employee.aa_eggrafhs,
+            periodApo: analysisFrom,
+            periodEos: analysisTo
+        });
 
     const dailyTerms = buildDailyOrarioTermsForPeriod({
         periodApo: analysisFrom,
@@ -1416,9 +1442,17 @@ async function detectPayrollPhases({
         orariaFilter.ypokatasthma = toTrimmedString(ypokatasthma);
     }
 
-    const orariaRows = await ProdhlomenaOrariaModel.find(orariaFilter)
-        .sort({ hmeromhnia: 1 })
-        .lean();
+    const orariaRows = Array.isArray(preloadedContext?.dailyRows)
+        ? preloadedContext.dailyRows
+            .filter((row) => {
+                const date = dateKeyUtc(row?.hmeromhnia);
+                return date && date >= dateKeyUtc(analysisFrom) && date <= dateKeyUtc(analysisTo);
+            })
+            .sort((left, right) => dateKeyUtc(left.hmeromhnia)
+                .localeCompare(dateKeyUtc(right.hmeromhnia)))
+        : await ProdhlomenaOrariaModel.find(orariaFilter)
+            .sort({ hmeromhnia: 1 })
+            .lean();
     const orariaByDate = new Map(orariaRows.map((row) => [formatDateYMD(row.hmeromhnia), row]));
 
     if (orariaRows.length === 0) {
@@ -1503,7 +1537,8 @@ async function detectPayrollPhasesForDateRange({
     eos,
     asOfDate = null,
     asOfDateSource = '',
-    clock
+    clock,
+    preloadedContext = null
 }) {
     return detectPayrollPhases({
         team,
@@ -1515,7 +1550,8 @@ async function detectPayrollPhasesForDateRange({
         includeWeeklyAnalysisContext: true,
         asOfDate,
         asOfDateSource,
-        clock
+        clock,
+        preloadedContext
     });
 }
 

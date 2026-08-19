@@ -7,6 +7,8 @@ const PeriodControlAuditModel = require('../../models/apasxoliseisPeriodControlA
 const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
 const { startOfWeekMondayUtc, endOfWeekSundayUtc } = require('../../utils/date/mondaySundayWeek');
 const { assertPeriodControlIndexesReady } = require('./apasxoliseisPeriodControlIndexGuardService');
+const { assertPeriodHrReady } = require('./apasxoliseisPeriodHrReadinessService');
+const { assertPeriodDataQualityReady } = require('./apasxoliseisPeriodDataQualityReadinessService');
 
 const MODES = Object.freeze({ NORMAL: 'NORMAL', LOCKED: 'LOCKED', FINALIZED: 'FINALIZED',
     HISTORICAL_RECONSTRUCTION_REQUIRED: 'HISTORICAL_RECONSTRUCTION_REQUIRED',
@@ -697,6 +699,8 @@ function actorFromSession(session = {}) {
 async function transitionPeriodControl({ session, scope: input, action, reason, requestId, now = new Date(), expectedVersion,
     periodControlModel = PeriodControlModel, auditModel = PeriodControlAuditModel, indexGuard,
     dbSession = null, transactionRunner = runTransaction,
+    periodHrReadinessResolver = null,
+    periodDataQualityReadinessResolver = null,
     historicalFingerprintResolver = (options) => require('./apasxoliseisHistoricalPeriodReconstructionService')
         .calculateHistoricalFingerprints(options) }) {
     const actor = actorFromSession(session); const scope = normalizeScope(input);
@@ -712,7 +716,8 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
             return await transactionRunner((transactionSession) => transitionPeriodControl({
                 session, scope, action, reason: cleanReason, requestId: cleanRequestId, now, expectedVersion,
                 periodControlModel, auditModel, indexGuard: null, dbSession: transactionSession,
-                transactionRunner: null, historicalFingerprintResolver
+                transactionRunner: null, historicalFingerprintResolver, periodHrReadinessResolver,
+                periodDataQualityReadinessResolver
             }));
         } catch (error) {
             if (error?.code !== 11000) throw error;
@@ -749,6 +754,12 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
     if (action === 'LOCK' && current?.active_calculation_id) {
         throw periodError('PERIOD_CONTROL_CALCULATION_IN_PROGRESS', 409,
             'Δεν είναι δυνατή η ολοκλήρωση του κλειδώματος επειδή βρίσκεται σε εξέλιξη Υπολογισμός Απασχολήσεων.');
+    }
+    if (action === 'LOCK' && typeof periodHrReadinessResolver === 'function') {
+        assertPeriodHrReady(await periodHrReadinessResolver({ scope, session: dbSession }), 'LOCK');
+    }
+    if (action === 'LOCK' && typeof periodDataQualityReadinessResolver === 'function') {
+        assertPeriodDataQualityReady(await periodDataQualityReadinessResolver({ scope, session: dbSession }), 'LOCK');
     }
     const commandIdentity = crypto.createHash('sha256').update(JSON.stringify({
         scope: { ...scope, period_start: scope.period_start.toISOString(), period_end: scope.period_end.toISOString() },

@@ -221,6 +221,22 @@ function buildWeeklyHrLifecycleProjection({
             ? new Set(employmentDateScope.authoritative_date_set) : null;
     const expectedDateKeys = employmentDateScope?.employment_owned_dates || null;
     const fullNaturalWeek = employmentDateScope?.is_full_natural_week !== false;
+    const weekEndKey = dateKeyUtc(scope.week_end || rows.at(-1)?.hmeromhnia);
+    const periodEndKey = dateKeyUtc(periodScope?.period_end);
+    const trailingPartialWeek = Boolean(periodSlice && weekEndKey && periodEndKey &&
+        weekEndKey > periodEndKey);
+    const trailingPartialWeekPresentation = trailingPartialWeek ? Object.freeze({
+        active: true,
+        title: 'ΜΕΡΙΚΗ ΕΒΔΟΜΑΔΑ ΠΕΡΙΟΔΟΥ',
+        message: `Για την τρέχουσα περίοδο εξετάζονται μόνο οι ημέρες ${periodSlice.actionable_dates
+            .map((item) => item.split('-').reverse().join('/')).join('–')}. ` +
+            'Ο πλήρης εβδομαδιαίος έλεγχος θα ολοκληρωθεί στην επόμενη περίοδο.',
+        actionable_dates: Object.freeze([...periodSlice.actionable_dates]),
+        deferred_weekly_checks: Object.freeze([
+            'Μεταφορά ρεπό', 'Τελικός εβδομαδιαίος έλεγχος', '6η ημέρα', '7η ημέρα',
+            'Λοιπές εβδομαδιαίες παραβάσεις'
+        ])
+    }) : null;
     const stage1Workflow = resolveWeeklyHrWorkflow({
         weekRows: rows,
         effectiveProfile,
@@ -278,11 +294,14 @@ function buildWeeklyHrLifecycleProjection({
         expected_date_keys: expectedDateKeys,
         ...decisions
     });
-    const repoTransfer = fullNaturalWeek ? analyzeWeeklyRepoTransferForEmploymentContract({
+    const repoTransfer = fullNaturalWeek && !trailingPartialWeek
+        ? analyzeWeeklyRepoTransferForEmploymentContract({
         weekRows: rows,
         employmentProfile: effectiveProfile
     }) : Object.freeze({ eligibility_status: 'NOT_APPLICABLE',
-        reasons: Object.freeze(['PARTIAL_EMPLOYMENT_SLICE_WEEKLY_REPO_TRANSFER_NOT_APPLICABLE']),
+        reasons: Object.freeze([trailingPartialWeek
+            ? 'TRAILING_PARTIAL_PERIOD_WEEK_DEFERRED'
+            : 'PARTIAL_EMPLOYMENT_SLICE_WEEKLY_REPO_TRANSFER_NOT_APPLICABLE']),
         source: null, target: null, semantic_proposal: null });
     const workflowRequestedStage2 =
         afterStage1.next_required_hr_stage === NEXT_STAGE.REPO_RESOLUTION;
@@ -318,10 +337,13 @@ function buildWeeklyHrLifecycleProjection({
         has_bounded_selection: stage2Actionability.has_bounded_selection,
         repo_transfer_status: repoTransfer.eligibility_status,
         repo_transfer_reasons: Object.freeze([...(repoTransfer.reasons || [])]),
-        unresolved_repo_count: afterStage1.unresolved_repo_count
+        unresolved_repo_count: afterStage1.unresolved_repo_count,
+        weekly_review_deferred: trailingPartialWeek,
+        deferment: trailingPartialWeekPresentation
     });
 
-    const stage2ResolvedDates = unique((afterStage1.possible_leave_days || []).filter((date) =>
+    const stage2ResolvedDates = trailingPartialWeek ? [] : unique(
+        (afterStage1.possible_leave_days || []).filter((date) =>
         !(afterStage1.remaining_possible_leave_days || []).includes(date) &&
         !(afterStage1.confirmed_leave_days || []).includes(date) &&
         !(afterStage1.confirmed_sickness_days || []).includes(date) &&
@@ -349,6 +371,22 @@ function buildWeeklyHrLifecycleProjection({
     const resolvedBeforeStage3Dates = stage3Dates.resolved_before_stage3;
     const remainingDates = stage3Dates.actionable
         .filter((date) => !actionableDateSet || actionableDateSet.has(date));
+    const weeklyResolutionCandidateDates = unique([
+        ...(afterStage1.direct_repo_candidates || []).map((item) => item.date),
+        ...(afterStage1.repo_transfer_candidates || []).map((item) => item.target_date)
+    ]);
+    const reviewedPossibleLeaveDateSet = new Set(stage1.reviewed_possible_leave_dates || []);
+    const stage1PendingDateSet = new Set(stage1.pending_dates || []);
+    const stage3PendingDateSet = new Set(remainingDates);
+    const unclassifiedPossibleLeaveDateSet = new Set(
+        afterStage1.unclassified_possible_leave_days || []);
+    const deferredWeeklyDates = trailingPartialWeek
+        ? weeklyResolutionCandidateDates.filter((date) =>
+            (!actionableDateSet || actionableDateSet.has(date)) &&
+            unclassifiedPossibleLeaveDateSet.has(date) &&
+            reviewedPossibleLeaveDateSet.has(date) &&
+            !stage1PendingDateSet.has(date) && !stage3PendingDateSet.has(date))
+        : [];
     const stage2Fingerprint = buildStage2ResolutionFingerprint({
         status: stage2.business_status,
         resolution: stage2.stage2_applicability,
@@ -434,14 +472,19 @@ function buildWeeklyHrLifecycleProjection({
             ? ['REMAINING_POSSIBLE_LEAVE_REVIEW_REQUIRED'] : [])
     });
 
-    const finalAnalysis = analyzeWeeklySixthSeventhDay({
+    const finalAnalysisProfile = effectiveProfilesByDate &&
+        Object.keys(effectiveProfilesByDate).length > 0
+        ? { ...effectiveProfile,
+            date_effective_profiles_by_date: effectiveProfilesByDate }
+        : effectiveProfile;
+    const finalAnalysis = trailingPartialWeek ? null : analyzeWeeklySixthSeventhDay({
         weekRows: rows,
-        effectiveProfile,
+        effectiveProfile: finalAnalysisProfile,
         expectedDateKeys,
         companyKod: scope.company_kod || rows[0]?.company_kod || '',
         companyPolicyRules
     });
-    const finalBlockers = finalAnalysis.status === 'NEEDS_HR_DECISION'
+    const finalBlockers = finalAnalysis?.status === 'NEEDS_HR_DECISION'
         ? unique(finalAnalysis.reasons || []) : [];
     const stage4 = stageResult('STAGE4', {
         business_status: finalBlockers.length
@@ -449,13 +492,16 @@ function buildWeeklyHrLifecycleProjection({
         pending_count: finalBlockers.length,
         pending_reasons: Object.freeze(finalBlockers),
         blockers: Object.freeze(finalBlockers),
-        final_weekly_analysis_available: finalBlockers.length === 0,
-        final_weekly_analysis: finalAnalysis
+        final_weekly_analysis_available: !trailingPartialWeek && finalBlockers.length === 0,
+        final_weekly_analysis: finalAnalysis,
+        weekly_review_deferred: trailingPartialWeek,
+        deferment: trailingPartialWeekPresentation
     });
 
     const stages = applySequentialPresentation({ stage1, stage2, stage3, stage4 });
     stages.stage4 = Object.freeze({ ...stages.stage4,
         final_weekly_analysis_available:
+            !trailingPartialWeek &&
             stages.stage4.presentation_status !== PRESENTATION_STATUS.LOCKED &&
             finalBlockers.length === 0 });
     const activeStage = Object.values(stages).find((stage) => stage.open_by_default) || null;
@@ -472,6 +518,10 @@ function buildWeeklyHrLifecycleProjection({
         current_stage: activeStage?.stage || null,
         total_pending_count: totalPending,
         requires_hr_action: Boolean(activeStage),
+        deferred_weekly_dates: Object.freeze(deferredWeeklyDates),
+        trailing_partial_week: trailingPartialWeekPresentation
+            ? Object.freeze({ ...trailingPartialWeekPresentation,
+                deferred_weekly_dates: Object.freeze(deferredWeeklyDates) }) : null,
         employment_date_scope: employmentDateScope,
         stage1_no_classification_preview_items: stage1NoClassificationPreviewItems,
         stages: Object.freeze(stages)

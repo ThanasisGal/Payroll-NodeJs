@@ -281,7 +281,7 @@ const policyPreviewFlagLabels = {
     is_optional_holiday: 'Προαιρετική αργία',
     is_locked: 'Κλειδωμένο',
     has_manual_override: 'Χειροκίνητη παρέμβαση',
-    blocked: 'Μπλοκαρισμένο',
+    blocked: 'Απαιτεί ενέργεια',
     requires_human_approval: 'Απαιτείται ανθρώπινος έλεγχος',
     batch_approvable: 'Δυνατή μαζική έγκριση'
 };
@@ -347,6 +347,10 @@ const scenarioProposedUpdateFillableFields = new Set([
 ]);
 
 let currentReviewRows = [];
+let currentReviewEmployeePage = 1;
+let currentReviewEmployeeCodes = [];
+const employmentReviewEmployeePageSize = 50;
+const partialWeekToastMessagesForCurrentLoad = new Set();
 const weeklyHrStage1Submitting = new Set();
 const weeklyHrStage1Scopes = new Map();
 const weeklyHrStage1RowsById = new Map();
@@ -365,6 +369,7 @@ let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentEmploymentReviewLifecyclePresentation = null;
 let currentStage2DailyResolutionByKey = new Map();
+let currentDeferredWeeklyDateByKey = new Map();
 let currentCanonicalDailyEmploymentTypeByKey = new Map();
 let currentReviewLifecycleProjectionReady = false;
 let currentWeeklyHrStage1Errors = [];
@@ -382,6 +387,8 @@ let currentApprovalHistoryExpanded = false;
 let currentPolicyPreviewApplyDryRun = null;
 let currentPolicyPreviewApplyDryRunError = '';
 let currentPolicyPreviewApplyDryRunExpanded = false;
+let currentPolicyPreviewLazyLoadPromise = null;
+let currentPolicyPreviewLazyLoaded = false;
 let currentHrReviewProjection = null;
 let currentHrPendingGroups = [];
 let currentHrCompletedGroups = [];
@@ -700,12 +707,24 @@ function renderReviewNoPendingEmployees(
     return true;
 }
 
+function stage4ReviewRows(rows = [], employeeCodes = []) {
+    const pageOrder = new Map(employeeCodes.map((code, index) => [
+        String(code || '').trim(), index
+    ]));
+    return [...rows].filter((row) => pageOrder.has(String(row.kodikos || '').trim()))
+        .sort((left, right) => {
+            const leftCode = String(left.kodikos || '').trim();
+            const rightCode = String(right.kodikos || '').trim();
+            return (pageOrder.get(leftCode) ?? Number.MAX_SAFE_INTEGER) -
+                    (pageOrder.get(rightCode) ?? Number.MAX_SAFE_INTEGER) ||
+                leftCode.localeCompare(rightCode, 'el', { numeric: true }) ||
+                String(left.hmeromhnia || '').localeCompare(String(right.hmeromhnia || ''));
+        });
+}
+
 function getVisibleReviewRows(rows = currentReviewRows) {
-    return filterGeneralReviewRows(rows, {
-        selectedKodikos: document.getElementById('kodikos')?.value || '',
-        lifecycleReady: currentReviewLifecycleProjectionReady,
-        lifecyclePayloads: [...weeklyHrStage1Payloads.values()]
-    });
+    if (currentReviewLifecycleProjectionReady !== true) return [];
+    return stage4ReviewRows(rows, currentReviewEmployeeCodes);
 }
 
 function renderCurrentReviewRows() {
@@ -2278,9 +2297,20 @@ function renderDeviationNoteCell(dev) {
               ...(Array.isArray(dev.canonical_reasons) ? dev.canonical_reasons : [])
           ]).filter((reason) => !resolvedSelectionAmbiguity ||
             !['MULTIPLE_SOURCE_CANDIDATES', 'MULTIPLE_TARGET_CANDIDATES'].includes(reason));
-    const reasonMessages = reviewHrReasonMessages(
-        visibleReasons
-    );
+    const blockedTargetCandidates = Array.isArray(dev.repo_transfer_blocked_target_candidates)
+        ? dev.repo_transfer_blocked_target_candidates
+        : [];
+    const categoryMessages = blockedTargetCandidates
+        .filter((candidate) => (candidate.blocker_reasons || [])
+            .includes('TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY'))
+        .map((candidate) => getBlockedTargetCandidateDiagnosticLabel(
+            'TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY', candidate, dev
+        ));
+    const reasonMessages = reviewHrReasonMessages(visibleReasons.filter((reason) =>
+        reason !== 'TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY' ||
+        categoryMessages.length === 0
+    ));
+    reasonMessages.push(...categoryMessages);
     const sixthDayDecisionText = renderReviewHrReasonList(reasonMessages);
     const noteText = humanNote
         ? `<div>${escapeHtml(humanNote)}</div>`
@@ -2773,6 +2803,7 @@ function buildScenarioReviewParams(baseParams, page) {
         eos_hmeromhnia: baseParams.get('eos_hmeromhnia') || '',
         ypokatasthma: baseParams.get('ypokatasthma') || '',
         kodikos: baseParams.get('kodikos') || '',
+        employee_codes: baseParams.get('employee_codes') || '',
         page: String(page),
         limit: '200'
     });
@@ -3014,6 +3045,12 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
             source: 'derived_stage2' };
     }
 
+    if (derived.deferredWeeklyReview === true) {
+        return { text: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
+            className: 'cell-adeia-suggestion', source: 'deferred_weekly_review',
+            tooltip: 'Η τελική κατάσταση της ημέρας θα προκύψει από τον πλήρη έλεγχο της εβδομάδας στην επόμενη περίοδο.' };
+    }
+
     if (isCompletedSingleDayNoActionPresentation(row)) {
         return { text: derived.apologistikoText || '', className: '',
             source: 'completed_single_day_no_action' };
@@ -3182,6 +3219,17 @@ function buildStage2DailyResolutionByKey(payloads = []) {
     return resolutions;
 }
 
+function buildDeferredWeeklyDateByKey(payloads = []) {
+    const deferredDates = new Map();
+    (Array.isArray(payloads) ? payloads : []).forEach((payload) => {
+        const employeeKodikos = payload?.scope?.employee_kodikos;
+        (payload?.lifecycle_projection?.deferred_weekly_dates || []).forEach((date) => {
+            deferredDates.set(stage2DailyResolutionKey(employeeKodikos, date), true);
+        });
+    });
+    return deferredDates;
+}
+
 function buildCanonicalDailyEmploymentTypeByKey(payloads = []) {
     const employmentTypes = new Map();
     (Array.isArray(payloads) ? payloads : []).forEach((payload) => {
@@ -3201,6 +3249,13 @@ function resolveStage2DailyPresentation(row = {}) {
         row.kodikos || row.employee_kodikos,
         row.hmeromhnia || row.date
     )) || null;
+}
+
+function isDeferredWeeklyDate(row = {}) {
+    return currentDeferredWeeklyDateByKey.get(stage2DailyResolutionKey(
+        row.kodikos || row.employee_kodikos,
+        row.hmeromhnia || row.date
+    )) === true;
 }
 
 function resolveReviewRowPresentation(
@@ -3297,24 +3352,19 @@ function employeeGroupLifecycleBadge(employeeKodikos, ypokatasthma, lifecyclePay
             return String(scope.employee_kodikos || '').trim() === normalizedKodikos &&
                 String(scope.ypokatasthma || '').trim() === normalizedBranch;
         });
-    if (!normalizedKodikos || employeePayloads.length === 0) return '';
-
-    const lifecycle = derivePeriodLifecyclePresentation(employeePayloads);
-    if (lifecycle.requires_hr_action !== true || Number(lifecycle.total_pending_count || 0) <= 0) {
-        return '';
+    if (!normalizedKodikos) return '';
+    if (employeePayloads.length === 0) {
+        return '<span class="badge text-bg-light border text-muted ms-2">' +
+            'ΟΛΟΚΛΗΡΩΜΕΝΟ</span>';
     }
 
-    const activeStage = lifecycle.stages?.[lifecycle.current_stage];
-    if (!activeStage || activeStage.presentation_status === 'LOCKED' ||
-        Number(activeStage.pending_count || 0) <= 0) return '';
-
-    const badges = {
-        STAGE1: '<span class="review-adeia-badge">⚠ Έλεγχος Άδειας</span>',
-        STAGE2: '<span class="review-warning-badge">⚠ Μεταφορά Ρεπό</span>',
-        STAGE3: '<span class="review-adeia-badge">⚠ Πιθανές Άδειες</span>',
-        STAGE4: '<span class="review-warning-badge">⚠ Τελικός Έλεγχος</span>'
-    };
-    return badges[lifecycle.current_stage] || '';
+    const lifecycle = derivePeriodLifecyclePresentation(employeePayloads);
+    if (lifecycle.requires_hr_action === true ||
+        Number(lifecycle.total_pending_count || 0) > 0) {
+        return '<span class="review-warning-badge">⚠ ΑΠΑΙΤΕΙ ΕΝΕΡΓΕΙΑ</span>';
+    }
+    return '<span class="badge text-bg-light border text-muted ms-2">' +
+        'ΟΛΟΚΛΗΡΩΜΕΝΟ</span>';
 }
 
 function renderReviewRows(rows = [], deviations = []) {
@@ -3458,7 +3508,8 @@ function renderReviewRows(rows = [], deviations = []) {
                 isApologistikoNonWorkRow,
                 declaredText,
                 declaredClass,
-                stage2AutomaticResolution: resolveStage2DailyPresentation(row)
+                stage2AutomaticResolution: resolveStage2DailyPresentation(row),
+                deferredWeeklyReview: isDeferredWeeklyDate(row)
             },
             repoTransferState
         );
@@ -3481,7 +3532,9 @@ function renderReviewRows(rows = [], deviations = []) {
                 ${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}
                 ${renderSixthDayCardsBadge(row)}
             </td>
-            <td data-review-cell="apologistiko"${tdClass(rowPresentation.apologistiko.className)}>
+            <td data-review-cell="apologistiko"${tdClass(rowPresentation.apologistiko.className)}${
+                rowPresentation.apologistiko.tooltip
+                    ? ` title="${escapeHtml(rowPresentation.apologistiko.tooltip)}"` : ''}>
                 ${rowPresentation.apologistiko.text}
                 ${renderDeclaredRepoWithCardsBadge(row)}
                 ${renderSeventhDayBadges(row)}
@@ -3547,24 +3600,45 @@ function updateAuthoritativeReviewDailyRow(authoritativeRecord) {
 
     const detailRow = document.querySelector(`#resultsTable .employee-detail-row[data-row-id="${CSS.escape(rowId)}"]`);
     const cell = detailRow?.querySelector('[data-review-cell="apologistiko"]');
-    if (!cell) return row;
+    const declaredCell = detailRow?.children?.[3];
+    if (!cell || !declaredCell) return row;
     const effectiveKathgoria = String(row.kathgoria_ergasias_apologistika ||
         row.kathgoria_ergasias || '').trim();
     const isFullTimeProfile = resolveReviewIsFullTimePresentation(row);
-    const presentation = resolveReviewApologistikoPresentation(row, {
+    const isDeclaredRestOrNonWork = row.apologistiko_biblio !== true &&
+        num(row.ores_ergasias) === 0 && num(row.cards_ores_ergasias) === 0;
+    const declaredText = isDeclaredRestOrNonWork
+        ? (isFullTimeProfile ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ' : 'ΜΗ ΕΡΓΑΣΙΑ')
+        : renderIntervalCell(row, 'apo_ora', 'eos_ora');
+    const declaredClass = isDeclaredRestOrNonWork
+        ? (isFullTimeProfile ? 'cell-declared-repo-day' : 'cell-non-work-day')
+        : '';
+    const repoTransferState = buildRepoTransferReviewRowStates().get(rowId) || null;
+    const presentation = resolveReviewRowPresentation(row, {
         apologistikoText: renderIntervalCell(row, 'apo_ora', 'eos_ora', '_apologistika'),
         isApologistikoRepoRow: row.apologistiko_biblio === true &&
             effectiveKathgoria === 'ΑΝ' && num(row.cards_ores_ergasias) === 0 && isFullTimeProfile,
         isApologistikoNonWorkRow: row.apologistiko_biblio === true &&
             (effectiveKathgoria === 'ΜΕ' || (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
-            num(row.cards_ores_ergasias) === 0
-    });
-    cell.className = presentation.className || '';
-    cell.innerHTML = `${presentation.text}${renderDeclaredRepoWithCardsBadge(row)}` +
+            num(row.cards_ores_ergasias) === 0,
+        declaredText,
+        declaredClass,
+        stage2AutomaticResolution: resolveStage2DailyPresentation(row),
+        deferredWeeklyReview: isDeferredWeeklyDate(row)
+    }, repoTransferState);
+    declaredCell.className = presentation.declared.className || '';
+    declaredCell.innerHTML = presentation.declared.text;
+    cell.className = presentation.apologistiko.className || '';
+    if (presentation.apologistiko.tooltip) cell.title = presentation.apologistiko.tooltip;
+    else cell.removeAttribute('title');
+    cell.innerHTML = `${presentation.apologistiko.text}${renderDeclaredRepoWithCardsBadge(row)}` +
         renderSeventhDayBadges(row) +
         renderApprovedOrphanAuditBadge(row) +
-        renderScenarioBadge(row, {});
+        renderScenarioBadge(row, presentation.badgeState);
     detailRow.classList.toggle('row-locked', row.is_locked === true);
+    detailRow.classList.toggle('row-repo-transfer-applied', presentation.isAppliedRow);
+    if (presentation.isAppliedRow) detailRow.dataset.repoTransferRole = repoTransferState.role;
+    else delete detailRow.dataset.repoTransferRole;
     return row;
 }
 
@@ -3712,8 +3786,9 @@ function buildPolicyPreviewParams(baseParams) {
         eos_hmeromhnia: baseParams.get('eos_hmeromhnia') || '',
         ypokatasthma: baseParams.get('ypokatasthma') || '',
         kodikos: baseParams.get('kodikos') || '',
+        employee_codes: baseParams.get('employee_codes') || '',
         page: '1',
-        limit: '200'
+        limit: '5000'
     });
 }
 
@@ -3805,6 +3880,77 @@ async function fetchPolicyPreviewApplyDryRun(baseParams) {
     }
 
     return payload;
+}
+
+function patchPolicyPreviewDailyRows(previewRows = []) {
+    const affectedIds = new Set((Array.isArray(previewRows) ? previewRows : [])
+        .map((row) => rowIdentityKey(row?.prodhlomena_oraria_id))
+        .filter(Boolean));
+    currentReviewRows.forEach((row) => {
+        if (affectedIds.has(rowIdentityKey(row?._id || row?.id))) {
+            updateAuthoritativeReviewDailyRow(row);
+        }
+    });
+}
+
+async function loadPolicyPreviewOnDemand() {
+    if (currentPolicyPreviewLazyLoaded || !currentPolicyPreviewBaseParams) return;
+    if (currentPolicyPreviewLazyLoadPromise) return currentPolicyPreviewLazyLoadPromise;
+
+    const params = new URLSearchParams(currentPolicyPreviewBaseParams);
+    renderPolicyPreviewGroups(null, { loading: true });
+    currentPolicyPreviewLazyLoadPromise = (async () => {
+        const [groupingResult, approvalsResult, dryRunResult] = await Promise.allSettled([
+            fetchPolicyPreviewGrouping(params),
+            refreshPolicyPreviewApprovals(params),
+            fetchPolicyPreviewApplyDryRun(params)
+        ]);
+
+        if (approvalsResult.status === 'rejected') {
+            currentPolicyPreviewApprovalRecords = [];
+            currentPolicyPreviewApprovalTotal = 0;
+            currentPolicyPreviewApprovalsByGroupId = new Map();
+            currentPolicyPreviewApprovalsError =
+                approvalsResult.reason?.message ||
+                'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.';
+        }
+        if (dryRunResult.status === 'fulfilled') {
+            currentPolicyPreviewApplyDryRun = dryRunResult.value;
+            currentPolicyPreviewApplyDryRunError = '';
+        } else {
+            currentPolicyPreviewApplyDryRun = null;
+            currentPolicyPreviewApplyDryRunError =
+                'Δεν ήταν δυνατή η ανάκτηση της προεπισκόπησης εφαρμογής.';
+        }
+
+        if (groupingResult.status !== 'fulfilled') {
+            throw groupingResult.reason;
+        }
+
+        const result = groupingResult.value;
+        attachPolicyPreviewResults(currentReviewRows, result.previewRows);
+        currentAtomicRepoTransferProjection = result.atomicGroupProjection || null;
+        try {
+            await refreshRepoTransferDecisions();
+        } catch (error) {
+            console.warn('[loadPolicyPreviewOnDemand] Repo-transfer decisions unavailable:', error);
+            currentRepoTransferDecisionsByProposalId = new Map();
+        }
+        patchPolicyPreviewDailyRows(result.previewRows);
+        renderPolicyPreviewGroups(result.grouping, {
+            atomicGroupProjection: result.atomicGroupProjection
+        });
+        currentPolicyPreviewLazyLoaded = true;
+    })().catch((error) => {
+        renderPolicyPreviewGroups(null, {
+            error: error?.message || 'Αποτυχία ανάκτησης ομαδοποίησης πολιτικών.'
+        });
+        throw error;
+    }).finally(() => {
+        currentPolicyPreviewLazyLoadPromise = null;
+    });
+
+    return currentPolicyPreviewLazyLoadPromise;
 }
 
 function buildPolicyPreviewApprovalsMap(records = []) {
@@ -5782,6 +5928,33 @@ function getAtomicRepoTransferDiagnosticLabel(code) {
         atomicRepoTransferUnknownDiagnosticLabel;
 }
 
+function blockedTargetCandidateReviewRow(candidate = {}, outcome = {}) {
+    const candidateId = String(candidate.prodhlomena_oraria_id || '').trim();
+    const candidateDate = String(candidate.hmeromhnia || '').trim();
+    const employeeKodikos = String(outcome.employee_kodikos || '').trim();
+    const branch = String(outcome.ypokatasthma || '').trim();
+    return currentReviewRows.find((row) => {
+        if (candidateId && String(row._id || row.id || '').trim() === candidateId) return true;
+        return stage1DateKey(row.hmeromhnia) === candidateDate &&
+            String(row.kodikos || '').trim() === employeeKodikos &&
+            (!branch || String(row.ypokatasthma || '').trim() === branch);
+    }) || null;
+}
+
+function getBlockedTargetCandidateDiagnosticLabel(code, candidate = {}, outcome = {}) {
+    if (String(code || '').trim() !== 'TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY') {
+        return getAtomicRepoTransferDiagnosticLabel(code);
+    }
+    const row = blockedTargetCandidateReviewRow(candidate, outcome);
+    const category = candidate.repo_apologistika === true || row?.repo_apologistika === true
+        ? 'ΑΝ'
+        : candidate.apologistika_category || row?.kathgoria_ergasias_apologistika;
+    if (!category) return getAtomicRepoTransferDiagnosticLabel(code);
+    return `${formatPolicyPreviewDate(candidate.hmeromhnia)}: ` +
+        'Προδηλωμένη εργασία χωρίς κάρτες — απολογιστικά χαρακτηρίστηκε ' +
+        `${stage1CurrentClassificationLabel(category)}.`;
+}
+
 function getAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
     return Object.entries(reasonCounts || {})
         .map(([code, rawCount]) => ({
@@ -5966,6 +6139,24 @@ function actionableIssueRelatedDates(issueCase = {}) {
     return [...dates].sort().map(formatPolicyPreviewDate);
 }
 
+function renderActionableBlockedTargetCandidate(candidate = {}, issueCase = {}) {
+    const reasons = Array.isArray(candidate.blocker_reasons) ? candidate.blocker_reasons : [];
+    const categoryReason = reasons.includes('TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY');
+    const messages = reasons.filter((reason) =>
+        reason !== 'TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY');
+    if (categoryReason) {
+        messages.unshift(getBlockedTargetCandidateDiagnosticLabel(
+            'TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY', candidate, issueCase
+        ));
+        return `<li>${messages.map((message) =>
+            `<div>${escapeHtml(message)}</div>`).join('')}</li>`;
+    }
+    return `<li>${escapeHtml(formatPolicyPreviewDate(candidate.hmeromhnia))}${
+        candidate.current_category ? ` — ${escapeHtml(candidate.current_category)}` : ''}${
+        messages.map((reason) => `<div>${escapeHtml(reviewHrReasonLabel(reason))}</div>`)
+            .join('')}</li>`;
+}
+
 function renderActionableIssueCase(issueCase = {}, issueCode, groupIndex, caseIndex) {
     const dates = actionableIssueRelatedDates(issueCase);
     const weekStart = formatPolicyPreviewDate(issueCase.week_start);
@@ -5996,9 +6187,7 @@ function renderActionableIssueCase(issueCase = {}, issueCode, groupIndex, caseIn
             ${candidateCount > 0 ? `<div><span class="text-muted">Πιθανές ημέρες:</span> ${escapeHtml(candidateCount)}</div>` : ''}
             ${guidance.length ? `<div><span class="text-muted">Τι χρειάζεται:</span> Ελέγξτε αν υπάρχει ${escapeHtml(guidance.join(' ή '))}.</div>` : ''}
             ${blockedCandidates.length ? `<div class="mt-1"><span class="text-muted">Υποψήφιες ημέρες:</span><ul class="mb-0">${blockedCandidates.map((candidate) =>
-                `<li>${escapeHtml(formatPolicyPreviewDate(candidate.hmeromhnia))}${candidate.current_category ? ` — ${escapeHtml(candidate.current_category)}` : ''}${(Array.isArray(candidate.blocker_reasons) ? candidate.blocker_reasons : []).map((reason) =>
-                    `<div>${escapeHtml(reviewHrReasonLabel(reason))}</div>`
-                ).join('')}</li>`
+                renderActionableBlockedTargetCandidate(candidate, issueCase)
             ).join('')}</ul></div>` : ''}
             <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
                 <button type="button" class="btn btn-sm actionable-issue-open-case employment-review-action-btn employment-review-action-primary"
@@ -7299,6 +7488,7 @@ function renderAtomicRepoTransferProjection(projection) {
         const blockerLabels = (Array.isArray(outcome?.blocked_target_reasons)
             ? [...new Set(outcome.blocked_target_reasons)]
             : [])
+            .filter((code) => code !== 'TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY')
             .sort()
             .map(getAtomicRepoTransferDiagnosticLabel);
         const rawBlockedCandidates = Array.isArray(outcome?.blocked_target_candidates)
@@ -7335,7 +7525,9 @@ function renderAtomicRepoTransferProjection(projection) {
                         ${blockedCandidates.map((candidate) => {
                             const candidateReasons = [...new Set(candidate.blocker_reasons)]
                                 .sort()
-                                .map(getAtomicRepoTransferDiagnosticLabel);
+                                .map((code) => getBlockedTargetCandidateDiagnosticLabel(
+                                    code, candidate, outcome
+                                ));
                             return `<li>
                                 <span>${escapeHtml(formatPolicyPreviewDate(candidate.hmeromhnia))}
                                     — ${escapeHtml(candidate.current_category || '-')}</span>
@@ -7851,7 +8043,18 @@ function renderEmploymentPeriodControl(state) {
     );
     const message = document.getElementById('employmentPeriodControlMessage');
     if (message) {
-        message.textContent = state?.index_readiness?.ready === false
+        const hrReadiness = state?.period_hr_readiness || {};
+        const dataQualityReadiness = state?.period_data_quality_readiness || {};
+        const pendingCount = Number(hrReadiness.total_pending_count || 0);
+        const dataQualityCount = Number(dataQualityReadiness.unresolved_count || 0);
+        message.textContent = dataQualityReadiness.ready === false
+            ? `Η περίοδος δεν μπορεί να επανυπολογιστεί ή να οριστικοποιηθεί. ${dataQualityCount === 1
+                ? 'Υπάρχει 1 εκκρεμότητα' : `Υπάρχουν ${dataQualityCount} εκκρεμότητες`} ποιότητας δεδομένων.`
+            : hrReadiness.ready === false
+            ? pendingCount > 0
+                ? `Υπάρχουν ${pendingCount} εκκρεμότητες ελέγχου εργαζομένων.`
+                : 'Η περίοδος δεν μπορεί να κλειδωθεί ή να οριστικοποιηθεί. Υπάρχουν εκκρεμότητες ελέγχου εργαζομένων.'
+            : state?.index_readiness?.ready === false
             ? 'Η μεταβολή κατάστασης περιόδου δεν είναι προσωρινά διαθέσιμη.'
             : mode === 'HISTORICAL_RECONSTRUCTION_STALE'
                 ? 'Τα πραγματικά δεδομένα της προηγούμενης περιόδου άλλαξαν. Απαιτείται επανεκτίμηση.'
@@ -8450,7 +8653,7 @@ const workflowStageNames = Object.freeze({
 });
 const workflowStageStatusLabels = Object.freeze({
     COMPLETED: 'ΟΛΟΚΛΗΡΩΜΕΝΟ', ACTIVE: 'ΕΝΕΡΓΟ', OPEN: 'ΑΝΟΙΧΤΟ',
-    BLOCKED: 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ', STALE: 'ΜΗ ΕΓΚΥΡΟ / STALE', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
+    BLOCKED: 'ΑΠΑΙΤΕΙ ΕΝΕΡΓΕΙΑ', STALE: 'ΑΠΑΙΤΕΙ ΕΠΑΝΕΛΕΓΧΟ', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
 });
 const workflowStageStatusClasses = Object.freeze({
     COMPLETED: 'text-bg-success', ACTIVE: 'text-bg-primary', OPEN: 'text-bg-secondary',
@@ -8479,6 +8682,9 @@ function derivePeriodLifecyclePresentation(payloads = []) {
         projectionsByWeeklyScope.set(scopeKey === '||' ? `UNSCOPED:${index}` : scopeKey, entry);
     });
     const projections = [...projectionsByWeeklyScope.values()];
+    const trailingPartialWeeks = projections.map(({ payload, lifecycle }) => ({
+        scope: payload?.scope || {}, ...lifecycle.trailing_partial_week
+    })).filter((item) => item.active === true);
     const statusPriority = ['BLOCKED', 'STALE', 'OPEN', 'COMPLETED'];
     const stages = Object.fromEntries(stageKeys.map((stageKey) => {
         const key = stageKey.toLowerCase();
@@ -8547,6 +8753,7 @@ function derivePeriodLifecyclePresentation(payloads = []) {
         current_stage: current,
         total_pending_count: current ? stages[current].pending_count : 0,
         requires_hr_action: Boolean(current),
+        trailing_partial_weeks: trailingPartialWeeks,
         stages
     };
 }
@@ -8701,6 +8908,7 @@ function updateEmploymentReviewWorkflowPresentation() {
     const lifecycle = derivePeriodLifecyclePresentation(payloads);
     currentEmploymentReviewLifecyclePresentation = lifecycle;
     currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(payloads);
+    currentDeferredWeeklyDateByKey = buildDeferredWeeklyDateByKey(payloads);
     currentCanonicalDailyEmploymentTypeByKey = buildCanonicalDailyEmploymentTypeByKey(payloads);
     if (currentReviewRows.length) renderCurrentReviewRows();
     const summary = document.getElementById('employmentReviewWorkflowSummary');
@@ -8710,11 +8918,12 @@ function updateEmploymentReviewWorkflowPresentation() {
     }
     const currentLabel = lifecycle.current_stage
         ? workflowStageNames[lifecycle.current_stage] : 'Όλα τα στάδια ολοκληρωμένα';
+    showPartialWeekToastOnce(lifecycle.trailing_partial_weeks);
     if (summary) {
         summary.innerHTML = `<div class="d-flex flex-wrap gap-3 small">
             <span><strong>Τρέχον Στάδιο:</strong> ${escapeHtml(currentLabel)}</span>
-            <span><strong>Συνολικές εκκρεμότητες:</strong> ${escapeHtml(lifecycle.total_pending_count)}</span>
-            <span><strong>Απαιτείται HR ενέργεια:</strong> ${lifecycle.requires_hr_action ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
+            <span><strong>Συνολικές εκκρεμότητες τρέχουσας σελίδας:</strong> ${escapeHtml(lifecycle.total_pending_count)}</span>
+            <span><strong>Απαιτείται ενέργεια στην τρέχουσα σελίδα:</strong> ${lifecycle.requires_hr_action ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
         </div>`;
         summary.classList.remove('d-none');
     }
@@ -8744,11 +8953,87 @@ function updateEmploymentReviewWorkflowPresentation() {
     return lifecycle;
 }
 
+function partialWeekToastDuration(message = '') {
+    const length = String(message).trim().length;
+    if (length <= 120) return 4000;
+    if (length <= 260) return 7000;
+    return 10000;
+}
+
+function partialWeekToastOptions(message = '') {
+    return Object.freeze({
+        position: 'top-end',
+        showCloseButton: true,
+        showConfirmButton: false,
+        timer: partialWeekToastDuration(message),
+        timerProgressBar: true
+    });
+}
+
+function partialWeekToastStack() {
+    let stack = document.getElementById('employmentReviewPartialWeekToastStack');
+    if (stack) return stack;
+    stack = document.createElement('div');
+    stack.id = 'employmentReviewPartialWeekToastStack';
+    stack.className = 'employment-review-partial-week-toast-stack';
+    stack.setAttribute('aria-live', 'polite');
+    document.body.appendChild(stack);
+    return stack;
+}
+
+function resetPartialWeekToasts() {
+    partialWeekToastMessagesForCurrentLoad.clear();
+    const stack = document.getElementById('employmentReviewPartialWeekToastStack');
+    stack?.querySelectorAll('.toast').forEach((element) => {
+        bootstrap.Toast.getInstance(element)?.dispose();
+    });
+    stack?.remove();
+}
+
+function showPartialWeekToastOnce(partialWeeks = []) {
+    const messages = [...new Set(partialWeeks
+        .map((item) => String(item?.message || '').trim())
+        .filter(Boolean))];
+    messages.forEach((message) => {
+        if (partialWeekToastMessagesForCurrentLoad.has(message)) return;
+        partialWeekToastMessagesForCurrentLoad.add(message);
+        const options = partialWeekToastOptions(message);
+        const slot = document.createElement('div');
+        slot.className = 'employment-review-partial-week-toast-slot';
+        slot.style.setProperty('--employment-review-toast-duration', `${options.timer}ms`);
+        slot.innerHTML = `<div class="toast employment-review-partial-week-toast" role="status"
+            aria-live="polite" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">ΜΕΡΙΚΗ ΕΒΔΟΜΑΔΑ ΠΕΡΙΟΔΟΥ</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"
+                    aria-label="Κλείσιμο"></button>
+            </div>
+            <div class="toast-body"></div>
+            <div class="employment-review-partial-week-toast-progress"></div>
+        </div>`;
+        slot.querySelector('.toast-body').textContent = message;
+        partialWeekToastStack().appendChild(slot);
+        const element = slot.querySelector('.toast');
+        const toast = bootstrap.Toast.getOrCreateInstance(element, {
+            animation: true,
+            autohide: true,
+            delay: options.timer
+        });
+        element.addEventListener('hidden.bs.toast', () => {
+            toast.dispose();
+            slot.remove();
+            const stack = document.getElementById('employmentReviewPartialWeekToastStack');
+            if (stack && !stack.children.length) stack.remove();
+        });
+        toast.show();
+    });
+}
+
 function renderWeeklyHrStage1BulkToolbar() {
     const counts = weeklyHrStage1Counts();
     const disabled = counts.selected === 0 || weeklyHrStage1BulkSubmitting;
     return `<div class="card mb-3 weekly-hr-stage1-bulk-toolbar"><div class="card-body py-2">
-        <div class="d-flex flex-wrap gap-3 small mb-2"><strong>Συνολικές σχετικές εβδομάδες: ${counts.total}</strong><span>Ανοιχτές: ${counts.open}</span><span>Παρωχημένες: ${counts.stale}</span><span>Ολοκληρωμένες: ${counts.completed}</span><span>Μπλοκαρισμένες: ${counts.blocked}</span><strong>Επιλεγμένες: <span id="weeklyHrStage1SelectedCount">${counts.selected}</span></strong></div>
+        <div class="d-flex flex-wrap gap-3 small mb-2"><strong>Σχετικές εβδομάδες τρέχουσας σελίδας: ${counts.total}</strong><span>Ανοιχτές: ${counts.open}</span><span>Απαιτούν επανέλεγχο: ${counts.stale}</span><span>Ολοκληρωμένες: ${counts.completed}</span><span>Απαιτούν ενέργεια: ${counts.blocked}</span><strong>Επιλεγμένες: <span id="weeklyHrStage1SelectedCount">${counts.selected}</span></strong></div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-select-all">Επιλογή όλων</button>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary weekly-hr-clear-all">Αποεπιλογή όλων</button>
@@ -8781,7 +9066,7 @@ function renderWeeklyHrStage1Card(payload) {
     const stale = businessStatus === 'STALE';
     const statusText = weeklyHrHasOnlyOrphanBlockers(payload)
         ? 'Απαιτείται επίλυση ορφανού χτυπήματος' : ({ OPEN: 'Ανοιχτό', COMPLETED: 'Ολοκληρωμένο',
-        BLOCKED: 'Μπλοκαρισμένο', STALE: 'Παρωχημένο' }[businessStatus] || businessStatus);
+        BLOCKED: 'Απαιτεί ενέργεια', STALE: 'Απαιτεί επανέλεγχο' }[businessStatus] || 'Άγνωστη κατάσταση');
     const blockedExplanation = weeklyHrBlockedExplanation(payload);
     const eligible = isWeeklyHrStage1Eligible(payload);
     const selected = eligible && weeklyHrStage1Selected.has(key);
@@ -8848,7 +9133,9 @@ async function refreshWeeklyHrStage1Scope(scope) {
     return payload;
 }
 
-async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' } = {}) {
+async function renderWeeklyHrStage1(rows, {
+    search_start = '', search_end = '', preloaded_projections = null
+} = {}) {
     const container = document.getElementById('weeklyHrStage1Container');
     if (!container) return;
     const scopes = buildWeeklyHrStage1Scopes(rows, search_start, search_end);
@@ -8862,16 +9149,25 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
     currentWeeklyHrStage1Errors = [];
     currentReviewLifecycleProjectionReady = false;
     await loadWeeklyHrLeaveCategories().catch((error) => console.warn('[weeklyHrLeaveCategories]', error));
-    await Promise.all([...scopes.values()].map(async (scope) => {
-        try { const payload = await fetchWeeklyHrStage1(scope);
+    if (Array.isArray(preloaded_projections)) {
+        preloaded_projections.forEach((payload) => {
+            const scope = payload.scope;
             (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
             weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
             weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
-        } catch (error) {
-            console.warn('[weeklyHrStage1]', error);
-            currentWeeklyHrStage1Errors.push({ scope, error });
-        }
-    }));
+        });
+    } else {
+        await Promise.all([...scopes.values()].map(async (scope) => {
+            try { const payload = await fetchWeeklyHrStage1(scope);
+                (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
+                weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
+                weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
+            } catch (error) {
+                console.warn('[weeklyHrStage1]', error);
+                currentWeeklyHrStage1Errors.push({ scope, error });
+            }
+        }));
+    }
     visibleWeeklyHrPayloads().forEach((payload) => {
         if (isWeeklyHrStage1Eligible(payload)) {
             weeklyHrStage1Selected.add(weeklyHrStage1Key(payload.scope));
@@ -8999,7 +9295,7 @@ function renderWeeklyHrStage1BulkResult(result = {}) {
     const summary = `Ολοκληρώθηκαν ${successful} από ${Number(result.requested_count || 0)} εβδομάδες.` +
         (needsReview ? ` ${needsReview} χρειάζονται επανέλεγχο.` : '');
     if (!failures.length) return { successful, needsReview, text: summary, html: '' };
-    const statusLabels = { BLOCKED: 'Μπλοκαρισμένο', STALE_RETRY_REQUIRED: 'Απαιτείται επανέλεγχος',
+    const statusLabels = { BLOCKED: 'Απαιτεί ενέργεια', STALE_RETRY_REQUIRED: 'Απαιτείται επανέλεγχος',
         FAILED: 'Αποτυχία' };
     const rows = failures.map((item) => `<tr>
         <td>${escapeHtml(formatStage1DateKey(item.scope?.week_start))}–${escapeHtml(
@@ -9153,8 +9449,81 @@ document.addEventListener('change', (event) => {
     updateWeeklyHrStage1BulkToolbar();
 });
 
+function normalizeEmploymentReviewPageJump(value, totalPages) {
+    const rawValue = String(value ?? '').trim();
+    if (!/^[+-]?\d+$/.test(rawValue)) return null;
+    const requestedPage = Number(rawValue);
+    if (!Number.isSafeInteger(requestedPage)) return null;
+    return Math.min(Math.max(requestedPage, 1), Math.max(Number(totalPages) || 1, 1));
+}
+
+function goToEmploymentReviewEmployeePage(value, totalPages) {
+    const targetPage = normalizeEmploymentReviewPageJump(value, totalPages);
+    if (targetPage === null) return false;
+    currentReviewEmployeePage = targetPage;
+    loadResults();
+    return true;
+}
+
+function renderEmploymentReviewEmployeePagination(payload = {}) {
+    const container = document.getElementById('employmentReviewEmployeePagination');
+    if (!container) return;
+    const selectedEmployee = String(document.getElementById('kodikos')?.value || '').trim();
+    const page = Math.max(Number(payload.page || 1), 1);
+    const totalPages = Math.max(Number(payload.totalPages || 1), 1);
+    const totalEmployees = Math.max(Number(payload.totalEmployees || 0), 0);
+    const limit = Math.max(Number(payload.limit || employmentReviewEmployeePageSize), 1);
+    if (selectedEmployee || totalEmployees <= limit) {
+        container.classList.add('d-none');
+        container.replaceChildren();
+        return;
+    }
+    const first = totalEmployees ? ((page - 1) * limit) + 1 : 0;
+    const last = Math.min(page * limit, totalEmployees);
+    container.innerHTML = `<div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="small text-muted">Εμφάνιση ${first}–${last} από ${totalEmployees} εργαζομένους</span>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Σελίδες εργαζομένων">
+            <button type="button" class="btn employment-review-pagination-control employment-review-page-previous"
+                ${page <= 1 ? 'disabled' : ''}>Προηγούμενη</button>
+            <span class="btn employment-review-pagination-control employment-review-pagination-label disabled">Σελίδα ${page}/${totalPages}</span>
+            <button type="button" class="btn employment-review-pagination-control employment-review-page-next"
+                ${page >= totalPages ? 'disabled' : ''}>Επόμενη</button>
+        </div>
+        <div class="employment-review-page-jump d-inline-flex align-items-center gap-1">
+            <label class="small mb-0" for="employmentReviewPageJumpInput">Σελίδα</label>
+            <input type="number" class="form-control form-control-sm employment-review-page-jump-input"
+                id="employmentReviewPageJumpInput" min="1" max="${totalPages}" step="1"
+                value="${page}" inputmode="numeric" aria-label="Μετάβαση σε σελίδα">
+            <span class="small text-muted text-nowrap">από ${totalPages}</span>
+            <button type="button"
+                class="btn btn-sm employment-review-pagination-control employment-review-page-jump-button">
+                Μετάβαση
+            </button>
+        </div></div>`;
+    container.classList.remove('d-none');
+    container.querySelector('.employment-review-page-previous')?.addEventListener('click', () => {
+        currentReviewEmployeePage = page - 1;
+        loadResults();
+    });
+    container.querySelector('.employment-review-page-next')?.addEventListener('click', () => {
+        currentReviewEmployeePage = page + 1;
+        loadResults();
+    });
+    const jumpInput = container.querySelector('.employment-review-page-jump-input');
+    const runPageJump = () => goToEmploymentReviewEmployeePage(jumpInput?.value, totalPages);
+    container.querySelector('.employment-review-page-jump-button')
+        ?.addEventListener('click', runPageJump);
+    jumpInput?.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        runPageJump();
+    });
+}
+
 async function loadResults() {
+    resetPartialWeekToasts();
     try {
+        const page = currentReviewEmployeePage;
         currentReviewLifecycleProjectionReady = false;
         const advancedBranch = String(
             document.getElementById('ypokatasthma_stathera_advanced')?.value ||
@@ -9170,22 +9539,20 @@ async function loadResults() {
         branchValidation?.classList.toggle('d-none', !invalidBranch);
         if (invalidBranch) return;
 
-        const periodControl = await loadEmploymentPeriodControl(advancedBranch);
-        const hasAuthoritativeResult = hasAuthoritativeEmploymentCalculation(periodControl);
-
         currentAtomicRepoTransferProjection = null;
         currentPolicyPreviewRowsById = new Map();
         currentPreCalculationDataIssueGroups = [];
-        if (hasAuthoritativeResult) renderPolicyPreviewGroups(null, { loading: true });
-        else document.getElementById('policyPreviewGroupsContainer')?.replaceChildren();
+        currentPolicyPreviewLazyLoadPromise = null;
+        currentPolicyPreviewLazyLoaded = false;
+        document.getElementById('policyPreviewGroupsContainer')?.replaceChildren();
 
         const params = new URLSearchParams({
             apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
             eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
             ypokatasthma: advancedBranch,
             kodikos: document.getElementById('kodikos')?.value || '',
-            page: 1,
-            limit: 5000
+            page,
+            limit: employmentReviewEmployeePageSize
         });
 
         const response = await fetch(`/api/prodhlomena-oraria/review?${params.toString()}`, {
@@ -9209,8 +9576,23 @@ async function loadResults() {
             return;
         }
 
+        const periodControl = payload.period_control;
+        if (!periodControl?.success) {
+            throw new Error('Δεν ήταν δυνατή η ανάκτηση της κατάστασης περιόδου.');
+        }
+        renderEmploymentPeriodControl(periodControl);
+        const hasAuthoritativeResult = hasAuthoritativeEmploymentCalculation(periodControl);
+
         ensureReviewTableStructure();
-        currentPolicyPreviewBaseParams = new URLSearchParams(params);
+        currentReviewEmployeePage = Math.max(Number(payload.page || page), 1);
+        currentReviewEmployeeCodes = [...new Set((payload.employeeCodes || [])
+            .map((code) => String(code || '').trim()).filter(Boolean))]
+            .sort((left, right) => left.localeCompare(right, 'el', { numeric: true }));
+        renderEmploymentReviewEmployeePagination(payload);
+        params.set('employee_codes', (payload.employeeCodes || []).join(','));
+        currentPolicyPreviewBaseParams = hasAuthoritativeResult && payload.finalized !== true
+            ? new URLSearchParams(params)
+            : null;
         currentRepoTransferDecisionsByProposalId = new Map();
         currentPolicyPreviewApprovalRecords = [];
         currentPolicyPreviewApprovalTotal = 0;
@@ -9223,24 +9605,19 @@ async function loadResults() {
         currentApprovalHistoryFilters.searchText = '';
 
         const rows = payload.rows || [];
-        if (payload.finalized !== true && hasAuthoritativeResult) {
-            try {
-                const scenarioRows = await fetchScenarioClassifications(params);
-                const scenarioByProdhlomenaId = buildScenarioClassificationsMap(scenarioRows);
-                attachScenarioClassifications(rows, scenarioByProdhlomenaId);
-            } catch (scenarioError) {
-                console.warn('[loadResults] Scenario classifications unavailable:', scenarioError);
-            }
-        }
+        const scenarioByProdhlomenaId = buildScenarioClassificationsMap(
+            payload.scenario_classifications || []
+        );
+        attachScenarioClassifications(rows, scenarioByProdhlomenaId);
 
         currentReviewRows = rows;
         currentReviewDeviations = payload.deviations || [];
         currentPendingDeviationWeeks = payload.pendingDeviationWeeks || [];
         currentLegacyDeviations = payload.legacyDeviations || [];
-        renderCurrentReviewRows();
         await renderWeeklyHrStage1(rows, {
             search_start: params.get('apo_hmeromhnia'),
-            search_end: params.get('eos_hmeromhnia')
+            search_end: params.get('eos_hmeromhnia'),
+            preloaded_projections: payload.weekly_hr_projections
         });
         await window.EmploymentReviewOrphanQualityCheck?.run({
             params,
@@ -9279,62 +9656,7 @@ async function loadResults() {
             return;
         }
 
-        if (payload.finalized !== true) {
-        const [groupingResult, approvalsResult, dryRunResult] = await Promise.allSettled([
-            fetchPolicyPreviewGrouping(params),
-            refreshPolicyPreviewApprovals(params),
-            fetchPolicyPreviewApplyDryRun(params)
-        ]);
-
-        if (approvalsResult.status === 'rejected') {
-            console.warn(
-                '[loadResults] Policy preview approvals unavailable:',
-                approvalsResult.reason
-            );
-            currentPolicyPreviewApprovalRecords = [];
-            currentPolicyPreviewApprovalTotal = 0;
-            currentPolicyPreviewApprovalsByGroupId = new Map();
-            currentPolicyPreviewApprovalsError =
-                approvalsResult.reason?.message ||
-                'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.';
-        }
-
-        if (dryRunResult.status === 'fulfilled') {
-            currentPolicyPreviewApplyDryRun = dryRunResult.value;
-            currentPolicyPreviewApplyDryRunError = '';
-        } else {
-            console.warn(
-                '[loadResults] Policy preview apply dry-run unavailable:',
-                dryRunResult.reason
-            );
-            currentPolicyPreviewApplyDryRun = null;
-            currentPolicyPreviewApplyDryRunError =
-                'Δεν ήταν δυνατή η ανάκτηση της προεπισκόπησης εφαρμογής.';
-        }
-
-        if (groupingResult.status === 'fulfilled') {
-            attachPolicyPreviewResults(rows, groupingResult.value.previewRows);
-            currentAtomicRepoTransferProjection = groupingResult.value.atomicGroupProjection || null;
-            try {
-                await refreshRepoTransferDecisions();
-            } catch (repoTransferDecisionsError) {
-                console.warn('[loadResults] Repo-transfer decisions unavailable:', repoTransferDecisionsError);
-                currentRepoTransferDecisionsByProposalId = new Map();
-            }
-            renderCurrentReviewRows();
-            renderPolicyPreviewGroups(groupingResult.value.grouping, {
-                atomicGroupProjection: groupingResult.value.atomicGroupProjection
-            });
-        } else {
-            const policyPreviewError = groupingResult.reason;
-            console.warn('[loadResults] Policy preview grouping unavailable:', policyPreviewError);
-            renderPolicyPreviewGroups(null, {
-                error:
-                    policyPreviewError.message ||
-                    'Αποτυχία ανάκτησης ομαδοποίησης πολιτικών.'
-            });
-        }
-        } else {
+        if (payload.finalized === true) {
             renderPolicyPreviewGroups(null);
         }
     } catch (error) {
@@ -9623,7 +9945,8 @@ function renderOrphanCardResolutionSection(row = {}) {
             </div>` : '<div class="alert alert-success py-2">Η πρόταση δεν παραβιάζει το διαθέσιμο 11ωρο.</div>'}
             ${approved ? '<div class="alert alert-info py-2">Υπάρχει ήδη εγκεκριμένη επίλυση από τον αρμόδιο χρήστη. Το πρωτογενές ορφανό χτύπημα παραμένει ορατό.</div>' : `
                 <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="orphanResolutionApprove">
+                    <input class="form-check-input" type="checkbox" id="orphanResolutionApprove"
+                        ${row.orphan_resolution_approval_checked === true ? 'checked' : ''}>
                     <label class="form-check-label fw-semibold" for="orphanResolutionApprove">
                         Εγκρίνω ρητά το απολογιστικό διάστημα για αυτή την περίπτωση ορφανού χτυπήματος.
                     </label>
@@ -9673,6 +9996,19 @@ function orphanResolutionPreviewRow(row) {
     return draft ? { ...row, ...draft } : row;
 }
 
+function captureOrphanResolutionModalDraft(row) {
+    const approvalInput = document.getElementById('orphanResolutionApprove');
+    if (!approvalInput) return;
+    orphanResolutionPreviewDrafts.set(row, {
+        ...(orphanResolutionPreviewDrafts.get(row) || {}),
+        orphan_resolution_approval_checked: approvalInput.checked === true
+    });
+}
+
+function resetOrphanResolutionModalDraft(row) {
+    orphanResolutionPreviewDrafts.delete(row);
+}
+
 function requiresExplicitOrphanResolutionApproval(row, approvalInput) {
     const preview = orphanResolutionPreviewRow(row)?.orphan_card_resolution_preview || {};
     return preview.orphanVisible === true && preview.eligible === true &&
@@ -9692,6 +10028,7 @@ function applyOrphanDerivedPreview(row, derivedPreview) {
 }
 
 async function refreshOrphanResolutionPreview(row) {
+    captureOrphanResolutionModalDraft(row);
     const start = document.getElementById('edit_apo_ora_01_apologistika')?.value || '';
     const end = document.getElementById('edit_eos_ora_01_apologistika')?.value || '';
     const response = await fetch(
@@ -9705,6 +10042,7 @@ async function refreshOrphanResolutionPreview(row) {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Αποτυχία ελέγχου 11ώρου.');
     const draft = {
+        ...(orphanResolutionPreviewDrafts.get(row) || {}),
         orphan_card_resolution_preview: payload.preview,
         orphan_derived_preview: payload.derived_preview || null
     };
@@ -10043,6 +10381,7 @@ function validateReviewSave(updates) {
 }
 
 function showDetailsModal(row) {
+    resetOrphanResolutionModalDraft(row);
     const html = `
     <div class="container-fluid">
 
@@ -10142,8 +10481,13 @@ function showDetailsModal(row) {
 
     document.getElementById('detailsContainer').innerHTML = html;
 
-    const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+    const modalElement = document.getElementById('detailsModal');
+    const modal = new bootstrap.Modal(modalElement);
     const lockBadge = document.getElementById('detailsLockBadge');
+
+    modalElement?.addEventListener('hidden.bs.modal', () => {
+        resetOrphanResolutionModalDraft(row);
+    }, { once: true });
 
     if (lockBadge) {
         lockBadge.classList.toggle('d-none', !row.is_locked);
@@ -10281,6 +10625,7 @@ function showDetailsModal(row) {
                 text: payload.message || 'Η εγγραφή αποθηκεύτηκε.'
             });
 
+            resetOrphanResolutionModalDraft(row);
             modal.hide();
 
             await loadResults();
@@ -10364,17 +10709,66 @@ function buildReviewExportParams() {
         kodikos: document.getElementById('kodikos')?.value || ''
     });
 }
+
+async function runEmploymentReviewExport(buttonId, action) {
+    const button = document.getElementById(buttonId);
+    if (button?.disabled) return;
+    const originalContent = button?.innerHTML;
+    if (button) {
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        button.innerHTML = `<span class="spinner-border spinner-border-sm employment-review-export-spinner"
+            aria-hidden="true"></span>${originalContent}`;
+    }
+    window.AppLoader?.begin('Ενημέρωση των πεδίων...', 200);
+    try {
+        return await action();
+    } finally {
+        window.AppLoader?.end();
+        if (button) {
+            button.innerHTML = originalContent;
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+        }
+    }
+}
+
 async function exportExcel() {
-    const params = buildReviewExportParams();
-    window.location.href = `/api/prodhlomena-oraria/review/export-excel?${params.toString()}`;
+    return runEmploymentReviewExport('exportExcelBtn', async () => {
+        try {
+            const response = await fetch(
+                `/api/prodhlomena-oraria/review/export-excel?${buildReviewExportParams().toString()}`,
+                { method: 'GET', headers: { 'CSRF-Token': csrfToken } }
+            );
+            if (!response.ok) throw new Error('Αποτυχία δημιουργίας Excel.');
+            const blob = await response.blob();
+            const disposition = response.headers.get('Content-Disposition') || '';
+            const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] ||
+                `elegxos_apasxolhseon_${Date.now()}.xlsx`;
+            const downloadUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = downloadUrl;
+            anchor.download = filename;
+            anchor.setAttribute('data-no-loader', 'true');
+            anchor.style.display = 'none';
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(downloadUrl);
+        } catch (error) {
+            console.error(error);
+            employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
+        }
+    });
 }
 
 let currentPdfBlobUrl = null;
 let currentPdfFileName = null;
 
 async function exportPdf() {
-    try {
-        const response = await fetch(
+    return runEmploymentReviewExport('exportPdfBtn', async () => {
+        try {
+            const response = await fetch(
             `/api/prodhlomena-oraria/review/export-pdf?${buildReviewExportParams().toString()}`,
             { method: 'GET', headers: { 'CSRF-Token': csrfToken } }
         );
@@ -10399,15 +10793,17 @@ async function exportPdf() {
         } else {
             window.open(currentPdfBlobUrl, '_blank');
         }
-    } catch (error) {
-        console.error(error);
-        employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
-    }
+        } catch (error) {
+            console.error(error);
+            employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
+        }
+    });
 }
 
 async function exportAuditDossierPdf() {
-    try {
-        const response = await fetch(
+    return runEmploymentReviewExport('exportAuditDossierPdfBtn', async () => {
+        try {
+            const response = await fetch(
             `/api/prodhlomena-oraria/review/export-audit-dossier-pdf?${buildReviewExportParams().toString()}`,
             { method: 'GET', headers: { 'CSRF-Token': csrfToken } }
         );
@@ -10422,10 +10818,11 @@ async function exportAuditDossierPdf() {
         if (modalEl && typeof bootstrap !== 'undefined') {
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
         } else window.open(currentPdfBlobUrl, '_blank');
-    } catch (error) {
-        console.error(error);
-        employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
-    }
+        } catch (error) {
+            console.error(error);
+            employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
+        }
+    });
 }
 
 function initReviewMoveByEnter() {
@@ -10675,7 +11072,19 @@ document.getElementById('postCorrectivePayrollBtn')?.addEventListener('click', (
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
 document.getElementById('exportAuditDossierPdfBtn')?.addEventListener('click', exportAuditDossierPdf);
-document.getElementById('searchBtn')?.addEventListener('click', loadResults);
+document.querySelector('[data-workflow-stage="STAGE2"] .accordion-button')?.addEventListener(
+    'click',
+    (event) => {
+        if (!event.currentTarget?.classList.contains('collapsed')) return;
+        loadPolicyPreviewOnDemand().catch((error) => {
+            console.warn('[loadPolicyPreviewOnDemand]', error);
+        });
+    }
+);
+document.getElementById('searchBtn')?.addEventListener('click', () => {
+    currentReviewEmployeePage = 1;
+    loadResults();
+});
 
 window.EmploymentReviewHrTest = {
     setGroups(groups, completedGroupIds = []) {

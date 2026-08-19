@@ -105,6 +105,15 @@ function testCanonicalWeeklyProfile() {
     assert.strictEqual(changed.expectedWeeklyRepo, 1);
     assert.strictEqual(changed.repoResolutionReason, null);
     assert.strictEqual(changed.profileChangedInsideWeek, true);
+    assert.deepStrictEqual(
+        Object.keys(changed.profilesByDate),
+        [
+            '2026-06-15', '2026-06-16', '2026-06-17', '2026-06-18',
+            '2026-06-19', '2026-06-20', '2026-06-21'
+        ]
+    );
+    assert.strictEqual(String(changed.profilesByDate['2026-06-17'].istorikoId), 'h1');
+    assert.strictEqual(String(changed.profilesByDate['2026-06-18'].istorikoId), 'h2');
     assert.strictEqual(
         changed.effectiveProfileDate,
         getProfileDateForDeviation(changed.effectiveProfile, week.naturalWeekEnd)
@@ -113,6 +122,66 @@ function testCanonicalWeeklyProfile() {
         changed.previousProfileDate,
         getProfileDateForDeviation(changed.previousProfile, week.weekStart)
     );
+}
+
+function testDeterministicDailyProfileChangesFor0015And0017() {
+    const cases = [
+        {
+            employeeCode: '0015',
+            weekStart: '2026-06-08',
+            firstId: '0003',
+            nextId: '0004',
+            firstWorkdays: 2,
+            nextWorkdays: 3,
+            changeDate: '2026-06-09',
+            expectedIds: ['0003', '0004', '0004', '0004', '0004', '0004', '0004']
+        },
+        {
+            employeeCode: '0017',
+            weekStart: '2026-06-01',
+            firstId: '0002',
+            nextId: '0004',
+            firstWorkdays: 3,
+            nextWorkdays: 5,
+            changeDate: '2026-06-02',
+            expectedIds: ['0002', '0004', '0004', '0004', '0004', '0004', '0004']
+        }
+    ];
+    for (const testCase of cases) {
+        const weekStart = new Date(`${testCase.weekStart}T00:00:00.000Z`);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+        const profileInfo = getWeeklyRepoProfileInfo({
+            week: {
+                naturalWeekEnd: weekEnd,
+                weekStart,
+                weekEnd,
+                isFullWeek: true
+            },
+            istorikoRows: [
+                {
+                    _id: testCase.firstId,
+                    hmeromhnia_isxyos_oron_ergasias_apo: weekStart,
+                    hmeres_ergasias_ebdomadas: testCase.firstWorkdays,
+                    ores_ergasias_ebdomadas: testCase.firstWorkdays * 8
+                },
+                {
+                    _id: testCase.nextId,
+                    hmeromhnia_isxyos_oron_ergasias_apo: new Date(
+                        `${testCase.changeDate}T00:00:00.000Z`
+                    ),
+                    hmeres_ergasias_ebdomadas: testCase.nextWorkdays,
+                    ores_ergasias_ebdomadas: testCase.nextWorkdays * 8
+                }
+            ],
+            ergazomenos: { kodikos: testCase.employeeCode }
+        });
+        assert.strictEqual(profileInfo.profileChangedInsideWeek, true);
+        assert.deepStrictEqual(
+            Object.values(profileInfo.profilesByDate).map((entry) => String(entry.istorikoId)),
+            testCase.expectedIds
+        );
+    }
 }
 
 function testDailyEmploymentProfileForMixedJune0014() {
@@ -274,9 +343,9 @@ function test0002ThroughAuthoritativeProjectionPath() {
         weekRows: rows,
         employmentProfile: repoTransferProfile(profileInfo.effectiveProfile)
     });
-    assert.strictEqual(projection.projection_status, 'NOT_AVAILABLE');
-    assert.strictEqual(projection.groups.length, 0);
-    assert.ok(projection.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+    assert.strictEqual(projection.projection_status, 'READY');
+    assert.strictEqual(projection.groups.length, 1);
+    assert.deepStrictEqual(projection.reasons, []);
 }
 
 function testProfileDateForDeviationPrecedenceAndFallbacks() {
@@ -390,6 +459,7 @@ async function run() {
     testNoCardsDisplayRequiresNoCardEvidence();
     testProfileDateForDeviationPrecedenceAndFallbacks();
     testCanonicalWeeklyProfile();
+    testDeterministicDailyProfileChangesFor0015And0017();
     testDailyEmploymentProfileForMixedJune0014();
     testContractualWeeklyRepoResolution();
     test0002ThroughAuthoritativeProjectionPath();

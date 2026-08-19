@@ -49,11 +49,11 @@ const reviewHandler = controller.slice(
     controller.indexOf('static getProdhlomenaOrariaForReview'),
     controller.indexOf('static getApasxoliseisPolicyCatalog')
 );
-const primaryReviewQuery = reviewHandler.slice(
-    reviewHandler.indexOf('const [rows, total, deviationContextRows]'),
-    reviewHandler.indexOf('ProdhlomenaOrariaModel.countDocuments(filter)')
+const reviewSelectFields = controller.slice(
+    controller.indexOf('const REVIEW_SELECT_FIELDS'),
+    controller.indexOf('function weeklyHrApiError')
 );
-assert.match(primaryReviewQuery, /orphan_card_resolution/);
+assert.match(reviewSelectFields, /orphan_card_resolution/);
 assert.doesNotMatch(controller, /approvedUpdates\.cards_(?:apo|eos)_ora/);
 assert.match(frontend, /Απόφαση ορφανού χτυπήματος/);
 assert.match(frontend, /orphanRestRiskAcknowledged/);

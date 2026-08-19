@@ -101,6 +101,25 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
         periodControlModel: activeCalculation.period, frozenModel: activeCalculation.frozen, auditModel: activeCalculation.audit,
         indexGuard: guard, transactionRunner: runner }), (error) => error.code === 'PERIOD_CONTROL_CALCULATION_IN_PROGRESS');
 
+    const pendingFinalization = stores({ status: 'LOCKED' });
+    await assert.rejects(() => finalizeEmploymentPeriod({ session: allowed, scope, reason: 'pending',
+        requestId: 'finalize-pending-request', snapshotInput, periodControlModel: pendingFinalization.period,
+        frozenModel: pendingFinalization.frozen, auditModel: pendingFinalization.audit,
+        indexGuard: guard, transactionRunner: runner, periodHrReadinessResolver: async () => ({
+            ready: false, total_pending_count: 1, pending_cases: [{ employee_kodikos: '999' }]
+        }) }), (error) => error.code === 'PERIOD_HAS_PENDING_HR_ACTIONS');
+    assert.strictEqual(pendingFinalization.control.status, 'LOCKED');
+    assert.strictEqual(pendingFinalization.frozenRecord, null);
+    const dataQualityFinalization = stores({ status: 'LOCKED' });
+    await assert.rejects(() => finalizeEmploymentPeriod({ session: allowed, scope, reason: 'data quality',
+        requestId: 'finalize-data-quality-request', snapshotInput,
+        periodControlModel: dataQualityFinalization.period, frozenModel: dataQualityFinalization.frozen,
+        auditModel: dataQualityFinalization.audit, indexGuard: guard, transactionRunner: runner,
+        periodDataQualityReadinessResolver: async () => ({ ready: false, unresolved_count: 1 }) }),
+    (error) => error.code === 'PERIOD_HAS_UNRESOLVED_DATA_QUALITY_ISSUES');
+    assert.strictEqual(dataQualityFinalization.control.status, 'LOCKED');
+    assert.strictEqual(dataQualityFinalization.frozenRecord, null);
+
     const historicalFinalized = stores({ historical_reconstruction_status: 'COMPLETED',
         historical_reconstruction_version: 2, historical_dependency_fingerprint: 'd'.repeat(64) });
     await finalizeEmploymentPeriod({ session: allowed, scope, reason: 'Ιστορική οριστικοποίηση',

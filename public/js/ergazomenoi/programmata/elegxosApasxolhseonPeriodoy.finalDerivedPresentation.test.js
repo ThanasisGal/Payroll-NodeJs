@@ -24,8 +24,10 @@ vm.createContext(sandbox);
 vm.runInContext(`${source}
 this.resolvePresentation = resolveReviewApologistikoPresentation;
 this.buildStage2Map = buildStage2DailyResolutionByKey;
+this.buildDeferredMap = buildDeferredWeeklyDateByKey;
 this.stage2Key = stage2DailyResolutionKey;
 this.renderDeviation = renderDeviationNoteCell;
+this.appendDeviationRows = appendEmployeeDeviationRows;
 this.isResolvedAmbiguity = isResolvedWeeklySelectionAmbiguity;
 this.finalWeeklyNonWorkDays = resolveFinalWeeklyNonWorkDays;
 this.weeklyEmploymentStatus = renderWeeklyEmploymentStatus;`, sandbox,
@@ -42,6 +44,15 @@ assert.equal(sandbox.resolvePresentation(possibleLeave(), {
     stage2AutomaticResolution: nonWork }).text, 'ΜΗ ΕΡΓΑΣΙΑ');
 assert.equal(sandbox.resolvePresentation(possibleLeave(), {
     stage2AutomaticResolution: restRepo }).text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+const deferred = sandbox.resolvePresentation(possibleLeave(), {
+    deferredWeeklyReview: true });
+assert.equal(deferred.text, 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ');
+assert.match(deferred.tooltip, /επόμενη περίοδο/);
+assert.equal(sandbox.resolvePresentation(possibleLeave(), {}).text, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+const deferredMap = sandbox.buildDeferredMap([{ scope: { employee_kodikos: '0031' },
+    lifecycle_projection: { deferred_weekly_dates: ['2026-06-30'] } }]);
+assert.equal(deferredMap.get(sandbox.stage2Key('0031', '2026-06-30')), true);
+assert.equal(deferredMap.has(sandbox.stage2Key('0031', '2026-06-29')), false);
 
 [
     [{ adeia_apologistika: true, kathgoria_adeias_apologistika: 'ΑΔΑΛ',
@@ -84,6 +95,35 @@ assert.doesNotMatch(sandbox.renderDeviation(deviation), /απαιτείται ε
 weeklyMap.clear();
 weeklyMap.set('unresolved', payload(true));
 assert.match(sandbox.renderDeviation(deviation), /απαιτείται επιλογή/i);
+
+const employee0009Deviation = {
+    kodikos: '0009', ypokatasthma: '0000',
+    week_apo: '2026-06-08', week_eos: '2026-06-14',
+    status: 'READY', pending_count: 0, requires_hr_action: false,
+    presentation_reasons: ['TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY'],
+    repo_transfer_blocked_target_candidates: [{
+        prodhlomena_oraria_id: '0009-2026-06-09',
+        hmeromhnia: '2026-06-09',
+        apologistika_category: 'ΑΝ',
+        repo_apologistika: true,
+        blocker_reasons: ['TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY']
+    }]
+};
+const employee0009BeforeRender = structuredClone(employee0009Deviation);
+let renderedWeeklyWrapper = null;
+const originalCreateElement = sandbox.document.createElement;
+sandbox.document.createElement = () => ({
+    classList: { add() {} }, dataset: {}, innerHTML: '', querySelectorAll: () => []
+});
+sandbox.appendDeviationRows({
+    appendChild(element) { renderedWeeklyWrapper = element; }
+}, [employee0009Deviation], '0009');
+sandbox.document.createElement = originalCreateElement;
+assert.match(renderedWeeklyWrapper.innerHTML,
+    /09\/06\/2026: Προδηλωμένη εργασία χωρίς κάρτες — απολογιστικά χαρακτηρίστηκε ΑΝΑΠΑΥΣΗ \/ ΡΕΠΟ\./);
+assert.doesNotMatch(renderedWeeklyWrapper.innerHTML,
+    /Η προδηλωμένη ημέρα χωρίς κάρτες έχει διαφορετική απολογιστική κατηγορία\./);
+assert.deepEqual(employee0009Deviation, employee0009BeforeRender);
 
 assert.equal(sandbox.weeklyEmploymentStatus({ effective_typos_apasxolhshs: '1' }), 'Μερική');
 assert.equal(sandbox.weeklyEmploymentStatus({ effective_typos_apasxolhshs: '2' }),

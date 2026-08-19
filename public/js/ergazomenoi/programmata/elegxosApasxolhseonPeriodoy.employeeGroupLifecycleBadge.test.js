@@ -36,6 +36,7 @@ function sourceFunction(name) {
 const helpers = new Function(`${sourceFunction('compareLifecyclePendingItems')}
 ${sourceFunction('derivePeriodLifecyclePresentation')}
 ${sourceFunction('employeeGroupLifecycleBadge')}
+${sourceFunction('stage4ReviewRows')}
 ${sourceFunction('isEmployeeLifecycleFullyCompleted')}
 ${sourceFunction('isEmployeeVisibleInGeneralReview')}
 ${sourceFunction('visibleWeeklyHrPayloads')}
@@ -43,7 +44,8 @@ ${sourceFunction('isReviewLifecycleRecordVisible')}
 ${sourceFunction('filterReviewLifecycleGroups')}
 ${sourceFunction('filterGeneralReviewRows')}
 ${sourceFunction('renderReviewNoPendingEmployees')}
-return { employeeGroupLifecycleBadge, isEmployeeLifecycleFullyCompleted,
+return { derivePeriodLifecyclePresentation, employeeGroupLifecycleBadge, stage4ReviewRows,
+    isEmployeeLifecycleFullyCompleted,
     filterGeneralReviewRows, visibleWeeklyHrPayloads,
     filterReviewLifecycleGroups,
     renderReviewNoPendingEmployees };`)();
@@ -65,48 +67,86 @@ function payload(employeeKodikos, statuses, pendingCounts = {}) {
     };
 }
 
-test('ολοκληρωμένος κύκλος ζωής δεν εμφανίζει σήμα', () => {
+test('ολοκληρωμένος κύκλος ζωής εμφανίζεται ως ολοκληρωμένος στο Στάδιο 4', () => {
     const badge = helpers.employeeGroupLifecycleBadge('0014', '0000', [payload('0014', {})]);
-    assert.equal(badge, '');
+    assert.match(badge, /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
 });
 
-test('ενεργό Στάδιο 1 εμφανίζει μόνο Έλεγχος Άδειας', () => {
+test('requires_hr_action εμφανίζεται ως απαίτηση ενέργειας στο Στάδιο 4', () => {
     const badge = helpers.employeeGroupLifecycleBadge('0001', '0000', [payload('0001', {
         stage1: 'OPEN', stage2: 'OPEN', stage3: 'OPEN'
     }, { stage1: 2, stage2: 3, stage3: 4 })]);
-    assert.match(badge, /Έλεγχος Άδειας/);
-    assert.doesNotMatch(badge, /Μεταφορά Ρεπό|Πιθανές Άδειες/);
+    assert.match(badge, /ΑΠΑΙΤΕΙ ΕΝΕΡΓΕΙΑ/);
+    assert.doesNotMatch(badge, /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
 });
 
-test('ενεργό Στάδιο 2 εμφανίζει μόνο Μεταφορά Ρεπό', () => {
-    const badge = helpers.employeeGroupLifecycleBadge('0002', '0000', [payload('0002', {
-        stage2: 'OPEN', stage3: 'OPEN'
-    }, { stage2: 1, stage3: 3 })]);
-    assert.match(badge, /Μεταφορά Ρεπό/);
-    assert.doesNotMatch(badge, /Έλεγχος Άδειας|Πιθανές Άδειες/);
+test('πραγματική εκκρεμότητα Σταδίου 4 διατηρεί την ενέργεια', () => {
+    const badge = helpers.employeeGroupLifecycleBadge('0004', '0000', [payload('0004', {
+        stage4: 'BLOCKED'
+    }, { stage4: 2 })]);
+    assert.match(badge, /ΑΠΑΙΤΕΙ ΕΝΕΡΓΕΙΑ/);
 });
 
-test('ενεργό Στάδιο 3 εμφανίζει μόνο Πιθανές Άδειες', () => {
-    const badge = helpers.employeeGroupLifecycleBadge('0003', '0000', [payload('0003', {
-        stage3: 'OPEN', stage4: 'OPEN'
-    }, { stage3: 1, stage4: 2 })]);
-    assert.match(badge, /Πιθανές Άδειες/);
-    assert.doesNotMatch(badge, /Έλεγχος Άδειας|Μεταφορά Ρεπό|Τελικός Έλεγχος/);
+test('εργαζόμενος χωρίς εβδομαδιαίες προβολές εμφανίζεται ολοκληρωμένος', () => {
+    const badge = helpers.employeeGroupLifecycleBadge('0003', '0000', []);
+    assert.match(badge, /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
+    assert.doesNotMatch(badge, /ΑΠΑΙΤΕΙ ΕΝΕΡΓΕΙΑ/);
+});
+
+test('επιλυμένο data-quality εύρημα του 0003 εμφανίζεται ολοκληρωμένο', () => {
+    const badge = helpers.employeeGroupLifecycleBadge('0003', '0000', []);
+    assert.match(badge, /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
+});
+
+test('οι 0001–0005 χωρίς πραγματική εκκρεμότητα εμφανίζονται ολοκληρωμένοι', () => {
+    ['0001', '0002', '0003', '0004', '0005'].forEach((employeeKodikos) => {
+        const projections = employeeKodikos === '0003' ? [] : [payload(employeeKodikos, {})];
+        assert.match(helpers.employeeGroupLifecycleBadge(
+            employeeKodikos, '0000', projections
+        ), /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
+    });
+});
+
+test('το χωρίς ευρήματα δεν χρησιμοποιείται ως κύριο badge του Σταδίου 4', () => {
+    assert.doesNotMatch(sourceFunction('employeeGroupLifecycleBadge'),
+        /ΧΩΡΙΣ ΕΥΡΗΜΑΤΑ ΠΡΟΣ ΕΛΕΓΧΟ/);
 });
 
 test('παλιό POSSIBLE_LEAVE δεν τροφοδοτεί τη συγκεντρωτική γραμμή', () => {
     const renderSource = sourceFunction('renderReviewRows');
     assert.match(renderSource, /employeeGroupLifecycleBadge/);
     assert.doesNotMatch(renderSource, /hasAdeiaSuggestionInRows|POSSIBLE_LEAVE/);
-    assert.equal(helpers.employeeGroupLifecycleBadge('0004', '0000', [payload('0004', {})]), '');
+    assert.match(helpers.employeeGroupLifecycleBadge(
+        '0004', '0000', [payload('0004', {})]
+    ), /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
 });
 
-test('κλειδωμένο μεταγενέστερο Στάδιο δεν δημιουργεί δεύτερο σήμα', () => {
-    const badge = helpers.employeeGroupLifecycleBadge('0005', '0000', [payload('0005', {
-        stage1: 'OPEN', stage2: 'OPEN'
-    }, { stage1: 1, stage2: 5 })]);
-    assert.match(badge, /Έλεγχος Άδειας/);
-    assert.doesNotMatch(badge, /Μεταφορά Ρεπό/);
+test('η λίστα Σταδίου 4 περιλαμβάνει όλους τους κωδικούς σε αριθμητική σειρά', () => {
+    const rows = [
+        { kodikos: '0004', hmeromhnia: '2026-06-02' },
+        { kodikos: '0001', hmeromhnia: '2026-06-01' },
+        { kodikos: '0003', hmeromhnia: '2026-06-01' },
+        { kodikos: '0002', hmeromhnia: '2026-06-01' },
+        { kodikos: '0004', hmeromhnia: '2026-06-01' }
+    ];
+    assert.deepEqual(helpers.stage4ReviewRows(
+        rows, ['0001', '0002', '0003', '0004']
+    ).map((row) => `${row.kodikos}:${row.hmeromhnia}`), [
+        '0001:2026-06-01', '0002:2026-06-01', '0003:2026-06-01',
+        '0004:2026-06-01', '0004:2026-06-02'
+    ]);
+});
+
+test('οι εργαζόμενοι χωρίς ευρήματα και οι ολοκληρωμένοι δεν αυξάνουν τις εκκρεμότητες', () => {
+    const stage4Pending = payload('0004', { stage4: 'BLOCKED' }, { stage4: 2 });
+    const lifecycle = helpers.derivePeriodLifecyclePresentation([
+        payload('0002', {}), stage4Pending
+    ]);
+    assert.equal(lifecycle?.stages?.STAGE4?.pending_count, 2);
+    assert.match(helpers.employeeGroupLifecycleBadge('0001', '0000', []),
+        /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
+    assert.match(helpers.employeeGroupLifecycleBadge('0002', '0000', [payload('0002', {})]),
+        /ΟΛΟΚΛΗΡΩΜΕΝΟ/);
 });
 
 test('γενική λίστα αποκρύπτει μόνο πλήρως ολοκληρωμένο εργαζόμενο', () => {

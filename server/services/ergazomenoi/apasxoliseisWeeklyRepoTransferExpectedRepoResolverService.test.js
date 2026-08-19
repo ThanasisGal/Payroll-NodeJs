@@ -91,10 +91,22 @@ for (const contractualWorkdays of [5, 6]) {
         hmeres_ergasias_ebdomadas: 5,
         profile_changed_inside_week: true
     });
-    assert.strictEqual(changedProfile.ok, false);
+    assert.strictEqual(changedProfile.ok, true);
+    assert.strictEqual(changedProfile.reason, null);
+    assert.strictEqual(changedProfile.effectiveExpectedWeeklyRepo, 2);
+
+    const unresolvedProfile = resolve(scheduledRows(5), {
+        hmeres_ergasias_ebdomadas: 5,
+        profile_changed_inside_week: true,
+        date_effective_profiles_by_date: {
+            '2026-06-08': { istorikoId: '0003' },
+            '2026-06-09': null
+        }
+    });
+    assert.strictEqual(unresolvedProfile.ok, false);
     assert.strictEqual(
-        changedProfile.reason,
-        REPO_RESOLUTION_REASON.PROFILE_CHANGED_INSIDE_WEEK
+        unresolvedProfile.reason,
+        REPO_RESOLUTION_REASON.UNRESOLVED_DAILY_EMPLOYMENT_PROFILE
     );
 }
 
@@ -152,12 +164,13 @@ for (const [type, analyzer] of [
     });
     assert.strictEqual(result.employee.effective_expected_weekly_repo, 2);
     assert.strictEqual(result.employee.repo_resolution_source, 'CONTRACTUAL_WEEKLY_WORKDAYS');
-    assert.ok(result.reasons.includes(
-        type === 'PLHRHS'
-            ? 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
-            : 'REPO_DEFICIT_REMAINS'
-    ));
-    assert.strictEqual(result.eligibility_status, ELIGIBILITY_STATUS.NEEDS_REVIEW);
+    if (type === 'PLHRHS') {
+        assert.deepStrictEqual(result.reasons, []);
+        assert.strictEqual(result.eligibility_status, ELIGIBILITY_STATUS.ELIGIBLE);
+    } else {
+        assert.ok(result.reasons.includes('REPO_DEFICIT_REMAINS'));
+        assert.strictEqual(result.eligibility_status, ELIGIBILITY_STATUS.NEEDS_REVIEW);
+    }
 }
 
 console.log('weekly repo-transfer effective expected repo resolver tests passed');

@@ -14577,12 +14577,147 @@ body.loader-active > *:not(.app-loader) {
 .employment-review-search-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.4rem;
     margin-bottom: 0.45rem;
 }
 
 .employment-review-search-actions .btn {
     margin-left: 0 !important;
+}
+
+.employment-review-employee-pagination {
+    margin-left: auto;
+    padding: 0;
+}
+
+.employment-review-employee-pagination > div {
+    justify-content: flex-end;
+}
+
+.employment-review-pagination-control {
+    --bs-btn-color: #495057;
+    --bs-btn-bg: #e9ecef;
+    --bs-btn-border-color: #adb5bd;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #6c757d;
+    --bs-btn-hover-border-color: #6c757d;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #5c636a;
+    --bs-btn-active-border-color: #565e64;
+    --bs-btn-disabled-color: #7b848c;
+    --bs-btn-disabled-bg: #f1f3f5;
+    --bs-btn-disabled-border-color: #ced4da;
+    --bs-btn-disabled-opacity: 1;
+    color: #495057;
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.employment-review-pagination-control:hover:not(:disabled):not(.disabled) {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.employment-review-pagination-control:disabled {
+    color: #7b848c;
+    background-color: #f1f3f5;
+    border-color: #ced4da;
+    opacity: 1;
+}
+
+.employment-review-pagination-label.disabled {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    color: #495057;
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    opacity: 1;
+}
+
+.employment-review-page-jump-input {
+    width: 4.25rem;
+    color: #495057;
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.employment-review-page-jump-input:focus {
+    color: #495057;
+    background-color: #f1f3f5;
+    border-color: #6c757d;
+    box-shadow: 0 0 0 0.15rem rgb(108 117 125 / 20%);
+}
+
+.employment-review-export-spinner {
+    width: 0.85rem;
+    height: 0.85rem;
+    margin-right: 0.35rem;
+    border-width: 0.12em;
+}
+
+.employment-review-partial-week-toast {
+    font-size: 0.88rem;
+}
+
+.employment-review-partial-week-toast-stack {
+    position: fixed;
+    z-index: 1070;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.55rem;
+    width: min(28rem, calc(100vw - 1.5rem));
+    pointer-events: none;
+}
+
+.employment-review-partial-week-toast-slot {
+    width: 100%;
+    pointer-events: auto;
+}
+
+.employment-review-partial-week-toast-slot .toast {
+    width: 100%;
+    max-width: none;
+    overflow: hidden;
+    border-color: #9eeaf9;
+    background-color: #f0fbfd;
+}
+
+.employment-review-partial-week-toast-slot .toast-header {
+    color: #055160;
+    background-color: #cff4fc;
+}
+
+.employment-review-partial-week-toast-progress {
+    width: 100%;
+    height: 0.2rem;
+    background-color: #0dcaf0;
+    transform-origin: left;
+    animation: employment-review-toast-progress var(--employment-review-toast-duration) linear forwards;
+}
+
+.employment-review-partial-week-toast-slot:hover .employment-review-partial-week-toast-progress {
+    animation-play-state: paused;
+}
+
+@keyframes employment-review-toast-progress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+}
+
+.employment-review-partial-week-toast-slot .btn-close {
+    flex: 0 0 auto;
+}
+
+.employment-review-partial-week-toast-slot .toast-body {
+    color: #055160;
+    background-color: #f0fbfd;
 }
 
 .hr-review-filters {
