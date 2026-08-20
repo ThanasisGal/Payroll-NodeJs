@@ -9689,7 +9689,7 @@ async function loadResults() {
         await renderWeeklyHrStage1(rows, {
             search_start: params.get('apo_hmeromhnia'),
             search_end: params.get('eos_hmeromhnia'),
-            preloaded_projections: payload.weekly_hr_projections
+            preloaded_projections: payload.finalized === true ? [] : payload.weekly_hr_projections
         });
         await window.EmploymentReviewOrphanQualityCheck?.run({
             params,

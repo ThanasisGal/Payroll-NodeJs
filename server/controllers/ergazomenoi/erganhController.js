@@ -364,6 +364,8 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisPeriodLifecycleIndexGuardService');
 const { projectFrozenReview,
     canonicalize } = require('../../services/ergazomenoi/apasxoliseisPeriodFrozenSnapshotService');
+const { projectFinalizedCorrectiveReview } =
+    require('../../services/ergazomenoi/apasxoliseisFinalizedCorrectiveReviewProjectionService');
 const {
     buildWtoDailySubmissionProjection,
     buildWTODayilyAPayload
@@ -6687,14 +6689,15 @@ class erganhController {
                             new Error('Η οριστικοποιημένη περίοδος δεν διαθέτει παγωμένο αποτέλεσμα.'),
                             { code: 'FINALIZED_SNAPSHOT_MISSING', statusCode: 409 }
                         );
-                        const projected = projectFrozenReview(frozenDocument.frozen_snapshot, { kodikos });
                         const corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
                             ...frozenScope,
                             status: mongoose.trusted({ $in: ['ACTIVE', 'CLOSED'] })
                         })
-                            .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
+                            .select('case_id status corrected_context corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
                             .sort({ opened_at: -1 })
                             .lean();
+                        const projected = projectFinalizedCorrectiveReview(
+                            frozenDocument.frozen_snapshot, corrective, { kodikos });
                         const correctivePostings = corrective ?
                             await ApasxoliseisCorrectivePayrollPostingModel.find({ ...frozenScope,
                                 case_id: corrective.case_id }).lean() : [];
