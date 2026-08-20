@@ -73,8 +73,9 @@ function resolveDailyActualWorkFacts(row = {}, {
     const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
     const cardVerification = resolveCardPairVerification(row);
-    const approvedOrphan = cardVerification.hasUnresolvedCardEvidence &&
-        isApprovedOrphanResolution(row);
+    const approvedOrphan = calculatedHoursAreAuthoritative && calculatedWork.ok &&
+        calculatedWork.value > 0 && cardVerification.hasUnresolvedCardEvidence &&
+        row.orphan_card_resolution?.status === 'HR_APPROVED' && isApprovedOrphanResolution(row);
     const hasCompleteCardEvidence = cardVerification.hasCompleteCardEvidence;
     const hasIncompleteCardInterval = cardVerification.hasUnresolvedCardEvidence;
     const verificationFacts = {
@@ -104,7 +105,7 @@ function resolveDailyActualWorkFacts(row = {}, {
     // ζεύγος της ημέρας είναι ελλιπές. Το ανεξακρίβωτο τμήμα δεν
     // συμπληρώνεται και δεν μετατρέπεται σε εργασία, άδεια, αργία ή ρεπό.
     if (hasIncompleteCardInterval && approvedOrphan) {
-        const actualWorkHours = calculatedWork.ok ? calculatedWork.value : 0;
+        const actualWorkHours = calculatedWork.value;
         return Object.freeze({ category: 'ΕΡΓ', declaredWorkHours: declared.value,
             cardHours: cards.value, hasCompleteCardEvidence: false, ...verificationFacts,
             cardVerificationStatus: 'HR_APPROVED_ORPHAN', actualWorkHours,

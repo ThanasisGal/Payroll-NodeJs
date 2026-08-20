@@ -179,10 +179,18 @@ const approvedOrphanFacts = resolveDailyActualWorkFacts({
     orphan_card_resolution: {
         status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
     }
-});
+}, { calculatedWorkHoursAuthoritative: true });
 assert.strictEqual(approvedOrphanFacts.cardVerificationStatus, 'HR_APPROVED_ORPHAN');
 assert.strictEqual(approvedOrphanFacts.actualWorkHours, 8);
 assert.strictEqual(approvedOrphanFacts.countsAsActualWorkDay, true);
+const unapprovedAuthoritativeOrphanFacts = resolveDailyActualWorkFacts({
+    kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+    cards_apo_ora_01: '09:00', cards_eos_ora_01: '',
+    ores_ergasias_apologistika: 8
+}, { calculatedWorkHoursAuthoritative: true });
+assert.strictEqual(unapprovedAuthoritativeOrphanFacts.actualWorkHours, 0);
+assert.deepStrictEqual(unapprovedAuthoritativeOrphanFacts.reasons,
+    ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION']);
 
 const partiallyVerifiedFacts = facts('ΕΡΓ', 8, 8, {
     cards_apo_ora_01: '09:00',

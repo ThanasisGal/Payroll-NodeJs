@@ -90,6 +90,16 @@ function createSandbox({ payloads, dataQualityReady = true, completedAfterRefres
     const orphan = stalePayload(21, { unresolved_orphan: true });
     assert.equal(successful.sandbox.isSafe(orphan, { ready: true }), false);
 
+    const staleCanonical = stalePayload(22);
+    staleCanonical.lifecycle_projection.stages.stage1.pending_reasons =
+        ['CANONICAL_DECISION_STALE'];
+    assert.equal(successful.sandbox.isSafe(staleCanonical, { ready: true }), false);
+
+    const unresolvedWeekly = stalePayload(23, { rows: [{
+        compensation_breakdown_apologistika: { status: 'NEEDS_HR_DECISION' }
+    }] });
+    assert.equal(successful.sandbox.isSafe(unresolvedWeekly, { ready: true }), false);
+
     console.log('historical reassessment automatic Stage 1 revalidation tests passed');
 })().catch((error) => {
     console.error(error);

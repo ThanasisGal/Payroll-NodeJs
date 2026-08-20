@@ -13,7 +13,9 @@ const { buildDailyCompensationBreakdown } =
 
 const PROFILE = Object.freeze({ typos_apasxolhshs: 'PLHRHS', plhrhs_apasxolhsh: true,
     hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
-    mo_oron_hmerhsias_ergasias: 8, pososto_prosayxhshs_6hs_hmeras: 40,
+    mo_oron_hmerhsias_ergasias: 8, pososto_prosayxhshs_6hs_hmeras: 0,
+    eidikh_kathgoria_ergazomenoy: '0009',
+    pragmatikoOromisthio: 10,
     evelikth_proselefsh: 120, source: '0004_JUNE_FIXTURE' });
 
 function row(date, { category = 'ΕΡΓ', hours = 8, cardHours = 0,
@@ -71,10 +73,13 @@ const effectiveA = weekA.map((item) => item.hmeromhnia === '2026-06-10'
           orphan_card_resolution: { status: 'HR_APPROVED',
               policy_version: 'orphan-card-continuous:v1' } } : item);
 const sixthA = analyzeWeeklySixthSeventhDay({ weekRows: effectiveA,
-    effectiveProfile: PROFILE });
+    effectiveProfile: PROFILE, hourlyRate: PROFILE.pragmatikoOromisthio,
+    isCalculatedWorkHoursAuthoritativeForRow: (item) => item.hmeromhnia === '2026-06-14' });
 assert.equal(sixthA.status, 'READY');
 assert.equal(sixthA.sixthDay.hmeromhnia, '2026-06-14');
 assert.equal(sixthA.sixthDay.sixthDayHours, 8);
+assert.equal(sixthA.sixthDay.premiumRate, 0);
+assert.equal(sixthA.sixthDay.premiumAmount, 0);
 assert.equal(sixthA.seventhDay, null);
 assert.ok(!sixthA.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
 const approvedOrphanDay = sixthA.dailyFacts.find((day) => day.hmeromhnia === '2026-06-14');

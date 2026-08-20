@@ -145,12 +145,26 @@ function buildEmploymentPeriodFrozenSnapshot(input = {}) {
 }
 
 function projectFrozenReview(snapshot = {}, { kodikos = '' } = {}) {
-    const rows = (snapshot.daily_results || []).filter((row) => !kodikos || String(row.kodikos) === String(kodikos));
+    const rows = (snapshot.daily_results || [])
+        .filter((row) => !kodikos || String(row.kodikos) === String(kodikos))
+        .map(projectFrozenSixthSeventhPresentation);
     return Object.freeze({ source: 'FROZEN_FINALIZED', rows, total: rows.length,
         deviations: snapshot.deviations || [], payroll_results: snapshot.payroll_results || [],
         corrective: null });
 }
 
+function projectFrozenSixthSeventhPresentation(row = {}) {
+    const classification = String(row.sixth_seventh_classification || '').trim().toUpperCase();
+    const isSixthDay = classification === 'SIXTH' && Number(row.sixth_day_hours || 0) > 0;
+    const isSeventhDay = classification === 'SEVENTH' && Number(row.seventh_day_hours || 0) > 0;
+    return { ...row,
+        is_sixth_day: isSixthDay,
+        sixth_day_premium_rate: isSixthDay ? row.effective_sixth_day_rate ?? null : null,
+        is_seventh_day: isSeventhDay,
+        seventh_day_severity: isSeventhDay ? 'SERIOUS_VIOLATION' : '' };
+}
+
 module.exports = { SNAPSHOT_SCHEMA_VERSION, DEFAULT_SOURCE_VERSION, DAILY_FIELDS, EMPLOYEE_FIELDS,
     HISTORY_FIELDS, PAYROLL_FIELDS,
-    canonicalize, buildEmploymentPeriodFrozenSnapshot, projectFrozenReview };
+    canonicalize, buildEmploymentPeriodFrozenSnapshot, projectFrozenReview,
+    projectFrozenSixthSeventhPresentation };

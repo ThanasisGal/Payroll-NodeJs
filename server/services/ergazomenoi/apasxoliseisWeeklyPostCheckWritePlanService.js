@@ -293,7 +293,9 @@ function buildWeeklyRepoPostCheckWritePlan({
                     pragmatikaRepo += 1;
                 } else if (!hasUnresolvedCardPair && declaredNonWork && oresErgasiasIsZero && cardsOresIsNonZero) {
                     update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
-                } else if (!hasUnresolvedCardPair && isNoCardDeclaredWorkRow(row) &&
+                } else if (!hasUnresolvedCardPair &&
+                    !isCalculatedWorkHoursAuthoritativeForRow(row) &&
+                    isNoCardDeclaredWorkRow(row) &&
                     classifyLeaveProvenance(row) !== LEAVE_PROVENANCE.HR_DECLARED_LEAVE) {
                     const noCardsDisplayStatus = resolveNoCardsDisplayStatus(row, noCardsDisplayContext);
                     update.apologistiko_biblio = false;
@@ -341,10 +343,23 @@ function buildWeeklyRepoPostCheckWritePlan({
                         week.isFullWeek && sixthSeventhAnalysis.status === 'NEEDS_HR_DECISION'
                             ? sixthSeventhAnalysis.reasons : []
                 });
-                update.ores_pragmatikhs_ergasias_apologistika = compensationBreakdown.hours.actualWorkHours;
-                update.ores_adeias_pistomenes_apologistika = compensationBreakdown.hours.paidLeaveHours;
-                update.ores_argias_pistomenes_apologistika = compensationBreakdown.hours.holidayCreditedHours;
-                update.compensation_breakdown_apologistika = compensationBreakdown;
+                const preserveAuthoritativeCompensation =
+                    compensationBreakdown.status !== 'READY' &&
+                    row.compensation_breakdown_apologistika?.status === 'READY';
+                if (!preserveAuthoritativeCompensation) {
+                    update.ores_pragmatikhs_ergasias_apologistika = compensationBreakdown.hours.actualWorkHours;
+                    update.ores_adeias_pistomenes_apologistika = compensationBreakdown.hours.paidLeaveHours;
+                    update.ores_argias_pistomenes_apologistika = compensationBreakdown.hours.holidayCreditedHours;
+                    update.compensation_breakdown_apologistika = compensationBreakdown;
+                } else {
+                    update.compensation_breakdown_apologistika =
+                        row.compensation_breakdown_apologistika;
+                    for (const field of ['ores_pragmatikhs_ergasias_apologistika',
+                        'ores_adeias_pistomenes_apologistika',
+                        'ores_argias_pistomenes_apologistika']) {
+                        if (row[field] !== undefined) update[field] = row[field];
+                    }
+                }
                 if (compensationBreakdown.status === 'READY') compensationBreakdowns.ready += 1;
                 else compensationBreakdowns.needsHrDecision += 1;
                 if (compensationBreakdown.warnings.some((warning) => String(warning).startsWith('REJECTED_'))) {

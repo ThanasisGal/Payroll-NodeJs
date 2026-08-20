@@ -354,7 +354,10 @@ const {
     saveCorrectiveResult,
     closeCorrectiveCase
 } = require('../../services/ergazomenoi/apasxoliseisPeriodLifecycleService');
-const { normalizeCorrectionCommands } = require('../../services/ergazomenoi/apasxoliseisPeriodCorrectiveService');
+const { normalizeCorrectionCommands,
+    previewFrozenCorrectiveWeek } = require('../../services/ergazomenoi/apasxoliseisPeriodCorrectiveService');
+const { getVerifiedCorrectiveOrphanEvidence } =
+    require('../../services/ergazomenoi/apasxoliseisCorrectiveWeeklyRecalculationService');
 const {
     getPeriodLifecycleIndexState,
     assertPeriodLifecycleIndexesReady
@@ -1592,7 +1595,6 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
         const breakConfiguration = resolveBreakConfigurationForDate(
             row.hmeromhnia, employeeHistory, currentEmployee
         );
-        const sixthHours = Number(row.compensation_breakdown_apologistika?.hours?.sixthDayHours) || 0;
         const resolvedProfile = Object.fromEntries([
             'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
             'kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas', 'typos_ergazomenon',
@@ -1604,16 +1606,15 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
         resolvedProfile.dialleima_entos_ektos_orarioy =
             breakConfiguration.break_inside_schedule;
         resolvedProfile.dialleima_se_lepta = breakConfiguration.break_minutes;
-        return { ...row, effective_sixth_day_rate: profile.pososto_prosayxhshs_6hs_hmeras ?? null,
+        return { ...row, ...projectSixthSeventhFlatFields(row,
+            profile.pososto_prosayxhshs_6hs_hmeras ?? null),
             effective_profile_source: profile.source || '',
             effective_profile_date: getProfileDateForDeviation(profile, row.hmeromhnia),
             effective_profile_istoriko_id: profile.istorikoId || null,
             effective_break_configuration: breakConfiguration,
             effective_profile_resolved: resolvedProfile,
             repo_original_identity: row.repo === true || row.repo === 1,
-            repo_effective_identity: row.repo_apologistika === true || row.repo_apologistika === 1,
-            sixth_day_hours: sixthHours,
-            sixth_seventh_classification: sixthHours > 0 ? 'SIXTH' : '' };
+            repo_effective_identity: row.repo_apologistika === true || row.repo_apologistika === 1 };
     };
     const frozenDailyResults = dailyResults.map(decorateFrozenRow);
     const frozenWeeklyRows = weeklyDailyResults.map(decorateFrozenRow);
@@ -2415,6 +2416,7 @@ async function runWeeklyRepoPostCheck({
                 'astheneia astheneia_apologistika apologistiko_biblio is_locked ' +
                 'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
                 'ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+                'compensation_breakdown_apologistika ' +
                 'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ' +
                 'ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika'
         )
@@ -5003,7 +5005,7 @@ async function getReviewRowsForExport(req) {
                 frozenRows.__frozenSnapshotFingerprint = document.frozen_snapshot_fingerprint;
                 frozenRows.__corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
                     ...scope,
-                    status: { $in: ['ACTIVE', 'CLOSED'] }
+                    status: mongoose.trusted({ $in: ['ACTIVE', 'CLOSED'] })
                 })
                     .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
                     .sort({ opened_at: -1 })
@@ -5825,6 +5827,22 @@ function formatDateDdMmYyyy(date) {
     return `${dd}/${mm}/${yyyy}`;
 }
 
+function projectSixthSeventhFlatFields(row = {}, effectiveSixthDayRate = null) {
+    const hours = row.compensation_breakdown_apologistika?.hours || {};
+    const sixthDayHours = Number(hours.sixthDayHours) || 0;
+    const seventhDayHours = Number(hours.seventhDayHours) || 0;
+    const resolvedSixthDayRate = row.compensation_breakdown_apologistika?.components
+        ?.find((component) => component?.code === 'SIXTH_DAY_PREMIUM')?.ratePercent;
+    return Object.freeze({
+        sixth_day_hours: sixthDayHours,
+        seventh_day_hours: seventhDayHours,
+        sixth_seventh_classification: sixthDayHours > 0
+            ? 'SIXTH' : seventhDayHours > 0 ? 'SEVENTH' : '',
+        effective_sixth_day_rate: sixthDayHours > 0 && Number.isFinite(Number(resolvedSixthDayRate))
+            ? Number(resolvedSixthDayRate) : effectiveSixthDayRate
+    });
+}
+
 const AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS = Object.freeze({
     normalizeZeroLengthCardPairs, resolveCardPairVerification, buildPartialVerifiedCardUpdate,
     checkBrokenProgramVsBrokenCards, checkEarlyOrLateCard, checkContinuousVsBrokenCards,
@@ -5941,6 +5959,7 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
     const effectiveEmployeeForRow = (row) => ({ ...employee, ...(row.effective_profile_resolved || {}),
         kodikos: employeeKodikos, ypokatasthma: row.ypokatasthma || baselineSnapshot.scope?.ypokatasthma });
     const firstEffectiveEmployee = effectiveEmployeeForRow(frozenRows[0] || {});
+    const weeklyEffectiveEmployee = effectiveEmployeeForRow(frozenRows.at(-1) || {});
     const argiesDateSet = new Set((baselineSnapshot.weekly_calculation_context?.calendar_facts || [])
         .filter((fact) => fact.is_holiday === true).map((fact) => dateKeyUtc(fact.hmeromhnia)));
     const loadedRowIds = frozenRows.map((row) => row._id);
@@ -5952,7 +5971,28 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
         weeklyOverworkCapMinutes: getWorkTimeRules(firstEffectiveEmployee).weeklyOverworkCapMinutes,
         weeklyLegalLimitMinutes: getWorkTimeRules(firstEffectiveEmployee).weeklyLegalLimitMinutes,
         usedOverworkMinutes: 0, isFirstPartialWeek: false };
-    for (const row of frozenRows) {
+    const correctiveRows = frozenRows.map((row) => {
+        const evidence = getVerifiedCorrectiveOrphanEvidence(row);
+        if (row.is_locked !== true || !evidence ||
+            evidence.orphan_card_resolution?.status !== 'HR_APPROVED') return row;
+        const effectiveEmployee = effectiveEmployeeForRow(row);
+        const approvedOrphanResolution = resolveOrphanCardResolution({
+            row, contextRows: frozenRows,
+            manualInterval: {
+                start: evidence.orphan_card_resolution.approved_start,
+                end: evidence.orphan_card_resolution.approved_end
+            },
+            riskAcknowledged: true, reuseScope: 'ONE_TIME', effectiveEmployee
+        });
+        const calculation = buildApprovedOrphanDailyDerivedUpdate({
+            row: { ...row, is_locked: false }, effectiveEmployee, argiesDateSet,
+            approvedOrphanResolution, appliedProtectionContext: protectionContext
+        });
+        return { ...row, ...(approvedOrphanResolution.approvedUpdates || {}),
+            ...calculation.derivedUpdate,
+            orphan_card_resolution: row.orphan_card_resolution };
+    });
+    for (const row of correctiveRows) {
         const effectiveEmployee = effectiveEmployeeForRow(row);
         const preliminary = buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee,
             argiesDateSet, operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
@@ -5960,7 +6000,7 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
             state.weeklyRegularCardsMinutes += getPayrollDailyWorkMinutes(preliminary.workingRow, effectiveEmployee);
         }
     }
-    const firstStageRows = frozenRows.map((row) => {
+    const firstStageRows = correctiveRows.map((row) => {
         if (row.is_locked === true) return { ...row };
         const effectiveEmployee = effectiveEmployeeForRow(row);
         const plan = buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesDateSet,
@@ -5968,6 +6008,10 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
             operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
         return { ...row, ...plan.sanitizedUpdate };
     });
+    const weeklyPlanningRows = firstStageRows.map((row, index) =>
+        frozenRows[index].is_locked === true && getVerifiedCorrectiveOrphanEvidence(frozenRows[index])
+            ? { ...row, is_locked: false }
+            : row);
     const historyRows = (baselineSnapshot.weekly_calculation_context?.profile_history || [])
         .filter((row) => String(row.kodikos) === String(employeeKodikos));
     const periodStart = dateKeyUtc(baselineSnapshot.scope.period_start);
@@ -5977,17 +6021,36 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
     const plannedEnd = naturalEnd > periodEnd ? periodEnd : naturalEnd;
     const writePlan = buildWeeklyRepoPostCheckWritePlan({ sessionTeam: baselineSnapshot.scope.team,
         companyId: baselineSnapshot.scope.company_kod, apoDate: new Date(`${plannedStart}T00:00:00.000Z`),
-        eosDate: new Date(`${plannedEnd}T00:00:00.000Z`), employees: [employee],
-        rows: firstStageRows, istorikoRowsByKodikos: new Map([[String(employeeKodikos), historyRows]]),
+        eosDate: new Date(`${plannedEnd}T00:00:00.000Z`), employees: [weeklyEffectiveEmployee],
+        rows: weeklyPlanningRows, istorikoRowsByKodikos: new Map([[String(employeeKodikos), historyRows]]),
         companyPolicyRules: baselineSnapshot.policy_context?.rules || [], postCheckArgiesDateSet: argiesDateSet,
         noCardsDisplayContext: {}, appliedProtectionContext: protectionContext,
         appliedProtectionReasonsByWeek: new Map(),
+        sameRunDailyCalculatedRowIds: new Set(frozenRows
+            .filter((row) => getVerifiedCorrectiveOrphanEvidence(row))
+            .map((row) => String(row._id))),
         canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions(baselineSnapshot.canonical_decisions || []),
         buildWeeklyIllegalOvertimeUpdate });
     const byId = new Map(firstStageRows.map((row) => [String(row._id), { ...row }]));
     for (const operation of writePlan.bulkOps) {
         const target = byId.get(String(operation.updateOne?.filter?._id));
         if (target) Object.assign(target, operation.updateOne.update?.$set || {});
+    }
+    for (const target of byId.values()) {
+        const effectiveEmployee = effectiveEmployeeForRow(target);
+        Object.assign(target, projectSixthSeventhFlatFields(target,
+            effectiveEmployee.pososto_prosayxhshs_6hs_hmeras ??
+                target.effective_sixth_day_rate ?? null));
+    }
+    for (let index = 0; index < frozenRows.length; index += 1) {
+        if (!getVerifiedCorrectiveOrphanEvidence(frozenRows[index])) continue;
+        const target = byId.get(String(frozenRows[index]._id));
+        if (target) Object.assign(target, pickOrphanDailyDerivedFields(firstStageRows[index]),
+            Object.fromEntries(['apo_ora_01_apologistika', 'eos_ora_01_apologistika',
+                'apo_ora_02_apologistika', 'eos_ora_02_apologistika',
+                'apo_ora_03_apologistika', 'eos_ora_03_apologistika',
+                'ores_pragmatikhs_ergasias_apologistika']
+                .map((field) => [field, firstStageRows[index][field]])));
     }
     return { correctedRows: frozenRows.map((row) => byId.get(String(row._id))),
         deviations: writePlan.deviations, diagnostics: writePlan.diagnostics,
@@ -17377,6 +17440,18 @@ Object.defineProperty(erganhController, '__orphanDailyCalculationTestHooks', {
 
 Object.defineProperty(erganhController, '__employmentReviewReportTestHooks', {
     value: Object.freeze({ buildEmploymentReviewReportForRequest }),
+    enumerable: false
+});
+
+Object.defineProperty(erganhController, 'frozenCorrectivePreview', {
+    value: Object.freeze({
+        runAuthoritativeWeek: runFrozenAuthoritativeEmploymentWeek,
+        preview: ({ baselineSnapshot, employee_kodikos, week_start, verifiedEvidence = [],
+            evidence_audit_ids = [] }) => previewFrozenCorrectiveWeek({
+            baselineSnapshot, employee_kodikos, week_start, verifiedEvidence, evidence_audit_ids,
+            runAuthoritativeWeek: runFrozenAuthoritativeEmploymentWeek
+        })
+    }),
     enumerable: false
 });
 

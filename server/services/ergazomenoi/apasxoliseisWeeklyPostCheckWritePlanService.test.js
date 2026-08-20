@@ -1,4 +1,7 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const {
     buildWeeklyRepoPostCheckWritePlan
 } = require('./apasxoliseisWeeklyPostCheckWritePlanService');
@@ -258,6 +261,49 @@ assert.ok(update.compensation_breakdown_apologistika.reasons.includes(
 ));
 assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 0);
 
+const unresolvedWithAuthoritativeRows = structuredClone(blockedRows);
+unresolvedWithAuthoritativeRows[5].compensation_breakdown_apologistika = {
+    status: 'READY', hours: { sixthDayHours: 6, seventhDayHours: 0,
+        actualWorkHours: 7, paidLeaveHours: 0, holidayCreditedHours: 0 }
+};
+result = plan(unresolvedWithAuthoritativeRows);
+update = updateFor(result, '2026-08-08');
+assert.deepEqual(update.compensation_breakdown_apologistika,
+    unresolvedWithAuthoritativeRows[5].compensation_breakdown_apologistika);
+assert.equal(unresolvedWithAuthoritativeRows[5]
+    .compensation_breakdown_apologistika.hours.sixthDayHours, 6);
+assert.equal(unresolvedWithAuthoritativeRows[5]
+    .compensation_breakdown_apologistika.hours.seventhDayHours, 0);
+assert.equal(onlyDeviation(result).status, 'NEEDS_HR_DECISION');
+
+const browserSource = fs.readFileSync(path.join(__dirname,
+    '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const browserHelperStart = browserSource.indexOf('function isWeeklyHrStage1Eligible');
+const browserHelperEnd = browserSource.indexOf(
+    'function weeklyHrStage1BusinessStatus', browserHelperStart
+);
+const browserSandbox = { weeklyHrStage1DayDrafts: new Map(),
+    weeklyHrOrphanRows: () => [] };
+vm.runInNewContext(`${browserSource.slice(browserHelperStart, browserHelperEnd)}\n` +
+    'this.isSafe = isSafeStage1StaleAutoRevalidation;', browserSandbox);
+const completedStage = { business_status: 'COMPLETED', pending_count: 0,
+    pending_dates: [], pending_reasons: [], blockers: [] };
+assert.equal(browserSandbox.isSafe({ rows: [{ compensation_breakdown_apologistika: {
+    status: 'NEEDS_HR_DECISION' } }], stage1_status: 'STALE', write_enabled: true,
+    workflow: { next_required_hr_stage: 'LEAVE_CLASSIFICATION' },
+    lifecycle_projection: { requires_hr_action: true,
+        stage1_no_classification_preview_items: [], stages: {
+            stage1: { ...completedStage, business_status: 'STALE' },
+            stage2: completedStage, stage3: completedStage, stage4: completedStage
+        } } }, { ready: true }), false);
+
+const deterministicAfterReassessment = structuredClone(unresolvedWithAuthoritativeRows);
+deterministicAfterReassessment[5].cards_eos_ora_01 = '17:00';
+result = plan(deterministicAfterReassessment);
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.status, 'READY');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7);
+
 const ambiguousRows = week([7, 7, 7, 7, 7, 7, 0]);
 Object.assign(ambiguousRows[6], {
     kathgoria_ergasias: 'ΕΡΓ',
@@ -272,6 +318,7 @@ assert.equal(deviation.reasons, undefined);
 update = updateFor(result, '2026-08-08');
 assert.equal(update.compensation_breakdown_apologistika.status, 'READY');
 assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7);
+assert.ok(Object.hasOwn(update, 'compensation_breakdown_apologistika'));
 
 const humanRepoRows = week([7, 7, 7, 7, 7, 8, 7]);
 Object.assign(humanRepoRows[4], { kathgoria_ergasias: 'ΑΝ',

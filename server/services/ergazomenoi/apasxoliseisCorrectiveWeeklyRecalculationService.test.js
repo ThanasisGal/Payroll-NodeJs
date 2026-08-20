@@ -3,6 +3,8 @@
 const assert = require('assert');
 const { patchHistoricalCardFacts, recalculateFrozenCorrectiveWeeks } =
     require('./apasxoliseisCorrectiveWeeklyRecalculationService');
+const { normalizeCorrectionCommands, reconstructCorrectedHistoricalResult } =
+    require('./apasxoliseisPeriodCorrectiveService');
 const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 
 function makeRow(index, employee = '1') {
@@ -52,4 +54,31 @@ assert.throws(() => recalculateFrozenCorrectiveWeeks({ baselineSnapshot: snapsho
 const locked = snapshot(); locked.weekly_calculation_context.rows[5].is_locked = true;
 assert.throws(() => recalculateFrozenCorrectiveWeeks({ baselineSnapshot: locked, commands: [command],
     runAuthoritativeWeek: authoritativeRunner }), (error) => error.code === 'CORRECTIVE_ROW_MANUALLY_LOCKED');
+
+const frozenWeekCommand = normalizeCorrectionCommands({ corrections: [{ type: 'RECOMPUTE_FROZEN_WEEK',
+    employee_kodikos: '1', week_start: '2026-06-01' }] });
+let frozenOnlyInput;
+const deterministic = reconstructCorrectedHistoricalResult({ baselineSnapshot: snapshot(),
+    commands: frozenWeekCommand, runAuthoritativeWeek: (input) => {
+        frozenOnlyInput = canonicalize(input.frozenRows);
+        return { correctedRows: input.frozenRows.map((row, index) => ({ ...row,
+            sixth_day_hours: index === 5 ? 8 : 0, seventh_day_hours: 0 })),
+        deviations: [], diagnostics: ['READY_FROM_FROZEN_BASELINE'], canonical: [{ status: 'READY' }] };
+    } });
+assert.deepStrictEqual(frozenOnlyInput, canonicalize(snapshot().weekly_calculation_context.rows.slice(0, 7)));
+assert.strictEqual(deterministic.correctedRows.find((row) => row.kodikos === '1' &&
+    row.hmeromhnia.startsWith('2026-06-06')).sixth_day_hours, 8);
+assert.strictEqual(deterministic.correctedContext.correction_type, 'RECOMPUTE_FROZEN_WEEK');
+assert.strictEqual(Object.hasOwn(deterministic, 'bulkOps'), false);
+
+assert.throws(() => reconstructCorrectedHistoricalResult({ baselineSnapshot: snapshot(),
+    commands: frozenWeekCommand, runAuthoritativeWeek: ({ frozenRows }) => ({
+        correctedRows: frozenRows.map((row) => ({ ...row, sixth_day_hours: 0, seventh_day_hours: 0 })),
+        deviations: [{ kodikos: '1', week_apo: '2026-06-01', status: 'NEEDS_HR_DECISION' }],
+        canonical: [{ status: 'NEEDS_HR_DECISION' }] }) }),
+    (error) => error.code === 'CORRECTIVE_WEEK_NEEDS_HR_DECISION');
+
+assert.throws(() => normalizeCorrectionCommands({ corrections: [{ type: 'RECOMPUTE_FROZEN_WEEK',
+    employee_kodikos: '1', week_start: '2026-06-01', sixth_day_hours: 8 }] }),
+    (error) => error.code === 'CORRECTIVE_AUTHORITATIVE_FIELD_FORBIDDEN');
 console.log('corrective shared-authoritative weekly orchestration: PASS');

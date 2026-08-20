@@ -78,6 +78,27 @@ input.policyContext.policy_version = 'current-v99';
 assert.strictEqual(reviewBefore.rows[0].ores_ergasias_apologistika, 8);
 assert.strictEqual(reviewBefore.source, 'FROZEN_FINALIZED');
 assert.strictEqual(projectFrozenReview(one.snapshot, { kodikos: 'other' }).total, 0);
+const persistedWeeklyPresentation = projectFrozenReview({ daily_results: [
+    { kodikos: '001', sixth_seventh_classification: 'SIXTH', sixth_day_hours: 8,
+        seventh_day_hours: 0, effective_sixth_day_rate: 40 },
+    { kodikos: '001', sixth_seventh_classification: 'SEVENTH', sixth_day_hours: 0,
+        seventh_day_hours: 7 },
+    { kodikos: '001', sixth_seventh_classification: '', sixth_day_hours: 0,
+        seventh_day_hours: 0 }
+] }).rows;
+assert.deepStrictEqual(persistedWeeklyPresentation.map((row) => ({
+    is_sixth_day: row.is_sixth_day,
+    sixth_day_premium_rate: row.sixth_day_premium_rate,
+    is_seventh_day: row.is_seventh_day,
+    seventh_day_severity: row.seventh_day_severity
+})), [
+    { is_sixth_day: true, sixth_day_premium_rate: 40,
+        is_seventh_day: false, seventh_day_severity: '' },
+    { is_sixth_day: false, sixth_day_premium_rate: null,
+        is_seventh_day: true, seventh_day_severity: 'SERIOUS_VIOLATION' },
+    { is_sixth_day: false, sixth_day_premium_rate: null,
+        is_seventh_day: false, seventh_day_severity: '' }
+]);
 
 daily[0].ores_ergasias_apologistika = 8;
 const corrected = [{ ...daily[0], ores_ergasias_apologistika: 9,

@@ -39,12 +39,18 @@ assert.deepStrictEqual(corrective.sanitizedUpdate, normal.sanitizedUpdate);
 
 const locked = buildEmploymentDailyCalculationUpdate({
     row: { _id: 'locked', is_locked: true, apologistiko_biblio: true,
-        apo_ora_01_apologistika: '13:00', eos_ora_01_apologistika: '21:00' },
+        apo_ora_01_apologistika: '13:00', eos_ora_01_apologistika: '21:00',
+        astheneia_apologistika: true, ores_apoysias: 8,
+        ores_apoysias_apologistika: 8, hmeres_apoysias_apologistika: 1 },
     effectiveEmployee: {}, argiesDateSet: new Set(), weeklyState: {}, operations
 });
 assert.deepStrictEqual(locked.sanitizedUpdate, {});
 assert.strictEqual(locked.workingRow.apologistiko_biblio, true);
 assert.strictEqual(locked.workingRow.apo_ora_01_apologistika, '13:00');
+assert.strictEqual(locked.workingRow.astheneia_apologistika, true);
+assert.strictEqual(locked.workingRow.ores_apoysias, 8);
+assert.strictEqual(locked.workingRow.ores_apoysias_apologistika, 8);
+assert.strictEqual(locked.workingRow.hmeres_apoysias_apologistika, 1);
 assert.strictEqual(locked.manualOwnership, 'LOCKED_HR_ROW');
 
 let correctedAttendanceRuleCalls = 0;

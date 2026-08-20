@@ -8572,12 +8572,19 @@ function isSafeStage1StaleAutoRevalidation(payload, dataQualityReadiness = {}) {
     const stage1 = stages.stage1 || {};
     const previews = lifecycle?.stage1_no_classification_preview_items || [];
     const hasUnresolvedOrphan = weeklyHrOrphanRows(payload).length > 0;
+    const unresolvedReasons = Object.values(stages).flatMap((stage) => [
+        ...(stage?.blockers || []), ...(stage?.pending_reasons || [])
+    ]);
+    const hasUnresolvedWeeklyResult = (payload?.rows || []).some((row) =>
+        row?.compensation_breakdown_apologistika?.status === 'NEEDS_HR_DECISION');
     return dataQualityReadiness?.ready === true &&
         lifecycle?.requires_hr_action === true &&
         stage1.business_status === 'STALE' &&
         Number(stage1.pending_count || 0) === 0 &&
         (stage1.pending_dates || []).length === 0 &&
         (stage1.blockers || []).length === 0 &&
+        unresolvedReasons.length === 0 &&
+        !hasUnresolvedWeeklyResult &&
         previews.every((item) => item?.safe === true) &&
         ['stage2', 'stage3', 'stage4'].every((key) =>
             stages[key]?.business_status === 'COMPLETED') &&

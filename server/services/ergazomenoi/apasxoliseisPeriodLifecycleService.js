@@ -6,6 +6,7 @@ const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const FrozenModel = require('../../models/apasxoliseisPeriodFrozenSnapshot');
 const CorrectiveModel = require('../../models/apasxoliseisPeriodCorrectiveCase');
 const LifecycleAuditModel = require('../../models/apasxoliseisPeriodLifecycleAudit');
+const { ProdhlomenaOrariaAuditModel } = require('../../models/ergazomenoi');
 const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
 const { normalizeScope, calculatePeriodDeadline, isPastDeadline, periodError } = require('./apasxoliseisPeriodControlService');
 const { buildEmploymentPeriodFrozenSnapshot } = require('./apasxoliseisPeriodFrozenSnapshotService');
@@ -14,6 +15,8 @@ const { buildCorrectiveDelta, correctionSubmissionCapability,
 const { assertPeriodLifecycleIndexesReady } = require('./apasxoliseisPeriodLifecycleIndexGuardService');
 const { assertPeriodHrReady } = require('./apasxoliseisPeriodHrReadinessService');
 const { assertPeriodDataQualityReady } = require('./apasxoliseisPeriodDataQualityReadinessService');
+const { loadVerifiedOrphanAuditEvidence } =
+    require('./apasxoliseisCorrectiveOrphanAuditEvidenceService');
 
 function actor(session = {}) {
     const role = assertCriticalEmploymentDecisionRole(session); const id = String(session.userId || '').trim();
@@ -173,7 +176,8 @@ async function saveCorrectiveResult({ session: userSession, scope: input, caseId
     corrections, requestId, requiresNewSubmission = false, now = new Date(),
     runAuthoritativeWeek,
     correctiveModel = CorrectiveModel, frozenModel = FrozenModel,
-    auditModel = LifecycleAuditModel, transactionRunner = transaction }) {
+    auditModel = LifecycleAuditModel, orphanEvidenceAuditModel = ProdhlomenaOrariaAuditModel,
+    transactionRunner = transaction }) {
     const scope = normalizeScope(input); const by = actor(userSession); const cleanReason = requiredText(reason,
         'CORRECTIVE_CALCULATION_REASON_REQUIRED', 'Απαιτείται αιτιολογία διορθωτικού υπολογισμού.');
     const cleanRequestId = requiredText(requestId, 'INVALID_CORRECTIVE_REQUEST_ID', 'Μη έγκυρο αναγνωριστικό διορθωτικού αιτήματος.');
@@ -186,8 +190,12 @@ async function saveCorrectiveResult({ session: userSession, scope: input, caseId
             frozen_snapshot_fingerprint: correctiveCase.baseline_fingerprint }).session(dbSession).lean();
         if (!baseline?.frozen_snapshot) throw periodError('CORRECTIVE_BASELINE_MISMATCH', 409,
             'Το παγωμένο ιστορικό αποτέλεσμα δεν συμφωνεί με τη διορθωτική υπόθεση.');
+        const verifiedEvidence = await loadVerifiedOrphanAuditEvidence({
+            baselineSnapshot: baseline.frozen_snapshot, finalizedAt: baseline.finalized_at,
+            commands: normalizedCommands, auditModel: orphanEvidenceAuditModel, session: dbSession
+        });
         const reconstructed = reconstructCorrectedHistoricalResult({ baselineSnapshot: baseline.frozen_snapshot,
-            commands: normalizedCommands, runAuthoritativeWeek });
+            commands: normalizedCommands, runAuthoritativeWeek, verifiedEvidence });
         const calculationCommandFingerprint = crypto.createHash('sha256').update(JSON.stringify({
             corrections: normalizedCommands, requires_new_submission: requiresNewSubmission === true
         })).digest('hex');
