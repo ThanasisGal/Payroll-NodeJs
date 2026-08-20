@@ -176,6 +176,11 @@ function correctiveRowKey(row = {}) {
     return `${String(row.kodikos || '')}|${String(row.hmeromhnia || '').slice(0, 10)}`;
 }
 
+function isUsablePersistedAmount(value) {
+    return value !== null && value !== undefined && String(value).trim() !== '' &&
+        Number.isFinite(Number(value));
+}
+
 function buildComparableLegacyBaselineRows({ baselineSnapshot = {}, correctedRows = [],
     verifiedEvidence = [] } = {}) {
     const correctedByKey = new Map(correctedRows.map((row) => [correctiveRowKey(row), row]));
@@ -191,8 +196,9 @@ function buildComparableLegacyBaselineRows({ baselineSnapshot = {}, correctedRow
     const companyRules = baselineSnapshot.policy_context?.rules || [];
     return (baselineSnapshot.daily_results || []).map((baselineRow) => {
         const amounts = baselineRow.compensation_breakdown_apologistika?.amounts;
-        if (amounts?.baseActualWorkAmount !== undefined &&
-            amounts?.premiumTotalAmount !== undefined && amounts?.grossWorkAmount !== undefined) {
+        if (isUsablePersistedAmount(amounts?.baseActualWorkAmount) &&
+            isUsablePersistedAmount(amounts?.premiumTotalAmount) &&
+            isUsablePersistedAmount(amounts?.grossWorkAmount)) {
             return baselineRow;
         }
         const code = String(baselineRow.kodikos || '');

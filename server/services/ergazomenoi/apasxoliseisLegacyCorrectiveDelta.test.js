@@ -14,6 +14,8 @@ const baselineRow = { _id: rowId, kodikos: '0004', company_kod: 'company',
     cards_apo_ora_01: '14:51', cards_eos_ora_01: '', cards_ores_ergasias: 0,
     ores_nyxtas_apologistika: 1.35, ores_argion_prosayxhsh_apologistika: 8,
     ores_argion_ergasia_apologistika: 0, sixth_day_hours: 0, seventh_day_hours: 0,
+    compensation_breakdown_apologistika: { amounts: { baseActualWorkAmount: null,
+        premiumTotalAmount: null, grossWorkAmount: null } },
     effective_profile_resolved: profile };
 const correctedFacts = { ...baselineRow, apo_ora_01_apologistika: '14:51',
     eos_ora_01_apologistika: '23:21', ores_ergasias_apologistika: 8,
