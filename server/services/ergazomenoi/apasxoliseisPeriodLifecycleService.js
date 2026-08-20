@@ -17,6 +17,11 @@ const { assertPeriodHrReady } = require('./apasxoliseisPeriodHrReadinessService'
 const { assertPeriodDataQualityReady } = require('./apasxoliseisPeriodDataQualityReadinessService');
 const { loadVerifiedOrphanAuditEvidence } =
     require('./apasxoliseisCorrectiveOrphanAuditEvidenceService');
+const { buildDailyCompensationBreakdown } =
+    require('./apasxoliseisDailyCompensationBreakdownService');
+const { resolveSixthDayPremiumRate } =
+    require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
+const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 
 function actor(session = {}) {
     const role = assertCriticalEmploymentDecisionRole(session); const id = String(session.userId || '').trim();
@@ -159,9 +164,68 @@ async function openCorrectiveCase({ session: userSession, scope: input, reason, 
     });
 }
 
+const LEGACY_COMPARABLE_FACT_FIELDS = Object.freeze([
+    'apo_ora_01_apologistika', 'eos_ora_01_apologistika',
+    'apo_ora_02_apologistika', 'eos_ora_02_apologistika',
+    'apo_ora_03_apologistika', 'eos_ora_03_apologistika',
+    'ores_ergasias_apologistika', 'ores_pragmatikhs_ergasias_apologistika',
+    'orphan_card_resolution'
+]);
+
+function correctiveRowKey(row = {}) {
+    return `${String(row.kodikos || '')}|${String(row.hmeromhnia || '').slice(0, 10)}`;
+}
+
+function buildComparableLegacyBaselineRows({ baselineSnapshot = {}, correctedRows = [],
+    verifiedEvidence = [] } = {}) {
+    const correctedByKey = new Map(correctedRows.map((row) => [correctiveRowKey(row), row]));
+    const evidenceRowIds = new Set(verifiedEvidence.map((item) => String(item.row_id)));
+    const employeeByCode = new Map((baselineSnapshot.employees || []).map((employee) =>
+        [String(employee.kodikos || ''), employee]));
+    const historyByCode = new Map();
+    for (const history of baselineSnapshot.weekly_calculation_context?.profile_history || []) {
+        const code = String(history.kodikos || '');
+        if (!historyByCode.has(code)) historyByCode.set(code, []);
+        historyByCode.get(code).push(history);
+    }
+    const companyRules = baselineSnapshot.policy_context?.rules || [];
+    return (baselineSnapshot.daily_results || []).map((baselineRow) => {
+        const amounts = baselineRow.compensation_breakdown_apologistika?.amounts;
+        if (amounts?.baseActualWorkAmount !== undefined &&
+            amounts?.premiumTotalAmount !== undefined && amounts?.grossWorkAmount !== undefined) {
+            return baselineRow;
+        }
+        const code = String(baselineRow.kodikos || '');
+        const correctedRow = correctedByKey.get(correctiveRowKey(baselineRow));
+        const comparableRow = evidenceRowIds.has(String(baselineRow._id)) && correctedRow
+            ? { ...baselineRow, ...Object.fromEntries(LEGACY_COMPARABLE_FACT_FIELDS
+                .filter((field) => Object.hasOwn(correctedRow, field))
+                .map((field) => [field, correctedRow[field]])) }
+            : { ...baselineRow };
+        const profile = { ...(employeeByCode.get(code) || {}),
+            ...getOrarioTermsForDate(baselineRow.hmeromhnia,
+                historyByCode.get(code) || [], employeeByCode.get(code) || {}),
+            ...(baselineRow.effective_profile_resolved || {}) };
+        const sixthRate = resolveSixthDayPremiumRate({ effectiveProfile: profile,
+            companyKod: baselineSnapshot.scope?.company_kod,
+            atDate: baselineRow.hmeromhnia, companyPolicyRules: companyRules }).rate;
+        const breakdown = buildDailyCompensationBreakdown({ row: comparableRow,
+            companyKod: baselineSnapshot.scope?.company_kod, atDate: baselineRow.hmeromhnia,
+            paidHourlyRate: profile.pragmatikoOromisthio,
+            legalHourlyRate: profile.nomimoOromisthio,
+            sixthDayHours: Number(baselineRow.sixth_day_hours) || 0,
+            weeklyIllegalOvertimeHours: Number(baselineRow.seventh_day_hours) || 0,
+            sixthDayMandatoryRatePercent: sixthRate, companyRules,
+            calculatedWorkHoursAuthoritative: true });
+        return { ...baselineRow, compensation_breakdown_apologistika: breakdown };
+    });
+}
+
 function buildCorrectiveResult({ baselineSnapshot, correctedRows, correctedContext, correctedDeviations = [],
-    requiresNewSubmission, deadline, now = new Date() }) {
-    const deltaResult = buildCorrectiveDelta({ baselineRows: baselineSnapshot?.daily_results || [], correctedRows,
+    verifiedEvidence = [], requiresNewSubmission, deadline, now = new Date() }) {
+    const baselineRows = buildComparableLegacyBaselineRows({ baselineSnapshot, correctedRows,
+        verifiedEvidence });
+    const deltaResult = buildCorrectiveDelta({ baselineRows, correctedRows,
         payrollResults: baselineSnapshot?.payroll_results || [] });
     const correctedResult = { daily_results: correctedRows, deviations: correctedDeviations };
     const correctedResultFingerprint = crypto.createHash('sha256').update(JSON.stringify(
@@ -208,6 +272,7 @@ async function saveCorrectiveResult({ session: userSession, scope: input, caseId
         const built = buildCorrectiveResult({ baselineSnapshot: baseline.frozen_snapshot,
             correctedRows: reconstructed.correctedRows, correctedContext: reconstructed.correctedContext,
             correctedDeviations: reconstructed.correctedDeviations,
+            verifiedEvidence,
             requiresNewSubmission, deadline: calculatePeriodDeadline(scope.period_end), now });
         const updated = await correctiveModel.findOneAndUpdate({ ...scope, case_id: caseId, status: 'ACTIVE',
             result_version: Number(correctiveCase.result_version || 0) },
@@ -249,4 +314,4 @@ async function closeCorrectiveCase({ session: userSession, scope: input, caseId,
 
 module.exports = { athensDateKey, submissionTimeliness, authoritativeSubmissionPeriod, finalizeEmploymentPeriod,
     linkEmploymentPeriodSubmission, openCorrectiveCase, buildCorrectiveResult,
-    saveCorrectiveResult, closeCorrectiveCase };
+    buildComparableLegacyBaselineRows, saveCorrectiveResult, closeCorrectiveCase };
