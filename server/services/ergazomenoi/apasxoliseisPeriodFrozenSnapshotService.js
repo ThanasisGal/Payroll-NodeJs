@@ -1,6 +1,9 @@
 'use strict';
 
 const crypto = require('crypto');
+const { resolveSixthDayPremiumRate } =
+    require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
+const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 
 const SNAPSHOT_SCHEMA_VERSION = 'employment-period-frozen:v3';
 const DEFAULT_SOURCE_VERSION = 'employment-calculation:v2';
@@ -147,24 +150,58 @@ function buildEmploymentPeriodFrozenSnapshot(input = {}) {
 function projectFrozenReview(snapshot = {}, { kodikos = '' } = {}) {
     const rows = (snapshot.daily_results || [])
         .filter((row) => !kodikos || String(row.kodikos) === String(kodikos))
-        .map(projectFrozenSixthSeventhPresentation);
+        .map((row) => projectFrozenDailyPresentation(row, snapshot));
     return Object.freeze({ source: 'FROZEN_FINALIZED', rows, total: rows.length,
         deviations: snapshot.deviations || [], payroll_results: snapshot.payroll_results || [],
         corrective: null });
 }
 
-function projectFrozenSixthSeventhPresentation(row = {}) {
+function usableHistoricalRate(value) {
+    return value !== null && value !== undefined && String(value).trim() !== '' &&
+        Number.isFinite(Number(value));
+}
+
+function frozenEffectiveProfile(snapshot = {}, row = {}) {
+    const code = String(row.kodikos || '');
+    const employee = (snapshot.employees || []).find((item) => String(item.kodikos || '') === code) || {};
+    const history = (snapshot.weekly_calculation_context?.profile_history || [])
+        .filter((item) => String(item.kodikos || '') === code);
+    return { ...employee, ...getOrarioTermsForDate(row.hmeromhnia, history, employee),
+        ...(row.effective_profile_resolved || {}) };
+}
+
+function resolveFrozenHistoricalSixthDayRate(snapshot = {}, row = {}) {
+    if (usableHistoricalRate(row.effective_sixth_day_rate)) return Number(row.effective_sixth_day_rate);
+    const resolved = resolveSixthDayPremiumRate({ effectiveProfile: frozenEffectiveProfile(snapshot, row),
+        companyKod: snapshot.scope?.company_kod, atDate: row.hmeromhnia,
+        companyPolicyRules: snapshot.policy_context?.rules || [] });
+    return usableHistoricalRate(resolved?.rate) ? Number(resolved.rate) : null;
+}
+
+function projectFrozenSixthSeventhPresentation(row = {}, historicalRate = null) {
     const classification = String(row.sixth_seventh_classification || '').trim().toUpperCase();
     const isSixthDay = classification === 'SIXTH' && Number(row.sixth_day_hours || 0) > 0;
     const isSeventhDay = classification === 'SEVENTH' && Number(row.seventh_day_hours || 0) > 0;
+    const rate = usableHistoricalRate(row.effective_sixth_day_rate)
+        ? Number(row.effective_sixth_day_rate) : historicalRate;
     return { ...row,
         is_sixth_day: isSixthDay,
-        sixth_day_premium_rate: isSixthDay ? row.effective_sixth_day_rate ?? null : null,
+        sixth_day_premium_rate: isSixthDay && usableHistoricalRate(rate) ? Number(rate) : null,
         is_seventh_day: isSeventhDay,
         seventh_day_severity: isSeventhDay ? 'SERIOUS_VIOLATION' : '' };
+}
+
+function projectFrozenDailyPresentation(row = {}, snapshot = {}) {
+    const projected = projectFrozenSixthSeventhPresentation(row,
+        resolveFrozenHistoricalSixthDayRate(snapshot, row));
+    return Number(projected.ores_apoysias_apologistika || 0) > 0 &&
+        projected.apousia_apologistika !== true
+        ? { ...projected, apousia_apologistika: true }
+        : projected;
 }
 
 module.exports = { SNAPSHOT_SCHEMA_VERSION, DEFAULT_SOURCE_VERSION, DAILY_FIELDS, EMPLOYEE_FIELDS,
     HISTORY_FIELDS, PAYROLL_FIELDS,
     canonicalize, buildEmploymentPeriodFrozenSnapshot, projectFrozenReview,
-    projectFrozenSixthSeventhPresentation };
+    projectFrozenSixthSeventhPresentation, projectFrozenDailyPresentation,
+    resolveFrozenHistoricalSixthDayRate };
