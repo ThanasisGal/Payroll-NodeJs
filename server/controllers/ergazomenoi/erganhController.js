@@ -8535,8 +8535,15 @@ class erganhController {
                 requires_new_submission: record.requires_new_submission,
                 can_submit_correction: record.can_submit_correction,
                 message: 'Ο διορθωτικός υπολογισμός ολοκληρώθηκε από τα ιστορικά στοιχεία.' });
-        } catch (error) { return res.status(error.statusCode || 500).json({ success: false,
-            code: error.code, message: error.statusCode ? error.message : 'Ο διορθωτικός υπολογισμός απέτυχε.' }); }
+        } catch (error) {
+            console.error('[calculateEmploymentReviewCorrectiveCase]', {
+                code: error?.code,
+                message: error?.message,
+                stack: error?.stack
+            });
+            return res.status(error.statusCode || 500).json({ success: false,
+                code: error.code, message: error.statusCode ? error.message : 'Ο διορθωτικός υπολογισμός απέτυχε.' });
+        }
     };
 
     static closeEmploymentReviewCorrectiveCase = async (req, res) => {

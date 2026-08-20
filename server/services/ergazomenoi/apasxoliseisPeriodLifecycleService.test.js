@@ -18,8 +18,10 @@ const testAuthoritativeWeek = ({ frozenRows }) => ({ correctedRows: frozenRows.m
     let minutes = end[0] * 60 + end[1] - start[0] * 60 - start[1]; if (minutes <= 0) minutes += 1440;
     const hours = minutes / 60; return { ...row, cards_ores_ergasias: hours,
         ores_ergasias_apologistika: hours, ores_pragmatikhs_ergasias_apologistika: hours,
-        compensation_breakdown_apologistika: { amounts: { baseActualWorkAmount: hours * 10,
-            premiumTotalAmount: 0, grossWorkAmount: hours * 10 } } };
+        compensation_breakdown_apologistika: { status: 'READY', reasons: [],
+            hours: { actualWorkHours: hours, sixthDayHours: 0 },
+            amounts: { baseActualWorkAmount: hours * 10,
+                premiumTotalAmount: 0, grossWorkAmount: hours * 10 } } };
 }), deviations: [], diagnostics: [] });
 function query(value) { return { session() { return this; }, async lean() { return value; } }; }
 function stores(controlInput = {}) {
@@ -65,7 +67,11 @@ function stores(controlInput = {}) {
                 return { ...item };
             }
         },
-        audit: { async create(documents) {
+        audit: { async create(documents, options = {}) {
+            if (Array.isArray(documents) && documents.length > 1 && options.session &&
+                options.ordered !== true) {
+                throw new Error('Cannot call create() with a session and multiple documents unless ordered: true is set');
+            }
             audits.push(...(Array.isArray(documents) ? documents : [documents])); return documents;
         } },
         get control() { return control; }, get frozenRecord() { return frozen; }, audits, cases

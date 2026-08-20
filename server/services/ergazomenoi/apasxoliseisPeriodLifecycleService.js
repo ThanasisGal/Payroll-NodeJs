@@ -222,7 +222,8 @@ async function saveCorrectiveResult({ session: userSession, scope: input, caseId
         { ...scope, event_type: 'SUBMISSION_NEEDED_DETERMINATION', actor_user_id: by.user_id,
             actor_user_name: by.user_name, actor_user_role: by.role, reason: cleanReason, reference_id: caseId,
             details: { requires_new_submission: built.requires_new_submission,
-                can_submit_correction: built.can_submit_correction }, occurred_at: now }], { session: dbSession });
+                can_submit_correction: built.can_submit_correction }, occurred_at: now }],
+        { session: dbSession, ordered: true });
         return { record: updated, idempotent: false };
     });
 }
