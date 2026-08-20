@@ -181,8 +181,20 @@ function isUsablePersistedAmount(value) {
         Number.isFinite(Number(value));
 }
 
+function affectedCorrectiveEmployeeWeekKeys(commands = []) {
+    return new Set(commands.map((command) => {
+        const date = String(command.week_start || command.date || '').slice(0, 10);
+        const parsed = new Date(`${date}T00:00:00.000Z`);
+        if (Number.isNaN(parsed.getTime())) return '';
+        const day = parsed.getUTCDay();
+        parsed.setUTCDate(parsed.getUTCDate() - (day === 0 ? 6 : day - 1));
+        return `${String(command.employee_kodikos || '')}|${parsed.toISOString().slice(0, 10)}`;
+    }).filter(Boolean));
+}
+
 function buildComparableLegacyBaselineRows({ baselineSnapshot = {}, correctedRows = [],
-    verifiedEvidence = [] } = {}) {
+    verifiedEvidence = [], commands = [] } = {}) {
+    const affectedEmployeeWeeks = affectedCorrectiveEmployeeWeekKeys(commands);
     const correctedByKey = new Map(correctedRows.map((row) => [correctiveRowKey(row), row]));
     const evidenceRowIds = new Set(verifiedEvidence.map((item) => String(item.row_id)));
     const employeeByCode = new Map((baselineSnapshot.employees || []).map((employee) =>
@@ -195,6 +207,13 @@ function buildComparableLegacyBaselineRows({ baselineSnapshot = {}, correctedRow
     }
     const companyRules = baselineSnapshot.policy_context?.rules || [];
     return (baselineSnapshot.daily_results || []).map((baselineRow) => {
+        const date = String(baselineRow.hmeromhnia || '').slice(0, 10);
+        const parsed = new Date(`${date}T00:00:00.000Z`);
+        const day = parsed.getUTCDay();
+        parsed.setUTCDate(parsed.getUTCDate() - (day === 0 ? 6 : day - 1));
+        if (!affectedEmployeeWeeks.has(`${String(baselineRow.kodikos || '')}|${parsed.toISOString().slice(0, 10)}`)) {
+            return baselineRow;
+        }
         const amounts = baselineRow.compensation_breakdown_apologistika?.amounts;
         if (isUsablePersistedAmount(amounts?.baseActualWorkAmount) &&
             isUsablePersistedAmount(amounts?.premiumTotalAmount) &&
@@ -230,7 +249,7 @@ function buildComparableLegacyBaselineRows({ baselineSnapshot = {}, correctedRow
 function buildCorrectiveResult({ baselineSnapshot, correctedRows, correctedContext, correctedDeviations = [],
     verifiedEvidence = [], requiresNewSubmission, deadline, now = new Date() }) {
     const baselineRows = buildComparableLegacyBaselineRows({ baselineSnapshot, correctedRows,
-        verifiedEvidence });
+        verifiedEvidence, commands: correctedContext?.commands || [] });
     const deltaResult = buildCorrectiveDelta({ baselineRows, correctedRows,
         payrollResults: baselineSnapshot?.payroll_results || [] });
     const correctedResult = { daily_results: correctedRows, deviations: correctedDeviations };

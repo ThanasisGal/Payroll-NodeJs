@@ -31,16 +31,25 @@ assert.equal(correctedBreakdown.status, 'READY');
 assert.equal(correctedBreakdown.components.find((item) =>
     item.code === 'SIXTH_DAY_PREMIUM').premiumAmount, 0);
 
+const unrelatedRows = ['0009', '0012'].map((kodikos) => ({ ...baselineRow,
+    _id: `legacy-${kodikos}`, kodikos,
+    effective_profile_resolved: { ...profile, kodikos } }));
+
 const result = buildCorrectiveResult({ baselineSnapshot: {
-    scope: { company_kod: 'company' }, employees: [profile],
-    daily_results: [baselineRow], weekly_calculation_context: { profile_history: [] },
+    scope: { company_kod: 'company' }, employees: [profile,
+        ...unrelatedRows.map((row) => row.effective_profile_resolved)],
+    daily_results: [baselineRow, ...unrelatedRows], weekly_calculation_context: { profile_history: [] },
     policy_context: { rules: [] }, payroll_results: []
 }, correctedRows: [{ ...correctedFacts,
-    compensation_breakdown_apologistika: correctedBreakdown }],
-correctedContext: {}, verifiedEvidence: [{ row_id: rowId }],
+    compensation_breakdown_apologistika: correctedBreakdown }, ...unrelatedRows],
+correctedContext: { commands: [{ type: 'RECOMPUTE_FROZEN_WEEK', employee_kodikos: '0004',
+    week_start: '2026-06-08', evidence_audit_ids: [] }] }, verifiedEvidence: [{ row_id: rowId }],
 requiresNewSubmission: false, deadline: '2026-07-31', now: new Date('2026-07-01') });
 
 const delta = result.corrective_delta.rows[0];
+assert.deepEqual(result.corrective_delta.rows.map((row) => row.key), ['0004|2026-06-14']);
+assert.ok(result.corrective_delta.rows.every((row) =>
+    !String(row.key).startsWith('0009|') && !String(row.key).startsWith('0012|')));
 assert.equal(delta.sixth_day_hours, 8);
 assert.equal(delta.baseActualWorkAmount, 0);
 assert.equal(delta.premiumTotalAmount, 0);
