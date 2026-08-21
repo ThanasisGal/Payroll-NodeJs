@@ -45,11 +45,26 @@ const declaredRepoWithCards = row();
 const before = JSON.stringify(declaredRepoWithCards);
 assert.match(
     sandbox.renderDeclaredRepoWithCardsBadge(declaredRepoWithCards, '0'),
-    /Ρεπό με κάρτες/
+    /Απασχόληση σε ρεπό/
 );
 assert.strictEqual(JSON.stringify(declaredRepoWithCards), before);
 
-assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({ repo: false }), '0'), /Ρεπό με κάρτες/);
+const duplicateRepoEvent = row({
+    scenarioDecision: {
+        scenario_code: 'DECLARED_REPO_WITH_CARDS',
+        display_labels: { show_badge: true }
+    }
+});
+const singleRepoPresentation =
+    sandbox.renderDeclaredRepoWithCardsBadge(duplicateRepoEvent, '0') +
+    sandbox.renderScenarioBadge(duplicateRepoEvent);
+assert.equal(
+    (singleRepoPresentation.match(/Απασχόληση σε ρεπό/g) || []).length,
+    1
+);
+assert.doesNotMatch(singleRepoPresentation, /Ρεπό με κάρτες|Δηλωμένο ρεπό με κάρτες/);
+
+assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({ repo: false }), '0'), /Απασχόληση σε ρεπό/);
 assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
     kathgoria_ergasias: 'ΜΕ', repo: false, effective_is_full_time: false
 }), '1'), /Μη εργασία με κάρτες/);
@@ -67,9 +82,9 @@ assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
 const mixedJune0014 = [
     ['2026-06-12', false, 'Μη εργασία με κάρτες'],
     ['2026-06-13', false, 'Μη εργασία με κάρτες'],
-    ['2026-06-15', true, 'Ρεπό με κάρτες'],
-    ['2026-06-25', true, 'Ρεπό με κάρτες'],
-    ['2026-06-30', true, 'Ρεπό με κάρτες']
+    ['2026-06-15', true, 'Απασχόληση σε ρεπό'],
+    ['2026-06-25', true, 'Απασχόληση σε ρεπό'],
+    ['2026-06-30', true, 'Απασχόληση σε ρεπό']
 ];
 mixedJune0014.forEach(([hmeromhnia, effective_is_full_time, expected]) => {
     const html = sandbox.renderDeclaredRepoWithCardsBadge(row({
@@ -94,7 +109,7 @@ assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
     kodikos: '0014', hmeromhnia: '2026-06-15', kathgoria_ergasias: 'ΜΕ',
     repo: false, effective_is_full_time: false
 }), transitionMap.get(sandbox.stage2DailyResolutionKey('0014', '2026-06-15'))),
-/Ρεπό με κάρτες/);
+/Απασχόληση σε ρεπό/);
 
 assert.strictEqual(sandbox.renderDeclaredRepoWithCardsBadge(row({
     cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0

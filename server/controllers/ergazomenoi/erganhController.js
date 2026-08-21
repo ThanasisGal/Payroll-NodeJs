@@ -7273,6 +7273,7 @@ class erganhController {
                     eponymo: erg?.eponymo || '',
                     onoma: erg?.onoma || '',
                     employee_id: erg?._id || null,
+                    employee_departure_date: erg?.hmeromhnia_apoxorhshs || null,
 
                     // Ιστορικά σωστό profile για την ΗΜΕΡΑ της εγγραφής.
                     // Χρησιμοποιείται από το frontend για display τύπου:

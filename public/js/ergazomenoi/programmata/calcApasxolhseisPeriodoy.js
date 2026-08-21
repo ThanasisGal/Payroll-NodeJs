@@ -43,6 +43,7 @@ document.getElementById('calcApasxolhseonButton')?.addEventListener('click', asy
                     ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου'
                     : 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
                 input: 'textarea', inputLabel: 'Υποχρεωτική αιτιολογία',
+                inputValue: 'Καθαρή ανακατασκευή της υπό εξέταση περιόδου μετά από ελεγχόμενο καθαρισμό των παράγωγων αποτελεσμάτων, με διατήρηση των πρωτογενών δεδομένων, των εγκεκριμένων αποφάσεων και των επαναχρησιμοποιήσιμων πολιτικών.',
                 showCancelButton: true, confirmButtonText: 'Εξουσιοδότηση', cancelButtonText: 'Ακύρωση',
                 inputValidator: value => String(value || '').trim()
                     ? undefined : 'Η αιτιολογία είναι υποχρεωτική.'

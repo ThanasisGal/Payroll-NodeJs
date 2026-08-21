@@ -554,6 +554,11 @@ function renderScenarioBadge(row, repoTransferState) {
 
     if (!decision || !decision.scenario_code) return '';
     if (
+        decision.scenario_code === 'DECLARED_REPO_WITH_CARDS' &&
+        isAuthoritativeDeclaredRepo(row) &&
+        hasAnyCardEvidence(row)
+    ) return '';
+    if (
         row?.policyResult?.result_status &&
         !isPolicyPreviewDecisionStatus(row.policyResult.result_status)
     ) return '';
@@ -1093,7 +1098,7 @@ function renderDeclaredRepoWithCardsBadge(
     if (!['0', '1', '2'].includes(canonicalEmploymentType)) return '';
 
     const label = canonicalEmploymentType === '0'
-        ? 'Ρεπό με κάρτες'
+        ? 'Απασχόληση σε ρεπό'
         : 'Μη εργασία με κάρτες';
     return `<div class="mt-1"><span class="badge text-bg-info">${label}</span></div>`;
 }
@@ -8076,6 +8081,7 @@ async function runHistoricalReconstruction() {
         title: reassess ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου' : 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
         html: '<p>Η περίοδος έχει λήξει. Η ανακατασκευή δεν αλλάζει την εκπρόθεσμη κατάστασή της και καταγράφεται με χρήστη, ημερομηνία και αιτιολογία.</p>',
         input: 'textarea', inputLabel: 'Υποχρεωτική αιτιολογία', showCancelButton: true,
+        inputValue: 'Καθαρή ανακατασκευή της υπό εξέταση περιόδου μετά από ελεγχόμενο καθαρισμό των παράγωγων αποτελεσμάτων, με διατήρηση των πρωτογενών δεδομένων, των εγκεκριμένων αποφάσεων και των επαναχρησιμοποιήσιμων πολιτικών.',
         customClass: {
             popup: 'historical-reconstruction-swal',
             htmlContainer: 'historical-reconstruction-swal__content',
@@ -8731,11 +8737,13 @@ const workflowStageNames = Object.freeze({
 });
 const workflowStageStatusLabels = Object.freeze({
     COMPLETED: 'ΟΛΟΚΛΗΡΩΜΕΝΟ', ACTIVE: 'ΕΝΕΡΓΟ', OPEN: 'ΑΝΟΙΧΤΟ',
-    BLOCKED: 'ΑΠΑΙΤΕΙ ΕΝΕΡΓΕΙΑ', STALE: 'ΑΠΑΙΤΕΙ ΕΠΑΝΕΛΕΓΧΟ', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
+    BLOCKED: 'ΑΠΑΙΤΕΙ ΕΝΕΡΓΕΙΑ', STALE: 'ΑΠΑΙΤΕΙ ΕΠΑΝΕΛΕΓΧΟ', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ',
+    NOT_RUN: 'ΔΕΝ ΕΧΕΙ ΕΚΤΕΛΕΣΤΕΙ', NOT_REQUIRED: 'ΔΕΝ ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ'
 });
 const workflowStageStatusClasses = Object.freeze({
     COMPLETED: 'text-bg-success', ACTIVE: 'text-bg-primary', OPEN: 'text-bg-secondary',
-    BLOCKED: 'text-bg-danger', STALE: 'text-bg-warning', LOCKED: 'text-bg-secondary'
+    BLOCKED: 'text-bg-danger', STALE: 'text-bg-warning', LOCKED: 'text-bg-secondary',
+    NOT_RUN: 'text-bg-secondary', NOT_REQUIRED: 'text-bg-light border text-dark'
 });
 
 function compareLifecyclePendingItems(left = {}, right = {}) {
@@ -8747,7 +8755,9 @@ function compareLifecyclePendingItems(left = {}, right = {}) {
         String(left.row_id || '').localeCompare(String(right.row_id || ''));
 }
 
-function derivePeriodLifecyclePresentation(payloads = []) {
+function derivePeriodLifecyclePresentation(payloads = [], {
+    employeeRows = [], authoritativeResultCompleted = false
+} = {}) {
     const stageKeys = ['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'];
     const rawProjections = (Array.isArray(payloads) ? payloads : [])
         .map((payload) => ({ payload, lifecycle: payload?.lifecycle_projection }))
@@ -8760,9 +8770,53 @@ function derivePeriodLifecyclePresentation(payloads = []) {
         projectionsByWeeklyScope.set(scopeKey === '||' ? `UNSCOPED:${index}` : scopeKey, entry);
     });
     const projections = [...projectionsByWeeklyScope.values()];
+    if (projections.length === 0) {
+        const employeeCodes = new Set((Array.isArray(employeeRows) ? employeeRows : [])
+            .map((row) => String(row?.kodikos || row?.employee_kodikos || '').trim())
+            .filter(Boolean));
+        const departureDates = [...new Set((Array.isArray(employeeRows) ? employeeRows : [])
+            .map((row) => String(row?.employee_departure_date || '').slice(0, 10))
+            .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)))].sort();
+        const departureDate = authoritativeResultCompleted === true &&
+            employeeCodes.size === 1 && departureDates.length === 1
+            ? departureDates[0] : '';
+        const completedWithoutPendingAction = authoritativeResultCompleted === true &&
+            employeeCodes.size === 1;
+        return {
+            current_stage: null,
+            total_pending_count: 0,
+            requires_hr_action: false,
+            departure_date: departureDate || null,
+            trailing_partial_weeks: [],
+            stages: Object.fromEntries(stageKeys.map((stage) => [stage, {
+                stage,
+                business_status: 'NO_STATE',
+                presentation_status: completedWithoutPendingAction
+                    ? (stage === 'STAGE4' ? 'COMPLETED' : 'NOT_REQUIRED')
+                    : 'NOT_RUN',
+                pending_count: 0,
+                pending_reasons: [],
+                pending_items: [],
+                persisted_statuses: [],
+                enabled: true,
+                open_by_default: false
+            }]))
+        };
+    }
     const trailingPartialWeeks = projections.map(({ payload, lifecycle }) => ({
         scope: payload?.scope || {}, ...lifecycle.trailing_partial_week
     })).filter((item) => item.active === true);
+    const employeeCodes = new Set(projections.map(({ payload }) =>
+        String(payload?.scope?.employee_kodikos || '').trim()).filter(Boolean));
+    const departureDates = projections.map(({ lifecycle }) => {
+        const employmentScope = lifecycle.employment_date_scope || {};
+        const employmentEnd = String(employmentScope.employment_end || '').slice(0, 10);
+        const naturalWeekEnd = String(employmentScope.natural_week_end || '').slice(0, 10);
+        return employmentEnd && naturalWeekEnd && employmentEnd < naturalWeekEnd
+            ? employmentEnd : '';
+    }).filter(Boolean).sort();
+    const departureDate = employeeCodes.size === 1 && departureDates.length
+        ? departureDates.at(-1) : '';
     const statusPriority = ['BLOCKED', 'STALE', 'OPEN', 'COMPLETED'];
     const stages = Object.fromEntries(stageKeys.map((stageKey) => {
         const key = stageKey.toLowerCase();
@@ -8809,10 +8863,16 @@ function derivePeriodLifecyclePresentation(payloads = []) {
     }));
     const firstUnresolvedIndex = stageKeys.findIndex((stageKey) =>
         stages[stageKey].business_status !== 'COMPLETED');
+    const completedWithoutPendingAction =
+        (authoritativeResultCompleted === true || Boolean(departureDate)) &&
+        stageKeys.every((stageKey) => stages[stageKey].business_status === 'COMPLETED' &&
+            Number(stages[stageKey].pending_count || 0) === 0);
     stageKeys.forEach((stageKey, index) => {
         const stage = stages[stageKey];
         stage.pending_items.sort(compareLifecyclePendingItems);
-        if (firstUnresolvedIndex < 0 || index < firstUnresolvedIndex) {
+        if (completedWithoutPendingAction) {
+            stage.presentation_status = stageKey === 'STAGE4' ? 'COMPLETED' : 'NOT_REQUIRED';
+        } else if (firstUnresolvedIndex < 0 || index < firstUnresolvedIndex) {
             stage.presentation_status = 'COMPLETED';
         } else if (index > firstUnresolvedIndex) {
             stage.presentation_status = 'LOCKED';
@@ -8831,12 +8891,24 @@ function derivePeriodLifecyclePresentation(payloads = []) {
         current_stage: current,
         total_pending_count: current ? stages[current].pending_count : 0,
         requires_hr_action: Boolean(current),
+        departure_date: departureDate || null,
         trailing_partial_weeks: trailingPartialWeeks,
         stages
     };
 }
 
 function applyEmploymentReviewWorkflowStageBadges(lifecycle) {
+    const departureNotice = document.getElementById('employmentReviewDepartureNotice');
+    if (departureNotice) {
+        if (lifecycle.departure_date) {
+            departureNotice.innerHTML = `Αποχώρηση εργαζομένου: ${escapeHtml(
+                formatStage1DateKey(lifecycle.departure_date))}`;
+            departureNotice.classList.remove('d-none');
+        } else {
+            departureNotice.innerHTML = '';
+            departureNotice.classList.add('d-none');
+        }
+    }
     Object.values(lifecycle.stages).forEach((stage) => {
         const item = document.querySelector(`[data-workflow-stage="${stage.stage}"]`);
         const button = item?.querySelector('.accordion-button');
@@ -9008,7 +9080,10 @@ async function submitWeeklyHrStage3Decision(rowId) {
 
 function updateEmploymentReviewWorkflowPresentation() {
     const payloads = visibleWeeklyHrPayloads().sort(compareWeeklyHrStage1Payloads);
-    const lifecycle = derivePeriodLifecyclePresentation(payloads);
+    const lifecycle = derivePeriodLifecyclePresentation(payloads, {
+        employeeRows: stage4ReviewRows(currentReviewRows, currentReviewEmployeeCodes),
+        authoritativeResultCompleted: hasAuthoritativeEmploymentCalculation()
+    });
     currentEmploymentReviewLifecyclePresentation = lifecycle;
     currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(payloads);
     currentDeferredWeeklyDateByKey = buildDeferredWeeklyDateByKey(payloads);
