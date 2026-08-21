@@ -27,7 +27,8 @@ const {
     PerifereiesModel,
     GenikesParametroiModel,
     ForologikesKlimakesModel,
-    ProgrammataDypaModel
+    ProgrammataDypaModel,
+    EidikothtesEfarmoghsModel
 } = Models_A;
 
 const { UserPrivilegesModel } = Models_B;
@@ -73,6 +74,48 @@ function buildErgazomenoiActiveInactiveFilter(showInactive) {
         archived: { $ne: true },
         ...(showInactive ? {} : { energos: true })
     };
+}
+
+async function getEidikothtaCodesForSearch(searchRegex) {
+    const eidikothtes = await EidikothtesEfarmoghsModel.find({
+        perigrafh: mongoose.trusted({ $regex: searchRegex })
+    })
+        .select('kodikos')
+        .lean();
+
+    return eidikothtes.map(({ kodikos }) => String(kodikos || '').trim()).filter(Boolean);
+}
+
+async function attachEidikothtaDescriptions(ergazomenoi) {
+    const codes = [
+        ...new Set(
+            ergazomenoi
+                .map(({ eidikothta }) => String(eidikothta || '').trim())
+                .filter(Boolean)
+        )
+    ];
+
+    if (codes.length === 0) {
+        return ergazomenoi.map((ergazomenos) => ({
+            ...ergazomenos,
+            eidikothta_perigrafh: ''
+        }));
+    }
+
+    const eidikothtes = await EidikothtesEfarmoghsModel.find({
+        kodikos: mongoose.trusted({ $in: codes })
+    })
+        .select('kodikos perigrafh')
+        .lean();
+    const descriptionsByCode = new Map(
+        eidikothtes.map(({ kodikos, perigrafh }) => [String(kodikos), perigrafh || ''])
+    );
+
+    return ergazomenoi.map((ergazomenos) => ({
+        ...ergazomenos,
+        eidikothta_perigrafh:
+            descriptionsByCode.get(String(ergazomenos.eidikothta || '').trim()) || ''
+    }));
 }
 
 function resolveStoredPdfS3Key(storedValue) {
@@ -727,7 +770,9 @@ class ergazomenoiController {
                 { $limit: limitPerPage }
             ];
 
-            const ergazomenoi = await ErgazomenoiModel.aggregate(queryPipeline).exec();
+            const ergazomenoi = await attachEidikothtaDescriptions(
+                await ErgazomenoiModel.aggregate(queryPipeline).exec()
+            );
 
             res.render('ergazomenoi/ergazomenoi/ergazomenoi', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
@@ -1041,6 +1086,7 @@ class ergazomenoiController {
             }).lean();
 
             const re = new RegExp(this.escapeRegExp(searchTerm), 'i');
+            const eidikothtaCodes = await getEidikothtaCodesForSearch(re);
 
             const matchFilter = {
                 company_kod: companyId,
@@ -1050,6 +1096,10 @@ class ergazomenoiController {
                     { eponymo: { $regex: re } },
                     { onoma: { $regex: re } },
                     { patronymo: { $regex: re } },
+                    { eidikothta: { $regex: re } },
+                    ...(eidikothtaCodes.length > 0
+                        ? [{ eidikothta: { $in: eidikothtaCodes } }]
+                        : []),
                     { afm: { $regex: re } },
                     { amka: { $regex: re } },
                     { adt: { $regex: re } }
@@ -1068,12 +1118,11 @@ class ergazomenoiController {
                 totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
             );
 
-            const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
-                matchStage,
-                { $sort: { kodikos: 1 } }
-            ])
-                .skip(skipRecords)
-                .limit(limitPerPage);
+            const ergazomenoiFilteredRecs = await attachEidikothtaDescriptions(
+                await ErgazomenoiModel.aggregate([matchStage, { $sort: { kodikos: 1 } }])
+                    .skip(skipRecords)
+                    .limit(limitPerPage)
+            );
 
             const highlightedRecords = ergazomenoiFilteredRecs.map((record) => ({
                 ...record,
@@ -1081,6 +1130,11 @@ class ergazomenoiController {
                 eponymo: this.highlightText(record.eponymo, searchTerm),
                 onoma: this.highlightText(record.onoma, searchTerm),
                 patronymo: this.highlightText(record.patronymo, searchTerm),
+                eidikothta_perigrafh_plain: record.eidikothta_perigrafh,
+                eidikothta_perigrafh: this.highlightText(
+                    record.eidikothta_perigrafh || record.eidikothta,
+                    searchTerm
+                ),
                 afm: this.highlightText(record.afm, searchTerm),
                 amka: this.highlightText(record.amka, searchTerm),
                 adt: this.highlightText(record.adt, searchTerm)
@@ -1128,6 +1182,7 @@ class ergazomenoiController {
             }).lean();
 
             const re = new RegExp(this.escapeRegExp(searchTerm), 'i');
+            const eidikothtaCodes = await getEidikothtaCodesForSearch(re);
 
             const matchFilter = {
                 company_kod: companyId,
@@ -1137,6 +1192,10 @@ class ergazomenoiController {
                     { eponymo: { $regex: re } },
                     { onoma: { $regex: re } },
                     { patronymo: { $regex: re } },
+                    { eidikothta: { $regex: re } },
+                    ...(eidikothtaCodes.length > 0
+                        ? [{ eidikothta: { $in: eidikothtaCodes } }]
+                        : []),
                     { afm: { $regex: re } },
                     { amka: { $regex: re } },
                     { adt: { $regex: re } }
@@ -1155,12 +1214,11 @@ class ergazomenoiController {
                 totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
             );
 
-            const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
-                matchStage,
-                { $sort: { kodikos: 1 } }
-            ])
-                .skip(skipRecords)
-                .limit(limitPerPage);
+            const ergazomenoiFilteredRecs = await attachEidikothtaDescriptions(
+                await ErgazomenoiModel.aggregate([matchStage, { $sort: { kodikos: 1 } }])
+                    .skip(skipRecords)
+                    .limit(limitPerPage)
+            );
 
             const highlightedRecords = ergazomenoiFilteredRecs.map((record) => ({
                 ...record,
@@ -1168,6 +1226,11 @@ class ergazomenoiController {
                 eponymo: this.highlightText(record.eponymo, searchTerm),
                 onoma: this.highlightText(record.onoma, searchTerm),
                 patronymo: this.highlightText(record.patronymo, searchTerm),
+                eidikothta_perigrafh_plain: record.eidikothta_perigrafh,
+                eidikothta_perigrafh: this.highlightText(
+                    record.eidikothta_perigrafh || record.eidikothta,
+                    searchTerm
+                ),
                 afm: this.highlightText(record.afm, searchTerm),
                 amka: this.highlightText(record.amka, searchTerm),
                 adt: this.highlightText(record.adt, searchTerm)
