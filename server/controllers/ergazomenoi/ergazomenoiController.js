@@ -1294,6 +1294,7 @@ class ergazomenoiController {
 
         const { formData = {} } = req.body || {};
         const filesToUpdate = req.body?.filesToUpdate || {};
+        const aforaDaneismoErgazomenoy = formData.afora_daneismo_ergazomenoy === true;
         const sixthDayPremiumRate = parseSixthDayPremiumRate(
             formData?.pososto_prosayxhshs_6hs_hmeras,
             { defaultForNew: true }
@@ -1452,10 +1453,18 @@ class ergazomenoiController {
             mhnes_proeidopoihshs: formData.mhnes_proeidopoihshs || 0,
             logos_peratosis: formData.logos_peratoshs_stathera || '',
             parathrhseis_peratosis: formData.parathrhseis_peratoshs || '',
-            afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
+            afora_daneismo_ergazomenoy: aforaDaneismoErgazomenoy,
             typos_daneismoy: formData.typos_daneismoy_stathera,
             hmnia_enarxhs_daneismoy: formData.hmnia_enarxhs_daneismoy || null,
             hmnia_lhxhs_daneismoy: formData.hmnia_lhxhs_daneismoy || null,
+            afm_daneizontos_ergodoth: aforaDaneismoErgazomenoy
+                ? String(formData.afm_daneizontos_ergodoth || '').trim() : '',
+            afm_daneizomenoy_ergodoth: aforaDaneismoErgazomenoy
+                ? String(formData.afm_daneizomenoy_ergodoth || '').trim() : '',
+            typos_ergodoth_daneismoy: aforaDaneismoErgazomenoy
+                ? formData.typos_ergodoth_daneismoy === true : false,
+            kodikos_ergazomenoy_alloy_ergodoth: aforaDaneismoErgazomenoy
+                ? String(formData.kodikos_ergazomenoy_alloy_ergodoth || '').trim() : '',
             afora_dokimastikh_periodo: formData.afora_dokimastikh_periodo,
             hmnia_lhxhs_dokimastikhs_periodoy: formData.hmnia_lhxhs_dokimastikhs_periodoy || null,
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs_stathera,
@@ -3341,6 +3350,7 @@ class ergazomenoiController {
     static postErgazomenoiUpdate = async (req, res) => {
         const ergazomenoiId = req.params.ergazomenoiId;
         const { formData = {}, filesToUpdate } = req.body || {};
+        const aforaDaneismoErgazomenoy = formData.afora_daneismo_ergazomenoy === true;
 
         const omadaErgasias = req.session?.userTeam;
         const kodikosEtaireias = req.session?.companyInUse;
@@ -3508,10 +3518,18 @@ class ergazomenoiController {
             mhnes_proeidopoihshs: formData.mhnes_proeidopoihshs || 0,
             logos_peratosis: formData.logos_peratoshs_stathera,
             parathrhseis_peratosis: formData.parathrhseis_peratoshs || '',
-            afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
+            afora_daneismo_ergazomenoy: aforaDaneismoErgazomenoy,
             typos_daneismoy: formData.typos_daneismoy,
             hmnia_enarxhs_daneismoy: formData.hmnia_enarxhs_daneismoy || null,
             hmnia_lhxhs_daneismoy: formData.hmnia_lhxhs_daneismoy || null,
+            afm_daneizontos_ergodoth: aforaDaneismoErgazomenoy
+                ? String(formData.afm_daneizontos_ergodoth || '').trim() : '',
+            afm_daneizomenoy_ergodoth: aforaDaneismoErgazomenoy
+                ? String(formData.afm_daneizomenoy_ergodoth || '').trim() : '',
+            typos_ergodoth_daneismoy: aforaDaneismoErgazomenoy
+                ? formData.typos_ergodoth_daneismoy === true : false,
+            kodikos_ergazomenoy_alloy_ergodoth: aforaDaneismoErgazomenoy
+                ? String(formData.kodikos_ergazomenoy_alloy_ergodoth || '').trim() : '',
             afora_dokimastikh_periodo: formData.afora_dokimastikh_periodo,
             hmnia_lhxhs_dokimastikhs_periodoy: formData.hmnia_lhxhs_dokimastikhs_periodoy || null,
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs,

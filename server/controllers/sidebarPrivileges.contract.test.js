@@ -26,7 +26,8 @@ assert.ok(!/situation_(?:A|S|HR|C|U|V)/.test(frontend));
 for (const form of [
     'Companies', 'Ypokatasthmata', 'NomimoiEkprosopoi', 'Passwords', 'Antistoixiseis', 'Trapezes',
     'Ergazomenoi', 'AntigrafhProgrammatonErgasias', 'LhpshOrarionApoErganh', 'LhpshOrarionApoKartes',
-    'CalcApasxolhseisPeriodoy', 'ElegxosApasxolhseonPeriodoy', 'ApologistikosPinakasOrarion',
+    'CalcApasxolhseisPeriodoy', 'CalcApasxolhseisDaneizomenoyProsopikoy',
+    'ElegxosApasxolhseonPeriodoy', 'ApologistikosPinakasOrarion',
     'ApologistikosPinakasYperorion', 'Krathseis', 'Symbaseis', 'KathgoriesSymbaseon',
     'EidikothtesSymbaseon', 'StoixeiaSymbaseon', 'KlimakiaSymbaseon',
     'YpologismoiKlimakionSymbaseon', 'Apasxolhseis', 'EktyposhAtomikonEkkathariseon',

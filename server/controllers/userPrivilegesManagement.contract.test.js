@@ -625,7 +625,14 @@ test('catalog visible order exactly matches canonical data-privilege-form sideba
         sidebarForms.map((_, index) => (index + 1) * 1000)
     );
     const employmentReview = visibleCatalog.find((entry) => entry.form === 'ElegxosApasxolhseonPeriodoy');
-    assert.strictEqual(employmentReview.sidebarOrder, 12000);
+    const borrowedEmployment = visibleCatalog.find((entry) =>
+        entry.form === 'CalcApasxolhseisDaneizomenoyProsopikoy');
+    assert.strictEqual(borrowedEmployment.sidebarOrder, 12000);
+    assert.strictEqual(borrowedEmployment.formLabel,
+        'Υπολογισμός Απασχολήσεων Δανειζόμενου Προσωπικού');
+    assert.deepStrictEqual(getSchemaPrivilegeKeys(),
+        ['admin', 'create', 'read', 'update', 'delete', 'print', 'export']);
+    assert.strictEqual(employmentReview.sidebarOrder, 13000);
     assert.strictEqual(employmentReview.formLabel, 'Έλεγχος Απασχολήσεων');
 });
 

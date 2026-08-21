@@ -69,7 +69,7 @@ const visibleCatalog = seedData
     .sort((left, right) => left.sidebarOrder - right.sidebarOrder);
 const sortedHierarchy = [...userPrivilegeSidebarHierarchy].sort(compareHierarchyEntries);
 
-assert.strictEqual(sidebarForms.length, 24);
+assert.strictEqual(sidebarForms.length, 25);
 assert.deepStrictEqual(sidebarForms.map((entry) => entry.form), visibleCatalog.map((entry) => entry.form));
 assert.deepStrictEqual(sidebarForms.map((entry) => entry.itemLabel), visibleCatalog.map((entry) => entry.formLabel));
 assert.deepStrictEqual(sortedHierarchy.map((entry) => entry.form), sidebarForms.map((entry) => entry.form));

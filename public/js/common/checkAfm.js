@@ -71,7 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
         afm_ergolaboy: noOpHandler,
 
         afm_ergazomenoy: fetchErgazomenoiData,
-        afm_antikatastath: noOpHandler
+        afm_antikatastath: noOpHandler,
+        afm_daneizontos_ergodoth: noOpHandler,
+        afm_daneizomenoy_ergodoth: noOpHandler
     };
 
     // ==========================================================================

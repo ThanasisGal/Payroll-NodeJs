@@ -126,6 +126,7 @@ const userPrivilegeSidebarHierarchy = [
     entry('LhpshOrarionApoErganh', 'li233', 'Λήψη Προδηλωμένων Ωραρίων από ΕΡΓΑΝΗ', 200, [files, ergani]),
     entry('LhpshOrarionApoKartes', 'li234', 'Λήψη Ωρών Απασχόλησης από Κάρτες Εργασίας', 300, [files, ergani]),
     entry('CalcApasxolhseisPeriodoy', 'li235', 'Υπολογισμός Απασχολήσεων Βάσει των Ψηφιακών Καρτών', 400, [files, ergani]),
+    entry('CalcApasxolhseisDaneizomenoyProsopikoy', 'li237', 'Υπολογισμός Απασχολήσεων Δανειζόμενου Προσωπικού', 450, [files, ergani]),
     entry('ElegxosApasxolhseonPeriodoy', 'li236', 'Έλεγχος Απασχολήσεων', 500, [files, ergani]),
     entry('ApologistikosPinakasOrarion', 'li2371', 'Απολογιστικός Πίνακας Ωραρίων', 100, [files, ergani, submissions]),
     entry('ApologistikosPinakasYperorion', 'li2372', 'Απολογιστικός Πίνακας Υπερωριών', 200, [files, ergani, submissions]),

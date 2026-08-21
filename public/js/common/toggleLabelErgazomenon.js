@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function () {
         'topos_ergasias',
         'kataggelia_me_proeidopoihsh',
         'afora_daneismo_ergazomenoy',
+        'typos_ergodoth_daneismoy',
         'afora_dokimastikh_periodo',
         'dieythethsh_ergasias',
         'efarmostea_sse',
@@ -355,6 +356,37 @@ function toggleCheckboxState(checkboxId, isChecked) {
             setFieldsDisabled(['hmnia_koinopoihshs_kataggelias'], !isChecked);
             setFieldsDisabled(['mhnes_proeidopoihshs'], !isChecked);
             break;
+        case 'afora_daneismo_ergazomenoy': {
+            label.textContent = isChecked ? 'ΝΑΙ' : 'ΟΧΙ';
+            var daneismosAfmRow = document.getElementById('daneismos_afm_row');
+            var daneismosErgodothsRow = document.getElementById('daneismos_ergodoths_row');
+            if (daneismosAfmRow) daneismosAfmRow.classList.toggle('d-none', !isChecked);
+            if (daneismosErgodothsRow) {
+                daneismosErgodothsRow.classList.toggle('d-none', !isChecked);
+            }
+            if (!isChecked) {
+                var typosErgodothDaneismoy = document.getElementById(
+                    'typos_ergodoth_daneismoy'
+                );
+                if (typosErgodothDaneismoy) {
+                    typosErgodothDaneismoy.checked = false;
+                    toggleCheckboxState('typos_ergodoth_daneismoy', false);
+                }
+            }
+            break;
+        }
+        case 'typos_ergodoth_daneismoy': {
+            label.textContent = isChecked ? 'ΔΑΝΕΙΖΟΜΕΝΟΣ' : 'ΔΑΝΕΙΖΩΝ';
+            var kodikosAlloyErgodothLabel = document.getElementById(
+                'kodikos_ergazomenoy_alloy_ergodoth_label'
+            );
+            if (kodikosAlloyErgodothLabel) {
+                kodikosAlloyErgodothLabel.textContent = isChecked
+                    ? 'Κωδ. Εργ/νου στον Δανείζοντα Εργοδότη'
+                    : 'Κωδ. Εργ/νου στον Δανειζόμενο Εργοδότη';
+            }
+            break;
+        }
         case 'afora_dokimastikh_periodo':
             label.textContent = isChecked ? 'ΝΑΙ' : 'ΟΧΙ';
             document.getElementById('hmnia_lhxhs_dokimastikhs_periodoy').value = null;
