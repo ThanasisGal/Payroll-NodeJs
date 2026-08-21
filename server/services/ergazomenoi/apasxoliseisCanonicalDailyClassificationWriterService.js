@@ -5,6 +5,9 @@ const {
     classificationUpdates,
     applyCanonicalAbsenceMetrics
 } = require('./apasxoliseisStage1DailyClassificationBulkService');
+const {
+    totalDeclaredDailyMinutes
+} = require('./apasxoliseisAttendanceDerivedScheduleService');
 const { positiveClassification } = require('./apasxoliseisStage3FingerprintService');
 
 const ALLOWED = new Set(['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO']);
@@ -46,8 +49,12 @@ async function writeCanonicalDailyClassification({
 } = {}) {
     if (!session) throw error('DAILY_CLASSIFICATION_TRANSACTION_REQUIRED',
         'Απαιτείται ασφαλής συναλλαγή.', 503);
-    const updates = applyCanonicalAbsenceMetrics(row,
-        buildCanonicalClassificationUpdates({ classification, leave_category }));
+    const updates = applyCanonicalAbsenceMetrics(row, {
+        ...buildCanonicalClassificationUpdates({ classification, leave_category }),
+        ...(String(classification || '').trim().toUpperCase() === 'LEAVE'
+            ? { ores_ergasias_apologistika: totalDeclaredDailyMinutes(row) / 60 }
+            : {})
+    });
     const oldValues = {}; const newValues = {};
     for (const [field, value] of Object.entries(updates)) {
         if (String(row?.[field] ?? '') !== String(value ?? '')) {

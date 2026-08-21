@@ -16,5 +16,7 @@ assert.match(section, /runWithPeriodWriteFence/);
 assert.match(section, /expected_input_fingerprint/);
 assert.match(section, /expected_stage3_version/);
 assert.match(section, /STAGE3_FIELDS_NOT_ALLOWED/);
+assert.match(section, /ProdhlomenaOrariaModel\.findOne\([\s\S]*?_id: initial\.row\._id/);
+assert.match(section, /res\.json\(\{ success: true, \.\.\.result, record \}\)/);
 assert.match(routes, /weekly-hr-workflow\/stage3\/resolve-day'[\s\S]*requireCriticalEmploymentDecisionRole[\s\S]*resolveWeeklyHrStage3Day/);
 console.log('erganhController weekly HR Stage-3 command contract tests passed');

@@ -9068,6 +9068,7 @@ async function submitWeeklyHrStage3Decision(rowId) {
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message ||
             'Η απόφαση Stage 3 δεν αποθηκεύτηκε.');
+        if (result.record) updateAuthoritativeReviewDailyRow(result.record);
         await refreshWeeklyHrStage1Scope({ ypokatasthma: item.ypokatasthma,
             employee_id: item.employee_id, employee_kodikos: item.employee_kodikos,
             week_start: item.week_start, week_end: item.week_end });
@@ -9281,7 +9282,7 @@ function renderWeeklyHrStage1Presentation() {
 
 async function refreshWeeklyHrStage1Scope(scope) {
     const payload = await fetchWeeklyHrStage1(scope);
-    (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
+    (payload.rows || []).forEach((row) => updateAuthoritativeReviewDailyRow(row));
     weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
     weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
     if (!isWeeklyHrStage1Eligible(payload)) weeklyHrStage1Selected.delete(weeklyHrStage1Key(scope));

@@ -11340,7 +11340,14 @@ class erganhController {
                     return fenced.result;
                 }
             });
-            return res.json({ success: true, ...result });
+            const record = await ProdhlomenaOrariaModel.findOne({
+                _id: initial.row._id,
+                team: initial.scope.team,
+                company_kod: initial.scope.company_kod
+            }).select(REVIEW_SELECT_FIELDS).lean();
+            if (!record) throw weeklyHrApiError('STAGE3_AUTHORITATIVE_RECORD_NOT_FOUND', 409,
+                'Η ενημερωμένη ημερήσια εγγραφή δεν βρέθηκε μετά την απόφαση Stage 3.');
+            return res.json({ success: true, ...result, record });
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'STAGE3_DAILY_RESOLUTION_FAILED',
