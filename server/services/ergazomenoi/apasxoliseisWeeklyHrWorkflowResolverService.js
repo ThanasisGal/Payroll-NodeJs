@@ -21,6 +21,9 @@ const {
     resolveDailyActualWorkFacts
 } = require('./apasxoliseisDailyActualWorkFactsService');
 const {
+    isValidPersistedApprovedOrphanResolution
+} = require('./apasxoliseisOrphanCardResolutionService');
+const {
     MODE: EFFECTIVE_REPO_MODE,
     resolveEffectiveRepoState
 } = require('./apasxoliseisEffectiveRepoStateService');
@@ -155,7 +158,11 @@ function resolveWeeklyHrWorkflow({
     const actualFactsByDate = new Map();
     orderedRows.forEach((row) => {
         const date = dateKeyUtc(row.hmeromhnia);
-        const facts = resolveDailyActualWorkFacts(row);
+        const facts = resolveDailyActualWorkFacts(row, {
+            calculatedWorkHoursAuthoritative:
+                isValidPersistedApprovedOrphanResolution(row) &&
+                Number(row.ores_ergasias_apologistika) > 0
+        });
         actualFactsByDate.set(date, facts);
         blockingReasons.push(...(facts.reasons || []));
         warnings.push(...(facts.warnings || []));

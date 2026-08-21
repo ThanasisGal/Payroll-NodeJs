@@ -802,7 +802,8 @@ function canonicalJunePreview({ decisionMode = 'NONE', approvedOrphan = true } =
         apo_ora_01: day === '14' ? '14:51' : '',
         eos_ora_01: day === '14' ? '22:51' : '',
         ...(day === '14' && approvedOrphan ? { orphan_card_resolution: {
-            status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
+            status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1',
+            approved_start: '14:51', approved_end: '23:21', approved_hours: 8
         } } : {})
     }));
     const employee = {

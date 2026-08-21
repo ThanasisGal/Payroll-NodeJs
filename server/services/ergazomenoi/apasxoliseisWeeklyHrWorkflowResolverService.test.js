@@ -209,11 +209,14 @@ assert.strictEqual(safeOrphan.next_required_hr_stage, NEXT_STAGE.BLOCKED);
 assert.ok(safeOrphan.blocking_reasons.includes('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
 assert.strictEqual(safeStartOnly.cards_eos_ora_01, '');
 const approvedStartOnly = { ...safeStartOnly,
+    kodikos: '0004',
     kathgoria_ergasias_apologistika: 'ΕΡΓ',
-    apo_ora_01_apologistika: '09:00', eos_ora_01_apologistika: '17:00',
+    cards_apo_ora_01: '14:51', cards_eos_ora_01: '',
+    apo_ora_01_apologistika: '14:51', eos_ora_01_apologistika: '23:21',
     ores_ergasias_apologistika: 8,
     orphan_card_resolution: { status: 'HR_APPROVED',
-        policy_version: 'orphan-card-continuous:v1' } };
+        policy_version: 'orphan-card-continuous:v1',
+        approved_start: '14:51', approved_end: '23:21', approved_hours: 8 } };
 const approvedOrphan = resolve(weekWith(
     repoRow(DATES[2], true), possibleLeaveRow(DATES[3]), approvedStartOnly
 ));

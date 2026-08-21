@@ -23,6 +23,9 @@ const {
     analyzeWeeklySixthSeventhDay
 } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
+const {
+    isValidPersistedApprovedOrphanResolution
+} = require('./apasxoliseisOrphanCardResolutionService');
 const { normalizeEmploymentType } = require('./apasxoliseisReviewEmploymentProfileService');
 const { buildStage2ResolutionFingerprint,
     buildStage3InputFingerprint } = require('./apasxoliseisStage3FingerprintService');
@@ -482,7 +485,10 @@ function buildWeeklyHrLifecycleProjection({
         effectiveProfile: finalAnalysisProfile,
         expectedDateKeys,
         companyKod: scope.company_kod || rows[0]?.company_kod || '',
-        companyPolicyRules
+        companyPolicyRules,
+        isCalculatedWorkHoursAuthoritativeForRow: (row) =>
+            isValidPersistedApprovedOrphanResolution(row) &&
+            Number(row.ores_ergasias_apologistika) > 0
     });
     const finalBlockers = finalAnalysis?.status === 'NEEDS_HR_DECISION'
         ? unique(finalAnalysis.reasons || []) : [];

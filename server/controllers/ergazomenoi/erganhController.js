@@ -221,6 +221,7 @@ const {
     POLICY_VERSION: ORPHAN_CARD_POLICY_VERSION,
     RESOLUTION_SCOPE: ORPHAN_RESOLUTION_SCOPE,
     resolveOrphanCardResolution,
+    resolvePersistedApprovedOrphanResolution,
     attachOrphanResolutionPreviews
 } = require('../../services/ergazomenoi/apasxoliseisOrphanCardResolutionService');
 const {
@@ -2417,6 +2418,7 @@ async function runWeeklyRepoPostCheck({
                 'kathgoria_adeias kathgoria_adeias_apologistika argia argia_apologistika ' +
                 'astheneia astheneia_apologistika apologistiko_biblio is_locked ' +
                 'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                'orphan_card_resolution ' +
                 'ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
                 'compensation_breakdown_apologistika ' +
                 'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ' +
@@ -10659,7 +10661,7 @@ class erganhController {
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 ' +
                             'cards_apo_ora_02 cards_eos_ora_02 ' +
-                            'cards_apo_ora_03 cards_eos_ora_03'
+                            'cards_apo_ora_03 cards_eos_ora_03 orphan_card_resolution'
                     )
                     .sort({ kodikos: 1, hmeromhnia: 1 })
                     .lean();
@@ -10730,6 +10732,20 @@ class erganhController {
                 return approval ? resolveOrphanCardResolution({ row, contextRows,
                     effectiveEmployee: breakAwareEmployee, breakConfiguration,
                     reusableRule: approval.reuse_match_criteria.criteria }) : null;
+            };
+            const persistedApprovedOrphanResolutionForRow = (row, effectiveEmployee) => {
+                const contextRows = orphanContextByEmployee.get(String(row.kodikos || '')) || [];
+                const employee = employeesByKodikos.get(String(row.kodikos || '')) || {};
+                const histories = istorikoRowsByKodikos.get(String(row.kodikos || '')) || [];
+                const breakConfiguration = resolveBreakConfigurationForDate(
+                    row.hmeromhnia, histories, employee
+                );
+                const breakAwareEmployee = { ...effectiveEmployee,
+                    dialleima_entos_ektos_orarioy:
+                        breakConfiguration.break_inside_schedule,
+                    dialleima_se_lepta: breakConfiguration.break_minutes };
+                return resolvePersistedApprovedOrphanResolution({ row, contextRows,
+                    effectiveEmployee: breakAwareEmployee, breakConfiguration });
             };
 
             const appliedProtectionRowIdsByBranch = new Map();
@@ -10818,6 +10834,9 @@ class erganhController {
                     proorhApoxorhshMinutes, operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS,
                     orphanReusableResolution: reusableOrphanResolutionForRow(
                         rec, effectiveErgazomenos
+                    ),
+                    orphanApprovedResolution: persistedApprovedOrphanResolutionForRow(
+                        rec, effectiveErgazomenos
                     ) });
                 const weeklyRec = preliminary.workingRow;
 
@@ -10855,6 +10874,9 @@ class erganhController {
                     appliedProtectionContext, proorhProseleyshMinutes, proorhApoxorhshMinutes,
                     operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS,
                     orphanReusableResolution: reusableOrphanResolutionForRow(
+                        rec, effectiveErgazomenos
+                    ),
+                    orphanApprovedResolution: persistedApprovedOrphanResolutionForRow(
                         rec, effectiveErgazomenos
                     ) });
 
@@ -17441,6 +17463,7 @@ Object.defineProperty(erganhController, '__orphanDailyCalculationTestHooks', {
         getPayrollCalculationIntervals,
         getPayrollDailyWorkMinutes,
         calculateAdditionalAndOverworkForDay,
+        AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS,
         ORPHAN_DAILY_DERIVED_FIELDS,
         ORPHAN_DERIVED_PREVIEW_FIELDS,
         ORPHAN_WEEKLY_DEPENDENT_FIELDS

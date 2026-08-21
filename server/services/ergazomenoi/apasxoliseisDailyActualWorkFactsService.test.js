@@ -173,11 +173,12 @@ assert.deepStrictEqual(incompleteCardFacts.unresolvedCardPairNumbers, ['01']);
 
 const approvedOrphanFacts = resolveDailyActualWorkFacts({
     ...incompleteCardFacts,
-    kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
-    cards_apo_ora_01: '09:00', cards_eos_ora_01: '',
+    hmeromhnia: '2026-06-14', kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+    cards_apo_ora_01: '14:51', cards_eos_ora_01: '',
     ores_ergasias_apologistika: 8,
     orphan_card_resolution: {
-        status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
+        status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1',
+        approved_start: '14:51', approved_end: '23:21', approved_hours: 8
     }
 }, { calculatedWorkHoursAuthoritative: true });
 assert.strictEqual(approvedOrphanFacts.cardVerificationStatus, 'HR_APPROVED_ORPHAN');

@@ -20,6 +20,9 @@ const {
     MODE: EFFECTIVE_REPO_MODE,
     resolveEffectiveRepoState
 } = require('./apasxoliseisEffectiveRepoStateService');
+const {
+    isValidPersistedApprovedOrphanResolution
+} = require('./apasxoliseisOrphanCardResolutionService');
 
 const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v2';
 const SOURCE_VERSION = 'raw-prodhlomena-oraria-daily-rows:v1';
@@ -292,10 +295,16 @@ function buildWeeklyRepoDeviationPreview({
             Number(actualRepo) !== Number(expectedRepo) ||
             repoStateReasons.length > 0
         ) {
-            const dailyFacts = uniqueRows.map((row) => resolveDailyActualWorkFacts(row));
+            const isCalculatedWorkHoursAuthoritativeForRow = (row) =>
+                isValidPersistedApprovedOrphanResolution(row) &&
+                Number(row.ores_ergasias_apologistika) > 0;
+            const dailyFacts = uniqueRows.map((row) => resolveDailyActualWorkFacts(row, {
+                isCalculatedWorkHoursAuthoritativeForRow
+            }));
             const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
                 weekRows: uniqueRows,
-                effectiveProfile
+                effectiveProfile,
+                isCalculatedWorkHoursAuthoritativeForRow
             });
             const canonicalResolution =
                 typeof resolveCanonicalAnalysis === 'function'
@@ -313,7 +322,8 @@ function buildWeeklyRepoDeviationPreview({
                 weekRows: uniqueRows,
                 employmentProfile: effectiveProfile,
                 holidayByDateKey,
-                existingAuditCountByRowKey
+                existingAuditCountByRowKey,
+                isCalculatedWorkHoursAuthoritativeForRow
             });
             const resolution = repoTransfer.weekly_resolution;
             const projectedSixthSeventhDay = resolution?.sixth_seventh_day;

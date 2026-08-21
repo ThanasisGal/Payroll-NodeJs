@@ -9,6 +9,9 @@ const {
 } = require('./apasxoliseisWeeklyCanonicalDecisionService');
 const { analyzeWeeklySixthSeventhDay } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 const {
+    isValidPersistedApprovedOrphanResolution
+} = require('./apasxoliseisOrphanCardResolutionService');
+const {
     findApplicableWeeklyReusableDecision
 } = require('./apasxoliseisReusablePolicyDecisionService');
 
@@ -127,9 +130,14 @@ function resolveWeeklyCanonicalDecisionAnalysis({
         analyzerOptions.classificationByDateOverride = payload.classification_by_date;
     } else return { analysis: blocked(automaticAnalysis, 'CANONICAL_DECISION_OUTCOME_NOT_CONSUMABLE'),
         ...resolved, decision: record };
+    const authoritativeCalculatedWorkHours =
+        typeof isCalculatedWorkHoursAuthoritativeForRow === 'function'
+            ? isCalculatedWorkHoursAuthoritativeForRow
+            : (row) => isValidPersistedApprovedOrphanResolution(row) &&
+                Number(row.ores_ergasias_apologistika) > 0;
     const analysis = analyzeWeeklySixthSeventhDay({ weekRows, effectiveProfile: profile,
         hourlyRate: profile.pragmatikoOromisthio,
-        isCalculatedWorkHoursAuthoritativeForRow,
+        isCalculatedWorkHoursAuthoritativeForRow: authoritativeCalculatedWorkHours,
         ...analyzerOptions });
     return { analysis, ...resolved, decision: record, effectiveProfile: profile };
 }

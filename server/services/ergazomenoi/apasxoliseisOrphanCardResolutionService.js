@@ -309,6 +309,31 @@ function isApprovedOrphanResolution(row = {}) {
         metadata.policy_version === POLICY_VERSION);
 }
 
+function isValidPersistedApprovedOrphanResolution(row = {}) {
+    const metadata = row.orphan_card_resolution;
+    return Boolean(isApprovedOrphanResolution(row) &&
+        normalizeTimeValue(metadata.approved_start) &&
+        normalizeTimeValue(metadata.approved_end) &&
+        Number.isFinite(Number(metadata.approved_hours)) &&
+        Number(metadata.approved_hours) > 0);
+}
+
+function resolvePersistedApprovedOrphanResolution({ row = {}, contextRows = [],
+    effectiveEmployee = null, breakConfiguration = null } = {}) {
+    if (!isValidPersistedApprovedOrphanResolution(row)) return null;
+    const metadata = row.orphan_card_resolution;
+    const resolution = resolveOrphanCardResolution({ row, contextRows,
+        manualInterval: { start: metadata.approved_start, end: metadata.approved_end },
+        riskAcknowledged: metadata.rest_risk_acknowledged === true,
+        reuseScope: metadata.reuse_scope || RESOLUTION_SCOPE.ONE_TIME,
+        effectiveEmployee, breakConfiguration });
+    if (resolution.eligible !== true || resolution.canApprove !== true ||
+        !resolution.approvedUpdates ||
+        resolution.proposal?.start !== normalizeTimeValue(metadata.approved_start) ||
+        resolution.proposal?.end !== normalizeTimeValue(metadata.approved_end)) return null;
+    return Object.freeze({ ...resolution, persistedMetadata: metadata });
+}
+
 function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
     reusableApprovals = [] } = {}) {
     const contexts = new Map();
@@ -343,4 +368,6 @@ module.exports = { POLICY_VERSION, ORPHAN_RULE, SCHEDULE_KIND, RESOLUTION_SCOPE,
     resolveContinuousDeclaredSchedule, resolveAverageFallback,
     resolveEffectiveBreakContext,
     buildProposal, authoritativeWorkIntervals, evaluateRestRisk,
-    resolveOrphanCardResolution, isApprovedOrphanResolution, attachOrphanResolutionPreviews };
+    resolveOrphanCardResolution, isApprovedOrphanResolution,
+    isValidPersistedApprovedOrphanResolution, resolvePersistedApprovedOrphanResolution,
+    attachOrphanResolutionPreviews };

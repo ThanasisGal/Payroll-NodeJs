@@ -887,7 +887,10 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
             employmentProfile: profile
         })
     );
-    const preTransferFacts = rows.map((row) => resolveDailyActualWorkFacts(row));
+    const preTransferFacts = rows.map((row) => resolveDailyActualWorkFacts(row, {
+        isCalculatedWorkHoursAuthoritativeForRow:
+            input.isCalculatedWorkHoursAuthoritativeForRow
+    }));
     const unresolvedSinglePunch = rows.some((row) =>
         row.orphan_card_resolution?.status !== 'HR_APPROVED' &&
         resolveCardPairVerification(row).unresolvedPairs.some((pair) =>
@@ -1084,6 +1087,8 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
     const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
         weekRows: sixthDayProjectionRows,
         effectiveProfile: profile,
+        isCalculatedWorkHoursAuthoritativeForRow:
+            input.isCalculatedWorkHoursAuthoritativeForRow,
         allowDeclaredRepoIdentityOverride: true,
         canonicalRepoDayIdentitiesOverride:
             input.sameRunDailyCalculatedRowIds instanceof Set &&

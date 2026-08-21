@@ -45,7 +45,7 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
             ? orphanReusableResolution : null);
     const unresolved = verification.hasUnresolvedCardEvidence && !safeOrphan;
     if (safeOrphan) Object.assign(update, safeOrphan.approvedUpdates, {
-        orphan_card_resolution: {
+        orphan_card_resolution: directApprovedOrphan?.persistedMetadata || {
             status: 'HR_APPROVED', policy_version: safeOrphan.policyVersion,
             orphan_type: safeOrphan.orphanType, approved_start: safeOrphan.proposal.start,
             approved_end: safeOrphan.proposal.end,

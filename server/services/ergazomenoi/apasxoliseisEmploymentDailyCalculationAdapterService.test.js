@@ -3,6 +3,9 @@
 const assert = require('assert');
 const { buildEmploymentDailyCalculationUpdate } = require('./apasxoliseisEmploymentDailyCalculationAdapterService');
 const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
+const {
+    resolvePersistedApprovedOrphanResolution
+} = require('./apasxoliseisOrphanCardResolutionService');
 const calls = [];
 const operation = (name, result) => (...args) => { calls.push({ name, args }); return typeof result === 'function' ? result(...args) : result; };
 const operations = {
@@ -133,6 +136,48 @@ assert.strictEqual(directApproved.sanitizedUpdate.eos_ora_01_apologistika, '22:3
 assert.strictEqual(directApproved.sanitizedUpdate.orphan_card_resolution.automatically_reused, false);
 assert.strictEqual(directApproved.sanitizedUpdate.overwork, undefined,
     'weekly-dependent fields must not be fabricated without weeklyState');
+
+const persistedMetadata = {
+    status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1',
+    orphan_type: 'START_ONLY', approved_start: '14:51', approved_end: '23:21',
+    approved_hours: 8, raw_cards_preserved: true
+};
+const persistedRow = { _id: 'persisted-approved', hmeromhnia: '2026-06-14',
+    kathgoria_ergasias: 'ΕΡΓ', apo_ora_01: '14:51', eos_ora_01: '23:21',
+    ores_ergasias: 8, cards_apo_ora_01: '14:51', cards_eos_ora_01: '',
+    cards_ores_ergasias: 0, orphan_card_resolution: persistedMetadata };
+const persistedResolution = resolvePersistedApprovedOrphanResolution({
+    row: persistedRow, contextRows: [persistedRow],
+    effectiveEmployee: { dialleima_entos_ektos_orarioy: false, dialleima_se_lepta: 30 }
+});
+const persistedApproved = buildEmploymentDailyCalculationUpdate({
+    row: persistedRow,
+    effectiveEmployee: {}, argiesDateSet: new Set(), weeklyState: null,
+    operations: { ...operations, resolveCardPairVerification },
+    orphanApprovedResolution: persistedResolution
+});
+assert.strictEqual(persistedApproved.unresolved, false);
+assert.strictEqual(persistedApproved.sanitizedUpdate.apo_ora_01_apologistika, '14:51');
+assert.strictEqual(persistedApproved.sanitizedUpdate.eos_ora_01_apologistika, '23:21');
+assert.strictEqual(persistedApproved.sanitizedUpdate.ores_ergasias_apologistika, 8);
+assert.strictEqual(persistedApproved.sanitizedUpdate
+    .ores_pragmatikhs_ergasias_apologistika, 8);
+assert.deepStrictEqual(persistedApproved.sanitizedUpdate.orphan_card_resolution,
+    persistedMetadata);
+assert.strictEqual(persistedApproved.calculationRow.cards_apo_ora_01, '14:51');
+assert.strictEqual(persistedApproved.calculationRow.cards_eos_ora_01, '');
+for (const invalidMetadata of [
+    { ...persistedMetadata, status: 'PENDING' },
+    { ...persistedMetadata, policy_version: 'unsupported:v1' },
+    { ...persistedMetadata, approved_start: 'invalid' },
+    { ...persistedMetadata, approved_end: '' },
+    { ...persistedMetadata, approved_hours: 0 }
+]) {
+    assert.strictEqual(resolvePersistedApprovedOrphanResolution({
+        row: { ...persistedRow, orphan_card_resolution: invalidMetadata },
+        contextRows: [persistedRow], effectiveEmployee: {}
+    }), null);
+}
 for (const required of ['normalize', 'verify', 'broken-program-cards', 'early-late', 'continuous-broken',
     'broken-continuous', 'no-schedule', 'night', 'sunday-holiday', 'repo-leave', 'absence', 'overtime', 'protection']) {
     assert.ok(calls.some((call) => call.name === required), required);

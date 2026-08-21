@@ -118,6 +118,55 @@ assert.ok(lifecycle0009.stages.stage1.pending_reasons.includes(
 assert.ok(lifecycle0009.stages.stage1.blockers.includes(
     'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
 
+const approvedOrphan0004 = week('0004-approved', '2026-06-08');
+approvedOrphan0004[3] = possibleLeave(approvedOrphan0004[3]);
+Object.assign(approvedOrphan0004[6], { cards_apo_ora_01: '14:51', cards_eos_ora_01: '',
+    cards_ores_ergasias: 0, ores_ergasias_apologistika: 8,
+    ores_pragmatikhs_ergasias_apologistika: 8,
+    apo_ora_01_apologistika: '14:51', eos_ora_01_apologistika: '23:21',
+    orphan_card_resolution: { status: 'HR_APPROVED',
+        policy_version: 'orphan-card-continuous:v1', orphan_type: 'START_ONLY',
+        approved_start: '14:51', approved_end: '23:21', approved_hours: 8,
+        raw_cards_preserved: true } });
+const approvedOrphan0004Lifecycle = buildWeeklyHrLifecycleProjection({
+    weekRows: approvedOrphan0004, effectiveProfile: profile
+});
+assert.equal(approvedOrphan0004Lifecycle.stages.stage1.blockers.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'), false);
+assert.equal(approvedOrphan0004Lifecycle.stages.stage1.blockers.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'), false);
+assert.deepEqual(approvedOrphan0004Lifecycle.stages.stage1.pending_dates, ['2026-06-11']);
+assert.equal(approvedOrphan0004Lifecycle.stages.stage4.business_status, 'COMPLETED');
+assert.equal(approvedOrphan0004Lifecycle.stages.stage4.pending_reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'), false);
+assert.equal(approvedOrphan0004Lifecycle.stages.stage4.pending_reasons.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'), false);
+assert.equal(
+    approvedOrphan0004Lifecycle.stages.stage4.final_weekly_analysis.sixthDay.hmeromhnia,
+    '2026-06-14'
+);
+assert.equal(
+    approvedOrphan0004Lifecycle.stages.stage4.final_weekly_analysis.sixthDay.sixthDayHours,
+    8
+);
+assert.equal(
+    approvedOrphan0004Lifecycle.stages.stage4.final_weekly_analysis.seventhDay,
+    null
+);
+
+const unresolvedOrphan0004 = approvedOrphan0004.map((row, index) => index !== 6 ? row : ({
+    ...row, ores_ergasias_apologistika: 0, ores_pragmatikhs_ergasias_apologistika: 0,
+    apo_ora_01_apologistika: '', eos_ora_01_apologistika: '',
+    orphan_card_resolution: null
+}));
+const unresolvedOrphan0004Lifecycle = buildWeeklyHrLifecycleProjection({
+    weekRows: unresolvedOrphan0004, effectiveProfile: profile
+});
+assert.ok(unresolvedOrphan0004Lifecycle.stages.stage1.blockers.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+assert.ok(unresolvedOrphan0004Lifecycle.stages.stage1.blockers.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+
 const employee0012 = week('0012');
 Object.assign(employee0012[6], { cards_apo_ora_01: '09:00', cards_eos_ora_01: '',
     cards_ores_ergasias: 0, ores_ergasias_apologistika: 0 });
@@ -623,7 +672,8 @@ assert.ok(departureOrphanBefore.stages.stage1.blockers.includes(
 const departureOrphanApprovedRows = departureTuesdayOrphanSlice.map((row, index) => index !== 1 ? row : ({
     ...row, kathgoria_ergasias_apologistika: 'ΕΡΓ', ores_ergasias_apologistika: 8,
     orphan_card_resolution: { status: 'HR_APPROVED',
-        policy_version: 'orphan-card-continuous:v1' }
+        policy_version: 'orphan-card-continuous:v1', approved_start: '14:52',
+        approved_end: '22:52', approved_hours: 8 }
 }));
 const departureOrphanAfter = buildWeeklyHrLifecycleProjection({
     weekRows: departureOrphanApprovedRows, effectiveProfile: profile,

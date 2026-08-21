@@ -26,7 +26,7 @@ const {
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
 const {
-    isApprovedOrphanResolution
+    isValidPersistedApprovedOrphanResolution
 } = require('./apasxoliseisOrphanCardResolutionService');
 
 function nonNegativeNumber(value) {
@@ -75,7 +75,7 @@ function resolveDailyActualWorkFacts(row = {}, {
     const cardVerification = resolveCardPairVerification(row);
     const approvedOrphan = calculatedHoursAreAuthoritative && calculatedWork.ok &&
         calculatedWork.value > 0 && cardVerification.hasUnresolvedCardEvidence &&
-        row.orphan_card_resolution?.status === 'HR_APPROVED' && isApprovedOrphanResolution(row);
+        isValidPersistedApprovedOrphanResolution(row);
     const hasCompleteCardEvidence = cardVerification.hasCompleteCardEvidence;
     const hasIncompleteCardInterval = cardVerification.hasUnresolvedCardEvidence;
     const verificationFacts = {

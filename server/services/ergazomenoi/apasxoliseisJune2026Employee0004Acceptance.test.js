@@ -10,6 +10,10 @@ const { buildSeventhDayAttendanceUpdate } =
     require('./apasxoliseisWeeklyPostCheckWritePlanService');
 const { buildDailyCompensationBreakdown } =
     require('./apasxoliseisDailyCompensationBreakdownService');
+const {
+    buildWeeklyRepoDeviationPreview,
+    attachSixthDayPresentationToRows
+} = require('./apasxoliseisWeeklyRepoDeviationPreviewService');
 
 const PROFILE = Object.freeze({ typos_apasxolhshs: 'PLHRHS', plhrhs_apasxolhsh: true,
     hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
@@ -68,9 +72,10 @@ const effectiveA = weekA.map((item) => item.hmeromhnia === '2026-06-10'
       ? { ...item, ...materializeTargetValues('ΑΝ') }
       : item.hmeromhnia === '2026-06-14' ? { ...item,
           kathgoria_ergasias_apologistika: 'ΕΡΓ',
-          apo_ora_01_apologistika: '14:51', eos_ora_01_apologistika: '22:51',
+          apo_ora_01_apologistika: '14:51', eos_ora_01_apologistika: '23:21',
           ores_ergasias_apologistika: 8,
           orphan_card_resolution: { status: 'HR_APPROVED',
+              approved_start: '14:51', approved_end: '23:21', approved_hours: 8,
               policy_version: 'orphan-card-continuous:v1' } } : item);
 const sixthA = analyzeWeeklySixthSeventhDay({ weekRows: effectiveA,
     effectiveProfile: PROFILE, hourlyRate: PROFILE.pragmatikoOromisthio,
@@ -85,6 +90,24 @@ assert.ok(!sixthA.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
 const approvedOrphanDay = sixthA.dailyFacts.find((day) => day.hmeromhnia === '2026-06-14');
 assert.equal(approvedOrphanDay.actualWorkHours, 8);
 assert.equal(approvedOrphanDay.cardVerificationStatus, 'HR_APPROVED_ORPHAN');
+
+const previewA = buildWeeklyRepoDeviationPreview({
+    rows: effectiveA,
+    periodStart: '2026-06-08',
+    periodEnd: '2026-06-14',
+    asOfDate: '2026-06-15',
+    resolveWeeklyProfile: () => ({ expectedWeeklyRepo: 2, effectiveProfile: PROFILE })
+});
+const deviationA = previewA.deviations[0];
+assert.equal(deviationA.actual_workdays, 6);
+assert.equal(deviationA.sixth_day_count, 1);
+assert.equal(deviationA.seventh_day_count, 0);
+assert.equal(deviationA.sixth_day_date, '2026-06-14');
+assert.equal(
+    attachSixthDayPresentationToRows(effectiveA, [deviationA])
+        .find((item) => item.hmeromhnia === '2026-06-14').is_sixth_day,
+    true
+);
 
 const weekB = week('2026-06-15', {
     '2026-06-16': { category: 'ΕΡΓ', hours: 8,
