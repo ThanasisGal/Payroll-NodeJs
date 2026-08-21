@@ -4911,7 +4911,7 @@ async function loadWeeklyHrStage2CompletionContext({ req, input, session = null 
 }
 
 async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
-    indexesAlreadyChecked = false }) {
+    indexesAlreadyChecked = false, includeAuthoritativePayload = false }) {
     const allowedInputFields = new Set(['ypokatasthma', 'employee_id', 'week_start', 'week_end',
         'period_start', 'period_end', 'period_control_token', 'request_id', 'reason_or_notes']);
     const forbiddenInputFields = Object.keys(input || {}).filter((field) =>
@@ -4942,11 +4942,14 @@ async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
         scope: periodAccess.scope, expectedToken: periodAccess.token,
         work: ({ session }) => work(session)
     })).result;
-    const loadFreshWeekRows = async ({ session }) => (await loadWeeklyHrContext({
-        req, input, session
-    })).rows;
+    let freshContext = null;
+    const loadFreshWeekRows = async ({ session }) => {
+        freshContext = await loadWeeklyHrContext({ req, input, session });
+        return freshContext.rows;
+    };
+    let completion;
     if (input.period_start && input.period_end) {
-        return completeWeeklyHrStage1PeriodSlice({ scope: commandScope,
+        completion = await completeWeeklyHrStage1PeriodSlice({ scope: commandScope,
             period_start: input.period_start, period_end: input.period_end,
             weekRows: initial.rows, effectiveProfile: initial.effectiveProfile,
             effectiveProfilesByDate: initial.effectiveProfilesByDate,
@@ -4955,24 +4958,40 @@ async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
             stateModel: ApasxoliseisWeeklyHrWorkflowStateModel,
             auditModel: ApasxoliseisWeeklyHrWorkflowAuditModel,
             transactionRunner, loadFreshWeekRows });
+    } else {
+        completion = await completeWeeklyHrWorkflowStage1({
+            scope: commandScope,
+            weekRows: initial.rows,
+            actor,
+            reason_or_notes: reason, request_id: requestId,
+            workflow_context: { effectiveProfile: initial.effectiveProfile,
+                effectiveProfilesByDate: initial.effectiveProfilesByDate,
+                expected_date_keys: initial.employmentDateScope?.employment_owned_dates || null },
+            stateModel: ApasxoliseisWeeklyHrWorkflowStateModel,
+            auditModel: ApasxoliseisWeeklyHrWorkflowAuditModel,
+            transactionRunner,
+            fenceWeeklyInput: async ({ session }) => {
+                if (!session) throw weeklyHrApiError('STAGE1_INPUT_FENCE_REQUIRED', 503,
+                    'Απαιτείται ενεργή συναλλαγή για τη φραγή της εβδομάδας.');
+            },
+            loadFreshWeekRows
+        });
     }
-    return completeWeeklyHrWorkflowStage1({
-        scope: commandScope,
-        weekRows: initial.rows,
-        actor,
-        reason_or_notes: reason, request_id: requestId,
-        workflow_context: { effectiveProfile: initial.effectiveProfile,
-            effectiveProfilesByDate: initial.effectiveProfilesByDate,
-            expected_date_keys: initial.employmentDateScope?.employment_owned_dates || null },
-        stateModel: ApasxoliseisWeeklyHrWorkflowStateModel,
-        auditModel: ApasxoliseisWeeklyHrWorkflowAuditModel,
-        transactionRunner,
-        fenceWeeklyInput: async ({ session }) => {
-            if (!session) throw weeklyHrApiError('STAGE1_INPUT_FENCE_REQUIRED', 503,
-                'Απαιτείται ενεργή συναλλαγή για τη φραγή της εβδομάδας.');
-        },
-        loadFreshWeekRows
+    if (!includeAuthoritativePayload || !freshContext || !completion?.stage1) return completion;
+    const authoritativeStage1Payload = buildWeeklyHrPayloadFromLoadedContext({
+        ...freshContext.base,
+        employee: freshContext.employee,
+        weekStart: freshContext.week.start,
+        weekEnd: freshContext.week.end,
+        periodStart: input.period_start || freshContext.week.start,
+        periodEnd: input.period_end || freshContext.week.end,
+        loadedRows: freshContext.rows,
+        histories: freshContext.histories,
+        state: { stage1: completion.stage1 },
+        indexState: { ready: true, code: null, missing: [] },
+        companyPolicyRules: freshContext.companyPolicyRules
     });
+    return { ...completion, authoritative_stage1_payload: authoritativeStage1Payload };
 }
 const CORRECTIVE_DELTA_LABELS = Object.freeze({
     ores_ergasias_apologistika: 'Ώρες εργασίας', ores_prostheths_ergasias_apologistika: 'Πρόσθετη εργασία',
@@ -11189,7 +11208,8 @@ class erganhController {
                 bulk_request_id: req.body.bulk_request_id, actor,
                 completeOne: ({ scope, reason_or_notes, request_id }) =>
                     completeWeeklyHrStage1ForScope({ req, input: scope, requestId: request_id,
-                        reason: reason_or_notes, indexesAlreadyChecked: true })
+                        reason: reason_or_notes, indexesAlreadyChecked: true,
+                        includeAuthoritativePayload: true })
             });
             return res.json({ success: true, ...result });
         } catch (error) {

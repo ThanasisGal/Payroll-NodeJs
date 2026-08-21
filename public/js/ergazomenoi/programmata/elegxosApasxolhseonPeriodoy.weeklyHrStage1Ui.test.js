@@ -299,12 +299,16 @@ const bulkFunctionSource = source.slice(
 );
 const submittedReasons = [];
 let editedReason = null;
+let includeAuthoritativePayload = true;
+let authoritativeApplications = 0;
+let fallbackRefreshes = 0;
+const bulkScope = { ypokatasthma: '0000', employee_id: 'employee-14',
+    week_start: '2026-06-01', week_end: '2026-06-07' };
 const bulkSandbox = {
     weeklyHrStage1BulkSubmitting: false,
     weeklyHrStage1Selected: new Set(['week-1']),
     weeklyHrStage1Payloads: new Map([['week-1', {}]]),
-    weeklyHrStage1Scopes: new Map([['week-1', { ypokatasthma: '0000',
-        employee_id: 'employee-14', week_start: '2026-06-01', week_end: '2026-06-07' }]]),
+    weeklyHrStage1Scopes: new Map([['week-1', bulkScope]]),
     isWeeklyHrStage1Eligible: () => true,
     updateWeeklyHrStage1BulkToolbar: () => {},
     employmentReviewSwal: async (options) => options.input === 'textarea'
@@ -314,18 +318,29 @@ const bulkSandbox = {
     submitWeeklyHrStage1BulkCompletion: async ({ reason }) => {
         submittedReasons.push(reason);
         return { success: true, requested_count: 1, completed_count: 1,
-            already_completed_count: 0, failed_count: 0, blocked_count: 0, results: [] };
+            already_completed_count: 0, failed_count: 0, blocked_count: 0,
+            results: [{ scope: bulkScope, status: 'COMPLETED',
+                ...(includeAuthoritativePayload ? { authoritative_stage1_payload:
+                    { success: true, rows: [], stage1_status: 'COMPLETED' } } : {}) }] };
     },
     csrfToken: 'csrf', crypto: { randomUUID: () => 'request-id' },
-    refreshWeeklyHrStage1Scope: async () => {}, weeklyHrStage1Key: () => 'week-1',
+    applyAuthoritativeWeeklyHrStage1Payload: () => { authoritativeApplications += 1; },
+    refreshWeeklyHrStage1Scope: async () => { fallbackRefreshes += 1; },
+    weeklyHrStage1Key: () => 'week-1',
     renderWeeklyHrStage1BulkResult: () => ({ needsReview: 0, text: 'ok', html: '' }),
     console
 };
 vm.runInNewContext(`${bulkFunctionSource}\nthis.runBulk = completeWeeklyHrStage1BulkFromUi;`, bulkSandbox);
 (async () => {
     await bulkSandbox.runBulk();
+    assert.equal(authoritativeApplications, 1);
+    assert.equal(fallbackRefreshes, 0);
+    bulkSandbox.weeklyHrStage1Selected.add('week-1');
+    includeAuthoritativePayload = false;
     editedReason = 'Νέα αιτιολογία HR';
     await bulkSandbox.runBulk();
+    assert.equal(authoritativeApplications, 1);
+    assert.equal(fallbackRefreshes, 1);
     assert.deepEqual(submittedReasons, [expectedDefaultReason, 'Νέα αιτιολογία HR']);
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 assert.match(bulkFunctionSource, new RegExp(`inputValue: '${expectedDefaultReason}'`));

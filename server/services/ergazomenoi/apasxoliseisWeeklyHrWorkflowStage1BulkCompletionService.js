@@ -79,7 +79,10 @@ async function completeWeeklyHrWorkflowStage1Bulk({
                 reason_or_notes: reason,
                 request_id: childRequestId(bulkRequestId, safeScope) });
             return { scope: safeScope, status: completion?.idempotent === true
-                ? 'ALREADY_COMPLETED' : 'COMPLETED', code: null, message: '' };
+                ? 'ALREADY_COMPLETED' : 'COMPLETED', code: null, message: '',
+                ...(completion?.authoritative_stage1_payload ? {
+                    authoritative_stage1_payload: completion.authoritative_stage1_payload
+                } : {}) };
         } catch (error) {
             return { scope: safeScope, status: resultStatus(error),
                 code: String(error?.code || 'STAGE1_BULK_ITEM_FAILED'),

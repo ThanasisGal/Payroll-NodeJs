@@ -19,6 +19,14 @@ const base = { reason_or_notes: 'Μαζικός έλεγχος', bulk_request_id
     assert.equal(calls.length, 3);
     assert.equal(three.completed_count, 3);
 
+    const authoritativePayload = { success: true, rows: [{ _id: 'row-1' }],
+        stage1_status: 'COMPLETED', lifecycle_projection: { requires_hr_action: false } };
+    const projected = await completeWeeklyHrWorkflowStage1Bulk({ ...base,
+        scopes: scopes.slice(0, 1),
+        completeOne: async () => ({ idempotent: false,
+            authoritative_stage1_payload: authoritativePayload }) });
+    assert.equal(projected.results[0].authoritative_stage1_payload, authoritativePayload);
+
     const already = await completeWeeklyHrWorkflowStage1Bulk({ ...base, scopes: scopes.slice(0, 1),
         completeOne: async () => ({ idempotent: true }) });
     assert.equal(already.results[0].status, 'ALREADY_COMPLETED');
@@ -34,6 +42,7 @@ const base = { reason_or_notes: 'Μαζικός έλεγχος', bulk_request_id
     assert.equal(partial.completed_count, 9);
     assert.equal(partial.failed_count, 1);
     assert.equal(partial.results[4].status, 'STALE_RETRY_REQUIRED');
+    assert.equal('authoritative_stage1_payload' in partial.results[4], false);
 
     let guardedCalls = 0;
     await assert.rejects(() => completeWeeklyHrWorkflowStage1Bulk({ ...base, scopes,

@@ -9283,8 +9283,7 @@ function renderWeeklyHrStage1Presentation() {
         <tbody>${cards.join('')}</tbody></table></div>`;
 }
 
-async function refreshWeeklyHrStage1Scope(scope) {
-    const payload = await fetchWeeklyHrStage1(scope);
+function applyAuthoritativeWeeklyHrStage1Payload(scope, payload) {
     (payload.rows || []).forEach((row) => updateAuthoritativeReviewDailyRow(row));
     weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
     weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
@@ -9292,6 +9291,10 @@ async function refreshWeeklyHrStage1Scope(scope) {
     renderWeeklyHrStage1Presentation();
     updateEmploymentReviewWorkflowPresentation();
     return payload;
+}
+
+async function refreshWeeklyHrStage1Scope(scope) {
+    return applyAuthoritativeWeeklyHrStage1Payload(scope, await fetchWeeklyHrStage1(scope));
 }
 
 async function renderWeeklyHrStage1(rows, {
@@ -9498,8 +9501,19 @@ async function completeWeeklyHrStage1BulkFromUi() {
                 weeklyHrStage1Selected.delete(weeklyHrStage1Key(item.scope));
             }
         });
-        await Promise.all(scopes.map((scope) => refreshWeeklyHrStage1Scope(scope)
-            .catch((error) => console.warn('[weeklyHrStage1BulkRefresh]', error))));
+        const resultsByKey = new Map((result.results || []).map((item) => [
+            weeklyHrStage1Key(item.scope || {}), item
+        ]));
+        await Promise.all(scopes.map((scope) => {
+            const authoritativePayload = resultsByKey.get(weeklyHrStage1Key(scope))
+                ?.authoritative_stage1_payload;
+            if (authoritativePayload?.success === true) {
+                applyAuthoritativeWeeklyHrStage1Payload(scope, authoritativePayload);
+                return Promise.resolve(authoritativePayload);
+            }
+            return refreshWeeklyHrStage1Scope(scope);
+        }).map((refresh) => refresh.catch((error) =>
+            console.warn('[weeklyHrStage1BulkRefresh]', error))));
         const presentation = renderWeeklyHrStage1BulkResult(result);
         await employmentReviewSwal({ icon: presentation.needsReview ? 'warning' : 'success',
             title: 'Μαζική ολοκλήρωση Σταδίου 1',

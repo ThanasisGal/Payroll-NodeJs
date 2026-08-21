@@ -93,7 +93,8 @@ async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_e
         if (previous?.status === 'COMPLETED' && previous.context_fingerprint === fresh.context_fingerprint &&
             String(previous.effective_fingerprint || previous.completion_fingerprint) ===
                 fresh.completion_fingerprint) return { completed: true, idempotent: true,
-            fingerprint: fresh.completion_fingerprint, slice_version: previous.version };
+            fingerprint: fresh.completion_fingerprint, slice_version: previous.version,
+            stage1: currentStage1 };
         const performedAt = now(); const previousVersion = Number(previous?.version || 0);
         const nextSlice = { period_start: new Date(`${slice.period_start}T00:00:00.000Z`),
             period_end: new Date(`${slice.period_end}T00:00:00.000Z`),
@@ -144,7 +145,8 @@ async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_e
             previous_slice_version: previousVersion,
             new_slice_version: nextSlice.version }], { session });
         return { completed: true, idempotent: false,
-            fingerprint: fresh.completion_fingerprint, slice_version: nextSlice.version };
+            fingerprint: fresh.completion_fingerprint, slice_version: nextSlice.version,
+            stage1: nextStage1 };
     });
 }
 

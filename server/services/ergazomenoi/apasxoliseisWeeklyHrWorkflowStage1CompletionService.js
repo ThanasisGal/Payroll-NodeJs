@@ -191,7 +191,8 @@ async function completeWeeklyHrWorkflowStage1({
         const previousFingerprint = text(previous.completion_fingerprint);
         if (previous.status === 'COMPLETED' && previousFingerprint === finalFingerprint) {
             return { completed: true, idempotent: true, replayed_request: false,
-                fingerprint: finalFingerprint, stage1_version: previousVersion };
+                fingerprint: finalFingerprint, stage1_version: previousVersion,
+                stage1: previous };
         }
 
         const performedAt = now();
@@ -236,7 +237,7 @@ async function completeWeeklyHrWorkflowStage1({
 
         return { completed: true, idempotent: false, replayed_request: false,
             fingerprint: finalFingerprint, previous_fingerprint: previousFingerprint,
-            stage1_version: nextVersion };
+            stage1_version: nextVersion, stage1: nextStage1 };
     });
 }
 
