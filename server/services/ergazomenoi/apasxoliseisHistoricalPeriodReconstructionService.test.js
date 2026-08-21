@@ -6,6 +6,7 @@ const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const { ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
 const {
     SOURCE_FIELDS,
+    RESULT_FIELDS,
     dependencyWindow,
     fingerprintRows,
     projectionForHistoricalState,
@@ -159,18 +160,23 @@ function castFingerprintDateSelector(dateSelector) {
         assert.strictEqual(trustedRange.filter.hmeromhnia.$lte.getTime(), periodEnd.getTime());
 
         const castFilters = [];
+        const selectedFieldSets = [];
         const castingProdhlomenaModel = { find(filter) {
             const query = ProdhlomenaOrariaModel.find(filter);
             query._castConditions();
             if (query.error()) throw query.error();
             castFilters.push(query.getFilter());
-            return { select() { return this; }, sort() { return this; }, session() { return this; },
+            return { select(fields) { selectedFieldSets.push(fields); return this; },
+                sort() { return this; }, session() { return this; },
                 async lean() { return []; } };
         } };
         const fingerprints = await calculateHistoricalFingerprints({ scope: juneScope,
             prodhlomenaModel: castingProdhlomenaModel,
             canonicalDecisionModel: emptyCanonicalDecisionModel });
-        assert.strictEqual(castFilters.length, 2);
+        assert.strictEqual(castFilters.length, 1);
+        assert.strictEqual(selectedFieldSets.length, 1);
+        for (const field of SOURCE_FIELDS) assert.ok(selectedFieldSets[0].includes(field));
+        for (const field of RESULT_FIELDS) assert.ok(selectedFieldSets[0].includes(field));
         for (const filter of castFilters) {
             assert.strictEqual(filter.hmeromhnia.$gte.getTime(), periodStart.getTime());
             assert.strictEqual(filter.hmeromhnia.$lte.getTime(), periodEnd.getTime());

@@ -8056,7 +8056,9 @@ function renderEmploymentPeriodControl(state) {
         const dataQualityReadiness = state?.period_data_quality_readiness || {};
         const pendingCount = Number(hrReadiness.total_pending_count || 0);
         const dataQualityCount = Number(dataQualityReadiness.unresolved_count || 0);
-        message.textContent = dataQualityReadiness.ready === false
+        message.textContent = state?.readiness_deferred === true
+            ? 'Η συνολική ετοιμότητα της περιόδου ενημερώνεται στο παρασκήνιο.'
+            : dataQualityReadiness.ready === false
             ? `Η περίοδος δεν μπορεί να επανυπολογιστεί ή να οριστικοποιηθεί. ${dataQualityCount === 1
                 ? 'Υπάρχει 1 εκκρεμότητα' : `Υπάρχουν ${dataQualityCount} εκκρεμότητες`} ποιότητας δεδομένων.`
             : hrReadiness.ready === false
@@ -8267,14 +8269,15 @@ async function submitFinalWTODayilyA() {
         text: `Πρωτόκολλο: ${payload.protocol || '-'}` });
 }
 
-async function loadEmploymentPeriodControl(ypokatasthma) {
+async function loadEmploymentPeriodControl(ypokatasthma, { skipLoader = false } = {}) {
     const scope = getActiveEmploymentReviewScope();
     const requestedBranch = String(ypokatasthma || '').trim();
     if (requestedBranch && requestedBranch !== scope.ypokatasthma) {
         throw new Error('Το παράρτημα της ενέργειας δεν αντιστοιχεί στην ενεργή προβολή ελέγχου.');
     }
     const response = await fetch(`/api/prodhlomena-oraria/review/period-control/current?ypokatasthma=${encodeURIComponent(scope.ypokatasthma)}`, {
-        headers: { Accept: 'application/json', 'CSRF-Token': csrfToken }
+        headers: { Accept: 'application/json', 'CSRF-Token': csrfToken },
+        skipLoader
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Δεν ήταν δυνατή η ανάκτηση της κατάστασης περιόδου.');
@@ -9772,6 +9775,10 @@ async function loadResults() {
             csrfToken,
             showDialog: employmentReviewSwal
         });
+        if (periodControl.readiness_deferred === true) {
+            loadEmploymentPeriodControl(advancedBranch, { skipLoader: true }).catch((error) =>
+                console.warn('[employmentPeriodControlDeferred]', error));
+        }
 
         const correctiveSummary = document.getElementById('employmentPeriodCorrectiveSummary');
         if (correctiveSummary) {

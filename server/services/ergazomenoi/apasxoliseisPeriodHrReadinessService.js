@@ -77,5 +77,29 @@ async function collectPeriodWideUiProjections({ loadPage, pageSize = 100 } = {})
         weeklyProjections: Object.freeze(weeklyProjections), rows: Object.freeze(rows) });
 }
 
+function deferredPeriodReadiness() {
+    return Object.freeze({
+        deferred: true,
+        hr: Object.freeze({ ready: false, deferred: true, reason_code: null,
+            employees_count: 0, employees_with_weekly_projections_count: 0,
+            weekly_projections_count: 0, total_pending_count: 0,
+            requires_hr_action_count: 0, pending_cases: Object.freeze([]) }),
+        data_quality: Object.freeze({ ready: false, deferred: true, reason_code: null,
+            unresolved_count: 0, unresolved_cases: Object.freeze([]) })
+    });
+}
+
+async function resolvePeriodReadinessForReviewRequest({
+    employeeScoped = false,
+    loadPeriodWideReadiness
+} = {}) {
+    if (employeeScoped) return deferredPeriodReadiness();
+    if (typeof loadPeriodWideReadiness !== 'function') {
+        throw new TypeError('Period-wide readiness loader is required.');
+    }
+    return loadPeriodWideReadiness();
+}
+
 module.exports = { REASON_CODE, projectionRequiresHrAction, buildPeriodHrReadiness, assertPeriodHrReady,
-    collectPeriodWideUiProjections };
+    collectPeriodWideUiProjections, deferredPeriodReadiness,
+    resolvePeriodReadinessForReviewRequest };

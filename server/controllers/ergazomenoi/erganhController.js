@@ -386,7 +386,8 @@ const {
 const {
     buildWeeklyHrLifecycleProjection
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
-const { buildPeriodHrReadiness, collectPeriodWideUiProjections } = require(
+const { buildPeriodHrReadiness, collectPeriodWideUiProjections,
+    resolvePeriodReadinessForReviewRequest } = require(
     '../../services/ergazomenoi/apasxoliseisPeriodHrReadinessService'
 );
 const { buildPeriodDataQualityReadiness, projectPeriodDataQualityReadiness,
@@ -1224,7 +1225,8 @@ async function loadEmploymentPeriodHrReadiness(req, scope) {
 async function buildEmploymentReviewPeriodControlProjection(req, {
     scope: preloadedScope = null,
     state: preloadedState = null,
-    branchOverride = ''
+    branchOverride = '',
+    deferPeriodWideReadiness = false
 } = {}) {
     const scope = preloadedScope || await activeEmploymentReviewPeriodScope(req, branchOverride);
     const [state, indexReadiness, latestCorrective] = await Promise.all([
@@ -1235,11 +1237,14 @@ async function buildEmploymentReviewPeriodControlProjection(req, {
     ]);
     const lifecycleIndexReadiness = await getPeriodLifecycleIndexState();
     const finalSubmissionIndexReadiness = await getWtoDailySubmissionIndexState();
-    const periodReadiness = await loadEmploymentPeriodReadiness(req, scope);
+    const periodReadiness = await resolvePeriodReadinessForReviewRequest({
+        employeeScoped: deferPeriodWideReadiness,
+        loadPeriodWideReadiness: () => loadEmploymentPeriodReadiness(req, scope)
+    });
     const periodHrReadiness = periodReadiness.hr;
-    const periodDataQualityReadiness = projectPeriodDataQualityReadiness(
-        periodReadiness.data_quality, state.stored_status
-    );
+    const periodDataQualityReadiness = periodReadiness.deferred === true
+        ? periodReadiness.data_quality
+        : projectPeriodDataQualityReadiness(periodReadiness.data_quality, state.stored_status);
     const finalSnapshot = state.stored_status === 'FINALIZED' && state.frozen_snapshot_id
         ? await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
               _id: state.frozen_snapshot_id,
@@ -1352,6 +1357,7 @@ async function buildEmploymentReviewPeriodControlProjection(req, {
         },
         period_hr_readiness: periodHrReadiness,
         period_data_quality_readiness: periodDataQualityReadiness,
+        readiness_deferred: periodReadiness.deferred === true,
         index_readiness: indexReadiness,
         lifecycle_index_readiness: lifecycleIndexReadiness,
         final_submission_index_readiness: finalSubmissionIndexReadiness
@@ -6679,7 +6685,8 @@ class erganhController {
                     ? Promise.resolve(null)
                     : buildEmploymentReviewPeriodControlProjection(req, {
                         scope: frozenScope,
-                        state: frozenState
+                        state: frozenState,
+                        deferPeriodWideReadiness: Boolean(requestedEmployeeCode)
                     });
                 if (samePeriod) {
                     reviewPeriodControl = frozenState;
@@ -6969,7 +6976,7 @@ class erganhController {
                 )
             ];
 
-            const ergazomenoi = await ErgazomenoiModel.find({
+            const ergazomenoiPromise = ErgazomenoiModel.find({
                 team: sessionTeam,
                 company_kod: companyId,
                 kodikos: mongoose.trusted({ $in: kodikoiRows })
@@ -6985,8 +6992,6 @@ class erganhController {
                         + ` ${CANONICAL_EMPLOYEE_PROFILE_FIELDS}`
                 )
                 .lean();
-
-            const ergByKodikos = new Map(ergazomenoi.map((e) => [e.kodikos, e]));
 
             // ============================================================
             // Ιστορικό profile ανά ημέρα για το review.
@@ -7009,15 +7014,14 @@ class erganhController {
                 ? endOfWeekSundayUtc(reviewPeriodEnd)
                 : null;
 
-            const istorikoRowsByKodikos = new Map();
-
+            let istorikoRowsPromise = Promise.resolve([]);
             if (
                 IstorikoProslhpseonAllagonModel &&
                 kodikoiRows.length > 0 &&
                 reviewPeriodStart &&
                 reviewPeriodEnd
             ) {
-                const istorikoRows = await IstorikoProslhpseonAllagonModel.find({
+                istorikoRowsPromise = IstorikoProslhpseonAllagonModel.find({
                     team: sessionTeam,
                     company_kod: companyId,
                     kodikos: mongoose.trusted({ $in: kodikoiRows }),
@@ -7067,13 +7071,6 @@ class erganhController {
                         createdAt: 1
                     })
                     .lean();
-
-                for (const row of istorikoRows) {
-                    const key = String(row.kodikos || '').trim();
-                    if (!key) continue;
-                    if (!istorikoRowsByKodikos.has(key)) istorikoRowsByKodikos.set(key, []);
-                    istorikoRowsByKodikos.get(key).push(row);
-                }
             }
 
             const deviationsFilter = {
@@ -7099,9 +7096,23 @@ class erganhController {
                 deviationsFilter.kodikos = mongoose.trusted({ $in: employeeCodes });
             }
 
-            const deviations = await ProdhlomenaOrariaDeviationsModel.find(deviationsFilter)
+            const deviationsPromise = ProdhlomenaOrariaDeviationsModel.find(deviationsFilter)
                 .sort({ ypokatasthma: 1, kodikos: 1, week_apo: 1 })
                 .lean();
+
+            const [ergazomenoi, istorikoRows, deviations] = await Promise.all([
+                ergazomenoiPromise,
+                istorikoRowsPromise,
+                deviationsPromise
+            ]);
+            const ergByKodikos = new Map(ergazomenoi.map((e) => [e.kodikos, e]));
+            const istorikoRowsByKodikos = new Map();
+            for (const row of istorikoRows) {
+                const key = String(row.kodikos || '').trim();
+                if (!key) continue;
+                if (!istorikoRowsByKodikos.has(key)) istorikoRowsByKodikos.set(key, []);
+                istorikoRowsByKodikos.get(key).push(row);
+            }
 
             const reviewDailyRowsByKodikos = new Map();
             deviationContextRows.forEach((row) => {

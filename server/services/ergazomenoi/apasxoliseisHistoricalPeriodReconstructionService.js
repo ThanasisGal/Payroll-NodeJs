@@ -144,15 +144,14 @@ async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = Prodh
     const window = dependencyWindow(periodStart);
     const weeklyContextStart = startOfWeekMondayUtc(periodStart);
     const weeklyContextEnd = endOfWeekSundayUtc(periodEnd);
-    const [sourceRows, dependencyRows, resultRows, canonicalDecisions] = await Promise.all([
-        loadRows({ scope, start: periodStart, end: periodEnd, fields: SOURCE_FIELDS, prodhlomenaModel, session }),
+    const [dependencyRows, resultRows, canonicalDecisions] = await Promise.all([
         loadRows({ scope, start: window.start, end: window.end, fields: DEPENDENCY_FIELDS, prodhlomenaModel, session }),
         loadRows({ scope, start: periodStart, end: periodEnd, fields: RESULT_FIELDS, prodhlomenaModel, session }),
         loadCanonicalDecisionDependencies({ scope, start: weeklyContextStart, end: weeklyContextEnd,
             canonicalDecisionModel, session })
     ]);
     return Object.freeze({ dependency_window_start: window.start, dependency_window_end: window.end,
-        source_fingerprint: fingerprintRows(sourceRows, SOURCE_FIELDS),
+        source_fingerprint: fingerprintRows(resultRows, SOURCE_FIELDS),
         dependency_fingerprint: fingerprintHistoricalDependencies(dependencyRows, canonicalDecisions),
         result_fingerprint: fingerprintRows(resultRows, RESULT_FIELDS) });
 }

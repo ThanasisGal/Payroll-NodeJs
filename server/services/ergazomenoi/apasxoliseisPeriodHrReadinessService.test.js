@@ -2,7 +2,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { buildPeriodHrReadiness, assertPeriodHrReady,
-    collectPeriodWideUiProjections } = require('./apasxoliseisPeriodHrReadinessService');
+    collectPeriodWideUiProjections,
+    resolvePeriodReadinessForReviewRequest } = require('./apasxoliseisPeriodHrReadinessService');
 function weekly(employee, pending = 0, requires = false, extra = {}) { return {
     scope: { employee_kodikos: employee, week_start: '2026-06-01', week_end: '2026-06-07' },
     lifecycle_projection: { total_pending_count: pending, requires_hr_action: requires, ...extra } }; }
@@ -46,4 +47,34 @@ test('period-wide συλλογή διατηρεί απαράλλακτη την 
     assert.equal(periodProjection.requires_hr_action, uiProjection.lifecycle_projection.requires_hr_action);
     assert.equal(periodProjection.total_pending_count, uiProjection.lifecycle_projection.total_pending_count);
     assert.deepEqual(periodProjection.stages, uiProjection.lifecycle_projection.stages);
+});
+
+test('employee-scoped review αναβάλλει το period-wide rebuild', async () => {
+    let periodWideLoads = 0;
+    const readiness = await resolvePeriodReadinessForReviewRequest({
+        employeeScoped: true,
+        loadPeriodWideReadiness: async () => {
+            periodWideLoads += 1;
+            return { hr: { ready: true }, data_quality: { ready: true } };
+        }
+    });
+    assert.equal(periodWideLoads, 0);
+    assert.equal(readiness.deferred, true);
+    assert.equal(readiness.hr.ready, false);
+    assert.equal(readiness.data_quality.ready, false);
+});
+
+test('period-wide review χωρίς εργαζόμενο διατηρεί το authoritative rebuild', async () => {
+    let periodWideLoads = 0;
+    const expected = { hr: { ready: true, total_pending_count: 0 },
+        data_quality: { ready: true, unresolved_count: 0 } };
+    const readiness = await resolvePeriodReadinessForReviewRequest({
+        employeeScoped: false,
+        loadPeriodWideReadiness: async () => {
+            periodWideLoads += 1;
+            return expected;
+        }
+    });
+    assert.equal(periodWideLoads, 1);
+    assert.equal(readiness, expected);
 });

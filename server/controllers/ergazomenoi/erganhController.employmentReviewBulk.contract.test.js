@@ -22,12 +22,15 @@ assert.match(review, /loadEmploymentReviewRequestContext\(\{/);
 assert.match(review, /employeeCodeLoader: \(\) => ProdhlomenaOrariaModel\.distinct\('kodikos', filter\)/);
 assert.match(review, /weekly_hr_projections: weeklyHrProjections/);
 assert.match(review, /period_control: await periodControlProjectionPromise/);
+assert.match(review, /deferPeriodWideReadiness: Boolean\(requestedEmployeeCode\)/);
 assert.match(review, /scenario_classifications: scenarioClassifications/);
 assert.match(review, /buildEmploymentReviewScenarioClassifications\(rows/);
 assert.match(review, /summary_scope: 'CURRENT_EMPLOYEE_PAGE'/);
 assert.match(review, /ApasxoliseisWeeklyHrWorkflowStateModel\.find\(\{/);
 assert.match(review, /ApasxoliseisCompanyPolicyRuleModel\.find\(\{/);
 assert.match(review, /filter\.kodikos = mongoose\.trusted\(\{ \$in: employeeCodes \}\)/);
+assert.match(review, /const \[ergazomenoi, istorikoRows, deviations\] = await Promise\.all\(\[/);
+assert.match(review, /ergazomenoiPromise,\s*istorikoRowsPromise,\s*deviationsPromise/);
 
 assert.match(phaseDetector, /preloadedContext = null/);
 assert.match(phaseDetector, /preloadedContext\?\.employee/);
@@ -35,14 +38,17 @@ assert.match(phaseDetector, /preloadedContext\?\.contractHistoryRows/);
 assert.match(phaseDetector, /preloadedContext\?\.workTermsHistoryRows/);
 assert.match(phaseDetector, /preloadedContext\?\.dailyRows/);
 
-assert.match(frontend, /preloaded_projections: payload\.weekly_hr_projections/);
+assert.match(frontend, /preloaded_projections: payload\.finalized === true \? \[\] : payload\.weekly_hr_projections/);
+assert.match(review, /rows: reviewRows/);
 const initialLoad = frontend.slice(
     frontend.indexOf('async function loadResults()'),
     frontend.indexOf('function pairNo(')
 );
 assert.match(initialLoad, /const periodControl = payload\.period_control/);
+assert.match(initialLoad, /periodControl\.readiness_deferred === true/);
+assert.match(initialLoad, /loadEmploymentPeriodControl\(advancedBranch, \{ skipLoader: true \}\)\.catch/);
 assert.match(initialLoad, /payload\.scenario_classifications/);
-assert.doesNotMatch(initialLoad, /loadEmploymentPeriodControl\(/);
+assert.doesNotMatch(initialLoad, /await loadEmploymentPeriodControl\(/);
 assert.doesNotMatch(initialLoad, /fetchScenarioClassifications\(/);
 assert.doesNotMatch(initialLoad, /fetchPolicyPreviewGrouping\(/);
 assert.doesNotMatch(initialLoad, /refreshPolicyPreviewApprovals\(/);
