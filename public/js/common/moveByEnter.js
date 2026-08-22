@@ -13,14 +13,20 @@ function onEnter(e) {
   // --- Tom Select χειρισμός ---
   const tsWrapper = e.target.closest('.ts-wrapper');
   if (tsWrapper) {
-    const select = tsWrapper.querySelector('select.tom-dropdown');
+    const select = tsWrapper.previousElementSibling?.matches?.('select.tom-dropdown')
+      ? tsWrapper.previousElementSibling
+      : tsWrapper.querySelector('select.tom-dropdown');
     const ts = select && select.tomselect;
 
     if (ts) {
       // Αν είναι ανοιχτό με query/highlight → άστο να κάνει επιλογή
       const open = ts.isOpen === true || ts.dropdown?.classList?.contains('is-open');
       const hasQuery = (ts.control_input?.value || '').trim().length > 0;
-      const hasHighlight = !!ts.activeOption;
+      const isMultiple = select.multiple === true || ts.settings?.mode === 'multi';
+      const hasHighlightedOption = !!ts.dropdown?.querySelector(
+        '.option.active:not(.disabled):not([aria-disabled="true"]), [data-selectable].active:not(.disabled):not([aria-disabled="true"])'
+      );
+      const hasHighlight = !!ts.activeOption || (!isMultiple && hasHighlightedOption);
       if (open && (hasQuery || hasHighlight)) return;
 
       // Κλειστό (ή ανοιχτό αλλά άδειο) → πήγαινε επόμενο
