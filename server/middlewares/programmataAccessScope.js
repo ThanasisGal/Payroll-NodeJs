@@ -5,6 +5,9 @@ const path = require('path');
 const { CompaniesModel, YpokatasthmataModel } = require('../models/companies');
 const { ErgazomenoiModel } = require('../models/ergazomenoi');
 const {
+    resolveBorrowedSourceContext
+} = require('../services/ergazomenoi/daneizomenoiProdhlomenaOrariaUpdateService');
+const {
     CANONICAL_ALL_TEAMS_CODE,
     normalizeRequiredUserTeam,
     normalizeUserTeam
@@ -27,7 +30,7 @@ function sendError(res, error) {
             : status === 500
               ? 'Σφάλμα ελέγχου πρόσβασης'
               : 'Δεν βρέθηκε πόρος';
-    return res.status(status).json({ success: false, message });
+    return res.status(status).json({ success: false, message: error?.publicMessage || message });
 }
 
 function stringValue(value, { required = true, max = 128 } = {}) {
@@ -133,6 +136,40 @@ async function assertYpokatasthma(scope, ypokatasthma) {
         .select('_id')
         .lean();
     if (!row) throw accessError(404);
+}
+
+async function assertSourceYpokatasthma(scope, sourceCompanyId, ypokatasthma) {
+    const row = await YpokatasthmataModel.findOne({
+        team: scope.effectiveTeam,
+        companykod_object: sourceCompanyId,
+        kodikos: ypokatasthma
+    }).select('_id').lean();
+    if (!row) throw accessError(404);
+}
+
+function branchCode(value) {
+    const raw = stringValue(value, { max: 4 });
+    if (!/^\d{1,4}$/.test(raw)) throw accessError(400);
+    return raw.padStart(4, '0');
+}
+
+async function resolveAuthorizedBorrowedSource(scope, targetBranch) {
+    const sourceContext = await resolveBorrowedSourceContext({
+        scope: {
+            team: scope.effectiveTeam,
+            company_kod: scope.companyId,
+            target_ypokatasthma: targetBranch
+        }
+    });
+    if (sourceContext.reason) {
+        const multiple = sourceContext.reason === 'MULTIPLE_SOURCE_COMPANIES';
+        const error = accessError(multiple ? 409 : 422);
+        error.publicMessage = multiple
+            ? 'Το επιλεγμένο Παράρτημα περιλαμβάνει εργαζόμενους από περισσότερες από μία Δανειζόμενες εταιρείες.'
+            : 'Δεν βρέθηκε μοναδική Δανειζόμενη εταιρεία για το επιλεγμένο Παράρτημα.';
+        throw error;
+    }
+    return sourceContext;
 }
 
 function freezeScope(req, base, extra = {}) {
@@ -381,6 +418,55 @@ async function authorizeExternalAction(req, res, next) {
     });
 }
 
+async function authorizeBorrowedDeclaredScheduleUpdate(req, res, next) {
+    return authorizeSessionCompany(req, res, async () => {
+        try {
+            const range = dateRange(req.body?.apo_hmeromhnia, req.body?.eos_hmeromhnia);
+            if (req.body?.sourceCompanyId !== undefined) throw accessError(400);
+            const targetBranch = branchCode(req.body?.target_ypokatasthma);
+            const sourceBranch = branchCode(req.body?.source_ypokatasthma);
+            await assertYpokatasthma(req.programmataAccessScope, targetBranch);
+            const sourceContext = await resolveAuthorizedBorrowedSource(
+                req.programmataAccessScope, targetBranch
+            );
+            await assertSourceYpokatasthma(
+                req.programmataAccessScope, sourceContext.sourceCompanyId, sourceBranch
+            );
+            freezeScope(req, req.programmataAccessScope, {
+                dateRange: range,
+                target_ypokatasthma: targetBranch,
+                source_ypokatasthma: sourceBranch,
+                sourceCompanyId: sourceContext.sourceCompanyId,
+                sourceContext
+            });
+            return next();
+        } catch (error) {
+            return sendError(res, error);
+        }
+    });
+}
+
+async function authorizeBorrowedSourceBranches(req, res, next) {
+    return authorizeSessionCompany(req, res, async () => {
+        try {
+            if (req.query?.sourceCompanyId !== undefined) throw accessError(400);
+            const targetBranch = branchCode(req.query?.target_ypokatasthma);
+            await assertYpokatasthma(req.programmataAccessScope, targetBranch);
+            const sourceContext = await resolveAuthorizedBorrowedSource(
+                req.programmataAccessScope, targetBranch
+            );
+            freezeScope(req, req.programmataAccessScope, {
+                target_ypokatasthma: targetBranch,
+                sourceCompanyId: sourceContext.sourceCompanyId,
+                sourceContext
+            });
+            return next();
+        } catch (error) {
+            return sendError(res, error);
+        }
+    });
+}
+
 module.exports = {
     authorizeList,
     authorizeEmployee,
@@ -390,6 +476,8 @@ module.exports = {
     authorizeGetOraria,
     authorizeSessionCompany,
     authorizeCalculation,
+    authorizeBorrowedDeclaredScheduleUpdate,
+    authorizeBorrowedSourceBranches,
     authorizeExternalAction,
     validatePdfDelete,
     employeeCode,
