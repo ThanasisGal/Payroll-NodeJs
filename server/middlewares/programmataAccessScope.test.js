@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('assert');
-const { CompaniesModel } = require('../models/companies');
+const { CompaniesModel, YpokatasthmataModel } = require('../models/companies');
 const { ErgazomenoiModel } = require('../models/ergazomenoi');
 const scope = require('./programmataAccessScope');
 
@@ -31,6 +31,8 @@ function employeeResult(rows) {
     assert.throws(() => scope.dateRange('2026-03-02', '2026-03-01'));
 
     const originalCompanyFindById = CompaniesModel.findById;
+    const originalCompanyFind = CompaniesModel.find;
+    const originalBranchFindOne = YpokatasthmataModel.findOne;
     const originalEmployeeFind = ErgazomenoiModel.find;
     try {
         CompaniesModel.findById = () =>
@@ -75,8 +77,71 @@ function employeeResult(rows) {
         const foreignEmployee = response();
         await scope.authorizeEmployee(req, foreignEmployee, () => assert.fail('next called'));
         assert.strictEqual(foreignEmployee.statusCode, 404);
+
+        const borrowedUpdate = {
+            session: { companyInUse: '507f1f77bcf86cd799439011', userId: '7' },
+            authenticatedUserTeam: 'TEAM1',
+            body: {
+                target_ypokatasthma: '1',
+                source_ypokatasthma: '99',
+                apo_hmeromhnia: '2026-06-01',
+                eos_hmeromhnia: '2026-06-30',
+                team: 'TEAM1',
+                company_kod: 'malicious-company',
+                companyId: 'malicious-company',
+                targetKodikos: '9999',
+                sourceKodikos: '9999',
+                targetCompanyId: 'malicious-company',
+                afm: '000000000'
+            }
+        };
+        CompaniesModel.find = () => employeeResult([
+            { _id: '507f1f77bcf86cd799439099', afm: '094259216' }
+        ]);
+        YpokatasthmataModel.findOne = () =>
+            companyResult({ _id: '507f1f77bcf86cd799439012' });
+        ErgazomenoiModel.find = (filter) => employeeResult(
+            filter.afora_daneismo_ergazomenoy === true
+                ? [{ kodikos: '0031', afm_daneizomenoy_ergodoth: '094259216',
+                    kodikos_ergazomenoy_alloy_ergodoth: '0003' }]
+                : []
+        );
+        let borrowedNext = 0;
+        await scope.authorizeBorrowedDeclaredScheduleUpdate(
+            borrowedUpdate, response(), () => borrowedNext++
+        );
+        assert.strictEqual(borrowedNext, 1);
+        assert.strictEqual(borrowedUpdate.programmataAccessScope.effectiveTeam, 'TEAM1');
+        assert.strictEqual(borrowedUpdate.programmataAccessScope.companyId, '507f1f77bcf86cd799439011');
+        assert.strictEqual(borrowedUpdate.programmataAccessScope.target_ypokatasthma, '0001');
+        assert.strictEqual(borrowedUpdate.programmataAccessScope.source_ypokatasthma, '0099');
+        assert.strictEqual(borrowedUpdate.programmataAccessScope.sourceCompanyId,
+            '507f1f77bcf86cd799439099');
+        assert.strictEqual(borrowedUpdate.programmataAccessScope.targetKodikos, undefined);
+
+        const malicious = { ...borrowedUpdate, programmataAccessScope: undefined,
+            body: { ...borrowedUpdate.body, sourceCompanyId: '507f1f77bcf86cd799439088' } };
+        const maliciousResponse = response();
+        await scope.authorizeBorrowedDeclaredScheduleUpdate(
+            malicious, maliciousResponse, () => assert.fail('next called')
+        );
+        assert.strictEqual(maliciousResponse.statusCode, 400);
+
+        YpokatasthmataModel.findOne = (filter) => companyResult(
+            filter.companykod_object === '507f1f77bcf86cd799439099' && filter.kodikos === '0098'
+                ? null : { _id: '507f1f77bcf86cd799439012' }
+        );
+        const foreignSourceBranch = { ...borrowedUpdate, programmataAccessScope: undefined,
+            body: { ...borrowedUpdate.body, source_ypokatasthma: '98' } };
+        const foreignSourceResponse = response();
+        await scope.authorizeBorrowedDeclaredScheduleUpdate(
+            foreignSourceBranch, foreignSourceResponse, () => assert.fail('next called')
+        );
+        assert.strictEqual(foreignSourceResponse.statusCode, 404);
     } finally {
         CompaniesModel.findById = originalCompanyFindById;
+        CompaniesModel.find = originalCompanyFind;
+        YpokatasthmataModel.findOne = originalBranchFindOne;
         ErgazomenoiModel.find = originalEmployeeFind;
     }
     console.log('PASS programmata canonical company/team/employee/date scope');

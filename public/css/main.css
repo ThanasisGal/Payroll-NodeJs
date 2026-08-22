@@ -5785,6 +5785,25 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .height-vh-31 {
     height: 31vh !important;
 }
+
+/* Borrowed declared schedules form: compact rows with room for a downward Tom Select menu. */
+#transferForm .borrowed-schedule-card-body {
+    min-height: 390px;
+    overflow: visible;
+}
+
+#transferForm .borrowed-schedule-row {
+    margin-bottom: 0.625rem !important;
+}
+
+#transferForm .borrowed-schedule-control {
+    margin-top: 0.125rem !important;
+}
+
+#transferForm .borrowed-schedule-spacer {
+    height: 0.25rem;
+    margin: 0;
+}
 .height-vh-33 {
     height: 33vh !important;
 }

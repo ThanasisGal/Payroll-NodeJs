@@ -52,6 +52,8 @@ const {
     authorizeGetOraria,
     authorizeSessionCompany: authorizeProgrammataSessionCompany,
     authorizeCalculation: authorizeProgrammataCalculation,
+    authorizeBorrowedDeclaredScheduleUpdate,
+    authorizeBorrowedSourceBranches,
     authorizeExternalAction: authorizeProgrammataExternalAction,
     validatePdfDelete
 } = require('../middlewares/programmataAccessScope');
@@ -642,6 +644,27 @@ router.get(
     requireUserPrivilegeAction('LhpshOrarionApoErganh', 'read'),
     authorizeProgrammataSessionCompany,
     erganhController.mainLhpshOrarionApoErganhForm
+);
+
+router.get(
+    '/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon',
+    requireUserPrivilegeAction('LhpshProdhlomenonOrarionMonoDaneizomenon', 'read'),
+    authorizeProgrammataSessionCompany,
+    erganhController.mainLhpshProdhlomenonOrarionMonoDaneizomenonForm
+);
+
+router.get(
+    '/ergazomenoi/programmata/borrowed-source-branches',
+    requireUserPrivilegeAction('LhpshProdhlomenonOrarionMonoDaneizomenon', 'read'),
+    authorizeBorrowedSourceBranches,
+    erganhController.getBorrowedSourceBranches
+);
+
+router.post(
+    '/ergazomenoi/programmata/updateProdhlomenaOrariaMonoDaneizomenon',
+    requireUserPrivilegeAction('LhpshProdhlomenonOrarionMonoDaneizomenon', 'update'),
+    authorizeBorrowedDeclaredScheduleUpdate,
+    erganhController.updateProdhlomenaOrariaMonoDaneizomenon
 );
 
 router.post(
