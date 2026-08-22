@@ -8,9 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const SEARCH_SEL = '#sidebarMenu .sidebar-search';
     const BTN_ERGANI_SEL = '#btn-open-ergani';
 
-    const USER_ID = (window.WPS_USER_ID || '').trim();
-    const STATE_KEY = (id) => `wps.sidebar.state.v1.${id || 'guest'}`;
-    const SCROL_KEY = (id) => `wps.sidebar.scroll.v1.${id || 'guest'}`;
+    const STATE_KEY = 'wps.sidebar.open-ids.v2';
 
     const tree = document.querySelector(TREE_SEL);
     const scrollArea = document.querySelector(SCROLL_SEL);
@@ -28,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!a || !ul) return;
         ul.classList.toggle('active', expanded);
         a.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        a.querySelector('.chevron-icon')?.classList.toggle('rotate-chevron', expanded);
+        const arrow = a.querySelector('.user-privileges-hierarchy-chevron');
+        if (arrow) arrow.textContent = expanded ? '▾' : '▸';
     };
 
     const getOpenIds = () =>
@@ -43,14 +42,70 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    const pathToRoot = (li) => {
+        const path = [];
+        let p = li?.parentElement;
+        while (p && p !== tree) {
+            if (p.tagName === 'UL' && p.classList.contains('submenu')) {
+                const parentLi = p.parentElement;
+                if (parentLi) path.push(parentLi);
+                p = parentLi?.parentElement;
+            } else {
+                p = p.parentElement;
+            }
+        }
+        return path;
+    };
+
+    const normalizePathname = (value) => {
+        const pathname = String(value || '').replace(/\/{2,}/g, '/');
+        if (!pathname || pathname === '/') return '/';
+        return pathname.replace(/\/+$/, '');
+    };
+
+    const findCurrentLeaf = () => {
+        const currentPath = normalizePathname(window.location.pathname);
+        const candidates = [...tree.querySelectorAll('a[href]')]
+            .filter((link) => !link.nextElementSibling?.classList.contains('submenu'))
+            .map((link) => {
+                try {
+                    const href = String(link.getAttribute('href') || '').trim();
+                    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return null;
+                    const url = new URL(href, window.location.origin);
+                    if (url.origin !== window.location.origin) return null;
+                    const path = normalizePathname(url.pathname);
+                    if (path === '/' && currentPath !== '/') return null;
+                    const exact = currentPath === path;
+                    const nested = path !== '/' && currentPath.startsWith(`${path}/`);
+                    return exact || nested ? { link, path, exact } : null;
+                } catch {
+                    return null;
+                }
+            })
+            .filter(Boolean)
+            .sort((left, right) => Number(right.exact) - Number(left.exact) || right.path.length - left.path.length);
+        return candidates[0]?.link || null;
+    };
+
+    const activateCurrentPath = () => {
+        tree.querySelectorAll('a.active').forEach((link) => link.classList.remove('active'));
+        const currentLeaf = findCurrentLeaf();
+        if (!currentLeaf) return null;
+        currentLeaf.classList.add('active');
+        pathToRoot(currentLeaf.closest('li')).reverse().forEach((parentLi) => {
+            setExpandedState(parentLi, true);
+        });
+        return currentLeaf;
+    };
+
     const collapseAll = () => {
         tree.querySelectorAll('ul.submenu.active').forEach((ul) => ul.classList.remove('active'));
         tree.querySelectorAll('#nav-tree a[aria-expanded]').forEach((a) =>
             a.setAttribute('aria-expanded', 'false')
         );
-        tree.querySelectorAll('.chevron-icon.rotate-chevron').forEach((i) =>
-            i.classList.remove('rotate-chevron')
-        );
+        tree.querySelectorAll('.user-privileges-hierarchy-chevron').forEach((arrow) => {
+            arrow.textContent = '▸';
+        });
         tree.querySelectorAll('#nav-tree a.active').forEach((a) => a.classList.remove('active'));
         if (scrollArea) scrollArea.scrollTop = 0;
     };
@@ -62,37 +117,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const saveState = ({ activeId = null } = {}) => {
-        if (!USER_ID) return;
-        const state = { openIds: getOpenIds(), activeId };
-        localStorage.setItem(STATE_KEY(USER_ID), JSON.stringify(state));
-        if (scrollArea) {
-            localStorage.setItem(SCROL_KEY(USER_ID), String(scrollArea.scrollTop));
+    const saveState = () => {
+        try {
+            sessionStorage.setItem(STATE_KEY, JSON.stringify(getOpenIds()));
+        } catch {
+            // Το sidebar παραμένει λειτουργικό όταν το storage δεν είναι διαθέσιμο.
         }
     };
 
     const loadState = () => {
-        if (!USER_ID) {
-            collapseAll();
-            return;
-        }
+        collapseAll();
         try {
-            const raw = localStorage.getItem(STATE_KEY(USER_ID));
+            const raw = sessionStorage.getItem(STATE_KEY);
             if (raw) {
-                const s = JSON.parse(raw);
-                if (Array.isArray(s.openIds)) openByIds(s.openIds);
-                if (s.activeId) {
-                    document
-                        .getElementById(s.activeId)
-                        ?.querySelector(':scope > a')
-                        ?.classList.add('active');
-                }
+                const openIds = JSON.parse(raw);
+                if (Array.isArray(openIds)) openByIds(openIds);
             }
-            const y = parseInt(localStorage.getItem(SCROL_KEY(USER_ID)) || '0', 10);
-            if (scrollArea && Number.isFinite(y)) scrollArea.scrollTop = y;
         } catch {
             collapseAll();
         }
+        activateCurrentPath();
     };
 
     // ---------- αρχική επαναφορά ----------
@@ -134,8 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         // leaf
-        const activeId = li?.id || null;
-        saveState({ activeId });
+        saveState();
     });
 
     // ---------- BFCache / refresh ----------
@@ -159,21 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .replace(/ς/g, 'σ');
-
-    const pathToRoot = (li) => {
-        const path = [];
-        let p = li?.parentElement;
-        while (p && p !== tree) {
-            if (p.tagName === 'UL' && p.classList.contains('submenu')) {
-                const parentLi = p.parentElement;
-                if (parentLi) path.push(parentLi);
-                p = parentLi?.parentElement;
-            } else {
-                p = p.parentElement;
-            }
-        }
-        return path;
-    };
 
     const filterTree = (queryRaw) => {
         const q = norm(queryRaw);

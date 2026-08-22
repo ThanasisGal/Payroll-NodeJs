@@ -4002,7 +4002,6 @@ mark,
     background-color: #24a41323;
     color: #1c5c00;
     /* font-weight: bold; */
-    font-size: 0.83rem;
 }
 
 /* Για τα υπομενού (nested lists) */
@@ -6977,7 +6976,7 @@ main {
     border-radius: 10px;
 }
 
-/* ===== Breakpoints με data-ml-* (padding + line-height ανά πλήθος γραμμών) ===== */
+/* ===== Legacy responsive widths for the remaining adjusted-gap classes ===== */
 
 /* >= 1913 */
 @media (min-width: 1913px) {
@@ -6997,34 +6996,7 @@ main {
         width: 13.2vw !important;
     }
 
-    #nav-tree a.menu-item[data-ml-1913='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 12.3vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1913='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 12.3vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1913='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 12.3vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1913='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 12.3vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1913='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 13.9vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 12.9vw !important;
@@ -7050,34 +7022,7 @@ main {
     }
     /* #nav-tree a.ajustedGap-submenu:hover{ width: 13.2vw !important;} */
 
-    #nav-tree a.menu-item[data-ml-1680='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 12.3vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1680='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 12.3vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1680='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 12.3vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1680='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 12.3vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1680='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 13.2vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 12.9vw !important;
@@ -7103,34 +7048,7 @@ main {
     }
     /* #nav-tree a.ajustedGap-submenu:hover{ width: 13vw !important;} */
 
-    #nav-tree a.menu-item[data-ml-1600='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 12.15vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1600='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 12.15vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1600='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 12.15vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1600='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 12.15vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1600='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 13vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 12.8vw !important;
@@ -7155,34 +7073,7 @@ main {
         width: 13.1vw !important;
     }
 
-    #nav-tree a.menu-item[data-ml-1440='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 12.1vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1440='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 12.1vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1440='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 12.1vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1440='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 12.1vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1440='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 13.1vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 13vw !important;
@@ -7207,34 +7098,7 @@ main {
         width: 13.8vw !important;
     }
 
-    #nav-tree a.menu-item[data-ml-1366='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 12.75vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1366='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 12.75vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1366='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 12.75vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1366='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 12.75vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1366='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 13.8vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 13.7vw !important;
@@ -7259,34 +7123,7 @@ main {
         width: 13.8vw !important;
     }
 
-    #nav-tree a.menu-item[data-ml-1360='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 12.7vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1360='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 12.7vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1360='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 12.7vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1360='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 12.7vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1360='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 13.8vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 13.8vw !important;
@@ -7312,34 +7149,7 @@ main {
     }
     /* #nav-tree a.ajustedGap-menu:hover{ width: 15vw !important; font-size: 1rem;} */
 
-    #nav-tree a.menu-item[data-ml-1280='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 13.6vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1280='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 13.6vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1280='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 13.6vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1280='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 13.6vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1280='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 15.1vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 14.6vw !important;
@@ -7364,34 +7174,7 @@ main {
         width: 16.3vw !important;
     }
 
-    #nav-tree a.menu-item[data-ml-1152='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 15.2vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1152='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 15.2vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1152='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 15.2vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1152='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 15.2vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1152='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 16.3vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 16.2vw !important;
@@ -7416,34 +7199,7 @@ main {
         width: 18.3vw !important;
     }
 
-    #nav-tree a.menu-item[data-ml-1024='1'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 17vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1024='2'] {
-        padding: 0.35rem 0.75rem 2.5rem;
-        line-height: 1.3;
-        width: 17vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1024='3'] {
-        padding: 0.35rem 0.75rem 3.5rem;
-        line-height: 1.3;
-        margin-bottom: -1rem !important;
-        width: 17vw !important;
-    }
-    #nav-tree a.menu-item[data-ml-1024='4'] {
-        padding: 0.35rem 0.75rem 4.5rem;
-        line-height: 1.3;
-        margin-bottom: 0.3rem !important;
-        width: 17vw !important;
-    }
 
-    #nav-tree a.menu-item[data-ml-1024='11'] {
-        padding: 0.6rem 0.75rem 0.2rem;
-        line-height: 1.3;
-        width: 18.3vw !important;
-    }
 
     #nav-tree a.ajustedGap-link {
         width: 18.2vw !important;
@@ -7451,6 +7207,118 @@ main {
     #nav-tree a.ajustedGap-link:hover {
         width: 18.2vw !important;
     }
+}
+
+/* Content-driven sidebar layout. */
+#nav-tree,
+#nav-tree .submenu {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+#nav-tree {
+    padding-right: 8px;
+}
+
+#nav-tree li {
+    padding-right: 0;
+}
+
+#nav-tree li,
+#nav-tree li ul li {
+    margin-bottom: 0.375rem;
+}
+
+#nav-tree li ul li {
+    padding-top: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+}
+
+#sidebarMenu #nav-tree a.menu-item {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0;
+    margin-bottom: 0 !important;
+    padding: 0.25rem 0.75rem !important;
+    line-height: 1.3 !important;
+}
+
+#nav-tree a.menu-item::after {
+    content: none;
+}
+
+
+#nav-tree a.sidebar-submenu-toggle {
+    display: flex !important;
+    font-weight: 600 !important;
+}
+
+#nav-tree .sidebar-menu-label {
+    display: block;
+    min-width: 0;
+    overflow-wrap: break-word;
+    transform-origin: left center;
+}
+
+#nav-tree a.menu-item:hover .sidebar-menu-label {
+    transform: scale(0.90);
+}
+
+/* Tree connectors follow the real nested submenu structure. */
+#nav-tree ul.submenu {
+    position: relative;
+    margin-left: 0;
+    padding-left: 0.85rem;
+}
+
+#nav-tree ul.submenu > li {
+    position: relative;
+}
+
+#nav-tree ul.submenu > li::before,
+#nav-tree ul.submenu > li::after {
+    content: '' !important;
+    position: absolute;
+    left: -0.5rem;
+    background-color: rgba(65, 80, 75, 0.5);
+    pointer-events: none;
+    opacity: 1 !important;
+}
+
+#nav-tree ul.submenu > li::before {
+    top: -0.375rem;
+    bottom: -0.375rem;
+    width: 1px;
+}
+
+#nav-tree ul.submenu > li::after {
+    top: calc(0.25rem + 0.65em);
+    width: 0.5rem;
+    height: 1px;
+}
+
+#nav-tree ul.submenu > li:last-child::before {
+    bottom: auto;
+    height: calc(0.625rem + 0.65em);
+}
+
+#nav-tree .sidebar-submenu-toggle .user-privileges-hierarchy-chevron {
+    align-self: center;
+}
+
+#nav-tree li > ul.submenu > li > a.menu-item:not(.sidebar-submenu-toggle) {
+    padding-left: 1rem !important;
+    font-weight: 400 !important;
+}
+
+#nav-tree a.menu-item.active:not(.disabled) {
+    color: #174f2d;
+    box-shadow:
+        inset 0 0 0 9999px rgba(104, 211, 151, 0.3),
+        inset 0 0 0 1px #5ca778,
+        inset 0.22rem 0 0 #287a4b;
 }
 
 /* Footer base font size */
