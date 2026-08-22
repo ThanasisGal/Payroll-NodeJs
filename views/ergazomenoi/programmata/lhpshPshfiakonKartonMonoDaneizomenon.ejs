@@ -1,9 +1,9 @@
 <br> <br> <br>
 <form class="formRadius" id="transferForm">
-    <input type="hidden" id="borrowedSchedulesCsrfToken" value="<%= csrfToken %>">
+    <input type="hidden" id="borrowedCardsCsrfToken" value="<%= csrfToken %>">
     <div class="card d-flex flex-column z-depth-5 w-60 margin-left-percent-20 overflow-hidden">
         <div class="card-header p-0 height-rem-3_5">
-            <label class="headers-content">Ενημέρωση Ωραρίων από Δανειζόμενη Εταιρεία</label>
+            <label class="headers-content">Ενημέρωση Ψηφιακών Καρτών από Δανειζόμενη Εταιρεία</label>
         </div>
 
         <div class="card-body flex-grow-1 bg-white borrowed-schedule-card-body">
@@ -15,33 +15,18 @@
                         Παράρτημα Δανείζουσας Εταιρείας
                     </label>
                 </div>
-                <input
-                    type="hidden"
-                    name="target_ypokatasthma"
-                    id="target_ypokatasthma"
-                    class="form-control input-contents"
-                    value="<%= safe('target_ypokatasthma') %>"
-                    readonly
-                />
+                <input type="hidden" name="target_ypokatasthma" id="target_ypokatasthma"
+                    value="<%= safe('target_ypokatasthma') %>" readonly />
                 <div class="col-9-5 borrowed-schedule-control">
-                    <select
-                        id="target_ypokatasthmata"
-                        name="target_ypokatasthmata"
+                    <select id="target_ypokatasthmata" name="target_ypokatasthmata"
                         class="tom-dropdown selectpicker-dropdown-normal left-align"
-                        aria-label="Υποκατάστημα"
                         data-api="/api/dropdown/erganh/ypokatasthmata?company=<%= companyInUse || '' %>"
-                        single
-                        data-target-input="target_ypokatasthma"
-                        data-preselect="target_ypokatasthma"
-                        data-preload-all="true"
-                        data-pad-length="4"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        data-dropdown-direction="down"
-                        placeholder="Αναζήτηση Υποκαταστήματος">
-                    </select>
+                        data-target-input="target_ypokatasthma" data-preselect="target_ypokatasthma"
+                        data-preload-all="true" data-pad-length="4"
+                        data-xrhsh-related="false" data-team-related="false"
+                        data-company-related="false" data-mhnas-related="false"
+                        data-dropdown-direction="down" single
+                        placeholder="Αναζήτηση Υποκαταστήματος"></select>
                 </div>
             </div>
 
@@ -61,41 +46,30 @@
 
             <div class="borrowed-schedule-spacer" aria-hidden="true"></div>
             <div class="row form-group g-3 align-items-center borrowed-schedule-row">
-                <div class="col-2 left-align">
-                    <label for="apo_hmeromhnia" class="col-form-label label-font-size-smaller">Από Ημερομηνία</label>
-                </div>
-                <div class="col-2-5">
-                    <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control"
-                        value="<%= periodRec && periodRec.apo ? new Date(periodRec.apo).toISOString().slice(0, 10) : safe('apo_hmeromhnia') %>" required />
-                </div>
+                <div class="col-2 left-align"><label for="apo_hmeromhnia"
+                    class="col-form-label label-font-size-smaller">Από Ημερομηνία</label></div>
+                <div class="col-2-5"><input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia"
+                    class="date-control" value="<%= periodRec && periodRec.apo ? new Date(periodRec.apo).toISOString().slice(0, 10) : safe('apo_hmeromhnia') %>" required /></div>
             </div>
 
             <div class="borrowed-schedule-spacer" aria-hidden="true"></div>
             <div class="row form-group g-3 align-items-center borrowed-schedule-row">
-                <div class="col-2 left-align">
-                    <label for="eos_hmeromhnia" class="col-form-label label-font-size-smaller">Έως Ημερομηνία</label>
-                </div>
-                <div class="col-2-5">
-                    <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control"
-                        value="<%= periodRec && periodRec.eos ? new Date(periodRec.eos).toISOString().slice(0, 10) : safe('eos_hmeromhnia') %>" required />
-                </div>
+                <div class="col-2 left-align"><label for="eos_hmeromhnia"
+                    class="col-form-label label-font-size-smaller">Έως Ημερομηνία</label></div>
+                <div class="col-2-5"><input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia"
+                    class="date-control" value="<%= periodRec && periodRec.eos ? new Date(periodRec.eos).toISOString().slice(0, 10) : safe('eos_hmeromhnia') %>" required /></div>
             </div>
         </div>
 
         <div class="card-footer">
             <div class="d-inline-block d-flex cardFooter01">
-                <button
-                    type="button"
+                <button type="button"
                     class="btn btn-brown rounded-4 mt-2 w-20 buttons-content <% if (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) { %>disabled-link<% } %>"
-                    id="updateBorrowedSchedulesButton">
-                    <i class="bi bi-arrow-repeat"></i> Ενημέρωση
-                </button>
+                    id="updateBorrowedCardsButton"><i class="bi bi-arrow-repeat"></i> Ενημέρωση</button>
                 <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp">
-                    <i class="bi bi-chevron-double-left"></i> Επιστροφή
-                </a>
+                    <i class="bi bi-chevron-double-left"></i> Επιστροφή</a>
                 <button type="button" class="btn btn-toTop scroll-to-top">
-                    <i class="bi bi-chevron-double-up"></i>
-                </button>
+                    <i class="bi bi-chevron-double-up"></i></button>
             </div>
         </div>
     </div>
@@ -103,4 +77,4 @@
 
 <script type="module" src="<%= script('ergazomenoi/programmata/initYpokatasthmataDropdowns.js') %>"></script>
 <script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
-<script src="<%= script('ergazomenoi/programmata/updateBorrowedDeclaredSchedules') %>"></script>
+<script src="<%= script('ergazomenoi/programmata/updateBorrowedDigitalCards') %>"></script>

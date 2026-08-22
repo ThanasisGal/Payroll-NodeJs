@@ -289,15 +289,20 @@ test('getRoles rejects unauthenticated requests and trusts only session userId',
     assert.deepStrictEqual(unauthorized.payload, { permissions: {} });
 
     const original = userController.fetchPermissions;
+    const originalAvailability = userController.fetchBorrowedTransferAvailability;
     try {
         let received;
         userController.fetchPermissions = async (userId) => { received = userId; return {}; };
+        userController.fetchBorrowedTransferAvailability = async () => true;
         const res = responseStub();
-        await userController.getUserRoles({ session: { userId: 123 }, query: { userId: 'attacker' } }, res);
+        await userController.getUserRoles({ session: { userId: 123, userTeam: 'THA', companyInUse: 'company' }, query: { userId: 'attacker' } }, res);
         assert.strictEqual(received, '123');
-        assert.deepStrictEqual(res.payload, { permissions: {} });
+        assert.deepStrictEqual(res.payload, {
+            permissions: {}, availability: { borrowedEmployeeTransfers: true }
+        });
     } finally {
         userController.fetchPermissions = original;
+        userController.fetchBorrowedTransferAvailability = originalAvailability;
     }
 });
 

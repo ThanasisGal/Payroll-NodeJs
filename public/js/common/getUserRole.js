@@ -28,10 +28,19 @@
         });
     }
 
-    function applySidebarPermissions(root, permissions) {
+    function applySidebarPermissions(root, permissions, availability = {}) {
+        const hasBorrowedTransfers = availability.borrowedEmployeeTransfers === true;
+        root.querySelectorAll('a[data-borrowed-standard-label="true"] .sidebar-menu-label')
+            .forEach((label) => {
+                label.textContent = hasBorrowedTransfers
+                    ? 'ΜΗ Δανειζόμενων Εργαζόμενων'
+                    : 'ΟΛΩΝ των Εργαζόμενων';
+            });
         root.querySelectorAll('a[data-privilege-form]').forEach((link) => {
             const form = link.dataset.privilegeForm;
-            setLinkEnabled(link, canOpenForm(permissions?.[form]));
+            const featureAvailable = link.dataset.requiresBorrowedTransfer !== 'true' ||
+                availability.borrowedEmployeeTransfers === true;
+            setLinkEnabled(link, canOpenForm(permissions?.[form]) && featureAvailable);
         });
         root.querySelectorAll('a[data-sidebar-special]').forEach((link) => {
             setLinkEnabled(link, link.dataset.sidebarAuthorized === 'true');
@@ -68,7 +77,7 @@
             }
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            applySidebarPermissions(root, data?.permissions || {});
+            applySidebarPermissions(root, data?.permissions || {}, data?.availability || {});
         } catch (error) {
             console.error('[sidebarPrivileges] Αποτυχία φόρτωσης δικαιωμάτων:', error);
             disableProtectedLinks(root);

@@ -109,6 +109,8 @@ const reports = { key: 'reports', label: 'Εκτυπώσεις', order: 300 };
 const companies = { key: 'companies', label: 'Εταιρείες', order: 100 };
 const employees = { key: 'employees', label: 'Εργαζόμενοι', order: 200 };
 const ergani = { key: 'ergani-ii', label: 'ΕΡΓΑΝΗ ΙΙ', order: 300 };
+const declaredSchedulesDownload = { key: 'declared-schedules-download', label: 'Λήψη Προδηλωμένων Ωραρίων', order: 200 };
+const digitalCardsDownload = { key: 'digital-cards-download', label: 'Λήψη Ψηφιακών Καρτών', order: 300 };
 const submissions = { key: 'file-submissions', label: 'Αποστολή Αρχείων', order: 600 };
 const contracts = { key: 'contracts', label: 'Συμβάσεις', order: 500 };
 const employmentReports = { key: 'employment-reports', label: 'Απασχολήσεις', order: 100 };
@@ -123,8 +125,10 @@ const userPrivilegeSidebarHierarchy = [
     entry('Trapezes', 'li216', 'Τράπεζες Ανά Εταιρεία', 600, [files, companies]),
     entry('Ergazomenoi', 'li221', 'Στοιχεία Εργαζομένων', 100, [files, employees]),
     entry('AntigrafhProgrammatonErgasias', 'li232', 'Αντιγραφή Προγράμματος Από Έως Ημερ/νία', 100, [files, ergani]),
-    entry('LhpshOrarionApoErganh', 'li233', 'Λήψη Προδηλωμένων Ωραρίων από ΕΡΓΑΝΗ', 200, [files, ergani]),
-    entry('LhpshOrarionApoKartes', 'li234', 'Λήψη Ωρών Απασχόλησης από Κάρτες Εργασίας', 300, [files, ergani]),
+    entry('LhpshOrarionApoErganh', 'li233', 'ΜΗ Δανειζόμενων Εργαζόμενων', 100, [files, ergani, declaredSchedulesDownload]),
+    entry('LhpshProdhlomenonOrarionMonoDaneizomenon', 'li2382', 'ΜΟΝΟ Δανειζόμενων Εργαζόμενων', 200, [files, ergani, declaredSchedulesDownload]),
+    entry('LhpshOrarionApoKartes', 'li234', 'ΜΗ Δανειζόμενων Εργαζόμενων', 100, [files, ergani, digitalCardsDownload]),
+    entry('LhpshPshfiakonKartonMonoDaneizomenon', 'li2392', 'ΜΟΝΟ Δανειζόμενων Εργαζόμενων', 200, [files, ergani, digitalCardsDownload]),
     entry('CalcApasxolhseisPeriodoy', 'li235', 'Υπολογισμός Απασχολήσεων Βάσει των Ψηφιακών Καρτών', 400, [files, ergani]),
     entry('ElegxosApasxolhseonPeriodoy', 'li236', 'Έλεγχος Απασχολήσεων', 500, [files, ergani]),
     entry('ApologistikosPinakasOrarion', 'li2371', 'Απολογιστικός Πίνακας Ωραρίων', 100, [files, ergani, submissions]),

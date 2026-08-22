@@ -76,10 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const loader = document.querySelector('.loader-container');
         if (loader) loader.style.display = 'grid';
         try {
-            const csrfToken = document.cookie
-                .split('; ')
-                .find((row) => row.startsWith('psifl.x-csrf-token='))
-                ?.split('=')[1];
+            const csrfToken = document.getElementById('borrowedSchedulesCsrfToken')?.value;
             const response = await fetch(
                 '/ergazomenoi/programmata/updateProdhlomenaOrariaMonoDaneizomenon',
                 {

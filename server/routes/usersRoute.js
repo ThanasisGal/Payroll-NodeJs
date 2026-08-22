@@ -681,6 +681,27 @@ router.get(
     erganhController.mainLhpshOrarionApoKartesForm
 );
 
+router.get(
+    '/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon',
+    requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'read'),
+    authorizeProgrammataSessionCompany,
+    erganhController.mainLhpshPshfiakonKartonMonoDaneizomenonForm
+);
+
+router.get(
+    '/ergazomenoi/programmata/borrowed-card-source-branches',
+    requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'read'),
+    authorizeBorrowedSourceBranches,
+    erganhController.getBorrowedSourceBranches
+);
+
+router.post(
+    '/ergazomenoi/programmata/updatePshfiakesKartesMonoDaneizomenon',
+    requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'update'),
+    authorizeBorrowedDeclaredScheduleUpdate,
+    erganhController.updatePshfiakesKartesMonoDaneizomenon
+);
+
 router.post(
     '/ergazomenoi/programmata/wtoApologistiko',
     requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'export'),
