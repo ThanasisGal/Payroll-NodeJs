@@ -11,7 +11,7 @@
         </div>
 
        
-        <div class="card-body overflow-auto flex-grow-1 height-vh-33 bg-white">
+        <div class="card-body overflow-auto flex-grow-1 height-vh-38 bg-white">
             <%
                 const safe = (k) => (rec && rec[k]) || '';
 
@@ -99,12 +99,12 @@
 
             <div class="row form-group g-3 align-items-center mb-3">
                 <div class="col-2 left-align">
-                    <label for="kodikos" class="col-form-label label-font-size-smaller">Κωδικός</label>
+                    <label for="kodikos" class="col-form-label label-font-size-smaller">Κωδικός Εργαζομένου</label>
                 </div>
                 <div class="col-2-5">
                     <input type="text" inputmode="numeric" pattern="[0-9]{1,4}" maxlength="4"
                         name="kodikos" id="kodikos" class="form-control input-contents"
-                        placeholder="Κενό = όλο το παράρτημα" autocomplete="off" />
+                        placeholder="π.χ. 0031" autocomplete="off" />
                 </div>
             </div>
 

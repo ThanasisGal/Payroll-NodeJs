@@ -23,13 +23,16 @@ function employeeModel(employees) {
 }
 function dependencies(employees) {
     const writes = [];
+    let cleanupCalls = 0;
     return {
         writes,
+        get cleanupCalls() { return cleanupCalls; },
         value: {
             ergazomenoiModel: employeeModel(employees),
             argiesModel: { find: () => ({ lean: async () => [] }) },
             prodhlomenaModel: {
                 find: () => query([]),
+                deleteMany: async () => { cleanupCalls++; },
                 bulkWrite: async (ops) => { writes.push(...ops); return { upsertedCount: ops.length, modifiedCount: 0 }; }
             }
         }
@@ -37,6 +40,23 @@ function dependencies(employees) {
 }
 const targetEmployee = { afm: '123456789', kodikos: '0001', ...scope };
 const otherEmployee = { afm: '123456789', kodikos: '9999', team: 'THA', company_kod: otherCompany, ypokatasthma: '0000' };
+
+const eligibilityCases = [
+    { name: 'explicit normal employee', fields: { afora_daneismo_ergazomenoy: false, typos_ergodoth_daneismoy: false }, expectedWrites: 1 },
+    { name: 'borrowed employee', fields: { afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false }, expectedWrites: 0 },
+    { name: 'borrowed employee of borrowing employer', fields: { afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: true }, expectedWrites: 0 },
+    { name: 'legacy employee without lending fields', fields: {}, expectedWrites: 1 }
+];
+
+for (const eligibilityCase of eligibilityCases) {
+    test(`schedule import eligibility: ${eligibilityCase.name}`, async () => {
+        const harness = dependencies([{ ...targetEmployee, ...eligibilityCase.fields }]);
+        const result = await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
+        assert.equal(result.bulkOps.length, eligibilityCase.expectedWrites);
+        assert.equal(harness.writes.length, eligibilityCase.expectedWrites);
+        assert.equal(harness.cleanupCalls, 0);
+    });
+}
 
 test('schedule import writes only the authorized company when AFM exists in both companies', async () => {
     const harness = dependencies([otherEmployee, targetEmployee]);
@@ -81,6 +101,24 @@ test('cards update filter is pinned to authorized team company branch', async ()
     });
     assert.equal(writes[0].updateOne.upsert, false);
 });
+
+for (const eligibilityCase of eligibilityCases) {
+    test(`cards import eligibility: ${eligibilityCase.name}`, async () => {
+        const writes = [];
+        let cleanupCalls = 0;
+        const result = await saveKartesPayloadToMongo(cardRows(), {
+            authorizedScope: scope,
+            ergazomenoiModel: employeeModel([{ ...targetEmployee, ...eligibilityCase.fields }]),
+            prodhlomenaModel: {
+                deleteMany: async () => { cleanupCalls++; },
+                bulkWrite: async (ops) => { writes.push(...ops); return { matchedCount: ops.length, modifiedCount: ops.length }; }
+            }
+        });
+        assert.equal(result.bulkOps.length, eligibilityCase.expectedWrites);
+        assert.equal(writes.length, eligibilityCase.expectedWrites);
+        assert.equal(cleanupCalls, 0);
+    });
+}
 
 test('cards perform no update for wrong-company-only, ambiguous, or other-branch evidence', async () => {
     for (const [employees, rows] of [

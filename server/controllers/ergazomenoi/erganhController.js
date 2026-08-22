@@ -16320,6 +16320,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         AMBIGUOUS_SCOPE_CODE,
         OUTSIDE_SCOPE_CODE,
         assertEmployeeWriteScope,
+        employeeIsEligibleForProdhlomenaOraria,
         loadScopedErganiEmployees
     } = require('../../services/ergazomenoi/erganiImportedEmployeeScopeService');
     const employeeResolution = await loadScopedErganiEmployees({
@@ -16394,6 +16395,10 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
             continue;
         }
         assertEmployeeWriteScope(ergazomenos, employeeResolution.scope);
+        if (!employeeIsEligibleForProdhlomenaOraria(ergazomenos)) {
+            i++;
+            continue;
+        }
 
         // ✅ Αργία βάσει της τρέχουσας ημερομηνίας του Εργάνη_Τελικό
         const argiaKey = `${ergazomenos.team}|${ergazomenos.company_kod}|${hmeromhnia.getTime()}`;
@@ -17116,6 +17121,7 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
         AMBIGUOUS_SCOPE_CODE,
         OUTSIDE_SCOPE_CODE,
         assertEmployeeWriteScope,
+        employeeIsEligibleForProdhlomenaOraria,
         loadScopedErganiEmployees
     } = require('../../services/ergazomenoi/erganiImportedEmployeeScopeService');
 
@@ -17184,6 +17190,9 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
             continue;
         }
         assertEmployeeWriteScope(ergazomenos, employeeResolution.scope);
+        if (!employeeIsEligibleForProdhlomenaOraria(ergazomenos)) {
+            continue;
+        }
 
         const update = {
             ypokatasthma: g.ypokatasthma,

@@ -29,6 +29,12 @@ function employeeIsInAuthorizedScope(employee, scope) {
         String(employee.ypokatasthma || '').trim().padStart(4, '0') === authorized.ypokatasthma;
 }
 
+function employeeIsEligibleForProdhlomenaOraria(employee) {
+    return Boolean(employee) &&
+        employee.afora_daneismo_ergazomenoy !== true &&
+        employee.typos_ergodoth_daneismoy !== true;
+}
+
 function indexScopedEmployees(candidates, scope) {
     const authorized = assertCompleteScope(scope);
     const byAfm = new Map();
@@ -73,6 +79,7 @@ module.exports = {
     AMBIGUOUS_SCOPE_CODE,
     OUTSIDE_SCOPE_CODE,
     assertEmployeeWriteScope,
+    employeeIsEligibleForProdhlomenaOraria,
     employeeIsInAuthorizedScope,
     indexScopedEmployees,
     loadScopedErganiEmployees,
