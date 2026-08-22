@@ -83,6 +83,18 @@
     .ergazomenoi-toggle-wrap {
         min-width: 11rem;
     }
+
+    #myTableHeader,
+    #myTable {
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    .ergazomenoi-specialty-cell {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 </style>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-5 mb-3 border-bottom bg-hero-cdn">
@@ -122,9 +134,10 @@
             <thead class="backgroundColor-brown font-size-rem-1_1 center-align">
                 <tr class="color-brown">
                     <th scope="col" class="color-brown col-1">Κωδ.<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-3-5">Επώνυμο<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-2">Όνομα<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-2">Πατρώνυμο<i class="sort-icon bi"></i></th>
+                    <th scope="col" class="color-brown col-2-5">Επώνυμο<i class="sort-icon bi"></i></th>
+                    <th scope="col" class="color-brown col-1-5">Όνομα<i class="sort-icon bi"></i></th>
+                    <th scope="col" class="color-brown col-1-5">Πατρώνυμο<i class="sort-icon bi"></i></th>
+                    <th scope="col" class="color-brown col-2">Ειδικότητα<i class="sort-icon bi"></i></th>
                     <th scope="col" class="color-brown col-1">Α.Φ.Μ.<i class="sort-icon bi"></i></th>
                     <th scope="col" class="color-brown col-1-5">Α.M.K.A.<i class="sort-icon bi"></i></th>
                     <th scope="col" class="color-brown col-1">Α.Δ.Τ.<i class="sort-icon bi"></i></th>
@@ -141,7 +154,7 @@
                         <% const isInactive = element.energos !== true; %>
                         <tr class="input-content-regular <%= isInactive ? 'ergazomenos-anenergos table-danger' : '' %>" data-id="<%- element._id %>" id="myTableRow">
                             <td class="col-1 padding-left-rem-0_5"><%- element.kodikos %></td>
-                            <td class="col-3-5">
+                            <td class="col-2-5">
                                 <%- element.eponymo %>
                                 <% if (isInactive) { %>
                                     <% const inactiveSince = formatInactiveDate(element.hmeromhnia_apoxorhshs); %>
@@ -150,8 +163,13 @@
                                     </span>
                                 <% } %>
                             </td>
-                            <td class="col-2"><%- element.onoma %></td>
-                            <td class="col-2"><%- element.patronymo %></td>
+                            <td class="col-1-5"><%- element.onoma %></td>
+                            <td class="col-1-5"><%- element.patronymo %></td>
+                            <td
+                                class="col-2 ergazomenoi-specialty-cell"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                data-bs-title="<%= element.eidikothta_perigrafh_plain || element.eidikothta || '' %>"><%- element.eidikothta_perigrafh || element.eidikothta || '' %></td>
                             <td class="col-1"><%- element.afm %></td>
                             <td class="col-1-5"><%- element.amka %></td>
                             <td class="col-1"><%- element.adt %></td>
@@ -159,7 +177,7 @@
                     <% }) %>
                 <% } else { %>
                     <tr>
-                        <td colspan="7" class="records-not-found">Δεν βρέθηκαν εγγραφές.</td>
+                        <td colspan="8" class="records-not-found">Δεν βρέθηκαν εγγραφές.</td>
                     </tr>
                 <% } %>
             </tbody>
