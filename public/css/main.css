@@ -4106,12 +4106,6 @@ a[href] {
     font-size: 0.85rem;
 }
 
-.childmenu-li:hover a {
-    color: #a81502 !important;
-    font-size: 0.8rem !important;
-    font-weight: 500 !important;
-}
-
 .table-active {
     background-color: #900101 !important;
 }
@@ -5785,6 +5779,25 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .height-vh-31 {
     height: 31vh !important;
 }
+
+/* Borrowed declared schedules form: compact rows with room for a downward Tom Select menu. */
+#transferForm .borrowed-schedule-card-body {
+    min-height: 390px;
+    overflow: visible;
+}
+
+#transferForm .borrowed-schedule-row {
+    margin-bottom: 0.625rem !important;
+}
+
+#transferForm .borrowed-schedule-control {
+    margin-top: 0.125rem !important;
+}
+
+#transferForm .borrowed-schedule-spacer {
+    height: 0.25rem;
+    margin: 0;
+}
 .height-vh-33 {
     height: 33vh !important;
 }
@@ -7451,6 +7464,133 @@ main {
     #nav-tree a.ajustedGap-link:hover {
         width: 18.2vw !important;
     }
+}
+
+/* Content-driven sidebar layout. */
+#nav-tree,
+#nav-tree .submenu {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+#nav-tree {
+    padding-right: 8px;
+}
+
+#nav-tree li {
+    padding-right: 0;
+}
+
+#nav-tree li,
+#nav-tree li ul li {
+    margin-bottom: 0.375rem;
+}
+
+#nav-tree li ul li {
+    padding-top: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+}
+
+#sidebarMenu #nav-tree a.menu-item {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0;
+    margin-bottom: 0 !important;
+    padding: 0.25rem 0.75rem !important;
+    line-height: 1.3 !important;
+}
+
+#nav-tree a.menu-item::after {
+    content: none;
+}
+
+
+#nav-tree a.sidebar-submenu-toggle {
+    display: flex !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+    letter-spacing: normal !important;
+    transform: none !important;
+    font-family: inherit !important;
+}
+
+#nav-tree a.sidebar-submenu-toggle .sidebar-menu-label {
+    transform: none !important;
+    font: inherit;
+    letter-spacing: inherit;
+}
+
+#nav-tree .sidebar-menu-label {
+    display: block;
+    min-width: 0;
+    overflow-wrap: break-word;
+    transform-origin: left center;
+}
+
+/* Tree connectors follow the real nested submenu structure. */
+#nav-tree ul.submenu {
+    position: relative;
+    margin-left: 0;
+    padding-left: 0.85rem;
+}
+
+#nav-tree ul.submenu > li {
+    position: relative;
+}
+
+#nav-tree ul.submenu > li::before,
+#nav-tree ul.submenu > li::after {
+    content: '' !important;
+    position: absolute;
+    left: -0.5rem;
+    background-color: rgba(65, 80, 75, 0.5);
+    pointer-events: none;
+    opacity: 1 !important;
+}
+
+#nav-tree ul.submenu > li::before {
+    top: -0.375rem;
+    bottom: -0.375rem;
+    width: 1px;
+}
+
+#nav-tree ul.submenu > li::after {
+    top: calc(0.25rem + 0.65em);
+    width: 0.5rem;
+    height: 1px;
+}
+
+#nav-tree ul.submenu > li:last-child::before {
+    bottom: auto;
+    height: calc(0.625rem + 0.65em);
+}
+
+#nav-tree .sidebar-submenu-toggle .user-privileges-hierarchy-chevron {
+    align-self: center;
+}
+
+#nav-tree li > ul.submenu > li > a.menu-item:not(.sidebar-submenu-toggle) {
+    padding-left: 1rem !important;
+    font-size: 0.85rem !important;
+    font-weight: 400 !important;
+    line-height: 1.3 !important;
+    letter-spacing: normal !important;
+    transform: none !important;
+}
+
+#nav-tree li > ul.submenu > li > a.menu-item:not(.sidebar-submenu-toggle) .sidebar-menu-label {
+    transform: none !important;
+}
+
+#nav-tree a.menu-item.active:not(.disabled) {
+    color: #174f2d;
+    box-shadow:
+        inset 0 0 0 9999px rgba(104, 211, 151, 0.3),
+        inset 0 0 0 1px #5ca778,
+        inset 0.22rem 0 0 #287a4b;
 }
 
 /* Footer base font size */

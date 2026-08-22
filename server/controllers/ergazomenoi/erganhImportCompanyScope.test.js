@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const controller = require('./erganhController');
+const {
+    hasLendingSideBorrowedEmployees
+} = require('../../services/ergazomenoi/erganiImportedEmployeeScopeService');
 
 const { saveTelikoToProdhlomena } = controller.__scheduleDownloadTestHooks;
 const { saveKartesPayloadToMongo } = controller.__cardsDownloadTestHooks;
@@ -37,6 +40,41 @@ function dependencies(employees) {
 }
 const targetEmployee = { afm: '123456789', kodikos: '0001', ...scope };
 const otherEmployee = { afm: '123456789', kodikos: '9999', team: 'THA', company_kod: otherCompany, ypokatasthma: '0000' };
+
+const eligibilityCases = [
+    { name: 'explicit normal employee', fields: { afora_daneismo_ergazomenoy: false, typos_ergodoth_daneismoy: false }, expectedWrites: 1 },
+    { name: 'borrowed employee', fields: { afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false }, expectedWrites: 0 },
+    { name: 'borrowed employee of borrowing employer', fields: { afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: true }, expectedWrites: 1 },
+    { name: 'inconsistent false/true legacy employee', fields: { afora_daneismo_ergazomenoy: false, typos_ergodoth_daneismoy: true }, expectedWrites: 1 },
+    { name: 'legacy employee without lending fields', fields: {}, expectedWrites: 1 }
+];
+
+test('borrowed transfer availability uses one company-scoped true/false lookup', async () => {
+    let receivedFilter;
+    const available = await hasLendingSideBorrowedEmployees({
+        team: 'THA', company_kod: scope.company_kod,
+        employeeModel: {
+            findOne(filter) {
+                receivedFilter = filter;
+                return { select: () => ({ lean: async () => ({ _id: 'employee' }) }) };
+            }
+        }
+    });
+    assert.equal(available, true);
+    assert.deepEqual(receivedFilter, {
+        team: 'THA', company_kod: scope.company_kod,
+        afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false
+    });
+});
+
+for (const eligibilityCase of eligibilityCases) {
+    test(`schedule import eligibility: ${eligibilityCase.name}`, async () => {
+        const harness = dependencies([{ ...targetEmployee, ...eligibilityCase.fields }]);
+        const result = await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
+        assert.equal(result.bulkOps.length, eligibilityCase.expectedWrites);
+        assert.equal(harness.writes.length, eligibilityCase.expectedWrites);
+    });
+}
 
 test('schedule import writes only the authorized company when AFM exists in both companies', async () => {
     const harness = dependencies([otherEmployee, targetEmployee]);

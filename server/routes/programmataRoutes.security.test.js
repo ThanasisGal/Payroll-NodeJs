@@ -16,8 +16,14 @@ const contracts = [
     ['POST', '/ergazomenoi/programmata/copy', "requireUserPrivilegeAnyAction('SynthrhshProgrammatosErgasias', ['create', 'update'])", 'authorizeProgrammataCopy'],
     ['POST', '/api/ergazomenoi/programmata/getOraria', "requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'update')", 'authorizeGetOraria'],
     ['GET', '/ergazomenoi/programmata/lhpshOrarionApoErganh', "requireUserPrivilegeAction('LhpshOrarionApoErganh', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon', "requireUserPrivilegeAction('LhpshProdhlomenonOrarionMonoDaneizomenon', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/borrowed-source-branches', "requireUserPrivilegeAction('LhpshProdhlomenonOrarionMonoDaneizomenon', 'read')", 'authorizeBorrowedSourceBranches'],
+    ['POST', '/ergazomenoi/programmata/updateProdhlomenaOrariaMonoDaneizomenon', "requireUserPrivilegeAction('LhpshProdhlomenonOrarionMonoDaneizomenon', 'update')", 'authorizeBorrowedDeclaredScheduleUpdate'],
     ['POST', '/ergazomenoi/programmata/downloadSchedule', "requireUserPrivilegeAction('LhpshOrarionApoErganh', 'update')", 'authorizeProgrammataExternalAction'],
     ['GET', '/ergazomenoi/programmata/lhpshOrarionApoKartes', "requireUserPrivilegeAction('LhpshOrarionApoKartes', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon', "requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/borrowed-card-source-branches', "requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'read')", 'authorizeBorrowedSourceBranches'],
+    ['POST', '/ergazomenoi/programmata/updatePshfiakesKartesMonoDaneizomenon', "requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'update')", 'authorizeBorrowedDeclaredScheduleUpdate'],
     ['POST', '/ergazomenoi/programmata/downloadCards', "requireUserPrivilegeAction('LhpshOrarionApoKartes', 'update')", 'authorizeProgrammataExternalAction'],
     ['POST', '/ergazomenoi/programmata/wtoApologistiko', "requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'export')", 'authorizeProgrammataExternalAction'],
     ['POST', '/ergazomenoi/programmata/wtoApologistikoYperorion', "requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'export')", 'authorizeProgrammataExternalAction'],
@@ -40,5 +46,16 @@ for (const [method, route, privilege, scope] of contracts) {
     assert.ok(block.includes(privilege), `${method} ${route}: action privilege middleware missing`);
     assert.ok(block.includes(scope), `${method} ${route}: scope middleware missing`);
 }
+
+const borrowedGetStart = routes.indexOf("'/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon'");
+const borrowedGetBlock = routes.slice(borrowedGetStart, routes.indexOf('router.', borrowedGetStart + 10));
+assert.ok(borrowedGetBlock.includes('mainLhpshProdhlomenonOrarionMonoDaneizomenonForm'));
+assert.ok(!borrowedGetBlock.includes('sendStatus(501)'));
+const borrowedPostStart = routes.indexOf("'/ergazomenoi/programmata/updateProdhlomenaOrariaMonoDaneizomenon'");
+const borrowedPostBlock = routes.slice(borrowedPostStart, routes.indexOf('router.', borrowedPostStart + 10));
+assert.ok(borrowedPostBlock.includes('updateProdhlomenaOrariaMonoDaneizomenon'));
+assert.ok(!borrowedPostBlock.includes('authorizeProgrammataExternalAction'));
+assert.ok(!borrowedPostBlock.includes('lhpshOrarionApoErganh'));
+assert.ok(!borrowedPostBlock.includes('processOrariaXlsx'));
 
 console.log(`PASS programmata route security contract (${contracts.length} sensitive routes)`);
