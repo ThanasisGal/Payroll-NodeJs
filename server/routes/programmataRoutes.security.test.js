@@ -16,8 +16,10 @@ const contracts = [
     ['POST', '/ergazomenoi/programmata/copy', "requireUserPrivilegeAnyAction('SynthrhshProgrammatosErgasias', ['create', 'update'])", 'authorizeProgrammataCopy'],
     ['POST', '/api/ergazomenoi/programmata/getOraria', "requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'update')", 'authorizeGetOraria'],
     ['GET', '/ergazomenoi/programmata/lhpshOrarionApoErganh', "requireUserPrivilegeAction('LhpshOrarionApoErganh', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon', "requireUserPrivilegeAction('LhpshProdhlomenonOrarionMonoDaneizomenon', 'read')", 'authorizeProgrammataSessionCompany'],
     ['POST', '/ergazomenoi/programmata/downloadSchedule', "requireUserPrivilegeAction('LhpshOrarionApoErganh', 'update')", 'authorizeProgrammataExternalAction'],
     ['GET', '/ergazomenoi/programmata/lhpshOrarionApoKartes', "requireUserPrivilegeAction('LhpshOrarionApoKartes', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon', "requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'read')", 'authorizeProgrammataSessionCompany'],
     ['POST', '/ergazomenoi/programmata/downloadCards', "requireUserPrivilegeAction('LhpshOrarionApoKartes', 'update')", 'authorizeProgrammataExternalAction'],
     ['POST', '/ergazomenoi/programmata/wtoApologistiko', "requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'export')", 'authorizeProgrammataExternalAction'],
     ['POST', '/ergazomenoi/programmata/wtoApologistikoYperorion', "requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'export')", 'authorizeProgrammataExternalAction'],
@@ -39,6 +41,17 @@ for (const [method, route, privilege, scope] of contracts) {
     const block = routes.slice(start, start + 500);
     assert.ok(block.includes(privilege), `${method} ${route}: action privilege middleware missing`);
     assert.ok(block.includes(scope), `${method} ${route}: scope middleware missing`);
+}
+
+for (const route of [
+    '/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon',
+    '/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon'
+]) {
+    const start = routes.indexOf(`'${route}'`);
+    const nextRoute = routes.indexOf('router.', start + route.length);
+    const block = routes.slice(start, nextRoute);
+    assert.ok(block.includes('res.sendStatus(501)'), `${route}: safe temporary handler missing`);
+    assert.ok(!block.includes('erganhController.'), `${route}: import/download controller must not be called`);
 }
 
 console.log(`PASS programmata route security contract (${contracts.length} sensitive routes)`);

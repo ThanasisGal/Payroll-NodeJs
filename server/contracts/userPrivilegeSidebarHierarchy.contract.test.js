@@ -11,6 +11,21 @@ const {
     USER_PRIVILEGE_FORM_CATALOG_SEED: seedData
 } = require('../seeds/userPrivilegeFormCatalogSeedData');
 
+const approvedSidebarOverrides = new Map([
+    ['LhpshOrarionApoErganh', {
+        itemLabel: 'ΜΗ Δανειζόμενων Εργαζόμενων'
+    }],
+    ['LhpshOrarionApoKartes', {
+        itemLabel: 'ΜΗ Δανειζόμενων Εργαζόμενων'
+    }],
+    ['LhpshProdhlomenonOrarionMonoDaneizomenon', {
+        itemLabel: 'ΜΟΝΟ Δανειζόμενων Εργαζόμενων'
+    }],
+    ['LhpshPshfiakonKartonMonoDaneizomenon', {
+        itemLabel: 'ΜΟΝΟ Δανειζόμενων Εργαζόμενων'
+    }]
+]);
+
 function normalizeLabel(value) {
     return value.replace(/\s+/g, ' ').trim();
 }
@@ -69,17 +84,58 @@ const visibleCatalog = seedData
     .sort((left, right) => left.sidebarOrder - right.sidebarOrder);
 const sortedHierarchy = [...userPrivilegeSidebarHierarchy].sort(compareHierarchyEntries);
 
-assert.strictEqual(sidebarForms.length, 25);
+assert.strictEqual(sidebarForms.length, 27);
+assert.strictEqual(visibleCatalog.length, 27);
+assert.deepStrictEqual(
+    visibleCatalog
+        .filter((entry) => [
+            'LhpshProdhlomenonOrarionMonoDaneizomenon',
+            'LhpshPshfiakonKartonMonoDaneizomenon'
+        ].includes(entry.form))
+        .map(({ form, sidebarOrder }) => ({ form, sidebarOrder })),
+    [
+        { form: 'LhpshProdhlomenonOrarionMonoDaneizomenon', sidebarOrder: 9500 },
+        { form: 'LhpshPshfiakonKartonMonoDaneizomenon', sidebarOrder: 10500 }
+    ]
+);
+assert.strictEqual(visibleCatalog.find((entry) => entry.form === 'LhpshOrarionApoErganh').sidebarOrder, 9000);
+assert.strictEqual(visibleCatalog.find((entry) => entry.form === 'LhpshOrarionApoKartes').sidebarOrder, 10000);
+assert.strictEqual(visibleCatalog.find((entry) => entry.form === 'CalcApasxolhseisPeriodoy').sidebarOrder, 11000);
+assert.ok(!visibleCatalog.some((entry) => entry.sidebarOrder === 12000));
+assert.ok(!visibleCatalog.some((entry) => entry.form === 'CalcApasxolhseisDaneizomenoyProsopikoy'));
+assert.deepStrictEqual(
+    sortedHierarchy.find((entry) => entry.form === 'YpobolhAdeion'),
+    {
+        form: 'YpobolhAdeion',
+        sidebarNodeId: 'li2373',
+        itemLabel: 'Υποβολή Αδειών',
+        itemOrder: 300,
+        ancestors: [
+            { key: 'files', label: 'Αρχεία', order: 100 },
+            { key: 'ergani-ii', label: 'ΕΡΓΑΝΗ ΙΙ', order: 300 },
+            { key: 'file-submissions', label: 'Αποστολή Αρχείων', order: 600 }
+        ]
+    }
+);
+assert.strictEqual(visibleCatalog.find((entry) => entry.form === 'YpobolhAdeion').sidebarOrder, 15500);
 assert.deepStrictEqual(sidebarForms.map((entry) => entry.form), visibleCatalog.map((entry) => entry.form));
-assert.deepStrictEqual(sidebarForms.map((entry) => entry.itemLabel), visibleCatalog.map((entry) => entry.formLabel));
+assert.deepStrictEqual(
+    sidebarForms.map((entry) => entry.itemLabel),
+    visibleCatalog.map((entry) => approvedSidebarOverrides.get(entry.form)?.itemLabel || entry.formLabel)
+);
 assert.deepStrictEqual(sortedHierarchy.map((entry) => entry.form), sidebarForms.map((entry) => entry.form));
 
 sortedHierarchy.forEach((entry, index) => {
     const sidebar = sidebarForms[index];
-    assert.strictEqual(entry.itemLabel, sidebar.itemLabel, `${entry.form}: leaf label`);
+    const approvedOverride = approvedSidebarOverrides.get(entry.form);
+    assert.strictEqual(
+        approvedOverride?.itemLabel || entry.itemLabel,
+        sidebar.itemLabel,
+        `${entry.form}: leaf label`
+    );
     assert.strictEqual(entry.sidebarNodeId, sidebar.sidebarNodeId, `${entry.form}: sidebar node id`);
     assert.deepStrictEqual(
-        entry.ancestors.map(({ label }) => label),
+        approvedOverride?.ancestorLabels || entry.ancestors.map(({ label }) => label),
         sidebar.ancestorLabels,
         `${entry.form}: hierarchy path`
     );
@@ -92,7 +148,7 @@ assert.ok(visibleCatalog.every((entry) => entry.sidebarOrder >= 1000));
 const hiddenCatalog = seedData.filter((entry) => entry.showInPrivileges === false);
 assert.ok(hiddenCatalog.every((entry) => !userPrivilegeSidebarHierarchy.some((item) => item.form === entry.form)));
 assert.ok(!userPrivilegeSidebarHierarchy.some((entry) =>
-    ['Μικτές από Καθαρές Αποδοχές', 'Ετήσιες Μονάδες Εργασίας (EME)', 'Υποβολή Αδειών']
+    ['Μικτές από Καθαρές Αποδοχές', 'Ετήσιες Μονάδες Εργασίας (EME)']
         .includes(entry.itemLabel)));
 
 console.log(`PASS sidebar/catalog/hierarchy contract (${sidebarForms.length} visible forms, exact labels/nesting/order)`);

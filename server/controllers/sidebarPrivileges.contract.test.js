@@ -11,6 +11,21 @@ const frontend = read('public/js/common/getUserRole.js');
 const reviewView = read('views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs');
 const reviewJs = read('public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js');
 const routes = read('server/routes/usersRoute.js');
+const renderedSidebar = ejs.render(sidebar, {
+    userRole: 'A',
+    isAdminUserRole: () => true,
+    isUserPrivilegesManagerRole: () => true,
+    NODE_ENV: 'test',
+    nonce: '',
+    userId: '',
+    script: () => ''
+}, { filename: path.join(root, 'views/partials/sidebar.ejs') });
+const renderedSidebarWithoutComments = renderedSidebar.replace(/<!--[\s\S]*?-->/g, '');
+const renderedMenuItems = [...renderedSidebarWithoutComments.matchAll(/<a\b[^>]*>[\s\S]*?<\/a\s*>/gi)]
+    .filter((match) => {
+        const classValue = match[0].match(/\bclass=["']([^"']*)["']/i)?.[1] || '';
+        return classValue.split(/\s+/).includes('menu-item');
+    });
 
 assert.ok(controller.includes('UserPrivilegesModel.find('));
 assert.ok(!/fetchPermissions[\s\S]*?SidebarStatusModel\.find/.test(controller));
@@ -25,10 +40,12 @@ assert.ok(!/situation_(?:A|S|HR|C|U|V)/.test(frontend));
 
 for (const form of [
     'Companies', 'Ypokatasthmata', 'NomimoiEkprosopoi', 'Passwords', 'Antistoixiseis', 'Trapezes',
-    'Ergazomenoi', 'AntigrafhProgrammatonErgasias', 'LhpshOrarionApoErganh', 'LhpshOrarionApoKartes',
-    'CalcApasxolhseisPeriodoy', 'CalcApasxolhseisDaneizomenoyProsopikoy',
+    'Ergazomenoi', 'AntigrafhProgrammatonErgasias',
+    'LhpshOrarionApoErganh', 'LhpshProdhlomenonOrarionMonoDaneizomenon',
+    'LhpshOrarionApoKartes', 'LhpshPshfiakonKartonMonoDaneizomenon',
+    'CalcApasxolhseisPeriodoy',
     'ElegxosApasxolhseonPeriodoy', 'ApologistikosPinakasOrarion',
-    'ApologistikosPinakasYperorion', 'Krathseis', 'Symbaseis', 'KathgoriesSymbaseon',
+    'ApologistikosPinakasYperorion', 'YpobolhAdeion', 'Krathseis', 'Symbaseis', 'KathgoriesSymbaseon',
     'EidikothtesSymbaseon', 'StoixeiaSymbaseon', 'KlimakiaSymbaseon',
     'YpologismoiKlimakionSymbaseon', 'Apasxolhseis', 'EktyposhAtomikonEkkathariseon',
     'EktyposhSymbaseonErgazomenon'
@@ -39,6 +56,31 @@ assert.ok(sidebar.includes('<% if (isUserPrivilegesManagerRole(userRole)) { %>')
 assert.ok(sidebar.includes('href="../../../login/logout"'));
 assert.ok(sidebar.includes('data-sidebar-special data-sidebar-authorized="true"'));
 assert.ok(!/\son[a-z]+\s*=/.test(sidebar));
+assert.strictEqual(renderedMenuItems.length, 58);
+renderedMenuItems.forEach((match, index) => {
+    const labels = [...match[0].matchAll(
+        /<span\b[^>]*\bclass=["'][^"']*\bsidebar-menu-label\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi
+    )];
+    assert.strictEqual(labels.length, 1, `menu-item ${index + 1}: exactly one sidebar label`);
+    assert.ok(labels[0][1].replace(/<[^>]+>/g, '').trim(), `menu-item ${index + 1}: non-empty sidebar label`);
+});
+assert.ok(sidebar.includes('id="li2373" data-value="li2373"'));
+assert.ok(sidebar.includes('id="ypobolhAdeion"'));
+assert.ok(sidebar.includes('data-privilege-form="YpobolhAdeion"'));
+for (const [liId, anchorId, form, href] of [
+    ['li2382', 'lhpshProdhlomenonMonoDaneizomenon', 'LhpshProdhlomenonOrarionMonoDaneizomenon', '/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon'],
+    ['li2392', 'lhpshPshfiakonKartonMonoDaneizomenon', 'LhpshPshfiakonKartonMonoDaneizomenon', '/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon']
+]) {
+    const liStart = sidebar.indexOf(`id="${liId}"`);
+    const liBlock = sidebar.slice(liStart, liStart + 900);
+    assert.ok(liStart >= 0, `${liId}: missing`);
+    assert.ok(liBlock.includes(`id="${anchorId}"`), `${liId}: anchor id mismatch`);
+    assert.ok(liBlock.includes(`data-privilege-form="${form}"`), `${liId}: privilege mismatch`);
+    assert.ok(liBlock.includes(`href="${href}"`), `${liId}: href mismatch`);
+    assert.ok(!liBlock.includes('href="#"'), `${liId}: placeholder href remains`);
+    assert.strictEqual((sidebar.match(new RegExp(`href="${href}"`, 'g')) || []).length, 1, `${liId}: route href must be unique`);
+}
+assert.strictEqual((sidebar.match(/id="apologistikosPinakasOrarion"/g) || []).length, 1);
 
 ejs.compile(reviewView, { filename: path.join(root, 'views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs') });
 assert.ok(reviewView.includes('class="btn btn-secondary rounded-4 employment-review-return-btn" href="/mainapp"'));

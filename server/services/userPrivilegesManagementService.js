@@ -203,7 +203,10 @@ async function updateAllPrivilegesAtomically({
             }
             const catalog = await catalogModel.find({
                 active: true,
-                showInPrivileges: true
+                showInPrivileges: true,
+                form: mongoose.trusted({
+                    $in: userPrivilegeSidebarHierarchy.map((entry) => entry.form)
+                })
             })
                 .select('_id form formLabel sidebarOrder')
                 .sort({ sidebarOrder: 1, form: 1 })

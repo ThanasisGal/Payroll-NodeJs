@@ -644,6 +644,13 @@ router.get(
     erganhController.mainLhpshOrarionApoErganhForm
 );
 
+router.get(
+    '/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon',
+    requireUserPrivilegeAction('LhpshProdhlomenonOrarionMonoDaneizomenon', 'read'),
+    authorizeProgrammataSessionCompany,
+    (_req, res) => res.sendStatus(501)
+);
+
 router.post(
     '/ergazomenoi/programmata/downloadSchedule',
     requireUserPrivilegeAction('LhpshOrarionApoErganh', 'update'),
@@ -656,6 +663,13 @@ router.get(
     requireUserPrivilegeAction('LhpshOrarionApoKartes', 'read'),
     authorizeProgrammataSessionCompany,
     erganhController.mainLhpshOrarionApoKartesForm
+);
+
+router.get(
+    '/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon',
+    requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'read'),
+    authorizeProgrammataSessionCompany,
+    (_req, res) => res.sendStatus(501)
 );
 
 router.post(

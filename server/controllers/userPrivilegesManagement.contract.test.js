@@ -206,6 +206,14 @@ test('a catalog form without a user document is serialized with false privileges
     assert.ok(!Object.prototype.hasOwnProperty.call(payload.rows[0], 'formLabel'));
 });
 
+test('YpobolhAdeion without a user document is serialized with every privilege false', () => {
+    const catalog = [{ form: 'YpobolhAdeion', formLabel: 'Υποβολή Αδειών', sidebarOrder: 15500 }];
+    const result = serializePrivilegeDocuments(catalog, [], undefined, hierarchyFor(catalog));
+    assert.strictEqual(result.rows[0].exists, false);
+    assert.strictEqual(result.rows[0].id, null);
+    assert.ok(Object.values(result.rows[0].privileges).every((value) => value === false));
+});
+
 test('mixed existing and missing documents are left-joined in catalog sidebar order', () => {
     const catalog = [
         { form: 'FirstForm', formLabel: 'Πρώτη', sidebarOrder: 4 },
@@ -510,6 +518,113 @@ test('controller returns safe 400 and 404 responses for invalid and missing user
     }
 });
 
+test('read and write catalog flows ignore non-canonical legacy forms without weakening canonical rows', async () => {
+    const previousSanitizeFilter = mongoose.get('sanitizeFilter');
+    const visibleCatalog = USER_PRIVILEGE_FORM_CATALOG_SEED
+        .filter((entry) => entry.active && entry.showInPrivileges);
+    const originalFindOne = UserModel.findOne;
+    const originalCatalogFind = UserPrivilegeFormCatalogModel.find;
+    const originalPrivilegesFind = UserPrivilegesModel.find;
+    let catalogFilter;
+    let documentsFilter;
+    try {
+        UserModel.findOne = () => ({
+            select: () => ({ lean: async () => ({ _id: id(8), privileges: 'U' }) })
+        });
+        UserPrivilegeFormCatalogModel.find = (filter) => {
+            catalogFilter = filter;
+            return {
+                select() { return this; },
+                sort() { return this; },
+                lean: async () => visibleCatalog
+            };
+        };
+        UserPrivilegesModel.find = (filter) => {
+            documentsFilter = filter;
+            return { select() { return this; }, lean: async () => [] };
+        };
+        const res = {
+            statusCode: 200,
+            payload: null,
+            status(code) { this.statusCode = code; return this; },
+            json(value) { this.payload = value; return this; }
+        };
+        await userPrivilegesController.getPrivileges({
+            session: { userTeam: 'TEAM1' },
+            params: { userId: String(id(8)) }
+        }, res);
+        assert.strictEqual(res.statusCode, 200);
+        assert.strictEqual(res.payload.rows.length, 27);
+        assert.strictEqual(catalogFilter.form.$in.length, 27);
+        assert.ok(catalogFilter.form.$in.includes('LhpshProdhlomenonOrarionMonoDaneizomenon'));
+        assert.ok(catalogFilter.form.$in.includes('LhpshPshfiakonKartonMonoDaneizomenon'));
+        assert.ok(!catalogFilter.form.$in.includes('CalcApasxolhseisDaneizomenoyProsopikoy'));
+        assert.deepStrictEqual(documentsFilter.form.$in, catalogFilter.form.$in);
+    } finally {
+        UserModel.findOne = originalFindOne;
+        UserPrivilegeFormCatalogModel.find = originalCatalogFind;
+        UserPrivilegesModel.find = originalPrivilegesFind;
+    }
+    mongoose.set('sanitizeFilter', true);
+    for (const [model, filter] of [
+        [UserPrivilegeFormCatalogModel, catalogFilter],
+        [UserPrivilegesModel, documentsFilter]
+    ]) {
+        const query = model.find(filter);
+        mongoose.sanitizeFilter(query.getFilter());
+        assert.doesNotThrow(() => query.cast());
+    }
+
+    let writeCatalogFilter;
+    const document = privilegeDoc(1, 'user-1', 'OnlyForm');
+    const catalog = catalogFor([document]);
+    const model = {
+        schema: UserPrivilegesModel.schema,
+        find() {
+            return { select() { return { session() { return { lean: async () => [document] }; } }; } };
+        },
+        async updateOne() { return { matchedCount: 1 }; }
+    };
+    const catalogModel = {
+        find(filter) {
+            writeCatalogFilter = filter;
+            return {
+                select() { return this; },
+                sort() { return this; },
+                session() { return this; },
+                lean: async () => catalog
+            };
+        }
+    };
+    const session = { async withTransaction(fn) { await fn(); }, async endSession() {} };
+    await updateAllPrivilegesAtomically({
+        userId: 'user-1',
+        payload: payloadFor([document]),
+        model,
+        catalogModel,
+        connection: { startSession: async () => session }
+    });
+    assert.strictEqual(writeCatalogFilter.form.$in.length, 27);
+    const writeCatalogQuery = UserPrivilegeFormCatalogModel.find(writeCatalogFilter);
+    mongoose.sanitizeFilter(writeCatalogQuery.getFilter());
+    assert.doesNotThrow(() => writeCatalogQuery.cast());
+    mongoose.set('sanitizeFilter', previousSanitizeFilter);
+});
+
+test('missing one of the 27 canonical catalog rows remains a strict hierarchy mismatch', () => {
+    const visibleCatalog = USER_PRIVILEGE_FORM_CATALOG_SEED
+        .filter((entry) => entry.active && entry.showInPrivileges);
+    const missingNewForm = visibleCatalog.filter(
+        (entry) => entry.form !== 'LhpshPshfiakonKartonMonoDaneizomenon'
+    );
+    assert.strictEqual(visibleCatalog.length, 27);
+    assert.strictEqual(missingNewForm.length, 26);
+    assert.throws(
+        () => serializePrivilegeDocuments(missingNewForm, []),
+        (error) => error.code === 'PRIVILEGE_HIERARCHY_MISMATCH' && error.status === 500
+    );
+});
+
 test('users dropdown response contains only safe descriptive fields and central role labels', async () => {
     const originalFind = UserModel.find;
     try {
@@ -622,14 +737,20 @@ test('catalog visible order exactly matches canonical data-privilege-form sideba
     assert.strictEqual(new Set(visibleCatalog.map((entry) => entry.sidebarOrder)).size, visibleCatalog.length);
     assert.deepStrictEqual(
         visibleCatalog.map((entry) => entry.sidebarOrder),
-        sidebarForms.map((_, index) => (index + 1) * 1000)
+        [
+            ...Array.from({ length: 9 }, (_, index) => (index + 1) * 1000),
+            9500,
+            10000,
+            10500,
+            11000,
+            13000,
+            14000,
+            15000,
+            15500,
+            ...Array.from({ length: 10 }, (_, index) => (index + 16) * 1000)
+        ]
     );
     const employmentReview = visibleCatalog.find((entry) => entry.form === 'ElegxosApasxolhseonPeriodoy');
-    const borrowedEmployment = visibleCatalog.find((entry) =>
-        entry.form === 'CalcApasxolhseisDaneizomenoyProsopikoy');
-    assert.strictEqual(borrowedEmployment.sidebarOrder, 12000);
-    assert.strictEqual(borrowedEmployment.formLabel,
-        'Υπολογισμός Απασχολήσεων Δανειζόμενου Προσωπικού');
     assert.deepStrictEqual(getSchemaPrivilegeKeys(),
         ['admin', 'create', 'read', 'update', 'delete', 'print', 'export']);
     assert.strictEqual(employmentReview.sidebarOrder, 13000);

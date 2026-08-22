@@ -3,6 +3,7 @@ const UserModel = require('../models/userModel');
 const { UserPrivilegesModel } = require('../models/privileges');
 const UserPrivilegeFormCatalogModel = require('../models/userPrivilegeFormCatalog');
 const { getUserRoleLabel } = require('../constants/userRoles');
+const { userPrivilegeSidebarHierarchy } = require('../constants/userPrivilegeSidebarHierarchy');
 const {
     normalizeRequiredUserTeam,
     buildManagedUserFilter,
@@ -71,12 +72,20 @@ exports.listUsers = async (req, res) => {
 exports.getPrivileges = async (req, res) => {
     try {
         const user = await requireExistingUser(req.params.userId, req.session?.userTeam);
+        const canonicalForms = userPrivilegeSidebarHierarchy.map((entry) => entry.form);
         const [catalog, documents] = await Promise.all([
-            UserPrivilegeFormCatalogModel.find({ active: true, showInPrivileges: true })
+            UserPrivilegeFormCatalogModel.find({
+                active: true,
+                showInPrivileges: true,
+                form: mongoose.trusted({ $in: canonicalForms })
+            })
                 .select('_id form formLabel sidebarOrder')
                 .sort({ sidebarOrder: 1, form: 1 })
                 .lean(),
-            UserPrivilegesModel.find({ userId: String(user._id) })
+            UserPrivilegesModel.find({
+                userId: String(user._id),
+                form: mongoose.trusted({ $in: canonicalForms })
+            })
                 .select('_id form privileges')
                 .lean()
         ]);

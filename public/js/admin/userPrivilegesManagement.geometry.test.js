@@ -103,7 +103,7 @@ function createServer() {
         }
         if (url.pathname === '/admin/user-privileges/user-1') {
             const columns = ['admin', 'create', 'read', 'update', 'delete', 'print', 'export'];
-            const rows = Array.from({ length: 18 }, (_, index) => ({
+            const rows = Array.from({ length: 27 }, (_, index) => ({
                 id: index === 11 ? null : `0000000000000000000000${String(index + 1).padStart(2, '0')}`,
                 form: index === 11 ? 'ElegxosApasxolhseonPeriodoy' : `FixtureForm${index}`,
                 formLabel: index === 11 ? 'Έλεγχος Απασχολήσεων' : `Δοκιμαστική φόρμα ${index}`,
@@ -313,6 +313,7 @@ async function measure(page) {
                     'tr[data-privilege-form-row="true"]'
                 )].every((row) => !row.hidden);
                 return {
+                    rowCount: rows.length,
                     headerButtons: columnButtons.map((button) => ({
                         type: button.type,
                         key: button.dataset.privilegeKey,
@@ -343,6 +344,7 @@ async function measure(page) {
                 tableBehavior.headerButtons.map((button) => button.key),
                 tableBehavior.expectedColumns
             );
+            assert.strictEqual(tableBehavior.rowCount, 27);
             assert.strictEqual(tableBehavior.headerButtons.length, 7);
             tableBehavior.headerButtons.forEach((button) => {
                 assert.strictEqual(button.type, 'button');
