@@ -4105,12 +4105,6 @@ a[href] {
     font-size: 0.85rem;
 }
 
-.childmenu-li:hover a {
-    color: #a81502 !important;
-    font-size: 0.8rem !important;
-    font-weight: 500 !important;
-}
-
 .table-active {
     background-color: #900101 !important;
 }
@@ -7271,7 +7265,18 @@ main {
 
 #nav-tree a.sidebar-submenu-toggle {
     display: flex !important;
+    font-size: 0.85rem !important;
     font-weight: 600 !important;
+    line-height: 1.3 !important;
+    letter-spacing: normal !important;
+    transform: none !important;
+    font-family: inherit !important;
+}
+
+#nav-tree a.sidebar-submenu-toggle .sidebar-menu-label {
+    transform: none !important;
+    font: inherit;
+    letter-spacing: inherit;
 }
 
 #nav-tree .sidebar-menu-label {
@@ -7279,10 +7284,6 @@ main {
     min-width: 0;
     overflow-wrap: break-word;
     transform-origin: left center;
-}
-
-#nav-tree a.menu-item:hover .sidebar-menu-label {
-    transform: scale(0.90);
 }
 
 /* Tree connectors follow the real nested submenu structure. */
@@ -7329,7 +7330,15 @@ main {
 
 #nav-tree li > ul.submenu > li > a.menu-item:not(.sidebar-submenu-toggle) {
     padding-left: 1rem !important;
+    font-size: 0.85rem !important;
     font-weight: 400 !important;
+    line-height: 1.3 !important;
+    letter-spacing: normal !important;
+    transform: none !important;
+}
+
+#nav-tree li > ul.submenu > li > a.menu-item:not(.sidebar-submenu-toggle) .sidebar-menu-label {
+    transform: none !important;
 }
 
 #nav-tree a.menu-item.active:not(.disabled) {

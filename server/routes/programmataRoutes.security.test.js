@@ -22,6 +22,8 @@ const contracts = [
     ['POST', '/ergazomenoi/programmata/downloadSchedule', "requireUserPrivilegeAction('LhpshOrarionApoErganh', 'update')", 'authorizeProgrammataExternalAction'],
     ['GET', '/ergazomenoi/programmata/lhpshOrarionApoKartes', "requireUserPrivilegeAction('LhpshOrarionApoKartes', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon', "requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/borrowed-card-source-branches', "requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'read')", 'authorizeBorrowedSourceBranches'],
+    ['POST', '/ergazomenoi/programmata/updatePshfiakesKartesMonoDaneizomenon', "requireUserPrivilegeAction('LhpshPshfiakonKartonMonoDaneizomenon', 'update')", 'authorizeBorrowedDeclaredScheduleUpdate'],
     ['POST', '/ergazomenoi/programmata/downloadCards', "requireUserPrivilegeAction('LhpshOrarionApoKartes', 'update')", 'authorizeProgrammataExternalAction'],
     ['POST', '/ergazomenoi/programmata/wtoApologistiko', "requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'export')", 'authorizeProgrammataExternalAction'],
     ['POST', '/ergazomenoi/programmata/wtoApologistikoYperorion', "requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'export')", 'authorizeProgrammataExternalAction'],
@@ -43,14 +45,6 @@ for (const [method, route, privilege, scope] of contracts) {
     const block = routes.slice(start, start + 500);
     assert.ok(block.includes(privilege), `${method} ${route}: action privilege middleware missing`);
     assert.ok(block.includes(scope), `${method} ${route}: scope middleware missing`);
-}
-
-for (const route of ['/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon']) {
-    const start = routes.indexOf(`'${route}'`);
-    const nextRoute = routes.indexOf('router.', start + route.length);
-    const block = routes.slice(start, nextRoute);
-    assert.ok(block.includes('res.sendStatus(501)'), `${route}: safe temporary handler missing`);
-    assert.ok(!block.includes('erganhController.'), `${route}: import/download controller must not be called`);
 }
 
 const borrowedGetStart = routes.indexOf("'/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon'");

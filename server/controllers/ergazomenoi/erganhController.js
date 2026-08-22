@@ -43,8 +43,12 @@ const {
     buildDeclaredScheduleUpdate
 } = require('../../services/ergazomenoi/prodhlomenaOrariaSchedulePolicy');
 const {
-    updateBorrowedEmployeeDeclaredSchedules
+    updateBorrowedEmployeeDeclaredSchedules,
+    updateBorrowedEmployeeDigitalCards
 } = require('../../services/ergazomenoi/daneizomenoiProdhlomenaOrariaUpdateService');
+const {
+    buildDigitalCardsUpdateFromPairs
+} = require('../../services/ergazomenoi/prodhlomenaOrariaCardsPolicy');
 const { generateMAJSON } = require('../../utils/xmlGenerators/e3_MA_v1Generator');
 const { generateE5NJSON } = require('../../utils/xmlGenerators/e5N_v1Generator');
 const {
@@ -6361,6 +6365,58 @@ class erganhController {
         } catch (error) {
             console.error('[getBorrowedSourceBranches]', error);
             return res.status(500).json({ success: false, message: 'Σφάλμα φόρτωσης Παραρτημάτων' });
+        }
+    };
+
+    static mainLhpshPshfiakonKartonMonoDaneizomenonForm = async (req, res) => {
+        try {
+            const [userPrivileges, periodRec] = await Promise.all([
+                UserPrivilegesModel.findOne({
+                    userId: req.session.userId,
+                    form: 'LhpshPshfiakonKartonMonoDaneizomenon'
+                }).exec(),
+                PeriodsModel.findOne({
+                    xrhsh: req.session.yearInUse,
+                    kodikos: req.session.periodInUse
+                }).lean()
+            ]);
+            return res.render('ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon', {
+                userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+                locals: {
+                    title: 'Ενημέρωση Ψηφιακών Καρτών από Δανειζόμενη Εταιρεία',
+                    description: 'Web Payroll Solutions'
+                },
+                companyInUse: req.programmataAccessScope.companyId,
+                rec: {},
+                periodRec
+            });
+        } catch (error) {
+            console.error('[mainLhpshPshfiakonKartonMonoDaneizomenonForm]', error);
+            return res.status(500).send('Παρουσιάστηκε σφάλμα κατά την επεξεργασία');
+        }
+    };
+
+    static updatePshfiakesKartesMonoDaneizomenon = async (req, res) => {
+        try {
+            const scope = req.programmataAccessScope;
+            const summary = await updateBorrowedEmployeeDigitalCards({
+                scope: {
+                    team: scope.effectiveTeam,
+                    company_kod: scope.companyId,
+                    target_ypokatasthma: scope.target_ypokatasthma,
+                    source_ypokatasthma: scope.source_ypokatasthma,
+                    startDate: scope.dateRange.startDate,
+                    endDate: scope.dateRange.endDate
+                },
+                sourceContext: scope.sourceContext
+            });
+            return res.status(200).json({ success: true, summary });
+        } catch (error) {
+            console.error('[updatePshfiakesKartesMonoDaneizomenon]', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ενημέρωση των Ψηφιακών Καρτών'
+            });
         }
     };
 
@@ -17233,24 +17289,8 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
 
         const update = {
             ypokatasthma: g.ypokatasthma,
-
-            cards_apo_ora_01: '',
-            cards_eos_ora_01: '',
-            cards_apo_ora_02: '',
-            cards_eos_ora_02: '',
-            cards_apo_ora_03: '',
-            cards_eos_ora_03: '',
-            cards_ores_ergasias: 0, // ✅ μετονομάστηκε
-            check_ergasia: false
+            ...buildDigitalCardsUpdateFromPairs(g.pairs, g.lastH, diffHours)
         };
-
-        for (let idx = 0; idx < Math.min(g.pairs.length, 3); idx++) {
-            const p = g.pairs[idx];
-            const suffix = String(idx + 1).padStart(2, '0'); // "01" / "02" / "03"
-            update[`cards_apo_ora_${suffix}`] = p.apo;
-            update[`cards_eos_ora_${suffix}`] = p.eos;
-            update.cards_ores_ergasias += diffHours(p.apo, p.eos);
-        }
 
         if (g.pairs.length > 3) {
             console.warn(
@@ -17259,9 +17299,6 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
                     `${g.pairs.length} ζεύγη — αποθηκεύονται μόνο τα πρώτα 3`
             );
         }
-
-        // ✅ check_ergasia: 'Not Ok' → true, αλλιώς ('Ok' ή '') → false
-        update.check_ergasia = g.lastH === 'Not Ok';
 
         bulkOps.push({
             updateOne: {

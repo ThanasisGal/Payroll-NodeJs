@@ -31,8 +31,19 @@ function employeeIsInAuthorizedScope(employee, scope) {
 
 function employeeIsEligibleForProdhlomenaOraria(employee) {
     return Boolean(employee) &&
-        employee.afora_daneismo_ergazomenoy !== true &&
-        employee.typos_ergodoth_daneismoy !== true;
+        !(employee.afora_daneismo_ergazomenoy === true &&
+            employee.typos_ergodoth_daneismoy === false);
+}
+
+async function hasLendingSideBorrowedEmployees({ employeeModel, team, company_kod }) {
+    if (!team || !company_kod) return false;
+    const employee = await employeeModel.findOne({
+        team,
+        company_kod,
+        afora_daneismo_ergazomenoy: true,
+        typos_ergodoth_daneismoy: false
+    }).select('_id').lean();
+    return Boolean(employee);
 }
 
 function indexScopedEmployees(candidates, scope) {
@@ -80,6 +91,7 @@ module.exports = {
     OUTSIDE_SCOPE_CODE,
     assertEmployeeWriteScope,
     employeeIsEligibleForProdhlomenaOraria,
+    hasLendingSideBorrowedEmployees,
     employeeIsInAuthorizedScope,
     indexScopedEmployees,
     loadScopedErganiEmployees,

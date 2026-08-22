@@ -35,7 +35,11 @@ assert.ok(controller.includes("{ _id: 0, form: 1, 'privileges.admin': 1, 'privil
 assert.ok(frontend.includes('permission?.admin === true || permission?.read === true'));
 assert.ok(frontend.includes("a[data-privilege-form]"));
 assert.ok(frontend.includes('updateParentLinks(root)'));
-assert.ok(!frontend.includes('textContent'));
+assert.strictEqual((frontend.match(/textContent\s*=/g) || []).length, 1);
+assert.ok(frontend.includes('availability.borrowedEmployeeTransfers === true'));
+assert.ok(frontend.includes("'ΟΛΩΝ των Εργαζόμενων'"));
+assert.ok(frontend.includes("'ΜΗ Δανειζόμενων Εργαζόμενων'"));
+assert.strictEqual((sidebar.match(/data-borrowed-standard-label="true"/g) || []).length, 2);
 assert.ok(!/situation_(?:A|S|HR|C|U|V)/.test(frontend));
 
 for (const form of [

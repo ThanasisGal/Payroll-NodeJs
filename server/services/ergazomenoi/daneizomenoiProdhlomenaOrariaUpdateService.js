@@ -7,6 +7,10 @@ const {
     DECLARED_SCHEDULE_SOURCE_FIELDS,
     buildDeclaredScheduleUpdate
 } = require('./prodhlomenaOrariaSchedulePolicy');
+const {
+    DIGITAL_CARD_FIELDS,
+    buildDigitalCardsUpdate
+} = require('./prodhlomenaOrariaCardsPolicy');
 
 const BULK_CHUNK_SIZE = 1000;
 
@@ -109,7 +113,14 @@ function targetRowKey({ team, company_kod, ypokatasthma, kodikos, hmeromhnia }) 
         .join('|');
 }
 
-async function updateBorrowedEmployeeDeclaredSchedules({ scope, models = {}, sourceContext = null }) {
+async function updateBorrowedEmployeeRows({
+    scope,
+    models = {},
+    sourceContext = null,
+    sourceFields,
+    buildUpdate,
+    upsert
+}) {
     const prodhlomenaModel = models.prodhlomenaModel || ProdhlomenaOrariaModel;
     const summary = {
         targetEmployeesFound: 0,
@@ -206,7 +217,7 @@ async function updateBorrowedEmployeeDeclaredSchedules({ scope, models = {}, sou
             startDate: scope.startDate,
             endDate: scope.endDate
         }))
-            .select(['kodikos', 'hmeromhnia', 'ypokatasthma', ...DECLARED_SCHEDULE_SOURCE_FIELDS].join(' '))
+            .select(['kodikos', 'hmeromhnia', 'ypokatasthma', ...sourceFields].join(' '))
             .lean();
         summary.sourceRowsFound += sourceRows.length;
 
@@ -258,16 +269,9 @@ async function updateBorrowedEmployeeDeclaredSchedules({ scope, models = {}, sou
             summary.targetAmbiguities++;
             continue;
         }
-        bulkOps.push({
-            updateOne: {
-                filter: identity,
-                update: {
-                    $set: buildDeclaredScheduleUpdate(sourceRow),
-                    $setOnInsert: identity
-                },
-                upsert: true
-            }
-        });
+        const update = { $set: buildUpdate(sourceRow) };
+        if (upsert) update.$setOnInsert = identity;
+        bulkOps.push({ updateOne: { filter: identity, update, upsert } });
     }
     if (bulkOps.length === 0) return summary;
 
@@ -282,6 +286,24 @@ async function updateBorrowedEmployeeDeclaredSchedules({ scope, models = {}, sou
     return summary;
 }
 
+function updateBorrowedEmployeeDeclaredSchedules(options) {
+    return updateBorrowedEmployeeRows({
+        ...options,
+        sourceFields: DECLARED_SCHEDULE_SOURCE_FIELDS,
+        buildUpdate: buildDeclaredScheduleUpdate,
+        upsert: true
+    });
+}
+
+function updateBorrowedEmployeeDigitalCards(options) {
+    return updateBorrowedEmployeeRows({
+        ...options,
+        sourceFields: DIGITAL_CARD_FIELDS,
+        buildUpdate: buildDigitalCardsUpdate,
+        upsert: false
+    });
+}
+
 module.exports = {
     candidateEmployeeFilter,
     normalizeAfm,
@@ -289,5 +311,6 @@ module.exports = {
     sourceSchedulesFilter,
     targetSchedulesFilter,
     resolveBorrowedSourceContext,
-    updateBorrowedEmployeeDeclaredSchedules
+    updateBorrowedEmployeeDeclaredSchedules,
+    updateBorrowedEmployeeDigitalCards
 };

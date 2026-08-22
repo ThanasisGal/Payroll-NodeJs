@@ -37,6 +37,10 @@ const { PeriodsModel } = Models;
 const { ParamModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel } = Models_C;
+const { ErgazomenoiModel } = require('../models/ergazomenoi');
+const {
+    hasLendingSideBorrowedEmployees
+} = require('../services/ergazomenoi/erganiImportedEmployeeScopeService');
 
 const APP_ORIGIN =
     process.env.NODE_ENV === 'production'
@@ -1172,10 +1176,26 @@ class userController {
             return res.status(401).json({ permissions: {} });
         }
 
-        const permissions = await userController.fetchPermissions(String(req.session.userId));
+        const [permissions, borrowedEmployeeTransfers] = await Promise.all([
+            userController.fetchPermissions(String(req.session.userId)),
+            userController.fetchBorrowedTransferAvailability(req.session)
+        ]);
 
-        res.json({ permissions }); // Επιστροφή δεδομένων στο frontend
+        res.json({ permissions, availability: { borrowedEmployeeTransfers } });
     };
+
+    static async fetchBorrowedTransferAvailability(session = {}) {
+        try {
+            return await hasLendingSideBorrowedEmployees({
+                employeeModel: ErgazomenoiModel,
+                team: String(session.userTeam || '').trim(),
+                company_kod: String(session.companyInUse || '').trim()
+            });
+        } catch (error) {
+            logger.error(error);
+            return false;
+        }
+    }
 
     static async fetchPermissions(authenticatedUserId) {
         try {
