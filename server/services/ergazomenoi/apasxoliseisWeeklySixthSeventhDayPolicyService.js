@@ -160,7 +160,8 @@ function analyzeWeeklySixthSeventhDay({
     canonicalRepoDayIdentitiesOverride = null,
     allowDeclaredRepoIdentityOverride = false,
     classificationByDateOverride = null,
-    calculatedWorkHoursAuthoritative = false
+    calculatedWorkHoursAuthoritative = false,
+    isCalculatedWorkHoursAuthoritativeForRow = null
 } = {}) {
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const dates = rows.map((row) => dateKeyUtc(row?.hmeromhnia));
@@ -191,14 +192,17 @@ function analyzeWeeklySixthSeventhDay({
     const dailyFacts = rows
         .map((row) => ({
             hmeromhnia: dateKeyUtc(row.hmeromhnia),
-            ...resolveDailyActualWorkFacts(row, { calculatedWorkHoursAuthoritative })
+            ...resolveDailyActualWorkFacts(row, {
+                calculatedWorkHoursAuthoritative,
+                isCalculatedWorkHoursAuthoritativeForRow
+            })
         }))
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
     const factReasons = [...new Set(dailyFacts.flatMap((day) => day.reasons))];
     if (factReasons.length > 0) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: factReasons, warnings: [], dailyFacts });
     }
-    if (dailyFacts.some((day) => !['READY', 'SAFE_AUTO_RESOLVED'].includes(day.cardVerificationStatus))) {
+    if (dailyFacts.some((day) => !['READY', 'HR_APPROVED_ORPHAN'].includes(day.cardVerificationStatus))) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,

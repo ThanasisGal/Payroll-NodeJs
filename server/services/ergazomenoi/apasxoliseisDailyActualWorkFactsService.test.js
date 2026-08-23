@@ -120,6 +120,22 @@ assert.strictEqual(
     'post-daily callers preserve a calculated zero'
 );
 assert.strictEqual(
+    resolveDailyActualWorkFacts({ ...zeroCalculatedRow, _id: 'same-run' }, {
+        calculatedWorkHoursAuthoritative: true,
+        isCalculatedWorkHoursAuthoritativeForRow: (row) => row._id === 'same-run'
+    }).actualWorkHours,
+    0,
+    'a row calculated in the same run preserves its calculated zero'
+);
+assert.strictEqual(
+    resolveDailyActualWorkFacts({ ...zeroCalculatedRow, _id: 'context-only' }, {
+        calculatedWorkHoursAuthoritative: true,
+        isCalculatedWorkHoursAuthoritativeForRow: (row) => row._id === 'same-run'
+    }).actualWorkHours,
+    6.98,
+    'a read-only weekly context row retains the card-hours fallback'
+);
+assert.strictEqual(
     resolveDailyActualWorkFacts({
         ...zeroCalculatedRow,
         is_locked: true,
@@ -137,12 +153,26 @@ const incompleteCardFacts = facts('ΕΡΓ', 8, 8, {
 assert.strictEqual(incompleteCardFacts.actualWorkHours, 0);
 assert.strictEqual(incompleteCardFacts.leaveHours, 0);
 assert.strictEqual(incompleteCardFacts.holidayCreditedHours, 0);
-assert.strictEqual(incompleteCardFacts.countsAsActualWorkDay, false);
-assert.deepStrictEqual(incompleteCardFacts.reasons, []);
+assert.strictEqual(incompleteCardFacts.category, 'ΕΡΓ');
+assert.strictEqual(incompleteCardFacts.countsAsActualWorkDay, true);
+assert.deepStrictEqual(incompleteCardFacts.reasons, ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION']);
 assert.deepStrictEqual(incompleteCardFacts.warnings, ['INCOMPLETE_CARD_INTERVAL']);
 assert.strictEqual(incompleteCardFacts.cardVerificationStatus, 'UNVERIFIED');
 assert.strictEqual(incompleteCardFacts.verifiedCardHours, 0);
 assert.deepStrictEqual(incompleteCardFacts.unresolvedCardPairNumbers, ['01']);
+
+const approvedOrphanFacts = resolveDailyActualWorkFacts({
+    ...incompleteCardFacts,
+    kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
+    cards_apo_ora_01: '09:00', cards_eos_ora_01: '',
+    ores_ergasias_apologistika: 8,
+    orphan_card_resolution: {
+        status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
+    }
+});
+assert.strictEqual(approvedOrphanFacts.cardVerificationStatus, 'HR_APPROVED_ORPHAN');
+assert.strictEqual(approvedOrphanFacts.actualWorkHours, 8);
+assert.strictEqual(approvedOrphanFacts.countsAsActualWorkDay, true);
 
 const partiallyVerifiedFacts = facts('ΕΡΓ', 8, 8, {
     cards_apo_ora_01: '09:00',
@@ -157,5 +187,17 @@ assert.strictEqual(partiallyVerifiedFacts.countsAsActualWorkDay, true);
 assert.deepStrictEqual(partiallyVerifiedFacts.completeCardPairNumbers, ['01']);
 assert.deepStrictEqual(partiallyVerifiedFacts.unresolvedCardPairNumbers, ['02']);
 assert.deepStrictEqual(partiallyVerifiedFacts.warnings, ['INCOMPLETE_CARD_INTERVAL']);
+
+const invalidPairFacts = facts('ΕΡΓ', 8, 4, {
+    cards_apo_ora_01: '09:00',
+    cards_eos_ora_01: '13:00',
+    cards_apo_ora_02: 'invalid',
+    cards_eos_ora_02: 'invalid'
+});
+assert.ok(!invalidPairFacts.reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'
+));
+assert.notStrictEqual(invalidPairFacts.cardVerificationStatus, 'READY');
+assert.strictEqual(invalidPairFacts.cardVerificationStatus, 'PARTIALLY_VERIFIED');
 
 console.log('daily actual-work facts tests passed');

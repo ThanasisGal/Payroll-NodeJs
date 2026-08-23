@@ -23,11 +23,12 @@ const {
     classifyLeaveProvenance
 } = require('./apasxoliseisLeaveProvenanceService');
 const {
+    CARD_PAIR_STATE,
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
 const {
-    resolveSafeStartOnlyOrphan
-} = require('./apasxoliseisAttendanceDerivedScheduleService');
+    isApprovedOrphanResolution
+} = require('./apasxoliseisOrphanCardResolutionService');
 
 function nonNegativeNumber(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -50,8 +51,13 @@ function categoryOf(row = {}) {
 }
 
 function resolveDailyActualWorkFacts(row = {}, {
-    calculatedWorkHoursAuthoritative = false
+    calculatedWorkHoursAuthoritative = false,
+    isCalculatedWorkHoursAuthoritativeForRow = null
 } = {}) {
+    const calculatedHoursAreAuthoritative =
+        typeof isCalculatedWorkHoursAuthoritativeForRow === 'function'
+            ? isCalculatedWorkHoursAuthoritativeForRow(row) === true
+            : calculatedWorkHoursAuthoritative === true;
     const declared = nonNegativeNumber(row.ores_ergasias);
     const cards = nonNegativeNumber(row.cards_ores_ergasias);
     const calculatedWork = nonNegativeNumber(row.ores_ergasias_apologistika);
@@ -67,11 +73,20 @@ function resolveDailyActualWorkFacts(row = {}, {
     const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
     const cardVerification = resolveCardPairVerification(row);
-    const safeOrphan = cardVerification.hasUnresolvedCardEvidence
-        ? resolveSafeStartOnlyOrphan(row, {
-              flexibleArrivalMinutes: row.evelikth_proselefsh ?? row.effective_evelikth_proselefsh
-          })
-        : null;
+    const supportedOrphanStates = new Set([
+        CARD_PAIR_STATE.START_ONLY,
+        CARD_PAIR_STATE.END_ONLY
+    ]);
+    const hasSupportedOrphanEvidence = cardVerification.unresolvedPairs.some(
+        (pair) => supportedOrphanStates.has(pair.state)
+    );
+    const hasOnlySupportedOrphanEvidence =
+        cardVerification.unresolvedPairs.length > 0 &&
+        cardVerification.unresolvedPairs.every((pair) =>
+            supportedOrphanStates.has(pair.state)
+        );
+    const approvedOrphan = hasOnlySupportedOrphanEvidence &&
+        isApprovedOrphanResolution(row);
     const hasCompleteCardEvidence = cardVerification.hasCompleteCardEvidence;
     const hasIncompleteCardInterval = cardVerification.hasUnresolvedCardEvidence;
     const verificationFacts = {
@@ -100,14 +115,33 @@ function resolveDailyActualWorkFacts(row = {}, {
     // Τα πλήρη ζεύγη παραμένουν αποδεδειγμένος χρόνος ακόμη κι όταν άλλο
     // ζεύγος της ημέρας είναι ελλιπές. Το ανεξακρίβωτο τμήμα δεν
     // συμπληρώνεται και δεν μετατρέπεται σε εργασία, άδεια, αργία ή ρεπό.
-    if (hasIncompleteCardInterval && safeOrphan) {
-        const actualWorkHours = safeOrphan.durationMinutes / 60;
+    if (hasIncompleteCardInterval && approvedOrphan) {
+        const actualWorkHours = calculatedWork.ok ? calculatedWork.value : 0;
         return Object.freeze({ category: 'ΕΡΓ', declaredWorkHours: declared.value,
             cardHours: cards.value, hasCompleteCardEvidence: false, ...verificationFacts,
-            cardVerificationStatus: 'SAFE_AUTO_RESOLVED', actualWorkHours,
+            cardVerificationStatus: 'HR_APPROVED_ORPHAN', actualWorkHours,
             leaveHours: 0, holidayCreditedHours: 0, sicknessHours: 0,
             countsAsActualWorkDay: true, reasons: [],
-            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL, safeOrphan.diagnostic] });
+            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL, 'HR_APPROVED_ORPHAN_CARD_RESOLUTION'] });
+    }
+    if (hasIncompleteCardInterval && hasSupportedOrphanEvidence) {
+        const verifiedActualWorkHours = hasCompleteCardEvidence
+            ? cardVerification.verifiedHours
+            : 0;
+        return Object.freeze({
+            category: 'ΕΡΓ',
+            declaredWorkHours: declared.value,
+            cardHours: cards.value,
+            hasCompleteCardEvidence,
+            ...verificationFacts,
+            actualWorkHours: verifiedActualWorkHours,
+            leaveHours: 0,
+            holidayCreditedHours: 0,
+            sicknessHours: 0,
+            countsAsActualWorkDay: true,
+            reasons: ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'],
+            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL]
+        });
     }
     if (hasIncompleteCardInterval) {
         const verifiedActualWorkHours = hasCompleteCardEvidence
@@ -138,7 +172,7 @@ function resolveDailyActualWorkFacts(row = {}, {
     // δεσμευτικό αριθμητικό αποτέλεσμα μετά την εφαρμογή διαλείμματος.
     const effectiveWorkedHours =
         cards.value > 0 && calculatedWork.ok && (
-            calculatedWorkHoursAuthoritative === true || row.is_locked === true ||
+            calculatedHoursAreAuthoritative || row.is_locked === true ||
             calculatedWork.value > 0
         )
             ? calculatedWork.value
