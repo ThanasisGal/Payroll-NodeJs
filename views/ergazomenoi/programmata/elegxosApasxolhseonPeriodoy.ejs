@@ -123,6 +123,7 @@
                             data-team-related="false"
                             data-company-related="false"
                             data-mhnas-related="false"
+                            data-skip-autoload="true"
                             single
                             placeholder="Επιλέξτε παράρτημα">
                         </select>
@@ -131,76 +132,25 @@
                         </div>
                     </div>
 
-                    <div class="col-md-2">
-                        <label class="form-label">Κωδικός</label>
-                        <input
-                            type="text"
-                            id="kodikos"
-                            class="form-control date-tall move-by-enter"
-                        />
+                    <div class="col-md-4 employment-review-advanced-branch">
+                        <label class="form-label" for="reviewEmployee">Εργαζόμενος</label>
+                        <input type="hidden" id="kodikos" value="" />
+                        <select id="reviewEmployee"
+                            class="tom-dropdown selectpicker-dropdown-normal left-align move-by-enter"
+                            aria-label="Εργαζόμενος"
+                            data-api="/api/dropdown/kinhseis/apasxolhseis/ergazomenoi"
+                            data-target-input="kodikos"
+                            data-preselect="kodikos"
+                            data-dropdown-direction="down"
+                            data-xrhsh-related="false"
+                            data-team-related="false"
+                            data-company-related="false"
+                            data-mhnas-related="false"
+                            data-skip-autoload="true"
+                            single
+                            placeholder="Αναζήτηση εργαζομένου">
+                        </select>
                     </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-4">
-                    <div class="col-auto d-flex align-items-center gap-2">
-                        <label for="only_apologistiko" class="col-form-label label-font-size mb-0">
-                            Μόνο Απολογιστικό
-                        </label>
-                        <input
-                            type="checkbox"
-                            class="form-check-input custom-checkbox checkbox-class mt-0"
-                            id="only_apologistiko"
-                            name="only_apologistiko"
-                            value=""
-                        />
-                    </div>
-
-                    <div class="col-auto d-flex align-items-center gap-2">
-                        <label for="only_nyxta" class="col-form-label label-font-size mb-0">
-                            Μόνο Νύχτα
-                        </label>
-                        <input
-                            type="checkbox"
-                            class="form-check-input custom-checkbox checkbox-class mt-0"
-                            id="only_nyxta"
-                            name="only_nyxta"
-                            value=""
-                        />
-                    </div>
-
-                    <div class="col-auto d-flex align-items-center gap-2">
-                        <label for="only_argia" class="col-form-label label-font-size mb-0">
-                            Μόνο Αργία
-                        </label>
-                        <input
-                            type="checkbox"
-                            class="form-check-input custom-checkbox checkbox-class mt-0"
-                            id="only_argia"
-                            name="only_argia"
-                            value=""
-                        />
-                    </div>
-
-                    <div class="col-auto d-flex align-items-center gap-2">
-                        <label for="only_yperergasia" class="col-form-label label-font-size mb-0">
-                            Μόνο Υπερεργασία
-                        </label>
-                        <input
-                            type="checkbox"
-                            class="form-check-input custom-checkbox checkbox-class mt-0"
-                            id="only_yperergasia"
-                            name="only_yperergasia"
-                            value=""
-                        />
-                    </div>
-                    <div class="col-auto d-flex align-items-center gap-2">
-                        <label for="scenarioRequiresReviewOnly" class="col-form-label label-font-size mb-0">
-                            Μόνο προς έλεγχο
-                        </label>
-                        <input type="checkbox" class="form-check-input custom-checkbox checkbox-class mt-0"
-                            id="scenarioRequiresReviewOnly" name="scenarioRequiresReviewOnly" />
-                    </div>
-                    <div id="scenarioRequiresReviewOnlyNotice" class="col-12 small text-muted d-none"></div>
                 </div>
 
                 <div class="employment-review-search-actions">

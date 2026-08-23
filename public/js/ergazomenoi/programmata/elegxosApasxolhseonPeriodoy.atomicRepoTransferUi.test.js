@@ -3248,11 +3248,12 @@ function testUnifiedEmploymentReviewWorkspaceContract() {
     ['Έναρξη ελέγχου', 'Αναλυτική προβολή', 'Επιστροφή στον απλό έλεγχο']
         .forEach((text) => assert.ok(!viewSource.includes(text)));
     ['apo_hmeromhnia', 'eos_hmeromhnia', 'ypokatasthma', 'kodikos',
-        'only_apologistiko', 'only_nyxta', 'only_argia', 'only_yperergasia',
-        'scenarioRequiresReviewOnly', 'searchBtn', 'exportExcelBtn', 'exportPdfBtn',
-        'resultsTable']
+        'reviewEmployee', 'searchBtn', 'exportExcelBtn', 'exportPdfBtn', 'resultsTable']
         .forEach((id) => assert.strictEqual((viewSource.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id));
-    assertContains(viewSource, ['Εξαγωγή Excel', 'Εξαγωγή PDF', 'Μόνο προς έλεγχο']);
+    assertContains(viewSource, ['Εξαγωγή Excel', 'Εξαγωγή PDF', 'Εργαζόμενος']);
+    ['only_apologistiko', 'only_nyxta', 'only_argia', 'only_yperergasia',
+        'scenarioRequiresReviewOnly']
+        .forEach((id) => assert.ok(!viewSource.includes(`id="${id}"`)));
     assert.ok(!viewSource.includes('Export Excel'));
     assert.ok(!viewSource.includes('Export PDF'));
 }

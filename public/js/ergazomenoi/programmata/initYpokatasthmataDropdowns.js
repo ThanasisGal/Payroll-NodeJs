@@ -1,6 +1,7 @@
 import { initTomDropdown } from '../../dropdown-item.js';
 
 const REVIEW_BRANCH_ID = 'ypokatasthma';
+const REVIEW_EMPLOYEE_ID = 'reviewEmployee';
 
 function normalizedBranch(value) {
     const branch = String(value || '').trim();
@@ -55,19 +56,49 @@ async function setBranch(id, value, silent = true) {
     return appliedBranch === branch;
 }
 
-function bindBranch(id) {
+function employeeOptionHtml(item, escape) {
+    const code = escape(String(item?.kodikos || item?.value || '').trim());
+    const name = escape([item?.eponymo, item?.onoma].filter(Boolean).join(' ').trim());
+    return `<div>${code}${name ? ` — ${name}` : ''}</div>`;
+}
+
+function clearEmployeeSelection() {
+    const select = document.getElementById(REVIEW_EMPLOYEE_ID);
+    const hidden = document.getElementById('kodikos');
+    select?.tomselect?.destroy();
+    if (select) { select.replaceChildren(); select.disabled = true; }
+    if (hidden) hidden.value = '';
+}
+
+function initializeEmployee(branch) {
+    const select = document.getElementById(REVIEW_EMPLOYEE_ID);
+    clearEmployeeSelection();
+    if (!select || !branch) return null;
+    select.disabled = false;
+    const instance = initTomDropdown({ selector: `#${REVIEW_EMPLOYEE_ID}`,
+        url: select.dataset.api,
+        extraParams: { ypokatasthma: branch, energoi: 'true' }, minChars: 1,
+        render: { option: employeeOptionHtml, item: employeeOptionHtml } });
+    instance?.enable?.();
+    return instance;
+}
+
+function bindBranch(id, onBranchChange) {
     const select = document.getElementById(id);
     const tom = tomFor(id);
     if (!select || !tom || select.__employmentReviewBranchSyncBound) return;
     select.__employmentReviewBranchSyncBound = true;
-    select.addEventListener('change', () => {
+    let lastAppliedBranch = null;
+    const applyBranch = (value) => {
         const hidden = hiddenFor(id);
-        if (hidden) hidden.value = normalizedBranch(tom.getValue?.());
-    });
-    tom.on('clear', () => {
-        const hidden = hiddenFor(id);
-        if (hidden) hidden.value = '';
-    });
+        const branch = normalizedBranch(value);
+        if (hidden) hidden.value = branch;
+        if (lastAppliedBranch === branch) return;
+        lastAppliedBranch = branch;
+        onBranchChange?.(branch);
+    };
+    tom.on('change', (value) => applyBranch(value));
+    tom.on('clear', () => applyBranch(''));
 }
 
 function initialize(id) {
@@ -87,9 +118,12 @@ function initialize(id) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     initialize(REVIEW_BRANCH_ID);
-    bindBranch(REVIEW_BRANCH_ID);
+    bindBranch(REVIEW_BRANCH_ID, initializeEmployee);
     const initialBranch = normalizedBranch(hiddenFor(REVIEW_BRANCH_ID)?.value);
-    if (initialBranch) await setBranch(REVIEW_BRANCH_ID, initialBranch, true);
+    if (initialBranch) {
+        await setBranch(REVIEW_BRANCH_ID, initialBranch, true);
+        initializeEmployee(initialBranch);
+    } else clearEmployeeSelection();
 
     window.EmploymentReviewBranches = {
         currentBranch,
@@ -99,6 +133,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 branch: currentBranch(REVIEW_BRANCH_ID),
                 initialized: Boolean(tomFor(REVIEW_BRANCH_ID))
             };
+        }
+    };
+    window.EmploymentReviewEmployees = {
+        initialize: initializeEmployee,
+        clear: clearEmployeeSelection,
+        diagnostics() {
+            return { branch: currentBranch(REVIEW_BRANCH_ID),
+                value: String(document.getElementById('kodikos')?.value || ''),
+                initialized: Boolean(tomFor(REVIEW_EMPLOYEE_ID)) };
         }
     };
 });
