@@ -51,7 +51,7 @@ function illegalUpdate(row, profile, hours, holidays, options) {
     }
     return buildWeeklyIllegalOvertimePersistenceMapping(
         Object.fromEntries(Object.entries(classified).map(([key, value]) => [key, +value.toFixed(2)])),
-        options
+        { ...options, authoritativeTotalHours: hours }
     );
 }
 
@@ -190,6 +190,8 @@ assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHou
 assert.deepEqual(ILLEGAL_FIELDS.map((field) => update[field]), [1, 0, 0, 0]);
 
 const seventhRows = week([7, 7, 7, 7, 7, 7, 10]);
+Object.assign(seventhRows[5], { kathgoria_ergasias: 'ΕΡΓ',
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', repo: false, repo_apologistika: false });
 result = plan(seventhRows);
 update = updateFor(result, '2026-08-09');
 assert.deepEqual(ILLEGAL_FIELDS.map((field) => update[field]), [0, 0, 10, 0]);
@@ -200,6 +202,8 @@ assert.equal(update.eos_ora_01_apologistika, '20:00');
 OVERLAPPING_LEGAL_FIELDS.forEach((field) => assert.equal(update[field], 0));
 
 const overlayRows = week([7, 7, 7, 7, 7, 7, 4], { 6: ['22:00', '02:00'] });
+Object.assign(overlayRows[5], { kathgoria_ergasias: 'ΕΡΓ',
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', repo: false, repo_apologistika: false });
 result = plan(overlayRows);
 update = updateFor(result, '2026-08-09');
 assert.deepEqual(ILLEGAL_FIELDS.map((field) => update[field]), [0, 2, 0, 2]);
@@ -214,7 +218,9 @@ const oldUpdate = updateFor(result, '2026-08-09');
 assert.equal(oldUpdate.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 0);
 assert.ok(ILLEGAL_FIELDS.every((field) => !Object.hasOwn(oldUpdate, field)));
 update = updateFor(result, '2026-08-08');
-assert.equal(ILLEGAL_FIELDS.reduce((sum, field) => sum + update[field], 0), 10);
+assert.ok(ILLEGAL_FIELDS.every((field) => !Object.hasOwn(update, field)));
+assert.ok(onlyDeviation(result).reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
 
 const protectedRows = week([7, 7, 7, 7, 7, 9, 0]);
 const protectedRow = protectedRows[5];

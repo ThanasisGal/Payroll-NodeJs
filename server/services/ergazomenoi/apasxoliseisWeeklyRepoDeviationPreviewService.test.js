@@ -646,17 +646,98 @@ function testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow() {
                 kodikos: '0006',
                 sixth_day_date: '2026-06-06',
                 sixth_day_premium_rate: 0,
-                sixth_seventh_day_status: 'READY'
+                seventh_day_date: '2026-06-05',
+                sixth_seventh_day_status: 'READY',
+                requires_new_hr_decision: false
             }
         ]
     );
 
     assert.strictEqual(reviewRows[0].is_sixth_day, false);
+    assert.strictEqual(reviewRows[0].is_seventh_day, true);
+    assert.strictEqual(reviewRows[0].seventh_day_severity, 'SERIOUS_VIOLATION');
     assert.strictEqual(reviewRows[0].sixth_day_premium_rate, null);
     assert.strictEqual(reviewRows[1].is_sixth_day, true);
     assert.strictEqual(reviewRows[1].sixth_day_premium_rate, 0);
     assert.strictEqual(reviewRows[1].sixth_day_policy_status, 'READY');
+    assert.strictEqual(reviewRows[1].is_seventh_day, false);
     assert.strictEqual(reviewRows[2].is_sixth_day, false);
+
+    const unresolved = attachSixthDayPresentationToRows(
+        [{ kodikos: '0006', hmeromhnia: '2026-06-05' }],
+        [{ kodikos: '0006', seventh_day_date: '2026-06-05',
+            sixth_seventh_day_status: 'NEEDS_HR_DECISION',
+            requires_new_hr_decision: true }]
+    );
+    assert.strictEqual(unresolved[0].is_seventh_day, false);
+}
+
+function testSingleWorkedDeclaredRepoResolvesSeventhDayWithoutHrDecision() {
+    const actualRows = rows('2026-06-15', 7, {
+        0: { cards_ores_ergasias: 9.1, ores_ergasias_apologistika: 8.6 },
+        1: { cards_ores_ergasias: 508 / 60, ores_ergasias_apologistika: 7.97 },
+        2: { kathgoria_ergasias: 'ΑΝ', repo: true, ores_ergasias: 0,
+            cards_ores_ergasias: 419 / 60, ores_ergasias_apologistika: 6.48 },
+        3: { cards_ores_ergasias: 469 / 60, ores_ergasias_apologistika: 7.32 },
+        4: { cards_ores_ergasias: 475 / 60, ores_ergasias_apologistika: 7.42 },
+        5: { cards_ores_ergasias: 517 / 60, ores_ergasias_apologistika: 8.12 },
+        6: { cards_ores_ergasias: 437 / 60, ores_ergasias_apologistika: 6.78 }
+    }).map((row, index) => ({
+        ...row,
+        team: 'THA',
+        company_kod: 'company',
+        cards_apo_ora_01: ['12:00', '14:18', '15:41', '12:00', '12:00', '12:00',
+            '15:40'][index],
+        cards_eos_ora_01: ['21:06', '22:46', '22:40', '19:49', '19:55', '20:37',
+            '22:57'][index]
+    }));
+    const preview = buildWeeklyRepoDeviationPreview({
+        rows: actualRows,
+        periodStart: '2026-06-15',
+        periodEnd: '2026-06-21',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: () => ({
+            ...fiveDayProfile(),
+            effectiveProfile: {
+                ...fiveDayProfile().effectiveProfile,
+                pososto_prosayxhshs_6hs_hmeras: 40,
+                pragmatikoOromisthio: 10
+            }
+        })
+    });
+    const deviation = preview.deviations[0];
+    assert.strictEqual(deviation.status, STATUS.READY);
+    assert.strictEqual(deviation.requires_new_hr_decision, false);
+    assert.strictEqual(deviation.sixth_day_date, '2026-06-21');
+    assert.strictEqual(deviation.seventh_day_date, '2026-06-17');
+    assert.strictEqual(deviation.sixth_day_count, 1);
+    assert.strictEqual(deviation.seventh_day_count, 1);
+    assert.ok(!deviation.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+    assert.ok(deviation.repo_transfer_reasons.includes(
+        'SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'));
+    assert.ok(!deviation.presentation_reasons.includes(
+        'SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'));
+
+    const unresolvedPreview = buildWeeklyRepoDeviationPreview({
+        rows: rows('2026-06-15').map((row) => ({
+            ...row,
+            team: 'THA',
+            company_kod: 'company',
+            cards_apo_ora_01: '12:00',
+            cards_eos_ora_01: '20:00'
+        })),
+        periodStart: '2026-06-15',
+        periodEnd: '2026-06-21',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: fiveDayProfile
+    });
+    const unresolved = unresolvedPreview.deviations[0];
+    assert.strictEqual(unresolved.status, STATUS.NEEDS_HR_DECISION);
+    assert.strictEqual(unresolved.requires_new_hr_decision, true);
+    assert.ok(unresolved.repo_transfer_reasons.includes(
+        'SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'));
+    assert.ok(unresolved.presentation_reasons.includes(
+        'SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'));
 }
 
 function canonicalJunePreview({ decisionMode = 'NONE', approvedOrphan = true } = {}) {
@@ -851,6 +932,7 @@ testDeviationAndAtomicUseTheSameContractSelector();
 testDeviationAndAtomicContextParity();
 testSixthDaySurvivesMissingRepoTransferSource();
 testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow();
+testSingleWorkedDeclaredRepoResolvesSeventhDayWithoutHrDecision();
 testCanonicalDecisionIsConsumedByWeeklyProjection();
 
 console.log('weekly repo deviation Monday-Sunday preview tests passed');

@@ -177,7 +177,7 @@ result = resolveWeeklyCanonicalDecisionAnalysis({ automaticAnalysis: base.analys
     snapshotInput: base.input, decisionRecords: [ambiguousClassification], weekRows: base.weekRows,
     effectiveProfile: profile, employee: profile });
 assert.equal(result.analysis.status, 'NEEDS_HR_DECISION');
-assert.ok(result.analysis.reasons.includes('CANONICAL_DECISION_CLASSIFICATION_INVALID'));
+assert.strictEqual(result.analysis.seventhDay, null);
 
 const nonRepoSixthRows = rows([7, 7.9, 7, 7, 7, 7.8, 7.7]);
 const nonRepoSixthAutomatic = analyzeWeeklySixthSeventhDay({
@@ -186,7 +186,8 @@ const nonRepoSixthAutomatic = analyzeWeeklySixthSeventhDay({
 assert.deepEqual(nonRepoSixthAutomatic.canonicalRepoDayIdentities, [
     '2026-08-08', '2026-08-09'
 ]);
-assert.ok(nonRepoSixthAutomatic.reasons.includes('SEVENTH_DAY_IDENTITY_NOT_DETERMINISTIC'));
+assert.ok(nonRepoSixthAutomatic.reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
 const nonRepoSixthContext = context(nonRepoSixthRows, nonRepoSixthAutomatic);
 const explicitNonRepoClassification = record(nonRepoSixthContext.input, 'CLASSIFICATION_BY_DATE', {
     classification_by_date: { '2026-08-04': 'SIXTH', '2026-08-08': 'SEVENTH' }
@@ -239,7 +240,9 @@ const validProfile = record(profileBase.input, 'PROFILE_CHANGED_INSIDE_WEEK', {
 });
 result = resolveWeeklyCanonicalDecisionAnalysis({ automaticAnalysis: profileBase.analysis, snapshotInput: profileBase.input,
     decisionRecords: [validProfile], weekRows: profileBase.weekRows, effectiveProfile: profile, employee: profile });
-assert.equal(result.analysis.status, 'READY');
+assert.equal(result.analysis.status, 'NEEDS_HR_DECISION');
+assert.ok(result.analysis.reasons.includes(
+    'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
 
 const appliedContext = { entriesByRowId: {
     'row-5': { state: 'PROTECTED', rowId: 'row-5', executionId: 'execution-1', role: 'SOURCE' },

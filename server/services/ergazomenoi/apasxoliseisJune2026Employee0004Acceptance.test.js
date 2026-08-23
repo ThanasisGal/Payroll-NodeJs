@@ -82,7 +82,7 @@ assert.equal(approvedOrphanDay.actualWorkHours, 8);
 assert.equal(approvedOrphanDay.cardVerificationStatus, 'HR_APPROVED_ORPHAN');
 
 const weekB = week('2026-06-15', {
-    '2026-06-16': { category: 'ΑΝ', hours: 0, declared: null,
+    '2026-06-16': { category: 'ΕΡΓ', hours: 8,
         cardHours: 508 / 60, cards: ['14:18', '22:46'],
         ores_ergasias_apologistika: 7.97 },
     '2026-06-17': { category: 'ΑΝ', hours: 0, declared: null,
@@ -95,14 +95,20 @@ weekB.forEach((item) => {
     item.cards_apo_ora_01 = '12:00';
     item.cards_eos_ora_01 = '19:00';
 });
+Object.assign(weekB[6], {
+    cards_ores_ergasias: 437 / 60,
+    cards_apo_ora_01: '15:40',
+    cards_eos_ora_01: '22:57',
+    ores_ergasias_apologistika: 6.78
+});
 const repoB = analyzeWeeklyRepoTransferSinglePairV2({ weekRows: weekB,
     employmentProfile: PROFILE });
 assert.equal(repoB.eligibility_status, 'NOT_APPLICABLE');
 assert.ok(repoB.reasons.includes('SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'));
 const sixthB = analyzeWeeklySixthSeventhDay({ weekRows: weekB, effectiveProfile: PROFILE });
 assert.equal(sixthB.status, 'READY');
-assert.equal(sixthB.sixthDay.hmeromhnia, '2026-06-16');
-assert.equal(sixthB.sixthDay.actualWorkHours, 7.97);
+assert.equal(sixthB.sixthDay.hmeromhnia, '2026-06-21');
+assert.equal(sixthB.sixthDay.actualWorkHours, 6.78);
 assert.equal(sixthB.seventhDay.hmeromhnia, '2026-06-17');
 assert.equal(sixthB.seventhDay.cardHours, 419 / 60);
 assert.equal(sixthB.seventhDay.actualWorkHours, 6.48);
