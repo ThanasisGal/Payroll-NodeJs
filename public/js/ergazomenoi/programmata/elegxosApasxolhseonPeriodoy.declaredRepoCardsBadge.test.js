@@ -44,23 +44,67 @@ function row(overrides = {}) {
 const declaredRepoWithCards = row();
 const before = JSON.stringify(declaredRepoWithCards);
 assert.match(
-    sandbox.renderDeclaredRepoWithCardsBadge(declaredRepoWithCards),
+    sandbox.renderDeclaredRepoWithCardsBadge(declaredRepoWithCards, '0'),
     /Ρεπό με κάρτες/
 );
 assert.strictEqual(JSON.stringify(declaredRepoWithCards), before);
 
-assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({ repo: false })), /Ρεπό με κάρτες/);
+assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({ repo: false }), '0'), /Ρεπό με κάρτες/);
 assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
     kathgoria_ergasias: 'ΜΕ', repo: false, effective_is_full_time: false
-})), /Ρεπό με κάρτες/);
+}), '1'), /Μη εργασία με κάρτες/);
+
+assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
+    kathgoria_ergasias: 'ΜΕ', repo: false,
+    effective_is_full_time: false, effective_kathestos_apasxolhshs: '1'
+}), '1'), /Μη εργασία με κάρτες/);
+
+assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
+    kathgoria_ergasias: 'ΜΕ', repo: false,
+    effective_is_full_time: false, effective_kathestos_apasxolhshs: '2'
+}), '2'), /Μη εργασία με κάρτες/);
+
+const mixedJune0014 = [
+    ['2026-06-12', false, 'Μη εργασία με κάρτες'],
+    ['2026-06-13', false, 'Μη εργασία με κάρτες'],
+    ['2026-06-15', true, 'Ρεπό με κάρτες'],
+    ['2026-06-25', true, 'Ρεπό με κάρτες'],
+    ['2026-06-30', true, 'Ρεπό με κάρτες']
+];
+mixedJune0014.forEach(([hmeromhnia, effective_is_full_time, expected]) => {
+    const html = sandbox.renderDeclaredRepoWithCardsBadge(row({
+        hmeromhnia,
+        kathgoria_ergasias: effective_is_full_time ? 'ΑΝ' : 'ΜΕ',
+        repo: effective_is_full_time,
+        effective_is_full_time
+    }), effective_is_full_time ? '0' : '1');
+    assert.match(html, new RegExp(expected));
+});
+
+const transitionRows = [
+    { date: '2026-06-14', employment_type: '1' },
+    { date: '2026-06-15', employment_type: '0' }
+];
+const transitionMap = sandbox.buildCanonicalDailyEmploymentTypeByKey([{
+    scope: { employee_kodikos: '0014' }, stage1_daily_presentation: transitionRows
+}]);
+assert.equal(transitionMap.get(sandbox.stage2DailyResolutionKey('0014', '2026-06-14')), '1');
+assert.equal(transitionMap.get(sandbox.stage2DailyResolutionKey('0014', '2026-06-15')), '0');
+assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
+    kodikos: '0014', hmeromhnia: '2026-06-15', kathgoria_ergasias: 'ΜΕ',
+    repo: false, effective_is_full_time: false
+}), transitionMap.get(sandbox.stage2DailyResolutionKey('0014', '2026-06-15'))),
+/Ρεπό με κάρτες/);
 
 assert.strictEqual(sandbox.renderDeclaredRepoWithCardsBadge(row({
     cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0
-})), '');
+}), '0'), '');
 
 assert.strictEqual(sandbox.renderDeclaredRepoWithCardsBadge(row({
     kathgoria_ergasias: 'ΕΡΓ', repo: false
-})), '');
+}), '0'), '');
+
+assert.strictEqual(sandbox.renderDeclaredRepoWithCardsBadge(row(), ''), '');
 
 assert.match(source,
     /\$\{rowPresentation\.apologistiko\.text\}[\s\S]*\$\{renderDeclaredRepoWithCardsBadge\(row\)\}/);

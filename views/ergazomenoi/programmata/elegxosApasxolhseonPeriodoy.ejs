@@ -171,10 +171,66 @@
                 </div>
             </div>
 
-            <div class="employment-review-scroll-container">
-                <div id="weeklyHrStage1Container" class="employment-review-actionable-summary"></div>
-                <div id="policyPreviewGroupsContainer" class="employment-review-actionable-summary"></div>
+            <div id="employmentReviewWorkflowSummary" class="alert alert-light border py-2 d-none" aria-live="polite"></div>
 
+            <div class="employment-review-scroll-container">
+                <div class="accordion" id="employmentReviewStagesAccordion">
+                    <div class="accordion-item" data-workflow-stage="STAGE1">
+                        <h2 class="accordion-header" id="employmentReviewStage1Heading">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#employmentReviewStage1Collapse" aria-expanded="false"
+                                aria-controls="employmentReviewStage1Collapse">
+                                <span class="workflow-stage-header" data-workflow-stage-header="STAGE1">ΣΤΑΔΙΟ 1 — Χαρακτηρισμός Αδειών</span>
+                            </button>
+                        </h2>
+                        <div id="employmentReviewStage1Collapse" class="accordion-collapse collapse"
+                            data-bs-parent="#employmentReviewStagesAccordion">
+                            <div class="accordion-body">
+                                <div id="weeklyHrStage1Container" class="employment-review-actionable-summary"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item" data-workflow-stage="STAGE2">
+                        <h2 class="accordion-header" id="employmentReviewStage2Heading">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#employmentReviewStage2Collapse" aria-expanded="false"
+                                aria-controls="employmentReviewStage2Collapse">
+                                <span class="workflow-stage-header" data-workflow-stage-header="STAGE2">ΣΤΑΔΙΟ 2 — Μεταφορά Ρεπό</span>
+                            </button>
+                        </h2>
+                        <div id="employmentReviewStage2Collapse" class="accordion-collapse collapse"
+                            data-bs-parent="#employmentReviewStagesAccordion">
+                            <div class="accordion-body">
+                                <div id="policyPreviewGroupsContainer" class="employment-review-actionable-summary"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item" data-workflow-stage="STAGE3">
+                        <h2 class="accordion-header" id="employmentReviewStage3Heading">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#employmentReviewStage3Collapse" aria-expanded="false"
+                                aria-controls="employmentReviewStage3Collapse">
+                                <span class="workflow-stage-header" data-workflow-stage-header="STAGE3">ΣΤΑΔΙΟ 3 — Υπόλοιπες Πιθανές Άδειες</span>
+                            </button>
+                        </h2>
+                        <div id="employmentReviewStage3Collapse" class="accordion-collapse collapse"
+                            data-bs-parent="#employmentReviewStagesAccordion">
+                            <div class="accordion-body">
+                                <div id="weeklyHrStage3Container" class="employment-review-actionable-summary"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item" data-workflow-stage="STAGE4">
+                        <h2 class="accordion-header" id="employmentReviewStage4Heading">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#employmentReviewStage4Collapse" aria-expanded="false"
+                                aria-controls="employmentReviewStage4Collapse">
+                                <span class="workflow-stage-header" data-workflow-stage-header="STAGE4">ΣΤΑΔΙΟ 4 — Τελικός Εβδομαδιαίος Έλεγχος</span>
+                            </button>
+                        </h2>
+                        <div id="employmentReviewStage4Collapse" class="accordion-collapse collapse"
+                            data-bs-parent="#employmentReviewStagesAccordion">
+                            <div class="accordion-body p-0">
                 <div class="table-responsive results-table-wrapper">
                     <table class="table table-bordered table-hover align-middle" id="resultsTable">
                     <colgroup class="employment-review-results-columns">
@@ -213,6 +269,10 @@
 
                     <tbody></tbody>
                     </table>
+                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
