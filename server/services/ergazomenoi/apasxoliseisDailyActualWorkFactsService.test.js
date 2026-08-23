@@ -188,4 +188,16 @@ assert.deepStrictEqual(partiallyVerifiedFacts.completeCardPairNumbers, ['01']);
 assert.deepStrictEqual(partiallyVerifiedFacts.unresolvedCardPairNumbers, ['02']);
 assert.deepStrictEqual(partiallyVerifiedFacts.warnings, ['INCOMPLETE_CARD_INTERVAL']);
 
+const invalidPairFacts = facts('ΕΡΓ', 8, 4, {
+    cards_apo_ora_01: '09:00',
+    cards_eos_ora_01: '13:00',
+    cards_apo_ora_02: 'invalid',
+    cards_eos_ora_02: 'invalid'
+});
+assert.ok(!invalidPairFacts.reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'
+));
+assert.notStrictEqual(invalidPairFacts.cardVerificationStatus, 'READY');
+assert.strictEqual(invalidPairFacts.cardVerificationStatus, 'PARTIALLY_VERIFIED');
+
 console.log('daily actual-work facts tests passed');

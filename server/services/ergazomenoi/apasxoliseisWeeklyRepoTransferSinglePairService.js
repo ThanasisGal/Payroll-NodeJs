@@ -25,6 +25,8 @@ const {
     startOfWeekMondayUtc
 } = require('../../utils/date/mondaySundayWeek');
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
+const { CARD_PAIR_STATE, resolveCardPairVerification } =
+    require('./apasxoliseisCardPairResolverService');
 
 const SCENARIO_CODE = 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR';
 const SCENARIO_VERSION = 'repo-transfer-single-pair:v5';
@@ -883,8 +885,18 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
             employmentProfile: profile
         })
     );
-    const preTransferActualWorkDays = rows.filter(
-        (row) => resolveDailyActualWorkFacts(row).countsAsActualWorkDay
+    const preTransferFacts = rows.map((row) => resolveDailyActualWorkFacts(row));
+    const unresolvedSinglePunch = rows.some((row) =>
+        row.orphan_card_resolution?.status !== 'HR_APPROVED' &&
+        resolveCardPairVerification(row).unresolvedPairs.some((pair) =>
+            [CARD_PAIR_STATE.START_ONLY, CARD_PAIR_STATE.END_ONLY].includes(pair.state)));
+    if (unresolvedSinglePunch) {
+        return buildResult({ ...base, status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION',
+                ...rowInfos.flatMap((info) => [...sourceExclusions(info), ...targetExclusions(info)])] });
+    }
+    const preTransferActualWorkDays = preTransferFacts.filter(
+        (facts) => facts.countsAsActualWorkDay && (facts.reasons || []).length === 0
     ).length;
     if (preTransferActualWorkDays === 7) {
         return buildResult({ ...base, status: ELIGIBILITY_STATUS.NOT_APPLICABLE,

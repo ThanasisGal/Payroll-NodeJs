@@ -23,6 +23,7 @@ const {
     classifyLeaveProvenance
 } = require('./apasxoliseisLeaveProvenanceService');
 const {
+    CARD_PAIR_STATE,
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
 const {
@@ -72,7 +73,19 @@ function resolveDailyActualWorkFacts(row = {}, {
     const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
     const cardVerification = resolveCardPairVerification(row);
-    const approvedOrphan = cardVerification.hasUnresolvedCardEvidence &&
+    const supportedOrphanStates = new Set([
+        CARD_PAIR_STATE.START_ONLY,
+        CARD_PAIR_STATE.END_ONLY
+    ]);
+    const hasSupportedOrphanEvidence = cardVerification.unresolvedPairs.some(
+        (pair) => supportedOrphanStates.has(pair.state)
+    );
+    const hasOnlySupportedOrphanEvidence =
+        cardVerification.unresolvedPairs.length > 0 &&
+        cardVerification.unresolvedPairs.every((pair) =>
+            supportedOrphanStates.has(pair.state)
+        );
+    const approvedOrphan = hasOnlySupportedOrphanEvidence &&
         isApprovedOrphanResolution(row);
     const hasCompleteCardEvidence = cardVerification.hasCompleteCardEvidence;
     const hasIncompleteCardInterval = cardVerification.hasUnresolvedCardEvidence;
@@ -111,7 +124,7 @@ function resolveDailyActualWorkFacts(row = {}, {
             countsAsActualWorkDay: true, reasons: [],
             warnings: [WARNING.INCOMPLETE_CARD_INTERVAL, 'HR_APPROVED_ORPHAN_CARD_RESOLUTION'] });
     }
-    if (hasIncompleteCardInterval) {
+    if (hasIncompleteCardInterval && hasSupportedOrphanEvidence) {
         const verifiedActualWorkHours = hasCompleteCardEvidence
             ? cardVerification.verifiedHours
             : 0;
@@ -127,6 +140,25 @@ function resolveDailyActualWorkFacts(row = {}, {
             sicknessHours: 0,
             countsAsActualWorkDay: true,
             reasons: ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'],
+            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL]
+        });
+    }
+    if (hasIncompleteCardInterval) {
+        const verifiedActualWorkHours = hasCompleteCardEvidence
+            ? cardVerification.verifiedHours
+            : 0;
+        return Object.freeze({
+            category,
+            declaredWorkHours: declared.value,
+            cardHours: cards.value,
+            hasCompleteCardEvidence,
+            ...verificationFacts,
+            actualWorkHours: verifiedActualWorkHours,
+            leaveHours: 0,
+            holidayCreditedHours: 0,
+            sicknessHours: 0,
+            countsAsActualWorkDay: verifiedActualWorkHours > 0,
+            reasons: [],
             warnings: [WARNING.INCOMPLETE_CARD_INTERVAL]
         });
     }

@@ -282,7 +282,7 @@ function testTargetCardAnomaliesAreExcluded() {
     incompleteRows[4].cards_apo_ora_01 = '09:00';
     incompleteRows[4].cards_eos_ora_01 = '';
     const incomplete = analyze(incompleteRows);
-    assertReason(incomplete, 'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR');
+    assertReason(incomplete, 'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION');
 }
 
 function testSundaySourceAndTargetRemainEligible() {
@@ -431,7 +431,7 @@ function testMultipleTargets() {
     assertReason(analyze(rows), 'MULTIPLE_TARGET_CANDIDATES');
 }
 
-function testSafeOrphanElsewhereDoesNotBlockDeterministicPair() {
+function testUnapprovedOrphanElsewhereBlocksDeterministicPair() {
     const rows = fullTimeWeek({ sourceDay: 2, targetDay: 3, existingRepoDay: 0 });
     rows.forEach((row, offset) => {
         row.hmeromhnia = `2026-06-${String(8 + offset).padStart(2, '0')}`;
@@ -445,15 +445,10 @@ function testSafeOrphanElsewhereDoesNotBlockDeterministicPair() {
     });
 
     const result = analyze(rows);
-    assert.strictEqual(result.counts.source_candidates, 1);
-    assert.strictEqual(result.counts.target_candidates, 1);
-    assert.strictEqual(result.source.hmeromhnia, '2026-06-10');
-    assert.strictEqual(result.target.hmeromhnia, '2026-06-11');
-    assert.ok(!result.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
-    assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-    assert.ok(!result.reasons.includes('CARD_VERIFICATION_PENDING'));
-    assert.ok(result.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
-    assert.ok(result.warnings.includes('SAFE_START_ONLY_ORPHAN_DERIVED'));
+    assert.notStrictEqual(result.eligibility_status, 'ELIGIBLE');
+    assert.ok(result.reasons.includes('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION') ||
+        result.reasons.includes('SOURCE_INVALID_CARD_EVIDENCE') ||
+        result.reasons.includes('TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'));
     assert.strictEqual(result.can_auto_apply, false);
 }
 
@@ -1216,7 +1211,7 @@ function run() {
     testSourceExclusions();
     testMultipleSources();
     testMultipleTargets();
-    testSafeOrphanElsewhereDoesNotBlockDeterministicPair();
+    testUnapprovedOrphanElsewhereBlocksDeterministicPair();
     testNoTarget();
     testSevenActualDaysForbidsRepoTransferBeforeCandidateAnalysis();
     testExactRepoCount();
