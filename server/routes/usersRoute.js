@@ -1636,6 +1636,14 @@ router.patch(
     erganhController.updateProdhlomenaOrariaReviewRecord
 );
 
+router.post(
+    '/api/prodhlomena-oraria/review/:id/orphan-resolution/preview',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.previewProdhlomenaOrariaOrphanResolution
+);
+
 router.get(
     '/api/prodhlomena-oraria/review/:id/audit',
     checkAuth,
