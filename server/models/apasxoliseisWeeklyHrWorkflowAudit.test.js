@@ -22,10 +22,49 @@ const record = {
 };
 
 assert.equal(new Model(record).validateSync(), undefined);
-assert.ok(new Model({ ...record, action: 'STAGE2_COMPLETED' }).validateSync()?.errors?.action);
+const stage2Record = { ...record, stage: 'STAGE2', action: 'STAGE2_COMPLETED',
+    stage2_resolution_items: [{ prodhlomena_oraria_id: new mongoose.Types.ObjectId(),
+        decision_date: new Date('2026-06-03T00:00:00.000Z'),
+        classification: 'NON_WORK' }] };
+assert.equal(new Model(stage2Record).validateSync(), undefined);
+assert.ok(new Model({ ...stage2Record, stage2_resolution_items: undefined })
+    .validateSync()?.errors?.stage2_resolution_items);
 assert.ok(new Model({ ...record, input_fingerprint: 'invalid' })
     .validateSync()?.errors?.input_fingerprint);
 assert.ok(new Model({ ...record, request_id: 'bad request' }).validateSync()?.errors?.request_id);
+const stage3Record = { ...record, stage: 'STAGE3', action: 'STAGE3_DAILY_RESOLVED',
+    new_completion_fingerprint: '', decision_date: new Date('2026-06-03T00:00:00.000Z'),
+    prodhlomena_oraria_id: new mongoose.Types.ObjectId(),
+    previous_residual_status: 'PENDING', previous_classification: 'UNCLASSIFIED',
+    final_classification: 'NON_WORK', period_control_version: 4,
+    period_write_fence_version: 9,
+    previous_stage1_effective_fingerprint: 'c'.repeat(64),
+    new_stage1_effective_fingerprint: 'd'.repeat(64),
+    previous_stage1_version: 1, new_stage1_version: 2 };
+assert.equal(new Model(stage3Record).validateSync(), undefined);
+assert.ok(new Model({ ...stage3Record, decision_date: undefined }).validateSync()
+    ?.errors?.decision_date);
+assert.ok(new Model({ ...stage3Record, final_classification: 'UNKNOWN' }).validateSync()
+    ?.errors?.final_classification);
+assert.ok(new Model({ ...stage3Record,
+    previous_stage1_effective_fingerprint: undefined }).validateSync()
+    ?.errors?.previous_stage1_effective_fingerprint);
+const sliceRecord = { ...record, action: 'STAGE1_PERIOD_SLICE_COMPLETED',
+    new_completion_fingerprint: '',
+    period_start: new Date('2026-06-01T00:00:00.000Z'),
+    period_end: new Date('2026-06-30T00:00:00.000Z'),
+    actionable_dates: [new Date('2026-06-29T00:00:00.000Z'),
+        new Date('2026-06-30T00:00:00.000Z')],
+    context_only_dates: [new Date('2026-07-01T00:00:00.000Z')],
+    context_fingerprint: 'c'.repeat(64),
+    slice_completion_fingerprint: 'd'.repeat(64),
+    slice_effective_fingerprint: 'd'.repeat(64),
+    previous_slice_version: 0, new_slice_version: 1 };
+assert.equal(new Model(sliceRecord).validateSync(), undefined);
+assert.ok(new Model({ ...sliceRecord, context_fingerprint: undefined }).validateSync()
+    ?.errors?.context_fingerprint);
+assert.equal(new Model(record).validateSync(), undefined);
+assert.equal(new Model(record).validateSync(), undefined);
 assert.equal(Model.schema.options.collection, 'Apasxoliseis_Weekly_Hr_Workflow_Audits');
 assert.equal(Model.schema.options.autoIndex, false);
 assert.equal(Model.schema.options.autoCreate, false);

@@ -6,6 +6,9 @@ const {
     commandIdentity,
     completeWeeklyHrWorkflowStage1
 } = require('./apasxoliseisWeeklyHrWorkflowStage1CompletionService');
+const {
+    resolveWeeklyHrWorkflow
+} = require('./apasxoliseisWeeklyHrWorkflowResolverService');
 
 const dates = ['01', '02', '03', '04', '05', '06', '07'].map((day) => `2026-06-${day}`);
 
@@ -104,7 +107,28 @@ function command(persistence, overrides = {}) {
     assert.equal(firstResult.idempotent, false);
     assert.equal(first.store.state.stage1.status, 'COMPLETED');
     assert.equal(first.store.state.stage1.version, 1);
+    assert.equal(first.store.state.stage1.effective_fingerprint,
+        first.store.state.stage1.completion_fingerprint);
     assert.equal(first.store.audits.length, 1);
+    assert.equal(first.store.audits[0].performed_by_user_name, 'HR User');
+    assert.equal(first.store.audits[0].reason_or_notes, 'Stage 1 reviewed');
+    assert.ok(first.store.audits[0].new_completion_fingerprint);
+    assert.ok(first.store.state.stage1.completed_at);
+
+    // Completion without a positive classification does not mutate or consume
+    // the candidate; the same day remains available to the downstream review.
+    const unclassifiedRows = week();
+    for (const index of [0, 2]) Object.assign(unclassifiedRows[index], {
+        kathgoria_ergasias: 'ΑΝ', ores_ergasias: 0, apo_ora_01: '', eos_ora_01: '', repo: true,
+        cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0,
+        kathgoria_ergasias_apologistika: 'ΑΝ', ores_ergasias_apologistika: 0,
+        repo_apologistika: true
+    });
+    const downstream = resolveWeeklyHrWorkflow({ weekRows: unclassifiedRows,
+        effectiveProfile: workflow_context.effectiveProfile,
+        leave_classification_completed: true });
+    assert.equal(unclassifiedRows[1].kathgoria_adeias_apologistika, 'POSSIBLE_LEAVE');
+    assert.deepEqual(downstream.remaining_possible_leave_days, [dates[1]]);
 
     // B. Existing OPEN state increments its existing version.
     const open = fakePersistence({ state: { ...baseScope, stage1: {
@@ -133,6 +157,8 @@ function command(persistence, overrides = {}) {
     await command(stale, { weekRows: changedRows });
     assert.equal(stale.store.state.stage1.version, 2);
     assert.notEqual(stale.store.state.stage1.completion_fingerprint, oldFingerprint);
+    assert.equal(stale.store.state.stage1.effective_fingerprint,
+        stale.store.state.stage1.completion_fingerprint);
     assert.equal(stale.store.audits.length, auditCount + 1);
     assert.equal(stale.store.audits[0].new_completion_fingerprint, oldFingerprint);
     assert.equal(stale.store.audits[1].previous_completion_fingerprint, oldFingerprint);
@@ -177,6 +203,13 @@ function command(persistence, overrides = {}) {
         week_start: '2026-06-02', week_end: '2026-06-08' } }),
     (error) => error.code === 'INVALID_WEEK_SCOPE');
 
+    // A real unresolved card-evidence blocker prevents completion.
+    const blockedRows = week({ ...workRow(dates[1]), cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: '', cards_ores_ergasias: 0,
+        ores_ergasias_apologistika: 0 });
+    await assert.rejects(command(fakePersistence(), { weekRows: blockedRows }),
+        (error) => error.code === 'STAGE1_COMPLETION_BLOCKED');
+
     // Employee identity is employee_id; a later code is reference metadata only.
     const originalCodeState = { ...baseScope, employee_kodikos: '0004', stage1: {
         status: 'OPEN', completion_fingerprint: '', version: 1 } };
@@ -193,5 +226,5 @@ function command(persistence, overrides = {}) {
     assert.equal(commandIdentity(identityInput), commandIdentity({ ...identityInput,
         scope: { ...baseScope, employee_kodikos: '0999' } }));
 
-    console.log('weekly HR Stage-1 completion service tests passed (14 scenarios)');
+    console.log('weekly HR Stage-1 completion service tests passed (16 scenarios)');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
