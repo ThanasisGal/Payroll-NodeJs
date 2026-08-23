@@ -197,6 +197,7 @@ async function completeWeeklyHrWorkflowStage1({
         const performedAt = now();
         const nextVersion = current ? previousVersion + 1 : 1;
         const nextStage1 = { status: 'COMPLETED', completion_fingerprint: finalFingerprint,
+            effective_fingerprint: finalFingerprint,
             completed_at: performedAt, completed_by_user_id: actor.user_id,
             completed_by_user_name: actor.user_name, completed_by_user_role: actor.role,
             reason_or_notes: reason, version: nextVersion };

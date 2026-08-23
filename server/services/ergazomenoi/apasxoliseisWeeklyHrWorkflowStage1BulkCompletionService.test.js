@@ -69,5 +69,14 @@ const base = { reason_or_notes: 'Μαζικός έλεγχος', bulk_request_id
     const stale = await completeWeeklyHrWorkflowStage1Bulk({ ...base, scopes: scopes.slice(0, 1),
         completeOne: async () => ({ idempotent: false, previous_fingerprint: 'a'.repeat(64) }) });
     assert.equal(stale.results[0].status, 'COMPLETED');
-    console.log('weekly HR Stage-1 bulk completion tests passed (9 scenarios)');
+
+    let forbiddenPayloadCalls = 0;
+    const forbiddenPayload = await completeWeeklyHrWorkflowStage1Bulk({ ...base,
+        scopes: [{ ...scopes[0], updates: { adeia_apologistika: true } }],
+        completeOne: async () => { forbiddenPayloadCalls += 1; } });
+    assert.equal(forbiddenPayload.results[0].status, 'FAILED');
+    assert.equal(forbiddenPayload.results[0].code,
+        'STAGE1_COMPLETION_SCOPE_FIELDS_NOT_ALLOWED');
+    assert.equal(forbiddenPayloadCalls, 0);
+    console.log('weekly HR Stage-1 bulk completion tests passed (10 scenarios)');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
