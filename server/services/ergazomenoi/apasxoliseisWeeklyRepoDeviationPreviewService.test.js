@@ -659,7 +659,7 @@ function testSixthDayPresentationIsAttachedOnlyToTheMatchingDailyRow() {
     assert.strictEqual(reviewRows[2].is_sixth_day, false);
 }
 
-function canonicalJunePreview({ decisionMode = 'NONE' } = {}) {
+function canonicalJunePreview({ decisionMode = 'NONE', approvedOrphan = true } = {}) {
     const dates = ['08', '09', '10', '11', '12', '13', '14'];
     const cards = [
         ['12:37', '22:18'], ['15:12', '22:17'], ['15:15', '22:07'], ['', ''],
@@ -686,7 +686,7 @@ function canonicalJunePreview({ decisionMode = 'NONE' } = {}) {
         cards_eos_ora_01: cards[index][1],
         apo_ora_01: day === '14' ? '14:51' : '',
         eos_ora_01: day === '14' ? '22:51' : '',
-        ...(day === '14' ? { orphan_card_resolution: {
+        ...(day === '14' && approvedOrphan ? { orphan_card_resolution: {
             status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
         } } : {})
     }));
@@ -787,6 +787,27 @@ function testCanonicalDecisionIsConsumedByWeeklyProjection() {
     assert.strictEqual(unresolved.sixth_day_date, '2026-06-14');
     assert.strictEqual(unresolved.seventh_day_date, null);
     assert.strictEqual(unresolved.sixth_day_count, 1);
+    for (const reason of [
+        'TARGET_LOCKED',
+        'TARGET_LEAVE_OR_SICKNESS',
+        'TARGET_ALREADY_PROCESSED',
+        'TARGET_CONFLICTING_REPO_STATE',
+        'SOURCE_LOCKED',
+        'SOURCE_LEAVE_OR_SICKNESS',
+        'SOURCE_INVALID_CARD_EVIDENCE',
+        'SOURCE_ALREADY_PROCESSED',
+        'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'
+    ]) {
+        assert.ok(!unresolved.presentation_reasons.includes(reason));
+    }
+    assert.ok(unresolved.repo_transfer_reasons.includes('SOURCE_ALREADY_PROCESSED'));
+
+    const blocking = canonicalJunePreview({ approvedOrphan: false }).deviations[0];
+    assert.strictEqual(blocking.status, STATUS.NEEDS_HR_DECISION);
+    assert.strictEqual(blocking.requires_new_hr_decision, true);
+    assert.ok(blocking.presentation_reasons.includes('SOURCE_INVALID_CARD_EVIDENCE'));
+    assert.ok(blocking.presentation_reasons.includes(
+        'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'));
 
     for (const decisionMode of ['ONE_TIME', 'REUSABLE']) {
         const resolved = canonicalJunePreview({ decisionMode }).deviations[0];
@@ -813,6 +834,8 @@ function testCanonicalDecisionIsConsumedByWeeklyProjection() {
     assert.strictEqual(stale.requires_new_hr_decision, false);
     assert.strictEqual(stale.sixth_day_date, '2026-06-14');
     assert.strictEqual(stale.seventh_day_date, null);
+    assert.ok(!stale.presentation_reasons.includes('SOURCE_ALREADY_PROCESSED'));
+    assert.ok(stale.repo_transfer_reasons.includes('SOURCE_ALREADY_PROCESSED'));
 }
 
 testSundayAndMondayUseDifferentBuckets();
