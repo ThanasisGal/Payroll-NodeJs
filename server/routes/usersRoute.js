@@ -1605,6 +1605,22 @@ router.post(
     erganhController.saveWeeklyHrStage1DailyClassificationsBulk
 );
 
+router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage2/complete',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.completeWeeklyHrWorkflowStage2
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/resolve-day',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.resolveWeeklyHrStage3Day
+);
+
 router.patch(
     '/api/prodhlomena-oraria/review/:id',
     checkAuth,
