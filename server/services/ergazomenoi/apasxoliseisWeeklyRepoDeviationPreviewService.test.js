@@ -4,7 +4,8 @@ const {
     STATUS,
     normalizeLegacyDeviation,
     buildWeeklyRepoDeviationPreview,
-    attachSixthDayPresentationToRows
+    attachSixthDayPresentationToRows,
+    resolveWeeklyRepoPreviewAsOfDate
 } = require('./apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
     analyzeWeeklyRepoTransferForEmploymentContract
@@ -177,6 +178,34 @@ function testOpenTrailingWeekIsPendingNotDeviation() {
     assert.strictEqual(result.pendingWeeks[0].complete, false);
     assert.strictEqual(result.pendingWeeks[0].weekStart, '2026-06-29');
     assert.strictEqual(result.pendingWeeks[0].weekEnd, '2026-07-05');
+}
+
+function testCompletedHistoricalReconstructionEvaluatesCrossMonthWeek() {
+    const historicalAsOf = resolveWeeklyRepoPreviewAsOfDate({
+        sessionAppDate: '2026-06-30',
+        periodEnd: '2026-06-30',
+        periodControl: {
+            historical_reconstruction_status: 'COMPLETED',
+            historical_reconstruction_completed_at: '2026-08-12T11:23:27.960Z'
+        }
+    });
+    assert.strictEqual(historicalAsOf, '2026-08-12');
+    const contextRows = rows('2026-06-29');
+    assert.deepStrictEqual(
+        contextRows.slice(2).map((row) => row.hmeromhnia),
+        ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05']
+    );
+    const result = buildWeeklyRepoDeviationPreview({
+        rows: contextRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: historicalAsOf,
+        resolveWeeklyProfile: fiveDayProfile
+    });
+    assert.strictEqual(result.pendingWeeks.length, 0);
+    assert.strictEqual(result.deviations.length, 1);
+    assert.strictEqual(result.deviations[0].weekStart, '2026-06-29');
+    assert.strictEqual(result.deviations[0].weekEnd, '2026-07-05');
 }
 
 function repoTransferWeek({ applied = false } = {}) {
@@ -623,6 +652,7 @@ testCompletedMondaySundayRanges();
 testDepartureWeekDoesNotCreateWeeklyPolicyChecks();
 testContractualProfileControlsExpectedRepo();
 testOpenTrailingWeekIsPendingNotDeviation();
+testCompletedHistoricalReconstructionEvaluatesCrossMonthWeek();
 testRepoTransferLifecycleUsesEffectiveFinalRows();
 testCanonicalCurrentRepoStateAndApprovalIsolation();
 testLegacyPersistedRangeIsExplicit();

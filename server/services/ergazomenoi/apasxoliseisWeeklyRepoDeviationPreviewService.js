@@ -354,11 +354,30 @@ function buildWeeklyRepoDeviationPreview({
     };
 }
 
+function resolveWeeklyRepoPreviewAsOfDate({
+    sessionAppDate,
+    periodEnd,
+    periodControl = null
+} = {}) {
+    if (periodControl?.historical_reconstruction_status !== 'COMPLETED') {
+        return sessionAppDate;
+    }
+
+    const completedAt = dateKeyUtc(periodControl.historical_reconstruction_completed_at);
+    const finalContextSunday = dateKeyUtc(endOfWeekSundayUtc(periodEnd));
+    if (!finalContextSunday) return completedAt || sessionAppDate;
+
+    return completedAt && completedAt > finalContextSunday
+        ? completedAt
+        : finalContextSunday;
+}
+
 module.exports = {
     POLICY_VERSION,
     SOURCE_VERSION,
     STATUS,
     normalizeLegacyDeviation,
     attachSixthDayPresentationToRows,
-    buildWeeklyRepoDeviationPreview
+    buildWeeklyRepoDeviationPreview,
+    resolveWeeklyRepoPreviewAsOfDate
 };

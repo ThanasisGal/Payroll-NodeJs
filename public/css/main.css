@@ -15015,6 +15015,31 @@ body.loader-active > *:not(.app-loader) {
     background: var(--bs-warning-bg-subtle, #fff3cd);
 }
 
+.weekly-hr-stage1-table {
+    font-size: 0.82rem;
+}
+
+.weekly-hr-stage1-table th,
+.weekly-hr-stage1-table td {
+    padding: 0.35rem 0.45rem;
+}
+
+.weekly-hr-stage1-day {
+    padding: 0.2rem;
+    border-radius: 0.4rem;
+    background: var(--bs-light);
+}
+
+.weekly-hr-stage1-day .weekly-hr-stage1-day-classification {
+    width: 7.5rem;
+}
+
+.weekly-hr-stage1-day .weekly-hr-stage1-leave-category {
+    flex: 0 1 30rem;
+    width: 30rem;
+    max-width: 100%;
+}
+
 .employment-review-return-btn,
 .employment-review-return-btn:hover,
 .employment-review-return-btn:focus,

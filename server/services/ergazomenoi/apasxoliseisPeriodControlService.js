@@ -46,7 +46,13 @@ function isDateInsideEmploymentPeriod({ period_start, period_end, date } = {}) {
     const candidate = dateOnly(date, 'ημερομηνία μεταβολής');
     return candidate >= scope.period_start && candidate <= scope.period_end;
 }
-function isWeekAllowedForEmploymentPeriod({ period_start, period_end, week_start, week_end } = {}) {
+function isWeekAllowedForEmploymentPeriod({
+    period_start, period_end, week_start, week_end,
+    period_control: periodControl = null,
+    historical_as_of: historicalAsOf = null,
+    authoritative_row_dates: authoritativeRowDates = [],
+    allow_stale_completed_context: allowStaleCompletedContext = false
+} = {}) {
     const scope = normalizeScope({ team: '_', company_kod: '_', ypokatasthma: '_', period_start, period_end });
     const start = dateOnly(week_start, 'έναρξη εβδομάδας');
     const end = dateOnly(week_end, 'λήξη εβδομάδας');
@@ -54,8 +60,28 @@ function isWeekAllowedForEmploymentPeriod({ period_start, period_end, week_start
     const naturalEnd = endOfWeekSundayUtc(start);
     if (start.toISOString().slice(0, 10) !== naturalStart.toISOString().slice(0, 10) ||
         end.toISOString().slice(0, 10) !== naturalEnd.toISOString().slice(0, 10)) return false;
-    if (end > scope.period_end) return false;
-    return start >= scope.period_start || (start <= scope.period_start && scope.period_start <= end);
+    if (start < scope.period_start || start > scope.period_end) return false;
+    if (end <= scope.period_end) return true;
+    const completedHistoricalMode = periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTED ||
+        (allowStaleCompletedContext === true &&
+            periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTION_STALE);
+    if (!completedHistoricalMode ||
+        periodControl?.historical_reconstruction_status !== 'COMPLETED') return false;
+    let asOf;
+    try { asOf = dateOnly(historicalAsOf, 'ιστορικό όριο ανακατασκευής'); }
+    catch (_error) { return false; }
+    if (end > asOf) return false;
+    const expectedDates = new Set();
+    for (let offset = 0; offset < 7; offset += 1) {
+        const date = new Date(start); date.setUTCDate(date.getUTCDate() + offset);
+        expectedDates.add(date.toISOString().slice(0, 10));
+    }
+    const loadedDates = new Set((Array.isArray(authoritativeRowDates) ? authoritativeRowDates : [])
+        .map((value) => {
+            try { return dateOnly(value, 'ημερήσια εγγραφή').toISOString().slice(0, 10); }
+            catch (_error) { return ''; }
+        }).filter(Boolean));
+    return loadedDates.size === 7 && [...expectedDates].every((date) => loadedDates.has(date));
 }
 function isPastDeadline(deadline, now = new Date()) {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -171,6 +197,21 @@ async function assertNormalPeriod({ scope, now = new Date(), expectedToken = nul
         'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED', 409,
         'Απαιτείται ρητή ανακατασκευή ή επανεκτίμηση της εκπρόθεσμης περιόδου.');
     if (state.effective_mode === MODES.CORRECTIVE_ONLY) throw periodError('PERIOD_CONTROL_CORRECTIVE_ONLY', 409, 'Η περίοδος επιτρέπει μόνο διορθωτική μισθοδοσία.');
+    return { state, token: stateToken(state) };
+}
+async function assertReviewReadablePeriod({ scope, now = new Date(), expectedToken = null,
+    periodControlModel = PeriodControlModel, stateResolver = getPeriodControl }) {
+    const state = await stateResolver({ scope, now, periodControlModel });
+    if (expectedToken && (state.exists !== expectedToken.exists ||
+        state.stored_status !== expectedToken.stored_status || state.version !== expectedToken.version)) {
+        throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+            'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    }
+    if (![MODES.NORMAL, MODES.HISTORICAL_RECONSTRUCTED,
+        MODES.HISTORICAL_RECONSTRUCTION_STALE].includes(state.effective_mode)) {
+        throw periodError('PERIOD_CONTROL_REVIEW_NOT_AVAILABLE', 409,
+            'Απαιτείται ρητή ανακατασκευή πριν από την ανάγνωση του εβδομαδιαίου ελέγχου.');
+    }
     return { state, token: stateToken(state) };
 }
 async function fencePeriodForWrite({ scope: input, expectedToken = null, now = new Date(), session,
@@ -501,7 +542,7 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
 module.exports = { MODES, periodError, dateOnly, calculatePeriodDeadline, normalizeScope,
     isDateInsideEmploymentPeriod, isWeekAllowedForEmploymentPeriod,
     isPastDeadline, resolveEffectiveMode, projectPeriodControl, getPeriodControl, stateToken,
-    assertNormalPeriod, fencePeriodForWrite, runWithPeriodWriteFence,
+    assertNormalPeriod, assertReviewReadablePeriod, fencePeriodForWrite, runWithPeriodWriteFence,
     fencePeriodCalculationForWrite,
     acquirePeriodCalculationOwnership, runWithPeriodCalculationWriteFence,
     releasePeriodCalculationOwnership, transitionPeriodControl };

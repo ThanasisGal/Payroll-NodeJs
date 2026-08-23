@@ -135,6 +135,21 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
 function getEffectiveRepoProfileForDate(date, history = [], employee = {}) { return getOrarioTermsForDate(date, history, employee); }
+function getDailyRepoProfileInfo({ row = {}, istorikoRows = [], ergazomenos = {} } = {}) {
+    const resolved = getOrarioTermsForDate(row.hmeromhnia, istorikoRows, ergazomenos);
+    const snapshot = String(row.kathestos_apasxolhshs_hmeras ?? '').trim();
+    const employmentType = ['0', '1', '2'].includes(snapshot)
+        ? snapshot
+        : String(resolved.typos_apasxolhshs ?? resolved.kathestos_apasxolhshs ?? '').trim();
+    const profile = { ...resolved, typos_apasxolhshs: employmentType,
+        kathestos_apasxolhshs: employmentType,
+        daily_employment_snapshot_source: ['0', '1', '2'].includes(snapshot)
+            ? 'PRODHLomena_ORARIA' : 'ORARIO_TERMS_FOR_DATE' };
+    return { profile, employmentType,
+        expectedRepoCategory: employmentType === '0'
+            ? 'ΑΝ'
+            : (employmentType === '1' || employmentType === '2' ? 'ΜΕ' : null) };
+}
 function profileSignature(profile = {}) {
     return [
         String(profile.typos_apasxolhshs ?? ''),
@@ -188,7 +203,7 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
 module.exports = {
     ATOMIC_REPO_TRANSFER_ROW_FIELDS, ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS,
     ATOMIC_REPO_TRANSFER_HISTORY_FIELDS, getCompanyHolidayFlags, buildArgiesByDateKey,
-    buildNoCardsDisplayContext, resolveNoCardsDisplayStatus,
+    buildNoCardsDisplayContext, resolveNoCardsDisplayStatus, getDailyRepoProfileInfo,
     resolveCurrentApologistikaDisplayCategory, getEffectiveRepoProfileForDate,
     getProfileDateForDeviation, getWeeklyRepoProfileInfo
 };
