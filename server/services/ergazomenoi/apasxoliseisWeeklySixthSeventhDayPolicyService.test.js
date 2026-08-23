@@ -44,6 +44,56 @@ assert.strictEqual(result.sixthDay.illegalOvertimeHours, 0);
 result = analyze([7, 7, 7, 7, 7, 7, 0]);
 assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
 
+const june0004Hours = [9.18, 6.58, 6.37, 0, 9.03, 6.35, 8];
+const june0004Rows = june0004Hours.map((hours, index) => {
+    const date = new Date('2026-06-08T00:00:00.000Z');
+    date.setUTCDate(date.getUTCDate() + index);
+    const day = date.toISOString().slice(0, 10);
+    return {
+        hmeromhnia: day,
+        kathgoria_ergasias: day === '2026-06-10' ? 'ΑΝ' : 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: day === '2026-06-11' ? '' : 'ΕΡΓ',
+        astheneia_apologistika: day === '2026-06-11',
+        repo: day === '2026-06-10',
+        repo_apologistika: false,
+        ores_ergasias_apologistika: hours,
+        cards_ores_ergasias: day === '2026-06-11' || day === '2026-06-14' ? 0 : hours,
+        cards_apo_ora_01: day === '2026-06-11' ? '' : day === '2026-06-14' ? '14:51' : '12:00',
+        cards_eos_ora_01: day === '2026-06-11' || day === '2026-06-14' ? '' : '20:00',
+        ...(day === '2026-06-14' ? {
+            apo_ora_01_apologistika: '14:51',
+            eos_ora_01_apologistika: '23:21',
+            orphan_card_resolution: {
+                status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
+            }
+        } : {})
+    };
+});
+const june0004 = analyzeWeeklySixthSeventhDay({
+    weekRows: june0004Rows,
+    effectiveProfile: {
+        hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 0,
+        eidikh_kathgoria_ergazomenoy: '0009'
+    }
+});
+assert.strictEqual(june0004.status, 'READY');
+assert.deepStrictEqual(june0004.reasons, []);
+assert.strictEqual(june0004.sixthDay.hmeromhnia, '2026-06-14');
+assert.strictEqual(june0004.sixthDay.sixthDayHours, 8);
+assert.strictEqual(june0004.sixthDay.cardVerificationStatus, 'HR_APPROVED_ORPHAN');
+assert.strictEqual(june0004.seventhDay, null);
+assert.ok(!june0004.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+
+const chronologicalCandidates = analyze([6.58, 6.37, 9.18, 9.03, 6.35, 8, 0]);
+assert.strictEqual(chronologicalCandidates.sixthDay.hmeromhnia, '2026-08-01');
+
+const fallbackClosestToEight = analyze([9.8, 9.6, 9.4, 9.2, 9.1, 9.05, 0]);
+assert.strictEqual(fallbackClosestToEight.sixthDay.hmeromhnia, '2026-08-01');
+assert.ok(fallbackClosestToEight.warnings.includes(
+    'SIXTH_DAY_NO_STANDARD_CANDIDATE_CLOSEST_TO_EIGHT'));
+assert.ok(fallbackClosestToEight.warnings.includes('SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT'));
+
 const laterCardHoursOverEight = week([7, 7, 7, 7, 7, 9, 0]);
 assert.strictEqual(analyzeWeeklySixthSeventhDay({
     weekRows: laterCardHoursOverEight,
@@ -465,18 +515,21 @@ assert.strictEqual(bothReposWorked.seventhDay.classification, 'SEVENTH_DAY_ILLEG
 assert.strictEqual(bothReposWorked.seventhDay.severity, 'SERIOUS_VIOLATION');
 assert.strictEqual(Object.hasOwn(bothReposWorked.seventhDay, 'sixthDayHours'), false);
 
-// Canonical identity semantics: SIXTH may be a deterministic non-repo actual day.
+// With exactly six actual workdays, the latest standard candidate is SIXTH.
 const sixActualNonRepoSixth = analyze([7, 7.9, 7, 7, 7, 7, 0]);
 assert.strictEqual(sixActualNonRepoSixth.status, 'READY');
-assert.strictEqual(sixActualNonRepoSixth.sixthDayIdentity, '2026-07-28');
-assert.strictEqual(sixActualNonRepoSixth.sixthDay.hmeromhnia, '2026-07-28');
-assert.strictEqual(sixActualNonRepoSixth.sixthDayRepoIdentity, null);
-assert.strictEqual(sixActualNonRepoSixth.remainingRepoIdentity, null);
+assert.strictEqual(sixActualNonRepoSixth.sixthDayIdentity, '2026-08-01');
+assert.strictEqual(sixActualNonRepoSixth.sixthDay.hmeromhnia, '2026-08-01');
+assert.strictEqual(sixActualNonRepoSixth.sixthDayRepoIdentity, '2026-08-01');
+assert.strictEqual(sixActualNonRepoSixth.remainingRepoIdentity, '2026-08-02');
 assert.strictEqual(sixActualNonRepoSixth.seventhDay, null);
 const sixActualNonRepoOverride = analyzeWeeklySixthSeventhDay({
     weekRows: week([7, 7.9, 7, 7, 7, 7, 0]),
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
-    classificationByDateOverride: { '2026-07-28': 'SIXTH' }
+    classificationByDateOverride: {
+        '2026-07-28': 'SIXTH',
+        '2026-08-01': 'NORMAL'
+    }
 });
 assert.strictEqual(sixActualNonRepoOverride.status, 'READY');
 assert.strictEqual(sixActualNonRepoOverride.sixthDayIdentity, '2026-07-28');
@@ -486,13 +539,14 @@ const automaticDifferentNonRepoSixth = analyzeWeeklySixthSeventhDay({
     weekRows: differentNonRepoSixthRows,
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 }
 });
-assert.strictEqual(automaticDifferentNonRepoSixth.sixthDayIdentity, '2026-07-28');
+assert.strictEqual(automaticDifferentNonRepoSixth.sixthDayIdentity, '2026-08-01');
 const humanDifferentNonRepoSixth = analyzeWeeklySixthSeventhDay({
     weekRows: differentNonRepoSixthRows,
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     classificationByDateOverride: {
         '2026-07-28': 'NORMAL',
-        '2026-07-29': 'SIXTH'
+        '2026-07-29': 'SIXTH',
+        '2026-08-01': 'NORMAL'
     }
 });
 assert.strictEqual(humanDifferentNonRepoSixth.status, 'READY');
