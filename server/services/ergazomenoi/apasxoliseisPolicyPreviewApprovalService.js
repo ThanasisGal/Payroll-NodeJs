@@ -37,6 +37,7 @@ const REUSABLE_DECISION_ALLOWED_ROLES = new Set(CRITICAL_EMPLOYMENT_DECISION_ROL
 const MAX_ITEMS = 500;
 const MAX_PAYLOAD_BYTES = 1024 * 1024;
 const MAX_NESTED_KEYS = 100;
+const ORPHAN_REUSABLE_POLICY_CODE = 'ORPHAN_CARD_CONTINUOUS';
 
 function validationError(message) {
     const error = new Error(message);
@@ -772,6 +773,85 @@ async function listActiveReusablePolicyDecisionRecords({
         .lean();
 }
 
+function buildOrphanReusableCriteria(rule = {}) {
+    const orphanType = toTrimmedString(rule.orphan_type, 20).toUpperCase();
+    const scheduleKind = toTrimmedString(rule.schedule_kind, 20).toUpperCase();
+    const policyVersion = toTrimmedString(rule.policy_version, 100);
+    const relativeRule = toTrimmedString(rule.rule, 100).toUpperCase();
+    const validRule = (scheduleKind === 'CONTINUOUS' && [
+        'ACTUAL_START_PLUS_DECLARED_DURATION',
+        'ACTUAL_END_MINUS_DECLARED_DURATION'
+    ].includes(relativeRule)) ||
+        (scheduleKind === 'NON_DECLARED' &&
+            orphanType === 'END_ONLY' &&
+            relativeRule === 'ACTUAL_END_MINUS_EFFECTIVE_DAILY_AVERAGE');
+    if (!policyVersion || !['START_ONLY', 'END_ONLY'].includes(orphanType) || !validRule) {
+        throw validationError('Μη έγκυρος επαναχρησιμοποιήσιμος κανόνας ορφανού χτυπήματος.');
+    }
+    return { version: 6, decision_grain: 'DAILY_ORPHAN_CARD', policy_code:
+        ORPHAN_REUSABLE_POLICY_CODE, policy_version: policyVersion,
+        orphan_type: orphanType, schedule_kind: scheduleKind, rule: relativeRule };
+}
+
+async function createOrphanReusablePolicyDecisionRecord({ session, row, rule, dbSession = null,
+    approvalModel = ApasxoliseisPolicyPreviewApprovalsModel, now = new Date() }) {
+    const scope = validateSessionScope(session);
+    assertCriticalEmploymentDecisionRole(session);
+    const criteria = buildOrphanReusableCriteria(rule);
+    const fingerprint = buildReusableDecisionFingerprint(criteria);
+    const branch = toTrimmedString(row?.ypokatasthma, 20).padStart(4, '0');
+    const date = parseDateOnly(new Date(row?.hmeromhnia).toISOString().slice(0, 10), 'hmeromhnia');
+    const duplicateQuery = approvalModel.findOne({ team: scope.team, company_kod: scope.company_kod,
+        ypokatasthma: branch, policy_code: ORPHAN_REUSABLE_POLICY_CODE,
+        reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL, reuse_status: REUSE_STATUS.ACTIVE,
+        decision_status: 'RECORDED', active_policy_key: fingerprint });
+    if (dbSession && typeof duplicateQuery.session === 'function') duplicateQuery.session(dbSession);
+    const duplicate = await duplicateQuery.select('_id').lean();
+    if (duplicate) return duplicate;
+    const document = {
+        team: scope.team, company_kod: scope.company_kod, ypokatasthma: branch,
+        etos: scope.etos, period_kodikos: toTrimmedString(session.periodInUse, 20),
+        period_id: '', apo_hmeromhnia: date, eos_hmeromhnia: date,
+        group_id: `ORPHAN:${criteria.orphan_type}:${fingerprint}`,
+        group_key: `ORPHAN:${criteria.orphan_type}`, grouping_scope: 'daily-orphan',
+        policy_code: ORPHAN_REUSABLE_POLICY_CODE, scenario_code: criteria.orphan_type,
+        status: 'APPROVED', action_type: 'ORPHAN_RESOLUTION', reason_code: 'HR_APPROVED',
+        decision_type: 'APPROVE_PROPOSAL', decision_status: 'RECORDED',
+        reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL, reuse_status: REUSE_STATUS.ACTIVE,
+        reuse_fingerprint: fingerprint, reuse_fingerprints: [fingerprint],
+        active_policy_key: fingerprint, active_policy_keys: [fingerprint],
+        reuse_match_criteria: { version: 6, criteria }, reuse_effective_from: date,
+        reuse_effective_to: null,
+        items: [{ preview_id: String(row?._id || ''), prodhlomena_oraria_id: row?._id,
+            employee_kodikos: toTrimmedString(row?.kodikos, 50), hmeromhnia: date,
+            kathgoria_ergasias: toTrimmedString(row?.kathgoria_ergasias, 50),
+            kathgoria_ergasias_apologistika: 'ΕΡΓ', declared_hours: Number(row?.ores_ergasias || 0),
+            policy_context: criteria, proposed_values: {}, flags: { raw_cards_preserved: true } }],
+        snapshot_summary: { items_count: 1, employees_count: 1, first_date: date, last_date: date },
+        created_by_user_id: scope.created_by_user_id,
+        created_by_user_name: scope.created_by_user_name,
+        created_by_user_role: scope.created_by_user_role,
+        created_at: now, source: 'ORPHAN_CARD_HR_DECISION', client_payload_version: 'orphan:v1'
+    };
+    const created = await approvalModel.create([document], dbSession ? { session: dbSession } : {});
+    return Array.isArray(created) ? created[0] : created;
+}
+
+async function findMatchingOrphanReusablePolicyDecision({ session, ypokatasthma, rule,
+    approvalModel = ApasxoliseisPolicyPreviewApprovalsModel, asOfDate = new Date() }) {
+    const scope = validateSessionScope(session);
+    const criteria = buildOrphanReusableCriteria(rule);
+    const fingerprint = buildReusableDecisionFingerprint(criteria);
+    return approvalModel.findOne({ team: scope.team, company_kod: scope.company_kod,
+        ypokatasthma: toTrimmedString(ypokatasthma, 20).padStart(4, '0'),
+        policy_code: ORPHAN_REUSABLE_POLICY_CODE, decision_status: 'RECORDED',
+        reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL, reuse_status: REUSE_STATUS.ACTIVE,
+        active_policy_key: fingerprint, reuse_effective_from: mongoose.trusted({ $lte: asOfDate }),
+        $or: [{ reuse_effective_to: null },
+            { reuse_effective_to: mongoose.trusted({ $gte: asOfDate }) }]
+    }).sort({ created_at: -1 }).lean();
+}
+
 function buildPolicyPreviewApprovalListFilter({ session, filters = {} }) {
     const scope = validateSessionScope(session);
     const source = asObject(filters);
@@ -841,5 +921,7 @@ module.exports = {
     createPolicyPreviewApprovalRecord,
     revokePolicyPreviewApprovalRecord,
     listPolicyPreviewApprovalRecords,
-    listActiveReusablePolicyDecisionRecords
+    listActiveReusablePolicyDecisionRecords,
+    ORPHAN_REUSABLE_POLICY_CODE, buildOrphanReusableCriteria,
+    createOrphanReusablePolicyDecisionRecord, findMatchingOrphanReusablePolicyDecision
 };
