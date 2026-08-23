@@ -667,4 +667,38 @@ for (const [name, nonActualUpdate] of [
     assert.strictEqual(fixtureResult.seventhDay, null, name);
 }
 
+const hireTuesdaySixWorkdays = week([0, 8, 8, 8, 8, 8, 8]).slice(1);
+const hireTuesdayDates = hireTuesdaySixWorkdays.map((row) => row.hmeromhnia);
+const hireTuesdayAnalysis = analyzeWeeklySixthSeventhDay({
+    weekRows: hireTuesdaySixWorkdays,
+    expectedDateKeys: hireTuesdayDates,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 }
+});
+assert.strictEqual(hireTuesdayAnalysis.status, 'READY');
+assert.strictEqual(hireTuesdayAnalysis.dailyFacts.length, 6);
+assert.strictEqual(hireTuesdayAnalysis.sixthDay.hmeromhnia, '2026-08-02');
+assert.strictEqual(hireTuesdayAnalysis.seventhDay, null);
+
+const hireSaturdayTwoWorkdays = week([0, 0, 0, 0, 0, 8, 8]).slice(5);
+const hireSaturdayAnalysis = analyzeWeeklySixthSeventhDay({
+    weekRows: hireSaturdayTwoWorkdays,
+    expectedDateKeys: hireSaturdayTwoWorkdays.map((row) => row.hmeromhnia),
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 }
+});
+assert.strictEqual(hireSaturdayAnalysis.status, 'NOT_APPLICABLE');
+assert.strictEqual(hireSaturdayAnalysis.dailyFacts.length, 2);
+assert.strictEqual(hireSaturdayAnalysis.sixthDay, null);
+
+const mismatchedEmploymentSlice = analyzeWeeklySixthSeventhDay({
+    weekRows: hireSaturdayTwoWorkdays,
+    expectedDateKeys: ['2026-07-31', ...hireSaturdayTwoWorkdays.map((row) => row.hmeromhnia)],
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 }
+});
+assert.strictEqual(mismatchedEmploymentSlice.status, 'NEEDS_HR_DECISION');
+assert.ok(mismatchedEmploymentSlice.reasons.includes(
+    'INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'));
+
 console.log('weekly sixth/seventh-day policy tests passed');

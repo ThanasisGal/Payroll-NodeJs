@@ -34,6 +34,43 @@ assert.equal(new Model({ ...base, stage1: {
     completed_by_user_id: new mongoose.Types.ObjectId(), completed_by_user_name: 'HR',
     completed_by_user_role: 'HR', reason_or_notes: 'Reviewed', version: 2
 } }).validateSync(), undefined);
+const juneSlice = {
+    period_start: new Date('2026-06-01T00:00:00.000Z'),
+    period_end: new Date('2026-06-30T00:00:00.000Z'),
+    actionable_dates: [new Date('2026-06-29T00:00:00.000Z'),
+        new Date('2026-06-30T00:00:00.000Z')],
+    context_only_dates: [new Date('2026-07-01T00:00:00.000Z')],
+    status: 'COMPLETED', context_fingerprint: 'c'.repeat(64),
+    completion_fingerprint: 'd'.repeat(64), effective_fingerprint: 'd'.repeat(64),
+    completed_at: new Date(), completed_by_user_id: new mongoose.Types.ObjectId(),
+    completed_by_user_name: 'HR', completed_by_user_role: 'HR', version: 1
+};
+const julySlice = { ...juneSlice,
+    period_start: new Date('2026-07-01T00:00:00.000Z'),
+    period_end: new Date('2026-07-31T00:00:00.000Z'),
+    actionable_dates: [new Date('2026-07-01T00:00:00.000Z')],
+    context_only_dates: [new Date('2026-06-29T00:00:00.000Z'),
+        new Date('2026-06-30T00:00:00.000Z')],
+    completion_fingerprint: 'e'.repeat(64), effective_fingerprint: 'e'.repeat(64)
+};
+assert.equal(new Model({ ...base,
+    week_start: new Date('2026-06-29T00:00:00.000Z'),
+    week_end: new Date('2026-07-05T00:00:00.000Z'),
+    stage1: { period_slices: [juneSlice, julySlice] }
+}).validateSync(), undefined);
+assert.equal(Model.schema.path('stage1').schema.path('effective_fingerprint').instance, 'String');
+assert.equal(new Model({ ...base, stage1: {
+    status: 'COMPLETED', completion_fingerprint: 'a'.repeat(64),
+    effective_fingerprint: 'b'.repeat(64), completed_at: new Date(),
+    completed_by_user_id: new mongoose.Types.ObjectId(), completed_by_user_name: 'HR',
+    completed_by_user_role: 'HR', version: 2
+} }).validateSync(), undefined);
+assert.ok(new Model({ ...base, stage1: {
+    status: 'COMPLETED', completion_fingerprint: 'a'.repeat(64),
+    effective_fingerprint: 'invalid', completed_at: new Date(),
+    completed_by_user_id: new mongoose.Types.ObjectId(), completed_by_user_name: 'HR',
+    completed_by_user_role: 'HR', version: 2
+} }).validateSync()?.errors?.['stage1.effective_fingerprint']);
 assert.equal(Model.schema.path('workflow_version').options.default, 'weekly-hr-workflow:v1');
 assert.equal(Model.schema.path('stage2').schema.path(
     'depends_on_stage1_fingerprint').instance, 'String');

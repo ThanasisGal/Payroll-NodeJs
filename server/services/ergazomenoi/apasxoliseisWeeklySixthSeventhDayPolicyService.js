@@ -176,6 +176,7 @@ function decisionFailure(reason, base = {}) {
 function analyzeWeeklySixthSeventhDay({
     weekRows = [],
     effectiveProfile = {},
+    expectedDateKeys = null,
     hourlyRate = null,
     canonicalRepoDayIdentitiesOverride = null,
     allowDeclaredRepoIdentityOverride = false,
@@ -186,12 +187,33 @@ function analyzeWeeklySixthSeventhDay({
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const dates = rows.map((row) => dateKeyUtc(row?.hmeromhnia));
     const range = dates[0] ? getMondaySundayWeekRange(dates[0]) : null;
+    const expectedDates = Array.isArray(expectedDateKeys)
+        ? [...new Set(expectedDateKeys.map(dateKeyUtc).filter(Boolean))].sort()
+        : null;
+    const validExpectedSlice = expectedDates === null || (
+        expectedDates.length > 0 &&
+        expectedDates.length <= 7 &&
+        expectedDates.every((date) =>
+            getMondaySundayWeekRange(date)?.weekStartKey === range?.weekStartKey) &&
+        expectedDates.every((date, index) => index === 0 ||
+            new Date(`${date}T00:00:00.000Z`).getTime() -
+                new Date(`${expectedDates[index - 1]}T00:00:00.000Z`).getTime() === 86400000)
+    );
+    const requiredDates = expectedDates || (range
+        ? Array.from({ length: 7 }, (_, index) => {
+              const date = new Date(`${range.weekStartKey}T00:00:00.000Z`);
+              date.setUTCDate(date.getUTCDate() + index);
+              return dateKeyUtc(date);
+          })
+        : []);
     if (
-        rows.length !== 7 ||
+        !validExpectedSlice ||
+        rows.length !== requiredDates.length ||
         dates.some((date) => !date) ||
-        new Set(dates).size !== 7 ||
+        new Set(dates).size !== requiredDates.length ||
         !range ||
-        dates.some((date) => getMondaySundayWeekRange(date)?.weekStartKey !== range.weekStartKey)
+        dates.some((date) => getMondaySundayWeekRange(date)?.weekStartKey !== range.weekStartKey) ||
+        requiredDates.some((date) => !dates.includes(date))
     ) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'], warnings: [], dailyFacts: [] });
     }

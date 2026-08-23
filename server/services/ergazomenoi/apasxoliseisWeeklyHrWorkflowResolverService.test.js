@@ -155,10 +155,10 @@ assert.deepStrictEqual(transfer.repo_transfer_candidates[0], {
 });
 assert.strictEqual(transfer.resting_repo_count, 0);
 assert.strictEqual(transfer.worked_repo_identity_count, 1);
-assert.strictEqual(transfer.known_repo_identity_count, 1);
-assert.strictEqual(transfer.unresolved_repo_identity_count_before_resolution, 1);
-assert.strictEqual(transfer.known_repo_identity_count_after_proposal, 2);
-assert.strictEqual(transfer.unresolved_repo_identity_count_after_proposed_resolution, 0);
+assert.strictEqual(transfer.known_repo_identity_count, 0);
+assert.strictEqual(transfer.unresolved_repo_identity_count_before_resolution, 2);
+assert.strictEqual(transfer.known_repo_identity_count_after_proposal, 1);
+assert.strictEqual(transfer.unresolved_repo_identity_count_after_proposed_resolution, 1);
 assert.strictEqual(transfer.resting_repo_count_after_proposal, 1);
 assert.strictEqual(transfer.next_required_hr_stage, NEXT_STAGE.REPO_RESOLUTION);
 
@@ -167,7 +167,7 @@ const multiple = resolve(weekWith(
     repoRow(DATES[1], true), possibleLeaveRow(DATES[3]), possibleLeaveRow(DATES[4])
 ));
 assert.strictEqual(multiple.repo_transfer_candidates.length, 2);
-assert.strictEqual(multiple.unresolved_repo_identity_count_after_proposed_resolution, 1);
+assert.strictEqual(multiple.unresolved_repo_identity_count_after_proposed_resolution, 2);
 assert.ok(multiple.warnings.includes('MULTIPLE_EQUIVALENT_REPO_TRANSFER_CANDIDATES'));
 
 // H. Seven actual workdays prohibit transfer but continue to final weekly checking.
@@ -179,13 +179,13 @@ assert.deepStrictEqual(sevenDays.repo_transfer_candidates, []);
 assert.strictEqual(sevenDays.next_required_hr_stage, NEXT_STAGE.FINAL_WEEKLY_CHECK);
 assert.deepStrictEqual(sevenDays.blocking_reasons, []);
 
-// TH. A six-day contract needs only its one worked repo identity.
+// TH. Δηλωμένο ρεπό με εργασία δεν αποτελεί πραγματοποιημένη ανάπαυση.
 const sixDay = resolve(weekWith(repoRow(DATES[2], true)), {
     effectiveProfile: profile(6)
 });
 assert.strictEqual(sixDay.expected_repo_count, 1);
-assert.strictEqual(sixDay.known_repo_identity_count, 1);
-assert.strictEqual(sixDay.unresolved_repo_identity_count_before_resolution, 0);
+assert.strictEqual(sixDay.known_repo_identity_count, 0);
+assert.strictEqual(sixDay.unresolved_repo_identity_count_before_resolution, 1);
 
 // I. 0009 stays contractual five-day with zero sixth-day rate.
 const hotelProfile = profile(5, {
@@ -234,12 +234,51 @@ assert.ok(!mixed.blocking_reasons.includes('PROFILE_CHANGED_INSIDE_WEEK'));
 assert.deepStrictEqual(mixed.unclassified_stage2_candidates, [
     { date: DATES[1], candidate_kind: 'REST_REPO',
         label: 'Προς εξέταση ως ΑΝΑΠΑΥΣΗ / ΡΕΠΟ' },
-    { date: DATES[3], candidate_kind: 'NON_WORK',
-        label: 'Προς εξέταση ως ΜΗ ΕΡΓΑΣΙΑ' }
+    { date: DATES[3], candidate_kind: 'POSSIBLE_LEAVE_RESIDUAL',
+        label: 'Προς τελική εξέταση ως ΠΙΘΑΝΗ ΑΔΕΙΑ' }
 ]);
 const rotational = resolve(directRows, { effectiveProfilesByDate: {
     [DATES[1]]: profile(5, { typos_apasxolhshs: '2' }) } });
-assert.strictEqual(rotational.unclassified_stage2_candidates[0].candidate_kind, 'NON_WORK');
+assert.strictEqual(rotational.unclassified_stage2_candidates[0].candidate_kind,
+    'POSSIBLE_LEAVE_RESIDUAL');
+assert.deepStrictEqual(rotational.direct_repo_candidates, []);
+
+// Non-full daily semantics are driven by the effective profile of that date.
+// No declared obligation and no work is ordinary non-work, never possible leave.
+const partialNoDeclared = { ...workRow(DATES[1]), ores_ergasias: 0,
+    apo_ora_01: '', eos_ora_01: '', cards_ores_ergasias: 0,
+    cards_apo_ora_01: '', cards_eos_ora_01: '', ores_ergasias_apologistika: 0,
+    kathgoria_ergasias_apologistika: 'ΜΕ', kathgoria_adeias_apologistika: '' };
+const partialNoDeclaredResult = resolve(weekWith(partialNoDeclared), {
+    effectiveProfilesByDate: { [DATES[1]]: profile(5, { typos_apasxolhshs: '1' }) }
+});
+assert.deepStrictEqual(partialNoDeclaredResult.possible_leave_days, []);
+assert.deepStrictEqual(partialNoDeclaredResult.remaining_possible_leave_days, []);
+
+// Πραγματική Stage-2 canonical μορφή 0014: η προδηλωμένη υποχρέωση μένει
+// αμετάβλητη, αλλά ΜΕ + repo=false δεν αποτελεί repo conflict.
+const partialCanonicalNonWork = { ...workRow(DATES[1]), apologistiko_biblio: true,
+    cards_ores_ergasias: 0, cards_apo_ora_01: '', cards_eos_ora_01: '',
+    ores_ergasias_apologistika: 0, kathgoria_ergasias_apologistika: 'ΜΕ',
+    kathgoria_adeias_apologistika: '', repo_apologistika: false,
+    adeia_apologistika: false, astheneia_apologistika: false,
+    apousia_apologistika: false };
+const partialCanonicalNonWorkResult = resolve(weekWith(partialCanonicalNonWork), {
+    leave_classification_completed: true,
+    effectiveProfilesByDate: { [DATES[1]]: profile(5, { typos_apasxolhshs: '1' }) }
+});
+assert.ok(!partialCanonicalNonWorkResult.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
+assert.notStrictEqual(partialCanonicalNonWorkResult.next_required_hr_stage,
+    NEXT_STAGE.BLOCKED);
+
+// Actual work remains actual work whether or not a non-full day was declared.
+const partialUndeclaredWork = { ...workRow(DATES[1]), ores_ergasias: 0,
+    apo_ora_01: '', eos_ora_01: '' };
+const partialUndeclaredWorkResult = resolve(weekWith(partialUndeclaredWork), {
+    effectiveProfilesByDate: { [DATES[1]]: profile(5, { typos_apasxolhshs: '1' }) }
+});
+assert.deepStrictEqual(partialUndeclaredWorkResult.possible_leave_days, []);
+assert.ok(partialUndeclaredWorkResult.worked_declared_repo_days.length === 0);
 const mixedOpen = resolve(twoPossibleRows, { leave_classification_completed: false,
     profile_changed_inside_week: true,
     effectiveProfile: profile(5, { profile_changed_inside_week: true }) });
