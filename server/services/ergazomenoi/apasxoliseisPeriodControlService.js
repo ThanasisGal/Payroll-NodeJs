@@ -51,6 +51,7 @@ function isWeekAllowedForEmploymentPeriod({
     period_control: periodControl = null,
     historical_as_of: historicalAsOf = null,
     authoritative_row_dates: authoritativeRowDates = [],
+    required_authoritative_dates: requiredAuthoritativeDates = null,
     allow_stale_completed_context: allowStaleCompletedContext = false
 } = {}) {
     const scope = normalizeScope({ team: '_', company_kod: '_', ypokatasthma: '_', period_start, period_end });
@@ -71,17 +72,20 @@ function isWeekAllowedForEmploymentPeriod({
     try { asOf = dateOnly(historicalAsOf, 'ιστορικό όριο ανακατασκευής'); }
     catch (_error) { return false; }
     if (end > asOf) return false;
-    const expectedDates = new Set();
-    for (let offset = 0; offset < 7; offset += 1) {
-        const date = new Date(start); date.setUTCDate(date.getUTCDate() + offset);
-        expectedDates.add(date.toISOString().slice(0, 10));
-    }
+    const expectedDates = Array.isArray(requiredAuthoritativeDates)
+        ? new Set(requiredAuthoritativeDates.map((value) => dateOnly(
+            value, 'απαιτούμενη ημερομηνία').toISOString().slice(0, 10)))
+        : new Set(Array.from({ length: 7 }, (_, offset) => {
+            const date = new Date(start); date.setUTCDate(date.getUTCDate() + offset);
+            return date.toISOString().slice(0, 10);
+        }));
     const loadedDates = new Set((Array.isArray(authoritativeRowDates) ? authoritativeRowDates : [])
         .map((value) => {
             try { return dateOnly(value, 'ημερήσια εγγραφή').toISOString().slice(0, 10); }
             catch (_error) { return ''; }
         }).filter(Boolean));
-    return loadedDates.size === 7 && [...expectedDates].every((date) => loadedDates.has(date));
+    return loadedDates.size === expectedDates.size &&
+        [...expectedDates].every((date) => loadedDates.has(date));
 }
 function isPastDeadline(deadline, now = new Date()) {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -146,6 +150,7 @@ function projectPeriodControl({ scope, record = null, now = new Date(), dependen
         historical_dependency_fingerprint: record?.historical_dependency_fingerprint || '',
         current_dependency_fingerprint: dependencyFingerprint,
         dependency_status: reconstructed ? 'CURRENT' : effectiveMode === MODES.HISTORICAL_RECONSTRUCTION_STALE ? 'STALE' : '',
+        write_fence_version: Number(record?.write_fence_version || 0),
         successful_calculation_version: Number(record?.successful_calculation_version || 0),
         last_successful_calculation_id: record?.last_successful_calculation_id || '',
         last_successful_calculation_at: record?.last_successful_calculation_at || null,
@@ -213,6 +218,145 @@ async function assertReviewReadablePeriod({ scope, now = new Date(), expectedTok
             'Απαιτείται ρητή ανακατασκευή πριν από την ανάγνωση του εβδομαδιαίου ελέγχου.');
     }
     return { state, token: stateToken(state) };
+}
+async function fenceStaleStage1CompletionWrite({ scope: input, expectedToken, now = new Date(), session,
+    periodControlModel = PeriodControlModel,
+    fingerprintResolver = require('./apasxoliseisHistoricalPeriodReconstructionService')
+        .calculateHistoricalFingerprints }) {
+    if (!session) throw periodError('PERIOD_CONTROL_TRANSACTION_REQUIRED', 503,
+        'Δεν είναι διαθέσιμη η ασφαλής ολοκλήρωση του Stage 1.');
+    const scope = normalizeScope(input);
+    if (expectedToken?.exists !== true) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const record = await periodControlModel.findOneAndUpdate({
+        ...filterForScope(scope), status: 'OPEN', version: Number(expectedToken.version),
+        historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: mongoose.trusted({ $gte: 1 }),
+        $or: mongoose.trusted([
+            { active_calculation_id: '' }, { active_calculation_id: null },
+            { active_calculation_id: mongoose.trusted({ $exists: false }) }
+        ])
+    }, { $inc: { write_fence_version: 1 }, $set: { updated_at: now } },
+    { new: true, session });
+    if (!record) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const plain = record?.toObject ? record.toObject() : record;
+    const dependencyFingerprint = (await fingerprintResolver({ scope, session }))
+        .dependency_fingerprint;
+    const state = projectPeriodControl({ scope, record: plain, now, dependencyFingerprint });
+    if (state.effective_mode !== MODES.HISTORICAL_RECONSTRUCTION_STALE ||
+        state.historical_reconstruction_status !== 'COMPLETED') {
+        throw periodError('PERIOD_CONTROL_STALE_STAGE1_COMPLETION_NOT_ALLOWED', 409,
+            'Η περίοδος δεν επιτρέπει ασφαλή ολοκλήρωση του Stage 1.');
+    }
+    return { state, token: stateToken(state) };
+}
+async function runWithStaleStage1CompletionWriteFence({ scope, expectedToken, now = new Date(), work,
+    periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
+    transactionRunner = runTransaction, fingerprintResolver }) {
+    if (typeof work !== 'function') throw new TypeError('Stage-1 completion callback is required.');
+    if (typeof indexGuard === 'function') await indexGuard();
+    return transactionRunner(async (session) => {
+        const fenced = await fenceStaleStage1CompletionWrite({
+            scope, expectedToken, now, session, periodControlModel, fingerprintResolver
+        });
+        return { result: await work({ session, state: fenced.state, token: fenced.token }), ...fenced };
+    });
+}
+async function fenceStaleStage3ResolutionWrite({ scope: input, expectedToken, now = new Date(), session,
+    periodControlModel = PeriodControlModel,
+    fingerprintResolver = require('./apasxoliseisHistoricalPeriodReconstructionService')
+        .calculateHistoricalFingerprints }) {
+    if (!session) throw periodError('PERIOD_CONTROL_TRANSACTION_REQUIRED', 503,
+        'Δεν είναι διαθέσιμη η ασφαλής επίλυση του Stage 3.');
+    const scope = normalizeScope(input);
+    if (expectedToken?.exists !== true) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const record = await periodControlModel.findOneAndUpdate({
+        ...filterForScope(scope), status: 'OPEN', version: Number(expectedToken.version),
+        historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: mongoose.trusted({ $gte: 1 }),
+        $or: mongoose.trusted([
+            { active_calculation_id: '' }, { active_calculation_id: null },
+            { active_calculation_id: mongoose.trusted({ $exists: false }) }
+        ])
+    }, { $inc: { write_fence_version: 1 }, $set: { updated_at: now } },
+    { new: true, session });
+    if (!record) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const dependencyFingerprint = (await fingerprintResolver({ scope, session }))
+        .dependency_fingerprint;
+    const state = projectPeriodControl({ scope,
+        record: record?.toObject ? record.toObject() : record, now, dependencyFingerprint });
+    if (state.effective_mode !== MODES.HISTORICAL_RECONSTRUCTION_STALE ||
+        state.historical_reconstruction_status !== 'COMPLETED') {
+        throw periodError('PERIOD_CONTROL_STALE_STAGE3_RESOLUTION_NOT_ALLOWED', 409,
+            'Η περίοδος δεν επιτρέπει ασφαλή ημερήσια επίλυση του Stage 3.');
+    }
+    return { state, token: stateToken(state),
+        period_control_version: Number(state.version || 0),
+        period_write_fence_version: Number(state.write_fence_version || 0) };
+}
+async function runWithStaleStage3ResolutionWriteFence({
+    scope, expectedToken, now = new Date(), work,
+    periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
+    transactionRunner = runTransaction, fingerprintResolver
+}) {
+    if (typeof work !== 'function') throw new TypeError('Stage-3 resolution callback is required.');
+    if (typeof indexGuard === 'function') await indexGuard();
+    return transactionRunner(async (session) => {
+        const fenced = await fenceStaleStage3ResolutionWrite({ scope, expectedToken, now,
+            session, periodControlModel, fingerprintResolver });
+        return { result: await work({ session, ...fenced }), ...fenced };
+    });
+}
+async function fenceStaleStage2MaterializationWrite({ scope: input, expectedToken,
+    now = new Date(), session, periodControlModel = PeriodControlModel,
+    fingerprintResolver = require('./apasxoliseisHistoricalPeriodReconstructionService')
+        .calculateHistoricalFingerprints }) {
+    if (!session) throw periodError('PERIOD_CONTROL_TRANSACTION_REQUIRED', 503,
+        'Δεν είναι διαθέσιμη η ιστορικά ασφαλής canonical αποθήκευση του Stage 2.');
+    const scope = normalizeScope(input);
+    if (expectedToken?.exists !== true) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const record = await periodControlModel.findOneAndUpdate({
+        ...filterForScope(scope), status: 'OPEN', version: Number(expectedToken.version),
+        write_fence_version: Number(expectedToken.write_fence_version),
+        historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: mongoose.trusted({ $gte: 1 }),
+        $or: mongoose.trusted([
+            { active_calculation_id: '' }, { active_calculation_id: null },
+            { active_calculation_id: mongoose.trusted({ $exists: false }) }
+        ])
+    }, { $inc: { write_fence_version: 1 }, $set: { updated_at: now } },
+    { new: true, session });
+    if (!record) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const dependencyFingerprint = (await fingerprintResolver({ scope, session }))
+        .dependency_fingerprint;
+    const state = projectPeriodControl({ scope,
+        record: record?.toObject ? record.toObject() : record, now, dependencyFingerprint });
+    if (state.effective_mode !== MODES.HISTORICAL_RECONSTRUCTION_STALE ||
+        state.historical_reconstruction_status !== 'COMPLETED') {
+        throw periodError('PERIOD_CONTROL_STALE_STAGE2_MATERIALIZATION_NOT_ALLOWED', 409,
+            'Η περίοδος δεν επιτρέπει canonical αποθήκευση υπάρχουσας Stage-2 απόφασης.');
+    }
+    return { state, token: stateToken(state),
+        period_control_version: Number(state.version || 0),
+        period_write_fence_version: Number(state.write_fence_version || 0) };
+}
+async function runWithStaleStage2MaterializationWriteFence({ scope, expectedToken,
+    now = new Date(), work, periodControlModel = PeriodControlModel,
+    indexGuard = assertPeriodControlIndexesReady, transactionRunner = runTransaction,
+    fingerprintResolver }) {
+    if (typeof work !== 'function') throw new TypeError(
+        'Stage-2 canonical materialization callback is required.');
+    if (typeof indexGuard === 'function') await indexGuard();
+    return transactionRunner(async (session) => {
+        const fenced = await fenceStaleStage2MaterializationWrite({ scope, expectedToken,
+            now, session, periodControlModel, fingerprintResolver });
+        return { result: await work({ session, ...fenced }), ...fenced };
+    });
 }
 async function fencePeriodForWrite({ scope: input, expectedToken = null, now = new Date(), session,
     periodControlModel = PeriodControlModel }) {
@@ -543,6 +687,10 @@ module.exports = { MODES, periodError, dateOnly, calculatePeriodDeadline, normal
     isDateInsideEmploymentPeriod, isWeekAllowedForEmploymentPeriod,
     isPastDeadline, resolveEffectiveMode, projectPeriodControl, getPeriodControl, stateToken,
     assertNormalPeriod, assertReviewReadablePeriod, fencePeriodForWrite, runWithPeriodWriteFence,
+    fenceStaleStage1CompletionWrite, runWithStaleStage1CompletionWriteFence,
+    fenceStaleStage3ResolutionWrite, runWithStaleStage3ResolutionWriteFence,
+    fenceStaleStage2MaterializationWrite,
+    runWithStaleStage2MaterializationWriteFence,
     fencePeriodCalculationForWrite,
     acquirePeriodCalculationOwnership, runWithPeriodCalculationWriteFence,
     releasePeriodCalculationOwnership, transitionPeriodControl };
