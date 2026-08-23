@@ -8,7 +8,10 @@ const {
     buildPolicyPreviewApprovalListFilter,
     createPolicyPreviewApprovalRecord,
     revokePolicyPreviewApprovalRecord,
-    listActiveReusablePolicyDecisionRecords
+    listActiveReusablePolicyDecisionRecords,
+    buildOrphanReusableCriteria,
+    createOrphanReusablePolicyDecisionRecord,
+    findMatchingOrphanReusablePolicyDecision
 } = require('./apasxoliseisPolicyPreviewApprovalService');
 const {
     buildAtomicReusableCriteriaV5
@@ -1019,6 +1022,69 @@ async function testReusableRuleLookupIsCompanyAndBranchScoped() {
     assert.strictEqual(capturedFilter.ypokatasthma, '0001');
 }
 
+async function testOrphanReusablePolicyFoundation() {
+    const rule = {
+        policy_version: 'orphan-card-continuous:v1',
+        orphan_type: 'END_ONLY',
+        schedule_kind: 'NON_DECLARED',
+        rule: 'ACTUAL_END_MINUS_EFFECTIVE_DAILY_AVERAGE'
+    };
+    const criteria = buildOrphanReusableCriteria(rule);
+    assert.strictEqual(criteria.decision_grain, 'DAILY_ORPHAN_CARD');
+    assert.strictEqual(criteria.schedule_kind, 'NON_DECLARED');
+    assert.strictEqual(JSON.stringify(criteria).includes('23:47'), false);
+    assert.throws(() => buildOrphanReusableCriteria({ ...rule, rule: 'ABSOLUTE_TIME' }),
+        /Μη έγκυρος επαναχρησιμοποιήσιμος κανόνας/);
+
+    let createdDocument;
+    const approvalModel = {
+        findOne(filter) {
+            assert.strictEqual(filter.team, session.userTeam);
+            assert.strictEqual(filter.company_kod, session.companyInUse);
+            assert.strictEqual(filter.ypokatasthma, '0001');
+            return { select: () => ({ lean: async () => null }) };
+        },
+        create: async ([document]) => {
+            createdDocument = document;
+            return [document];
+        }
+    };
+    await createOrphanReusablePolicyDecisionRecord({
+        session,
+        row: { _id: '507f1f77bcf86cd799439012', kodikos: '0004', ypokatasthma: '1',
+            hmeromhnia: '2026-06-15', kathgoria_ergasias: 'ΑΝ' },
+        rule,
+        approvalModel
+    });
+    assert.strictEqual(createdDocument.reuse_match_criteria.criteria.rule,
+        'ACTUAL_END_MINUS_EFFECTIVE_DAILY_AVERAGE');
+    assert.strictEqual(createdDocument.active_policy_key.includes('0004'), false);
+    assert.strictEqual(createdDocument.items[0].flags.raw_cards_preserved, true);
+
+    let lookupFilter;
+    const found = { _id: 'matching' };
+    const matchingModel = {
+        findOne(filter) {
+            lookupFilter = filter;
+            return { sort: () => ({ lean: async () => found }) };
+        }
+    };
+    assert.strictEqual(await findMatchingOrphanReusablePolicyDecision({
+        session, ypokatasthma: '1', rule, approvalModel: matchingModel,
+        asOfDate: new Date('2026-06-16')
+    }), found);
+    assert.strictEqual(lookupFilter.team, session.userTeam);
+    assert.strictEqual(lookupFilter.company_kod, session.companyInUse);
+    assert.strictEqual(lookupFilter.ypokatasthma, '0001');
+    assert.strictEqual(lookupFilter.reuse_status, 'ACTIVE');
+
+    await assert.rejects(() => createOrphanReusablePolicyDecisionRecord({
+        session: { ...session, userRole: 'U' },
+        row: { ypokatasthma: '1', hmeromhnia: '2026-06-15' }, rule,
+        approvalModel: {}
+    }), (error) => error.statusCode === 403);
+}
+
 async function run() {
     testMissingGroupIdRejected();
     testInvalidDecisionTypeRejected();
@@ -1052,6 +1118,7 @@ async function run() {
     await testRevokeValidationAndAuthorization();
     await testAuthoritativeAtomicV5ApprovalCreationAndGuards();
     await testAtomicV5DuplicateLifecycleAndCrossEmployeeIdentity();
+    await testOrphanReusablePolicyFoundation();
     console.log('apasxoliseis policy preview approval service tests passed');
 }
 

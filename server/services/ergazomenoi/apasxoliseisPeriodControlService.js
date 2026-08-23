@@ -219,6 +219,49 @@ async function assertReviewReadablePeriod({ scope, now = new Date(), expectedTok
     }
     return { state, token: stateToken(state) };
 }
+async function fenceStaleOrphanResolutionWrite({ scope, expectedToken, now = new Date(), session,
+    periodControlModel = PeriodControlModel,
+    fingerprintResolver = require('./apasxoliseisHistoricalPeriodReconstructionService')
+        .calculateHistoricalFingerprints }) {
+    if (!session) throw periodError('PERIOD_CONTROL_TRANSACTION_REQUIRED', 503,
+        'Δεν είναι διαθέσιμη η ασφαλής επίλυση ορφανού χτυπήματος.');
+    const normalized = normalizeScope(scope);
+    if (expectedToken?.exists !== true) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const record = await periodControlModel.findOneAndUpdate({
+        ...filterForScope(normalized), status: 'OPEN', version: Number(expectedToken.version),
+        historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: mongoose.trusted({ $gte: 1 }),
+        $or: mongoose.trusted([
+            { active_calculation_id: '' }, { active_calculation_id: null },
+            { active_calculation_id: mongoose.trusted({ $exists: false }) }
+        ])
+    }, { $inc: { write_fence_version: 1 }, $set: { updated_at: now } }, { new: true, session });
+    if (!record) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
+        'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
+    const dependencyFingerprint = (await fingerprintResolver({ scope: normalized, session }))
+        .dependency_fingerprint;
+    const state = projectPeriodControl({ scope: normalized,
+        record: record?.toObject ? record.toObject() : record, now, dependencyFingerprint });
+    if (state.effective_mode !== MODES.HISTORICAL_RECONSTRUCTION_STALE ||
+        state.historical_reconstruction_status !== 'COMPLETED') {
+        throw periodError('PERIOD_CONTROL_STALE_ORPHAN_RESOLUTION_NOT_ALLOWED', 409,
+            'Η περίοδος δεν επιτρέπει επίλυση ορφανού χτυπήματος.');
+    }
+    return { state, token: stateToken(state) };
+}
+async function runWithStaleOrphanResolutionWriteFence({ scope, expectedToken, now = new Date(), work,
+    periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
+    transactionRunner = runTransaction, fingerprintResolver }) {
+    if (typeof work !== 'function') throw new TypeError('Orphan-resolution write callback is required.');
+    if (typeof indexGuard === 'function') await indexGuard();
+    return transactionRunner(async (session) => {
+        const fenced = await fenceStaleOrphanResolutionWrite({
+            scope, expectedToken, now, session, periodControlModel, fingerprintResolver
+        });
+        return { result: await work({ session, state: fenced.state, token: fenced.token }), ...fenced };
+    });
+}
 async function fenceStaleStage1CompletionWrite({ scope: input, expectedToken, now = new Date(), session,
     periodControlModel = PeriodControlModel,
     fingerprintResolver = require('./apasxoliseisHistoricalPeriodReconstructionService')
@@ -687,6 +730,7 @@ module.exports = { MODES, periodError, dateOnly, calculatePeriodDeadline, normal
     isDateInsideEmploymentPeriod, isWeekAllowedForEmploymentPeriod,
     isPastDeadline, resolveEffectiveMode, projectPeriodControl, getPeriodControl, stateToken,
     assertNormalPeriod, assertReviewReadablePeriod, fencePeriodForWrite, runWithPeriodWriteFence,
+    fenceStaleOrphanResolutionWrite, runWithStaleOrphanResolutionWriteFence,
     fenceStaleStage1CompletionWrite, runWithStaleStage1CompletionWriteFence,
     fenceStaleStage3ResolutionWrite, runWithStaleStage3ResolutionWriteFence,
     fenceStaleStage2MaterializationWrite,
