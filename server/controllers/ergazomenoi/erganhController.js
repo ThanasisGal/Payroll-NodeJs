@@ -304,6 +304,9 @@ const {
 const {
     resolveCardPairVerification
 } = require('../../services/ergazomenoi/apasxoliseisCardPairResolverService');
+const {
+    countOrphanHitsByEmployee
+} = require('../../services/ergazomenoi/apasxoliseisOrphanQualityCheckService');
 const ApasxoliseisCompanyPolicyRuleModel = require('../../models/apasxoliseisCompanyPolicyRule');
 const ApasxoliseisPeriodFrozenSnapshotModel = require('../../models/apasxoliseisPeriodFrozenSnapshot');
 const ApasxoliseisPeriodCorrectiveCaseModel = require('../../models/apasxoliseisPeriodCorrectiveCase');
@@ -389,6 +392,9 @@ const {
     saveStage1DailyClassificationsBulk,
     applyCanonicalAbsenceMetrics
 } = require('../../services/ergazomenoi/apasxoliseisStage1DailyClassificationBulkService');
+const {
+    assertHrSelectableLeaveCategory
+} = require('../../services/ergazomenoi/apasxoliseisHrLeaveCategoryPolicyService');
 
 const REPO_TRANSFER_APPLY_ERRORS = Object.freeze({
     APPLY_RUNTIME_DISABLED: [503, 'Η εφαρμογή εγκεκριμένων μεταφορών ρεπό δεν είναι ενεργοποιημένη.'],
@@ -6677,6 +6683,67 @@ class erganhController {
         }
     };
 
+    static getProdhlomenaOrariaOrphanQualityCheck = async (req, res) => {
+        try {
+            const { apo_hmeromhnia, eos_hmeromhnia, ypokatasthma, kodikos } = req.query;
+            const branch = String(ypokatasthma || '').trim();
+            const employeeCode = String(kodikos || '').trim();
+            const start = /^\d{4}-\d{2}-\d{2}$/.test(String(apo_hmeromhnia || ''))
+                ? new Date(`${apo_hmeromhnia}T00:00:00.000Z`) : null;
+            const end = /^\d{4}-\d{2}-\d{2}$/.test(String(eos_hmeromhnia || ''))
+                ? new Date(`${eos_hmeromhnia}T23:59:59.999Z`) : null;
+
+            if (!start || !end || start > end || !branch || branch.toUpperCase() === 'ALL' ||
+                branch.includes(',')) {
+                return res.status(400).json({ success: false,
+                    message: 'Μη έγκυρο εύρος ελέγχου ορφανών χτυπημάτων.' });
+            }
+
+            const filter = {
+                team: req.session.userTeam,
+                company_kod: req.session.companyInUse,
+                ypokatasthma: branch.padStart(4, '0'),
+                hmeromhnia: mongoose.trusted({ $gte: start, $lte: end })
+            };
+            if (employeeCode) filter.kodikos = employeeCode;
+
+            await applyEmploymentDepartureScopeToFilters({
+                filters: [filter],
+                team: req.session.userTeam,
+                companyId: req.session.companyInUse,
+                ypokatasthma: branch,
+                kodikos: employeeCode
+            });
+
+            const rows = await ProdhlomenaOrariaModel.find(filter)
+                .select('kodikos hmeromhnia cards_apo_ora_01 cards_eos_ora_01 ' +
+                    'cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                    'orphan_card_resolution')
+                .lean();
+            const result = countOrphanHitsByEmployee(rows);
+            const flaggedCodes = result.employees.map((employee) => employee.kodikos);
+            const employeeRows = flaggedCodes.length ? await ErgazomenoiModel.find({
+                team: req.session.userTeam,
+                company_kod: req.session.companyInUse,
+                ypokatasthma: branch.padStart(4, '0'),
+                kodikos: mongoose.trusted({ $in: flaggedCodes })
+            }).select('kodikos eponymo onoma').lean() : [];
+            const employeeByCode = new Map(employeeRows.map((employee) => [
+                String(employee.kodikos || ''), employee
+            ]));
+
+            return res.json({ success: true, ...result,
+                employees: result.employees.map((employee) => {
+                    const details = employeeByCode.get(employee.kodikos) || {};
+                    return { ...employee, eponymo: details.eponymo || '', onoma: details.onoma || '' };
+                }) });
+        } catch (error) {
+            console.error('[getProdhlomenaOrariaOrphanQualityCheck] ❌', error);
+            return res.status(500).json({ success: false,
+                message: 'Δεν κατέστη δυνατός ο έλεγχος ορφανών χτυπημάτων.' });
+        }
+    };
+
     static getApasxoliseisPolicyCatalog = async (_req, res) => {
         try {
             const validation = validateApasxoliseisPolicyCatalog();
@@ -10417,6 +10484,12 @@ class erganhController {
                 if (Object.prototype.hasOwnProperty.call(updates, field)) {
                     cleanUpdates[field] = updates[field];
                 }
+            }
+
+            if (Object.prototype.hasOwnProperty.call(
+                cleanUpdates, 'kathgoria_adeias_apologistika'
+            )) {
+                assertHrSelectableLeaveCategory(cleanUpdates.kathgoria_adeias_apologistika);
             }
 
             if (Object.keys(cleanUpdates).length === 0) {

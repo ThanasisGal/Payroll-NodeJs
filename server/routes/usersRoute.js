@@ -1402,6 +1402,13 @@ router.get(
 router.get('/api/prodhlomena-oraria/review', checkAuth, requireEmploymentReviewAccess, erganhController.getProdhlomenaOrariaForReview);
 
 router.get(
+    '/api/prodhlomena-oraria/review/orphan-quality-check',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getProdhlomenaOrariaOrphanQualityCheck
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/period-control/current',
     checkAuth,
     requireEmploymentReviewAccess,

@@ -9242,6 +9242,11 @@ async function loadResults() {
             search_start: params.get('apo_hmeromhnia'),
             search_end: params.get('eos_hmeromhnia')
         });
+        await window.EmploymentReviewOrphanQualityCheck?.run({
+            params,
+            csrfToken,
+            showDialog: employmentReviewSwal
+        });
 
         const correctiveSummary = document.getElementById('employmentPeriodCorrectiveSummary');
         if (correctiveSummary) {
