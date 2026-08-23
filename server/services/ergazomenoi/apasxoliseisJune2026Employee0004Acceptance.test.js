@@ -53,24 +53,33 @@ for (const date of ['2026-06-08', '2026-06-09', '2026-06-13']) {
 }
 const repoA = analyzeWeeklyRepoTransferSinglePairV2({ weekRows: weekA,
     employmentProfile: PROFILE });
-assert.equal(repoA.eligibility_status, 'ELIGIBLE');
-assert.equal(repoA.source.hmeromhnia, '2026-06-10');
-assert.equal(repoA.target.hmeromhnia, '2026-06-11');
-assert.ok(!repoA.reasons.includes('CARD_VERIFICATION_PENDING'));
+assert.equal(repoA.eligibility_status, 'NEEDS_REVIEW');
 const orphanA = resolveDailyActualWorkFacts(weekA[6]);
 assert.equal(orphanA.cardHours, 0);
-assert.equal(orphanA.cardVerificationStatus, 'SAFE_AUTO_RESOLVED');
-assert.equal(orphanA.actualWorkHours, 8);
+assert.equal(orphanA.cardVerificationStatus, 'UNVERIFIED');
+assert.equal(orphanA.category, 'ΕΡΓ');
+assert.equal(orphanA.actualWorkHours, 0);
+assert.equal(orphanA.countsAsActualWorkDay, true);
 const effectiveA = weekA.map((item) => item.hmeromhnia === '2026-06-10'
     ? { ...item, kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: false }
     : item.hmeromhnia === '2026-06-11'
-      ? { ...item, ...materializeTargetValues('ΑΝ') } : item);
+      ? { ...item, ...materializeTargetValues('ΑΝ') }
+      : item.hmeromhnia === '2026-06-14' ? { ...item,
+          kathgoria_ergasias_apologistika: 'ΕΡΓ',
+          apo_ora_01_apologistika: '14:51', eos_ora_01_apologistika: '22:51',
+          ores_ergasias_apologistika: 8,
+          orphan_card_resolution: { status: 'HR_APPROVED',
+              policy_version: 'orphan-card-continuous:v1' } } : item);
 const sixthA = analyzeWeeklySixthSeventhDay({ weekRows: effectiveA,
     effectiveProfile: PROFILE });
 assert.equal(sixthA.status, 'READY');
 assert.equal(sixthA.sixthDay.hmeromhnia, '2026-06-14');
-assert.equal(sixthA.sixthDay.actualWorkHours, 8);
-assert.equal(sixthA.sixthDay.cardVerificationStatus, 'SAFE_AUTO_RESOLVED');
+assert.equal(sixthA.sixthDay.sixthDayHours, 8);
+assert.equal(sixthA.seventhDay, null);
+assert.ok(!sixthA.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+const approvedOrphanDay = sixthA.dailyFacts.find((day) => day.hmeromhnia === '2026-06-14');
+assert.equal(approvedOrphanDay.actualWorkHours, 8);
+assert.equal(approvedOrphanDay.cardVerificationStatus, 'HR_APPROVED_ORPHAN');
 
 const weekB = week('2026-06-15', {
     '2026-06-16': { category: 'ΑΝ', hours: 0, declared: null,

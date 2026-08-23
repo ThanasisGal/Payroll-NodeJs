@@ -31,15 +31,19 @@ function resolveSeventhDayIllegalOvertimeHours(day) {
 function selectSixthDay(candidates) {
     const cardProvenCandidates = candidates
         .filter((day) => day.cardHours > 0 ||
-            day.cardVerificationStatus === 'SAFE_AUTO_RESOLVED')
+            ['SAFE_AUTO_RESOLVED', 'HR_APPROVED_ORPHAN'].includes(
+                day.cardVerificationStatus))
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
     const standardCandidates = cardProvenCandidates.filter(
         (day) => day.actualWorkHours > 5 && day.actualWorkHours <= 8
     );
-    const day = [...standardCandidates].sort((a, b) => {
-        const distance = Math.abs(a.actualWorkHours - 8) - Math.abs(b.actualWorkHours - 8);
-        return distance || b.hmeromhnia.localeCompare(a.hmeromhnia);
-    })[0] || null;
+    const day = candidates.length === 6
+        ? standardCandidates.at(-1) || null
+        : [...standardCandidates].sort((a, b) => {
+            const distance = Math.abs(a.actualWorkHours - 8) -
+                Math.abs(b.actualWorkHours - 8);
+            return distance || b.hmeromhnia.localeCompare(a.hmeromhnia);
+        })[0] || null;
 
     if (day) {
         return { day, warnings: [] };
@@ -66,7 +70,8 @@ function selectSixthDay(candidates) {
 }
 
 function isSixthDayEligible(day) {
-    return (day.cardHours > 0 || day.cardVerificationStatus === 'SAFE_AUTO_RESOLVED') &&
+    return (day.cardHours > 0 ||
+        ['SAFE_AUTO_RESOLVED', 'HR_APPROVED_ORPHAN'].includes(day.cardVerificationStatus)) &&
         day.actualWorkHours > 5 && day.actualWorkHours <= 8;
 }
 
@@ -246,7 +251,7 @@ function analyzeWeeklySixthSeventhDay({
             });
         }
         canonicalRepoDayIdentities = override;
-    } else if (!repoIdentityResolution.ok) {
+    } else if (!repoIdentityResolution.ok && actualDays.length >= 7) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,
@@ -261,7 +266,9 @@ function analyzeWeeklySixthSeventhDay({
             seventhDay: null
         });
     } else {
-        canonicalRepoDayIdentities = [...repoIdentityResolution.canonicalRepoDayIdentities];
+        canonicalRepoDayIdentities = repoIdentityResolution.ok
+            ? [...repoIdentityResolution.canonicalRepoDayIdentities]
+            : [];
     }
     const workedRepoDays = actualDays.filter((day) =>
         canonicalRepoDayIdentities.includes(day.hmeromhnia)

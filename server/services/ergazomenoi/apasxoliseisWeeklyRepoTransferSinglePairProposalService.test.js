@@ -601,8 +601,17 @@ function testNonEligibleAnalyzerPaths() {
     deficit[6] = workRow(6);
     assertNotAvailable(
         build(deficit),
-        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
+        'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'
     );
+    const resolvedDeficit = build(deficit, {
+        typos_apasxolhshs: 'PLHRHS',
+        pososto_prosayxhshs_6hs_hmeras: 40
+    });
+    assertReadyContract(resolvedDeficit, dateKey(1), dateKey(4), 'ΑΝ');
+    assert.ok(!resolvedDeficit.reasons.includes(
+        'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+    assert.ok(!resolvedDeficit.reasons.includes(
+        'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
     assert.strictEqual(
         build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS'})
             .proposal_status,
