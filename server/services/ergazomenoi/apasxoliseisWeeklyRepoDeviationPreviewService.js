@@ -96,6 +96,7 @@ function buildWeeklyRepoDeviationPreview({
     resolveWeeklyProfile,
     resolveEmploymentPeriod,
     resolveDailyProfile,
+    resolveCanonicalAnalysis,
     isFullTimeProfile,
     holidayByDateKey = new Map(),
     existingAuditCountByRowKey = new Map()
@@ -262,6 +263,18 @@ function buildWeeklyRepoDeviationPreview({
                 weekRows: uniqueRows,
                 effectiveProfile
             });
+            const canonicalResolution =
+                typeof resolveCanonicalAnalysis === 'function'
+                    ? resolveCanonicalAnalysis({
+                          base,
+                          weekRows: uniqueRows,
+                          weeklyProfile,
+                          effectiveProfile,
+                          automaticAnalysis: sixthSeventhDay
+                      }) || null
+                    : null;
+            const resolvedSixthSeventhDay =
+                canonicalResolution?.analysis || sixthSeventhDay;
             const repoTransfer = analyzeWeeklyRepoTransferForEmploymentContract({
                 weekRows: uniqueRows,
                 employmentProfile: effectiveProfile,
@@ -270,21 +283,41 @@ function buildWeeklyRepoDeviationPreview({
             });
             const resolution = repoTransfer.weekly_resolution;
             const projectedSixthSeventhDay = resolution?.sixth_seventh_day;
-            const authoritativeSixthSeventhDay = projectedSixthSeventhDay?.status
+            const authoritativeSixthSeventhDay =
+                canonicalResolution && canonicalResolution.applicability !== 'NOT_FOUND'
+                    ? resolvedSixthSeventhDay
+                    : projectedSixthSeventhDay?.status
                 ? {
-                      ...sixthSeventhDay,
+                      ...resolvedSixthSeventhDay,
                       status: projectedSixthSeventhDay.status,
                       reasons: [...(projectedSixthSeventhDay.reasons || [])],
                       warnings: [...(projectedSixthSeventhDay.warnings || [])],
                       sixthDay: projectedSixthSeventhDay.sixth_day || null,
                       seventhDay: projectedSixthSeventhDay.seventh_day || null
                   }
-                : sixthSeventhDay;
+                : resolvedSixthSeventhDay;
+            const resolvedCanonicalRepoIdentities =
+                canonicalResolution?.applicability === 'APPLICABLE' &&
+                Array.isArray(authoritativeSixthSeventhDay.canonicalRepoDayIdentities)
+                    ? authoritativeSixthSeventhDay.canonicalRepoDayIdentities
+                    : [];
+            const projectedActualRepo = resolvedCanonicalRepoIdentities.length > 0
+                ? resolvedCanonicalRepoIdentities.length
+                : actualRepo;
             const actualWorkdays = dailyFacts.filter(
                 (facts) => facts.countsAsActualWorkDay
             ).length;
             const sixthSeventhDayNeedsDecision =
                 authoritativeSixthSeventhDay.status === 'NEEDS_HR_DECISION';
+            const presentationReasons = [...new Set([
+                ...(authoritativeSixthSeventhDay.reasons || []),
+                ...(repoTransfer.reasons || [])
+            ])].filter((reason) =>
+                !(
+                    canonicalResolution?.applicability === 'APPLICABLE' &&
+                    reason === 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'
+                )
+            );
             deviations.push({
                 ...base,
                 status:
@@ -301,9 +334,16 @@ function buildWeeklyRepoDeviationPreview({
                     ...repoStateReasons
                 ])],
                 expected_repo: expectedRepo,
-                actual_repo: actualRepo,
-                missing_repo: Math.max(Number(expectedRepo || 0) - Number(actualRepo), 0),
-                resolved_repo: resolution?.resolved_repo ?? actualRepo,
+                actual_repo: projectedActualRepo,
+                missing_repo:
+                    Math.max(Number(expectedRepo || 0) - Number(projectedActualRepo), 0),
+                resolved_repo: resolvedCanonicalRepoIdentities.length > 0
+                    ? resolvedCanonicalRepoIdentities.length
+                    : resolution?.resolved_repo ?? actualRepo,
+                resolved_repo_identities: [...resolvedCanonicalRepoIdentities],
+                requires_new_hr_decision:
+                    canonicalResolution?.applicability !== 'APPLICABLE' &&
+                    sixthSeventhDayNeedsDecision,
                 // Η ταξινόμηση 6ης/7ης ημέρας είναι ανεξάρτητη από το αν
                 // υπάρχει ασφαλές ζεύγος μεταφοράς ρεπό. Το αποτέλεσμα της
                 // μεταφοράς δεν επιτρέπεται να μηδενίζει την άμεση πολιτική.
@@ -316,6 +356,11 @@ function buildWeeklyRepoDeviationPreview({
                 seventh_day_date: authoritativeSixthSeventhDay.seventhDay?.hmeromhnia || null,
                 sixth_seventh_day_status: authoritativeSixthSeventhDay.status,
                 sixth_seventh_day_reasons: [...(authoritativeSixthSeventhDay.reasons || [])],
+                presentation_reasons: presentationReasons,
+                canonical_decision_applicability:
+                    canonicalResolution?.applicability || 'NOT_FOUND',
+                canonical_decision_request_id:
+                    canonicalResolution?.decision?.request_id || null,
                 repo_transfer_status: repoTransfer.eligibility_status,
                 repo_transfer_reasons: [...(repoTransfer.reasons || [])],
                 repo_transfer_source_available:

@@ -160,17 +160,23 @@ function decisionFor(rows, decisionType, decisionPayload, overrides = {}) {
         istorikoRows: [], ergazomenos: sourceEmployee }).effectiveProfile;
     const automaticAnalysis = analyzeWeeklySixthSeventhDay({ weekRows: rows,
         effectiveProfile, hourlyRate: effectiveProfile.pragmatikoOromisthio });
+    const snapshotAnalysis = automaticAnalysis.status === 'NEEDS_HR_DECISION'
+        ? automaticAnalysis
+        : { ...automaticAnalysis, status: 'NEEDS_HR_DECISION',
+            reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'],
+            canonicalRepoDayIdentities: [], sixthDay: null, seventhDay: null };
     const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
         team: 'THA', company_kod: 'company', employee: sourceEmployee,
         week: decisionWeek,
-        weekRows: rows, effectiveProfile, profileHistory: [], automaticAnalysis,
+        weekRows: rows, effectiveProfile, profileHistory: [], automaticAnalysis: snapshotAnalysis,
         appliedProtectionContext: overrides.appliedProtectionContext || { entriesByRowId: {} }
     });
     const snapshot = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
     return { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
         employee_kodikos: 'D1', week_start: new Date('2026-08-03'),
         week_end: new Date('2026-08-09'), decision_status: 'RECORDED',
-        snapshot_fingerprint: snapshot.fingerprint, decision_type: decisionType,
+        snapshot_fingerprint: snapshot.fingerprint, canonical_snapshot: snapshot.snapshot,
+        decision_type: decisionType,
         decision_payload: decisionPayload, decision_payload_fingerprint: fingerprint(decisionPayload),
         created_at: new Date('2026-08-10') };
 }
@@ -240,7 +246,9 @@ blockedRows[5].cards_eos_ora_01 = '';
 result = plan(blockedRows);
 update = updateFor(result, '2026-08-08');
 assert.equal(update.compensation_breakdown_apologistika.status, 'NEEDS_HR_DECISION');
-assert.ok(update.compensation_breakdown_apologistika.reasons.includes('CARD_VERIFICATION_PENDING'));
+assert.ok(update.compensation_breakdown_apologistika.reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'
+));
 assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 0);
 
 const ambiguousRows = week([7, 7, 7, 7, 7, 7, 0]);
@@ -252,8 +260,11 @@ Object.assign(ambiguousRows[6], {
 });
 result = plan(ambiguousRows);
 let deviation = onlyDeviation(result);
-assert.equal(deviation.status, 'NEEDS_HR_DECISION');
-assert.ok(deviation.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+assert.equal(deviation.status, undefined);
+assert.equal(deviation.reasons, undefined);
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.status, 'READY');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7);
 
 const humanRepoRows = week([7, 7, 7, 7, 7, 8, 7]);
 Object.assign(humanRepoRows[4], { kathgoria_ergasias: 'ΑΝ',
@@ -304,7 +315,10 @@ result = plan(ambiguousRows, {
     canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions([staleDecision])
 });
 deviation = onlyDeviation(result);
-assert.ok(deviation.reasons.includes('CANONICAL_DECISION_STALE'));
+assert.equal(deviation.status, undefined);
+assert.equal(deviation.reasons, undefined);
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.status, 'READY');
 
 const pendingRows = week([7, 7, 7, 7, 7, 0, 0]);
 pendingRows[0].cards_eos_ora_01 = '';
@@ -315,9 +329,11 @@ assert.equal(deviation.actual_repo, 2);
 assert.equal(deviation.missing_repo, 0);
 assert.equal(deviation.excess_repo, 0);
 assert.equal(deviation.status, 'NEEDS_HR_DECISION');
-assert.deepEqual(deviation.reasons, ['CARD_VERIFICATION_PENDING']);
+assert.deepEqual(deviation.reasons, ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION']);
 update = updateFor(result, '2026-08-03');
-assert.ok(update.compensation_breakdown_apologistika.reasons.includes('CARD_VERIFICATION_PENDING'));
+assert.ok(update.compensation_breakdown_apologistika.reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'
+));
 assert.ok(deviation.reasons.every((reason) =>
     update.compensation_breakdown_apologistika.reasons.includes(reason)
 ));
@@ -461,8 +477,8 @@ Object.assign(appliedSequencingRows[6], {
     apologistiko_biblio: true
 });
 result = plan(appliedSequencingRows);
-update = updateFor(result, '2026-08-05');
-assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 8);
+update = updateFor(result, '2026-08-08');
+assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 7);
 
 // A proposal which has not been applied is not an input to Phase C. The raw
 // target must not be materialized as repo/book by the post-check write plan.

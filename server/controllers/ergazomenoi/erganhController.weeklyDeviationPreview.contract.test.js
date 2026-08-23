@@ -21,6 +21,13 @@ assert.ok(source.includes('rows: deviationContextRows'));
 assert.ok(source.includes('holidayByDateKey:'));
 assert.ok(source.includes('existingAuditCountByRowKey:'));
 assert.ok(source.includes('deviationAuditCountByRowKey'));
+assert.ok(source.includes('const weeklyCanonicalDecisionsByWeek = groupWeeklyCanonicalDecisions('));
+assert.ok(source.includes('resolveCanonicalAnalysis: ({'));
+assert.ok(source.includes('return resolveWeeklyCanonicalDecisionAnalysis({'));
+assert.ok(source.includes("reuse_scope: 'FUTURE_IDENTICAL'"));
+assert.ok(source.includes("execution_status: 'APPLIED'"));
+assert.ok(source.includes('CANONICAL_EMPLOYEE_PROFILE_FIELDS'));
+assert.ok(source.includes('.select(CANONICAL_HISTORY_SELECT_FIELDS)'));
 assert.ok(source.includes('external_break_minutes:'));
 assert.ok(source.includes('eidikh_kathgoria_ergazomenoy:'));
 const deviationSelectStart = source.indexOf(
@@ -36,11 +43,16 @@ for (const field of [
     'adeia',
     'kathgoria_adeias',
     'ores_apoysias',
+    'explicit_hourly_leave_hours',
+    'hr_declared_leave',
     'adeia_apologistika',
     'kathgoria_adeias_apologistika',
     'ores_apoysias_apologistika',
     'astheneia',
     'astheneia_apologistika',
+    'argia',
+    'argia_apologistika',
+    'orphan_card_resolution',
     'cards_ores_ergasias',
     'cards_apo_ora_01',
     'cards_eos_ora_01',

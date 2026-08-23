@@ -15,6 +15,9 @@ const {
     utcDateKey,
     buildWeeklyReusableDecisionRule
 } = require('./apasxoliseisReusablePolicyDecisionService');
+const {
+    resolveFullTimeFromWorkTerms
+} = require('./apasxoliseisReviewEmploymentProfileService');
 
 const SNAPSHOT_VERSION = 'weekly-canonical-human-decision-snapshot:v1';
 const DECISION_SCHEMA_VERSION = 'weekly-canonical-human-decision:v2';
@@ -33,6 +36,7 @@ const DECISION_TYPES = Object.freeze([
 const CLASSIFICATIONS = new Set(['NORMAL', 'SIXTH', 'SEVENTH']);
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/;
 const PROFILE_FINGERPRINT_VERSION = 'weekly-canonical-selected-profile:v1';
+const REPO_IDENTITY_SEMANTIC_VERSION = 'weekly-canonical-repo-identity-semantic:v1';
 
 function fail(message, statusCode = 400, code = 'INVALID_WEEKLY_CANONICAL_DECISION') {
     const error = new Error(message); error.statusCode = statusCode; error.code = code; return error;
@@ -55,6 +59,55 @@ function stable(value) {
 }
 function fingerprint(value) {
     return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
+}
+function repoIdentityDailyFactProjection(value = {}) {
+    const fact = object(value);
+    return {
+        category: fact.category ?? null,
+        actualWorkHours: fact.actualWorkHours ?? null,
+        countsAsActualWorkDay: fact.countsAsActualWorkDay === true,
+        cardVerificationStatus: fact.cardVerificationStatus ?? null,
+        reasons: uniqueSorted(fact.reasons)
+    };
+}
+function repoIdentityWeeklyRowProjection(value = {}) {
+    const row = object(value);
+    return {
+        date: row.date ?? null,
+        declared_category: row.declared_category ?? null,
+        calculated_category: row.calculated_category ?? null,
+        declared_repo: row.declared_repo === true,
+        current_repo: row.current_repo === true,
+        locked: row.locked === true
+    };
+}
+function repoIdentityDecisionSnapshotProjection(value = {}) {
+    const snapshot = object(value);
+    const profile = object(snapshot.effective_profile);
+    const actualFacts = object(snapshot.actual_work_facts);
+    return stable({
+        semantic_version: REPO_IDENTITY_SEMANTIC_VERSION,
+        scope: snapshot.scope,
+        employment_contract: {
+            weekly_days: profile.hmeres_ergasias_ebdomadas ?? null,
+            full_time: resolveFullTimeFromWorkTerms(profile)
+        },
+        weekly_rows: (Array.isArray(snapshot.weekly_rows) ? snapshot.weekly_rows : [])
+            .map(repoIdentityWeeklyRowProjection),
+        actual_work_facts: Object.fromEntries(Object.keys(actualFacts).sort().map((date) => [
+            date, repoIdentityDailyFactProjection(actualFacts[date])
+        ])),
+        current_repo_identities: uniqueSorted(snapshot.current_repo_identities),
+        applied_atomic_repo_transfer: snapshot.applied_atomic_repo_transfer || null
+    });
+}
+function isRecordSnapshotApplicable(record, current) {
+    if (record?.snapshot_fingerprint === current.fingerprint) return true;
+    if (record?.decision_type !== 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC' ||
+        !record?.canonical_snapshot ||
+        fingerprint(record.canonical_snapshot) !== record.snapshot_fingerprint) return false;
+    return fingerprint(repoIdentityDecisionSnapshotProjection(record.canonical_snapshot)) ===
+        fingerprint(repoIdentityDecisionSnapshotProjection(current.snapshot));
 }
 function selectedProfileFingerprint(profile = {}) {
     const source = object(profile);
@@ -390,7 +443,7 @@ async function getLatestApplicableWeeklyCanonicalDecision({ session, currentInpu
         week_start: new Date(`${scope.week_start}T00:00:00.000Z`), week_end: new Date(`${scope.week_end}T00:00:00.000Z`),
         decision_status: 'RECORDED' }).sort({ created_at: -1 }));
     if (!records.length) return { applicability: APPLICABILITY.NOT_FOUND, record: null, current_fingerprint: current.fingerprint };
-    const applicable = records.filter((record) => record.snapshot_fingerprint === current.fingerprint);
+    const applicable = records.filter((record) => isRecordSnapshotApplicable(record, current));
     if (!applicable.length) return { applicability: APPLICABILITY.STALE, record: records[0], current_fingerprint: current.fingerprint };
     const identities = new Set(applicable.map((record) => `${record.decision_type}|${record.decision_payload_fingerprint}`));
     if (identities.size > 1) return { applicability: APPLICABILITY.CONFLICT, records: applicable, current_fingerprint: current.fingerprint };
@@ -409,7 +462,7 @@ function resolvePreloadedWeeklyCanonicalDecision({ currentInput, records = [] } 
     );
     if (!scoped.length) return { applicability: APPLICABILITY.NOT_FOUND, record: null,
         current_fingerprint: current.fingerprint };
-    const applicable = scoped.filter((record) => record.snapshot_fingerprint === current.fingerprint);
+    const applicable = scoped.filter((record) => isRecordSnapshotApplicable(record, current));
     if (!applicable.length) return { applicability: APPLICABILITY.STALE,
         record: [...scoped].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0],
         current_fingerprint: current.fingerprint };
@@ -423,8 +476,10 @@ function resolvePreloadedWeeklyCanonicalDecision({ currentInput, records = [] } 
 }
 
 module.exports = {
-    SNAPSHOT_VERSION, DECISION_SCHEMA_VERSION, PROFILE_FINGERPRINT_VERSION, APPLICABILITY, DECISION_TYPES,
+    SNAPSHOT_VERSION, DECISION_SCHEMA_VERSION, PROFILE_FINGERPRINT_VERSION,
+    REPO_IDENTITY_SEMANTIC_VERSION, APPLICABILITY, DECISION_TYPES,
     stable, fingerprint, selectedProfileFingerprint, scopeFromInput, buildCanonicalWeeklyDecisionSnapshot,
+    repoIdentityDecisionSnapshotProjection, isRecordSnapshotApplicable,
     validateDecisionPayload, validateDecisionCommand, isDuplicateKey, applicableFilter,
     classifyConcurrentDuplicate, recordWeeklyCanonicalDecision,
     listWeeklyCanonicalDecisions, getLatestApplicableWeeklyCanonicalDecision,
