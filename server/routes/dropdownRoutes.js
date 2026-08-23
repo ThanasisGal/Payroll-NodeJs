@@ -401,7 +401,14 @@ router.get(
 );
 router.get(
     '/kinhseis/apasxolhseis/ergazomenoi',
-    buildDropdownRoute(ergazomenoiKinhseon.model, ergazomenoiKinhseon.options)
+    (req, res, next) => {
+        req.query = { ...req.query, team: req.session.userTeam,
+            company: String(req.session.companyInUse || '') };
+        return buildDropdownRoute(
+            ergazomenoiKinhseon.model,
+            ergazomenoiKinhseon.options
+        )(req, res, next);
+    }
 );
 router.get(
     '/kinhseis/apasxolhseis/typoiApodoxon',

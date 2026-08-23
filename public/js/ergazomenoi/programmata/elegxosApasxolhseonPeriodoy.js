@@ -388,14 +388,6 @@ const currentApprovalHistoryFilters = {
     searchText: ''
 };
 
-const reviewFilterDefinitions = [
-    { key: 'onlyApologistiko', id: 'only_apologistiko', label: 'Μόνο Απολογιστικό' },
-    { key: 'onlyNight', id: 'only_nyxta', label: 'Μόνο Νύχτα' },
-    { key: 'onlyHoliday', id: 'only_argia', label: 'Μόνο Αργία' },
-    { key: 'onlyYperergasia', id: 'only_yperergasia', label: 'Μόνο Υπερεργασία' },
-    { key: 'onlyScenarioReview', id: 'scenarioRequiresReviewOnly', label: 'Μόνο προς έλεγχο' }
-];
-
 function rowIdentityKey(value) {
     if (value === null || value === undefined) return '';
 
@@ -582,81 +574,8 @@ function isScenarioReviewRow(row) {
     return row?.scenarioDecision?.requires_review === true;
 }
 
-function scenarioReviewOnlyEnabled() {
-    return document.getElementById('scenarioRequiresReviewOnly')?.checked === true;
-}
-
-function getActiveReviewFilters() {
-    return reviewFilterDefinitions.reduce((filters, filter) => {
-        filters[filter.key] = document.getElementById(filter.id)?.checked === true;
-        return filters;
-    }, {});
-}
-
-function getActiveReviewFilterLabels(filters = getActiveReviewFilters()) {
-    return reviewFilterDefinitions
-        .filter((filter) => filters[filter.key] === true)
-        .map((filter) => filter.label);
-}
-
-function isAnyReviewFilterActive(filters = getActiveReviewFilters()) {
-    return Object.values(filters).some(Boolean);
-}
-
-function rowPassesActiveReviewFilters(row, filters, holidayLikeDateSet) {
-    if (filters.onlyApologistiko && row.apologistiko_biblio !== true) return false;
-
-    if (filters.onlyNight && !hasPositiveNumber(row.ores_nyxtas_apologistika)) return false;
-
-    if (filters.onlyHoliday && !hasPositiveNumber(calculateHolidayDisplayHours(row, holidayLikeDateSet))) {
-        return false;
-    }
-
-    if (filters.onlyYperergasia && !(sumYperergasia(row) > 0)) return false;
-
-    if (filters.onlyScenarioReview && !isScenarioReviewRow(row)) return false;
-
-    return true;
-}
-
 function getVisibleReviewRows(rows = currentReviewRows) {
-    const filters = getActiveReviewFilters();
-
-    if (!isAnyReviewFilterActive(filters)) return rows;
-
-    const holidayLikeDateSet = buildHolidayLikeDateSet(rows);
-
-    return rows.filter((row) => rowPassesActiveReviewFilters(row, filters, holidayLikeDateSet));
-}
-
-function updateReviewFilterLayoutState() {
-    const cardBody = document.querySelector('.review-card-body');
-
-    if (!cardBody) return;
-
-    cardBody.classList.toggle('review-filters-active', isAnyReviewFilterActive());
-}
-
-function updateScenarioReviewFilterNotice() {
-    const notice = document.getElementById('scenarioRequiresReviewOnlyNotice');
-
-    if (!notice) return;
-
-    const filters = getActiveReviewFilters();
-    const activeFilterLabels = getActiveReviewFilterLabels(filters);
-
-    if (!isAnyReviewFilterActive(filters)) {
-        notice.classList.add('d-none');
-        notice.textContent = '';
-        return;
-    }
-
-    const visibleCount = getVisibleReviewRows().length;
-    const totalCount = currentReviewRows.length;
-    const prefix = activeFilterLabels.length === 1 ? 'Ενεργό φίλτρο' : 'Ενεργά φίλτρα';
-
-    notice.classList.remove('d-none');
-    notice.textContent = `${prefix}: ${activeFilterLabels.join(', ')} (${visibleCount}/${totalCount}).`;
+    return rows;
 }
 
 function renderCurrentReviewRows() {
@@ -666,8 +585,6 @@ function renderCurrentReviewRows() {
         ...currentLegacyDeviations
     ]);
     updateWeeklyDeviationStickyMetrics();
-    updateScenarioReviewFilterNotice();
-    updateReviewFilterLayoutState();
 }
 
 function updateWeeklyDeviationStickyMetrics() {
@@ -691,58 +608,6 @@ function updateWeeklyDeviationStickyMetrics() {
     scrollContainer.style.setProperty(
         '--employment-review-weekly-title-height', `${visibleSectionTitle?.getBoundingClientRect().height || 0}px`
     );
-}
-
-function bindReviewFilterChangeListeners() {
-    reviewFilterDefinitions.forEach((filter) => {
-        const checkbox = document.getElementById(filter.id);
-
-        if (!checkbox || checkbox.dataset.reviewFilterListenerBound === '1') return;
-
-        checkbox.addEventListener('change', () => {
-            renderCurrentReviewRows();
-        });
-
-        checkbox.dataset.reviewFilterListenerBound = '1';
-    });
-}
-
-function ensureScenarioReviewFilterControl() {
-    const filtersRow = document.querySelector('.review-filters-sticky .row.form-group');
-
-    if (!filtersRow) return;
-
-    if (document.getElementById('scenarioRequiresReviewOnly')) {
-        bindReviewFilterChangeListeners();
-        updateReviewFilterLayoutState();
-        return;
-    }
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'col-auto d-flex align-items-center gap-2';
-
-    const label = document.createElement('label');
-    label.className = 'col-form-label label-font-size mb-0';
-    label.htmlFor = 'scenarioRequiresReviewOnly';
-    label.textContent = 'Μόνο προς έλεγχο';
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.className = 'form-check-input custom-checkbox checkbox-class mt-0';
-    checkbox.id = 'scenarioRequiresReviewOnly';
-    checkbox.name = 'scenarioRequiresReviewOnly';
-
-    wrapper.appendChild(label);
-    wrapper.appendChild(checkbox);
-    filtersRow.appendChild(wrapper);
-
-    const notice = document.createElement('div');
-    notice.id = 'scenarioRequiresReviewOnlyNotice';
-    notice.className = 'col-12 small text-muted d-none';
-    filtersRow.appendChild(notice);
-
-    bindReviewFilterChangeListeners();
-    updateReviewFilterLayoutState();
 }
 
 function ensureReviewCardElevation() {
@@ -8299,10 +8164,6 @@ async function loadResults() {
             eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
             ypokatasthma: advancedBranch,
             kodikos: document.getElementById('kodikos')?.value || '',
-            only_apologistiko: document.getElementById('only_apologistiko')?.checked || false,
-            only_nyxta: document.getElementById('only_nyxta')?.checked || false,
-            only_argia: document.getElementById('only_argia')?.checked || false,
-            only_yperergasia: document.getElementById('only_yperergasia')?.checked || false,
             page: 1,
             limit: 5000
         });
@@ -9211,11 +9072,7 @@ function buildReviewExportParams() {
         apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
         eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
         ypokatasthma: document.getElementById('ypokatasthma')?.value || '',
-        kodikos: document.getElementById('kodikos')?.value || '',
-        only_apologistiko: document.getElementById('only_apologistiko')?.checked || false,
-        only_nyxta: document.getElementById('only_nyxta')?.checked || false,
-        only_argia: document.getElementById('only_argia')?.checked || false,
-        only_yperergasia: document.getElementById('only_yperergasia')?.checked || false
+        kodikos: document.getElementById('kodikos')?.value || ''
     });
 }
 async function exportExcel() {
@@ -9466,7 +9323,6 @@ document.getElementById('reviewPdfDownloadBtn')?.addEventListener('click', (even
 });
 
 document.addEventListener('DOMContentLoaded', initReviewMoveByEnter);
-document.addEventListener('DOMContentLoaded', ensureScenarioReviewFilterControl);
 document.addEventListener('DOMContentLoaded', ensureReviewCardElevation);
 document.addEventListener('DOMContentLoaded', bindHrReviewEvents);
 document.getElementById('lockEmploymentPeriodBtn')?.addEventListener('click', () => {

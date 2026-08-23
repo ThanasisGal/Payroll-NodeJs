@@ -14751,6 +14751,10 @@ body.loader-active > *:not(.app-loader) {
     width: calc(100% - 2rem);
 }
 
+#reviewEmployee + .ts-wrapper {
+    width: 99.75%;
+}
+
 .employment-review-start-action {
     grid-column: 5;
     align-self: end;
