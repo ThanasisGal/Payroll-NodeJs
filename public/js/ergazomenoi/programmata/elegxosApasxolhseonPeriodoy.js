@@ -1063,6 +1063,21 @@ function hasAnyCardEvidence(row = {}) {
     );
 }
 
+function isAuthoritativeDeclaredRepo(row = {}) {
+    const declaredCategory = String(
+        row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
+    ).trim();
+    const expectedRepoCategory = resolveReviewIsFullTimePresentation(row) ? 'ΑΝ' : 'ΜΕ';
+
+    return row.repo === true || declaredCategory === expectedRepoCategory;
+}
+
+function renderDeclaredRepoWithCardsBadge(row = {}) {
+    if (!isAuthoritativeDeclaredRepo(row) || !hasAnyCardEvidence(row)) return '';
+
+    return '<div class="mt-1"><span class="badge text-bg-info">Ρεπό με κάρτες</span></div>';
+}
+
 function resolveCardEvidenceIssue(row = {}) {
     const pairs = [1, 2, 3].map((n) => {
         const p = pairNo(n);
@@ -3163,6 +3178,7 @@ function renderReviewRows(rows = [], deviations = []) {
             </td>
             <td${tdClass(rowPresentation.apologistiko.className)}>
                 ${rowPresentation.apologistiko.text}
+                ${renderDeclaredRepoWithCardsBadge(row)}
                 ${renderScenarioBadge(row, rowPresentation.badgeState)}
             </td>
             <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
@@ -3235,7 +3251,8 @@ function updateAuthoritativeReviewDailyRow(authoritativeRecord) {
             num(row.cards_ores_ergasias) === 0
     });
     cell.className = presentation.className || '';
-    cell.innerHTML = `${presentation.text}${renderApprovedOrphanAuditBadge(row)}` +
+    cell.innerHTML = `${presentation.text}${renderDeclaredRepoWithCardsBadge(row)}` +
+        renderApprovedOrphanAuditBadge(row) +
         renderScenarioBadge(row, {});
     detailRow.classList.toggle('row-locked', row.is_locked === true);
     return row;
