@@ -362,6 +362,10 @@ let currentLegacyDeviations = [];
 let currentPolicyPreviewRowsById = new Map();
 let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
+let currentEmploymentReviewLifecyclePresentation = null;
+let currentStage2DailyResolutionByKey = new Map();
+let currentCanonicalDailyEmploymentTypeByKey = new Map();
+let currentReviewLifecycleProjectionReady = false;
 let currentRepoTransferDecisionsByProposalId = new Map();
 const repoTransferDecisionSubmitting = new Set();
 const repoTransferApplySubmitting = new Set();
@@ -574,8 +578,134 @@ function isScenarioReviewRow(row) {
     return row?.scenarioDecision?.requires_review === true;
 }
 
+function isEmployeeLifecycleFullyCompleted(employeeKodikos, ypokatasthma, lifecyclePayloads = []) {
+    const normalizedKodikos = String(employeeKodikos || '').trim();
+    const normalizedBranch = String(ypokatasthma || '').trim();
+    const employeePayloads = (Array.isArray(lifecyclePayloads) ? lifecyclePayloads : [])
+        .filter((payload) => {
+            const scope = payload?.scope || {};
+            return payload?.lifecycle_projection?.stages &&
+                String(scope.employee_kodikos || '').trim() === normalizedKodikos &&
+                String(scope.ypokatasthma || '').trim() === normalizedBranch;
+        });
+    if (!normalizedKodikos || employeePayloads.length === 0) return false;
+
+    const lifecycle = derivePeriodLifecyclePresentation(employeePayloads);
+    return lifecycle.requires_hr_action === false &&
+        Number(lifecycle.total_pending_count || 0) === 0;
+}
+
+function isEmployeeVisibleInGeneralReview(
+    employeeKodikos,
+    ypokatasthma,
+    { selectedKodikos = '', lifecyclePayloads = [] } = {}
+) {
+    if (String(selectedKodikos || '').trim()) return true;
+    return !isEmployeeLifecycleFullyCompleted(
+        employeeKodikos,
+        ypokatasthma,
+        lifecyclePayloads
+    );
+}
+
+function visibleWeeklyHrPayloads(
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()],
+    selectedKodikos = document.getElementById('kodikos')?.value || ''
+) {
+    const payloads = Array.isArray(lifecyclePayloads) ? lifecyclePayloads : [];
+    return payloads.filter((payload) => isEmployeeVisibleInGeneralReview(
+        payload?.scope?.employee_kodikos,
+        payload?.scope?.ypokatasthma,
+        { selectedKodikos, lifecyclePayloads: payloads }
+    ));
+}
+
+function isReviewLifecycleRecordVisible(
+    record = {},
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()],
+    selectedKodikos = document.getElementById('kodikos')?.value || ''
+) {
+    const employeeKodikos = String(record.employee_kodikos || record.kodikos || '').trim();
+    if (!employeeKodikos) return true;
+    const explicitBranch = String(record.ypokatasthma || record.branch || '').trim();
+    const matchingBranches = [...new Set((Array.isArray(lifecyclePayloads)
+        ? lifecyclePayloads : []).filter((payload) =>
+        String(payload?.scope?.employee_kodikos || '').trim() === employeeKodikos)
+        .map((payload) => String(payload?.scope?.ypokatasthma || '').trim())
+        .filter(Boolean))];
+    return isEmployeeVisibleInGeneralReview(
+        employeeKodikos,
+        explicitBranch || (matchingBranches.length === 1 ? matchingBranches[0] : ''),
+        { selectedKodikos, lifecyclePayloads }
+    );
+}
+
+function filterReviewLifecycleGroups(
+    groups = [],
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()],
+    selectedKodikos = document.getElementById('kodikos')?.value || ''
+) {
+    return (Array.isArray(groups) ? groups : []).flatMap((group) => {
+        const items = Array.isArray(group?.items) ? group.items : [];
+        const visibleItems = items.filter((item) =>
+            isReviewLifecycleRecordVisible(item, lifecyclePayloads, selectedKodikos));
+        if (items.length > 0 && visibleItems.length === 0) return [];
+        if (items.length === 0 &&
+            !isReviewLifecycleRecordVisible(group, lifecyclePayloads, selectedKodikos)) return [];
+        if (items.length === 0) return [group];
+        return [{ ...group, items: visibleItems, count: visibleItems.length,
+            employees_count: new Set(visibleItems.map((item) =>
+                String(item.employee_kodikos || item.kodikos || '').trim()).filter(Boolean)).size }];
+    });
+}
+
+function filterReviewLifecycleProjection(
+    projection,
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()],
+    selectedKodikos = document.getElementById('kodikos')?.value || ''
+) {
+    if (!projection) return projection;
+    return { ...projection,
+        groups: filterReviewLifecycleGroups(
+            projection.groups, lifecyclePayloads, selectedKodikos),
+        review_outcomes: (Array.isArray(projection.review_outcomes)
+            ? projection.review_outcomes : []).filter((outcome) =>
+            isReviewLifecycleRecordVisible(outcome, lifecyclePayloads, selectedKodikos)) };
+}
+
+function filterGeneralReviewRows(
+    rows = [],
+    { selectedKodikos = '', lifecycleReady = false, lifecyclePayloads = [] } = {}
+) {
+    if (String(selectedKodikos || '').trim()) return rows;
+    if (lifecycleReady !== true) return [];
+    return rows.filter((row) => isEmployeeVisibleInGeneralReview(
+        row.kodikos,
+        row.ypokatasthma,
+        { selectedKodikos, lifecyclePayloads }
+    ));
+}
+
+function renderReviewNoPendingEmployees(
+    tbody,
+    { lifecycleReady = currentReviewLifecycleProjectionReady,
+        selectedKodikos = document.getElementById('kodikos')?.value || '' } = {}
+) {
+    if (!tbody || lifecycleReady !== true || String(selectedKodikos || '').trim()) return false;
+    tbody.innerHTML = `<tr class="employment-review-no-pending-employees">
+        <td colspan="13" class="text-center text-muted py-4">
+            Δεν υπάρχουν εργαζόμενοι με εκκρεμότητες ελέγχου.
+        </td>
+    </tr>`;
+    return true;
+}
+
 function getVisibleReviewRows(rows = currentReviewRows) {
-    return rows;
+    return filterGeneralReviewRows(rows, {
+        selectedKodikos: document.getElementById('kodikos')?.value || '',
+        lifecycleReady: currentReviewLifecycleProjectionReady,
+        lifecyclePayloads: [...weeklyHrStage1Payloads.values()]
+    });
 }
 
 function renderCurrentReviewRows() {
@@ -932,15 +1062,27 @@ function isAuthoritativeDeclaredRepo(row = {}) {
     const declaredCategory = String(
         row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
     ).trim();
-    const expectedRepoCategory = resolveReviewIsFullTimePresentation(row) ? 'ΑΝ' : 'ΜΕ';
-
-    return row.repo === true || declaredCategory === expectedRepoCategory;
+    return row.repo === true || ['ΑΝ', 'ΜΕ'].includes(declaredCategory);
 }
 
-function renderDeclaredRepoWithCardsBadge(row = {}) {
+function renderDeclaredRepoWithCardsBadge(
+    row = {},
+    canonicalEmploymentType = resolveCanonicalDailyEmploymentType(row)
+) {
     if (!isAuthoritativeDeclaredRepo(row) || !hasAnyCardEvidence(row)) return '';
+    if (!['0', '1', '2'].includes(canonicalEmploymentType)) return '';
 
-    return '<div class="mt-1"><span class="badge text-bg-info">Ρεπό με κάρτες</span></div>';
+    const label = canonicalEmploymentType === '0'
+        ? 'Ρεπό με κάρτες'
+        : 'Μη εργασία με κάρτες';
+    return `<div class="mt-1"><span class="badge text-bg-info">${label}</span></div>`;
+}
+
+function resolveCanonicalDailyEmploymentType(row = {}) {
+    return currentCanonicalDailyEmploymentTypeByKey.get(stage2DailyResolutionKey(
+        row.kodikos || row.employee_kodikos,
+        row.hmeromhnia || row.date
+    )) || '';
 }
 
 function resolveCardEvidenceIssue(row = {}) {
@@ -1171,10 +1313,34 @@ function renderReviewDateCell(row = {}) {
     return `<div>${formattedDate}</div><span class="review-holiday-description-badge"${titleAttribute}>${escapeHtml(description)}</span>`;
 }
 
-function renderSixthDayCardsBadge(row = {}) {
-    if (row.is_sixth_day !== true) return '';
+function resolveSixthDayRowPresentation(
+    row = {},
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()]
+) {
+    if (row.is_sixth_day === true) return row;
+    const rowDate = stage1DateKey(row.hmeromhnia);
+    const employeeKodikos = String(row.kodikos || row.employee_kodikos || '').trim();
+    const branch = String(row.ypokatasthma || '').trim();
+    const payload = lifecyclePayloads.find((item) => {
+        const scope = item?.scope || {};
+        const sixthDay = item?.lifecycle_projection?.stages?.stage4
+            ?.final_weekly_analysis?.sixthDay;
+        return String(scope.employee_kodikos || '').trim() === employeeKodikos &&
+            String(scope.ypokatasthma || '').trim() === branch &&
+            stage1DateKey(sixthDay?.hmeromhnia) === rowDate;
+    });
+    const sixthDay = payload?.lifecycle_projection?.stages?.stage4
+        ?.final_weekly_analysis?.sixthDay;
+    if (!sixthDay) return row;
+    return { ...row, is_sixth_day: true,
+        sixth_day_premium_rate: sixthDay.premiumRate };
+}
 
-    const rawRate = row.sixth_day_premium_rate;
+function renderSixthDayCardsBadge(row = {}) {
+    const presentation = resolveSixthDayRowPresentation(row);
+    if (presentation.is_sixth_day !== true) return '';
+
+    const rawRate = presentation.sixth_day_premium_rate;
     const parsedRate =
         rawRate === null || rawRate === undefined || String(rawRate).trim() === ''
             ? null
@@ -1259,6 +1425,11 @@ function ensureReviewTableStructure() {
                 background-color: #dc3545 !important;
                 color: #ffffff !important;
                 font-weight: 700;
+            }
+
+            .cell-stage1-absence {
+                background-color: #f8d7da !important;
+                color: #dc3545 !important;
             }
 
             .cell-break-subtracted {
@@ -1968,7 +2139,7 @@ function employmentTypeLabel(value) {
         case '1':
             return 'Μερική';
         case '2':
-            return 'Εκ Περιτροπής';
+            return 'Εκ περιτροπής / Μερική';
         default:
             return v || '-';
     }
@@ -2011,7 +2182,9 @@ function renderDeviationNoteCell(dev) {
         return '';
     }
 
-    const humanNote = dev.note && !looksLikeInternalReviewCode(dev.note)
+    const resolvedSelectionAmbiguity = isResolvedWeeklySelectionAmbiguity(dev);
+    const humanNote = dev.note && !looksLikeInternalReviewCode(dev.note) &&
+        !(resolvedSelectionAmbiguity && /απαιτείται επιλογή/i.test(String(dev.note)))
         ? String(dev.note)
         : '';
 
@@ -2051,11 +2224,21 @@ function renderDeviationNoteCell(dev) {
               formatDate(dev.seventh_day_date)
           )}</div>`
         : '';
-    const reasonMessages = reviewHrReasonMessages([
-        ...(Array.isArray(dev.sixth_seventh_day_reasons) ? dev.sixth_seventh_day_reasons : []),
-        ...(Array.isArray(dev.repo_transfer_reasons) ? dev.repo_transfer_reasons : []),
-        ...(Array.isArray(dev.canonical_reasons) ? dev.canonical_reasons : [])
-    ]);
+    const visibleReasons = (Array.isArray(dev.presentation_reasons)
+        ? dev.presentation_reasons
+        : [
+              ...(Array.isArray(dev.sixth_seventh_day_reasons)
+                  ? dev.sixth_seventh_day_reasons
+                  : []),
+              ...(Array.isArray(dev.repo_transfer_reasons)
+                  ? dev.repo_transfer_reasons
+                  : []),
+              ...(Array.isArray(dev.canonical_reasons) ? dev.canonical_reasons : [])
+          ]).filter((reason) => !resolvedSelectionAmbiguity ||
+            !['MULTIPLE_SOURCE_CANDIDATES', 'MULTIPLE_TARGET_CANDIDATES'].includes(reason));
+    const reasonMessages = reviewHrReasonMessages(
+        visibleReasons
+    );
     const sixthDayDecisionText = renderReviewHrReasonList(reasonMessages);
     const noteText = humanNote
         ? `<div>${escapeHtml(humanNote)}</div>`
@@ -2084,6 +2267,70 @@ function hasAdeiaSuggestion(row) {
 function hasAdeiaSuggestionInRows(rows = []) {
     return Array.isArray(rows) && rows.some((row) => hasAdeiaSuggestion(row));
 }
+
+function weeklyLifecyclePayloadForDeviation(
+    dev = {},
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()]
+) {
+    const employeeKodikos = String(dev.kodikos || dev.employee_kodikos || '').trim();
+    const weekStart = stage1DateKey(dev.week_apo || dev.weekStart);
+    const weekEnd = stage1DateKey(dev.week_eos || dev.weekEnd);
+    return lifecyclePayloads.find((payload) => {
+        const scope = payload?.scope || {};
+        return String(scope.employee_kodikos || '').trim() === employeeKodikos &&
+            stage1DateKey(scope.week_start) === weekStart &&
+            (!weekEnd || stage1DateKey(scope.week_end) === weekEnd);
+    }) || null;
+}
+
+
+function resolveFinalWeeklyNonWorkDays(dev = {}, lifecyclePayloads) {
+    const actualWorkdays = Number(dev.actual_workdays);
+    if (dev.actual_workdays !== null && dev.actual_workdays !== undefined &&
+        dev.actual_workdays !== '' && Number.isFinite(actualWorkdays)) {
+        return Math.max(0, Math.min(7, 7 - actualWorkdays));
+    }
+
+    const payload = weeklyLifecyclePayloadForDeviation(dev, lifecyclePayloads);
+    const stage2Items = payload?.lifecycle_projection?.stages?.stage3
+        ?.stage2_automatic_resolution_items || [];
+    const resolvedDates = new Set((dev.resolved_repo_identities || [])
+        .map((item) => stage1DateKey(item?.date || item?.hmeromhnia || item))
+        .filter(Boolean));
+    const additionalResolvedDays = stage2Items.filter((item) =>
+        ['NON_WORK', 'REST_REPO'].includes(item?.classification) &&
+        !resolvedDates.has(stage1DateKey(item.date))).length;
+    const currentResolved = Number(dev.resolved_repo ?? dev.actual_repo);
+    return Number.isFinite(currentResolved)
+        ? Math.max(0, Math.min(7, currentResolved + additionalResolvedDays))
+        : '-';
+}
+
+function renderWeeklyEmploymentStatus(dev = {}) {
+    return employmentTypeLabel(dev.effective_typos_apasxolhshs);
+}
+
+function isResolvedWeeklySelectionAmbiguity(
+    dev = {},
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()]
+) {
+    const employeeKodikos = String(dev.kodikos || dev.employee_kodikos || '').trim();
+    const weekStart = stage1DateKey(dev.week_apo || dev.weekStart);
+    const weekEnd = stage1DateKey(dev.week_eos || dev.weekEnd);
+    if (!employeeKodikos || !weekStart) return false;
+
+    return weeklyLifecyclePayloadForDeviation(dev, lifecyclePayloads)
+        ?.lifecycle_projection?.requires_hr_action === false;
+}
+
+function isHrVisibleDeviation(deviation = {}) {
+    return String(deviation.status || '').trim() !== 'OPEN_WEEK_PENDING_COMPLETION';
+}
+
+function hasAdeiaSuggestion(row) {
+    return hasMeaningfulValue(row?.kathgoria_adeias_apologistika);
+}
+
 
 function appendEmployeeDeviationRows(tbody, deviations, groupId) {
     const visibleDeviations = Array.isArray(deviations)
@@ -2116,13 +2363,13 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                 >
                     <td>${formatDate(dev.week_apo || dev.weekStart)}</td>
                     <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
-                    <td class="text-end">${escapeHtml(dev.expected_repo ?? '-')}</td>
-                    <td class="text-end fw-bold">${escapeHtml(dev.actual_repo ?? dev.pragmatikaRepo ?? '-')}</td>
-                    <td class="text-end">${escapeHtml(dev.resolved_repo ?? dev.actual_repo ?? '-')}</td>
+                    <td>${escapeHtml(renderWeeklyEmploymentStatus(dev))}</td>
+                    <td class="text-end">${escapeHtml(dev.effective_weekly_workdays ?? '-')}</td>
+                    <td class="text-end">${escapeHtml(dev.effective_expected_repo ?? dev.expected_repo ?? '-')}</td>
                     <td class="text-end">${escapeHtml(dev.actual_workdays ?? '-')}</td>
+                    <td class="text-end fw-bold">${escapeHtml(resolveFinalWeeklyNonWorkDays(dev))}</td>
                     <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
                     <td class="text-end">${escapeHtml(renderWeeklySeventhDayValue(dev))}</td>
-                    <td class="weekly-deviation-employment-type">${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
                     <td class="weekly-deviation-comment">${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && dev.requires_new_hr_decision !== false && canRecordCanonicalEmploymentDecision()
                         ? `<div class="mt-2">${Number(dev.canonical_identical_group_count || 0) > 1
                             ? `<div class="small fw-semibold mb-1">${escapeHtml(dev.canonical_identical_group_count)} όμοιες περιπτώσεις</div>` : ''}<button type="button" class="btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary"
@@ -2140,28 +2387,28 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
     wrapperTr.innerHTML = `
         <td colspan="13" class="p-2 bg-warning-subtle">
             <div class="fw-bold weekly-deviation-section-title">
-                Αποκλίσεις εβδομαδιαίων ρεπό
+                Εβδομαδιαίος έλεγχος εργασίας και ανάπαυσης
                 <span class="badge text-bg-light border ms-1">Εβδομάδα Δευτέρα–Κυριακή</span>
             </div>
             <div class="weekly-deviation-table-shell">
                 <table class="table table-sm table-bordered mb-0 bg-white weekly-deviation-table">
                     <colgroup>
                         <col span="2" class="weekly-deviation-date-column">
-                        <col span="6" class="weekly-deviation-number-column">
                         <col class="weekly-deviation-employment-type-column">
+                        <col span="6" class="weekly-deviation-number-column">
                         <col class="weekly-deviation-comment-column">
                     </colgroup>
                     <thead class="table-light">
                         <tr>
                             <th>Από</th>
                             <th>Έως</th>
-                            <th class="text-end">Αναμενόμενα ρεπό</th>
-                            <th class="text-end">Πραγματικά ρεπό</th>
-                            <th class="text-end">Προτεινόμενα/επιλυμένα ρεπό</th>
+                            <th>Καθεστώς</th>
+                            <th class="text-end">Συμβατικές ημέρες εργασίας</th>
+                            <th class="text-end">Αναμενόμενες ημέρες ανάπαυσης / μη εργασίας</th>
                             <th class="text-end">Πραγματικές ημέρες εργασίας</th>
+                            <th class="text-end">Τελικές ημέρες ανάπαυσης / μη εργασίας</th>
                             <th class="text-end">6η ημέρα</th>
-                            <th class="text-end">7η ημέρα/παράβαση</th>
-                            <th class="weekly-deviation-employment-type">Τύπος απασχόλησης</th>
+                            <th class="text-end">7η ημέρα / παράβαση</th>
                             <th class="weekly-deviation-comment">Σχόλιο</th>
                         </tr>
                     </thead>
@@ -2646,6 +2893,37 @@ function resolvePossibleLeavePresentationState(row = {}) {
     return possibleLeavePresentationStates.NONE;
 }
 
+function isCompletedSingleDayNoActionPresentation(
+    row = {},
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()]
+) {
+    const rowDate = stage1DateKey(row.hmeromhnia);
+    const employeeKodikos = String(row.kodikos || row.employee_kodikos || '').trim();
+    const branch = String(row.ypokatasthma || '').trim();
+    const hasPositiveClassification = row.adeia_apologistika === true ||
+        row.astheneia_apologistika === true || row.apousia_apologistika === true ||
+        (hasMeaningfulValue(row.kathgoria_adeias_apologistika) &&
+            String(row.kathgoria_adeias_apologistika).trim() !== 'POSSIBLE_LEAVE');
+    if (!rowDate || hasAnyCardEvidence(row) ||
+        num(row.cards_ores_ergasias) > 0 ||
+        num(row.ores_pragmatikhs_ergasias_apologistika) > 0 ||
+        hasPositiveClassification) return false;
+
+    return lifecyclePayloads.some((payload) => {
+        const scope = payload?.scope || {};
+        const lifecycle = payload?.lifecycle_projection;
+        const employmentDates = lifecycle?.employment_date_scope?.employment_owned_dates || [];
+        const stages = Object.values(lifecycle?.stages || {});
+        return String(scope.employee_kodikos || '').trim() === employeeKodikos &&
+            String(scope.ypokatasthma || '').trim() === branch &&
+            lifecycle?.requires_hr_action === false &&
+            Number(lifecycle?.total_pending_count || 0) === 0 &&
+            employmentDates.length === 1 && employmentDates[0] === rowDate &&
+            stages.length === 4 && stages.every((stage) =>
+                stage?.business_status === 'COMPLETED');
+    });
+}
+
 function resolveReviewIsFullTimePresentation(row = {}) {
     if (
         row.effective_is_full_time === true ||
@@ -2683,6 +2961,24 @@ function resolveReviewIsFullTimePresentation(row = {}) {
 }
 
 function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
+    const storedStage1Decision = resolveStoredStage1DailyPresentation(row);
+    if (storedStage1Decision) return storedStage1Decision;
+
+    const stage2Resolution = derived.stage2AutomaticResolution;
+    if (stage2Resolution?.classification === 'NON_WORK') {
+        return { text: 'ΜΗ ΕΡΓΑΣΙΑ', className: 'cell-non-work-day',
+            source: 'derived_stage2' };
+    }
+    if (stage2Resolution?.classification === 'REST_REPO') {
+        return { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', className: 'cell-repo-day',
+            source: 'derived_stage2' };
+    }
+
+    if (isCompletedSingleDayNoActionPresentation(row)) {
+        return { text: derived.apologistikoText || '', className: '',
+            source: 'completed_single_day_no_action' };
+    }
+
     const possibleLeaveState = resolvePossibleLeavePresentationState(row);
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
@@ -2867,6 +3163,61 @@ function resolveReviewRowPresentation(
     };
 }
 
+function resolveStoredStage1DailyPresentation(row = {}) {
+    if (row.astheneia_apologistika === true) {
+        return { text: 'ΑΣΘΕΝΕΙΑ', className: 'cell-no-card-adeia', source: 'persisted_stage1' };
+    }
+    const leaveCategory = String(row.kathgoria_adeias_apologistika || '').trim();
+    if ((row.adeia_apologistika === true || hasMeaningfulValue(leaveCategory)) &&
+        leaveCategory !== 'POSSIBLE_LEAVE' &&
+        !matchesLegacyAutoCalculatedLeavePresentation(row)) {
+        return { text: 'ΑΔΕΙΑ', className: 'cell-no-card-adeia', source: 'persisted_stage1' };
+    }
+    if (row.apousia_apologistika === true) {
+        return { text: 'ΑΠΟΥΣΙΑ', className: 'cell-apoysia cell-stage1-absence', source: 'persisted_stage1' };
+    }
+    return null;
+}
+
+function stage2DailyResolutionKey(employeeKodikos, date) {
+    return `${String(employeeKodikos || '').trim()}|${stage1DateKey(date)}`;
+}
+
+function buildStage2DailyResolutionByKey(payloads = []) {
+    const resolutions = new Map();
+    (Array.isArray(payloads) ? payloads : []).forEach((payload) => {
+        const employeeKodikos = payload?.scope?.employee_kodikos;
+        const items = payload?.lifecycle_projection?.stages?.stage3
+            ?.stage2_automatic_resolution_items || [];
+        items.forEach((item) => {
+            if (!['NON_WORK', 'REST_REPO'].includes(item?.classification)) return;
+            resolutions.set(stage2DailyResolutionKey(employeeKodikos, item.date), item);
+        });
+    });
+    return resolutions;
+}
+
+function buildCanonicalDailyEmploymentTypeByKey(payloads = []) {
+    const employmentTypes = new Map();
+    (Array.isArray(payloads) ? payloads : []).forEach((payload) => {
+        const employeeKodikos = payload?.scope?.employee_kodikos;
+        (payload?.stage1_daily_presentation || []).forEach((item) => {
+            const employmentType = String(item?.employment_type || '').trim();
+            if (!['0', '1', '2'].includes(employmentType)) return;
+            employmentTypes.set(stage2DailyResolutionKey(employeeKodikos, item.date),
+                employmentType);
+        });
+    });
+    return employmentTypes;
+}
+
+function resolveStage2DailyPresentation(row = {}) {
+    return currentStage2DailyResolutionByKey.get(stage2DailyResolutionKey(
+        row.kodikos || row.employee_kodikos,
+        row.hmeromhnia || row.date
+    )) || null;
+}
+
 function setEmployeeGroupExpanded(groupTr, expanded) {
     const groupId = String(groupTr?.dataset?.groupId || '');
     if (!groupId) return;
@@ -2897,6 +3248,36 @@ function toggleEmployeeGroupAccordion(groupTr) {
     setEmployeeGroupExpanded(groupTr, willExpand);
 }
 
+function employeeGroupLifecycleBadge(employeeKodikos, ypokatasthma, lifecyclePayloads = []) {
+    const normalizedKodikos = String(employeeKodikos || '').trim();
+    const normalizedBranch = String(ypokatasthma || '').trim();
+    const employeePayloads = (Array.isArray(lifecyclePayloads) ? lifecyclePayloads : [])
+        .filter((payload) => {
+            const scope = payload?.scope || {};
+            return String(scope.employee_kodikos || '').trim() === normalizedKodikos &&
+                String(scope.ypokatasthma || '').trim() === normalizedBranch;
+        });
+    if (!normalizedKodikos || employeePayloads.length === 0) return '';
+
+    const lifecycle = derivePeriodLifecyclePresentation(employeePayloads);
+    if (lifecycle.requires_hr_action !== true || Number(lifecycle.total_pending_count || 0) <= 0) {
+        return '';
+    }
+
+    const activeStage = lifecycle.stages?.[lifecycle.current_stage];
+    if (!activeStage || activeStage.presentation_status === 'LOCKED' ||
+        Number(activeStage.pending_count || 0) <= 0) return '';
+
+    const badges = {
+        STAGE1: '<span class="review-adeia-badge">⚠ Έλεγχος Άδειας</span>',
+        STAGE2: '<span class="review-warning-badge">⚠ Μεταφορά Ρεπό</span>',
+        STAGE3: '<span class="review-adeia-badge">⚠ Πιθανές Άδειες</span>',
+        STAGE4: '<span class="review-warning-badge">⚠ Τελικός Έλεγχος</span>'
+    };
+    return badges[lifecycle.current_stage] || '';
+}
+
+
 function renderReviewRows(rows = [], deviations = []) {
     ensureReviewTableStructure();
 
@@ -2912,6 +3293,8 @@ function renderReviewRows(rows = [], deviations = []) {
 
     const tbody = document.querySelector('#resultsTable tbody');
     tbody.innerHTML = '';
+
+    if (rows.length === 0 && renderReviewNoPendingEmployees(tbody)) return;
 
     let currentGroup = '';
     let currentGroupId = '';
@@ -2949,9 +3332,11 @@ function renderReviewRows(rows = [], deviations = []) {
             groupTr.setAttribute('role', 'button');
             groupTr.setAttribute('aria-expanded', 'false');
 
-            const groupDeviations = deviationsByKodikos.get(groupKey) || [];
-            const groupHasProfileChange = hasProfileChangeDeviation(groupDeviations);
-            const groupHasAdeiaSuggestion = hasAdeiaSuggestionInRows(rowsByKodikos.get(groupKey) || []);
+            const lifecycleBadge = employeeGroupLifecycleBadge(
+                row.kodikos,
+                row.ypokatasthma,
+                [...weeklyHrStage1Payloads.values()]
+            );
 
             groupTr.innerHTML = `
                 <td colspan="13" class="fw-bold">
@@ -2961,8 +3346,7 @@ function renderReviewRows(rows = [], deviations = []) {
                     |
                     ${row.eponymo || ''}
                     ${row.onoma || ''}
-                    ${groupHasProfileChange ? '<span class="review-warning-badge">⚠ Αλλαγή όρων</span>' : ''}
-                    ${groupHasAdeiaSuggestion ? '<span class="review-adeia-badge">⚠ Έλεγχος άδειας</span>' : ''}
+                    ${lifecycleBadge}
                 </td>
             `;
 
@@ -3040,7 +3424,8 @@ function renderReviewRows(rows = [], deviations = []) {
                 isApologistikoRepoRow,
                 isApologistikoNonWorkRow,
                 declaredText,
-                declaredClass
+                declaredClass,
+                stage2AutomaticResolution: resolveStage2DailyPresentation(row)
             },
             repoTransferState
         );
@@ -6428,9 +6813,7 @@ function isHrReviewGroupCompleted(group = {}) {
 }
 
 function classifyHrReviewGroups() {
-    const groups = Array.isArray(currentHrReviewProjection?.groups)
-        ? currentHrReviewProjection.groups
-        : [];
+    const groups = filterReviewLifecycleGroups(currentHrReviewProjection?.groups);
 
     currentHrPendingGroups = groups.filter((group) => !isHrReviewGroupCompleted(group));
     currentHrCompletedGroups = groups.filter((group) => isHrReviewGroupCompleted(group));
@@ -6850,6 +7233,8 @@ function bindHrReviewEvents() {
 function renderAtomicRepoTransferProjection(projection) {
     if (!projection) return '';
 
+    projection = filterReviewLifecycleProjection(projection);
+
     const groups = Array.isArray(projection.groups)
         ? projection.groups.filter((group) => {
               const state = currentRepoTransferDecisionsByProposalId.get(String(group?.group_id || ''));
@@ -7012,14 +7397,18 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
     if (!container) return;
 
     if (Object.prototype.hasOwnProperty.call(options, 'atomicGroupProjection')) {
-        currentAtomicRepoTransferProjection = options.atomicGroupProjection || null;
+        currentAtomicRepoTransferProjection = filterReviewLifecycleProjection(
+            options.atomicGroupProjection || null
+        );
     }
 
     if (options.loading || options.error) {
         currentAtomicRepoTransferProjection = null;
     }
 
-    currentPolicyPreviewGrouping = grouping || null;
+    grouping = grouping ? { ...grouping,
+        groups: filterReviewLifecycleGroups(grouping.groups) } : null;
+    currentPolicyPreviewGrouping = grouping;
 
     if (options.loading) {
         container.innerHTML = `
@@ -7204,6 +7593,9 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
         !(userCanManageReusablePolicyApproval() && inheritedApprovalGroups.length > 0) &&
         !currentPolicyPreviewApprovalsError) {
         container.innerHTML = '';
+        renderWeeklyHrStage2LifecycleFallback(
+            currentEmploymentReviewLifecyclePresentation
+        );
         return;
     }
 
@@ -7300,6 +7692,9 @@ function canRecordCanonicalEmploymentDecision(state = currentEmploymentPeriodCon
 }
 
 function canRecordEmploymentDecisionForCurrentPeriod(state = currentEmploymentPeriodControl) {
+    if (String(state?.effective_mode || '') === 'HISTORICAL_RECONSTRUCTION_STALE') {
+        return state?.allowed_actions?.record_stale_canonical_decision === true;
+    }
     return hasAuthoritativeEmploymentCalculation(state) &&
         state?.allowed_actions?.record_decision === true;
 }
@@ -7663,7 +8058,7 @@ async function transitionEmploymentPeriod(action) {
     await employmentReviewSwal({ icon: 'success', title: 'Κατάσταση περιόδου', text: payload.message });
 }
 
-+function stage1DateKey(value) {
+function stage1DateKey(value) {
     const text = String(value || '').slice(0, 10);
     return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
 }
@@ -7685,10 +8080,12 @@ function naturalWeekScopeForRow(row, searchStart = '', searchEnd = '') {
     const weekEnd = sunday.toISOString().slice(0, 10);
     const rangeStart = stage1DateKey(searchStart);
     const rangeEnd = stage1DateKey(searchEnd);
-    if (!rangeStart || !rangeEnd || weekStart < rangeStart || weekEnd > rangeEnd) return null;
+    if (!rangeStart || !rangeEnd || weekEnd < rangeStart || weekStart > rangeEnd) return null;
+    const crossesBoundary = weekStart < rangeStart || weekEnd > rangeEnd;
     return { ypokatasthma: row.ypokatasthma, employee_id: String(row.employee_id),
         employee_kodikos: row.kodikos, week_start: monday.toISOString().slice(0, 10),
-        week_end: sunday.toISOString().slice(0, 10) };
+        week_end: sunday.toISOString().slice(0, 10),
+        ...(crossesBoundary ? { period_start: rangeStart, period_end: rangeEnd } : {}) };
 }
 
 function weeklyHrStage1Key(scope) {
@@ -7742,17 +8139,128 @@ function stage1RelevantDates(payload) {
         ...(payload.confirmed_absence_dates || [])])].sort();
 }
 
+function compareWeeklyHrStage1Payloads(left = {}, right = {}) {
+    const leftScope = left.scope || {};
+    const rightScope = right.scope || {};
+    const employeeOrder = String(leftScope.employee_kodikos || '').localeCompare(
+        String(rightScope.employee_kodikos || ''), 'el', { numeric: true }
+    );
+    if (employeeOrder) return employeeOrder;
+    const weekStartOrder = String(leftScope.week_start || '')
+        .localeCompare(String(rightScope.week_start || ''));
+    if (weekStartOrder) return weekStartOrder;
+    return String(leftScope.week_end || '').localeCompare(String(rightScope.week_end || ''));
+}
+
 function stage1RowForDate(payload, date) {
     return (payload.rows || []).find((row) => stage1DateKey(row.hmeromhnia) === date) || null;
 }
 
+function stage1DailyPresentationForDate(payload, date) {
+    return (payload.stage1_daily_presentation || []).find((item) => item.date === date) || null;
+}
+
+function stage1IntervalsText(intervals = []) {
+    return intervals.length ? intervals.map((item) =>
+        `${item.start || '—'}–${item.end || '—'}`).join(', ') : '';
+}
+
+function stage1CurrentClassificationLabel(value) {
+    const text = String(value || '').trim();
+    if (!text) return 'Χωρίς απολογιστικό χαρακτηρισμό';
+    if (text === 'POSSIBLE_LEAVE') return 'ΠΙΘΑΝΗ ΑΔΕΙΑ';
+    if (text === 'ΜΕ') return 'ΜΗ ΕΡΓΑΣΙΑ';
+    if (text === 'ΑΝ') return 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ';
+    return text;
+}
+
+function stage1NoClassificationPreviewForDate(payload, date) {
+    return (payload?.lifecycle_projection?.stage1_no_classification_preview_items || [])
+        .find((item) => item.date === date) || null;
+}
+
+function shouldRenderStage1NoClassificationPreview(payload, date) {
+    const row = stage1RowForDate(payload, date);
+    if (!row) return false;
+    const draft = weeklyHrStage1DayDrafts.get(String(row._id));
+    return (draft?.classification || stage1ClassificationForRow(row)) === 'UNCLASSIFIED';
+}
+
+function renderStage1NoClassificationPreview(payload, date) {
+    const preview = stage1NoClassificationPreviewForDate(payload, date);
+    if (!preview || !shouldRenderStage1NoClassificationPreview(payload, date)) return '';
+    let result = 'Δεν υπάρχει ασφαλής αυτόματη επίλυση.';
+    if (preview.safe === true && preview.classification === 'NON_WORK') {
+        result = 'Θα επιλυθεί ως ΜΗ ΕΡΓΑΣΙΑ.';
+    } else if (preview.safe === true && preview.classification === 'REST_REPO') {
+        result = 'Θα επιλυθεί ως ΑΝΑΠΑΥΣΗ / ΡΕΠΟ.';
+        if (preview.source_date) {
+            result += ` Μεταφορά ρεπό από ${formatStage1DateKey(preview.source_date)}.`;
+        }
+    } else if (preview.requires_further_review === true) {
+        result += ' Η περίπτωση θα απαιτήσει περαιτέρω έλεγχο.';
+    }
+    return `<div class="weekly-hr-stage1-no-classification-preview mt-2 border-start border-3 ps-2 py-1">
+        <div class="small fw-semibold">Αν δεν επιλεγεί χαρακτηρισμός:</div>
+        <div class="small">${escapeHtml(result)}</div>
+    </div>`;
+}
+
+function renderStage1DayFacts(payload, date, { informational = false } = {}) {
+    const item = stage1DailyPresentationForDate(payload, date);
+    if (!item) return '';
+    const declaredIntervals = stage1IntervalsText(item.declared_intervals);
+    const cardIntervals = stage1IntervalsText(item.card_intervals);
+    return `<div class="weekly-hr-stage1-day-facts border rounded p-2 ${informational ? 'bg-light' : ''}"
+        data-stage1-facts-date="${escapeHtml(date)}">
+        ${informational ? `<div class="fw-semibold mb-1">${escapeHtml(formatStage1DateKey(date))}
+            <span class="badge text-bg-light border ms-1">Πληροφοριακά</span></div>` : ''}
+        <div><strong>Καθεστώς:</strong> ${escapeHtml(item.employment_label || 'Άγνωστο')}</div>
+        <div><strong>Προδηλωμένο:</strong> ${escapeHtml(declaredIntervals || 'Δεν υπάρχει')}
+            / ${escapeHtml(formatAtomicRepoTransferHours(item.declared_hours || 0))} ώρες</div>
+        <div><strong>Πραγματική εργασία:</strong>
+            ${escapeHtml(formatAtomicRepoTransferHours(item.actual_work_hours || 0))} ώρες</div>
+        <div><strong>Κάρτες:</strong> ${escapeHtml(cardIntervals || 'Δεν υπάρχουν')}</div>
+        <div><strong>Ώρες βάσει καρτών:</strong>
+            ${escapeHtml(formatAtomicRepoTransferHours(item.card_hours || 0))} ώρες</div>
+        <div><strong>Τρέχων απολογιστικός χαρακτηρισμός:</strong>
+            ${escapeHtml(stage1CurrentClassificationLabel(item.current_apologistiko_classification))}</div>
+        ${renderStage1NoClassificationPreview(payload, date)}
+    </div>`;
+}
+
+function renderStage1ReviewDay(payload, date, relevantDates) {
+    const pending = relevantDates.includes(date);
+    return `<div class="weekly-hr-stage1-review-day d-flex flex-column gap-2">
+        ${pending ? renderStage1DayEditor(payload, date) : ''}
+        ${renderStage1DayFacts(payload, date, { informational: !pending })}
+    </div>`;
+}
+
+
+function isHrSelectableLeaveCategoryOption(item = {}) {
+    const value = String(
+        item.value || item.kodikos || item.id || ''
+    ).trim().toUpperCase();
+
+    const label = String(
+        item.label || item.text || item.perigrafh || ''
+    ).trim().toUpperCase();
+
+    return value !== 'POSSIBLE_LEAVE' &&
+        !label.includes('ΠΙΘΑΝΗ ΑΔΕΙΑ');
+}
+
 function stage1LeaveCategoryOptions(selected = '') {
-    const options = [...weeklyHrLeaveCategories];
-    if (selected && !options.some((item) => item.value === selected)) {
-        options.unshift({ value: selected, label: selected });
+    const safeSelected = isHrSelectableLeaveCategoryOption({ value: selected })
+        ? selected
+        : '';
+    const options = weeklyHrLeaveCategories.filter(isHrSelectableLeaveCategoryOption);
+    if (safeSelected && !options.some((item) => item.value === safeSelected)) {
+        options.unshift({ value: safeSelected, label: safeSelected });
     }
     return `<option value="">Κατηγορία άδειας</option>${options.map((item) =>
-        `<option value="${escapeHtml(item.value)}" ${item.value === selected ? 'selected' : ''}>${escapeHtml(formatStage1LeaveCategoryLabel(item.label))}</option>`).join('')}`;
+        `<option value="${escapeHtml(item.value)}" ${item.value === safeSelected ? 'selected' : ''}>${escapeHtml(formatStage1LeaveCategoryLabel(item.label))}</option>`).join('')}`;
 }
 
 function formatStage1LeaveCategoryLabel(label) {
@@ -7795,24 +8303,383 @@ async function loadWeeklyHrLeaveCategories() {
     const raw = Array.isArray(payload) ? payload : payload.results || payload.data || payload.items || payload.options || [];
     weeklyHrLeaveCategories = raw.map((item) => ({ value: String(item.value || item.kodikos || item.id || ''),
         label: String(item.label || item.text || `${item.kodikos || item.value || ''} - ${item.perigrafh || ''}`) }))
-        .filter((item) => item.value && item.value !== 'POSSIBLE_LEAVE');
+        .filter((item) => item.value && isHrSelectableLeaveCategoryOption(item));
 }
 
 function isWeeklyHrStage1Eligible(payload) {
+    const businessStatus = payload?.lifecycle_projection?.stages?.stage1?.business_status ||
+        payload?.stage1_status;
+    const hasUnsavedChanges = (payload?.rows || []).some((row) =>
+        weeklyHrStage1DayDrafts.has(String(row?._id)));
     return ['OPEN', 'STALE'].includes(payload?.stage1_status) &&
+        ['OPEN', 'STALE'].includes(businessStatus) &&
         payload?.workflow?.next_required_hr_stage !== 'BLOCKED' &&
+        !hasUnsavedChanges &&
         payload?.write_enabled === true;
 }
 
+function weeklyHrStage1BusinessStatus(payload) {
+    return payload?.lifecycle_projection?.stages?.stage1?.business_status ||
+        payload?.stage1_status || 'OPEN';
+}
+
+function weeklyHrBlockedExplanation(payload = {}) {
+    const authoritativeStage1 = payload?.lifecycle_projection?.stages?.stage1;
+    const blocked = authoritativeStage1
+        ? authoritativeStage1.business_status === 'BLOCKED'
+        : payload?.workflow?.next_required_hr_stage === 'BLOCKED';
+    if (!blocked) return '';
+    const reasons = new Set(authoritativeStage1
+        ? authoritativeStage1.blockers || []
+        : payload?.workflow?.blocking_reasons || []);
+    if (reasons.has('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION') ||
+        reasons.has('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE')) {
+        return 'Υπάρχει ορφανό χτύπημα κάρτας που πρέπει να επιλυθεί πριν συνεχιστεί ο έλεγχος.';
+    }
+    if (reasons.has('MULTIPLE_SOURCE_CANDIDATES') ||
+        reasons.has('MULTIPLE_TARGET_CANDIDATES') ||
+        reasons.has('MULTIPLE_EQUIVALENT_REPO_TRANSFER_CANDIDATES')) {
+        return 'Βρέθηκαν περισσότερες από μία πιθανές μεταφορές ρεπό και απαιτείται επιλογή HR.';
+    }
+    if (reasons.has('INCOMPLETE_NATURAL_WEEK') ||
+        reasons.has('MISSING_AUTHORITATIVE_EMPLOYMENT_FACTS') ||
+        reasons.has('MISSING_EFFECTIVE_EMPLOYMENT_PROFILE')) {
+        return 'Λείπουν απαραίτητα στοιχεία απασχόλησης για την εβδομάδα.';
+    }
+    return reasons.size > 0
+        ? 'Απαιτείται επίλυση των στοιχείων της εβδομάδας πριν συνεχιστεί ο έλεγχος.'
+        : '';
+}
+
+function weeklyHrHasOnlyOrphanBlockers(payload = {}) {
+    const authoritativeStage1 = payload?.lifecycle_projection?.stages?.stage1;
+    const reasons = [...new Set(authoritativeStage1
+        ? authoritativeStage1.blockers || []
+        : payload?.workflow?.blocking_reasons || [])];
+    const orphanReasons = new Set([
+        'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION',
+        'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'
+    ]);
+    return reasons.length > 0 && reasons.every((reason) => orphanReasons.has(reason));
+}
+
 function weeklyHrStage1Counts() {
-    const payloads = [...weeklyHrStage1Payloads.values()];
+    const payloads = visibleWeeklyHrPayloads();
+    const visiblePayloadSet = new Set(payloads);
+    const visibleKeys = new Set([...weeklyHrStage1Payloads]
+        .filter(([, payload]) => visiblePayloadSet.has(payload))
+        .map(([key]) => key));
     return { total: payloads.length,
-        open: payloads.filter((item) => item.stage1_status === 'OPEN').length,
-        stale: payloads.filter((item) => item.stage1_status === 'STALE').length,
-        completed: payloads.filter((item) => item.stage1_status === 'COMPLETED').length,
-        blocked: payloads.filter((item) => item.workflow?.next_required_hr_stage === 'BLOCKED').length,
-        selected: [...weeklyHrStage1Selected].filter((key) =>
+        open: payloads.filter((item) => weeklyHrStage1BusinessStatus(item) === 'OPEN').length,
+        stale: payloads.filter((item) => weeklyHrStage1BusinessStatus(item) === 'STALE').length,
+        completed: payloads.filter((item) =>
+            weeklyHrStage1BusinessStatus(item) === 'COMPLETED').length,
+        blocked: payloads.filter((item) =>
+            weeklyHrStage1BusinessStatus(item) === 'BLOCKED').length,
+        selected: [...weeklyHrStage1Selected].filter((key) => visibleKeys.has(key) &&
             isWeeklyHrStage1Eligible(weeklyHrStage1Payloads.get(key))).length };
+}
+
+const workflowStageNames = Object.freeze({
+    STAGE1: 'ΣΤΑΔΙΟ 1 — Χαρακτηρισμός Αδειών',
+    STAGE2: 'ΣΤΑΔΙΟ 2 — Μεταφορά Ρεπό',
+    STAGE3: 'ΣΤΑΔΙΟ 3 — Υπόλοιπες Πιθανές Άδειες',
+    STAGE4: 'ΣΤΑΔΙΟ 4 — Τελικός Εβδομαδιαίος Έλεγχος'
+});
+const workflowStageStatusLabels = Object.freeze({
+    COMPLETED: 'ΟΛΟΚΛΗΡΩΜΕΝΟ', ACTIVE: 'ΕΝΕΡΓΟ', OPEN: 'ΑΝΟΙΧΤΟ',
+    BLOCKED: 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ', STALE: 'ΜΗ ΕΓΚΥΡΟ / STALE', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
+});
+const workflowStageStatusClasses = Object.freeze({
+    COMPLETED: 'text-bg-success', ACTIVE: 'text-bg-primary', OPEN: 'text-bg-secondary',
+    BLOCKED: 'text-bg-danger', STALE: 'text-bg-warning', LOCKED: 'text-bg-secondary'
+});
+
+function compareLifecyclePendingItems(left = {}, right = {}) {
+    const leftDate = String(left.date || '9999-12-31');
+    const rightDate = String(right.date || '9999-12-31');
+    return leftDate.localeCompare(rightDate) ||
+        String(left.employee_kodikos || '').localeCompare(String(right.employee_kodikos || '')) ||
+        String(left.week_start || '').localeCompare(String(right.week_start || '')) ||
+        String(left.row_id || '').localeCompare(String(right.row_id || ''));
+}
+
+function derivePeriodLifecyclePresentation(payloads = []) {
+    const stageKeys = ['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'];
+    const rawProjections = (Array.isArray(payloads) ? payloads : [])
+        .map((payload) => ({ payload, lifecycle: payload?.lifecycle_projection }))
+        .filter(({ lifecycle }) => lifecycle?.stages);
+    const projectionsByWeeklyScope = new Map();
+    rawProjections.forEach((entry, index) => {
+        const scope = entry.payload?.scope || {};
+        const scopeKey = [scope.employee_kodikos, scope.week_start, scope.week_end]
+            .map((value) => String(value || '').trim()).join('|');
+        projectionsByWeeklyScope.set(scopeKey === '||' ? `UNSCOPED:${index}` : scopeKey, entry);
+    });
+    const projections = [...projectionsByWeeklyScope.values()];
+    const statusPriority = ['BLOCKED', 'STALE', 'OPEN', 'COMPLETED'];
+    const stages = Object.fromEntries(stageKeys.map((stageKey) => {
+        const key = stageKey.toLowerCase();
+        const entries = projections.map(({ payload, lifecycle }) => ({
+            payload,
+            stage: lifecycle.stages[key]
+        })).filter((entry) => entry.stage);
+        const businessStatus = statusPriority.find((status) =>
+            entries.some((entry) => entry.stage.business_status === status)) || 'COMPLETED';
+        return [stageKey, {
+            stage: stageKey,
+            business_status: businessStatus,
+            presentation_status: 'COMPLETED',
+            pending_count: entries.reduce((sum, entry) =>
+                sum + Number(entry.stage.pending_count || 0), 0),
+            pending_reasons: [...new Set(entries.flatMap(({ stage }) =>
+                stage.pending_reasons || []))],
+            pending_items: entries.flatMap(({ payload, stage }) => {
+                const scope = payload.scope || {};
+                const dates = [...new Set(stage.pending_dates || [])];
+                const pendingCount = Number(stage.pending_count || 0);
+                const common = { employee_kodikos: scope.employee_kodikos || '',
+                    employee_id: scope.employee_id || '',
+                    ypokatasthma: scope.ypokatasthma || '',
+                    week_start: scope.week_start || '', week_end: scope.week_end || '',
+                    period_start: scope.period_start || '', period_end: scope.period_end || '',
+                    reasons: [...(stage.pending_reasons || [])] };
+                if (!pendingCount) return [];
+                if (Array.isArray(stage.pending_items) && stage.pending_items.length) {
+                    return stage.pending_items.map((item) => ({ ...common, ...item,
+                        date: item.date || null, pending_count: 1 }));
+                }
+                const datedItems = dates.slice(0, pendingCount).map((date) => ({
+                    ...common, date, pending_count: 1
+                }));
+                const remainingCount = pendingCount - datedItems.length;
+                return remainingCount > 0
+                    ? [...datedItems, { ...common, date: null, pending_count: remainingCount }]
+                    : datedItems;
+            }),
+            persisted_statuses: [...new Set(entries.map(({ stage }) =>
+                stage.persisted_status).filter(Boolean))]
+        }];
+    }));
+    const firstUnresolvedIndex = stageKeys.findIndex((stageKey) =>
+        stages[stageKey].business_status !== 'COMPLETED');
+    stageKeys.forEach((stageKey, index) => {
+        const stage = stages[stageKey];
+        stage.pending_items.sort(compareLifecyclePendingItems);
+        if (firstUnresolvedIndex < 0 || index < firstUnresolvedIndex) {
+            stage.presentation_status = 'COMPLETED';
+        } else if (index > firstUnresolvedIndex) {
+            stage.presentation_status = 'LOCKED';
+        } else if (stage.business_status === 'BLOCKED') {
+            stage.presentation_status = 'BLOCKED';
+        } else if (stage.business_status === 'STALE') {
+            stage.presentation_status = 'STALE';
+        } else {
+            stage.presentation_status = 'ACTIVE';
+        }
+        stage.enabled = stage.presentation_status !== 'LOCKED';
+        stage.open_by_default = index === firstUnresolvedIndex;
+    });
+    const current = stageKeys.find((stageKey) => stages[stageKey].open_by_default) || null;
+    return {
+        current_stage: current,
+        total_pending_count: current ? stages[current].pending_count : 0,
+        requires_hr_action: Boolean(current),
+        stages
+    };
+}
+
+function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
+    const container = document.getElementById('policyPreviewGroupsContainer');
+    const stage = lifecycle?.stages?.STAGE2;
+    if (!container || String(container.innerHTML || '').trim() || !stage) return false;
+    if (Number(stage.pending_count || 0) <= 0) {
+        container.innerHTML = '<div class="text-muted small employment-review-stage2-empty">' +
+            'Δεν υπάρχουν εκκρεμότητες Μεταφοράς Ρεπό.</div>';
+        return true;
+    }
+    const items = Array.isArray(stage.pending_items) ? stage.pending_items : [];
+    const reasons = Array.isArray(stage.pending_reasons) ? stage.pending_reasons : [];
+    const hasDatedItems = items.some((item) => Boolean(item.date));
+    const rows = items.length
+        ? items.map((item) => `<tr>
+            <td>${escapeHtml(item.employee_kodikos)}</td>
+            <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(
+                formatStage1DateKey(item.week_end))}</td>
+            ${hasDatedItems ? `<td>${escapeHtml(item.date ? formatStage1DateKey(item.date) : '—')}</td>` : ''}
+            <td>${escapeHtml(item.pending_count || 0)}</td>
+            <td>${escapeHtml((item.reasons || []).map(getStage2LifecycleReasonLabel).join(' · '))}</td>
+        </tr>`).join('')
+        : `<tr><td colspan="${hasDatedItems ? 5 : 4}">${escapeHtml(reasons.map(
+            getStage2LifecycleReasonLabel).join(' · ') ||
+            `${stage.pending_count} εκκρεμότητες μεταφοράς ρεπό`)}</td></tr>`;
+    container.innerHTML = `
+        <section class="card border rounded employment-review-stage2-lifecycle-fallback"
+            aria-label="Εκκρεμότητες μεταφοράς ρεπό">
+            <div class="card-body py-2">
+                <div class="fw-semibold mb-2">Εκκρεμότητες Μεταφοράς Ρεπό</div>
+                <div class="table-responsive"><table class="table table-sm table-bordered mb-0">
+                    <thead><tr><th>Κωδικός</th><th>Εβδομάδα</th>
+                        ${hasDatedItems ? '<th>Ημερομηνία</th>' : ''}
+                        <th>Εκκρεμότητες</th><th>Αιτία</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>
+            </div>
+        </section>`;
+    return true;
+}
+
+function getStage2LifecycleReasonLabel(reasonCode) {
+    const key = String(reasonCode || '').trim();
+    return policyPreviewReasonLabels[key] || atomicRepoTransferDiagnosticLabels[key] ||
+        formatPolicyPreviewUnknownCode(key);
+}
+
+const STAGE3_NON_WORK_DEFAULT_REASON =
+    'Μετά από έλεγχο του προδηλωμένου ωραρίου, των πραγματικών στοιχείων απασχόλησης και του καθεστώτος μερικής/εκ περιτροπής απασχόλησης, η ημέρα χαρακτηρίζεται ως ΜΗ ΕΡΓΑΣΙΑ. Δεν προέκυψε άδεια, ασθένεια ή απουσία.';
+
+function stage3DeclaredText(item) {
+    const intervals = (item.declared_intervals || []).map((interval) =>
+        `${interval.start || '—'}–${interval.end || '—'}`).join(', ');
+    return `${intervals || 'Χωρίς διάστημα'} / ${formatPolicyPreviewHours(item.declared_hours || 0)} ώρες`;
+}
+
+function stage3ClassificationOptions(item) {
+    const labels = { LEAVE: 'ΑΔΕΙΑ', SICKNESS: 'ΑΣΘΕΝΕΙΑ', ABSENCE: 'ΑΠΟΥΣΙΑ',
+        NON_WORK: 'ΜΗ ΕΡΓΑΣΙΑ' };
+    return '<option value="">Επιλέξτε</option>' + (item.allowed_classifications || [])
+        .map((value) => `<option value="${value}">${labels[value]}</option>`).join('');
+}
+
+function renderWeeklyHrStage3(lifecycle) {
+    const container = document.getElementById('weeklyHrStage3Container');
+    if (!container) return;
+    const items = lifecycle?.stages?.STAGE3?.pending_items || [];
+    container.innerHTML = items.length
+        ? `<div class="table-responsive"><table class="table table-sm table-bordered mb-0 weekly-hr-stage3-table">
+            <thead><tr><th>Κωδικός</th><th>Ημερομηνία</th><th>Καθεστώς ημέρας</th>
+                <th>Προδηλωμένο ωράριο</th><th>Πραγματική εργασία</th><th>Αιτία</th>
+                <th>Τελικός χαρακτηρισμός</th><th>Ενέργεια</th></tr></thead>
+            <tbody>${items.map((item) => `<tr data-stage3-row-id="${escapeHtml(item.row_id)}">
+                <td>${escapeHtml(item.employee_kodikos)}</td>
+                <td>${escapeHtml(formatStage1DateKey(item.date))}</td>
+                <td>${escapeHtml(item.employment_label || 'Άγνωστο')}</td>
+                <td>${escapeHtml(stage3DeclaredText(item))}</td>
+                <td>${escapeHtml(`${formatPolicyPreviewHours(item.actual_work_hours || 0)} ώρες`)}</td>
+                <td>Απαιτείται τελική εξέταση πιθανής άδειας.</td>
+                <td><select class="form-select form-select-sm weekly-hr-stage3-classification"
+                    data-row-id="${escapeHtml(item.row_id)}">${stage3ClassificationOptions(item)}</select>
+                    <select class="form-select form-select-sm mt-1 weekly-hr-stage3-leave-category d-none"
+                        data-row-id="${escapeHtml(item.row_id)}">${stage1LeaveCategoryOptions('')}</select></td>
+                <td><button type="button" class="btn btn-sm btn-primary weekly-hr-stage3-resolve"
+                    data-row-id="${escapeHtml(item.row_id)}">Αποθήκευση</button></td>
+                </tr>`).join('')}</tbody>
+            </table></div>`
+        : '<div class="text-muted small">Δεν υπάρχουν υπόλοιπες πιθανές άδειες.</div>';
+}
+
+function findStage3PendingItem(rowId) {
+    return (currentEmploymentReviewLifecyclePresentation?.stages?.STAGE3?.pending_items || [])
+        .find((item) => String(item.row_id) === String(rowId));
+}
+
+async function submitWeeklyHrStage3Decision(rowId) {
+    const item = findStage3PendingItem(rowId);
+    const row = document.querySelector(`[data-stage3-row-id="${CSS.escape(String(rowId))}"]`);
+    const selection = row?.querySelector('.weekly-hr-stage3-classification')?.value || '';
+    const leaveCategory = row?.querySelector('.weekly-hr-stage3-leave-category')?.value || '';
+    if (!item || !selection) return;
+    if (selection === 'LEAVE' && !leaveCategory) {
+        await employmentReviewSwal({ icon: 'warning', title: 'Απαιτείται κατηγορία άδειας' });
+        return;
+    }
+    const prompt = await employmentReviewSwal({ title: 'Τελική επίλυση Stage 3',
+        input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
+        inputValue: selection === 'NON_WORK' ? STAGE3_NON_WORK_DEFAULT_REASON :
+            'Τελική εξέταση πιθανής άδειας στο Στάδιο 3.',
+        confirmButtonText: 'Αποθήκευση', cancelButtonText: 'Ακύρωση',
+        inputValidator: (value) => String(value || '').trim() ? undefined :
+            'Η αιτιολογία είναι υποχρεωτική.' });
+    if (!prompt.isConfirmed) return;
+    const button = row.querySelector('.weekly-hr-stage3-resolve');
+    button.disabled = true;
+    try {
+        const response = await fetch(
+            '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/resolve-day', {
+                method: 'POST', headers: { 'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken },
+                body: JSON.stringify({ ypokatasthma: item.ypokatasthma,
+                    employee_id: item.employee_id, week_start: item.week_start,
+                    week_end: item.week_end,
+                    ...(item.period_start && item.period_end ? {
+                        period_start: item.period_start, period_end: item.period_end
+                    } : {}), row_id: item.row_id,
+                    decision_date: item.date,
+                    expected_input_fingerprint: item.input_fingerprint,
+                    expected_stage3_version: Number(item.expected_stage3_version || 0),
+                    final_classification: selection, leave_category: leaveCategory,
+                    reason_or_notes: String(prompt.value || '').trim(),
+                    request_id: `stage3-ui:${crypto.randomUUID()}` })
+            });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message ||
+            'Η απόφαση Stage 3 δεν αποθηκεύτηκε.');
+        await refreshWeeklyHrStage1Scope({ ypokatasthma: item.ypokatasthma,
+            employee_id: item.employee_id, employee_kodikos: item.employee_kodikos,
+            week_start: item.week_start, week_end: item.week_end });
+        await employmentReviewSwal({ icon: 'success', title: 'Η απόφαση αποθηκεύτηκε.' });
+    } catch (error) {
+        await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία', text: error.message });
+        button.disabled = false;
+    }
+}
+
+function updateEmploymentReviewWorkflowPresentation() {
+    const payloads = visibleWeeklyHrPayloads().sort(compareWeeklyHrStage1Payloads);
+    const lifecycle = derivePeriodLifecyclePresentation(payloads);
+    currentEmploymentReviewLifecyclePresentation = lifecycle;
+    currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(payloads);
+    currentCanonicalDailyEmploymentTypeByKey = buildCanonicalDailyEmploymentTypeByKey(payloads);
+    if (currentReviewRows.length) renderCurrentReviewRows();
+    const summary = document.getElementById('employmentReviewWorkflowSummary');
+    if (!payloads.length) {
+        summary?.classList.add('d-none');
+        return lifecycle;
+    }
+    const currentLabel = lifecycle.current_stage
+        ? workflowStageNames[lifecycle.current_stage] : 'Όλα τα στάδια ολοκληρωμένα';
+    if (summary) {
+        summary.innerHTML = `<div class="d-flex flex-wrap gap-3 small">
+            <span><strong>Τρέχον Στάδιο:</strong> ${escapeHtml(currentLabel)}</span>
+            <span><strong>Συνολικές εκκρεμότητες:</strong> ${escapeHtml(lifecycle.total_pending_count)}</span>
+            <span><strong>Απαιτείται HR ενέργεια:</strong> ${lifecycle.requires_hr_action ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
+        </div>`;
+        summary.classList.remove('d-none');
+    }
+    Object.values(lifecycle.stages).forEach((stage) => {
+        const item = document.querySelector(`[data-workflow-stage="${stage.stage}"]`);
+        const button = item?.querySelector('.accordion-button');
+        const header = item?.querySelector('[data-workflow-stage-header]');
+        const collapseElement = item?.querySelector('.accordion-collapse');
+        if (!button || !header || !collapseElement) return;
+        const status = stage.presentation_status;
+        const pendingText = status === 'LOCKED' ? '' :
+            ` <span class="small ms-2">${stage.pending_count} εκκρεμότητες</span>`;
+        header.innerHTML = `${escapeHtml(workflowStageNames[stage.stage])}
+            <span class="badge ${workflowStageStatusClasses[status]} ms-2">${escapeHtml(
+                workflowStageStatusLabels[status])}</span>${pendingText}`;
+        button.disabled = status === 'LOCKED';
+        button.setAttribute('aria-disabled', status === 'LOCKED' ? 'true' : 'false');
+        if (status === 'LOCKED') {
+            bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false }).hide();
+        }
+    });
+    const activeStage = lifecycle.current_stage
+        ? document.querySelector(`[data-workflow-stage="${lifecycle.current_stage}"] .accordion-collapse`)
+        : null;
+    if (activeStage) bootstrap.Collapse.getOrCreateInstance(activeStage, { toggle: false }).show();
+    renderWeeklyHrStage3(lifecycle);
+    return lifecycle;
 }
 
 function renderWeeklyHrStage1BulkToolbar() {
@@ -7848,25 +8715,36 @@ function updateWeeklyHrStage1BulkToolbar() {
 function renderWeeklyHrStage1Card(payload) {
     const scope = payload.scope;
     const key = weeklyHrStage1Key(scope);
-    const stale = payload.stage1_status === 'STALE';
-    const statusText = { OPEN: 'Ανοιχτό', COMPLETED: 'Ολοκληρωμένο', STALE: 'Παρωχημένο' }[payload.stage1_status] || payload.stage1_status;
+    const businessStatus = weeklyHrStage1BusinessStatus(payload);
+    const stale = businessStatus === 'STALE';
+    const statusText = weeklyHrHasOnlyOrphanBlockers(payload)
+        ? 'Απαιτείται επίλυση ορφανού χτυπήματος' : ({ OPEN: 'Ανοιχτό', COMPLETED: 'Ολοκληρωμένο',
+        BLOCKED: 'Μπλοκαρισμένο', STALE: 'Παρωχημένο' }[businessStatus] || businessStatus);
+    const blockedExplanation = weeklyHrBlockedExplanation(payload);
     const eligible = isWeeklyHrStage1Eligible(payload);
     const selected = eligible && weeklyHrStage1Selected.has(key);
     const selection = `<input type="checkbox" class="form-check-input weekly-hr-stage1-select" aria-label="Επιλογή εβδομάδας" data-stage1-key="${escapeHtml(key)}" ${selected ? 'checked' : ''} ${eligible ? '' : 'disabled'}>`;
-    const nextStage = payload.stage1_status === 'COMPLETED' &&
-        payload.workflow?.next_required_hr_stage === 'REPO_RESOLUTION'
-        ? '<span class="badge bg-info text-dark ms-1">Επόμενο: Επίλυση ΡΕΠΟ</span>' : '';
     const warning = stale
         ? '<div class="small text-warning-emphasis">Τα ημερήσια δεδομένα άλλαξαν μετά την τελευταία ολοκλήρωση. Απαιτείται νέος έλεγχος του Σταδίου 1.</div>' : '';
     const indexWarning = payload.write_enabled ? '' :
         '<div class="small text-muted">Η λειτουργία εγγραφής δεν έχει ακόμη ενεργοποιηθεί στη βάση.</div>';
-    const dayEditors = stage1RelevantDates(payload).map((date) => renderStage1DayEditor(payload, date)).join('');
+    const relevantDates = stage1RelevantDates(payload);
+    const displayDates = payload.period_slice?.actionable_dates?.length
+        ? [...new Set([...relevantDates, ...payload.period_slice.actionable_dates])].sort()
+        : relevantDates;
+    const dayEditors = displayDates.map((date) =>
+        renderStage1ReviewDay(payload, date, relevantDates)).join('');
+    const sliceInfo = payload.period_slice ? `<div class="small mt-2">
+        <div><strong>Ημερομηνίες περιόδου:</strong> ${payload.period_slice.actionable_dates
+            .map(formatStage1DateKey).map(escapeHtml).join(', ')}</div>
+        <div class="text-muted"><strong>Μόνο εβδομαδιαίο πλαίσιο:</strong> ${payload.period_slice.context_only_dates
+            .map(formatStage1DateKey).map(escapeHtml).join(', ')}</div></div>` : '';
     return `<tr class="weekly-hr-stage1-card" data-stage1-key="${escapeHtml(key)}">
         <td>${selection}</td><td>${escapeHtml(scope.employee_kodikos)}</td>
         <td>${escapeHtml(payload.employee_name || '')}</td>
         <td class="text-nowrap">${escapeHtml(formatStage1DateKey(scope.week_start))}–${escapeHtml(formatStage1DateKey(scope.week_end))}</td>
-        <td><span class="badge bg-${stale ? 'warning text-dark' : payload.stage1_status === 'COMPLETED' ? 'success' : 'secondary'}">${escapeHtml(statusText)}</span>${nextStage}${warning}${indexWarning}</td>
-        <td><div class="d-flex flex-wrap gap-2">${dayEditors || '<span class="text-muted">—</span>'}</div></td>
+        <td><span class="badge bg-${stale ? 'warning text-dark' : businessStatus === 'COMPLETED' ? 'success' : businessStatus === 'BLOCKED' ? 'danger' : 'secondary'}">${escapeHtml(statusText)}</span>${blockedExplanation ? `<div class="small text-danger-emphasis mt-1">${escapeHtml(blockedExplanation)}</div>` : ''}${warning}${indexWarning}</td>
+        <td><div class="d-flex flex-column gap-2">${dayEditors || '<span class="text-muted">—</span>'}</div>${sliceInfo}</td>
     </tr>`;
 }
 
@@ -7876,15 +8754,29 @@ function renderWeeklyHrStage1Error(scope, error) {
     </td></tr>`;
 }
 
+function renderWeeklyHrStage1Presentation() {
+    const container = document.getElementById('weeklyHrStage1Container');
+    if (!container) return;
+    const payloads = visibleWeeklyHrPayloads();
+    const visibleKeys = new Set(payloads.map((payload) => weeklyHrStage1Key(payload.scope)));
+    [...weeklyHrStage1Selected].forEach((key) => {
+        if (!visibleKeys.has(key)) weeklyHrStage1Selected.delete(key);
+    });
+    const cards = payloads.sort(compareWeeklyHrStage1Payloads)
+        .map((payload) => renderWeeklyHrStage1Card(payload));
+    container.innerHTML = `${renderWeeklyHrStage1BulkToolbar()}<div class="table-responsive"><table class="table table-sm table-bordered align-middle weekly-hr-stage1-table">
+        <thead><tr><th>Επιλογή</th><th>Κωδικός</th><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Κατάσταση</th><th>Πιθανές άδειες</th></tr></thead>
+        <tbody>${cards.join('')}</tbody></table></div>`;
+}
+
 async function refreshWeeklyHrStage1Scope(scope) {
     const payload = await fetchWeeklyHrStage1(scope);
     (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
     weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
     weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
     if (!isWeeklyHrStage1Eligible(payload)) weeklyHrStage1Selected.delete(weeklyHrStage1Key(scope));
-    const existing = document.querySelector(`.weekly-hr-stage1-card[data-stage1-key="${CSS.escape(weeklyHrStage1Key(scope))}"]`);
-    if (existing) existing.outerHTML = renderWeeklyHrStage1Card(payload);
-    updateWeeklyHrStage1BulkToolbar();
+    renderWeeklyHrStage1Presentation();
+    updateEmploymentReviewWorkflowPresentation();
     return payload;
 }
 
@@ -7899,6 +8791,7 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
     weeklyHrStage1Selected.clear();
     weeklyHrStage1DaySelected.clear();
     weeklyHrStage1DayDrafts.clear();
+    currentReviewLifecycleProjectionReady = false;
     await loadWeeklyHrLeaveCategories().catch((error) => console.warn('[weeklyHrLeaveCategories]', error));
     const cards = await Promise.all([...scopes.values()].map(async (scope) => {
         try { const payload = await fetchWeeklyHrStage1(scope);
@@ -7915,6 +8808,8 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
     container.innerHTML = `${renderWeeklyHrStage1BulkToolbar()}<div class="table-responsive"><table class="table table-sm table-bordered align-middle weekly-hr-stage1-table">
         <thead><tr><th>Επιλογή</th><th>Κωδικός</th><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Κατάσταση</th><th>Πιθανές άδειες</th></tr></thead>
         <tbody>${cards.join('')}</tbody></table></div>`;
+    currentReviewLifecycleProjectionReady = true;
+    updateEmploymentReviewWorkflowPresentation();
 }
 
 function rerenderWeeklyHrStage1Rows() {
@@ -7996,6 +8891,19 @@ async function saveStage1DailyClassificationDrafts() {
 async function completeWeeklyHrStage1FromUi(scope, button) {
     const key = weeklyHrStage1Key(scope);
     if (weeklyHrStage1Submitting.has(key)) return;
+    const payload = weeklyHrStage1Payloads.get(key);
+    if (!isWeeklyHrStage1Eligible(payload)) {
+        const hasUnsavedChanges = (payload?.rows || []).some((row) =>
+            weeklyHrStage1DayDrafts.has(String(row?._id)));
+        if (hasUnsavedChanges) {
+            await employmentReviewSwal({
+                icon: 'warning',
+                title: 'Εκκρεμεί αποθήκευση',
+                text: 'Αποθηκεύστε πρώτα τους χαρακτηρισμούς και μετά ολοκληρώστε το Στάδιο 1.'
+            });
+        }
+        return;
+    }
     const prompt = await employmentReviewSwal({ title: 'Ολοκλήρωση Σταδίου 1',
         input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
         confirmButtonText: 'Ολοκλήρωση', cancelButtonText: 'Ακύρωση',
@@ -8017,6 +8925,62 @@ async function completeWeeklyHrStage1FromUi(scope, button) {
     finally { weeklyHrStage1Submitting.delete(key); if (button.isConnected) button.disabled = false; }
 }
 
+function renderWeeklyHrStage1BulkResult(result = {}) {
+    const successful = Number(result.completed_count || 0) +
+        Number(result.already_completed_count || 0);
+    const needsReview = Number(result.failed_count || 0) +
+        Number(result.blocked_count || 0);
+
+    const failures = (Array.isArray(result.results) ? result.results : [])
+        .filter((item) =>
+            !['COMPLETED', 'ALREADY_COMPLETED'].includes(item.status));
+
+    const summary =
+        `Ολοκληρώθηκαν ${successful} από ${Number(result.requested_count || 0)} εβδομάδες.` +
+        (needsReview ? ` ${needsReview} χρειάζονται επανέλεγχο.` : '');
+
+    if (!failures.length) {
+        return {
+            successful,
+            needsReview,
+            text: summary,
+            html: ''
+        };
+    }
+
+    const statusLabels = {
+        BLOCKED: 'Μπλοκαρισμένο',
+        STALE_RETRY_REQUIRED: 'Απαιτείται επανέλεγχος',
+        FAILED: 'Αποτυχία'
+    };
+
+    const rows = failures.map((item) => `<tr>
+        <td>${escapeHtml(formatStage1DateKey(item.scope?.week_start))}–${escapeHtml(
+            formatStage1DateKey(item.scope?.week_end))}</td>
+        <td>${escapeHtml(statusLabels[item.status] || item.status || 'Αποτυχία')}</td>
+        <td>${escapeHtml(item.message || item.code ||
+            'Η ολοκλήρωση της εβδομάδας απέτυχε.')}</td>
+    </tr>`).join('');
+
+    return {
+        successful,
+        needsReview,
+        text: summary,
+        html: `<p>${escapeHtml(summary)}</p><div class="table-responsive">
+            <table class="table table-sm table-bordered text-start mb-0 weekly-hr-stage1-bulk-results">
+                <thead>
+                    <tr>
+                        <th>Εβδομάδα</th>
+                        <th>Αποτέλεσμα</th>
+                        <th>Αιτία</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`
+    };
+}
+
 async function completeWeeklyHrStage1BulkFromUi() {
     if (weeklyHrStage1BulkSubmitting) return;
     const selectedKeys = [...weeklyHrStage1Selected].filter((key) =>
@@ -8024,7 +8988,9 @@ async function completeWeeklyHrStage1BulkFromUi() {
     if (!selectedKeys.length) return;
     const prompt = await employmentReviewSwal({ title: 'Μαζική ολοκλήρωση Σταδίου 1',
         input: 'textarea', inputLabel: 'Κοινή αιτιολογία', showCancelButton: true,
+        inputValue: 'Ολοκλήρωση ελέγχου Σταδίου 1. – Δεν προέκυψαν επιπλέον χαρακτηρισμοί άδειας, ασθένειας ή απουσίας.',
         confirmButtonText: 'Μαζική ολοκλήρωση', cancelButtonText: 'Ακύρωση',
+        customClass: { confirmButton: 'weekly-hr-stage1-bulk-confirm' },
         inputValidator: (value) => String(value || '').trim() ? undefined :
             'Η κοινή αιτιολογία είναι υποχρεωτική.' });
     if (!prompt.isConfirmed) return;
@@ -8051,13 +9017,12 @@ async function completeWeeklyHrStage1BulkFromUi() {
         });
         await Promise.all(scopes.map((scope) => refreshWeeklyHrStage1Scope(scope)
             .catch((error) => console.warn('[weeklyHrStage1BulkRefresh]', error))));
-        const successful = Number(result.completed_count || 0) +
-            Number(result.already_completed_count || 0);
-        const needsReview = Number(result.failed_count || 0) + Number(result.blocked_count || 0);
-        await employmentReviewSwal({ icon: needsReview ? 'warning' : 'success',
+        const presentation = renderWeeklyHrStage1BulkResult(result);
+        await employmentReviewSwal({ icon: presentation.needsReview ? 'warning' : 'success',
             title: 'Μαζική ολοκλήρωση Σταδίου 1',
-            text: `Ολοκληρώθηκαν ${successful} από ${result.requested_count} εβδομάδες.` +
-                (needsReview ? ` ${needsReview} χρειάζονται επανέλεγχο.` : '') });
+            ...(presentation.html
+                ? { html: presentation.html }
+                : { text: presentation.text }) });
     } catch (error) {
         await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία', text: error.message });
     } finally {
@@ -8067,8 +9032,13 @@ async function completeWeeklyHrStage1BulkFromUi() {
 }
 
 document.addEventListener('click', (event) => {
+    const stage3Resolve = event.target.closest('.weekly-hr-stage3-resolve');
+    if (stage3Resolve) {
+        submitWeeklyHrStage3Decision(stage3Resolve.dataset.rowId);
+        return;
+    }
     if (event.target.closest('.weekly-hr-select-all-days')) {
-        weeklyHrStage1Payloads.forEach((payload) => stage1RelevantDates(payload).forEach((date) => {
+        visibleWeeklyHrPayloads().forEach((payload) => stage1RelevantDates(payload).forEach((date) => {
             const row = stage1RowForDate(payload, date); if (row) weeklyHrStage1DaySelected.add(String(row._id));
         }));
         rerenderWeeklyHrStage1Rows(); return;
@@ -8108,6 +9078,13 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+    const stage3Classification = event.target.closest('.weekly-hr-stage3-classification');
+    if (stage3Classification) {
+        const stage3Row = stage3Classification.closest('[data-stage3-row-id]');
+        stage3Row?.querySelector('.weekly-hr-stage3-leave-category')?.classList.toggle(
+            'd-none', stage3Classification.value !== 'LEAVE');
+        return;
+    }
     const dayCheckbox = event.target.closest('.weekly-hr-stage1-day-select');
     if (dayCheckbox) {
         if (dayCheckbox.checked) weeklyHrStage1DaySelected.add(dayCheckbox.dataset.rowId);
@@ -8136,6 +9113,7 @@ document.addEventListener('change', (event) => {
 
 async function loadResults() {
     try {
+        currentReviewLifecycleProjectionReady = false;
         const advancedBranch = String(
             document.getElementById('ypokatasthma_stathera_advanced')?.value ||
             document.getElementById('ypokatasthma')?.tomselect?.getValue?.() ||
@@ -8324,6 +9302,8 @@ async function loadResults() {
             title: 'Σφάλμα',
             text: error.message
         });
+    } finally {
+        renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
     }
 }
 
@@ -8494,7 +9474,6 @@ function renderApologistikaFields(row) {
                         data-preselect="edit_kathgoria_adeias_apologistika_hidden"
                         data-preload-all="true"
                         data-pad-length="6">
-                        ${possibleLeave ? '<option value="POSSIBLE_LEAVE" selected>ΠΙΘΑΝΗ ΑΔΕΙΑ</option>' : ''}
                     </select>
                 </div>
         </div>
@@ -9216,7 +10195,7 @@ function initModalKathgoriaAdeiasTomSelect() {
                         value,
                         label
                     };
-                });
+                }).filter(isHrSelectableLeaveCategoryOption);
 
                 callback(options);
             } catch (error) {
@@ -9228,7 +10207,11 @@ function initModalKathgoriaAdeiasTomSelect() {
         onInitialize: function () {
             const value = hidden.dataset.presentationValue || hidden.value || '';
 
-            if (value) {
+            if (value === 'POSSIBLE_LEAVE' && adeiaCheckbox) {
+                adeiaCheckbox.checked = false;
+            }
+
+            if (value && isHrSelectableLeaveCategoryOption({ value })) {
                 this.addOption({
                     value,
                     label: categoryLabel(value)
@@ -9243,6 +10226,14 @@ function initModalKathgoriaAdeiasTomSelect() {
         },
 
         onChange: function (value) {
+            if (!isHrSelectableLeaveCategoryOption({ value })) {
+                hidden.value = '';
+                hidden.dataset.derivedPossibleLeave = 'false';
+                hidden.dataset.presentationValue = '';
+                this.clear(true);
+                if (adeiaCheckbox) adeiaCheckbox.checked = false;
+                return;
+            }
             hidden.value = value || '';
             hidden.dataset.derivedPossibleLeave = 'false';
             hidden.dataset.presentationValue = value || '';
@@ -9271,11 +10262,7 @@ function initModalKathgoriaAdeiasTomSelect() {
                 hidden.value = '';
                 if (hidden.dataset.derivedPossibleLeave === 'true') {
                     hidden.dataset.presentationValue = 'POSSIBLE_LEAVE';
-                    tomSelect.addOption({
-                        value: 'POSSIBLE_LEAVE',
-                        label: 'ΠΙΘΑΝΗ ΑΔΕΙΑ'
-                    });
-                    tomSelect.setValue('POSSIBLE_LEAVE', true);
+                    tomSelect.clear(true);
                 } else {
                     hidden.dataset.presentationValue = '';
                     tomSelect.clear(true);

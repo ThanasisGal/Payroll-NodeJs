@@ -120,6 +120,7 @@ async function loadOperationalState(page) {
             week_eos: '2026-06-07'
         }];
         currentLegacyDeviations = [];
+        currentReviewLifecycleProjectionReady = true;
         renderCurrentReviewRows();
         window.openWeekRenderedText = document.querySelector('#resultsTable tbody')?.innerText || '';
         document.getElementById('employmentPeriodControlPanel').classList.remove('d-none');
@@ -157,6 +158,13 @@ async function loadOperationalState(page) {
             currentAtomicRepoTransferProjection.actionable_issue_groups
         );
         bindActionableIssueEvents(summary);
+        document.getElementById('employmentReviewStage2Collapse').classList.add('show');
+        const stage2Button = document.querySelector(
+            '[data-bs-target="#employmentReviewStage2Collapse"]'
+        );
+        stage2Button.classList.remove('collapsed');
+        stage2Button.setAttribute('aria-expanded', 'true');
+        document.getElementById('employmentReviewStage4Collapse').classList.add('show');
         const scenarioDetails = document.createElement('div');
         scenarioDetails.id = 'scenarioDetailsTestHost';
         scenarioDetails.innerHTML = renderScenarioDetailsSection({
@@ -318,7 +326,7 @@ async function weeklyDeviationStickyInteraction(page) {
 async function weeklyDeviationColumnWidths(page) {
     return page.evaluate(() => {
         const table = document.querySelector('#resultsTable .weekly-deviation-table');
-        const typeCell = table.querySelector(':scope > tbody > tr > .weekly-deviation-employment-type');
+        const typeCell = table.querySelector(':scope > tbody > tr > td:nth-child(3)');
         const commentCell = table.querySelector(':scope > tbody > tr > .weekly-deviation-comment');
         const commentStyle = getComputedStyle(commentCell);
         const lineHeight = parseFloat(commentStyle.lineHeight) ||
@@ -395,8 +403,10 @@ async function canonicalDecisionGatingContract(page) {
         });
         const stale = renderWith({
             effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
-            calculation: { authoritative_result: true },
-            allowed_actions: { record_decision: true }
+            calculation: { authoritative_result: false },
+            allowed_actions: { record_decision: false,
+                record_stale_canonical_decision: true,
+                calculate: false, repo_transfer: false }
         });
         currentEmploymentPeriodControl = {
             effective_mode: 'NORMAL', calculation: { authoritative_result: true },
@@ -557,7 +567,7 @@ async function modalGeometry(page) {
             assert.strictEqual(tableContract.subtotalLogicalColumns, 13);
             assert.strictEqual(tableContract.after.filter((text) => text === 'Απουσίες').length, 1);
             assert.strictEqual(tableContract.after.filter((text) => text === 'Προδηλωμένο').length, 1);
-            assert.ok(tableContract.weeklyHeaders.includes('Τύπος απασχόλησης'));
+            assert.ok(tableContract.weeklyHeaders.includes('Καθεστώς'));
             assert.ok(!tableContract.weeklyHeaders.includes('Profile'));
             assert.strictEqual(tableContract.weeklyRowCount, 9);
             assert.strictEqual(tableContract.possibleLeaveCell, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
@@ -623,9 +633,11 @@ async function modalGeometry(page) {
             });
             assert.strictEqual(weeklySticky.headerCellsReadable, true);
             assert.deepStrictEqual(weeklySticky.headerTexts, [
-                'Από', 'Έως', 'Αναμενόμενα ρεπό', 'Πραγματικά ρεπό',
-                'Προτεινόμενα/επιλυμένα ρεπό', 'Πραγματικές ημέρες εργασίας',
-                '6η ημέρα', '7η ημέρα/παράβαση', 'Τύπος απασχόλησης', 'Σχόλιο'
+                'Από', 'Έως', 'Καθεστώς', 'Συμβατικές ημέρες εργασίας',
+                'Αναμενόμενες ημέρες ανάπαυσης / μη εργασίας',
+                'Πραγματικές ημέρες εργασίας',
+                'Τελικές ημέρες ανάπαυσης / μη εργασίας',
+                '6η ημέρα', '7η ημέρα / παράβαση', 'Σχόλιο'
             ]);
             assert.ok(weeklySticky.verticalAfter.title.top >= weeklySticky.verticalAfter.subtotal.bottom - 1);
             assert.ok(weeklySticky.verticalAfter.header.top >= weeklySticky.verticalAfter.title.bottom - 1);
@@ -664,7 +676,7 @@ async function modalGeometry(page) {
             assert.deepStrictEqual(decisionGating, {
                 preCalculation: 0,
                 postCalculation: 9,
-                stale: 0
+                stale: 9
             });
             const actionButton = await canonicalDecisionButtonStyles(page);
             assert.strictEqual(actionButton.text, 'Απόφαση για την ομάδα');
@@ -700,7 +712,7 @@ async function modalGeometry(page) {
         const possibleLeaveModal = await possibleLeaveModalContract(page);
         assert.ok(possibleLeaveModal.visibleText.includes('ΠΙΘΑΝΗ ΑΔΕΙΑ'));
         assert.ok(!possibleLeaveModal.visibleText.includes('POSSIBLE_LEAVE'));
-        assert.strictEqual(possibleLeaveModal.categoryOption, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+        assert.strictEqual(possibleLeaveModal.categoryOption, '');
         assert.strictEqual(possibleLeaveModal.leaveChecked, false);
         assert.strictEqual(possibleLeaveModal.persistedValue, '');
         assert.strictEqual(possibleLeaveModal.derived, 'true');
