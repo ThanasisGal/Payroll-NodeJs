@@ -104,6 +104,72 @@ result = resolveWeeklyCanonicalDecisionAnalysis({ automaticAnalysis: base.analys
 assert.equal(result.analysis.status, 'READY');
 assert.deepEqual(result.analysis.canonicalRepoDayIdentities, ['2026-08-08', '2026-08-09']);
 
+const actualJuneDates = ['08', '09', '10', '11', '12', '13', '14'];
+const actualJuneCards = [
+    ['12:37', '22:18'], ['15:12', '22:17'], ['15:15', '22:07'], ['', ''],
+    ['13:35', '23:07'], ['15:44', '22:35'], ['14:51', '']
+];
+const actualJuneHours = [9.18, 6.58, 6.37, 0, 9.03, 6.35, 8];
+const actualJuneRows = actualJuneDates.map((day, index) => ({
+    _id: `june-row-${day}`, team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+    kodikos: '0004', hmeromhnia: `2026-06-${day}`, kathgoria_ergasias: day === '10' ? 'ΑΝ' : 'ΕΡΓ',
+    kathgoria_ergasias_apologistika: day === '10' ? 'ΕΡΓ' : '', repo: day === '10',
+    repo_apologistika: false, ores_ergasias: day === '10' ? 0 : 8,
+    ores_ergasias_apologistika: actualJuneHours[index],
+    cards_ores_ergasias: index === 6 ? 0 : actualJuneHours[index] > 0
+        ? actualJuneHours[index] + 0.5 : 0,
+    cards_apo_ora_01: actualJuneCards[index][0], cards_eos_ora_01: actualJuneCards[index][1],
+    apo_ora_01: day === '14' ? '14:51' : '', eos_ora_01: day === '14' ? '22:51' : '',
+    ...(day === '14' ? { orphan_card_resolution: {
+        status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
+    } } : {})
+}));
+const juneProfile = employee({ kodikos: '0004' });
+const juneWeek = { naturalWeekStart: '2026-06-08', naturalWeekEnd: '2026-06-14',
+    weekStart: '2026-06-08', weekEnd: '2026-06-14' };
+const juneAutomatic = analyzeWeeklySixthSeventhDay({
+    weekRows: actualJuneRows, effectiveProfile: juneProfile, hourlyRate: 10
+});
+assert.equal(juneAutomatic.status, 'READY');
+assert.equal(juneAutomatic.sixthDay.hmeromhnia, '2026-06-14');
+const historicalJuneAutomatic = { ...juneAutomatic,
+    status: 'NEEDS_HR_DECISION',
+    reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'],
+    canonicalRepoDayIdentities: [], sixthDay: null, seventhDay: null };
+const historicalJuneInput = buildWeeklyCanonicalDecisionSnapshotInput({
+    team: 'THA', company_kod: 'company', employee: juneProfile, week: juneWeek,
+    weekRows: actualJuneRows, effectiveProfile: juneProfile, profileHistory: [],
+    automaticAnalysis: historicalJuneAutomatic, appliedProtectionContext: { entriesByRowId: {} }
+});
+const juneInput = buildWeeklyCanonicalDecisionSnapshotInput({
+    team: 'THA', company_kod: 'company', employee: juneProfile, week: juneWeek,
+    weekRows: actualJuneRows, effectiveProfile: juneProfile, profileHistory: [],
+    automaticAnalysis: juneAutomatic, appliedProtectionContext: { entriesByRowId: {} }
+});
+const juneDecision = record(historicalJuneInput, 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC', {
+    current_repo_identities: ['2026-06-10', '2026-06-11'], applied_execution_id: null
+}, { employee_kodikos: '0004', week_start: new Date('2026-06-08'),
+    week_end: new Date('2026-06-14') });
+result = resolveWeeklyCanonicalDecisionAnalysis({ automaticAnalysis: juneAutomatic,
+    snapshotInput: juneInput, decisionRecords: [juneDecision], weekRows: actualJuneRows,
+    effectiveProfile: juneProfile, employee: juneProfile });
+assert.equal(result.applicability, 'APPLICABLE');
+assert.ok(!result.analysis.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
+assert.deepEqual(result.analysis.canonicalRepoDayIdentities, ['2026-06-10', '2026-06-11']);
+assert.equal(result.analysis.status, 'READY');
+
+const materiallyChangedJuneRows = actualJuneRows.map((row) => ({ ...row }));
+materiallyChangedJuneRows[3].astheneia_apologistika = true;
+const changedInput = buildWeeklyCanonicalDecisionSnapshotInput({
+    team: 'THA', company_kod: 'company', employee: juneProfile, week: juneWeek,
+    weekRows: materiallyChangedJuneRows, effectiveProfile: juneProfile, profileHistory: [],
+    automaticAnalysis: juneAutomatic, appliedProtectionContext: { entriesByRowId: {} }
+});
+result = resolveWeeklyCanonicalDecisionAnalysis({ automaticAnalysis: juneAutomatic,
+    snapshotInput: changedInput, decisionRecords: [juneDecision], weekRows: materiallyChangedJuneRows,
+    effectiveProfile: juneProfile, employee: juneProfile });
+assert.equal(result.applicability, 'STALE');
+
 const ambiguousClassification = record(base.input, 'CLASSIFICATION_BY_DATE', {
     classification_by_date: { '2026-08-08': 'SIXTH', '2026-08-09': 'SEVENTH' }
 });
