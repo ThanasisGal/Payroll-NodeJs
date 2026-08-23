@@ -35,6 +35,15 @@ const {
 
 const MAX_HISTORY_RECORDS = 100;
 const MAX_DECISION_HISTORY = 100;
+const CANONICAL_EMPLOYEE_PROFILE_FIELDS = [
+    '_id', 'kodikos', 'ypokatasthma',
+    'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas',
+    'mo_oron_hmerhsias_ergasias', 'kathestos_apasxolhshs',
+    'typos_apasxolhshs', 'typos_ebdomadas', 'pososto_prosayxhshs_6hs_hmeras',
+    'nomimoOromisthio', 'pragmatikoOromisthio', 'employment_profile_source',
+    'eidikh_kathgoria_ergazomenoy', 'eidikh_periptosh',
+    'dialleima_se_lepta', 'dialleima_entos_ektos_orarioy'
+].join(' ');
 const HISTORY_SELECT_FIELDS = [
     'kodikos', 'aa_eggrafhs', 'hmeromhnia_allaghs_symbashs',
     'hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos',
@@ -43,7 +52,9 @@ const HISTORY_SELECT_FIELDS = [
     'mo_oron_hmerhsias_ergasias', 'kathestos_apasxolhshs',
     'typos_apasxolhshs', 'typos_ebdomadas', 'pososto_prosayxhshs_6hs_hmeras',
     'nomimoOromisthio', 'pragmatikoOromisthio', 'employment_profile_source',
-    'afora_allagh_oron_ergasias', 'createdAt'
+    'afora_allagh_oron_ergasias', 'afora_allagh_dialleimatos',
+    'hmeromhnia_isxyos_dialleimatos_apo',
+    'dialleima_se_lepta', 'dialleima_entos_ektos_orarioy', 'createdAt'
 ].join(' ');
 const ALLOWED_COMMAND_FIELDS = new Set([
     'ypokatasthma', 'employee_kodikos', 'week_start', 'request_id',
@@ -168,7 +179,8 @@ function supportedActions(reasons = [], context = {}) {
     const values = new Set(reasons);
     return {
         profile: values.has('PROFILE_CHANGED_INSIDE_WEEK'),
-        card_documentary: values.has('CARD_VERIFICATION_PENDING'),
+        card_documentary: values.has('CARD_VERIFICATION_PENDING') ||
+            values.has('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'),
         repo_identities: values.has('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC') &&
             context.appliedExecutions.length === 0 &&
             (context.currentRepoCandidateDates || []).length >= 2,
@@ -408,6 +420,7 @@ function projectCurrentContext(context, indexReadiness) {
 module.exports = {
     MAX_HISTORY_RECORDS,
     MAX_DECISION_HISTORY,
+    CANONICAL_EMPLOYEE_PROFILE_FIELDS,
     HISTORY_SELECT_FIELDS,
     ALLOWED_COMMAND_FIELDS,
     normalizeBranch,

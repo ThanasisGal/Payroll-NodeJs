@@ -6,6 +6,7 @@ const {
     getCompanyHolidayFlags,
     buildArgiesByDateKey,
     getProfileDateForDeviation,
+    getDailyRepoProfileInfo,
     getWeeklyRepoProfileInfo,
     buildNoCardsDisplayContext,
     resolveNoCardsDisplayStatus
@@ -112,6 +113,30 @@ function testCanonicalWeeklyProfile() {
         changed.previousProfileDate,
         getProfileDateForDeviation(changed.previousProfile, week.weekStart)
     );
+}
+
+function testDailyEmploymentProfileForMixedJune0014() {
+    const history = [
+        { _id: 'partial', afora_allagh_oron_ergasias: true,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-01',
+            hmeromhnia_isxyos_oron_ergasias_eos: '2026-06-14',
+            kathestos_apasxolhshs: '1' },
+        { _id: 'full', afora_allagh_oron_ergasias: true,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-15',
+            kathestos_apasxolhshs: '0' }
+    ];
+    const partial = getDailyRepoProfileInfo({ row: { hmeromhnia: '2026-06-14' },
+        istorikoRows: history, ergazomenos: { kodikos: '0014' } });
+    const full = getDailyRepoProfileInfo({ row: { hmeromhnia: '2026-06-15' },
+        istorikoRows: history, ergazomenos: { kodikos: '0014' } });
+    assert.equal(partial.employmentType, '1');
+    assert.equal(partial.expectedRepoCategory, 'ΜΕ');
+    assert.equal(full.employmentType, '0');
+    assert.equal(full.expectedRepoCategory, 'ΑΝ');
+    assert.equal(getDailyRepoProfileInfo({ row: { hmeromhnia: '2026-06-15',
+        kathestos_apasxolhshs_hmeras: '2' }, istorikoRows: history }).expectedRepoCategory, 'ΜΕ');
+    assert.equal(getDailyRepoProfileInfo({ row: { hmeromhnia: '2026-06-14',
+        kathestos_apasxolhshs_hmeras: '' }, istorikoRows: history }).employmentType, '1');
 }
 
 function naturalWeek(start = '2026-06-08') {
@@ -365,6 +390,7 @@ async function run() {
     testNoCardsDisplayRequiresNoCardEvidence();
     testProfileDateForDeviationPrecedenceAndFallbacks();
     testCanonicalWeeklyProfile();
+    testDailyEmploymentProfileForMixedJune0014();
     testContractualWeeklyRepoResolution();
     test0002ThroughAuthoritativeProjectionPath();
     testControllerImportsSharedProfileDateHelper();
