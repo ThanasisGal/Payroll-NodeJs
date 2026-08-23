@@ -135,14 +135,22 @@ function resolveStage1Status({ current_fingerprint, persisted_stage1_state } = {
         !text(persisted.completion_fingerprint)) {
         return STAGE1_DERIVED_STATUS.OPEN;
     }
-    return text(persisted.completion_fingerprint) === text(current_fingerprint)
+    const applicableFingerprint = text(persisted.effective_fingerprint) ||
+        text(persisted.completion_fingerprint);
+    return applicableFingerprint === text(current_fingerprint)
         ? STAGE1_DERIVED_STATUS.COMPLETED
         : STAGE1_DERIVED_STATUS.STALE;
+}
+
+function applicableStage1Fingerprint(persisted_stage1_state = {}) {
+    return text(persisted_stage1_state?.effective_fingerprint) ||
+        text(persisted_stage1_state?.completion_fingerprint);
 }
 
 module.exports = {
     FINGERPRINT_VERSION,
     STAGE1_DERIVED_STATUS,
     buildStage1Fingerprint,
-    resolveStage1Status
+    resolveStage1Status,
+    applicableStage1Fingerprint
 };

@@ -4,7 +4,8 @@ const assert = require('assert/strict');
 const {
     STAGE1_DERIVED_STATUS,
     buildStage1Fingerprint,
-    resolveStage1Status
+    resolveStage1Status,
+    applicableStage1Fingerprint
 } = require('./apasxoliseisStage1FingerprintService');
 
 const dates = ['01', '02', '03', '04', '05', '06', '07'].map((day) => `2026-06-${day}`);
@@ -86,6 +87,27 @@ assert.equal(resolveStage1Status({ current_fingerprint: originalFingerprint,
     persisted_stage1_state: persisted }), STAGE1_DERIVED_STATUS.COMPLETED);
 assert.equal(resolveStage1Status({ current_fingerprint: 'b'.repeat(64),
     persisted_stage1_state: persisted }), STAGE1_DERIVED_STATUS.STALE);
+const successor = { ...persisted, effective_fingerprint: 'b'.repeat(64) };
+assert.equal(applicableStage1Fingerprint(persisted), originalFingerprint);
+assert.equal(applicableStage1Fingerprint(successor), 'b'.repeat(64));
+assert.equal(resolveStage1Status({ current_fingerprint: 'b'.repeat(64),
+    persisted_stage1_state: successor }), STAGE1_DERIVED_STATUS.COMPLETED);
+assert.equal(resolveStage1Status({ current_fingerprint: 'c'.repeat(64),
+    persisted_stage1_state: successor }), STAGE1_DERIVED_STATUS.STALE);
+for (const canonicalStage2Row of [
+    { ...possibleLeave(), apologistiko_biblio: true, repo_apologistika: false,
+        kathgoria_ergasias_apologistika: 'ΜΕ',
+        kathgoria_adeias_apologistika: '', apousia_apologistika: false },
+    { ...possibleLeave(), apologistiko_biblio: true, repo_apologistika: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        kathgoria_adeias_apologistika: '', apousia_apologistika: false }
+]) {
+    const postStage2Fingerprint = buildStage1Fingerprint(week(canonicalStage2Row)).fingerprint;
+    assert.equal(resolveStage1Status({ current_fingerprint: postStage2Fingerprint,
+        persisted_stage1_state: { ...persisted,
+            effective_fingerprint: postStage2Fingerprint } }),
+    STAGE1_DERIVED_STATUS.COMPLETED);
+}
 assert.equal(JSON.stringify(persisted), snapshotBeforeResolution);
 
 console.log('Stage-1 fingerprint/status tests passed');
