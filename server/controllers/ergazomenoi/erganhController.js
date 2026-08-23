@@ -2580,7 +2580,7 @@ function buildWeeklyIllegalOvertimeUpdate(
             holiday: toHours(classified.holiday),
             holidayNight: toHours(classified.holidayNight)
         },
-        options
+        { ...options, authoritativeTotalHours: Number(illegalOvertimeHours || 0) }
     );
 }
 

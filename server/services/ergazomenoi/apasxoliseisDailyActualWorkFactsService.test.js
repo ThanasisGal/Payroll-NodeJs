@@ -80,6 +80,16 @@ assert.deepStrictEqual(
     expected({ category: 'ΑΣΘΕΝΕΙΑ', cardHours: 6, actualWorkHours: 6, leaveHours: 0, holidayCreditedHours: 0, sicknessHours: 2, countsAsActualWorkDay: true, reasons: [], warnings: ['MIXED_WORK_AND_SICKNESS'] })
 );
 assert.strictEqual(facts('ΑΣΘΕΝΕΙΑ', 8, 0, { astheneia: true }).sicknessHours, 8);
+const finalizedAbsence = facts('ΕΡΓ', 8, 0, { apousia_apologistika: true });
+assert.strictEqual(finalizedAbsence.category, 'ΑΠΟΥΣΙΑ');
+assert.strictEqual(finalizedAbsence.actualWorkHours, 0);
+assert.strictEqual(finalizedAbsence.countsAsActualWorkDay, false);
+const finalizedAbsenceWithWork = facts('ΕΡΓ', 8, 4, {
+    apousia_apologistika: true
+});
+assert.strictEqual(finalizedAbsenceWithWork.category, 'ΑΠΟΥΣΙΑ');
+assert.strictEqual(finalizedAbsenceWithWork.actualWorkHours, 4);
+assert.strictEqual(finalizedAbsenceWithWork.countsAsActualWorkDay, true);
 assert.strictEqual(facts('ΕΡΓ', 8, 8).actualWorkHours, 8);
 assert.strictEqual(facts('ΕΡΓ', 8, 0).actualWorkHours, 0);
 assert.ok(facts('ΑΔΕΙΑ', 8, 9, { adeia: true }).warnings.includes('CARD_HOURS_EXCEED_DECLARED_HOURS'));

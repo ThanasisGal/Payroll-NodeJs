@@ -45,6 +45,7 @@ function categoryOf(row = {}) {
     if (row.astheneia_apologistika === true || row.astheneia === true) return 'ΑΣΘΕΝΕΙΑ';
     if (row.argia_apologistika === true || row.argia === true) return 'ΑΡΓΙΑ';
     if (row.adeia_apologistika === true || row.adeia === true) return 'ΑΔΕΙΑ';
+    if (row.apousia_apologistika === true) return 'ΑΠΟΥΣΙΑ';
     return String(
         row.kathgoria_ergasias_apologistika || row.kathgoria_ergasias || ''
     ).trim().toUpperCase();
@@ -208,7 +209,7 @@ function resolveDailyActualWorkFacts(row = {}, {
         if (actualWorkHours > 0 && sicknessHours > 0) {
             warnings.push(WARNING.MIXED_WORK_AND_SICKNESS);
         }
-    } else if (category === 'ΑΝ' || category === 'ΜΕ') {
+    } else if (category === 'ΑΝ' || category === 'ΜΕ' || category === 'ΑΠΟΥΣΙΑ') {
         actualWorkHours = effectiveWorkedHours;
     } else {
         reasons.push(REASON.UNSUPPORTED_DAILY_CATEGORY);

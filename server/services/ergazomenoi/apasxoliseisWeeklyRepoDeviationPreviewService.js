@@ -29,6 +29,7 @@ const STATUS = Object.freeze({
     NEEDS_HR_DECISION: 'NEEDS_HR_DECISION'
 });
 const RESOLVED_REPO_TRANSFER_CANDIDATE_REASONS = new Set([
+    'SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN',
     'TARGET_LOCKED',
     'TARGET_LEAVE_OR_SICKNESS',
     'TARGET_ALREADY_PROCESSED',
@@ -51,19 +52,35 @@ function employeeKey(row = {}) {
 
 function attachSixthDayPresentationToRows(rows = [], deviations = []) {
     const sixthDayByEmployeeAndDate = new Map();
+    const seventhDayByEmployeeAndDate = new Map();
     for (const deviation of Array.isArray(deviations) ? deviations : []) {
         const deviationEmployeeKey = employeeKey(deviation);
         const sixthDayDate = dateKeyUtc(deviation?.sixth_day_date);
-        if (!deviationEmployeeKey || !sixthDayDate) continue;
-
-        sixthDayByEmployeeAndDate.set(`${deviationEmployeeKey}|${sixthDayDate}`, {
-            rate: deviation.sixth_day_premium_rate ?? null,
-            status: deviation.sixth_seventh_day_status || ''
-        });
+        const seventhDayDate = dateKeyUtc(deviation?.seventh_day_date);
+        if (!deviationEmployeeKey) continue;
+        if (sixthDayDate) {
+            sixthDayByEmployeeAndDate.set(`${deviationEmployeeKey}|${sixthDayDate}`, {
+                rate: deviation.sixth_day_premium_rate ?? null,
+                status: deviation.sixth_seventh_day_status || ''
+            });
+        }
+        if (
+            seventhDayDate &&
+            deviation.sixth_seventh_day_status === STATUS.READY &&
+            deviation.requires_new_hr_decision !== true
+        ) {
+            seventhDayByEmployeeAndDate.set(
+                `${deviationEmployeeKey}|${seventhDayDate}`,
+                { severity: 'SERIOUS_VIOLATION' }
+            );
+        }
     }
 
     return (Array.isArray(rows) ? rows : []).map((row) => {
         const sixthDay = sixthDayByEmployeeAndDate.get(
+            `${employeeKey(row)}|${dateKeyUtc(row?.hmeromhnia)}`
+        );
+        const seventhDay = seventhDayByEmployeeAndDate.get(
             `${employeeKey(row)}|${dateKeyUtc(row?.hmeromhnia)}`
         );
 
@@ -71,7 +88,9 @@ function attachSixthDayPresentationToRows(rows = [], deviations = []) {
             ...row,
             is_sixth_day: Boolean(sixthDay),
             sixth_day_premium_rate: sixthDay?.rate ?? null,
-            sixth_day_policy_status: sixthDay?.status || ''
+            sixth_day_policy_status: sixthDay?.status || '',
+            is_seventh_day: Boolean(seventhDay),
+            seventh_day_severity: seventhDay?.severity || ''
         };
     });
 }
