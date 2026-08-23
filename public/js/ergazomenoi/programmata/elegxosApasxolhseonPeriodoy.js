@@ -1352,8 +1352,49 @@ function renderSixthDayCardsBadge(row = {}) {
     return `<span class="badge text-bg-warning d-block mt-1 review-sixth-day-badge">6η ημέρα · ${escapeHtml(rateLabel)}</span>`;
 }
 
+function resolveSeventhDayRowPresentation(
+    row = {},
+    lifecyclePayloads = [...weeklyHrStage1Payloads.values()]
+) {
+    const unresolvedPresentation = {
+        ...row,
+        is_seventh_day: false,
+        seventh_day_severity: null
+    };
+    const rowDate = stage1DateKey(row.hmeromhnia);
+    const employeeKodikos = String(row.kodikos || row.employee_kodikos || '').trim();
+    const branch = String(row.ypokatasthma || '').trim();
+    if (!rowDate || !employeeKodikos || !branch) return unresolvedPresentation;
+
+    const payload = lifecyclePayloads.find((item) => {
+        const scope = item?.scope || {};
+        const stage4 = item?.lifecycle_projection?.stages?.stage4;
+        const analysis = stage4?.final_weekly_analysis;
+        const seventhDay = analysis?.seventhDay;
+        return String(scope.employee_kodikos || '').trim() === employeeKodikos &&
+            String(scope.ypokatasthma || '').trim() === branch &&
+            stage4?.final_weekly_analysis_available === true &&
+            analysis?.status === 'READY' &&
+            seventhDay?.severity === 'SERIOUS_VIOLATION' &&
+            stage1DateKey(seventhDay?.hmeromhnia) === rowDate;
+    });
+    const seventhDay = payload?.lifecycle_projection?.stages?.stage4
+        ?.final_weekly_analysis?.seventhDay;
+    if (!seventhDay) return unresolvedPresentation;
+
+    return {
+        ...row,
+        is_seventh_day: true,
+        seventh_day_severity: seventhDay.severity,
+        seventh_day_classification: seventhDay.classification,
+        seventh_day_illegal_overtime_hours: seventhDay.illegalOvertimeHours
+    };
+}
+
 function renderSeventhDayBadges(row = {}) {
-    if (row.is_seventh_day !== true || row.seventh_day_severity !== 'SERIOUS_VIOLATION') {
+    const presentation = resolveSeventhDayRowPresentation(row);
+    if (presentation.is_seventh_day !== true ||
+        presentation.seventh_day_severity !== 'SERIOUS_VIOLATION') {
         return '';
     }
     return '<div class="mt-1 review-seventh-day-badges">' +
