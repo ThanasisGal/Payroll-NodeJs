@@ -81,6 +81,8 @@ assert.strictEqual(staleProjection.has_authoritative_calculation_result, false);
 const serviceSource = fs.readFileSync(__filename.replace('.test.js', '.js'), 'utf8');
 assert.ok(serviceSource.includes('session.withTransaction'));
 assert.ok(serviceSource.includes('status: previousStatus, version: beforeVersion'));
+assert.ok(serviceSource.includes("state.effective_mode === MODES.CORRECTIVE_ONLY"));
+assert.ok(serviceSource.includes("periodError('PERIOD_CONTROL_CORRECTIVE_ONLY'"));
 
 mongoose.set('sanitizeFilter', true);
 const unsafeMissingFieldQuery = PeriodControlModel.findOneAndUpdate({
@@ -377,7 +379,14 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
         periodControlModel: deadlineCrossing.model, indexGuard, transactionRunner });
     await assert.rejects(() => acquirePeriodCalculationOwnership({ scope, calculationId: 'calculation-after-deadline',
         now: new Date('2026-08-01'), periodControlModel: deadlineCrossing.model, indexGuard, transactionRunner }),
-    (error) => error.code === 'PERIOD_CONTROL_CORRECTIVE_ONLY');
+    (error) => {
+        assert.strictEqual(error.code, 'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED');
+        assert.notStrictEqual(error.code, 'PERIOD_CONTROL_CORRECTIVE_ONLY');
+        assert.strictEqual(error.message,
+            'Απαιτείται ρητή ανακατασκευή ή επανεκτίμηση της εκπρόθεσμης περιόδου.');
+        assert.strictEqual(error.statusCode, 409);
+        return true;
+    });
 
     const julyScopeIndependent = normalizeScope({ team: 'THA', company_kod: 'c', ypokatasthma: '0',
         period_start: '2026-07-01', period_end: '2026-07-31' });
