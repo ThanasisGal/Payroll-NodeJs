@@ -59,23 +59,18 @@ async function initializeKlimakiaForoy() {
 // Συνάρτηση λήψης δεδομένων
 async function fetchData() {
     try {
-        const xrhsh = sharedParams._XRHSH;
         const forologikhKlimaka = sharedParams.ergazomenoi?.forologikh_klimaka;
-        const kodikosKlimakas = typeof forologikhKlimaka === 'string' && forologikhKlimaka.trim().length >= 8
-            ? forologikhKlimaka.trim().slice(4, 8).trim()
-            : '';
         const epoxikos = Boolean(sharedParams.ergazomenoi?.epoxikos);
         const params = new URLSearchParams({
-            xrhsh,
             epoxikos: String(epoxikos),
         });
 
-        if (kodikosKlimakas) {
-            params.set('kodikos_klimakas', kodikosKlimakas);
+        if (forologikhKlimaka) {
+            params.set('forologikh_klimaka', forologikhKlimaka);
         }
 
         const klimakia = await getCachedTaxEndpointJson(
-            `getKlimakiaForoy:${xrhsh}:${kodikosKlimakas}:${epoxikos}`,
+            `getKlimakiaForoy:${forologikhKlimaka || ''}:${epoxikos}`,
             `/api/kinhseis/getKlimakiaForoy?${params.toString()}`
         );
 

@@ -1,9 +1,9 @@
 /**
  * Auto-load tax scale from ForologikesKlimakesModel
  * 
- * LOOKUP:   xrhsh = calcXrhsh AND kodikos = calcAge + calcChildren
- * UPDATE:  createTaxScale = xrhsh + calcAge + calcChildren
- * UPDATE:  forologikh_klimaka = perigrafh
+ * LOOKUP: server session year AND kodikos = calcAge + calcChildren
+ * UPDATE: createTaxScale = calcAge + calcChildren
+ * UPDATE: forologikh_klimaka = kodikos + perigrafh
  */
 (function() {
     'use strict';
@@ -32,7 +32,7 @@
     /**
      * Fetch tax scale from database
      */
-    async function fetchTaxScale() {
+    async function fetchTaxScale(rawValue = '') {
     const csrfToken = getCsrfToken();
     
     if (!csrfToken) {
@@ -42,15 +42,14 @@
     
 
         try {
-            const xrhsh = calcXrhshField.value.trim();
             const calcAge = calcAgeField.value.trim();
-            const calcChildren = calcChildrenField.value. trim();
-            const kodikos = calcAge + calcChildren;
-            
-            if (!xrhsh || !calcAge || !calcChildren) {
+            const calcChildren = calcChildrenField.value.trim();
+            const kodikos = rawValue || calcAge + calcChildren;
+
+            if (!kodikos || (!rawValue && (!calcAge || !calcChildren))) {
                 return;
             }
-            
+
             // API call
             const response = await fetch('/api/forologikes-klimakes/lookup', {
                 method:  'POST',
@@ -58,7 +57,7 @@
                     'Content-Type':  'application/json',
                     'csrf-token': csrfToken  // ✅ ΑΛΛΑΓΗ:    lowercase & direct variable
                 },
-                body: JSON.stringify({ xrhsh, kodikos }),
+                body: JSON.stringify({ kodikos }),
                 credentials: 'same-origin'
             });            
             
@@ -69,11 +68,11 @@
             const data = await response.json();
             
             if (data.success && data.taxScale) {
-                createTaxScaleField.value = xrhsh + calcAge + calcChildren;
-                forologikhKlimakaField.value = createTaxScaleField.value + " - " + data.taxScale.perigrafh;
+                createTaxScaleField.value = data.kodikos;
+                forologikhKlimakaField.value = data.kodikos + " - " + data.taxScale.perigrafh;
             } else {
-                createTaxScaleField.value = '';
-                forologikhKlimakaField.value = 'Δεν βρέθηκε';
+                createTaxScaleField.value = data.kodikos || '';
+                forologikhKlimakaField.value = data.kodikos || rawValue;
             }
             
         } catch (error) {
@@ -92,5 +91,10 @@
     // Events
     birthDateField.addEventListener('blur', debouncedFetch);
     childrenField.addEventListener('blur', debouncedFetch);
+
+    const initialValue = forologikhKlimakaField.value.trim();
+    if (initialValue) {
+        fetchTaxScale(initialValue);
+    }
     
 })();

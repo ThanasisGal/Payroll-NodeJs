@@ -55,6 +55,10 @@ const {
     buildCanonicalWorkTermsSnapshotFields
 } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const {
+    extractForologikhKlimakaSuffix,
+    buildForologikhKlimakaLookup
+} = require('../../utils/ergazomenoi/forologikhKlimakaCode');
+const {
     generatePresignedUrl,
     downloadS3UriToTempFile,
     isS3Url,
@@ -1459,7 +1463,8 @@ class ergazomenoiController {
             dhmos: formData.dhmos_stathera,
             polh: formData.polh_stathera,
             ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo_stathera,
-            forologikh_klimaka: formData.forologikh_klimaka,
+            forologikh_klimaka:
+                extractForologikhKlimakaSuffix(formData.forologikh_klimaka) || '',
             trapeza: formData.trapeza_stathera,
             iban: formData.iban,
 
@@ -3484,7 +3489,8 @@ class ergazomenoiController {
             polh: formData.polh,
             email: formData.email,
             ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo,
-            forologikh_klimaka: formData.forologikh_klimaka,
+            forologikh_klimaka:
+                extractForologikhKlimakaSuffix(formData.forologikh_klimaka) || '',
             trapeza: formData.trapeza,
             iban: formData.iban,
             hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs || null,
@@ -4902,24 +4908,38 @@ class ergazomenoiController {
 
     static forologikesKlimakes = async (req, res) => {
         try {
-            const { xrhsh, kodikos } = req.body;
+            const incomingValue = req.body?.kodikos ?? req.body?.forologikh_klimaka;
+            const resolved = buildForologikhKlimakaLookup(
+                incomingValue,
+                req.session?.yearInUse
+            );
 
-            if (!xrhsh || !kodikos) {
+            if (!resolved) {
                 return res.status(400).json({ success: false, message: 'Missing data' });
             }
 
             // READ from ForologikesKlimakesModel
-            const taxScale = await ForologikesKlimakesModel.findOne({ xrhsh, kodikos });
+            const taxScale = await ForologikesKlimakesModel.findOne({
+                xrhsh: resolved.xrhsh,
+                kodikos: resolved.kodikos
+            });
 
             if (taxScale) {
                 return res.json({
                     success: true,
+                    kodikos: resolved.kodikos,
+                    xrhsh: resolved.xrhsh,
                     taxScale: {
                         perigrafh: taxScale.perigrafh
                     }
                 });
             } else {
-                return res.json({ success: false, taxScale: null });
+                return res.json({
+                    success: false,
+                    kodikos: resolved.kodikos,
+                    xrhsh: resolved.xrhsh,
+                    taxScale: null
+                });
             }
         } catch (error) {
             console.error(error);

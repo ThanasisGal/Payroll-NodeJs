@@ -11,7 +11,10 @@ const Models_E = require("../../models/kinhseis");
 const { Klimaka_ForoyModel,
         EkptoshForoyModel,
         Eisodhma_Pro_Foroy_MeioshsModel,
-      } = Models_A; 
+      } = Models_A;
+const {
+    buildForologikhKlimakaLookup
+} = require('../../utils/ergazomenoi/forologikhKlimakaCode');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -26,16 +29,18 @@ function toUTCDate(dateString) {
 
 class forosController {
     static getKlimakiaForoy = async (req, res) => {
-        const { xrhsh } = req.query; // Διαβάζουμε την παράμετρο από το query string
-        const kodikos_klimakas = typeof req.query?.kodikos_klimakas === 'string'
-            ? req.query.kodikos_klimakas.trim()
-            : '';
+        const rawTaxScale =
+            req.query?.forologikh_klimaka ?? req.query?.kodikos_klimakas ?? '';
+        const resolved = buildForologikhKlimakaLookup(
+            rawTaxScale,
+            req.session?.yearInUse
+        );
 
         try {
             // Δημιουργία βασικού φίλτρου με team και company_kod
-            const filter =  {  xrhsh: xrhsh };
-            if (kodikos_klimakas) {
-                filter.kodikos_klimakas = kodikos_klimakas;
+            const filter = { xrhsh: String(req.session?.yearInUse ?? '').trim() };
+            if (resolved) {
+                filter.kodikos_klimakas = resolved.kodikos;
             }
 
             const klimakiaForoy = await Klimaka_ForoyModel.find(filter)
