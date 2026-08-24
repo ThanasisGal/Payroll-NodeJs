@@ -10442,6 +10442,29 @@ async function exportPdf() {
     }
 }
 
+async function exportAuditDossierPdf() {
+    try {
+        const response = await fetch(
+            `/api/prodhlomena-oraria/review/export-audit-dossier-pdf?${buildReviewExportParams().toString()}`,
+            { method: 'GET', headers: { 'CSRF-Token': csrfToken } }
+        );
+        if (!response.ok) throw new Error('Αποτυχία δημιουργίας φακέλου ελέγχου PDF.');
+        const blob = await response.blob();
+        if (currentPdfBlobUrl) URL.revokeObjectURL(currentPdfBlobUrl);
+        currentPdfBlobUrl = URL.createObjectURL(blob);
+        currentPdfFileName = `fakelos_elegxou_apasxolhshs_${Date.now()}.pdf`;
+        const iframe = document.getElementById('reviewPdfFrame');
+        if (iframe) iframe.src = currentPdfBlobUrl;
+        const modalEl = document.getElementById('pdfPreviewModal');
+        if (modalEl && typeof bootstrap !== 'undefined') {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        } else window.open(currentPdfBlobUrl, '_blank');
+    } catch (error) {
+        console.error(error);
+        employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
+    }
+}
+
 function initReviewMoveByEnter() {
     const fields = Array.from(document.querySelectorAll('#reviewFiltersEnterScope .move-by-enter'));
 
@@ -10688,6 +10711,7 @@ document.getElementById('postCorrectivePayrollBtn')?.addEventListener('click', (
 });
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
+document.getElementById('exportAuditDossierPdfBtn')?.addEventListener('click', exportAuditDossierPdf);
 document.getElementById('searchBtn')?.addEventListener('click', loadResults);
 
 window.EmploymentReviewHrTest = {

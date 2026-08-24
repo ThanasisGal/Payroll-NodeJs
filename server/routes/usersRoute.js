@@ -1582,6 +1582,13 @@ router.get(
 );
 
 router.get(
+    '/api/prodhlomena-oraria/review/export-audit-dossier-pdf',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.exportProdhlomenaOrariaReviewAuditDossierPdf
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1',
     checkAuth,
     requireEmploymentReviewAccess,
