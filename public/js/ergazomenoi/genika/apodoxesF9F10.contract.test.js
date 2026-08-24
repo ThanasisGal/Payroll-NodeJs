@@ -1,7 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const ejs = require('ejs');
+const Decimal = require('decimal.js');
 const {
     ErgazomenoiModel,
     IstorikoProslhpseonAllagonModel
@@ -76,6 +78,112 @@ for (const source of [editScript, addScript]) {
     assert.ok(source.includes('__manualOromisthioKeyboardBound'));
     assert.ok(source.includes('_TOTAL_EXTRA_APODOXES'));
     assert.ok(source.includes('findExistingOrFirstEmptyExtraRow'));
+    assert.ok(source.includes('isManualOromisthioEqualToLegalAtDisplayPrecision'));
+    assert.ok(source.includes('const legalValues = getManualLegalWageValues();'));
+    assert.ok(source.includes('pragmatikoHmeromisthioValue = legalValues.hmeromisthio;'));
+    assert.ok(source.includes('pragmatikosMisthosValue = legalValues.misthos;'));
+    assert.ok(source.includes('const existingExtraRow = findExistingExtraApodoxesRow();'));
+    assert.ok(source.includes('setManualExtraAmountToRow(existingExtraRow, new Decimal(0));'));
+    assert.ok(source.includes('await calculateTotal();'));
+}
+
+assert.ok(addScript.includes('clearManualExtraApodoxesSnapshot();'));
+
+function extractFunction(source, functionName) {
+    const start = source.indexOf(`function ${functionName}(`);
+    assert.notStrictEqual(start, -1, `missing function ${functionName}`);
+    const bodyStart = source.indexOf('{', start);
+    let depth = 0;
+    for (let i = bodyStart; i < source.length; i++) {
+        if (source[i] === '{') depth += 1;
+        if (source[i] === '}') depth -= 1;
+        if (depth === 0) return source.slice(start, i + 1);
+    }
+    throw new Error(`unterminated function ${functionName}`);
+}
+
+function runManualHelpersContract(source) {
+    const elements = new Map();
+    const makeAmount = (id, value) => ({ id, value });
+    const extraSelect = {
+        id: 'stoixeio_symbashs_01',
+        value: '0099',
+        selectedOptions: [
+            { textContent: 'EXTRA ΑΠΟΔΟΧΕΣ ΔΥΝΑΜΕΝΕΣ ΝΑ ΑΝΑΙΡΕΘΟΥΝ' }
+        ]
+    };
+    elements.set(extraSelect.id, extraSelect);
+    elements.set('poso_symbashs_01', makeAmount('poso_symbashs_01', '0.00'));
+    elements.set(
+        'poso_symbashs_basei_oron_ergasias_01',
+        makeAmount('poso_symbashs_basei_oron_ergasias_01', '240.55')
+    );
+
+    const context = {
+        Decimal,
+        currentValues: {
+            poso_symbashs_01: '0',
+            poso_symbashs_basei_oron_ergasias_01: '240.55'
+        },
+        document: { getElementById: (id) => elements.get(id) || null },
+        getEffectiveRowCount: () => 2,
+        MANUAL_EXTRA_APODOXES_TEXT: 'EXTRA ΑΠΟΔΟΧΕΣ ΔΥΝΑΜΕΝΕΣ ΝΑ ΑΝΑΙΡΕΘΟΥΝ',
+        formatForDisplay: (value, decimals) => new Decimal(value).toFixed(decimals)
+    };
+    vm.createContext(context);
+    vm.runInContext(
+        [
+            extractFunction(source, 'normalizeGreekSearchText'),
+            extractFunction(source, 'isManualOromisthioEqualToLegalAtDisplayPrecision'),
+            extractFunction(source, 'findExistingExtraApodoxesRow'),
+            extractFunction(source, 'setManualExtraAmountToRow')
+        ].join('\n'),
+        context
+    );
+
+    assert.strictEqual(
+        context.isManualOromisthioEqualToLegalAtDisplayPrecision(
+            new Decimal('7.0567'),
+            new Decimal('7.05672')
+        ),
+        true
+    );
+    assert.strictEqual(context.findExistingExtraApodoxesRow(), '01');
+    context.setManualExtraAmountToRow('01', new Decimal(0));
+    assert.strictEqual(elements.get('poso_symbashs_01').value, '0.00');
+    assert.strictEqual(elements.get('poso_symbashs_basei_oron_ergasias_01').value, '0.00');
+    assert.strictEqual(context.currentValues.poso_symbashs_01, '0');
+    assert.strictEqual(context.currentValues.poso_symbashs_basei_oron_ergasias_01, '0');
+
+    extraSelect.value = '';
+    extraSelect.selectedOptions = [];
+    assert.strictEqual(context.findExistingExtraApodoxesRow(), null);
+}
+
+runManualHelpersContract(addScript);
+runManualHelpersContract(editScript);
+
+for (const source of [addScript, editScript]) {
+    const canonicalBranch = source.indexOf('if (isCanonicalLegalReset)');
+    const fullTimeFormula = source.indexOf('} else if (isFullTime)', canonicalBranch);
+    const noExtraBranch = source.indexOf('if (diafora.lte(0))', canonicalBranch);
+    const createExtraRow = source.indexOf(
+        'findExistingOrFirstEmptyExtraRow(extraItem.value)',
+        noExtraBranch
+    );
+    assert.ok(canonicalBranch > -1 && fullTimeFormula > canonicalBranch);
+    assert.ok(noExtraBranch > fullTimeFormula && createExtraRow > noExtraBranch);
+    assert.ok(
+        source.slice(noExtraBranch, createExtraRow).includes('findExistingExtraApodoxesRow()')
+    );
+    assert.ok(
+        !source
+            .slice(noExtraBranch, createExtraRow)
+            .includes('findExistingOrFirstEmptyExtraRow(')
+    );
+    assert.ok(source.includes('pragmatikoHmeromisthioValue = neoOromisthio.div('));
+    assert.ok(source.includes('pragmatikosMisthosValue = neoOromisthio.times('));
+    assert.ok(source.includes('setManualExtraAmountToRow(targetRow, diafora);'));
 }
 
 for (const field of ['pragmatikosMisthos', 'pragmatikoHmeromisthio', 'pragmatikoOromisthio']) {

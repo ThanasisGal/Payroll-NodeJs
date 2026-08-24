@@ -1197,10 +1197,30 @@ function getNomimoOromisthioValue() {
     return new Decimal(0);
 }
 
+function getManualLegalWageValues() {
+    return {
+        oromisthio: getManualDecimalFromInput(document.getElementById('nomimoOromisthio')),
+        hmeromisthio: getManualDecimalFromInput(document.getElementById('nomimoHmeromisthio')),
+        misthos: getManualDecimalFromInput(document.getElementById('nomimosMisthos'))
+    };
+}
+
+function isManualOromisthioEqualToLegalAtDisplayPrecision(manualValue, legalValue) {
+    return formatForDisplay(manualValue, 4) === formatForDisplay(legalValue, 4);
+}
+
 function validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl) {
     const nomimoOromisthioValue = getNomimoOromisthioValue();
+    const isCanonicalLegalValue = isManualOromisthioEqualToLegalAtDisplayPrecision(
+        neoOromisthio,
+        nomimoOromisthioValue
+    );
 
-    if (!nomimoOromisthioValue.isZero() && neoOromisthio.lt(nomimoOromisthioValue)) {
+    if (
+        !isCanonicalLegalValue &&
+        !nomimoOromisthioValue.isZero() &&
+        neoOromisthio.lt(nomimoOromisthioValue)
+    ) {
         if (oromisthioEl) {
             oromisthioEl.value = formatForDisplay(nomimoOromisthioValue, 4);
         }
@@ -1442,6 +1462,12 @@ function saveManualExtraApodoxesSnapshot(row, item, diafora) {
     _manualExtraApodoxesDiafora = toDecimal(diafora);
 }
 
+function clearManualExtraApodoxesSnapshot() {
+    _manualExtraApodoxesRow = null;
+    _manualExtraApodoxesItem = null;
+    _manualExtraApodoxesDiafora = null;
+}
+
 function restoreManualPragmatikoOromisthioSnapshot() {
     if (!_manualPragmatikoOromisthioActive || !_manualPragmatikoOromisthioSnapshot) return;
 
@@ -1548,8 +1574,13 @@ async function applyManualPragmatikoOromisthio() {
     const hmeres = toDecimal(document.getElementById('hmeres_ergasias_ebdomadas')?.value);
     const typosErg = document.getElementById('typos_ergazomenon')?.value || '';
     const isFullTime = Boolean(document.getElementById('plhrhs_apasxolhsh')?.checked);
+    const legalValues = getManualLegalWageValues();
+    const isCanonicalLegalReset = isManualOromisthioEqualToLegalAtDisplayPrecision(
+        neoOromisthio,
+        legalValues.oromisthio
+    );
 
-    if (!isFullTime && (ores.lte(0) || hmeres.lte(0))) {
+    if (!isCanonicalLegalReset && !isFullTime && (ores.lte(0) || hmeres.lte(0))) {
         showAlert({
             icon: 'warning',
             title: 'Προσοχή',
@@ -1561,7 +1592,10 @@ async function applyManualPragmatikoOromisthio() {
     let pragmatikoHmeromisthioValue = new Decimal(0);
     let pragmatikosMisthosValue = new Decimal(0);
 
-    if (isFullTime) {
+    if (isCanonicalLegalReset) {
+        pragmatikoHmeromisthioValue = legalValues.hmeromisthio;
+        pragmatikosMisthosValue = legalValues.misthos;
+    } else if (isFullTime) {
         pragmatikoHmeromisthioValue = neoOromisthio.div(new Decimal(6).div(40));
         pragmatikosMisthosValue = neoOromisthio.times(
             toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
@@ -1585,12 +1619,16 @@ async function applyManualPragmatikoOromisthio() {
         return;
     }
 
-    if (oromisthioEl) oromisthioEl.value = formatForDisplay(neoOromisthio, 4);
+    const pragmatikoOromisthioValue = isCanonicalLegalReset
+        ? legalValues.oromisthio
+        : neoOromisthio;
+
+    if (oromisthioEl) oromisthioEl.value = formatForDisplay(pragmatikoOromisthioValue, 4);
     if (hmeromisthioEl) hmeromisthioEl.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
     if (misthosEl) misthosEl.value = formatForDisplay(pragmatikosMisthosValue, 2);
 
     saveManualPragmatikoOromisthioSnapshot({
-        oromisthio: neoOromisthio,
+        oromisthio: pragmatikoOromisthioValue,
         hmeromisthio: pragmatikoHmeromisthioValue,
         misthos: pragmatikosMisthosValue
     });
@@ -1598,6 +1636,14 @@ async function applyManualPragmatikoOromisthio() {
     const diafora = pragmatikosMisthosValue.minus(previousSynoloBaseiOron);
 
     if (diafora.lte(0)) {
+        clearManualExtraApodoxesSnapshot();
+        const existingExtraRow = findExistingExtraApodoxesRow();
+        if (existingExtraRow) {
+            setManualExtraAmountToRow(existingExtraRow, new Decimal(0));
+            await calculateTotal();
+            restoreManualPragmatikoOromisthioSnapshot();
+        }
+
         showAlert({
             icon: 'info',
             title: 'Δεν απαιτούνται Extra Αποδοχές',
@@ -1743,6 +1789,37 @@ function findExistingOrFirstEmptyExtraRow(extraValue) {
     return firstEmpty;
 }
 
+function findExistingExtraApodoxesRow() {
+    const rowCount = getEffectiveRowCount();
+    const targetText = normalizeGreekSearchText(MANUAL_EXTRA_APODOXES_TEXT);
+
+    for (let i = 1; i <= rowCount; i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
+        const hiddenEl = document.getElementById(`stoixeio_symbashs_${idNum}_hidden`);
+        const selectedValue =
+            selectEl?.tomselect?.getValue?.() || selectEl?.value || hiddenEl?.value || '';
+        if (!selectedValue) continue;
+
+        const tomOption = selectEl?.tomselect?.options?.[selectedValue];
+        const selectedOption = selectEl?.selectedOptions?.[0];
+        const searchable = normalizeGreekSearchText(
+            `${tomOption?.label || ''} ${tomOption?.text || ''} ${tomOption?.perigrafh || ''} ${selectedOption?.textContent || ''}`
+        );
+
+        if (
+            searchable.includes(targetText) ||
+            (searchable.includes('EXTRA') &&
+                searchable.includes('ΑΠΟΔΟΧΕΣ') &&
+                searchable.includes('ΑΝΑΙΡΕΘΟΥΝ'))
+        ) {
+            return idNum;
+        }
+    }
+
+    return null;
+}
+
 async function ensureTomSelectForManualRow(idNum) {
     const selectId = `stoixeio_symbashs_${idNum}`;
     const selectEl = document.getElementById(selectId);
@@ -1877,6 +1954,7 @@ function setManualExtraAmountToRow(idNum, diafora) {
 
     if (posoField) {
         posoField.value = '0.00';
+        currentValues[posoField.id] = '0';
     }
 
     if (posoBaseiField) {
