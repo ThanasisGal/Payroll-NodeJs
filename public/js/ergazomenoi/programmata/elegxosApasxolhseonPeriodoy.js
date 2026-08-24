@@ -9146,6 +9146,10 @@ document.addEventListener('click', (event) => {
     if (event.target.closest('.weekly-hr-bulk-complete')) {
         completeWeeklyHrStage1BulkFromUi(); return;
     }
+    const orphanButton = event.target.closest('.weekly-hr-open-orphan');
+    if (orphanButton) { const row = currentReviewRows.find((item) => String(item._id) === orphanButton.dataset.rowId) ||
+        weeklyHrStage1RowsById.get(orphanButton.dataset.rowId);
+        if (row) showDetailsModal(row); return; }
     const dayButton = event.target.closest('.weekly-hr-open-day');
     if (dayButton) { const row = currentReviewRows.find((item) => String(item._id) === dayButton.dataset.rowId) ||
         weeklyHrStage1RowsById.get(dayButton.dataset.rowId);
