@@ -1,7 +1,25 @@
 'use strict';
 
 const assert = require('assert');
-const erganhController = require('./erganhController');
+const Module = require('module');
+
+const originalModuleLoad = Module._load;
+let erganhController;
+try {
+    Module._load = function orphanBoundaryModuleLoad(request, parent, isMain) {
+        if (request === 'libxmljs2') {
+            return {
+                parseXml() {
+                    throw new Error('Unexpected libxmljs2 use in orphan controller boundary test');
+                }
+            };
+        }
+        return originalModuleLoad.call(this, request, parent, isMain);
+    };
+    erganhController = require('./erganhController');
+} finally {
+    Module._load = originalModuleLoad;
+}
 
 const ID = '6a7c515e6aeaefb3c8764b54';
 const oldRecord = Object.freeze({
