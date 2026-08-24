@@ -1,5 +1,10 @@
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
+function employmentReviewSaveErrorMessage(payload) {
+    const message = typeof payload?.message === 'string' ? payload.message.trim() : '';
+    return message || 'Η ενημέρωση δεν ολοκληρώθηκε. Παρακαλώ δοκιμάστε ξανά.';
+}
+
 const employmentReviewSwalCommonClasses = Object.freeze({
     title: 'custom-title',
     popup: 'custom-swal-popup employment-review-swal-popup',
@@ -10316,7 +10321,7 @@ function showDetailsModal(row) {
                 employmentReviewSwal({
                     icon: 'error',
                     title: 'Σφάλμα',
-                    text: payload.message || 'Αποτυχία αποθήκευσης.'
+                    text: employmentReviewSaveErrorMessage(payload)
                 });
 
                 return;
@@ -10337,7 +10342,7 @@ function showDetailsModal(row) {
             employmentReviewSwal({
                 icon: 'error',
                 title: 'Σφάλμα',
-                text: error.message
+                text: employmentReviewSaveErrorMessage(null)
             });
         }
     });

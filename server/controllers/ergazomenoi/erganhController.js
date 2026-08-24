@@ -201,6 +201,11 @@ const {
     sanitizeAppliedRepoTransferUpdate
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionService');
 const {
+    removeClientRawCardUpdates,
+    buildEmploymentReviewUpdateErrorResponse,
+    persistOrphanResolutionWrite
+} = require('../../services/ergazomenoi/apasxoliseisOrphanResolutionPersistenceService');
+const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
@@ -10931,12 +10936,15 @@ class erganhController {
                 'ores_apoysias_apologistika'
             ];
 
-            const cleanUpdates = {};
+            let cleanUpdates = {};
 
             for (const field of allowedFields) {
                 if (Object.prototype.hasOwnProperty.call(updates, field)) {
                     cleanUpdates[field] = updates[field];
                 }
+            }
+            if (orphanResolutionCommand) {
+                cleanUpdates = removeClientRawCardUpdates(cleanUpdates);
             }
 
             if (Object.prototype.hasOwnProperty.call(
@@ -11028,16 +11036,17 @@ class erganhController {
                 orphanMetadata = {
                     status: 'HR_APPROVED', policy_version: ORPHAN_CARD_POLICY_VERSION,
                     orphan_type: approvedOrphanResolution.orphanType,
-                    resolution_scope: approvedOrphanResolution.reuseScope,
+                    reuse_scope: approvedOrphanResolution.reuseScope,
                     approved_interval: approvedOrphanResolution.proposal,
                     reusable_decision_rule:
                         approvedOrphanResolution.reusableDecisionRule || null,
-                    rest_risk_acknowledged:
+                    rest_violation: approvedOrphanResolution.rest?.hasViolation === true,
+                    risk_acknowledged:
                         orphanResolutionCommand.risk_acknowledged === true,
                     rest_conflicts: approvedOrphanResolution.rest?.conflicts || [],
                     raw_cards_preserved: true,
                     approved_by: changedBy,
-                    approved_at: new Date()
+                    approved_at: null
                 };
                 cleanUpdates.orphan_card_resolution = orphanMetadata;
             }
@@ -11092,38 +11101,43 @@ class erganhController {
                 }
             }
 
-            if (Object.keys(newValues).length === 0) {
+            if (Object.keys(newValues).length === 0 && !orphanResolutionCommand) {
                 return res.json({
                     success: true,
                     message: 'Δεν υπήρχαν αλλαγές για αποθήκευση.'
                 });
             }
 
-            permittedUpdates.is_locked = true;
-            permittedUpdates.locked_by = changedBy;
-            permittedUpdates.locked_at = new Date();
-
+            let persistenceResult = null;
             await periodFence({
                 scope: periodAccess.scope,
                 expectedToken: periodAccess.token,
                 work: async ({ session }) => {
-                    const rowFilter = { _id: id, team: sessionTeam, company_kod: companyId };
-                    rowFilter.updatedAt = oldRecord.updatedAt;
-                    await ProdhlomenaOrariaModel.updateOne(
-                        rowFilter,
-                        { $set: permittedUpdates },
-                        { session }
-                    );
-                    if (approvedOrphanResolution?.reuseScope ===
-                        ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL &&
-                        approvedOrphanResolution.reusableDecisionRule) {
-                        await createOrphanReusablePolicyDecisionRecord({
-                            session: req.session,
-                            row: oldRecord,
-                            rule: approvedOrphanResolution.reusableDecisionRule,
-                            dbSession: session
+                    if (orphanResolutionCommand) {
+                        persistenceResult = await persistOrphanResolutionWrite({
+                            oldRecord, semanticUpdates: permittedUpdates, changedBy,
+                            reason: String(reason).trim(),
+                            schemaPaths: Object.keys(ProdhlomenaOrariaModel.schema.paths),
+                            rowModel: ProdhlomenaOrariaModel,
+                            auditModel: ProdhlomenaOrariaAuditModel,
+                            session,
+                            createReusableApproval: approvedOrphanResolution?.reuseScope ===
+                                ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL &&
+                                approvedOrphanResolution.reusableDecisionRule
+                                ? (dbSession) => createOrphanReusablePolicyDecisionRecord({
+                                    session: req.session, row: oldRecord,
+                                    rule: approvedOrphanResolution.reusableDecisionRule,
+                                    dbSession
+                                }) : null
                         });
+                        return;
                     }
+                    const finalUpdates = { ...permittedUpdates, is_locked: true,
+                        locked_by: changedBy, locked_at: new Date() };
+                    await ProdhlomenaOrariaModel.updateOne(
+                        { _id: id, team: sessionTeam, company_kod: companyId },
+                        { $set: finalUpdates }, { session }
+                    );
                     await ProdhlomenaOrariaAuditModel.create([{
                         team: sessionTeam, company_kod: companyId,
                         prodhlomena_oraria_id: oldRecord._id, kodikos: oldRecord.kodikos,
@@ -11135,16 +11149,16 @@ class erganhController {
 
             return res.json({
                 success: true,
-                message: 'Η εγγραφή ενημερώθηκε επιτυχώς.'
+                code: persistenceResult?.idempotent
+                    ? 'ORPHAN_RESOLUTION_ALREADY_APPLIED' : undefined,
+                message: persistenceResult?.idempotent
+                    ? 'Η ίδια επίλυση ορφανού χτυπήματος έχει ήδη αποθηκευτεί.'
+                    : 'Η εγγραφή ενημερώθηκε επιτυχώς.'
             });
         } catch (error) {
             console.error('[updateProdhlomenaOrariaReviewRecord] ❌', error);
-            return res.status(error.statusCode || 500).json({
-                success: false,
-                code: error.code || undefined,
-                message: error.statusCode ? error.message : 'Σφάλμα κατά την ενημέρωση της εγγραφής.',
-                error: error.message
-            });
+            const response = buildEmploymentReviewUpdateErrorResponse(error);
+            return res.status(response.status).json(response.body);
         }
     };
 

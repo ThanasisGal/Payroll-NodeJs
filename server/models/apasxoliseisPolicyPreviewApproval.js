@@ -137,6 +137,23 @@ ApasxoliseisPolicyPreviewApprovalSchema.index({
     team: 1,
     company_kod: 1,
     ypokatasthma: 1,
+    policy_code: 1,
+    active_policy_key: 1
+}, {
+    unique: true,
+    name: 'uniq_active_orphan_reusable_policy',
+    partialFilterExpression: {
+        policy_code: 'ORPHAN_CARD_CONTINUOUS',
+        reuse_scope: 'FUTURE_IDENTICAL',
+        reuse_status: 'ACTIVE',
+        decision_status: 'RECORDED'
+    }
+});
+
+ApasxoliseisPolicyPreviewApprovalSchema.index({
+    team: 1,
+    company_kod: 1,
+    ypokatasthma: 1,
     reuse_scope: 1,
     reuse_status: 1,
     reuse_fingerprints: 1,

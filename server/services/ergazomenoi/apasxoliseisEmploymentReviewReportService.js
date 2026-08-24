@@ -5,6 +5,9 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const { dateKeyUtc, getMondaySundayWeekRange } = require('../../utils/date/mondaySundayWeek');
+const {
+    canonicalOrphanResolutionMetadata
+} = require('./apasxoliseisOrphanResolutionPersistenceService');
 
 const REPORT_SCHEMA_VERSION = 'employment-review-report:v1';
 const DAILY_NUMBER_FIELDS = Object.freeze([
@@ -208,7 +211,7 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
         const finalAnalysis = lifecycleStage(lifecycle, 'stage4').final_weekly_analysis || {};
         const rowDate = dateKeyUtc(row.hmeromhnia);
         const preview = row.orphan_card_resolution_preview || {};
-        const resolution = row.orphan_card_resolution || {};
+        const resolution = canonicalOrphanResolutionMetadata(row.orphan_card_resolution || {});
         const sixthFromLifecycle = dateKeyUtc(finalAnalysis.sixthDay?.hmeromhnia) === rowDate;
         const seventhFromLifecycle = dateKeyUtc(finalAnalysis.seventhDay?.hmeromhnia) === rowDate;
         const sixth = sixthFromLifecycle || row.policy?.classification === 'SIXTH';
@@ -258,11 +261,14 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
                 rawPunch: cards(row),
                 approvedInterval: intervals(row, 'approved'),
                 reuseScope: reuseScopeLabel(resolution.reuse_scope),
-                restViolation: Boolean(preview.restValidation?.hasViolation || resolution.rest_violation),
-                restResult: preview.restValidation?.hasViolation || resolution.rest_violation
+                restViolation: Boolean(preview.restValidation?.hasViolation || preview.rest?.hasViolation ||
+                    resolution.rest_violation),
+                restResult: preview.restValidation?.hasViolation || preview.rest?.hasViolation ||
+                    resolution.rest_violation
                     ? 'Παραβίαση 11ωρης ανάπαυσης' : 'Δεν διαπιστώθηκε παραβίαση 11ωρης ανάπαυσης',
-                riskRequired: Boolean(preview.restValidation?.hasViolation || resolution.rest_violation),
-                riskAcknowledged: Boolean(resolution.risk_acknowledgement)
+                riskRequired: Boolean(preview.restValidation?.hasViolation || preview.rest?.hasViolation ||
+                    resolution.rest_violation),
+                riskAcknowledged: resolution.risk_acknowledged
             } : null,
             stageStatuses: Object.fromEntries(['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'].map((stage) =>
                 [stage, statusLabel(stageValue(state, stage)?.status)]))

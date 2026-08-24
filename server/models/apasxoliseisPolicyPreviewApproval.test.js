@@ -91,7 +91,13 @@ assert.strictEqual(decisionTypePath.options.required, true);
 assert.strictEqual(ApprovalModel.schema.options.collection,
     'Apasxoliseis_Policy_Preview_Approvals');
 assert.strictEqual(ApprovalModel.modelName, 'ApasxoliseisPolicyPreviewApprovals');
-assert.deepStrictEqual(ApprovalModel.schema.indexes().length, 5);
+assert.deepStrictEqual(ApprovalModel.schema.indexes().length, 6);
+const orphanUniqueIndex = ApprovalModel.schema.indexes().find(([, options]) =>
+    options.name === 'uniq_active_orphan_reusable_policy');
+assert(orphanUniqueIndex);
+assert.strictEqual(orphanUniqueIndex[1].unique, true);
+assert.strictEqual(orphanUniqueIndex[1].partialFilterExpression.policy_code,
+    'ORPHAN_CARD_CONTINUOUS');
 
 const atomic = new ApprovalModel(validRecord('APPROVE_PROPOSAL'));
 assert.strictEqual(atomic.reuse_match_criteria.version, 5);

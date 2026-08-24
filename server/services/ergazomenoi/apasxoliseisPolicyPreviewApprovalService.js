@@ -801,13 +801,10 @@ async function createOrphanReusablePolicyDecisionRecord({ session, row, rule, db
     const fingerprint = buildReusableDecisionFingerprint(criteria);
     const branch = toTrimmedString(row?.ypokatasthma, 20).padStart(4, '0');
     const date = parseDateOnly(new Date(row?.hmeromhnia).toISOString().slice(0, 10), 'hmeromhnia');
-    const duplicateQuery = approvalModel.findOne({ team: scope.team, company_kod: scope.company_kod,
+    const activeFilter = { team: scope.team, company_kod: scope.company_kod,
         ypokatasthma: branch, policy_code: ORPHAN_REUSABLE_POLICY_CODE,
         reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL, reuse_status: REUSE_STATUS.ACTIVE,
-        decision_status: 'RECORDED', active_policy_key: fingerprint });
-    if (dbSession && typeof duplicateQuery.session === 'function') duplicateQuery.session(dbSession);
-    const duplicate = await duplicateQuery.select('_id').lean();
-    if (duplicate) return duplicate;
+        decision_status: 'RECORDED', active_policy_key: fingerprint };
     const document = {
         team: scope.team, company_kod: scope.company_kod, ypokatasthma: branch,
         etos: scope.etos, period_kodikos: toTrimmedString(session.periodInUse, 20),
@@ -833,8 +830,25 @@ async function createOrphanReusablePolicyDecisionRecord({ session, row, rule, db
         created_by_user_role: scope.created_by_user_role,
         created_at: now, source: 'ORPHAN_CARD_HR_DECISION', client_payload_version: 'orphan:v1'
     };
-    const created = await approvalModel.create([document], dbSession ? { session: dbSession } : {});
-    return Array.isArray(created) ? created[0] : created;
+    try {
+        const options = { upsert: true, new: true, setDefaultsOnInsert: true,
+            ...(dbSession ? { session: dbSession } : {}) };
+        const query = approvalModel.findOneAndUpdate(
+            activeFilter, { $setOnInsert: document }, options
+        );
+        return await (typeof query.lean === 'function' ? query.lean() : query);
+    } catch (error) {
+        if (error?.code !== 11000) throw error;
+        const duplicateQuery = approvalModel.findOne(activeFilter);
+        if (dbSession && typeof duplicateQuery.session === 'function') {
+            duplicateQuery.session(dbSession);
+        }
+        const duplicate = await duplicateQuery.select('_id').lean();
+        if (duplicate) return duplicate;
+        throw Object.assign(new Error(
+            'Η ίδια επαναχρησιμοποιήσιμη έγκριση δημιουργήθηκε ταυτόχρονα. Ανανεώστε τα αποτελέσματα.'
+        ), { code: 'ORPHAN_REUSABLE_APPROVAL_CONFLICT', statusCode: 409 });
+    }
 }
 
 async function findMatchingOrphanReusablePolicyDecision({ session, ypokatasthma, rule,
