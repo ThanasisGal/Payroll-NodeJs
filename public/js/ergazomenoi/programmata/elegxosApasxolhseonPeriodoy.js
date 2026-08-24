@@ -9246,7 +9246,6 @@ async function loadResults() {
         }
 
         ensureReviewTableStructure();
-        ensureScenarioReviewFilterControl();
         currentPolicyPreviewBaseParams = new URLSearchParams(params);
         currentRepoTransferDecisionsByProposalId = new Map();
         currentPolicyPreviewApprovalRecords = [];
