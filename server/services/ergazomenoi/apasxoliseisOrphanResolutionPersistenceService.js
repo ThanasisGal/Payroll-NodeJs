@@ -1,5 +1,7 @@
 'use strict';
 
+const mongoose = require('mongoose');
+
 const RAW_CARD_FIELDS = Object.freeze([
     'cards_apo_ora_01', 'cards_eos_ora_01', 'cards_apo_ora_02',
     'cards_eos_ora_02', 'cards_apo_ora_03', 'cards_eos_ora_03',
@@ -87,7 +89,7 @@ function buildReviewCompareAndSetFilter({ oldRecord, schemaPaths = [] }) {
         .filter((field) => !['_id', '__v', 'team', 'company_kod'].includes(field));
     filter.$and = guardedPaths.map((field) => Object.hasOwn(oldRecord, field)
         ? { [field]: oldRecord[field] }
-        : { [field]: { $exists: false } });
+        : { [field]: mongoose.trusted({ $exists: false }) });
     return filter;
 }
 

@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+const mongoose = require('mongoose');
 const {
     removeClientRawCardUpdates,
     canonicalOrphanResolutionMetadata,
@@ -121,6 +122,53 @@ async function run() {
     const filter = buildReviewCompareAndSetFilter({ oldRecord: baseRow,
         schemaPaths: [...Object.keys(baseRow), 'new_field'] });
     assert(filter.$and.some((part) => part.new_field?.$exists === false));
+
+    const previousSanitizeFilter = mongoose.get('sanitizeFilter');
+    const casModelName = 'OrphanResolutionCasSanitizeFilterTest';
+    try {
+        mongoose.set('sanitizeFilter', true);
+        const CasModel = mongoose.models[casModelName] || mongoose.model(casModelName,
+            new mongoose.Schema({
+                team: String,
+                company_kod: String,
+                unlocked_at: Date
+            }));
+        const absentDateFilter = buildReviewCompareAndSetFilter({
+            oldRecord: {
+                _id: new mongoose.Types.ObjectId(),
+                team: 'THA',
+                company_kod: 'company'
+            },
+            schemaPaths: ['_id', 'team', 'company_kod', 'unlocked_at']
+        });
+        const absentDateQuery = CasModel.findOne(absentDateFilter);
+        absentDateQuery._castConditions();
+        assert.strictEqual(absentDateQuery.error(), undefined);
+        const absentDateCondition = absentDateQuery.getFilter().$and
+            .find((part) => part.unlocked_at);
+        assert.strictEqual(absentDateCondition.unlocked_at.$exists, false);
+        assert.strictEqual(Object.hasOwn(absentDateCondition.unlocked_at, '$eq'), false);
+
+        const unlockedAt = new Date('2026-08-24T18:04:50Z');
+        const existingDateFilter = buildReviewCompareAndSetFilter({
+            oldRecord: {
+                _id: new mongoose.Types.ObjectId(),
+                team: 'THA',
+                company_kod: 'company',
+                unlocked_at: unlockedAt
+            },
+            schemaPaths: ['_id', 'team', 'company_kod', 'unlocked_at']
+        });
+        const existingDateQuery = CasModel.findOne(existingDateFilter);
+        existingDateQuery._castConditions();
+        assert.strictEqual(existingDateQuery.error(), undefined);
+        assert.strictEqual(existingDateQuery.getFilter().$and
+            .find((part) => part.unlocked_at).unlocked_at.getTime(), unlockedAt.getTime());
+        assert.strictEqual(mongoose.get('sanitizeFilter'), true);
+    } finally {
+        mongoose.set('sanitizeFilter', previousSanitizeFilter);
+        if (mongoose.models[casModelName]) mongoose.deleteModel(casModelName);
+    }
 
     assert.strictEqual(canonicalOrphanResolutionMetadata({
         status: 'HR_APPROVED', resolution_scope: 'FUTURE_IDENTICAL',
