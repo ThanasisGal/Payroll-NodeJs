@@ -41,26 +41,27 @@
             <ul id="nav-tree" class="menu">
                 <li id="li0" data-value="li0">
                     <a class="enabled menu-li menu-item mt-1 ajustedGap-menu" href="/" data-sidebar-special data-sidebar-authorized="true">
-                        Αρχική Σελίδα</a
+                        <span class="sidebar-menu-label">Αρχική Σελίδα</span></a
                     >
                 </li>
 
                 <li class="menu-separator"><hr class="menu-hr" /></li>
                 <li id="li1" data-value="li1">
                     <!--  Admin -->
-                    <a class="menu-li menu-item disabled ajustedGap-menu">
-                        Admin <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i
-                    ></a>
+                    <a class="menu-li menu-item disabled ajustedGap-menu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                        <span class="sidebar-menu-label flex-grow-1 text-wrap">Admin</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                    </a>
 
                     <ul class="submenu">
                         <!-- ΕΝΑ submenu που περιέχει όλα τα items -->
 
                         <!-- Χρήστες -->
                         <li id="li11" data-value="li11">
-                            <a class="disabled submenu-li menu-item ajustedGap-submenu">
-                                Χρήστες
-                                <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i
-                            ></a>
+                            <a class="disabled submenu-li menu-item ajustedGap-submenu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                <span class="sidebar-menu-label flex-grow-1 text-wrap">Χρήστες</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                            </a>
 
                             <ul class="submenu">
                                 <li id="li111" data-value="li111">
@@ -69,21 +70,12 @@
                                         data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                                         class="disabled childmenu-li menu-item"
                                         href="/admin"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15vw"
                                         data-bs-title="Διαχείριση των στοιχείων των Χρηστών"
                                     >
-                                        Διαχείριση Χρηστών
+                                        <span class="sidebar-menu-label">Διαχείριση Χρηστών</span>
                                     </a>
                                 </li>
                                 <% if (isUserPrivilegesManagerRole(userRole)) { %>
@@ -98,7 +90,7 @@
                                             data-tooltip-max-width="15vw"
                                             data-bs-title="Διαχείριση δικαιωμάτων χρηστών"
                                         >
-                                            Δικαιώματα Χρηστών
+                                            <span class="sidebar-menu-label">Δικαιώματα Χρηστών</span>
                                         </a>
                                     </li>
                                 <% } %>
@@ -109,15 +101,6 @@
                         <li id="li12" data-value="li12" class="margin-top--0_5rem">
                             <a
                                 class="disabled submenu-li menu-item ajustedGap-link"
-                                data-ml-1913="1"
-                                data-ml-1680="1"
-                                data-ml-1600="1"
-                                data-ml-1440="1"
-                                data-ml-1366="1"
-                                data-ml-1360="1"
-                                data-ml-1280="1"
-                                data-ml-1152="1"
-                                data-ml-1024="1"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="right"
                                 data-tooltip-max-width="15vw"
@@ -128,7 +111,7 @@
                                 <i
                                     class="bi bi-chevron-down chevron-icon margin-right-0_5rem display-none"
                                 ></i>
-                                Cloud
+                                <span class="sidebar-menu-label">Cloud</span>
                             </a>
                         </li>
 
@@ -138,15 +121,6 @@
                                 id="btn-anoigma-neas-xrhshs"
                                 data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
-                                data-ml-1913="1"
-                                data-ml-1680="1"
-                                data-ml-1600="1"
-                                data-ml-1440="1"
-                                data-ml-1366="1"
-                                data-ml-1360="1"
-                                data-ml-1280="1"
-                                data-ml-1152="1"
-                                data-ml-1024="1"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="right"
                                 data-tooltip-max-width="15vw"
@@ -156,7 +130,7 @@
                                 <i
                                     class="bi bi-chevron-down chevron-icon margin-right-0_5rem display-none"
                                 ></i>
-                                Άνοιγμα Νέας Χρήσης
+                                <span class="sidebar-menu-label">Άνοιγμα Νέας Χρήσης</span>
                             </a>
                         </li>
 
@@ -166,15 +140,6 @@
                                 data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
                                 href="/admin/active-sessions"
-                                data-ml-1913="1"
-                                data-ml-1680="1"
-                                data-ml-1600="1"
-                                data-ml-1440="1"
-                                data-ml-1366="1"
-                                data-ml-1360="1"
-                                data-ml-1280="1"
-                                data-ml-1152="1"
-                                data-ml-1024="1"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="right"
                                 data-tooltip-max-width="15vw"
@@ -183,7 +148,7 @@
                                 <i
                                     class="bi bi-chevron-down chevron-icon margin-right-0_5rem display-none"
                                 ></i>
-                                Ενεργοί Χρήστες
+                                <span class="sidebar-menu-label">Ενεργοί Χρήστες</span>
                             </a>
                         </li>
 
@@ -193,15 +158,6 @@
                                 data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
                                 href="/admin/usage-report"
-                                data-ml-1913="1"
-                                data-ml-1680="1"
-                                data-ml-1600="1"
-                                data-ml-1440="1"
-                                data-ml-1366="1"
-                                data-ml-1360="1"
-                                data-ml-1280="1"
-                                data-ml-1152="1"
-                                data-ml-1024="1"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="right"
                                 data-tooltip-max-width="15vw"
@@ -210,7 +166,7 @@
                                 <i
                                     class="bi bi-chevron-down chevron-icon margin-right-0_5rem display-none"
                                 ></i>
-                                Αναφορά Χρήσης
+                                <span class="sidebar-menu-label">Αναφορά Χρήσης</span>
                             </a>
                         </li>
                     </ul>
@@ -219,16 +175,17 @@
                 <li class="menu-separator"><hr class="menu-hr" /></li>
                 <li id="li2" data-value="li2">
                     <!--  Αρχεία -->
-                    <a class="disabled menu-li menu-item ajustedGap-menu">
-                        Αρχεία <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i
-                    ></a>
+                    <a class="disabled menu-li menu-item ajustedGap-menu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                        <span class="sidebar-menu-label flex-grow-1 text-wrap">Αρχεία</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                    </a>
 
                     <ul class="submenu">
                         <li id="li21" data-value="li21">
-                            <a class="disabled submenu-li menu-item ajustedGap-submenu">
-                                Εταιρείες
-                                <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i
-                            ></a>
+                            <a class="disabled submenu-li menu-item ajustedGap-submenu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                <span class="sidebar-menu-label flex-grow-1 text-wrap">Εταιρείες</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                            </a>
 
                             <ul class="submenu">
                                 <li id="li211" data-value="li211">
@@ -237,21 +194,12 @@
                                         data-privilege-form="Companies"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/genikastoixeia"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15vw"
                                         data-bs-title="Διαχείριση των γενικών στοιχείων των Εταιρειών"
                                     >
-                                        Γενικά Στοιχεία
+                                            <span class="sidebar-menu-label">Γενικά Στοιχεία</span>
                                     </a>
                                 </li>
                                 <li id="li212" data-value="li212">
@@ -260,21 +208,12 @@
                                         data-privilege-form="Ypokatasthmata"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/ypokatasthmata"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15vw"
                                         data-bs-title="Διαχείριση των υποκαταστημάτων της επιλεγμένης εταιρείας"
                                     >
-                                        Υποκαταστήματα
+                                            <span class="sidebar-menu-label">Υποκαταστήματα</span>
                                     </a>
                                 </li>
                                 <li id="li213" data-value="li213">
@@ -283,21 +222,12 @@
                                         data-privilege-form="NomimoiEkprosopoi"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/nomimoi_ekprosopoi"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15vw"
                                         data-bs-title="Διαχείριση των νομίμων εκπροσώπων της επιλεγμένης εταιρείας"
                                     >
-                                        Νόμιμοι Εκπρόσωποι
+                                            <span class="sidebar-menu-label">Νόμιμοι Εκπρόσωποι</span>
                                     </a>
                                 </li>
                                 <li id="li214" data-value="li214">
@@ -306,21 +236,12 @@
                                         data-privilege-form="Passwords"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/passwords"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15vw"
                                         data-bs-title="Διαχείριση των Κωδικών Πρόσβασης"
                                     >
-                                        Κωδικοί Πρόσβασης
+                                            <span class="sidebar-menu-label">Κωδικοί Πρόσβασης</span>
                                     </a>
                                 </li>
                                 <li id="li215" data-value="li215">
@@ -329,21 +250,12 @@
                                         data-privilege-form="Antistoixiseis"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/antistoixiseis"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15vw"
                                         data-bs-title="Διαχείριση των Αντιστοιχίσεων των Κ.Π.Κ με εναλλακτικούς κώδικούς ΑΠΔ ΕΦΚΑ"
                                     >
-                                        Αντιστοιχίσεις Κ.Π.Κ.
+                                            <span class="sidebar-menu-label">Αντιστοιχίσεις Κ.Π.Κ.</span>
                                     </a>
                                 </li>
                                 <li id="li216" data-value="li216">
@@ -352,30 +264,21 @@
                                         data-privilege-form="Trapezes"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/trapezes"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15vw"
                                         data-bs-title="Διαχείριση των Τραπεζών - Επαγγελματικών Λογαριασμών της Εταιρείας"
                                     >
-                                        Τράπεζες Ανά Εταιρεία
+                                            <span class="sidebar-menu-label">Τράπεζες Ανά Εταιρεία</span>
                                     </a>
                                 </li>
                             </ul>
                         </li>
 
                         <li id="li22" data-value="li22">
-                            <a class="disabled submenu-li menu-item ajustedGap-submenu">
-                                Εργαζόμενοι
-                                <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i>
+                            <a class="disabled submenu-li menu-item ajustedGap-submenu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                <span class="sidebar-menu-label flex-grow-1 text-wrap">Εργαζόμενοι</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
                             </a>
 
                             <ul class="submenu">
@@ -385,21 +288,12 @@
                                         data-privilege-form="Ergazomenoi"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/ergazomenoi"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Διαχείριση όλων των στοιχείων των Εργαζομένων"
                                     >
-                                        Στοιχεία Εργαζομένων
+                                        <span class="sidebar-menu-label">Στοιχεία Εργαζομένων</span>
                                     </a>
                                 </li>
                                 <li id="li222" data-value="li222">
@@ -407,21 +301,12 @@
                                         id="miktesApoKatharesApodoxes"
                                         class="disabled childmenu-li menu-item"
                                         href="#"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="2"
-                                        data-ml-1440="2"
-                                        data-ml-1366="2"
-                                        data-ml-1360="2"
-                                        data-ml-1280="2"
-                                        data-ml-1152="2"
-                                        data-ml-1024="2"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Υπολογισμός των μικτών αποδοχών βάσει του πληρωτέων ποσών"
                                     >
-                                        Μικτές από Καθαρές Αποδοχές
+                                        <span class="sidebar-menu-label">Μικτές από Καθαρές Αποδοχές</span>
                                     </a>
                                 </li>
                                 <li id="li223" data-value="li223">
@@ -429,46 +314,28 @@
                                         id="eme"
                                         class="disabled childmenu-li menu-item"
                                         href="#"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="2"
-                                        data-ml-1440="2"
-                                        data-ml-1366="2"
-                                        data-ml-1360="2"
-                                        data-ml-1280="2"
-                                        data-ml-1152="2"
-                                        data-ml-1024="2"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Υπολογισμός και προεπισκόπηση των Ετήσιων Μονάδων Εργασίας"
                                     >
-                                        Ετήσιες Μονάδες Εργασίας (EME)
+                                        <span class="sidebar-menu-label">Ετήσιες Μονάδες Εργασίας (EME)</span>
                                     </a>
                                 </li>
                             </ul>
                         </li>
 
                         <li id="li23" data-value="li23">
-                            <a class="disabled submenu-li menu-item ajustedGap-submenu mb-2">
-                                ΕΡΓΑΝΗ ΙΙ
-                                <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i
-                            ></a>
+                            <a class="disabled submenu-li menu-item ajustedGap-submenu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                <span class="sidebar-menu-label flex-grow-1 text-wrap">ΕΡΓΑΝΗ ΙΙ</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                            </a>
                             <ul class="submenu">
                                 <!-- <li id="li231" data-value="li231">
                                     <a
                                         id="synthrhshProgrammatosErgasias"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/programmaErgasias"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="2"
-                                        data-ml-1440="2"
-                                        data-ml-1366="2"
-                                        data-ml-1360="2"
-                                        data-ml-1280="2"
-                                        data-ml-1152="2"
-                                        data-ml-1024="2"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
@@ -483,21 +350,12 @@
                                         data-privilege-form="AntigrafhProgrammatonErgasias"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/antigrafhProgrammaton"
-                                        data-ml-1913="2"
-                                        data-ml-1680="2"
-                                        data-ml-1600="2"
-                                        data-ml-1440="3"
-                                        data-ml-1366="3"
-                                        data-ml-1360="3"
-                                        data-ml-1280="3"
-                                        data-ml-1152="3"
-                                        data-ml-1024="3"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Αντιγραφή Προγράμματος Εργασίας από προηγούμενη περίοδο ΚΑΙ από εργαζόμενο σε εργαζόμενο"
                                     >
-                                        Αντιγραφή Προγράμματος Από Έως Ημερ/νία
+                                        <span class="sidebar-menu-label">Αντιγραφή Προγράμματος Από Έως Ημερ/νία</span>
                                     </a>
                                 </li>
 
@@ -589,21 +447,12 @@
                                         data-privilege-form="CalcApasxolhseisPeriodoy"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/calcApasxolhseisPeriodoy"
-                                        data-ml-1913="2"
-                                        data-ml-1680="3"
-                                        data-ml-1600="3"
-                                        data-ml-1440="3"
-                                        data-ml-1366="3"
-                                        data-ml-1360="3"
-                                        data-ml-1280="3"
-                                        data-ml-1152="3"
-                                        data-ml-1024="3"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Εξαγωγή ωραρίων εργασίας απ' την εφαρμογή και ενημέρωση του Ψηφιακού Ωραρίου στο ΕΡΓΑΝΗ"
                                     >
-                                        Υπολογισμός Απασχολήσεων Βάσει των Ψηφιακών Καρτών</a
+                                        <span class="sidebar-menu-label">Υπολογισμός Απασχολήσεων Βάσει των Ψηφιακών Καρτών</span></a
                                     >
                                 </li>
 
@@ -613,30 +462,19 @@
                                         data-privilege-form="ElegxosApasxolhseonPeriodoy"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Έλεγχος Απασχολήσεων Περιόδου"
                                     >
-                                        Έλεγχος Απασχολήσεων
+                                        <span class="sidebar-menu-label">Έλεγχος Απασχολήσεων</span>
                                     </a>
                                 </li>
 
                                 <li id="li237" data-value="li237">
-                                    <a class="disabled submenu-li menu-item ajustedGap-submenu">
-                                        Αποστολή Αρχείων
-                                        <i
-                                            class="bi bi-chevron-down chevron-icon margin-right-1_5rem"
-                                        ></i>
+                                    <a class="disabled submenu-li menu-item ajustedGap-submenu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                        <span class="sidebar-menu-label flex-grow-1 text-wrap">Αποστολή Αρχείων</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
                                     </a>
 
                                     <ul class="submenu">
@@ -646,21 +484,12 @@
                                                 data-privilege-form="ApologistikosPinakasOrarion"
                                                 class="disabled childmenu-li menu-item"
                                                 href="/ergazomenoi/programmata/apologistikosPinakasOrarion"
-                                                data-ml-1913="1"
-                                                data-ml-1680="2"
-                                                data-ml-1600="2"
-                                                data-ml-1440="2"
-                                                data-ml-1366="2"
-                                                data-ml-1360="2"
-                                                data-ml-1280="2"
-                                                data-ml-1152="2"
-                                                data-ml-1024="2"
                                                 data-bs-toggle="tooltip"
                                                 data-bs-placement="right"
                                                 data-tooltip-max-width="15rem"
                                                 data-bs-title="Απολογιστικός Πίνακας Ωραρίων Μεταβαλλόμενος / Τροποποιούμενος ανά Ημέρα"
                                             >
-                                                Απολογιστικός Πίνακας Ωραρίων
+                                                <span class="sidebar-menu-label">Απολογιστικός Πίνακας Ωραρίων</span>
                                             </a>
                                         </li>
 
@@ -670,21 +499,12 @@
                                                 data-privilege-form="ApologistikosPinakasYperorion"
                                                 class="disabled childmenu-li menu-item"
                                                 href="/ergazomenoi/programmata/apologistikosPinakasYperorion"
-                                                data-ml-1913="2"
-                                                data-ml-1680="2"
-                                                data-ml-1600="2"
-                                                data-ml-1440="2"
-                                                data-ml-1366="2"
-                                                data-ml-1360="2"
-                                                data-ml-1280="2"
-                                                data-ml-1152="2"
-                                                data-ml-1024="2"
                                                 data-bs-toggle="tooltip"
                                                 data-bs-placement="right"
                                                 data-tooltip-max-width="15rem"
                                                 data-bs-title="Απολογιστικός Πίνακας Υποβολής Υπερωριών ανά Ημέρα"
                                             >
-                                                Απολογιστικός Πίνακας Υπερωριών
+                                                <span class="sidebar-menu-label">Απολογιστικός Πίνακας Υπερωριών</span>
                                             </a>
                                         </li>
 
@@ -693,21 +513,12 @@
                                                 id="apologistikosPinakasOrarion"
                                                 class="disabled childmenu-li menu-item"
                                                 href="#"
-                                                data-ml-1913="1"
-                                                data-ml-1680="1"
-                                                data-ml-1600="1"
-                                                data-ml-1440="1"
-                                                data-ml-1366="1"
-                                                data-ml-1360="1"
-                                                data-ml-1280="1"
-                                                data-ml-1152="1"
-                                                data-ml-1024="1"
                                                 data-bs-toggle="tooltip"
                                                 data-bs-placement="right"
                                                 data-tooltip-max-width="15rem"
-                                                data-bs-title="Απολογιστικός Πίνακας Υποβολής Υπερωριών ανά Ημέρα"
+                                                data-bs-title="Υποβολή Αδειών μέσω ΕΡΓΑΝΗ ΙΙ"
                                             >
-                                                Υποβολή Αδειών
+                                                <span class="sidebar-menu-label">Υποβολή Αδειών</span>
                                             </a>
                                         </li>
                                     </ul>
@@ -728,14 +539,14 @@
                                 <i
                                     class="bi bi-chevron-down chevron-icon margin-right-0_5rem display-none"
                                 ></i>
-                                Κρατήσεις
+                                <span class="sidebar-menu-label">Κρατήσεις</span>
                             </a>
                         </li>
 
                         <li id="li25" data-value="li25">
-                            <a class="disabled submenu-li menu-item ajustedGap-submenu">
-                                Συμβάσεις
-                                <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i>
+                            <a class="disabled submenu-li menu-item ajustedGap-submenu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                <span class="sidebar-menu-label flex-grow-1 text-wrap">Συμβάσεις</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
                             </a>
 
                             <ul class="submenu">
@@ -745,21 +556,12 @@
                                         data-privilege-form="Symbaseis"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/symbaseis"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Διαχείριση των στοιχείων των συμβάσεων"
                                     >
-                                        Συμβάσεις
+                                        <span class="sidebar-menu-label">Συμβάσεις</span>
                                     </a>
                                 </li>
                                 <li id="li252" data-value="li252">
@@ -768,21 +570,12 @@
                                         data-privilege-form="KathgoriesSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/kathgories"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Διαχείριση των στοιχείων των κατηγοριών των συμβάσεων"
                                     >
-                                        Κατηγορίες Συμβάσεων
+                                        <span class="sidebar-menu-label">Κατηγορίες Συμβάσεων</span>
                                     </a>
                                 </li>
                                 <li id="li253" data-value="li253">
@@ -791,21 +584,12 @@
                                         data-privilege-form="EidikothtesSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/eidikothtes"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Διαχείριση των στοιχείων των ειδικοτήτων των συμβάσεων"
                                     >
-                                        Ειδικότητες Συμβάσεων
+                                        <span class="sidebar-menu-label">Ειδικότητες Συμβάσεων</span>
                                     </a>
                                 </li>
                                 <li id="li254" data-value="li254">
@@ -814,21 +598,12 @@
                                         data-privilege-form="StoixeiaSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/stoixeiaSymbaseon"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Διαχείριση των στοιχείων των στοιχείων των συμβάσεων"
                                     >
-                                        Στοιχεία Συμβάσεων
+                                        <span class="sidebar-menu-label">Στοιχεία Συμβάσεων</span>
                                     </a>
                                 </li>
                                 <li id="li255" data-value="li255">
@@ -837,21 +612,12 @@
                                         data-privilege-form="KlimakiaSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/klimakia"
-                                        data-ml-1913="1"
-                                        data-ml-1680="1"
-                                        data-ml-1600="1"
-                                        data-ml-1440="1"
-                                        data-ml-1366="1"
-                                        data-ml-1360="1"
-                                        data-ml-1280="1"
-                                        data-ml-1152="1"
-                                        data-ml-1024="1"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Διαχείριση των στοιχείων των κλιμακίων των συμβάσεων"
                                     >
-                                        Κλιμάκια Συμβάσεων
+                                        <span class="sidebar-menu-label">Κλιμάκια Συμβάσεων</span>
                                     </a>
                                 </li>
                                 <li id="li256" data-value="li256">
@@ -860,21 +626,12 @@
                                         data-privilege-form="YpologismoiKlimakionSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/ypologismoiKlimakion"
-                                        data-ml-1913="2"
-                                        data-ml-1680="2"
-                                        data-ml-1600="2"
-                                        data-ml-1440="2"
-                                        data-ml-1366="2"
-                                        data-ml-1360="2"
-                                        data-ml-1280="2"
-                                        data-ml-1152="2"
-                                        data-ml-1024="2"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="right"
                                         data-tooltip-max-width="15rem"
                                         data-bs-title="Υπολογισμός των κλιμακίων των συμβάσεων"
                                     >
-                                        Υπολογισμός Κλιμακίων Συμβάσεων
+                                        <span class="sidebar-menu-label">Υπολογισμός Κλιμακίων Συμβάσεων</span>
                                     </a>
                                 </li>
                             </ul>
@@ -885,9 +642,10 @@
                 <li class="menu-separator"><hr class="menu-hr" /></li>
                 <li id="li3" data-value="li3">
                     <!--  Κινήσεις -->
-                    <a class="disabled menu-li menu-item ajustedGap-menu">
-                        Κινήσεις <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i
-                    ></a>
+                    <a class="disabled menu-li menu-item ajustedGap-menu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                        <span class="sidebar-menu-label flex-grow-1 text-wrap">Κινήσεις</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                    </a>
 
                     <ul class="submenu">
                         <!-- <li id="li31" data-value="li31">
@@ -895,15 +653,6 @@
                                 id="apoysies"
                                 class="disabled childmenu-li menu-item"
                                 href="/kinhseis/apoysies"
-                                data-ml-1913="11"
-                                data-ml-1680="11"
-                                data-ml-1600="11"
-                                data-ml-1440="11"
-                                data-ml-1366="11"
-                                data-ml-1360="11"
-                                data-ml-1280="11"
-                                data-ml-1152="11"
-                                data-ml-1024="11"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="right"
                                 data-tooltip-max-width="15rem"
@@ -919,21 +668,12 @@
                                 data-privilege-form="Apasxolhseis"
                                 class="disabled childmenu-li menu-item"
                                 href="/kinhseis/apasxolhseis"
-                                data-ml-1913="11"
-                                data-ml-1680="11"
-                                data-ml-1600="11"
-                                data-ml-1440="11"
-                                data-ml-1366="11"
-                                data-ml-1360="11"
-                                data-ml-1280="11"
-                                data-ml-1152="11"
-                                data-ml-1024="11"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="right"
                                 data-tooltip-max-width="15rem"
                                 data-bs-title="Διαχείριση των απασχολήσεων του εργαζόμενου"
                             >
-                                Απασχολήσεις
+                                        <span class="sidebar-menu-label">Απασχολήσεις</span>
                             </a>
                         </li>
 
@@ -942,21 +682,12 @@
                                 id="kartelaKinhseon"
                                 class="disabled childmenu-li menu-item"
                                 href="/kinhseis/kartelaKinhseon"
-                                data-ml-1913="11"
-                                data-ml-1680="11"
-                                data-ml-1600="11"
-                                data-ml-1440="11"
-                                data-ml-1366="11"
-                                data-ml-1360="11"
-                                data-ml-1280="11"
-                                data-ml-1152="11"
-                                data-ml-1024="11"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="right"
                                 data-tooltip-max-width="15rem"
                                 data-bs-title="Καρτέλα των κινήσεων του εργαζόμενου"
                             >
-                                Καρτέλα Κινήσεων
+                                        <span class="sidebar-menu-label">Καρτέλα Κινήσεων</span>
                             </a>
                         </li>
                     </ul>
@@ -965,17 +696,17 @@
                 <li class="menu-separator"><hr class="menu-hr" /></li>
                 <li id="li4" data-value="li4">
                     <!--  Εκτυπώσεις -->
-                    <a class="disabled menu-li menu-item ajustedGap-menu">
-                        Εκτυπώσεις
-                        <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i>
+                    <a class="disabled menu-li menu-item ajustedGap-menu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                        <span class="sidebar-menu-label flex-grow-1 text-wrap">Εκτυπώσεις</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
                     </a>
 
                     <ul class="submenu">
                         <li id="li41" data-value="li41">
-                            <a class="disabled submenu-li menu-item">
-                                Απασχολήσεις
-                                <i class="bi bi-chevron-down chevron-icon margin-right--4px"></i
-                            ></a>
+                            <a class="disabled submenu-li menu-item sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                <span class="sidebar-menu-label flex-grow-1 text-wrap">Απασχολήσεις</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                            </a>
 
                             <ul class="submenu">
                                 <li id="li411" data-value="li411">
@@ -989,7 +720,7 @@
                                         data-tooltip-max-width="30rem"
                                         data-bs-title="Εκτύπωση ατομικών εκκαθαρίσεων εργαζομένων"
                                     >
-                                        Αποδείξεις Μισθοδοσίας
+                                            <span class="sidebar-menu-label">Αποδείξεις Μισθοδοσίας</span>
                                     </a>
                                 </li>
                                 <!-- <li id="li412" data-value="li412">
@@ -1001,10 +732,10 @@
                         </li>
 
                         <li id="li42" data-value="li42">
-                            <a class="disabled submenu-li menu-item">
-                                Συμβάσεις
-                                <i class="bi bi-chevron-down chevron-icon margin-right--4px"></i
-                            ></a>
+                            <a class="disabled submenu-li menu-item sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                <span class="sidebar-menu-label flex-grow-1 text-wrap">Συμβάσεις</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                            </a>
 
                             <ul class="submenu">
                                 <li id="li421" data-value="li421">
@@ -1017,7 +748,7 @@
                                         data-tooltip-max-width="30rem"
                                         data-bs-title="Σύμβαση εργασίας ανάλογα με τα στοιχεία του εργαζόμενου δηλ. αν είναι αορίστου ή ορισμένου χρόνου πλήρους ή μερικής ή εκ περιτροπής απασχόλησης, ΜΟΝΟ ΣΤΕΛΕΧΩΝ ΕΠΙΧΕΙΡΗΣΕΩΝ"
                                     >
-                                        Στελεχών επιχειρήσεων
+                                            <span class="sidebar-menu-label">Στελεχών επιχειρήσεων</span>
                                     </a>
                                 </li>
                                 <li id="li422" data-value="li422">
@@ -1031,7 +762,7 @@
                                         data-tooltip-max-width="30rem"
                                         data-bs-title="Σύμβαση εργασίας ανάλογα με τα στοιχεία του εργαζόμενου δηλ. αν είναι αορίστου ή ορισμένου χρόνου, πλήρους ή μερικής ή εκ περιτροπής απασχόλησης κλπ, ΕΡΓΑΖΟΜΕΝΩΝ πλην ΣΤΕΛΕΧΩΝ"
                                     >
-                                        Εργαζόμενων
+                                            <span class="sidebar-menu-label">Εργαζόμενων</span>
                                     </a>
                                 </li>
                             </ul>
@@ -1042,16 +773,16 @@
                 <li class="menu-separator"><hr class="menu-hr" /></li>
                 <li id="li5" data-value="li5">
                     <!--  Παράμετροι -->
-                    <a class="disabled menu-li menu-item ajustedGap-menu">
-                        Παράμετροι Αρχείων
-                        <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i
-                    ></a>
+                    <a class="disabled menu-li menu-item ajustedGap-menu sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                        <span class="sidebar-menu-label flex-grow-1 text-wrap">Παράμετροι Αρχείων</span>
+                        <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                    </a>
                     <ul class="submenu">
                         <li id="li51" data-value="li51">
-                            <a class="disabled submenu-li menu-item">
-                                Ενημέρωση Αρχείων
-                                <i class="bi bi-chevron-down chevron-icon margin-right--4px"></i
-                            ></a>
+                            <a class="disabled submenu-li menu-item sidebar-submenu-toggle d-flex align-items-center w-100 py-1 gap-2">
+                                <span class="sidebar-menu-label flex-grow-1 text-wrap">Ενημέρωση Αρχείων</span>
+                                <span class="user-privileges-hierarchy-chevron flex-shrink-0 ms-auto" aria-hidden="true"><%= '▸' %></span>
+                            </a>
 
                             <ul class="submenu">
                                 <li id="li511" data-value="li511">
@@ -1064,7 +795,7 @@
                                         data-tooltip-max-width="25vw"
                                         data-bs-title="Ενημέρωση του πεδίου krathshId του αρχείου Ποσοστά Κρατήσεων με το ID του αρχείου κρατήσεων"
                                     >
-                                        Ποσοστά Κρατήσεων
+                                        <span class="sidebar-menu-label">Ποσοστά Κρατήσεων</span>
                                     </a>
                                     <!-- <a
                                         id="enhmerosh_pososton_me_id_krathseon"
@@ -1088,7 +819,7 @@
                                         data-tooltip-max-width="25vw"
                                         data-bs-title="Ενημέρωση του πεδίου kodikosSort του αρχείου KadModel"
                                     >
-                                        Κ.Α.Δ.
+                                        <span class="sidebar-menu-label">Κ.Α.Δ.</span>
                                     </a>
                                 </li>
                                 <li id="li513" data-value="li513">
@@ -1101,7 +832,7 @@
                                         data-tooltip-max-width="25vw"
                                         data-bs-title="Ενημέρωση του πεδίου kodikosSort του αρχείου TypoiApodoxonModel"
                                     >
-                                        Τύποι Αποδοχών
+                                        <span class="sidebar-menu-label">Τύποι Αποδοχών</span>
                                     </a>
                                 </li>
                             </ul>
@@ -1113,7 +844,7 @@
                 <li class="menu-separator"><hr class="menu-hr" /></li>
                 <li id="li6" data-value="li6">
                     <!--  Επικοινωνία -->
-                    <a class="disabled menu-li menu-item ajustedGap-menu" href="#"> Επικοινωνία </a>
+                    <a class="disabled menu-li menu-item ajustedGap-menu" href="#"><span class="sidebar-menu-label">Επικοινωνία</span></a>
                 </li>
             </ul>
         </div>
