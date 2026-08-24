@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+const mongoose = require('mongoose');
 const {
     DIAGNOSTIC,
     PROTECTION_STATE,
@@ -141,6 +142,25 @@ test('exports stable protected identity fields and exact snapshot field count', 
         'apologistiko_biblio'
     ]);
     assert.strictEqual(SNAPSHOT_FIELDS.length, 17);
+});
+
+test('sanitizer treats Mongoose ObjectId and typed arrays as safe leaf values', () => {
+    const objectId = new mongoose.Types.ObjectId();
+    const bytes = new Uint8Array([1, 2, 3]);
+    const result = sanitizeAppliedRepoTransferUpdate({
+        rowId: IDS.otherSource,
+        currentRow: {},
+        update: { orphan_card_resolution: { approved_interval: {
+            effectiveProfileHistoryId: objectId, evidence: bytes
+        } } },
+        protectionContext: context([], [IDS.otherSource])
+    });
+    assert.strictEqual(result.sanitizedUpdate.orphan_card_resolution
+        .approved_interval.effectiveProfileHistoryId, objectId);
+    assert.strictEqual(result.sanitizedUpdate.orphan_card_resolution
+        .approved_interval.evidence, bytes);
+    assert.strictEqual(Object.isFrozen(objectId), false);
+    assert.strictEqual(Object.isFrozen(bytes), false);
 });
 
 test('legacy applied snapshots remain protected without silently inventing book state', () => {

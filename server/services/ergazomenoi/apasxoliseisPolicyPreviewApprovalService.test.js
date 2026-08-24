@@ -1044,9 +1044,10 @@ async function testOrphanReusablePolicyFoundation() {
             assert.strictEqual(filter.ypokatasthma, '0001');
             return { select: () => ({ lean: async () => null }) };
         },
-        create: async ([document]) => {
-            createdDocument = document;
-            return [document];
+        findOneAndUpdate: (filter, update) => {
+            assert.strictEqual(filter.team, session.userTeam);
+            createdDocument = update.$setOnInsert;
+            return { lean: async () => createdDocument };
         }
     };
     await createOrphanReusablePolicyDecisionRecord({
@@ -1077,12 +1078,38 @@ async function testOrphanReusablePolicyFoundation() {
     assert.strictEqual(lookupFilter.company_kod, session.companyInUse);
     assert.strictEqual(lookupFilter.ypokatasthma, '0001');
     assert.strictEqual(lookupFilter.reuse_status, 'ACTIVE');
+    const identityPolicies = lookupFilter.$and[0].$or.map((item) => item.policy_code).sort();
+    assert.deepStrictEqual(identityPolicies, [
+        'ORPHAN_CARD_CONTINUOUS', 'ORPHAN_CARD_CONTINUOUS_RESOLUTION'
+    ]);
 
     await assert.rejects(() => createOrphanReusablePolicyDecisionRecord({
         session: { ...session, userRole: 'U' },
         row: { ypokatasthma: '1', hmeromhnia: '2026-06-15' }, rule,
         approvalModel: {}
     }), (error) => error.statusCode === 403);
+}
+
+async function testConcurrentOrphanReusableCreationIsAtomic() {
+    const rule = { policy_version: 'orphan-card-continuous:v1', orphan_type: 'START_ONLY',
+        schedule_kind: 'CONTINUOUS', rule: 'ACTUAL_START_PLUS_DECLARED_DURATION' };
+    let stored = null;
+    let inserts = 0;
+    const approvalModel = {
+        findOneAndUpdate(filter, update) {
+            if (!stored) { stored = { _id: 'single', ...update.$setOnInsert }; inserts += 1; }
+            return { lean: async () => stored };
+        }
+    };
+    const args = { session, row: { _id: '507f1f77bcf86cd799439012', kodikos: '0004',
+        ypokatasthma: '1', hmeromhnia: '2026-06-15', kathgoria_ergasias: 'ΕΡΓ' },
+    rule, approvalModel };
+    const [left, right] = await Promise.all([
+        createOrphanReusablePolicyDecisionRecord(args),
+        createOrphanReusablePolicyDecisionRecord(args)
+    ]);
+    assert.strictEqual(inserts, 1);
+    assert.strictEqual(left._id, right._id);
 }
 
 async function run() {
@@ -1119,6 +1146,7 @@ async function run() {
     await testAuthoritativeAtomicV5ApprovalCreationAndGuards();
     await testAtomicV5DuplicateLifecycleAndCrossEmployeeIdentity();
     await testOrphanReusablePolicyFoundation();
+    await testConcurrentOrphanReusableCreationIsAtomic();
     console.log('apasxoliseis policy preview approval service tests passed');
 }
 

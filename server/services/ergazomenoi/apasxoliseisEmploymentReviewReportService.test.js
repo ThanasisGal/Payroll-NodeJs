@@ -75,6 +75,22 @@ test('η κοινή προβολή διατηρεί τις κανονικές η
     assert.equal(report.daily.find((item) => item.employeeCode === '0009').cards, '14:38–—');
 });
 
+test('canonical και legacy orphan metadata έχουν ίδια ασφαλή παρουσίαση', () => {
+    const canonical = buildEmploymentReviewReportProjection({ rows: [row({
+        orphan_card_resolution: { status: 'HR_APPROVED', reuse_scope: 'FUTURE_IDENTICAL',
+            rest_violation: true, risk_acknowledged: true }
+    })] }).daily[0].orphan;
+    const legacy = buildEmploymentReviewReportProjection({ rows: [row({
+        orphan_card_resolution: { status: 'HR_APPROVED', resolution_scope: 'FUTURE_IDENTICAL',
+            rest_conflicts: ['PREVIOUS'], rest_risk_acknowledged: true }
+    })] }).daily[0].orphan;
+    assert.equal(canonical.reuseScope, legacy.reuseScope);
+    assert.equal(canonical.restViolation, true);
+    assert.equal(legacy.restViolation, true);
+    assert.equal(canonical.riskAcknowledged, true);
+    assert.equal(legacy.riskAcknowledged, true);
+});
+
 test('μία εβδομαδιαία εκκρεμότητα δεν αθροίζεται επτά φορές', () => {
     const rows = Array.from({ length: 7 }, (_, index) => row({
         kodikos: '0040', employeeName: 'ΜΙΑ ΕΚΚΡΕΜΟΤΗΤΑ',

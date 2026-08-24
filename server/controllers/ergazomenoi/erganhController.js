@@ -201,6 +201,11 @@ const {
     sanitizeAppliedRepoTransferUpdate
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionService');
 const {
+    removeClientRawCardUpdates,
+    buildEmploymentReviewUpdateErrorResponse,
+    persistOrphanResolutionWrite
+} = require('../../services/ergazomenoi/apasxoliseisOrphanResolutionPersistenceService');
+const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
@@ -484,6 +489,7 @@ if (isProduction) {
 }
 
 let team, company, username, _pdfUrlPath;
+let orphanResolutionBoundaryTestOverrides = null;
 
 // ============================================================
 // Διαφορά σε ώρες (decimal) μεταξύ "HH:MM" - "HH:MM"
@@ -10851,6 +10857,7 @@ class erganhController {
 
     static updateProdhlomenaOrariaReviewRecord = async (req, res) => {
         try {
+            const boundaryOverrides = orphanResolutionBoundaryTestOverrides || {};
             const sessionTeam = req.session.userTeam;
             const companyId = req.session.companyInUse;
             const changedBy =
@@ -10931,12 +10938,15 @@ class erganhController {
                 'ores_apoysias_apologistika'
             ];
 
-            const cleanUpdates = {};
+            let cleanUpdates = {};
 
             for (const field of allowedFields) {
                 if (Object.prototype.hasOwnProperty.call(updates, field)) {
                     cleanUpdates[field] = updates[field];
                 }
+            }
+            if (orphanResolutionCommand) {
+                cleanUpdates = removeClientRawCardUpdates(cleanUpdates);
             }
 
             if (Object.prototype.hasOwnProperty.call(
@@ -10952,11 +10962,13 @@ class erganhController {
                 });
             }
 
-            const oldRecord = await ProdhlomenaOrariaModel.findOne({
-                _id: id,
-                team: sessionTeam,
-                company_kod: companyId
-            }).lean();
+            const oldRecord = boundaryOverrides.loadOldRecord
+                ? await boundaryOverrides.loadOldRecord({ id, sessionTeam, companyId })
+                : await ProdhlomenaOrariaModel.findOne({
+                    _id: id,
+                    team: sessionTeam,
+                    company_kod: companyId
+                }).lean();
 
             if (!oldRecord) {
                 return res.status(404).json({
@@ -10974,86 +10986,101 @@ class erganhController {
                         'Απαιτείται ρητή έγκριση για την επίλυση ορφανού χτυπήματος.'),
                     { code: 'ORPHAN_RESOLUTION_EXPLICIT_APPROVAL_REQUIRED', statusCode: 400 });
                 }
-                const [contextRows, employee, histories] = await Promise.all([
-                    ProdhlomenaOrariaModel.find({ team: sessionTeam, company_kod: companyId,
-                        ypokatasthma: oldRecord.ypokatasthma, kodikos: oldRecord.kodikos })
-                        .select(REVIEW_SELECT_FIELDS).sort({ hmeromhnia: 1 }).lean(),
-                    ErgazomenoiModel.findOne({ team: sessionTeam, company_kod: companyId,
-                        ypokatasthma: oldRecord.ypokatasthma, kodikos: oldRecord.kodikos }).lean(),
-                    IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
-                        company_kod: companyId, kodikos: oldRecord.kodikos })
-                        .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
-                ]);
-                const breakConfiguration = resolveBreakConfigurationForDate(
-                    oldRecord.hmeromhnia, histories, employee || {}
-                );
-                const effectiveEmployee = {
-                    ...getEffectiveEmployeeForDate(oldRecord, employee || {}, histories),
-                    dialleima_entos_ektos_orarioy: breakConfiguration.break_inside_schedule,
-                    dialleima_se_lepta: breakConfiguration.break_minutes,
-                    _breakConfiguration: breakConfiguration
-                };
-                approvedOrphanResolution = resolveOrphanCardResolution({
-                    row: oldRecord, contextRows, effectiveEmployee, breakConfiguration,
-                    manualInterval: { start: orphanResolutionCommand.apologistiko_start,
-                        end: orphanResolutionCommand.apologistiko_end },
-                    riskAcknowledged: orphanResolutionCommand.risk_acknowledged === true,
-                    reuseScope: orphanResolutionCommand.reuse_scope ===
-                        ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
-                        ? ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
-                        : ORPHAN_RESOLUTION_SCOPE.ONE_TIME
-                });
-                if (approvedOrphanResolution.requiresRiskAcknowledgement === true ||
-                    approvedOrphanResolution.canApprove !== true ||
-                    !approvedOrphanResolution.approvedUpdates) {
-                    throw Object.assign(new Error(
-                        'Απαιτείται ρητή επιβεβαίωση της παραβίασης 11ωρης ανάπαυσης.'),
-                    { code: 'ORPHAN_REST_RISK_ACKNOWLEDGEMENT_REQUIRED', statusCode: 409 });
+                if (boundaryOverrides.prepareOrphanResolution) {
+                    const prepared = await boundaryOverrides.prepareOrphanResolution({
+                        oldRecord, orphanResolutionCommand, changedBy
+                    });
+                    approvedOrphanResolution = prepared.approvedOrphanResolution;
+                    dailyDerived = prepared.dailyDerived;
+                } else {
+                    const [contextRows, employee, histories] = await Promise.all([
+                        ProdhlomenaOrariaModel.find({ team: sessionTeam, company_kod: companyId,
+                            ypokatasthma: oldRecord.ypokatasthma, kodikos: oldRecord.kodikos })
+                            .select(REVIEW_SELECT_FIELDS).sort({ hmeromhnia: 1 }).lean(),
+                        ErgazomenoiModel.findOne({ team: sessionTeam, company_kod: companyId,
+                            ypokatasthma: oldRecord.ypokatasthma,
+                            kodikos: oldRecord.kodikos }).lean(),
+                        IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
+                            company_kod: companyId, kodikos: oldRecord.kodikos })
+                            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
+                    ]);
+                    const breakConfiguration = resolveBreakConfigurationForDate(
+                        oldRecord.hmeromhnia, histories, employee || {}
+                    );
+                    const effectiveEmployee = {
+                        ...getEffectiveEmployeeForDate(oldRecord, employee || {}, histories),
+                        dialleima_entos_ektos_orarioy: breakConfiguration.break_inside_schedule,
+                        dialleima_se_lepta: breakConfiguration.break_minutes,
+                        _breakConfiguration: breakConfiguration
+                    };
+                    approvedOrphanResolution = resolveOrphanCardResolution({
+                        row: oldRecord, contextRows, effectiveEmployee, breakConfiguration,
+                        manualInterval: { start: orphanResolutionCommand.apologistiko_start,
+                            end: orphanResolutionCommand.apologistiko_end },
+                        riskAcknowledged: orphanResolutionCommand.risk_acknowledged === true,
+                        reuseScope: orphanResolutionCommand.reuse_scope ===
+                            ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
+                            ? ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
+                            : ORPHAN_RESOLUTION_SCOPE.ONE_TIME
+                    });
+                    if (approvedOrphanResolution.requiresRiskAcknowledgement === true ||
+                        approvedOrphanResolution.canApprove !== true ||
+                        !approvedOrphanResolution.approvedUpdates) {
+                        throw Object.assign(new Error(
+                            'Απαιτείται ρητή επιβεβαίωση της παραβίασης 11ωρης ανάπαυσης.'),
+                        { code: 'ORPHAN_REST_RISK_ACKNOWLEDGEMENT_REQUIRED', statusCode: 409 });
+                    }
+                    const noCardsDisplayContext = await buildNoCardsDisplayContext({
+                        team: sessionTeam, companyId,
+                        etos: String(new Date(oldRecord.hmeromhnia).getUTCFullYear()),
+                        periodStart: oldRecord.hmeromhnia,
+                        periodEnd: addDaysUtc(oldRecord.hmeromhnia, 1)
+                    });
+                    const orphanProtectionContext = await loadAppliedProtectionForRows([oldRecord]);
+                    dailyDerived = buildApprovedOrphanDailyDerivedUpdate({
+                        row: oldRecord, effectiveEmployee,
+                        argiesDateSet: new Set(noCardsDisplayContext.argiesByDateKey.keys()),
+                        approvedOrphanResolution,
+                        appliedProtectionContext: orphanProtectionContext
+                    });
                 }
-                const noCardsDisplayContext = await buildNoCardsDisplayContext({
-                    team: sessionTeam, companyId,
-                    etos: String(new Date(oldRecord.hmeromhnia).getUTCFullYear()),
-                    periodStart: oldRecord.hmeromhnia,
-                    periodEnd: addDaysUtc(oldRecord.hmeromhnia, 1)
-                });
-                const orphanProtectionContext = await loadAppliedProtectionForRows([oldRecord]);
-                dailyDerived = buildApprovedOrphanDailyDerivedUpdate({
-                    row: oldRecord, effectiveEmployee,
-                    argiesDateSet: new Set(noCardsDisplayContext.argiesByDateKey.keys()),
-                    approvedOrphanResolution,
-                    appliedProtectionContext: orphanProtectionContext
-                });
                 Object.assign(cleanUpdates, approvedOrphanResolution.approvedUpdates);
                 Object.assign(cleanUpdates, dailyDerived.derivedUpdate);
                 orphanMetadata = {
                     status: 'HR_APPROVED', policy_version: ORPHAN_CARD_POLICY_VERSION,
                     orphan_type: approvedOrphanResolution.orphanType,
-                    resolution_scope: approvedOrphanResolution.reuseScope,
+                    reuse_scope: approvedOrphanResolution.reuseScope,
                     approved_interval: approvedOrphanResolution.proposal,
                     reusable_decision_rule:
                         approvedOrphanResolution.reusableDecisionRule || null,
-                    rest_risk_acknowledged:
+                    rest_violation: approvedOrphanResolution.rest?.hasViolation === true,
+                    risk_acknowledged:
                         orphanResolutionCommand.risk_acknowledged === true,
                     rest_conflicts: approvedOrphanResolution.rest?.conflicts || [],
                     raw_cards_preserved: true,
                     approved_by: changedBy,
-                    approved_at: new Date()
+                    approved_at: null
                 };
                 cleanUpdates.orphan_card_resolution = orphanMetadata;
             }
 
-            const periodAccess = orphanResolutionCommand
+            const periodAccess = boundaryOverrides.getPeriodAccess
+                ? await boundaryOverrides.getPeriodAccess({ req, oldRecord,
+                    orphanResolutionCommand })
+                : orphanResolutionCommand
                 ? await assertActiveEmploymentReviewOrphanResolutionPeriod(
                     req, oldRecord.ypokatasthma, oldRecord.hmeromhnia)
                 : await assertActiveEmploymentReviewPeriodNormal(
                     req, oldRecord.ypokatasthma, null, { start: oldRecord.hmeromhnia });
             const staleOrphanResolution = Boolean(orphanResolutionCommand &&
                 periodAccess.state?.effective_mode === 'HISTORICAL_RECONSTRUCTION_STALE');
-            const periodFence = staleOrphanResolution
+            const periodFence = boundaryOverrides.periodFence || (staleOrphanResolution
                 ? runWithStaleOrphanResolutionWriteFence
-                : runWithPeriodWriteFence;
+                : runWithPeriodWriteFence);
 
-            const appliedProtectionContext = await loadAppliedProtectionForRows([oldRecord]);
+            const appliedProtectionContext = boundaryOverrides.loadAppliedProtection
+                ? await boundaryOverrides.loadAppliedProtection([oldRecord])
+                : await loadAppliedProtectionForRows([oldRecord]);
             const protectedManualUpdate = sanitizeAppliedRepoTransferUpdate({
                 rowId: oldRecord._id,
                 currentRow: oldRecord,
@@ -11092,38 +11119,45 @@ class erganhController {
                 }
             }
 
-            if (Object.keys(newValues).length === 0) {
+            if (Object.keys(newValues).length === 0 && !orphanResolutionCommand) {
                 return res.json({
                     success: true,
                     message: 'Δεν υπήρχαν αλλαγές για αποθήκευση.'
                 });
             }
 
-            permittedUpdates.is_locked = true;
-            permittedUpdates.locked_by = changedBy;
-            permittedUpdates.locked_at = new Date();
-
+            let persistenceResult = null;
             await periodFence({
                 scope: periodAccess.scope,
                 expectedToken: periodAccess.token,
                 work: async ({ session }) => {
-                    const rowFilter = { _id: id, team: sessionTeam, company_kod: companyId };
-                    rowFilter.updatedAt = oldRecord.updatedAt;
-                    await ProdhlomenaOrariaModel.updateOne(
-                        rowFilter,
-                        { $set: permittedUpdates },
-                        { session }
-                    );
-                    if (approvedOrphanResolution?.reuseScope ===
-                        ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL &&
-                        approvedOrphanResolution.reusableDecisionRule) {
-                        await createOrphanReusablePolicyDecisionRecord({
-                            session: req.session,
-                            row: oldRecord,
-                            rule: approvedOrphanResolution.reusableDecisionRule,
-                            dbSession: session
+                    if (orphanResolutionCommand) {
+                        const persist = boundaryOverrides.persistOrphanResolutionWrite ||
+                            persistOrphanResolutionWrite;
+                        persistenceResult = await persist({
+                            oldRecord, semanticUpdates: permittedUpdates, changedBy,
+                            reason: String(reason).trim(),
+                            schemaPaths: Object.keys(ProdhlomenaOrariaModel.schema.paths),
+                            rowModel: ProdhlomenaOrariaModel,
+                            auditModel: ProdhlomenaOrariaAuditModel,
+                            session,
+                            createReusableApproval: approvedOrphanResolution?.reuseScope ===
+                                ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL &&
+                                approvedOrphanResolution.reusableDecisionRule
+                                ? (dbSession) => createOrphanReusablePolicyDecisionRecord({
+                                    session: req.session, row: oldRecord,
+                                    rule: approvedOrphanResolution.reusableDecisionRule,
+                                    dbSession
+                                }) : null
                         });
+                        return;
                     }
+                    const finalUpdates = { ...permittedUpdates, is_locked: true,
+                        locked_by: changedBy, locked_at: new Date() };
+                    await ProdhlomenaOrariaModel.updateOne(
+                        { _id: id, team: sessionTeam, company_kod: companyId },
+                        { $set: finalUpdates }, { session }
+                    );
                     await ProdhlomenaOrariaAuditModel.create([{
                         team: sessionTeam, company_kod: companyId,
                         prodhlomena_oraria_id: oldRecord._id, kodikos: oldRecord.kodikos,
@@ -11135,16 +11169,16 @@ class erganhController {
 
             return res.json({
                 success: true,
-                message: 'Η εγγραφή ενημερώθηκε επιτυχώς.'
+                code: persistenceResult?.idempotent
+                    ? 'ORPHAN_RESOLUTION_ALREADY_APPLIED' : undefined,
+                message: persistenceResult?.idempotent
+                    ? 'Η ίδια επίλυση ορφανού χτυπήματος έχει ήδη αποθηκευτεί.'
+                    : 'Η εγγραφή ενημερώθηκε επιτυχώς.'
             });
         } catch (error) {
             console.error('[updateProdhlomenaOrariaReviewRecord] ❌', error);
-            return res.status(error.statusCode || 500).json({
-                success: false,
-                code: error.code || undefined,
-                message: error.statusCode ? error.message : 'Σφάλμα κατά την ενημέρωση της εγγραφής.',
-                error: error.message
-            });
+            const response = buildEmploymentReviewUpdateErrorResponse(error);
+            return res.status(response.status).json(response.body);
         }
     };
 
@@ -16764,6 +16798,23 @@ Object.defineProperty(erganhController, '__orphanDailyCalculationTestHooks', {
         calculateAdditionalAndOverworkForDay,
         ORPHAN_DERIVED_PREVIEW_FIELDS,
         ORPHAN_WEEKLY_DEPENDENT_FIELDS
+    }),
+    enumerable: false
+});
+
+Object.defineProperty(erganhController, '__orphanResolutionBoundaryTestHooks', {
+    value: Object.freeze({
+        async withOverrides(overrides, work) {
+            if (orphanResolutionBoundaryTestOverrides) {
+                throw new Error('Orphan resolution boundary test overrides are already active.');
+            }
+            orphanResolutionBoundaryTestOverrides = Object.freeze({ ...overrides });
+            try {
+                return await work();
+            } finally {
+                orphanResolutionBoundaryTestOverrides = null;
+            }
+        }
     }),
     enumerable: false
 });
