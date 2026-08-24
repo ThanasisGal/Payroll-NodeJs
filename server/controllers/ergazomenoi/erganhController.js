@@ -263,6 +263,11 @@ const {
 const {
     buildReviewExportProjection
 } = require('../../services/ergazomenoi/apasxoliseisReviewExportProjectionService');
+const {
+    buildEmploymentReviewReportProjection,
+    buildEmploymentReviewWorkbook,
+    buildEmploymentReviewPdf
+} = require('../../services/ergazomenoi/apasxoliseisEmploymentReviewReportService');
 const ApasxoliseisPolicyPreviewApprovalModel = require('../../models/apasxoliseisPolicyPreviewApproval');
 const ApasxoliseisWeeklyRepoTransferDecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
 const ApasxoliseisWeeklyRepoTransferExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
@@ -4901,12 +4906,154 @@ async function getReviewRowsForExport(req) {
         canonicalResolutionsByWeek,
         deviations: exportDeviations,
         atomicGroupProjection,
-        findingsOnly: true
+        findingsOnly: false
     });
+    const workflowScope = {
+        team: req.session.userTeam,
+        company_kod: String(req.session.companyInUse || ''),
+        ...(String(req.query.ypokatasthma || '').trim()
+            ? { ypokatasthma: String(req.query.ypokatasthma).trim().padStart(4, '0') }
+            : {}),
+        ...(kodikoi.length ? { employee_kodikos: mongoose.trusted({ $in: kodikoi }) } : {}),
+        ...(periodStart && periodEnd ? {
+            week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
+            week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) })
+        } : {})
+    };
+    const [workflowStates, workflowAudits, companyPolicyRules] = await Promise.all([
+        ApasxoliseisWeeklyHrWorkflowStateModel.find(workflowScope).lean(),
+        ApasxoliseisWeeklyHrWorkflowAuditModel.find(workflowScope)
+            .sort({ performed_at: 1 }).lean(),
+        ApasxoliseisCompanyPolicyRuleModel.find({
+            team: req.session.userTeam,
+            company_kod: String(req.session.companyInUse || '')
+        }).sort({ policy_code: 1, effective_from: 1 }).lean()
+    ]);
+    const workflowStateByWeek = new Map(workflowStates.map((state) => [
+        `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`,
+        state
+    ]));
+    const lifecycleByWeek = new Map();
+    for (const [key, weekRows] of reviewWeekRows) {
+        const firstRow = weekRows[0];
+        const employee = lifecycleByKodikos.get(String(firstRow.kodikos || '')) ||
+            ergByKodikos.get(String(firstRow.kodikos || '')) || {};
+        const naturalWeekStart = startOfWeekMondayUtc(firstRow.hmeromhnia);
+        const naturalWeekEnd = endOfWeekSundayUtc(firstRow.hmeromhnia);
+        const employmentDateScope = deriveEmploymentOwnedDateScope({
+            natural_week_start: naturalWeekStart,
+            natural_week_end: naturalWeekEnd,
+            period_start: periodStart || naturalWeekStart,
+            period_end: periodEnd || naturalWeekEnd,
+            hire_date: employee.hmeromhnia_proslhpshs,
+            departure_date: employee.hmeromhnia_apoxorhshs
+        });
+        const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
+            dateKeyUtc(row.hmeromhnia), {
+                hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
+                ores_ergasias_ebdomadas: row.effective_weekly_hours,
+                mo_oron_hmerhsias_ergasias: row.effective_daily_hours,
+                kathestos_apasxolhshs: row.effective_kathestos_apasxolhshs,
+                typos_apasxolhshs: row.effective_typos_apasxolhshs,
+                typos_ebdomadas: row.effective_typos_ebdomadas,
+                pososto_prosayxhshs_6hs_hmeras: row.effective_sixth_day_rate,
+                eidikh_kathgoria_ergazomenoy: row.effective_special_category,
+                eidikh_periptosh: row.effective_special_case,
+                source: row.effective_profile_source
+            }
+        ]));
+        const effectiveProfile = effectiveProfilesByDate[dateKeyUtc(weekRows.at(-1)?.hmeromhnia)] || {};
+        const state = workflowStateByWeek.get(key) || {};
+        lifecycleByWeek.set(key, buildWeeklyHrLifecycleProjection({
+            weekRows: weekRows.map((row) => ({ ...row,
+                team: req.session.userTeam,
+                company_kod: String(req.session.companyInUse || '')
+            })),
+            effectiveProfile,
+            effectiveProfilesByDate,
+            persistedStage1State: state.stage1 || null,
+            persistedStage3State: state.stage3 || null,
+            scope: {
+                team: req.session.userTeam,
+                company_kod: String(req.session.companyInUse || ''),
+                ypokatasthma: String(firstRow.ypokatasthma || '').padStart(4, '0'),
+                employee_id: employee._id || firstRow.employee_id,
+                employee_kodikos: firstRow.kodikos,
+                week_start: naturalWeekStart,
+                week_end: naturalWeekEnd
+            },
+            periodScope: periodStart && periodEnd &&
+                (dateKeyUtc(naturalWeekStart) < dateKeyUtc(periodStart) ||
+                    dateKeyUtc(naturalWeekEnd) > dateKeyUtc(periodEnd)) &&
+                (employmentDateScope?.context_only_dates?.length || 0) > 0
+                ? { period_start: periodStart, period_end: periodEnd }
+                : null,
+            employmentDateScope,
+            companyPolicyRules
+        }));
+    }
     projection.rows.__deviations = exportDeviations;
     projection.rows.__projectionTotals = projection.totals;
     projection.rows.__policyVersion = projection.policyVersion;
+    projection.rows.__workflowStates = workflowStates;
+    projection.rows.__workflowAudits = workflowAudits;
+    projection.rows.__lifecycleByWeek = lifecycleByWeek;
+    projection.rows.__repoTransferDecisions = decisionsWithApplyState;
+    projection.rows.__periodStart = periodStart;
+    projection.rows.__periodEnd = periodEnd;
     return projection.rows;
+}
+
+async function buildEmploymentReviewReportForRequest(req) {
+    const rows = await getReviewRowsForExport(req);
+    let periodControl = null;
+    try {
+        const scope = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
+        periodControl = await getPeriodControl({ scope });
+    } catch (_) {
+        periodControl = null;
+    }
+    return buildEmploymentReviewReportProjection({
+        rows,
+        workflowStates: rows.__workflowStates || [],
+        workflowAudits: rows.__workflowAudits || [],
+        lifecycleByWeek: rows.__lifecycleByWeek || new Map(),
+        repoTransferDecisions: rows.__repoTransferDecisions || [],
+        metadata: {
+            companyName: req.session.companyDescription || req.session.companyKodikos ||
+                String(req.session.companyInUse || ''),
+            companyCode: req.session.companyKodikos || '',
+            branch: String(req.query.ypokatasthma || '').trim().padStart(4, '0'),
+            periodStart: rows.__periodStart || req.query.apo_hmeromhnia,
+            periodEnd: rows.__periodEnd || req.query.eos_hmeromhnia,
+            periodStatus: periodControl?.stored_status || '',
+            periodVersion: periodControl?.version || periodControl?.period_control_version || '',
+            reconstructionStatus: periodControl?.historical_reconstruction_status || '',
+            reconstructionVersion: periodControl?.historical_reconstruction_version || '',
+            policyVersion: rows.__policyVersion || '',
+            frozenFingerprint: rows.__frozenSnapshotFingerprint || '',
+            generatedAt: new Date()
+        }
+    });
+}
+
+async function sendEmploymentReviewWorkbook(req, res) {
+    const report = await buildEmploymentReviewReportForRequest(req);
+    const workbook = buildEmploymentReviewWorkbook(report);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="elegxos_apasxolhseon_${Date.now()}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+}
+
+async function sendEmploymentReviewPdf(req, res, { dossier = false } = {}) {
+    const report = await buildEmploymentReviewReportForRequest(req);
+    const doc = buildEmploymentReviewPdf(report, { dossier });
+    const baseName = dossier ? 'fakelos_elegxou_apasxolhshs' : 'elegxos_apasxolhseon';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${baseName}_${Date.now()}.pdf"`);
+    doc.pipe(res);
+    doc.end();
 }
 function makeReviewPdfDocument() {
     const doc = new PDFDocument({
@@ -8322,6 +8469,8 @@ class erganhController {
 
     static exportProdhlomenaOrariaReviewExcel = async (req, res) => {
         try {
+            return await sendEmploymentReviewWorkbook(req, res);
+            /* istanbul ignore next -- η παλιά μορφοποίηση διατηρείται προσωρινά μόνο για ασφαλή σύγκριση. */
             const rows = await getReviewRowsForExport(req);
             const deviations = rows.__deviations || [];
             const deviationsByKodikos = new Map();
@@ -8925,6 +9074,8 @@ class erganhController {
 
     static exportProdhlomenaOrariaReviewPdf = async (req, res) => {
         try {
+            return await sendEmploymentReviewPdf(req, res);
+            /* istanbul ignore next -- η παλιά μορφοποίηση διατηρείται προσωρινά μόνο για ασφαλή σύγκριση. */
             const rows = await getReviewRowsForExport(req);
             const deviations = rows.__deviations || [];
             const deviationsByKodikos = new Map();
@@ -10414,6 +10565,16 @@ class erganhController {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'WEEKLY_HR_WORKFLOW_READ_FAILED',
                 message: error.statusCode ? error.message : 'Αποτυχία ανάγνωσης της εβδομαδιαίας ροής HR.' });
+        }
+    };
+
+    static exportProdhlomenaOrariaReviewAuditDossierPdf = async (req, res) => {
+        try {
+            return await sendEmploymentReviewPdf(req, res, { dossier: true });
+        } catch (error) {
+            console.error('[exportProdhlomenaOrariaReviewAuditDossierPdf] ❌', error);
+            if (!res.headersSent) return res.status(500).json({ success: false,
+                message: 'Σφάλμα κατά τη δημιουργία του φακέλου ελέγχου.', error: error.message });
         }
     };
 
@@ -16639,6 +16800,11 @@ Object.defineProperty(erganhController, '__cardsDownloadTestHooks', {
         codes: ERGANH_CARDS_CODES,
         selectors: ERGANH_CARDS_SELECTORS
     }),
+    enumerable: false
+});
+
+Object.defineProperty(erganhController, '__employmentReviewReportTestHooks', {
+    value: Object.freeze({ buildEmploymentReviewReportForRequest }),
     enumerable: false
 });
 
