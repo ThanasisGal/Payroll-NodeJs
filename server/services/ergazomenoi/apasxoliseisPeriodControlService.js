@@ -480,7 +480,8 @@ async function acquirePeriodCalculationOwnership({ scope: input, now = new Date(
     if (typeof indexGuard === 'function') await indexGuard();
     const overdue = isPastDeadline(calculatePeriodDeadline(scope.period_end), now);
     if (overdue && !String(historicalRequestId || '').trim()) {
-        throw periodError('PERIOD_CONTROL_CORRECTIVE_ONLY', 409, 'Η περίοδος επιτρέπει μόνο διορθωτική μισθοδοσία.');
+        throw periodError('PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED', 409,
+            'Απαιτείται ρητή ανακατασκευή ή επανεκτίμηση της εκπρόθεσμης περιόδου.');
     }
     try {
         return await transactionRunner(async (session) => {
