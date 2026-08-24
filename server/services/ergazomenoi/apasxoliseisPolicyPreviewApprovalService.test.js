@@ -1078,6 +1078,10 @@ async function testOrphanReusablePolicyFoundation() {
     assert.strictEqual(lookupFilter.company_kod, session.companyInUse);
     assert.strictEqual(lookupFilter.ypokatasthma, '0001');
     assert.strictEqual(lookupFilter.reuse_status, 'ACTIVE');
+    const identityPolicies = lookupFilter.$and[0].$or.map((item) => item.policy_code).sort();
+    assert.deepStrictEqual(identityPolicies, [
+        'ORPHAN_CARD_CONTINUOUS', 'ORPHAN_CARD_CONTINUOUS_RESOLUTION'
+    ]);
 
     await assert.rejects(() => createOrphanReusablePolicyDecisionRecord({
         session: { ...session, userRole: 'U' },

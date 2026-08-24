@@ -143,7 +143,7 @@ ApasxoliseisPolicyPreviewApprovalSchema.index({
     unique: true,
     name: 'uniq_active_orphan_reusable_policy',
     partialFilterExpression: {
-        policy_code: 'ORPHAN_CARD_CONTINUOUS',
+        policy_code: 'ORPHAN_CARD_CONTINUOUS_RESOLUTION',
         reuse_scope: 'FUTURE_IDENTICAL',
         reuse_status: 'ACTIVE',
         decision_status: 'RECORDED'

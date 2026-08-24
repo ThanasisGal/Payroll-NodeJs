@@ -17,11 +17,11 @@ assert.match(controller, /raw_cards_preserved:\s*true/);
 assert.match(controller, /reusable_decision_rule:\s*[\s\S]*approvedOrphanResolution\.reusableDecisionRule/);
 assert.match(controller, /runWithStaleOrphanResolutionWriteFence/);
 assert.match(controller,
-    /const periodAccess = orphanResolutionCommand[\s\S]*assertActiveEmploymentReviewOrphanResolutionPeriod[\s\S]*assertActiveEmploymentReviewPeriodNormal/);
+    /const periodAccess = boundaryOverrides\.getPeriodAccess[\s\S]*orphanResolutionCommand[\s\S]*assertActiveEmploymentReviewOrphanResolutionPeriod[\s\S]*assertActiveEmploymentReviewPeriodNormal/);
 assert.match(controller,
-    /const periodFence = staleOrphanResolution[\s\S]*runWithStaleOrphanResolutionWriteFence[\s\S]*runWithPeriodWriteFence/);
+    /const periodFence = boundaryOverrides\.periodFence[\s\S]*staleOrphanResolution[\s\S]*runWithStaleOrphanResolutionWriteFence[\s\S]*runWithPeriodWriteFence/);
 assert.match(controller,
-    /periodFence\([\s\S]*persistOrphanResolutionWrite\(\{[\s\S]*createOrphanReusablePolicyDecisionRecord\(\{/);
+    /periodFence\([\s\S]*const persist = boundaryOverrides\.persistOrphanResolutionWrite[\s\S]*await persist\(\{[\s\S]*createOrphanReusablePolicyDecisionRecord\(\{/);
 assert.match(controller, /buildStaleOrphanResolutionWriteSet\(\{/);
 assert.match(controller, /buildApprovedOrphanDailyDerivedUpdate\(\{/);
 assert.match(controller, /Object\.assign\(cleanUpdates, dailyDerived\.derivedUpdate\)/);

@@ -37,7 +37,8 @@ const REUSABLE_DECISION_ALLOWED_ROLES = new Set(CRITICAL_EMPLOYMENT_DECISION_ROL
 const MAX_ITEMS = 500;
 const MAX_PAYLOAD_BYTES = 1024 * 1024;
 const MAX_NESTED_KEYS = 100;
-const ORPHAN_REUSABLE_POLICY_CODE = 'ORPHAN_CARD_CONTINUOUS';
+const ORPHAN_REUSABLE_POLICY_CODE = 'ORPHAN_CARD_CONTINUOUS_RESOLUTION';
+const LEGACY_ORPHAN_REUSABLE_POLICY_CODE = 'ORPHAN_CARD_CONTINUOUS';
 
 function validationError(message) {
     const error = new Error(message);
@@ -793,18 +794,30 @@ function buildOrphanReusableCriteria(rule = {}) {
         orphan_type: orphanType, schedule_kind: scheduleKind, rule: relativeRule };
 }
 
+function buildOrphanReusableIdentityVariants(criteria) {
+    return [ORPHAN_REUSABLE_POLICY_CODE, LEGACY_ORPHAN_REUSABLE_POLICY_CODE].map(
+        (policyCode) => {
+            const variant = { ...criteria, policy_code: policyCode };
+            return { policyCode, fingerprint: buildReusableDecisionFingerprint(variant) };
+        }
+    );
+}
+
 async function createOrphanReusablePolicyDecisionRecord({ session, row, rule, dbSession = null,
     approvalModel = ApasxoliseisPolicyPreviewApprovalsModel, now = new Date() }) {
     const scope = validateSessionScope(session);
     assertCriticalEmploymentDecisionRole(session);
     const criteria = buildOrphanReusableCriteria(rule);
     const fingerprint = buildReusableDecisionFingerprint(criteria);
+    const identityVariants = buildOrphanReusableIdentityVariants(criteria);
     const branch = toTrimmedString(row?.ypokatasthma, 20).padStart(4, '0');
     const date = parseDateOnly(new Date(row?.hmeromhnia).toISOString().slice(0, 10), 'hmeromhnia');
     const activeFilter = { team: scope.team, company_kod: scope.company_kod,
-        ypokatasthma: branch, policy_code: ORPHAN_REUSABLE_POLICY_CODE,
+        ypokatasthma: branch,
         reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL, reuse_status: REUSE_STATUS.ACTIVE,
-        decision_status: 'RECORDED', active_policy_key: fingerprint };
+        decision_status: 'RECORDED', $or: identityVariants.map((identity) => ({
+            policy_code: identity.policyCode, active_policy_key: identity.fingerprint
+        })) };
     const document = {
         team: scope.team, company_kod: scope.company_kod, ypokatasthma: branch,
         etos: scope.etos, period_kodikos: toTrimmedString(session.periodInUse, 20),
@@ -855,14 +868,19 @@ async function findMatchingOrphanReusablePolicyDecision({ session, ypokatasthma,
     approvalModel = ApasxoliseisPolicyPreviewApprovalsModel, asOfDate = new Date() }) {
     const scope = validateSessionScope(session);
     const criteria = buildOrphanReusableCriteria(rule);
-    const fingerprint = buildReusableDecisionFingerprint(criteria);
+    const identityVariants = buildOrphanReusableIdentityVariants(criteria);
     return approvalModel.findOne({ team: scope.team, company_kod: scope.company_kod,
         ypokatasthma: toTrimmedString(ypokatasthma, 20).padStart(4, '0'),
-        policy_code: ORPHAN_REUSABLE_POLICY_CODE, decision_status: 'RECORDED',
-        reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL, reuse_status: REUSE_STATUS.ACTIVE,
-        active_policy_key: fingerprint, reuse_effective_from: mongoose.trusted({ $lte: asOfDate }),
-        $or: [{ reuse_effective_to: null },
-            { reuse_effective_to: mongoose.trusted({ $gte: asOfDate }) }]
+        decision_status: 'RECORDED', reuse_scope: REUSE_SCOPE.FUTURE_IDENTICAL,
+        reuse_status: REUSE_STATUS.ACTIVE,
+        reuse_effective_from: mongoose.trusted({ $lte: asOfDate }),
+        $and: [
+            { $or: identityVariants.map((identity) => ({
+                policy_code: identity.policyCode, active_policy_key: identity.fingerprint
+            })) },
+            { $or: [{ reuse_effective_to: null },
+                { reuse_effective_to: mongoose.trusted({ $gte: asOfDate }) }] }
+        ]
     }).sort({ created_at: -1 }).lean();
 }
 
@@ -936,6 +954,7 @@ module.exports = {
     revokePolicyPreviewApprovalRecord,
     listPolicyPreviewApprovalRecords,
     listActiveReusablePolicyDecisionRecords,
-    ORPHAN_REUSABLE_POLICY_CODE, buildOrphanReusableCriteria,
+    ORPHAN_REUSABLE_POLICY_CODE, LEGACY_ORPHAN_REUSABLE_POLICY_CODE,
+    buildOrphanReusableCriteria,
     createOrphanReusablePolicyDecisionRecord, findMatchingOrphanReusablePolicyDecision
 };

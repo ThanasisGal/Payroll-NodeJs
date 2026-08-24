@@ -97,7 +97,7 @@ const orphanUniqueIndex = ApprovalModel.schema.indexes().find(([, options]) =>
 assert(orphanUniqueIndex);
 assert.strictEqual(orphanUniqueIndex[1].unique, true);
 assert.strictEqual(orphanUniqueIndex[1].partialFilterExpression.policy_code,
-    'ORPHAN_CARD_CONTINUOUS');
+    'ORPHAN_CARD_CONTINUOUS_RESOLUTION');
 
 const atomic = new ApprovalModel(validRecord('APPROVE_PROPOSAL'));
 assert.strictEqual(atomic.reuse_match_criteria.version, 5);
