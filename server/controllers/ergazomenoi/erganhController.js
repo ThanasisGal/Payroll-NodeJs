@@ -4511,7 +4511,7 @@ function correctiveDeltaPresentation(delta = {}) {
     }
     return output;
 }
-async function getReviewRowsForExport(req) {
+async function getReviewRowsForExport(req, { findingsOnly = true } = {}) {
     if (req.query.apo_hmeromhnia && req.query.eos_hmeromhnia && req.query.ypokatasthma) {
         const scope = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
         if (dateKeyUtc(scope.period_start) === String(req.query.apo_hmeromhnia).slice(0, 10) &&
@@ -4912,7 +4912,7 @@ async function getReviewRowsForExport(req) {
         canonicalResolutionsByWeek,
         deviations: exportDeviations,
         atomicGroupProjection,
-        findingsOnly: false
+        findingsOnly
     });
     const workflowScope = {
         team: req.session.userTeam,
@@ -5011,7 +5011,7 @@ async function getReviewRowsForExport(req) {
 }
 
 async function buildEmploymentReviewReportForRequest(req) {
-    const rows = await getReviewRowsForExport(req);
+    const rows = await getReviewRowsForExport(req, { findingsOnly: false });
     let periodControl = null;
     try {
         const scope = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
@@ -8475,8 +8475,6 @@ class erganhController {
 
     static exportProdhlomenaOrariaReviewExcel = async (req, res) => {
         try {
-            return await sendEmploymentReviewWorkbook(req, res);
-            /* istanbul ignore next -- η παλιά μορφοποίηση διατηρείται προσωρινά μόνο για ασφαλή σύγκριση. */
             const rows = await getReviewRowsForExport(req);
             const deviations = rows.__deviations || [];
             const deviationsByKodikos = new Map();
@@ -9080,8 +9078,6 @@ class erganhController {
 
     static exportProdhlomenaOrariaReviewPdf = async (req, res) => {
         try {
-            return await sendEmploymentReviewPdf(req, res);
-            /* istanbul ignore next -- η παλιά μορφοποίηση διατηρείται προσωρινά μόνο για ασφαλή σύγκριση. */
             const rows = await getReviewRowsForExport(req);
             const deviations = rows.__deviations || [];
             const deviationsByKodikos = new Map();
