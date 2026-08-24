@@ -9729,7 +9729,9 @@ function applyOrphanDerivedPreview(row, derivedPreview) {
     }
 }
 
-async function refreshOrphanResolutionPreview(row) {
+async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = false } = {}) {
+    const explicitApprovalChecked = preserveExplicitApproval &&
+        document.getElementById('orphanResolutionApprove')?.checked === true;
     const start = document.getElementById('edit_apo_ora_01_apologistika')?.value || '';
     const end = document.getElementById('edit_eos_ora_01_apologistika')?.value || '';
     const response = await fetch(
@@ -9749,9 +9751,13 @@ async function refreshOrphanResolutionPreview(row) {
     orphanResolutionPreviewDrafts.set(row, draft);
     applyOrphanDerivedPreview(row, draft.orphan_derived_preview);
     const section = document.getElementById('orphanCardResolutionSection');
-    if (section) section.outerHTML = renderOrphanCardResolutionSection(
-        orphanResolutionPreviewRow(row)
-    );
+    if (section) {
+        section.outerHTML = renderOrphanCardResolutionSection(orphanResolutionPreviewRow(row));
+        const approvalInput = document.getElementById('orphanResolutionApprove');
+        if (preserveExplicitApproval && approvalInput) {
+            approvalInput.checked = explicitApprovalChecked;
+        }
+    }
 }
 
 async function initializeOrphanResolutionPreview(row) {
@@ -9771,11 +9777,12 @@ async function initializeOrphanResolutionPreview(row) {
 
 function bindOrphanResolutionManualPreview(row) {
     let timer = null;
-    const refresh = () => {
+    const refresh = (event) => {
+        const preserveExplicitApproval = event?.currentTarget?.id === 'orphanResolutionScope';
         clearTimeout(timer);
         timer = setTimeout(async () => {
             try {
-                await refreshOrphanResolutionPreview(row);
+                await refreshOrphanResolutionPreview(row, { preserveExplicitApproval });
                 bindOrphanResolutionManualPreview(row);
             } catch (error) {
                 employmentReviewSwal({ icon: 'error', title: 'Έλεγχος 11ώρου', text: error.message });
