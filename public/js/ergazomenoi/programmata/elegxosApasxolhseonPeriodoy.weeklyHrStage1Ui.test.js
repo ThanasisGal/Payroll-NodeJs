@@ -207,7 +207,9 @@ vm.runInNewContext(`${source.slice(eligibilityStart, eligibilityEnd)}\nthis.help
     isWeeklyHrStage1Eligible, weeklyHrStage1BusinessStatus };`, eligibilitySandbox);
 const completedDerived = { stage1_status: 'OPEN', write_enabled: true, rows: [{ _id: 'r1' }],
     workflow: { next_required_hr_stage: 'REPO_RESOLUTION' },
-    lifecycle_projection: { stages: { stage1: { business_status: 'COMPLETED' } } } };
+    lifecycle_projection: { stages: { stage1: {
+        business_status: 'COMPLETED', pending_count: 0
+    } } } };
 assert.equal(eligibilitySandbox.helpers.weeklyHrStage1BusinessStatus(completedDerived),
     'COMPLETED');
 assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Eligible(completedDerived), false);
@@ -232,7 +234,7 @@ const toolbarSandbox = {
     weeklyHrStage1DaySelected: new Set(),
     weeklyHrStage1BulkSubmitting: false,
     weeklyHrStage1DaySaving: false,
-    stage1DisplayFilters: { open: true, stale: true, completed: true, blocked: true,
+    stage1DisplayFilters: { open: true, stale: true, completed: false, blocked: true,
         leave: false, sickness: false, absence: false },
     stage1PayloadsForDisplay: () => [...weeklyPayloads.values()],
     visibleWeeklyHrPayloads: () => [...weeklyPayloads.values()]
@@ -307,14 +309,18 @@ const classifiedRows = [
 const statusPayloads = [
     filterPayload('OPEN', '01', classifiedRows),
     filterPayload('STALE', '08'),
-    filterPayload('COMPLETED', '15', [classifiedRows[0], classifiedRows[2]]),
+    filterPayload('COMPLETED', '15', [classifiedRows[0], classifiedRows[2], classifiedRows[3]]),
     filterPayload('BLOCKED', '22', [classifiedRows[0], classifiedRows[3]])
 ];
 const applyFilters = (filters) => filterSandbox.helpers.stage1ApplyDisplayFilters(
     statusPayloads, filters);
-const defaultFilters = { open: true, stale: true, completed: true, blocked: true,
+const defaultFilters = { open: true, stale: true, completed: false, blocked: true,
     leave: false, sickness: false, absence: false };
-assert.equal(applyFilters(defaultFilters).length, 4);
+assert.match(source, /const stage1DisplayFilters = \{[\s\S]*?completed: false,/);
+assert.deepEqual(applyFilters(defaultFilters).map(({ payload }) => payload.stage1_status),
+    ['OPEN', 'STALE', 'BLOCKED']);
+assert.deepEqual(applyFilters({ ...defaultFilters, open: false, blocked: false })
+    .map(({ payload }) => payload.stage1_status), ['STALE']);
 assert.deepEqual(applyFilters({ ...defaultFilters, stale: false, completed: false,
     blocked: false }).map(({ payload }) => payload.stage1_status), ['OPEN']);
 assert.deepEqual(applyFilters({ ...defaultFilters, stale: false, completed: false })
@@ -335,8 +341,9 @@ assert.deepEqual(applyFilters({ ...defaultFilters, sickness: true })
     .map(({ payload }) => payload.stage1_status), ['OPEN', 'COMPLETED']);
 const absence = applyFilters({ ...defaultFilters, absence: true });
 assert.deepEqual(Array.from(absence[0].dates), ['2026-06-04']);
-assert.equal(absence.some(({ payload }) => payload.stage1_status === 'COMPLETED'), false);
-assert.deepEqual(absence.map(({ payload }) => payload.stage1_status), ['OPEN', 'BLOCKED']);
+assert.equal(absence.some(({ payload }) => payload.stage1_status === 'COMPLETED'), true);
+assert.deepEqual(absence.map(({ payload }) => payload.stage1_status),
+    ['OPEN', 'COMPLETED', 'BLOCKED']);
 
 const completedLeavePayload = (kodikos, date) => filterPayload('COMPLETED', kodikos, [{
     _id: `${kodikos}-leave`, hmeromhnia: date, employee_id: `employee-${kodikos}`,
@@ -379,12 +386,12 @@ const statusCodes = (filters) => Array.from(
     ({ payload }) => payload.scope.employee_kodikos
 );
 assert.deepEqual(statusCodes({ ...defaultFilters, open: false, stale: false,
-    blocked: false }), ['0001', '0002', '0010', '0030', '0031']);
+    completed: true, blocked: false }), ['0001', '0002', '0010', '0030', '0031']);
 assert.deepEqual(statusCodes({ ...defaultFilters, stale: false, completed: false,
     blocked: false }), ['0003']);
 assert.deepEqual(statusCodes({ ...defaultFilters, open: false, stale: false,
     completed: false }), ['0004']);
-assert.deepEqual(statusCodes(defaultFilters),
+assert.deepEqual(statusCodes({ ...defaultFilters, completed: true }),
     ['0001', '0002', '0003', '0004', '0010', '0030', '0031']);
 assert.deepEqual(statusCodes({ ...defaultFilters, open: false, stale: false,
     completed: false, blocked: false }), []);
@@ -461,6 +468,7 @@ const bulkFunctionSource = source.slice(
     source.indexOf("document.addEventListener('click'")
 );
 const submittedReasons = [];
+const submittedScopes = [];
 let editedReason = null;
 const bulkSandbox = {
     weeklyHrStage1BulkSubmitting: false,
@@ -473,8 +481,9 @@ const bulkSandbox = {
     employmentReviewSwal: async (options) => options.input === 'textarea'
         ? { isConfirmed: true, value: editedReason ?? options.inputValue }
         : { isConfirmed: true },
-    fetch: async (_url, options) => { submittedReasons.push(
-        JSON.parse(options.body).reason_or_notes);
+    fetch: async (_url, options) => { const body = JSON.parse(options.body);
+        submittedReasons.push(body.reason_or_notes);
+        submittedScopes.push(body.scopes[0]);
         return { ok: true, json: async () => ({ success: true, requested_count: 1,
             completed_count: 1, already_completed_count: 0, failed_count: 0,
             blocked_count: 0, results: [] }) }; },
@@ -488,7 +497,17 @@ vm.runInNewContext(`${bulkFunctionSource}\nthis.runBulk = completeWeeklyHrStage1
     await bulkSandbox.runBulk();
     editedReason = 'Νέα αιτιολογία HR';
     await bulkSandbox.runBulk();
-    assert.deepEqual(submittedReasons, [expectedDefaultReason, 'Νέα αιτιολογία HR']);
+    bulkSandbox.weeklyHrStage1Scopes.set('week-1', { ypokatasthma: '0000',
+        employee_id: 'employee-14', week_start: '2026-06-29', week_end: '2026-07-05',
+        period_start: '2026-06-01', period_end: '2026-06-30' });
+    await bulkSandbox.runBulk();
+    assert.deepEqual(submittedReasons,
+        [expectedDefaultReason, 'Νέα αιτιολογία HR', 'Νέα αιτιολογία HR']);
+    assert.deepEqual(submittedScopes[0], { ypokatasthma: '0000',
+        employee_id: 'employee-14', week_start: '2026-06-01', week_end: '2026-06-07' });
+    assert.deepEqual(submittedScopes[2], { ypokatasthma: '0000',
+        employee_id: 'employee-14', week_start: '2026-06-29', week_end: '2026-07-05',
+        period_start: '2026-06-01', period_end: '2026-06-30' });
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 assert.match(bulkFunctionSource, new RegExp(`inputValue: '${expectedDefaultReason}'`));
 assert.match(bulkFunctionSource,

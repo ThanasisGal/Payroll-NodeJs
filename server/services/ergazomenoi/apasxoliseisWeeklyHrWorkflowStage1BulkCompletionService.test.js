@@ -19,6 +19,14 @@ const base = { reason_or_notes: 'Μαζικός έλεγχος', bulk_request_id
     assert.equal(calls.length, 3);
     assert.equal(three.completed_count, 3);
 
+    const boundaryScope = { ...scopes[0], week_start: '2026-06-29',
+        week_end: '2026-07-05', period_start: '2026-06-01', period_end: '2026-06-30' };
+    let forwardedBoundaryScope = null;
+    await completeWeeklyHrWorkflowStage1Bulk({ ...base, scopes: [boundaryScope],
+        completeOne: async ({ scope }) => { forwardedBoundaryScope = scope;
+            return { idempotent: false }; } });
+    assert.deepEqual(forwardedBoundaryScope, boundaryScope);
+
     const already = await completeWeeklyHrWorkflowStage1Bulk({ ...base, scopes: scopes.slice(0, 1),
         completeOne: async () => ({ idempotent: true }) });
     assert.equal(already.results[0].status, 'ALREADY_COMPLETED');
