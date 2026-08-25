@@ -233,8 +233,20 @@ result = analyze([7, 7, 7, 7, 7, 7, 0], {
     pososto_prosayxhshs_6hs_hmeras: 0,
     eidikh_kathgoria_ergazomenoy: '0009'
 });
+assert.strictEqual(result.status, 'READY');
+assert.strictEqual(result.premiumRate, 0);
 assert.strictEqual(result.sixthDay.value, 70);
 assert.strictEqual(result.sixthDay.premiumRate, 0);
+for (const exemptRate of [undefined, null, '']) {
+    result = analyze([7, 7, 7, 7, 7, 7, 0], {
+        pososto_prosayxhshs_6hs_hmeras: exemptRate,
+        eidikh_kathgoria_ergazomenoy: '0009'
+    });
+    assert.strictEqual(result.status, 'READY');
+    assert.strictEqual(result.premiumRate, 0);
+    assert.strictEqual(result.sixthDay.premiumRate, 0);
+    assert.ok(!result.reasons.includes('MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
+}
 result = analyze([7, 7, 7, 7, 7, 7, 0], {
     pososto_prosayxhshs_6hs_hmeras: 0,
     eidikh_kathgoria_ergazomenoy: '0001'
@@ -380,7 +392,17 @@ result = analyze([7, 7, 7, 7, 7, 7, 0], {
     eidikh_kathgoria_ergazomenoy: '0020'
 });
 assert.strictEqual(result.status, 'READY');
+assert.strictEqual(result.premiumRate, 10);
+assert.strictEqual(result.sixthDay.premiumRate, 10);
 assert.strictEqual(result.sixthDay.value, 77);
+
+result = analyze([7, 7, 7, 7, 7, 7, 0], {
+    pososto_prosayxhshs_6hs_hmeras: 40,
+    eidikh_kathgoria_ergazomenoy: '0020'
+});
+assert.strictEqual(result.status, 'READY');
+assert.strictEqual(result.premiumRate, 40);
+assert.strictEqual(result.sixthDay.premiumRate, 40);
 
 const mixedProfileSixthDay = analyze(
     [7, 7, 7, 7, 7, 7, 0],

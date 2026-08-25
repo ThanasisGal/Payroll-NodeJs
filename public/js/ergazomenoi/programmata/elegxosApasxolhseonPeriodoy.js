@@ -360,6 +360,15 @@ let weeklyHrStage1BulkSubmitting = false;
 const weeklyHrStage1DaySelected = new Set();
 const weeklyHrStage1DayDrafts = new Map();
 let weeklyHrStage1DaySaving = false;
+const stage1DisplayFilters = {
+    open: true,
+    stale: true,
+    completed: true,
+    blocked: true,
+    leave: false,
+    sickness: false,
+    absence: false
+};
 let weeklyHrLeaveCategories = [];
 let currentReviewDeviations = [];
 let currentPendingDeviationWeeks = [];
@@ -1076,11 +1085,10 @@ function renderDeclaredRepoWithCardsBadge(
 ) {
     if (!isAuthoritativeDeclaredRepo(row) || !hasAnyCardEvidence(row)) return '';
     if (!['0', '1', '2'].includes(canonicalEmploymentType)) return '';
+    if (canonicalEmploymentType === '0') return '';
 
-    const label = canonicalEmploymentType === '0'
-        ? 'Ρεπό με κάρτες'
-        : 'Μη εργασία με κάρτες';
-    return `<div class="mt-1"><span class="badge text-bg-info">${label}</span></div>`;
+    return '<div class="mt-1"><span class="badge text-bg-info">' +
+        'Μη εργασία με κάρτες</span></div>';
 }
 
 function resolveCanonicalDailyEmploymentType(row = {}) {
@@ -8197,6 +8205,49 @@ function stage1ClassificationLabel(value) {
         ABSENCE: 'Απουσία' }[value] || '—';
 }
 
+function stage1HasClassificationFilter(filters = stage1DisplayFilters) {
+    return filters.leave || filters.sickness || filters.absence;
+}
+
+function stage1PayloadMatchesStatusFilter(payload, filters = stage1DisplayFilters) {
+    const statusFilter = {
+        OPEN: filters.open,
+        STALE: filters.stale,
+        COMPLETED: filters.completed,
+        BLOCKED: filters.blocked
+    };
+    return statusFilter[weeklyHrStage1BusinessStatus(payload)] === true;
+}
+
+function stage1FilteredDatesForPayload(payload, filters = stage1DisplayFilters) {
+    if (!stage1HasClassificationFilter(filters)) return null;
+    const allowed = new Set([
+        ...(filters.leave ? ['LEAVE'] : []),
+        ...(filters.sickness ? ['SICKNESS'] : []),
+        ...(filters.absence ? ['ABSENCE'] : [])
+    ]);
+    return [...new Set((payload.rows || [])
+        .filter((row) => allowed.has(stage1ClassificationForRow(row)))
+        .map((row) => stage1DateKey(row.hmeromhnia))
+        .filter(Boolean))].sort();
+}
+
+function stage1ApplyDisplayFilters(payloads = [], filters = stage1DisplayFilters) {
+    const classificationFiltering = stage1HasClassificationFilter(filters);
+    return payloads.flatMap((payload) => {
+        if (!classificationFiltering) {
+            return stage1PayloadMatchesStatusFilter(payload, filters)
+                ? [{ payload, dates: null }] : [];
+        }
+        const dates = stage1FilteredDatesForPayload(payload, filters);
+        return dates.length ? [{ payload, dates }] : [];
+    });
+}
+
+function stage1PayloadsForDisplay() {
+    return [...weeklyHrStage1Payloads.values()];
+}
+
 function stage1RelevantDates(payload) {
     return [...new Set([...(payload.workflow?.possible_leave_days || []),
         ...(payload.confirmed_leave_dates || []), ...(payload.confirmed_sickness_dates || []),
@@ -8454,11 +8505,7 @@ function renderWeeklyHrOrphanItem(row = {}) {
 }
 
 function weeklyHrStage1Counts() {
-    const payloads = visibleWeeklyHrPayloads();
-    const visiblePayloadSet = new Set(payloads);
-    const visibleKeys = new Set([...weeklyHrStage1Payloads]
-        .filter(([, payload]) => visiblePayloadSet.has(payload))
-        .map(([key]) => key));
+    const payloads = stage1PayloadsForDisplay();
     return { total: payloads.length,
         open: payloads.filter((item) => weeklyHrStage1BusinessStatus(item) === 'OPEN').length,
         stale: payloads.filter((item) => weeklyHrStage1BusinessStatus(item) === 'STALE').length,
@@ -8466,7 +8513,7 @@ function weeklyHrStage1Counts() {
             weeklyHrStage1BusinessStatus(item) === 'COMPLETED').length,
         blocked: payloads.filter((item) =>
             weeklyHrStage1BusinessStatus(item) === 'BLOCKED').length,
-        selected: [...weeklyHrStage1Selected].filter((key) => visibleKeys.has(key) &&
+        selected: [...weeklyHrStage1Selected].filter((key) =>
             isWeeklyHrStage1Eligible(weeklyHrStage1Payloads.get(key))).length };
 }
 
@@ -8776,14 +8823,26 @@ function renderWeeklyHrStage1BulkToolbar() {
     const counts = weeklyHrStage1Counts();
     const disabled = counts.selected === 0 || weeklyHrStage1BulkSubmitting;
     return `<div class="card mb-3 weekly-hr-stage1-bulk-toolbar"><div class="card-body py-2">
-        <div class="d-flex flex-wrap gap-3 small mb-2"><strong>Συνολικές σχετικές εβδομάδες: ${counts.total}</strong><span>Ανοιχτές: ${counts.open}</span><span>Παρωχημένες: ${counts.stale}</span><span>Ολοκληρωμένες: ${counts.completed}</span><span>Μπλοκαρισμένες: ${counts.blocked}</span><strong>Επιλεγμένες: <span id="weeklyHrStage1SelectedCount">${counts.selected}</span></strong></div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
+        <div class="d-flex flex-wrap gap-3 small mb-2 align-items-center">
+            <strong>Συνολικές σχετικές εβδομάδες: ${counts.total}</strong>
+            <label class="form-check form-check-inline mb-0"><input id="stage1FilterOpen" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="open" ${stage1DisplayFilters.open ? 'checked' : ''}><span class="form-check-label">Ανοιχτές: ${counts.open}</span></label>
+            <label class="form-check form-check-inline mb-0"><input id="stage1FilterStale" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="stale" ${stage1DisplayFilters.stale ? 'checked' : ''}><span class="form-check-label">Παρωχημένες: ${counts.stale}</span></label>
+            <label class="form-check form-check-inline mb-0"><input id="stage1FilterCompleted" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="completed" ${stage1DisplayFilters.completed ? 'checked' : ''}><span class="form-check-label">Ολοκληρωμένες: ${counts.completed}</span></label>
+            <label class="form-check form-check-inline mb-0"><input id="stage1FilterBlocked" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="blocked" ${stage1DisplayFilters.blocked ? 'checked' : ''}><span class="form-check-label">Μπλοκαρισμένες: ${counts.blocked}</span></label>
+            <span class="border-start ps-3 d-flex flex-wrap gap-3">
+                <label class="form-check form-check-inline mb-0"><input id="stage1FilterLeave" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="leave" ${stage1DisplayFilters.leave ? 'checked' : ''}><span class="form-check-label">Άδειες</span></label>
+                <label class="form-check form-check-inline mb-0"><input id="stage1FilterSickness" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="sickness" ${stage1DisplayFilters.sickness ? 'checked' : ''}><span class="form-check-label">Ασθένειες</span></label>
+                <label class="form-check form-check-inline mb-0"><input id="stage1FilterAbsence" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="absence" ${stage1DisplayFilters.absence ? 'checked' : ''}><span class="form-check-label">Απουσίες</span></label>
+            </span>
+            <strong>Επιλεγμένες: <span id="weeklyHrStage1SelectedCount">${counts.selected}</span></strong>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center weekly-hr-legacy-bulk-controls">
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-select-all">Επιλογή όλων</button>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary weekly-hr-clear-all">Αποεπιλογή όλων</button>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-success weekly-hr-bulk-complete" ${disabled ? 'disabled aria-disabled="true"' : ''}>Μαζική Ολοκλήρωση Ελέγχου Αδειών / Ασθενειών / Απουσιών</button>
             <span class="small weekly-hr-bulk-progress">${weeklyHrStage1BulkSubmitting ? 'Η μαζική ολοκλήρωση βρίσκεται σε εξέλιξη...' : ''}</span>
         </div>
-        <div class="border-top mt-2 pt-2 d-flex flex-wrap gap-2 align-items-center weekly-hr-day-bulk-toolbar">
+        <div class="d-none border-top mt-2 pt-2 d-flex flex-wrap gap-2 align-items-center weekly-hr-day-bulk-toolbar">
             <strong class="small">Επιλεγμένες ημέρες: <span class="weekly-hr-selected-days-count">${weeklyHrStage1DaySelected.size}</span></strong>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-select-all-days">Επιλογή όλων των ημερών</button>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary weekly-hr-clear-all-days">Αποεπιλογή όλων των ημερών</button>
@@ -8802,7 +8861,7 @@ function updateWeeklyHrStage1BulkToolbar() {
     if (toolbar) toolbar.outerHTML = renderWeeklyHrStage1BulkToolbar();
 }
 
-function renderWeeklyHrStage1Card(payload) {
+function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const scope = payload.scope;
     const key = weeklyHrStage1Key(scope);
     const businessStatus = weeklyHrStage1BusinessStatus(payload);
@@ -8819,13 +8878,15 @@ function renderWeeklyHrStage1Card(payload) {
     const indexWarning = payload.write_enabled ? '' :
         '<div class="small text-muted">Η λειτουργία εγγραφής δεν έχει ακόμη ενεργοποιηθεί στη βάση.</div>';
     const relevantDates = stage1RelevantDates(payload);
-    const displayDates = payload.period_slice?.actionable_dates?.length
+    const displayDates = Array.isArray(filteredDates) ? filteredDates :
+        payload.period_slice?.actionable_dates?.length
         ? [...new Set([...relevantDates, ...payload.period_slice.actionable_dates])].sort()
         : relevantDates;
     const dayEditors = displayDates.map((date) =>
         renderStage1ReviewDay(payload, date, relevantDates)).join('');
-    const orphanItems = weeklyHrOrphanRows(payload).map(renderWeeklyHrOrphanItem).join('');
-    const sliceInfo = payload.period_slice ? `<div class="small mt-2">
+    const orphanItems = Array.isArray(filteredDates) ? '' :
+        weeklyHrOrphanRows(payload).map(renderWeeklyHrOrphanItem).join('');
+    const sliceInfo = !Array.isArray(filteredDates) && payload.period_slice ? `<div class="small mt-2">
         <div><strong>Ημερομηνίες περιόδου:</strong> ${payload.period_slice.actionable_dates
             .map(formatStage1DateKey).map(escapeHtml).join(', ')}</div>
         <div class="text-muted"><strong>Μόνο εβδομαδιαίο πλαίσιο:</strong> ${payload.period_slice.context_only_dates
@@ -8848,13 +8909,15 @@ function renderWeeklyHrStage1Error(scope, error) {
 function renderWeeklyHrStage1Presentation() {
     const container = document.getElementById('weeklyHrStage1Container');
     if (!container) return;
-    const payloads = visibleWeeklyHrPayloads();
-    const visibleKeys = new Set(payloads.map((payload) => weeklyHrStage1Key(payload.scope)));
+    const visibleKeys = new Set(visibleWeeklyHrPayloads()
+        .map((payload) => weeklyHrStage1Key(payload.scope)));
     [...weeklyHrStage1Selected].forEach((key) => {
         if (!visibleKeys.has(key)) weeklyHrStage1Selected.delete(key);
     });
-    const cards = payloads.sort(compareWeeklyHrStage1Payloads)
-        .map((payload) => renderWeeklyHrStage1Card(payload));
+    const cards = stage1ApplyDisplayFilters(
+        stage1PayloadsForDisplay().sort(compareWeeklyHrStage1Payloads)
+    )
+        .map(({ payload, dates }) => renderWeeklyHrStage1Card(payload, dates));
     container.innerHTML = `${renderWeeklyHrStage1BulkToolbar()}<div class="table-responsive"><table class="table table-sm table-bordered align-middle weekly-hr-stage1-table">
         <thead><tr><th>Επιλογή</th><th>Κωδικός</th><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Κατάσταση</th><th>Πιθανές άδειες</th></tr></thead>
         <tbody>${cards.join('')}</tbody></table></div>`;
@@ -8884,21 +8947,25 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
     weeklyHrStage1DayDrafts.clear();
     currentReviewLifecycleProjectionReady = false;
     await loadWeeklyHrLeaveCategories().catch((error) => console.warn('[weeklyHrLeaveCategories]', error));
-    const cards = await Promise.all([...scopes.values()].map(async (scope) => {
+    const loadedCards = await Promise.all([...scopes.values()].map(async (scope) => {
         try { const payload = await fetchWeeklyHrStage1(scope);
             (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
             weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
             weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
             if (isWeeklyHrStage1Eligible(payload)) weeklyHrStage1Selected.add(weeklyHrStage1Key(scope));
-            return renderWeeklyHrStage1Card(payload);
+            return null;
         } catch (error) {
             console.warn('[weeklyHrStage1]', error);
             return renderWeeklyHrStage1Error(scope, error);
         }
     }));
+    const cards = stage1ApplyDisplayFilters(
+        stage1PayloadsForDisplay().sort(compareWeeklyHrStage1Payloads)
+    ).map(({ payload, dates }) => renderWeeklyHrStage1Card(payload, dates));
+    const errors = loadedCards.filter(Boolean);
     container.innerHTML = `${renderWeeklyHrStage1BulkToolbar()}<div class="table-responsive"><table class="table table-sm table-bordered align-middle weekly-hr-stage1-table">
         <thead><tr><th>Επιλογή</th><th>Κωδικός</th><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Κατάσταση</th><th>Πιθανές άδειες</th></tr></thead>
-        <tbody>${cards.join('')}</tbody></table></div>`;
+        <tbody>${[...cards, ...errors].join('')}</tbody></table></div>`;
     currentReviewLifecycleProjectionReady = true;
     updateEmploymentReviewWorkflowPresentation();
 }
@@ -9173,6 +9240,15 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+    const displayFilter = event.target.closest('.stage1-display-filter');
+    if (displayFilter) {
+        const filterName = displayFilter.dataset.stage1Filter;
+        if (Object.prototype.hasOwnProperty.call(stage1DisplayFilters, filterName)) {
+            stage1DisplayFilters[filterName] = displayFilter.checked;
+            renderWeeklyHrStage1Presentation();
+        }
+        return;
+    }
     const stage3Classification = event.target.closest('.weekly-hr-stage3-classification');
     if (stage3Classification) {
         const stage3Row = stage3Classification.closest('[data-stage3-row-id]');
