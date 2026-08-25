@@ -363,7 +363,7 @@ let weeklyHrStage1DaySaving = false;
 const stage1DisplayFilters = {
     open: true,
     stale: true,
-    completed: true,
+    completed: false,
     blocked: true,
     leave: false,
     sickness: false,
@@ -9156,8 +9156,11 @@ async function completeWeeklyHrStage1BulkFromUi() {
     updateWeeklyHrStage1BulkToolbar();
     try {
         const scopes = selectedKeys.map((key) => weeklyHrStage1Scopes.get(key)).filter(Boolean)
-            .map(({ ypokatasthma, employee_id, week_start, week_end }) =>
-                ({ ypokatasthma, employee_id, week_start, week_end }));
+            .map(({ ypokatasthma, employee_id, week_start, week_end,
+                period_start, period_end }) => ({
+                ypokatasthma, employee_id, week_start, week_end,
+                ...(period_start && period_end ? { period_start, period_end } : {})
+            }));
         const response = await fetch(
             '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/bulk-complete', {
                 method: 'POST', headers: { 'Content-Type': 'application/json',
