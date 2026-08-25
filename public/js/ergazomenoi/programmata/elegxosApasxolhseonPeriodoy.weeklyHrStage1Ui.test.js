@@ -149,7 +149,7 @@ assert.equal(previewSandbox.helpers.renderStage1NoClassificationPreview(previewP
     date: '2026-06-02', safe: true, classification: 'REST_REPO' }, {
         adeia_apologistika: true, kathgoria_adeias_apologistika: 'ΑΔΚΑΝ'
     }), '2026-06-02'), '');
-assert.match(source, /displayDates = payload\.period_slice\?\.actionable_dates/);
+assert.match(source, /displayDates = Array\.isArray\(filteredDates\) \? filteredDates :[\s\S]*?payload\.period_slice\?\.actionable_dates/);
 assert.match(source, /renderStage1ReviewDay\(payload, date, relevantDates\)/);
 assert.match(source, /pending \? renderStage1DayEditor\(payload, date\) : ''/);
 assert.doesNotMatch(source.match(/function renderStage1DayFacts[\s\S]*?\n}/)?.[0] || '',
@@ -232,6 +232,9 @@ const toolbarSandbox = {
     weeklyHrStage1DaySelected: new Set(),
     weeklyHrStage1BulkSubmitting: false,
     weeklyHrStage1DaySaving: false,
+    stage1DisplayFilters: { open: true, stale: true, completed: true, blocked: true,
+        leave: false, sickness: false, absence: false },
+    stage1PayloadsForDisplay: () => [...weeklyPayloads.values()],
     visibleWeeklyHrPayloads: () => [...weeklyPayloads.values()]
 };
 vm.runInNewContext(`${source.slice(toolbarStart, toolbarEnd)}\nthis.helpers = {
@@ -264,10 +267,163 @@ weeklyPayloads.set('hidden-completed', hiddenCompletedPayload);
 weeklyPayloads.set('visible-active', visibleActivePayload);
 toolbarSandbox.visibleWeeklyHrPayloads = () => [visibleActivePayload];
 assert.equal(JSON.stringify(toolbarSandbox.helpers.weeklyHrStage1Counts()), JSON.stringify({
-    total: 1, open: 1, stale: 0, completed: 0, blocked: 0, selected: 0
+    total: 2, open: 1, stale: 0, completed: 1, blocked: 0, selected: 0
 }));
 assert.doesNotMatch(source.match(/function isWeeklyHrStage1Eligible[\s\S]*?\n}/)?.[0] || '',
     /classificationForRow|LEAVE|SICKNESS|ABSENCE/);
+assert.match(source, /id="stage1FilterOpen"[^>]*checked/);
+assert.match(source, /id="stage1FilterStale"[^>]*checked/);
+assert.match(source, /id="stage1FilterCompleted"[^>]*checked/);
+assert.match(source, /id="stage1FilterBlocked"[^>]*checked/);
+assert.match(source, /id="stage1FilterLeave"/);
+assert.match(source, /id="stage1FilterSickness"/);
+assert.match(source, /id="stage1FilterAbsence"/);
+
+const filterHelpersStart = source.indexOf('function stage1ClassificationForRow');
+const filterHelpersEnd = source.indexOf('function stage1RelevantDates', filterHelpersStart);
+const businessStatusFunction = source.match(
+    /function weeklyHrStage1BusinessStatus\([\s\S]*?\n}/)?.[0] || '';
+const filterSandbox = {};
+vm.runInNewContext(`${source.match(/function stage1DateKey[\s\S]*?\n}/)?.[0]}\n` +
+    `${businessStatusFunction}\n${source.slice(filterHelpersStart, filterHelpersEnd)}\n` +
+    'this.helpers = { stage1ApplyDisplayFilters, stage1FilteredDatesForPayload, ' +
+    'stage1PayloadsForDisplay };',
+filterSandbox);
+const filterPayload = (status, id, rows = []) => ({
+    scope: { employee_kodikos: id, week_start: `2026-06-${id}`, week_end: `2026-06-${id}` },
+    stage1_status: status,
+    lifecycle_projection: { stages: { stage1: { business_status: status } } },
+    rows
+});
+const classifiedRows = [
+    { _id: 'leave', hmeromhnia: '2026-06-01', adeia_apologistika: true,
+        kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' },
+    { _id: 'possible', hmeromhnia: '2026-06-02', adeia_apologistika: false,
+        kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' },
+    { _id: 'sickness', hmeromhnia: '2026-06-03', astheneia_apologistika: true },
+    { _id: 'absence', hmeromhnia: '2026-06-04', apousia_apologistika: true },
+    { _id: 'none', hmeromhnia: '2026-06-05' }
+];
+const statusPayloads = [
+    filterPayload('OPEN', '01', classifiedRows),
+    filterPayload('STALE', '08'),
+    filterPayload('COMPLETED', '15', [classifiedRows[0], classifiedRows[2]]),
+    filterPayload('BLOCKED', '22', [classifiedRows[0], classifiedRows[3]])
+];
+const applyFilters = (filters) => filterSandbox.helpers.stage1ApplyDisplayFilters(
+    statusPayloads, filters);
+const defaultFilters = { open: true, stale: true, completed: true, blocked: true,
+    leave: false, sickness: false, absence: false };
+assert.equal(applyFilters(defaultFilters).length, 4);
+assert.deepEqual(applyFilters({ ...defaultFilters, stale: false, completed: false,
+    blocked: false }).map(({ payload }) => payload.stage1_status), ['OPEN']);
+assert.deepEqual(applyFilters({ ...defaultFilters, stale: false, completed: false })
+    .map(({ payload }) => payload.stage1_status), ['OPEN', 'BLOCKED']);
+assert.equal(applyFilters({ ...defaultFilters, open: false, stale: false,
+    completed: false, blocked: false }).length, 0);
+const leaveResults = applyFilters({ ...defaultFilters, open: false, stale: false,
+    completed: false, blocked: false, leave: true });
+assert.deepEqual(leaveResults.map(({ payload }) => payload.stage1_status),
+    ['OPEN', 'COMPLETED', 'BLOCKED']);
+assert.deepEqual(Array.from(leaveResults[0].dates), ['2026-06-01']);
+assert.equal(filterSandbox.helpers.stage1ApplyDisplayFilters([
+    filterPayload('OPEN', '29', [classifiedRows[1]])
+], { ...defaultFilters, leave: true }).length, 0);
+const leaveSickness = applyFilters({ ...defaultFilters, leave: true, sickness: true });
+assert.deepEqual(Array.from(leaveSickness[0].dates), ['2026-06-01', '2026-06-03']);
+assert.deepEqual(applyFilters({ ...defaultFilters, sickness: true })
+    .map(({ payload }) => payload.stage1_status), ['OPEN', 'COMPLETED']);
+const absence = applyFilters({ ...defaultFilters, absence: true });
+assert.deepEqual(Array.from(absence[0].dates), ['2026-06-04']);
+assert.equal(absence.some(({ payload }) => payload.stage1_status === 'COMPLETED'), false);
+assert.deepEqual(absence.map(({ payload }) => payload.stage1_status), ['OPEN', 'BLOCKED']);
+
+const completedLeavePayload = (kodikos, date) => filterPayload('COMPLETED', kodikos, [{
+    _id: `${kodikos}-leave`, hmeromhnia: date, employee_id: `employee-${kodikos}`,
+    kodikos, adeia_apologistika: true,
+    kathgoria_adeias_apologistika: 'ΑΔΚΑΝ'
+}]);
+const employee0031 = completedLeavePayload('0031', '2026-06-01');
+employee0031.scope.week_start = '2026-06-01';
+employee0031.scope.week_end = '2026-06-07';
+const employee0015 = completedLeavePayload('0015', '2026-06-30');
+const allEmployeesPayloads = new Map([
+    ['0031|2026-06-01', employee0031], ['0015|2026-06-30', employee0015]
+]);
+filterSandbox.weeklyHrStage1Payloads = allEmployeesPayloads;
+filterSandbox.visibleWeeklyHrPayloads = () => [employee0015];
+filterSandbox.stage1DisplayFilters = { ...defaultFilters, leave: true };
+const allCompletedLeaveResults = filterSandbox.helpers.stage1ApplyDisplayFilters(
+    filterSandbox.helpers.stage1PayloadsForDisplay(), filterSandbox.stage1DisplayFilters);
+assert.deepEqual(Array.from(allCompletedLeaveResults,
+    ({ payload }) => payload.scope.employee_kodikos),
+    ['0031', '0015']);
+assert.deepEqual(Array.from(allCompletedLeaveResults[0].dates), ['2026-06-01']);
+filterSandbox.stage1DisplayFilters = defaultFilters;
+assert.deepEqual(Array.from(filterSandbox.helpers.stage1PayloadsForDisplay(),
+    (payload) => payload.scope.employee_kodikos), ['0031', '0015']);
+
+const manyEmployeePayloads = [
+    completedLeavePayload('0001', '2026-06-01'),
+    completedLeavePayload('0002', '2026-06-02'),
+    filterPayload('OPEN', '0003'),
+    filterPayload('BLOCKED', '0004'),
+    completedLeavePayload('0010', '2026-06-10'),
+    completedLeavePayload('0030', '2026-06-30'),
+    employee0031
+];
+manyEmployeePayloads[1].rows[0].adeia_apologistika = false;
+manyEmployeePayloads[1].rows[0].kathgoria_adeias_apologistika = 'POSSIBLE_LEAVE';
+const statusCodes = (filters) => Array.from(
+    filterSandbox.helpers.stage1ApplyDisplayFilters(manyEmployeePayloads, filters),
+    ({ payload }) => payload.scope.employee_kodikos
+);
+assert.deepEqual(statusCodes({ ...defaultFilters, open: false, stale: false,
+    blocked: false }), ['0001', '0002', '0010', '0030', '0031']);
+assert.deepEqual(statusCodes({ ...defaultFilters, stale: false, completed: false,
+    blocked: false }), ['0003']);
+assert.deepEqual(statusCodes({ ...defaultFilters, open: false, stale: false,
+    completed: false }), ['0004']);
+assert.deepEqual(statusCodes(defaultFilters),
+    ['0001', '0002', '0003', '0004', '0010', '0030', '0031']);
+assert.deepEqual(statusCodes({ ...defaultFilters, open: false, stale: false,
+    completed: false, blocked: false }), []);
+assert.deepEqual(statusCodes({ ...defaultFilters, leave: true }),
+    ['0001', '0010', '0030', '0031']);
+
+const countsSandbox = {
+    weeklyHrStage1Payloads: new Map(statusPayloads.map((payload, index) =>
+        [String(index), payload])),
+    weeklyHrStage1Selected: new Set(),
+    isWeeklyHrStage1Eligible: () => false,
+    stage1PayloadsForDisplay: () => statusPayloads
+};
+vm.runInNewContext(`${businessStatusFunction}\n` +
+    `${source.match(/function weeklyHrStage1Counts\([\s\S]*?\n}/)?.[0]}\n` +
+    'this.counts = weeklyHrStage1Counts;', countsSandbox);
+const countsBefore = JSON.stringify(countsSandbox.counts());
+applyFilters({ ...defaultFilters, leave: true });
+assert.equal(JSON.stringify(countsSandbox.counts()), countsBefore);
+
+const toolbarSource = source.slice(source.indexOf('function renderWeeklyHrStage1BulkToolbar'),
+    source.indexOf('function updateWeeklyHrStage1BulkToolbar'));
+for (const legacyControl of ['weekly-hr-select-all', 'weekly-hr-clear-all',
+    'weekly-hr-bulk-complete', 'weekly-hr-select-all-days', 'weekly-hr-clear-all-days',
+    'weekly-hr-classify-selected', 'weekly-hr-save-day-classifications']) {
+    assert.match(toolbarSource, new RegExp(legacyControl));
+}
+assert.match(toolbarSource, /d-none d-flex[\s\S]*weekly-hr-legacy-bulk-controls/);
+assert.match(toolbarSource, /d-none border-top[\s\S]*weekly-hr-day-bulk-toolbar/);
+assert.match(source, /renderWeeklyHrStage1Card\(payload, filteredDates = null\)/);
+assert.match(source, /renderStage1ReviewDay\(payload, date, relevantDates\)/);
+assert.match(source, /function stage1PayloadsForDisplay\(\) \{\s*return \[\.\.\.weeklyHrStage1Payloads\.values\(\)\];\s*}/);
+assert.match(source.match(/function weeklyHrStage1Counts[\s\S]*?\n}/)?.[0] || '',
+    /stage1PayloadsForDisplay\(\)/);
+assert.match(source.match(/function renderWeeklyHrStage1Presentation[\s\S]*?\n}/)?.[0] || '',
+    /stage1PayloadsForDisplay\(\)/);
+assert.match(source.match(/function updateEmploymentReviewWorkflowPresentation[\s\S]*?\n}/)?.[0] || '',
+    /visibleWeeklyHrPayloads\(\)/);
+assert.match(source, /weekly-hr-select-all-days'[\s\S]*?visibleWeeklyHrPayloads\(\)/);
 assert.match(css, /\.weekly-hr-stage1-bulk-toolbar\s*\{[\s\S]*?position:\s*sticky/);
 assert.match(css, /\.weekly-hr-stage1-bulk-toolbar \.weekly-hr-bulk-complete\s*\{[\s\S]*?height:\s*auto/);
 
