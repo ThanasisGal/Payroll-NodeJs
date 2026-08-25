@@ -55,8 +55,9 @@ const modalStart = source.indexOf('function initModalKathgoriaAdeiasTomSelect');
 const modalEnd = source.indexOf('\nlet suppressLoaderUntil', modalStart);
 const elements = {
     edit_kathgoria_adeias_apologistika: { dataset: {} },
-    edit_kathgoria_adeias_apologistika_hidden: { value: '', dataset: {} },
-    edit_adeia_apologistika: { checked: false, addEventListener(event, handler) {
+    edit_kathgoria_adeias_apologistika_hidden: { value: 'ΑΔΚΑΝ',
+        dataset: { presentationValue: 'ΑΔΚΑΝ' } },
+    edit_adeia_apologistika: { checked: true, addEventListener(event, handler) {
         this[event] = handler;
     } },
     edit_ores_ergasias_apologistika: { value: '0.00' }
@@ -80,6 +81,9 @@ const modalSandbox = {
 vm.runInNewContext(`${source.slice(modalStart, modalEnd)}\n` +
     'this.init = initModalKathgoriaAdeiasTomSelect;', modalSandbox);
 modalSandbox.init({ apo_ora_01: '10:00', eos_ora_01: '16:00', ores_ergasias: 6 });
+assert.equal(elements.edit_ores_ergasias_apologistika.value, '6.00');
+assert.equal(elements.edit_adeia_apologistika.checked, true);
+elements.edit_ores_ergasias_apologistika.value = '0.00';
 tomSelect.change('ΑΔΚΑΝ');
 assert.equal(elements.edit_ores_ergasias_apologistika.value, '6.00');
 elements.edit_ores_ergasias_apologistika.value = '0.00';

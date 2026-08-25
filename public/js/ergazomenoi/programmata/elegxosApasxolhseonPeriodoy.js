@@ -10621,6 +10621,7 @@ function initModalKathgoriaAdeiasTomSelect(row) {
                 if (adeiaCheckbox) {
                     adeiaCheckbox.checked = value !== 'POSSIBLE_LEAVE';
                 }
+                applyConfirmedLeaveWorkHours(value);
             }
         },
 
