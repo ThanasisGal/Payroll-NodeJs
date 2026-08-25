@@ -43,13 +43,13 @@ function row(overrides = {}) {
 
 const declaredRepoWithCards = row();
 const before = JSON.stringify(declaredRepoWithCards);
-assert.match(
+assert.strictEqual(
     sandbox.renderDeclaredRepoWithCardsBadge(declaredRepoWithCards, '0'),
-    /Ρεπό με κάρτες/
+    ''
 );
 assert.strictEqual(JSON.stringify(declaredRepoWithCards), before);
 
-assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({ repo: false }), '0'), /Ρεπό με κάρτες/);
+assert.strictEqual(sandbox.renderDeclaredRepoWithCardsBadge(row({ repo: false }), '0'), '');
 assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
     kathgoria_ergasias: 'ΜΕ', repo: false, effective_is_full_time: false
 }), '1'), /Μη εργασία με κάρτες/);
@@ -67,9 +67,9 @@ assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
 const mixedJune0014 = [
     ['2026-06-12', false, 'Μη εργασία με κάρτες'],
     ['2026-06-13', false, 'Μη εργασία με κάρτες'],
-    ['2026-06-15', true, 'Ρεπό με κάρτες'],
-    ['2026-06-25', true, 'Ρεπό με κάρτες'],
-    ['2026-06-30', true, 'Ρεπό με κάρτες']
+    ['2026-06-15', true, ''],
+    ['2026-06-25', true, ''],
+    ['2026-06-30', true, '']
 ];
 mixedJune0014.forEach(([hmeromhnia, effective_is_full_time, expected]) => {
     const html = sandbox.renderDeclaredRepoWithCardsBadge(row({
@@ -78,7 +78,8 @@ mixedJune0014.forEach(([hmeromhnia, effective_is_full_time, expected]) => {
         repo: effective_is_full_time,
         effective_is_full_time
     }), effective_is_full_time ? '0' : '1');
-    assert.match(html, new RegExp(expected));
+    if (expected) assert.match(html, new RegExp(expected));
+    else assert.strictEqual(html, '');
 });
 
 const transitionRows = [
@@ -90,11 +91,11 @@ const transitionMap = sandbox.buildCanonicalDailyEmploymentTypeByKey([{
 }]);
 assert.equal(transitionMap.get(sandbox.stage2DailyResolutionKey('0014', '2026-06-14')), '1');
 assert.equal(transitionMap.get(sandbox.stage2DailyResolutionKey('0014', '2026-06-15')), '0');
-assert.match(sandbox.renderDeclaredRepoWithCardsBadge(row({
+assert.strictEqual(sandbox.renderDeclaredRepoWithCardsBadge(row({
     kodikos: '0014', hmeromhnia: '2026-06-15', kathgoria_ergasias: 'ΜΕ',
     repo: false, effective_is_full_time: false
 }), transitionMap.get(sandbox.stage2DailyResolutionKey('0014', '2026-06-15'))),
-/Ρεπό με κάρτες/);
+'');
 
 assert.strictEqual(sandbox.renderDeclaredRepoWithCardsBadge(row({
     cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0
@@ -108,5 +109,10 @@ assert.strictEqual(sandbox.renderDeclaredRepoWithCardsBadge(row(), ''), '');
 
 assert.match(source,
     /\$\{rowPresentation\.apologistiko\.text\}[\s\S]*\$\{renderDeclaredRepoWithCardsBadge\(row\)\}/);
+assert.match(source, /DECLARED_REPO_WITH_CARDS: 'Δηλωμένο ρεπό με κάρτες'/);
+assert.doesNotMatch(
+    sandbox.renderDeclaredRepoWithCardsBadge(declaredRepoWithCards, '0'),
+    /Ρεπό με κάρτες/
+);
 
 console.log('declared repo with cards apologistiko badge: PASS');

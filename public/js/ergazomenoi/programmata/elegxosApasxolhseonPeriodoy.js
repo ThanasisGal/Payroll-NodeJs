@@ -1085,11 +1085,10 @@ function renderDeclaredRepoWithCardsBadge(
 ) {
     if (!isAuthoritativeDeclaredRepo(row) || !hasAnyCardEvidence(row)) return '';
     if (!['0', '1', '2'].includes(canonicalEmploymentType)) return '';
+    if (canonicalEmploymentType === '0') return '';
 
-    const label = canonicalEmploymentType === '0'
-        ? 'Ρεπό με κάρτες'
-        : 'Μη εργασία με κάρτες';
-    return `<div class="mt-1"><span class="badge text-bg-info">${label}</span></div>`;
+    return '<div class="mt-1"><span class="badge text-bg-info">' +
+        'Μη εργασία με κάρτες</span></div>';
 }
 
 function resolveCanonicalDailyEmploymentType(row = {}) {

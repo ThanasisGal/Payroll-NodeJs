@@ -429,7 +429,14 @@ function analyzeWeeklySixthSeventhDay({
         ...(selected.warnings || []),
         ...(seventhDay ? ['SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'] : [])
     ])];
-    const premiumRate = validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
+    const specialCategory = String(
+        effectiveProfile.eidikh_kathgoria_ergazomenoy ||
+        effectiveProfile.eidikh_periptosh ||
+        ''
+    ).trim().padStart(4, '0');
+    const premiumRate = ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES.has(specialCategory)
+        ? 0
+        : validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
     if (premiumRate === null) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
@@ -449,11 +456,6 @@ function analyzeWeeklySixthSeventhDay({
         ...sixthDayWithoutAmounts,
         premiumRate
     };
-    const specialCategory = String(
-        effectiveProfile.eidikh_kathgoria_ergazomenoy ||
-        effectiveProfile.eidikh_periptosh ||
-        ''
-    ).trim().padStart(4, '0');
     if (
         premiumRate === 0 &&
         !ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES.has(specialCategory)
