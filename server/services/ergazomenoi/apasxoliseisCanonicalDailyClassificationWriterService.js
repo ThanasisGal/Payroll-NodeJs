@@ -13,7 +13,7 @@ function error(code, message, statusCode = 400) {
     return Object.assign(new Error(message), { code, statusCode });
 }
 
-function buildCanonicalClassificationUpdates({ classification, leave_category = '' } = {}) {
+function buildCanonicalClassificationUpdates({ classification, leave_category = '', row = {} } = {}) {
     const normalized = String(classification || '').trim().toUpperCase();
     if (!ALLOWED.has(normalized)) throw error('INVALID_STAGE3_CLASSIFICATION',
         'Μη έγκυρος τελικός χαρακτηρισμός Stage 3.');
@@ -35,8 +35,10 @@ function buildCanonicalClassificationUpdates({ classification, leave_category = 
             astheneia_apologistika: false, apousia_apologistika: false,
             ores_ergasias_apologistika: 0 };
     }
-    return classificationUpdates({ classification: normalized,
-        kathgoria_adeias_apologistika: String(leave_category || '').trim() });
+    return { ...classificationUpdates({ classification: normalized,
+        kathgoria_adeias_apologistika: String(leave_category || '').trim() }),
+        ...(normalized === 'LEAVE' ? { ores_ergasias_apologistika: Math.max(0,
+            Number.isFinite(Number(row.ores_ergasias)) ? Number(row.ores_ergasias) : 0) } : {}) };
 }
 
 async function writeCanonicalDailyClassification({
@@ -47,7 +49,7 @@ async function writeCanonicalDailyClassification({
     if (!session) throw error('DAILY_CLASSIFICATION_TRANSACTION_REQUIRED',
         'Απαιτείται ασφαλής συναλλαγή.', 503);
     const updates = applyCanonicalAbsenceMetrics(row,
-        buildCanonicalClassificationUpdates({ classification, leave_category }));
+        buildCanonicalClassificationUpdates({ classification, leave_category, row }));
     const oldValues = {}; const newValues = {};
     for (const [field, value] of Object.entries(updates)) {
         if (String(row?.[field] ?? '') !== String(value ?? '')) {
