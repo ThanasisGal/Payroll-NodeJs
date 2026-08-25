@@ -2307,7 +2307,11 @@ function isHrVisibleDeviation(deviation = {}) {
 }
 
 function hasAdeiaSuggestion(row) {
-    return hasMeaningfulValue(row?.kathgoria_adeias_apologistika);
+    return [
+        possibleLeavePresentationStates.DERIVED,
+        possibleLeavePresentationStates.PERSISTED,
+        possibleLeavePresentationStates.LEGACY
+    ].includes(resolvePossibleLeavePresentationState(row));
 }
 
 function hasAdeiaSuggestionInRows(rows = []) {
@@ -2374,7 +2378,11 @@ function isHrVisibleDeviation(deviation = {}) {
 }
 
 function hasAdeiaSuggestion(row) {
-    return hasMeaningfulValue(row?.kathgoria_adeias_apologistika);
+    return [
+        possibleLeavePresentationStates.DERIVED,
+        possibleLeavePresentationStates.PERSISTED,
+        possibleLeavePresentationStates.LEGACY
+    ].includes(resolvePossibleLeavePresentationState(row));
 }
 
 
@@ -10204,7 +10212,7 @@ function showDetailsModal(row) {
 
     // initModalKathgoriaAdeiasTomSelect();
     setTimeout(() => {
-        initModalKathgoriaAdeiasTomSelect();
+        initModalKathgoriaAdeiasTomSelect(row);
     }, 100);
     initModalMoveByEnter();
     initializeOrphanResolutionPreview(row);
@@ -10523,10 +10531,11 @@ function initModalMoveByEnter() {
     });
 }
 
-function initModalKathgoriaAdeiasTomSelect() {
+function initModalKathgoriaAdeiasTomSelect(row) {
     const select = document.getElementById('edit_kathgoria_adeias_apologistika');
     const hidden = document.getElementById('edit_kathgoria_adeias_apologistika_hidden');
     const adeiaCheckbox = document.getElementById('edit_adeia_apologistika');
+    const workHoursInput = document.getElementById('edit_ores_ergasias_apologistika');
 
     if (!select || !hidden) return;
 
@@ -10541,6 +10550,11 @@ function initModalKathgoriaAdeiasTomSelect() {
 
     const categoryLabel = (value, fallback = '') =>
         value === 'POSSIBLE_LEAVE' ? 'ΠΙΘΑΝΗ ΑΔΕΙΑ' : (fallback || value);
+    const applyConfirmedLeaveWorkHours = (value) => {
+        if (value && value !== 'POSSIBLE_LEAVE' && workHoursInput) {
+            workHoursInput.value = hours(row?.ores_ergasias);
+        }
+    };
 
     const tomSelect = new TomSelect(select, {
         valueField: 'value',
@@ -10607,6 +10621,7 @@ function initModalKathgoriaAdeiasTomSelect() {
                 if (adeiaCheckbox) {
                     adeiaCheckbox.checked = value !== 'POSSIBLE_LEAVE';
                 }
+                applyConfirmedLeaveWorkHours(value);
             }
         },
 
@@ -10626,11 +10641,16 @@ function initModalKathgoriaAdeiasTomSelect() {
             if (adeiaCheckbox) {
                 adeiaCheckbox.checked = Boolean(value) && value !== 'POSSIBLE_LEAVE';
             }
+            applyConfirmedLeaveWorkHours(value);
         }
     });
 
     if (adeiaCheckbox) {
         adeiaCheckbox.addEventListener('change', () => {
+            if (adeiaCheckbox.checked && hidden.value &&
+                hidden.value !== 'POSSIBLE_LEAVE') {
+                applyConfirmedLeaveWorkHours(hidden.value);
+            }
             if (
                 adeiaCheckbox.checked &&
                 (hidden.value === 'POSSIBLE_LEAVE' ||
