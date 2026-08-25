@@ -252,6 +252,41 @@ function testInputImmutability() {
     assert.deepStrictEqual(history, historyBefore);
 }
 
+function testExplicitTermsChangeFlagPrecedence() {
+    const fallback = { hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40 };
+    const scheduleOnly = historyRecord({ afora_allagh_oron_ergasias: false,
+        hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_allaghs_orarioy_apo: '2026-06-01',
+        hmeromhnia_allaghs_orarioy_eos: '2026-06-30',
+        hmeres_ergasias_ebdomadas: 2, ores_ergasias_ebdomadas: 14 });
+    assert.strictEqual(getOrarioTermsForDate('2026-06-10', [scheduleOnly], fallback).source,
+        'ERG_AKTUAL');
+
+    const explicitLegacy = { ...scheduleOnly, _id: 'explicit-true',
+        afora_allagh_oron_ergasias: true };
+    assert.strictEqual(getOrarioTermsForDate('2026-06-10', [explicitLegacy], fallback).istorikoId,
+        'explicit-true');
+
+    const legacyWithoutFlag = { ...scheduleOnly, _id: 'legacy-without-flag' };
+    delete legacyWithoutFlag.afora_allagh_oron_ergasias;
+    assert.strictEqual(getOrarioTermsForDate(
+        '2026-06-10', [legacyWithoutFlag], fallback).istorikoId, 'legacy-without-flag');
+
+    const explicitFalseNewDates = historyRecord({ _id: 'explicit-false-new',
+        afora_allagh_oron_ergasias: false, hmeres_ergasias_ebdomadas: 3 });
+    assert.strictEqual(getOrarioTermsForDate(
+        '2026-06-10', [explicitFalseNewDates], fallback).source, 'ERG_AKTUAL');
+
+    const overlapping = [
+        historyRecord({ _id: 'older', hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-01',
+            hmeres_ergasias_ebdomadas: 4 }),
+        historyRecord({ _id: 'latest', hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-08',
+            hmeres_ergasias_ebdomadas: 5 })
+    ];
+    assert.strictEqual(getOrarioTermsForDate('2026-06-10', overlapping, fallback).istorikoId,
+        'latest');
+}
+
 function run() {
     testCurrentCanonicalEmploymentTypes();
     testHistoryCanonicalEmploymentTypesAndPrecedence();
@@ -263,6 +298,7 @@ function run() {
     testWeeklyWorkdaysNormalizationAndPriority();
     testSnapshotFields();
     testInputImmutability();
+    testExplicitTermsChangeFlagPrecedence();
     console.log('getOrarioTermsForDate tests passed');
 }
 

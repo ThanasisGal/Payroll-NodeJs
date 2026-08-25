@@ -90,6 +90,24 @@ Object.assign(employee0012[6], { cards_apo_ora_01: '09:00', cards_eos_ora_01: ''
 const lifecycle0012 = buildWeeklyHrLifecycleProjection({ weekRows: employee0012,
     effectiveProfile: profile });
 assert.equal(lifecycle0012.stages.stage1.business_status, 'BLOCKED');
+assert.equal(lifecycle0012.stages.stage4.presentation_status, 'LOCKED');
+assert.equal(lifecycle0012.stages.stage4.pending_count, 0);
+assert.equal(lifecycle0012.stages.stage4.diagnostic_pending_count, 1);
+assert.ok(lifecycle0012.stages.stage4.final_weekly_analysis.reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+
+const genuineStage4Blocked = buildWeeklyHrLifecycleProjection({
+    weekRows: week('stage4-blocked'),
+    effectiveProfile: { ...profile, pososto_prosayxhshs_6hs_hmeras: null }
+});
+assert.equal(genuineStage4Blocked.stages.stage4.business_status, 'BLOCKED');
+assert.equal(genuineStage4Blocked.stages.stage4.presentation_status, 'BLOCKED');
+assert.equal(genuineStage4Blocked.stages.stage4.pending_count, 1);
+
+assert.equal(lifecycle0004.stages.stage4.business_status, 'COMPLETED');
+assert.equal(lifecycle0004.stages.stage4.pending_count, 0);
+assert.equal(lifecycle0004.stages.stage4.final_weekly_analysis.status, 'READY');
+assert.ok(lifecycle0004.stages.stage4.final_weekly_analysis.seventhDay);
 
 const employee0014 = week('0014');
 employee0014[2] = possibleLeave(employee0014[2]);
@@ -478,26 +496,21 @@ assert.equal(hireTuesdayLifecycle.stages.stage4.final_weekly_analysis.sixthDay.h
 assert.equal(hireTuesdayLifecycle.stages.stage4.final_weekly_analysis.seventhDay, null);
 assert.equal(hireTuesdayLifecycle.requires_hr_action, false);
 
-const hireTuesdayMissingPremium = buildWeeklyHrLifecycleProjection({
+const hireTuesdayExemptMissingPremium = buildWeeklyHrLifecycleProjection({
     weekRows: hireTuesdayRows,
     effectiveProfile: { ...profile, pososto_prosayxhshs_6hs_hmeras: null,
         eidikh_kathgoria_ergazomenoy: '0009', source: 'ISTORIKO',
         istorikoId: '0025-history' },
     employmentDateScope: employmentScope('2026-06-08', '2026-06-14', hireTuesdayDates)
 });
-assert.equal(hireTuesdayMissingPremium.stages.stage4.business_status, 'BLOCKED');
-assert.ok(hireTuesdayMissingPremium.stages.stage4.blockers.includes(
-    'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
-assert.equal(hireTuesdayMissingPremium.stages.stage4.final_weekly_analysis.status,
-    'NEEDS_HR_DECISION');
-assert.ok(hireTuesdayMissingPremium.stages.stage4.final_weekly_analysis.reasons.includes(
-    'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
-assert.equal(hireTuesdayMissingPremium.stages.stage4.final_weekly_analysis.sixthDay.hmeromhnia,
+assert.equal(hireTuesdayExemptMissingPremium.stages.stage4.business_status, 'COMPLETED');
+assert.deepEqual(hireTuesdayExemptMissingPremium.stages.stage4.blockers, []);
+assert.equal(hireTuesdayExemptMissingPremium.stages.stage4.final_weekly_analysis.status,
+    'READY');
+assert.equal(hireTuesdayExemptMissingPremium.stages.stage4.final_weekly_analysis.sixthDay.hmeromhnia,
     '2026-06-14');
-assert.equal(hireTuesdayMissingPremium.stages.stage4.final_weekly_analysis.sixthDay.premiumRate,
-    null);
-assert.equal(hireTuesdayMissingPremium.stages.stage4.final_weekly_analysis.sixthDay.value,
-    null);
+assert.equal(hireTuesdayExemptMissingPremium.stages.stage4.final_weekly_analysis.sixthDay.premiumRate,
+    0);
 const hireTuesdayMissingPremiumDirect = analyzeWeeklySixthSeventhDay({
     weekRows: hireTuesdayRows,
     expectedDateKeys: hireTuesdayDates,
@@ -505,7 +518,7 @@ const hireTuesdayMissingPremiumDirect = analyzeWeeklySixthSeventhDay({
         eidikh_kathgoria_ergazomenoy: '0009', source: 'ISTORIKO',
         istorikoId: '0025-history' }
 });
-assert.deepEqual(hireTuesdayMissingPremium.stages.stage4.final_weekly_analysis,
+assert.deepEqual(hireTuesdayExemptMissingPremium.stages.stage4.final_weekly_analysis,
     hireTuesdayMissingPremiumDirect);
 
 const hireSaturdayRows = week('0029', '2026-06-22').slice(5);

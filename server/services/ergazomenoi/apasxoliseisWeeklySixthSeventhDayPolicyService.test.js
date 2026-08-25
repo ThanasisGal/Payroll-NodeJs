@@ -431,6 +431,67 @@ assert.ok(unchangedProfileSeventhDay.reasons.includes(
     'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
 assert.strictEqual(unchangedProfileSeventhDay.seventhDay, null);
 
+function profilesByDate(workdays, rates = [], categories = []) {
+    return Object.fromEntries(workdays.map((days, index) => {
+        const date = new Date('2026-07-27T00:00:00.000Z');
+        date.setUTCDate(date.getUTCDate() + index);
+        return [date.toISOString().slice(0, 10), {
+            kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: days,
+            pososto_prosayxhshs_6hs_hmeras: rates[index] ?? 40,
+            eidikh_kathgoria_ergazomenoy: categories[index] || ''
+        }];
+    }));
+}
+
+for (const workdays of [
+    [4, 4, 4, 4, 4, 4, 4],
+    [4, 4, 3, 3, 3, 3, 3],
+    [3, 5, 5, 5, 5, 5, 5],
+    [1, 1, 1, 1, 1, 2, 2]
+]) {
+    const structuralResult = analyzeWeeklySixthSeventhDay({
+        weekRows: week([7, 7, 7, 7, 7, 7, 0]),
+        effectiveProfile: { hmeres_ergasias_ebdomadas: workdays.at(-1),
+            pososto_prosayxhshs_6hs_hmeras: 40 },
+        effectiveProfilesByDate: profilesByDate(workdays)
+    });
+    assert.strictEqual(structuralResult.status, 'NOT_APPLICABLE');
+    assert.deepStrictEqual(structuralResult.reasons, []);
+}
+
+const rateChangesAfterSixth = analyzeWeeklySixthSeventhDay({
+    weekRows: week([7, 7, 7, 7, 7, 7, 0]),
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 10, profile_changed_inside_week: true },
+    effectiveProfilesByDate: profilesByDate(
+        [5, 5, 5, 5, 5, 5, 5], [10, 10, 10, 10, 10, 40, 40])
+});
+assert.strictEqual(rateChangesAfterSixth.status, 'READY');
+assert.strictEqual(rateChangesAfterSixth.sixthDay.premiumRate, 40);
+
+const sixthBeforeRateChangeRows = week([7, 7, 7, 7, 7, 9, 0]);
+const rateChangesAfterSelectedSixth = analyzeWeeklySixthSeventhDay({
+    weekRows: sixthBeforeRateChangeRows,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40, profile_changed_inside_week: true },
+    effectiveProfilesByDate: profilesByDate(
+        [5, 5, 5, 5, 5, 5, 5], [10, 10, 10, 10, 10, 40, 40])
+});
+assert.strictEqual(rateChangesAfterSelectedSixth.status, 'READY');
+assert.strictEqual(rateChangesAfterSelectedSixth.sixthDay.hmeromhnia, '2026-07-31');
+assert.strictEqual(rateChangesAfterSelectedSixth.sixthDay.premiumRate, 10);
+
+const exemptOnSixthDate = analyzeWeeklySixthSeventhDay({
+    weekRows: week([7, 7, 7, 7, 7, 7, 0]),
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 },
+    effectiveProfilesByDate: profilesByDate(
+        [5, 5, 5, 5, 5, 5, 5], [40, 40, 40, 40, 40, 40, 40],
+        ['', '', '', '', '', '0009', ''])
+});
+assert.strictEqual(exemptOnSixthDate.status, 'READY');
+assert.strictEqual(exemptOnSixthDate.sixthDay.premiumRate, 0);
+
 // C3.4: the two current canonical repo identities drive the handoff from the
 // selected sixth day to the complementary remaining repo.
 const basicIdentity = analyze([7, 7, 7, 7, 7, 7, 0]);

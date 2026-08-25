@@ -10,6 +10,7 @@ const {
     resolveEffectiveRepoState
 } = require('./apasxoliseisEffectiveRepoStateService');
 const {
+    normalizeEmploymentType,
     resolveFullTimeFromWorkTerms
 } = require('./apasxoliseisReviewEmploymentProfileService');
 
@@ -176,6 +177,7 @@ function decisionFailure(reason, base = {}) {
 function analyzeWeeklySixthSeventhDay({
     weekRows = [],
     effectiveProfile = {},
+    effectiveProfilesByDate = null,
     expectedDateKeys = null,
     hourlyRate = null,
     canonicalRepoDayIdentitiesOverride = null,
@@ -217,7 +219,29 @@ function analyzeWeeklySixthSeventhDay({
     ) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'], warnings: [], dailyFacts: [] });
     }
-    if (effectiveProfile.profile_changed_inside_week === true) {
+    const hasDailyProfiles = effectiveProfilesByDate &&
+        typeof effectiveProfilesByDate === 'object' &&
+        !Array.isArray(effectiveProfilesByDate);
+    const structuralProfiles = requiredDates.map((date) => {
+        const profile = hasDailyProfiles
+            ? effectiveProfilesByDate[date] || effectiveProfile
+            : effectiveProfile;
+        return {
+            signature: [
+                normalizeEmploymentType(profile.kathestos_apasxolhshs) ||
+                    normalizeEmploymentType(profile.typos_apasxolhshs),
+                String(profile.hmeres_ergasias_ebdomadas ?? '').trim()
+            ].join('|'),
+            weeklyWorkdays: Number(profile.hmeres_ergasias_ebdomadas)
+        };
+    });
+    const structuralSignatures = new Set(structuralProfiles.map((item) => item.signature));
+    if (structuralProfiles.every((item) => item.weeklyWorkdays !== 5) ||
+        structuralSignatures.size > 1) {
+        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE,
+            reasons: [], warnings: [], dailyFacts: [], sixthDay: null, seventhDay: null });
+    }
+    if (!hasDailyProfiles && effectiveProfile.profile_changed_inside_week === true) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,
@@ -429,14 +453,17 @@ function analyzeWeeklySixthSeventhDay({
         ...(selected.warnings || []),
         ...(seventhDay ? ['SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'] : [])
     ])];
+    const sixthDayProfile = hasDailyProfiles
+        ? effectiveProfilesByDate[sixthDayIdentity] || effectiveProfile
+        : effectiveProfile;
     const specialCategory = String(
-        effectiveProfile.eidikh_kathgoria_ergazomenoy ||
-        effectiveProfile.eidikh_periptosh ||
+        sixthDayProfile.eidikh_kathgoria_ergazomenoy ||
+        sixthDayProfile.eidikh_periptosh ||
         ''
     ).trim().padStart(4, '0');
     const premiumRate = ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES.has(specialCategory)
         ? 0
-        : validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
+        : validRate(sixthDayProfile.pososto_prosayxhshs_6hs_hmeras);
     if (premiumRate === null) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
@@ -494,7 +521,7 @@ function analyzeWeeklySixthSeventhDay({
         warnings: classificationWarnings,
         week: { start: range.weekStartKey, end: range.weekEndKey },
         premiumRate,
-        premiumRateSource: effectiveProfile.source || null,
+        premiumRateSource: sixthDayProfile.source || null,
         dailyFacts,
         canonicalRepoDayIdentities,
         sixthDayIdentity,
