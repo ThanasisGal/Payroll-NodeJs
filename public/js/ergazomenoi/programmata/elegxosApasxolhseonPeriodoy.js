@@ -7482,6 +7482,9 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
         groups: filterReviewLifecycleGroups(grouping.groups) } : null;
     currentPolicyPreviewGrouping = grouping;
 
+    if (currentReviewLifecycleProjectionReady && renderWeeklyHrStage2LifecycleFallback(
+        currentEmploymentReviewLifecyclePresentation)) return;
+
     if (options.loading) {
         container.innerHTML = `
             <div class="card border rounded">
@@ -8629,10 +8632,10 @@ function derivePeriodLifecyclePresentation(payloads = []) {
 function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     const container = document.getElementById('policyPreviewGroupsContainer');
     const stage = lifecycle?.stages?.STAGE2;
-    if (!container || String(container.innerHTML || '').trim() || !stage) return false;
+    if (!container || !stage) return false;
     if (Number(stage.pending_count || 0) <= 0) {
         container.innerHTML = '<div class="text-muted small employment-review-stage2-empty">' +
-            'Δεν υπάρχουν εκκρεμότητες Μεταφοράς Ρεπό.</div>';
+            'Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό.</div>';
         return true;
     }
     const items = Array.isArray(stage.pending_items) ? stage.pending_items : [];
@@ -8811,6 +8814,7 @@ function updateEmploymentReviewWorkflowPresentation() {
             bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false }).hide();
         }
     });
+    renderWeeklyHrStage2LifecycleFallback(lifecycle);
     const activeStage = lifecycle.current_stage
         ? document.querySelector(`[data-workflow-stage="${lifecycle.current_stage}"] .accordion-collapse`)
         : null;

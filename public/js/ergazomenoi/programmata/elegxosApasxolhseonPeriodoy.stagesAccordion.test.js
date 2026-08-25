@@ -105,7 +105,37 @@ const stage2HtmlBeforeToggle = stage2Container.innerHTML;
 stage2Collapse.className = 'accordion-collapse collapse show';
 stage2Collapse.className = 'accordion-collapse collapse';
 assert.equal(stage2Container.innerHTML, stage2HtmlBeforeToggle);
-assert.match(source, /container\.innerHTML = '';\s*renderWeeklyHrStage2LifecycleFallback/);
+
+stage2Container.innerHTML = '<section>Προτάσεις Μεταφοράς Ρεπό · ' +
+    'Μεταφορές ρεπό προς απόφαση: 9</section>';
+assert.equal(sandbox.renderWeeklyHrStage2LifecycleFallback({ stages: { STAGE2: {
+    business_status: 'COMPLETED', pending_count: 0, pending_items: []
+} } }), true);
+assert.equal(stage2Container.innerHTML,
+    '<div class="text-muted small employment-review-stage2-empty">' +
+    'Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό.</div>');
+assert.doesNotMatch(stage2Container.innerHTML, /Προτάσεις Μεταφοράς Ρεπό/);
+assert.doesNotMatch(stage2Container.innerHTML, /Μεταφορές ρεπό προς απόφαση/);
+
+stage2Container.innerHTML = '<div>legacy A B C D</div>';
+const pendingLifecycle = { stages: { STAGE2: { business_status: 'OPEN', pending_count: 2,
+    pending_reasons: ['REPO_RESOLUTION_REQUIRED'], pending_items: [
+        { employee_kodikos: 'A', week_start: '2026-06-01', week_end: '2026-06-07',
+            pending_count: 1, reasons: ['REPO_RESOLUTION_REQUIRED'] },
+        { employee_kodikos: 'B', week_start: '2026-06-08', week_end: '2026-06-14',
+            pending_count: 1, reasons: ['REPO_RESOLUTION_REQUIRED'] }
+    ] } } };
+assert.equal(sandbox.renderWeeklyHrStage2LifecycleFallback(pendingLifecycle), true);
+assert.match(stage2Container.innerHTML, /<td>A<\/td>/);
+assert.match(stage2Container.innerHTML, /<td>B<\/td>/);
+assert.doesNotMatch(stage2Container.innerHTML, /legacy|<td>C<\/td>|<td>D<\/td>/);
+const authoritativePendingHtml = stage2Container.innerHTML;
+stage2Collapse.className = 'accordion-collapse collapse show';
+stage2Collapse.className = 'accordion-collapse collapse';
+assert.equal(stage2Container.innerHTML, authoritativePendingHtml);
+assert.match(source, /currentReviewLifecycleProjectionReady && renderWeeklyHrStage2LifecycleFallback/);
+assert.match(source.match(/function updateEmploymentReviewWorkflowPresentation[\s\S]*?\n}/)?.[0] || '',
+    /renderWeeklyHrStage2LifecycleFallback\(lifecycle\)/);
 
 const headingIds = [...view.matchAll(/id="(employmentReviewStage[1-4]Heading)"/g)].map((match) => match[1]);
 const collapseIds = [...view.matchAll(/id="(employmentReviewStage[1-4]Collapse)"/g)].map((match) => match[1]);
