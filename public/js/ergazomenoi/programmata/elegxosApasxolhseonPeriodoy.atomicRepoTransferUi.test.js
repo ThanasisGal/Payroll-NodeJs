@@ -3443,26 +3443,30 @@ function testWeeklyDeviationUsesAuthoritativePresentationReasons() {
     const resolvedHtml = sandbox.renderDeviationNoteCell({
         status: 'READY',
         sixth_day_date: '2026-06-14',
+        sixth_day_premium_rate: 40,
         presentation_reasons: ['CARD_VERIFICATION_PENDING'],
         repo_transfer_reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
     });
     const resolvedText = getVisibleText(resolvedHtml);
-    assert.ok(resolvedText.includes('6η ημέρα: Κυ 14/06/2026'));
-    assert.ok(resolvedText.includes(
+    assert.ok(resolvedText.includes('6η ημέρα εργασίας: Κυ 14/06/2026'));
+    assert.ok(resolvedText.includes('Προσαύξηση 6ης ημέρας: 40%.'));
+    assert.ok(!resolvedText.includes('CARD_VERIFICATION_PENDING'));
+    assert.ok(!resolvedText.includes(
         'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.'));
     assert.ok(!resolvedText.includes(
         'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό'));
 
     const unresolvedText = getVisibleText(sandbox.renderDeviationNoteCell({
         status: 'NEEDS_HR_DECISION',
-        presentation_reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
+        sixth_seventh_day_reasons: ['CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC']
     }));
     assert.ok(unresolvedText.includes(
-        'Δεν μπορούν να προσδιοριστούν με βεβαιότητα οι ημέρες ανάπαυσης/ρεπό'));
+        'Δεν μπορεί να προσδιοριστεί με ασφάλεια ποιες ημέρες αποτελούν τις ημέρες ανάπαυσης.'));
+    assert.ok(!unresolvedText.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
 
     const staleText = getVisibleText(sandbox.renderDeviationNoteCell({
         status: 'NEEDS_HR_DECISION',
-        presentation_reasons: [
+        sixth_seventh_day_reasons: [
             'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC',
             'CANONICAL_DECISION_STALE'
         ]

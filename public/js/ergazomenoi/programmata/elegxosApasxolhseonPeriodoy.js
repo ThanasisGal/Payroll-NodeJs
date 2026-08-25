@@ -2233,7 +2233,13 @@ function renderDeviationNoteCell(dev) {
     }
 
     if (dev.is_legacy_policy === true) {
-        return '<span class="badge text-bg-secondary">Ιστορική εγγραφή παλιάς πολιτικής</span>';
+        const legacyHumanNote = dev.note && !looksLikeInternalReviewCode(dev.note)
+            ? String(dev.note)
+            : '';
+        return '<span class="badge text-bg-secondary">Ιστορική εγγραφή παλιάς πολιτικής</span>' +
+            (legacyHumanNote
+                ? `<div class="small mt-1">${escapeHtml(legacyHumanNote)}</div>`
+                : '');
     }
 
     const lifecycleAnalysis = weeklyLifecyclePayloadForDeviation(dev)
