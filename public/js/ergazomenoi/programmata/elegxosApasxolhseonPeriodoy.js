@@ -693,11 +693,7 @@ function filterGeneralReviewRows(
 ) {
     if (String(selectedKodikos || '').trim()) return rows;
     if (lifecycleReady !== true) return [];
-    return rows.filter((row) => isEmployeeVisibleInGeneralReview(
-        row.kodikos,
-        row.ypokatasthma,
-        { selectedKodikos, lifecyclePayloads }
-    ));
+    return rows;
 }
 
 function renderReviewNoPendingEmployees(
@@ -2236,71 +2232,94 @@ function renderDeviationNoteCell(dev) {
         return '';
     }
 
-    const resolvedSelectionAmbiguity = isResolvedWeeklySelectionAmbiguity(dev);
-    const humanNote = dev.note && !looksLikeInternalReviewCode(dev.note) &&
-        !(resolvedSelectionAmbiguity && /απαιτείται επιλογή/i.test(String(dev.note)))
-        ? String(dev.note)
-        : '';
-
     if (dev.is_legacy_policy === true) {
-        return `
-            <span class="badge text-bg-secondary">Ιστορική εγγραφή παλιάς πολιτικής</span>
-            ${humanNote ? `<div class="small mt-1">${escapeHtml(humanNote)}</div>` : ''}
-        `;
+        return '<span class="badge text-bg-secondary">Ιστορική εγγραφή παλιάς πολιτικής</span>';
     }
 
-    if (dev.profile_changed_inside_week) {
-        const excessRepo =
-            Number(dev.actual_repo ?? dev.pragmatikaRepo ?? 0) -
-            Number(dev.expected_repo ?? 0);
-        const excessText =
-            excessRepo > 0
-                ? `<div>Πλεονάζοντα ρεπό: <strong>${escapeHtml(excessRepo)}</strong></div>`
-                : '';
-
-        return `
-            <div class="fw-bold text-warning-emphasis">
-                ⚠ Αλλαγή όρων εργασίας μέσα στην εβδομάδα
-            </div>
-            <small class="text-muted">
-                Η εβδομάδα απαιτεί απόφαση HR επειδή άλλαξαν κρίσιμοι όροι εργασίας.
-            </small>
-            ${excessText}
-            ${humanNote ? `<div class="small mt-1">${escapeHtml(humanNote)}</div>` : ''}
-        `;
+    const lifecycleAnalysis = weeklyLifecyclePayloadForDeviation(dev)
+        ?.lifecycle_projection?.stages?.stage4?.final_weekly_analysis || {};
+    const status = String(
+        lifecycleAnalysis.status || dev.sixth_seventh_day_status || dev.status || ''
+    ).trim();
+    if (status === 'NOT_APPLICABLE') {
+        return '<div>Δεν εφαρμόζεται έλεγχος 6ης/7ης ημέρας για τη συγκεκριμένη εβδομάδα.</div>';
     }
 
-    const sixthDayText = dev.sixth_day_date
-        ? `<div><strong>6η ημέρα:</strong> ${escapeHtml(formatDate(dev.sixth_day_date))}</div>`
-        : '';
-    const seventhDayText = dev.seventh_day_date
-        ? `<div class="text-danger"><strong>7η ημέρα:</strong> ${escapeHtml(
-              formatDate(dev.seventh_day_date)
-          )}</div>`
-        : '';
-    const visibleReasons = (Array.isArray(dev.presentation_reasons)
-        ? dev.presentation_reasons
-        : [
-              ...(Array.isArray(dev.sixth_seventh_day_reasons)
-                  ? dev.sixth_seventh_day_reasons
-                  : []),
-              ...(Array.isArray(dev.repo_transfer_reasons)
-                  ? dev.repo_transfer_reasons
-                  : []),
-              ...(Array.isArray(dev.canonical_reasons) ? dev.canonical_reasons : [])
-          ]).filter((reason) => !resolvedSelectionAmbiguity ||
-            !['MULTIPLE_SOURCE_CANDIDATES', 'MULTIPLE_TARGET_CANDIDATES'].includes(reason));
-    const reasonMessages = reviewHrReasonMessages(
-        visibleReasons
+    const reasons = Array.isArray(lifecycleAnalysis.reasons)
+        ? lifecycleAnalysis.reasons
+        : (Array.isArray(dev.sixth_seventh_day_reasons)
+            ? dev.sixth_seventh_day_reasons : []);
+    if (status === 'NEEDS_HR_DECISION') {
+        const stage4ReasonLabels = {
+            CARD_VERIFICATION_PENDING:
+                'Δεν υπάρχουν ακόμη επαρκή στοιχεία κάρτας για ασφαλή ολοκλήρωση του εβδομαδιαίου ελέγχου.',
+            MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE:
+                'Δεν έχει οριστεί έγκυρο ποσοστό προσαύξησης για την 6η ημέρα.',
+            CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC:
+                'Δεν μπορεί να προσδιοριστεί με ασφάλεια ποιες ημέρες αποτελούν τις ημέρες ανάπαυσης.'
+        };
+        const messages = reasons.map((reason) =>
+            stage4ReasonLabels[reason] || reviewHrReasonLabel(reason)
+        ).filter(Boolean);
+        return renderReviewHrReasonList([...new Set(messages)]) ||
+            `<div>${escapeHtml(reviewHrUnknownReasonLabel)}</div>`;
+    }
+
+    const sixthDay = lifecycleAnalysis.sixthDay || {};
+    const seventhDay = lifecycleAnalysis.seventhDay || {};
+    const sixthDayDate = sixthDay.hmeromhnia || dev.sixth_day_date;
+    const seventhDayDate = seventhDay.hmeromhnia || dev.seventh_day_date;
+    const premiumRate = sixthDay.premiumRate ?? dev.sixth_day_premium_rate;
+    const illegalOvertimeHours = seventhDay.illegalOvertimeHours ??
+        dev.seventh_day_illegal_overtime_hours;
+    const warnings = new Set([
+        ...(Array.isArray(lifecycleAnalysis.warnings) ? lifecycleAnalysis.warnings : []),
+        ...(Array.isArray(dev.sixth_seventh_day_warnings)
+            ? dev.sixth_seventh_day_warnings : [])
+    ]);
+    const lines = [];
+
+    if (sixthDayDate) {
+        lines.push(`<div><strong>6η ημέρα εργασίας:</strong> ${escapeHtml(
+            formatDate(sixthDayDate).replace(/\s+/g, ' ')
+        )}.</div>`);
+        if (premiumRate !== null && premiumRate !== undefined &&
+            Number.isFinite(Number(premiumRate))) {
+            const rate = String(Number(premiumRate)).replace('.', ',');
+            lines.push(Number(premiumRate) === 0
+                ? `<div>Προσαύξηση 6ης ημέρας: ${escapeHtml(rate)}% λόγω ειδικής κατηγορίας.</div>`
+                : `<div>Προσαύξηση 6ης ημέρας: ${escapeHtml(rate)}%.</div>`);
+        }
+        if (warnings.has('SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT') ||
+            reasons.includes('SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT')) {
+            lines.push('<div class="text-warning-emphasis">Η εργασία της 6ης ημέρας υπερβαίνει τις 8 ώρες.</div>');
+        }
+    }
+
+    if (seventhDayDate) {
+        lines.push(`<div class="text-danger"><strong>7η ημέρα εργασίας:</strong> ${escapeHtml(
+            formatDate(seventhDayDate).replace(/\s+/g, ' ')
+        )}.</div>`);
+        lines.push('<div class="text-danger fw-bold">Εργασία σε ημέρα ανάπαυσης — σοβαρή παράβαση.</div>');
+        if (Number.isFinite(Number(illegalOvertimeHours))) {
+            lines.push(`<div class="text-danger">Παράνομη υπερωρία: ${escapeHtml(
+                Number(illegalOvertimeHours).toFixed(2).replace('.', ',')
+            )} ώρες.</div>`);
+        }
+    }
+
+    const actualWorkdays = Number(dev.actual_workdays);
+    const contractualWorkdays = Number(
+        dev.effective_weekly_workdays ?? dev.contractual_workdays
     );
-    const sixthDayDecisionText = renderReviewHrReasonList(reasonMessages);
-    const noteText = humanNote
-        ? `<div>${escapeHtml(humanNote)}</div>`
-        : '';
+    if (!sixthDayDate && !seventhDayDate && Number.isFinite(actualWorkdays) &&
+        Number.isFinite(contractualWorkdays) && actualWorkdays <= contractualWorkdays) {
+        const nonWorkDays = resolveFinalWeeklyNonWorkDays(dev);
+        return `<div>Η εβδομάδα ολοκληρώθηκε με ${escapeHtml(actualWorkdays)} ημέρες εργασίας και ${escapeHtml(nonWorkDays)} ημέρες ανάπαυσης / μη εργασίας.</div>` +
+            '<div>Δεν προκύπτει 6η ή 7η ημέρα εργασίας.</div>';
+    }
 
-    return sixthDayText || seventhDayText || sixthDayDecisionText || noteText
-        ? `${sixthDayText}${seventhDayText}${sixthDayDecisionText}${noteText}`
-        : '-';
+    return lines.join('');
 }
 
 function hasProfileChangeDeviation(deviations = []) {
@@ -8775,11 +8794,14 @@ async function submitWeeklyHrStage3Decision(rowId) {
 }
 
 function updateEmploymentReviewWorkflowPresentation() {
-    const payloads = visibleWeeklyHrPayloads().sort(compareWeeklyHrStage1Payloads);
+    const allPayloads = [...weeklyHrStage1Payloads.values()]
+        .sort(compareWeeklyHrStage1Payloads);
+    const payloads = visibleWeeklyHrPayloads(allPayloads)
+        .sort(compareWeeklyHrStage1Payloads);
     const lifecycle = derivePeriodLifecyclePresentation(payloads);
     currentEmploymentReviewLifecyclePresentation = lifecycle;
-    currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(payloads);
-    currentCanonicalDailyEmploymentTypeByKey = buildCanonicalDailyEmploymentTypeByKey(payloads);
+    currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(allPayloads);
+    currentCanonicalDailyEmploymentTypeByKey = buildCanonicalDailyEmploymentTypeByKey(allPayloads);
     if (currentReviewRows.length) renderCurrentReviewRows();
     const summary = document.getElementById('employmentReviewWorkflowSummary');
     if (!payloads.length) {

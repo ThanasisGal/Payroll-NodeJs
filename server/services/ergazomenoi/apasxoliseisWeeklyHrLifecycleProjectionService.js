@@ -437,6 +437,7 @@ function buildWeeklyHrLifecycleProjection({
     const finalAnalysis = analyzeWeeklySixthSeventhDay({
         weekRows: rows,
         effectiveProfile,
+        effectiveProfilesByDate,
         expectedDateKeys,
         companyKod: scope.company_kod || rows[0]?.company_kod || '',
         companyPolicyRules
@@ -455,6 +456,9 @@ function buildWeeklyHrLifecycleProjection({
 
     const stages = applySequentialPresentation({ stage1, stage2, stage3, stage4 });
     stages.stage4 = Object.freeze({ ...stages.stage4,
+        diagnostic_pending_count: finalBlockers.length,
+        pending_count: stages.stage4.presentation_status === PRESENTATION_STATUS.LOCKED
+            ? 0 : stages.stage4.pending_count,
         final_weekly_analysis_available:
             stages.stage4.presentation_status !== PRESENTATION_STATUS.LOCKED &&
             finalBlockers.length === 0 });

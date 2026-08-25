@@ -262,8 +262,12 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
         // Για παλιές εγγραφές χωρίς flag, επιτρέπουμε fallback αν έχουν ημερομηνίες.
         const hasNewTermsDates = Boolean(row.hmeromhnia_isxyos_oron_ergasias_apo);
         const hasLegacyDates = Boolean(row.hmeromhnia_allaghs_orarioy_apo);
-        const isTermsChange =
-            row.afora_allagh_oron_ergasias === true || hasNewTermsDates || hasLegacyDates;
+        const hasExplicitTermsChangeFlag = Object.prototype.hasOwnProperty.call(
+            row, 'afora_allagh_oron_ergasias'
+        );
+        const isTermsChange = hasExplicitTermsChangeFlag
+            ? row.afora_allagh_oron_ergasias === true
+            : hasNewTermsDates || hasLegacyDates;
 
         if (!isTermsChange) return false;
 
