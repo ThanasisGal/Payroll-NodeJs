@@ -8837,7 +8837,7 @@ function renderWeeklyHrStage1BulkToolbar() {
             </span>
             <strong>Επιλεγμένες: <span id="weeklyHrStage1SelectedCount">${counts.selected}</span></strong>
         </div>
-        <div class="d-none d-flex flex-wrap gap-2 align-items-center weekly-hr-legacy-bulk-controls">
+        <div class="d-flex flex-wrap gap-2 align-items-center weekly-hr-legacy-bulk-controls">
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-select-all">Επιλογή όλων</button>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary weekly-hr-clear-all">Αποεπιλογή όλων</button>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-success weekly-hr-bulk-complete" ${disabled ? 'disabled aria-disabled="true"' : ''}>Μαζική Ολοκλήρωση Ελέγχου Αδειών / Ασθενειών / Απουσιών</button>

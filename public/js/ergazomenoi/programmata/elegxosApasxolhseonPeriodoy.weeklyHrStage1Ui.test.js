@@ -412,7 +412,14 @@ for (const legacyControl of ['weekly-hr-select-all', 'weekly-hr-clear-all',
     'weekly-hr-classify-selected', 'weekly-hr-save-day-classifications']) {
     assert.match(toolbarSource, new RegExp(legacyControl));
 }
-assert.match(toolbarSource, /d-none d-flex[\s\S]*weekly-hr-legacy-bulk-controls/);
+const legacyBulkControls = toolbarSource.match(
+    /<div class="[^"]*weekly-hr-legacy-bulk-controls[^"]*">[\s\S]*?<\/div>/)?.[0] || '';
+assert.match(legacyBulkControls, /class="d-flex/);
+assert.doesNotMatch(legacyBulkControls, /\bd-none\b/);
+assert.match(legacyBulkControls, /Επιλογή όλων/);
+assert.match(legacyBulkControls, /Αποεπιλογή όλων/);
+assert.match(legacyBulkControls,
+    /Μαζική Ολοκλήρωση Ελέγχου Αδειών \/ Ασθενειών \/ Απουσιών/);
 assert.match(toolbarSource, /d-none border-top[\s\S]*weekly-hr-day-bulk-toolbar/);
 assert.match(source, /renderWeeklyHrStage1Card\(payload, filteredDates = null\)/);
 assert.match(source, /renderStage1ReviewDay\(payload, date, relevantDates\)/);
