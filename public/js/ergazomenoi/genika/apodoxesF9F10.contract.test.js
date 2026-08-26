@@ -80,19 +80,32 @@ for (const source of [editScript, addScript]) {
     assert.ok(source.includes('findExistingOrFirstEmptyExtraRow'));
     assert.ok(source.includes('isManualOromisthioEqualToLegalAtDisplayPrecision'));
     assert.ok(source.includes('const legalValues = getManualLegalWageValues();'));
-    assert.ok(source.includes('pragmatikoHmeromisthioValue = legalValues.hmeromisthio;'));
-    assert.ok(source.includes('pragmatikosMisthosValue = legalValues.misthos;'));
+    assert.ok(source.includes('resolveManualPragmatikoOromisthio'));
+    assert.ok(source.includes('calculateManualActualWages'));
+    assert.ok(!source.includes('pragmatikoHmeromisthioValue = legalValues.hmeromisthio;'));
+    assert.ok(!source.includes('pragmatikosMisthosValue = legalValues.misthos;'));
     assert.ok(source.includes('const existingExtraRow = findExistingExtraApodoxesRow();'));
     assert.ok(source.includes('setManualExtraAmountToRow(existingExtraRow, new Decimal(0));'));
     assert.ok(source.includes('await calculateTotal();'));
 }
 
+assert.ok(editScript.includes('const preserveManualDeviation = hasManualPragmatikoOromisthioDeviation();'));
+assert.ok(editScript.includes('await recalculateActualWagesAfterLegalChange(preserveManualDeviation);'));
+assert.ok(editScript.includes("if (typeof window.reCalculate === 'function')"));
+assert.ok(editScript.includes('await window.reCalculate();'));
+assert.ok(editScript.includes('const effectiveHourly = preserveManualDeviation'));
+assert.ok(editScript.includes(': getNomimoOromisthioValue();'));
+
 assert.ok(addScript.includes('clearManualExtraApodoxesSnapshot();'));
 
 function extractFunction(source, functionName) {
-    const start = source.indexOf(`function ${functionName}(`);
-    assert.notStrictEqual(start, -1, `missing function ${functionName}`);
-    const bodyStart = source.indexOf('{', start);
+    const functionStart = source.indexOf(`function ${functionName}(`);
+    assert.notStrictEqual(functionStart, -1, `missing function ${functionName}`);
+    const asyncPrefix = 'async ';
+    const start = source.slice(functionStart - asyncPrefix.length, functionStart) === asyncPrefix
+        ? functionStart - asyncPrefix.length
+        : functionStart;
+    const bodyStart = source.indexOf('{', functionStart);
     let depth = 0;
     for (let i = bodyStart; i < source.length; i++) {
         if (source[i] === '{') depth += 1;
@@ -126,6 +139,12 @@ function runManualHelpersContract(source) {
             poso_symbashs_basei_oron_ergasias_01: '240.55'
         },
         document: { getElementById: (id) => elements.get(id) || null },
+        window: {
+            _ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS: new Decimal('166.6666666667'),
+            _SYNTELESTHS_EBDOMADON_HMEROMISTHION: new Decimal('4.3333333333'),
+            _SYNTELESTHS_EBDOMADON_MISTHOTON: new Decimal('4.3333333333')
+        },
+        toDecimal: (value) => (value instanceof Decimal ? value : new Decimal(value || 0)),
         getEffectiveRowCount: () => 2,
         MANUAL_EXTRA_APODOXES_TEXT: 'EXTRA ΑΠΟΔΟΧΕΣ ΔΥΝΑΜΕΝΕΣ ΝΑ ΑΝΑΙΡΕΘΟΥΝ',
         formatForDisplay: (value, decimals) => new Decimal(value).toFixed(decimals)
@@ -135,6 +154,8 @@ function runManualHelpersContract(source) {
         [
             extractFunction(source, 'normalizeGreekSearchText'),
             extractFunction(source, 'isManualOromisthioEqualToLegalAtDisplayPrecision'),
+            extractFunction(source, 'resolveManualPragmatikoOromisthio'),
+            extractFunction(source, 'calculateManualActualWages'),
             extractFunction(source, 'findExistingExtraApodoxesRow'),
             extractFunction(source, 'setManualExtraAmountToRow')
         ].join('\n'),
@@ -148,6 +169,50 @@ function runManualHelpersContract(source) {
         ),
         true
     );
+    const canonicalHourly = context.resolveManualPragmatikoOromisthio(
+        new Decimal('7.0567'),
+        new Decimal('7.05672')
+    );
+    assert.strictEqual(canonicalHourly.toString(), '7.05672');
+    assert.strictEqual(canonicalHourly.toFixed(4), '7.0567');
+
+    const canonicalWages = context.calculateManualActualWages(
+        canonicalHourly,
+        new Decimal(40),
+        new Decimal(5),
+        'Μ',
+        false
+    );
+    assert.strictEqual(canonicalWages.hmeromisthio.toString(), '56.45376');
+    assert.ok(canonicalWages.misthos.eq(canonicalHourly.times(40).times('4.3333333333')));
+    assert.ok(!canonicalWages.hmeromisthio.eq(new Decimal('40.48')));
+    assert.ok(!canonicalWages.misthos.eq(new Decimal('1012')));
+
+    const manualHourly = context.resolveManualPragmatikoOromisthio(
+        new Decimal('8.5000'),
+        new Decimal('7.05672')
+    );
+    assert.strictEqual(manualHourly.toString(), '8.5');
+    const manualWages = context.calculateManualActualWages(
+        manualHourly,
+        new Decimal(40),
+        new Decimal(5),
+        'Μ',
+        false
+    );
+    assert.strictEqual(manualWages.hmeromisthio.toString(), '68');
+    assert.ok(manualWages.misthos.eq(manualHourly.times(40).times('4.3333333333')));
+
+    const returnedToLegalHourly = context.resolveManualPragmatikoOromisthio(
+        manualHourly,
+        new Decimal('7.05672')
+    );
+    assert.strictEqual(returnedToLegalHourly.toString(), '8.5');
+    const resetToLegalHourly = context.resolveManualPragmatikoOromisthio(
+        new Decimal('7.0567'),
+        new Decimal('7.05672')
+    );
+    assert.strictEqual(resetToLegalHourly.toString(), '7.05672');
     assert.strictEqual(context.findExistingExtraApodoxesRow(), '01');
     context.setManualExtraAmountToRow('01', new Decimal(0));
     assert.strictEqual(elements.get('poso_symbashs_01').value, '0.00');
@@ -163,16 +228,65 @@ function runManualHelpersContract(source) {
 runManualHelpersContract(addScript);
 runManualHelpersContract(editScript);
 
+async function runEditLegalChangeContract() {
+    const hourlyInput = { value: '7.0567' };
+    let legalHourly = new Decimal('7.05672');
+    let appliedHourly = null;
+    const context = {
+        Decimal,
+        _manualPragmatikoOromisthioActive: true,
+        _manualPragmatikoOromisthioSnapshot: {
+            oromisthio: new Decimal('7.05672'),
+            hmeromisthio: new Decimal('56.45376'),
+            misthos: new Decimal('1223.164799990592')
+        },
+        document: {
+            getElementById: (id) => (id === 'pragmatikoOromisthio' ? hourlyInput : null)
+        },
+        getNomimoOromisthioValue: () => legalHourly,
+        isManualOromisthioEqualToLegalAtDisplayPrecision: (manual, legal) =>
+            new Decimal(manual).toDecimalPlaces(4).eq(new Decimal(legal).toDecimalPlaces(4)),
+        formatForDisplay: (value, decimals) => new Decimal(value).toFixed(decimals),
+        applyManualPragmatikoOromisthio: async () => {
+            appliedHourly = new Decimal(hourlyInput.value);
+        }
+    };
+    vm.createContext(context);
+    vm.runInContext(
+        [
+            extractFunction(editScript, 'hasManualPragmatikoOromisthioDeviation'),
+            extractFunction(editScript, 'recalculateActualWagesAfterLegalChange')
+        ].join('\n'),
+        context
+    );
+
+    assert.strictEqual(context.hasManualPragmatikoOromisthioDeviation(), false);
+    legalHourly = new Decimal('6.50004');
+    await context.recalculateActualWagesAfterLegalChange(false);
+    assert.strictEqual(hourlyInput.value, '6.5000');
+    assert.ok(appliedHourly.eq('6.5'));
+
+    context._manualPragmatikoOromisthioSnapshot.oromisthio = new Decimal('8.5000');
+    legalHourly = new Decimal('7.05672');
+    assert.strictEqual(context.hasManualPragmatikoOromisthioDeviation(), true);
+    legalHourly = new Decimal('6.50004');
+    await context.recalculateActualWagesAfterLegalChange(true);
+    assert.strictEqual(hourlyInput.value, '8.5000');
+    assert.ok(appliedHourly.eq('8.5'));
+}
+
+runEditLegalChangeContract().then(() => {
+    console.log('apodoxes F9/F10 add/edit contract tests passed');
+});
+
 for (const source of [addScript, editScript]) {
-    const canonicalBranch = source.indexOf('if (isCanonicalLegalReset)');
-    const fullTimeFormula = source.indexOf('} else if (isFullTime)', canonicalBranch);
-    const noExtraBranch = source.indexOf('if (diafora.lte(0))', canonicalBranch);
+    const calculation = source.indexOf('const calculatedActualWages = calculateManualActualWages(');
+    const noExtraBranch = source.indexOf('if (diafora.lte(0))', calculation);
     const createExtraRow = source.indexOf(
         'findExistingOrFirstEmptyExtraRow(extraItem.value)',
         noExtraBranch
     );
-    assert.ok(canonicalBranch > -1 && fullTimeFormula > canonicalBranch);
-    assert.ok(noExtraBranch > fullTimeFormula && createExtraRow > noExtraBranch);
+    assert.ok(calculation > -1 && noExtraBranch > calculation && createExtraRow > noExtraBranch);
     assert.ok(
         source.slice(noExtraBranch, createExtraRow).includes('findExistingExtraApodoxesRow()')
     );
@@ -181,8 +295,8 @@ for (const source of [addScript, editScript]) {
             .slice(noExtraBranch, createExtraRow)
             .includes('findExistingOrFirstEmptyExtraRow(')
     );
-    assert.ok(source.includes('pragmatikoHmeromisthioValue = neoOromisthio.div('));
-    assert.ok(source.includes('pragmatikosMisthosValue = neoOromisthio.times('));
+    assert.ok(source.includes('hmeromisthio: actualHourly.times(averageDailyHours)'));
+    assert.ok(source.includes('misthos: actualHourly.times(toDecimal(ores)).times(weeklyFactor)'));
     assert.ok(source.includes('setManualExtraAmountToRow(targetRow, diafora);'));
 }
 
@@ -203,5 +317,3 @@ for (const Model of [ErgazomenoiModel, IstorikoProslhpseonAllagonModel]) {
     assert.strictEqual(document.pragmatikosMisthos, 2500);
     assert.strictEqual(document.poso_symbashs_basei_oron_ergasias_01, 1488);
 }
-
-console.log('apodoxes F9/F10 add/edit contract tests passed');
