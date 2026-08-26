@@ -21,6 +21,8 @@ Object.defineProperty(container, 'innerHTML', {
         html = String(value);
     }
 });
+container.querySelector = (selector) => selector.split(',').some((candidate) =>
+    html.includes(candidate.trim().slice(1))) ? {} : null;
 const sandbox = {
     document: { getElementById: (id) => id === 'policyPreviewGroupsContainer' ? container : null },
     escapeHtml: (value) => String(value ?? ''),
@@ -78,7 +80,7 @@ assert.equal(completedStage2Lifecycle.stages.STAGE2.pending_count, 0);
 assert.equal(completedStage2Lifecycle.stages.STAGE2.pending_items.length, 0);
 container.innerHTML = '';
 assert.equal(sandbox.renderFallback(completedStage2Lifecycle), true);
-assert.match(container.innerHTML, /Δεν υπάρχουν εκκρεμότητες Μεταφοράς Ρεπό\./);
+assert.match(container.innerHTML, /Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό\./);
 const completedHtmlBeforeToggle = container.innerHTML;
 let stage2CollapseState = 'show';
 stage2CollapseState = 'hidden';
@@ -88,7 +90,7 @@ assert.equal(container.innerHTML, completedHtmlBeforeToggle);
 container.innerHTML = '';
 assert.equal(sandbox.renderFallback(lifecycle), true);
 assert.match(container.innerHTML, /Εκκρεμότητες Μεταφοράς Ρεπό/);
-assert.doesNotMatch(container.innerHTML, /Δεν υπάρχουν εκκρεμότητες Μεταφοράς Ρεπό\./);
+assert.doesNotMatch(container.innerHTML, /Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό\./);
 assert.match(container.innerHTML, /01\/06\/2026–07\/06\/2026/);
 assert.match(container.innerHTML, /Απαιτείται επίλυση μεταφοράς ρεπό\./);
 assert.doesNotMatch(container.innerHTML, /REPO_RESOLUTION_REQUIRED/);
@@ -106,7 +108,11 @@ assert.equal((container.innerHTML.match(/Απαιτείται επίλυση μ�
 container.innerHTML = '<section class="atomic-repo-transfer-section">atomic card</section>';
 assert.equal(sandbox.renderFallback(lifecycle), false);
 assert.equal(container.innerHTML, '<section class="atomic-repo-transfer-section">atomic card</section>');
-assert.doesNotMatch(container.innerHTML, /Δεν υπάρχουν εκκρεμότητες Μεταφοράς Ρεπό\./);
+assert.doesNotMatch(container.innerHTML, /Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό\./);
+
+container.innerHTML = '<section class="policy-preview-card">policy card</section>';
+assert.equal(sandbox.renderFallback(lifecycle), false);
+assert.equal(container.innerHTML, '<section class="policy-preview-card">policy card</section>');
 
 // A later no-card refresh can clear, then restore, the same derived fallback.
 container.innerHTML = '';
