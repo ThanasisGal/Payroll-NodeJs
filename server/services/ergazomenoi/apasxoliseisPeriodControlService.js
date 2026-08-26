@@ -637,6 +637,7 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
     const current = await queryLean(withSession(periodControlModel.findOne(filterForScope(scope)), dbSession));
     const previousStatus = ['LOCKED', 'FINALIZED'].includes(current?.status) ? current.status : 'OPEN';
     const target = action === 'LOCK' ? 'LOCKED' : action === 'UNLOCK' ? 'OPEN' : null;
+    let preTransitionDependencyFingerprint = '';
     if (!target) throw periodError('INVALID_PERIOD_TRANSITION', 400, 'Μη έγκυρη μετάβαση περιόδου.');
     if (previousStatus === 'FINALIZED') throw periodError('PERIOD_CONTROL_FINALIZED', 409, 'Η οριστικοποιημένη περίοδος δεν ξεκλειδώνεται.');
     if (isPastDeadline(calculatePeriodDeadline(scope.period_end), now)) {
@@ -646,6 +647,7 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
         }
         if (action === 'LOCK') {
             const fingerprints = await historicalFingerprintResolver({ scope });
+            preTransitionDependencyFingerprint = fingerprints.dependency_fingerprint;
             if (fingerprints.dependency_fingerprint !== current.historical_dependency_fingerprint) {
                 throw periodError('HISTORICAL_RECONSTRUCTION_STALE_CANNOT_FINALIZE', 409,
                     'Η ανακατασκευασμένη περίοδος είναι παρωχημένη και απαιτεί επανεκτίμηση.');
@@ -710,14 +712,17 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
                 last_transition_command_identity: commandIdentity, updated_at: at, version: afterVersion };
         const transitionFilter = { ...filterForScope(scope), status: previousStatus, version: beforeVersion };
         if (action === 'LOCK') transitionFilter.$or = [
-            { active_calculation_id: '' }, { active_calculation_id: null }, { active_calculation_id: { $exists: false } }
+            { active_calculation_id: '' }, { active_calculation_id: null },
+            { active_calculation_id: mongoose.trusted({ $exists: false }) }
         ];
         updated = await periodControlModel.findOneAndUpdate(transitionFilter, { $set: set }, { new: true, ...(dbSession ? { session: dbSession } : {}) });
         if (!updated) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409, 'Η κατάσταση της περιόδου άλλαξε.');
     }
     const updatedPlain = updated?.toObject ? updated.toObject() : updated;
+    const effectiveModeBefore = projectPeriodControl({ scope, record: current, now,
+        dependencyFingerprint: preTransitionDependencyFingerprint }).effective_mode;
     const auditDocument = { ...scope, previous_status: previousStatus, new_status: target,
-        effective_mode_before: resolveEffectiveMode({ storedStatus: previousStatus, deadline: calculatePeriodDeadline(scope.period_end), now }),
+        effective_mode_before: effectiveModeBefore,
         effective_mode_after: resolveEffectiveMode({ storedStatus: target, deadline: calculatePeriodDeadline(scope.period_end), now }),
         actor_user_id: actor.user_id, actor_user_name: actor.user_name, actor_user_role: actor.role,
         reason: cleanReason, request_id: cleanRequestId, command_identity: commandIdentity,

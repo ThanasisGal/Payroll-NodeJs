@@ -1,6 +1,10 @@
 'use strict';
 
 const assert = require('assert');
+const mongoose = require('mongoose');
+const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
+const FrozenSnapshotModel = require('../../models/apasxoliseisPeriodFrozenSnapshot');
+const LifecycleAuditModel = require('../../models/apasxoliseisPeriodLifecycleAudit');
 const { finalizeEmploymentPeriod, linkEmploymentPeriodSubmission, openCorrectiveCase,
     saveCorrectiveResult, closeCorrectiveCase } = require('./apasxoliseisPeriodLifecycleService');
 const { transitionPeriodControl } = require('./apasxoliseisPeriodControlService');
@@ -131,6 +135,59 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
     assert.strictEqual(reconstructedFlow.frozenRecord.baseline_origin,
         'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE');
     assert.strictEqual(reconstructedFlow.frozenRecord.historical_reconstruction_version, 1);
+
+    const validatedHistorical = stores({ status: 'LOCKED', version: 3,
+        deadline: new Date('2026-07-31'),
+        historical_reconstruction_status: 'COMPLETED', historical_reconstruction_version: 1,
+        historical_source_fingerprint: 's'.repeat(64),
+        historical_dependency_fingerprint: 'v'.repeat(64), active_calculation_id: '',
+        historical_result_fingerprint: 'r'.repeat(64),
+        frozen_snapshot_id: null, frozen_snapshot_fingerprint: '' });
+    let validatedFrozen = null; let validatedAudit = null; let finalizeFilter = null;
+    const validatingFrozenModel = {
+        findOne() { return query(null); },
+        async create(documents) {
+            const document = new FrozenSnapshotModel(documents[0]);
+            await document.validate();
+            validatedFrozen = document;
+            return [document];
+        }
+    };
+    const validatingPeriodModel = {
+        findOne: (...args) => validatedHistorical.period.findOne(...args),
+        async findOneAndUpdate(filter, update) {
+            finalizeFilter = filter;
+            const castQuery = PeriodControlModel.findOneAndUpdate(filter, update, { runValidators: true });
+            castQuery._castConditions();
+            assert.strictEqual(castQuery.error(), undefined);
+            assert.deepStrictEqual(castQuery.getFilter().active_calculation_id.$in, ['', null]);
+            assert.strictEqual(castQuery.getFilter().active_calculation_id.$eq, undefined);
+            const updated = await validatedHistorical.period.findOneAndUpdate(filter, update);
+            const document = new PeriodControlModel(updated);
+            await document.validate();
+            return document;
+        }
+    };
+    const validatingLifecycleAuditModel = { async create(documents) {
+        const document = new LifecycleAuditModel(documents[0]);
+        await document.validate();
+        validatedAudit = document;
+        return [document];
+    } };
+    const validatedResult = await finalizeEmploymentPeriod({ session: allowed, scope,
+        reason: 'Validation-only historical finalize', requestId: 'historical-finalize-validation-01',
+        snapshotInput, now: new Date('2026-08-03'), periodControlModel: validatingPeriodModel,
+        frozenModel: validatingFrozenModel, auditModel: validatingLifecycleAuditModel,
+        indexGuard: guard, transactionRunner: runner,
+        historicalFingerprintResolver: async () => ({ dependency_fingerprint: 'v'.repeat(64) }) });
+    assert.ok(finalizeFilter);
+    assert.strictEqual(validatedResult.control.status, 'FINALIZED');
+    assert.strictEqual(validatedFrozen.baseline_origin, 'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE');
+    assert.strictEqual(validatedFrozen.historical_reconstruction_version, 1);
+    assert.strictEqual(validatedFrozen.frozen_snapshot_fingerprint.length, 64);
+    assert.strictEqual(validatedAudit.event_type, 'FINALIZE');
+    assert.strictEqual(validatedAudit.details.baseline_origin,
+        'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE');
 
     const staleHistorical = stores({ historical_reconstruction_status: 'COMPLETED',
         historical_reconstruction_version: 1, historical_dependency_fingerprint: 'a'.repeat(64) });

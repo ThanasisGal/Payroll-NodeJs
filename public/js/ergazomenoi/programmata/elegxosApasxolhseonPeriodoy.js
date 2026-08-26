@@ -8059,11 +8059,23 @@ async function closeCorrectivePayroll() {
 
 async function runEmploymentPeriodLifecycleAction(kind) {
     const corrective = kind === 'corrective';
+    const historicalReconstruction =
+        currentEmploymentPeriodControl?.historical_reconstruction || {};
+    const historicalFinalize = !corrective &&
+        currentEmploymentPeriodControl?.past_deadline === true &&
+        historicalReconstruction.status === 'COMPLETED' &&
+        Number(historicalReconstruction.version || 0) >= 1;
     const confirmation = await employmentReviewSwal({ icon: 'warning',
         title: corrective ? 'Άνοιγμα διορθωτικής μισθοδοσίας' : 'Οριστικοποίηση περιόδου',
         text: corrective ? 'Το αρχικό οριστικοποιημένο αποτέλεσμα θα παραμείνει αμετάβλητο.' :
             'Θα δημιουργηθεί παγωμένο ιστορικό αποτέλεσμα που δεν ανακατασκευάζεται από μελλοντικές πολιτικές.',
         input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
+        ...(!corrective ? {
+            inputValue: historicalFinalize
+                ? 'Ολοκλήρωση ελέγχου και οριστικοποίηση ανακατασκευασμένης εκπρόθεσμης περιόδου'
+                : 'Ολοκλήρωση ελέγχου και οριστικοποίηση περιόδου',
+            customClass: { confirmButton: 'employment-period-finalize-confirm-button' }
+        } : {}),
         confirmButtonText: corrective ? 'Άνοιγμα διορθωτικής μισθοδοσίας' : 'Οριστικοποίηση περιόδου',
         cancelButtonText: 'Ακύρωση', inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.' });
     if (!confirmation.isConfirmed) return;
@@ -8126,6 +8138,8 @@ async function loadEmploymentPeriodControl(ypokatasthma) {
 
 async function transitionEmploymentPeriod(action) {
     const unlocking = action === 'unlock';
+    const historicalLock = !unlocking &&
+        currentEmploymentPeriodControl?.effective_mode === 'HISTORICAL_RECONSTRUCTED';
     const confirmation = await employmentReviewSwal({
         icon: 'warning',
         title: unlocking ? 'Ξεκλείδωμα περιόδου' : 'Κλείδωμα περιόδου',
@@ -8133,9 +8147,19 @@ async function transitionEmploymentPeriod(action) {
             ? 'Η ενέργεια αφορά ολόκληρη την περίοδο και δεν ξεκλειδώνει χειροκίνητα κλειδωμένες ημερήσιες εγγραφές.'
             : 'Μετά το κλείδωμα δεν επιτρέπονται κανονικές μεταβολές στην περίοδο.',
         input: 'textarea',
+        inputValue: unlocking
+            ? ''
+            : historicalLock
+                ? 'Ολοκλήρωση ελέγχου και κλείδωμα ανακατασκευασμένης εκπρόθεσμης περιόδου'
+                : 'Ολοκλήρωση ελέγχου και κλείδωμα περιόδου',
         inputLabel: 'Αιτιολογία',
         inputPlaceholder: 'Συμπληρώστε υποχρεωτική αιτιολογία',
         showCancelButton: true,
+        customClass: {
+            confirmButton: unlocking
+                ? 'employment-period-unlock-confirm-button'
+                : 'employment-period-lock-confirm-button'
+        },
         confirmButtonText: unlocking ? 'Ξεκλείδωμα περιόδου' : 'Κλείδωμα περιόδου',
         cancelButtonText: 'Ακύρωση',
         inputValidator: (value) => String(value || '').trim() ? undefined : 'Η αιτιολογία είναι υποχρεωτική.'

@@ -23,4 +23,10 @@ assert.strictEqual(Control.schema.path('last_successful_calculation_at').options
 assert.strictEqual(Audit.schema.options.autoIndex, false);
 assert.strictEqual(Audit.schema.options.autoCreate, false);
 assert.strictEqual(Audit.schema.path('reason').options.immutable, true);
-console.log('apasxoliseisPeriodControl model tests: 16/16 PASS');
+assert.deepStrictEqual(Audit.schema.path('effective_mode_before').enumValues, [
+    'NORMAL', 'LOCKED', 'CORRECTIVE_ONLY', 'HISTORICAL_RECONSTRUCTION_REQUIRED',
+    'HISTORICAL_RECONSTRUCTED', 'HISTORICAL_RECONSTRUCTION_STALE'
+]);
+assert.deepStrictEqual(Audit.schema.path('effective_mode_after').enumValues,
+    Audit.schema.path('effective_mode_before').enumValues);
+console.log('apasxoliseisPeriodControl model tests: 18/18 PASS');
