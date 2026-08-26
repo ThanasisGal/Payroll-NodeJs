@@ -220,6 +220,7 @@ function reloadStoixeioRowOptions(idNum) {
 }
 
 async function clearSingleStoixeioRow(idNum) {
+    const preserveManualDeviation = hasManualPragmatikoOromisthioDeviation();
     const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
     const row = document.getElementById(`row_${idNum}`);
     const tom = selectEl?.tomselect;
@@ -238,8 +239,9 @@ async function clearSingleStoixeioRow(idNum) {
 
     if (row) row.classList.remove('d-none');
 
-    calculateTotal();
+    await calculateTotal();
     applyNomimaFromSymbashTotals();
+    await recalculateActualWagesAfterLegalChange(preserveManualDeviation);
     syncStoixeioRowTrash(idNum);
 
     if (tom) {
@@ -1826,23 +1828,21 @@ function normalizeManualInputInPlace(input) {
 function getNomimoOromisthioValue() {
     const nomimoOromisthioEl = document.getElementById('nomimoOromisthio');
 
-    // Παίρνουμε πρώτα την ΟΡΑΤΗ τιμή του πεδίου. Σε ορισμένες φόρμες/flows
-    // το local _NOMIMO_OROMISTHIO μπορεί να μην έχει προλάβει να συγχρονιστεί,
-    // ενώ το input στην οθόνη έχει ήδη σωστή τιμή.
-    const inputValue = toDecimal(normalizeManualDecimalValue(nomimoOromisthioEl?.value));
-    if (!inputValue.isNaN() && !inputValue.isZero()) {
-        return inputValue;
+    // Η local τιμή προκύπτει από τον authoritative υπολογισμό και διατηρεί
+    // περισσότερα δεκαδικά από τα τέσσερα που εμφανίζει το input.
+    const localValue = toDecimal(_NOMIMO_OROMISTHIO);
+    if (!localValue.isNaN() && !localValue.isZero()) {
+        return localValue;
     }
 
-    // Fallback στο global/local υπολογισμένο νόμιμο ωρομίσθιο.
     const windowValue = toDecimal(window._NOMIMO_OROMISTHIO);
     if (!windowValue.isNaN() && !windowValue.isZero()) {
         return windowValue;
     }
 
-    const localValue = toDecimal(_NOMIMO_OROMISTHIO);
-    if (!localValue.isNaN() && !localValue.isZero()) {
-        return localValue;
+    const inputValue = toDecimal(normalizeManualDecimalValue(nomimoOromisthioEl?.value));
+    if (!inputValue.isNaN() && !inputValue.isZero()) {
+        return inputValue;
     }
 
     return new Decimal(0);
@@ -1850,14 +1850,46 @@ function getNomimoOromisthioValue() {
 
 function getManualLegalWageValues() {
     return {
-        oromisthio: getManualDecimalFromInput(document.getElementById('nomimoOromisthio')),
+        oromisthio: getNomimoOromisthioValue(),
         hmeromisthio: getManualDecimalFromInput(document.getElementById('nomimoHmeromisthio')),
         misthos: getManualDecimalFromInput(document.getElementById('nomimosMisthos'))
     };
 }
 
 function isManualOromisthioEqualToLegalAtDisplayPrecision(manualValue, legalValue) {
-    return formatForDisplay(manualValue, 4) === formatForDisplay(legalValue, 4);
+    return toDecimal(manualValue)
+        .toDecimalPlaces(4, Decimal.ROUND_HALF_UP)
+        .eq(toDecimal(legalValue).toDecimalPlaces(4, Decimal.ROUND_HALF_UP));
+}
+
+function resolveManualPragmatikoOromisthio(manualValue, legalValue) {
+    return isManualOromisthioEqualToLegalAtDisplayPrecision(manualValue, legalValue)
+        ? toDecimal(legalValue)
+        : toDecimal(manualValue);
+}
+
+function calculateManualActualWages(oromisthio, ores, hmeres, typosErg, isFullTime) {
+    const actualHourly = toDecimal(oromisthio);
+
+    if (isFullTime) {
+        return {
+            hmeromisthio: actualHourly.div(new Decimal(6).div(40)),
+            misthos: actualHourly.times(
+                toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
+            )
+        };
+    }
+
+    const averageDailyHours = toDecimal(ores).div(toDecimal(hmeres));
+    const weeklyFactor =
+        typosErg === 'Η'
+            ? toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION)
+            : toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON);
+
+    return {
+        hmeromisthio: actualHourly.times(averageDailyHours),
+        misthos: actualHourly.times(toDecimal(ores)).times(weeklyFactor)
+    };
 }
 
 function validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl) {
@@ -2046,8 +2078,14 @@ function setupManualRecalcButtonInterceptor() {
             event.stopPropagation();
             event.stopImmediatePropagation();
 
-            await calculateTotal();
-            restoreManualPragmatikoOromisthioSnapshot();
+            const preserveManualDeviation = hasManualPragmatikoOromisthioDeviation();
+            if (typeof window.reCalculate === 'function') {
+                await window.reCalculate();
+            } else {
+                await calculateTotal();
+                applyNomimaFromSymbashTotals();
+            }
+            await recalculateActualWagesAfterLegalChange(preserveManualDeviation);
 
             showAlert({
                 icon: 'success',
@@ -2068,6 +2106,31 @@ function saveManualPragmatikoOromisthioSnapshot({ oromisthio, hmeromisthio, mist
         hmeromisthio: toDecimal(hmeromisthio),
         misthos: toDecimal(misthos)
     };
+}
+
+function hasManualPragmatikoOromisthioDeviation() {
+    if (!_manualPragmatikoOromisthioActive || !_manualPragmatikoOromisthioSnapshot) {
+        return false;
+    }
+
+    return !isManualOromisthioEqualToLegalAtDisplayPrecision(
+        _manualPragmatikoOromisthioSnapshot.oromisthio,
+        getNomimoOromisthioValue()
+    );
+}
+
+async function recalculateActualWagesAfterLegalChange(preserveManualDeviation) {
+    if (!_manualPragmatikoOromisthioActive || !_manualPragmatikoOromisthioSnapshot) return;
+
+    const oromisthioEl = document.getElementById('pragmatikoOromisthio');
+    if (!oromisthioEl) return;
+
+    const effectiveHourly = preserveManualDeviation
+        ? _manualPragmatikoOromisthioSnapshot.oromisthio
+        : getNomimoOromisthioValue();
+
+    oromisthioEl.value = formatForDisplay(effectiveHourly, 4);
+    await applyManualPragmatikoOromisthio();
 }
 
 function restoreManualPragmatikoOromisthioSnapshot() {
@@ -2177,12 +2240,12 @@ async function applyManualPragmatikoOromisthio() {
     const typosErg = document.getElementById('typos_ergazomenon')?.value || '';
     const isFullTime = Boolean(document.getElementById('plhrhs_apasxolhsh')?.checked);
     const legalValues = getManualLegalWageValues();
-    const isCanonicalLegalReset = isManualOromisthioEqualToLegalAtDisplayPrecision(
+    const pragmatikoOromisthioValue = resolveManualPragmatikoOromisthio(
         neoOromisthio,
         legalValues.oromisthio
     );
 
-    if (!isCanonicalLegalReset && !isFullTime && (ores.lte(0) || hmeres.lte(0))) {
+    if (!isFullTime && (ores.lte(0) || hmeres.lte(0))) {
         showAlert({
             icon: 'warning',
             title: 'Προσοχή',
@@ -2191,28 +2254,15 @@ async function applyManualPragmatikoOromisthio() {
         return;
     }
 
-    let pragmatikoHmeromisthioValue = new Decimal(0);
-    let pragmatikosMisthosValue = new Decimal(0);
-
-    if (isCanonicalLegalReset) {
-        pragmatikoHmeromisthioValue = legalValues.hmeromisthio;
-        pragmatikosMisthosValue = legalValues.misthos;
-    } else if (isFullTime) {
-        pragmatikoHmeromisthioValue = neoOromisthio.div(new Decimal(6).div(40));
-        pragmatikosMisthosValue = neoOromisthio.times(
-            toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
-        );
-    } else {
-        const moOronHmeras = ores.div(hmeres);
-        pragmatikoHmeromisthioValue = neoOromisthio.times(moOronHmeras);
-
-        const weeklyFactor =
-            typosErg === 'Η'
-                ? toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION)
-                : toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON);
-
-        pragmatikosMisthosValue = neoOromisthio.times(ores).times(weeklyFactor);
-    }
+    const calculatedActualWages = calculateManualActualWages(
+        pragmatikoOromisthioValue,
+        ores,
+        hmeres,
+        typosErg,
+        isFullTime
+    );
+    const pragmatikoHmeromisthioValue = calculatedActualWages.hmeromisthio;
+    const pragmatikosMisthosValue = calculatedActualWages.misthos;
 
     // Τελική δικλείδα ασφαλείας: πριν γραφτούν Πραγματικός Μισθός/Ημερομίσθιο
     // και πριν ψάξουμε EXTRA γραμμή, ελέγχουμε ξανά ότι το δωτό ωρομίσθιο
@@ -2220,10 +2270,6 @@ async function applyManualPragmatikoOromisthio() {
     if (!validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl)) {
         return;
     }
-
-    const pragmatikoOromisthioValue = isCanonicalLegalReset
-        ? legalValues.oromisthio
-        : neoOromisthio;
 
     if (oromisthioEl) oromisthioEl.value = formatForDisplay(pragmatikoOromisthioValue, 4);
     if (hmeromisthioEl) hmeromisthioEl.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
@@ -2290,7 +2336,7 @@ async function applyManualPragmatikoOromisthio() {
     await calculateTotal();
 
     // Επαναφέρουμε τις manual τιμές, ώστε το κουμπί/οι παλιοί υπολογισμοί να μη τις αντικαταστήσουν.
-    if (oromisthioEl) oromisthioEl.value = formatForDisplay(neoOromisthio, 4);
+    if (oromisthioEl) oromisthioEl.value = formatForDisplay(pragmatikoOromisthioValue, 4);
     if (hmeromisthioEl) hmeromisthioEl.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
     if (misthosEl) misthosEl.value = formatForDisplay(pragmatikosMisthosValue, 2);
 

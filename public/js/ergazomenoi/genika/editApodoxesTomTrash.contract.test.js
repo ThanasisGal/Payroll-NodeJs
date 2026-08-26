@@ -57,7 +57,8 @@ function createDynamicHarness({
         refreshOptionsCalls: [],
         setTextboxValue: [],
         clearFilter: 0,
-        handleStoixeioChange: 0
+        handleStoixeioChange: 0,
+        recalculateActualWages: 0
     };
     const trash = { hidden: true };
     const hidden = { value: hiddenValue };
@@ -166,6 +167,12 @@ function createDynamicHarness({
         applyNomimaFromSymbashTotals() {
             calls.applyNomima += 1;
         },
+        hasManualPragmatikoOromisthioDeviation() {
+            return false;
+        },
+        async recalculateActualWagesAfterLegalChange() {
+            calls.recalculateActualWages += 1;
+        },
         async handleStoixeioChange(idNum, value) {
             calls.handleStoixeioChange += 1;
             elements[`poso_symbashs_${idNum}`].value = value === '0002' ? '22.00' : '32.00';
@@ -247,6 +254,7 @@ test('preselected dynamic trash reloads options once and stays enabled, closed a
     assert.deepEqual(harness.calls.refreshOptionsCalls, [false]);
     assert.equal(harness.calls.calculateTotal, 1);
     assert.equal(harness.calls.applyNomima, 1);
+    assert.equal(harness.calls.recalculateActualWages, 1);
     assert.equal(harness.calls.open, 0);
     assert.equal(harness.tom.isOpen, false);
     assert.equal(harness.trash.hidden, true);
