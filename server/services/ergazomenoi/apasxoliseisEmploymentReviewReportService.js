@@ -10,6 +10,8 @@ const {
 } = require('./apasxoliseisOrphanResolutionPersistenceService');
 
 const REPORT_SCHEMA_VERSION = 'employment-review-report:v1';
+const DAILY_DETAIL_FONT_SIZE = 7.2;
+const SUMMARY_FONT_SIZE = DAILY_DETAIL_FONT_SIZE + 1;
 const DAILY_NUMBER_FIELDS = Object.freeze([
     ['ores_ergasias_apologistika', 'Ώρες εργασίας'],
     ['ores_pragmatikhs_ergasias_apologistika', 'Πραγματικές ώρες'],
@@ -71,6 +73,8 @@ function number(value) {
 function aggregateRows(rows) {
     const totals = Object.fromEntries(TOTAL_NUMBER_FIELDS.map(([field]) => [field,
         number(rows.reduce((sum, row) => sum + number(row.values[field]), 0))]));
+    totals.sixthDayHours = number(rows.reduce((sum, row) => sum + number(row.sixthDayHours), 0));
+    totals.seventhDayHours = number(rows.reduce((sum, row) => sum + number(row.seventhDayHours), 0));
     const counts = Object.fromEntries(COUNT_FIELDS.map(([key, , rowKey]) => [key,
         rows.filter((row) => row[rowKey] === true).length]));
     return { totals, counts };
@@ -82,6 +86,24 @@ function dateLabel(value) {
     if (!key) return '';
     const [year, month, day] = key.split('-');
     return `${day}/${month}/${year}`;
+}
+function pdfFileNamePart(value) {
+    return text(value).replace(/[\\/:*?"<>|]/g, '').trim().replace(/\s+/g, '_');
+}
+function pdfFileNameDate(value) {
+    return dateLabel(value).replaceAll('/', '-');
+}
+function buildSimplePdfFileName({ team, companyCode, companyName, periodStart, periodEnd } = {}) {
+    const parts = [team, companyCode, companyName].map(pdfFileNamePart);
+    const dates = [pdfFileNameDate(periodStart), pdfFileNameDate(periodEnd)];
+    return `${[...parts, ...dates].filter(Boolean).join('_')}.pdf`;
+}
+function buildDossierPdfFileName({ team, companyCode, companyName, periodStart, periodEnd } = {}) {
+    const parts = [team, companyCode, companyName]
+        .map((value) => pdfFileNamePart(value).replace(/_+/g, '_'));
+    const dates = [pdfFileNameDate(periodStart), pdfFileNameDate(periodEnd)];
+    return `ΦΑΚΕΛΟΣ_ΕΛΕΓΧΟΥ_ΑΠΑΣΧΟΛΗΣΕΩΝ_${[...parts, ...dates]
+        .filter(Boolean).join('_')}.pdf`;
 }
 function time(value) { return text(value).slice(0, 5); }
 function intervals(row, kind = 'declared') {
@@ -154,10 +176,16 @@ function stage2DailyResolution(lifecycle, rowDate) {
     const items = lifecycleStage(lifecycle, 'stage3').stage2_automatic_resolution_items || [];
     return items.find((item) => dateKeyUtc(item?.date) === rowDate) || null;
 }
-function authoritativeDailyState(row, lifecycle, rowDate) {
+function declaredDailyCategory(row = {}) {
+    const category = text(row.kathgoria_ergasias_original || row.kathgoria_ergasias);
+    return category || (row.repo === true ? 'ΑΝ' : '');
+}
+function authoritativeDailyState(row, lifecycle, rowDate, stage2DailyResolutionsByDate = new Map()) {
     const canonicalPositive = row.adeia_apologistika === true ||
         row.astheneia_apologistika === true || row.apousia_apologistika === true;
-    const resolution = canonicalPositive ? null : stage2DailyResolution(lifecycle, rowDate);
+    const resolution = canonicalPositive ? null :
+        stage2DailyResolutionsByDate.get(`${text(row.kodikos)}|${rowDate}`) ||
+        stage2DailyResolution(lifecycle, rowDate);
     if (resolution?.classification === 'REST_REPO') {
         return { classification: 'ΑΝ', repo: true, apologistikoBook: true,
             source: 'STAGE2_FINAL_PROJECTION' };
@@ -166,8 +194,11 @@ function authoritativeDailyState(row, lifecycle, rowDate) {
         return { classification: 'ΜΕ', repo: false, apologistikoBook: true,
             source: 'STAGE2_FINAL_PROJECTION' };
     }
-    return { classification: text(row.kathgoria_ergasias_apologistika ||
-        row.kathgoria_ergasias_effective || row.kathgoria_ergasias),
+    const finalCategory = row.repo_apologistika === true
+        ? 'ΑΝ'
+        : text(row.kathgoria_ergasias_apologistika ||
+            row.kathgoria_ergasias_effective || row.kathgoria_ergasias);
+    return { classification: finalCategory,
     repo: Boolean(row.repo_apologistika), apologistikoBook: row.apologistiko_biblio === true,
     source: 'CANONICAL_DAILY' };
 }
@@ -193,7 +224,9 @@ function employmentStatusLabel(value) {
     return text(value).toUpperCase();
 }
 function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [], workflowAudits = [],
-    lifecycleByWeek = new Map(), repoTransferDecisions = [], metadata = {} } = {}) {
+    lifecycleByWeek = new Map(), finalWeeklyAnalysisByWeek = new Map(),
+    stage2DailyResolutionsByDate = new Map(),
+    repoTransferDecisions = [], metadata = {} } = {}) {
     const states = new Map(workflowStates.map((state) => [
         `${text(state.employee_kodikos)}|${dateKeyUtc(state.week_start)}`, state
     ]));
@@ -208,20 +241,25 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
         const key = stateKey(row);
         const state = states.get(key);
         const lifecycle = lifecycleByWeek.get(key) || {};
-        const finalAnalysis = lifecycleStage(lifecycle, 'stage4').final_weekly_analysis || {};
+        const lifecycleFinalAnalysis = lifecycleStage(lifecycle, 'stage4').final_weekly_analysis || {};
+        const finalAnalysis = lifecycleByWeek.has(key)
+            ? lifecycleFinalAnalysis
+            : finalWeeklyAnalysisByWeek.get(key) || {};
         const rowDate = dateKeyUtc(row.hmeromhnia);
         const preview = row.orphan_card_resolution_preview || {};
         const resolution = canonicalOrphanResolutionMetadata(row.orphan_card_resolution || {});
-        const sixthFromLifecycle = dateKeyUtc(finalAnalysis.sixthDay?.hmeromhnia) === rowDate;
-        const seventhFromLifecycle = dateKeyUtc(finalAnalysis.seventhDay?.hmeromhnia) === rowDate;
-        const sixth = sixthFromLifecycle || row.policy?.classification === 'SIXTH';
-        const seventh = seventhFromLifecycle;
-        const premium = sixthFromLifecycle ? finalAnalysis.sixthDay?.premiumRate
+        const sixthFromFinalAnalysis = dateKeyUtc(finalAnalysis.sixthDay?.hmeromhnia) === rowDate;
+        const seventhFromFinalAnalysis = dateKeyUtc(finalAnalysis.seventhDay?.hmeromhnia) === rowDate;
+        const sixth = sixthFromFinalAnalysis || row.policy?.classification === 'SIXTH';
+        const seventh = seventhFromFinalAnalysis || row.policy?.classification === 'SEVENTH';
+        const premium = sixthFromFinalAnalysis ? finalAnalysis.sixthDay?.premiumRate
             : sixth ? row.policy?.sixthDayRate : null;
         const noActionPossibleLeave = (lifecycle.requires_hr_action === false ||
             (!lifecycleByWeek.has(key) && row.requires_hr_action === false)) &&
             Number(lifecycle.total_pending_count ?? row.total_pending_count ?? 0) === 0;
-        const authoritative = authoritativeDailyState(row, lifecycle, rowDate);
+        const authoritative = authoritativeDailyState(
+            row, lifecycle, rowDate, stage2DailyResolutionsByDate
+        );
         return {
             source: row,
             employeeCode: text(row.kodikos), employeeName: text(row.employeeName || `${row.eponymo || ''} ${row.onoma || ''}`),
@@ -238,6 +276,9 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
                 ? null : number(row.effective_sixth_day_rate),
             profileSource: technicalSourceLabel(row.effective_profile_source), declared: intervals(row), cards: cards(row),
             approved: intervals(row, 'approved'),
+            declaredCategory: declaredDailyCategory(row),
+            finalCategory: authoritative.classification,
+            finalCategorySource: authoritative.source,
             classification: noActionPossibleLeave &&
                 text(row.kathgoria_ergasias_apologistika) === 'POSSIBLE_LEAVE' &&
                 authoritative.source === 'CANONICAL_DAILY' ? '' : authoritative.classification,
@@ -252,7 +293,16 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
                 number(row.ores_argias_pistomenes_apologistika) > 0,
             values: Object.fromEntries(DAILY_NUMBER_FIELDS.map(([field]) => [field, number(row[field])])),
             sixthDay: sixth, sixthDayRate: premium === null || premium === undefined ? null : number(premium),
+            sixthDayHours: sixthFromFinalAnalysis
+                ? number(finalAnalysis.sixthDay?.sixthDayHours)
+                : sixth ? number(row.policy?.sixthDayHours) : 0,
             seventhDay: seventh,
+            seventhDayHours: seventhFromFinalAnalysis
+                ? number(finalAnalysis.seventhDay?.illegalOvertimeHours ??
+                    finalAnalysis.seventhDay?.actualWorkHours)
+                : seventh ? number(row.policy?.seventhDayHours ??
+                    row.policy?.illegalOvertimeHours ?? row.illegalOvertime?.total ??
+                    row.ores_pragmatikhs_ergasias_apologistika) : 0,
             requiresHrAction: lifecycle.requires_hr_action === true,
             orphan: preview.orphanType || resolution.orphan_type ? {
                 type: preview.orphanType || resolution.orphan_type,
@@ -261,6 +311,8 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
                 rawPunch: cards(row),
                 approvedInterval: intervals(row, 'approved'),
                 reuseScope: reuseScopeLabel(resolution.reuse_scope),
+                approvedBy: text(resolution.approved_by),
+                approvedAt: resolution.approved_at || null,
                 restViolation: Boolean(preview.restValidation?.hasViolation || preview.rest?.hasViolation ||
                     resolution.rest_violation),
                 restResult: preview.restValidation?.hasViolation || preview.rest?.hasViolation ||
@@ -297,7 +349,9 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
             initial: text(row.source.kathgoria_ergasias_original || row.source.kathgoria_ergasias),
             result: row.classification || 'Χωρίς τελικό χαρακτηρισμό',
             source: row.source.hr_declared_leave === true || row.leave || row.sickness || row.absence ? 'HR' : 'Αυτόματα',
-            reason: text(state.stage1?.reason_or_notes) }));
+            reason: text(state.stage1?.reason_or_notes),
+            actor: text(state.stage1?.completed_by_user_name),
+            decidedAt: state.stage1?.completed_at || null }));
         const repoDecisions = repoTransferDecisions.filter((decision) =>
             text(decision.employee_kodikos) === employeeCode && dateKeyUtc(decision.week_start) === weekStart)
             .map((decision) => ({ applicable: true,
@@ -305,7 +359,8 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
                 targetDate: dateKeyUtc(decision.canonical_snapshot?.target?.hmeromhnia),
                 result: decisionCodeLabel(decision.decision_code), source: decision.created_by_user_id ? 'HR' : 'Αυτόματα',
                 reason: text(decision.notes), decidedAt: decision.created_at || null,
-                actor: text(decision.created_by_user_name) }));
+                actor: text(decision.created_by_user_name),
+                reuseScope: reuseScopeLabel(decision.reuse_scope) }));
         const stage3Decisions = (auditsByWeek.get(key) || [])
             .filter((audit) => audit.action === 'STAGE3_DAILY_RESOLVED')
             .map((audit) => { const decidedRow = weekRows.find((row) => row.date === dateKeyUtc(audit.decision_date));
@@ -316,6 +371,11 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
                     ),
                     reason: text(audit.reason_or_notes), source: audit.performed_by_user_id ? 'HR' : 'Αυτόματα',
                     decidedAt: audit.performed_at || null, actor: text(audit.performed_by_user_name) }; });
+        const automaticRepoResolutions = (stage3Lifecycle.stage2_automatic_resolution_items || [])
+            .filter((item) => item.classification === 'REST_REPO')
+            .map((item) => ({ targetDate: dateKeyUtc(item.date), reason: text(item.reason),
+                sourceDate: weekRows.find((row) => row.declaredCategory === 'ΑΝ' &&
+                    row.finalCategory === 'ΕΡΓ')?.date || '' }));
         const totals = Object.fromEntries(DAILY_NUMBER_FIELDS.map(([field]) => [field,
             number(weekRows.reduce((sum, row) => sum + number(row.values[field]), 0))]));
         return { key, employeeCode, employeeName: weekRows[0]?.employeeName || '', weekStart,
@@ -325,8 +385,15 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
             workdays: workRows.length, repos: weekRows.filter((row) => row.repo).length,
             sixthDay: dateKeyUtc(finalAnalysis.sixthDay?.hmeromhnia) || sixth?.date || '',
             sixthDayRate: finalAnalysis.sixthDay?.premiumRate ?? sixth?.sixthDayRate ?? null,
+            sixthDayHours: number(finalAnalysis.sixthDay?.sixthDayHours ?? sixth?.sixthDayHours),
+            sixthDayIllegalOvertimeHours: number(
+                finalAnalysis.sixthDay?.illegalOvertimeHours),
             sixthDayRateSource: text(finalAnalysis.sixthDay?.premiumRateSource),
             seventhDay: dateKeyUtc(finalAnalysis.seventhDay?.hmeromhnia) || seventh?.date || '',
+            seventhDayHours: number(finalAnalysis.seventhDay?.actualWorkHours ??
+                finalAnalysis.seventhDay?.illegalOvertimeHours ?? seventh?.seventhDayHours),
+            seventhDayIllegalOvertimeHours: number(
+                finalAnalysis.seventhDay?.illegalOvertimeHours ?? seventh?.seventhDayHours),
             violations: weekRows.filter((row) =>
                 row.values.ores_paranomhs_yperorias_apologistika > 0).length,
             totals,
@@ -344,7 +411,7 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
                 if (reasons.length) return reasons.map((reason) => `${key}|${stageName}|${text(reason)}`);
                 return Array.from({ length: Number(stage.pending_count || 0) }, (_, index) => `${key}|${stageName}|${index}`);
             }),
-            stage1Decisions, repoDecisions, stage3Decisions,
+            stage1Decisions, repoDecisions, stage3Decisions, automaticRepoResolutions,
             stages: ['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'].map((stage) => {
                 const value = stageValue(state, stage) || {};
                 const projected = lifecycleStage(lifecycle, stage);
@@ -392,17 +459,104 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
 function styleSheet(sheet) {
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
     sheet.autoFilter = { from: 'A1', to: sheet.getRow(1).getCell(sheet.columnCount).address };
-    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    sheet.getRow(1).font = { name: 'DejaVu Sans', size: 9, bold: true,
+        color: { argb: 'FFFFFFFF' } };
     sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B4F3A' } };
     sheet.getRow(1).alignment = { vertical: 'middle', wrapText: true };
     sheet.eachRow((row, index) => { if (index > 1) row.alignment = { vertical: 'top', wrapText: true }; });
 }
-function addSheet(workbook, name, columns, rows) {
+function addSheet(workbook, name, columns, rows, { state = 'hidden' } = {}) {
     const sheet = workbook.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] });
+    sheet.state = state;
     sheet.columns = columns;
     sheet.addRows(rows);
     styleSheet(sheet);
     return sheet;
+}
+const REVIEW_EXCEL_FOOTER =
+    '© 2009 - 2026 Copyright: www.WebPayrollSolutions.com   Ιωλκού 266α Βόλος   ' +
+    'Τηλ.: 2421056825   Κιν.: 6972012650   email: support@WebPayrollSolutions.com';
+const REVIEW_EXCEL_BORDER = Object.freeze({
+    top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+    left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+    bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+    right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+});
+const DAILY_DETAIL_ROW_HEIGHT_POINTS = 60.0945;
+const OVERTIME_COMPONENTS = Object.freeze({
+    overwork: ['ores_yperergasias_apologistika', 'ores_yperergasias_nyxtas_apologistika',
+        'ores_yperergasias_argion_apologistika', 'ores_yperergasias_argion_nyxtas_apologistika'],
+    legal: ['ores_nominhs_yperorias_apologistika', 'ores_nominhs_yperorias_nyxtas_apologistika',
+        'ores_nominhs_yperorias_argion_apologistika', 'ores_nominhs_yperorias_argion_nyxtas_apologistika'],
+    illegal: ['ores_paranomhs_yperorias_apologistika', 'ores_paranomhs_yperorias_nyxtas_apologistika',
+        'ores_paranomhs_yperorias_argion_apologistika', 'ores_paranomhs_yperorias_argion_nyxtas_apologistika']
+});
+function overtimeBreakdown(values = {}, fields = []) {
+    const parts = fields.map((field) => number(values[field]));
+    const total = number(parts.reduce((sum, value) => sum + value, 0));
+    const display = (value) => value.toFixed(2).replace('.', ',');
+    return `Σύνολο: ${display(total)}\nΑπλή: ${display(parts[0])}\n` +
+        `Νύχτα: ${display(parts[1])}\nΑργία: ${display(parts[2])}\n` +
+        `Αργία+Νύχτα: ${display(parts[3])}`;
+}
+function holidayTotal(values = {}) {
+    return number(number(values.ores_argion_prosayxhsh_apologistika) +
+        number(values.ores_argion_ergasia_apologistika));
+}
+function reviewCategoryRichText(row) {
+    const regular = { name: 'DejaVu Sans', size: 9 };
+    const declaredCategory = text(row.declaredCategory);
+    const finalCategory = text(row.finalCategory);
+    const finalDiffers = declaredCategory !== finalCategory;
+    return { richText: [
+        { font: regular, text: `Προδ.: ${declaredCategory || '—'}\n\n` },
+        { font: regular, text: 'Απολ.: ' },
+        { font: { ...regular, ...(finalDiffers ? { bold: true } : {}) }, text: finalCategory || '—' }
+    ] };
+}
+function excelHeaderText(value) {
+    return text(value).replace(/&/g, '&&');
+}
+function configureVisibleReviewSheet(sheet, report, { printTitlesRow, margins }) {
+    sheet.pageSetup = {
+        paperSize: 9, orientation: 'landscape', fitToPage: true,
+        fitToWidth: 1, fitToHeight: 0, horizontalCentered: true,
+        verticalCentered: false, margins: { ...margins, header: 0.19 }
+    };
+    sheet.pageSetup.printTitlesRow = printTitlesRow;
+    const font = '&"DejaVu Sans"&9';
+    sheet.headerFooter.oddHeader = `&L${font}${excelHeaderText(report.metadata.companyName)}` +
+        `&C${font}Περίοδος από ${dateLabel(report.metadata.periodStart)} έως ${dateLabel(report.metadata.periodEnd)}` +
+        `&R${font}Ημερομηνία - Ώρα Εκτύπωσης: &D &T`;
+    sheet.headerFooter.evenHeader = sheet.headerFooter.oddHeader;
+    sheet.headerFooter.firstHeader = sheet.headerFooter.oddHeader;
+    sheet.headerFooter.oddFooter = `&C&"DejaVu Sans"&9${REVIEW_EXCEL_FOOTER}` +
+        '&R&"DejaVu Sans"&9Σελίδα &P / &N';
+    sheet.headerFooter.evenFooter = sheet.headerFooter.oddFooter;
+    sheet.headerFooter.firstFooter = sheet.headerFooter.oddFooter;
+}
+function styleReviewRange(sheet, fromRow, toRow, fromColumn, toColumn) {
+    for (let rowNumber = fromRow; rowNumber <= toRow; rowNumber += 1) {
+        const row = sheet.getRow(rowNumber);
+        for (let column = fromColumn; column <= toColumn; column += 1) {
+            const cell = row.getCell(column);
+            cell.border = REVIEW_EXCEL_BORDER;
+            cell.alignment = cell.alignment || { vertical: 'middle', wrapText: true };
+        }
+    }
+}
+function enforceWorkbookFont(workbook) {
+    workbook.worksheets.forEach((sheet) => {
+        const lastRow = Math.max(sheet.rowCount, 1);
+        const lastColumn = Math.max(sheet.columnCount, 1);
+        for (let rowNumber = 1; rowNumber <= lastRow; rowNumber += 1) {
+            const row = sheet.getRow(rowNumber);
+            for (let column = 1; column <= lastColumn; column += 1) {
+                const cell = row.getCell(column);
+                cell.font = { ...(cell.font || {}), name: 'DejaVu Sans', size: 9 };
+            }
+        }
+    });
 }
 function buildEmploymentReviewWorkbook(report) {
     const workbook = new ExcelJS.Workbook();
@@ -421,35 +575,169 @@ function buildEmploymentReviewWorkbook(report) {
         ...COUNT_FIELDS.map(([key, label]) => [`Σύνολο — ${label}`, report.summary.counts[key]])
     ].map(([label, value]) => ({ label, value })));
     const dailyColumns = [
-        ['Κωδικός', 'employeeCode', 11], ['Εργαζόμενος', 'employeeName', 28], ['Ημερομηνία', 'date', 13],
-        ['Καθεστώς απασχόλησης', 'employmentStatus', 22],
-        ['Προδηλωμένο', 'declared', 24], ['Κάρτες', 'cards', 24], ['Απολογιστικό', 'approved', 24],
-        ...DAILY_NUMBER_FIELDS.map(([field, label]) => [label, field, 14]),
-        ['Απολογιστικό βιβλίο', 'apologistikoBook', 16], ['Ρεπό', 'repo', 9],
-        ['Άδεια', 'leave', 9], ['Κατηγορία άδειας', 'leaveCategory', 20],
-        ['Ασθένεια', 'sickness', 11], ['Απουσία', 'absence', 10], ['Κυριακή', 'sunday', 10],
-        ['Αργία', 'holiday', 9], ['6η ημέρα', 'sixth', 11], ['Ποσοστό 6ης ημέρας', 'sixthDayRate', 16],
-        ['7η ημέρα', 'seventh', 11], ['Ορφανό χτύπημα', 'orphan', 20],
-        ['Κωδικός χαρακτηρισμού', 'classification', 18],
-        ['Τελικός χαρακτηρισμός', 'classificationLabel', 22],
-        ['Πηγή τελικής κατάστασης', 'classificationSource', 22]
+        ['Εργαζόμενος', 'employee', 18], ['Ημερομηνία / Καθεστώς', 'dateStatus', 14],
+        ['Προδηλωμένο', 'declared', 13], ['Κάρτες', 'cards', 15],
+        ['Κατηγορίες εργασίας', 'categories', 14], ['Απολογιστικό', 'approved', 15],
+        ['Πραγματική εργασία', 'actual', 10], ['Απουσία', 'absence', 9],
+        ['Νύχτα', 'night', 8], ['Αργίες', 'holiday', 8], ['Πρόσθετη εργασία', 'extra', 9],
+        ['6η ημέρα', 'sixth', 7], ['7η ημέρα', 'seventh', 7],
+        ['Υπερεργασία', 'overwork', 18], ['Νόμιμη Υπερωρία', 'legal', 18],
+        ['Παράνομη Υπερωρία', 'illegal', 18]
     ].map(([header, key, width]) => ({ header, key, width }));
-    const dailySheet = addSheet(workbook, 'ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ', dailyColumns, report.daily.map((row) => ({
-        ...row.values, employeeCode: row.employeeCode, employeeName: row.employeeName, date: dateLabel(row.date),
-        employmentStatus: row.employmentStatus,
-        declared: row.declared, cards: row.cards, approved: row.approved,
-        apologistikoBook: row.apologistikoBook ? 'ΝΑΙ' : '', repo: row.repo ? 'ΝΑΙ' : '',
-        leave: row.leave ? 'ΝΑΙ' : '', sickness: row.sickness ? 'ΝΑΙ' : '',
-        absence: row.absence ? 'ΝΑΙ' : '', sunday: row.sunday ? 'ΝΑΙ' : '', holiday: row.holiday ? 'ΝΑΙ' : '',
-        leaveCategory: row.leaveCategory, sixth: row.sixthDay ? 'ΝΑΙ' : '',
-        sixthDayRate: row.sixthDay ? number(row.sixthDayRate) : null,
-        seventh: row.seventhDay ? 'ΝΑΙ' : '',
-        orphan: row.orphan ? `${row.orphan.label} — ${row.orphan.status}` : '',
-        classification: row.classification, classificationLabel: row.classificationLabel,
-        classificationSource: row.classificationSource
-    })));
-    DAILY_NUMBER_FIELDS.forEach(([field]) => { dailySheet.getColumn(field).numFmt = '0.00'; });
-    dailySheet.getColumn('sixthDayRate').numFmt = '0.00';
+    const dailySheet = addSheet(workbook, 'ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ', dailyColumns, [],
+        { state: 'visible' });
+    dailySheet.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
+    dailySheet.getRow(1).height = 30;
+    let previousEmployee = null;
+    for (const row of report.daily) {
+        if (previousEmployee && previousEmployee !== row.employeeCode) {
+            const employee = report.employees.find((item) => item.employeeCode === previousEmployee);
+            const total = dailySheet.addRow({ employee: `Σύνολα εργαζομένου: ${employee.employeeName}`,
+                actual: employee.totals.ores_pragmatikhs_ergasias_apologistika,
+                absence: employee.totals.ores_apoysias_apologistika,
+                night: employee.totals.ores_nyxtas_apologistika,
+                holiday: holidayTotal(employee.totals),
+                extra: employee.totals.ores_prostheths_ergasias_apologistika,
+                sixth: employee.totals.sixthDayHours, seventh: employee.totals.seventhDayHours,
+                overwork: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.overwork),
+                legal: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.legal),
+                illegal: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.illegal) });
+            total.height = 68;
+            total.font = { bold: true };
+            total.alignment = { vertical: 'middle', wrapText: true };
+            total.eachCell({ includeEmpty: true }, (cell) => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2F0D9' } };
+            });
+        }
+        previousEmployee = row.employeeCode;
+        const detail = dailySheet.addRow({
+            employee: `${row.employeeCode} — ${row.employeeName}`,
+            dateStatus: `${dateLabel(row.date)}\n${row.employmentStatus || '—'}`,
+            declared: row.declared, cards: row.cards, categories: reviewCategoryRichText(row),
+            approved: row.approved,
+            actual: row.values.ores_pragmatikhs_ergasias_apologistika,
+            absence: row.values.ores_apoysias_apologistika,
+            night: row.values.ores_nyxtas_apologistika,
+            holiday: holidayTotal(row.values),
+            extra: row.values.ores_prostheths_ergasias_apologistika,
+            sixth: row.sixthDay ? row.sixthDayHours : '',
+            seventh: row.seventhDay ? row.seventhDayHours : '',
+            overwork: overtimeBreakdown(row.values, OVERTIME_COMPONENTS.overwork),
+            legal: overtimeBreakdown(row.values, OVERTIME_COMPONENTS.legal),
+            illegal: overtimeBreakdown(row.values, OVERTIME_COMPONENTS.illegal)
+        });
+        detail.height = DAILY_DETAIL_ROW_HEIGHT_POINTS;
+        detail.alignment = { vertical: 'middle', wrapText: true };
+        detail.eachCell({ includeEmpty: true }, (cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid',
+                fgColor: { argb: detail.number % 2 ? 'FFFFFFFF' : 'FFF7F3EF' } };
+        });
+        const semanticFills = [[8, row.absence || number(row.values.ores_apoysias_apologistika) > 0, 'FFFFC7CE'],
+            [10, row.holiday, 'FFFCE4D6'], [11, number(row.values.ores_prostheths_ergasias_apologistika) > 0, 'FFEADCF8'],
+            [12, row.sixthDay, 'FFFFF2CC'], [13, row.seventhDay, 'FFFFC7CE'],
+            [14, OVERTIME_COMPONENTS.overwork.some((field) => number(row.values[field]) > 0), 'FFFFF2CC'],
+            [15, OVERTIME_COMPONENTS.legal.some((field) => number(row.values[field]) > 0), 'FFF8CBAD'],
+            [16, OVERTIME_COMPONENTS.illegal.some((field) => number(row.values[field]) > 0), 'FFF4CCCC']];
+        semanticFills.forEach(([column, active, color]) => {
+            if (active) detail.getCell(column).fill = { type: 'pattern', pattern: 'solid',
+                fgColor: { argb: color } };
+        });
+    }
+    if (previousEmployee) {
+        const employee = report.employees.find((item) => item.employeeCode === previousEmployee);
+        const total = dailySheet.addRow({ employee: `Σύνολα εργαζομένου: ${employee.employeeName}`,
+            actual: employee.totals.ores_pragmatikhs_ergasias_apologistika,
+            absence: employee.totals.ores_apoysias_apologistika,
+            night: employee.totals.ores_nyxtas_apologistika,
+            holiday: holidayTotal(employee.totals),
+            extra: employee.totals.ores_prostheths_ergasias_apologistika,
+            sixth: employee.totals.sixthDayHours, seventh: employee.totals.seventhDayHours,
+            overwork: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.overwork),
+            legal: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.legal),
+            illegal: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.illegal) });
+        total.height = 68;
+        total.font = { bold: true };
+        total.alignment = { vertical: 'middle', wrapText: true };
+        total.eachCell({ includeEmpty: true }, (cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2F0D9' } };
+        });
+    }
+    const grand = dailySheet.addRow({ employee: 'Γενικά σύνολα',
+        actual: report.summary.totals.ores_pragmatikhs_ergasias_apologistika,
+        absence: report.summary.totals.ores_apoysias_apologistika,
+        night: report.summary.totals.ores_nyxtas_apologistika,
+        holiday: holidayTotal(report.summary.totals),
+        extra: report.summary.totals.ores_prostheths_ergasias_apologistika,
+        sixth: report.summary.totals.sixthDayHours, seventh: report.summary.totals.seventhDayHours,
+        overwork: overtimeBreakdown(report.summary.totals, OVERTIME_COMPONENTS.overwork),
+        legal: overtimeBreakdown(report.summary.totals, OVERTIME_COMPONENTS.legal),
+        illegal: overtimeBreakdown(report.summary.totals, OVERTIME_COMPONENTS.illegal) });
+    grand.height = 68;
+    grand.font = { bold: true };
+    grand.alignment = { vertical: 'middle', wrapText: true };
+    grand.eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
+    });
+    ['actual', 'absence', 'night', 'holiday', 'extra', 'sixth', 'seventh'].forEach((key) => {
+        dailySheet.getColumn(key).numFmt = '0.00';
+    });
+    styleReviewRange(dailySheet, 1, dailySheet.rowCount, 1, 16);
+    configureVisibleReviewSheet(dailySheet, report, { printTitlesRow: '1:1',
+        margins: { left: 0.22, right: 0.22, top: 0.38, bottom: 0.38, footer: 0.17 } });
+    dailySheet.pageSetup.printArea = `A1:P${dailySheet.rowCount}`;
+
+    const recapSheet = workbook.addWorksheet('ΑΝΑΚΕΦΑΛΑΙΩΣΗ');
+    recapSheet.state = 'visible';
+    recapSheet.columns = [10, 28, 16, 12, 12, 12, 16, 11, 11, 24, 24, 24]
+        .map((width) => ({ width }));
+    recapSheet.mergeCells('A1:L1');
+    recapSheet.getCell('A1').value = 'ΑΝΑΚΕΦΑΛΑΙΩΣΗ ΣΥΝΟΛΩΝ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ';
+    recapSheet.getCell('A1').font = { bold: true };
+    recapSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+    recapSheet.addRow(['Κωδικός', 'Εργαζόμενος', 'Πραγματική εργασία', 'Απουσία', 'Νύχτα',
+        'Αργίες', 'Πρόσθετη εργασία', '6η ημέρα', '7η ημέρα', 'Υπερεργασία',
+        'Νόμιμη Υπερωρία', 'Παράνομη Υπερωρία']);
+    recapSheet.getRow(2).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    recapSheet.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B4F3A' } };
+    report.employees.forEach((employee, index) => {
+        const row = recapSheet.addRow([employee.employeeCode, employee.employeeName,
+            employee.totals.ores_pragmatikhs_ergasias_apologistika,
+            employee.totals.ores_apoysias_apologistika, employee.totals.ores_nyxtas_apologistika,
+            holidayTotal(employee.totals),
+            employee.totals.ores_prostheths_ergasias_apologistika,
+            employee.totals.sixthDayHours, employee.totals.seventhDayHours,
+            overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.overwork),
+            overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.legal),
+            overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.illegal)]);
+        row.height = 60;
+        row.alignment = { vertical: 'middle', wrapText: true };
+        row.eachCell({ includeEmpty: true }, (cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid',
+                fgColor: { argb: index % 2 ? 'FFF7F3EF' : 'FFFFFFFF' } };
+        });
+    });
+    const recapGrand = recapSheet.addRow(['', 'ΓΕΝΙΚΑ ΣΥΝΟΛΑ',
+        report.summary.totals.ores_pragmatikhs_ergasias_apologistika,
+        report.summary.totals.ores_apoysias_apologistika,
+        report.summary.totals.ores_nyxtas_apologistika,
+        holidayTotal(report.summary.totals),
+        report.summary.totals.ores_prostheths_ergasias_apologistika,
+        report.summary.totals.sixthDayHours,
+        report.summary.totals.seventhDayHours,
+        overtimeBreakdown(report.summary.totals, OVERTIME_COMPONENTS.overwork),
+        overtimeBreakdown(report.summary.totals, OVERTIME_COMPONENTS.legal),
+        overtimeBreakdown(report.summary.totals, OVERTIME_COMPONENTS.illegal)]);
+    recapGrand.height = 68;
+    recapGrand.font = { bold: true };
+    recapGrand.alignment = { vertical: 'middle', wrapText: true };
+    recapGrand.eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
+    });
+    styleReviewRange(recapSheet, 1, recapSheet.rowCount, 1, 12);
+    recapSheet.views = [{ state: 'frozen', ySplit: 2 }];
+    configureVisibleReviewSheet(recapSheet, report, { printTitlesRow: '2:2',
+        margins: { left: 0.25, right: 0.25, top: 0.35, bottom: 0.35, footer: 0.15 } });
+    recapSheet.pageSetup.printArea = `A1:L${recapSheet.rowCount}`;
     const totalColumns = [
         ['Κωδικός', 'employeeCode', 11], ['Εργαζόμενος', 'employeeName', 28],
         ...TOTAL_NUMBER_FIELDS.map(([field, label]) => [label, field, 16]),
@@ -520,6 +808,9 @@ function buildEmploymentReviewWorkbook(report) {
             stage.fingerprint
         ]))
     ].map(([label, value]) => ({ label, value: value ?? '' })));
+    workbook.views = [{ activeTab: 1, firstSheet: 1, visibility: 'visible' }];
+    workbook.getWorksheet('ΣΥΝΟΨΗ').state = 'hidden';
+    enforceWorkbookFont(workbook);
     return workbook;
 }
 
@@ -571,29 +862,32 @@ function writeHeader(doc, report, fonts, title) {
             `Περίοδος: ${dateLabel(report.metadata.periodStart)}–${dateLabel(report.metadata.periodEnd)}`, { align: 'center' });
     doc.moveDown(0.7);
 }
-function pdfFooterLines(pageNumber, pageCount) {
-    const currentYear = new Date().getFullYear();
-    return [
-        `(c) 2009 - ${currentYear}  Copyright: WebPayrollSolutions.com • Ιωλκού 266α Βόλος`,
-        `Τηλ. 2421056825 • Κιν. 6972012650 • eMail: support@WebPayrollSolutions.com • Σελίδα ${pageNumber} / ${pageCount}`
-    ];
+const SIMPLE_PDF_FOOTER_TEXT =
+    '© 2009 - 2026 Copyright: www.WebPayrollSolutions.com   Ιωλκού 266α Βόλος   ' +
+    'Τηλ.: 2421056825   Κιν.: 6972012650   email: support@WebPayrollSolutions.com';
+function simplePdfFooterLayout(pageNumber, pageCount) {
+    return Object.freeze({ center: SIMPLE_PDF_FOOTER_TEXT,
+        page: `Σελίδα ${pageNumber} / ${pageCount}` });
 }
-function addFooters(doc, fonts, report) {
+function addSimplePdfFooters(doc, fonts) {
     const range = doc.bufferedPageRange();
     for (let index = range.start; index < range.start + range.count; index += 1) {
         doc.switchToPage(index);
         const bottomMargin = doc.page.margins.bottom;
         const left = doc.page.margins.left;
-        const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-        const [firstLine, secondLine] = pdfFooterLines(index + 1, range.count);
+        const right = doc.page.margins.right;
+        const width = doc.page.width - left - right;
+        const footer = simplePdfFooterLayout(index + 1, range.count);
         doc.page.margins.bottom = 0;
         doc.save().lineWidth(0.35).strokeColor('#b9b1aa')
-            .moveTo(left, doc.page.height - 36).lineTo(left + width, doc.page.height - 36).stroke().restore();
-        doc.font(fonts.regular).fontSize(6.8).fillColor('#666666')
-            .text(firstLine, left, doc.page.height - 32,
-                { width, align: 'center', lineBreak: false })
-            .text(secondLine, left, doc.page.height - 22,
-                { width, align: 'center', lineBreak: false });
+            .moveTo(left, doc.page.height - 29).lineTo(left + width, doc.page.height - 29)
+            .stroke().restore();
+        doc.font(fonts.regular).fontSize(5.2).fillColor('#666666')
+            .text(footer.center, 0, doc.page.height - 21,
+                { width: doc.page.width, align: 'center', lineBreak: false });
+        doc.font(fonts.regular).fontSize(5.2).fillColor('#666666')
+            .text(footer.page, doc.page.width - right - 68, doc.page.height - 21,
+                { width: 68, align: 'right', lineBreak: false });
         doc.page.margins.bottom = bottomMargin;
     }
 }
@@ -666,7 +960,7 @@ function writeCompactDailyTable(doc, rows, fonts) {
     header();
     rows.forEach((row, rowIndex) => {
         const analysis = compactDailyText(row);
-        doc.font(fonts.regular).fontSize(7.2);
+        doc.font(fonts.regular).fontSize(DAILY_DETAIL_FONT_SIZE);
         const analysisHeight = analysis ? Math.max(14,
             doc.heightOfString(`↳ Απολογιστικά: ${analysis}`, { width: width - 12, lineGap: 0 }) + 5) : 0;
         ensureSpace(doc, 18 + analysisHeight, header);
@@ -698,7 +992,8 @@ function writeCompactDailyTable(doc, rows, fonts) {
         if (analysis) {
             const analysisY = doc.y;
             doc.lineWidth(0.3).rect(left, analysisY, width, analysisHeight).fillAndStroke(fill, '#d9cfc7');
-            doc.font(fonts.regular).fontSize(7.2).fillColor('#3f342c').text(`↳ Απολογιστικά: ${analysis}`,
+            doc.font(fonts.regular).fontSize(DAILY_DETAIL_FONT_SIZE).fillColor('#3f342c')
+                .text(`↳ Απολογιστικά: ${analysis}`,
                 left + 6, analysisY + 2, { width: width - 12, lineGap: 0 });
             doc.y = analysisY + analysisHeight;
         }
@@ -738,46 +1033,131 @@ function writeTotalsGrid(doc, aggregate, fonts, heading) {
         doc.y = y + 17; doc.x = left;
     }
 }
+const SIMPLE_PDF_SUMMARY_COLUMNS = Object.freeze([
+    ['Κωδικός', 'code', 7], ['Εργαζόμενος', 'name', 18],
+    ['Πραγματική εργασία', 'actual', 9], ['Απουσία', 'absence', 7],
+    ['Νύχτα', 'night', 7], ['Αργίες', 'holiday', 7],
+    ['Πρόσθετη εργασία', 'extra', 9], ['6η ημέρα', 'sixth', 6],
+    ['7η ημέρα', 'seventh', 6], ['Υπερεργασία', 'overwork', 15],
+    ['Νόμιμη Υπερωρία', 'legal', 15], ['Παράνομη Υπερωρία', 'illegal', 15]
+].map(([label, key, weight]) => Object.freeze({ label, key, weight })));
+const SIMPLE_PDF_GRAND_TOTAL_FILL = '#e2f0d9';
+function simplePdfSummaryFill(rowIndex, grandTotal = false) {
+    return grandTotal ? SIMPLE_PDF_GRAND_TOTAL_FILL : rowIndex % 2 ? '#f7f3ef' : '#ffffff';
+}
+function uniqueSummaryDates(rows = [], predicate) {
+    return [...new Set(rows.filter(predicate).map((row) => dateKeyUtc(row.date)).filter(Boolean))]
+        .sort().map(dateLabel);
+}
+function simplePdfSummaryDetails(counts = {}, rows = [], { includeDates = true } = {}) {
+    const dated = (label, key, predicate) => {
+        const count = Number(counts[key] || 0);
+        const dates = includeDates ? uniqueSummaryDates(rows, predicate) : [];
+        return `${label}: ${count}${dates.length ? `  •  ${dates.join(', ')}` : ''}`;
+    };
+    return Object.freeze([
+        dated('Άδειες', 'leaves', (row) => row.leave === true),
+        dated('Ασθένειες', 'sicknesses', (row) => row.sickness === true),
+        dated('Απουσίες', 'absences', (row) => row.absence === true),
+        `Κυριακές: ${Number(counts.sundays || 0)}     Αργίες: ${Number(counts.holidays || 0)}     ` +
+            `Ημέρες απολογιστικού βιβλίου: ${Number(counts.apologistikoBookDays || 0)}`
+    ]);
+}
+function simplePdfSummaryRow(values = {}, identity = {}, details = []) {
+    return Object.freeze({ code: text(identity.code), name: text(identity.name),
+        actual: number(values.ores_pragmatikhs_ergasias_apologistika).toFixed(2),
+        absence: number(values.ores_apoysias_apologistika).toFixed(2),
+        night: number(values.ores_nyxtas_apologistika).toFixed(2),
+        holiday: holidayTotal(values).toFixed(2),
+        extra: number(values.ores_prostheths_ergasias_apologistika).toFixed(2),
+        sixth: number(values.sixthDayHours).toFixed(2),
+        seventh: number(values.seventhDayHours).toFixed(2),
+        overwork: overtimeBreakdown(values, OVERTIME_COMPONENTS.overwork),
+        legal: overtimeBreakdown(values, OVERTIME_COMPONENTS.legal),
+        illegal: overtimeBreakdown(values, OVERTIME_COMPONENTS.illegal),
+        details: Object.freeze(details) });
+}
+function buildSimplePdfSummaryRows(report) {
+    const employees = report.employees.map((employee) => simplePdfSummaryRow(employee.totals,
+        { code: employee.employeeCode, name: employee.employeeName },
+        simplePdfSummaryDetails(employee.counts, employee.rows)));
+    const grandTotal = simplePdfSummaryRow(report.summary.totals,
+        { code: '', name: 'ΓΕΝΙΚΑ ΣΥΝΟΛΑ' },
+        simplePdfSummaryDetails(report.summary.counts, [], { includeDates: false }));
+    return Object.freeze({ employees: Object.freeze(employees), grandTotal });
+}
 function writePeriodSummary(doc, report, fonts) {
     const left = doc.page.margins.left;
     const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    ensureSpace(doc, 90);
-    doc.x = left;
-    doc.moveDown(0.8).font(fonts.bold).fontSize(11).fillColor('#4f392a')
-        .text('ΑΝΑΚΕΦΑΛΑΙΩΤΙΚΟΣ ΠΙΝΑΚΑΣ ΠΕΡΙΟΔΟΥ', left, doc.y, { width });
-    doc.moveDown(0.25);
-    const base = report.employees.map((employee) => ({ code: employee.employeeCode, name: employee.employeeName,
-        work: employee.totals.ores_ergasias_apologistika.toFixed(2),
-        actual: employee.totals.ores_pragmatikhs_ergasias_apologistika.toFixed(2),
-        absence: employee.totals.ores_apoysias_apologistika.toFixed(2),
-        night: employee.totals.ores_nyxtas_apologistika.toFixed(2),
-        holiday: employee.totals.ores_argion_ergasia_apologistika.toFixed(2),
-        extra: employee.totals.ores_prostheths_ergasias_apologistika.toFixed(2),
-        sixth: employee.counts.sixthDays, seventh: employee.counts.seventhDays }));
-    table(doc, [
-        { label: 'Κωδ.', key: 'code', width: 7 }, { label: 'Εργαζόμενος', key: 'name', width: 22 },
-        { label: 'Εργασία', key: 'work', width: 9 }, { label: 'Πραγματική', key: 'actual', width: 10 },
-        { label: 'Απουσία', key: 'absence', width: 9 }, { label: 'Νύχτα', key: 'night', width: 8 },
-        { label: 'Εργασία αργίας', key: 'holiday', width: 11 }, { label: 'Πρόσθετη', key: 'extra', width: 9 },
-        { label: '6η', key: 'sixth', width: 5 }, { label: '7η', key: 'seventh', width: 5 }
-    ], base, fonts);
-    doc.x = left;
-    doc.moveDown(0.35).font(fonts.bold).fontSize(8.5).fillColor('#4f392a')
-        .text('Β. ΥΠΕΡΕΡΓΑΣΙΑ / ΥΠΕΡΩΡΙΕΣ', left, doc.y, { width });
-    const special = report.employees.map((employee) => ({ code: employee.employeeCode, name: employee.employeeName,
-        overwork: employee.totals.ores_yperergasias_apologistika.toFixed(2),
-        legal: employee.totals.ores_nominhs_yperorias_apologistika.toFixed(2),
-        illegal: employee.totals.ores_paranomhs_yperorias_apologistika.toFixed(2),
-        holidayPremium: employee.totals.ores_argion_prosayxhsh_apologistika.toFixed(2) }));
-    table(doc, [
-        { label: 'Κωδ.', key: 'code', width: 8 }, { label: 'Εργαζόμενος', key: 'name', width: 32 },
-        { label: 'Υπερεργασία', key: 'overwork', width: 15 },
-        { label: 'Νόμιμη υπερωρία', key: 'legal', width: 15 },
-        { label: 'Παράνομη υπερωρία', key: 'illegal', width: 15 },
-        { label: 'Προσαύξηση αργίας', key: 'holidayPremium', width: 15 }
-    ], special, fonts);
-    writeTotalsGrid(doc, { totals: report.summary.totals, counts: report.summary.counts }, fonts,
-        `Γενικό σύνολο περιόδου — ${report.summary.employeeCount} εργαζόμενοι`);
+    const bottom = () => doc.page.height - doc.page.margins.bottom;
+    const totalWeight = SIMPLE_PDF_SUMMARY_COLUMNS.reduce((sum, column) => sum + column.weight, 0);
+    const widths = SIMPLE_PDF_SUMMARY_COLUMNS.map((column) => width * column.weight / totalWeight);
+    const drawHeadingAndHeader = (continued = false) => {
+        doc.x = left;
+        doc.font(fonts.bold).fontSize(continued ? 9 : 11).fillColor('#4f392a').text(
+            `ΑΝΑΚΕΦΑΛΑΙΩΤΙΚΟΣ ΠΙΝΑΚΑΣ ΠΕΡΙΟΔΟΥ${continued ? ' — ΣΥΝΕΧΕΙΑ' : ''}`,
+            left, doc.y, { width });
+        doc.moveDown(0.25);
+        const headerY = doc.y;
+        let x = left;
+        SIMPLE_PDF_SUMMARY_COLUMNS.forEach((column, index) => {
+            doc.lineWidth(0.35).rect(x, headerY, widths[index], 27)
+                .fillAndStroke('#6b4f3a', '#d9cfc7');
+            doc.font(fonts.bold).fontSize(5.6).fillColor('#ffffff').text(column.label,
+                x + 2, headerY + 4, { width: widths[index] - 4, height: 20,
+                    align: index >= 2 ? 'center' : 'left' });
+            x += widths[index];
+        });
+        doc.y = headerY + 27;
+        doc.x = left;
+    };
+    const newSummaryPage = () => { doc.addPage(); drawHeadingAndHeader(true); };
+    const rowHeight = (row) => {
+        doc.font(fonts.regular).fontSize(SUMMARY_FONT_SIZE);
+        return Math.max(64, ...SIMPLE_PDF_SUMMARY_COLUMNS.map((column, index) =>
+            doc.heightOfString(text(row[column.key]), { width: widths[index] - 4,
+                lineGap: index >= 9 ? 0.4 : 0 }) + 8));
+    };
+    const detailHeight = (row) => {
+        doc.font(fonts.regular).fontSize(DAILY_DETAIL_FONT_SIZE);
+        return Math.max(27, doc.heightOfString(row.details.join('\n'),
+            { width: width - 12, lineGap: 1.2 }) + 10);
+    };
+    const drawRow = (row, rowIndex, grandTotal = false) => {
+        const mainHeight = rowHeight(row);
+        const secondaryHeight = detailHeight(row);
+        const y = doc.y;
+        const fill = simplePdfSummaryFill(rowIndex, grandTotal);
+        let x = left;
+        SIMPLE_PDF_SUMMARY_COLUMNS.forEach((column, index) => {
+            doc.lineWidth(0.35).rect(x, y, widths[index], mainHeight)
+                .fillAndStroke(fill, '#d9cfc7');
+            doc.font(grandTotal || index < 2 ? fonts.bold : fonts.regular)
+                .fontSize(SUMMARY_FONT_SIZE).fillColor('#222222')
+                .text(text(row[column.key]), x + 2, y + 4,
+                    { width: widths[index] - 4, height: mainHeight - 8,
+                        align: index >= 2 && index < 9 ? 'right' : 'left', lineGap: 0.6 });
+            x += widths[index];
+        });
+        const detailY = y + mainHeight;
+        doc.lineWidth(0.35).rect(left, detailY, width, secondaryHeight)
+            .fillAndStroke(fill, '#d9cfc7');
+        doc.font(grandTotal ? fonts.bold : fonts.regular).fontSize(DAILY_DETAIL_FONT_SIZE)
+            .fillColor('#3f342c').text(row.details.join('\n'), left + 6, detailY + 5,
+                { width: width - 12, height: secondaryHeight - 10, lineGap: 1.2 });
+        doc.y = detailY + secondaryHeight;
+        doc.x = left;
+        return mainHeight + secondaryHeight;
+    };
+    if (doc.y + 105 > bottom()) doc.addPage();
+    else doc.moveDown(0.8);
+    drawHeadingAndHeader(false);
+    const rows = buildSimplePdfSummaryRows(report);
+    [...rows.employees, rows.grandTotal].forEach((row, index) => {
+        const requiredHeight = rowHeight(row) + detailHeight(row);
+        if (doc.y + requiredHeight > bottom()) newSummaryPage();
+        drawRow(row, index, index === rows.employees.length);
+    });
 }
 function writeDailyAnalysis(doc, rows, fonts, heading = 'Απολογιστική ανάλυση') {
     const left = doc.page.margins.left;
@@ -833,130 +1213,252 @@ function writeDailyAnalysis(doc, rows, fonts, heading = 'Απολογιστικ�
     });
     doc.x = left;
 }
+function dossierChangeReason(row = {}, explicitReason = '') {
+    if (text(explicitReason)) return `Η αλλαγή αυτή έγινε επειδή ${text(explicitReason)}.`;
+    if (text(row.cards)) {
+        return 'Η αλλαγή αυτή έγινε επειδή οι καταγραφές της ψηφιακής κάρτας και τα ' +
+            'διαθέσιμα απολογιστικά στοιχεία έδωσαν διαφορετική τελική εικόνα από την προδηλωμένη.';
+    }
+    return 'Η αλλαγή αυτή έγινε βάσει των διαθέσιμων προδηλωμένων και απολογιστικών ' +
+        'στοιχείων της ημέρας.';
+}
+function dossierActorSentence({ source, actor, decidedAt, reuseScope } = {}) {
+    if (source !== 'HR' && !actor && !decidedAt) return '';
+    const parts = ['Η απόφαση εγκρίθηκε από το HR'];
+    if (actor) parts.push(`από τον χρήστη ${actor}`);
+    if (decidedAt) {
+        const decided = new Date(decidedAt);
+        const time = Number.isNaN(decided.getTime()) ? '' :
+            `${String(decided.getUTCHours()).padStart(2, '0')}:` +
+            `${String(decided.getUTCMinutes()).padStart(2, '0')}`;
+        parts.push(`στις ${dateLabel(decidedAt)}${time && time !== '00:00' ? `, ώρα ${time}` : ''}`);
+    }
+    let sentence = `${parts.join(' ')}.`;
+    if (reuseScope) sentence += ` Η εμβέλεια της απόφασης ήταν: ${reuseScope}.`;
+    return sentence;
+}
+function buildDossierWeekNarrative(week = {}, weekRows = []) {
+    const events = [];
+    const coveredDates = new Set();
+    const automaticTransfers = week.automaticRepoResolutions || [];
+    automaticTransfers.forEach((transfer) => {
+        const source = weekRows.find((row) => row.date === transfer.sourceDate) || {};
+        const target = weekRows.find((row) => row.date === transfer.targetDate) || {};
+        const sourceChange = transfer.sourceDate
+            ? `Στις ${dateLabel(transfer.sourceDate)} είχε προδηλωθεί ${source.declaredCategory || 'ανάπαυση'}, ` +
+                `όμως από τις ψηφιακές κάρτες ή τα απολογιστικά στοιχεία προέκυψε ` +
+                `${source.finalCategory || 'εργασία'}. ` : '';
+        events.push(`${sourceChange}Στο πλαίσιο του εβδομαδιαίου ελέγχου πραγματοποιήθηκε ` +
+            `μεταφορά ρεπό${transfer.sourceDate ? ` από τις ${dateLabel(transfer.sourceDate)}` : ''} ` +
+            `στις ${dateLabel(transfer.targetDate)} και η τελική κατάσταση της ημέρας ` +
+            `ορίστηκε σε ${target.finalCategory || 'ΑΝ'}. Η αλλαγή αυτή έγινε επειδή η καθαρή ` +
+            'εβδομαδιαία επίλυση προσδιόρισε τη συγκεκριμένη ημέρα ως ημέρα ανάπαυσης.');
+        if (transfer.sourceDate) coveredDates.add(transfer.sourceDate);
+        coveredDates.add(transfer.targetDate);
+    });
+    (week.repoDecisions || []).forEach((decision) => {
+        const reason = decision.reason
+            ? ` Η απόφαση τεκμηριώθηκε ως εξής: ${decision.reason}.`
+            : ' Η απόφαση βασίστηκε στα διαθέσιμα στοιχεία του εβδομαδιαίου ελέγχου.';
+        events.push(`Εξετάστηκε μεταφορά ρεπό από τις ${dateLabel(decision.sourceDate)} στις ` +
+            `${dateLabel(decision.targetDate)}. Η καταγεγραμμένη απόφαση ήταν «${decision.result}».${reason} ` +
+            dossierActorSentence(decision));
+        coveredDates.add(decision.sourceDate);
+        coveredDates.add(decision.targetDate);
+    });
+    (week.stage3Decisions || []).forEach((decision) => {
+        const category = decision.leaveCategory
+            ? ` ως ${decision.leaveCategory}` : ` σε ${decision.result}`;
+        events.push(`Στις ${dateLabel(decision.date)} η αρχική κατάσταση ήταν ` +
+            `${decision.initial || 'χωρίς οριστικό χαρακτηρισμό'} και η ημέρα χαρακτηρίστηκε${category}. ` +
+            dossierChangeReason(weekRows.find((row) => row.date === decision.date), decision.reason) +
+            ` ${dossierActorSentence(decision)}`);
+        coveredDates.add(decision.date);
+    });
+    (week.stage1Decisions || []).forEach((decision) => {
+        if (coveredDates.has(decision.date) || !decision.initial || !decision.result ||
+            decision.initial === decision.result) return;
+        const row = weekRows.find((candidate) => candidate.date === decision.date) || {};
+        let classification = `η τελική κατάσταση μεταβλήθηκε από ${decision.initial} σε ${decision.result}`;
+        if (row.leave) classification = `η ημέρα χαρακτηρίστηκε ως άδεια αντί για ${decision.initial}`;
+        else if (row.sickness) classification = `η ημέρα χαρακτηρίστηκε ως ασθένεια αντί για ${decision.initial}`;
+        else if (row.absence) classification = `η ημέρα χαρακτηρίστηκε ως απουσία αντί για ${decision.initial}`;
+        events.push(`Στις ${dateLabel(decision.date)} ${classification}. ` +
+            dossierChangeReason(row, decision.reason) + ` ${dossierActorSentence(decision)}`);
+    });
+    const sixthRow = weekRows.find((row) => row.date === week.sixthDay) || {};
+    if (week.sixthDay) events.push(`Στις ${dateLabel(week.sixthDay)} καταγράφηκε 6η ημέρα ` +
+        `απασχόλησης με ${number(week.sixthDayHours).toFixed(2)} ώρες εργασίας` +
+        `${week.sixthDayRate === null ? '' : ` και ποσοστό προσαύξησης ${week.sixthDayRate}%`}. ` +
+        `${sixthRow.specialCategory ? `Η ειδική κατηγορία του εργαζομένου ήταν ${sixthRow.specialCategory}. ` : ''}` +
+        `${week.sixthDayRate === 0 ? 'Εφαρμόστηκε μηδενικό ποσοστό λόγω της καταγεγραμμένης εξαίρεσης. ' : ''}` +
+        'Ο χαρακτηρισμός προέκυψε από την τελική εβδομαδιαία ανάλυση των ημερών πραγματικής εργασίας.' +
+        (number(week.sixthDayIllegalOvertimeHours) > 0
+            ? ` Επιπλέον καταγράφηκαν ${number(week.sixthDayIllegalOvertimeHours).toFixed(2)} ` +
+                'ώρες παράνομης υπερωρίας πέραν των οκτώ ωρών.' : ''));
+    if (week.seventhDay) events.push(`Στις ${dateLabel(week.seventhDay)} καταγράφηκε 7η ημέρα ` +
+        `απασχόλησης με ${number(week.seventhDayHours).toFixed(2)} ώρες εργασίας σε ημέρα ` +
+        `ανάπαυσης. Πρόκειται για σοβαρή παράβαση και καταγράφηκαν ` +
+        `${number(week.seventhDayIllegalOvertimeHours).toFixed(2)} ώρες παράνομης υπερωρίας, ` +
+        'επειδή η τελική εβδομαδιαία ανάλυση κατέγραψε πραγματική εργασία και στις επτά ημέρες.');
+    weekRows.filter((row) => row.orphan).forEach((row) => {
+        const orphan = row.orphan;
+        const missing = orphan.type === 'START_ONLY'
+            ? 'καταγράφηκε μόνο η είσοδος και έλειπε η αντίστοιχη έξοδος'
+            : 'καταγράφηκε μόνο η έξοδος και έλειπε η αντίστοιχη είσοδος';
+        const resolved = orphan.status === 'Απαιτεί επίλυση'
+            ? 'Η περίπτωση παρέμεινε εκκρεμής και απαιτούσε περαιτέρω έλεγχο.'
+            : orphan.status === 'Επιλυμένο από εγκεκριμένη πολιτική'
+                ? `Η περίπτωση επιλύθηκε βάσει παλαιότερης εγκεκριμένης απόφασης HR ` +
+                    `με τελικό διάστημα εργασίας ${orphan.approvedInterval || 'χωρίς διαθέσιμο διάστημα'}.`
+                : `Η περίπτωση εξετάστηκε και επιλύθηκε από το HR με τελικό διάστημα ` +
+                    `εργασίας ${orphan.approvedInterval || 'χωρίς διαθέσιμο διάστημα'}.`;
+        const approval = orphan.approvedBy || orphan.approvedAt
+            ? ` Η επίλυση εγκρίθηκε από το HR${orphan.approvedBy ? ` από τον χρήστη ${orphan.approvedBy}` : ''}` +
+                `${orphan.approvedAt ? ` στις ${dateLabel(orphan.approvedAt)}` : ''}.` : '';
+        const reuse = orphan.reuseScope
+            ? ` Η εμβέλεια της απόφασης ήταν: ${orphan.reuseScope}.` : '';
+        events.push(`Στις ${dateLabel(row.date)} ${missing}. Η πραγματική καταγραφή ήταν ` +
+            `${orphan.rawPunch || 'μη διαθέσιμη'}. Η περίπτωση χαρακτηρίστηκε ως ορφανό χτύπημα. ` +
+            `${resolved}${approval}${reuse} Μετά τη διόρθωση ελέγχθηκε η ελάχιστη ημερήσια ` +
+            `ανάπαυση των 11 ωρών. ${orphan.restResult}.`);
+    });
+    const hourFacts = [
+        ['πρόσθετης εργασίας', week.totals?.ores_prostheths_ergasias_apologistika],
+        ['υπερεργασίας', week.totals?.ores_yperergasias_apologistika],
+        ['νόμιμης υπερωρίας', week.totals?.ores_nominhs_yperorias_apologistika],
+        ['παράνομης υπερωρίας', week.totals?.ores_paranomhs_yperorias_apologistika]
+    ].filter(([, value]) => number(value) > 0);
+    if (hourFacts.length) events.push('Οι οριστικοποιημένες ημερήσιες τιμές της εβδομάδας ' +
+        `περιλαμβάνουν ${hourFacts.map(([label, value]) =>
+            `${number(value).toFixed(2)} ώρες ${label}`).join(', ')}.`);
+    const summaryParts = [];
+    if (automaticTransfers.length || (week.repoDecisions || []).length) summaryParts.push('εξετάστηκε μεταφορά ρεπό');
+    if (events.some((event) => event.includes('τελική κατάσταση μεταβλήθηκε') ||
+        event.includes('χαρακτηρίστηκε ως'))) summaryParts.push('υπήρξαν αλλαγές ημερήσιων κατηγοριών');
+    if (week.sixthDay) summaryParts.push('προέκυψε 6η ημέρα');
+    if (week.seventhDay) summaryParts.push('προέκυψε 7η ημέρα');
+    const summary = events.length
+        ? `Κατά την εβδομάδα αυτή ${summaryParts.length ? summaryParts.join(', ') :
+            'καταγράφηκαν ουσιώδη γεγονότα που απαιτούν τεκμηρίωση'}.`
+        : 'Κατά την εβδομάδα αυτή δεν προέκυψε ουσιώδης μεταβολή μεταξύ των προδηλωμένων ' +
+            'και των τελικών στοιχείων και δεν απαιτήθηκε ανθρώπινη παρέμβαση.';
+    return Object.freeze({ title: `Εβδομάδα ${dateLabel(week.weekStart)} – ${dateLabel(week.weekEnd)}`,
+        summary, events: Object.freeze(events) });
+}
+function writeDossierCover(doc, report, fonts) {
+    const left = doc.page.margins.left;
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    doc.rect(left, 58, width, 92).fill('#6b4f3a');
+    doc.font(fonts.bold).fontSize(22).fillColor('#ffffff')
+        .text('ΦΑΚΕΛΟΣ ΕΛΕΓΧΟΥ ΑΠΑΣΧΟΛΗΣΕΩΝ', left + 24, 82,
+            { width: width - 48, align: 'center' });
+    doc.font(fonts.regular).fontSize(10).fillColor('#f7f3ef')
+        .text('Τεκμηρίωση ελέγχου απασχόλησης βάσει προδηλωμένων στοιχείων, ' +
+            'ψηφιακών καρτών και απολογιστικών δεδομένων',
+            left + 24, 119, { width: width - 48, align: 'center' });
+    const boxY = 186;
+    doc.roundedRect(left + 58, boxY, width - 116, 210, 5)
+        .fillAndStroke('#f7f3ef', '#d9cfc7');
+    const labels = [
+        ['Επωνυμία εταιρείας', report.metadata.companyName],
+        ['Κωδικός εταιρείας', report.metadata.companyCode],
+        ['Παράρτημα', report.metadata.branch],
+        ['Ομάδα', report.metadata.team],
+        ['Περίοδος', `${dateLabel(report.metadata.periodStart)} έως ${dateLabel(report.metadata.periodEnd)}`],
+        ['Ημερομηνία δημιουργίας', dateLabel(report.generatedAt)],
+        ['Χρήστης δημιουργίας', report.metadata.generatedBy || '—']
+    ];
+    labels.forEach(([label, value], index) => {
+        const y = boxY + 20 + index * 25;
+        doc.font(fonts.bold).fontSize(8.5).fillColor('#4f392a')
+            .text(label, left + 78, y, { width: 150 });
+        doc.font(fonts.regular).fontSize(9).fillColor('#222222')
+            .text(text(value) || '—', left + 232, y, { width: width - 310 });
+    });
+    doc.font(fonts.regular).fontSize(8).fillColor('#5d5148').text(
+        'Το παρόν έντυπο αποτελεί ιστορική τεκμηρίωση των ελέγχων και των μεταβολών ' +
+        'της περιόδου, με σκοπό τη δυνατότητα μεταγενέστερης αναδρομής και επαλήθευσης.',
+        left + 90, 430, { width: width - 180, align: 'center', lineGap: 2 });
+}
+function writeDossierWeekNarratives(doc, employee, fonts) {
+    const left = doc.page.margins.left;
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const bottom = () => doc.page.height - doc.page.margins.bottom;
+    employee.weeks.forEach((week) => {
+        const narrative = buildDossierWeekNarrative(week,
+            employee.rows.filter((row) => row.weekStart === week.weekStart));
+        doc.font(fonts.regular).fontSize(8);
+        const body = [`Σύντομη σύνοψη: ${narrative.summary}`,
+            ...narrative.events.map((event) => `• ${event}`)].join('\n\n');
+        const bodyHeight = doc.heightOfString(body, { width: width - 24, lineGap: 2 });
+        const blockHeight = 31 + bodyHeight + 13;
+        if (doc.y + blockHeight > bottom()) {
+            doc.addPage();
+            doc.font(fonts.bold).fontSize(10).fillColor('#4f392a')
+                .text(`${employee.employeeCode} — ${employee.employeeName} — ΣΥΝΕΧΕΙΑ`);
+            doc.moveDown(0.45);
+        }
+        const y = doc.y;
+        doc.roundedRect(left, y, width, blockHeight, 3).fillAndStroke('#f7f3ef', '#d9cfc7');
+        doc.rect(left, y, width, 25).fill('#8a6a50');
+        doc.font(fonts.bold).fontSize(9).fillColor('#ffffff')
+            .text(narrative.title, left + 8, y + 7, { width: width - 16 });
+        doc.font(fonts.regular).fontSize(8).fillColor('#222222')
+            .text(body, left + 12, y + 32, { width: width - 24, lineGap: 2 });
+        doc.y = y + blockHeight + 8;
+        doc.x = left;
+    });
+}
+function writeBasicEmployeePresentation(doc, employee, fonts) {
+    doc.moveDown(0.7).font(fonts.bold).fontSize(11).fillColor('#4f392a')
+        .text(`${employee.employeeCode} — ${employee.employeeName}`);
+    doc.font(fonts.regular).fontSize(7.5).fillColor('#222222')
+        .text(`Καθεστώς απασχόλησης: ${employee.periodEmploymentStatus}`);
+    doc.moveDown(0.2);
+    writeCompactDailyTable(doc, employee.rows, fonts);
+    writeTotalsGrid(doc, employee, fonts, 'Σύνολα εργαζομένου');
+}
 function buildEmploymentReviewPdf(report, { dossier = false } = {}) {
     const fonts = createPdf({ landscape: true });
     const { doc } = fonts;
-    writeHeader(doc, report, fonts, dossier ? 'ΦΑΚΕΛΟΣ ΕΛΕΓΧΟΥ ΑΠΑΣΧΟΛΗΣΗΣ' : 'ΕΛΕΓΧΟΣ ΑΠΑΣΧΟΛΗΣΕΩΝ');
-    doc.font(fonts.bold).fontSize(10).text('Σύνοψη');
-    doc.font(fonts.regular).fontSize(8).text(
-        `Εργαζόμενοι: ${report.summary.employeeCount}   Εκκρεμότητες: ${report.summary.pendingCount}   ` +
-        `6ες ημέρες: ${report.summary.sixthDays}   7ες ημέρες: ${report.summary.seventhDays}   ` +
-        `Παραβάσεις: ${report.summary.severeViolations}`
-    );
+    if (dossier) writeDossierCover(doc, report, fonts);
+    else {
+        writeHeader(doc, report, fonts, 'ΕΛΕΓΧΟΣ ΑΠΑΣΧΟΛΗΣΕΩΝ');
+        doc.font(fonts.bold).fontSize(10).text('Σύνοψη');
+        doc.font(fonts.regular).fontSize(8).text(
+            `Εργαζόμενοι: ${report.summary.employeeCount}   Εκκρεμότητες: ${report.summary.pendingCount}   ` +
+            `6ες ημέρες: ${report.summary.sixthDays}   7ες ημέρες: ${report.summary.seventhDays}   ` +
+            `Παραβάσεις: ${report.summary.severeViolations}`
+        );
+    }
     if (!dossier) {
         report.employees.forEach((employee, index) => {
             if (index > 0) doc.addPage();
-            doc.moveDown(0.7).font(fonts.bold).fontSize(11).fillColor('#4f392a')
-                .text(`${employee.employeeCode} — ${employee.employeeName}`);
-            doc.font(fonts.regular).fontSize(7.5).fillColor('#222222')
-                .text(`Καθεστώς απασχόλησης: ${employee.periodEmploymentStatus}`);
-            doc.moveDown(0.2);
-            writeCompactDailyTable(doc, employee.rows, fonts);
-            writeTotalsGrid(doc, employee, fonts, 'Σύνολα εργαζομένου');
+            writeBasicEmployeePresentation(doc, employee, fonts);
         });
         writePeriodSummary(doc, report, fonts);
     } else {
         report.employees.forEach((employee) => {
             doc.addPage();
-            doc.font(fonts.bold).fontSize(14).fillColor('#4f392a').text(`${employee.employeeCode} — ${employee.employeeName}`);
-            const dates = employee.rows.map((row) => row.date).sort();
-            doc.font(fonts.regular).fontSize(8).fillColor('#222222').text(
-                `Διάστημα σχέσης στην περίοδο: ${dateLabel(dates[0])}–${dateLabel(dates.at(-1))}   Παράρτημα: ${employee.branch}\n` +
-                `Καθεστώς απασχόλησης: ${employee.periodEmploymentStatus}   Ειδική κατηγορία: ${employee.specialCategory || '—'}\n` +
-                `Εβδομαδιαίες ημέρες/ώρες: ${employee.weeklyWorkdays || '—'} / ${employee.weeklyHours || '—'}   ` +
-                `Ποσοστό 6ης ημέρας: ${employee.sixthDayRate === null ? 'κανονική πολιτική' : `${employee.sixthDayRate}%`}   ` +
-                `Πηγή προφίλ: ${employee.profileSource || '—'}`
-            );
-            doc.moveDown(0.5).font(fonts.bold).fontSize(10).text('Α. Ημερήσιο ημερολόγιο');
-            writeCompactDailyTable(doc, employee.rows, fonts);
-            writeTotalsGrid(doc, employee, fonts, 'Σύνολα εργαζομένου');
+            writeBasicEmployeePresentation(doc, employee, fonts);
             ensureSpace(doc, 55);
-            doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('Β. Στάδιο 1 — Χαρακτηρισμός αδειών');
-            doc.font(fonts.regular).fontSize(7.5);
-            employee.weeks.forEach((week) => {
-                doc.font(fonts.bold).text(`${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)}`);
-                doc.font(fonts.regular);
-                week.stage1Decisions.forEach((decision) => doc.text(
-                    `${dateLabel(decision.date)} — Αρχική κατάσταση: ${decision.initial || '—'} — ` +
-                    `Τελικό αποτέλεσμα: ${decision.result} — Πηγή: ${decision.source}` +
-                    `${decision.reason ? ` — Αιτιολογία: ${decision.reason}` : ''}`));
-            });
-            ensureSpace(doc, 55);
-            doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('Γ. Στάδιο 2 — Μεταφορά ρεπό');
-            doc.font(fonts.regular).fontSize(7.5);
-            employee.weeks.forEach((week) => {
-                doc.font(fonts.bold).text(`${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)}`);
-                doc.font(fonts.regular);
-                if (!week.repoDecisions.length) doc.text('Δεν εφαρμόστηκε μεταφορά ρεπό.');
-                week.repoDecisions.forEach((decision) => doc.text(
-                    `Εφαρμόζεται — ${dateLabel(decision.sourceDate)} → ${dateLabel(decision.targetDate)} — ` +
-                    `Αποτέλεσμα: ${decision.result} — Πηγή: ${decision.source}` +
-                    `${decision.reason ? ` — Αιτιολογία: ${decision.reason}` : ''}`));
-            });
-            ensureSpace(doc, 55);
-            doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('Δ. Στάδιο 3 — Υπόλοιπες πιθανές άδειες');
-            doc.font(fonts.regular).fontSize(7.5);
-            const stage3Decisions = employee.weeks.flatMap((week) => week.stage3Decisions);
-            if (!stage3Decisions.length) doc.text('Δεν καταγράφηκε απόφαση για υπόλοιπη πιθανή άδεια.');
-            stage3Decisions.forEach((decision) => doc.text(
-                `${dateLabel(decision.date)} — ${decision.initial} → ${decision.result}` +
-                `${decision.leaveCategory ? ` — Κατηγορία άδειας: ${decision.leaveCategory}` : ''} — ` +
-                `Πηγή: ${decision.source}${decision.reason ? ` — Αιτιολογία: ${decision.reason}` : ''}` +
-                `${decision.decidedAt ? ` — Χρόνος: ${new Date(decision.decidedAt).toISOString()}` : ''}` +
-                `${decision.actor ? ` — Χρήστης: ${decision.actor}` : ''}`));
-            ensureSpace(doc, 80);
-            doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('Ε. Στάδιο 4 — Τελικός εβδομαδιαίος έλεγχος');
-            doc.font(fonts.regular).fontSize(7.5);
-            employee.weeks.forEach((week) => doc.text(
-                `${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)} — ` +
-                `Διάστημα σχέσης: ${dateLabel(week.sliceStart)}–${dateLabel(week.sliceEnd)} — ` +
-                `Ημέρες εργασίας: ${week.workdays} — Ρεπό: ${week.repos} — ` +
-                `6η ημέρα: ${week.sixthDay ? `${dateLabel(week.sixthDay)} / ${week.sixthDayRate ?? 0}%` : 'Όχι'} — ` +
-                `7η ημέρα: ${week.seventhDay ? dateLabel(week.seventhDay) : 'Όχι'} — ` +
-                `Νύχτα: ${week.totals.ores_nyxtas_apologistika.toFixed(2)} — ` +
-                `Κυριακές/αργίες: ${week.sundays}/${week.holidays} — ` +
-                `Πρόσθετη: ${week.totals.ores_prostheths_ergasias_apologistika.toFixed(2)} — ` +
-                `Υπερεργασία: ${week.totals.ores_yperergasias_apologistika.toFixed(2)} — ` +
-                `Νόμιμη υπερωρία: ${week.totals.ores_nominhs_yperorias_apologistika.toFixed(2)} — ` +
-                `Παράνομη υπερωρία: ${week.totals.ores_paranomhs_yperorias_apologistika.toFixed(2)} — ` +
-                `Σοβαρές παραβάσεις: ${week.severeReasons.length ? week.severeReasons.join(', ') : 'Καμία'} — ` +
-                `Τελική κατάσταση: ${week.status || '—'}`));
-            const orphans = employee.rows.filter((row) => row.orphan);
-            if (orphans.length) {
-                ensureSpace(doc, 55);
-                doc.moveDown(0.6).font(fonts.bold).fontSize(10).text('ΣΤ. Ορφανά χτυπήματα');
-                doc.font(fonts.regular).fontSize(7.5);
-                orphans.forEach((row) => doc.text(`${dateLabel(row.date)} — ${row.orphan.label} — Πραγματικό χτύπημα: ${row.orphan.rawPunch || '—'} — ` +
-                    `Κατάσταση: ${row.orphan.status} — Εγκεκριμένο διάστημα: ${row.orphan.approvedInterval || '—'} — ` +
-                    `Εμβέλεια απόφασης: ${row.orphan.reuseScope || '—'} — ${row.orphan.restResult} — ` +
-                    `Επιβεβαίωση κινδύνου: ${row.orphan.riskRequired ? (row.orphan.riskAcknowledged ? 'Δόθηκε' : 'Απαιτήθηκε, δεν καταγράφεται ως δοθείσα') : 'Δεν απαιτήθηκε'} — ` +
-                    `Τελικά στοιχεία: εργασία ${row.values.ores_ergasias_apologistika.toFixed(2)}, ` +
-                    `νύχτα ${row.values.ores_nyxtas_apologistika.toFixed(2)}, ` +
-                    `Κυριακή/αργία ${row.sunday || row.holiday ? 'ΝΑΙ' : 'ΟΧΙ'}`));
-            }
+            doc.moveDown(0.6).font(fonts.bold).fontSize(10).fillColor('#4f392a')
+                .text('Επεξηγήσεις και ιστορικό μεταβολών');
+            doc.moveDown(0.35);
+            writeDossierWeekNarratives(doc, employee, fonts);
         });
         writePeriodSummary(doc, report, fonts);
-        doc.addPage();
-        doc.font(fonts.bold).fontSize(13).text('Τεχνικό παράρτημα');
-        doc.font(fonts.regular).fontSize(8).text([
-            `Ημερομηνία δημιουργίας: ${new Date(report.generatedAt).toISOString()}`,
-            `Κατάσταση περιόδου: ${text(report.metadata.periodStatus)}`,
-            `Έκδοση ελέγχου περιόδου: ${text(report.metadata.periodVersion)}`,
-            `Κατάσταση ανακατασκευής: ${text(report.metadata.reconstructionStatus)}`,
-            `Έκδοση ανακατασκευής: ${text(report.metadata.reconstructionVersion)}`,
-            `Έκδοση πολιτικής: ${text(report.metadata.policyVersion)}`,
-            `Έκδοση σχήματος αναφοράς: ${report.schemaVersion}`,
-            `Αποτύπωμα παγωμένου αποτελέσματος/αναφοράς: ${text(report.metadata.frozenFingerprint) || 'Δεν υπάρχει'}`,
-            ...report.weekly.flatMap((week) => week.stages.filter((stage) => stage.fingerprint).map((stage) =>
-                `${week.employeeCode} ${dateLabel(week.weekStart)}–${dateLabel(week.weekEnd)} ${stage.stage}: ${stage.fingerprint}`))
-        ].join('\n'));
     }
-    addFooters(doc, fonts, report);
+    addSimplePdfFooters(doc, fonts);
     return doc;
 }
 
 module.exports = { REPORT_SCHEMA_VERSION, DAILY_NUMBER_FIELDS, TOTAL_NUMBER_FIELDS, COUNT_FIELDS,
     authoritativeDailyState,
     buildEmploymentReviewReportProjection, buildEmploymentReviewWorkbook,
-    buildEmploymentReviewPdf, dailyAnalysis, dateLabel, orphanLabel, pdfFooterLines,
-    employmentStatusLabel, presentationLeaveCategory };
+    buildEmploymentReviewPdf, dailyAnalysis, dateLabel, orphanLabel,
+    employmentStatusLabel, presentationLeaveCategory, SIMPLE_PDF_SUMMARY_COLUMNS,
+    buildSimplePdfSummaryRows, simplePdfFooterLayout, DAILY_DETAIL_FONT_SIZE,
+    SUMMARY_FONT_SIZE, buildSimplePdfFileName, SIMPLE_PDF_GRAND_TOTAL_FILL,
+    simplePdfSummaryFill, buildDossierWeekNarrative, buildDossierPdfFileName };

@@ -10536,67 +10536,78 @@ function buildReviewExportParams() {
     });
 }
 async function exportExcel() {
-    const params = buildReviewExportParams();
-    window.location.href = `/api/prodhlomena-oraria/review/export-excel?${params.toString()}`;
-}
-
-let currentPdfBlobUrl = null;
-let currentPdfFileName = null;
-
-async function exportPdf() {
+    window.showLoader?.('', 'Δημιουργία αρχείου Excel...');
+    let downloadUrl = null;
     try {
         const response = await fetch(
-            `/api/prodhlomena-oraria/review/export-pdf?${buildReviewExportParams().toString()}`,
+            `/api/prodhlomena-oraria/review/export-excel?${buildReviewExportParams().toString()}`,
             { method: 'GET', headers: { 'CSRF-Token': csrfToken } }
         );
-
-        if (!response.ok) throw new Error('Αποτυχία δημιουργίας PDF.');
+        if (!response.ok) throw new Error('Αποτυχία δημιουργίας αρχείου Excel.');
 
         const blob = await response.blob();
-
-        if (currentPdfBlobUrl) {
-            URL.revokeObjectURL(currentPdfBlobUrl);
-        }
-
-        currentPdfBlobUrl = URL.createObjectURL(blob);
-        currentPdfFileName = `elegxos_apasxolhseon_${Date.now()}.pdf`;
-
-        const iframe = document.getElementById('reviewPdfFrame');
-        if (iframe) iframe.src = currentPdfBlobUrl;
-
-        const modalEl = document.getElementById('pdfPreviewModal');
-        if (modalEl && typeof bootstrap !== 'undefined') {
-            bootstrap.Modal.getOrCreateInstance(modalEl).show();
-        } else {
-            window.open(currentPdfBlobUrl, '_blank');
-        }
+        downloadUrl = URL.createObjectURL(blob);
+        const disposition = response.headers?.get?.('Content-Disposition') || '';
+        const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+        const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+        const fileName = encodedName
+            ? decodeURIComponent(encodedName)
+            : plainName || `elegxos_apasxolhseon_${Date.now()}.xlsx`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = fileName;
+        link.setAttribute('data-no-loader', 'true');
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
     } catch (error) {
         console.error(error);
         employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
+    } finally {
+        if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+        window.hideLoader?.();
     }
 }
 
-async function exportAuditDossierPdf() {
-    try {
-        const response = await fetch(
-            `/api/prodhlomena-oraria/review/export-audit-dossier-pdf?${buildReviewExportParams().toString()}`,
-            { method: 'GET', headers: { 'CSRF-Token': csrfToken } }
-        );
-        if (!response.ok) throw new Error('Αποτυχία δημιουργίας φακέλου ελέγχου PDF.');
-        const blob = await response.blob();
-        if (currentPdfBlobUrl) URL.revokeObjectURL(currentPdfBlobUrl);
-        currentPdfBlobUrl = URL.createObjectURL(blob);
-        currentPdfFileName = `fakelos_elegxou_apasxolhshs_${Date.now()}.pdf`;
-        const iframe = document.getElementById('reviewPdfFrame');
-        if (iframe) iframe.src = currentPdfBlobUrl;
-        const modalEl = document.getElementById('pdfPreviewModal');
-        if (modalEl && typeof bootstrap !== 'undefined') {
-            bootstrap.Modal.getOrCreateInstance(modalEl).show();
-        } else window.open(currentPdfBlobUrl, '_blank');
-    } catch (error) {
-        console.error(error);
-        employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
+let currentPdfPreviewUrl = null;
+let currentPdfPreviewId = null;
+
+function openPdfPreview(previewUrl) {
+    currentPdfPreviewId = window.crypto.randomUUID();
+    const previewParams = new URLSearchParams(previewUrl.split('?')[1] || '');
+    previewParams.set('preview_id', currentPdfPreviewId);
+    currentPdfPreviewUrl = `${previewUrl.split('?')[0]}?${previewParams.toString()}`;
+    window.showLoader?.('', 'Δημιουργία PDF...');
+
+    const previousIframe = document.getElementById('reviewPdfFrame');
+    if (previousIframe) {
+        const iframe = previousIframe.cloneNode(false);
+        iframe.removeAttribute('src');
+        previousIframe.replaceWith(iframe);
+        iframe.addEventListener('load', () => window.hideLoader?.(), { once: true });
+        iframe.src = currentPdfPreviewUrl;
+    } else {
+        window.hideLoader?.();
+        window.open(currentPdfPreviewUrl, '_blank');
     }
+
+    const modalEl = document.getElementById('pdfPreviewModal');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+
+function exportPdf() {
+    openPdfPreview(
+        `/api/prodhlomena-oraria/review/export-pdf?${buildReviewExportParams().toString()}`
+    );
+}
+
+function exportAuditDossierPdf() {
+    openPdfPreview(
+        `/api/prodhlomena-oraria/review/export-audit-dossier-pdf?${buildReviewExportParams().toString()}`
+    );
 }
 
 function initReviewMoveByEnter() {
@@ -10804,24 +10815,46 @@ if (typeof window.showLoader === 'function' && !window.__reviewPdfShowLoaderPatc
     window.__reviewPdfShowLoaderPatched = true;
 }
 
-document.getElementById('reviewPdfDownloadBtn')?.addEventListener('click', (event) => {
+document.getElementById('reviewPdfDownloadBtn')?.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
 
-    if (!currentPdfBlobUrl) return;
+    if (!currentPdfPreviewId) return;
 
-    const a = document.createElement('a');
-    a.href = currentPdfBlobUrl;
-    a.download = currentPdfFileName || `elegxos_apasxolhseon_${Date.now()}.pdf`;
-    a.setAttribute('data-no-loader', 'true');
-    a.style.display = 'none';
+    let downloadUrl = null;
+    try {
+        window.showLoader?.('', 'Λήψη PDF...');
+        const response = await fetch(
+            `/api/prodhlomena-oraria/review/cached-pdf/${encodeURIComponent(currentPdfPreviewId)}`,
+            { method: 'GET' }
+        );
+        if (!response.ok) {
+            if ([404, 410].includes(response.status)) {
+                throw new Error('Η προσωρινή έκδοση του PDF έχει λήξει. Δημιουργήστε ξανά την προεπισκόπηση.');
+            }
+            throw new Error('Αποτυχία λήψης PDF.');
+        }
+        const disposition = response.headers?.get?.('Content-Disposition') || '';
+        const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+        const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+        const fileName = encodedName ? decodeURIComponent(encodedName) : plainName;
+        const blob = await response.blob();
+        downloadUrl = URL.createObjectURL(blob);
 
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    if (typeof window.AppLoader?.hide === 'function') {
-        window.AppLoader.hide();
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = fileName;
+        a.setAttribute('data-no-loader', 'true');
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    } catch (error) {
+        console.error(error);
+        employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message });
+    } finally {
+        if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+        window.hideLoader?.();
     }
 });
 

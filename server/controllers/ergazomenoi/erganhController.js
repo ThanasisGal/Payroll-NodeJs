@@ -13,6 +13,9 @@ const {
     startOfWeekMondayUtc,
     endOfWeekSundayUtc
 } = require('../../utils/date/mondaySundayWeek');
+const {
+    employmentReviewPdfCache
+} = require('../../services/ergazomenoi/employmentReviewPdfCacheService');
 
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
@@ -271,7 +274,9 @@ const {
 const {
     buildEmploymentReviewReportProjection,
     buildEmploymentReviewWorkbook,
-    buildEmploymentReviewPdf
+    buildEmploymentReviewPdf,
+    buildSimplePdfFileName,
+    buildDossierPdfFileName
 } = require('../../services/ergazomenoi/apasxoliseisEmploymentReviewReportService');
 const ApasxoliseisPolicyPreviewApprovalModel = require('../../models/apasxoliseisPolicyPreviewApproval');
 const ApasxoliseisWeeklyRepoTransferDecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
@@ -4511,7 +4516,7 @@ function correctiveDeltaPresentation(delta = {}) {
     }
     return output;
 }
-async function getReviewRowsForExport(req) {
+async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
     if (req.query.apo_hmeromhnia && req.query.eos_hmeromhnia && req.query.ypokatasthma) {
         const scope = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
         if (dateKeyUtc(scope.period_start) === String(req.query.apo_hmeromhnia).slice(0, 10) &&
@@ -4732,6 +4737,10 @@ async function getReviewRowsForExport(req) {
                 Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
             effective_sixth_day_rate:
                 effectiveProfile.pososto_prosayxhshs_6hs_hmeras ?? null,
+            effective_special_category:
+                effectiveProfile.eidikh_kathgoria_ergazomenoy || '',
+            effective_special_case: effectiveProfile.eidikh_periptosh || '',
+            effective_hourly_rate: effectiveProfile.pragmatikoOromisthio ?? null,
             effective_profile_source:
                 reviewPhaseCode ? 'SCHEDULE_PHASE' : effectiveProfile.source || '',
             effective_schedule_phase_code: reviewPhaseCode,
@@ -4850,6 +4859,8 @@ async function getReviewRowsForExport(req) {
     });
     const canonicalDecisionsByWeek = groupWeeklyCanonicalDecisions(canonicalDecisions);
     const canonicalResolutionsByWeek = new Map();
+    const finalWeeklyAnalysisByWeek = new Map();
+    const stage2DailyResolutionsByDate = new Map();
     const reviewWeekRows = new Map();
     for (const row of policyContextRows) {
         const weekStart = dateKeyUtc(startOfWeekMondayUtc(row.hmeromhnia));
@@ -4857,19 +4868,100 @@ async function getReviewRowsForExport(req) {
         if (!reviewWeekRows.has(key)) reviewWeekRows.set(key, []);
         reviewWeekRows.get(key).push(row);
     }
+    const classicStage1States = includeLifecycle === false && reviewWeekRows.size > 0
+        ? await ApasxoliseisWeeklyHrWorkflowStateModel.find({
+            team: req.session.userTeam,
+            company_kod: String(req.session.companyInUse || ''),
+            ...(String(req.query.ypokatasthma || '').trim()
+                ? { ypokatasthma: String(req.query.ypokatasthma).trim().padStart(4, '0') }
+                : {}),
+            ...(kodikoi.length
+                ? { employee_kodikos: mongoose.trusted({ $in: kodikoi }) }
+                : {}),
+            week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(periodEnd) }),
+            week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(periodStart) })
+        }).select('employee_kodikos week_start stage1').lean()
+        : [];
+    const classicStage1StateByWeek = new Map(classicStage1States.map((state) => [
+        `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`,
+        state.stage1 || null
+    ]));
     for (const [projectionKey, weekRows] of reviewWeekRows) {
         const firstRow = weekRows[0];
-        const employee = ergByKodikos.get(firstRow.kodikos) || {};
+        const employee = lifecycleByKodikos.get(String(firstRow.kodikos || '')) ||
+            ergByKodikos.get(firstRow.kodikos) || {};
         const naturalWeekStart = startOfWeekMondayUtc(firstRow.hmeromhnia);
         const naturalWeekEnd = endOfWeekSundayUtc(firstRow.hmeromhnia);
         const week = { naturalWeekStart, naturalWeekEnd, weekStart: naturalWeekStart,
             weekEnd: naturalWeekEnd, isFullWeek: weekRows.length === 7 };
         const histories = istorikoRowsByKodikos.get(String(firstRow.kodikos || '').trim()) || [];
-        const weeklyProfileInfo = getWeeklyRepoProfileInfo({ week, istorikoRows: histories,
-            ergazomenos: employee });
-        const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
-        const automaticAnalysis = analyzeWeeklySixthSeventhDay({ weekRows,
-            effectiveProfile, hourlyRate: effectiveProfile.pragmatikoOromisthio });
+        const employmentDateScope = deriveEmploymentOwnedDateScope({
+            natural_week_start: naturalWeekStart,
+            natural_week_end: naturalWeekEnd,
+            period_start: periodStart || naturalWeekStart,
+            period_end: periodEnd || naturalWeekEnd,
+            hire_date: employee.hmeromhnia_proslhpshs,
+            departure_date: employee.hmeromhnia_apoxorhshs
+        });
+        const employmentOwnedDateSet = new Set(
+            employmentDateScope?.employment_owned_dates || weekRows.map((row) => dateKeyUtc(row.hmeromhnia))
+        );
+        const analysisRows = weekRows.filter((row) =>
+            employmentOwnedDateSet.has(dateKeyUtc(row.hmeromhnia)));
+        const effectiveProfilesByDate = Object.fromEntries(analysisRows.map((row) => [
+            dateKeyUtc(row.hmeromhnia), {
+                hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
+                ores_ergasias_ebdomadas: row.effective_weekly_hours,
+                mo_oron_hmerhsias_ergasias: row.effective_daily_hours,
+                kathestos_apasxolhshs: row.effective_kathestos_apasxolhshs,
+                typos_apasxolhshs: row.effective_typos_apasxolhshs,
+                typos_ebdomadas: row.effective_typos_ebdomadas,
+                pososto_prosayxhshs_6hs_hmeras: row.effective_sixth_day_rate,
+                eidikh_kathgoria_ergazomenoy: row.effective_special_category,
+                eidikh_periptosh: row.effective_special_case,
+                pragmatikoOromisthio: row.effective_hourly_rate,
+                source: row.effective_profile_source
+            }
+        ]));
+        const effectiveProfile = effectiveProfilesByDate[
+            dateKeyUtc(analysisRows.at(-1)?.hmeromhnia)
+        ] || {};
+        const automaticAnalysis = analyzeWeeklySixthSeventhDay({
+            weekRows: analysisRows,
+            effectiveProfile,
+            effectiveProfilesByDate,
+            expectedDateKeys: employmentDateScope?.employment_owned_dates || null,
+            hourlyRate: effectiveProfile.pragmatikoOromisthio
+        });
+        if (includeLifecycle === false) {
+            const lifecycle = buildWeeklyHrLifecycleProjection({
+                weekRows: analysisRows.map((row) => ({ ...row,
+                    team: req.session.userTeam,
+                    company_kod: String(req.session.companyInUse || ''),
+                    employee_id: employee._id || row.employee_id
+                })),
+                effectiveProfile,
+                effectiveProfilesByDate,
+                persistedStage1State: classicStage1StateByWeek.get(projectionKey) || null,
+                scope: {
+                    team: req.session.userTeam,
+                    company_kod: String(req.session.companyInUse || ''),
+                    ypokatasthma: String(firstRow.ypokatasthma || '').padStart(4, '0'),
+                    employee_id: employee._id || firstRow.employee_id,
+                    employee_kodikos: firstRow.kodikos,
+                    week_start: naturalWeekStart,
+                    week_end: naturalWeekEnd
+                },
+                periodScope: null,
+                employmentDateScope
+            });
+            (lifecycle.stages.stage3.stage2_automatic_resolution_items || []).forEach((item) => {
+                stage2DailyResolutionsByDate.set(
+                    `${String(firstRow.kodikos || '').trim()}|${item.date}`,
+                    { date: item.date, classification: item.classification }
+                );
+            });
+        }
         const decisionKey = weeklyCanonicalDecisionGroupKey({
             ypokatasthma: firstRow.ypokatasthma || employee.ypokatasthma,
             employee_kodikos: firstRow.kodikos,
@@ -4880,29 +4972,34 @@ async function getReviewRowsForExport(req) {
             ...(canonicalDecisionsByWeek.get(decisionKey) || []),
             ...(canonicalDecisionsByWeek.get('__REUSABLE__') || [])
         ];
-        if (!records.length || automaticAnalysis.status !== 'NEEDS_HR_DECISION') continue;
-        const matchingExecutions = executions.filter((execution) =>
-            String(execution.employee_kodikos || '') === String(firstRow.kodikos || '') &&
-            dateKeyUtc(execution.week_start) === dateKeyUtc(naturalWeekStart) &&
-            dateKeyUtc(execution.week_end) === dateKeyUtc(naturalWeekEnd));
-        const entriesByRowId = {};
-        matchingExecutions.forEach((execution) => {
-            for (const [field, role] of [['source_prodhlomena_oraria_id', 'SOURCE'],
-                ['target_prodhlomena_oraria_id', 'TARGET']]) {
-                const rowId = String(execution[field] || '');
-                if (rowId) entriesByRowId[rowId] = { state: 'PROTECTED', rowId,
-                    executionId: String(execution._id || ''), role };
-            }
-        });
-        const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
-            team: req.session.userTeam, company_kod: req.session.companyInUse,
-            employee, week, weekRows, effectiveProfile, profileHistory: histories,
-            automaticAnalysis, appliedProtectionContext: { entriesByRowId }
-        });
-        canonicalResolutionsByWeek.set(projectionKey, resolveWeeklyCanonicalDecisionAnalysis({
-            automaticAnalysis, snapshotInput, decisionRecords: records, weekRows,
-            effectiveProfile, employee, profileHistory: histories
-        }));
+        let finalAnalysis = automaticAnalysis;
+        if (records.length && automaticAnalysis.status === 'NEEDS_HR_DECISION') {
+            const matchingExecutions = executions.filter((execution) =>
+                String(execution.employee_kodikos || '') === String(firstRow.kodikos || '') &&
+                dateKeyUtc(execution.week_start) === dateKeyUtc(naturalWeekStart) &&
+                dateKeyUtc(execution.week_end) === dateKeyUtc(naturalWeekEnd));
+            const entriesByRowId = {};
+            matchingExecutions.forEach((execution) => {
+                for (const [field, role] of [['source_prodhlomena_oraria_id', 'SOURCE'],
+                    ['target_prodhlomena_oraria_id', 'TARGET']]) {
+                    const rowId = String(execution[field] || '');
+                    if (rowId) entriesByRowId[rowId] = { state: 'PROTECTED', rowId,
+                        executionId: String(execution._id || ''), role };
+                }
+            });
+            const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
+                team: req.session.userTeam, company_kod: req.session.companyInUse,
+                employee, week, weekRows: analysisRows, effectiveProfile, profileHistory: histories,
+                automaticAnalysis, appliedProtectionContext: { entriesByRowId }
+            });
+            const canonicalResolution = resolveWeeklyCanonicalDecisionAnalysis({
+                automaticAnalysis, snapshotInput, decisionRecords: records, weekRows: analysisRows,
+                effectiveProfile, employee, profileHistory: histories
+            });
+            canonicalResolutionsByWeek.set(projectionKey, canonicalResolution);
+            finalAnalysis = canonicalResolution?.analysis || automaticAnalysis;
+        }
+        finalWeeklyAnalysisByWeek.set(projectionKey, finalAnalysis);
     }
     const projection = buildReviewExportProjection({
         rows: enrichedRows,
@@ -4914,6 +5011,16 @@ async function getReviewRowsForExport(req) {
         atomicGroupProjection,
         findingsOnly: false
     });
+    projection.rows.__deviations = exportDeviations;
+    projection.rows.__projectionTotals = projection.totals;
+    projection.rows.__policyVersion = projection.policyVersion;
+    projection.rows.__repoTransferDecisions = decisionsWithApplyState;
+    projection.rows.__periodStart = periodStart;
+    projection.rows.__periodEnd = periodEnd;
+    projection.rows.__finalWeeklyAnalysisByWeek = finalWeeklyAnalysisByWeek;
+    projection.rows.__stage2DailyResolutionsByDate = stage2DailyResolutionsByDate;
+    if (includeLifecycle === false) return projection.rows;
+
     const workflowScope = {
         team: req.session.userTeam,
         company_kod: String(req.session.companyInUse || ''),
@@ -4998,20 +5105,14 @@ async function getReviewRowsForExport(req) {
             companyPolicyRules
         }));
     }
-    projection.rows.__deviations = exportDeviations;
-    projection.rows.__projectionTotals = projection.totals;
-    projection.rows.__policyVersion = projection.policyVersion;
     projection.rows.__workflowStates = workflowStates;
     projection.rows.__workflowAudits = workflowAudits;
     projection.rows.__lifecycleByWeek = lifecycleByWeek;
-    projection.rows.__repoTransferDecisions = decisionsWithApplyState;
-    projection.rows.__periodStart = periodStart;
-    projection.rows.__periodEnd = periodEnd;
     return projection.rows;
 }
 
-async function buildEmploymentReviewReportForRequest(req) {
-    const rows = await getReviewRowsForExport(req);
+async function buildEmploymentReviewReportForRequest(req, { includeLifecycle = true } = {}) {
+    const rows = await getReviewRowsForExport(req, { includeLifecycle });
     let periodControl = null;
     try {
         const scope = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
@@ -5024,8 +5125,13 @@ async function buildEmploymentReviewReportForRequest(req) {
         workflowStates: rows.__workflowStates || [],
         workflowAudits: rows.__workflowAudits || [],
         lifecycleByWeek: rows.__lifecycleByWeek || new Map(),
+        finalWeeklyAnalysisByWeek: rows.__finalWeeklyAnalysisByWeek || new Map(),
+        stage2DailyResolutionsByDate: rows.__stage2DailyResolutionsByDate || new Map(),
         repoTransferDecisions: rows.__repoTransferDecisions || [],
         metadata: {
+            team: req.session.userTeam || '',
+            generatedBy: req.session.userName || req.session.username ||
+                String(req.session.userId || ''),
             companyName: req.session.companyDescription || req.session.companyKodikos ||
                 String(req.session.companyInUse || ''),
             companyCode: req.session.companyKodikos || '',
@@ -5044,7 +5150,7 @@ async function buildEmploymentReviewReportForRequest(req) {
 }
 
 async function sendEmploymentReviewWorkbook(req, res) {
-    const report = await buildEmploymentReviewReportForRequest(req);
+    const report = await buildEmploymentReviewReportForRequest(req, { includeLifecycle: false });
     const workbook = buildEmploymentReviewWorkbook(report);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="elegxos_apasxolhseon_${Date.now()}.xlsx"`);
@@ -5053,13 +5159,42 @@ async function sendEmploymentReviewWorkbook(req, res) {
 }
 
 async function sendEmploymentReviewPdf(req, res, { dossier = false } = {}) {
-    const report = await buildEmploymentReviewReportForRequest(req);
+    const previewId = String(req.query?.preview_id || '').trim();
+    if (previewId && !employmentReviewPdfCache.isValidPreviewId(previewId)) {
+        return res.status(400).json({ success: false, message: 'Μη έγκυρο αναγνωριστικό προεπισκόπησης PDF.' });
+    }
+    const report = await buildEmploymentReviewReportForRequest(req, {
+        includeLifecycle: dossier
+    });
     const doc = buildEmploymentReviewPdf(report, { dossier });
-    const baseName = dossier ? 'fakelos_elegxou_apasxolhshs' : 'elegxos_apasxolhseon';
+    const fileNameInput = { team: report.metadata.team,
+            companyCode: report.metadata.companyCode,
+            companyName: report.metadata.companyName,
+            periodStart: report.metadata.periodStart,
+            periodEnd: report.metadata.periodEnd };
+    const fileName = dossier
+        ? buildDossierPdfFileName(fileNameInput)
+        : buildSimplePdfFileName(fileNameInput);
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'self'");
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${baseName}_${Date.now()}.pdf"`);
-    doc.pipe(res);
-    doc.end();
+    res.setHeader('Content-Disposition',
+        `inline; filename="employment_review.pdf"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    if (!previewId) {
+        doc.pipe(res);
+        doc.end();
+        return;
+    }
+    const entry = await employmentReviewPdfCache.storeDocument({
+        previewId,
+        fileName,
+        sessionId: req.sessionID,
+        userId: req.session?.userId,
+        reportType: dossier ? 'dossier' : 'simple',
+        document: doc
+    });
+    fs.createReadStream(entry.filePath).pipe(res);
 }
 function makeReviewPdfDocument() {
     const doc = new PDFDocument({
@@ -10581,6 +10716,33 @@ class erganhController {
             console.error('[exportProdhlomenaOrariaReviewAuditDossierPdf] ❌', error);
             if (!res.headersSent) return res.status(500).json({ success: false,
                 message: 'Σφάλμα κατά τη δημιουργία του φακέλου ελέγχου.', error: error.message });
+        }
+    };
+
+    static downloadCachedEmploymentReviewPdf = async (req, res) => {
+        try {
+            const result = await employmentReviewPdfCache.getEntry({
+                previewId: req.params.previewId,
+                sessionId: req.sessionID,
+                userId: req.session?.userId
+            });
+            if (result.status === 'expired') {
+                return res.status(410).json({ success: false,
+                    message: 'Η προσωρινή έκδοση του PDF έχει λήξει. Δημιουργήστε ξανά την προεπισκόπηση.' });
+            }
+            if (result.status !== 'ok') {
+                return res.status(404).json({ success: false,
+                    message: 'Η προσωρινή έκδοση του PDF δεν είναι πλέον διαθέσιμη. Δημιουργήστε ξανά την προεπισκόπηση.' });
+            }
+            const { entry } = result;
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition',
+                `attachment; filename="employment_review.pdf"; filename*=UTF-8''${encodeURIComponent(entry.fileName)}`);
+            return fs.createReadStream(entry.filePath).pipe(res);
+        } catch (error) {
+            console.error('[downloadCachedEmploymentReviewPdf] ❌', error);
+            if (!res.headersSent) return res.status(500).json({ success: false,
+                message: 'Αποτυχία λήψης της προσωρινής έκδοσης PDF.' });
         }
     };
 
