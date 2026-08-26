@@ -8658,6 +8658,9 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     const container = document.getElementById('policyPreviewGroupsContainer');
     const stage = lifecycle?.stages?.STAGE2;
     if (!container || !stage) return false;
+    if (container.querySelector?.(
+        '.atomic-repo-transfer-section, .policy-preview-card, .employment-review-pending-summary'
+    )) return false;
     if (Number(stage.pending_count || 0) <= 0) {
         container.innerHTML = '<div class="text-muted small employment-review-stage2-empty">' +
             'Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό.</div>';
