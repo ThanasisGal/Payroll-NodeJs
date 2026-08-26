@@ -1589,6 +1589,13 @@ router.get(
 );
 
 router.get(
+    '/api/prodhlomena-oraria/review/cached-pdf/:previewId',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.downloadCachedEmploymentReviewPdf
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1',
     checkAuth,
     requireEmploymentReviewAccess,
