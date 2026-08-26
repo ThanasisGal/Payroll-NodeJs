@@ -4,6 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
+const PeriodControlAuditModel = require('../../models/apasxoliseisPeriodControlAudit');
 const {
     calculatePeriodDeadline, normalizeScope, resolveEffectiveMode, projectPeriodControl,
     assertNormalPeriod, assertReviewReadablePeriod, runWithPeriodWriteFence,
@@ -91,6 +92,10 @@ const unsafeMissingFieldQuery = PeriodControlModel.findOneAndUpdate({
 }, { $set: { active_calculation_id: 'calculation-cast-regression' } });
 unsafeMissingFieldQuery._castConditions();
 assert.ok(unsafeMissingFieldQuery.error() instanceof mongoose.Error.CastError);
+assert.strictEqual(unsafeMissingFieldQuery.getFilter().$or[2]
+    .active_calculation_id.$eq.$exists, false);
+assert.strictEqual(unsafeMissingFieldQuery.getFilter().$or[2]
+    .active_calculation_id.$exists, undefined);
 const trustedMissingFieldQuery = PeriodControlModel.findOneAndUpdate({
     $or: [{ active_calculation_id: '' }, { active_calculation_id: null },
         { active_calculation_id: mongoose.trusted({ $exists: false }) }]
@@ -99,6 +104,8 @@ trustedMissingFieldQuery._castConditions();
 assert.strictEqual(trustedMissingFieldQuery.error(), undefined);
 assert.strictEqual(trustedMissingFieldQuery.getFilter().$or[2]
     .active_calculation_id.$exists, false);
+assert.strictEqual(trustedMissingFieldQuery.getFilter().$or[2]
+    .active_calculation_id.$eq, undefined);
 
 function fake(initial = null, options = {}) {
     let record = initial ? { ...initial } : null;
@@ -108,6 +115,7 @@ function fake(initial = null, options = {}) {
             findOne() { return { lean: async () => record ? { ...record } : null }; },
             async create(value) { record = { ...value, _id: 'control' }; return { ...record }; },
             async findOneAndUpdate(filter, update) {
+                if (typeof options.inspectFilter === 'function') options.inspectFilter(filter);
                 if (options.conflict || !record || record.status !== filter.status || record.version !== filter.version) return null;
                 record = { ...record, ...update.$set }; return { ...record };
             }
@@ -164,6 +172,46 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     assert.strictEqual(store.audits.length, 1);
     assert.strictEqual(store.audits[0].version_before, 0);
     assert.strictEqual(store.audits[0].version_after, 1);
+    let historicalLockFilterInspected = false;
+    const historicalStore = fake({ ...reconstructedRecord, version: 3, active_calculation_id: '' }, {
+        inspectFilter(filter) {
+            historicalLockFilterInspected = true;
+            const query = PeriodControlModel.findOneAndUpdate(filter, { $set: { status: 'LOCKED' } });
+            query._castConditions();
+            assert.strictEqual(query.error(), undefined);
+            const castFilter = query.getFilter();
+            assert.strictEqual(castFilter.$or.length, 3);
+            assert.strictEqual(castFilter.$or[0].active_calculation_id, '');
+            assert.strictEqual(castFilter.$or[1].active_calculation_id, null);
+            assert.strictEqual(castFilter.$or[2].active_calculation_id.$exists, false);
+            assert.strictEqual(castFilter.$or[2].active_calculation_id.$eq, undefined);
+            assert.ok(castFilter.$or.every((branch) =>
+                branch.active_calculation_id !== 'calculation-active'));
+        }
+    });
+    const validatedHistoricalAudits = [];
+    const validatingAuditModel = { async create(values) {
+        const documents = Array.isArray(values) ? values : [values];
+        for (const value of documents) {
+            const audit = new PeriodControlAuditModel(value);
+            await audit.validate();
+            validatedHistoricalAudits.push(audit.toObject());
+        }
+        return Array.isArray(values) ? validatedHistoricalAudits : validatedHistoricalAudits[0];
+    } };
+    const historicalLock = await transitionPeriodControl({ session, scope, action: 'LOCK',
+        reason: 'Ολοκλήρωση ελέγχου ανακατασκευής', requestId: 'historical-lock-regression-01',
+        now: new Date('2026-08-01'), expectedVersion: 3,
+        periodControlModel: historicalStore.model, auditModel: validatingAuditModel,
+        indexGuard: async () => ({ ready: true }),
+        transactionRunner: async (work) => work({ id: 'historical-lock-transaction' }),
+        historicalFingerprintResolver: async () => ({ dependency_fingerprint: 'a'.repeat(64) }) });
+    assert.strictEqual(historicalLock.state.stored_status, 'LOCKED');
+    assert.strictEqual(historicalLockFilterInspected, true);
+    assert.strictEqual(historicalStore.record.version, 4);
+    assert.strictEqual(validatedHistoricalAudits.length, 1);
+    assert.strictEqual(validatedHistoricalAudits[0].effective_mode_before, 'HISTORICAL_RECONSTRUCTED');
+    assert.strictEqual(validatedHistoricalAudits[0].effective_mode_after, 'LOCKED');
     const idempotent = await transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'Οριστικοποίηση ελέγχου', requestId: 'period-lock-001', now: new Date('2026-07-01'), expectedVersion: 1, periodControlModel: store.model, auditModel: store.audit, indexGuard: async () => ({ ready: true }) });
     assert.strictEqual(idempotent.idempotent, true);
     await assert.rejects(() => transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'Άλλη εντολή', requestId: 'period-lock-002', now: new Date('2026-07-01'), expectedVersion: 1, periodControlModel: store.model, auditModel: store.audit, indexGuard: async () => ({ ready: true }) }), (error) => error.code === 'PERIOD_CONTROL_STATE_CONFLICT');

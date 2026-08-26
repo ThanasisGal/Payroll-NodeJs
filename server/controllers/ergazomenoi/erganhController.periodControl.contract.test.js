@@ -8,6 +8,7 @@ const controller = fs.readFileSync(path.join(__dirname, 'erganhController.js'), 
 const routes = fs.readFileSync(path.join(__dirname, '../../routes/usersRoute.js'), 'utf8');
 const view = fs.readFileSync(path.join(__dirname, '../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
 const browser = fs.readFileSync(path.join(__dirname, '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const css = fs.readFileSync(path.join(__dirname, '../../../public/css/main.css'), 'utf8');
 const policyExecution = fs.readFileSync(path.join(__dirname, '../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyExecutionService.js'), 'utf8');
 
 assert.match(controller, /calculationOwnership = await acquirePeriodCalculationOwnership\(\{ scope: periodControlScope,[\s\S]*historicalRequestId \}\)/);
@@ -40,6 +41,9 @@ assert.ok(browser.includes("LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'"));
 assert.ok(browser.includes("CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'"));
 assert.ok(browser.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ'"));
 assert.ok(browser.includes('δεν ξεκλειδώνει χειροκίνητα κλειδωμένες ημερήσιες εγγραφές'));
+assert.ok(browser.includes("inputValue: unlocking ? '' : 'Ολοκλήρωση ελέγχου και κλείδωμα ανακατασκευασμένης εκπρόθεσμης περιόδου '"));
+assert.ok(browser.includes("confirmButton: 'employment-period-lock-confirm-button'"));
+assert.match(css, /\.employment-review-swal-popup \.swal2-confirm\.employment-period-lock-confirm-button\s*\{[^}]*min-width:\s*11rem;[^}]*white-space:\s*nowrap;/s);
 assert.ok(browser.includes("transitionEmploymentPeriod('unlock')"));
 assert.ok(browser.includes("/period-control/${action}"));
 assert.ok(!/apologistiko_biblio[\s\S]{0,80}(PERIOD_CONTROL|periodControl)/.test(controller));

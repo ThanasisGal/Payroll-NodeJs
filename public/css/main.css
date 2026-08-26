@@ -15063,6 +15063,27 @@ body.loader-active > *:not(.app-loader) {
     font-size: 0.9rem;
 }
 
+.employment-review-swal-popup .swal2-confirm.employment-period-lock-confirm-button {
+    width: auto;
+    min-width: 11rem;
+    padding-inline: 1.25rem;
+    white-space: nowrap;
+}
+
+.employment-review-swal-popup .swal2-confirm.employment-period-unlock-confirm-button {
+    width: auto;
+    min-width: 12.5rem;
+    padding-inline: 1.25rem;
+    white-space: nowrap;
+}
+
+.employment-review-swal-popup .swal2-confirm.employment-period-finalize-confirm-button {
+    width: auto;
+    min-width: 15.5rem;
+    padding-inline: 1.25rem;
+    white-space: nowrap;
+}
+
 @media (max-width: 420px) {
     .employment-review-swal-popup .swal2-confirm.weekly-hr-stage1-bulk-confirm {
         min-width: 0;
