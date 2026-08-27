@@ -42,6 +42,16 @@ const reconstructedWeek = { ...juneCrossMonth, period_control: {
     '2026-07-03', '2026-07-04', '2026-07-05'
 ] };
 assert.strictEqual(isWeekAllowedForEmploymentPeriod(reconstructedWeek), true);
+const finalizedCompletedWeek = { ...reconstructedWeek,
+    period_control: { effective_mode: 'FINALIZED',
+        historical_reconstruction_status: 'COMPLETED' } };
+assert.strictEqual(isWeekAllowedForEmploymentPeriod(finalizedCompletedWeek), true);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...finalizedCompletedWeek,
+    period_control: { effective_mode: 'FINALIZED', historical_reconstruction_status: '' } }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...finalizedCompletedWeek,
+    authoritative_row_dates: finalizedCompletedWeek.authoritative_row_dates.slice(0, 6) }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...finalizedCompletedWeek,
+    historical_as_of: '2026-07-04' }), false);
 const staleCompletedWeek = { ...reconstructedWeek,
     period_control: { effective_mode: 'HISTORICAL_RECONSTRUCTION_STALE',
         historical_reconstruction_status: 'COMPLETED' },
@@ -136,11 +146,18 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     const normal = await assertNormalPeriod({ scope, now: new Date('2026-07-01'), periodControlModel: empty.model });
     assert.strictEqual(normal.token.exists, false);
     await assert.rejects(() => assertNormalPeriod({ scope, now: new Date('2026-08-01'), periodControlModel: empty.model }), (error) => error.code === 'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED');
+    await assert.rejects(() => assertNormalPeriod({ scope, now: new Date('2026-08-01'),
+        periodControlModel: fake({ status: 'FINALIZED', version: 2,
+            deadline: new Date('2026-07-31') }).model }),
+    (error) => error.code === 'PERIOD_CONTROL_FINALIZED');
 
     const staleStateResolver = async () => staleProjection;
     const staleReadable = await assertReviewReadablePeriod({ scope,
         stateResolver: staleStateResolver });
     assert.strictEqual(staleReadable.state.effective_mode, 'HISTORICAL_RECONSTRUCTION_STALE');
+    await assert.rejects(() => assertReviewReadablePeriod({ scope,
+        stateResolver: async () => ({ ...staleProjection, effective_mode: 'FINALIZED' }) }),
+    (error) => error.code === 'PERIOD_CONTROL_REVIEW_NOT_AVAILABLE');
     await assert.rejects(() => assertReviewReadablePeriod({ scope,
         stateResolver: async () => ({ ...staleProjection,
             effective_mode: 'HISTORICAL_RECONSTRUCTION_REQUIRED' }) }),
