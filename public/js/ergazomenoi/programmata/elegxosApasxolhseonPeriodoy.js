@@ -3364,6 +3364,21 @@ function employeeGroupLifecycleBadge(employeeKodikos, ypokatasthma, lifecyclePay
     return badges[lifecycle.current_stage] || '';
 }
 
+function employeeDepartureBadge(row = {}) {
+    const departureDate = stage1DateKey(row.hmeromhnia_apoxorhshs);
+    const periodStart = stage1DateKey(
+        document.getElementById('apo_hmeromhnia')?.value
+    );
+    const periodEnd = stage1DateKey(
+        document.getElementById('eos_hmeromhnia')?.value
+    );
+    if (!departureDate || !periodStart || !periodEnd ||
+        departureDate < periodStart || departureDate > periodEnd) return '';
+    return `<span class="badge text-bg-secondary ms-2">ΑΠΟΧΩΡΗΣΕ ΣΤΙΣ ${escapeHtml(
+        formatStage1DateKey(departureDate)
+    )}</span>`;
+}
+
 
 function renderReviewRows(rows = [], deviations = []) {
     ensureReviewTableStructure();
@@ -3424,6 +3439,7 @@ function renderReviewRows(rows = [], deviations = []) {
                 row.ypokatasthma,
                 [...weeklyHrStage1Payloads.values()]
             );
+            const departureBadge = employeeDepartureBadge(row);
 
             groupTr.innerHTML = `
                 <td colspan="13" class="fw-bold">
@@ -3434,6 +3450,7 @@ function renderReviewRows(rows = [], deviations = []) {
                     ${row.eponymo || ''}
                     ${row.onoma || ''}
                     ${lifecycleBadge}
+                    ${departureBadge}
                 </td>
             `;
 
@@ -8767,7 +8784,8 @@ function renderWeeklyHrStage3(lifecycle) {
                     data-row-id="${escapeHtml(item.row_id)}">Αποθήκευση</button></td>
                 </tr>`).join('')}</tbody>
             </table></div>`
-        : '<div class="text-muted small">Δεν υπάρχουν υπόλοιπες πιθανές άδειες.</div>';
+        : '<div class="text-muted small employment-review-stage3-empty">' +
+            'Δεν υπάρχουν ανέλεγκτες πιθανές άδειες.</div>';
 }
 
 function findStage3PendingItem(rowId) {
@@ -8831,13 +8849,13 @@ function updateEmploymentReviewWorkflowPresentation() {
         .sort(compareWeeklyHrStage1Payloads);
     const payloads = visibleWeeklyHrPayloads(allPayloads)
         .sort(compareWeeklyHrStage1Payloads);
-    const lifecycle = derivePeriodLifecyclePresentation(payloads);
+    const lifecycle = derivePeriodLifecyclePresentation(allPayloads);
     currentEmploymentReviewLifecyclePresentation = lifecycle;
     currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(allPayloads);
     currentCanonicalDailyEmploymentTypeByKey = buildCanonicalDailyEmploymentTypeByKey(allPayloads);
     if (currentReviewRows.length) renderCurrentReviewRows();
     const summary = document.getElementById('employmentReviewWorkflowSummary');
-    if (!payloads.length) {
+    if (!allPayloads.length) {
         summary?.classList.add('d-none');
         return lifecycle;
     }
@@ -8857,15 +8875,25 @@ function updateEmploymentReviewWorkflowPresentation() {
         const header = item?.querySelector('[data-workflow-stage-header]');
         const collapseElement = item?.querySelector('.accordion-collapse');
         if (!button || !header || !collapseElement) return;
-        const status = stage.presentation_status;
-        const pendingText = status === 'LOCKED' ? '' :
+        const presentationStatus = stage.presentation_status;
+        const noHrAction = ['STAGE1', 'STAGE2', 'STAGE3'].includes(stage.stage) &&
+            Number(stage.pending_count || 0) === 0 &&
+            stage.business_status !== 'BLOCKED' &&
+            presentationStatus !== 'LOCKED';
+        const badgeStatus = stage.stage === 'STAGE4'
+            ? stage.business_status : presentationStatus;
+        const badge = noHrAction
+            ? '<span class="badge text-bg-success ms-2">' +
+                'ΔΕΝ ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ ΑΠΟ ΤΟ HR</span>'
+            : `<span class="badge ${workflowStageStatusClasses[badgeStatus]} ms-2">${escapeHtml(
+                workflowStageStatusLabels[badgeStatus])}</span>`;
+        const pendingText = presentationStatus === 'LOCKED' || noHrAction ? '' :
             ` <span class="small ms-2">${stage.pending_count} εκκρεμότητες</span>`;
         header.innerHTML = `${escapeHtml(workflowStageNames[stage.stage])}
-            <span class="badge ${workflowStageStatusClasses[status]} ms-2">${escapeHtml(
-                workflowStageStatusLabels[status])}</span>${pendingText}`;
-        button.disabled = status === 'LOCKED';
-        button.setAttribute('aria-disabled', status === 'LOCKED' ? 'true' : 'false');
-        if (status === 'LOCKED') {
+            ${badge}${pendingText}`;
+        button.disabled = presentationStatus === 'LOCKED';
+        button.setAttribute('aria-disabled', presentationStatus === 'LOCKED' ? 'true' : 'false');
+        if (presentationStatus === 'LOCKED') {
             bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false }).hide();
         }
     });

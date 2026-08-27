@@ -64,6 +64,7 @@ function isWeekAllowedForEmploymentPeriod({
     if (start < scope.period_start || start > scope.period_end) return false;
     if (end <= scope.period_end) return true;
     const completedHistoricalMode = periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTED ||
+        periodControl?.effective_mode === MODES.FINALIZED ||
         (allowStaleCompletedContext === true &&
             periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTION_STALE);
     if (!completedHistoricalMode ||

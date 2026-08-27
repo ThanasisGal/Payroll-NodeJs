@@ -1272,6 +1272,46 @@ async function assertActiveEmploymentReviewPeriodReadable(req, branchOverride = 
     return { scope, ...periodAccess };
 }
 
+async function assertActiveEmploymentReviewPeriodPresentationReadable(
+    req, branchOverride = '', requiredRange = null
+) {
+    const scope = await activeEmploymentReviewPeriodScope(req, branchOverride);
+    const state = await getPeriodControl({ scope });
+    if (!['NORMAL', 'HISTORICAL_RECONSTRUCTED',
+        'HISTORICAL_RECONSTRUCTION_STALE', 'FINALIZED'].includes(state.effective_mode)) {
+        const error = new Error(
+            'Απαιτείται ρητή ανακατασκευή πριν από την ανάγνωση του εβδομαδιαίου ελέγχου.'
+        );
+        error.code = 'PERIOD_CONTROL_REVIEW_NOT_AVAILABLE';
+        error.statusCode = 409;
+        throw error;
+    }
+    if (requiredRange) {
+        const insideScope = isWeekAllowedForEmploymentPeriod({
+            period_start: scope.period_start,
+            period_end: scope.period_end,
+            week_start: requiredRange.start,
+            week_end: requiredRange.end,
+            period_control: state,
+            historical_as_of: resolveWeeklyRepoPreviewAsOfDate({
+                sessionAppDate: req.session.appDate,
+                periodEnd: scope.period_end,
+                periodControl: state
+            }),
+            authoritative_row_dates: requiredRange.authoritativeRowDates,
+            required_authoritative_dates: requiredRange.requiredAuthoritativeDates,
+            allow_stale_completed_context: true
+        });
+        if (!insideScope) {
+            const error = new Error('Η ανάγνωση δεν ανήκει στην ενεργή περίοδο.');
+            error.code = 'PERIOD_CONTROL_SCOPE_MISMATCH';
+            error.statusCode = 409;
+            throw error;
+        }
+    }
+    return { scope, state };
+}
+
 async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
     const range = { $gte: asDateOnlyUtc(scope.period_start), $lte: asDateOnlyUtc(scope.period_end, true) };
     const weeklyRange = { $gte: startOfWeekMondayUtc(scope.period_start),
@@ -4526,27 +4566,30 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
                 const document = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({ _id: state.frozen_snapshot_id, ...scope }).lean();
                 if (!document?.frozen_snapshot) throw Object.assign(new Error('Λείπει το παγωμένο αποτέλεσμα της οριστικοποιημένης περιόδου.'),
                     { code: 'FINALIZED_SNAPSHOT_MISSING', statusCode: 409 });
-                const employees = new Map((document.frozen_snapshot.employees || []).map((employee) => [String(employee.kodikos), employee]));
-                const projected = projectFrozenReview(document.frozen_snapshot, { kodikos: req.query.kodikos });
-                const frozenRows = projected.rows.map((row) => { const employee = employees.get(String(row.kodikos)) || {};
-                    return { ...row, eponymo: employee.eponymo || '', onoma: employee.onoma || '',
-                        employeeName: `${employee.eponymo || ''} ${employee.onoma || ''}`.trim(),
-                        exportYpokatasthma: row.ypokatasthma || scope.ypokatasthma };
-                });
-                frozenRows.__deviations = projected.deviations;
-                frozenRows.__policyVersion = document.frozen_snapshot.snapshot_schema_version;
-                frozenRows.__frozenSnapshotFingerprint = document.frozen_snapshot_fingerprint;
-                frozenRows.__corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
-                    ...scope,
-                    status: { $in: ['ACTIVE', 'CLOSED'] }
-                })
-                    .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
-                    .sort({ opened_at: -1 })
-                    .lean();
-                if (frozenRows.__corrective) frozenRows.__corrective.payroll_postings =
-                    await ApasxoliseisCorrectivePayrollPostingModel.find({ ...scope,
-                        case_id: frozenRows.__corrective.case_id }).lean();
-                return frozenRows;
+                if (document.frozen_snapshot.snapshot_schema_version !== 'employment-period-frozen:v3') {
+                    const employees = new Map((document.frozen_snapshot.employees || []).map((employee) => [String(employee.kodikos), employee]));
+                    const projected = projectFrozenReview(document.frozen_snapshot, { kodikos: req.query.kodikos });
+                    const frozenRows = projected.rows.map((row) => { const employee = employees.get(String(row.kodikos)) || {};
+                        return { ...row, eponymo: employee.eponymo || '', onoma: employee.onoma || '',
+                            employeeName: `${employee.eponymo || ''} ${employee.onoma || ''}`.trim(),
+                            exportYpokatasthma: row.ypokatasthma || scope.ypokatasthma };
+                    });
+                    frozenRows.__deviations = projected.deviations;
+                    frozenRows.__policyVersion = document.frozen_snapshot.snapshot_schema_version;
+                    frozenRows.__frozenSnapshotFingerprint = document.frozen_snapshot_fingerprint;
+                    const corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
+                        ...scope,
+                        status: mongoose.trusted({ $in: ['ACTIVE', 'CLOSED'] })
+                    })
+                        .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
+                        .sort({ opened_at: -1 })
+                        .lean();
+                    frozenRows.__corrective = corrective;
+                    if (frozenRows.__corrective) frozenRows.__corrective.payroll_postings =
+                        await ApasxoliseisCorrectivePayrollPostingModel.find({ ...scope,
+                            case_id: frozenRows.__corrective.case_id }).lean();
+                    return frozenRows;
+                }
             }
         }
     }
@@ -6363,24 +6406,25 @@ class erganhController {
                             new Error('Η οριστικοποιημένη περίοδος δεν διαθέτει παγωμένο αποτέλεσμα.'),
                             { code: 'FINALIZED_SNAPSHOT_MISSING', statusCode: 409 }
                         );
-                        const projected = projectFrozenReview(frozenDocument.frozen_snapshot, { kodikos });
-                        const corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
-                            ...frozenScope,
-                            status: { $in: ['ACTIVE', 'CLOSED'] }
-                        })
-                            .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
-                            .sort({ opened_at: -1 })
-                            .lean();
-                        const correctivePostings = corrective ?
-                            await ApasxoliseisCorrectivePayrollPostingModel.find({ ...frozenScope,
-                                case_id: corrective.case_id }).lean() : [];
-                        const rows = projected.rows.slice(skip, skip + limitNum);
-                        return res.json({ success: true, source: projected.source, finalized: true,
+                        if (frozenDocument.frozen_snapshot.snapshot_schema_version !== 'employment-period-frozen:v3') {
+                            const projected = projectFrozenReview(frozenDocument.frozen_snapshot, { kodikos });
+                            const corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
+                                ...frozenScope,
+                                status: mongoose.trusted({ $in: ['ACTIVE', 'CLOSED'] })
+                            })
+                                .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
+                                .sort({ opened_at: -1 })
+                                .lean();
+                            const correctivePostings = corrective ?
+                                await ApasxoliseisCorrectivePayrollPostingModel.find({ ...frozenScope,
+                                    case_id: corrective.case_id }).lean() : [];
+                            const rows = projected.rows.slice(skip, skip + limitNum);
+                            return res.json({ success: true, source: projected.source, finalized: true,
                             frozen_snapshot_fingerprint: frozenDocument.frozen_snapshot_fingerprint,
                             page: pageNum, limit: limitNum, total: projected.total,
                             totalPages: Math.ceil(projected.total / limitNum), rows,
                             deviations: projected.deviations, payroll_results: projected.payroll_results,
-                            corrective: corrective ? {
+                                corrective: corrective ? {
                                 case_id: corrective.case_id,
                                 status: corrective.status,
                                 corrected_result: corrective.corrected_result,
@@ -6389,7 +6433,8 @@ class erganhController {
                                 requires_new_submission: corrective.requires_new_submission,
                                 can_submit_correction: corrective.can_submit_correction,
                                 payroll_postings: correctivePostings
-                            } : null });
+                                } : null });
+                        }
                     }
                 }
             }
@@ -6896,6 +6941,7 @@ class erganhController {
                     employee_id: erg?._id || null,
                     eponymo: erg?.eponymo || '',
                     onoma: erg?.onoma || '',
+                    hmeromhnia_apoxorhshs: erg?.hmeromhnia_apoxorhshs || null,
 
                     // Ιστορικά σωστό profile για την ΗΜΕΡΑ της εγγραφής.
                     // Χρησιμοποιείται από το frontend για display τύπου:
@@ -10631,12 +10677,14 @@ class erganhController {
     static getWeeklyHrWorkflowStage1 = async (req, res) => {
         try {
             const context = await loadWeeklyHrContext({ req, input: req.query });
-            await assertActiveEmploymentReviewPeriodReadable(req, context.base.ypokatasthma, {
+            await assertActiveEmploymentReviewPeriodPresentationReadable(
+                req, context.base.ypokatasthma, {
                 kind: 'WEEKLY_CONTEXT', start: context.week.start, end: context.week.end,
                 authoritativeRowDates: context.rows.map((row) => row.hmeromhnia),
                 requiredAuthoritativeDates:
                     context.employmentDateScope?.employment_owned_dates || null
-            });
+                }
+            );
             const state = await ApasxoliseisWeeklyHrWorkflowStateModel.findOne({
                 ...context.base, employee_id: context.employee._id,
                 week_start: context.week.start, week_end: context.week.end
