@@ -1277,7 +1277,9 @@ async function assertActiveEmploymentReviewPeriodPresentationReadable(
 ) {
     const scope = await activeEmploymentReviewPeriodScope(req, branchOverride);
     const state = await getPeriodControl({ scope });
-    if (!['NORMAL', 'HISTORICAL_RECONSTRUCTED',
+    const lockedWithAuthoritativeResult = state.effective_mode === 'LOCKED' &&
+        state.has_authoritative_calculation_result === true;
+    if (!lockedWithAuthoritativeResult && !['NORMAL', 'HISTORICAL_RECONSTRUCTED',
         'HISTORICAL_RECONSTRUCTION_STALE', 'FINALIZED'].includes(state.effective_mode)) {
         const error = new Error(
             'Απαιτείται ρητή ανακατασκευή πριν από την ανάγνωση του εβδομαδιαίου ελέγχου.'

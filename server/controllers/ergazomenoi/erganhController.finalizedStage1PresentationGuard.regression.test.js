@@ -32,6 +32,9 @@ const orphanWrite = section(
 );
 
 assert.match(presentationGuard, /getPeriodControl\(\{ scope \}\)/);
+assert.match(presentationGuard, /const lockedWithAuthoritativeResult = state\.effective_mode === 'LOCKED' &&/);
+assert.match(presentationGuard, /state\.has_authoritative_calculation_result === true/);
+assert.match(presentationGuard, /if \(!lockedWithAuthoritativeResult && !\['NORMAL', 'HISTORICAL_RECONSTRUCTED'/);
 assert.match(presentationGuard, /'HISTORICAL_RECONSTRUCTION_STALE', 'FINALIZED'/);
 assert.match(presentationGuard, /isWeekAllowedForEmploymentPeriod\(\{/);
 assert.match(presentationGuard, /required_authoritative_dates:/);
@@ -46,4 +49,39 @@ assert.strictEqual(
     2
 );
 
-console.log('finalized Stage 1 presentation guard regression tests: PASS');
+function executablePresentationGuard(state) {
+    return Function(
+        'activeEmploymentReviewPeriodScope', 'getPeriodControl',
+        'isWeekAllowedForEmploymentPeriod', 'resolveWeeklyRepoPreviewAsOfDate',
+        `${presentationGuard}; return assertActiveEmploymentReviewPeriodPresentationReadable;`
+    )(
+        async () => ({ team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+            period_start: '2026-06-01', period_end: '2026-06-30' }),
+        async () => state,
+        () => true,
+        () => new Date('2026-07-05T00:00:00.000Z')
+    );
+}
+
+(async () => {
+    const lockedAuthoritativeState = {
+        effective_mode: 'LOCKED',
+        has_authoritative_calculation_result: true,
+        historical_reconstruction_status: 'COMPLETED',
+        historical_reconstruction_version: 2
+    };
+    const lockedResult = await executablePresentationGuard(lockedAuthoritativeState)({ session: {} });
+    assert.strictEqual(lockedResult.state, lockedAuthoritativeState);
+
+    await assert.rejects(
+        () => executablePresentationGuard({ ...lockedAuthoritativeState,
+            has_authoritative_calculation_result: false })({ session: {} }),
+        (error) => error.code === 'PERIOD_CONTROL_REVIEW_NOT_AVAILABLE'
+    );
+
+    const finalizedState = { effective_mode: 'FINALIZED' };
+    const finalizedResult = await executablePresentationGuard(finalizedState)({ session: {} });
+    assert.strictEqual(finalizedResult.state, finalizedState);
+
+    console.log('finalized Stage 1 presentation guard regression tests: PASS');
+})().catch((error) => { console.error(error); process.exitCode = 1; });

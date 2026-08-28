@@ -64,6 +64,7 @@ function isWeekAllowedForEmploymentPeriod({
     if (start < scope.period_start || start > scope.period_end) return false;
     if (end <= scope.period_end) return true;
     const completedHistoricalMode = periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTED ||
+        periodControl?.effective_mode === MODES.LOCKED ||
         periodControl?.effective_mode === MODES.FINALIZED ||
         (allowStaleCompletedContext === true &&
             periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTION_STALE);
@@ -113,12 +114,13 @@ function projectPeriodControl({ scope, record = null, now = new Date(), dependen
     const effectiveMode = resolveEffectiveMode({ storedStatus, deadline, now, record, dependencyFingerprint });
     const normal = effectiveMode === MODES.NORMAL;
     const reconstructed = effectiveMode === MODES.HISTORICAL_RECONSTRUCTED;
+    const locked = effectiveMode === MODES.LOCKED;
     const pastDeadline = isPastDeadline(deadline, now);
     const normalCalculationCompleted =
         Number(record?.successful_calculation_version || 0) > 0 &&
         Boolean(record?.last_successful_calculation_at);
     const historicalCalculationCompleted =
-        reconstructed &&
+        (reconstructed || locked) &&
         record?.historical_reconstruction_status === 'COMPLETED' &&
         Number(record?.historical_reconstruction_version || 0) >= 1;
     const hasAuthoritativeCalculationResult =
@@ -213,7 +215,9 @@ async function assertReviewReadablePeriod({ scope, now = new Date(), expectedTok
         throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
             'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
     }
-    if (![MODES.NORMAL, MODES.HISTORICAL_RECONSTRUCTED,
+    const lockedWithAuthoritativeResult = state.effective_mode === MODES.LOCKED &&
+        state.has_authoritative_calculation_result === true;
+    if (!lockedWithAuthoritativeResult && ![MODES.NORMAL, MODES.HISTORICAL_RECONSTRUCTED,
         MODES.HISTORICAL_RECONSTRUCTION_STALE].includes(state.effective_mode)) {
         throw periodError('PERIOD_CONTROL_REVIEW_NOT_AVAILABLE', 409,
             'Απαιτείται ρητή ανακατασκευή πριν από την ανάγνωση του εβδομαδιαίου ελέγχου.');
