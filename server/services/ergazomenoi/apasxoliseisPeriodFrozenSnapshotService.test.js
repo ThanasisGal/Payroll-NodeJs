@@ -122,7 +122,14 @@ for (const model of [FrozenModel, CorrectiveModel, AuditModel]) {
     assert.strictEqual(model.schema.options.autoIndex, false);
     assert.strictEqual(model.schema.options.autoCreate, false);
 }
-assert.ok(FrozenModel.schema.indexes().some(([, options]) => options.name === 'unique_apasxoliseis_frozen_snapshot_scope'));
+const frozenScopeVersionIndex = FrozenModel.schema.indexes().find(([, options]) =>
+    options.name === 'unique_apasxoliseis_frozen_snapshot_scope_version');
+assert.ok(frozenScopeVersionIndex);
+assert.deepStrictEqual(frozenScopeVersionIndex[0], { team: 1, company_kod: 1, ypokatasthma: 1,
+    period_start: 1, period_end: 1, historical_reconstruction_version: 1 });
+assert.strictEqual(frozenScopeVersionIndex[1].unique, true);
+assert.ok(!FrozenModel.schema.indexes().some(([, options]) =>
+    options.name === 'unique_apasxoliseis_frozen_snapshot_scope'));
 assert.ok(CorrectiveModel.schema.indexes().some(([, options]) => options.name === 'unique_active_apasxoliseis_corrective_case' && options.unique));
 assert.deepStrictEqual(CorrectiveModel.schema.path('status').enumValues, ['ACTIVE', 'CLOSED']);
 assert.ok(AuditModel.schema.path('event_type').enumValues.includes('SUBMISSION_NEEDED_DETERMINATION'));

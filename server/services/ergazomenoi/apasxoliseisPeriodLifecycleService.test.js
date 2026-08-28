@@ -39,7 +39,12 @@ function stores(controlInput = {}) {
             }
         },
         frozen: {
-            findOne(filter) { return query(frozen?.request_id === filter.request_id ? { ...frozen } : null); },
+            findOne(filter) {
+                if (!frozen) return query(null);
+                if (filter.request_id !== undefined) return query(frozen.request_id === filter.request_id ? { ...frozen } : null);
+                return query(frozen.historical_reconstruction_version === filter.historical_reconstruction_version
+                    ? { ...frozen } : null);
+            },
             async create(documents) { frozen = { _id: '507f1f77bcf86cd799439012', ...documents[0] }; return [{ ...frozen }]; }
         },
         corrective: {

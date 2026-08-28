@@ -6,6 +6,14 @@ const indexes = (model) => REQUIRED_INDEXES.filter((item) => item.model === mode
     const ready = await getPeriodLifecycleIndexState({ loaders: { frozen: async () => indexes('frozen'), corrective: async () => indexes('corrective'),
         posting: async () => indexes('posting'), balance: async () => indexes('balance'), payroll: async () => indexes('payroll') } });
     assert.strictEqual(ready.ready, true);
+    const oldFrozenIndexes = indexes('frozen').filter((index) =>
+        index.name !== 'unique_apasxoliseis_frozen_snapshot_scope_version');
+    oldFrozenIndexes.push({ name: 'unique_apasxoliseis_frozen_snapshot_scope', unique: true });
+    const oldOnly = await getPeriodLifecycleIndexState({ loaders: { frozen: async () => oldFrozenIndexes,
+        corrective: async () => indexes('corrective'), posting: async () => indexes('posting'),
+        balance: async () => indexes('balance'), payroll: async () => indexes('payroll') } });
+    assert.strictEqual(oldOnly.ready, false);
+    assert.deepStrictEqual(oldOnly.missing, ['unique_apasxoliseis_frozen_snapshot_scope_version']);
     const empty = { frozen: async () => [], corrective: async () => [], posting: async () => [], balance: async () => [], payroll: async () => [] };
     const missing = await getPeriodLifecycleIndexState({ loaders: empty });
     assert.strictEqual(missing.ready, false);
