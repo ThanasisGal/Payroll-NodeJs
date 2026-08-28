@@ -11,7 +11,7 @@ const employeeModels = fs.readFileSync(path.join(__dirname, '../../models/ergazo
 assert.match(controller, /static getWeeklyHrWorkflowStage1/);
 const stage1Read = controller.slice(controller.indexOf('static getWeeklyHrWorkflowStage1'),
     controller.indexOf('static completeWeeklyHrWorkflowStage1'));
-assert.match(stage1Read, /assertActiveEmploymentReviewPeriodReadable/);
+assert.match(stage1Read, /assertActiveEmploymentReviewPeriodPresentationReadable/);
 assert.doesNotMatch(stage1Read, /assertActiveEmploymentReviewPeriodNormal/);
 const reviewSearch = controller.slice(
     controller.indexOf('static getProdhlomenaOrariaForReview'),
@@ -44,6 +44,10 @@ assert.match(stage1Read, /resolveStage3DailyActualWorkFacts\(row\)/);
 assert.match(stage1Read, /declared_intervals/);
 assert.match(stage1Read, /card_intervals/);
 assert.match(stage1Read, /current_apologistiko_classification/);
+assert.match(stage1Read, /loadWeeklyRepoTransferDecisionBatch/);
+assert.match(stage1Read, /buildWeeklyLifecycleWithStage2State/);
+assert.match(stage1Read, /current_proposal_fingerprint/);
+assert.match(stage1Read, /current_proposal\?\.employee_kodikos/);
 assert.match(controller, /static completeWeeklyHrWorkflowStage2/);
 assert.match(controller, /runWithStaleStage2MaterializationWriteFence/);
 assert.match(routes, /weekly-hr-workflow\/stage2\/complete'[\s\S]*requireCriticalEmploymentDecisionRole[\s\S]*completeWeeklyHrWorkflowStage2/);

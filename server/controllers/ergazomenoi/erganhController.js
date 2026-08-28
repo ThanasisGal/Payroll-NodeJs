@@ -398,6 +398,9 @@ const {
 const {
     buildWeeklyHrLifecycleProjection
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
+const { buildWeeklyLifecycleWithStage2State } = require(
+    '../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleStage2StateService'
+);
 const {
     getWeeklyHrWorkflowIndexState,
     assertWeeklyHrWorkflowIndexesReady
@@ -10700,7 +10703,7 @@ class erganhController {
                     context.employmentDateScope?.employment_owned_dates || null });
             const periodScope = req.query.period_start && req.query.period_end
                 ? { period_start: req.query.period_start, period_end: req.query.period_end } : null;
-            const lifecycleProjection = buildWeeklyHrLifecycleProjection({
+            const lifecycleInput = {
                 weekRows: context.rows.map((row) => ({ ...row,
                     team: context.base.team,
                     company_kod: context.base.company_kod })),
@@ -10713,6 +10716,26 @@ class erganhController {
                     week_start: context.week.start, week_end: context.week.end },
                 periodScope,
                 employmentDateScope: context.employmentDateScope
+            };
+            const lifecycleProjection = await buildWeeklyLifecycleWithStage2State({
+                projectionInput: lifecycleInput,
+                buildProjection: buildWeeklyHrLifecycleProjection,
+                loadStage2State: async () => {
+                    const batch = await loadWeeklyRepoTransferDecisionBatch({
+                        session: req.session,
+                        filters: { apo_hmeromhnia: context.week.startKey,
+                            eos_hmeromhnia: context.week.endKey,
+                            ypokatasthma: context.base.ypokatasthma,
+                            kodikos: context.employee.kodikos }
+                    });
+                    return (batch.records || []).find((record) =>
+                        Boolean(record?.current_proposal_fingerprint) &&
+                        String(record.current_proposal?.employee_kodikos || '') ===
+                            String(context.employee.kodikos || '') &&
+                        dateKeyUtc(record.current_proposal?.week_start) === context.week.startKey &&
+                        dateKeyUtc(record.current_proposal?.week_end) === context.week.endKey
+                    ) || null;
+                }
             });
             const stage1DailyPresentation = context.rows.map((row) => {
                 const rowDate = dateKeyUtc(row.hmeromhnia);

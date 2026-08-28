@@ -50,6 +50,56 @@ function unique(values = []) {
     return [...new Set(values.filter(Boolean))];
 }
 
+function stage2ProposalForScope(state = null, scope = {}) {
+    const proposal = state?.current_proposal;
+    const sameEmployee = String(proposal?.employee_kodikos || '') ===
+        String(scope.employee_kodikos || '');
+    const sameWeek = dateKeyUtc(proposal?.week_start) === dateKeyUtc(scope.week_start) &&
+        dateKeyUtc(proposal?.week_end) === dateKeyUtc(scope.week_end);
+    return state?.current_proposal_fingerprint && sameEmployee && sameWeek ? proposal : null;
+}
+
+function stage2DecisionForProposal(state = null, proposal = null) {
+    const decision = state?.current_decision;
+    if (!proposal || !decision || decision.is_current !== true ||
+        decision.decision_status !== 'RECORDED') return null;
+    const sameScope = String(decision.employee_kodikos || '') ===
+        String(proposal.employee_kodikos || '') &&
+        dateKeyUtc(decision.week_start) === dateKeyUtc(proposal.week_start) &&
+        dateKeyUtc(decision.week_end) === dateKeyUtc(proposal.week_end);
+    return sameScope &&
+        state.current_proposal_fingerprint === state.current_decision_fingerprint
+        ? decision : null;
+}
+
+function displayStage2Classification(value) {
+    const classification = String(value || '').trim();
+    return classification === 'ΑΝ' ? 'ΡΕΠΟ'
+        : classification === 'ΕΡΓ' ? 'ΕΡΓΑΣΙΑ' : classification || 'ΑΧΑΡΑΚΤΗΡΙΣΤΟ';
+}
+
+function dailyStage2Item(row = {}, currentClassification = '') {
+    const intervals = (prefix) => [1, 2, 3].map((index) => ({
+        start: String(row?.[`${prefix}apo_ora_0${index}`] || ''),
+        end: String(row?.[`${prefix}eos_ora_0${index}`] || '')
+    })).filter((interval) => interval.start || interval.end);
+    const facts = resolveDailyActualWorkFacts(row);
+    return Object.freeze({
+        date: dateKeyUtc(row.hmeromhnia),
+        declaration_classification: displayStage2Classification(
+            currentClassification || row.kathgoria_ergasias
+        ),
+        declared_intervals: Object.freeze(intervals('')),
+        card_intervals: Object.freeze(intervals('cards_')),
+        card_hours: Number(facts.cardHours || 0),
+        actual_classification: row.repo_apologistika === true ||
+            String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΑΝ' ? 'ΡΕΠΟ'
+            : facts.countsAsActualWorkDay === true ? 'ΕΡΓΑΣΙΑ'
+                : String(row.kathgoria_ergasias_apologistika || '').trim() || 'ΑΧΑΡΑΚΤΗΡΙΣΤΟ',
+        actual_work_hours: Number(facts.actualWorkHours || 0)
+    });
+}
+
 function possibleLeaveDates(rows = []) {
     return unique(rows.filter(isPossibleLeave)
         .map((row) => dateKeyUtc(row?.hmeromhnia))).sort();
@@ -182,6 +232,8 @@ function buildWeeklyHrLifecycleProjection({
     effectiveProfile = {},
     effectiveProfilesByDate = {},
     persistedStage1State = null,
+    persistedStage2DecisionState = null,
+    stage2StateDiagnostic = null,
     persistedStage3State = null,
     scope = {},
     periodScope = null,
@@ -295,20 +347,75 @@ function buildWeeklyHrLifecycleProjection({
         !actionableDateSet || actionableDateSet.has(date));
     const stage2ActionableForScope = stage2Actionability.actionable &&
         (!actionableDateSet || stage2CandidateDates.length > 0);
+    const currentStage2Proposal = stage2ProposalForScope(
+        persistedStage2DecisionState, scope);
+    const currentStage2Decision = stage2DecisionForProposal(
+        persistedStage2DecisionState, currentStage2Proposal);
+    const appliedStage2Decision = currentStage2Decision &&
+        persistedStage2DecisionState?.current_decision_execution?.execution_status === 'APPLIED';
+    const rejectedStage2Decision = currentStage2Decision?.decision_code ===
+        'REJECT_PROPOSAL';
+    const approvedPendingApply = currentStage2Decision?.decision_code ===
+        'APPROVE_PROPOSAL' && !appliedStage2Decision;
+    const stage2ResolvedByDecision = Boolean(appliedStage2Decision || rejectedStage2Decision);
     const repoReasons = unique(repoTransfer.reasons || []);
+    const stage2Diagnostics = stage2StateDiagnostic ? [stage2StateDiagnostic] : [];
     // Candidate exclusions and repo deficits are diagnostics. A Stage-2 blocker
     // exists only in the context of an otherwise actionable transfer contract.
     const stage2Blockers = stage2ActionableForScope &&
         repoTransfer.eligibility_status === 'INVALID_INPUT' ? repoReasons : [];
-    const stage2PendingCount = stage2ActionableForScope ? 1 : 0;
+    const stage2PendingCount = stage2ActionableForScope && !stage2ResolvedByDecision ? 1 : 0;
+    const sourceRow = rows.find((row) => dateKeyUtc(row.hmeromhnia) ===
+        dateKeyUtc(repoTransfer.source?.hmeromhnia));
+    const targetRow = rows.find((row) => dateKeyUtc(row.hmeromhnia) ===
+        dateKeyUtc(repoTransfer.target?.hmeromhnia));
+    const stage2DecisionState = appliedStage2Decision ? 'APPLIED'
+        : rejectedStage2Decision ? 'REJECTED'
+            : approvedPendingApply ? 'APPROVED_PENDING_APPLY' : 'NONE';
+    const stage2PendingItems = stage2PendingCount && sourceRow && targetRow
+        ? [Object.freeze({
+            employee_kodikos: String(scope.employee_kodikos || rows[0]?.kodikos || ''),
+            week_start: dateKeyUtc(scope.week_start || repoTransfer.week?.start_date),
+            week_end: dateKeyUtc(scope.week_end || repoTransfer.week?.end_date),
+            reason_code: 'REPO_TRANSFER_DECISION_REQUIRED',
+            reasons: Object.freeze(['REPO_TRANSFER_DECISION_REQUIRED', ...repoReasons,
+                ...stage2Diagnostics]),
+            source: dailyStage2Item(sourceRow, repoTransfer.source?.current_category),
+            target: dailyStage2Item(targetRow, repoTransfer.target?.current_category),
+            proposal: Object.freeze({
+                source_new_classification: String(currentStage2Proposal?.source
+                    ?.proposed_classification || repoTransfer.source?.semantic_target_category || ''),
+                target_new_classification: String(currentStage2Proposal?.target
+                    ?.proposed_classification || repoTransfer.target?.semantic_target_category || '')
+            }),
+            decision_state: stage2DecisionState,
+            can_apply: persistedStage2DecisionState?.can_apply === true,
+            apply_state: String(persistedStage2DecisionState?.apply_state || 'NOT_APPROVED'),
+            decision_id: String(currentStage2Decision?.id || ''),
+            proposal_id: String(currentStage2Proposal?.command?.proposal_id || ''),
+            decision_command: currentStage2Proposal?.command
+                ? Object.freeze({ ...currentStage2Proposal.command }) : null,
+            canonical_source: currentStage2Proposal?.source
+                ? Object.freeze({ ...currentStage2Proposal.source,
+                    proposed_values: Object.freeze({
+                        ...(currentStage2Proposal.source.proposed_values || {})
+                    }) }) : null,
+            canonical_target: currentStage2Proposal?.target
+                ? Object.freeze({ ...currentStage2Proposal.target,
+                    proposed_values: Object.freeze({
+                        ...(currentStage2Proposal.target.proposed_values || {})
+                    }) }) : null
+        })] : [];
     const stage2 = stageResult('STAGE2', {
         business_status: stage2Blockers.length
             ? BUSINESS_STATUS.BLOCKED
-            : stage2ActionableForScope ? BUSINESS_STATUS.OPEN : BUSINESS_STATUS.COMPLETED,
+            : stage2ActionableForScope && !stage2ResolvedByDecision
+                ? BUSINESS_STATUS.OPEN : BUSINESS_STATUS.COMPLETED,
         pending_count: stage2PendingCount,
-        pending_dates: Object.freeze(stage2CandidateDates),
-        pending_reasons: Object.freeze(stage2ActionableForScope ? unique([
-            'REPO_TRANSFER_DECISION_REQUIRED', ...repoReasons
+        pending_dates: Object.freeze(stage2PendingCount ? stage2CandidateDates : []),
+        pending_items: Object.freeze(stage2PendingItems),
+        pending_reasons: Object.freeze(stage2PendingCount ? unique([
+            'REPO_TRANSFER_DECISION_REQUIRED', ...repoReasons, ...stage2Diagnostics
         ]) : []),
         blockers: Object.freeze(stage2Blockers),
         stage2_applicability: stage2ActionableForScope
@@ -318,7 +425,10 @@ function buildWeeklyHrLifecycleProjection({
         has_bounded_selection: stage2Actionability.has_bounded_selection,
         repo_transfer_status: repoTransfer.eligibility_status,
         repo_transfer_reasons: Object.freeze([...(repoTransfer.reasons || [])]),
-        unresolved_repo_count: afterStage1.unresolved_repo_count
+        unresolved_repo_count: afterStage1.unresolved_repo_count,
+        decision_state: stage2DecisionState,
+        can_apply: persistedStage2DecisionState?.can_apply === true,
+        apply_state: String(persistedStage2DecisionState?.apply_state || 'NOT_APPROVED')
     });
 
     const stage2ResolvedDates = unique((afterStage1.possible_leave_days || []).filter((date) =>
@@ -331,10 +441,12 @@ function buildWeeklyHrLifecycleProjection({
         ? resolveSafeNonFullNonWorkDates({ rows,
             candidateDates: afterStage1.remaining_possible_leave_days || [],
             effectiveProfile, effectiveProfilesByDate }) : [];
+    const rejectedTargetDate = rejectedStage2Decision
+        ? dateKeyUtc(repoTransfer.target?.hmeromhnia) : null;
     const stage2AutomaticResolvedDates = unique([
         ...stage2ResolvedDates,
         ...nonFullResolvedDates
-    ]).sort();
+    ]).filter((date) => date !== rejectedTargetDate).sort();
     const stage2AutomaticResolutionItems = stage2AutomaticResolvedDates.map((date) =>
         Object.freeze({ date,
             classification: nonFullResolvedDates.includes(date) ? 'NON_WORK' : 'REST_REPO',
@@ -342,7 +454,10 @@ function buildWeeklyHrLifecycleProjection({
                 ? 'STAGE1_REVIEWED_NON_FULL_WITHOUT_ACTUAL_WORK'
                 : 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }));
     const stage3Dates = resolveStage3ActionableDates({
-        rawRemainingDates: afterStage1.remaining_possible_leave_days || [],
+        rawRemainingDates: unique([
+            ...(afterStage1.remaining_possible_leave_days || []),
+            rejectedTargetDate
+        ]),
         stage2ResolvedDates: stage2AutomaticResolvedDates
     });
     const rawRemainingDates = stage3Dates.raw;
@@ -466,7 +581,13 @@ function buildWeeklyHrLifecycleProjection({
     const totalPending = Number(activeStage?.pending_count || 0);
     const stage1NoClassificationPreviewItems = buildStage1NoClassificationPreviewItems({
         rows, possibleDates: stage1PendingDates, effectiveProfile, effectiveProfilesByDate,
-        repoTransfer, stage2Actionability, stage2ResolvedDates
+        repoTransfer,
+        stage2Actionability: rejectedStage2Decision
+            ? { ...stage2Actionability, has_transferable_pair: false }
+            : stage2Actionability,
+        stage2ResolvedDates: rejectedStage2Decision
+            ? stage2ResolvedDates.filter((date) => date !== rejectedTargetDate)
+            : stage2ResolvedDates
     });
     return Object.freeze({
         projection_version: 'weekly-hr-derived-lifecycle:v1',

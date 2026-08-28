@@ -143,6 +143,38 @@ async function testManyProposalsKeepConstantQueryCounts() {
     assert.strictEqual(counter.filters.decisions.ypokatasthma, '0000');
 }
 
+async function testUndecidedCurrentProposalRetainsIdentityAndCommand() {
+    const rows = week('2026-07-06', '0001');
+    const { result, counter } = await load(rows, [], [], {
+        apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12',
+        ypokatasthma: '0000', kodikos: '0001'
+    });
+    const record = result.records[0];
+    assert.strictEqual(record.current_decision, null);
+    assert.ok(record.current_proposal_fingerprint);
+    assert.strictEqual(record.current_proposal.employee_kodikos, '0001');
+    assert.strictEqual(record.current_proposal.week_start, '2026-07-06');
+    assert.strictEqual(record.current_proposal.week_end, '2026-07-12');
+    assert.strictEqual(record.current_proposal.command.proposal_id, record.proposal_id);
+    assert.ok(record.current_proposal.command.expected_source_id);
+    assert.ok(record.current_proposal.command.expected_target_id);
+    assert.ok(record.current_proposal.command.expected_proposal_version);
+    assert.ok(record.current_proposal.command.expected_choice_code);
+    assert.strictEqual(record.current_proposal.source.current_category, 'ΑΝ');
+    assert.strictEqual(record.current_proposal.source.proposed_classification, 'ΕΡΓ');
+    assert.strictEqual(
+        record.current_proposal.source.proposed_values.kathgoria_ergasias_apologistika,
+        'ΕΡΓ'
+    );
+    assert.strictEqual(record.current_proposal.target.current_category, 'ΕΡΓ');
+    assert.strictEqual(record.current_proposal.target.proposed_classification, 'ΑΝ');
+    assert.strictEqual(
+        record.current_proposal.target.proposed_values.kathgoria_ergasias_apologistika,
+        'ΑΝ'
+    );
+    assert.strictEqual(counter.filters.rows.kodikos, '0001');
+}
+
 async function testCurrentAndHistoricalAssociationIsSafe() {
     const rows = week('2026-07-06', '0001');
     const initial = await load(rows);
@@ -186,6 +218,8 @@ async function testReadyAndHistoricalExecutionPrecedence() {
         runtimeStateLoader: async () => ({ enabled: true }), indexStateLoader: async () => ({ ready: true })
     });
     assert.strictEqual(ready.records[0].apply_state, 'READY_TO_APPLY');
+    assert.strictEqual(ready.records[0].current_proposal_fingerprint, 'current');
+    assert.strictEqual(ready.records[0].current_decision_fingerprint, 'current');
     assert.strictEqual(ready.records[0].can_apply, true);
     assert.strictEqual(ready.records[0].apply_allowed, true);
     assert.deepStrictEqual(ready.records[0].apply_readiness, { status: 'READY', reason: null });
@@ -448,6 +482,7 @@ async function testFirstCrossMonthWeekUsesMondayReadContextOnly() {
 async function run() {
     await testZeroProposalsUsesOneBatchOfQueries();
     await testManyProposalsKeepConstantQueryCounts();
+    await testUndecidedCurrentProposalRetainsIdentityAndCommand();
     await testCurrentAndHistoricalAssociationIsSafe();
     await testReadyAndHistoricalExecutionPrecedence();
     await testApprovedCapabilityFailsClosedForRuntimeIndexesAndStaleData();
