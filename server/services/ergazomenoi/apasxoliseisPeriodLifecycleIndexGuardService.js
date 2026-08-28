@@ -7,7 +7,7 @@ const BalanceModel = require('../../models/apasxoliseisCorrectivePayrollBalance'
 const { ApasxolhseisModel } = require('../../models/kinhseis');
 
 const REQUIRED_INDEXES = Object.freeze([
-    Object.freeze({ model: 'frozen', name: 'unique_apasxoliseis_frozen_snapshot_scope', unique: true }),
+    Object.freeze({ model: 'frozen', name: 'unique_apasxoliseis_frozen_snapshot_scope_version', unique: true }),
     Object.freeze({ model: 'frozen', name: 'unique_apasxoliseis_finalize_request', unique: true }),
     Object.freeze({ model: 'corrective', name: 'unique_active_apasxoliseis_corrective_case', unique: true }),
     Object.freeze({ model: 'corrective', name: 'unique_apasxoliseis_corrective_case_id', unique: true }),

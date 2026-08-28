@@ -31,8 +31,9 @@ const schema = new Schema({
     autoIndex: false, autoCreate: false
 });
 
-schema.index({ team: 1, company_kod: 1, ypokatasthma: 1, period_start: 1, period_end: 1 },
-    { unique: true, name: 'unique_apasxoliseis_frozen_snapshot_scope' });
+schema.index({ team: 1, company_kod: 1, ypokatasthma: 1, period_start: 1, period_end: 1,
+    historical_reconstruction_version: 1 },
+    { unique: true, name: 'unique_apasxoliseis_frozen_snapshot_scope_version' });
 schema.index({ team: 1, company_kod: 1, request_id: 1 },
     { unique: true, name: 'unique_apasxoliseis_finalize_request' });
 

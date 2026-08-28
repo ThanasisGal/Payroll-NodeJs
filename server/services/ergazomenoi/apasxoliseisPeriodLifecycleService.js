@@ -61,14 +61,29 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
                     'Η παρωχημένη ιστορική ανακατασκευή πρέπει πρώτα να επανεκτιμηθεί.');
             }
         }
+        const historicalReconstructionVersion = Number(control.historical_reconstruction_version || 0);
+        const existingVersion = await frozenModel.findOne({ ...scope,
+            historical_reconstruction_version: historicalReconstructionVersion }).session(dbSession).lean();
+        if (existingVersion) throw periodError('PERIOD_FROZEN_SNAPSHOT_VERSION_CONFLICT', 409,
+            'Υπάρχει ήδη παγωμένο αποτέλεσμα για την ίδια έκδοση ιστορικής ανακατασκευής.');
         const baselineOrigin = control.historical_reconstruction_status === 'COMPLETED'
             ? 'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE' : 'NORMAL';
-        const documents = await frozenModel.create([{ ...scope, ...built, frozen_snapshot: built.snapshot,
-            finalized_at: now, finalized_by_user_id: by.user_id, finalized_by_user_name: by.user_name,
-            finalized_by_user_role: by.role, finalize_reason: cleanReason, request_id: cleanRequestId,
-            baseline_origin: baselineOrigin,
-            historical_reconstruction_version: Number(control.historical_reconstruction_version || 0),
-            created_at: now }], { session: dbSession });
+        let documents;
+        try {
+            documents = await frozenModel.create([{ ...scope, ...built, frozen_snapshot: built.snapshot,
+                finalized_at: now, finalized_by_user_id: by.user_id, finalized_by_user_name: by.user_name,
+                finalized_by_user_role: by.role, finalize_reason: cleanReason, request_id: cleanRequestId,
+                baseline_origin: baselineOrigin,
+                historical_reconstruction_version: historicalReconstructionVersion,
+                created_at: now }], { session: dbSession });
+        } catch (error) {
+            const scopeVersionConflict = error?.code === 11000 && (
+                error?.keyPattern?.historical_reconstruction_version === 1 ||
+                String(error?.message || '').includes('unique_apasxoliseis_frozen_snapshot_scope_version'));
+            if (scopeVersionConflict) throw periodError('PERIOD_FROZEN_SNAPSHOT_VERSION_CONFLICT', 409,
+                'Υπάρχει ήδη παγωμένο αποτέλεσμα για την ίδια έκδοση ιστορικής ανακατασκευής.');
+            throw error;
+        }
         const frozen = documents[0];
         const updated = await periodControlModel.findOneAndUpdate({ ...scope, status: 'LOCKED', version: control.version,
             active_calculation_id: mongoose.trusted({ $in: ['', null] }), frozen_snapshot_id: null }, { $set: {
@@ -83,7 +98,7 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
             actor_user_name: by.user_name, actor_user_role: by.role, reason: cleanReason,
             reference_id: String(frozen._id), details: { fingerprint: built.frozen_snapshot_fingerprint,
                 baseline_origin: baselineOrigin,
-                historical_reconstruction_version: Number(control.historical_reconstruction_version || 0) }, occurred_at: now }], { session: dbSession });
+                historical_reconstruction_version: historicalReconstructionVersion }, occurred_at: now }], { session: dbSession });
         return { idempotent: false, snapshot: frozen, control: updated };
     });
 }
