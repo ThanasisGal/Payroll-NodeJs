@@ -5,8 +5,13 @@ const {
     applySequentialPresentation,
     buildStage1NoClassificationPreviewItems,
     buildWeeklyHrLifecycleProjection,
+    buildFinalizedWeeklyHrLifecyclePresentation,
     resolveStage3ActionableDates
 } = require('./apasxoliseisWeeklyHrLifecycleProjectionService');
+const { buildEmploymentPeriodFrozenSnapshot } = require(
+    './apasxoliseisPeriodFrozenSnapshotService');
+const { deriveStage1PeriodSlice, buildStage1PeriodSliceFingerprints } = require(
+    './apasxoliseisStage1PeriodSliceService');
 const {
     analyzeWeeklySixthSeventhDay
 } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
@@ -553,6 +558,72 @@ assert.equal(completedJuneCross.stages.stage1.business_status, 'COMPLETED');
 assert.deepEqual(completedJuneCross.stages.stage3.pending_dates, []);
 assert.deepEqual(completedJuneCross.stages.stage3.stage2_automatic_resolved_dates,
     ['2026-06-29']);
+const junePersistedSlice = { status: 'OPEN', version: 4, period_slices: [{
+    period_start: '2026-06-01', period_end: '2026-06-30', status: 'COMPLETED',
+    context_fingerprint: juneCross.stages.stage1.current_context_fingerprint,
+    completion_fingerprint: juneCross.stages.stage1.current_completion_fingerprint,
+    effective_fingerprint: juneCross.stages.stage1.current_completion_fingerprint,
+    version: 1 }] };
+const julyContextChanged = structuredClone(crossMonth);
+Object.assign(julyContextChanged[2], { apologistiko_biblio: true,
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', ores_ergasias_apologistika: 8 });
+const liveJuneAfterJulyChange = buildWeeklyHrLifecycleProjection({
+    weekRows: julyContextChanged, effectiveProfile: profile, scope: crossScope,
+    periodScope: { period_start: '2026-06-01', period_end: '2026-06-30' },
+    persistedStage1State: junePersistedSlice
+});
+assert.equal(liveJuneAfterJulyChange.stages.stage1.business_status, 'STALE');
+const originalFinalizationRows = structuredClone(crossMonth);
+Object.assign(originalFinalizationRows[0], {
+    kathestos_apasxolhshs_hmeras: 'PLHRHS',
+    hmeres_apoysias_apologistika: 1,
+    apousia_apologistika: true
+});
+const originalSlice = deriveStage1PeriodSlice({ weekRows: originalFinalizationRows,
+    week_start: '2026-06-29', week_end: '2026-07-05',
+    period_start: '2026-06-01', period_end: '2026-06-30' });
+const originalFingerprints = buildStage1PeriodSliceFingerprints({
+    weekRows: originalFinalizationRows, slice: originalSlice });
+const frozenSnapshot = buildEmploymentPeriodFrozenSnapshot({
+    scope: { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+        period_start: '2026-06-01', period_end: '2026-06-30' },
+    dailyResults: originalFinalizationRows.slice(0, 2),
+    weeklyDailyResults: originalFinalizationRows,
+    employees: [{ kodikos: '0014', hmeres_ergasias_ebdomadas: 5 }]
+}).snapshot;
+const reducedFrozenRows = frozenSnapshot.weekly_calculation_context.rows;
+for (const missingField of ['kathestos_apasxolhshs_hmeras',
+    'hmeres_apoysias_apologistika', 'apousia_apologistika']) {
+    assert.equal(Object.hasOwn(reducedFrozenRows[0], missingField), false);
+}
+const frozenSlice = deriveStage1PeriodSlice({ weekRows: reducedFrozenRows,
+    week_start: '2026-06-29', week_end: '2026-07-05',
+    period_start: '2026-06-01', period_end: '2026-06-30' });
+const frozenFingerprints = buildStage1PeriodSliceFingerprints({
+    weekRows: reducedFrozenRows, slice: frozenSlice });
+assert.notEqual(frozenFingerprints.context_fingerprint,
+    originalFingerprints.context_fingerprint);
+assert.notEqual(frozenFingerprints.completion_fingerprint,
+    originalFingerprints.completion_fingerprint);
+const reducedFrozenLifecycle = buildWeeklyHrLifecycleProjection({
+    weekRows: reducedFrozenRows, effectiveProfile: profile, scope: crossScope,
+    periodScope: { period_start: '2026-06-01', period_end: '2026-06-30' },
+    persistedStage1State: { status: 'OPEN', period_slices: [{
+        period_start: '2026-06-01', period_end: '2026-06-30', status: 'COMPLETED',
+        context_fingerprint: originalFingerprints.context_fingerprint,
+        completion_fingerprint: originalFingerprints.completion_fingerprint,
+        effective_fingerprint: originalFingerprints.completion_fingerprint }] }
+});
+assert.equal(reducedFrozenLifecycle.stages.stage1.business_status, 'STALE');
+const finalizedJune = buildFinalizedWeeklyHrLifecyclePresentation(reducedFrozenLifecycle);
+assert.equal(finalizedJune.current_stage, null);
+assert.equal(finalizedJune.total_pending_count, 0);
+assert.equal(finalizedJune.requires_hr_action, false);
+for (const stage of Object.values(finalizedJune.stages)) {
+    assert.equal(stage.business_status, 'COMPLETED');
+    assert.equal(stage.presentation_status, 'COMPLETED');
+    assert.equal(stage.pending_count, 0);
+}
 const julyCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMonth,
     effectiveProfile: profile, scope: crossScope,
     periodScope: { period_start: '2026-07-01', period_end: '2026-07-31' },

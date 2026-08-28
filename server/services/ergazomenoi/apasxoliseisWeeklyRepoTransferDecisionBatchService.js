@@ -64,6 +64,9 @@ function presentation(record, currentFingerprint) {
         notes: record.notes || '',
         created_by_user_name: record.created_by_user_name || '',
         created_at: record.created_at || null,
+        employee_kodikos: record.employee_kodikos || '',
+        week_start: record.week_start || null,
+        week_end: record.week_end || null,
         is_current: Boolean(currentFingerprint && record.snapshot_fingerprint === currentFingerprint)
     };
 }

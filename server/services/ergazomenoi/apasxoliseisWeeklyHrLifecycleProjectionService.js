@@ -603,6 +603,27 @@ function buildWeeklyHrLifecycleProjection({
     });
 }
 
+function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
+    const completedStages = Object.fromEntries(
+        ['stage1', 'stage2', 'stage3', 'stage4'].map((key, index) => {
+            const stage = projection?.stages?.[key] || {};
+            return [key, Object.freeze({ ...stage, stage: `STAGE${index + 1}`,
+                business_status: BUSINESS_STATUS.COMPLETED,
+                presentation_status: PRESENTATION_STATUS.COMPLETED,
+                persisted_status: BUSINESS_STATUS.COMPLETED,
+                enabled: true, open_by_default: false,
+                pending_count: 0, pending_dates: Object.freeze([]),
+                pending_items: Object.freeze([]), pending_reasons: Object.freeze([]),
+                blockers: Object.freeze([]) })];
+        })
+    );
+    return Object.freeze({ ...projection, finalized_authoritative: true,
+        persisted_stage1_status: BUSINESS_STATUS.COMPLETED,
+        current_stage: null, total_pending_count: 0, requires_hr_action: false,
+        stage1_no_classification_preview_items: Object.freeze([]),
+        stages: Object.freeze(completedStages) });
+}
+
 module.exports = {
     BUSINESS_STATUS,
     PRESENTATION_STATUS,
@@ -611,5 +632,6 @@ module.exports = {
     resolveSafeNonFullNonWorkDates,
     buildStage1NoClassificationPreviewItems,
     isSingleDayEmploymentWithoutReviewableActivity,
-    buildWeeklyHrLifecycleProjection
+    buildWeeklyHrLifecycleProjection,
+    buildFinalizedWeeklyHrLifecyclePresentation
 };

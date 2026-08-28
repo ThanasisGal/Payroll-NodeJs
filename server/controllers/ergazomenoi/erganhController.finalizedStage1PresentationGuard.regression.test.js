@@ -39,6 +39,16 @@ assert.match(presentationGuard, /'HISTORICAL_RECONSTRUCTION_STALE', 'FINALIZED'/
 assert.match(presentationGuard, /isWeekAllowedForEmploymentPeriod\(\{/);
 assert.match(presentationGuard, /required_authoritative_dates:/);
 assert.match(stage1Get, /assertActiveEmploymentReviewPeriodPresentationReadable\(/);
+assert.match(stage1Get, /loadFinalizedWeeklyHrPresentationSnapshot/);
+assert.match(stage1Get,
+    /presentationSnapshot\s*\?\s*buildFinalizedWeeklyHrLifecyclePresentation\([\s\S]*?: await buildWeeklyLifecycleWithStage2State/);
+const finalizedSource = section(
+    'async function loadFinalizedWeeklyHrPresentationSnapshot',
+    'async function loadWeeklyHrContext'
+);
+assert.match(finalizedSource, /state\.stored_status !== 'FINALIZED'/);
+assert.match(finalizedSource, /ApasxoliseisPeriodFrozenSnapshotModel\.findOne/);
+assert.match(finalizedSource, /return document\.frozen_snapshot/);
 assert.doesNotMatch(stage1Get, /assertActiveEmploymentReviewPeriodReadable\(/);
 assert.match(stage1Completion, /assertActiveEmploymentReviewPeriodReadable\(/);
 assert.match(stage2Completion, /assertActiveEmploymentReviewPeriodReadable\(/);

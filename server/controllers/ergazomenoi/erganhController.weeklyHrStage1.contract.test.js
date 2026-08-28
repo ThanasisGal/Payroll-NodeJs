@@ -46,8 +46,16 @@ assert.match(stage1Read, /card_intervals/);
 assert.match(stage1Read, /current_apologistiko_classification/);
 assert.match(stage1Read, /loadWeeklyRepoTransferDecisionBatch/);
 assert.match(stage1Read, /buildWeeklyLifecycleWithStage2State/);
+assert.match(stage1Read, /loadFinalizedWeeklyHrPresentationSnapshot/);
+assert.match(stage1Read, /presentationSnapshot/);
+assert.match(stage1Read, /buildFinalizedWeeklyHrLifecyclePresentation/);
 assert.match(stage1Read, /current_proposal_fingerprint/);
 assert.match(stage1Read, /current_proposal\?\.employee_kodikos/);
+const weeklyContext = controller.slice(controller.indexOf('async function loadWeeklyHrContext'),
+    controller.indexOf('async function loadWeeklyHrStage3DecisionContext'));
+assert.match(weeklyContext, /presentationSnapshot\?\.weekly_calculation_context\?\.rows/);
+assert.match(weeklyContext, /presentationSnapshot\?\.weekly_calculation_context\?\.profile_history/);
+assert.match(weeklyContext, /presentationSnapshot\?\.employees/);
 assert.match(controller, /static completeWeeklyHrWorkflowStage2/);
 assert.match(controller, /runWithStaleStage2MaterializationWriteFence/);
 assert.match(routes, /weekly-hr-workflow\/stage2\/complete'[\s\S]*requireCriticalEmploymentDecisionRole[\s\S]*completeWeeklyHrWorkflowStage2/);

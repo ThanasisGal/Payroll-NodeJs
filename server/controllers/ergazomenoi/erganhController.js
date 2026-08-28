@@ -396,7 +396,8 @@ const {
     buildWeeklyHrWorkflowProjection
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowProjectionService');
 const {
-    buildWeeklyHrLifecycleProjection
+    buildWeeklyHrLifecycleProjection,
+    buildFinalizedWeeklyHrLifecyclePresentation
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildWeeklyLifecycleWithStage2State } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleStage2StateService'
@@ -4333,7 +4334,25 @@ function normalizeNaturalWeek(startValue, endValue) {
     return { start, end, startKey, endKey };
 }
 
-async function loadWeeklyHrContext({ req, input, session = null }) {
+async function loadFinalizedWeeklyHrPresentationSnapshot(req, input = {}) {
+    if (!input.period_start || !input.period_end || !input.ypokatasthma) return null;
+    const scope = await activeEmploymentReviewPeriodScope(req, input.ypokatasthma);
+    if (dateKeyUtc(scope.period_start) !== dateKeyUtc(input.period_start) ||
+        dateKeyUtc(scope.period_end) !== dateKeyUtc(input.period_end)) return null;
+    const state = await getPeriodControl({ scope });
+    if (state.stored_status !== 'FINALIZED' || !state.frozen_snapshot_id) return null;
+    const document = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
+        _id: state.frozen_snapshot_id, ...scope
+    }).lean();
+    if (!document?.frozen_snapshot) throw weeklyHrApiError(
+        'FINALIZED_SNAPSHOT_MISSING', 409,
+        'Η οριστικοποιημένη περίοδος δεν διαθέτει παγωμένο αποτέλεσμα.'
+    );
+    return document.frozen_snapshot;
+}
+
+async function loadWeeklyHrContext({ req, input, session = null,
+    presentationSnapshot = null }) {
     const branch = String(input.ypokatasthma || '').trim().padStart(4, '0');
     const employeeId = String(input.employee_id || '').trim();
     const week = normalizeNaturalWeek(input.week_start, input.week_end);
@@ -4343,17 +4362,33 @@ async function loadWeeklyHrContext({ req, input, session = null }) {
     const base = { team: req.session.userTeam, company_kod: String(req.session.companyInUse || ''),
         ypokatasthma: branch };
     const applySession = (query) => session ? query.session(session) : query;
-    const employee = await applySession(ErgazomenoiModel.findOne({ ...base, _id: employeeId })
+    const liveEmployee = await applySession(ErgazomenoiModel.findOne({ ...base, _id: employeeId })
         .select(`${CANONICAL_EMPLOYEE_PROFILE_FIELDS} eponymo onoma ` +
             'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')).lean();
-    if (!employee) throw weeklyHrApiError('WEEKLY_HR_EMPLOYEE_NOT_FOUND', 404,
+    if (!liveEmployee) throw weeklyHrApiError('WEEKLY_HR_EMPLOYEE_NOT_FOUND', 404,
         'Ο εργαζόμενος δεν βρέθηκε στο ενεργό εταιρικό πλαίσιο.');
-    const loadedRows = await applySession(ProdhlomenaOrariaModel.find({ ...base,
-        kodikos: employee.kodikos, hmeromhnia: mongoose.trusted({ $gte: week.start, $lte: week.end }) })
-        .select(REVIEW_SELECT_FIELDS).sort({ hmeromhnia: 1 })).lean();
-    const histories = await applySession(IstorikoProslhpseonAllagonModel.find({
-        team: base.team, company_kod: base.company_kod, kodikos: employee.kodikos
-    }).select(CANONICAL_HISTORY_SELECT_FIELDS).sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 })).lean();
+    const frozenEmployee = (presentationSnapshot?.employees || []).find((candidate) =>
+        String(candidate.kodikos || '') === String(liveEmployee.kodikos || '')) || null;
+    const employee = frozenEmployee ? { ...liveEmployee, ...frozenEmployee,
+        _id: liveEmployee._id, eponymo: liveEmployee.eponymo, onoma: liveEmployee.onoma } : liveEmployee;
+    const frozenRows = presentationSnapshot?.weekly_calculation_context?.rows;
+    const loadedRows = Array.isArray(frozenRows)
+        ? frozenRows.filter((row) => String(row.ypokatasthma || '').padStart(4, '0') === branch &&
+            String(row.kodikos || '') === String(employee.kodikos || '') &&
+            dateKeyUtc(row.hmeromhnia) >= week.startKey && dateKeyUtc(row.hmeromhnia) <= week.endKey)
+            .sort((a, b) => dateKeyUtc(a.hmeromhnia).localeCompare(dateKeyUtc(b.hmeromhnia)))
+        : await applySession(ProdhlomenaOrariaModel.find({ ...base,
+            kodikos: employee.kodikos,
+            hmeromhnia: mongoose.trusted({ $gte: week.start, $lte: week.end }) })
+            .select(REVIEW_SELECT_FIELDS).sort({ hmeromhnia: 1 })).lean();
+    const frozenHistories = presentationSnapshot?.weekly_calculation_context?.profile_history;
+    const histories = Array.isArray(frozenHistories)
+        ? frozenHistories.filter((row) => String(row.kodikos || '') ===
+            String(employee.kodikos || ''))
+        : await applySession(IstorikoProslhpseonAllagonModel.find({
+            team: base.team, company_kod: base.company_kod, kodikos: employee.kodikos
+        }).select(CANONICAL_HISTORY_SELECT_FIELDS)
+            .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 })).lean();
     const employmentDateScope = deriveEmploymentOwnedDateScope({
         natural_week_start: week.startKey,
         natural_week_end: week.endKey,
@@ -10681,7 +10716,10 @@ class erganhController {
 
     static getWeeklyHrWorkflowStage1 = async (req, res) => {
         try {
-            const context = await loadWeeklyHrContext({ req, input: req.query });
+            const presentationSnapshot = await loadFinalizedWeeklyHrPresentationSnapshot(
+                req, req.query);
+            const context = await loadWeeklyHrContext({ req, input: req.query,
+                presentationSnapshot });
             await assertActiveEmploymentReviewPeriodPresentationReadable(
                 req, context.base.ypokatasthma, {
                 kind: 'WEEKLY_CONTEXT', start: context.week.start, end: context.week.end,
@@ -10717,26 +10755,29 @@ class erganhController {
                 periodScope,
                 employmentDateScope: context.employmentDateScope
             };
-            const lifecycleProjection = await buildWeeklyLifecycleWithStage2State({
-                projectionInput: lifecycleInput,
-                buildProjection: buildWeeklyHrLifecycleProjection,
-                loadStage2State: async () => {
-                    const batch = await loadWeeklyRepoTransferDecisionBatch({
-                        session: req.session,
-                        filters: { apo_hmeromhnia: context.week.startKey,
-                            eos_hmeromhnia: context.week.endKey,
-                            ypokatasthma: context.base.ypokatasthma,
-                            kodikos: context.employee.kodikos }
-                    });
-                    return (batch.records || []).find((record) =>
-                        Boolean(record?.current_proposal_fingerprint) &&
-                        String(record.current_proposal?.employee_kodikos || '') ===
-                            String(context.employee.kodikos || '') &&
-                        dateKeyUtc(record.current_proposal?.week_start) === context.week.startKey &&
-                        dateKeyUtc(record.current_proposal?.week_end) === context.week.endKey
-                    ) || null;
-                }
-            });
+            const lifecycleProjection = presentationSnapshot
+                ? buildFinalizedWeeklyHrLifecyclePresentation(
+                    buildWeeklyHrLifecycleProjection(lifecycleInput))
+                : await buildWeeklyLifecycleWithStage2State({
+                    projectionInput: lifecycleInput,
+                    buildProjection: buildWeeklyHrLifecycleProjection,
+                    loadStage2State: async () => {
+                        const batch = await loadWeeklyRepoTransferDecisionBatch({
+                            session: req.session,
+                            filters: { apo_hmeromhnia: context.week.startKey,
+                                eos_hmeromhnia: context.week.endKey,
+                                ypokatasthma: context.base.ypokatasthma,
+                                kodikos: context.employee.kodikos }
+                        });
+                        return (batch.records || []).find((record) =>
+                            Boolean(record?.current_proposal_fingerprint) &&
+                            String(record.current_proposal?.employee_kodikos || '') ===
+                                String(context.employee.kodikos || '') &&
+                            dateKeyUtc(record.current_proposal?.week_start) === context.week.startKey &&
+                            dateKeyUtc(record.current_proposal?.week_end) === context.week.endKey
+                        ) || null;
+                    }
+                });
             const stage1DailyPresentation = context.rows.map((row) => {
                 const rowDate = dateKeyUtc(row.hmeromhnia);
                 const dailyProfile = context.effectiveProfilesByDate[rowDate] ||
