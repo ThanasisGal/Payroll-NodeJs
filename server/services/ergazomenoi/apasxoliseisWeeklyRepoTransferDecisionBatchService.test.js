@@ -4,6 +4,8 @@ const {
     validateBatchFilters,
     loadWeeklyRepoTransferDecisionBatch
 } = require('./apasxoliseisWeeklyRepoTransferDecisionBatchService');
+const { buildWeeklyHrLifecycleProjection } = require(
+    './apasxoliseisWeeklyHrLifecycleProjectionService');
 
 function query(result, counter, name) {
     counter[name] = (counter[name] || 0) + 1;
@@ -180,7 +182,11 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
     const initial = await load(rows);
     const proposalId = initial.result.records[0].proposal_id;
     const decisions = [
-        { _id: new mongoose.Types.ObjectId(), proposal_id: proposalId, snapshot_fingerprint: 'current', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', created_by_user_name: 'Current HR', created_at: new Date('2026-07-02') },
+        { _id: new mongoose.Types.ObjectId(), proposal_id: proposalId,
+            snapshot_fingerprint: 'current', decision_code: 'APPROVE_PROPOSAL',
+            decision_status: 'RECORDED', employee_kodikos: '0001',
+            week_start: date('2026-07-06', 0), week_end: date('2026-07-06', 6),
+            created_by_user_name: 'Current HR', created_at: new Date('2026-07-02') },
         { _id: new mongoose.Types.ObjectId(), proposal_id: proposalId, snapshot_fingerprint: 'old', decision_code: 'REJECT_PROPOSAL', decision_status: 'RECORDED', created_by_user_name: 'Old HR', created_at: new Date('2026-07-01') }
     ];
     const deps = dependencies(rows, decisions);
@@ -192,6 +198,12 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
         snapshotFingerprintBuilder: () => 'current'
     });
     assert.strictEqual(result.records[0].current_decision.decision_code, 'APPROVE_PROPOSAL');
+    assert.strictEqual(result.records[0].current_decision.employee_kodikos, '0001');
+    assert.strictEqual(result.records[0].current_decision.week_start.toISOString().slice(0, 10),
+        '2026-07-06');
+    assert.strictEqual(result.records[0].current_decision.week_end.toISOString().slice(0, 10),
+        '2026-07-12');
+    assert.strictEqual(result.records[0].current_decision.is_current, true);
     assert.strictEqual(result.records[0].history_count, 2);
     assert.strictEqual(deps.counter.executions, 1);
     assert.strictEqual(result.records[0].apply_state, 'RUNTIME_DISABLED');
@@ -199,6 +211,18 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
     assert.strictEqual(result.records[0].apply_allowed, false);
     assert.deepStrictEqual(result.records[0].apply_readiness, { status: 'BLOCKED', reason: 'RUNTIME_DISABLED' });
     assert.strictEqual(result.records[0].runtime_enabled, false);
+    const lifecycle = buildWeeklyHrLifecycleProjection({ weekRows: rows,
+        effectiveProfile: { kathestos_apasxolhshs: 'PLHRHS',
+            typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5,
+            mo_oron_hmerhsias_ergasias: 8 },
+        scope: { team: 'THA', company_kod: session.companyInUse,
+            ypokatasthma: '0000', employee_kodikos: '0001',
+            week_start: '2026-07-06', week_end: '2026-07-12' },
+        persistedStage2DecisionState: result.records[0] });
+    assert.strictEqual(lifecycle.stages.stage2.decision_state,
+        'APPROVED_PENDING_APPLY');
+    assert.strictEqual(lifecycle.stages.stage2.apply_state, 'RUNTIME_DISABLED');
+    assert.strictEqual(lifecycle.stages.stage3.presentation_status, 'LOCKED');
     assert.deepStrictEqual(result.records[0].history.map((entry) => entry.is_current), [true, false]);
     assert.ok(!JSON.stringify(result).includes('snapshot_fingerprint'));
     assert.ok(!JSON.stringify(result).includes('canonical_snapshot'));
