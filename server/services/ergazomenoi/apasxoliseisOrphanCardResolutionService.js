@@ -15,6 +15,8 @@ const {
 } = require('./apasxoliseisRestPeriodPolicyService');
 
 const POLICY_VERSION = 'orphan-card-continuous:v1';
+const LEGACY_REUSABLE_ORPHAN_REASON =
+    'Εφαρμογή προϋπάρχουσας έγκρισης σε μελλοντική όμοια περίπτωση.';
 const ORPHAN_RULE = Object.freeze({
     ACTUAL_START_PLUS_DECLARED_DURATION: 'ACTUAL_START_PLUS_DECLARED_DURATION',
     ACTUAL_END_MINUS_DECLARED_DURATION: 'ACTUAL_END_MINUS_DECLARED_DURATION',
@@ -332,14 +334,22 @@ function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
                 criteria.schedule_kind === base.scheduleKind &&
                 criteria.rule === base.rule && from <= rowDate && (!to || to >= rowDate);
         });
-        return { ...row, orphan_card_resolution_preview: resolveOrphanCardResolution({
+        const preview = resolveOrphanCardResolution({
             row, contextRows: employeeRows,
             reusableRule: approval?.reuse_match_criteria?.criteria || null
-        }) };
+        });
+        return { ...row, orphan_card_resolution_preview: {
+            ...preview,
+            ...(preview.automaticReusableApplied ? {
+                reusableDecisionReason: String(approval?.notes || '').trim() ||
+                    LEGACY_REUSABLE_ORPHAN_REASON
+            } : {})
+        } };
     });
 }
 
 module.exports = { POLICY_VERSION, ORPHAN_RULE, SCHEDULE_KIND, RESOLUTION_SCOPE,
+    LEGACY_REUSABLE_ORPHAN_REASON,
     resolveContinuousDeclaredSchedule, resolveAverageFallback,
     resolveEffectiveBreakContext,
     buildProposal, authoritativeWorkIntervals, evaluateRestRisk,

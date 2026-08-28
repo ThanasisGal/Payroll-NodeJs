@@ -8575,6 +8575,7 @@ function renderWeeklyHrOrphanItem(row = {}) {
 
 function weeklyHrStage1Counts() {
     const payloads = stage1PayloadsForDisplay();
+    const visiblePayloads = visibleWeeklyHrStage1Payloads();
     return { total: payloads.length,
         open: payloads.filter((item) => weeklyHrStage1BusinessStatus(item) === 'OPEN').length,
         stale: payloads.filter((item) => weeklyHrStage1BusinessStatus(item) === 'STALE').length,
@@ -8582,8 +8583,27 @@ function weeklyHrStage1Counts() {
             weeklyHrStage1BusinessStatus(item) === 'COMPLETED').length,
         blocked: payloads.filter((item) =>
             weeklyHrStage1BusinessStatus(item) === 'BLOCKED').length,
-        selected: [...weeklyHrStage1Selected].filter((key) =>
-            isWeeklyHrStage1Eligible(weeklyHrStage1Payloads.get(key))).length };
+        visible: visiblePayloads.length,
+        selected: visiblePayloads.filter((payload) => {
+            const key = weeklyHrStage1Key(payload.scope);
+            return weeklyHrStage1Selected.has(key) && isWeeklyHrStage1Eligible(payload);
+        }).length };
+}
+
+function visibleWeeklyHrStage1Payloads() {
+    return stage1ApplyDisplayFilters(
+        stage1PayloadsForDisplay().sort(compareWeeklyHrStage1Payloads)
+    ).map(({ payload }) => payload);
+}
+
+function pruneHiddenWeeklyHrStage1Selections() {
+    const visibleEligibleKeys = new Set(visibleWeeklyHrStage1Payloads()
+        .filter(isWeeklyHrStage1Eligible)
+        .map((payload) => weeklyHrStage1Key(payload.scope)));
+    [...weeklyHrStage1Selected].forEach((key) => {
+        if (!visibleEligibleKeys.has(key)) weeklyHrStage1Selected.delete(key);
+    });
+    return visibleEligibleKeys;
 }
 
 const workflowStageNames = Object.freeze({
@@ -8793,6 +8813,26 @@ function findStage3PendingItem(rowId) {
         .find((item) => String(item.row_id) === String(rowId));
 }
 
+function focusWeeklyHrStage1StaleAfterStage3Save() {
+    const staleCount = stage1PayloadsForDisplay().filter((payload) =>
+        weeklyHrStage1BusinessStatus(payload) === 'STALE').length;
+    if (!staleCount) return 0;
+    Object.assign(stage1DisplayFilters, {
+        open: false, stale: true, completed: false, blocked: false,
+        leave: false, sickness: false, absence: false
+    });
+    weeklyHrStage1Selected.clear();
+    pruneHiddenWeeklyHrStage1Selections();
+    renderWeeklyHrStage1Presentation();
+    const stage1Collapse = document.querySelector(
+        '[data-workflow-stage="STAGE1"] .accordion-collapse'
+    );
+    if (stage1Collapse) {
+        bootstrap.Collapse.getOrCreateInstance(stage1Collapse, { toggle: false }).show();
+    }
+    return staleCount;
+}
+
 async function submitWeeklyHrStage3Decision(rowId) {
     const item = findStage3PendingItem(rowId);
     const row = document.querySelector(`[data-stage3-row-id="${CSS.escape(String(rowId))}"]`);
@@ -8834,10 +8874,14 @@ async function submitWeeklyHrStage3Decision(rowId) {
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message ||
             'Η απόφαση Stage 3 δεν αποθηκεύτηκε.');
-        await refreshWeeklyHrStage1Scope({ ypokatasthma: item.ypokatasthma,
-            employee_id: item.employee_id, employee_kodikos: item.employee_kodikos,
-            week_start: item.week_start, week_end: item.week_end });
-        await employmentReviewSwal({ icon: 'success', title: 'Η απόφαση αποθηκεύτηκε.' });
+        await loadResults();
+        const staleCount = focusWeeklyHrStage1StaleAfterStage3Save();
+        await employmentReviewSwal(staleCount > 0
+            ? { icon: 'warning', title: 'Απαιτείται επανέλεγχος Σταδίου 1',
+                text: staleCount === 1
+                    ? 'Η αλλαγή δημιούργησε 1 Παρωχημένη εβδομάδα στο Στάδιο 1. Επανελέγξτε και ολοκληρώστε την πριν συνεχίσετε.'
+                    : `Η αλλαγή δημιούργησε ${staleCount} Παρωχημένες εβδομάδες στο Στάδιο 1. Επανελέγξτε και ολοκληρώστε τις πριν συνεχίσετε.` }
+            : { icon: 'success', title: 'Η απόφαση αποθηκεύτηκε.' });
     } catch (error) {
         await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία', text: error.message });
         button.disabled = false;
@@ -8877,11 +8921,12 @@ function updateEmploymentReviewWorkflowPresentation() {
         if (!button || !header || !collapseElement) return;
         const presentationStatus = stage.presentation_status;
         const noHrAction = ['STAGE1', 'STAGE2', 'STAGE3'].includes(stage.stage) &&
+            stage.business_status === 'COMPLETED' &&
             Number(stage.pending_count || 0) === 0 &&
-            stage.business_status !== 'BLOCKED' &&
             presentationStatus !== 'LOCKED';
         const badgeStatus = stage.stage === 'STAGE4'
-            ? stage.business_status : presentationStatus;
+            ? (presentationStatus === 'LOCKED' ? 'LOCKED' : stage.business_status)
+            : presentationStatus;
         const badge = noHrAction
             ? '<span class="badge text-bg-success ms-2">' +
                 'ΔΕΝ ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ ΑΠΟ ΤΟ HR</span>'
@@ -8921,7 +8966,8 @@ function renderWeeklyHrStage1BulkToolbar() {
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterSickness" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="sickness" ${stage1DisplayFilters.sickness ? 'checked' : ''}><span class="form-check-label">Ασθένειες</span></label>
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterAbsence" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="absence" ${stage1DisplayFilters.absence ? 'checked' : ''}><span class="form-check-label">Απουσίες</span></label>
             </span>
-            <strong>Επιλεγμένες: <span id="weeklyHrStage1SelectedCount">${counts.selected}</span></strong>
+            <strong>Εμφανιζόμενες: <span id="weeklyHrStage1VisibleCount">${counts.visible}</span></strong>
+            <strong>Επιλεγμένες για ολοκλήρωση: <span id="weeklyHrStage1SelectedCount">${counts.selected}</span></strong>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center weekly-hr-legacy-bulk-controls">
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-select-all">Επιλογή όλων</button>
@@ -8996,11 +9042,7 @@ function renderWeeklyHrStage1Error(scope, error) {
 function renderWeeklyHrStage1Presentation() {
     const container = document.getElementById('weeklyHrStage1Container');
     if (!container) return;
-    const visibleKeys = new Set(visibleWeeklyHrPayloads()
-        .map((payload) => weeklyHrStage1Key(payload.scope)));
-    [...weeklyHrStage1Selected].forEach((key) => {
-        if (!visibleKeys.has(key)) weeklyHrStage1Selected.delete(key);
-    });
+    pruneHiddenWeeklyHrStage1Selections();
     const cards = stage1ApplyDisplayFilters(
         stage1PayloadsForDisplay().sort(compareWeeklyHrStage1Payloads)
     )
@@ -9228,8 +9270,9 @@ function renderWeeklyHrStage1BulkResult(result = {}) {
 
 async function completeWeeklyHrStage1BulkFromUi() {
     if (weeklyHrStage1BulkSubmitting) return;
+    const visibleEligibleKeys = pruneHiddenWeeklyHrStage1Selections();
     const selectedKeys = [...weeklyHrStage1Selected].filter((key) =>
-        isWeeklyHrStage1Eligible(weeklyHrStage1Payloads.get(key)));
+        visibleEligibleKeys.has(key));
     if (!selectedKeys.length) return;
     const prompt = await employmentReviewSwal({ title: 'Μαζική ολοκλήρωση Σταδίου 1',
         input: 'textarea', inputLabel: 'Κοινή αιτιολογία', showCancelButton: true,
@@ -9300,8 +9343,10 @@ document.addEventListener('click', (event) => {
         saveStage1DailyClassificationDrafts(); return;
     }
     if (event.target.closest('.weekly-hr-select-all')) {
-        weeklyHrStage1Payloads.forEach((payload, key) => {
-            if (isWeeklyHrStage1Eligible(payload)) weeklyHrStage1Selected.add(key);
+        visibleWeeklyHrStage1Payloads().forEach((payload) => {
+            if (isWeeklyHrStage1Eligible(payload)) {
+                weeklyHrStage1Selected.add(weeklyHrStage1Key(payload.scope));
+            }
         });
         document.querySelectorAll('.weekly-hr-stage1-select:not(:disabled)')
             .forEach((input) => { input.checked = true; });
@@ -9335,6 +9380,7 @@ document.addEventListener('change', (event) => {
         const filterName = displayFilter.dataset.stage1Filter;
         if (Object.prototype.hasOwnProperty.call(stage1DisplayFilters, filterName)) {
             stage1DisplayFilters[filterName] = displayFilter.checked;
+            pruneHiddenWeeklyHrStage1Selections();
             renderWeeklyHrStage1Presentation();
         }
         return;
@@ -9909,6 +9955,7 @@ function applyOrphanDerivedPreview(row, derivedPreview) {
 }
 
 async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = false } = {}) {
+    const currentPreview = orphanResolutionPreviewRow(row)?.orphan_card_resolution_preview || {};
     const explicitApprovalChecked = preserveExplicitApproval &&
         document.getElementById('orphanResolutionApprove')?.checked === true;
     const start = document.getElementById('edit_apo_ora_01_apologistika')?.value || '';
@@ -9924,7 +9971,14 @@ async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = 
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Αποτυχία ελέγχου 11ώρου.');
     const draft = {
-        orphan_card_resolution_preview: payload.preview,
+        orphan_card_resolution_preview: {
+            ...payload.preview,
+            ...(currentPreview.automaticReusableApplied ? {
+                automaticReusableApplied: true,
+                canAutomaticReuse: true,
+                reusableDecisionReason: currentPreview.reusableDecisionReason
+            } : {})
+        },
         orphan_derived_preview: payload.derived_preview || null
     };
     orphanResolutionPreviewDrafts.set(row, draft);
@@ -10268,6 +10322,9 @@ function validateReviewSave(updates) {
 }
 
 function showDetailsModal(row) {
+    const reusableOrphanReason = row?.orphan_card_resolution_preview
+        ?.automaticReusableApplied === true
+        ? String(row.orphan_card_resolution_preview.reusableDecisionReason || '') : '';
     const html = `
     <div class="container-fluid">
 
@@ -10324,7 +10381,8 @@ function showDetailsModal(row) {
         <div class="review-modal-section">
             <div class="review-modal-section-title">Αιτιολογία Αλλαγής</div>
 
-            <textarea id="edit_reason" class="form-control" rows="3"></textarea>
+            <textarea id="edit_reason" class="form-control" rows="3"
+                ${reusableOrphanReason ? 'readonly' : ''}>${escapeHtml(reusableOrphanReason)}</textarea>
 
             <div class="d-flex gap-2 mt-3">
                 ${

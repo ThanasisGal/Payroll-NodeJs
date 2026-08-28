@@ -803,7 +803,7 @@ function buildOrphanReusableIdentityVariants(criteria) {
     );
 }
 
-async function createOrphanReusablePolicyDecisionRecord({ session, row, rule, dbSession = null,
+async function createOrphanReusablePolicyDecisionRecord({ session, row, rule, reason = '', dbSession = null,
     approvalModel = ApasxoliseisPolicyPreviewApprovalsModel, now = new Date() }) {
     const scope = validateSessionScope(session);
     assertCriticalEmploymentDecisionRole(session);
@@ -841,6 +841,7 @@ async function createOrphanReusablePolicyDecisionRecord({ session, row, rule, db
         created_by_user_id: scope.created_by_user_id,
         created_by_user_name: scope.created_by_user_name,
         created_by_user_role: scope.created_by_user_role,
+        notes: toTrimmedString(reason, 2000),
         created_at: now, source: 'ORPHAN_CARD_HR_DECISION', client_payload_version: 'orphan:v1'
     };
     try {

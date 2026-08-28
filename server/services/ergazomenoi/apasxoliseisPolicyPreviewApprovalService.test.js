@@ -1055,12 +1055,14 @@ async function testOrphanReusablePolicyFoundation() {
         row: { _id: '507f1f77bcf86cd799439012', kodikos: '0004', ypokatasthma: '1',
             hmeromhnia: '2026-06-15', kathgoria_ergasias: 'ΑΝ' },
         rule,
+        reason: 'Η αρχική αιτιολογία HR',
         approvalModel
     });
     assert.strictEqual(createdDocument.reuse_match_criteria.criteria.rule,
         'ACTUAL_END_MINUS_EFFECTIVE_DAILY_AVERAGE');
     assert.strictEqual(createdDocument.active_policy_key.includes('0004'), false);
     assert.strictEqual(createdDocument.items[0].flags.raw_cards_preserved, true);
+    assert.strictEqual(createdDocument.notes, 'Η αρχική αιτιολογία HR');
 
     let lookupFilter;
     const found = { _id: 'matching' };

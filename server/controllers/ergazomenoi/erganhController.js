@@ -11357,6 +11357,7 @@ class erganhController {
                                 ? (dbSession) => createOrphanReusablePolicyDecisionRecord({
                                     session: req.session, row: oldRecord,
                                     rule: approvedOrphanResolution.reusableDecisionRule,
+                                    reason: String(reason).trim(),
                                     dbSession
                                 }) : null
                         });
