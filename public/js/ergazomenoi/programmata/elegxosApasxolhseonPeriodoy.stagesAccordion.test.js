@@ -274,12 +274,15 @@ assert.doesNotMatch(buttonRule, /(?:^|\n)\s*height\s*:\s*[0-9.]+(?:px|rem|vh|vw)
     stage2Container.querySelectorAll = () => [applyArticle];
     sandbox.userCanApplyRepoTransferDecision = () => true;
     let fallbackApplyGroup = null;
+    let successfulApplyCalls = 0;
     sandbox.submitRepoTransferApply = async (group) => {
+        successfulApplyCalls += 1;
         fallbackApplyGroup = group;
         return true;
     };
     assert.equal(sandbox.renderWeeklyHrStage2LifecycleFallback(approvedLifecycle), true);
     await applyButton.listener();
+    assert.equal(successfulApplyCalls, 1);
     assert.equal(loadResultsCalls.length, 3);
     assert.equal(fallbackErrors.length, 0);
     const sourceItem = fallbackApplyGroup.items.find((item) =>
@@ -297,5 +300,71 @@ assert.doesNotMatch(buttonRule, /(?:^|\n)\s*height\s*:\s*[0-9.]+(?:px|rem|vh|vw)
         batchShapedCurrentProposal.source.proposed_values);
     assert.deepEqual(targetItem.proposed_values,
         batchShapedCurrentProposal.target.proposed_values);
+
+    let decisionPostAttempts = 0;
+    fallbackErrors.length = 0;
+    sandbox.submitRepoTransferDecision = async () => {
+        decisionPostAttempts += 1;
+        throw new Error('decision submit failed');
+    };
+    await decisionButtons[0].listener();
+    assert.equal(decisionPostAttempts, 1);
+    assert.equal(fallbackErrors.at(-1).title, 'Δεν καταγράφηκε η απόφαση');
+
+    fallbackErrors.length = 0;
+    sandbox.submitRepoTransferDecision = async () => {
+        decisionPostAttempts += 1;
+        return true;
+    };
+    sandbox.loadResults = async () => { throw new Error('decision refresh failed'); };
+    await decisionButtons[1].listener();
+    assert.equal(decisionPostAttempts, 2);
+    assert.equal(fallbackErrors.at(-1).icon, 'warning');
+    assert.match(fallbackErrors.at(-1).title,
+        /Η απόφαση καταγράφηκε, αλλά η προβολή δεν ανανεώθηκε/);
+    assert.doesNotMatch(fallbackErrors.at(-1).title, /Δεν καταγράφηκε/);
+    assert.match(fallbackErrors.at(-1).text, /Αναζήτηση/);
+
+    let applyPostAttempts = 0;
+    let applyRefreshAttempts = 0;
+    fallbackErrors.length = 0;
+    sandbox.loadResults = async () => { applyRefreshAttempts += 1; };
+    sandbox.submitRepoTransferApply = async () => {
+        applyPostAttempts += 1;
+        return false;
+    };
+    await applyButton.listener();
+    assert.equal(applyPostAttempts, 1);
+    assert.equal(applyRefreshAttempts, 0);
+    assert.equal(fallbackErrors.length, 0);
+
+    fallbackErrors.length = 0;
+    sandbox.submitRepoTransferApply = async () => {
+        applyPostAttempts += 1;
+        throw new Error('apply submit failed');
+    };
+    await applyButton.listener();
+    assert.equal(applyPostAttempts, 2);
+    assert.equal(applyRefreshAttempts, 0);
+    assert.equal(fallbackErrors.length, 1);
+    assert.equal(fallbackErrors.at(-1).title, 'Δεν εφαρμόστηκε η μεταφορά');
+
+    fallbackErrors.length = 0;
+    sandbox.submitRepoTransferApply = async () => {
+        applyPostAttempts += 1;
+        return true;
+    };
+    sandbox.loadResults = async () => {
+        applyRefreshAttempts += 1;
+        throw new Error('apply refresh failed');
+    };
+    await applyButton.listener();
+    assert.equal(applyPostAttempts, 3);
+    assert.equal(applyRefreshAttempts, 1);
+    assert.equal(fallbackErrors.at(-1).icon, 'warning');
+    assert.match(fallbackErrors.at(-1).title,
+        /Η εφαρμογή ολοκληρώθηκε, αλλά η προβολή δεν ανανεώθηκε/);
+    assert.doesNotMatch(fallbackErrors.at(-1).title, /Δεν εφαρμόστηκε/);
+    assert.match(fallbackErrors.at(-1).text, /Αναζήτηση/);
     console.log('employment review four-stage accordion projection tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

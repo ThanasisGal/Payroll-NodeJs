@@ -8836,26 +8836,47 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
             article?.querySelectorAll?.('.stage2-lifecycle-decision-btn').forEach((button) =>
                 button.addEventListener('click', async () => {
                     if (button.disabled) return;
+                    let recorded = false;
                     try {
-                        const recorded = await submitRepoTransferDecision(group,
+                        recorded = await submitRepoTransferDecision(group,
                             String(button.dataset.decisionCode || ''), { mode: 'hr' });
-                        if (recorded === true) await loadResults();
                     } catch (error) {
                         await employmentReviewSwal({ icon: 'error',
                             title: 'Δεν καταγράφηκε η απόφαση',
                             text: error?.message || 'Η καταγραφή απέτυχε.' });
+                        return;
+                    }
+                    if (recorded === true) {
+                        try {
+                            await loadResults();
+                        } catch (_refreshError) {
+                            await employmentReviewSwal({ icon: 'warning',
+                                title: 'Η απόφαση καταγράφηκε, αλλά η προβολή δεν ανανεώθηκε.',
+                                text: 'Πατήστε ξανά “Αναζήτηση” πριν από οποιαδήποτε νέα ενέργεια.' });
+                        }
                     }
                 }));
             const applyButton = article?.querySelector?.('.stage2-lifecycle-apply-btn');
             applyButton?.addEventListener('click', async () => {
+                let applied = false;
                 try {
-                    const applied = await submitRepoTransferApply(
+                    applied = await submitRepoTransferApply(
                         group, item.decision_id, applyButton);
-                    if (applied === true) await loadResults();
                 } catch (error) {
                     await employmentReviewSwal({ icon: 'error',
                         title: 'Δεν εφαρμόστηκε η μεταφορά',
                         text: error?.message || 'Η εφαρμογή απέτυχε.' });
+                    return;
+                }
+                if (applied !== true) {
+                    return;
+                }
+                try {
+                    await loadResults();
+                } catch (_refreshError) {
+                    await employmentReviewSwal({ icon: 'warning',
+                        title: 'Η εφαρμογή ολοκληρώθηκε, αλλά η προβολή δεν ανανεώθηκε.',
+                        text: 'Πατήστε ξανά “Αναζήτηση” πριν από οποιαδήποτε νέα ενέργεια.' });
                 }
             });
         });
