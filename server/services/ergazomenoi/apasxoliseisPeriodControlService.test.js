@@ -42,6 +42,12 @@ const reconstructedWeek = { ...juneCrossMonth, period_control: {
     '2026-07-03', '2026-07-04', '2026-07-05'
 ] };
 assert.strictEqual(isWeekAllowedForEmploymentPeriod(reconstructedWeek), true);
+const lockedCompletedWeek = { ...reconstructedWeek,
+    period_control: { effective_mode: 'LOCKED',
+        historical_reconstruction_status: 'COMPLETED' } };
+assert.strictEqual(isWeekAllowedForEmploymentPeriod(lockedCompletedWeek), true);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...lockedCompletedWeek,
+    authoritative_row_dates: lockedCompletedWeek.authoritative_row_dates.slice(0, 6) }), false);
 const finalizedCompletedWeek = { ...reconstructedWeek,
     period_control: { effective_mode: 'FINALIZED',
         historical_reconstruction_status: 'COMPLETED' } };
@@ -155,6 +161,24 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     const staleReadable = await assertReviewReadablePeriod({ scope,
         stateResolver: staleStateResolver });
     assert.strictEqual(staleReadable.state.effective_mode, 'HISTORICAL_RECONSTRUCTION_STALE');
+    const lockedHistoricalProjection = projectPeriodControl({ scope, now: new Date('2026-08-14'),
+        record: { ...reconstructedRecord, status: 'LOCKED', version: 12 } });
+    assert.strictEqual(lockedHistoricalProjection.effective_mode, 'LOCKED');
+    assert.strictEqual(lockedHistoricalProjection.has_authoritative_calculation_result, true);
+    assert.strictEqual(lockedHistoricalProjection.can_finalize, true);
+    assert.strictEqual(lockedHistoricalProjection.can_unlock_period, true);
+    assert.strictEqual(lockedHistoricalProjection.can_record_decision, false);
+    assert.strictEqual(lockedHistoricalProjection.can_repo_transfer, false);
+    assert.strictEqual(lockedHistoricalProjection.can_manual_edit, false);
+    assert.strictEqual(lockedHistoricalProjection.can_calculate, false);
+    assert.strictEqual(lockedHistoricalProjection.can_historical_calculate, false);
+    const lockedReadable = await assertReviewReadablePeriod({ scope,
+        stateResolver: async () => lockedHistoricalProjection });
+    assert.strictEqual(lockedReadable.state.effective_mode, 'LOCKED');
+    await assert.rejects(() => assertReviewReadablePeriod({ scope,
+        stateResolver: async () => ({ ...lockedHistoricalProjection,
+            has_authoritative_calculation_result: false }) }),
+    (error) => error.code === 'PERIOD_CONTROL_REVIEW_NOT_AVAILABLE');
     await assert.rejects(() => assertReviewReadablePeriod({ scope,
         stateResolver: async () => ({ ...staleProjection, effective_mode: 'FINALIZED' }) }),
     (error) => error.code === 'PERIOD_CONTROL_REVIEW_NOT_AVAILABLE');
