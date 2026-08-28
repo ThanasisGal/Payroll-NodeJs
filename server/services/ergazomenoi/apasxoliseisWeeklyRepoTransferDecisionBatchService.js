@@ -166,11 +166,13 @@ async function loadWeeklyRepoTransferDecisionBatch({
     const auditModel = models.auditModel || ProdhlomenaOrariaAuditModel;
     const decisionModel = models.decisionModel || DecisionModel;
     const executionModel = models.executionModel || ExecutionModel;
+    const employeeCode = text(filters.kodikos, 50);
     const rowFilter = {
         team: scope.team,
         company_kod: scope.company_kod,
         ypokatasthma: normalized.ypokatasthma,
-        hmeromhnia: mongoose.trusted({ $gte: readContextStart, $lte: readContextEnd })
+        hmeromhnia: mongoose.trusted({ $gte: readContextStart, $lte: readContextEnd }),
+        ...(employeeCode ? { kodikos: employeeCode } : {})
     };
     const rows = await prodhlomenaModel.find(rowFilter)
         .select(ATOMIC_REPO_TRANSFER_ROW_FIELDS)
@@ -288,7 +290,6 @@ async function loadWeeklyRepoTransferDecisionBatch({
         week_start: mongoose.trusted({ $lte: normalized.end.date }),
         week_end: mongoose.trusted({ $gte: normalized.start.date })
     };
-    const employeeCode = text(filters.kodikos, 50);
     if (employeeCode) decisionFilter.employee_kodikos = employeeCode;
     const decisions = await decisionModel.find(decisionFilter)
         .select('-canonical_group_key -command_identity -request_id')
@@ -323,9 +324,17 @@ async function loadWeeklyRepoTransferDecisionBatch({
     }
     const currentProposalIds = new Set(current.map(({ group }) => String(group.group_id || '')));
     const currentRecords = current.map(({ group, fingerprint }) => {
+            const sourceItem = group.items.find((item) =>
+                item.role === 'SOURCE_BECOMES_WORK') || {};
+            const targetItem = group.items.find((item) =>
+                item.role === 'TARGET_BECOMES_REPO') || {};
+            const proposalWeekStart = group.group_key.match(/week=([^:|]+)/)?.[1] || '';
+            const proposalWeekEnd = group.group_key.match(/week=[^:|]+:([^|]+)/)?.[1] || '';
             const proposalDecisions = decisionsByProposalId.get(String(group.group_id || '')) || [];
             const history = proposalDecisions.map((decision) => presentation(decision, fingerprint));
             const rawCurrent = proposalDecisions.find((decision) => decision.snapshot_fingerprint === fingerprint) || null;
+            const currentDecisionExecution = rawCurrent
+                ? executionByDecisionId.get(String(rawCurrent._id)) || null : null;
             const executedDecision = proposalDecisions.find((decision) => executedDecisionIds.has(String(decision._id))) || null;
             const execution = executedDecision ? executionByDecisionId.get(String(executedDecision._id)) || null : null;
             let apply_state = 'NOT_APPROVED';
@@ -347,6 +356,39 @@ async function loadWeeklyRepoTransferDecisionBatch({
             } : null;
             return {
                 proposal_id: group.group_id,
+                current_proposal_fingerprint: fingerprint,
+                current_decision_fingerprint: rawCurrent?.snapshot_fingerprint || null,
+                current_proposal: {
+                    employee_kodikos: text(sourceItem.employee_kodikos ||
+                        targetItem.employee_kodikos, 50),
+                    week_start: proposalWeekStart >= normalized.start.key &&
+                        proposalWeekEnd <= normalized.end.key ? proposalWeekStart : null,
+                    week_end: proposalWeekStart >= normalized.start.key &&
+                        proposalWeekEnd <= normalized.end.key ? proposalWeekEnd : null,
+                    command: {
+                        proposal_id: group.group_id,
+                        expected_source_id: String(sourceItem.prodhlomena_oraria_id || ''),
+                        expected_target_id: String(targetItem.prodhlomena_oraria_id || ''),
+                        expected_proposal_version: String(
+                            group.pair_contract?.proposal_version || ''),
+                        expected_choice_code: String(group.pair_contract?.choice_code || '')
+                    },
+                    source: {
+                        prodhlomena_oraria_id: String(sourceItem.prodhlomena_oraria_id || ''),
+                        current_category: String(sourceItem.kathgoria_ergasias || ''),
+                        proposed_values: { ...(sourceItem.proposed_values || {}) },
+                        proposed_classification: String(sourceItem.proposed_values
+                            ?.kathgoria_ergasias_apologistika || '')
+                    },
+                    target: {
+                        prodhlomena_oraria_id: String(targetItem.prodhlomena_oraria_id || ''),
+                        current_category: String(targetItem.kathgoria_ergasias || ''),
+                        proposed_values: { ...(targetItem.proposed_values || {}) },
+                        proposed_classification: String(targetItem.proposed_values
+                            ?.kathgoria_ergasias_apologistika || '')
+                    }
+                },
+                current_decision_execution: executionPresentation(currentDecisionExecution),
                 current_decision: history.find((decision) => decision.is_current) || null,
                 current_execution: executionPresentation(execution),
                 applied_history: appliedHistoryPresentation(

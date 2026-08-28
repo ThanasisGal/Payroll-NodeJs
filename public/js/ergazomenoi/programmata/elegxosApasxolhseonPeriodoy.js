@@ -6707,9 +6707,9 @@ async function refreshRepoTransferDecisions() {
 }
 
 async function submitRepoTransferDecision(group, decisionCode, options = {}) {
-    if (!userCanRecordRepoTransferDecision()) return;
+    if (!userCanRecordRepoTransferDecision()) return false;
     const proposalId = String(group?.group_id || '');
-    if (!proposalId || repoTransferDecisionSubmitting.has(proposalId)) return;
+    if (!proposalId || repoTransferDecisionSubmitting.has(proposalId)) return false;
     const selectedBranch = String(currentPolicyPreviewBaseParams?.get('ypokatasthma') || '').trim();
     if (!selectedBranch || selectedBranch.toUpperCase() === 'ALL' || selectedBranch.includes(',')) {
         throw new Error('Για την καταγραφή απόφασης επιλέξτε συγκεκριμένο υποκατάστημα.');
@@ -6756,7 +6756,7 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
           }
         : { icon: 'warning', title: labels[decisionCode], html: '<div class="text-start"><div>Η απόφαση αφορά και τις δύο συνδεδεμένες αλλαγές της πρότασης.</div><div class="mt-2">Δεν θα εφαρμοστεί καμία αλλαγή στα Προδηλωμένα.</div></div>', input: 'textarea', inputLabel: 'Προαιρετικές σημειώσεις', inputAttributes: { maxlength: '2000' }, showCancelButton: true, confirmButtonText: 'Καταγραφή απόφασης', cancelButtonText: 'Άκυρο' };
     const confirmation = await employmentReviewSwal(confirmationOptions);
-    if (!confirmation.isConfirmed) return;
+    if (!confirmation.isConfirmed) return false;
     repoTransferDecisionSubmitting.add(proposalId);
     try {
         const token = await getPolicyPreviewCsrfToken();
@@ -6784,7 +6784,7 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
                     title: 'Η απόφαση καταγράφηκε',
                     text: 'Η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Αναζήτηση» για να δείτε την τρέχουσα κατάσταση.'
                 });
-                return;
+                return true;
             }
             classifyHrReviewGroups();
             renderHrReviewWorkspace();
@@ -6794,14 +6794,15 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
             renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
             await employmentReviewSwal({ icon: 'success', title: 'Η απόφαση καταγράφηκε', text: 'Η απόφαση αφορά ολόκληρη τη συνδεδεμένη πρόταση. Δεν έγινε αλλαγή στα Προδηλωμένα.' });
         }
+        return true;
     } finally { repoTransferDecisionSubmitting.delete(proposalId); }
 }
 
 async function submitRepoTransferApply(group, decisionId, button) {
-    if (!userCanApplyRepoTransferDecision()) return;
-    if (!decisionId || repoTransferApplySubmitting.has(decisionId)) return;
+    if (!userCanApplyRepoTransferDecision()) return false;
+    if (!decisionId || repoTransferApplySubmitting.has(decisionId)) return false;
     const decisionState = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || ''));
-    if (decisionState?.can_apply !== true || decisionState?.apply_state !== 'READY_TO_APPLY') return;
+    if (decisionState?.can_apply !== true || decisionState?.apply_state !== 'READY_TO_APPLY') return false;
     repoTransferApplySubmitting.add(decisionId);
     button.disabled = true;
     const source = group.items?.find((item) => item.role === 'SOURCE_BECOMES_WORK') || {};
@@ -6838,7 +6839,7 @@ async function submitRepoTransferApply(group, decisionId, button) {
     if (!confirmation.isConfirmed) {
         repoTransferApplySubmitting.delete(decisionId);
         button.disabled = false;
-        return;
+        return false;
     }
     let payload;
     const requestId = repoTransferApplyRequestIds.get(decisionId) || repoTransferDecisionRequestId();
@@ -6868,7 +6869,7 @@ async function submitRepoTransferApply(group, decisionId, button) {
         const state = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || ''));
         if (state?.can_apply === true && state?.apply_state === 'READY_TO_APPLY') button.disabled = false;
         repoTransferApplySubmitting.delete(decisionId);
-        return;
+        return false;
     }
 
     Swal.close();
@@ -6896,6 +6897,7 @@ async function submitRepoTransferApply(group, decisionId, button) {
     } finally {
         repoTransferApplySubmitting.delete(decisionId);
     }
+    return true;
 }
 
 function userCanUseAdvancedEmploymentReview() {
@@ -6985,6 +6987,19 @@ function renderHrReviewDay(item = {}, kind) {
     `;
 }
 
+function hrReviewCardIntervals(item = {}) {
+    const row = currentReviewRows.find((candidate) =>
+        String(candidate?.kodikos || '') === String(item.employee_kodikos || '') &&
+        String(candidate?.hmeromhnia || '').slice(0, 10) ===
+            String(item.hmeromhnia || '').slice(0, 10));
+    return [1, 2, 3].map((index) => {
+        const pair = pairNo(index);
+        const start = String(row?.[`cards_apo_ora_${pair}`] || '').trim();
+        const end = String(row?.[`cards_eos_ora_${pair}`] || '').trim();
+        return start || end ? `${start || '—'}–${end || '—'}` : '';
+    }).filter(Boolean);
+}
+
 function renderHrPendingCase() {
     const container = document.getElementById('hrReviewPendingContainer');
     if (!container) return;
@@ -6998,6 +7013,9 @@ function renderHrPendingCase() {
         const items = Array.isArray(group.items) ? group.items : [];
         const source = items.find((item) => item?.role === 'SOURCE_BECOMES_WORK') || {};
         const target = items.find((item) => item?.role === 'TARGET_BECOMES_REPO') || {};
+        const sourceCards = hrReviewCardIntervals(source).join(', ') || 'καμία';
+        const nonWorkTerms = stage2LifecycleNonWorkTerms(
+            source.current_category || source.kathgoria_ergasias);
         const employeeName = source.employee_name || target.employee_name || '';
         const employeeCode = source.employee_kodikos || target.employee_kodikos || '-';
         const decisionState = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || '')) || {};
@@ -7048,7 +7066,7 @@ function renderHrPendingCase() {
             <div class="hr-review-days-grid">${renderHrReviewDay(source, 'work')}${renderHrReviewDay(target, 'rest')}</div>
             ${staleDecisionNotice}
             ${reusableWarning}
-            <div class="hr-review-question">Είναι σωστή αυτή η πρόταση;</div>
+            <div class="hr-review-question">Βρέθηκε ${escapeHtml(nonWorkTerms.declared)} στις ${escapeHtml(formatPolicyPreviewDate(source.hmeromhnia))} με πραγματική εργασία βάσει κάρτας ${escapeHtml(sourceCards)}.<br><br>Στις ${escapeHtml(formatPolicyPreviewDate(target.hmeromhnia))} υπάρχει προδηλωμένη εργασία χωρίς κάρτες.<br><br>Ελέγξτε αν η ${escapeHtml(formatPolicyPreviewDate(target.hmeromhnia))} ήταν πράγματι ${escapeHtml(nonWorkTerms.received)} που δόθηκε αντί ${escapeHtml(nonWorkTerms.insteadOf)} της ${escapeHtml(formatPolicyPreviewDate(source.hmeromhnia))}.</div>
             ${decisionActions}
         </article>`;
     }).join('');
@@ -7167,6 +7185,9 @@ function renderHrCompletedCases() {
                     <div>${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(formatPolicyPreviewDate(group.last_date))}</div>
                     ${decision.created_by_user_name ? `<div>Καταχώριση: ${escapeHtml(decision.created_by_user_name)}</div>` : ''}
                     ${decision.notes ? `<div>Σημείωση: ${escapeHtml(decision.notes)}</div>` : ''}
+                    ${approved && state.apply_state !== 'ALREADY_APPLIED'
+                        ? '<div class="fw-semibold mt-2">Η μεταφορά ρεπό εγκρίθηκε.<br>Εκκρεμεί η εφαρμογή της αλλαγής.</div>' : ''}
+                    ${approved ? `<div>${escapeHtml(formatPolicyPreviewDate(source.hmeromhnia))}: ${escapeHtml(stage2LifecycleClassificationLabel(source.current_category || source.kathgoria_ergasias))} → ${escapeHtml(stage2LifecycleClassificationLabel(source.proposed_values?.kathgoria_ergasias_apologistika))}</div><div>${escapeHtml(formatPolicyPreviewDate(target.hmeromhnia))}: ${escapeHtml(stage2LifecycleClassificationLabel(target.current_category || target.kathgoria_ergasias))} → ${escapeHtml(stage2LifecycleClassificationLabel(target.proposed_values?.kathgoria_ergasias_apologistika))}</div>` : ''}
                     ${automaticReusable
                         ? '<div class="alert alert-info py-2"><strong>Αυτόματη μεταφορά ρεπό</strong><br>Βάσει παλαιότερης έγκρισης HR</div>'
                         : inheritedReusable ? renderAtomicReusableDecision(group) : ''}
@@ -8715,6 +8736,20 @@ function derivePeriodLifecyclePresentation(payloads = []) {
     };
 }
 
+function stage2LifecycleClassificationLabel(value) {
+    const labels = { 'ΕΡΓ': 'Εργασία', 'ΑΝ': 'Ρεπό', 'ΜΕ': 'Μη εργασία' };
+    return labels[String(value || '').trim()] || String(value || '');
+}
+
+function stage2LifecycleNonWorkTerms(value) {
+    const nonWork = String(value || '').trim() === 'ΜΕ';
+    return nonWork
+        ? { declared: 'προδηλωμένη μη εργασία', received: 'η μη εργασία',
+            insteadOf: 'της προδηλωμένης μη εργασίας' }
+        : { declared: 'προδηλωμένο ρεπό', received: 'το ρεπό',
+            insteadOf: 'του προδηλωμένου ρεπό' };
+}
+
 function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     const container = document.getElementById('policyPreviewGroupsContainer');
     const stage = lifecycle?.stages?.STAGE2;
@@ -8729,6 +8764,103 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     }
     const items = Array.isArray(stage.pending_items) ? stage.pending_items : [];
     const reasons = Array.isArray(stage.pending_reasons) ? stage.pending_reasons : [];
+    const structuredItemHtml = items.filter((item) => item.source && item.target)
+        .map((item) => {
+            const sourceCards = (item.source.card_intervals || []).map((interval) =>
+                `${interval.start || '—'}–${interval.end || '—'}`).join(', ') || 'καμία';
+            const targetCards = (item.target.card_intervals || []).map((interval) =>
+                `${interval.start || '—'}–${interval.end || '—'}`).join(', ') || 'καμία';
+            const approved = item.decision_state === 'APPROVED_PENDING_APPLY';
+            const nonWorkTerms = stage2LifecycleNonWorkTerms(
+                item.source.declaration_classification);
+            const command = item.decision_command || {};
+            const hasDecisionCommand = item.decision_state === 'NONE' &&
+                command.proposal_id && command.expected_source_id &&
+                command.expected_target_id && command.expected_proposal_version &&
+                command.expected_choice_code;
+            const stateUnavailable = (item.reasons || []).includes(
+                'STAGE2_DECISION_STATE_UNAVAILABLE');
+            const applyMessages = {
+                RUNTIME_DISABLED: 'Η εφαρμογή δεν είναι ακόμη ενεργοποιημένη.',
+                INDEXES_NOT_READY: 'Η ασφαλής εφαρμογή δεν είναι ακόμη διαθέσιμη.',
+                NOT_AUTHORIZED: 'Δεν έχετε δικαίωμα εφαρμογής.'
+            };
+            return `<article class="employment-review-stage2-proposal" data-proposal-id="${escapeHtml(item.proposal_id || '')}">
+                <div class="fw-semibold">${approved
+                    ? 'Η μεταφορά ρεπό εγκρίθηκε. Εκκρεμεί η εφαρμογή της αλλαγής.'
+                    : `Βρέθηκε ${escapeHtml(nonWorkTerms.declared)} στις ${escapeHtml(formatStage1DateKey(item.source.date))} με πραγματική εργασία βάσει κάρτας ${escapeHtml(sourceCards)}.`}</div>
+                <div>${escapeHtml(formatStage1DateKey(item.source.date))}: ${escapeHtml(stage2LifecycleClassificationLabel(item.source.declaration_classification))} → ${escapeHtml(stage2LifecycleClassificationLabel(item.proposal.source_new_classification))}</div>
+                <div>${escapeHtml(formatStage1DateKey(item.target.date))}: ${escapeHtml(stage2LifecycleClassificationLabel(item.target.declaration_classification))} → ${escapeHtml(stage2LifecycleClassificationLabel(item.proposal.target_new_classification))} (κάρτες: ${escapeHtml(targetCards)})</div>
+                ${approved
+                    ? `<div class="small text-muted">${escapeHtml(applyMessages[item.apply_state] || '')}</div>`
+                    : `<div class="mt-2">Ελέγξτε αν η ${escapeHtml(formatStage1DateKey(item.target.date))} ήταν πράγματι ${escapeHtml(nonWorkTerms.received)} που δόθηκε αντί ${escapeHtml(nonWorkTerms.insteadOf)} της ${escapeHtml(formatStage1DateKey(item.source.date))}.</div>`}
+                ${stateUnavailable
+                    ? '<div class="alert alert-warning py-2 mt-2 mb-0">Δεν ήταν δυνατή η ασφαλής φόρτωση της τρέχουσας πρότασης. Η περίπτωση παραμένει ανοιχτή και δεν είναι διαθέσιμη για απόφαση.</div>' : ''}
+                ${hasDecisionCommand && userCanRecordRepoTransferDecision()
+                    ? `<div class="hr-review-decision-actions mt-2">
+                        <button type="button" class="btn stage2-lifecycle-decision-btn employment-review-action-btn employment-review-action-success" data-decision-code="APPROVE_PROPOSAL">Αποδοχή πρότασης</button>
+                        <button type="button" class="btn stage2-lifecycle-decision-btn employment-review-action-btn employment-review-action-danger" data-decision-code="REJECT_PROPOSAL">Δεν ισχύει</button>
+                    </div>` : ''}
+                ${approved && item.can_apply === true && item.decision_id &&
+                    userCanApplyRepoTransferDecision()
+                    ? `<button type="button" class="btn btn-sm stage2-lifecycle-apply-btn employment-review-action-btn employment-review-action-success mt-2">Εφαρμογή εγκεκριμένης μεταφοράς</button>` : ''}
+            </article>`;
+        }).join('');
+    if (structuredItemHtml) {
+        container.innerHTML = structuredItemHtml;
+        items.filter((item) => item.source && item.target).forEach((item, index) => {
+            const article = container.querySelectorAll?.(
+                '.employment-review-stage2-proposal')?.[index];
+            const command = item.decision_command || {};
+            const group = {
+                group_id: command.proposal_id,
+                pair_contract: { proposal_version: command.expected_proposal_version,
+                    choice_code: command.expected_choice_code },
+                items: [
+                    { role: 'SOURCE_BECOMES_WORK',
+                        prodhlomena_oraria_id: command.expected_source_id,
+                        employee_kodikos: item.employee_kodikos,
+                        hmeromhnia: item.source.date,
+                        current_category: item.canonical_source?.current_category,
+                        kathgoria_ergasias: item.canonical_source?.current_category,
+                        proposed_values: item.canonical_source?.proposed_values || {} },
+                    { role: 'TARGET_BECOMES_REPO',
+                        prodhlomena_oraria_id: command.expected_target_id,
+                        employee_kodikos: item.employee_kodikos,
+                        hmeromhnia: item.target.date,
+                        current_category: item.canonical_target?.current_category,
+                        kathgoria_ergasias: item.canonical_target?.current_category,
+                        proposed_values: item.canonical_target?.proposed_values || {} }
+                ]
+            };
+            article?.querySelectorAll?.('.stage2-lifecycle-decision-btn').forEach((button) =>
+                button.addEventListener('click', async () => {
+                    if (button.disabled) return;
+                    try {
+                        const recorded = await submitRepoTransferDecision(group,
+                            String(button.dataset.decisionCode || ''), { mode: 'hr' });
+                        if (recorded === true) await loadResults();
+                    } catch (error) {
+                        await employmentReviewSwal({ icon: 'error',
+                            title: 'Δεν καταγράφηκε η απόφαση',
+                            text: error?.message || 'Η καταγραφή απέτυχε.' });
+                    }
+                }));
+            const applyButton = article?.querySelector?.('.stage2-lifecycle-apply-btn');
+            applyButton?.addEventListener('click', async () => {
+                try {
+                    const applied = await submitRepoTransferApply(
+                        group, item.decision_id, applyButton);
+                    if (applied === true) await loadResults();
+                } catch (error) {
+                    await employmentReviewSwal({ icon: 'error',
+                        title: 'Δεν εφαρμόστηκε η μεταφορά',
+                        text: error?.message || 'Η εφαρμογή απέτυχε.' });
+                }
+            });
+        });
+        return true;
+    }
     const hasDatedItems = items.some((item) => Boolean(item.date));
     const rows = items.length
         ? items.map((item) => `<tr>
@@ -8760,6 +8892,9 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
 
 function getStage2LifecycleReasonLabel(reasonCode) {
     const key = String(reasonCode || '').trim();
+    if (key === 'REPO_TRANSFER_DECISION_REQUIRED') {
+        return 'Απαιτείται απόφαση για τη συνδεδεμένη πρόταση μεταφοράς ρεπό.';
+    }
     return policyPreviewReasonLabels[key] || atomicRepoTransferDiagnosticLabels[key] ||
         formatPolicyPreviewUnknownCode(key);
 }

@@ -1454,6 +1454,13 @@ async function testApplyPostSuccessAndRefreshSuccess() {
     assert.strictEqual(calls.post, 1);
     assert.strictEqual(calls.refresh, 1);
     assert.strictEqual(calls.render, 1);
+    const confirmation = calls.swal.find((call) => call.showCancelButton === true);
+    assert.ok(confirmation.html.includes('Κατηγορία: ΑΝ → ΕΡΓ'));
+    assert.ok(confirmation.html.includes('Ώρες: 7,5'));
+    assert.ok(confirmation.html.includes('08:00–12:00'));
+    assert.ok(confirmation.html.includes('12:30–16:00'));
+    assert.ok(confirmation.html.includes('Κατηγορία: ΕΡΓ → ΑΝ'));
+    assert.ok(!confirmation.html.includes('→ -'));
     assert.ok(calls.swal.some((call) => call.title === 'Η μεταφορά ρεπό εφαρμόστηκε επιτυχώς.' && call.icon === 'success'));
     assert.strictEqual(button.disabled, true);
 }
@@ -2625,6 +2632,8 @@ function testMinimalRenderingAndTerminology() {
         ]
     });
     projection.groups[0].items[0].employee_name = '<img src=x onerror=alert(1)>';
+    vm.runInContext(`currentReviewRows = [{ kodikos: '001', hmeromhnia: '2026-07-06',
+        cards_apo_ora_01: '14:07', cards_eos_ora_01: '22:37' }]`, sandbox);
     vm.runInContext(`currentHrReviewProjection = ${JSON.stringify(projection)}; currentHrReviewLoaded = true; currentRepoTransferDecisionsByProposalId = new Map()`, sandbox);
     sandbox.classifyHrReviewGroups();
     sandbox.renderHrReviewWorkspace();
@@ -2641,8 +2650,12 @@ function testMinimalRenderingAndTerminology() {
         '12:00–16:00',
         'Αποδοχή πρότασης',
         'Δεν ισχύει',
-        'Χρειάζομαι οδηγία'
+        'Χρειάζομαι οδηγία',
+        'Βρέθηκε προδηλωμένο ρεπό στις 06/07/2026',
+        '14:07–22:37',
+        'Ελέγξτε αν η 09/07/2026 ήταν πράγματι το ρεπό'
     ]);
+    assert.ok(!html.includes('Απαιτείται έλεγχος της περίπτωσης.'));
     assert.ok(html.indexOf('Ωράριο 01') < html.indexOf('Ωράριο 02'));
     assert.ok(html.indexOf('Ωράριο 02') < html.indexOf('12:00–16:00'));
     [
@@ -2688,6 +2701,8 @@ function testMinimalCompletionAndClosedCompletedSection() {
     assert.ok(completed.includes('&lt;Admin&gt;'));
     assert.ok(completed.includes('&lt;note&gt;'));
     assert.ok(completed.includes('hr-review-apply-btn'));
+    assert.ok(completed.includes('Η μεταφορά ρεπό εγκρίθηκε.'));
+    assert.ok(completed.includes('Εκκρεμεί η εφαρμογή της αλλαγής.'));
     vm.runInContext("currentRepoTransferDecisionsByProposalId.get('atomic-group-1').apply_state = 'RUNTIME_DISABLED'; currentRepoTransferDecisionsByProposalId.get('atomic-group-1').can_apply = false", sandbox);
     sandbox.renderHrCompletedCases();
     const blocked = elementsById.get('hrReviewCompletedContainer').innerHTML;

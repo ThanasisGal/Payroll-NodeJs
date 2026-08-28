@@ -346,6 +346,114 @@ assert.equal(lifecycleStage2.stages.stage2.presentation_status, 'ACTIVE');
 assert.equal(lifecycleStage2.stages.stage2.enabled, true);
 assert.equal(lifecycleStage2.stages.stage2.pending_count, 1);
 assert.equal(lifecycleStage2.stages.stage2.has_transferable_pair, true);
+assert.equal(lifecycleStage2.stages.stage2.decision_state, 'NONE');
+assert.equal(lifecycleStage2.stages.stage2.pending_items.length, 1);
+assert.equal(lifecycleStage2.stages.stage2.pending_items[0].reason_code,
+    'REPO_TRANSFER_DECISION_REQUIRED');
+assert.equal(lifecycleStage2.stages.stage2.pending_items[0].source.date, '2026-06-16');
+assert.equal(lifecycleStage2.stages.stage2.pending_items[0].target.date, '2026-06-18');
+assert.equal(lifecycleStage2.stages.stage2.pending_items[0].proposal
+    .source_new_classification, 'ΕΡΓ');
+assert.equal(lifecycleStage2.stages.stage2.pending_items[0].proposal
+    .target_new_classification, 'ΑΝ');
+
+for (const [employmentType, targetCategory] of [['1', 'ΜΕ'], ['2', 'ΜΕ']]) {
+    const nonFullRows = week(`partial-${employmentType}`).map((row) => ({ ...row,
+        kathgoria_ergasias_apologistika: '', ores_ergasias_apologistika: 0,
+        repo_apologistika: false }));
+    Object.assign(nonFullRows[1], { kathgoria_ergasias: 'ΜΕ', repo: false,
+        ores_ergasias: 0, apo_ora_01: '', eos_ora_01: '',
+        cards_ores_ergasias: 8, cards_apo_ora_01: '09:00', cards_eos_ora_01: '17:00' });
+    Object.assign(nonFullRows[3], { cards_ores_ergasias: 0,
+        cards_apo_ora_01: '', cards_eos_ora_01: '' });
+    const nonFullLifecycle = buildWeeklyHrLifecycleProjection({ weekRows: nonFullRows,
+        effectiveProfile: { ...profile, typos_apasxolhshs: employmentType,
+            hmeres_ergasias_ebdomadas: 6 } });
+    const item = nonFullLifecycle.stages.stage2.pending_items[0];
+    assert.ok(item, `missing Stage 2 item for employment type ${employmentType}`);
+    assert.equal(item.source.declaration_classification, 'ΜΕ');
+    assert.equal(item.proposal.source_new_classification, 'ΕΡΓ');
+    assert.equal(item.proposal.target_new_classification, targetCategory);
+}
+
+const stage2Scope = { employee_kodikos: 'stage2', week_start: '2026-06-15',
+    week_end: '2026-06-21' };
+const currentDecision = (decision_code, overrides = {}) => ({
+    proposal_id: 'current-proposal', apply_state: 'RUNTIME_DISABLED', can_apply: false,
+    current_proposal_fingerprint: 'f'.repeat(64),
+    current_decision_fingerprint: 'f'.repeat(64),
+    current_proposal: { employee_kodikos: 'stage2', week_start: '2026-06-15',
+        week_end: '2026-06-21', source: { proposed_classification: 'ΕΡΓ' },
+        target: { proposed_classification: 'ΑΝ' }, command: {
+            proposal_id: 'current-proposal', expected_source_id: 'source-id',
+            expected_target_id: 'target-id', expected_proposal_version: 'v5',
+            expected_choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR' } },
+    current_decision: { decision_code, decision_status: 'RECORDED', is_current: true,
+        employee_kodikos: 'stage2', week_start: '2026-06-15', week_end: '2026-06-21' },
+    current_decision_execution: null, ...overrides
+});
+const approvedStage2 = buildWeeklyHrLifecycleProjection({ weekRows: stage2Rows,
+    effectiveProfile: profile, scope: stage2Scope,
+    persistedStage2DecisionState: currentDecision('APPROVE_PROPOSAL') });
+assert.equal(approvedStage2.stages.stage2.business_status, 'OPEN');
+assert.equal(approvedStage2.stages.stage2.decision_state, 'APPROVED_PENDING_APPLY');
+assert.equal(approvedStage2.stages.stage2.pending_items[0].apply_state, 'RUNTIME_DISABLED');
+assert.equal(approvedStage2.stages.stage3.presentation_status, 'LOCKED');
+
+const appliedStage2 = buildWeeklyHrLifecycleProjection({ weekRows: stage2Rows,
+    effectiveProfile: profile, scope: stage2Scope,
+    persistedStage2DecisionState: currentDecision('APPROVE_PROPOSAL', {
+        apply_state: 'ALREADY_APPLIED',
+        current_decision_execution: { execution_status: 'APPLIED' }
+    }) });
+assert.equal(appliedStage2.stages.stage2.business_status, 'COMPLETED');
+assert.equal(appliedStage2.stages.stage2.decision_state, 'APPLIED');
+
+const rejectedStage2 = buildWeeklyHrLifecycleProjection({ weekRows: stage2Rows,
+    effectiveProfile: profile, scope: stage2Scope,
+    persistedStage2DecisionState: currentDecision('REJECT_PROPOSAL') });
+assert.equal(rejectedStage2.stages.stage2.business_status, 'COMPLETED');
+assert.equal(rejectedStage2.stages.stage2.decision_state, 'REJECTED');
+assert.equal(rejectedStage2.stages.stage3.presentation_status, 'ACTIVE');
+assert.ok(rejectedStage2.stages.stage3.pending_dates.includes('2026-06-18'));
+assert.deepEqual(rejectedStage2.stages.stage3.pending_items.find((item) =>
+    item.date === '2026-06-18').allowed_classifications, ['LEAVE', 'SICKNESS', 'ABSENCE']);
+const rejectedTargetPreview = rejectedStage2.stage1_no_classification_preview_items
+    .find((item) => item.date === '2026-06-18');
+assert.ok(!rejectedTargetPreview || rejectedTargetPreview.classification !== 'REST_REPO');
+if (rejectedTargetPreview) {
+    assert.equal(rejectedTargetPreview.safe, false);
+    assert.equal(rejectedTargetPreview.source_date, null);
+}
+
+const undecidedStage2 = buildWeeklyHrLifecycleProjection({ weekRows: stage2Rows,
+    effectiveProfile: profile, scope: stage2Scope,
+    persistedStage2DecisionState: { ...currentDecision('APPROVE_PROPOSAL'),
+        current_decision: null, current_decision_fingerprint: null } });
+assert.equal(undecidedStage2.stages.stage2.decision_state, 'NONE');
+assert.equal(undecidedStage2.stages.stage2.pending_items[0].proposal_id,
+    'current-proposal');
+assert.equal(undecidedStage2.stages.stage2.pending_items[0].decision_command
+    .expected_choice_code, 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR');
+
+for (const staleDecision of [
+    currentDecision('REJECT_PROPOSAL', { current_decision: {
+        ...currentDecision('REJECT_PROPOSAL').current_decision, is_current: false } }),
+    currentDecision('APPROVE_PROPOSAL', { current_decision: {
+        ...currentDecision('APPROVE_PROPOSAL').current_decision,
+        employee_kodikos: 'other-employee' } }),
+    currentDecision('REJECT_PROPOSAL', { current_decision: {
+        ...currentDecision('REJECT_PROPOSAL').current_decision,
+        week_start: '2026-06-08', week_end: '2026-06-14' } }),
+    currentDecision('REJECT_PROPOSAL', {
+        current_decision_fingerprint: 'e'.repeat(64) })
+]) {
+    const unaffected = buildWeeklyHrLifecycleProjection({ weekRows: stage2Rows,
+        effectiveProfile: profile, scope: stage2Scope,
+        persistedStage2DecisionState: staleDecision });
+    assert.equal(unaffected.stages.stage2.business_status, 'OPEN');
+    assert.equal(unaffected.stages.stage2.decision_state, 'NONE');
+}
 
 const noSource = week('0004', '2026-06-01');
 Object.assign(noSource[2], { kathgoria_ergasias: 'ΑΝ', repo: true, ores_ergasias: 0,
