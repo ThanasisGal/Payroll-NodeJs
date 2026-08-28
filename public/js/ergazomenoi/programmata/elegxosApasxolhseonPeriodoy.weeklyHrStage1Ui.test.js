@@ -237,17 +237,26 @@ const toolbarSandbox = {
     stage1DisplayFilters: { open: true, stale: true, completed: false, blocked: true,
         leave: false, sickness: false, absence: false },
     stage1PayloadsForDisplay: () => [...weeklyPayloads.values()],
-    visibleWeeklyHrPayloads: () => [...weeklyPayloads.values()]
+    stage1ApplyDisplayFilters: (payloads) => payloads.filter((payload) =>
+        toolbarSandbox.stage1DisplayFilters[
+            String(payload.lifecycle_projection.stages.stage1.business_status).toLowerCase()
+        ]).map((payload) => ({ payload })),
+    compareWeeklyHrStage1Payloads: () => 0,
+    weeklyHrStage1Key: (scope) => scope.key
 };
 vm.runInNewContext(`${source.slice(toolbarStart, toolbarEnd)}\nthis.helpers = {
-    isWeeklyHrStage1Eligible, weeklyHrStage1Counts, renderWeeklyHrStage1BulkToolbar
+    isWeeklyHrStage1Eligible, weeklyHrStage1Counts, renderWeeklyHrStage1BulkToolbar,
+    visibleWeeklyHrStage1Payloads, pruneHiddenWeeklyHrStage1Selections
 };`, toolbarSandbox);
-const openPayload = (id) => ({ stage1_status: 'OPEN', write_enabled: true,
+const openPayload = (id) => ({ scope: { key: id }, stage1_status: 'OPEN', write_enabled: true,
     rows: [{ _id: id, kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' }],
     workflow: { next_required_hr_stage: 'LEAVE_CLASSIFICATION' },
     lifecycle_projection: { stages: { stage1: { business_status: 'OPEN' } } } });
 for (const [key, item] of [['w1', openPayload('03')], ['w2', openPayload('09')],
-    ['w4', openPayload('22')], ['w3', completedDerived]]) weeklyPayloads.set(key, item);
+    ['w4', openPayload('22')], ['w3', { ...completedDerived, scope: { key: 'w3' } }]]) {
+    item.scope.key = key;
+    weeklyPayloads.set(key, item);
+}
 for (const key of ['w1', 'w2', 'w4']) weeklySelected.add(key);
 const enabledToolbar = toolbarSandbox.helpers.renderWeeklyHrStage1BulkToolbar();
 assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().selected, 3);
@@ -263,14 +272,32 @@ const blockedPayload = { ...openPayload('blocked'),
     workflow: { next_required_hr_stage: 'BLOCKED' } };
 assert.equal(toolbarSandbox.helpers.isWeeklyHrStage1Eligible(blockedPayload), false);
 weeklyPayloads.clear();
-const hiddenCompletedPayload = { ...completedDerived, scope: { employee_kodikos: '0001' } };
-const visibleActivePayload = { ...openPayload('visible'), scope: { employee_kodikos: '0002' } };
+const hiddenCompletedPayload = { ...completedDerived,
+    scope: { key: 'hidden-completed', employee_kodikos: '0001' } };
+const visibleActivePayload = { ...openPayload('visible'),
+    scope: { key: 'visible-active', employee_kodikos: '0002' } };
 weeklyPayloads.set('hidden-completed', hiddenCompletedPayload);
 weeklyPayloads.set('visible-active', visibleActivePayload);
-toolbarSandbox.visibleWeeklyHrPayloads = () => [visibleActivePayload];
 assert.equal(JSON.stringify(toolbarSandbox.helpers.weeklyHrStage1Counts()), JSON.stringify({
-    total: 2, open: 1, stale: 0, completed: 1, blocked: 0, selected: 0
+    total: 2, open: 1, stale: 0, completed: 1, blocked: 0, visible: 1, selected: 0
 }));
+weeklySelected.add('hidden-completed');
+weeklySelected.add('visible-active');
+toolbarSandbox.helpers.pruneHiddenWeeklyHrStage1Selections();
+assert.deepEqual([...weeklySelected], ['visible-active']);
+assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().visible, 1);
+assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().selected, 1);
+toolbarSandbox.stage1DisplayFilters.open = false;
+toolbarSandbox.stage1DisplayFilters.blocked = true;
+weeklyPayloads.set('visible-blocked', { ...blockedPayload,
+    scope: { key: 'visible-blocked', employee_kodikos: '0003' },
+    lifecycle_projection: { stages: { stage1: { business_status: 'BLOCKED' } } } });
+toolbarSandbox.helpers.pruneHiddenWeeklyHrStage1Selections();
+assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().visible, 1);
+assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().selected, 0);
+assert.deepEqual([...weeklySelected], []);
+assert.match(source, /visibleWeeklyHrStage1Payloads\(\)\.forEach\(\(payload\)/);
+assert.match(source, /const visibleEligibleKeys = pruneHiddenWeeklyHrStage1Selections\(\)/);
 assert.doesNotMatch(source.match(/function isWeeklyHrStage1Eligible[\s\S]*?\n}/)?.[0] || '',
     /classificationForRow|LEAVE|SICKNESS|ABSENCE/);
 assert.match(source, /id="stage1FilterOpen"[^>]*checked/);
@@ -403,7 +430,9 @@ const countsSandbox = {
         [String(index), payload])),
     weeklyHrStage1Selected: new Set(),
     isWeeklyHrStage1Eligible: () => false,
-    stage1PayloadsForDisplay: () => statusPayloads
+    stage1PayloadsForDisplay: () => statusPayloads,
+    visibleWeeklyHrStage1Payloads: () => statusPayloads,
+    weeklyHrStage1Key: (scope) => scope.employee_kodikos
 };
 vm.runInNewContext(`${businessStatusFunction}\n` +
     `${source.match(/function weeklyHrStage1Counts\([\s\S]*?\n}/)?.[0]}\n` +
@@ -436,7 +465,7 @@ assert.match(source.match(/function weeklyHrStage1Counts[\s\S]*?\n}/)?.[0] || ''
 assert.match(source.match(/function renderWeeklyHrStage1Presentation[\s\S]*?\n}/)?.[0] || '',
     /stage1PayloadsForDisplay\(\)/);
 assert.match(source.match(/function updateEmploymentReviewWorkflowPresentation[\s\S]*?\n}/)?.[0] || '',
-    /visibleWeeklyHrPayloads\(\)/);
+    /visibleWeeklyHrPayloads\(allPayloads\)/);
 assert.match(source, /weekly-hr-select-all-days'[\s\S]*?visibleWeeklyHrPayloads\(\)/);
 assert.match(css, /\.weekly-hr-stage1-bulk-toolbar\s*\{[\s\S]*?position:\s*sticky/);
 assert.match(css, /\.weekly-hr-stage1-bulk-toolbar \.weekly-hr-bulk-complete\s*\{[\s\S]*?height:\s*auto/);
@@ -459,7 +488,7 @@ assert.match(failedBulk.html, /Αιτία/);
 assert.match(failedBulk.html, /01\/06\/2026–07\/06\/2026/);
 assert.match(failedBulk.html, /Απαιτείται ρητή ανακατασκευή ή επανεκτίμηση/);
 assert.match(source, /Απαιτείται τελική εξέταση πιθανής άδειας\./);
-assert.match(source, /Δεν υπάρχουν υπόλοιπες πιθανές άδειες\./);
+assert.match(source, /Δεν υπάρχουν ανέλεγκτες πιθανές άδειες\./);
 
 const expectedDefaultReason =
     'Ολοκλήρωση ελέγχου Σταδίου 1. – Δεν προέκυψαν επιπλέον χαρακτηρισμοί άδειας, ασθένειας ή απουσίας.';
@@ -477,6 +506,7 @@ const bulkSandbox = {
     weeklyHrStage1Scopes: new Map([['week-1', { ypokatasthma: '0000',
         employee_id: 'employee-14', week_start: '2026-06-01', week_end: '2026-06-07' }]]),
     isWeeklyHrStage1Eligible: () => true,
+    pruneHiddenWeeklyHrStage1Selections: () => new Set(['week-1']),
     updateWeeklyHrStage1BulkToolbar: () => {},
     employmentReviewSwal: async (options) => options.input === 'textarea'
         ? { isConfirmed: true, value: editedReason ?? options.inputValue }

@@ -22,11 +22,12 @@ assert.match(departureBadge, /ΑΠΟΧΩΡΗΣΕ ΣΤΙΣ/);
 assert.match(browser, /\$\{lifecycleBadge\}[\s\S]{0,100}\$\{departureBadge\}/);
 assert.match(workflowPresentation, /\['STAGE1', 'STAGE2', 'STAGE3'\]\.includes\(stage\.stage\)/);
 assert.match(workflowPresentation, /Number\(stage\.pending_count \|\| 0\) === 0/);
-assert.match(workflowPresentation, /stage\.business_status !== 'BLOCKED'/);
+assert.match(workflowPresentation, /stage\.business_status === 'COMPLETED'/);
 assert.match(workflowPresentation, /presentationStatus !== 'LOCKED'/);
 assert.match(workflowPresentation,
     /presentationStatus === 'LOCKED' \|\| noHrAction \? ''/);
-assert.match(workflowPresentation, /stage\.stage === 'STAGE4'[\s\S]{0,80}stage\.business_status/);
+assert.match(workflowPresentation,
+    /stage\.stage === 'STAGE4'[\s\S]{0,120}presentationStatus === 'LOCKED'[\s\S]{0,80}stage\.business_status/);
 assert.match(workflowPresentation, /workflowStageStatusLabels\[badgeStatus\]/);
 assert.match(browser, /Δεν υπάρχουν ανέλεγκτες πιθανές άδειες\./);
 

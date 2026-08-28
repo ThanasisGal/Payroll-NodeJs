@@ -3,7 +3,9 @@
 const assert = require('assert');
 const {
     RESOLUTION_SCOPE,
-    resolveOrphanCardResolution
+    LEGACY_REUSABLE_ORPHAN_REASON,
+    resolveOrphanCardResolution,
+    attachOrphanResolutionPreviews
 } = require('./apasxoliseisOrphanCardResolutionService');
 
 function row(date, overrides = {}) {
@@ -33,6 +35,27 @@ assert.strictEqual(startResult.proposal.workDurationMinutes, 480);
 assert.strictEqual(startResult.proposal.durationSource, 'DECLARED_CONTINUOUS_DURATION');
 assert.strictEqual(startResult.apologistikoBookUpdate, false);
 assert.strictEqual(startResult.canApprove, true);
+
+const reusableCriteria = {
+    policy_version: startResult.policyVersion,
+    orphan_type: startResult.orphanType,
+    schedule_kind: startResult.scheduleKind,
+    rule: startResult.rule
+};
+const reusableBase = {
+    policy_code: 'ORPHAN_CARD_CONTINUOUS',
+    reuse_effective_from: new Date('2026-06-01'), reuse_effective_to: null,
+    reuse_match_criteria: { criteria: reusableCriteria }
+};
+const withReason = attachOrphanResolutionPreviews({ rows: [startOnly],
+    reusableApprovals: [{ ...reusableBase, notes: 'Η ίδια αιτιολογία HR' }] })[0];
+assert.strictEqual(withReason.orphan_card_resolution_preview.automaticReusableApplied, true);
+assert.strictEqual(withReason.orphan_card_resolution_preview.reusableDecisionReason,
+    'Η ίδια αιτιολογία HR');
+const legacyReason = attachOrphanResolutionPreviews({ rows: [startOnly],
+    reusableApprovals: [reusableBase] })[0];
+assert.strictEqual(legacyReason.orphan_card_resolution_preview.reusableDecisionReason,
+    LEGACY_REUSABLE_ORPHAN_REASON);
 assert.strictEqual(startResult.approvedUpdates.apologistiko_biblio, false);
 assert.strictEqual(startOnly.cards_eos_ora_01, '');
 

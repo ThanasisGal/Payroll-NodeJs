@@ -80,6 +80,24 @@ assert.equal(lifecycle.stages.STAGE3.presentation_status, 'LOCKED');
 assert.equal(lifecycle.stages.STAGE3.enabled, false);
 assert.equal(lifecycle.stages.STAGE4.presentation_status, 'LOCKED');
 
+const staleLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
+    lifecycle_projection: { stages: {
+        stage1: stage('STALE'), stage2: stage('COMPLETED'),
+        stage3: stage('COMPLETED'), stage4: stage('COMPLETED')
+    } } }]);
+assert.equal(staleLifecycle.current_stage, 'STAGE1');
+assert.equal(staleLifecycle.stages.STAGE2.presentation_status, 'LOCKED');
+assert.equal(staleLifecycle.stages.STAGE3.presentation_status, 'LOCKED');
+assert.equal(staleLifecycle.stages.STAGE4.presentation_status, 'LOCKED');
+const completedLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
+    lifecycle_projection: { stages: {
+        stage1: stage('COMPLETED'), stage2: stage('COMPLETED'),
+        stage3: stage('COMPLETED'), stage4: stage('COMPLETED')
+    } } }]);
+assert.equal(completedLifecycle.current_stage, null);
+assert.equal(completedLifecycle.requires_hr_action, false);
+assert.equal(completedLifecycle.total_pending_count, 0);
+
 const unsortedStage3 = sandbox.derive([
     [['2026-06-09', '2026-06-10'], 'week-2'],
     [['2026-06-03'], 'week-1'], [['2026-06-22'], 'week-4']
@@ -92,7 +110,7 @@ const unsortedStage3 = sandbox.derive([
     } } })));
 assert.deepEqual(Array.from(unsortedStage3.stages.STAGE3.pending_items, (item) => item.date),
     ['2026-06-03', '2026-06-09', '2026-06-10', '2026-06-22']);
-assert.match(source, /button\.disabled = status === 'LOCKED'/);
+assert.match(source, /button\.disabled = presentationStatus === 'LOCKED'/);
 assert.match(source, /aria-disabled[\s\S]{0,100}LOCKED/);
 
 const rendered = sandbox.renderWeeklyHrStage2LifecycleFallback(lifecycle);

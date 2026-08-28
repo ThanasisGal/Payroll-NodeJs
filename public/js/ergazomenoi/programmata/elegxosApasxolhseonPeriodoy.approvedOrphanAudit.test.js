@@ -7,6 +7,8 @@ const vm = require('vm');
 
 const sourcePath = path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
+assert.match(source, /reusableDecisionReason/);
+assert.match(source, /reusableOrphanReason \? 'readonly' : ''/);
 const sandbox = {
     console,
     document: {
@@ -71,4 +73,3 @@ assert.match(source,
     /\$\{rowPresentation\.apologistiko\.text\}[\s\S]*\$\{renderApprovedOrphanAuditBadge\(row\)\}/);
 
 console.log('approved orphan pending/audit renderer regression: PASS');
-
