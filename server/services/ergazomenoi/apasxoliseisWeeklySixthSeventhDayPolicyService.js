@@ -236,7 +236,7 @@ function analyzeWeeklySixthSeventhDay({
         };
     });
     const structuralSignatures = new Set(structuralProfiles.map((item) => item.signature));
-    if (structuralProfiles.every((item) => item.weeklyWorkdays !== 5) ||
+    if (structuralProfiles.every((item) => ![5, 6].includes(item.weeklyWorkdays)) ||
         structuralSignatures.size > 1) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE,
             reasons: [], warnings: [], dailyFacts: [], sixthDay: null, seventhDay: null });
@@ -252,7 +252,8 @@ function analyzeWeeklySixthSeventhDay({
             seventhDay: null
         });
     }
-    if (Number(effectiveProfile.hmeres_ergasias_ebdomadas) !== 5) {
+    const contractualWeeklyWorkdays = Number(effectiveProfile.hmeres_ergasias_ebdomadas);
+    if (![5, 6].includes(contractualWeeklyWorkdays)) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [], dailyFacts: [] });
     }
     const dailyFacts = rows
@@ -280,7 +281,7 @@ function analyzeWeeklySixthSeventhDay({
         });
     }
     const actualDays = dailyFacts.filter((day) => day.countsAsActualWorkDay);
-    if (actualDays.length <= 5) {
+    if (actualDays.length <= contractualWeeklyWorkdays) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: null });
     }
     const workedDeclaredRepoDays = resolveWorkedDeclaredRepoDays({
@@ -288,6 +289,41 @@ function analyzeWeeklySixthSeventhDay({
         dailyFacts,
         effectiveProfile
     });
+    if (contractualWeeklyWorkdays === 6) {
+        if (actualDays.length !== 7 || workedDeclaredRepoDays.length !== 1) {
+            return decisionFailure('SEVENTH_DAY_IDENTITY_NOT_DETERMINISTIC', {
+                dailyFacts,
+                warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))]
+            });
+        }
+        const seventhDay = workedDeclaredRepoDays[0];
+        const seventhDayIllegalOvertimeHours =
+            resolveSeventhDayIllegalOvertimeHours(seventhDay);
+        return Object.freeze({
+            policyVersion: POLICY_VERSION,
+            status: STATUS.READY,
+            reasons: [],
+            warnings: [...new Set([
+                ...dailyFacts.flatMap((day) => day.warnings),
+                'SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'
+            ])],
+            week: { start: range.weekStartKey, end: range.weekEndKey },
+            premiumRate: null,
+            premiumRateSource: null,
+            dailyFacts,
+            canonicalRepoDayIdentities: [seventhDay.hmeromhnia],
+            sixthDayIdentity: null,
+            sixthDayRepoIdentity: null,
+            remainingRepoIdentity: seventhDay.hmeromhnia,
+            sixthDay: null,
+            seventhDay: {
+                ...seventhDay,
+                severity: 'SERIOUS_VIOLATION',
+                classification: 'SEVENTH_DAY_ILLEGAL_OVERTIME',
+                illegalOvertimeHours: seventhDayIllegalOvertimeHours
+            }
+        });
+    }
     const automaticSingleWorkedRepoSeventhDay =
         actualDays.length === 7 &&
         workedDeclaredRepoDays.length === 1 &&

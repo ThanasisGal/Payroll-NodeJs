@@ -31,6 +31,65 @@ function analyze(hours, profile = {}, hourlyRate = 10) {
     });
 }
 
+function sixDayWeek(cards = [7, 7, 7, 7, 7, 7, 0]) {
+    return cards.map((hours, index) => ({
+        hmeromhnia: new Date(Date.UTC(2026, 0, 12 + index)).toISOString().slice(0, 10),
+        kathgoria_ergasias: index === 6 ? 'ΑΝ' : 'ΕΡΓ',
+        repo: index === 6,
+        ores_ergasias: index === 6 ? 0 : 8,
+        cards_ores_ergasias: hours,
+        cards_apo_ora_01: hours > 0 ? '09:00' : '',
+        cards_eos_ora_01: hours > 0 ? '16:00' : ''
+    }));
+}
+function analyzeSixDay(rows) {
+    return analyzeWeeklySixthSeventhDay({
+        weekRows: rows,
+        effectiveProfile: { kathestos_apasxolhshs: '0', typos_apasxolhshs: '0',
+            hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 40,
+            profile_changed_inside_week: false }
+    });
+}
+
+let sixDayResult = analyzeSixDay(sixDayWeek());
+assert.strictEqual(sixDayResult.status, 'NOT_APPLICABLE');
+assert.strictEqual(sixDayResult.dailyFacts.filter((day) => day.countsAsActualWorkDay).length, 6);
+assert.strictEqual(sixDayResult.sixthDay, null);
+assert.strictEqual(sixDayResult.seventhDay, null);
+
+sixDayResult = analyzeSixDay(sixDayWeek([7, 7, 7, 7, 7, 7, 3.93]));
+assert.strictEqual(sixDayResult.status, 'READY');
+assert.strictEqual(sixDayResult.sixthDay, null);
+assert.strictEqual(sixDayResult.sixthDayIdentity, null);
+assert.strictEqual(sixDayResult.sixthDayRepoIdentity, null);
+assert.strictEqual(sixDayResult.premiumRate, null);
+assert.strictEqual(sixDayResult.seventhDay.hmeromhnia, '2026-01-18');
+assert.strictEqual(sixDayResult.seventhDay.classification,
+    'SEVENTH_DAY_ILLEGAL_OVERTIME');
+assert.strictEqual(sixDayResult.seventhDay.severity, 'SERIOUS_VIOLATION');
+assert.strictEqual(sixDayResult.seventhDay.illegalOvertimeHours, 3.93);
+
+const january0031 = sixDayWeek([4.47, 6.72, 3.78, 6.5, 7.55, 4.07, 4.433333333333334]);
+Object.assign(january0031[6], {
+    cards_apo_ora_01: '12:30', cards_eos_ora_01: '16:56',
+    ores_ergasias_apologistika: 3.93,
+    ores_pragmatikhs_ergasias_apologistika: 3.93,
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: false
+});
+sixDayResult = analyzeSixDay(january0031);
+assert.strictEqual(sixDayResult.dailyFacts.filter((day) => day.countsAsActualWorkDay).length, 7);
+assert.strictEqual(sixDayResult.seventhDay.hmeromhnia, '2026-01-18');
+assert.strictEqual(sixDayResult.seventhDay.actualWorkHours, 3.93);
+assert.strictEqual(sixDayResult.seventhDay.illegalOvertimeHours, 3.93);
+
+const indeterminateSixDay = sixDayWeek([7, 7, 7, 7, 7, 7, 7]);
+Object.assign(indeterminateSixDay[6], { kathgoria_ergasias: 'ΕΡΓ', repo: false });
+sixDayResult = analyzeSixDay(indeterminateSixDay);
+assert.strictEqual(sixDayResult.status, 'NEEDS_HR_DECISION');
+assert.ok(sixDayResult.reasons.includes('SEVENTH_DAY_IDENTITY_NOT_DETERMINISTIC'));
+assert.strictEqual(sixDayResult.sixthDay, null);
+assert.strictEqual(sixDayResult.seventhDay, null);
+
 let result = analyze([4, 4, 4, 4, 4, 7, 0]);
 assert.strictEqual(result.status, 'READY');
 assert.strictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
