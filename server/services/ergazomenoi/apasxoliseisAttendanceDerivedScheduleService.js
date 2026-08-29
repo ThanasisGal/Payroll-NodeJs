@@ -2,6 +2,8 @@
 
 const { CARD_PAIR_STATE, resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
 const { normalizeTimeValue, timeToMinutes } = require('./apasxoliseisScenarioFactsService');
+const { STATUS: REST_STATUS, evaluateSplitShiftRest } =
+    require('./apasxoliseisRestPeriodPolicyService');
 
 const DECLARED_PAIRS = Object.freeze(['01', '02', '03']);
 
@@ -49,6 +51,38 @@ function buildDurationAnchoredInterval({ row = {}, actualArrival } = {}) {
     return Object.freeze({ start, end: minutesToTime(startMinutes + durationMinutes), durationMinutes });
 }
 
+function buildValidSplitProgramCardProjection(row = {}, { flexibleArrivalMinutes = 0 } = {}) {
+    const projected = {};
+    let pairCount = 0;
+    let hasDeviation = false;
+    for (const pair of DECLARED_PAIRS) {
+        const declaredStart = normalizeTimeValue(row[`apo_ora_${pair}`]);
+        const declaredEnd = normalizeTimeValue(row[`eos_ora_${pair}`]);
+        const cardStart = normalizeTimeValue(row[`cards_apo_ora_${pair}`]);
+        const cardEnd = normalizeTimeValue(row[`cards_eos_ora_${pair}`]);
+        if (!declaredStart || !declaredEnd || !cardStart || !cardEnd) continue;
+        pairCount += 1;
+        const decision = resolveApologistikoArrivalDecision({ declaredStart,
+            actualArrival: cardStart, flexibleArrivalMinutes });
+        hasDeviation ||= decision.requiresBook;
+        const declaredDuration = intervalDurationMinutes(declaredStart, declaredEnd);
+        projected[`apo_ora_${pair}_apologistika`] = cardStart;
+        projected[`eos_ora_${pair}_apologistika`] = decision.requiresBook
+            ? minutesToTime(timeToMinutes(cardStart) + declaredDuration) : cardEnd;
+    }
+    if (pairCount < 2 || !hasDeviation) return null;
+    for (const pair of DECLARED_PAIRS) {
+        projected[`apo_ora_${pair}_apologistika`] ||= '';
+        projected[`eos_ora_${pair}_apologistika`] ||= '';
+    }
+    const projectedAsCards = Object.fromEntries(DECLARED_PAIRS.flatMap((pair) => [
+        [`cards_apo_ora_${pair}`, projected[`apo_ora_${pair}_apologistika`]],
+        [`cards_eos_ora_${pair}`, projected[`eos_ora_${pair}_apologistika`]]
+    ]));
+    if (evaluateSplitShiftRest(projectedAsCards).status !== REST_STATUS.READY) return null;
+    return Object.freeze({ apologistiko_biblio: true, ...projected });
+}
+
 function resolveSafeStartOnlyOrphan(row = {}, { flexibleArrivalMinutes = 0 } = {}) {
     const verification = resolveCardPairVerification(row);
     if (verification.completePairs.length !== 0 || verification.unresolvedPairs.length !== 1) return null;
@@ -76,4 +110,4 @@ function buildAutoAttendanceReset() {
 
 module.exports = { intervalDurationMinutes, totalDeclaredDailyMinutes, minutesToTime,
     resolveApologistikoArrivalDecision, buildDurationAnchoredInterval,
-    resolveSafeStartOnlyOrphan, buildAutoAttendanceReset };
+    buildValidSplitProgramCardProjection, resolveSafeStartOnlyOrphan, buildAutoAttendanceReset };

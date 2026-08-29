@@ -139,6 +139,7 @@ const {
 const {
     resolveApologistikoArrivalDecision,
     buildDurationAnchoredInterval,
+    buildValidSplitProgramCardProjection,
     totalDeclaredDailyMinutes
 } = require('../../services/ergazomenoi/apasxoliseisAttendanceDerivedScheduleService');
 const {
@@ -674,6 +675,11 @@ function checkBrokenProgramVsBrokenCards(context) {
             flexibleArrivalMinutes: evelikthProselefshMinutes }).requiresBook);
 
     if (!hasDeviation) return {};
+
+    const preservedSplitProjection = buildValidSplitProgramCardProjection(rec, {
+        flexibleArrivalMinutes: evelikthProselefshMinutes
+    });
+    if (preservedSplitProjection) return preservedSplitProjection;
 
     const firstArrival = matchedIntervals[0].cardInterval.apo;
     const anchored = buildDurationAnchoredInterval({ row: rec, actualArrival: firstArrival });
