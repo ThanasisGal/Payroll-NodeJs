@@ -40,13 +40,18 @@ assert.ok(routes.includes('/period-control/historical-reconstruction/authorize')
 assert.ok(routes.includes('requireCriticalEmploymentDecisionRole'));
 assert.ok(!frontend.includes('unlock finalized period'));
 
-const auditedSwalCalls = (frontend.match(/employmentReviewSwal\(/g) || []).length - 1;
-assert.strictEqual(auditedSwalCalls, 64, 'all 64 Employment Review Swal calls must use the common wrapper');
-assert.strictEqual(
-    (frontend.match(/Swal\.fire\(/g) || []).length,
-    1,
-    'only the common Employment Review wrapper may call Swal.fire directly'
-);
+const wrapperStart = frontend.indexOf('function employmentReviewSwal');
+const wrapperEnd = frontend.indexOf('function userCanReviewEdit', wrapperStart);
+assert.ok(wrapperStart >= 0 && wrapperEnd > wrapperStart,
+    'the common Employment Review Swal wrapper must exist');
+const wrapperSource = frontend.slice(wrapperStart, wrapperEnd);
+const frontendOutsideWrapper = frontend.slice(0, wrapperStart) + frontend.slice(wrapperEnd);
+assert.strictEqual((wrapperSource.match(/Swal\.fire\(/g) || []).length, 1,
+    'the common Employment Review wrapper must call Swal.fire exactly once');
+assert.strictEqual((frontendOutsideWrapper.match(/Swal\.fire\(/g) || []).length, 0,
+    'no code outside the common Employment Review wrapper may call Swal.fire directly');
+assert.ok((frontendOutsideWrapper.match(/employmentReviewSwal\(/g) || []).length > 0,
+    'the common Employment Review wrapper must be used by the frontend');
 
 const helperSource = frontend.slice(0, frontend.indexOf('function userCanReviewEdit'));
 const renderedOptions = [];

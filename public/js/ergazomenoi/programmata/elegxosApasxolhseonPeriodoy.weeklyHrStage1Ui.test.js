@@ -467,7 +467,14 @@ assert.match(source.match(/function renderWeeklyHrStage1Presentation[\s\S]*?\n}/
 assert.match(source.match(/function updateEmploymentReviewWorkflowPresentation[\s\S]*?\n}/)?.[0] || '',
     /visibleWeeklyHrPayloads\(allPayloads\)/);
 assert.match(source, /weekly-hr-select-all-days'[\s\S]*?visibleWeeklyHrPayloads\(\)/);
-assert.match(css, /\.weekly-hr-stage1-bulk-toolbar\s*\{[\s\S]*?position:\s*sticky/);
+const stage1ToolbarCss = css.match(/\.weekly-hr-stage1-bulk-toolbar\s*\{[^}]*\}/)?.[0] || '';
+assert.ok(stage1ToolbarCss, 'Stage 1 toolbar CSS contract must exist');
+assert.doesNotMatch(stage1ToolbarCss, /position:\s*sticky/);
+const stage1TableHeaderCss = css.match(
+    /\.weekly-hr-stage1-table\s*>\s*thead\s*>\s*tr\s*>\s*th\s*\{[^}]*\}/
+)?.[0] || '';
+assert.ok(stage1TableHeaderCss, 'Stage 1 table-header CSS contract must exist');
+assert.match(stage1TableHeaderCss, /position:\s*sticky/);
 assert.match(css, /\.weekly-hr-stage1-bulk-toolbar \.weekly-hr-bulk-complete\s*\{[\s\S]*?height:\s*auto/);
 
 const resultRendererSource = source.match(
