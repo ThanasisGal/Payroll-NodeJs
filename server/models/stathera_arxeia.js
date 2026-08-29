@@ -695,7 +695,8 @@ const ArgiesSchema = new Schema(
         hmeromhnia: { type: Date },
         hmera: { type: String, trim: true },
         ypoxreotikh_argia: { type: Boolean, default: false },
-        topikh_argia: { type: Boolean, default: false }
+        topikh_argia: { type: Boolean, default: false },
+        leitoyrgia_etaireias: { type: Boolean, default: null }
     },
     {
         collection: 'Argies'

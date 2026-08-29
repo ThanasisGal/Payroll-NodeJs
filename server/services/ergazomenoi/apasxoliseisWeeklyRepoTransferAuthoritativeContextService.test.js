@@ -1,6 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { ArgiesModel } = require('../../models/stathera_arxeia');
 const {
     ATOMIC_REPO_TRANSFER_ROW_FIELDS,
     getCompanyHolidayFlags,
@@ -40,6 +41,8 @@ function testRowFieldEquivalence() {
 }
 
 function testHolidayContexts() {
+    assert.strictEqual(ArgiesModel.schema.path('leitoyrgia_etaireias').instance, 'Boolean');
+    assert.strictEqual(ArgiesModel.schema.path('leitoyrgia_etaireias').defaultValue, null);
     assert.strictEqual(buildArgiesByDateKey([], {}).size, 0);
     const mandatory = buildArgiesByDateKey(
         [{ hmeromhnia: '2026-06-15', ypoxreotikh_argia: true, perigrafh: 'Υποχρεωτική' }],
@@ -60,6 +63,44 @@ function testHolidayContexts() {
     ).get('2026-06-16');
     assert.strictEqual(open.companyOperatesOnHoliday, true);
     assert.strictEqual(open.blocksRepoTransfer, false);
+
+    const companyOpen = getCompanyHolidayFlags({
+        apasxolhsh_kata_tis_argies: true,
+        leitoyrgia_stis_mh_ypoxreotikes_argies: true
+    });
+    const mandatoryOverrideClosed = buildArgiesByDateKey([{
+        hmeromhnia: '2026-01-06', ypoxreotikh_argia: true,
+        leitoyrgia_etaireias: false
+    }], companyOpen).get('2026-01-06');
+    assert.strictEqual(mandatoryOverrideClosed.companyOperatesOnHoliday, false);
+
+    for (const [label, holiday, expected] of [
+        ['null override', { leitoyrgia_etaireias: null }, true],
+        ['true override', { leitoyrgia_etaireias: true }, true],
+        ['missing override', {}, true]
+    ]) {
+        const resolved = buildArgiesByDateKey([{
+            hmeromhnia: '2026-01-06', ypoxreotikh_argia: true, ...holiday
+        }], companyOpen).get('2026-01-06');
+        assert.strictEqual(resolved.companyOperatesOnHoliday, expected, label);
+    }
+
+    const optionalOverrideClosed = buildArgiesByDateKey([{
+        hmeromhnia: '2026-01-07', ypoxreotikh_argia: false,
+        leitoyrgia_etaireias: false
+    }], companyOpen).get('2026-01-07');
+    assert.strictEqual(optionalOverrideClosed.companyOperatesOnHoliday, false);
+    const optionalFallbackOpen = buildArgiesByDateKey([{
+        hmeromhnia: '2026-01-07', ypoxreotikh_argia: false
+    }], companyOpen).get('2026-01-07');
+    assert.strictEqual(optionalFallbackOpen.companyOperatesOnHoliday, true);
+    const optionalOverrideOpen = buildArgiesByDateKey([{
+        hmeromhnia: '2026-01-07', ypoxreotikh_argia: false,
+        leitoyrgia_etaireias: true
+    }], getCompanyHolidayFlags({
+        leitoyrgia_stis_mh_ypoxreotikes_argies: false
+    })).get('2026-01-07');
+    assert.strictEqual(optionalOverrideOpen.companyOperatesOnHoliday, true);
 }
 
 function testNoCardsDisplayRequiresNoCardEvidence() {

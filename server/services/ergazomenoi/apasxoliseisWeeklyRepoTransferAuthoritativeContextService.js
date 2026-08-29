@@ -58,9 +58,12 @@ function buildArgiesByDateKey(argies = [], companyFlags = {}) {
     for (const argia of argies) {
         const key = dateKeyUtc(argia?.hmeromhnia); if (!key) continue;
         const isMandatoryHoliday = argia.ypoxreotikh_argia === true;
-        const companyOperatesOnHoliday = isMandatoryHoliday
-            ? companyFlags.apasxolhsh_kata_tis_argies === true
-            : companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true;
+        const companyOperatesOnHoliday =
+            typeof argia.leitoyrgia_etaireias === 'boolean'
+                ? argia.leitoyrgia_etaireias
+                : isMandatoryHoliday
+                    ? companyFlags.apasxolhsh_kata_tis_argies === true
+                    : companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true;
         map.set(key, {
             ypoxreotikh_argia: isMandatoryHoliday, isHoliday: true,
             isMandatoryHoliday, isOptionalHoliday: !isMandatoryHoliday,
@@ -130,7 +133,7 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     const yearFilter = resolvedYears.length === 1
         ? resolvedYears[0]
         : mongoose.trusted({ $in: resolvedYears });
-    const argies = await argiesModel.find({ team: sessionTeam, company_kod: resolvedCompanyKodikos, etos: yearFilter, hmeromhnia: mongoose.trusted({ $gte: periodStart, $lte: periodEnd }) }).select('hmeromhnia ypoxreotikh_argia perigrafh perigrafh_argias').lean();
+    const argies = await argiesModel.find({ team: sessionTeam, company_kod: resolvedCompanyKodikos, etos: yearFilter, hmeromhnia: mongoose.trusted({ $gte: periodStart, $lte: periodEnd }) }).select('hmeromhnia ypoxreotikh_argia leitoyrgia_etaireias perigrafh perigrafh_argias').lean();
     const companyFlags = getCompanyHolidayFlags(company);
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
