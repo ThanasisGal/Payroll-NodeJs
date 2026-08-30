@@ -9511,9 +9511,20 @@ async function saveStage1DailyClassificationDrafts(requestedRowIds = null) {
     weeklyHrStage1DaySaving = true; updateWeeklyHrStage1BulkToolbar();
     try {
         const changes = draftsToSave.map(([row_id, draft]) => ({ row_id, ...draft }));
+        const periodSummary = currentEmploymentPeriodControl?.final_submission_summary || {};
+        const exactPeriodScope = {
+            period_start: String(periodSummary.period_start || '').trim(),
+            period_end: String(periodSummary.period_end || '').trim(),
+            ypokatasthma: String(periodSummary.branch || '').trim()
+        };
+        if (!exactPeriodScope.period_start || !exactPeriodScope.period_end ||
+            !exactPeriodScope.ypokatasthma) {
+            throw new Error('Δεν είναι διαθέσιμη η ενεργή περίοδος για την αποθήκευση χαρακτηρισμών.');
+        }
         const response = await fetch('/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/bulk-classify-days', {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
-            body: JSON.stringify({ reason: String(prompt.value).trim(), changes }) });
+            body: JSON.stringify({ reason: String(prompt.value).trim(), changes,
+                ...exactPeriodScope }) });
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || 'Αποτυχία αποθήκευσης χαρακτηρισμών.');
         if (requestedSet && Number(result.failed_count || 0) > 0) {

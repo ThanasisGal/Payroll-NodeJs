@@ -11104,28 +11104,33 @@ class erganhController {
         try {
             const classificationPeriodStart = dateKeyUtc(req.body.period_start);
             const classificationPeriodEnd = dateKeyUtc(req.body.period_end);
-            if ((classificationPeriodStart && !classificationPeriodEnd) ||
-                (!classificationPeriodStart && classificationPeriodEnd) ||
-                (classificationPeriodStart && classificationPeriodStart > classificationPeriodEnd)) {
+            if (!classificationPeriodStart || !classificationPeriodEnd ||
+                classificationPeriodStart > classificationPeriodEnd) {
                 throw weeklyHrApiError('INVALID_STAGE1_CLASSIFICATION_PERIOD', 400,
                     'Μη έγκυρα όρια περιόδου για τον χαρακτηρισμό ημερών.');
+            }
+            const classificationScope = await activeEmploymentReviewPeriodScope(
+                req, req.body.ypokatasthma
+            );
+            if (classificationPeriodStart !== dateKeyUtc(classificationScope.period_start) ||
+                classificationPeriodEnd !== dateKeyUtc(classificationScope.period_end)) {
+                throw weeklyHrApiError('STAGE1_CLASSIFICATION_PERIOD_SCOPE_MISMATCH', 409,
+                    'Τα όρια χαρακτηρισμού δεν ταυτίζονται με την ενεργή περίοδο.');
             }
             const result = await saveStage1DailyClassificationsBulk({
                 changes: req.body.changes,
                 reason: req.body.reason,
                 applyOne: async ({ row_id, classification, updates, reason }) => {
-                    let authoritativeTarget = null;
-                    if (classificationPeriodStart) {
-                        const target = await ProdhlomenaOrariaModel.findOne({ _id: row_id,
-                            team: req.session.userTeam,
-                            company_kod: String(req.session.companyInUse || '') })
-                            .select('hmeromhnia').lean();
-                        const targetDate = dateKeyUtc(target?.hmeromhnia);
-                        if (!targetDate || targetDate < classificationPeriodStart ||
-                            targetDate > classificationPeriodEnd) {
-                            throw weeklyHrApiError('STAGE1_DATE_OUTSIDE_ACTIONABLE_PERIOD', 409,
-                                'Η ημερομηνία δεν αποτελεί στόχο εγγραφής της περιόδου.');
-                        }
+                    let authoritativeTarget = await ProdhlomenaOrariaModel.findOne({ _id: row_id,
+                        team: req.session.userTeam,
+                        company_kod: String(req.session.companyInUse || ''),
+                        ypokatasthma: classificationScope.ypokatasthma })
+                        .select(REVIEW_SELECT_FIELDS).lean();
+                    const targetDate = dateKeyUtc(authoritativeTarget?.hmeromhnia);
+                    if (!targetDate || targetDate < classificationPeriodStart ||
+                        targetDate > classificationPeriodEnd) {
+                        throw weeklyHrApiError('STAGE1_DATE_OUTSIDE_ACTIONABLE_PERIOD', 409,
+                            'Η ημερομηνία δεν αποτελεί στόχο εγγραφής της περιόδου.');
                     }
                     if (classification === 'HOLIDAY') {
                         authoritativeTarget = authoritativeTarget ||
