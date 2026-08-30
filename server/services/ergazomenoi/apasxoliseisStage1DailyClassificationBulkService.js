@@ -1,7 +1,16 @@
 'use strict';
 
 const BULK_DAILY_CLASSIFICATION_CONCURRENCY = 12;
-const ALLOWED_CLASSIFICATIONS = new Set(['UNCLASSIFIED', 'LEAVE', 'SICKNESS', 'ABSENCE']);
+const { buildAutoAttendanceReset } = require('./apasxoliseisAttendanceDerivedScheduleService');
+const { buildApasxoliseisScenarioFacts } = require('./apasxoliseisScenarioFactsService');
+const {
+    matchApasxoliseisScenarioFacts,
+    SCENARIO_CODES
+} = require('./apasxoliseisScenarioMatcherService');
+
+const ALLOWED_CLASSIFICATIONS = new Set([
+    'UNCLASSIFIED', 'LEAVE', 'SICKNESS', 'ABSENCE', 'HOLIDAY'
+]);
 const ERGANI_II_SICKNESS_LEAVE_CATEGORY = 'ΑΔΑΣ';
 
 // Locked future ERGANI II contract: a daily sickness remains sickness internally,
@@ -30,7 +39,20 @@ function normalizeChange(change = {}) {
             ? { kathgoria_adeias_apologistika: ERGANI_II_SICKNESS_LEAVE_CATEGORY } : {}) };
 }
 
-function classificationUpdates(change) {
+function classificationUpdates(change, row = {}) {
+    if (change.classification === 'HOLIDAY') {
+        return {
+            ...buildAutoAttendanceReset(),
+            argia: true,
+            repo_apologistika: false,
+            adeia_apologistika: false,
+            kathgoria_adeias_apologistika: '',
+            astheneia_apologistika: false,
+            apousia_apologistika: false,
+            ores_ergasias_apologistika: Number(row.ores_ergasias || 0),
+            ores_pragmatikhs_ergasias_apologistika: 0
+        };
+    }
     return {
         repo_apologistika: false,
         adeia_apologistika: change.classification === 'LEAVE',
@@ -40,6 +62,30 @@ function classificationUpdates(change) {
         astheneia_apologistika: change.classification === 'SICKNESS',
         apousia_apologistika: change.classification === 'ABSENCE'
     };
+}
+
+function resolveAuthoritativeHolidayClassification({ row = {}, holiday = {},
+    companyFlags = {} } = {}) {
+    const facts = buildApasxoliseisScenarioFacts(row, { holiday, companyFlags });
+    const decision = matchApasxoliseisScenarioFacts(facts);
+    return Object.freeze({
+        eligible: decision.scenario_code ===
+            SCENARIO_CODES.DECLARED_WORK_NO_CARDS_HOLIDAY_REQUIRED,
+        scenario_code: decision.scenario_code,
+        decision
+    });
+}
+
+async function loadAuthoritativeStage1HolidayContext({ team, companyId, etos,
+    periodStart, periodEnd, presentationSnapshot = null, loadHolidayContext } = {}) {
+    if (typeof loadHolidayContext !== 'function') {
+        throw serviceError('HOLIDAY_CONTEXT_LOADER_REQUIRED',
+            'Δεν είναι διαθέσιμο το authoritative πλαίσιο αργιών.', 500);
+    }
+    // Τα frozen calendar facts δεν περιέχουν όλα τα mandatory/company-operation
+    // facts που απαιτεί ο authoritative scenario matcher.
+    void presentationSnapshot;
+    return loadHolidayContext({ team, companyId, etos, periodStart, periodEnd });
 }
 
 function nonNegativeNumber(value) {
@@ -141,6 +187,7 @@ async function saveStage1DailyClassificationsBulk({ changes, reason, applyOne,
     const results = await mapLimited(normalized, concurrency, async (change) => {
         try {
             const outcome = await applyOne({ row_id: change.row_id,
+                classification: change.classification,
                 updates: classificationUpdates(change), reason: normalizedReason });
             return { row_id: change.row_id, status: outcome?.unchanged ? 'UNCHANGED' : 'SAVED',
                 ...(outcome?.record ? { record: outcome.record } : {}) };
@@ -161,7 +208,9 @@ async function saveStage1DailyClassificationsBulk({ changes, reason, applyOne,
 }
 
 module.exports = { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY,
-    classificationUpdates, applyCanonicalAbsenceMetrics, applyCardDerivedAbsenceMetrics,
+    classificationUpdates, resolveAuthoritativeHolidayClassification,
+    loadAuthoritativeStage1HolidayContext,
+    applyCanonicalAbsenceMetrics, applyCardDerivedAbsenceMetrics,
     resolveEffectiveAbsenceMetrics,
     buildEffectiveAbsenceDaysAggregationExpression,
     buildEffectiveAbsenceHoursAggregationExpression,
