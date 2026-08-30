@@ -4512,6 +4512,39 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
         lifecycle, workflowState: state };
 }
 
+async function assertActiveEmploymentReviewStage3DayWritable(req, initial, input) {
+    if (!input.period_start || !input.period_end) {
+        return assertActiveEmploymentReviewPeriodReadable(
+            req, initial.scope.ypokatasthma,
+            { kind: 'WEEKLY_CONTEXT', start: initial.scope.week_start,
+                end: initial.scope.week_end,
+                authoritativeRowDates: initial.weekRows.map((row) => row.hmeromhnia) }
+        );
+    }
+    const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
+        req, initial.scope.ypokatasthma
+    );
+    const targetDate = dateKeyUtc(initial.row?.hmeromhnia);
+    const weekStart = dateKeyUtc(initial.scope.week_start);
+    const weekEnd = dateKeyUtc(initial.scope.week_end);
+    const authoritativeDates = initial.lifecycle?.employment_date_scope
+        ?.authoritative_date_set || [];
+    const exactActivePeriod = dateKeyUtc(input.period_start) ===
+            dateKeyUtc(periodAccess.scope.period_start) &&
+        dateKeyUtc(input.period_end) === dateKeyUtc(periodAccess.scope.period_end);
+    const targetInsideActivePeriod = targetDate &&
+        targetDate >= dateKeyUtc(periodAccess.scope.period_start) &&
+        targetDate <= dateKeyUtc(periodAccess.scope.period_end);
+    const targetInsideNaturalWeek = targetDate && targetDate >= weekStart && targetDate <= weekEnd;
+    const targetIsAuthoritative = authoritativeDates.includes(targetDate);
+    if (!exactActivePeriod || !targetInsideActivePeriod ||
+        !targetInsideNaturalWeek || !targetIsAuthoritative) {
+        throw weeklyHrApiError('STAGE3_DATE_OUTSIDE_ACTIVE_PERIOD', 409,
+            'Η ημερομηνία Stage 3 δεν αποτελεί στόχο εγγραφής της ενεργής περιόδου.');
+    }
+    return periodAccess;
+}
+
 async function loadWeeklyHrStage2CompletionContext({ req, input, session = null }) {
     const weekly = await loadWeeklyHrContext({ req, input, session });
     const applySession = (query) => session ? query.session(session) : query;
@@ -11119,12 +11152,17 @@ class erganhController {
                     'Το αίτημα Stage 3 περιέχει μη επιτρεπτά πεδία.');
             }
             const initial = await loadWeeklyHrStage3DecisionContext({ req, input: req.body });
-            const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
-                req, initial.scope.ypokatasthma,
-                { kind: 'WEEKLY_CONTEXT', start: initial.scope.week_start,
-                    end: initial.scope.week_end,
-                    authoritativeRowDates: initial.weekRows.map((row) => row.hmeromhnia) }
+            const periodAccess = await assertActiveEmploymentReviewStage3DayWritable(
+                req, initial, req.body
             );
+            if (!isDateInsideEmploymentPeriod({
+                period_start: periodAccess.scope.period_start,
+                period_end: periodAccess.scope.period_end,
+                date: initial.row.hmeromhnia
+            })) {
+                throw weeklyHrApiError('STAGE3_DATE_OUTSIDE_ACTIVE_PERIOD', 409,
+                    'Η ημερομηνία Stage 3 δεν αποτελεί στόχο εγγραφής της ενεργής περιόδου.');
+            }
             const stale = periodAccess.state.effective_mode ===
                 'HISTORICAL_RECONSTRUCTION_STALE';
             const runFence = stale
