@@ -1302,6 +1302,9 @@ async function assertActiveEmploymentReviewPeriodPresentationReadable(
         throw error;
     }
     if (requiredRange) {
+        const exactPresentationPeriod =
+            dateKeyUtc(requiredRange.periodStart) === dateKeyUtc(scope.period_start) &&
+            dateKeyUtc(requiredRange.periodEnd) === dateKeyUtc(scope.period_end);
         const insideScope = isWeekAllowedForEmploymentPeriod({
             period_start: scope.period_start,
             period_end: scope.period_end,
@@ -1315,7 +1318,8 @@ async function assertActiveEmploymentReviewPeriodPresentationReadable(
             }),
             authoritative_row_dates: requiredRange.authoritativeRowDates,
             required_authoritative_dates: requiredRange.requiredAuthoritativeDates,
-            allow_stale_completed_context: true
+            allow_stale_completed_context: true,
+            allow_presentation_boundary_slice: exactPresentationPeriod
         });
         if (!insideScope) {
             const error = new Error('Η ανάγνωση δεν ανήκει στην ενεργή περίοδο.');
@@ -10817,12 +10821,16 @@ class erganhController {
                 presentationSnapshot });
             await assertActiveEmploymentReviewPeriodPresentationReadable(
                 req, context.base.ypokatasthma, {
-                kind: 'WEEKLY_CONTEXT', start: context.week.start, end: context.week.end,
-                authoritativeRowDates: context.rows.map((row) => row.hmeromhnia),
-                requiredAuthoritativeDates:
-                    context.employmentDateScope?.employment_owned_dates || null
-                }
-            );
+                    kind: 'WEEKLY_CONTEXT', start: context.week.start, end: context.week.end,
+                    authoritativeRowDates: context.rows.filter((row) =>
+                        context.employmentDateScope?.authoritative_date_set?.includes(
+                            dateKeyUtc(row.hmeromhnia)
+                        )).map((row) => row.hmeromhnia),
+                    requiredAuthoritativeDates:
+                        context.employmentDateScope?.authoritative_date_set || null,
+                    periodStart: req.query.period_start,
+                    periodEnd: req.query.period_end
+                });
             const state = await ApasxoliseisWeeklyHrWorkflowStateModel.findOne({
                 ...context.base, employee_id: context.employee._id,
                 week_start: context.week.start, week_end: context.week.end
@@ -10925,6 +10933,7 @@ class erganhController {
                 employee_name: `${context.employee.eponymo || ''} ${context.employee.onoma || ''}`.trim(),
                 rows: context.rows, stage1_daily_presentation: stage1DailyPresentation,
                 stage1: state?.stage1 || null, ...projection,
+                employment_date_scope: context.employmentDateScope,
                 period_slice: lifecycleProjection.stages.stage1.period_slice,
                 stage1_status: lifecycleProjection.stages.stage1.persisted_status,
                 lifecycle_projection: lifecycleProjection });

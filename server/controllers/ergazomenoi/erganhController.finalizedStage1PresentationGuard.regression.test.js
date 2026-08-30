@@ -38,7 +38,14 @@ assert.match(presentationGuard, /if \(!lockedWithAuthoritativeResult && !\['NORM
 assert.match(presentationGuard, /'HISTORICAL_RECONSTRUCTION_STALE', 'FINALIZED'/);
 assert.match(presentationGuard, /isWeekAllowedForEmploymentPeriod\(\{/);
 assert.match(presentationGuard, /required_authoritative_dates:/);
+assert.match(presentationGuard, /allow_presentation_boundary_slice: exactPresentationPeriod/);
+assert.match(presentationGuard, /dateKeyUtc\(requiredRange\.periodStart\)/);
 assert.match(stage1Get, /assertActiveEmploymentReviewPeriodPresentationReadable\(/);
+assert.match(stage1Get, /authoritative_date_set\?\.includes/);
+assert.match(stage1Get, /requiredAuthoritativeDates:[\s\S]*authoritative_date_set \|\| null/);
+assert.match(stage1Get, /employment_date_scope: context\.employmentDateScope/);
+assert.doesNotMatch(stage1Get,
+    /requiredAuthoritativeDates:[\s\S]{0,120}employment_owned_dates/);
 assert.match(stage1Get, /loadFinalizedWeeklyHrPresentationSnapshot/);
 assert.match(stage1Get,
     /presentationSnapshot\s*\?\s*buildFinalizedWeeklyHrLifecyclePresentation\([\s\S]*?: await buildWeeklyLifecycleWithStage2State/);
@@ -62,14 +69,15 @@ assert.strictEqual(
 function executablePresentationGuard(state) {
     return Function(
         'activeEmploymentReviewPeriodScope', 'getPeriodControl',
-        'isWeekAllowedForEmploymentPeriod', 'resolveWeeklyRepoPreviewAsOfDate',
+        'isWeekAllowedForEmploymentPeriod', 'resolveWeeklyRepoPreviewAsOfDate', 'dateKeyUtc',
         `${presentationGuard}; return assertActiveEmploymentReviewPeriodPresentationReadable;`
     )(
         async () => ({ team: 'THA', company_kod: 'company', ypokatasthma: '0000',
             period_start: '2026-06-01', period_end: '2026-06-30' }),
         async () => state,
         () => true,
-        () => new Date('2026-07-05T00:00:00.000Z')
+        () => new Date('2026-07-05T00:00:00.000Z'),
+        (value) => String(value || '').slice(0, 10)
     );
 }
 
