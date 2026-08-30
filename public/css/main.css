@@ -15215,6 +15215,63 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage1-bulk-toolbar {
     position: static;
     background: var(--bs-body-bg, #fff);
+    margin-bottom: 0.625rem !important;
+}
+
+.employment-review-boundary-sides {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.employment-review-boundary-side {
+    padding-top: 0.35rem;
+    border-top: 1px solid rgba(102, 77, 3, 0.2);
+}
+
+.employment-review-boundary-dialog details summary {
+    cursor: pointer;
+}
+
+.employment-review-boundary-dialog {
+    overflow: visible;
+}
+
+.employment-review-boundary-context-button {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+}
+
+#employmentReviewBoundaryContextButton:not(:hover):not(:focus) {
+    background-color: var(--bs-secondary-bg-subtle, #e9ecef);
+    color: #41464b;
+    border-color: #ced4da;
+}
+
+.swal2-popup.employment-review-boundary-popup {
+    max-height: calc(100vh - 2rem);
+    overflow: hidden;
+    padding: 0.65rem 1rem 0.75rem;
+}
+
+.swal2-popup.employment-review-boundary-popup .swal2-icon {
+    width: 3rem;
+    height: 3rem;
+    margin: 0.25rem auto 0;
+    font-size: 0.75rem;
+}
+
+.swal2-popup.employment-review-boundary-popup .swal2-title {
+    margin: 0;
+    padding: 0.25rem 0.5rem 0;
+}
+
+.swal2-popup.employment-review-boundary-popup .swal2-html-container {
+    margin: 0.4rem 1rem 0;
+}
+
+.swal2-popup.employment-review-boundary-popup .swal2-actions {
+    margin: 0.55rem auto 0;
 }
 
 .weekly-hr-stage1-bulk-toolbar .weekly-hr-bulk-complete {
