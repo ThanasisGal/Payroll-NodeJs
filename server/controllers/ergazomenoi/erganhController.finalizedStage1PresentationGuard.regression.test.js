@@ -38,7 +38,7 @@ assert.match(presentationGuard, /if \(!lockedWithAuthoritativeResult && !\['NORM
 assert.match(presentationGuard, /'HISTORICAL_RECONSTRUCTION_STALE', 'FINALIZED'/);
 assert.match(presentationGuard, /isWeekAllowedForEmploymentPeriod\(\{/);
 assert.match(presentationGuard, /required_authoritative_dates:/);
-assert.match(presentationGuard, /allow_presentation_boundary_slice: exactPresentationPeriod/);
+assert.match(presentationGuard, /allow_presentation_boundary_slice: presentationSliceInsideActivePeriod/);
 assert.match(presentationGuard, /dateKeyUtc\(requiredRange\.periodStart\)/);
 assert.match(stage1Get, /assertActiveEmploymentReviewPeriodPresentationReadable\(/);
 assert.match(stage1Get, /authoritative_date_set\?\.includes/);

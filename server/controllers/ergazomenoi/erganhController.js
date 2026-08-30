@@ -1303,9 +1303,16 @@ async function assertActiveEmploymentReviewPeriodPresentationReadable(
         throw error;
     }
     if (requiredRange) {
-        const exactPresentationPeriod =
-            dateKeyUtc(requiredRange.periodStart) === dateKeyUtc(scope.period_start) &&
-            dateKeyUtc(requiredRange.periodEnd) === dateKeyUtc(scope.period_end);
+        const requestedPresentationStart = dateKeyUtc(requiredRange.periodStart);
+        const requestedPresentationEnd = dateKeyUtc(requiredRange.periodEnd);
+        const activePeriodStart = dateKeyUtc(scope.period_start);
+        const activePeriodEnd = dateKeyUtc(scope.period_end);
+        const presentationSliceInsideActivePeriod = Boolean(
+            requestedPresentationStart && requestedPresentationEnd &&
+            requestedPresentationStart <= requestedPresentationEnd &&
+            requestedPresentationStart >= activePeriodStart &&
+            requestedPresentationEnd <= activePeriodEnd
+        );
         const insideScope = isWeekAllowedForEmploymentPeriod({
             period_start: scope.period_start,
             period_end: scope.period_end,
@@ -1320,7 +1327,7 @@ async function assertActiveEmploymentReviewPeriodPresentationReadable(
             authoritative_row_dates: requiredRange.authoritativeRowDates,
             required_authoritative_dates: requiredRange.requiredAuthoritativeDates,
             allow_stale_completed_context: true,
-            allow_presentation_boundary_slice: exactPresentationPeriod
+            allow_presentation_boundary_slice: presentationSliceInsideActivePeriod
         });
         if (!insideScope) {
             const error = new Error('Η ανάγνωση δεν ανήκει στην ενεργή περίοδο.');
