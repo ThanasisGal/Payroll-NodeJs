@@ -8339,9 +8339,12 @@ function stage1PayloadsForDisplay() {
 }
 
 function stage1RelevantDates(payload) {
-    return [...new Set([...(payload.workflow?.possible_leave_days || []),
+    const dates = [...new Set([...(payload.workflow?.possible_leave_days || []),
         ...(payload.confirmed_leave_dates || []), ...(payload.confirmed_sickness_dates || []),
         ...(payload.confirmed_absence_dates || [])])].sort();
+    const actionable = payload.period_slice?.actionable_dates;
+    return Array.isArray(actionable) && actionable.length
+        ? dates.filter((date) => actionable.includes(date)) : dates;
 }
 
 function compareWeeklyHrStage1Payloads(left = {}, right = {}) {
