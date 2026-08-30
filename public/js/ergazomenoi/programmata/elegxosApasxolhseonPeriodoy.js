@@ -8292,7 +8292,7 @@ function stage1ClassificationForRow(row = {}) {
 
 function stage1ClassificationLabel(value) {
     return { UNCLASSIFIED: '—', LEAVE: 'Άδεια', SICKNESS: 'Ασθένεια',
-        ABSENCE: 'Απουσία' }[value] || '—';
+        ABSENCE: 'Απουσία', HOLIDAY: 'Αργία' }[value] || '—';
 }
 
 function stage1HasClassificationFilter(filters = stage1DisplayFilters) {
@@ -8487,13 +8487,23 @@ function renderStage1DayEditor(payload, date) {
     };
     const stage2Candidate = (payload.workflow?.unclassified_stage2_candidates || [])
         .find((candidate) => candidate.date === date);
+    const holidayEligible = stage1DailyPresentationForDate(payload, date)
+        ?.holiday_classification_eligible === true;
+    const classifications = holidayEligible
+        ? ['UNCLASSIFIED', 'LEAVE', 'SICKNESS', 'ABSENCE', 'HOLIDAY']
+        : ['UNCLASSIFIED', 'LEAVE', 'SICKNESS', 'ABSENCE'];
+    if (holidayEligible && draft.classification === 'UNCLASSIFIED') {
+        draft.classification = 'HOLIDAY';
+        weeklyHrStage1DayDrafts.set(rowId, draft);
+    }
     return `<span class="weekly-hr-stage1-day d-inline-flex flex-wrap align-items-center gap-1">
         <input type="checkbox" class="form-check-input weekly-hr-stage1-day-select" data-row-id="${escapeHtml(rowId)}" ${weeklyHrStage1DaySelected.has(rowId) ? 'checked' : ''}>
         <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-day" data-row-id="${escapeHtml(rowId)}">${escapeHtml(formatStage1DateKey(date))}</button>
         <select class="form-select form-select-sm weekly-hr-stage1-day-classification" data-row-id="${escapeHtml(rowId)}" aria-label="Χαρακτηρισμός ${escapeHtml(formatStage1DateKey(date))}">
-            ${['UNCLASSIFIED', 'LEAVE', 'SICKNESS', 'ABSENCE'].map((value) =>
+            ${classifications.map((value) =>
                 `<option value="${value}" ${draft.classification === value ? 'selected' : ''}>${stage1ClassificationLabel(value)}</option>`).join('')}
         </select>
+        ${holidayEligible ? `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-success weekly-hr-save-holiday-day" data-row-id="${escapeHtml(rowId)}" ${draft.classification === 'HOLIDAY' && !weeklyHrStage1DaySaving ? '' : 'disabled aria-disabled="true"'}>Αποθήκευση</button>` : ''}
         <select class="form-select form-select-sm weekly-hr-stage1-leave-category ${['LEAVE', 'SICKNESS'].includes(draft.classification) ? '' : 'd-none'}" data-row-id="${escapeHtml(rowId)}" ${draft.classification === 'SICKNESS' ? 'disabled aria-disabled="true"' : ''}>${stage1LeaveCategoryOptions(draft.kathgoria_adeias_apologistika)}</select>
         ${draft.classification === 'UNCLASSIFIED' && stage2Candidate
             ? `<small class="weekly-hr-stage2-candidate-label text-muted">${escapeHtml(stage2Candidate.label)}</small>` : ''}
@@ -9287,9 +9297,14 @@ async function classifySelectedStage1Days(classification) {
     rerenderWeeklyHrStage1Rows();
 }
 
-async function saveStage1DailyClassificationDrafts() {
+async function saveStage1DailyClassificationDrafts(requestedRowIds = null) {
     if (weeklyHrStage1DaySaving || !weeklyHrStage1DayDrafts.size) return;
-    for (const draft of weeklyHrStage1DayDrafts.values()) {
+    const requestedSet = requestedRowIds
+        ? new Set([...requestedRowIds].map(String)) : null;
+    const draftsToSave = [...weeklyHrStage1DayDrafts]
+        .filter(([rowId]) => !requestedSet || requestedSet.has(String(rowId)));
+    if (!draftsToSave.length) return;
+    for (const [, draft] of draftsToSave) {
         if (draft.classification === 'LEAVE' && !draft.kathgoria_adeias_apologistika) {
             await employmentReviewSwal({ icon: 'warning', title: 'Κατηγορία άδειας',
                 text: 'Κάθε επιλεγμένη Άδεια πρέπει να έχει πραγματική κατηγορία άδειας.' }); return;
@@ -9302,16 +9317,22 @@ async function saveStage1DailyClassificationDrafts() {
     if (!prompt.isConfirmed) return;
     const affectedKeys = new Set();
     weeklyHrStage1Payloads.forEach((payload, key) => {
-        if ((payload.rows || []).some((row) => weeklyHrStage1DayDrafts.has(String(row._id)))) affectedKeys.add(key);
+        if ((payload.rows || []).some((row) => draftsToSave.some(([rowId]) =>
+            String(row._id) === String(rowId)))) affectedKeys.add(key);
     });
     weeklyHrStage1DaySaving = true; updateWeeklyHrStage1BulkToolbar();
     try {
-        const changes = [...weeklyHrStage1DayDrafts].map(([row_id, draft]) => ({ row_id, ...draft }));
+        const changes = draftsToSave.map(([row_id, draft]) => ({ row_id, ...draft }));
         const response = await fetch('/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/bulk-classify-days', {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
             body: JSON.stringify({ reason: String(prompt.value).trim(), changes }) });
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || 'Αποτυχία αποθήκευσης χαρακτηρισμών.');
+        if (requestedSet && Number(result.failed_count || 0) > 0) {
+            throw new Error((result.results || []).find((item) =>
+                ['FAILED', 'REVIEW_REQUIRED'].includes(item.status))?.message ||
+                'Η ημερήσια αλλαγή δεν αποθηκεύτηκε.');
+        }
         (result.results || []).forEach((item) => {
             if (['SAVED', 'UNCHANGED'].includes(item.status)) {
                 if (item.record) updateAuthoritativeReviewDailyRow(item.record);
@@ -9497,6 +9518,10 @@ document.addEventListener('click', (event) => {
     if (classifyButton) { classifySelectedStage1Days(classifyButton.dataset.classification); return; }
     if (event.target.closest('.weekly-hr-save-day-classifications')) {
         saveStage1DailyClassificationDrafts(); return;
+    }
+    const holidaySaveButton = event.target.closest('.weekly-hr-save-holiday-day');
+    if (holidaySaveButton && !holidaySaveButton.disabled) {
+        saveStage1DailyClassificationDrafts([holidaySaveButton.dataset.rowId]); return;
     }
     if (event.target.closest('.weekly-hr-select-all')) {
         visibleWeeklyHrStage1Payloads().forEach((payload) => {
