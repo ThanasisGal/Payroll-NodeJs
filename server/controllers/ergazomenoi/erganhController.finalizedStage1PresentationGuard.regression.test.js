@@ -50,7 +50,7 @@ assert.match(finalizedSource, /state\.stored_status !== 'FINALIZED'/);
 assert.match(finalizedSource, /ApasxoliseisPeriodFrozenSnapshotModel\.findOne/);
 assert.match(finalizedSource, /return document\.frozen_snapshot/);
 assert.doesNotMatch(stage1Get, /assertActiveEmploymentReviewPeriodReadable\(/);
-assert.match(stage1Completion, /assertActiveEmploymentReviewPeriodReadable\(/);
+assert.match(stage1Completion, /assertActiveEmploymentReviewStage1CompletionReadable\(/);
 assert.match(stage2Completion, /assertActiveEmploymentReviewPeriodReadable\(/);
 assert.match(stage3Decision, /assertActiveEmploymentReviewPeriodReadable\(/);
 assert.match(orphanWrite, /assertActiveEmploymentReviewOrphanResolutionPeriod\(/);
