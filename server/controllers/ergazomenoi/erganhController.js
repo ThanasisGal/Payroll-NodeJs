@@ -427,6 +427,9 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisDailyActualWorkFactsService');
 const {
     saveStage1DailyClassificationsBulk,
+    classificationUpdates: buildStage1ClassificationUpdates,
+    resolveAuthoritativeHolidayClassification,
+    loadAuthoritativeStage1HolidayContext,
     applyCanonicalAbsenceMetrics
 } = require('../../services/ergazomenoi/apasxoliseisStage1DailyClassificationBulkService');
 const {
@@ -4325,6 +4328,26 @@ const REVIEW_SELECT_FIELDS =
 
 function weeklyHrApiError(code, statusCode, message) {
     return Object.assign(new Error(message), { code, statusCode });
+}
+
+function stage1HolidayEligibilityContext(holidayRecord, companyFlags = {}) {
+    const resolvedOperation = typeof holidayRecord?.companyOperatesOnHoliday === 'boolean'
+        ? holidayRecord.companyOperatesOnHoliday : null;
+    return {
+        holiday: {
+            isHoliday: Boolean(holidayRecord),
+            isMandatoryHoliday: holidayRecord?.ypoxreotikh_argia === true,
+            isOptionalHoliday: Boolean(holidayRecord) &&
+                holidayRecord?.ypoxreotikh_argia !== true,
+            description: holidayRecord?.description || ''
+        },
+        companyFlags: {
+            companyWorksOnMandatoryHoliday: resolvedOperation ??
+                (companyFlags.apasxolhsh_kata_tis_argies === true),
+            companyWorksOnOptionalHoliday: resolvedOperation ??
+                (companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true)
+        }
+    };
 }
 
 function normalizeNaturalWeek(startValue, endValue) {
@@ -10784,6 +10807,15 @@ class erganhController {
                         ) || null;
                     }
                 });
+            const stage1HolidayContext = await loadAuthoritativeStage1HolidayContext({
+                    team: context.base.team,
+                    companyId: context.base.company_kod,
+                    etos: String(context.week.start.getUTCFullYear()),
+                    periodStart: context.week.start,
+                    periodEnd: context.week.end,
+                    presentationSnapshot,
+                    loadHolidayContext: buildNoCardsDisplayContext
+                });
             const stage1DailyPresentation = context.rows.map((row) => {
                 const rowDate = dateKeyUtc(row.hmeromhnia);
                 const dailyProfile = context.effectiveProfilesByDate[rowDate] ||
@@ -10792,6 +10824,13 @@ class erganhController {
                     dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
                 );
                 const actualFacts = resolveStage3DailyActualWorkFacts(row);
+                const holidayRecord = stage1HolidayContext.argiesByDateKey
+                    .get(rowDate);
+                const holidayEligibility = resolveAuthoritativeHolidayClassification({
+                    row,
+                    ...stage1HolidayEligibilityContext(holidayRecord,
+                        stage1HolidayContext.companyFlags)
+                });
                 const intervals = (prefix) => [1, 2, 3].map((index) => ({
                     start: String(row?.[`${prefix}apo_ora_0${index}`] || ''),
                     end: String(row?.[`${prefix}eos_ora_0${index}`] || '')
@@ -10805,6 +10844,7 @@ class erganhController {
                     actual_work_hours: actualFacts.actualWorkHours,
                     card_intervals: intervals('cards_'),
                     card_hours: actualFacts.cardHours,
+                    holiday_classification_eligible: holidayEligibility.eligible,
                     current_apologistiko_classification:
                         row.apousia_apologistika === true ? 'ΑΠΟΥΣΙΑ'
                             : row.astheneia_apologistika === true ? 'ΑΣΘΕΝΕΙΑ'
@@ -10956,7 +10996,8 @@ class erganhController {
             const result = await saveStage1DailyClassificationsBulk({
                 changes: req.body.changes,
                 reason: req.body.reason,
-                applyOne: async ({ row_id, updates, reason }) => {
+                applyOne: async ({ row_id, classification, updates, reason }) => {
+                    let authoritativeTarget = null;
                     if (classificationPeriodStart) {
                         const target = await ProdhlomenaOrariaModel.findOne({ _id: row_id,
                             team: req.session.userTeam,
@@ -10968,6 +11009,35 @@ class erganhController {
                             throw weeklyHrApiError('STAGE1_DATE_OUTSIDE_ACTIONABLE_PERIOD', 409,
                                 'Η ημερομηνία δεν αποτελεί στόχο εγγραφής της περιόδου.');
                         }
+                    }
+                    if (classification === 'HOLIDAY') {
+                        authoritativeTarget = authoritativeTarget ||
+                            await ProdhlomenaOrariaModel.findOne({ _id: row_id,
+                                team: req.session.userTeam,
+                                company_kod: String(req.session.companyInUse || '') })
+                                .select(REVIEW_SELECT_FIELDS).lean();
+                        if (!authoritativeTarget) throw weeklyHrApiError(
+                            'DAILY_REVIEW_RECORD_NOT_FOUND', 404,
+                            'Η ημερήσια εγγραφή δεν βρέθηκε.');
+                        const holidayContext = await buildNoCardsDisplayContext({
+                            team: req.session.userTeam,
+                            companyId: req.session.companyInUse,
+                            etos: String(new Date(authoritativeTarget.hmeromhnia).getUTCFullYear()),
+                            periodStart: authoritativeTarget.hmeromhnia,
+                            periodEnd: authoritativeTarget.hmeromhnia
+                        });
+                        const holidayRecord = holidayContext.argiesByDateKey.get(
+                            dateKeyUtc(authoritativeTarget.hmeromhnia));
+                        const eligibility = resolveAuthoritativeHolidayClassification({
+                            row: authoritativeTarget,
+                            ...stage1HolidayEligibilityContext(holidayRecord,
+                                holidayContext.companyFlags)
+                        });
+                        if (!eligibility.eligible) throw weeklyHrApiError(
+                            'STAGE1_HOLIDAY_NOT_AUTHORITATIVE', 409,
+                            'Η ημέρα δεν πληροί τις προϋποθέσεις χαρακτηρισμού ως Αργία.');
+                        updates = buildStage1ClassificationUpdates(
+                            { classification: 'HOLIDAY' }, authoritativeTarget);
                     }
                     let statusCode = 200;
                     let payload;
@@ -11214,8 +11284,11 @@ class erganhController {
 
                 'kyriakes_apologistika',
                 'ores_ergasias_apologistika',
+                'ores_pragmatikhs_ergasias_apologistika',
                 'ores_argion_prosayxhsh_apologistika',
                 'ores_argion_ergasia_apologistika',
+
+                'argia',
 
                 'ores_apoysias_apologistika'
             ];
@@ -11224,6 +11297,8 @@ class erganhController {
 
             for (const field of allowedFields) {
                 if (Object.prototype.hasOwnProperty.call(updates, field)) {
+                    if (['argia', 'ores_pragmatikhs_ergasias_apologistika'].includes(field) &&
+                        updates.argia !== true) continue;
                     cleanUpdates[field] = updates[field];
                 }
             }
@@ -11257,6 +11332,28 @@ class erganhController {
                     success: false,
                     message: 'Δεν βρέθηκε η εγγραφή.'
                 });
+            }
+
+            if (cleanUpdates.argia === true) {
+                const holidayContext = await buildNoCardsDisplayContext({
+                    team: sessionTeam,
+                    companyId,
+                    etos: String(new Date(oldRecord.hmeromhnia).getUTCFullYear()),
+                    periodStart: oldRecord.hmeromhnia,
+                    periodEnd: oldRecord.hmeromhnia
+                });
+                const holidayRecord = holidayContext.argiesByDateKey.get(
+                    dateKeyUtc(oldRecord.hmeromhnia));
+                const eligibility = resolveAuthoritativeHolidayClassification({
+                    row: oldRecord,
+                    ...stage1HolidayEligibilityContext(holidayRecord,
+                        holidayContext.companyFlags)
+                });
+                if (!eligibility.eligible) throw weeklyHrApiError(
+                    'STAGE1_HOLIDAY_NOT_AUTHORITATIVE', 409,
+                    'Η ημέρα δεν πληροί τις προϋποθέσεις χαρακτηρισμού ως Αργία.');
+                cleanUpdates = buildStage1ClassificationUpdates(
+                    { classification: 'HOLIDAY' }, oldRecord);
             }
 
             let approvedOrphanResolution = null;
