@@ -213,7 +213,8 @@ const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
-    deriveEmploymentOwnedDateScope
+    deriveEmploymentOwnedDateScope,
+    buildFullMonthBoundaryContextPreflight
 } = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
 const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
@@ -7349,6 +7350,46 @@ class erganhController {
                 )
                 .filter((d) => d.is_legacy_policy === true);
 
+            const boundaryScope = buildFullMonthBoundaryContextPreflight({
+                period_start: reviewPeriodStart,
+                period_end: reviewPeriodEnd,
+                employees: lifecycleEmployees
+            });
+            const loadBoundaryCardRows = async (side) => {
+                if (!side?.dates?.length || !side.affected_employee_codes?.length) return [];
+                const boundaryFilter = {
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    kodikos: mongoose.trusted({ $in: side.affected_employee_codes }),
+                    hmeromhnia: mongoose.trusted({
+                        $gte: clampDateStartUtc(`${side.dates[0]}T00:00:00.000Z`),
+                        $lte: clampDateEndUtc(`${side.dates.at(-1)}T23:59:59.999Z`)
+                    })
+                };
+                if (ypokatasthma && String(ypokatasthma).trim()) {
+                    boundaryFilter.ypokatasthma = String(ypokatasthma).trim().padStart(4, '0');
+                }
+                return ProdhlomenaOrariaModel.find(boundaryFilter)
+                    .select('ypokatasthma kodikos hmeromhnia cards_apo_ora_01 cards_eos_ora_01 ' +
+                        'cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                        'cards_ores_ergasias')
+                    .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+                    .lean();
+            };
+            const [previousBoundaryRows, nextBoundaryRows] = boundaryScope
+                ? await Promise.all([
+                    loadBoundaryCardRows(boundaryScope.previous),
+                    loadBoundaryCardRows(boundaryScope.next)
+                ]) : [[], []];
+            const boundaryContextPreflight = boundaryScope
+                ? buildFullMonthBoundaryContextPreflight({
+                    period_start: reviewPeriodStart,
+                    period_end: reviewPeriodEnd,
+                    employees: lifecycleEmployees,
+                    previous_rows: previousBoundaryRows,
+                    next_rows: nextBoundaryRows
+                }) : null;
+
             return res.json({
                 success: true,
                 page: pageNum,
@@ -7359,6 +7400,7 @@ class erganhController {
                 deviations: enrichedDeviations,
                 pendingDeviationWeeks,
                 legacyDeviations,
+                boundaryContextPreflight,
                 deviationPolicyVersion: deviationPreview.policyVersion
             });
         } catch (error) {
