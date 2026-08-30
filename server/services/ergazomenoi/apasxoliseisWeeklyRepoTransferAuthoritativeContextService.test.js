@@ -19,6 +19,9 @@ const {
 const {
     buildWeeklyRepoTransferSinglePairGroupProjection
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
+const {
+    resolveAuthoritativeHolidayClassification
+} = require('./apasxoliseisStage1DailyClassificationBulkService');
 
 function testRowFieldEquivalence() {
     const authoritative = new Set(ATOMIC_REPO_TRANSFER_ROW_FIELDS.split(/\s+/).filter(Boolean));
@@ -73,6 +76,20 @@ function testHolidayContexts() {
         leitoyrgia_etaireias: false
     }], companyOpen).get('2026-01-06');
     assert.strictEqual(mandatoryOverrideClosed.companyOperatesOnHoliday, false);
+    const eligibleRow = { _id: 'holiday', hmeromhnia: '2026-01-06',
+        kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8, cards_ores_ergasias: 0 };
+    assert.strictEqual(resolveAuthoritativeHolidayClassification({
+        row: eligibleRow,
+        holiday: {
+            isHoliday: mandatoryOverrideClosed.isHoliday,
+            isMandatoryHoliday: mandatoryOverrideClosed.isMandatoryHoliday,
+            isOptionalHoliday: mandatoryOverrideClosed.isOptionalHoliday
+        },
+        companyFlags: {
+            companyWorksOnMandatoryHoliday:
+                mandatoryOverrideClosed.companyOperatesOnHoliday
+        }
+    }).eligible, true);
 
     for (const [label, holiday, expected] of [
         ['null override', { leitoyrgia_etaireias: null }, true],
@@ -84,6 +101,16 @@ function testHolidayContexts() {
         }], companyOpen).get('2026-01-06');
         assert.strictEqual(resolved.companyOperatesOnHoliday, expected, label);
     }
+    const mandatoryNull = buildArgiesByDateKey([{
+        hmeromhnia: '2026-01-06', ypoxreotikh_argia: true,
+        leitoyrgia_etaireias: null
+    }], companyOpen).get('2026-01-06');
+    assert.strictEqual(resolveAuthoritativeHolidayClassification({
+        row: eligibleRow,
+        holiday: { isHoliday: true, isMandatoryHoliday: true },
+        companyFlags: { companyWorksOnMandatoryHoliday:
+            mandatoryNull.companyOperatesOnHoliday }
+    }).eligible, false);
 
     const optionalOverrideClosed = buildArgiesByDateKey([{
         hmeromhnia: '2026-01-07', ypoxreotikh_argia: false,
