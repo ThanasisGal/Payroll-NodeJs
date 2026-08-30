@@ -5,7 +5,9 @@ const mongoose = require('mongoose');
 const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const { ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
 const {
+    EMPLOYMENT_CALCULATION_SEMANTICS_VERSION,
     SOURCE_FIELDS,
+    DEPENDENCY_FIELDS,
     dependencyWindow,
     fingerprintRows,
     projectionForHistoricalState,
@@ -34,6 +36,26 @@ assert.strictEqual(mayDependencyV1, fingerprintRows([...boundary]));
 assert.notStrictEqual(mayDependencyV1, fingerprintRows([{ ...boundary[0], cards_ores_ergasias: 7.5 }]));
 assert.strictEqual(fingerprintRows([]), fingerprintRows([]));
 assert.ok(!SOURCE_FIELDS.includes('updated_at'));
+
+const currentSemanticDependency = fingerprintRows(boundary, DEPENDENCY_FIELDS, {
+    calculationSemanticsVersion: EMPLOYMENT_CALCULATION_SEMANTICS_VERSION
+});
+const previousSemanticDependency = fingerprintRows(boundary, DEPENDENCY_FIELDS, {
+    calculationSemanticsVersion: 'employment-calculation-semantics:v1'
+});
+const legacyDependencyWithoutSemanticVersion = fingerprintRows(boundary, DEPENDENCY_FIELDS);
+const semanticCurrentRecord = { status: 'OPEN',
+    historical_reconstruction_status: 'COMPLETED',
+    historical_dependency_fingerprint: currentSemanticDependency };
+assert.strictEqual(projectionForHistoricalState({ record: semanticCurrentRecord,
+    pastDeadline: true, dependencyFingerprint: currentSemanticDependency }),
+'HISTORICAL_RECONSTRUCTED');
+assert.strictEqual(projectionForHistoricalState({ record: { ...semanticCurrentRecord,
+    historical_dependency_fingerprint: previousSemanticDependency }, pastDeadline: true,
+dependencyFingerprint: currentSemanticDependency }), 'HISTORICAL_RECONSTRUCTION_STALE');
+assert.strictEqual(projectionForHistoricalState({ record: { ...semanticCurrentRecord,
+    historical_dependency_fingerprint: legacyDependencyWithoutSemanticVersion }, pastDeadline: true,
+dependencyFingerprint: currentSemanticDependency }), 'HISTORICAL_RECONSTRUCTION_STALE');
 
 assert.strictEqual(projectionForHistoricalState({ record: null, pastDeadline: true,
     dependencyFingerprint: fingerprintRows([]) }), 'HISTORICAL_RECONSTRUCTION_REQUIRED');
@@ -271,7 +293,10 @@ function castFingerprintDateSelector(dateSelector) {
         originalMayDependency);
     const juneFingerprints = await calculateHistoricalFingerprints({ scope: juneScope, prodhlomenaModel });
     assert.strictEqual(juneFingerprints.dependency_window_start, null);
-    assert.strictEqual(juneFingerprints.dependency_fingerprint, fingerprintRows([]));
+    assert.strictEqual(juneFingerprints.dependency_fingerprint,
+        fingerprintRows([], DEPENDENCY_FIELDS, {
+            calculationSemanticsVersion: EMPLOYMENT_CALCULATION_SEMANTICS_VERSION
+        }));
 
     replayStore.record.active_calculation_id = 'historical-calculation-complete-01';
     replayStore.record.last_historical_reconstruction_request_id = 'historical-reassess-02';
@@ -377,6 +402,6 @@ function castFingerprintDateSelector(dateSelector) {
     await assert.rejects(() => acquirePeriodCalculationOwnership({ scope: juneScope,
         calculationId: 'historical-calculation-owner-02', now: new Date('2026-08-01'),
         periodControlModel: ownershipStore.model, indexGuard: async () => ({ ready: true }), transactionRunner }),
-    error => error.code === 'PERIOD_CONTROL_CORRECTIVE_ONLY');
+    error => error.code === 'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED');
     console.log('apasxoliseisHistoricalPeriodReconstructionService tests: PASS');
 })().catch(error => { console.error(error); process.exitCode = 1; });

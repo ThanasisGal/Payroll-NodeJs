@@ -27,6 +27,38 @@ assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026
 assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-07-27', week_end: '2026-08-02' }), false);
 assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-06-22', week_end: '2026-06-28' }), false);
 assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july, week_start: '2026-06-30', week_end: '2026-07-06' }), false);
+const leadingJulyBoundaryPresentation = { ...july,
+    week_start: '2026-06-29', week_end: '2026-07-05',
+    required_authoritative_dates: ['2026-07-01', '2026-07-02', '2026-07-03',
+        '2026-07-04', '2026-07-05'],
+    authoritative_row_dates: ['2026-07-01', '2026-07-02', '2026-07-03',
+        '2026-07-04', '2026-07-05'],
+    allow_presentation_boundary_slice: true };
+assert.strictEqual(isWeekAllowedForEmploymentPeriod(leadingJulyBoundaryPresentation), true);
+const trailingJulyBoundaryPresentation = { ...july,
+    week_start: '2026-07-27', week_end: '2026-08-02',
+    required_authoritative_dates: ['2026-07-27', '2026-07-28', '2026-07-29',
+        '2026-07-30', '2026-07-31'],
+    authoritative_row_dates: ['2026-07-27', '2026-07-28', '2026-07-29',
+        '2026-07-30', '2026-07-31'],
+    allow_presentation_boundary_slice: true };
+assert.strictEqual(isWeekAllowedForEmploymentPeriod(trailingJulyBoundaryPresentation), true);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...leadingJulyBoundaryPresentation,
+    required_authoritative_dates: null }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...leadingJulyBoundaryPresentation,
+    authoritative_row_dates: ['2026-07-01', '2026-07-02'] }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...leadingJulyBoundaryPresentation,
+    required_authoritative_dates: [...leadingJulyBoundaryPresentation.required_authoritative_dates,
+        '2026-06-30'],
+    authoritative_row_dates: [...leadingJulyBoundaryPresentation.authoritative_row_dates,
+        '2026-06-30'] }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...trailingJulyBoundaryPresentation,
+    allow_presentation_boundary_slice: false }), false);
+assert.strictEqual(isWeekAllowedForEmploymentPeriod({ ...july,
+    week_start: '2026-06-22', week_end: '2026-06-28',
+    required_authoritative_dates: ['2026-06-22'],
+    authoritative_row_dates: ['2026-06-22'],
+    allow_presentation_boundary_slice: true }), false);
 assert.strictEqual(isDateInsideEmploymentPeriod({ ...july, date: '2026-06-30' }), false);
 assert.strictEqual(isDateInsideEmploymentPeriod({ ...july, date: '2026-07-01' }), true);
 assert.strictEqual(isDateInsideEmploymentPeriod({ ...july, date: '2026-07-31' }), true);

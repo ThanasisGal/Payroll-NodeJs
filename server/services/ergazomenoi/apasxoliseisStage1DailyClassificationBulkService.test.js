@@ -3,6 +3,8 @@
 const assert = require('assert/strict');
 const { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY,
     classificationUpdates,
+    resolveAuthoritativeHolidayClassification,
+    loadAuthoritativeStage1HolidayContext,
     applyCanonicalAbsenceMetrics,
     applyCardDerivedAbsenceMetrics,
     resolveEffectiveAbsenceMetrics,
@@ -20,6 +22,64 @@ const { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY
         repo_apologistika: false, adeia_apologistika: false,
         kathgoria_adeias_apologistika: '', astheneia_apologistika: false,
         apousia_apologistika: true });
+    assert.deepEqual(classificationUpdates({ classification: 'HOLIDAY' }, {
+        ores_ergasias: 8
+    }), {
+        apologistiko_biblio: false,
+        apo_ora_01_apologistika: '', eos_ora_01_apologistika: '',
+        apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
+        apo_ora_03_apologistika: '', eos_ora_03_apologistika: '',
+        argia: true, repo_apologistika: false, adeia_apologistika: false,
+        kathgoria_adeias_apologistika: '', astheneia_apologistika: false,
+        apousia_apologistika: false, ores_ergasias_apologistika: 8,
+        ores_pragmatikhs_ergasias_apologistika: 0
+    });
+    const declaredHolidayRow = { _id: 'holiday', hmeromhnia: new Date('2026-01-06'),
+        kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8, cards_ores_ergasias: 0 };
+    const mandatoryClosed = resolveAuthoritativeHolidayClassification({
+        row: declaredHolidayRow,
+        holiday: { isHoliday: true, isMandatoryHoliday: true },
+        companyFlags: { companyWorksOnMandatoryHoliday: false }
+    });
+    assert.equal(mandatoryClosed.eligible, true);
+    let snapshotHolidayLoad;
+    const snapshotHolidayContext = await loadAuthoritativeStage1HolidayContext({
+        team: 'THA', companyId: 'company', etos: '2026',
+        periodStart: new Date('2026-01-05'), periodEnd: new Date('2026-01-11'),
+        presentationSnapshot: { weekly_calculation_context: {
+            calendar_facts: [{ hmeromhnia: '2026-01-06', is_holiday: true }]
+        } },
+        loadHolidayContext: async (input) => {
+            snapshotHolidayLoad = input;
+            return { companyFlags: { apasxolhsh_kata_tis_argies: false },
+                argiesByDateKey: new Map([['2026-01-06', {
+                    isHoliday: true, ypoxreotikh_argia: true
+                }]]) };
+        }
+    });
+    assert.equal(snapshotHolidayLoad.team, 'THA');
+    assert.equal(snapshotHolidayContext.argiesByDateKey.get('2026-01-06')
+        .ypoxreotikh_argia, true);
+    assert.equal(resolveAuthoritativeHolidayClassification({
+        row: declaredHolidayRow,
+        holiday: { isHoliday: true, isMandatoryHoliday: true },
+        companyFlags: { companyWorksOnMandatoryHoliday: false }
+    }).eligible, true);
+    assert.equal(resolveAuthoritativeHolidayClassification({
+        row: { ...declaredHolidayRow, cards_ores_ergasias: 8 },
+        holiday: { isHoliday: true, isMandatoryHoliday: true },
+        companyFlags: { companyWorksOnMandatoryHoliday: false }
+    }).eligible, false);
+    assert.equal(resolveAuthoritativeHolidayClassification({
+        row: declaredHolidayRow,
+        holiday: { isHoliday: true, isOptionalHoliday: true },
+        companyFlags: { companyWorksOnOptionalHoliday: true }
+    }).eligible, false);
+    let holidayCommand;
+    await saveStage1DailyClassificationsBulk({ reason: 'x',
+        changes: [{ row_id: 'holiday', classification: 'HOLIDAY' }],
+        applyOne: async (command) => { holidayCommand = command; } });
+    assert.equal(holidayCommand.classification, 'HOLIDAY');
     assert.deepEqual(applyCanonicalAbsenceMetrics({ ores_ergasias: 7.5,
         ores_apoysias_apologistika: 1.25, apousia_apologistika: false },
     classificationUpdates({ classification: 'ABSENCE' })), {

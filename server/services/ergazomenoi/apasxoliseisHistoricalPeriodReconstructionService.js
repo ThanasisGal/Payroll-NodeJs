@@ -10,6 +10,7 @@ const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCritical
 const { startOfWeekMondayUtc } = require('../../utils/date/mondaySundayWeek');
 
 const FINGERPRINT_VERSION = 'HISTORICAL_PERIOD_FACTS_V1';
+const EMPLOYMENT_CALCULATION_SEMANTICS_VERSION = 'employment-calculation-semantics:v2';
 const SOURCE_FIELDS = Object.freeze([
     'team', 'company_kod', 'ypokatasthma', 'kodikos', 'hmeromhnia',
     'kathgoria_ergasias', 'apo_ora_01', 'eos_ora_01', 'apo_ora_02', 'eos_ora_02',
@@ -64,12 +65,16 @@ function selectFields(row, fields) {
     for (const field of fields) if (row[field] !== undefined) selected[field] = row[field];
     return selected;
 }
-function fingerprintRows(rows = [], fields = DEPENDENCY_FIELDS) {
+function fingerprintRows(rows = [], fields = DEPENDENCY_FIELDS, {
+    calculationSemanticsVersion = null
+} = {}) {
     const normalized = [...rows]
         .map((row) => selectFields(row, fields))
         .sort((a, b) => [String(a.kodikos || ''), String(a.hmeromhnia || ''), String(a._id || '')]
             .join('|').localeCompare([String(b.kodikos || ''), String(b.hmeromhnia || ''), String(b._id || '')].join('|')));
     return crypto.createHash('sha256').update(JSON.stringify({ version: FINGERPRINT_VERSION,
+        ...(calculationSemanticsVersion
+            ? { calculation_semantics_version: calculationSemanticsVersion } : {}),
         rows: canonicalize(normalized) })).digest('hex');
 }
 function projectionForHistoricalState({ record, pastDeadline, dependencyFingerprint }) {
@@ -115,7 +120,9 @@ async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = Prodh
     ]);
     return Object.freeze({ dependency_window_start: window.start, dependency_window_end: window.end,
         source_fingerprint: fingerprintRows(sourceRows, SOURCE_FIELDS),
-        dependency_fingerprint: fingerprintRows(dependencyRows, DEPENDENCY_FIELDS),
+        dependency_fingerprint: fingerprintRows(dependencyRows, DEPENDENCY_FIELDS, {
+            calculationSemanticsVersion: EMPLOYMENT_CALCULATION_SEMANTICS_VERSION
+        }),
         result_fingerprint: fingerprintRows(resultRows, RESULT_FIELDS) });
 }
 async function authorizeHistoricalReconstruction({ session: userSession, scope, reason, requestId,
@@ -315,7 +322,8 @@ async function failHistoricalReconstruction({ scope, requestId, calculationId = 
     });
 }
 
-module.exports = { FINGERPRINT_VERSION, SOURCE_FIELDS, DEPENDENCY_FIELDS, RESULT_FIELDS,
+module.exports = { FINGERPRINT_VERSION, EMPLOYMENT_CALCULATION_SEMANTICS_VERSION,
+    SOURCE_FIELDS, DEPENDENCY_FIELDS, RESULT_FIELDS,
     dependencyWindow, fingerprintRows, projectionForHistoricalState, isPastDeadline,
     calculateHistoricalFingerprints, authorizeHistoricalReconstruction,
     completeHistoricalReconstruction, failHistoricalReconstruction, reconstructionError };

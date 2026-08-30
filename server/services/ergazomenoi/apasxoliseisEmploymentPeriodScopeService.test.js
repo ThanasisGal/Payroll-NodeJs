@@ -3,7 +3,8 @@ const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
-    deriveEmploymentOwnedDateScope
+    deriveEmploymentOwnedDateScope,
+    buildFullMonthBoundaryContextPreflight
 } = require('./apasxoliseisEmploymentPeriodScopeService');
 
 const departed = {
@@ -62,5 +63,145 @@ assert.deepStrictEqual(deriveEmploymentOwnedDateScope({
     context_only_dates: Object.freeze(['2026-07-01', '2026-07-02']),
     is_full_natural_week: false
 }));
+
+const julyLeading = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-06-29', natural_week_end: '2026-07-05',
+    period_start: '2026-07-01', period_end: '2026-07-31'
+});
+assert.deepStrictEqual(julyLeading.employment_owned_dates, [
+    '2026-06-29', '2026-06-30', '2026-07-01', '2026-07-02',
+    '2026-07-03', '2026-07-04', '2026-07-05'
+]);
+assert.deepStrictEqual(julyLeading.authoritative_date_set, [
+    '2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05'
+]);
+assert.deepStrictEqual(julyLeading.context_only_dates, ['2026-06-29', '2026-06-30']);
+
+const hiredJulySecond = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-06-29', natural_week_end: '2026-07-05',
+    period_start: '2026-07-01', period_end: '2026-07-31', hire_date: '2026-07-02'
+});
+assert.deepStrictEqual(hiredJulySecond.employment_owned_dates,
+    ['2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05']);
+assert.deepStrictEqual(hiredJulySecond.context_only_dates, []);
+
+const departedJuly = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-07-27', natural_week_end: '2026-08-02',
+    period_start: '2026-07-01', period_end: '2026-07-31', departure_date: '2026-07-31'
+});
+assert.deepStrictEqual(departedJuly.authoritative_date_set,
+    ['2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31']);
+assert.deepStrictEqual(departedJuly.context_only_dates, []);
+
+const julyPreflight = buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-07-01', period_end: '2026-07-31', employees: [
+        { kodikos: '0001', hmeromhnia_proslhpshs: '2026-01-01' },
+        { kodikos: '0002', hmeromhnia_proslhpshs: '2026-07-02' },
+        { kodikos: '0003', hmeromhnia_proslhpshs: '2026-01-01',
+            hmeromhnia_apoxorhshs: '2026-07-31' }
+    ]
+});
+assert.strictEqual(julyPreflight.previous.status, 'NO_CARD_DATA_FOUND');
+assert.deepStrictEqual(julyPreflight.previous.affected_employee_codes, ['0001', '0003']);
+assert.strictEqual(julyPreflight.previous.excluded_employee_count, 1);
+assert.strictEqual(julyPreflight.next.status, 'NO_CARD_DATA_FOUND');
+assert.deepStrictEqual(julyPreflight.next.affected_employee_codes, ['0001', '0002']);
+assert.strictEqual(julyPreflight.next.excluded_employee_count, 1);
+const noBoundaryEmployment = buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-07-01', period_end: '2026-07-31', employees: [{
+        kodikos: '0010', hmeromhnia_proslhpshs: '2026-07-02',
+        hmeromhnia_apoxorhshs: '2026-07-31'
+    }]
+});
+assert.strictEqual(noBoundaryEmployment.previous.status, 'NOT_REQUIRED');
+assert.strictEqual(noBoundaryEmployment.previous.excluded_employee_count, 1);
+assert.strictEqual(noBoundaryEmployment.next.status, 'NOT_REQUIRED');
+assert.strictEqual(noBoundaryEmployment.next.excluded_employee_count, 1);
+
+const cardEvidenceEmployees = [
+    { kodikos: '0101', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2026-01-01' },
+    { kodikos: '0102', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2026-01-01' },
+    { kodikos: '0103', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2026-01-01' },
+    { kodikos: '0104', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2026-01-01' },
+    { kodikos: '0105', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2026-01-01' }
+];
+const cardEvidencePreflight = buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-07-01', period_end: '2026-07-31',
+    employees: cardEvidenceEmployees,
+    previous_rows: [
+        { kodikos: '0101', ypokatasthma: '0001', hmeromhnia: '2026-06-29',
+            cards_apo_ora_01: '08:00', cards_eos_ora_01: '16:00' },
+        { kodikos: '0102', ypokatasthma: '0001', hmeromhnia: '2026-06-29',
+            cards_apo_ora_01: '08:00' },
+        { kodikos: '0103', ypokatasthma: '0001', hmeromhnia: '2026-06-30',
+            cards_eos_ora_01: '16:00' },
+        { kodikos: '0104', ypokatasthma: '0001', hmeromhnia: '2026-06-30',
+            cards_ores_ergasias: 8 },
+        { kodikos: '0105', ypokatasthma: '0001', hmeromhnia: '2026-06-30' }
+    ],
+    next_rows: []
+});
+assert.strictEqual(cardEvidencePreflight.previous.status, 'CARD_DATA_FOUND');
+assert.strictEqual(cardEvidencePreflight.previous.employees_with_card_evidence, 4);
+assert.strictEqual(cardEvidencePreflight.previous.employees_without_card_evidence, 1);
+assert.strictEqual(cardEvidencePreflight.previous.complete_card_pairs, 1);
+assert.strictEqual(cardEvidencePreflight.previous.orphan_unresolved_card_evidence, 3);
+assert.strictEqual(cardEvidencePreflight.next.status, 'NO_CARD_DATA_FOUND');
+assert.strictEqual(cardEvidencePreflight.next.employees_with_card_evidence, 0);
+assert.strictEqual(cardEvidencePreflight.next.employees_without_card_evidence, 5);
+
+const completeCardRow = (kodikos, hmeromhnia) => ({
+    kodikos, ypokatasthma: '0001', hmeromhnia,
+    cards_apo_ora_01: '08:00', cards_eos_ora_01: '16:00'
+});
+const leadingHirePreflight = buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-01-01', period_end: '2026-01-31', employees: [{
+        kodikos: '0201', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2025-12-30'
+    }], previous_rows: [
+        completeCardRow('0201', '2025-12-29'),
+        completeCardRow('0201', '2025-12-30')
+    ]
+});
+assert.strictEqual(leadingHirePreflight.previous.complete_card_pairs, 1);
+assert.strictEqual(leadingHirePreflight.previous.employees_with_card_evidence, 1);
+
+const trailingDeparturePreflight = buildFullMonthBoundaryContextPreflight({
+    period_start: '2025-12-01', period_end: '2025-12-31', employees: [{
+        kodikos: '0202', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2025-01-01',
+        hmeromhnia_apoxorhshs: '2026-01-02'
+    }], next_rows: [
+        completeCardRow('0202', '2026-01-02'),
+        completeCardRow('0202', '2026-01-03')
+    ]
+});
+assert.strictEqual(trailingDeparturePreflight.next.complete_card_pairs, 1);
+assert.strictEqual(trailingDeparturePreflight.next.employees_with_card_evidence, 1);
+
+const openEndedPreflight = buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-01-01', period_end: '2026-01-31', employees: [{
+        kodikos: '0203', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2025-01-01'
+    }], previous_rows: [completeCardRow('0203', '2025-12-29')]
+});
+assert.strictEqual(openEndedPreflight.previous.complete_card_pairs, 1);
+assert.strictEqual(openEndedPreflight.previous.employees_with_card_evidence, 1);
+
+const rehirePreflight = buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-01-01', period_end: '2026-01-31', employees: [{
+        kodikos: '0204', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2025-12-31'
+    }, {
+        kodikos: '0204', ypokatasthma: '0001', hmeromhnia_proslhpshs: '2025-12-29',
+        hmeromhnia_apoxorhshs: '2025-12-29'
+    }], previous_rows: [
+        completeCardRow('0204', '2025-12-29'),
+        completeCardRow('0204', '2025-12-30'),
+        completeCardRow('0204', '2025-12-31')
+    ]
+});
+assert.strictEqual(rehirePreflight.previous.affected_employee_count, 1);
+assert.strictEqual(rehirePreflight.previous.complete_card_pairs, 1);
+assert.strictEqual(rehirePreflight.previous.employees_with_card_evidence, 1);
+assert.strictEqual(buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-07-02', period_end: '2026-07-31', employees: []
+}), null);
 
 console.log('PASS employment-period scope');

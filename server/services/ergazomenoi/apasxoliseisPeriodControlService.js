@@ -52,7 +52,8 @@ function isWeekAllowedForEmploymentPeriod({
     historical_as_of: historicalAsOf = null,
     authoritative_row_dates: authoritativeRowDates = [],
     required_authoritative_dates: requiredAuthoritativeDates = null,
-    allow_stale_completed_context: allowStaleCompletedContext = false
+    allow_stale_completed_context: allowStaleCompletedContext = false,
+    allow_presentation_boundary_slice: allowPresentationBoundarySlice = false
 } = {}) {
     const scope = normalizeScope({ team: '_', company_kod: '_', ypokatasthma: '_', period_start, period_end });
     const start = dateOnly(week_start, 'έναρξη εβδομάδας');
@@ -61,6 +62,27 @@ function isWeekAllowedForEmploymentPeriod({
     const naturalEnd = endOfWeekSundayUtc(start);
     if (start.toISOString().slice(0, 10) !== naturalStart.toISOString().slice(0, 10) ||
         end.toISOString().slice(0, 10) !== naturalEnd.toISOString().slice(0, 10)) return false;
+    const overlapsPeriod = start <= scope.period_end && end >= scope.period_start;
+    const crossesPeriodBoundary = start < scope.period_start || end > scope.period_end;
+    if (allowPresentationBoundarySlice === true && crossesPeriodBoundary) {
+        if (!overlapsPeriod || !Array.isArray(requiredAuthoritativeDates) ||
+            requiredAuthoritativeDates.length === 0) return false;
+        const expectedDates = new Set(requiredAuthoritativeDates.map((value) => dateOnly(
+            value, 'απαιτούμενη ημερομηνία').toISOString().slice(0, 10)));
+        if (expectedDates.size !== requiredAuthoritativeDates.length ||
+            [...expectedDates].some((dateKey) => {
+                const date = dateOnly(dateKey, 'απαιτούμενη ημερομηνία');
+                return date < scope.period_start || date > scope.period_end ||
+                    date < start || date > end;
+            })) return false;
+        const loadedDates = new Set((Array.isArray(authoritativeRowDates)
+            ? authoritativeRowDates : []).map((value) => {
+            try { return dateOnly(value, 'ημερήσια εγγραφή').toISOString().slice(0, 10); }
+            catch (_error) { return ''; }
+        }).filter(Boolean));
+        return loadedDates.size === expectedDates.size &&
+            [...expectedDates].every((dateKey) => loadedDates.has(dateKey));
+    }
     if (start < scope.period_start || start > scope.period_end) return false;
     if (end <= scope.period_end) return true;
     const completedHistoricalMode = periodControl?.effective_mode === MODES.HISTORICAL_RECONSTRUCTED ||

@@ -139,6 +139,7 @@ const {
 const {
     resolveApologistikoArrivalDecision,
     buildDurationAnchoredInterval,
+    buildValidSplitProgramCardProjection,
     totalDeclaredDailyMinutes
 } = require('../../services/ergazomenoi/apasxoliseisAttendanceDerivedScheduleService');
 const {
@@ -212,7 +213,8 @@ const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
-    deriveEmploymentOwnedDateScope
+    deriveEmploymentOwnedDateScope,
+    buildFullMonthBoundaryContextPreflight
 } = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
 const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
@@ -426,6 +428,9 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisDailyActualWorkFactsService');
 const {
     saveStage1DailyClassificationsBulk,
+    classificationUpdates: buildStage1ClassificationUpdates,
+    resolveAuthoritativeHolidayClassification,
+    loadAuthoritativeStage1HolidayContext,
     applyCanonicalAbsenceMetrics
 } = require('../../services/ergazomenoi/apasxoliseisStage1DailyClassificationBulkService');
 const {
@@ -674,6 +679,11 @@ function checkBrokenProgramVsBrokenCards(context) {
             flexibleArrivalMinutes: evelikthProselefshMinutes }).requiresBook);
 
     if (!hasDeviation) return {};
+
+    const preservedSplitProjection = buildValidSplitProgramCardProjection(rec, {
+        flexibleArrivalMinutes: evelikthProselefshMinutes
+    });
+    if (preservedSplitProjection) return preservedSplitProjection;
 
     const firstArrival = matchedIntervals[0].cardInterval.apo;
     const anchored = buildDurationAnchoredInterval({ row: rec, actualArrival: firstArrival });
@@ -1293,6 +1303,16 @@ async function assertActiveEmploymentReviewPeriodPresentationReadable(
         throw error;
     }
     if (requiredRange) {
+        const requestedPresentationStart = dateKeyUtc(requiredRange.periodStart);
+        const requestedPresentationEnd = dateKeyUtc(requiredRange.periodEnd);
+        const activePeriodStart = dateKeyUtc(scope.period_start);
+        const activePeriodEnd = dateKeyUtc(scope.period_end);
+        const presentationSliceInsideActivePeriod = Boolean(
+            requestedPresentationStart && requestedPresentationEnd &&
+            requestedPresentationStart <= requestedPresentationEnd &&
+            requestedPresentationStart >= activePeriodStart &&
+            requestedPresentationEnd <= activePeriodEnd
+        );
         const insideScope = isWeekAllowedForEmploymentPeriod({
             period_start: scope.period_start,
             period_end: scope.period_end,
@@ -1306,7 +1326,8 @@ async function assertActiveEmploymentReviewPeriodPresentationReadable(
             }),
             authoritative_row_dates: requiredRange.authoritativeRowDates,
             required_authoritative_dates: requiredRange.requiredAuthoritativeDates,
-            allow_stale_completed_context: true
+            allow_stale_completed_context: true,
+            allow_presentation_boundary_slice: presentationSliceInsideActivePeriod
         });
         if (!insideScope) {
             const error = new Error('Η ανάγνωση δεν ανήκει στην ενεργή περίοδο.');
@@ -4321,6 +4342,26 @@ function weeklyHrApiError(code, statusCode, message) {
     return Object.assign(new Error(message), { code, statusCode });
 }
 
+function stage1HolidayEligibilityContext(holidayRecord, companyFlags = {}) {
+    const resolvedOperation = typeof holidayRecord?.companyOperatesOnHoliday === 'boolean'
+        ? holidayRecord.companyOperatesOnHoliday : null;
+    return {
+        holiday: {
+            isHoliday: Boolean(holidayRecord),
+            isMandatoryHoliday: holidayRecord?.ypoxreotikh_argia === true,
+            isOptionalHoliday: Boolean(holidayRecord) &&
+                holidayRecord?.ypoxreotikh_argia !== true,
+            description: holidayRecord?.description || ''
+        },
+        companyFlags: {
+            companyWorksOnMandatoryHoliday: resolvedOperation ??
+                (companyFlags.apasxolhsh_kata_tis_argies === true),
+            companyWorksOnOptionalHoliday: resolvedOperation ??
+                (companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true)
+        }
+    };
+}
+
 function normalizeNaturalWeek(startValue, endValue) {
     const startKey = dateKeyUtc(startValue);
     const endKey = dateKeyUtc(endValue);
@@ -4483,6 +4524,39 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
         lifecycle, workflowState: state };
 }
 
+async function assertActiveEmploymentReviewStage3DayWritable(req, initial, input) {
+    if (!input.period_start || !input.period_end) {
+        return assertActiveEmploymentReviewPeriodReadable(
+            req, initial.scope.ypokatasthma,
+            { kind: 'WEEKLY_CONTEXT', start: initial.scope.week_start,
+                end: initial.scope.week_end,
+                authoritativeRowDates: initial.weekRows.map((row) => row.hmeromhnia) }
+        );
+    }
+    const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
+        req, initial.scope.ypokatasthma
+    );
+    const targetDate = dateKeyUtc(initial.row?.hmeromhnia);
+    const weekStart = dateKeyUtc(initial.scope.week_start);
+    const weekEnd = dateKeyUtc(initial.scope.week_end);
+    const authoritativeDates = initial.lifecycle?.employment_date_scope
+        ?.authoritative_date_set || [];
+    const exactActivePeriod = dateKeyUtc(input.period_start) ===
+            dateKeyUtc(periodAccess.scope.period_start) &&
+        dateKeyUtc(input.period_end) === dateKeyUtc(periodAccess.scope.period_end);
+    const targetInsideActivePeriod = targetDate &&
+        targetDate >= dateKeyUtc(periodAccess.scope.period_start) &&
+        targetDate <= dateKeyUtc(periodAccess.scope.period_end);
+    const targetInsideNaturalWeek = targetDate && targetDate >= weekStart && targetDate <= weekEnd;
+    const targetIsAuthoritative = authoritativeDates.includes(targetDate);
+    if (!exactActivePeriod || !targetInsideActivePeriod ||
+        !targetInsideNaturalWeek || !targetIsAuthoritative) {
+        throw weeklyHrApiError('STAGE3_DATE_OUTSIDE_ACTIVE_PERIOD', 409,
+            'Η ημερομηνία Stage 3 δεν αποτελεί στόχο εγγραφής της ενεργής περιόδου.');
+    }
+    return periodAccess;
+}
+
 async function loadWeeklyHrStage2CompletionContext({ req, input, session = null }) {
     const weekly = await loadWeeklyHrContext({ req, input, session });
     const applySession = (query) => session ? query.session(session) : query;
@@ -4513,6 +4587,43 @@ async function loadWeeklyHrStage2CompletionContext({ req, input, session = null 
         stage2_version: Number(state?.stage2?.version || 0) } };
 }
 
+async function assertActiveEmploymentReviewStage1CompletionReadable(req, initial, input) {
+    if (!input.period_start || !input.period_end) {
+        return assertActiveEmploymentReviewPeriodReadable(
+            req, initial.base.ypokatasthma,
+            { kind: 'WEEKLY_CONTEXT', start: initial.week.start, end: initial.week.end,
+                authoritativeRowDates: initial.rows.filter((row) =>
+                    initial.employmentDateScope?.authoritative_date_set?.includes(
+                        dateKeyUtc(row.hmeromhnia)
+                    )).map((row) => row.hmeromhnia),
+                requiredAuthoritativeDates:
+                    initial.employmentDateScope?.authoritative_date_set || null }
+        );
+    }
+    const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
+        req, initial.base.ypokatasthma
+    );
+    const exactActivePeriod = dateKeyUtc(input.period_start) ===
+            dateKeyUtc(periodAccess.scope.period_start) &&
+        dateKeyUtc(input.period_end) === dateKeyUtc(periodAccess.scope.period_end);
+    const authoritativeDates = initial.employmentDateScope?.authoritative_date_set || [];
+    const authoritativeDateSet = new Set(authoritativeDates);
+    const authoritativeRowDates = initial.rows.map((row) => dateKeyUtc(row.hmeromhnia))
+        .filter((date) => authoritativeDateSet.has(date));
+    const exactAuthoritativeRows = new Set(authoritativeRowDates).size ===
+            authoritativeDateSet.size &&
+        authoritativeDates.every((date) => authoritativeRowDates.includes(date));
+    const authoritativeSliceInsideActivePeriod = authoritativeDates.length > 0 &&
+        authoritativeDates.every((date) => date >= dateKeyUtc(periodAccess.scope.period_start) &&
+            date <= dateKeyUtc(periodAccess.scope.period_end) &&
+            date >= initial.week.startKey && date <= initial.week.endKey);
+    if (!exactActivePeriod || !exactAuthoritativeRows || !authoritativeSliceInsideActivePeriod) {
+        throw weeklyHrApiError('PERIOD_CONTROL_SCOPE_MISMATCH', 409,
+            'Η ολοκλήρωση δεν ανήκει στην ενεργή περίοδο.');
+    }
+    return periodAccess;
+}
+
 async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
     indexesAlreadyChecked = false }) {
     const allowedInputFields = new Set(['ypokatasthma', 'employee_id', 'week_start', 'week_end',
@@ -4524,12 +4635,8 @@ async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
         'Το αίτημα ολοκλήρωσης Stage 1 περιέχει μη επιτρεπτά πεδία.');
     if (!indexesAlreadyChecked) await assertWeeklyHrWorkflowIndexesReady();
     const initial = await loadWeeklyHrContext({ req, input });
-    const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
-        req, initial.base.ypokatasthma,
-        { kind: 'WEEKLY_CONTEXT', start: initial.week.start, end: initial.week.end,
-            authoritativeRowDates: initial.rows.map((row) => row.hmeromhnia),
-            requiredAuthoritativeDates:
-                initial.employmentDateScope?.employment_owned_dates || null }
+    const periodAccess = await assertActiveEmploymentReviewStage1CompletionReadable(
+        req, initial, input
     );
     const staleHistoricalCompletion =
         periodAccess.state.effective_mode === 'HISTORICAL_RECONSTRUCTION_STALE';
@@ -7250,6 +7357,46 @@ class erganhController {
                 )
                 .filter((d) => d.is_legacy_policy === true);
 
+            const boundaryScope = buildFullMonthBoundaryContextPreflight({
+                period_start: reviewPeriodStart,
+                period_end: reviewPeriodEnd,
+                employees: lifecycleEmployees
+            });
+            const loadBoundaryCardRows = async (side) => {
+                if (!side?.dates?.length || !side.affected_employee_codes?.length) return [];
+                const boundaryFilter = {
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    kodikos: mongoose.trusted({ $in: side.affected_employee_codes }),
+                    hmeromhnia: mongoose.trusted({
+                        $gte: clampDateStartUtc(`${side.dates[0]}T00:00:00.000Z`),
+                        $lte: clampDateEndUtc(`${side.dates.at(-1)}T23:59:59.999Z`)
+                    })
+                };
+                if (ypokatasthma && String(ypokatasthma).trim()) {
+                    boundaryFilter.ypokatasthma = String(ypokatasthma).trim().padStart(4, '0');
+                }
+                return ProdhlomenaOrariaModel.find(boundaryFilter)
+                    .select('ypokatasthma kodikos hmeromhnia cards_apo_ora_01 cards_eos_ora_01 ' +
+                        'cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                        'cards_ores_ergasias')
+                    .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+                    .lean();
+            };
+            const [previousBoundaryRows, nextBoundaryRows] = boundaryScope
+                ? await Promise.all([
+                    loadBoundaryCardRows(boundaryScope.previous),
+                    loadBoundaryCardRows(boundaryScope.next)
+                ]) : [[], []];
+            const boundaryContextPreflight = boundaryScope
+                ? buildFullMonthBoundaryContextPreflight({
+                    period_start: reviewPeriodStart,
+                    period_end: reviewPeriodEnd,
+                    employees: lifecycleEmployees,
+                    previous_rows: previousBoundaryRows,
+                    next_rows: nextBoundaryRows
+                }) : null;
+
             return res.json({
                 success: true,
                 page: pageNum,
@@ -7260,6 +7407,7 @@ class erganhController {
                 deviations: enrichedDeviations,
                 pendingDeviationWeeks,
                 legacyDeviations,
+                boundaryContextPreflight,
                 deviationPolicyVersion: deviationPreview.policyVersion
             });
         } catch (error) {
@@ -10722,12 +10870,16 @@ class erganhController {
                 presentationSnapshot });
             await assertActiveEmploymentReviewPeriodPresentationReadable(
                 req, context.base.ypokatasthma, {
-                kind: 'WEEKLY_CONTEXT', start: context.week.start, end: context.week.end,
-                authoritativeRowDates: context.rows.map((row) => row.hmeromhnia),
-                requiredAuthoritativeDates:
-                    context.employmentDateScope?.employment_owned_dates || null
-                }
-            );
+                    kind: 'WEEKLY_CONTEXT', start: context.week.start, end: context.week.end,
+                    authoritativeRowDates: context.rows.filter((row) =>
+                        context.employmentDateScope?.authoritative_date_set?.includes(
+                            dateKeyUtc(row.hmeromhnia)
+                        )).map((row) => row.hmeromhnia),
+                    requiredAuthoritativeDates:
+                        context.employmentDateScope?.authoritative_date_set || null,
+                    periodStart: req.query.period_start,
+                    periodEnd: req.query.period_end
+                });
             const state = await ApasxoliseisWeeklyHrWorkflowStateModel.findOne({
                 ...context.base, employee_id: context.employee._id,
                 week_start: context.week.start, week_end: context.week.end
@@ -10778,6 +10930,15 @@ class erganhController {
                         ) || null;
                     }
                 });
+            const stage1HolidayContext = await loadAuthoritativeStage1HolidayContext({
+                    team: context.base.team,
+                    companyId: context.base.company_kod,
+                    etos: String(context.week.start.getUTCFullYear()),
+                    periodStart: context.week.start,
+                    periodEnd: context.week.end,
+                    presentationSnapshot,
+                    loadHolidayContext: buildNoCardsDisplayContext
+                });
             const stage1DailyPresentation = context.rows.map((row) => {
                 const rowDate = dateKeyUtc(row.hmeromhnia);
                 const dailyProfile = context.effectiveProfilesByDate[rowDate] ||
@@ -10786,6 +10947,13 @@ class erganhController {
                     dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
                 );
                 const actualFacts = resolveStage3DailyActualWorkFacts(row);
+                const holidayRecord = stage1HolidayContext.argiesByDateKey
+                    .get(rowDate);
+                const holidayEligibility = resolveAuthoritativeHolidayClassification({
+                    row,
+                    ...stage1HolidayEligibilityContext(holidayRecord,
+                        stage1HolidayContext.companyFlags)
+                });
                 const intervals = (prefix) => [1, 2, 3].map((index) => ({
                     start: String(row?.[`${prefix}apo_ora_0${index}`] || ''),
                     end: String(row?.[`${prefix}eos_ora_0${index}`] || '')
@@ -10799,6 +10967,7 @@ class erganhController {
                     actual_work_hours: actualFacts.actualWorkHours,
                     card_intervals: intervals('cards_'),
                     card_hours: actualFacts.cardHours,
+                    holiday_classification_eligible: holidayEligibility.eligible,
                     current_apologistiko_classification:
                         row.apousia_apologistika === true ? 'ΑΠΟΥΣΙΑ'
                             : row.astheneia_apologistika === true ? 'ΑΣΘΕΝΕΙΑ'
@@ -10813,6 +10982,7 @@ class erganhController {
                 employee_name: `${context.employee.eponymo || ''} ${context.employee.onoma || ''}`.trim(),
                 rows: context.rows, stage1_daily_presentation: stage1DailyPresentation,
                 stage1: state?.stage1 || null, ...projection,
+                employment_date_scope: context.employmentDateScope,
                 period_slice: lifecycleProjection.stages.stage1.period_slice,
                 stage1_status: lifecycleProjection.stages.stage1.persisted_status,
                 lifecycle_projection: lifecycleProjection });
@@ -10941,27 +11111,62 @@ class erganhController {
         try {
             const classificationPeriodStart = dateKeyUtc(req.body.period_start);
             const classificationPeriodEnd = dateKeyUtc(req.body.period_end);
-            if ((classificationPeriodStart && !classificationPeriodEnd) ||
-                (!classificationPeriodStart && classificationPeriodEnd) ||
-                (classificationPeriodStart && classificationPeriodStart > classificationPeriodEnd)) {
+            if (!classificationPeriodStart || !classificationPeriodEnd ||
+                classificationPeriodStart > classificationPeriodEnd) {
                 throw weeklyHrApiError('INVALID_STAGE1_CLASSIFICATION_PERIOD', 400,
                     'Μη έγκυρα όρια περιόδου για τον χαρακτηρισμό ημερών.');
+            }
+            const classificationScope = await activeEmploymentReviewPeriodScope(
+                req, req.body.ypokatasthma
+            );
+            if (classificationPeriodStart !== dateKeyUtc(classificationScope.period_start) ||
+                classificationPeriodEnd !== dateKeyUtc(classificationScope.period_end)) {
+                throw weeklyHrApiError('STAGE1_CLASSIFICATION_PERIOD_SCOPE_MISMATCH', 409,
+                    'Τα όρια χαρακτηρισμού δεν ταυτίζονται με την ενεργή περίοδο.');
             }
             const result = await saveStage1DailyClassificationsBulk({
                 changes: req.body.changes,
                 reason: req.body.reason,
-                applyOne: async ({ row_id, updates, reason }) => {
-                    if (classificationPeriodStart) {
-                        const target = await ProdhlomenaOrariaModel.findOne({ _id: row_id,
+                applyOne: async ({ row_id, classification, updates, reason }) => {
+                    let authoritativeTarget = await ProdhlomenaOrariaModel.findOne({ _id: row_id,
+                        team: req.session.userTeam,
+                        company_kod: String(req.session.companyInUse || ''),
+                        ypokatasthma: classificationScope.ypokatasthma })
+                        .select(REVIEW_SELECT_FIELDS).lean();
+                    const targetDate = dateKeyUtc(authoritativeTarget?.hmeromhnia);
+                    if (!targetDate || targetDate < classificationPeriodStart ||
+                        targetDate > classificationPeriodEnd) {
+                        throw weeklyHrApiError('STAGE1_DATE_OUTSIDE_ACTIONABLE_PERIOD', 409,
+                            'Η ημερομηνία δεν αποτελεί στόχο εγγραφής της περιόδου.');
+                    }
+                    if (classification === 'HOLIDAY') {
+                        authoritativeTarget = authoritativeTarget ||
+                            await ProdhlomenaOrariaModel.findOne({ _id: row_id,
+                                team: req.session.userTeam,
+                                company_kod: String(req.session.companyInUse || '') })
+                                .select(REVIEW_SELECT_FIELDS).lean();
+                        if (!authoritativeTarget) throw weeklyHrApiError(
+                            'DAILY_REVIEW_RECORD_NOT_FOUND', 404,
+                            'Η ημερήσια εγγραφή δεν βρέθηκε.');
+                        const holidayContext = await buildNoCardsDisplayContext({
                             team: req.session.userTeam,
-                            company_kod: String(req.session.companyInUse || '') })
-                            .select('hmeromhnia').lean();
-                        const targetDate = dateKeyUtc(target?.hmeromhnia);
-                        if (!targetDate || targetDate < classificationPeriodStart ||
-                            targetDate > classificationPeriodEnd) {
-                            throw weeklyHrApiError('STAGE1_DATE_OUTSIDE_ACTIONABLE_PERIOD', 409,
-                                'Η ημερομηνία δεν αποτελεί στόχο εγγραφής της περιόδου.');
-                        }
+                            companyId: req.session.companyInUse,
+                            etos: String(new Date(authoritativeTarget.hmeromhnia).getUTCFullYear()),
+                            periodStart: authoritativeTarget.hmeromhnia,
+                            periodEnd: authoritativeTarget.hmeromhnia
+                        });
+                        const holidayRecord = holidayContext.argiesByDateKey.get(
+                            dateKeyUtc(authoritativeTarget.hmeromhnia));
+                        const eligibility = resolveAuthoritativeHolidayClassification({
+                            row: authoritativeTarget,
+                            ...stage1HolidayEligibilityContext(holidayRecord,
+                                holidayContext.companyFlags)
+                        });
+                        if (!eligibility.eligible) throw weeklyHrApiError(
+                            'STAGE1_HOLIDAY_NOT_AUTHORITATIVE', 409,
+                            'Η ημέρα δεν πληροί τις προϋποθέσεις χαρακτηρισμού ως Αργία.');
+                        updates = buildStage1ClassificationUpdates(
+                            { classification: 'HOLIDAY' }, authoritativeTarget);
                     }
                     let statusCode = 200;
                     let payload;
@@ -11010,12 +11215,17 @@ class erganhController {
                     'Το αίτημα Stage 3 περιέχει μη επιτρεπτά πεδία.');
             }
             const initial = await loadWeeklyHrStage3DecisionContext({ req, input: req.body });
-            const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
-                req, initial.scope.ypokatasthma,
-                { kind: 'WEEKLY_CONTEXT', start: initial.scope.week_start,
-                    end: initial.scope.week_end,
-                    authoritativeRowDates: initial.weekRows.map((row) => row.hmeromhnia) }
+            const periodAccess = await assertActiveEmploymentReviewStage3DayWritable(
+                req, initial, req.body
             );
+            if (!isDateInsideEmploymentPeriod({
+                period_start: periodAccess.scope.period_start,
+                period_end: periodAccess.scope.period_end,
+                date: initial.row.hmeromhnia
+            })) {
+                throw weeklyHrApiError('STAGE3_DATE_OUTSIDE_ACTIVE_PERIOD', 409,
+                    'Η ημερομηνία Stage 3 δεν αποτελεί στόχο εγγραφής της ενεργής περιόδου.');
+            }
             const stale = periodAccess.state.effective_mode ===
                 'HISTORICAL_RECONSTRUCTION_STALE';
             const runFence = stale
@@ -11208,8 +11418,11 @@ class erganhController {
 
                 'kyriakes_apologistika',
                 'ores_ergasias_apologistika',
+                'ores_pragmatikhs_ergasias_apologistika',
                 'ores_argion_prosayxhsh_apologistika',
                 'ores_argion_ergasia_apologistika',
+
+                'argia',
 
                 'ores_apoysias_apologistika'
             ];
@@ -11218,6 +11431,8 @@ class erganhController {
 
             for (const field of allowedFields) {
                 if (Object.prototype.hasOwnProperty.call(updates, field)) {
+                    if (['argia', 'ores_pragmatikhs_ergasias_apologistika'].includes(field) &&
+                        updates.argia !== true) continue;
                     cleanUpdates[field] = updates[field];
                 }
             }
@@ -11251,6 +11466,28 @@ class erganhController {
                     success: false,
                     message: 'Δεν βρέθηκε η εγγραφή.'
                 });
+            }
+
+            if (cleanUpdates.argia === true) {
+                const holidayContext = await buildNoCardsDisplayContext({
+                    team: sessionTeam,
+                    companyId,
+                    etos: String(new Date(oldRecord.hmeromhnia).getUTCFullYear()),
+                    periodStart: oldRecord.hmeromhnia,
+                    periodEnd: oldRecord.hmeromhnia
+                });
+                const holidayRecord = holidayContext.argiesByDateKey.get(
+                    dateKeyUtc(oldRecord.hmeromhnia));
+                const eligibility = resolveAuthoritativeHolidayClassification({
+                    row: oldRecord,
+                    ...stage1HolidayEligibilityContext(holidayRecord,
+                        holidayContext.companyFlags)
+                });
+                if (!eligibility.eligible) throw weeklyHrApiError(
+                    'STAGE1_HOLIDAY_NOT_AUTHORITATIVE', 409,
+                    'Η ημέρα δεν πληροί τις προϋποθέσεις χαρακτηρισμού ως Αργία.');
+                cleanUpdates = buildStage1ClassificationUpdates(
+                    { classification: 'HOLIDAY' }, oldRecord);
             }
 
             let approvedOrphanResolution = null;

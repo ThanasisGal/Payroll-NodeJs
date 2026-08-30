@@ -87,5 +87,33 @@ const common = { scope, weekRows, effectiveProfile: { typos_apasxolhshs: '0',
         request_id: 'slice-june-0002', loadFreshWeekRows: async () => changedRows }),
     { code: 'STAGE1_INPUT_CHANGED' });
     assert.equal(audits.length, 2);
+
+    storedState = null;
+    audits.length = 0;
+    const januaryScope = { ...scope,
+        week_start: new Date('2025-12-29T00:00:00.000Z'),
+        week_end: new Date('2026-01-04T00:00:00.000Z') };
+    const januaryRows = Array.from({ length: 7 }, (_, index) => ({
+        ...weekRows[index],
+        _id: new mongoose.Types.ObjectId(),
+        hmeromhnia: new Date(Date.UTC(2025, 11, 29 + index)),
+        kathgoria_adeias_apologistika: index === 6 ? 'POSSIBLE_LEAVE' : ''
+    }));
+    const januaryResult = await completeWeeklyHrStage1PeriodSlice({ ...common,
+        scope: januaryScope, weekRows: januaryRows,
+        period_start: '2026-01-01', period_end: '2026-01-31',
+        employment_date_scope: {
+            authoritative_date_set: ['2026-01-01', '2026-01-02',
+                '2026-01-03', '2026-01-04'],
+            context_only_dates: ['2025-12-29', '2025-12-30', '2025-12-31']
+        },
+        request_id: 'slice-january-boundary-0001',
+        loadFreshWeekRows: async () => januaryRows });
+    assert.equal(januaryResult.completed, true);
+    assert.deepEqual(storedState.stage1.period_slices[0].actionable_dates
+        .map((value) => new Date(value).toISOString().slice(0, 10)),
+    ['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-04']);
+    assert.ok(!storedState.stage1.period_slices[0].actionable_dates
+        .some((value) => new Date(value).toISOString().slice(0, 10) < '2026-01-01'));
     console.log('Stage-1 period-slice completion tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

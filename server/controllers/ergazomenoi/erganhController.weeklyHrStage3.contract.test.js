@@ -10,7 +10,7 @@ assert.match(controller, /static resolveWeeklyHrStage3Day/);
 const section = controller.slice(controller.indexOf('static resolveWeeklyHrStage3Day'),
     controller.indexOf('static previewProdhlomenaOrariaOrphanResolution'));
 assert.match(section, /loadWeeklyHrStage3DecisionContext/);
-assert.match(section, /assertActiveEmploymentReviewPeriodReadable/);
+assert.match(section, /assertActiveEmploymentReviewStage3DayWritable/);
 assert.match(section, /runWithStaleStage3ResolutionWriteFence/);
 assert.match(section, /runWithPeriodWriteFence/);
 assert.match(section, /expected_input_fingerprint/);
