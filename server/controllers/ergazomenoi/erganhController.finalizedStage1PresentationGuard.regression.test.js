@@ -47,6 +47,10 @@ assert.match(stage1Get, /employment_date_scope: context\.employmentDateScope/);
 assert.doesNotMatch(stage1Get,
     /requiredAuthoritativeDates:[\s\S]{0,120}employment_owned_dates/);
 assert.match(stage1Get, /loadFinalizedWeeklyHrPresentationSnapshot/);
+assert.match(stage1Get, /loadAuthoritativeStage1HolidayContext\(\{/);
+assert.match(stage1Get, /presentationSnapshot,[\s\S]*loadHolidayContext: buildNoCardsDisplayContext/);
+assert.doesNotMatch(stage1Get,
+    /presentationSnapshot\s*\?\s*\{ companyFlags: \{\}, argiesByDateKey: new Map\(\) \}/);
 assert.match(stage1Get,
     /presentationSnapshot\s*\?\s*buildFinalizedWeeklyHrLifecyclePresentation\([\s\S]*?: await buildWeeklyLifecycleWithStage2State/);
 const finalizedSource = section(
