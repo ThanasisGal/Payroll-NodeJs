@@ -14777,6 +14777,22 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage1-table {
     font-size: 0.82rem;
+    margin-bottom: 0;
+}
+
+.weekly-hr-stage1-table-shell {
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+}
+
+.weekly-hr-stage1-table > thead > tr > th {
+    position: sticky;
+    top: 0;
+    z-index: 13;
+    background-color: var(--bs-body-bg, #fff) !important;
+    background-clip: padding-box;
+    box-shadow: inset 0 -1px 0 var(--bs-border-color, #dee2e6);
 }
 
 .weekly-hr-stage1-table th,
@@ -15197,9 +15213,7 @@ body.loader-active > *:not(.app-loader) {
     }
 }
 .weekly-hr-stage1-bulk-toolbar {
-    position: sticky;
-    top: 0;
-    z-index: 14;
+    position: static;
     background: var(--bs-body-bg, #fff);
 }
 
