@@ -3,6 +3,9 @@ const {
     startOfWeekMondayUtc,
     endOfWeekSundayUtc
 } = require('../../utils/date/mondaySundayWeek');
+const {
+    resolveCardPairVerification
+} = require('./apasxoliseisCardPairResolverService');
 
 function normalizeBranch(value) {
     const raw = String(value ?? '').trim();
@@ -122,11 +125,91 @@ function deriveEmploymentOwnedDateScope({ natural_week_start, natural_week_end,
     });
 }
 
+function isFullCalendarMonthRange(periodStartValue, periodEndValue) {
+    const periodStart = dateKeyUtc(periodStartValue);
+    const periodEnd = dateKeyUtc(periodEndValue);
+    if (!periodStart || !periodEnd || !periodStart.endsWith('-01') ||
+        periodStart.slice(0, 7) !== periodEnd.slice(0, 7)) return false;
+    const [year, month] = periodStart.split('-').map(Number);
+    return periodEnd === new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+function buildFullMonthBoundaryContextPreflight({ period_start, period_end,
+    employees = [], previous_rows = [], next_rows = [] } = {}) {
+    const periodStart = dateKeyUtc(period_start);
+    const periodEnd = dateKeyUtc(period_end);
+    if (!isFullCalendarMonthRange(periodStart, periodEnd)) return null;
+    const naturalStart = dateKeyUtc(startOfWeekMondayUtc(periodStart));
+    const naturalEnd = dateKeyUtc(endOfWeekSundayUtc(periodEnd));
+    const previousEnd = new Date(`${periodStart}T00:00:00.000Z`);
+    previousEnd.setUTCDate(previousEnd.getUTCDate() - 1);
+    const nextStart = new Date(`${periodEnd}T00:00:00.000Z`);
+    nextStart.setUTCDate(nextStart.getUTCDate() + 1);
+    const previousDates = enumerateDateKeys(naturalStart, dateKeyUtc(previousEnd));
+    const nextDates = enumerateDateKeys(dateKeyUtc(nextStart), naturalEnd);
+    const employeeRecordsByKey = new Map();
+    for (const employee of employees) {
+        const employeeKey = `${normalizeBranch(employee?.ypokatasthma)}|${String(employee?.kodikos || '').trim()}`;
+        if (!employeeRecordsByKey.has(employeeKey)) employeeRecordsByKey.set(employeeKey, []);
+        employeeRecordsByKey.get(employeeKey).push(employee);
+    }
+    const periodDates = enumerateDateKeys(periodStart, periodEnd);
+    const activeEmploymentRecordsByKey = new Map([...employeeRecordsByKey.entries()]
+        .map(([employeeKey, records]) => [employeeKey, records.filter((employee) =>
+            periodDates.some((date) => isDateWithinEmploymentPeriod(date, employee)))])
+        .filter(([, records]) => records.length));
+    const activeDuringPeriod = [...activeEmploymentRecordsByKey.values()].map((records) => records[0]);
+    const side = (dates, rows = []) => {
+        if (!dates.length) return Object.freeze({ status: 'NOT_REQUIRED', dates: Object.freeze([]),
+            affected_employee_count: 0, excluded_employee_count: 0,
+            employees_with_card_evidence: 0, employees_without_card_evidence: 0,
+            complete_card_pairs: 0, orphan_unresolved_card_evidence: 0,
+            affected_employee_codes: Object.freeze([]) });
+        const affectedEmploymentRecordsByKey = new Map([...activeEmploymentRecordsByKey.entries()]
+            .filter(([, records]) => records.some((employee) => dates.some((date) =>
+                isDateWithinEmploymentPeriod(date, employee)))));
+        const affected = [...affectedEmploymentRecordsByKey.values()].map((records) => records[0]);
+        const affectedKeys = new Set(affectedEmploymentRecordsByKey.keys());
+        const evidenceEmployeeKeys = new Set();
+        let completeCardPairs = 0;
+        let orphanUnresolvedEvidence = 0;
+        for (const row of rows) {
+            const rowKey = `${normalizeBranch(row?.ypokatasthma)}|${String(row?.kodikos || '').trim()}`;
+            const rowDate = dateKeyUtc(row?.hmeromhnia);
+            const employmentRecords = affectedEmploymentRecordsByKey.get(rowKey) || [];
+            if (!affectedKeys.has(rowKey) || !dates.includes(rowDate) ||
+                !employmentRecords.some((employee) => isDateWithinEmploymentPeriod(rowDate, employee))) continue;
+            const verification = resolveCardPairVerification(row);
+            if (verification.hasCompleteCardEvidence || verification.hasUnresolvedCardEvidence) {
+                evidenceEmployeeKeys.add(rowKey);
+            }
+            completeCardPairs += verification.completePairs.length;
+            orphanUnresolvedEvidence += verification.unresolvedPairs.length +
+                (verification.aggregateHoursWithoutPairs ? 1 : 0);
+        }
+        const withEvidence = evidenceEmployeeKeys.size;
+        return Object.freeze({ status: !affected.length ? 'NOT_REQUIRED'
+            : withEvidence > 0 ? 'CARD_DATA_FOUND' : 'NO_CARD_DATA_FOUND',
+            dates: Object.freeze(dates), affected_employee_count: affected.length,
+            excluded_employee_count: activeDuringPeriod.length - affected.length,
+            employees_with_card_evidence: withEvidence,
+            employees_without_card_evidence: Math.max(0, affected.length - withEvidence),
+            complete_card_pairs: completeCardPairs,
+            orphan_unresolved_card_evidence: orphanUnresolvedEvidence,
+            affected_employee_codes: Object.freeze(affected.map((employee) =>
+                String(employee.kodikos || '')).filter(Boolean).sort()) });
+    };
+    return Object.freeze({ coverage_source: 'PERSISTED_CARD_DATA',
+        previous: side(previousDates, previous_rows), next: side(nextDates, next_rows) });
+}
+
 module.exports = {
     buildPostDepartureExclusionDescriptors,
     endOfDepartureDay,
     startOfHireDay,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
-    deriveEmploymentOwnedDateScope
+    deriveEmploymentOwnedDateScope,
+    isFullCalendarMonthRange,
+    buildFullMonthBoundaryContextPreflight
 };
