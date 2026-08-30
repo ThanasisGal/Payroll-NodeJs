@@ -4542,6 +4542,43 @@ async function loadWeeklyHrStage2CompletionContext({ req, input, session = null 
         stage2_version: Number(state?.stage2?.version || 0) } };
 }
 
+async function assertActiveEmploymentReviewStage1CompletionReadable(req, initial, input) {
+    if (!input.period_start || !input.period_end) {
+        return assertActiveEmploymentReviewPeriodReadable(
+            req, initial.base.ypokatasthma,
+            { kind: 'WEEKLY_CONTEXT', start: initial.week.start, end: initial.week.end,
+                authoritativeRowDates: initial.rows.filter((row) =>
+                    initial.employmentDateScope?.authoritative_date_set?.includes(
+                        dateKeyUtc(row.hmeromhnia)
+                    )).map((row) => row.hmeromhnia),
+                requiredAuthoritativeDates:
+                    initial.employmentDateScope?.authoritative_date_set || null }
+        );
+    }
+    const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
+        req, initial.base.ypokatasthma
+    );
+    const exactActivePeriod = dateKeyUtc(input.period_start) ===
+            dateKeyUtc(periodAccess.scope.period_start) &&
+        dateKeyUtc(input.period_end) === dateKeyUtc(periodAccess.scope.period_end);
+    const authoritativeDates = initial.employmentDateScope?.authoritative_date_set || [];
+    const authoritativeDateSet = new Set(authoritativeDates);
+    const authoritativeRowDates = initial.rows.map((row) => dateKeyUtc(row.hmeromhnia))
+        .filter((date) => authoritativeDateSet.has(date));
+    const exactAuthoritativeRows = new Set(authoritativeRowDates).size ===
+            authoritativeDateSet.size &&
+        authoritativeDates.every((date) => authoritativeRowDates.includes(date));
+    const authoritativeSliceInsideActivePeriod = authoritativeDates.length > 0 &&
+        authoritativeDates.every((date) => date >= dateKeyUtc(periodAccess.scope.period_start) &&
+            date <= dateKeyUtc(periodAccess.scope.period_end) &&
+            date >= initial.week.startKey && date <= initial.week.endKey);
+    if (!exactActivePeriod || !exactAuthoritativeRows || !authoritativeSliceInsideActivePeriod) {
+        throw weeklyHrApiError('PERIOD_CONTROL_SCOPE_MISMATCH', 409,
+            'Η ολοκλήρωση δεν ανήκει στην ενεργή περίοδο.');
+    }
+    return periodAccess;
+}
+
 async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
     indexesAlreadyChecked = false }) {
     const allowedInputFields = new Set(['ypokatasthma', 'employee_id', 'week_start', 'week_end',
@@ -4553,12 +4590,8 @@ async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
         'Το αίτημα ολοκλήρωσης Stage 1 περιέχει μη επιτρεπτά πεδία.');
     if (!indexesAlreadyChecked) await assertWeeklyHrWorkflowIndexesReady();
     const initial = await loadWeeklyHrContext({ req, input });
-    const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
-        req, initial.base.ypokatasthma,
-        { kind: 'WEEKLY_CONTEXT', start: initial.week.start, end: initial.week.end,
-            authoritativeRowDates: initial.rows.map((row) => row.hmeromhnia),
-            requiredAuthoritativeDates:
-                initial.employmentDateScope?.employment_owned_dates || null }
+    const periodAccess = await assertActiveEmploymentReviewStage1CompletionReadable(
+        req, initial, input
     );
     const staleHistoricalCompletion =
         periodAccess.state.effective_mode === 'HISTORICAL_RECONSTRUCTION_STALE';
