@@ -7,6 +7,7 @@ const fs = require('fs-extra');
 const logger = require('../utils/logger');
 const os = require('os');
 const { pipeline } = require('stream/promises');
+const { buildPeriodBoundsUtc } = require('../utils/date/periodBoundsUtc');
 
 const Models_A = require('../models/stathera_arxeia');
 const Models_B = require('../models/privileges');
@@ -99,19 +100,15 @@ class adminController {
                     });
                 }
 
-                const fixDate = (date, newYear) => {
-                    if (!date) return null;
-                    const d = new Date(date);
-                    d.setFullYear(parseInt(newYear, 10));
-                    return d;
-                };
-
-                const neasPeriods = protypaPeriods.map(({ _id, __v, ...rest }) => ({
-                    ...rest,
-                    xrhsh: YearInUse,
-                    apo: fixDate(rest.apo, YearInUse),
-                    eos: fixDate(rest.eos, YearInUse)
-                }));
+                const neasPeriods = protypaPeriods.map(({ _id, __v, ...rest }) => {
+                    const bounds = buildPeriodBoundsUtc(YearInUse, rest.kodikos);
+                    return {
+                        ...rest,
+                        xrhsh: YearInUse,
+                        apo: bounds.apo,
+                        eos: bounds.eos
+                    };
+                });
 
                 const insertedPeriods = await PeriodsModel.insertMany(neasPeriods, {
                     ordered: true
