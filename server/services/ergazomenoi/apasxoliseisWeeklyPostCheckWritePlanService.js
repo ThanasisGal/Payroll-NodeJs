@@ -146,6 +146,7 @@ function buildWeeklyRepoPostCheckWritePlan({
     appliedProtectionReasonsByWeek = new Map(),
     canonicalDecisionsByWeek = new Map(),
     sameRunDailyCalculatedRowIds = new Set(),
+    resolveProfileForDate = null,
     buildWeeklyIllegalOvertimeUpdate
 }) {
     if (typeof buildWeeklyIllegalOvertimeUpdate !== 'function') {
@@ -181,7 +182,11 @@ function buildWeeklyRepoPostCheckWritePlan({
             const weeklyProfileInfo = getWeeklyRepoProfileInfo({
                 week,
                 istorikoRows,
-                ergazomenos: erg
+                ergazomenos: erg,
+                resolveProfileForDate: typeof resolveProfileForDate === 'function'
+                    ? (reviewDate) => resolveProfileForDate({
+                        reviewDate, employee: erg, history: istorikoRows })
+                    : null
             });
             const expectedWeeklyRepo = weeklyProfileInfo.expectedWeeklyRepo;
             const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
@@ -251,7 +256,10 @@ function buildWeeklyRepoPostCheckWritePlan({
                 const kathgoriaErgasias = String(row.kathgoria_ergasias || '').trim();
                 const oresErgasiasIsZero = isZeroHours(row.ores_ergasias);
                 const cardsOresIsNonZero = isNonZeroHours(row.cards_ores_ergasias);
-                const dailyProfile = getEffectiveRepoProfileForDate(day, istorikoRows, erg);
+                const dailyProfile = typeof resolveProfileForDate === 'function'
+                    ? resolveProfileForDate({ reviewDate: day, employee: erg,
+                        history: istorikoRows })
+                    : getEffectiveRepoProfileForDate(day, istorikoRows, erg);
                 const isFullTimeProfile = resolveFullTimeFromWorkTerms(dailyProfile) === true;
                 const update = {};
                 const rawUnresolvedCardPair = resolveCardPairVerification(row).hasUnresolvedCardEvidence;
@@ -406,11 +414,13 @@ function buildWeeklyRepoPostCheckWritePlan({
                     expected_repo_source: weeklyProfileInfo.repoResolutionSource || '',
                     effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                     effective_profile_source:
+                        effectiveProfile.resolution_source ||
                         effectiveProfile.employment_profile_source || effectiveProfile.source || '',
                     effective_profile_date: weeklyProfileInfo.effectiveProfileDate,
                     effective_profile_istoriko_id: effectiveProfile.istorikoId || null,
                     previous_typos_apasxolhshs: previousProfile.typos_apasxolhshs || '',
                     previous_profile_source:
+                        previousProfile.resolution_source ||
                         previousProfile.employment_profile_source || previousProfile.source || '',
                     previous_profile_date: weeklyProfileInfo.previousProfileDate,
                     previous_profile_istoriko_id: previousProfile.istorikoId || null,

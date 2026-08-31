@@ -186,6 +186,13 @@ function analyzeWeeklySixthSeventhDay({
     calculatedWorkHoursAuthoritative = false,
     isCalculatedWorkHoursAuthoritativeForRow = null
 } = {}) {
+    const blockedProfile = effectiveProfile?.resolution_blocked === true
+        ? effectiveProfile
+        : Object.values(effectiveProfilesByDate || {}).find((profile) =>
+            profile?.resolution_blocked === true);
+    if (blockedProfile) {
+        return decisionFailure(blockedProfile.resolution_reason || 'EMPLOYMENT_PROFILE_BLOCKED');
+    }
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const dates = rows.map((row) => dateKeyUtc(row?.hmeromhnia));
     const range = dates[0] ? getMondaySundayWeekRange(dates[0]) : null;

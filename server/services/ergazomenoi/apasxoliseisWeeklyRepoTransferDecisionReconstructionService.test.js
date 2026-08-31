@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { reconstructWeeklyRepoTransferDecision } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
+const { reconstructWeeklyRepoTransferDecision, defaultContextLoader } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 
 const sourceId = '507f1f77bcf86cd799439011';
 const targetId = '507f1f77bcf86cd799439012';
@@ -21,7 +21,50 @@ const group = {
 const context = { candidates: [{ _id: sourceId, team: 't', company_kod: 'c', ypokatasthma: '0001', kodikos: '001' }, { _id: targetId, team: 't', company_kod: 'c', ypokatasthma: '0001', kodikos: '001' }], weekRows: [{ _id: sourceId, hmeromhnia: '2026-06-15' }, { _id: targetId, hmeromhnia: '2026-06-16' }], employee: { _id: '507f191e810c19729de860eb' }, employmentProfile: { typos_apasxolhshs: 'PLHRHS' }, history: [], audits: [], week: { start: '2026-06-15', end: '2026-06-21' }, companyFlags: {}, companyKodikos: '0004', holidayByDateKey: new Map() };
 const command = { proposal_id: 'proposal-1', expected_source_id: sourceId, expected_target_id: targetId, expected_proposal_version: 'repo-transfer-single-pair-proposal:v5', expected_choice_code: 'choice' };
 
+function query(value) {
+    return { select() { return this; }, sort() { return this; }, lean: async () => value };
+}
+
+async function borrowedDefaultContext(lendingDays, borrowingDays, duplicateCompanies = false) {
+    const rows = [
+        { ...context.candidates[0], hmeromhnia: new Date('2026-06-15'), kodikos: '001',
+            ypokatasthma: '0001' },
+        { ...context.candidates[1], hmeromhnia: new Date('2026-06-16'), kodikos: '001',
+            ypokatasthma: '0001' }
+    ];
+    const lendingEmployee = { _id: '507f191e810c19729de860eb', team: 't', company_kod: 'c',
+        kodikos: '001', ypokatasthma: '0001', hmeres_ergasias_ebdomadas: lendingDays,
+        typos_apasxolhshs: 'PLHRHS', kathestos_apasxolhshs: 'PLHRHS',
+        afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false,
+        hmnia_enarxhs_daneismoy: new Date('2026-01-01'), hmnia_lhxhs_daneismoy: null,
+        afm_daneizomenoy_ergodoth: '094259216',
+        kodikos_ergazomenoy_alloy_ergodoth: 'B1' };
+    const borrowingEmployee = { ...lendingEmployee, _id: '507f191e810c19729de860ec',
+        company_kod: '507f191e810c19729de860ed', kodikos: 'B1',
+        hmeres_ergasias_ebdomadas: borrowingDays, afora_daneismo_ergazomenoy: false };
+    const companies = [{ _id: '507f191e810c19729de860ed', afm: '094259216' }];
+    if (duplicateCompanies) companies.push({ _id: '507f191e810c19729de860ee', afm: '094259216' });
+    let prodCalls = 0;
+    return defaultContextLoader({ scope: { team: 't', company_kod: 'c',
+        company_kodikos: '0004', year: '2026' }, sourceId, targetId,
+        models: {
+            prodhlomenaModel: { find: () => query(prodCalls++ === 0 ? rows : rows) },
+            employeeModel: { find: (filter) => query(typeof filter.company_kod === 'object'
+                ? [borrowingEmployee] : [lendingEmployee]) },
+            historyModel: { find: () => query([]) }, auditModel: { find: () => query([]) },
+            companiesModel: { find: () => query(companies) }
+        },
+        holidayContextBuilder: async () => ({ argiesByDateKey: new Map(), companyFlags: {} })
+    });
+}
+
 async function run() {
+    assert.equal((await borrowedDefaultContext(5, 6)).employmentProfile
+        .hmeres_ergasias_ebdomadas, 6);
+    assert.equal((await borrowedDefaultContext(6, 5)).employmentProfile
+        .hmeres_ergasias_ebdomadas, 5);
+    assert.equal((await borrowedDefaultContext(5, 6, true)).employmentProfile
+        .resolution_blocked, true);
     const originalRows = JSON.stringify(context.weekRows);
     const result = await reconstructWeeklyRepoTransferDecision({ scope: { team: 't', company_kod: 'c' }, command, contextLoader: async () => context, projectionBuilder: () => ({ projection_status: 'READY', groups: [group] }) });
     assert.strictEqual(result.snapshot.source.prodhlomena_oraria_id, sourceId);

@@ -55,7 +55,7 @@ const session = {
     userStatus: 'A'
 };
 
-function dependencies(rows, decisions = [], executions = []) {
+function dependencies(rows, decisions = [], executions = [], options = {}) {
     const counter = { filters: {} };
     const employeeCodes = [...new Set(rows.map((row) => row.kodikos))];
     const employees = employeeCodes.map((kodikos) => ({
@@ -68,14 +68,28 @@ function dependencies(rows, decisions = [], executions = []) {
         archived: false,
         kathestos_apasxolhshs: 'PLHRHS',
         typos_apasxolhshs: 'PLHRHS', hmeres_ergasias_ebdomadas: 5,
-        mo_oron_hmerhsias_ergasias: 8
+        mo_oron_hmerhsias_ergasias: 8,
+        ...(options.employeeOverrides || {})
     }));
+    const borrowingEmployees = options.borrowingEmployees || [];
     return {
         counter,
         models: {
             prodhlomenaModel: { find: (filter) => { counter.filters.rows = filter; return query(rows, counter, 'rows'); } },
-            employeeModel: { find: (filter) => { counter.filters.employees = filter; return query(employees, counter, 'employees'); } },
-            historyModel: { find: (filter) => { counter.filters.histories = filter; return query([], counter, 'histories'); } },
+            employeeModel: { find: (filter) => {
+                const borrowedLookup = filter.company_kod && typeof filter.company_kod === 'object';
+                if (!borrowedLookup) counter.filters.employees = filter;
+                return query(borrowedLookup ? borrowingEmployees : employees, counter,
+                    borrowedLookup ? 'borrowingEmployees' : 'employees');
+            } },
+            historyModel: { find: (filter) => {
+                const borrowedLookup = filter.company_kod && typeof filter.company_kod === 'object';
+                if (!borrowedLookup) counter.filters.histories = filter;
+                return query(borrowedLookup ? options.borrowingHistories || [] : [], counter,
+                    borrowedLookup ? 'borrowingHistories' : 'histories');
+            } },
+            companiesModel: { find: () => query(options.borrowingCompanies || [], counter,
+                'borrowingCompanies') },
             auditModel: { find: (filter) => { counter.filters.audits = filter; return query([], counter, 'audits'); } },
             decisionModel: { find: (filter) => { counter.filters.decisions = filter; return query(decisions, counter, 'decisions'); } },
             executionModel: { find: (filter) => { counter.filters.executions = filter; return query(executions, counter, 'executions'); } }
@@ -503,6 +517,50 @@ async function testFirstCrossMonthWeekUsesMondayReadContextOnly() {
     );
 }
 
+async function testBorrowingProfileDrivesBatchAndAmbiguityDoesNotFallback() {
+    for (const [lending, borrowing, expectedRepo] of [[5, 6, 1], [6, 5, 2]]) {
+        const rows = week('2026-07-06', '0001');
+        const deps = dependencies(rows, [], [], {
+            employeeOverrides: {
+                hmeres_ergasias_ebdomadas: lending,
+                afora_daneismo_ergazomenoy: true,
+                typos_ergodoth_daneismoy: false,
+                hmnia_enarxhs_daneismoy: new Date('2026-01-01'),
+                hmnia_lhxhs_daneismoy: null,
+                afm_daneizomenoy_ergodoth: '094259216',
+                kodikos_ergazomenoy_alloy_ergodoth: 'B1'
+            },
+            borrowingCompanies: [{ _id: 'borrowing-company', afm: '094259216' }],
+            borrowingEmployees: [{ _id: 'borrowing-employee', team: 'THA',
+                company_kod: 'borrowing-company', kodikos: 'B1',
+                kathestos_apasxolhshs: 'PLHRHS', typos_apasxolhshs: 'PLHRHS',
+                hmeres_ergasias_ebdomadas: borrowing, mo_oron_hmerhsias_ergasias: 8,
+                pososto_prosayxhshs_6hs_hmeras: 40 }]
+        });
+        const result = await loadWeeklyRepoTransferDecisionBatch({ session,
+            filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12',
+                ypokatasthma: '0000' }, ...deps });
+        assert.equal(result.current_groups_count, expectedRepo === 1 ? 0 : 1);
+    }
+
+    const rows = week('2026-07-06', '0001');
+    const deps = dependencies(rows, [], [], {
+        employeeOverrides: { hmeres_ergasias_ebdomadas: 5,
+            afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false,
+            hmnia_enarxhs_daneismoy: new Date('2026-01-01'), hmnia_lhxhs_daneismoy: null,
+            afm_daneizomenoy_ergodoth: '094259216',
+            kodikos_ergazomenoy_alloy_ergodoth: 'B1' },
+        borrowingCompanies: [
+            { _id: 'one', afm: '094259216' }, { _id: 'two', afm: '094259216' }
+        ]
+    });
+    const blocked = await loadWeeklyRepoTransferDecisionBatch({ session,
+        filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12',
+            ypokatasthma: '0000' }, ...deps });
+    assert.equal(blocked.records.length, 0);
+    assert.ok(Object.values(blocked.reason_counts).some((count) => count > 0));
+}
+
 async function run() {
     await testZeroProposalsUsesOneBatchOfQueries();
     await testManyProposalsKeepConstantQueryCounts();
@@ -515,6 +573,7 @@ async function run() {
     await testTwentyPeriodDecisionsUseTwoConstantQueries();
     await testFilterAndScopeRejections();
     await testFirstCrossMonthWeekUsesMondayReadContextOnly();
+    await testBorrowingProfileDrivesBatchAndAmbiguityDoesNotFallback();
     console.log('weekly repo transfer decision batch tests passed');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

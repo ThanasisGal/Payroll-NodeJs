@@ -33,7 +33,10 @@ const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     'pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
     'nomimoOromisthio pragmatikoOromisthio ' +
     'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
-    'dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh';
+    'dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh ' +
+    'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy ' +
+    'hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy ' +
+    'afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth';
 
 const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
@@ -138,8 +141,11 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
 function getEffectiveRepoProfileForDate(date, history = [], employee = {}) { return getOrarioTermsForDate(date, history, employee); }
-function getDailyRepoProfileInfo({ row = {}, istorikoRows = [], ergazomenos = {} } = {}) {
-    const resolved = getOrarioTermsForDate(row.hmeromhnia, istorikoRows, ergazomenos);
+function getDailyRepoProfileInfo({ row = {}, istorikoRows = [], ergazomenos = {},
+    resolveProfileForDate = null } = {}) {
+    const resolved = typeof resolveProfileForDate === 'function'
+        ? resolveProfileForDate(row.hmeromhnia)
+        : getOrarioTermsForDate(row.hmeromhnia, istorikoRows, ergazomenos);
     const snapshot = String(row.kathestos_apasxolhshs_hmeras ?? '').trim();
     const employmentType = ['0', '1', '2'].includes(snapshot)
         ? snapshot
@@ -159,7 +165,8 @@ function profileSignature(profile = {}) {
         String(profile.hmeres_ergasias_ebdomadas ?? ''),
         String(profile.ores_ergasias_ebdomadas ?? ''),
         String(profile.mo_oron_hmerhsias_ergasias ?? ''),
-        String(profile.pososto_prosayxhshs_6hs_hmeras ?? '')
+        String(profile.pososto_prosayxhshs_6hs_hmeras ?? ''),
+        String(profile.resolution_source ?? '')
     ].join('|');
 }
 function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
@@ -168,13 +175,17 @@ function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
         normalizeDateOnly(profile.hmeromhnia_allaghs_symbashs) ||
         normalizeDateOnly(fallbackDate);
 }
-function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} }) {
+function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {},
+    resolveProfileForDate = null }) {
+    const resolve = (date) => typeof resolveProfileForDate === 'function'
+        ? resolveProfileForDate(date)
+        : getEffectiveRepoProfileForDate(date, istorikoRows, ergazomenos);
     const sunday = week.naturalWeekEnd || endOfWeekSundayUtc(week.weekStart);
     const profiles = [];
-    for (let day = clampDateStartUtc(week.weekStart); day <= week.weekEnd; day = addDaysUtc(day, 1)) profiles.push(getEffectiveRepoProfileForDate(day, istorikoRows, ergazomenos));
-    const first = profiles[0] || getEffectiveRepoProfileForDate(week.weekStart, istorikoRows, ergazomenos);
-    const sundayProfile = getEffectiveRepoProfileForDate(sunday, istorikoRows, ergazomenos);
-    const last = profiles[profiles.length - 1] || getEffectiveRepoProfileForDate(week.weekEnd, istorikoRows, ergazomenos);
+    for (let day = clampDateStartUtc(week.weekStart); day <= week.weekEnd; day = addDaysUtc(day, 1)) profiles.push(resolve(day));
+    const first = profiles[0] || resolve(week.weekStart);
+    const sundayProfile = resolve(sunday);
+    const last = profiles[profiles.length - 1] || resolve(week.weekEnd);
     const profileChangedInsideWeek =
         new Set(profiles.map(profileSignature)).size > 1 ||
         profileSignature(first) !== profileSignature(sundayProfile);
@@ -182,6 +193,19 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
         ...sundayProfile,
         profile_changed_inside_week: profileChangedInsideWeek
     };
+    const blockedProfile = profiles.find((profile) => profile?.resolution_blocked === true);
+    if (blockedProfile) {
+        return {
+            expectedWeeklyRepo: null,
+            repoResolutionSource: null,
+            repoResolutionReason: blockedProfile.resolution_reason,
+            profileChangedInsideWeek,
+            effectiveProfile: { ...blockedProfile, profile_changed_inside_week: profileChangedInsideWeek },
+            effectiveProfileDate: getProfileDateForDeviation(blockedProfile, sunday),
+            previousProfile: first,
+            previousProfileDate: getProfileDateForDeviation(first, week.weekStart)
+        };
+    }
     const contractualWeeklyWorkdays = Number(effective.hmeres_ergasias_ebdomadas);
     const expectedWeeklyRepo = Number.isSafeInteger(contractualWeeklyWorkdays) &&
             contractualWeeklyWorkdays >= 1 &&

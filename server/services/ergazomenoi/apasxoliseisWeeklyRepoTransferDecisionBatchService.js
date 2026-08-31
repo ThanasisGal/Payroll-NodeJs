@@ -33,6 +33,11 @@ const {
     startOfWeekMondayUtc,
     dateKeyUtc
 } = require('../../utils/date/mondaySundayWeek');
+const {
+    employeeKey: borrowedProfileEmployeeKey,
+    resolveEffectiveEmploymentProfileForReviewDate,
+    preloadBorrowedEmploymentProfileContexts
+} = require('./apasxoliseisBorrowedEmploymentProfileResolverService');
 
 function requestError(message, statusCode = 400) {
     const error = new Error(message);
@@ -211,6 +216,13 @@ async function loadWeeklyRepoTransferDecisionBatch({
         if (!historyByCode.has(code)) historyByCode.set(code, []);
         historyByCode.get(code).push(history);
     });
+    const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
+        team: scope.team, employees, models: {
+            companiesModel: models.companiesModel,
+            employeeModel,
+            historyModel
+        }
+    });
     const auditsByRowId = new Map();
     audits.forEach((audit) => {
         const id = String(audit.prodhlomena_oraria_id || '');
@@ -234,7 +246,13 @@ async function loadWeeklyRepoTransferDecisionBatch({
             const profileInfo = getWeeklyRepoProfileInfo({
                 week: { naturalWeekStart: weekStart, naturalWeekEnd: weekEnd, weekStart, weekEnd, isFullWeek: true },
                 istorikoRows: historyByCode.get(employee_kodikos) || [],
-                ergazomenos: employee
+                ergazomenos: employee,
+                resolveProfileForDate: (reviewDate) =>
+                    resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+                        normalEmployee: employee,
+                        normalHistory: historyByCode.get(employee_kodikos) || [],
+                        borrowedContext: borrowedContexts.get(
+                            borrowedProfileEmployeeKey(employee)) || null })
             });
             const effective = profileInfo.effectiveProfile || {};
             const profile = {
@@ -247,7 +265,9 @@ async function loadWeeklyRepoTransferDecisionBatch({
                 eidikh_kathgoria_ergazomenoy:
                     employee.eidikh_kathgoria_ergazomenoy || '',
                 eidikh_periptosh: employee.eidikh_periptosh || '',
-                profile_source: effective.source || '',
+                profile_source: effective.resolution_source || effective.source || '',
+                resolution_blocked: effective.resolution_blocked === true,
+                resolution_reason: effective.resolution_reason || '',
                 profile_istoriko_id: effective.istorikoId ? String(effective.istorikoId) : null,
                 profile_effective_date: profileInfo.effectiveProfileDate,
                 profile_changed_inside_week: profileInfo.profileChangedInsideWeek === true

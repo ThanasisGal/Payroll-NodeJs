@@ -502,4 +502,25 @@ assert.notEqual(unapprovedTargetUpdate.repo_apologistika, true);
 assert.notEqual(unapprovedTargetUpdate.kathgoria_ergasias_apologistika, 'ΑΝ');
 assert.notEqual(unapprovedTargetUpdate.apologistiko_biblio, true);
 
-console.log('weekly post-check pure write-plan contract tests passed (20 contracts)');
+const noRepoRows = week([7, 7, 7, 7, 7, 7, 7]);
+noRepoRows.forEach((item) => Object.assign(item, { kathgoria_ergasias: 'ΕΡΓ',
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', repo: false, repo_apologistika: false }));
+for (const [lendingDays, borrowingDays, expectedRepo] of [[5, 6, 1], [6, 5, 2]]) {
+    result = plan(noRepoRows, {
+        employees: [employee({ hmeres_ergasias_ebdomadas: lendingDays })],
+        resolveProfileForDate: () => employee({
+            hmeres_ergasias_ebdomadas: borrowingDays,
+            resolution_source: 'BORROWING_COMPANY'
+        })
+    });
+    assert.equal(onlyDeviation(result).expected_repo, expectedRepo);
+    assert.equal(result.deviations[0].effective_profile_source, 'BORROWING_COMPANY');
+}
+result = plan(noRepoRows, { resolveProfileForDate: () => employee({
+    resolution_source: 'AMBIGUOUS', resolution_blocked: true,
+    resolution_reason: 'BORROWING_COMPANY_AMBIGUOUS'
+}) });
+assert.equal(onlyDeviation(result).status, 'NEEDS_HR_DECISION');
+assert.ok(result.deviations[0].reasons.includes('BORROWING_COMPANY_AMBIGUOUS'));
+
+console.log('weekly post-check pure write-plan contract tests passed (23 contracts)');

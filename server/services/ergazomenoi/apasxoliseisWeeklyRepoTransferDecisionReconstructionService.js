@@ -22,6 +22,11 @@ const {
     getWeeklyRepoProfileInfo
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const { getMondaySundayWeekRange } = require('../../utils/date/mondaySundayWeek');
+const {
+    employeeKey: borrowedProfileEmployeeKey,
+    resolveEffectiveEmploymentProfileForReviewDate,
+    preloadBorrowedEmploymentProfileContexts
+} = require('./apasxoliseisBorrowedEmploymentProfileResolverService');
 
 const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v4';
 const ROW_FIELDS = Object.freeze(ATOMIC_REPO_TRANSFER_ROW_FIELDS.split(/\s+/).filter(Boolean));
@@ -107,6 +112,14 @@ async function defaultContextLoader({
     if (!holidayContext?.argiesByDateKey || !(holidayContext.argiesByDateKey instanceof Map)) {
         throw conflict('Δεν ήταν δυνατή η επίλυση του πλαισίου αργιών.');
     }
+    const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
+        team: scope.team, employees: [employee], models: {
+            companiesModel: models.companiesModel,
+            employeeModel,
+            historyModel
+        }
+    });
+    const borrowedContext = borrowedContexts.get(borrowedProfileEmployeeKey(employee)) || null;
     const weeklyProfileInfo = getWeeklyRepoProfileInfo({
         week: {
             naturalWeekStart: periodStart,
@@ -116,7 +129,10 @@ async function defaultContextLoader({
             isFullWeek: true
         },
         istorikoRows: history,
-        ergazomenos: employee
+        ergazomenos: employee,
+        resolveProfileForDate: (reviewDate) =>
+            resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+                normalEmployee: employee, normalHistory: history, borrowedContext })
     });
     const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
     const employmentProfile = {
@@ -131,7 +147,9 @@ async function defaultContextLoader({
         eidikh_kathgoria_ergazomenoy:
             employee.eidikh_kathgoria_ergazomenoy || '',
         eidikh_periptosh: employee.eidikh_periptosh || '',
-        profile_source: effectiveProfile.source || '',
+        profile_source: effectiveProfile.resolution_source || effectiveProfile.source || '',
+        resolution_blocked: effectiveProfile.resolution_blocked === true,
+        resolution_reason: effectiveProfile.resolution_reason || '',
         profile_istoriko_id: effectiveProfile.istorikoId ? String(effectiveProfile.istorikoId) : null,
         profile_effective_date: weeklyProfileInfo.effectiveProfileDate,
         profile_changed_inside_week: weeklyProfileInfo.profileChangedInsideWeek === true

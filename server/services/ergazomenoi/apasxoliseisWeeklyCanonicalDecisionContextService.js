@@ -32,6 +32,11 @@ const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTerm
 const {
     buildAppliedRepoTransferProtectionContext
 } = require('./apasxoliseisWeeklyRepoTransferAppliedProtectionService');
+const {
+    employeeKey: borrowedProfileEmployeeKey,
+    resolveEffectiveEmploymentProfileForReviewDate,
+    preloadBorrowedEmploymentProfileContexts
+} = require('./apasxoliseisBorrowedEmploymentProfileResolverService');
 
 const MAX_HISTORY_RECORDS = 100;
 const MAX_DECISION_HISTORY = 100;
@@ -42,7 +47,10 @@ const CANONICAL_EMPLOYEE_PROFILE_FIELDS = [
     'typos_apasxolhshs', 'typos_ebdomadas', 'pososto_prosayxhshs_6hs_hmeras',
     'nomimoOromisthio', 'pragmatikoOromisthio', 'employment_profile_source',
     'eidikh_kathgoria_ergazomenoy', 'eidikh_periptosh',
-    'dialleima_se_lepta', 'dialleima_entos_ektos_orarioy'
+    'dialleima_se_lepta', 'dialleima_entos_ektos_orarioy',
+    'afora_daneismo_ergazomenoy', 'typos_ergodoth_daneismoy',
+    'hmnia_enarxhs_daneismoy', 'hmnia_lhxhs_daneismoy',
+    'afm_daneizomenoy_ergodoth', 'kodikos_ergazomenoy_alloy_ergodoth'
 ].join(' ');
 const HISTORY_SELECT_FIELDS = [
     'kodikos', 'aa_eggrafhs', 'hmeromhnia_allaghs_symbashs',
@@ -262,10 +270,22 @@ async function loadWeeklyCanonicalDecisionContext({
         sortedLean(Execution.find(executionQuery), { applied_at: -1 }, 20),
         sortedLean(Decision.find(decisionQuery), { created_at: -1 }, MAX_DECISION_HISTORY)
     ]);
+    const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
+        team, employees: [employee], models: {
+            companiesModel: models.companiesModel,
+            employeeModel: Employee,
+            historyModel: History
+        }
+    });
+    const borrowedContext = borrowedContexts.get(borrowedProfileEmployeeKey(employee)) || null;
+    const resolveProfileForDate = (reviewDate) =>
+        resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+            normalEmployee: employee, normalHistory: histories, borrowedContext });
     const weekContext = { naturalWeekStart: week.start, naturalWeekEnd: week.end,
         weekStart: week.start, weekEnd: week.end, isFullWeek: rows.length === 7 };
     const weeklyProfileInfo = getWeeklyRepoProfileInfo({
-        week: weekContext, istorikoRows: histories, ergazomenos: employee
+        week: weekContext, istorikoRows: histories, ergazomenos: employee,
+        resolveProfileForDate
     });
     const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
     const automaticAnalysis = analyzeWeeklySixthSeventhDay({
