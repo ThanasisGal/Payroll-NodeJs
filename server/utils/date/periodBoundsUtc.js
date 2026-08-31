@@ -1,7 +1,7 @@
 function buildPeriodBoundsUtc(year, periodCode) {
     const yearText = String(year);
-    if (!/^\d{4}$/.test(yearText)) {
-        throw new TypeError('year must be a four-digit year');
+    if (!/^[1-9]\d{3}$/.test(yearText)) {
+        throw new TypeError('year must be a four-digit year from 1000 to 9999');
     }
 
     if (typeof periodCode !== 'string' || !/^(0[1-9]|1[0-2])$/.test(periodCode)) {

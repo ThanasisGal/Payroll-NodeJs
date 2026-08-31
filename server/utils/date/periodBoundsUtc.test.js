@@ -38,8 +38,14 @@ for (const year of ['2026', '2028']) {
     }
 }
 
-for (const invalidYear of ['invalid', '26', '20260', '', null, undefined]) {
+for (const invalidYear of [
+    '0000', '0001', '0099', '0999', 'invalid', '26', '20260', '', null, undefined
+]) {
     assert.throws(() => buildPeriodBoundsUtc(invalidYear, '01'), /four-digit year/);
+}
+
+for (const validYear of ['1000', '2026', '9999']) {
+    assert.doesNotThrow(() => buildPeriodBoundsUtc(validYear, '01'));
 }
 
 for (const invalidPeriodCode of ['00', '13', '1', '2x', '', null, undefined]) {
