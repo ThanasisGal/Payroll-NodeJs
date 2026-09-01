@@ -12,6 +12,8 @@ const { buildEmploymentPeriodFrozenSnapshot } = require('./apasxoliseisPeriodFro
 const { buildCorrectiveDelta, correctionSubmissionCapability,
     normalizeCorrectionCommands, reconstructCorrectedHistoricalResult } = require('./apasxoliseisPeriodCorrectiveService');
 const { assertPeriodLifecycleIndexesReady } = require('./apasxoliseisPeriodLifecycleIndexGuardService');
+const { isHistoricalDependencyCurrent } =
+    require('./apasxoliseisHistoricalPeriodReconstructionService');
 
 function actor(session = {}) {
     const role = assertCriticalEmploymentDecisionRole(session); const id = String(session.userId || '').trim();
@@ -56,7 +58,7 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
         if (control.frozen_snapshot_id) throw periodError('PERIOD_ALREADY_FINALIZED', 409, 'Η περίοδος έχει ήδη οριστικοποιηθεί.');
         if (control.historical_reconstruction_status === 'COMPLETED') {
             const currentFingerprints = await historicalFingerprintResolver({ scope, session: dbSession });
-            if (currentFingerprints.dependency_fingerprint !== control.historical_dependency_fingerprint) {
+            if (!isHistoricalDependencyCurrent(control, currentFingerprints)) {
                 throw periodError('HISTORICAL_RECONSTRUCTION_STALE_CANNOT_FINALIZE', 409,
                     'Η παρωχημένη ιστορική ανακατασκευή πρέπει πρώτα να επανεκτιμηθεί.');
             }

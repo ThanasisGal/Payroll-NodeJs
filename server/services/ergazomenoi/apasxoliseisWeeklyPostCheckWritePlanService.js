@@ -146,6 +146,8 @@ function buildWeeklyRepoPostCheckWritePlan({
     appliedProtectionReasonsByWeek = new Map(),
     canonicalDecisionsByWeek = new Map(),
     sameRunDailyCalculatedRowIds = new Set(),
+    resolveProfileForDate = null,
+    resolveHolidayContextForDate = null,
     buildWeeklyIllegalOvertimeUpdate
 }) {
     if (typeof buildWeeklyIllegalOvertimeUpdate !== 'function') {
@@ -181,7 +183,11 @@ function buildWeeklyRepoPostCheckWritePlan({
             const weeklyProfileInfo = getWeeklyRepoProfileInfo({
                 week,
                 istorikoRows,
-                ergazomenos: erg
+                ergazomenos: erg,
+                resolveProfileForDate: typeof resolveProfileForDate === 'function'
+                    ? (reviewDate) => resolveProfileForDate({
+                        reviewDate, employee: erg, history: istorikoRows })
+                    : null
             });
             const expectedWeeklyRepo = weeklyProfileInfo.expectedWeeklyRepo;
             const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
@@ -251,7 +257,10 @@ function buildWeeklyRepoPostCheckWritePlan({
                 const kathgoriaErgasias = String(row.kathgoria_ergasias || '').trim();
                 const oresErgasiasIsZero = isZeroHours(row.ores_ergasias);
                 const cardsOresIsNonZero = isNonZeroHours(row.cards_ores_ergasias);
-                const dailyProfile = getEffectiveRepoProfileForDate(day, istorikoRows, erg);
+                const dailyProfile = typeof resolveProfileForDate === 'function'
+                    ? resolveProfileForDate({ reviewDate: day, employee: erg,
+                        history: istorikoRows })
+                    : getEffectiveRepoProfileForDate(day, istorikoRows, erg);
                 const isFullTimeProfile = resolveFullTimeFromWorkTerms(dailyProfile) === true;
                 const update = {};
                 const rawUnresolvedCardPair = resolveCardPairVerification(row).hasUnresolvedCardEvidence;
@@ -283,7 +292,13 @@ function buildWeeklyRepoPostCheckWritePlan({
                     update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
                 } else if (!hasUnresolvedCardPair && isNoCardDeclaredWorkRow(row) &&
                     classifyLeaveProvenance(row) !== LEAVE_PROVENANCE.HR_DECLARED_LEAVE) {
-                    const noCardsDisplayStatus = resolveNoCardsDisplayStatus(row, noCardsDisplayContext);
+                    const effectiveHolidayContext =
+                        typeof resolveHolidayContextForDate === 'function'
+                            ? resolveHolidayContextForDate({ reviewDate: day,
+                                employee: erg, history: istorikoRows })
+                            : noCardsDisplayContext;
+                    const noCardsDisplayStatus = resolveNoCardsDisplayStatus(
+                        row, effectiveHolidayContext);
                     update.apologistiko_biblio = false;
                     update.kathgoria_ergasias_apologistika = '';
                     update.ores_ergasias_apologistika = isMisthotosEmployee(dailyProfile)
@@ -406,11 +421,13 @@ function buildWeeklyRepoPostCheckWritePlan({
                     expected_repo_source: weeklyProfileInfo.repoResolutionSource || '',
                     effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                     effective_profile_source:
+                        effectiveProfile.resolution_source ||
                         effectiveProfile.employment_profile_source || effectiveProfile.source || '',
                     effective_profile_date: weeklyProfileInfo.effectiveProfileDate,
                     effective_profile_istoriko_id: effectiveProfile.istorikoId || null,
                     previous_typos_apasxolhshs: previousProfile.typos_apasxolhshs || '',
                     previous_profile_source:
+                        previousProfile.resolution_source ||
                         previousProfile.employment_profile_source || previousProfile.source || '',
                     previous_profile_date: weeklyProfileInfo.previousProfileDate,
                     previous_profile_istoriko_id: previousProfile.istorikoId || null,

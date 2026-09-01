@@ -33,6 +33,7 @@ const {
 
 function query(value) {
     return {
+        select() { return this; },
         sort() { return this; },
         limit() { return this; },
         lean: async () => value
@@ -173,10 +174,39 @@ const session = { userTeam: 'THA', companyInUse: 'company', userStatus: 'A', use
     assert.equal(projection.snapshot_fingerprint, context.snapshot.fingerprint);
     assert.equal(Object.hasOwn(projection, 'histories'), false);
 
+    const lendingEmployee = { ...employee,
+        afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false,
+        hmnia_enarxhs_daneismoy: new Date('2026-01-01'), hmnia_lhxhs_daneismoy: null,
+        afm_daneizomenoy_ergodoth: '094259216',
+        kodikos_ergazomenoy_alloy_ergodoth: 'B2' };
+    const borrowingEmployee = { ...employee, _id: 'borrowing-employee',
+        company_kod: 'borrowing-company', kodikos: 'B2', hmeres_ergasias_ebdomadas: 6 };
+    const borrowedModels = {
+        ...models,
+        employeeModel: model({ one: lendingEmployee, many: [borrowingEmployee] }),
+        companiesModel: model({ many: [{ _id: 'borrowing-company', afm: '094259216' }] })
+    };
+    const borrowedContext = await loadWeeklyCanonicalDecisionContext({ session,
+        ypokatasthma: '0000', employee_kodikos: 'E2', week_start: '2026-08-03',
+        models: borrowedModels });
+    assert.equal(borrowedContext.effectiveProfile.hmeres_ergasias_ebdomadas, 6);
+    assert.equal(borrowedContext.effectiveProfile.resolution_source,
+        'BORROWING_COMPANY_EMPLOYMENT_PROFILE');
+    const ambiguousContext = await loadWeeklyCanonicalDecisionContext({ session,
+        ypokatasthma: '0000', employee_kodikos: 'E2', week_start: '2026-08-03',
+        models: { ...borrowedModels, companiesModel: model({ many: [
+            { _id: 'borrowing-a', afm: '094259216' },
+            { _id: 'borrowing-b', afm: '094259216' }
+        ] }) } });
+    assert.equal(ambiguousContext.effectiveProfile.resolution_blocked, true);
+    assert.equal(ambiguousContext.effectiveProfile.hmeres_ergasias_ebdomadas, null);
+    assert.ok(ambiguousContext.automaticAnalysis.reasons.includes(
+        'BORROWING_COMPANY_AMBIGUOUS'));
+
     const crossScope = await assert.rejects(() => loadWeeklyCanonicalDecisionContext({
         session, ypokatasthma: '9999', employee_kodikos: 'E2', week_start: '2026-08-03',
         models: { ...models, employeeModel: model({ one: null }) }
     }));
     void crossScope;
-    console.log('weekly canonical decision context tests passed (32 contracts)');
+    console.log('weekly canonical decision context tests passed (36 contracts)');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

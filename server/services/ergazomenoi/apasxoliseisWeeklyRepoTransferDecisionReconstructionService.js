@@ -22,6 +22,14 @@ const {
     getWeeklyRepoProfileInfo
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const { getMondaySundayWeekRange } = require('../../utils/date/mondaySundayWeek');
+const {
+    employeeKey: borrowedProfileEmployeeKey,
+    resolveEffectiveEmploymentProfileForReviewDate,
+    preloadBorrowedEmploymentProfileContexts
+} = require('./apasxoliseisBorrowedEmploymentProfileResolverService');
+const {
+    preloadEffectiveHolidayContextProvider
+} = require('./apasxoliseisEffectiveHolidayContextProviderService');
 
 const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v4';
 const ROW_FIELDS = Object.freeze(ATOMIC_REPO_TRANSFER_ROW_FIELDS.split(/\s+/).filter(Boolean));
@@ -88,25 +96,52 @@ async function defaultContextLoader({
     }
     const periodStart = new Date(`${week.start}T00:00:00.000Z`);
     const periodEnd = new Date(`${week.end}T23:59:59.999Z`);
-    const [audits, history, holidayContext] = await Promise.all([
+    const [audits, history] = await Promise.all([
         auditModel.find({ team: scope.team, company_kod: scope.company_kod, prodhlomena_oraria_id: mongoose.trusted({ $in: weekRows.map((row) => row._id) }) }).select('_id prodhlomena_oraria_id changedAt').lean(),
         historyModel
             ? historyModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: first.kodikos }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS).sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1, createdAt: 1 }).lean()
-            : [],
-        holidayContextBuilder({
-            team: scope.team,
-            companyId: scope.company_kod,
-            companyKodikos: scope.company_kodikos,
-            etos: scope.year,
-            periodStart,
-            periodEnd,
-            companiesModel: models.companiesModel,
-            argiesModel: models.argiesModel
-        })
+            : []
     ]);
-    if (!holidayContext?.argiesByDateKey || !(holidayContext.argiesByDateKey instanceof Map)) {
-        throw conflict('Δεν ήταν δυνατή η επίλυση του πλαισίου αργιών.');
+    const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
+        team: scope.team, employees: [employee], models: {
+            companiesModel: models.companiesModel,
+            employeeModel,
+            historyModel
+        }
+    });
+    const borrowedContext = borrowedContexts.get(borrowedProfileEmployeeKey(employee)) || null;
+    const holidayProvider = await preloadEffectiveHolidayContextProvider({
+        team: scope.team,
+        employees: [employee],
+        etos: scope.year,
+        periodStart,
+        periodEnd,
+        normalHistoryByEmployeeKey: new Map([[
+            borrowedProfileEmployeeKey(employee), history
+        ]]),
+        borrowedProfileContexts: borrowedContexts,
+        models,
+        loadHolidayContext: holidayContextBuilder
+    });
+    const holidayByDateKey = new Map();
+    const effectiveHolidayContextsByCompany = new Map();
+    for (const row of weekRows) {
+        const resolution = holidayProvider.resolveForEmployeeDate({
+            employee, reviewDate: row.hmeromhnia, normalHistory: history
+        });
+        if (resolution.blocked === true) throw conflict(
+            resolution.resolution_reason || 'Δεν επιλύθηκε η εταιρεία αργιών.');
+        effectiveHolidayContextsByCompany.set(
+            resolution.effective_company_id, resolution.holidayContext);
+        const key = dateKey(row.hmeromhnia);
+        const holiday = resolution.holidayContext.argiesByDateKey.get(key);
+        if (holiday) holidayByDateKey.set(key, { ...holiday,
+            effective_company_id: resolution.effective_company_id,
+            effective_company_kodikos: resolution.holidayContext.company_kodikos || '' });
     }
+    const effectiveHolidayContext = effectiveHolidayContextsByCompany.size === 1
+        ? [...effectiveHolidayContextsByCompany.values()][0]
+        : null;
     const weeklyProfileInfo = getWeeklyRepoProfileInfo({
         week: {
             naturalWeekStart: periodStart,
@@ -116,7 +151,10 @@ async function defaultContextLoader({
             isFullWeek: true
         },
         istorikoRows: history,
-        ergazomenos: employee
+        ergazomenos: employee,
+        resolveProfileForDate: (reviewDate) =>
+            resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+                normalEmployee: employee, normalHistory: history, borrowedContext })
     });
     const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
     const employmentProfile = {
@@ -131,7 +169,9 @@ async function defaultContextLoader({
         eidikh_kathgoria_ergazomenoy:
             employee.eidikh_kathgoria_ergazomenoy || '',
         eidikh_periptosh: employee.eidikh_periptosh || '',
-        profile_source: effectiveProfile.source || '',
+        profile_source: effectiveProfile.resolution_source || effectiveProfile.source || '',
+        resolution_blocked: effectiveProfile.resolution_blocked === true,
+        resolution_reason: effectiveProfile.resolution_reason || '',
         profile_istoriko_id: effectiveProfile.istorikoId ? String(effectiveProfile.istorikoId) : null,
         profile_effective_date: weeklyProfileInfo.effectiveProfileDate,
         profile_changed_inside_week: weeklyProfileInfo.profileChangedInsideWeek === true
@@ -139,9 +179,9 @@ async function defaultContextLoader({
     return {
         candidates, weekRows, employee, employmentProfile, weeklyProfileInfo,
         history, audits, week,
-        companyFlags: holidayContext.companyFlags,
-        companyKodikos: holidayContext.company_kodikos,
-        holidayByDateKey: holidayContext.argiesByDateKey
+        companyFlags: effectiveHolidayContext?.companyFlags || {},
+        companyKodikos: effectiveHolidayContext?.company_kodikos || '',
+        holidayByDateKey
     };
 }
 

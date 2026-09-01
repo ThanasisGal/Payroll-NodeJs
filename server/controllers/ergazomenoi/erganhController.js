@@ -194,6 +194,11 @@ const {
     normalizeEmploymentType: normalizeReviewEmploymentType
 } = require('../../services/ergazomenoi/apasxoliseisReviewEmploymentProfileService');
 const {
+    employeeKey: borrowedProfileEmployeeKey,
+    resolveEffectiveEmploymentProfileForReviewDate,
+    preloadBorrowedEmploymentProfileContexts
+} = require('../../services/ergazomenoi/apasxoliseisBorrowedEmploymentProfileResolverService');
+const {
     resolveCanonicalRepoDayCountState
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalRepoCountService');
 const {
@@ -389,8 +394,12 @@ const { getWtoDailySubmissionIndexState,
     assertWtoDailySubmissionIndexesReady } = require('../../services/ergazomenoi/wtoDailySubmissionIndexGuardService');
 const { assertWtoDailyFrozenSnapshotVersion, resolveWtoDailyRestIdentity,
     buildWtoDailyPayloadFingerprint } = require('../../services/ergazomenoi/wtoDailyRestIdentityService');
-const { buildEmploymentDailyPreliminaryUpdate, buildEmploymentDailyCalculationUpdate } =
+const { buildEmploymentDailyPreliminaryUpdate, buildEmploymentDailyCalculationUpdate,
+    buildStage1EffectiveHolidayDailyCalculationUpdate } =
     require('../../services/ergazomenoi/apasxoliseisEmploymentDailyCalculationAdapterService');
+const {
+    preloadEffectiveHolidayContextProvider
+} = require('../../services/ergazomenoi/apasxoliseisEffectiveHolidayContextProviderService');
 const { postCorrectivePayroll } = require('../../services/ergazomenoi/apasxoliseisCorrectivePayrollPostingService');
 const ApasxoliseisWeeklyHrWorkflowStateModel = require('../../models/apasxoliseisWeeklyHrWorkflowState');
 const ApasxoliseisWeeklyHrWorkflowAuditModel = require('../../models/apasxoliseisWeeklyHrWorkflowAudit');
@@ -1348,7 +1357,7 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
         payrollResults, payrollPhaseFacts, policyRules] = await Promise.all([
         ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(range) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
         ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(weeklyRange) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
-        ErgazomenoiModel.find(base).select('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio').lean(),
+        ErgazomenoiModel.find(base).select('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth').lean(),
         ProdhlomenaOrariaDeviationsModel.find({ ...base, period_apo: asDateOnlyUtc(scope.period_start), period_eos: asDateOnlyUtc(scope.period_end, true) }).sort({ kodikos: 1, week_apo: 1 }).lean(),
         ApasxoliseisWeeklyCanonicalDecisionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), decision_status: 'RECORDED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
         ApasxoliseisWeeklyRepoTransferExecutionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), execution_status: 'APPLIED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
@@ -1364,21 +1373,32 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
     const historyByCode = new Map();
     historyRows.forEach((row) => { const key = String(row.kodikos || '');
         if (!historyByCode.has(key)) historyByCode.set(key, []); historyByCode.get(key).push(row); });
+    const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
+        team: scope.team, employees
+    });
     const decorateFrozenRow = (row) => {
-        const profile = getOrarioTermsForDate(row.hmeromhnia, historyByCode.get(String(row.kodikos || '')) || [],
-            employeeByCode.get(String(row.kodikos || '')) || {});
-        const sixthHours = Number(row.compensation_breakdown_apologistika?.hours?.sixthDayHours) || 0;
         const currentEmployee = employeeByCode.get(String(row.kodikos || '')) || {};
+        const currentHistory = historyByCode.get(String(row.kodikos || '')) || [];
+        const profile = resolveEffectiveEmploymentProfileForReviewDate({
+            reviewDate: row.hmeromhnia,
+            normalEmployee: currentEmployee,
+            normalHistory: currentHistory,
+            borrowedContext: borrowedProfileContexts.get(
+                borrowedProfileEmployeeKey(currentEmployee)) || null
+        });
+        const sixthHours = Number(row.compensation_breakdown_apologistika?.hours?.sixthDayHours) || 0;
         const resolvedProfile = Object.fromEntries([
             'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
             'kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas', 'typos_ergazomenon',
             'eidikh_kathgoria_ergazomenoy', 'eidikh_periptosh', 'dialleima_entos_ektos_orarioy',
             'dialleima_se_lepta', 'evelikth_proselefsh', 'pososto_prosayxhshs_6hs_hmeras',
             'nomimoHmeromisthio', 'nomimoOromisthio', 'pragmatikoHmeromisthio', 'pragmatikoOromisthio',
-            'source', 'employment_profile_source', 'istorikoId'
+            'source', 'employment_profile_source', 'istorikoId', 'resolution_source',
+            'resolution_blocked', 'resolution_reason', 'profile_company_id',
+            'profile_employee_id', 'profile_history_id', 'review_date'
         ].map((field) => [field, profile[field] ?? currentEmployee[field]]).filter(([, value]) => value !== undefined));
         return { ...row, effective_sixth_day_rate: profile.pososto_prosayxhshs_6hs_hmeras ?? null,
-            effective_profile_source: profile.source || '',
+            effective_profile_source: profile.resolution_source || profile.source || '',
             effective_profile_date: getProfileDateForDeviation(profile, row.hmeromhnia),
             effective_profile_istoriko_id: profile.istorikoId || null, effective_profile_resolved: resolvedProfile,
             repo_original_identity: row.repo === true || row.repo === 1,
@@ -1764,6 +1784,11 @@ function buildReviewHolidayResponseFields(row = {}, context = {}) {
     };
 }
 
+function resolveReviewNoCardsDisplayStatus(row = {}, context = {}) {
+    if (row.argia === true || row.argia_apologistika === true) return 'ΑΡΓΙΑ';
+    return resolveNoCardsDisplayStatus(row, context);
+}
+
 function getExpectedWeeklyRepo(ergazomenos) {
     const contractualWorkdays = Number(ergazomenos?.hmeres_ergasias_ebdomadas);
     return Number.isSafeInteger(contractualWorkdays) &&
@@ -2026,6 +2051,7 @@ async function runWeeklyRepoPostCheck({
     appliedProtectionContext,
     appliedProtectionReasonsByWeek = new Map(),
     sameRunDailyCalculatedRowIds = new Set(),
+    effectiveHolidayContextProvider = null,
     periodControlScope = null,
     calculationId = null
 }) {
@@ -2068,13 +2094,16 @@ async function runWeeklyRepoPostCheck({
 
     const employees = await ErgazomenoiModel.find(employeeQuery)
         .select(
-            'ypokatasthma kodikos eponymo onoma ' +
+            'company_kod ypokatasthma kodikos eponymo onoma ' +
                 'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                 'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                 'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                 'typos_apasxolhshs typos_ebdomadas ' +
                 'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
-                'pososto_prosayxhshs_6hs_hmeras nomimoOromisthio pragmatikoOromisthio'
+                'pososto_prosayxhshs_6hs_hmeras nomimoOromisthio pragmatikoOromisthio ' +
+                'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy ' +
+                'hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy ' +
+                'afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth'
         )
         .sort({ kodikos: 1 })
         .lean();
@@ -2231,6 +2260,36 @@ async function runWeeklyRepoPostCheck({
         await ApasxoliseisWeeklyCanonicalDecisionModel.find(canonicalDecisionQuery)
             .sort({ created_at: -1 }).lean()
     );
+    const borrowedProfileContexts = effectiveHolidayContextProvider
+        ? null
+        : await preloadBorrowedEmploymentProfileContexts({ team: sessionTeam, employees });
+    const postCheckHistoryByEmployeeKey = new Map(employees.map((employee) => [
+        borrowedProfileEmployeeKey(employee),
+        istorikoRowsByKodikos.get(String(employee.kodikos || '').trim()) || []
+    ]));
+    const postCheckHolidayProvider = effectiveHolidayContextProvider ||
+        await preloadEffectiveHolidayContextProvider({
+            team: sessionTeam,
+            employees,
+            etos: String(periodStart.getUTCFullYear()),
+            periodStart,
+            periodEnd,
+            normalHistoryByEmployeeKey: postCheckHistoryByEmployeeKey,
+            borrowedProfileContexts: borrowedProfileContexts || undefined
+        });
+    const resolvePostCheckHoliday = ({ reviewDate, employee, history }) => {
+        const resolution = postCheckHolidayProvider.resolveForEmployeeDate({
+            employee, reviewDate, normalHistory: history
+        });
+        if (resolution.blocked === true) {
+            throw Object.assign(new Error(
+                'Απαιτείται έλεγχος HR για το profile δανεισμού.'), {
+                code: resolution.resolution_reason,
+                statusCode: 409
+            });
+        }
+        return resolution;
+    };
 
     const writePlan = buildWeeklyRepoPostCheckWritePlan({
         sessionTeam,
@@ -2247,6 +2306,10 @@ async function runWeeklyRepoPostCheck({
         appliedProtectionReasonsByWeek,
         canonicalDecisionsByWeek,
         sameRunDailyCalculatedRowIds,
+        resolveProfileForDate: (input) =>
+            resolvePostCheckHoliday(input).effectiveProfile,
+        resolveHolidayContextForDate: (input) =>
+            resolvePostCheckHoliday(input).holidayContext,
         buildWeeklyIllegalOvertimeUpdate
     });
     const bulkOps = writePlan.bulkOps;
@@ -4336,7 +4399,7 @@ async function applyEmploymentDepartureScopeToFilters({
 
 const REVIEW_SELECT_FIELDS =
     'kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_apoysias_base_apologistika ' +
-    'team company_kod updatedAt ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
+    'team company_kod updatedAt ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia argia_apologistika perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
 
 function weeklyHrApiError(code, statusCode, message) {
     return Object.assign(new Error(message), { code, statusCode });
@@ -4405,7 +4468,9 @@ async function loadWeeklyHrContext({ req, input, session = null,
     const applySession = (query) => session ? query.session(session) : query;
     const liveEmployee = await applySession(ErgazomenoiModel.findOne({ ...base, _id: employeeId })
         .select(`${CANONICAL_EMPLOYEE_PROFILE_FIELDS} eponymo onoma ` +
-            'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')).lean();
+            'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs afora_daneismo_ergazomenoy ' +
+            'typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy ' +
+            'afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth')).lean();
     if (!liveEmployee) throw weeklyHrApiError('WEEKLY_HR_EMPLOYEE_NOT_FOUND', 404,
         'Ο εργαζόμενος δεν βρέθηκε στο ενεργό εταιρικό πλαίσιο.');
     const frozenEmployee = (presentationSnapshot?.employees || []).find((candidate) =>
@@ -4430,6 +4495,16 @@ async function loadWeeklyHrContext({ req, input, session = null,
             team: base.team, company_kod: base.company_kod, kodikos: employee.kodikos
         }).select(CANONICAL_HISTORY_SELECT_FIELDS)
             .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 })).lean();
+    const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
+        team: base.team, employees: [employee]
+    });
+    const resolveProfileForDate = (reviewDate) =>
+        resolveEffectiveEmploymentProfileForReviewDate({
+            reviewDate,
+            normalEmployee: employee,
+            normalHistory: histories,
+            borrowedContext: borrowedContexts.get(borrowedProfileEmployeeKey(employee)) || null
+        });
     const employmentDateScope = deriveEmploymentOwnedDateScope({
         natural_week_start: week.startKey,
         natural_week_end: week.endKey,
@@ -4451,11 +4526,12 @@ async function loadWeeklyHrContext({ req, input, session = null,
         week: { weekStart: new Date(`${expectedDates[0]}T00:00:00.000Z`),
             weekEnd: new Date(`${expectedDates.at(-1)}T00:00:00.000Z`),
             naturalWeekEnd: new Date(`${expectedDates.at(-1)}T00:00:00.000Z`) },
-        istorikoRows: histories, ergazomenos: employee
+        istorikoRows: histories, ergazomenos: employee, resolveProfileForDate
     });
     const effectiveProfilesByDate = Object.fromEntries(rows.map((row) => [
         dateKeyUtc(row.hmeromhnia),
-        getDailyRepoProfileInfo({ row, istorikoRows: histories, ergazomenos: employee }).profile
+        getDailyRepoProfileInfo({ row, istorikoRows: histories, ergazomenos: employee,
+            resolveProfileForDate }).profile
     ]));
     return { base, employee, rows, week, employmentDateScope,
         effectiveProfile: profile.effectiveProfile,
@@ -4770,7 +4846,10 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
                       'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                       'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
                       'nomimoOromisthio pragmatikoOromisthio typos_ergazomenon ' +
-                      'eidikh_kathgoria_ergazomenoy eidikh_periptosh'
+                      'eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
+                      'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy ' +
+                      'hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy ' +
+                      'afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth'
               )
               .lean()
         : [];
@@ -4850,6 +4929,15 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
         }
     }
 
+    const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
+        team: req.session.userTeam, employees: ergazomenoi
+    });
+    const resolveReviewProfile = (reviewDate, employee, history) =>
+        resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+            normalEmployee: employee, normalHistory: history,
+            borrowedContext: borrowedProfileContexts.get(
+                borrowedProfileEmployeeKey(employee)) || null });
+
     const deviations = await ProdhlomenaOrariaDeviationsModel.find(buildReviewDeviationsFilter(req))
         .sort({ ypokatasthma: 1, kodikos: 1, week_apo: 1 })
         .lean();
@@ -4879,10 +4967,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
         const erg = ergByKodikos.get(row.kodikos) || {};
         const istorikoRowsForEmployee =
             istorikoRowsByKodikos.get(String(row.kodikos || '').trim()) || [];
-        const effectiveProfile = getOrarioTermsForDate(
-            row.hmeromhnia,
-            istorikoRowsForEmployee,
-            erg || {}
+        const effectiveProfile = resolveReviewProfile(
+            row.hmeromhnia, erg || {}, istorikoRowsForEmployee
         );
         const reviewPhaseCode = getReviewPhaseCodeForRow(row, phaseContextByKodikos);
         const normalizedRow = normalizeReviewNonFullNonWorkRow(
@@ -4902,7 +4988,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
             kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
             kathgoria_ergasias: effectiveKathgoria,
             kathgoria_ergasias_effective: effectiveKathgoria,
-            noCardsDisplayStatus: resolveNoCardsDisplayStatus(
+            noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus(
                 normalizedRow,
                 noCardsDisplayContext
             ),
@@ -4932,7 +5018,13 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
             effective_special_case: effectiveProfile.eidikh_periptosh || '',
             effective_hourly_rate: effectiveProfile.pragmatikoOromisthio ?? null,
             effective_profile_source:
-                reviewPhaseCode ? 'SCHEDULE_PHASE' : effectiveProfile.source || '',
+                reviewPhaseCode ? 'SCHEDULE_PHASE' :
+                    effectiveProfile.resolution_source || effectiveProfile.source || '',
+            effective_profile_resolution_blocked:
+                effectiveProfile.resolution_blocked === true,
+            effective_profile_resolution_reason: effectiveProfile.resolution_reason || '',
+            effective_profile_company_id: effectiveProfile.profile_company_id || null,
+            effective_profile_employee_id: effectiveProfile.profile_employee_id || null,
             effective_schedule_phase_code: reviewPhaseCode,
             effective_profile_date: getProfileDateForDeviation(
                 effectiveProfile,
@@ -5110,7 +5202,12 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
                 eidikh_kathgoria_ergazomenoy: row.effective_special_category,
                 eidikh_periptosh: row.effective_special_case,
                 pragmatikoOromisthio: row.effective_hourly_rate,
-                source: row.effective_profile_source
+                source: row.effective_profile_source,
+                resolution_source: row.effective_profile_source,
+                resolution_blocked: row.effective_profile_resolution_blocked === true,
+                resolution_reason: row.effective_profile_resolution_reason || '',
+                profile_company_id: row.effective_profile_company_id || null,
+                profile_employee_id: row.effective_profile_employee_id || null
             }
         ]));
         const effectiveProfile = effectiveProfilesByDate[
@@ -5262,7 +5359,12 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
                 pososto_prosayxhshs_6hs_hmeras: row.effective_sixth_day_rate,
                 eidikh_kathgoria_ergazomenoy: row.effective_special_category,
                 eidikh_periptosh: row.effective_special_case,
-                source: row.effective_profile_source
+                source: row.effective_profile_source,
+                resolution_source: row.effective_profile_source,
+                resolution_blocked: row.effective_profile_resolution_blocked === true,
+                resolution_reason: row.effective_profile_resolution_reason || '',
+                profile_company_id: row.effective_profile_company_id || null,
+                profile_employee_id: row.effective_profile_employee_id || null
             }
         ]));
         const effectiveProfile = effectiveProfilesByDate[dateKeyUtc(weekRows.at(-1)?.hmeromhnia)] || {};
@@ -5795,6 +5897,11 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
         noCardsDisplayContext: {}, appliedProtectionContext: protectionContext,
         appliedProtectionReasonsByWeek: new Map(),
         canonicalDecisionsByWeek: groupWeeklyCanonicalDecisions(baselineSnapshot.canonical_decisions || []),
+        resolveProfileForDate: ({ reviewDate }) => {
+            const key = dateKeyUtc(reviewDate);
+            const row = frozenRows.find((candidate) => dateKeyUtc(candidate.hmeromhnia) === key);
+            return row?.effective_profile_resolved || effectiveEmployeeForRow(row || {});
+        },
         buildWeeklyIllegalOvertimeUpdate });
     const byId = new Map(firstStageRows.map((row) => [String(row._id), { ...row }]));
     for (const operation of writePlan.bulkOps) {
@@ -6761,7 +6868,7 @@ class erganhController {
                             'orphan_card_resolution ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
                             'repo adeia kathgoria_adeias ores_apoysias hr_declared_leave ' +
-                            'argia perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
+                            'argia argia_apologistika perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
                             'ores_ergasias cards_ores_ergasias ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
                             'ores_prostheths_ergasias_apologistika ' +
                             'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
@@ -6815,6 +6922,9 @@ class erganhController {
                         'typos_apasxolhshs typos_ebdomadas'
                         + ' dialleima_se_lepta dialleima_entos_ektos_orarioy'
                         + ' eidikh_kathgoria_ergazomenoy eidikh_periptosh'
+                        + ' afora_daneismo_ergazomenoy typos_ergodoth_daneismoy'
+                        + ' hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy'
+                        + ' afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth'
                         + ` ${CANONICAL_EMPLOYEE_PROFILE_FIELDS}`
                 )
                 .lean();
@@ -6908,6 +7018,15 @@ class erganhController {
                     istorikoRowsByKodikos.get(key).push(row);
                 }
             }
+
+            const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
+                team: sessionTeam, employees: ergazomenoi
+            });
+            const resolveReviewProfile = (reviewDate, employee, history) =>
+                resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+                    normalEmployee: employee, normalHistory: history,
+                    borrowedContext: borrowedProfileContexts.get(
+                        borrowedProfileEmployeeKey(employee)) || null });
 
             const deviationsFilter = {
                 team: sessionTeam,
@@ -7048,10 +7167,8 @@ class erganhController {
                 const erg = ergByKodikos.get(r.kodikos);
                 const istorikoRowsForEmployee =
                     istorikoRowsByKodikos.get(String(r.kodikos || '').trim()) || [];
-                const effectiveProfile = getOrarioTermsForDate(
-                    r.hmeromhnia,
-                    istorikoRowsForEmployee,
-                    erg || {}
+                const effectiveProfile = resolveReviewProfile(
+                    r.hmeromhnia, erg || {}, istorikoRowsForEmployee
                 );
                 const breakConfiguration = resolveBreakConfigurationForDate(
                     r.hmeromhnia, istorikoRowsForEmployee, erg || {}
@@ -7074,7 +7191,7 @@ class erganhController {
                     kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
                     kathgoria_ergasias: effectiveKathgoria,
                     kathgoria_ergasias_effective: effectiveKathgoria,
-                    noCardsDisplayStatus: resolveNoCardsDisplayStatus(
+                    noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus(
                         normalizedRow,
                         noCardsDisplayContext
                     ),
@@ -7108,7 +7225,14 @@ class erganhController {
                     effective_daily_hours:
                         Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
                     effective_profile_source:
-                        reviewPhaseCode ? 'SCHEDULE_PHASE' : effectiveProfile.source || '',
+                        reviewPhaseCode ? 'SCHEDULE_PHASE' :
+                            effectiveProfile.resolution_source || effectiveProfile.source || '',
+                    effective_profile_resolution_blocked:
+                        effectiveProfile.resolution_blocked === true,
+                    effective_profile_resolution_reason:
+                        effectiveProfile.resolution_reason || '',
+                    effective_profile_company_id: effectiveProfile.profile_company_id || null,
+                    effective_profile_employee_id: effectiveProfile.profile_employee_id || null,
                     effective_schedule_phase_code: reviewPhaseCode,
                     effective_profile_date: getProfileDateForDeviation(
                         effectiveProfile,
@@ -7174,7 +7298,9 @@ class erganhController {
                               const canonicalWeeklyProfile = getWeeklyRepoProfileInfo({
                                   week,
                                   istorikoRows: histories,
-                                  ergazomenos: employee
+                                  ergazomenos: employee,
+                                  resolveProfileForDate: (date) =>
+                                      resolveReviewProfile(date, employee, histories)
                               });
                               const canonicalEffectiveProfile =
                                   canonicalWeeklyProfile.effectiveProfile || {};
@@ -7209,6 +7335,8 @@ class erganhController {
                           resolveWeeklyProfile: ({ kodikos: employeeKodikos, weekStart, weekEnd }) => {
                               const employee =
                                   ergByKodikos.get(String(employeeKodikos)) || {};
+                              const histories = istorikoRowsByKodikos.get(
+                                  String(employeeKodikos)) || [];
                               const weeklyProfile = getWeeklyRepoProfileInfo({
                                   week: {
                                       naturalWeekStart: new Date(`${weekStart}T00:00:00.000Z`),
@@ -7217,9 +7345,10 @@ class erganhController {
                                       weekEnd: new Date(`${weekEnd}T23:59:59.999Z`),
                                       isFullWeek: true
                                   },
-                                  istorikoRows:
-                                      istorikoRowsByKodikos.get(String(employeeKodikos)) || [],
-                                  ergazomenos: employee
+                                  istorikoRows: histories,
+                                  ergazomenos: employee,
+                                  resolveProfileForDate: (date) =>
+                                      resolveReviewProfile(date, employee, histories)
                               });
                               return {
                                   ...weeklyProfile,
@@ -7254,11 +7383,9 @@ class erganhController {
                               };
                           },
                           resolveDailyProfile: (row) =>
-                              getEffectiveRepoProfileForDate(
-                                  row.hmeromhnia,
-                                  istorikoRowsByKodikos.get(String(row.kodikos)) || [],
-                                  ergByKodikos.get(String(row.kodikos)) || {}
-                              ),
+                              resolveReviewProfile(row.hmeromhnia,
+                                  ergByKodikos.get(String(row.kodikos)) || {},
+                                  istorikoRowsByKodikos.get(String(row.kodikos)) || []),
                           isFullTimeProfile: isFullTimeWorkTerms
                       })
                     : { deviations: [], pendingWeeks: [], policyVersion: null };
@@ -7286,7 +7413,9 @@ class erganhController {
                     weekStart, weekEnd, isFullWeek: weekRows.length === 7 };
                 const weeklyProfile = getWeeklyRepoProfileInfo({ week: weekContext,
                     istorikoRows: istorikoRowsByKodikos.get(String(deviation.kodikos || '')) || [],
-                    ergazomenos: employee });
+                    ergazomenos: employee,
+                    resolveProfileForDate: (date) => resolveReviewProfile(date, employee,
+                        istorikoRowsByKodikos.get(String(deviation.kodikos || '')) || []) });
                 const automatic = analyzeWeeklySixthSeventhDay({ weekRows,
                     effectiveProfile: weeklyProfile.effectiveProfile || {} });
                 if (automatic.status !== 'NEEDS_HR_DECISION' ||
@@ -7397,6 +7526,19 @@ class erganhController {
                     next_rows: nextBoundaryRows
                 }) : null;
 
+            const canonicalLifecycleRows = await getReviewRowsForExport(req, {
+                includeLifecycle: true
+            });
+            const canonicalLifecycleProjections = [
+                ...(canonicalLifecycleRows.__lifecycleByWeek || new Map())
+            ].map(([scopeKey, lifecycleProjection]) => {
+                const [employeeKodikos = '', weekStart = ''] = String(scopeKey).split('|');
+                return {
+                    scope: { employee_kodikos: employeeKodikos, week_start: weekStart },
+                    lifecycle_projection: lifecycleProjection
+                };
+            });
+
             return res.json({
                 success: true,
                 page: pageNum,
@@ -7407,6 +7549,7 @@ class erganhController {
                 deviations: enrichedDeviations,
                 pendingDeviationWeeks,
                 legacyDeviations,
+                canonicalLifecycleProjections,
                 boundaryContextPreflight,
                 deviationPolicyVersion: deviationPreview.policyVersion
             });
@@ -10341,7 +10484,7 @@ class erganhController {
 
             const ergazomenoi = await ErgazomenoiModel.find(employeeQuery)
                 .select(
-                    'kodikos eponymo onoma ypokatasthma ' +
+                    'company_kod kodikos eponymo onoma ypokatasthma ' +
                         'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                         'aa_eggrafhs hmeres_ergasias_ebdomadas ' +
                         'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
@@ -10349,7 +10492,10 @@ class erganhController {
                         'dialleima_entos_ektos_orarioy dialleima_se_lepta ' +
                         'plhrhs_apasxolhsh pliris_apasxolisi plhrhs ' +
                         'merikh_apasxolhsh meriki_apasxolisi ' +
-                        'evelikth_proselefsh'
+                        'evelikth_proselefsh afora_daneismo_ergazomenoy ' +
+                        'typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy ' +
+                        'hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth ' +
+                        'kodikos_ergazomenoy_alloy_ergodoth'
                 )
                 .sort({ kodikos: 1 })
                 .lean();
@@ -10482,6 +10628,24 @@ class erganhController {
                 );
             }
 
+            const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
+                team: sessionTeam, employees: ergazomenoi
+            });
+            const calculationHistoryByEmployeeKey = new Map(ergazomenoi.map((employee) => [
+                borrowedProfileEmployeeKey(employee),
+                istorikoRowsByKodikos.get(String(employee.kodikos || '').trim()) || []
+            ]));
+            const effectiveHolidayContextProvider =
+                await preloadEffectiveHolidayContextProvider({
+                    team: sessionTeam,
+                    employees: ergazomenoi,
+                    etos: req.session.yearInUse,
+                    periodStart: calculationStartDate,
+                    periodEnd: eosDate,
+                    normalHistoryByEmployeeKey: calculationHistoryByEmployeeKey,
+                    borrowedProfileContexts
+                });
+
             const kodikoiChunks = chunkArray(kodikoi, 300);
             const prodhlomena = [];
 
@@ -10561,8 +10725,6 @@ class erganhController {
                 periodEnd: eosDate
             });
 
-            const argiesDateSet = new Set(noCardsDisplayContext.argiesByDateKey.keys());
-
             console.log(
                 `[calcApasxolhseisPeriodoy] Προδηλωμένα προς έλεγχο: ${prodhlomena.length}`
             );
@@ -10575,11 +10737,24 @@ class erganhController {
                 const calculationRec = normalizeZeroLengthCardPairs(rec);
 
                 const istorikoRows = istorikoRowsByKodikos.get(calculationRec.kodikos) || [];
-                const effectiveErgazomenos = getEffectiveEmployeeForDate(
-                    calculationRec,
-                    ergazomenos,
-                    istorikoRows
-                );
+                const holidayResolution = effectiveHolidayContextProvider.resolveForEmployeeDate({
+                    employee: ergazomenos,
+                    reviewDate: calculationRec.hmeromhnia,
+                    normalHistory: istorikoRows
+                });
+                if (holidayResolution.blocked === true) {
+                    throw Object.assign(new Error(
+                        'Απαιτείται έλεγχος HR για το profile δανεισμού.'), {
+                        code: holidayResolution.resolution_reason,
+                        statusCode: 409
+                    });
+                }
+                const effectiveErgazomenos = {
+                    ...ergazomenos,
+                    ...holidayResolution.effectiveProfile
+                };
+                const effectiveArgiesDateSet = new Set(
+                    holidayResolution.holidayContext.argiesByDateKey.keys());
 
                 const weekKey = `${calculationRec.kodikos}|${getWeekKeyMonday(calculationRec.hmeromhnia)}`;
 
@@ -10607,7 +10782,8 @@ class erganhController {
                 }
 
                 const preliminary = buildEmploymentDailyPreliminaryUpdate({ row: rec,
-                    effectiveEmployee: effectiveErgazomenos, argiesDateSet, proorhProseleyshMinutes,
+                    effectiveEmployee: effectiveErgazomenos,
+                    argiesDateSet: effectiveArgiesDateSet, proorhProseleyshMinutes,
                     proorhApoxorhshMinutes, operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
                 const weeklyRec = preliminary.workingRow;
 
@@ -10626,16 +10802,28 @@ class erganhController {
                 const calculationRec = normalizeZeroLengthCardPairs(rec);
 
                 const istorikoRows = istorikoRowsByKodikos.get(calculationRec.kodikos) || [];
-                const effectiveErgazomenos = getEffectiveEmployeeForDate(
-                    calculationRec,
-                    ergazomenos,
-                    istorikoRows
-                );
+                const holidayResolution = effectiveHolidayContextProvider.resolveForEmployeeDate({
+                    employee: ergazomenos,
+                    reviewDate: calculationRec.hmeromhnia,
+                    normalHistory: istorikoRows
+                });
+                if (holidayResolution.blocked === true) {
+                    throw Object.assign(new Error(
+                        'Απαιτείται έλεγχος HR για το profile δανεισμού.'), {
+                        code: holidayResolution.resolution_reason,
+                        statusCode: 409
+                    });
+                }
+                const effectiveErgazomenos = {
+                    ...ergazomenos,
+                    ...holidayResolution.effectiveProfile
+                };
 
                 const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
                 const weeklyState = weeklyStateMap.get(weekKey);
-                const dailyPlan = buildEmploymentDailyCalculationUpdate({ row: rec,
-                    effectiveEmployee: effectiveErgazomenos, argiesDateSet, weeklyState,
+                const dailyPlan = buildStage1EffectiveHolidayDailyCalculationUpdate({ row: rec,
+                    effectiveEmployee: effectiveErgazomenos,
+                    holidayContext: holidayResolution.holidayContext, weeklyState,
                     appliedProtectionContext, proorhProseleyshMinutes, proorhApoxorhshMinutes,
                     operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
 
@@ -10697,7 +10885,8 @@ class erganhController {
                 appliedProtectionReasonsByWeek,
                 periodControlScope,
                 calculationId: calculationOwnership.calculationId,
-                sameRunDailyCalculatedRowIds
+                sameRunDailyCalculatedRowIds,
+                effectiveHolidayContextProvider
             });
 
             let automaticRepoTransfer = {

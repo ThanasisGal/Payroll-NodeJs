@@ -71,7 +71,8 @@ const sandbox = {
     loadResults: async () => { loadResultsCalls.push(true); },
     employmentReviewSwal: async (options) => { fallbackErrors.push(options); }
 };
-vm.runInNewContext(`${source.slice(helperStart, helperEnd)}\nthis.derive = derivePeriodLifecyclePresentation;`, sandbox);
+vm.runInNewContext(`${source.slice(helperStart, helperEnd)}
+this.derive = derivePeriodLifecyclePresentation;`, sandbox);
 const stage = (business_status, pending_count = 0) => ({ business_status, pending_count,
     pending_dates: [], pending_reasons: [] });
 const lifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
@@ -98,6 +99,21 @@ assert.equal(staleLifecycle.current_stage, 'STAGE1');
 assert.equal(staleLifecycle.stages.STAGE2.presentation_status, 'LOCKED');
 assert.equal(staleLifecycle.stages.STAGE3.presentation_status, 'LOCKED');
 assert.equal(staleLifecycle.stages.STAGE4.presentation_status, 'LOCKED');
+const activeStage1Lifecycle = sandbox.derive([{ scope: { employee_kodikos: '0031' },
+    lifecycle_projection: { stages: {
+        stage1: stage('OPEN', 1), stage2: stage('COMPLETED'),
+        stage3: stage('COMPLETED'), stage4: stage('COMPLETED')
+    } } }]);
+assert.equal(activeStage1Lifecycle.stages.STAGE1.presentation_status, 'ACTIVE');
+const refreshedActiveStage1Lifecycle = sandbox.derive([{ scope: {
+    employee_kodikos: '0031' }, lifecycle_projection: { stages: {
+    stage1: stage('OPEN', 1), stage2: stage('COMPLETED'),
+    stage3: stage('COMPLETED'), stage4: stage('COMPLETED')
+} } }]);
+assert.equal(refreshedActiveStage1Lifecycle.stages.STAGE1.presentation_status, 'ACTIVE');
+assert.equal(refreshedActiveStage1Lifecycle.stages.STAGE2.presentation_status, 'LOCKED');
+assert.equal(refreshedActiveStage1Lifecycle.stages.STAGE3.presentation_status, 'LOCKED');
+assert.equal(refreshedActiveStage1Lifecycle.stages.STAGE4.presentation_status, 'LOCKED');
 const completedLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
     lifecycle_projection: { stages: {
         stage1: stage('COMPLETED'), stage2: stage('COMPLETED'),
@@ -106,6 +122,16 @@ const completedLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' }
 assert.equal(completedLifecycle.current_stage, null);
 assert.equal(completedLifecycle.requires_hr_action, false);
 assert.equal(completedLifecycle.total_pending_count, 0);
+const progressedLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
+    lifecycle_projection: { stages: {
+        stage1: stage('COMPLETED'), stage2: stage('OPEN', 1),
+        stage3: stage('COMPLETED'), stage4: stage('COMPLETED')
+    } } }]);
+assert.notStrictEqual(progressedLifecycle, refreshedActiveStage1Lifecycle);
+assert.equal(progressedLifecycle.stages.STAGE1.presentation_status, 'COMPLETED');
+assert.equal(progressedLifecycle.stages.STAGE2.presentation_status, 'ACTIVE');
+assert.equal(progressedLifecycle.stages.STAGE3.presentation_status, 'LOCKED');
+assert.equal(progressedLifecycle.stages.STAGE4.presentation_status, 'LOCKED');
 
 const unsortedStage3 = sandbox.derive([
     [['2026-06-09', '2026-06-10'], 'week-2'],

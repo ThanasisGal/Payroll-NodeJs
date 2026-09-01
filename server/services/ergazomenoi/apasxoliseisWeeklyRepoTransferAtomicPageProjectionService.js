@@ -180,6 +180,7 @@ function buildWeeklyRepoTransferAtomicInputs({
     asOfDate = null,
     resolveEmploymentProfile,
     holidayByDateKey = new Map(),
+    resolveHolidayByDateKey = null,
     existingAuditCountByRowKey = new Map()
 } = {}) {
     const weeklyInputs = [];
@@ -266,7 +267,14 @@ function buildWeeklyRepoTransferAtomicInputs({
                     .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
                     .map((entry) => entry.row),
                 employmentProfile,
-                holidayByDateKey,
+                holidayByDateKey: typeof resolveHolidayByDateKey === 'function'
+                    ? resolveHolidayByDateKey({
+                          employee_kodikos: bucket.employeeKodikos,
+                          week_start: bucket.weekStart,
+                          week_end: bucket.weekEnd,
+                          weekRows: bucket.rows.map((entry) => entry.row)
+                      })
+                    : holidayByDateKey,
                 existingAuditCountByRowKey,
                 diagnosticContext: inputDiagnostic(null, bucket)
             });

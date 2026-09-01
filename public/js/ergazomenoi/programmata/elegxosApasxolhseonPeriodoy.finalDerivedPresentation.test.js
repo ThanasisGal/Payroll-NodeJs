@@ -38,6 +38,19 @@ function possibleLeave(overrides = {}) {
         kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE', ...overrides };
 }
 
+const persistedHoliday = possibleLeave({ kodikos: '0031', hmeromhnia: '2026-02-23',
+    argia: true, argia_apologistika: false, noCardsDisplayStatus: 'ΑΔΕΙΑ',
+    kathgoria_adeias_apologistika: '', adeia_apologistika: false,
+    repo_apologistika: false, ores_argias_pistomenes_apologistika: 6,
+    ores_argion_prosayxhsh_apologistika: 0 });
+const persistedHolidayPresentation = sandbox.resolvePresentation(persistedHoliday, {});
+assert.equal(persistedHolidayPresentation.text, 'ΑΡΓΙΑ');
+assert.equal(persistedHolidayPresentation.source, 'persisted_stage1');
+assert.notEqual(persistedHolidayPresentation.text, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+assert.notEqual(persistedHolidayPresentation.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+assert.equal(persistedHoliday.ores_argias_pistomenes_apologistika, 6);
+assert.equal(persistedHoliday.ores_argion_prosayxhsh_apologistika, 0);
+
 const nonWork = { classification: 'NON_WORK' };
 const restRepo = { classification: 'REST_REPO' };
 assert.equal(sandbox.resolvePresentation(possibleLeave(), {

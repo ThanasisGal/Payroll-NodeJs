@@ -30,6 +30,8 @@ const DAILY_FIELDS = Object.freeze([
     'effective_typos_apasxolhshs', 'effective_typos_ebdomadas', 'effective_weekly_workdays',
     'effective_weekly_hours', 'effective_daily_hours', 'effective_profile_source',
     'effective_profile_date', 'effective_profile_istoriko_id', 'effective_profile_resolved',
+    'effective_profile_resolution_blocked', 'effective_profile_resolution_reason',
+    'effective_profile_company_id', 'effective_profile_employee_id',
     'effective_schedule_phase_code',
     'effective_sixth_day_rate', 'sixth_seventh_classification', 'sixth_day_hours', 'seventh_day_hours'
 ]);

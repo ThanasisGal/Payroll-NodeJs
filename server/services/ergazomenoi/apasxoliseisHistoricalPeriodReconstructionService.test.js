@@ -126,6 +126,9 @@ function store(initial = null) {
     } }, get record() { return record; }, audits, auditOptions };
 }
 const transactionRunner = work => work({ id: 'transaction' });
+const noHolidayDependencies = async () => ({
+    fingerprint: fingerprintRows([]), legacy_compatible: true
+});
 
 function castAuthorizationSelector(activeCalculationSelector) {
     const query = PeriodControlModel.findOneAndUpdate({ ...juneScope, status: 'OPEN', version: 2,
@@ -179,8 +182,9 @@ function castFingerprintDateSelector(dateSelector) {
                 async lean() { return []; } };
         } };
         const fingerprints = await calculateHistoricalFingerprints({ scope: juneScope,
-            prodhlomenaModel: castingProdhlomenaModel });
-        assert.strictEqual(castFilters.length, 2);
+            prodhlomenaModel: castingProdhlomenaModel,
+            holidayDependencyResolver: noHolidayDependencies });
+        assert.strictEqual(castFilters.length, 3);
         for (const filter of castFilters) {
             assert.strictEqual(filter.hmeromhnia.$gte.getTime(), periodStart.getTime());
             assert.strictEqual(filter.hmeromhnia.$lte.getTime(), periodEnd.getTime());
@@ -281,17 +285,21 @@ function castFingerprintDateSelector(dateSelector) {
         row.hmeromhnia >= filter.hmeromhnia.$gte && row.hmeromhnia <= filter.hmeromhnia.$lte);
         return { select() { return this; }, sort() { return this; }, session() { return this; },
             async lean() { return selected.map(row => ({ ...row })); } }; } };
-    const mayFingerprints = await calculateHistoricalFingerprints({ scope: mayScope, prodhlomenaModel });
+    const mayFingerprints = await calculateHistoricalFingerprints({ scope: mayScope, prodhlomenaModel,
+        holidayDependencyResolver: noHolidayDependencies });
     assert.strictEqual(mayFingerprints.dependency_window_start.toISOString().slice(0, 10), '2026-04-27');
     assert.strictEqual(mayFingerprints.dependency_window_end.toISOString().slice(0, 10), '2026-04-30');
     const originalMayDependency = mayFingerprints.dependency_fingerprint;
     factRows[0].cards_eos_ora_01 = '15:30';
-    const changedMayDependency = (await calculateHistoricalFingerprints({ scope: mayScope, prodhlomenaModel })).dependency_fingerprint;
+    const changedMayDependency = (await calculateHistoricalFingerprints({ scope: mayScope,
+        prodhlomenaModel, holidayDependencyResolver: noHolidayDependencies })).dependency_fingerprint;
     assert.notStrictEqual(changedMayDependency, originalMayDependency);
     factRows[0].cards_eos_ora_01 = '16:00';
-    assert.strictEqual((await calculateHistoricalFingerprints({ scope: mayScope, prodhlomenaModel })).dependency_fingerprint,
+    assert.strictEqual((await calculateHistoricalFingerprints({ scope: mayScope, prodhlomenaModel,
+        holidayDependencyResolver: noHolidayDependencies })).dependency_fingerprint,
         originalMayDependency);
-    const juneFingerprints = await calculateHistoricalFingerprints({ scope: juneScope, prodhlomenaModel });
+    const juneFingerprints = await calculateHistoricalFingerprints({ scope: juneScope, prodhlomenaModel,
+        holidayDependencyResolver: noHolidayDependencies });
     assert.strictEqual(juneFingerprints.dependency_window_start, null);
     assert.strictEqual(juneFingerprints.dependency_fingerprint,
         fingerprintRows([], DEPENDENCY_FIELDS, {
@@ -304,7 +312,9 @@ function castFingerprintDateSelector(dateSelector) {
     const completion = await completeHistoricalReconstruction({ scope: mayScope,
         calculationId: 'historical-calculation-complete-01', requestId: 'historical-reassess-02',
         now: new Date('2026-08-02'), periodControlModel: replayStore.model,
-        auditModel: replayStore.audit, prodhlomenaModel, transactionRunner });
+        auditModel: replayStore.audit, prodhlomenaModel, transactionRunner,
+        fingerprintResolver: options => calculateHistoricalFingerprints({ ...options,
+            holidayDependencyResolver: noHolidayDependencies }) });
     assert.strictEqual(completion.record.historical_reconstruction_status, 'COMPLETED');
     assert.strictEqual(completion.record.historical_reconstruction_version, 2);
     assert.strictEqual(completion.record.historical_reconstruction_pending_version, 0);
@@ -338,7 +348,9 @@ function castFingerprintDateSelector(dateSelector) {
     const retryComplete = await completeHistoricalReconstruction({ scope: juneScope,
         calculationId: 'historical-first-retry-calculation', requestId: retry.record.last_historical_reconstruction_request_id,
         periodControlModel: failedFirst.model, auditModel: failedFirst.audit,
-        prodhlomenaModel, transactionRunner });
+        prodhlomenaModel, transactionRunner,
+        fingerprintResolver: options => calculateHistoricalFingerprints({ ...options,
+            holidayDependencyResolver: noHolidayDependencies }) });
     assert.strictEqual(retryComplete.record.historical_reconstruction_version, 1);
 
     const completedV1Fingerprints = {
@@ -374,7 +386,9 @@ function castFingerprintDateSelector(dateSelector) {
         calculationId: 'historical-reassess-retry-calculation',
         requestId: reassessRetry.record.last_historical_reconstruction_request_id,
         periodControlModel: failedFirst.model, auditModel: failedFirst.audit,
-        prodhlomenaModel, transactionRunner });
+        prodhlomenaModel, transactionRunner,
+        fingerprintResolver: options => calculateHistoricalFingerprints({ ...options,
+            holidayDependencyResolver: noHolidayDependencies }) });
     assert.strictEqual(reassessRetryComplete.record.historical_reconstruction_version, 2);
 
     const abandoned = store();

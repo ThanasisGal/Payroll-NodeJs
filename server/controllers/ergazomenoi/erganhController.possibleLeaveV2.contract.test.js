@@ -22,6 +22,12 @@ assert.match(ui, /Κατάσταση:<\/strong> ΠΙΘΑΝΗ ΑΔΕΙΑ/);
 assert.match(ui, /adeia_apologistika: false/);
 assert.match(ui, /data-api="\/api\/dropdown\/ergazomenoi\/kathgoria_adeias"/);
 assert.match(ui, /function resolvePossibleLeavePresentationState\(row = \{\}\)/);
+assert.match(controller,
+    /function resolveReviewNoCardsDisplayStatus\(row = \{\}, context = \{\}\)[\s\S]*?row\.argia === true \|\| row\.argia_apologistika === true[\s\S]*?return 'ΑΡΓΙΑ'/);
+assert.strictEqual((controller.match(/noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus\(/g) || [])
+    .length, 2);
+assert.match(ui,
+    /function resolveStoredStage1DailyPresentation\(row = \{\}\)[\s\S]*?row\.argia === true \|\| row\.argia_apologistika === true[\s\S]*?text: 'ΑΡΓΙΑ'/);
 assert.match(ui, /DERIVED_POSSIBLE_LEAVE/);
 assert.match(ui, /PERSISTED_POSSIBLE_LEAVE/);
 assert.match(ui, /data-derived-possible-leave/);

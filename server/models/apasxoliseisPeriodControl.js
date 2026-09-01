@@ -47,6 +47,7 @@ const schema = new Schema({
     historical_reconstruction_reason: { type: String, trim: true, maxlength: 2000, default: '' },
     historical_source_fingerprint: { type: String, trim: true, default: '' },
     historical_dependency_fingerprint: { type: String, trim: true, default: '' },
+    historical_holiday_dependency_fingerprint: { type: String, trim: true, default: '' },
     historical_dependency_window_start: { type: Date, default: null },
     historical_dependency_window_end: { type: Date, default: null },
     historical_result_fingerprint: { type: String, trim: true, default: '' },

@@ -164,6 +164,25 @@ function getEffectiveTermsEos(record = {}) {
     );
 }
 
+function isEffectiveTermsRowForDate(record = {}, date,
+    { includeExplicitFalseWithDates = false } = {}) {
+    if (!record) return false;
+    const targetDate = normalizeDateOnly(date);
+    if (!targetDate) return false;
+    const hasNewTermsDates = Boolean(record.hmeromhnia_isxyos_oron_ergasias_apo);
+    const hasLegacyDates = Boolean(record.hmeromhnia_allaghs_orarioy_apo);
+    const hasExplicitTermsChangeFlag = Object.prototype.hasOwnProperty.call(
+        record, 'afora_allagh_oron_ergasias');
+    const isTermsChange = hasExplicitTermsChangeFlag
+        ? record.afora_allagh_oron_ergasias === true ||
+            (includeExplicitFalseWithDates && (hasNewTermsDates || hasLegacyDates))
+        : hasNewTermsDates || hasLegacyDates;
+    if (!isTermsChange) return false;
+    const apo = getEffectiveTermsApo(record);
+    const eos = getEffectiveTermsEos(record);
+    return Boolean(apo && targetDate >= apo && (!eos || targetDate <= eos));
+}
+
 function buildFallbackTerms(ergazomenos = {}) {
     const hmeres = toNumberOrZero(ergazomenos.hmeres_ergasias_ebdomadas);
     const ores = toNumberOrZero(ergazomenos.ores_ergasias_ebdomadas);
@@ -255,29 +274,8 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
 
     const validRows = Array.isArray(istorikoRows) ? istorikoRows : [];
 
-    const matchingRows = validRows.filter((row) => {
-        if (!row) return false;
-
-        // Κοιτάμε μόνο εγγραφές που αφορούν αλλαγή όρων εργασίας.
-        // Για παλιές εγγραφές χωρίς flag, επιτρέπουμε fallback αν έχουν ημερομηνίες.
-        const hasNewTermsDates = Boolean(row.hmeromhnia_isxyos_oron_ergasias_apo);
-        const hasLegacyDates = Boolean(row.hmeromhnia_allaghs_orarioy_apo);
-        const hasExplicitTermsChangeFlag = Object.prototype.hasOwnProperty.call(
-            row, 'afora_allagh_oron_ergasias'
-        );
-        const isTermsChange = hasExplicitTermsChangeFlag
-            ? row.afora_allagh_oron_ergasias === true
-            : hasNewTermsDates || hasLegacyDates;
-
-        if (!isTermsChange) return false;
-
-        const apo = getEffectiveTermsApo(row);
-        const eos = getEffectiveTermsEos(row);
-
-        if (!apo) return false;
-
-        return targetDate >= apo && (!eos || targetDate <= eos);
-    });
+    const matchingRows = validRows.filter((row) =>
+        isEffectiveTermsRowForDate(row, targetDate));
 
     if (matchingRows.length === 0) {
         return buildFallbackTerms(ergazomenos);
@@ -304,5 +302,6 @@ module.exports = {
     buildCanonicalWorkTermsSnapshotFields,
     normalizeDateOnly,
     getEffectiveTermsApo,
-    getEffectiveTermsEos
+    getEffectiveTermsEos,
+    isEffectiveTermsRowForDate
 };

@@ -13,6 +13,8 @@ const { buildWeeklyCanonicalDecisionSnapshotInput, groupWeeklyCanonicalDecisions
     require('./apasxoliseisWeeklyCanonicalDecisionSnapshotInputService');
 const { getWeeklyRepoProfileInfo } =
     require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
+const { buildArgiesByDateKey } =
+    require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 
 const ILLEGAL_FIELDS = [
     'ores_paranomhs_yperorias_apologistika',
@@ -502,4 +504,44 @@ assert.notEqual(unapprovedTargetUpdate.repo_apologistika, true);
 assert.notEqual(unapprovedTargetUpdate.kathgoria_ergasias_apologistika, 'ΑΝ');
 assert.notEqual(unapprovedTargetUpdate.apologistiko_biblio, true);
 
-console.log('weekly post-check pure write-plan contract tests passed (20 contracts)');
+const noRepoRows = week([7, 7, 7, 7, 7, 7, 7]);
+noRepoRows.forEach((item) => Object.assign(item, { kathgoria_ergasias: 'ΕΡΓ',
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', repo: false, repo_apologistika: false }));
+for (const [lendingDays, borrowingDays, expectedRepo] of [[5, 6, 1], [6, 5, 2]]) {
+    result = plan(noRepoRows, {
+        employees: [employee({ hmeres_ergasias_ebdomadas: lendingDays })],
+        resolveProfileForDate: () => employee({
+            hmeres_ergasias_ebdomadas: borrowingDays,
+            resolution_source: 'BORROWING_COMPANY'
+        })
+    });
+    assert.equal(onlyDeviation(result).expected_repo, expectedRepo);
+    assert.equal(result.deviations[0].effective_profile_source, 'BORROWING_COMPANY');
+}
+result = plan(noRepoRows, { resolveProfileForDate: () => employee({
+    resolution_source: 'AMBIGUOUS', resolution_blocked: true,
+    resolution_reason: 'BORROWING_COMPANY_AMBIGUOUS'
+}) });
+assert.equal(onlyDeviation(result).status, 'NEEDS_HR_DECISION');
+assert.ok(result.deviations[0].reasons.includes('BORROWING_COMPANY_AMBIGUOUS'));
+
+const borrowedHolidayRows = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date('2026-02-23T00:00:00.000Z');
+    date.setUTCDate(date.getUTCDate() + index);
+    return row(date.toISOString().slice(0, 10), index === 0 ? 8 : 0, index !== 0,
+        ['', ''], index === 0 ? { cards_ores_ergasias: 0,
+            kathgoria_ergasias_apologistika: '', kodikos: '0031' } : { kodikos: '0031' });
+});
+const borrowingHolidayContext = { company_kodikos: '0008', companyFlags: {},
+    argiesByDateKey: buildArgiesByDateKey([{ hmeromhnia: new Date('2026-02-23'),
+        ypoxreotikh_argia: false, leitoyrgia_etaireias: false,
+        perigrafh: 'ΚΑΘΑΡΑ ΔΕΥΤΕΡΑ' }], {}) };
+result = plan(borrowedHolidayRows, { apoDate: new Date('2026-02-23'),
+    eosDate: new Date('2026-03-01T23:59:59.999Z'),
+    employees: [employee({ kodikos: '0031', company_kod: '0004' })],
+    resolveHolidayContextForDate: () => borrowingHolidayContext });
+const borrowedHolidayUpdate = updateFor(result, '2026-02-23');
+assert.equal(borrowedHolidayUpdate.argia, true);
+assert.equal(borrowedHolidayUpdate.kathgoria_adeias_apologistika, '');
+
+console.log('weekly post-check pure write-plan contract tests passed (23 contracts)');

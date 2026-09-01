@@ -415,6 +415,7 @@ const ProdhlomenaOrariaSchema = new Schema(
         ores_prostheths_ergasias_apologistika: { type: Number, default: 0 },
         repo_apologistika: { type: Boolean, default: false },
         adeia_apologistika: { type: Boolean, default: false },
+        argia_apologistika: { type: Boolean, default: false },
         kathgoria_adeias_apologistika: { type: String, trim: true },
         astheneia_apologistika: { type: Boolean, default: false },
         apousia_apologistika: { type: Boolean, default: false },

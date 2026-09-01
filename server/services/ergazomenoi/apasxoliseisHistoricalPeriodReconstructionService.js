@@ -4,10 +4,19 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const LifecycleAuditModel = require('../../models/apasxoliseisPeriodLifecycleAudit');
-const { ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
+const { ProdhlomenaOrariaModel, ErgazomenoiModel,
+    IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
+const { CompaniesModel } = require('../../models/companies');
+const { ArgiesModel } = require('../../models/stathera_arxeia');
 const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
 const { startOfWeekMondayUtc } = require('../../utils/date/mondaySundayWeek');
+const { employeeKey, preloadBorrowedEmploymentProfileContexts } =
+    require('./apasxoliseisBorrowedEmploymentProfileResolverService');
+const { preloadEffectiveHolidayContextProvider } =
+    require('./apasxoliseisEffectiveHolidayContextProviderService');
+const { buildNoCardsDisplayContext } =
+    require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 
 const FINGERPRINT_VERSION = 'HISTORICAL_PERIOD_FACTS_V1';
 const EMPLOYMENT_CALCULATION_SEMANTICS_VERSION = 'employment-calculation-semantics:v2';
@@ -110,7 +119,94 @@ async function loadRows({ scope, start, end, fields, prodhlomenaModel = Prodhlom
     if (session && typeof query.session === 'function') query = query.session(session);
     return typeof query.lean === 'function' ? query.lean() : query;
 }
-async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = ProdhlomenaOrariaModel, session = null }) {
+function hash(value) {
+    return crypto.createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
+}
+async function calculateHolidayDependencies({ scope, start, end, rows, models = {} }) {
+    const employeeModel = models.employeeModel || ErgazomenoiModel;
+    const historyModel = models.historyModel === undefined
+        ? IstorikoProslhpseonAllagonModel : models.historyModel;
+    const companiesModel = models.companiesModel || CompaniesModel;
+    const argiesModel = models.argiesModel || ArgiesModel;
+    const codes = [...new Set(rows.map((row) => String(row.kodikos || '').trim()).filter(Boolean))];
+    if (!codes.length) return { fingerprint: hash([]), legacy_compatible: true };
+    const employees = await employeeModel.find({ team: scope.team, company_kod: scope.company_kod,
+        ypokatasthma: scope.ypokatasthma, kodikos: mongoose.trusted({ $in: codes }) }).lean();
+    const histories = historyModel ? await historyModel.find({ team: scope.team,
+        company_kod: scope.company_kod,
+        kodikos: mongoose.trusted({ $in: codes }) }).lean() : [];
+    const historyByCode = new Map();
+    histories.forEach((row) => { const code = String(row.kodikos || '').trim();
+        if (!historyByCode.has(code)) historyByCode.set(code, []);
+        historyByCode.get(code).push(row); });
+    const historiesByEmployeeKey = new Map(employees.map((employee) => [employeeKey(employee),
+        historyByCode.get(String(employee.kodikos || '').trim()) || []]));
+    const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
+        team: scope.team, employees, models: { companiesModel, employeeModel, historyModel } });
+    const provider = await preloadEffectiveHolidayContextProvider({ team: scope.team, employees,
+        etos: String(start.getUTCFullYear()), periodStart: start, periodEnd: end,
+        normalHistoryByEmployeeKey: historiesByEmployeeKey, borrowedProfileContexts,
+        models: { companiesModel, argiesModel } });
+    const legacyContext = await buildNoCardsDisplayContext({ team: scope.team,
+        companyId: scope.company_kod, etos: String(start.getUTCFullYear()), periodStart: start,
+        periodEnd: end, companiesModel, argiesModel });
+    const employeeByCode = new Map(employees.map((employee) =>
+        [String(employee.kodikos || '').trim(), employee]));
+    const dependencies = [];
+    let legacyCompatible = true;
+    for (const row of rows) {
+        const code = String(row.kodikos || '').trim();
+        const employee = employeeByCode.get(code);
+        if (!employee) continue;
+        const date = dateOnly(row.hmeromhnia).toISOString().slice(0, 10);
+        const resolution = provider.resolveForEmployeeDate({ employee, reviewDate: row.hmeromhnia,
+            normalHistory: historyByCode.get(code) || [] });
+        if (resolution.blocked === true) {
+            dependencies.push({ employee: code, date, blocked: true,
+                resolution_reason: resolution.resolution_reason });
+            legacyCompatible = false;
+            continue;
+        }
+        const effectiveHoliday = resolution.holidayContext.argiesByDateKey.get(date) || null;
+        const legacyHoliday = legacyContext.argiesByDateKey.get(date) || null;
+        if (!effectiveHoliday && !legacyHoliday) continue;
+        const effectiveDecision = effectiveHoliday
+            ? Boolean(effectiveHoliday.companyOperatesOnHoliday) : null;
+        const legacyDecision = legacyHoliday
+            ? Boolean(legacyHoliday.companyOperatesOnHoliday) : null;
+        const effectiveMandatory = effectiveHoliday?.isMandatoryHoliday === true;
+        const legacyMandatory = legacyHoliday?.isMandatoryHoliday === true;
+        if (effectiveDecision !== legacyDecision ||
+            Boolean(effectiveHoliday) !== Boolean(legacyHoliday) ||
+            effectiveMandatory !== legacyMandatory) {
+            legacyCompatible = false;
+        }
+        dependencies.push({ employee: code, date,
+            effective_company_id: resolution.effective_company_id,
+            holiday_exists: Boolean(effectiveHoliday),
+            is_mandatory: effectiveMandatory,
+            company_operates: effectiveDecision,
+            operation_source: effectiveHoliday?.companyOperationSource || null });
+    }
+    return { fingerprint: hash(dependencies), legacy_compatible: legacyCompatible };
+}
+function isHistoricalDependencyCurrent(record, fingerprints) {
+    if (!Object.prototype.hasOwnProperty.call(fingerprints || {},
+        'holiday_dependency_fingerprint') &&
+        !Object.prototype.hasOwnProperty.call(fingerprints || {},
+            'legacy_dependency_fingerprint')) {
+        return record?.historical_dependency_fingerprint === fingerprints?.dependency_fingerprint;
+    }
+    if (record?.historical_holiday_dependency_fingerprint) {
+        return record.historical_dependency_fingerprint === fingerprints.dependency_fingerprint &&
+            record.historical_holiday_dependency_fingerprint ===
+                fingerprints.holiday_dependency_fingerprint;
+    }
+    return record?.historical_dependency_fingerprint === fingerprints.legacy_dependency_fingerprint &&
+        fingerprints.legacy_holiday_semantics_compatible === true;
+}
+async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = ProdhlomenaOrariaModel,
+    session = null, models = {}, holidayDependencyResolver = calculateHolidayDependencies }) {
     const periodStart = dateOnly(scope.period_start), periodEnd = dateOnly(scope.period_end);
     const window = dependencyWindow(periodStart);
     const [sourceRows, dependencyRows, resultRows] = await Promise.all([
@@ -118,11 +214,20 @@ async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = Prodh
         loadRows({ scope, start: window.start, end: window.end, fields: DEPENDENCY_FIELDS, prodhlomenaModel, session }),
         loadRows({ scope, start: periodStart, end: periodEnd, fields: RESULT_FIELDS, prodhlomenaModel, session })
     ]);
+    const dependencyStart = window.start || periodStart;
+    const holidayRows = await loadRows({ scope, start: dependencyStart, end: periodEnd,
+        fields: ['_id', 'kodikos', 'hmeromhnia'], prodhlomenaModel, session });
+    const holiday = await holidayDependencyResolver({ scope, start: dependencyStart,
+        end: periodEnd, rows: holidayRows, models });
+    const legacyDependencyFingerprint = fingerprintRows(dependencyRows, DEPENDENCY_FIELDS, {
+        calculationSemanticsVersion: EMPLOYMENT_CALCULATION_SEMANTICS_VERSION
+    });
     return Object.freeze({ dependency_window_start: window.start, dependency_window_end: window.end,
         source_fingerprint: fingerprintRows(sourceRows, SOURCE_FIELDS),
-        dependency_fingerprint: fingerprintRows(dependencyRows, DEPENDENCY_FIELDS, {
-            calculationSemanticsVersion: EMPLOYMENT_CALCULATION_SEMANTICS_VERSION
-        }),
+        legacy_dependency_fingerprint: legacyDependencyFingerprint,
+        dependency_fingerprint: legacyDependencyFingerprint,
+        holiday_dependency_fingerprint: holiday.fingerprint,
+        legacy_holiday_semantics_compatible: holiday.legacy_compatible,
         result_fingerprint: fingerprintRows(resultRows, RESULT_FIELDS) });
 }
 async function authorizeHistoricalReconstruction({ session: userSession, scope, reason, requestId,
@@ -154,7 +259,7 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
         let staleDetails = null;
         if (current?.historical_reconstruction_status === 'COMPLETED') {
             const fingerprints = await fingerprintResolver({ scope, session: dbSession });
-            if (fingerprints.dependency_fingerprint === current.historical_dependency_fingerprint) {
+            if (isHistoricalDependencyCurrent(current, fingerprints)) {
                 throw reconstructionError('HISTORICAL_RECONSTRUCTION_DEPENDENCY_CURRENT', 409,
                     'Η εξάρτηση της ανακατασκευασμένης περιόδου παραμένει τρέχουσα.');
             }
@@ -217,13 +322,15 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
 }
 async function completeHistoricalReconstruction({ scope, calculationId, requestId, now = new Date(),
     periodControlModel = PeriodControlModel, auditModel = LifecycleAuditModel,
-    prodhlomenaModel = ProdhlomenaOrariaModel, transactionRunner = transaction }) {
+    prodhlomenaModel = ProdhlomenaOrariaModel, transactionRunner = transaction,
+    fingerprintResolver = calculateHistoricalFingerprints }) {
     return transactionRunner(async (dbSession) => {
         const current = await periodControlModel.findOne({ ...scope, status: 'OPEN',
             historical_reconstruction_status: 'AUTHORIZED', active_calculation_id: calculationId,
             last_historical_reconstruction_request_id: requestId }).session(dbSession).lean();
         if (!current) throw reconstructionError('HISTORICAL_RECONSTRUCTION_OWNERSHIP_LOST', 409, 'Η εξουσιοδότηση ανακατασκευής δεν είναι πλέον ενεργή.');
-        const fingerprints = await calculateHistoricalFingerprints({ scope, prodhlomenaModel, session: dbSession });
+        const fingerprints = await fingerprintResolver({ scope, prodhlomenaModel,
+            session: dbSession });
         const completedVersion = Number(current.historical_reconstruction_pending_version || 0);
         if (completedVersion !== Number(current.historical_reconstruction_version || 0) + 1) {
             throw reconstructionError('HISTORICAL_RECONSTRUCTION_VERSION_CONFLICT', 409,
@@ -247,6 +354,8 @@ async function completeHistoricalReconstruction({ scope, calculationId, requestI
             historical_reconstruction_pending_reason: '',
             historical_source_fingerprint: fingerprints.source_fingerprint,
             historical_dependency_fingerprint: fingerprints.dependency_fingerprint,
+            historical_holiday_dependency_fingerprint:
+                fingerprints.holiday_dependency_fingerprint,
             historical_dependency_window_start: fingerprints.dependency_window_start,
             historical_dependency_window_end: fingerprints.dependency_window_end,
             historical_result_fingerprint: fingerprints.result_fingerprint, updated_at: now
@@ -267,6 +376,7 @@ async function completeHistoricalReconstruction({ scope, calculationId, requestI
             details: { reconstruction_version: completedVersion,
                 source_fingerprint: fingerprints.source_fingerprint,
                 dependency_fingerprint: fingerprints.dependency_fingerprint,
+                holiday_dependency_fingerprint: fingerprints.holiday_dependency_fingerprint,
                 result_fingerprint: fingerprints.result_fingerprint,
                 dependency_window_start: fingerprints.dependency_window_start,
                 dependency_window_end: fingerprints.dependency_window_end }, occurred_at: now }],
@@ -325,5 +435,7 @@ async function failHistoricalReconstruction({ scope, requestId, calculationId = 
 module.exports = { FINGERPRINT_VERSION, EMPLOYMENT_CALCULATION_SEMANTICS_VERSION,
     SOURCE_FIELDS, DEPENDENCY_FIELDS, RESULT_FIELDS,
     dependencyWindow, fingerprintRows, projectionForHistoricalState, isPastDeadline,
-    calculateHistoricalFingerprints, authorizeHistoricalReconstruction,
+    calculateHistoricalFingerprints, calculateHolidayDependencies,
+    isHistoricalDependencyCurrent,
+    authorizeHistoricalReconstruction,
     completeHistoricalReconstruction, failHistoricalReconstruction, reconstructionError };

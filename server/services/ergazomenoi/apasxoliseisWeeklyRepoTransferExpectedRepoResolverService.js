@@ -91,6 +91,10 @@ function diagnostic(reason, scheduledDays, effectiveWeeklyWorkdays = null) {
 
 function resolveEffectiveExpectedWeeklyRepo({ weekRows = [], effectiveProfile = {} } = {}) {
     const scheduledDays = scheduledWorkDays(weekRows);
+    if (effectiveProfile.resolution_blocked === true) {
+        return diagnostic(effectiveProfile.resolution_reason || 'EMPLOYMENT_PROFILE_BLOCKED',
+            scheduledDays);
+    }
     if (effectiveProfile.profile_changed_inside_week === true) {
         return diagnostic(REPO_RESOLUTION_REASON.PROFILE_CHANGED_INSIDE_WEEK, scheduledDays);
     }
