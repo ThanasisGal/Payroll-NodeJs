@@ -38,6 +38,9 @@ const {
     resolveEffectiveEmploymentProfileForReviewDate,
     preloadBorrowedEmploymentProfileContexts
 } = require('./apasxoliseisBorrowedEmploymentProfileResolverService');
+const {
+    preloadEffectiveHolidayContextProvider
+} = require('./apasxoliseisEffectiveHolidayContextProviderService');
 
 function requestError(message, statusCode = 400) {
     const error = new Error(message);
@@ -188,7 +191,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
         .lean();
     const employeeCodes = [...new Set(rows.map((row) => text(row.kodikos)).filter(Boolean))];
     const rowIds = rows.map((row) => row._id).filter(Boolean);
-    const [employees, histories, audits, holidayContext] = await Promise.all([
+    const [employees, histories, audits] = await Promise.all([
         employeeCodes.length
             ? employeeModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: mongoose.trusted({ $in: employeeCodes }) }).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean()
             : [],
@@ -197,17 +200,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
             : [],
         rowIds.length
             ? auditModel.find({ team: scope.team, company_kod: scope.company_kod, prodhlomena_oraria_id: mongoose.trusted({ $in: rowIds }) }).select('_id prodhlomena_oraria_id changedAt').lean()
-            : [],
-        holidayContextBuilder({
-            team: scope.team,
-            companyId: scope.company_kod,
-            companyKodikos: text(session.companyKodikos, 50),
-            etos: scope.etos,
-            periodStart: readContextStart,
-            periodEnd: readContextEnd,
-            companiesModel: models.companiesModel,
-            argiesModel: models.argiesModel
-        })
+            : []
     ]);
     const employeeByCode = buildCompanyWideUniqueEmployeeByKodikos(employees);
     const historyByCode = new Map();
@@ -223,6 +216,27 @@ async function loadWeeklyRepoTransferDecisionBatch({
             historyModel
         }
     });
+    const historyByEmployeeKey = new Map(employees.map((employee) => [
+        borrowedProfileEmployeeKey(employee), historyByCode.get(text(employee.kodikos)) || []
+    ]));
+    const holidayProvider = await preloadEffectiveHolidayContextProvider({
+        team: scope.team,
+        employees,
+        etos: scope.etos,
+        periodStart: readContextStart,
+        periodEnd: readContextEnd,
+        normalHistoryByEmployeeKey: historyByEmployeeKey,
+        borrowedProfileContexts: borrowedContexts,
+        models,
+        loadHolidayContext: holidayContextBuilder
+    });
+    const resolveHoliday = (employee, reviewDate) => {
+        const resolution = holidayProvider.resolveForEmployeeDate({ employee, reviewDate,
+            normalHistory: historyByCode.get(text(employee?.kodikos)) || [] });
+        if (resolution.blocked === true) throw requestError(
+            resolution.resolution_reason || 'Δεν επιλύθηκε η εταιρεία αργιών.', 409);
+        return resolution;
+    };
     const auditsByRowId = new Map();
     audits.forEach((audit) => {
         const id = String(audit.prodhlomena_oraria_id || '');
@@ -231,12 +245,32 @@ async function loadWeeklyRepoTransferDecisionBatch({
     });
     const auditCounts = new Map([...auditsByRowId].map(([id, values]) => [id, values.length]));
     const weeklyContexts = new Map();
+    const weeklyHolidayContexts = new Map();
     const inputs = buildWeeklyRepoTransferAtomicInputs({
         rows,
         periodStart: normalized.start.date,
         periodEnd: normalized.end.date,
         asOfDate: session.appDate,
-        holidayByDateKey: holidayContext.argiesByDateKey,
+        resolveHolidayByDateKey: ({ employee_kodikos, weekRows }) => {
+            const employee = employeeByCode.get(employee_kodikos);
+            const effectiveMap = new Map();
+            const effectiveContextsByCompany = new Map();
+            for (const row of weekRows) {
+                const date = dateKeyUtc(row.hmeromhnia);
+                const resolution = resolveHoliday(employee, row.hmeromhnia);
+                const resolvedContext = resolution.holidayContext;
+                effectiveContextsByCompany.set(resolution.effective_company_id, resolvedContext);
+                const holiday = resolvedContext.argiesByDateKey.get(date);
+                if (holiday) effectiveMap.set(date, { ...holiday,
+                    effective_company_id: resolution.effective_company_id,
+                    effective_company_kodikos: resolvedContext.company_kodikos || '' });
+            }
+            weeklyHolidayContexts.set(`${employee_kodikos}|${dateKeyUtc(
+                weekRows[0]?.hmeromhnia)}`, effectiveContextsByCompany.size === 1
+                ? [...effectiveContextsByCompany.values()][0]
+                : null);
+            return effectiveMap;
+        },
         existingAuditCountByRowKey: auditCounts,
         resolveEmploymentProfile: ({ ypokatasthma, employee_kodikos, week_start, week_end }) => {
             const employee = employeeByCode.get(employee_kodikos);
@@ -286,6 +320,8 @@ async function loadWeeklyRepoTransferDecisionBatch({
         const employeeCode = text(group.items[0].employee_kodikos);
         const weekStart = group.group_key.match(/week=([^:|]+)/)?.[1] || '';
         const contextInfo = weeklyContexts.get(`${employeeCode}|${weekStart}`);
+        const effectiveHolidayContext = weeklyHolidayContexts.get(
+            `${employeeCode}|${weekStart}`) || {};
         if (!contextInfo || weekRows.length === 0) {
             throw requestError('Δεν ήταν δυνατή η ανακατασκευή της τρέχουσας πρότασης.', 409);
         }
@@ -298,9 +334,11 @@ async function loadWeeklyRepoTransferDecisionBatch({
             history: historyByCode.get(employeeCode) || [],
             audits: weekRows.flatMap((row) => auditsByRowId.get(String(row._id)) || []),
             week: { start: group.group_key.match(/week=([^:|]+)/)?.[1], end: group.group_key.match(/week=[^:|]+:([^|]+)/)?.[1] },
-            companyFlags: holidayContext.companyFlags,
-            companyKodikos: holidayContext.company_kodikos,
-            holidayByDateKey: holidayContext.argiesByDateKey
+            companyFlags: effectiveHolidayContext.companyFlags || {},
+            companyKodikos: effectiveHolidayContext.company_kodikos || '',
+            holidayByDateKey: inputs.weeklyInputs.find((input) =>
+                input.weekRows.some((row) => String(row._id) === sourceId))
+                ?.holidayByDateKey || new Map()
         };
         const snapshot = canonicalSnapshotBuilder({ scope, context, group });
         return { group, fingerprint: snapshotFingerprintBuilder(snapshot) };

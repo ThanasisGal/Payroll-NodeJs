@@ -27,7 +27,7 @@ const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
     'ores_prostheths_ergasias_apologistika ores_apoysias_apologistika';
 
 const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
-    '_id kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
+    '_id company_kod kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
     'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
     'pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
@@ -67,11 +67,17 @@ function buildArgiesByDateKey(argies = [], companyFlags = {}) {
                 : isMandatoryHoliday
                     ? companyFlags.apasxolhsh_kata_tis_argies === true
                     : companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true;
+        const companyOperationSource = typeof argia.leitoyrgia_etaireias === 'boolean'
+            ? 'ARGIES_LEITOYRGIA_ETAIREIAS'
+            : isMandatoryHoliday
+                ? 'COMPANY_APASXOLHSH_KATA_TIS_ARGIES'
+                : 'COMPANY_LEITOYRGIA_STIS_MH_YPOXREOTIKES_ARGIES';
         map.set(key, {
             ypoxreotikh_argia: isMandatoryHoliday, isHoliday: true,
             isMandatoryHoliday, isOptionalHoliday: !isMandatoryHoliday,
             description: String(argia.perigrafh || argia.perigrafh_argias || '').trim().slice(0, 200),
             companyOperatesOnHoliday,
+            companyOperationSource,
             blocksRepoTransfer: isMandatoryHoliday || !companyOperatesOnHoliday
         });
     }

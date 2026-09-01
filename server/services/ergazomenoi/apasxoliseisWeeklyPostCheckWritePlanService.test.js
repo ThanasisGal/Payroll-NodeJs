@@ -13,6 +13,8 @@ const { buildWeeklyCanonicalDecisionSnapshotInput, groupWeeklyCanonicalDecisions
     require('./apasxoliseisWeeklyCanonicalDecisionSnapshotInputService');
 const { getWeeklyRepoProfileInfo } =
     require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
+const { buildArgiesByDateKey } =
+    require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 
 const ILLEGAL_FIELDS = [
     'ores_paranomhs_yperorias_apologistika',
@@ -522,5 +524,24 @@ result = plan(noRepoRows, { resolveProfileForDate: () => employee({
 }) });
 assert.equal(onlyDeviation(result).status, 'NEEDS_HR_DECISION');
 assert.ok(result.deviations[0].reasons.includes('BORROWING_COMPANY_AMBIGUOUS'));
+
+const borrowedHolidayRows = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date('2026-02-23T00:00:00.000Z');
+    date.setUTCDate(date.getUTCDate() + index);
+    return row(date.toISOString().slice(0, 10), index === 0 ? 8 : 0, index !== 0,
+        ['', ''], index === 0 ? { cards_ores_ergasias: 0,
+            kathgoria_ergasias_apologistika: '', kodikos: '0031' } : { kodikos: '0031' });
+});
+const borrowingHolidayContext = { company_kodikos: '0008', companyFlags: {},
+    argiesByDateKey: buildArgiesByDateKey([{ hmeromhnia: new Date('2026-02-23'),
+        ypoxreotikh_argia: false, leitoyrgia_etaireias: false,
+        perigrafh: 'ΚΑΘΑΡΑ ΔΕΥΤΕΡΑ' }], {}) };
+result = plan(borrowedHolidayRows, { apoDate: new Date('2026-02-23'),
+    eosDate: new Date('2026-03-01T23:59:59.999Z'),
+    employees: [employee({ kodikos: '0031', company_kod: '0004' })],
+    resolveHolidayContextForDate: () => borrowingHolidayContext });
+const borrowedHolidayUpdate = updateFor(result, '2026-02-23');
+assert.equal(borrowedHolidayUpdate.argia, true);
+assert.equal(borrowedHolidayUpdate.kathgoria_adeias_apologistika, '');
 
 console.log('weekly post-check pure write-plan contract tests passed (23 contracts)');

@@ -25,7 +25,8 @@ function query(value) {
     return { select() { return this; }, sort() { return this; }, lean: async () => value };
 }
 
-async function borrowedDefaultContext(lendingDays, borrowingDays, duplicateCompanies = false) {
+async function borrowedDefaultContext(lendingDays, borrowingDays, duplicateCompanies = false,
+    sourceChangeInsideWeek = false) {
     const rows = [
         { ...context.candidates[0], hmeromhnia: new Date('2026-06-15'), kodikos: '001',
             ypokatasthma: '0001' },
@@ -36,7 +37,8 @@ async function borrowedDefaultContext(lendingDays, borrowingDays, duplicateCompa
         kodikos: '001', ypokatasthma: '0001', hmeres_ergasias_ebdomadas: lendingDays,
         typos_apasxolhshs: 'PLHRHS', kathestos_apasxolhshs: 'PLHRHS',
         afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false,
-        hmnia_enarxhs_daneismoy: new Date('2026-01-01'), hmnia_lhxhs_daneismoy: null,
+        hmnia_enarxhs_daneismoy: new Date(sourceChangeInsideWeek
+            ? '2026-06-16' : '2026-01-01'), hmnia_lhxhs_daneismoy: null,
         afm_daneizomenoy_ergodoth: '094259216',
         kodikos_ergazomenoy_alloy_ergodoth: 'B1' };
     const borrowingEmployee = { ...lendingEmployee, _id: '507f191e810c19729de860ec',
@@ -45,7 +47,8 @@ async function borrowedDefaultContext(lendingDays, borrowingDays, duplicateCompa
     const companies = [{ _id: '507f191e810c19729de860ed', afm: '094259216' }];
     if (duplicateCompanies) companies.push({ _id: '507f191e810c19729de860ee', afm: '094259216' });
     let prodCalls = 0;
-    return defaultContextLoader({ scope: { team: 't', company_kod: 'c',
+    const holidayCompanyIds = [];
+    const loaded = await defaultContextLoader({ scope: { team: 't', company_kod: 'c',
         company_kodikos: '0004', year: '2026' }, sourceId, targetId,
         models: {
             prodhlomenaModel: { find: () => query(prodCalls++ === 0 ? rows : rows) },
@@ -54,17 +57,37 @@ async function borrowedDefaultContext(lendingDays, borrowingDays, duplicateCompa
             historyModel: { find: () => query([]) }, auditModel: { find: () => query([]) },
             companiesModel: { find: () => query(companies) }
         },
-        holidayContextBuilder: async () => ({ argiesByDateKey: new Map(), companyFlags: {} })
+        holidayContextBuilder: async ({ companyId }) => {
+            holidayCompanyIds.push(companyId);
+            return { company_kodikos: companyId === 'c' ? '0004' : '0008',
+                argiesByDateKey: new Map([
+                    ['2026-06-15', { isHoliday: true, companyOperatesOnHoliday: companyId === 'c' }],
+                    ['2026-06-16', { isHoliday: true, companyOperatesOnHoliday: companyId === 'c' }]
+                ]), companyFlags: { source: companyId } };
+        }
     });
+    return { ...loaded, holidayCompanyIds };
 }
 
 async function run() {
     assert.equal((await borrowedDefaultContext(5, 6)).employmentProfile
         .hmeres_ergasias_ebdomadas, 6);
+    assert.deepStrictEqual((await borrowedDefaultContext(5, 6)).holidayCompanyIds,
+        ['507f191e810c19729de860ed']);
+    const sourceChange = await borrowedDefaultContext(5, 6, false, true);
+    assert.deepStrictEqual(sourceChange.holidayCompanyIds.sort(),
+        ['507f191e810c19729de860ed', 'c'].sort());
+    assert.equal(sourceChange.holidayByDateKey.get('2026-06-15').effective_company_id, 'c');
+    assert.equal(sourceChange.holidayByDateKey.get('2026-06-16').effective_company_id,
+        '507f191e810c19729de860ed');
+    assert.equal(sourceChange.holidayByDateKey.get('2026-06-15').companyOperatesOnHoliday, true);
+    assert.equal(sourceChange.holidayByDateKey.get('2026-06-16').companyOperatesOnHoliday, false);
+    assert.deepStrictEqual(sourceChange.companyFlags, {});
+    assert.equal(sourceChange.companyKodikos, '');
     assert.equal((await borrowedDefaultContext(6, 5)).employmentProfile
         .hmeres_ergasias_ebdomadas, 5);
-    assert.equal((await borrowedDefaultContext(5, 6, true)).employmentProfile
-        .resolution_blocked, true);
+    await assert.rejects(() => borrowedDefaultContext(5, 6, true),
+        (error) => error.statusCode === 409 && error.message === 'BORROWING_COMPANY_AMBIGUOUS');
     const originalRows = JSON.stringify(context.weekRows);
     const result = await reconstructWeeklyRepoTransferDecision({ scope: { team: 't', company_kod: 'c' }, command, contextLoader: async () => context, projectionBuilder: () => ({ projection_status: 'READY', groups: [group] }) });
     assert.strictEqual(result.snapshot.source.prodhlomena_oraria_id, sourceId);

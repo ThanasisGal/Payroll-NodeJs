@@ -394,8 +394,12 @@ const { getWtoDailySubmissionIndexState,
     assertWtoDailySubmissionIndexesReady } = require('../../services/ergazomenoi/wtoDailySubmissionIndexGuardService');
 const { assertWtoDailyFrozenSnapshotVersion, resolveWtoDailyRestIdentity,
     buildWtoDailyPayloadFingerprint } = require('../../services/ergazomenoi/wtoDailyRestIdentityService');
-const { buildEmploymentDailyPreliminaryUpdate, buildEmploymentDailyCalculationUpdate } =
+const { buildEmploymentDailyPreliminaryUpdate, buildEmploymentDailyCalculationUpdate,
+    buildStage1EffectiveHolidayDailyCalculationUpdate } =
     require('../../services/ergazomenoi/apasxoliseisEmploymentDailyCalculationAdapterService');
+const {
+    preloadEffectiveHolidayContextProvider
+} = require('../../services/ergazomenoi/apasxoliseisEffectiveHolidayContextProviderService');
 const { postCorrectivePayroll } = require('../../services/ergazomenoi/apasxoliseisCorrectivePayrollPostingService');
 const ApasxoliseisWeeklyHrWorkflowStateModel = require('../../models/apasxoliseisWeeklyHrWorkflowState');
 const ApasxoliseisWeeklyHrWorkflowAuditModel = require('../../models/apasxoliseisWeeklyHrWorkflowAudit');
@@ -1780,6 +1784,11 @@ function buildReviewHolidayResponseFields(row = {}, context = {}) {
     };
 }
 
+function resolveReviewNoCardsDisplayStatus(row = {}, context = {}) {
+    if (row.argia === true || row.argia_apologistika === true) return 'ΑΡΓΙΑ';
+    return resolveNoCardsDisplayStatus(row, context);
+}
+
 function getExpectedWeeklyRepo(ergazomenos) {
     const contractualWorkdays = Number(ergazomenos?.hmeres_ergasias_ebdomadas);
     return Number.isSafeInteger(contractualWorkdays) &&
@@ -2042,6 +2051,7 @@ async function runWeeklyRepoPostCheck({
     appliedProtectionContext,
     appliedProtectionReasonsByWeek = new Map(),
     sameRunDailyCalculatedRowIds = new Set(),
+    effectiveHolidayContextProvider = null,
     periodControlScope = null,
     calculationId = null
 }) {
@@ -2084,7 +2094,7 @@ async function runWeeklyRepoPostCheck({
 
     const employees = await ErgazomenoiModel.find(employeeQuery)
         .select(
-            'ypokatasthma kodikos eponymo onoma ' +
+            'company_kod ypokatasthma kodikos eponymo onoma ' +
                 'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                 'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                 'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
@@ -2250,9 +2260,36 @@ async function runWeeklyRepoPostCheck({
         await ApasxoliseisWeeklyCanonicalDecisionModel.find(canonicalDecisionQuery)
             .sort({ created_at: -1 }).lean()
     );
-    const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
-        team: sessionTeam, employees
-    });
+    const borrowedProfileContexts = effectiveHolidayContextProvider
+        ? null
+        : await preloadBorrowedEmploymentProfileContexts({ team: sessionTeam, employees });
+    const postCheckHistoryByEmployeeKey = new Map(employees.map((employee) => [
+        borrowedProfileEmployeeKey(employee),
+        istorikoRowsByKodikos.get(String(employee.kodikos || '').trim()) || []
+    ]));
+    const postCheckHolidayProvider = effectiveHolidayContextProvider ||
+        await preloadEffectiveHolidayContextProvider({
+            team: sessionTeam,
+            employees,
+            etos: String(periodStart.getUTCFullYear()),
+            periodStart,
+            periodEnd,
+            normalHistoryByEmployeeKey: postCheckHistoryByEmployeeKey,
+            borrowedProfileContexts: borrowedProfileContexts || undefined
+        });
+    const resolvePostCheckHoliday = ({ reviewDate, employee, history }) => {
+        const resolution = postCheckHolidayProvider.resolveForEmployeeDate({
+            employee, reviewDate, normalHistory: history
+        });
+        if (resolution.blocked === true) {
+            throw Object.assign(new Error(
+                'Απαιτείται έλεγχος HR για το profile δανεισμού.'), {
+                code: resolution.resolution_reason,
+                statusCode: 409
+            });
+        }
+        return resolution;
+    };
 
     const writePlan = buildWeeklyRepoPostCheckWritePlan({
         sessionTeam,
@@ -2269,11 +2306,10 @@ async function runWeeklyRepoPostCheck({
         appliedProtectionReasonsByWeek,
         canonicalDecisionsByWeek,
         sameRunDailyCalculatedRowIds,
-        resolveProfileForDate: ({ reviewDate, employee, history }) =>
-            resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
-                normalEmployee: employee, normalHistory: history,
-                borrowedContext: borrowedProfileContexts.get(
-                    borrowedProfileEmployeeKey(employee)) || null }),
+        resolveProfileForDate: (input) =>
+            resolvePostCheckHoliday(input).effectiveProfile,
+        resolveHolidayContextForDate: (input) =>
+            resolvePostCheckHoliday(input).holidayContext,
         buildWeeklyIllegalOvertimeUpdate
     });
     const bulkOps = writePlan.bulkOps;
@@ -4363,7 +4399,7 @@ async function applyEmploymentDepartureScopeToFilters({
 
 const REVIEW_SELECT_FIELDS =
     'kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_apoysias_base_apologistika ' +
-    'team company_kod updatedAt ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
+    'team company_kod updatedAt ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia argia_apologistika perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
 
 function weeklyHrApiError(code, statusCode, message) {
     return Object.assign(new Error(message), { code, statusCode });
@@ -4952,7 +4988,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
             kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
             kathgoria_ergasias: effectiveKathgoria,
             kathgoria_ergasias_effective: effectiveKathgoria,
-            noCardsDisplayStatus: resolveNoCardsDisplayStatus(
+            noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus(
                 normalizedRow,
                 noCardsDisplayContext
             ),
@@ -6832,7 +6868,7 @@ class erganhController {
                             'orphan_card_resolution ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
                             'repo adeia kathgoria_adeias ores_apoysias hr_declared_leave ' +
-                            'argia perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
+                            'argia argia_apologistika perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
                             'ores_ergasias cards_ores_ergasias ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
                             'ores_prostheths_ergasias_apologistika ' +
                             'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
@@ -7155,7 +7191,7 @@ class erganhController {
                     kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
                     kathgoria_ergasias: effectiveKathgoria,
                     kathgoria_ergasias_effective: effectiveKathgoria,
-                    noCardsDisplayStatus: resolveNoCardsDisplayStatus(
+                    noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus(
                         normalizedRow,
                         noCardsDisplayContext
                     ),
@@ -7490,6 +7526,19 @@ class erganhController {
                     next_rows: nextBoundaryRows
                 }) : null;
 
+            const canonicalLifecycleRows = await getReviewRowsForExport(req, {
+                includeLifecycle: true
+            });
+            const canonicalLifecycleProjections = [
+                ...(canonicalLifecycleRows.__lifecycleByWeek || new Map())
+            ].map(([scopeKey, lifecycleProjection]) => {
+                const [employeeKodikos = '', weekStart = ''] = String(scopeKey).split('|');
+                return {
+                    scope: { employee_kodikos: employeeKodikos, week_start: weekStart },
+                    lifecycle_projection: lifecycleProjection
+                };
+            });
+
             return res.json({
                 success: true,
                 page: pageNum,
@@ -7500,6 +7549,7 @@ class erganhController {
                 deviations: enrichedDeviations,
                 pendingDeviationWeeks,
                 legacyDeviations,
+                canonicalLifecycleProjections,
                 boundaryContextPreflight,
                 deviationPolicyVersion: deviationPreview.policyVersion
             });
@@ -10434,7 +10484,7 @@ class erganhController {
 
             const ergazomenoi = await ErgazomenoiModel.find(employeeQuery)
                 .select(
-                    'kodikos eponymo onoma ypokatasthma ' +
+                    'company_kod kodikos eponymo onoma ypokatasthma ' +
                         'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                         'aa_eggrafhs hmeres_ergasias_ebdomadas ' +
                         'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
@@ -10581,11 +10631,20 @@ class erganhController {
             const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
                 team: sessionTeam, employees: ergazomenoi
             });
-            const resolveCalculationProfile = (reviewDate, employee, history) =>
-                resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
-                    normalEmployee: employee, normalHistory: history,
-                    borrowedContext: borrowedProfileContexts.get(
-                        borrowedProfileEmployeeKey(employee)) || null });
+            const calculationHistoryByEmployeeKey = new Map(ergazomenoi.map((employee) => [
+                borrowedProfileEmployeeKey(employee),
+                istorikoRowsByKodikos.get(String(employee.kodikos || '').trim()) || []
+            ]));
+            const effectiveHolidayContextProvider =
+                await preloadEffectiveHolidayContextProvider({
+                    team: sessionTeam,
+                    employees: ergazomenoi,
+                    etos: req.session.yearInUse,
+                    periodStart: calculationStartDate,
+                    periodEnd: eosDate,
+                    normalHistoryByEmployeeKey: calculationHistoryByEmployeeKey,
+                    borrowedProfileContexts
+                });
 
             const kodikoiChunks = chunkArray(kodikoi, 300);
             const prodhlomena = [];
@@ -10666,8 +10725,6 @@ class erganhController {
                 periodEnd: eosDate
             });
 
-            const argiesDateSet = new Set(noCardsDisplayContext.argiesByDateKey.keys());
-
             console.log(
                 `[calcApasxolhseisPeriodoy] Προδηλωμένα προς έλεγχο: ${prodhlomena.length}`
             );
@@ -10680,17 +10737,24 @@ class erganhController {
                 const calculationRec = normalizeZeroLengthCardPairs(rec);
 
                 const istorikoRows = istorikoRowsByKodikos.get(calculationRec.kodikos) || [];
-                const effectiveErgazomenos = {
-                    ...ergazomenos,
-                    ...resolveCalculationProfile(calculationRec.hmeromhnia,
-                        ergazomenos, istorikoRows)
-                };
-                if (effectiveErgazomenos.resolution_blocked === true) {
-                    throw Object.assign(new Error('Απαιτείται έλεγχος HR για το profile δανεισμού.'), {
-                        code: effectiveErgazomenos.resolution_reason,
+                const holidayResolution = effectiveHolidayContextProvider.resolveForEmployeeDate({
+                    employee: ergazomenos,
+                    reviewDate: calculationRec.hmeromhnia,
+                    normalHistory: istorikoRows
+                });
+                if (holidayResolution.blocked === true) {
+                    throw Object.assign(new Error(
+                        'Απαιτείται έλεγχος HR για το profile δανεισμού.'), {
+                        code: holidayResolution.resolution_reason,
                         statusCode: 409
                     });
                 }
+                const effectiveErgazomenos = {
+                    ...ergazomenos,
+                    ...holidayResolution.effectiveProfile
+                };
+                const effectiveArgiesDateSet = new Set(
+                    holidayResolution.holidayContext.argiesByDateKey.keys());
 
                 const weekKey = `${calculationRec.kodikos}|${getWeekKeyMonday(calculationRec.hmeromhnia)}`;
 
@@ -10718,7 +10782,8 @@ class erganhController {
                 }
 
                 const preliminary = buildEmploymentDailyPreliminaryUpdate({ row: rec,
-                    effectiveEmployee: effectiveErgazomenos, argiesDateSet, proorhProseleyshMinutes,
+                    effectiveEmployee: effectiveErgazomenos,
+                    argiesDateSet: effectiveArgiesDateSet, proorhProseleyshMinutes,
                     proorhApoxorhshMinutes, operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
                 const weeklyRec = preliminary.workingRow;
 
@@ -10737,22 +10802,28 @@ class erganhController {
                 const calculationRec = normalizeZeroLengthCardPairs(rec);
 
                 const istorikoRows = istorikoRowsByKodikos.get(calculationRec.kodikos) || [];
-                const effectiveErgazomenos = {
-                    ...ergazomenos,
-                    ...resolveCalculationProfile(calculationRec.hmeromhnia,
-                        ergazomenos, istorikoRows)
-                };
-                if (effectiveErgazomenos.resolution_blocked === true) {
-                    throw Object.assign(new Error('Απαιτείται έλεγχος HR για το profile δανεισμού.'), {
-                        code: effectiveErgazomenos.resolution_reason,
+                const holidayResolution = effectiveHolidayContextProvider.resolveForEmployeeDate({
+                    employee: ergazomenos,
+                    reviewDate: calculationRec.hmeromhnia,
+                    normalHistory: istorikoRows
+                });
+                if (holidayResolution.blocked === true) {
+                    throw Object.assign(new Error(
+                        'Απαιτείται έλεγχος HR για το profile δανεισμού.'), {
+                        code: holidayResolution.resolution_reason,
                         statusCode: 409
                     });
                 }
+                const effectiveErgazomenos = {
+                    ...ergazomenos,
+                    ...holidayResolution.effectiveProfile
+                };
 
                 const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
                 const weeklyState = weeklyStateMap.get(weekKey);
-                const dailyPlan = buildEmploymentDailyCalculationUpdate({ row: rec,
-                    effectiveEmployee: effectiveErgazomenos, argiesDateSet, weeklyState,
+                const dailyPlan = buildStage1EffectiveHolidayDailyCalculationUpdate({ row: rec,
+                    effectiveEmployee: effectiveErgazomenos,
+                    holidayContext: holidayResolution.holidayContext, weeklyState,
                     appliedProtectionContext, proorhProseleyshMinutes, proorhApoxorhshMinutes,
                     operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
 
@@ -10814,7 +10885,8 @@ class erganhController {
                 appliedProtectionReasonsByWeek,
                 periodControlScope,
                 calculationId: calculationOwnership.calculationId,
-                sameRunDailyCalculatedRowIds
+                sameRunDailyCalculatedRowIds,
+                effectiveHolidayContextProvider
             });
 
             let automaticRepoTransfer = {

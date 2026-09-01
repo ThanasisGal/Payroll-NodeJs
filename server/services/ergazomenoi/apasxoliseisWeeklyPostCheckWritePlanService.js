@@ -147,6 +147,7 @@ function buildWeeklyRepoPostCheckWritePlan({
     canonicalDecisionsByWeek = new Map(),
     sameRunDailyCalculatedRowIds = new Set(),
     resolveProfileForDate = null,
+    resolveHolidayContextForDate = null,
     buildWeeklyIllegalOvertimeUpdate
 }) {
     if (typeof buildWeeklyIllegalOvertimeUpdate !== 'function') {
@@ -291,7 +292,13 @@ function buildWeeklyRepoPostCheckWritePlan({
                     update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
                 } else if (!hasUnresolvedCardPair && isNoCardDeclaredWorkRow(row) &&
                     classifyLeaveProvenance(row) !== LEAVE_PROVENANCE.HR_DECLARED_LEAVE) {
-                    const noCardsDisplayStatus = resolveNoCardsDisplayStatus(row, noCardsDisplayContext);
+                    const effectiveHolidayContext =
+                        typeof resolveHolidayContextForDate === 'function'
+                            ? resolveHolidayContextForDate({ reviewDate: day,
+                                employee: erg, history: istorikoRows })
+                            : noCardsDisplayContext;
+                    const noCardsDisplayStatus = resolveNoCardsDisplayStatus(
+                        row, effectiveHolidayContext);
                     update.apologistiko_biblio = false;
                     update.kathgoria_ergasias_apologistika = '';
                     update.ores_ergasias_apologistika = isMisthotosEmployee(dailyProfile)

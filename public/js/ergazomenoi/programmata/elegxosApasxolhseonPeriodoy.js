@@ -377,6 +377,7 @@ let currentPolicyPreviewRowsById = new Map();
 let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentEmploymentReviewLifecyclePresentation = null;
+let currentCanonicalLifecyclePayloads = [];
 let currentStage2DailyResolutionByKey = new Map();
 let currentCanonicalDailyEmploymentTypeByKey = new Map();
 let currentReviewLifecycleProjectionReady = false;
@@ -3260,6 +3261,9 @@ function resolveReviewRowPresentation(
 }
 
 function resolveStoredStage1DailyPresentation(row = {}) {
+    if (row.argia === true || row.argia_apologistika === true) {
+        return { text: 'ΑΡΓΙΑ', className: 'cell-no-card-argia', source: 'persisted_stage1' };
+    }
     if (row.astheneia_apologistika === true) {
         return { text: 'ΑΣΘΕΝΕΙΑ', className: 'cell-no-card-adeia', source: 'persisted_stage1' };
     }
@@ -7883,6 +7887,10 @@ const employmentSubmissionTimelinessLabels = Object.freeze({
 const employmentCriticalRoleLabels = Object.freeze({
     A: 'Διαχειριστής', S: 'Επόπτης', HR: 'Υπεύθυνος Ανθρώπινου Δυναμικού'
 });
+const historicalReconstructionDefaultReasons = Object.freeze({
+    reconstruction: 'Ανακατασκευή περιόδου μετά την ολοκλήρωση λήψης προδηλωμένων ωραρίων και ψηφιακών καρτών για πλήρη επανέλεγχο αυτής.',
+    reassessment: 'Επανεκτίμηση ανακατασκευασμένης περιόδου μετά από διόρθωση των δεδομένων και πλήρη επανέλεγχο της περιόδου.'
+});
 const correctiveDeltaLabels = Object.freeze({
     ores_ergasias_apologistika: 'Ώρες εργασίας', ores_prostheths_ergasias_apologistika: 'Πρόσθετη εργασία',
     ores_yperergasias_apologistika: 'Υπερεργασία', ores_nominhs_yperorias_apologistika: 'Νόμιμη υπερωρία',
@@ -7969,10 +7977,14 @@ async function runHistoricalReconstruction() {
     const state = currentEmploymentPeriodControl;
     const scope = getActiveEmploymentReviewScope();
     const reassess = state?.allowed_actions?.historical_reassess === true;
+    const defaultReason = reassess
+        ? historicalReconstructionDefaultReasons.reassessment
+        : historicalReconstructionDefaultReasons.reconstruction;
     const confirmation = await employmentReviewSwal({ icon: 'warning',
         title: reassess ? 'Επανεκτίμηση Ανακατασκευασμένης Περιόδου' : 'Ανακατασκευή Εκπρόθεσμης Περιόδου',
         html: '<p>Η περίοδος έχει λήξει. Η ανακατασκευή δεν αλλάζει την εκπρόθεσμη κατάστασή της και καταγράφεται με χρήστη, ημερομηνία και αιτιολογία.</p>',
-        input: 'textarea', inputLabel: 'Υποχρεωτική αιτιολογία', showCancelButton: true,
+        input: 'textarea', inputLabel: 'Υποχρεωτική αιτιολογία', inputValue: defaultReason,
+        showCancelButton: true,
         customClass: {
             popup: 'historical-reconstruction-swal',
             htmlContainer: 'historical-reconstruction-swal__content',
@@ -8436,6 +8448,20 @@ function naturalWeekScopeForRow(row, searchStart = '', searchEnd = '') {
 
 function weeklyHrStage1Key(scope) {
     return [scope.ypokatasthma, scope.employee_id, scope.week_start].join('|');
+}
+
+function canonicalLifecyclePayloadKey(payload) {
+    const scope = payload?.scope || {};
+    return [scope.employee_kodikos, scope.week_start].join('|');
+}
+
+function replaceCanonicalLifecyclePayload(payload) {
+    const key = canonicalLifecyclePayloadKey(payload);
+    currentCanonicalLifecyclePayloads = [
+        ...currentCanonicalLifecyclePayloads.filter((item) =>
+            canonicalLifecyclePayloadKey(item) !== key),
+        payload
+    ];
 }
 
 function isWeeklyHrStage1RelevantRow(row) {
@@ -9242,7 +9268,7 @@ async function submitWeeklyHrStage3Decision(rowId) {
 }
 
 function updateEmploymentReviewWorkflowPresentation() {
-    const allPayloads = [...weeklyHrStage1Payloads.values()]
+    const allPayloads = [...currentCanonicalLifecyclePayloads]
         .sort(compareWeeklyHrStage1Payloads);
     const payloads = visibleWeeklyHrPayloads(allPayloads)
         .sort(compareWeeklyHrStage1Payloads);
@@ -9410,6 +9436,7 @@ async function refreshWeeklyHrStage1Scope(scope) {
     (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
     weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
     weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
+    replaceCanonicalLifecyclePayload(payload);
     if (!isWeeklyHrStage1Eligible(payload)) weeklyHrStage1Selected.delete(weeklyHrStage1Key(scope));
     renderWeeklyHrStage1Presentation();
     updateEmploymentReviewWorkflowPresentation();
@@ -9869,6 +9896,9 @@ async function loadResults() {
         currentApprovalHistoryFilters.searchText = '';
 
         const rows = payload.rows || [];
+        currentCanonicalLifecyclePayloads = Array.isArray(
+            payload.canonicalLifecycleProjections
+        ) ? payload.canonicalLifecycleProjections : [];
         currentEmploymentReviewBoundaryContextPreflight = payload.finalized === true
             ? { disabled: true } : payload.boundaryContextPreflight || null;
         if (payload.finalized !== true && hasAuthoritativeResult) {

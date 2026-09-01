@@ -202,13 +202,22 @@ async function runTransaction(work) {
         return output;
     } finally { await session.endSession(); }
 }
-async function getPeriodControl({ scope: input, now = new Date(), periodControlModel = PeriodControlModel }) {
+async function getPeriodControl({ scope: input, now = new Date(),
+    periodControlModel = PeriodControlModel, historicalFingerprintResolver = null }) {
     const scope = normalizeScope(input);
     const record = await queryLean(periodControlModel.findOne(filterForScope(scope)));
     let dependencyFingerprint = '';
     if (record?.historical_reconstruction_status === 'COMPLETED' && record.status !== 'FINALIZED') {
-        dependencyFingerprint = (await require('./apasxoliseisHistoricalPeriodReconstructionService')
-            .calculateHistoricalFingerprints({ scope })).dependency_fingerprint;
+        const historicalService = require('./apasxoliseisHistoricalPeriodReconstructionService');
+        const fingerprints = await (historicalFingerprintResolver ||
+            historicalService.calculateHistoricalFingerprints)({ scope });
+        dependencyFingerprint = historicalService.isHistoricalDependencyCurrent(record, fingerprints)
+            ? record.historical_dependency_fingerprint
+            : fingerprints.dependency_fingerprint;
+        if (!historicalService.isHistoricalDependencyCurrent(record, fingerprints) &&
+            dependencyFingerprint === record.historical_dependency_fingerprint) {
+            dependencyFingerprint = `STALE:${fingerprints.holiday_dependency_fingerprint}`;
+        }
     }
     return projectPeriodControl({ scope, record, now, dependencyFingerprint });
 }
@@ -463,8 +472,13 @@ async function fencePeriodForWrite({ scope: input, expectedToken = null, now = n
     const plain = record?.toObject ? record.toObject() : record;
     let dependencyFingerprint = '';
     if (overdue && plain?.historical_reconstruction_status === 'COMPLETED') {
-        dependencyFingerprint = (await require('./apasxoliseisHistoricalPeriodReconstructionService')
-            .calculateHistoricalFingerprints({ scope, session })).dependency_fingerprint;
+        const historicalService =
+            require('./apasxoliseisHistoricalPeriodReconstructionService');
+        const fingerprints = await historicalService.calculateHistoricalFingerprints({ scope, session });
+        dependencyFingerprint = historicalService.isHistoricalDependencyCurrent(plain, fingerprints)
+            ? plain.historical_dependency_fingerprint
+            : `STALE:${fingerprints.holiday_dependency_fingerprint ||
+                fingerprints.dependency_fingerprint}`;
     }
     const state = projectPeriodControl({ scope, record: plain, now, dependencyFingerprint });
     if (![MODES.NORMAL, MODES.HISTORICAL_RECONSTRUCTED].includes(state.effective_mode)) {
@@ -675,7 +689,9 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
         if (action === 'LOCK') {
             const fingerprints = await historicalFingerprintResolver({ scope });
             preTransitionDependencyFingerprint = fingerprints.dependency_fingerprint;
-            if (fingerprints.dependency_fingerprint !== current.historical_dependency_fingerprint) {
+            const { isHistoricalDependencyCurrent } =
+                require('./apasxoliseisHistoricalPeriodReconstructionService');
+            if (!isHistoricalDependencyCurrent(current, fingerprints)) {
                 throw periodError('HISTORICAL_RECONSTRUCTION_STALE_CANNOT_FINALIZE', 409,
                     'Η ανακατασκευασμένη περίοδος είναι παρωχημένη και απαιτεί επανεκτίμηση.');
             }

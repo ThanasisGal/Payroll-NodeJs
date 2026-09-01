@@ -94,8 +94,9 @@ function dependencies(rows, decisions = [], executions = [], options = {}) {
             decisionModel: { find: (filter) => { counter.filters.decisions = filter; return query(decisions, counter, 'decisions'); } },
             executionModel: { find: (filter) => { counter.filters.executions = filter; return query(executions, counter, 'executions'); } }
         },
-        holidayContextBuilder: async () => {
+        holidayContextBuilder: async ({ companyId }) => {
             counter.holidays = (counter.holidays || 0) + 1;
+            counter.holidayCompanyIds = [...(counter.holidayCompanyIds || []), companyId];
             return {
                 companyFlags: {
                     apasxolhsh_kata_tis_argies: false,
@@ -119,7 +120,7 @@ async function testZeroProposalsUsesOneBatchOfQueries() {
     assert.deepStrictEqual(result.records, []);
     assert.strictEqual(result.current_groups_count, 0);
     assert.strictEqual(counter.rows, 1);
-    assert.strictEqual(counter.holidays, 1);
+    assert.strictEqual(counter.holidays || 0, 0);
     assert.strictEqual(counter.employees || 0, 0);
     assert.strictEqual(counter.histories || 0, 0);
     assert.strictEqual(counter.audits || 0, 0);
@@ -149,6 +150,7 @@ async function testManyProposalsKeepConstantQueryCounts() {
         histories: 1,
         audits: 1,
         holidays: 1,
+        holidayCompanyIds: [session.companyInUse],
         decisions: 1
     });
     for (const name of ['rows', 'employees', 'histories', 'audits', 'decisions']) {
@@ -541,6 +543,7 @@ async function testBorrowingProfileDrivesBatchAndAmbiguityDoesNotFallback() {
             filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12',
                 ypokatasthma: '0000' }, ...deps });
         assert.equal(result.current_groups_count, expectedRepo === 1 ? 0 : 1);
+        assert.deepStrictEqual(deps.counter.holidayCompanyIds, ['borrowing-company']);
     }
 
     const rows = week('2026-07-06', '0001');
@@ -554,11 +557,10 @@ async function testBorrowingProfileDrivesBatchAndAmbiguityDoesNotFallback() {
             { _id: 'one', afm: '094259216' }, { _id: 'two', afm: '094259216' }
         ]
     });
-    const blocked = await loadWeeklyRepoTransferDecisionBatch({ session,
+    await assert.rejects(() => loadWeeklyRepoTransferDecisionBatch({ session,
         filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12',
-            ypokatasthma: '0000' }, ...deps });
-    assert.equal(blocked.records.length, 0);
-    assert.ok(Object.values(blocked.reason_counts).some((count) => count > 0));
+            ypokatasthma: '0000' }, ...deps }),
+    (error) => error.statusCode === 409 && error.message === 'BORROWING_COMPANY_AMBIGUOUS');
 }
 
 async function run() {

@@ -4,6 +4,9 @@ const {
     buildAutoAttendanceReset,
     resolveSafeStartOnlyOrphan
 } = require('./apasxoliseisAttendanceDerivedScheduleService');
+const {
+    resolveNoCardsDisplayStatus
+} = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 
 function assertOperations(operations, names) {
     for (const name of names) if (typeof operations?.[name] !== 'function') {
@@ -92,5 +95,32 @@ function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesD
         protectionDiagnostics: protectedUpdate.diagnostics || [] });
 }
 
+function buildStage1EffectiveHolidayDailyCalculationUpdate({ row, holidayContext, ...options }) {
+    const noCardsDisplayStatus = resolveNoCardsDisplayStatus(row, holidayContext);
+    const effectiveHoliday = noCardsDisplayStatus === 'ΑΡΓΙΑ';
+    const rowDate = new Date(row?.hmeromhnia);
+    const rowDateKey = Number.isNaN(rowDate.getTime())
+        ? null
+        : rowDate.toISOString().slice(0, 10);
+    const hasHolidayRecord = Boolean(rowDateKey &&
+        holidayContext?.argiesByDateKey?.has?.(rowDateKey));
+    const calculationRow = hasHolidayRecord
+        ? { ...row, argia_apologistika: effectiveHoliday }
+        : row;
+    const plan = buildEmploymentDailyCalculationUpdate({
+        ...options,
+        row: calculationRow,
+        argiesDateSet: new Set(holidayContext?.argiesByDateKey?.keys?.() || [])
+    });
+    return Object.freeze({
+        ...plan,
+        noCardsDisplayStatus,
+        sanitizedUpdate: hasHolidayRecord
+            ? { ...plan.sanitizedUpdate, argia_apologistika: effectiveHoliday }
+            : plan.sanitizedUpdate
+    });
+}
+
 module.exports = { PRELIMINARY_OPERATIONS, DAILY_OPERATIONS,
-    buildEmploymentDailyPreliminaryUpdate, buildEmploymentDailyCalculationUpdate };
+    buildEmploymentDailyPreliminaryUpdate, buildEmploymentDailyCalculationUpdate,
+    buildStage1EffectiveHolidayDailyCalculationUpdate };
