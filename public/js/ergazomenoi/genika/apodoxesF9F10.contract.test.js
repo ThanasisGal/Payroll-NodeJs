@@ -95,6 +95,12 @@ assert.ok(editScript.includes("if (typeof window.reCalculate === 'function')"));
 assert.ok(editScript.includes('await window.reCalculate();'));
 assert.ok(editScript.includes('const effectiveHourly = preserveManualDeviation'));
 assert.ok(editScript.includes(': getNomimoOromisthioValue();'));
+const editInterceptor = editScript.slice(editScript.indexOf(
+    'function setupManualRecalcButtonInterceptor()'), editScript.indexOf(
+    'function saveManualPragmatikoOromisthioSnapshot'));
+assert.ok(editInterceptor.indexOf(
+    'if (!_manualPragmatikoOromisthioActive || !_manualPragmatikoOromisthioSnapshot)') <
+    editInterceptor.indexOf('event.preventDefault();'));
 
 assert.ok(addScript.includes('clearManualExtraApodoxesSnapshot();'));
 
@@ -114,6 +120,61 @@ function extractFunction(source, functionName) {
     }
     throw new Error(`unterminated function ${functionName}`);
 }
+
+function runStoredActualWagesActivationContract() {
+    const elements = {
+        pragmatikoOromisthio: { value: '8.1650' },
+        pragmatikoHmeromisthio: { value: '54.4336' },
+        pragmatikosMisthos: { value: '1360.84' }
+    };
+    const context = {
+        Decimal,
+        _manualPragmatikoOromisthioActive: false,
+        _manualPragmatikoOromisthioSnapshot: null,
+        _storedActualWagesSnapshotCandidate: null,
+        hasExtra: false,
+        document: { getElementById: (id) => elements[id] || null },
+        toDecimal: (value) => new Decimal(value || 0),
+        formatForDisplay: (value, decimals) => new Decimal(value).toFixed(decimals),
+        findExistingExtraApodoxesRow: () => context.hasExtra ? '01' : null,
+        saveManualPragmatikoOromisthioSnapshot: (snapshot) => {
+            context._manualPragmatikoOromisthioActive = true;
+            context._manualPragmatikoOromisthioSnapshot = snapshot;
+        }
+    };
+    vm.createContext(context);
+    vm.runInContext([
+        extractFunction(editScript, 'initializeStoredActualWagesSnapshot'),
+        extractFunction(editScript, 'restoreManualPragmatikoOromisthioSnapshot'),
+        extractFunction(editScript, 'activateStoredActualWagesSnapshotIfManualExtraExists'),
+        extractFunction(editScript, 'clearManualPragmatikoOromisthioSnapshot')
+    ].join('\n'), context);
+
+    context.initializeStoredActualWagesSnapshot();
+    assert.strictEqual(context._manualPragmatikoOromisthioActive, false);
+    assert.strictEqual(context.activateStoredActualWagesSnapshotIfManualExtraExists(), false);
+    assert.strictEqual(context._manualPragmatikoOromisthioActive, false);
+
+    context.hasExtra = true;
+    assert.strictEqual(context.activateStoredActualWagesSnapshotIfManualExtraExists(), true);
+    assert.strictEqual(context._manualPragmatikoOromisthioActive, true);
+    assert.ok(context._manualPragmatikoOromisthioSnapshot.oromisthio.eq('8.1650'));
+
+    context.clearManualPragmatikoOromisthioSnapshot();
+    assert.strictEqual(context._manualPragmatikoOromisthioActive, false);
+    assert.strictEqual(context._manualPragmatikoOromisthioSnapshot, null);
+    assert.strictEqual(context._storedActualWagesSnapshotCandidate, null);
+}
+
+runStoredActualWagesActivationContract();
+
+const negativeComponentTotal = new Decimal('1360.84').minus('20.60');
+assert.equal(negativeComponentTotal.toFixed(2), '1340.24');
+assert.equal(negativeComponentTotal.div(25).toFixed(4), '53.6096');
+assert.equal(negativeComponentTotal.div(25).times(6).div(40).toFixed(4), '8.0414');
+assert.equal(new Decimal('1360.84').plus('20.60').toFixed(2), '1381.44');
+assert.ok(!addScript.includes('initializeStoredActualWagesSnapshot()'));
+assert.match(addScript, /let _manualPragmatikoOromisthioActive = false;/);
 
 function runManualHelpersContract(source) {
     const elements = new Map();

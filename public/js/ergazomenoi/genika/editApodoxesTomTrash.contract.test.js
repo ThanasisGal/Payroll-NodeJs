@@ -42,7 +42,8 @@ function createDynamicHarness({
     tomValue = '',
     selectValue = '',
     hiddenValue = '',
-    preloadAll = false
+    preloadAll = false,
+    manualExtraRow = null
 } = {}) {
     const calls = {
         calculateTotal: 0,
@@ -58,7 +59,8 @@ function createDynamicHarness({
         setTextboxValue: [],
         clearFilter: 0,
         handleStoixeioChange: 0,
-        recalculateActualWages: 0
+        recalculateActualWages: 0,
+        clearManualSnapshot: 0
     };
     const trash = { hidden: true };
     const hidden = { value: hiddenValue };
@@ -170,6 +172,12 @@ function createDynamicHarness({
         hasManualPragmatikoOromisthioDeviation() {
             return false;
         },
+        findExistingExtraApodoxesRow() {
+            return manualExtraRow;
+        },
+        clearManualPragmatikoOromisthioSnapshot() {
+            calls.clearManualSnapshot += 1;
+        },
         async recalculateActualWagesAfterLegalChange() {
             calls.recalculateActualWages += 1;
         },
@@ -275,6 +283,19 @@ test('clear/reload permits a new selection and recalculates both amounts', async
     assert.equal(harness.secondAmount.value, '20.00');
     assert.equal(harness.calls.handleStoixeioChange, 1);
     assert.equal(harness.trash.hidden, false);
+});
+
+test('trash of the manual EXTRA row clears its active manual snapshot', async () => {
+    const harness = createDynamicHarness({ tomValue: '0013', hiddenValue: '0013',
+        manualExtraRow: '01' });
+    await harness.sandbox.clearSingleStoixeioRow('01');
+
+    assert.equal(harness.calls.clearManualSnapshot, 1);
+    assert.equal(harness.calls.recalculateActualWages, 1);
+    assert.equal(harness.firstAmount.value, '');
+    assert.equal(harness.secondAmount.value, '');
+    assert.match(dynamicSource,
+        /setTimeout\(async \(\) => \{\s*if \(!_manualPragmatikoOromisthioActive \|\| !_manualPragmatikoOromisthioSnapshot\) return;\s*setManualExtraAmountToRow/);
 });
 
 test('two clear/reselect cycles reuse one TomSelect and one change listener', async () => {

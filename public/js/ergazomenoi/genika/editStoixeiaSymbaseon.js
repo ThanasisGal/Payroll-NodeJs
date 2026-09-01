@@ -220,7 +220,10 @@ function reloadStoixeioRowOptions(idNum) {
 }
 
 async function clearSingleStoixeioRow(idNum) {
-    const preserveManualDeviation = hasManualPragmatikoOromisthioDeviation();
+    const clearsManualExtra = findExistingExtraApodoxesRow() === idNum;
+    if (clearsManualExtra) clearManualPragmatikoOromisthioSnapshot();
+    const preserveManualDeviation = !clearsManualExtra &&
+        hasManualPragmatikoOromisthioDeviation();
     const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
     const row = document.getElementById(`row_${idNum}`);
     const tom = selectEl?.tomselect;
@@ -692,6 +695,7 @@ async function loadExistingStoixeia() {
 
     setTimeout(() => {
         calculateTotal();
+        activateStoredActualWagesSnapshotIfManualExtraExists();
 
         requestAnimationFrame(async () => {
             applyNomimaFromSymbashTotals();
@@ -1943,6 +1947,7 @@ let _manualPragmatikoOromisthioEnabled = false;
 let _manualPragmatikoOromisthioApplying = false;
 let _manualPragmatikoOromisthioActive = false;
 let _manualPragmatikoOromisthioSnapshot = null;
+let _storedActualWagesSnapshotCandidate = null;
 
 function initializeStoredActualWagesSnapshot() {
     const oromisthio = document.getElementById('pragmatikoOromisthio')?.value;
@@ -1951,9 +1956,17 @@ function initializeStoredActualWagesSnapshot() {
     const isPresent = (value) =>
         value !== null && value !== undefined && String(value).trim() !== '';
 
-    if ([oromisthio, hmeromisthio, misthos].every(isPresent)) {
-        saveManualPragmatikoOromisthioSnapshot({ oromisthio, hmeromisthio, misthos });
-    }
+    _storedActualWagesSnapshotCandidate = [oromisthio, hmeromisthio, misthos].every(isPresent)
+        ? { oromisthio: toDecimal(oromisthio), hmeromisthio: toDecimal(hmeromisthio),
+            misthos: toDecimal(misthos) }
+        : null;
+}
+
+function activateStoredActualWagesSnapshotIfManualExtraExists() {
+    if (!_storedActualWagesSnapshotCandidate || !findExistingExtraApodoxesRow()) return false;
+    saveManualPragmatikoOromisthioSnapshot(_storedActualWagesSnapshotCandidate);
+    restoreManualPragmatikoOromisthioSnapshot();
+    return true;
 }
 
 function setupManualPragmatikoOromisthioEditor() {
@@ -2106,6 +2119,12 @@ function saveManualPragmatikoOromisthioSnapshot({ oromisthio, hmeromisthio, mist
         hmeromisthio: toDecimal(hmeromisthio),
         misthos: toDecimal(misthos)
     };
+}
+
+function clearManualPragmatikoOromisthioSnapshot() {
+    _manualPragmatikoOromisthioActive = false;
+    _manualPragmatikoOromisthioSnapshot = null;
+    _storedActualWagesSnapshotCandidate = null;
 }
 
 function hasManualPragmatikoOromisthioDeviation() {
@@ -2342,6 +2361,7 @@ async function applyManualPragmatikoOromisthio() {
 
     // Και ένα τελευταίο async σφράγισμα για την οθόνη, χωρίς να πειράξει ο χρήστης κάτι.
     setTimeout(async () => {
+        if (!_manualPragmatikoOromisthioActive || !_manualPragmatikoOromisthioSnapshot) return;
         setManualExtraAmountToRow(targetRow, diafora);
         await calculateTotal();
         restoreManualPragmatikoOromisthioSnapshot();
