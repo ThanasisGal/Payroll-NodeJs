@@ -251,6 +251,71 @@ test('overlap with explicit false flag and effective dates fails closed', () => 
     assert.strictEqual(profile.resolution_reason, BLOCK_REASON.HISTORY_OVERLAP);
 });
 
+test('explicit-false schedule-only history does not overlap real borrowing terms', () => {
+    const realTerms = history('6a476485e275226dd172d30a', '2026-04-01', null, 6);
+    const scheduleOnly = {
+        _id: '6a8888e56aeaefb3c884f5f6',
+        afora_allagh_oron_ergasias: false,
+        hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_allaghs_orarioy_apo: new Date('2026-04-01T00:00:00.000Z'),
+        hmeromhnia_allaghs_orarioy_eos: new Date('2026-04-07T00:00:00.000Z'),
+        hmeres_ergasias_ebdomadas: 6
+    };
+    const profile = resolve('2026-04-02', lendingLoan(5, {
+        hmnia_enarxhs_daneismoy: new Date('2026-01-01T00:00:00.000Z'),
+        hmnia_lhxhs_daneismoy: null
+    }), context(6, { borrowingHistory: [realTerms, scheduleOnly] }));
+    assert.strictEqual(profile.resolution_blocked, false);
+    assert.strictEqual(profile.resolution_reason, null);
+    assert.strictEqual(profile.profile_history_id, '6a476485e275226dd172d30a');
+    assert.strictEqual(profile.hmeres_ergasias_ebdomadas, 6);
+});
+
+test('two real borrowing terms rows still fail closed as history overlap', () => {
+    const profile = resolve('2026-04-02', lendingLoan(5, {
+        hmnia_enarxhs_daneismoy: new Date('2026-01-01T00:00:00.000Z'),
+        hmnia_lhxhs_daneismoy: null
+    }), context(6, { borrowingHistory: [
+        history('real-a', '2026-04-01', null, 6),
+        history('real-b', '2026-04-02', '2026-04-05', 5)
+    ] }));
+    assert.strictEqual(profile.resolution_blocked, true);
+    assert.strictEqual(profile.resolution_reason, BLOCK_REASON.HISTORY_OVERLAP);
+});
+
+test('legacy borrowing history without an explicit terms flag remains compatible', () => {
+    const legacy = {
+        _id: 'legacy-without-flag',
+        hmeromhnia_allaghs_orarioy_apo: new Date('2026-04-01T00:00:00.000Z'),
+        hmeromhnia_allaghs_orarioy_eos: new Date('2026-04-07T00:00:00.000Z'),
+        hmeres_ergasias_ebdomadas: 6,
+        ores_ergasias_ebdomadas: 40,
+        kathestos_apasxolhshs: '0'
+    };
+    const profile = resolve('2026-04-02', lendingLoan(5, {
+        hmnia_enarxhs_daneismoy: new Date('2026-01-01T00:00:00.000Z'),
+        hmnia_lhxhs_daneismoy: null
+    }), context(6, { borrowingHistory: [legacy] }));
+    assert.strictEqual(profile.resolution_blocked, false);
+    assert.strictEqual(profile.profile_history_id, 'legacy-without-flag');
+    assert.strictEqual(profile.hmeres_ergasias_ebdomadas, 6);
+});
+
+test('explicit-false borrowing history with new terms dates remains fail closed', () => {
+    const realTerms = history('real-terms', '2026-04-01', null, 6);
+    const explicitFalseTerms = {
+        ...history('explicit-false-new-terms', '2026-04-02', '2026-04-05', 5),
+        afora_allagh_oron_ergasias: false
+    };
+    const profile = resolve('2026-04-02', lendingLoan(5, {
+        hmnia_enarxhs_daneismoy: new Date('2026-01-01T00:00:00.000Z'),
+        hmnia_lhxhs_daneismoy: null
+    }), context(6, { borrowingHistory: [realTerms, explicitFalseTerms] }));
+    assert.strictEqual(profile.resolution_blocked, true);
+    assert.strictEqual(profile.resolution_reason, BLOCK_REASON.HISTORY_OVERLAP);
+});
+
 function weekRows(workedDays) {
     return Array.from({ length: 7 }, (_, index) => {
         const date = new Date(Date.UTC(2026, 0, 12 + index)).toISOString().slice(0, 10);

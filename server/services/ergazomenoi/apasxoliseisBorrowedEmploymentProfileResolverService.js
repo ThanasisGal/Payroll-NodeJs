@@ -46,8 +46,13 @@ function isActiveLoan(reviewDate, employee = {}) {
 }
 
 function matchingHistoryRows(reviewDate, rows = []) {
-    return rows.filter((row) => isEffectiveTermsRowForDate(row, reviewDate,
-        { includeExplicitFalseWithDates: true }));
+    return rows.filter((row) => {
+        const isExplicitScheduleOnly = row.afora_allagh_oron_ergasias === false &&
+            !row.hmeromhnia_isxyos_oron_ergasias_apo &&
+            !row.hmeromhnia_isxyos_oron_ergasias_eos;
+        return !isExplicitScheduleOnly && isEffectiveTermsRowForDate(row, reviewDate,
+            { includeExplicitFalseWithDates: true });
+    });
 }
 
 function blockedProfile(reason, reviewDate, normalEmployee = {}, context = {}) {
