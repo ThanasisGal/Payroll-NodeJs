@@ -31,7 +31,7 @@ function models({ employees, audits = [], history = [] }) {
         }
     };
 }
-const employee = { _id: new mongoose.Types.ObjectId(), kodikos: '0001', ypokatasthma: '0000', energos: true, archived: false, kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
+const employee = { _id: new mongoose.Types.ObjectId(), company_kod: 'company-id', kodikos: '0001', ypokatasthma: '0000', energos: true, archived: false, kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
 const holidayContextBuilder = async () => ({ companyFlags: { apasxolhsh_kata_tis_argies: false, leitoyrgia_stis_mh_ypoxreotikes_argies: false }, company_kodikos: '0004', argiesByDateKey: new Map() });
 const scope = { team: 'THA', company_kod: 'company-id', company_kodikos: '0004', year: '2026' };
 
@@ -40,7 +40,7 @@ async function run() {
     const context = await defaultContextLoader({ scope, sourceId: String(sourceId), targetId: String(targetId), models: configured.value, holidayContextBuilder });
     assert.strictEqual(context.weekRows.length, 7);
     assert.strictEqual(context.employee, employee);
-    assert.strictEqual(context.employmentProfile.profile_source, 'ERG_AKTUAL');
+    assert.strictEqual(context.employmentProfile.profile_source, 'LOCAL_EMPLOYMENT_PROFILE');
     assert.strictEqual(String(context.audits[0].prodhlomena_oraria_id), String(sourceId));
     assert.strictEqual(configured.log.prodFilters[0].team, 'THA');
     assert.strictEqual(configured.log.prodFilters[1].ypokatasthma, '0000');
@@ -72,7 +72,8 @@ async function run() {
         }).value,
         holidayContextBuilder
     });
-    assert.strictEqual(historyRawContext.employmentProfile.profile_source, 'ISTORIKO');
+    assert.strictEqual(historyRawContext.employmentProfile.profile_source,
+        'LOCAL_EMPLOYMENT_PROFILE');
     assert.strictEqual(historyRawContext.employmentProfile.hmeres_ergasias_ebdomadas, 4);
 
     for (const employees of [[], [employee, { ...employee, _id: new mongoose.Types.ObjectId() }], [{ ...employee, ypokatasthma: '0001' }]]) {
