@@ -12,6 +12,17 @@ function normalizeBranch(value) {
     return raw ? raw.padStart(4, '0') : '';
 }
 
+function employmentReviewIdentity(row = {}) {
+    const kodikos = String(row.kodikos || '').trim();
+    const ypokatasthma = normalizeBranch(row.ypokatasthma);
+    return kodikos && ypokatasthma ? `${ypokatasthma}|${kodikos}` : '';
+}
+
+function restrictBoundaryContextToPeriodEmployees(periodRows = [], contextRows = []) {
+    const eligibleIdentities = new Set(periodRows.map(employmentReviewIdentity).filter(Boolean));
+    return contextRows.filter((row) => eligibleIdentities.has(employmentReviewIdentity(row)));
+}
+
 function endOfDepartureDay(value) {
     const key = dateKeyUtc(value);
     return key ? new Date(`${key}T23:59:59.999Z`) : null;
@@ -209,6 +220,7 @@ module.exports = {
     startOfHireDay,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
+    restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,
     isFullCalendarMonthRange,
     buildFullMonthBoundaryContextPreflight

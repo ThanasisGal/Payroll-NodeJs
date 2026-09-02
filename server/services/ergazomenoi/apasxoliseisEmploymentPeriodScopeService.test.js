@@ -3,9 +3,74 @@ const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
+    restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,
     buildFullMonthBoundaryContextPreflight
 } = require('./apasxoliseisEmploymentPeriodScopeService');
+
+const periodRows = [
+    { kodikos: '0031', ypokatasthma: '0000', hmeromhnia: '2026-04-01' },
+    { kodikos: '0016', ypokatasthma: '0000', hmeromhnia: '2026-04-30' }
+];
+const scopedBoundaryRows = restrictBoundaryContextToPeriodEmployees(periodRows, [
+    { kodikos: '0031', ypokatasthma: '0000', hmeromhnia: '2026-03-31' },
+    { kodikos: '0031', ypokatasthma: '0000', hmeromhnia: '2026-05-01' },
+    { kodikos: '0016', ypokatasthma: '0000', hmeromhnia: '2026-05-01' },
+    { kodikos: '0017', ypokatasthma: '0000', hmeromhnia: '2026-05-01' },
+    { kodikos: '0099', ypokatasthma: '0000', hmeromhnia: '2026-03-31' },
+    { kodikos: '0031', ypokatasthma: '0001', hmeromhnia: '2026-04-01' }
+]);
+assert.deepStrictEqual(scopedBoundaryRows.map((row) =>
+    `${row.ypokatasthma}|${row.kodikos}|${row.hmeromhnia}`), [
+    '0000|0031|2026-03-31',
+    '0000|0031|2026-05-01',
+    '0000|0016|2026-05-01'
+]);
+
+const aprilPeriod = { period_start: '2026-04-01', period_end: '2026-04-30' };
+const afterPeriodHire = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-04-27', natural_week_end: '2026-05-03',
+    ...aprilPeriod, hire_date: '2026-05-01'
+});
+assert.deepStrictEqual(afterPeriodHire.authoritative_date_set, []);
+assert.deepStrictEqual(afterPeriodHire.context_only_dates,
+    ['2026-05-01', '2026-05-02', '2026-05-03']);
+
+const lastDayHire = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-04-27', natural_week_end: '2026-05-03',
+    ...aprilPeriod, hire_date: '2026-04-30'
+});
+assert.deepStrictEqual(lastDayHire.authoritative_date_set, ['2026-04-30']);
+assert.deepStrictEqual(lastDayHire.context_only_dates,
+    ['2026-05-01', '2026-05-02', '2026-05-03']);
+
+const beforePeriodDeparture = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-03-30', natural_week_end: '2026-04-05',
+    ...aprilPeriod, departure_date: '2026-03-31'
+});
+assert.deepStrictEqual(beforePeriodDeparture.authoritative_date_set, []);
+assert.deepStrictEqual(beforePeriodDeparture.context_only_dates, ['2026-03-30', '2026-03-31']);
+
+const activeNextBoundary = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-04-27', natural_week_end: '2026-05-03', ...aprilPeriod
+});
+assert.deepStrictEqual(activeNextBoundary.authoritative_date_set,
+    ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30']);
+assert.deepStrictEqual(activeNextBoundary.context_only_dates,
+    ['2026-05-01', '2026-05-02', '2026-05-03']);
+
+const activePreviousBoundary = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-03-30', natural_week_end: '2026-04-05', ...aprilPeriod
+});
+assert.deepStrictEqual(activePreviousBoundary.authoritative_date_set,
+    ['2026-04-01', '2026-04-02', '2026-04-03', '2026-04-04', '2026-04-05']);
+assert.deepStrictEqual(activePreviousBoundary.context_only_dates, ['2026-03-30', '2026-03-31']);
+
+const ordinaryAprilWeek = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-04-06', natural_week_end: '2026-04-12', ...aprilPeriod
+});
+assert.strictEqual(ordinaryAprilWeek.is_full_natural_week, true);
+assert.strictEqual(ordinaryAprilWeek.context_only_dates.length, 0);
 
 const departed = {
     kodikos: '0014',
