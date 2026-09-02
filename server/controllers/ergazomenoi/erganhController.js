@@ -218,6 +218,7 @@ const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
     isWeekFullyWithinEmploymentPeriod,
+    restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,
     buildFullMonthBoundaryContextPreflight
 } = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
@@ -5042,10 +5043,14 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
             $gte: startOfWeekMondayUtc(periodStart),
             $lte: endOfWeekSundayUtc(periodEnd)
         });
-        policyContextRows = (await ProdhlomenaOrariaModel.find(policyContextFilter)
+        const boundaryContextRows = (await ProdhlomenaOrariaModel.find(policyContextFilter)
             .select(REVIEW_SELECT_FIELDS)
             .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
             .lean()).map(enrichReviewRow);
+        policyContextRows = restrictBoundaryContextToPeriodEmployees(
+            enrichedRows,
+            boundaryContextRows
+        );
     }
 
     const exportDeviations = deviations
@@ -5390,6 +5395,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
             periodScope: periodStart && periodEnd &&
                 (dateKeyUtc(naturalWeekStart) < dateKeyUtc(periodStart) ||
                     dateKeyUtc(naturalWeekEnd) > dateKeyUtc(periodEnd)) &&
+                (employmentDateScope?.authoritative_date_set?.length || 0) > 0 &&
                 (employmentDateScope?.context_only_dates?.length || 0) > 0
                 ? { period_start: periodStart, period_end: periodEnd }
                 : null,
