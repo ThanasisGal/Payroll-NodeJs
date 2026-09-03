@@ -800,4 +800,64 @@ assert.equal(employee0002ActualLifecycle.stages.stage1.blockers.includes(
 assert.deepEqual(employee0002ActualLifecycle.stages.stage1.pending_dates, ['2026-06-03']);
 assert.equal(employee0002ActualLifecycle.employment_date_scope.is_full_natural_week, true);
 
+const aprilBoundaryPeriod = {
+    period_start: '2026-04-01', period_end: '2026-04-30'
+};
+const aprilBoundaryScope = {
+    team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+    employee_id: 'boundary-employee', employee_kodikos: 'boundary-employee',
+    week_start: '2026-04-27', week_end: '2026-05-03'
+};
+function orphanAt(rows, index) {
+    return rows.map((row, rowIndex) => rowIndex !== index ? row : {
+        ...row,
+        cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: '',
+        cards_ores_ergasias: 0,
+        ores_ergasias_apologistika: 0
+    });
+}
+
+const aprilContextOnlyOrphan = buildWeeklyHrLifecycleProjection({
+    weekRows: orphanAt(week('context-only', '2026-04-27'), 4),
+    effectiveProfile: profile,
+    scope: aprilBoundaryScope,
+    periodScope: aprilBoundaryPeriod
+});
+assert.notEqual(aprilContextOnlyOrphan.stages.stage1.business_status, 'BLOCKED');
+assert.deepEqual(aprilContextOnlyOrphan.stages.stage1.period_slice.context_only_dates,
+    ['2026-05-01', '2026-05-02', '2026-05-03']);
+
+const aprilAuthoritativeOrphan = buildWeeklyHrLifecycleProjection({
+    weekRows: orphanAt(week('authoritative', '2026-04-27'), 1),
+    effectiveProfile: profile,
+    scope: aprilBoundaryScope,
+    periodScope: aprilBoundaryPeriod
+});
+assert.equal(aprilAuthoritativeOrphan.stages.stage1.business_status, 'BLOCKED');
+assert.ok(aprilAuthoritativeOrphan.stages.stage1.blockers.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+
+const aprilBothOrphansRows = orphanAt(
+    orphanAt(week('both-orphans', '2026-04-27'), 1),
+    4
+);
+const aprilBothOrphans = buildWeeklyHrLifecycleProjection({
+    weekRows: aprilBothOrphansRows,
+    effectiveProfile: profile,
+    scope: aprilBoundaryScope,
+    periodScope: aprilBoundaryPeriod
+});
+assert.equal(aprilBothOrphans.stages.stage1.business_status, 'BLOCKED');
+assert.deepEqual([...aprilBothOrphans.stages.stage1.blockers].sort(), [
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION',
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'
+].sort());
+
+const fullWeekUnscopedOrphan = buildWeeklyHrLifecycleProjection({
+    weekRows: orphanAt(week('unscoped-orphan', '2026-04-27'), 4),
+    effectiveProfile: profile
+});
+assert.equal(fullWeekUnscopedOrphan.stages.stage1.business_status, 'BLOCKED');
+
 console.log('weekly HR derived lifecycle projection tests passed');

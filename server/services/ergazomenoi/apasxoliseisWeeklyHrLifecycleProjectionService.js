@@ -278,7 +278,8 @@ function buildWeeklyHrLifecycleProjection({
         effectiveProfile,
         effectiveProfilesByDate,
         leave_classification_completed: false,
-        expected_date_keys: expectedDateKeys
+        expected_date_keys: expectedDateKeys,
+        actionable_date_keys: actionableDateSet ? [...actionableDateSet] : null
     });
     const stage1PendingDates = possibleLeaveDates(rows)
         .filter((date) => !actionableDateSet || actionableDateSet.has(date));
@@ -328,6 +329,7 @@ function buildWeeklyHrLifecycleProjection({
         effectiveProfilesByDate,
         leave_classification_completed: true,
         expected_date_keys: expectedDateKeys,
+        actionable_date_keys: actionableDateSet ? [...actionableDateSet] : null,
         ...decisions
     });
     const repoTransfer = fullNaturalWeek ? analyzeWeeklyRepoTransferForEmploymentContract({

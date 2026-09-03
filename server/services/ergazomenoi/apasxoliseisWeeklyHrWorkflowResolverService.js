@@ -69,7 +69,8 @@ function resolveWeeklyHrWorkflow({
     repo_resolution_completed = false,
     selected_repo_transfers = [],
     remaining_possible_leave_review_completed = false,
-    expected_date_keys = null
+    expected_date_keys = null,
+    actionable_date_keys = null
 } = {}) {
     const rows = Array.isArray(weekRows) ? [...weekRows] : [];
     const orderedRows = rows.slice().sort((left, right) =>
@@ -87,6 +88,8 @@ function resolveWeeklyHrWorkflow({
         : [];
     const expectedDates = Array.isArray(expected_date_keys)
         ? uniqueDateKeys(expected_date_keys) : naturalWeekDates;
+    const actionableDateSet = Array.isArray(actionable_date_keys)
+        ? new Set(uniqueDateKeys(actionable_date_keys)) : null;
     const blockingReasons = [];
     const warnings = [];
 
@@ -154,9 +157,11 @@ function resolveWeeklyHrWorkflow({
         const date = dateKeyUtc(row.hmeromhnia);
         const facts = resolveDailyActualWorkFacts(row);
         actualFactsByDate.set(date, facts);
-        blockingReasons.push(...(facts.reasons || []));
+        const dateIsActionable = !actionableDateSet || actionableDateSet.has(date);
+        if (dateIsActionable) blockingReasons.push(...(facts.reasons || []));
         warnings.push(...(facts.warnings || []));
-        if ((facts.warnings || []).includes('INCOMPLETE_CARD_INTERVAL') &&
+        if (dateIsActionable &&
+            (facts.warnings || []).includes('INCOMPLETE_CARD_INTERVAL') &&
             facts.cardVerificationStatus !== 'HR_APPROVED_ORPHAN') {
             blockingReasons.push('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE');
         }

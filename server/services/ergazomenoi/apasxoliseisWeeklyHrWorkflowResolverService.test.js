@@ -83,7 +83,9 @@ function resolve(rows, options = {}) {
         selected_repo_transfers: options.selected_repo_transfers || [],
         remaining_possible_leave_review_completed:
             options.remaining_possible_leave_review_completed ?? false,
-        profile_changed_inside_week: options.profile_changed_inside_week === true
+        profile_changed_inside_week: options.profile_changed_inside_week === true,
+        expected_date_keys: options.expected_date_keys ?? null,
+        actionable_date_keys: options.actionable_date_keys ?? null
     });
 }
 
@@ -288,5 +290,24 @@ assert.ok(!mixedOpen.blocking_reasons.includes('PROFILE_CHANGED_INSIDE_WEEK'));
 // Existing immutability remains intact.
 assert.ok(Object.isFrozen(transfer));
 assert.ok(Object.isFrozen(transfer.repo_transfer_candidates));
+
+// A context-only daily card defect remains available to weekly facts/warnings,
+// but is not an actionable blocker for the requested period.
+const contextOnlyOrphan = { ...workRow(DATES[4]), cards_apo_ora_01: '09:00',
+    cards_eos_ora_01: '', cards_ores_ergasias: 0, ores_ergasias_apologistika: 0 };
+const scopedContextOnly = resolve(weekWith(contextOnlyOrphan), {
+    actionable_date_keys: DATES.slice(0, 4)
+});
+assert.ok(!scopedContextOnly.blocking_reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+assert.ok(!scopedContextOnly.blocking_reasons.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+assert.ok(scopedContextOnly.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
+
+const unscopedContextOnly = resolve(weekWith(contextOnlyOrphan));
+assert.ok(unscopedContextOnly.blocking_reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+assert.ok(unscopedContextOnly.blocking_reasons.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
 
 console.log('weekly HR workflow resolver tests passed (11 locked scenarios)');
