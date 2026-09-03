@@ -2069,6 +2069,8 @@ async function runWeeklyRepoPostCheck({
 
     const periodStart = clampDateStartUtc(apoDate);
     const periodEnd = clampDateEndUtc(eosDate);
+    const naturalContextStart = startOfWeekMondayUtc(periodStart);
+    const naturalContextEnd = endOfWeekSundayUtc(periodEnd);
 
     const employeeQuery = {
         team: sessionTeam,
@@ -2131,11 +2133,11 @@ async function runWeeklyRepoPostCheck({
             kodikos: mongoose.trusted({ $in: kodikoi }),
             $or: mongoose.trusted([
                 {
-                    hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({ $lte: periodEnd }),
+                    hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({ $lte: naturalContextEnd }),
                     $or: mongoose.trusted([
                         {
                             hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
-                                $gte: periodStart
+                                $gte: naturalContextStart
                             })
                         },
                         { hmeromhnia_isxyos_oron_ergasias_eos: null }
@@ -2143,11 +2145,11 @@ async function runWeeklyRepoPostCheck({
                 },
                 {
                     hmeromhnia_isxyos_oron_ergasias_apo: null,
-                    hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({ $lte: periodEnd }),
+                    hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({ $lte: naturalContextEnd }),
                     $or: mongoose.trusted([
                         {
                             hmeromhnia_allaghs_orarioy_eos: mongoose.trusted({
-                                $gte: periodStart
+                                $gte: naturalContextStart
                             })
                         },
                         { hmeromhnia_allaghs_orarioy_eos: null }
@@ -2157,7 +2159,7 @@ async function runWeeklyRepoPostCheck({
                     // Fallback για ιστορικά records που έχουν μόνο ημερομηνία αλλαγής σύμβασης.
                     hmeromhnia_isxyos_oron_ergasias_apo: null,
                     hmeromhnia_allaghs_orarioy_apo: null,
-                    hmeromhnia_allaghs_symbashs: mongoose.trusted({ $lte: periodEnd })
+                    hmeromhnia_allaghs_symbashs: mongoose.trusted({ $lte: naturalContextEnd })
                 }
             ])
         })
@@ -2194,8 +2196,8 @@ async function runWeeklyRepoPostCheck({
         company_kod: companyId,
         kodikos: mongoose.trusted({ $in: kodikoi }),
         hmeromhnia: mongoose.trusted({
-            $gte: periodStart,
-            $lte: periodEnd
+            $gte: naturalContextStart,
+            $lte: naturalContextEnd
         })
     };
 
@@ -2217,15 +2219,20 @@ async function runWeeklyRepoPostCheck({
         .sort({ kodikos: 1, hmeromhnia: 1 })
         .lean();
 
-    const rows = loadedRows.filter((row) => {
+    const weeklyContextRows = loadedRows.filter((row) => {
         const employee = employeesByKodikos.get(String(row.kodikos || ''));
         return employee
             ? isDateWithinEmploymentPeriod(row.hmeromhnia, employee)
             : false;
     });
 
+    const rows = weeklyContextRows.filter((row) => {
+        const rowDate = clampDateStartUtc(row.hmeromhnia).getTime();
+        return rowDate >= periodStart.getTime() && rowDate <= periodEnd.getTime();
+    });
+
     const postCheckArgiesDateSet = new Set(
-        rows
+        weeklyContextRows
             .filter((row) => row.argia === true || row.argia_apologistika === true)
             .map((row) => dateKeyUtc(row.hmeromhnia))
     );
@@ -2273,8 +2280,8 @@ async function runWeeklyRepoPostCheck({
             team: sessionTeam,
             employees,
             etos: String(periodStart.getUTCFullYear()),
-            periodStart,
-            periodEnd,
+            periodStart: naturalContextStart,
+            periodEnd: naturalContextEnd,
             normalHistoryByEmployeeKey: postCheckHistoryByEmployeeKey,
             borrowedProfileContexts: borrowedProfileContexts || undefined
         });
@@ -2299,6 +2306,7 @@ async function runWeeklyRepoPostCheck({
         eosDate,
         employees,
         rows,
+        weeklyContextRows,
         istorikoRowsByKodikos,
         companyPolicyRules,
         postCheckArgiesDateSet,

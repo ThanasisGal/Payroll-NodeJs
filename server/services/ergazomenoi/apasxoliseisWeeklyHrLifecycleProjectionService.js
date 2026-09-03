@@ -556,6 +556,7 @@ function buildWeeklyHrLifecycleProjection({
         effectiveProfile,
         effectiveProfilesByDate,
         expectedDateKeys,
+        actionableDateKeys: actionableDateSet ? [...actionableDateSet] : null,
         companyKod: scope.company_kod || rows[0]?.company_kod || '',
         companyPolicyRules
     });

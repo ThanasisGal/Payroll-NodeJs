@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
     buildWeeklyRepoPostCheckWritePlan
 } = require('./apasxoliseisWeeklyPostCheckWritePlanService');
@@ -202,6 +204,53 @@ assert.equal(update.apologistiko_biblio, true);
 assert.equal(update.apo_ora_01_apologistika, '10:00');
 assert.equal(update.eos_ora_01_apologistika, '20:00');
 OVERLAPPING_LEGAL_FIELDS.forEach((field) => assert.equal(update[field], 0));
+
+// A requested period may start inside a natural week. The surrounding rows are
+// analysis-only context; the canonical Sunday seventh day must still generate
+// its actionable in-period detailed illegal-overtime update.
+const boundaryContextRows = [
+    row('2026-03-30', 7, false),
+    row('2026-03-31', 7, false),
+    row('2026-04-01', 7, false),
+    row('2026-04-02', 7, false),
+    row('2026-04-03', 7, false),
+    row('2026-04-04', 7, false),
+    row('2026-04-05', 4.98, true, ['12:30', '19:10'])
+];
+result = buildWeeklyRepoPostCheckWritePlan({
+    sessionTeam: 'THA',
+    companyId: 'company',
+    apoDate: new Date('2026-04-01T00:00:00.000Z'),
+    eosDate: new Date('2026-04-30T23:59:59.999Z'),
+    employees: [employee()],
+    rows: boundaryContextRows.slice(2),
+    weeklyContextRows: boundaryContextRows,
+    istorikoRowsByKodikos: new Map(),
+    companyPolicyRules: [],
+    postCheckArgiesDateSet: new Set(),
+    noCardsDisplayContext: {},
+    appliedProtectionContext: { entriesByRowId: {} },
+    appliedProtectionReasonsByWeek: new Map(),
+    buildWeeklyIllegalOvertimeUpdate: illegalUpdate
+});
+update = updateFor(result, '2026-04-05');
+assert.deepEqual(ILLEGAL_FIELDS.map((field) => update[field]), [0, 0, 4.98, 0]);
+assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 4.98);
+assert.ok(result.bulkOps.every(({ updateOne }) =>
+    !boundaryContextRows.slice(0, 2).some((contextRow) => contextRow._id === updateOne.filter._id)
+));
+const controllerSource = fs.readFileSync(path.resolve(__dirname,
+    '../../controllers/ergazomenoi/erganhController.js'), 'utf8');
+const postCheckRunner = controllerSource.slice(
+    controllerSource.indexOf('async function runWeeklyRepoPostCheck'),
+    controllerSource.indexOf('\nfunction normalizeEmploymentTypeForAdditionalWork')
+);
+assert.match(postCheckRunner,
+    /const naturalContextStart = startOfWeekMondayUtc\(periodStart\)/);
+assert.match(postCheckRunner,
+    /hmeromhnia:[\s\S]*?\$gte: naturalContextStart,[\s\S]*?\$lte: naturalContextEnd/);
+assert.match(postCheckRunner,
+    /buildWeeklyRepoPostCheckWritePlan\(\{[\s\S]*?rows,[\s\S]*?weeklyContextRows,/);
 
 const overlayRows = week([7, 7, 7, 7, 7, 7, 4], { 6: ['22:00', '02:00'] });
 Object.assign(overlayRows[5], { kathgoria_ergasias: 'ΕΡΓ',

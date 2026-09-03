@@ -129,6 +129,8 @@ function buildSeventhDayAttendanceUpdate(row = {}) {
 /**
  * Builds the exact Phase-C post-check Mongo write plan. `rows` must be the rows
  * reloaded after the first calculation-stage ProdhlomenaOraria bulkWrite.
+ * `weeklyContextRows` may additionally contain the surrounding natural-week
+ * rows; they participate in weekly analysis but never broaden the write loop.
  * This function performs no persistence and does not support pre-first-stage rows.
  */
 function buildWeeklyRepoPostCheckWritePlan({
@@ -138,6 +140,7 @@ function buildWeeklyRepoPostCheckWritePlan({
     eosDate,
     employees = [],
     rows = [],
+    weeklyContextRows = rows,
     istorikoRowsByKodikos = new Map(),
     companyPolicyRules = [],
     postCheckArgiesDateSet = new Set(),
@@ -157,6 +160,13 @@ function buildWeeklyRepoPostCheckWritePlan({
     const rowsByEmployeeAndDate = new Map();
     for (const row of rows) {
         rowsByEmployeeAndDate.set(`${row.kodikos}|${dateKeyUtc(row.hmeromhnia)}`, row);
+    }
+    const contextRowsByEmployeeAndDate = new Map();
+    for (const row of weeklyContextRows) {
+        contextRowsByEmployeeAndDate.set(
+            `${row.kodikos}|${dateKeyUtc(row.hmeromhnia)}`,
+            row
+        );
     }
 
     const bulkOps = [];
@@ -181,7 +191,11 @@ function buildWeeklyRepoPostCheckWritePlan({
             }
             const weekFullyInsideEmployment = isWeekFullyWithinEmploymentPeriod(week.weekStart, erg);
             const weeklyProfileInfo = getWeeklyRepoProfileInfo({
-                week,
+                week: {
+                    ...week,
+                    weekStart: week.naturalWeekStart,
+                    weekEnd: week.naturalWeekEnd
+                },
                 istorikoRows,
                 ergazomenos: erg,
                 resolveProfileForDate: typeof resolveProfileForDate === 'function'
@@ -193,8 +207,11 @@ function buildWeeklyRepoPostCheckWritePlan({
             const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
             const previousProfile = weeklyProfileInfo.previousProfile || {};
             const weekRows = [];
-            for (let day = clampDateStartUtc(week.weekStart); day <= week.weekEnd; day = addDaysUtc(day, 1)) {
-                const row = rowsByEmployeeAndDate.get(`${erg.kodikos}|${dateKeyUtc(day)}`);
+            for (let day = clampDateStartUtc(week.naturalWeekStart);
+                day <= week.naturalWeekEnd; day = addDaysUtc(day, 1)) {
+                const row = contextRowsByEmployeeAndDate.get(
+                    `${erg.kodikos}|${dateKeyUtc(day)}`
+                );
                 if (row) weekRows.push(row);
             }
             const automaticSixthSeventhAnalysis = weekFullyInsideEmployment
