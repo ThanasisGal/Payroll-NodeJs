@@ -67,6 +67,55 @@ assert.deepEqual(JSON.parse(JSON.stringify(crossMonthScope)), {
     period_start: '2026-06-01', period_end: '2026-06-30'
 });
 assert.equal(scopeSandbox.helpers.formatStage1DateKey('2026-06-02'), '02/06/2026');
+
+function lifecyclePayload(employeeKodikos, weekStart, status, pendingCount = 0) {
+    return {
+        scope: { employee_kodikos: employeeKodikos, week_start: weekStart },
+        lifecycle_projection: { stages: { stage1: {
+            business_status: status, pending_count: pendingCount
+        } } }
+    };
+}
+const cardOnlyRows = [
+    { _id: '0008-row', employee_id: 'employee-0008', kodikos: '0008',
+        ypokatasthma: '0000', hmeromhnia: '2026-04-24' },
+    { _id: '0009-row', employee_id: 'employee-0009', kodikos: '0009',
+        ypokatasthma: '0000', hmeromhnia: '2026-04-26' },
+    { _id: '0010-row', employee_id: 'employee-0010', kodikos: '0010',
+        ypokatasthma: '0000', hmeromhnia: '2026-04-28' }
+];
+const blockedLifecyclePayloads = [
+    lifecyclePayload('0008', '2026-04-20', 'BLOCKED'),
+    lifecyclePayload('0009', '2026-04-20', 'BLOCKED'),
+    lifecyclePayload('0010', '2026-04-27', 'BLOCKED')
+];
+const cardOnlyScopes = scopeSandbox.helpers.buildWeeklyHrStage1Scopes(
+    cardOnlyRows,
+    '2026-04-01',
+    '2026-04-30',
+    blockedLifecyclePayloads
+);
+assert.equal(cardOnlyScopes.size, 3);
+assert.deepEqual([...cardOnlyScopes.values()].map((scope) => scope.employee_kodikos).sort(),
+    ['0008', '0009', '0010']);
+
+const possibleLeaveAndLifecycle = [{
+    ...cardOnlyRows[0], kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE'
+}];
+assert.equal(scopeSandbox.helpers.buildWeeklyHrStage1Scopes(
+    possibleLeaveAndLifecycle,
+    '2026-04-01',
+    '2026-04-30',
+    [blockedLifecyclePayloads[0]]
+).size, 1);
+
+assert.equal(scopeSandbox.helpers.buildWeeklyHrStage1Scopes(
+    [cardOnlyRows[0]],
+    '2026-04-01',
+    '2026-04-30',
+    [lifecyclePayload('0008', '2026-04-20', 'COMPLETED')]
+).size, 0);
+
 const comparatorStart = source.indexOf('function compareWeeklyHrStage1Payloads');
 const comparatorEnd = source.indexOf('function stage1RowForDate', comparatorStart);
 const comparatorSandbox = {};

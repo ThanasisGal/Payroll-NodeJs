@@ -8470,7 +8470,12 @@ function isWeeklyHrStage1RelevantRow(row) {
         row?.apousia_apologistika === true;
 }
 
-function buildWeeklyHrStage1Scopes(rows = [], searchStart = '', searchEnd = '') {
+function buildWeeklyHrStage1Scopes(
+    rows = [],
+    searchStart = '',
+    searchEnd = '',
+    lifecyclePayloads = []
+) {
     const relevantEmployees = new Set(rows.filter(isWeeklyHrStage1RelevantRow)
         .map((row) => String(row?.employee_id || '')).filter(Boolean));
     const scopes = new Map();
@@ -8479,6 +8484,22 @@ function buildWeeklyHrStage1Scopes(rows = [], searchStart = '', searchEnd = '') 
             const scope = naturalWeekScopeForRow(row, searchStart, searchEnd);
             if (scope) scopes.set(weeklyHrStage1Key(scope), scope);
         });
+    const unresolvedStage1Statuses = new Set(['BLOCKED', 'OPEN', 'STALE']);
+    (Array.isArray(lifecyclePayloads) ? lifecyclePayloads : []).forEach((payload) => {
+        const lifecycleScope = payload?.scope || {};
+        const status = payload?.lifecycle_projection?.stages?.stage1?.business_status;
+        if (!unresolvedStage1Statuses.has(status)) return;
+        const employeeKodikos = String(lifecycleScope.employee_kodikos || '').trim();
+        const weekStart = stage1DateKey(lifecycleScope.week_start);
+        const matchingRow = rows.find((row) =>
+            String(row?.kodikos || '').trim() === employeeKodikos &&
+            naturalWeekScopeForRow(row, searchStart, searchEnd)?.week_start === weekStart
+        );
+        const scope = matchingRow
+            ? naturalWeekScopeForRow(matchingRow, searchStart, searchEnd)
+            : null;
+        if (scope) scopes.set(weeklyHrStage1Key(scope), scope);
+    });
     return scopes;
 }
 
@@ -9446,7 +9467,12 @@ async function refreshWeeklyHrStage1Scope(scope) {
 async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' } = {}) {
     const container = document.getElementById('weeklyHrStage1Container');
     if (!container) return;
-    const scopes = buildWeeklyHrStage1Scopes(rows, search_start, search_end);
+    const scopes = buildWeeklyHrStage1Scopes(
+        rows,
+        search_start,
+        search_end,
+        currentCanonicalLifecyclePayloads
+    );
     container.innerHTML = '';
     weeklyHrStage1Scopes.clear();
     weeklyHrStage1RowsById.clear();

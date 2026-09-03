@@ -104,10 +104,11 @@ function getTyposEbdomadasFromHmeres(hmeres) {
 }
 
 function normalizeWeeklyWorkdaysValue(value) {
-    if (value === 5 || value === 6) return value;
+    if (Number.isSafeInteger(value) && value >= 1 && value <= 6) return value;
     if (typeof value !== 'string') return null;
 
     const raw = value.trim().toUpperCase();
+    if (/^[1-6]$/.test(raw)) return Number(raw);
     if (['5', '5HMERH', '5ΗΜΕΡΗ', '5ΗΜΕΡΟ'].includes(raw)) return 5;
     if (['6', '6HMERH', '6ΗΜΕΡΗ', '6ΗΜΕΡΟ'].includes(raw)) return 6;
     return null;
@@ -219,12 +220,16 @@ function buildFallbackTerms(ergazomenos = {}) {
     };
 }
 
-function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}) {
-    const hmeres = toNumberOrZero(record.hmeres_ergasias_ebdomadas);
+function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}, previousRecords = []) {
+    const historyHmeres = [record, ...previousRecords]
+        .map((row) => normalizeWeeklyWorkdaysValue(row.hmeres_ergasias_ebdomadas))
+        .find((value) => value !== null);
+    const effectiveHmeres = historyHmeres ??
+        resolveEffectiveWeeklyWorkdays(fallbackErgazomenos) ?? 0;
     const ores = toNumberOrZero(record.ores_ergasias_ebdomadas);
     const mo =
         toNumberOrZero(record.mo_oron_hmerhsias_ergasias) ||
-        (hmeres > 0 ? +(ores / hmeres).toFixed(4) : 0);
+        (effectiveHmeres > 0 ? +(ores / effectiveHmeres).toFixed(4) : 0);
     const employmentType = resolveEmploymentTypeValue(record);
 
     return {
@@ -249,7 +254,7 @@ function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}) {
         eidikh_periptosh:
             record.eidikh_periptosh || fallbackErgazomenos.eidikh_periptosh || '',
 
-        hmeres_ergasias_ebdomadas: hmeres,
+        hmeres_ergasias_ebdomadas: effectiveHmeres,
         ores_ergasias_ebdomadas: ores,
         mo_oron_hmerhsias_ergasias: mo,
 
@@ -290,7 +295,7 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
         return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
     });
 
-    return buildTermsFromHistoryRecord(matchingRows[0], ergazomenos);
+    return buildTermsFromHistoryRecord(matchingRows[0], ergazomenos, matchingRows.slice(1));
 }
 
 module.exports = {
