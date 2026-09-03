@@ -179,6 +179,7 @@ function analyzeWeeklySixthSeventhDay({
     effectiveProfile = {},
     effectiveProfilesByDate = null,
     expectedDateKeys = null,
+    actionableDateKeys = null,
     hourlyRate = null,
     canonicalRepoDayIdentitiesOverride = null,
     allowDeclaredRepoIdentityOverride = false,
@@ -272,11 +273,17 @@ function analyzeWeeklySixthSeventhDay({
             })
         }))
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
-    const factReasons = [...new Set(dailyFacts.flatMap((day) => day.reasons))];
+    const actionableDateSet = Array.isArray(actionableDateKeys)
+        ? new Set(actionableDateKeys.map(dateKeyUtc).filter(Boolean)) : null;
+    const actionableDailyFacts = actionableDateSet
+        ? dailyFacts.filter((day) => actionableDateSet.has(day.hmeromhnia))
+        : dailyFacts;
+    const factReasons = [...new Set(actionableDailyFacts.flatMap((day) => day.reasons))];
     if (factReasons.length > 0) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: factReasons, warnings: [], dailyFacts });
     }
-    if (dailyFacts.some((day) => !['READY', 'HR_APPROVED_ORPHAN'].includes(day.cardVerificationStatus))) {
+    if (actionableDailyFacts.some((day) =>
+        !['READY', 'HR_APPROVED_ORPHAN'].includes(day.cardVerificationStatus))) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,

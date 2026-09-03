@@ -818,8 +818,19 @@ function orphanAt(rows, index) {
     });
 }
 
+function aprilBoundaryFiveDayWeek(kodikos) {
+    const rows = week(kodikos, '2026-04-27');
+    for (const index of [5, 6]) Object.assign(rows[index], {
+        kathgoria_ergasias: 'ΑΝ', kathgoria_ergasias_apologistika: 'ΑΝ',
+        ores_ergasias: 0, ores_ergasias_apologistika: 0,
+        cards_ores_ergasias: 0, cards_apo_ora_01: '', cards_eos_ora_01: '',
+        apo_ora_01: '', eos_ora_01: '', repo: true, repo_apologistika: true
+    });
+    return rows;
+}
+
 const aprilContextOnlyOrphan = buildWeeklyHrLifecycleProjection({
-    weekRows: orphanAt(week('context-only', '2026-04-27'), 4),
+    weekRows: orphanAt(aprilBoundaryFiveDayWeek('context-only'), 4),
     effectiveProfile: profile,
     scope: aprilBoundaryScope,
     periodScope: aprilBoundaryPeriod
@@ -827,9 +838,15 @@ const aprilContextOnlyOrphan = buildWeeklyHrLifecycleProjection({
 assert.notEqual(aprilContextOnlyOrphan.stages.stage1.business_status, 'BLOCKED');
 assert.deepEqual(aprilContextOnlyOrphan.stages.stage1.period_slice.context_only_dates,
     ['2026-05-01', '2026-05-02', '2026-05-03']);
+assert.equal(aprilContextOnlyOrphan.stages.stage4.business_status, 'COMPLETED');
+assert.ok(!aprilContextOnlyOrphan.stages.stage4.blockers.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+assert.equal(aprilContextOnlyOrphan.stages.stage4.final_weekly_analysis.dailyFacts.length, 7);
+assert.ok(aprilContextOnlyOrphan.stages.stage4.final_weekly_analysis.dailyFacts.some((day) =>
+    day.hmeromhnia === '2026-05-01'));
 
 const aprilAuthoritativeOrphan = buildWeeklyHrLifecycleProjection({
-    weekRows: orphanAt(week('authoritative', '2026-04-27'), 1),
+    weekRows: orphanAt(aprilBoundaryFiveDayWeek('authoritative'), 1),
     effectiveProfile: profile,
     scope: aprilBoundaryScope,
     periodScope: aprilBoundaryPeriod
@@ -837,9 +854,12 @@ const aprilAuthoritativeOrphan = buildWeeklyHrLifecycleProjection({
 assert.equal(aprilAuthoritativeOrphan.stages.stage1.business_status, 'BLOCKED');
 assert.ok(aprilAuthoritativeOrphan.stages.stage1.blockers.includes(
     'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+assert.equal(aprilAuthoritativeOrphan.stages.stage4.business_status, 'BLOCKED');
+assert.ok(aprilAuthoritativeOrphan.stages.stage4.blockers.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
 
 const aprilBothOrphansRows = orphanAt(
-    orphanAt(week('both-orphans', '2026-04-27'), 1),
+    orphanAt(aprilBoundaryFiveDayWeek('both-orphans'), 1),
     4
 );
 const aprilBothOrphans = buildWeeklyHrLifecycleProjection({
@@ -853,11 +873,40 @@ assert.deepEqual([...aprilBothOrphans.stages.stage1.blockers].sort(), [
     'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION',
     'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'
 ].sort());
+assert.deepEqual(aprilBothOrphans.stages.stage4.blockers,
+    ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION']);
 
 const fullWeekUnscopedOrphan = buildWeeklyHrLifecycleProjection({
-    weekRows: orphanAt(week('unscoped-orphan', '2026-04-27'), 4),
+    weekRows: orphanAt(aprilBoundaryFiveDayWeek('unscoped-orphan'), 4),
     effectiveProfile: profile
 });
 assert.equal(fullWeekUnscopedOrphan.stages.stage1.business_status, 'BLOCKED');
+assert.equal(fullWeekUnscopedOrphan.stages.stage4.business_status, 'BLOCKED');
+assert.ok(fullWeekUnscopedOrphan.stages.stage4.blockers.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+
+const aprilContextSixthDayRows = aprilBoundaryFiveDayWeek('context-sixth-day');
+Object.assign(aprilContextSixthDayRows[5], {
+    kathgoria_ergasias: 'ΕΡΓ', kathgoria_ergasias_apologistika: 'ΕΡΓ',
+    ores_ergasias: 8, ores_ergasias_apologistika: 8,
+    cards_ores_ergasias: 8, cards_apo_ora_01: '09:00', cards_eos_ora_01: '17:00',
+    apo_ora_01: '09:00', eos_ora_01: '17:00', repo: false, repo_apologistika: false
+});
+const aprilContextSixthDay = buildWeeklyHrLifecycleProjection({
+    weekRows: aprilContextSixthDayRows, effectiveProfile: profile,
+    scope: aprilBoundaryScope, periodScope: aprilBoundaryPeriod
+});
+assert.equal(aprilContextSixthDay.stages.stage4.business_status, 'COMPLETED');
+assert.equal(aprilContextSixthDay.stages.stage4.final_weekly_analysis.sixthDay.hmeromhnia,
+    '2026-05-02');
+
+const aprilWeekGlobalBlocker = buildWeeklyHrLifecycleProjection({
+    weekRows: aprilContextSixthDayRows,
+    effectiveProfile: { ...profile, pososto_prosayxhshs_6hs_hmeras: null },
+    scope: aprilBoundaryScope, periodScope: aprilBoundaryPeriod
+});
+assert.equal(aprilWeekGlobalBlocker.stages.stage4.business_status, 'BLOCKED');
+assert.deepEqual(aprilWeekGlobalBlocker.stages.stage4.blockers,
+    ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE']);
 
 console.log('weekly HR derived lifecycle projection tests passed');

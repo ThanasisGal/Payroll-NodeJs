@@ -754,6 +754,43 @@ test('η απλή PDF ανακεφαλαίωση χρησιμοποιεί τις
     assert.equal(rows.grandTotal.seventh, report.summary.totals.seventhDayHours.toFixed(2));
 });
 
+test('το production-pattern 0031 μεταφέρει 4.98 detailed illegal holiday hours σε PDF και XLSX projections', () => {
+    const report = buildEmploymentReviewReportProjection({ rows: [row({
+        kodikos: '0031',
+        employeeName: 'ΣΑΛΑΠΑ ΕΥΣΤΑΘΙΑ',
+        hmeromhnia: new Date('2026-04-05T00:00:00.000Z'),
+        ores_nominhs_yperorias_apologistika: 13.19,
+        ores_paranomhs_yperorias_apologistika: 0,
+        ores_paranomhs_yperorias_nyxtas_apologistika: 0,
+        ores_paranomhs_yperorias_argion_apologistika: 4.98,
+        ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0,
+        orphan_card_resolution_preview: null,
+        orphan_card_resolution: null
+    })] });
+
+    assert.deepEqual([
+        report.daily[0].values.ores_paranomhs_yperorias_apologistika,
+        report.daily[0].values.ores_paranomhs_yperorias_nyxtas_apologistika,
+        report.daily[0].values.ores_paranomhs_yperorias_argion_apologistika,
+        report.daily[0].values.ores_paranomhs_yperorias_argion_nyxtas_apologistika
+    ], [0, 0, 4.98, 0]);
+    assert.equal(report.employees[0].totals.ores_paranomhs_yperorias_argion_apologistika,
+        4.98);
+    assert.equal(report.summary.totals.ores_paranomhs_yperorias_argion_apologistika,
+        4.98);
+
+    const pdfSummary = buildSimplePdfSummaryRows(report);
+    assert.match(pdfSummary.employees[0].illegal, /Σύνολο: 4,98/);
+    assert.match(pdfSummary.employees[0].illegal, /Αργία: 4,98/);
+    assert.match(pdfSummary.employees[0].legal, /Σύνολο: 13,19/);
+
+    const workbook = buildEmploymentReviewWorkbook(report);
+    const dailySheet = workbook.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
+    const illegalCell = dailySheet.getRow(3).getCell(16).value;
+    assert.match(illegalCell, /Σύνολο: 4,98/);
+    assert.match(illegalCell, /Αργία: 4,98/);
+});
+
 test('η γραμματοσειρά PDF ανακεφαλαίωσης είναι ακριβώς μία στιγμή μεγαλύτερη από την ημερήσια', () => {
     assert.equal(DAILY_DETAIL_FONT_SIZE, 7.2);
     assert.equal(SUMMARY_FONT_SIZE, 8.2);

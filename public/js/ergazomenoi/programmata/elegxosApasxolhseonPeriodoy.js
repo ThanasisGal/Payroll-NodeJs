@@ -1373,7 +1373,10 @@ function renderSixthDayCardsBadge(row = {}) {
 
 function resolveSeventhDayRowPresentation(
     row = {},
-    lifecyclePayloads = [...weeklyHrStage1Payloads.values()]
+    lifecyclePayloads = [
+        ...weeklyHrStage1Payloads.values(),
+        ...currentCanonicalLifecyclePayloads
+    ]
 ) {
     const unresolvedPresentation = {
         ...row,
@@ -1390,11 +1393,16 @@ function resolveSeventhDayRowPresentation(
         const stage4 = item?.lifecycle_projection?.stages?.stage4;
         const analysis = stage4?.final_weekly_analysis;
         const seventhDay = analysis?.seventhDay;
+        const scopeBranch = String(scope.ypokatasthma || '').trim();
+        const authoritativeDates = item?.lifecycle_projection
+            ?.employment_date_scope?.authoritative_date_set;
+        const actionable = !Array.isArray(authoritativeDates) ||
+            authoritativeDates.includes(rowDate);
         return String(scope.employee_kodikos || '').trim() === employeeKodikos &&
-            String(scope.ypokatasthma || '').trim() === branch &&
+            (!scopeBranch || scopeBranch === branch) &&
+            actionable &&
             stage4?.final_weekly_analysis_available === true &&
             analysis?.status === 'READY' &&
-            seventhDay?.severity === 'SERIOUS_VIOLATION' &&
             stage1DateKey(seventhDay?.hmeromhnia) === rowDate;
     });
     const seventhDay = payload?.lifecycle_projection?.stages?.stage4
@@ -1412,13 +1420,12 @@ function resolveSeventhDayRowPresentation(
 
 function renderSeventhDayBadges(row = {}) {
     const presentation = resolveSeventhDayRowPresentation(row);
-    if (presentation.is_seventh_day !== true ||
-        presentation.seventh_day_severity !== 'SERIOUS_VIOLATION') {
-        return '';
-    }
-    return '<div class="mt-1 review-seventh-day-badges">' +
-        '<span class="badge text-bg-warning me-1">7η ημέρα εργασίας</span>' +
-        '<span class="badge text-bg-danger">ΣΟΒΑΡΗ ΠΑΡΑΒΑΣΗ</span></div>';
+    if (presentation.is_seventh_day !== true) return '';
+    return '<div class="d-flex flex-column align-items-center gap-1 mt-1 review-seventh-day-badges">' +
+        '<span class="badge text-bg-warning">7η ημέρα εργασίας</span>' +
+        (presentation.seventh_day_severity === 'SERIOUS_VIOLATION'
+            ? '<span class="badge text-bg-danger">ΣΟΒΑΡΗ ΠΑΡΑΒΑΣΗ</span>' : '') +
+        '</div>';
 }
 
 function renderWeeklySeventhDayValue(deviation = {}) {
@@ -2110,7 +2117,8 @@ function createEmptyTotals() {
         ores_prostheths_ergasias_apologistika: 0,
         yperergasia: 0,
         nomimiYperoria: 0,
-        paranomiYperoria: 0
+        paranomiYperoria: 0,
+        uiYperoria: 0
     };
 }
 
@@ -2141,6 +2149,10 @@ function sumParanomiYperoria(row) {
     );
 }
 
+function sumUiYperoria(row) {
+    return sumNomimiYperoria(row) + sumParanomiYperoria(row);
+}
+
 function addRowToTotals(totals, row) {
     totals.ores_ergasias_apologistika += effectiveWorkHoursValue(row);
     totals.ores_apoysias_apologistika += num(row.ores_apoysias_apologistika);
@@ -2151,6 +2163,7 @@ function addRowToTotals(totals, row) {
     totals.yperergasia += sumYperergasia(row);
     totals.nomimiYperoria += sumNomimiYperoria(row);
     totals.paranomiYperoria += sumParanomiYperoria(row);
+    totals.uiYperoria += sumUiYperoria(row);
 }
 
 function appendEmployeeTotalsRow(tbody, totals, groupId) {
@@ -2171,7 +2184,7 @@ function appendEmployeeTotalsRow(tbody, totals, groupId) {
         <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
         <td class="fw-bold">${hours(totals.yperergasia)}</td>
-        <td class="fw-bold">${hours(totals.nomimiYperoria + totals.paranomiYperoria)}</td>
+        <td class="fw-bold">${hours(totals.uiYperoria)}</td>
     `;
 
     tbody.appendChild(tr);
@@ -2261,10 +2274,16 @@ function renderDeviationNoteCell(dev) {
         return '<div>Δεν εφαρμόζεται έλεγχος 6ης/7ης ημέρας για τη συγκεκριμένη εβδομάδα.</div>';
     }
 
-    const reasons = Array.isArray(lifecycleAnalysis.reasons)
-        ? lifecycleAnalysis.reasons
-        : (Array.isArray(dev.sixth_seventh_day_reasons)
-            ? dev.sixth_seventh_day_reasons : []);
+    const lifecycleReasons = Array.isArray(lifecycleAnalysis.reasons)
+        ? lifecycleAnalysis.reasons : [];
+    const reasons = lifecycleReasons.length > 0
+        ? lifecycleReasons
+        : [...new Set([
+            ...(Array.isArray(dev.sixth_seventh_day_reasons)
+                ? dev.sixth_seventh_day_reasons : []),
+            ...(Array.isArray(dev.canonical_reasons) ? dev.canonical_reasons : []),
+            ...(Array.isArray(dev.repo_transfer_reasons) ? dev.repo_transfer_reasons : [])
+        ])];
     if (status === 'NEEDS_HR_DECISION') {
         const stage4ReasonLabels = {
             CARD_VERIFICATION_PENDING:
@@ -2274,11 +2293,18 @@ function renderDeviationNoteCell(dev) {
             CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC:
                 'Δεν μπορεί να προσδιοριστεί με ασφάλεια ποιες ημέρες αποτελούν τις ημέρες ανάπαυσης.'
         };
+        const hasSixthSeventhReasons = Array.isArray(dev.sixth_seventh_day_reasons) &&
+            dev.sixth_seventh_day_reasons.length > 0;
         const messages = reasons.map((reason) =>
-            stage4ReasonLabels[reason] || reviewHrReasonLabel(reason)
+            (lifecycleReasons.length > 0 || hasSixthSeventhReasons
+                ? stage4ReasonLabels[reason] : null) ||
+                reviewHrReasonLabel(reason)
         ).filter(Boolean);
-        return renderReviewHrReasonList([...new Set(messages)]) ||
+        const renderedReasons = renderReviewHrReasonList([...new Set(messages)]) ||
             `<div>${escapeHtml(reviewHrUnknownReasonLabel)}</div>`;
+        const humanNote = dev.note && !looksLikeInternalReviewCode(dev.note)
+            ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : '';
+        return renderedReasons + humanNote;
     }
 
     const sixthDay = lifecycleAnalysis.sixthDay || {};
@@ -2343,10 +2369,6 @@ function hasProfileChangeDeviation(deviations = []) {
         Array.isArray(deviations) &&
         deviations.some((dev) => dev.profile_changed_inside_week === true)
     );
-}
-
-function isHrVisibleDeviation(deviation = {}) {
-    return String(deviation.status || '').trim() !== 'OPEN_WEEK_PENDING_COMPLETION';
 }
 
 function hasAdeiaSuggestion(row) {
@@ -2417,7 +2439,30 @@ function isResolvedWeeklySelectionAmbiguity(
 }
 
 function isHrVisibleDeviation(deviation = {}) {
-    return String(deviation.status || '').trim() !== 'OPEN_WEEK_PENDING_COMPLETION';
+    const stage4 = weeklyLifecyclePayloadForDeviation(deviation)
+        ?.lifecycle_projection?.stages?.stage4;
+    return stage4?.business_status === 'BLOCKED' ||
+        String(deviation.status || '').trim() !== 'OPEN_WEEK_PENDING_COMPLETION';
+}
+
+function renderStage4StatusCell(dev = {}) {
+    const stage4 = weeklyLifecyclePayloadForDeviation(dev)
+        ?.lifecycle_projection?.stages?.stage4;
+    if (stage4?.business_status !== 'BLOCKED') return '';
+
+    const reasons = [...new Set([
+        ...(Array.isArray(stage4.blockers) ? stage4.blockers : []),
+        ...(Array.isArray(stage4.pending_reasons) ? stage4.pending_reasons : []),
+        ...(Array.isArray(stage4.final_weekly_analysis?.reasons)
+            ? stage4.final_weekly_analysis.reasons : [])
+    ].map((reason) => String(reason || '').trim()).filter(Boolean))];
+    const messages = [...new Set(reasons.map(reviewHrReasonLabel).filter(Boolean))];
+
+    return '<span class="badge text-bg-danger">ΜΠΛΟΚΑΡΙΣΜΕΝΟ</span>' +
+        (messages.length
+            ? `<div class="small text-danger-emphasis mt-1">${messages
+                .map((message) => `<div>${escapeHtml(message)}</div>`).join('')}</div>`
+            : '');
 }
 
 function hasAdeiaSuggestion(row) {
@@ -2467,7 +2512,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td class="text-end fw-bold">${escapeHtml(resolveFinalWeeklyNonWorkDays(dev))}</td>
                     <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
                     <td class="text-end">${escapeHtml(renderWeeklySeventhDayValue(dev))}</td>
-                    <td class="weekly-deviation-comment">${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && dev.requires_new_hr_decision !== false && canRecordCanonicalEmploymentDecision()
+                    <td class="weekly-deviation-comment">${renderStage4StatusCell(dev)}${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && dev.requires_new_hr_decision !== false && canRecordCanonicalEmploymentDecision()
                         ? `<div class="mt-2">${Number(dev.canonical_identical_group_count || 0) > 1
                             ? `<div class="small fw-semibold mb-1">${escapeHtml(dev.canonical_identical_group_count)} όμοιες περιπτώσεις</div>` : ''}<button type="button" class="btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary"
                             data-employee-kodikos="${escapeHtml(dev.kodikos || '')}"
@@ -2535,6 +2580,8 @@ const canonicalStatusLabels = {
 };
 
 const canonicalReasonLabels = {
+    ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION:
+        'Υπάρχει ορφανό χτύπημα κάρτας που πρέπει να επιλυθεί πριν συνεχιστεί ο έλεγχος.',
     PROFILE_CHANGED_INSIDE_WEEK: 'Αλλαγή όρων εργασίας μέσα στην εβδομάδα',
     CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.',
     CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC:
@@ -2818,7 +2865,7 @@ function appendGrandTotalsRow(tbody, totals) {
         <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
         <td class="fw-bold">${hours(totals.yperergasia)}</td>
-        <td class="fw-bold">${hours(totals.nomimiYperoria + totals.paranomiYperoria)}</td>
+        <td class="fw-bold">${hours(totals.uiYperoria)}</td>
     `;
 
     tbody.appendChild(tr);
@@ -3554,7 +3601,7 @@ function renderReviewRows(rows = [], deviations = []) {
 
         const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
 
-        const yperoriaTotal = sumNomimiYperoria(row) + sumParanomiYperoria(row);
+        const yperoriaTotal = sumUiYperoria(row);
 
         tr.innerHTML = `
             <td>${renderReviewDateCell(row)}</td>
@@ -3565,12 +3612,12 @@ function renderReviewRows(rows = [], deviations = []) {
                 ${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}
                 ${renderSixthDayCardsBadge(row)}
             </td>
-            <td${tdClass(rowPresentation.apologistiko.className)}>
+            <td${tdClass(`${rowPresentation.apologistiko.className} text-center`)}>
                 ${rowPresentation.apologistiko.text}
                 ${renderDeclaredRepoWithCardsBadge(row)}
-                ${renderSeventhDayBadges(row)}
                 ${renderApprovedOrphanAuditBadge(row)}
                 ${renderScenarioBadge(row, rowPresentation.badgeState)}
+                ${renderSeventhDayBadges(row)}
             </td>
             <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
                 ${renderHoursCell(row)}
@@ -8474,7 +8521,8 @@ function buildWeeklyHrStage1Scopes(
     rows = [],
     searchStart = '',
     searchEnd = '',
-    lifecyclePayloads = []
+    lifecyclePayloads = [],
+    stage4Rows = []
 ) {
     const relevantEmployees = new Set(rows.filter(isWeeklyHrStage1RelevantRow)
         .map((row) => String(row?.employee_id || '')).filter(Boolean));
@@ -8500,6 +8548,19 @@ function buildWeeklyHrStage1Scopes(
             : null;
         if (scope) scopes.set(weeklyHrStage1Key(scope), scope);
     });
+    (Array.isArray(stage4Rows) ? stage4Rows : [])
+        .filter((item) => stage1DateKey(item?.seventh_day_date))
+        .forEach((item) => {
+            const employeeKodikos = String(item.kodikos || item.employee_kodikos || '').trim();
+            const weekStart = stage1DateKey(item.week_apo || item.weekStart);
+            const matchingRow = rows.find((row) =>
+                String(row?.kodikos || row?.employee_kodikos || '').trim() === employeeKodikos &&
+                naturalWeekScopeForRow(row, searchStart, searchEnd)?.week_start === weekStart
+            );
+            const scope = matchingRow
+                ? naturalWeekScopeForRow(matchingRow, searchStart, searchEnd) : null;
+            if (scope) scopes.set(weeklyHrStage1Key(scope), scope);
+        });
     return scopes;
 }
 
@@ -9471,7 +9532,8 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
         rows,
         search_start,
         search_end,
-        currentCanonicalLifecyclePayloads
+        currentCanonicalLifecyclePayloads,
+        currentReviewDeviations
     );
     container.innerHTML = '';
     weeklyHrStage1Scopes.clear();

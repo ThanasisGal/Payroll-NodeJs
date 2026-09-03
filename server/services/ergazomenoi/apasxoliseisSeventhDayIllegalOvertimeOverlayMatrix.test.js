@@ -124,4 +124,30 @@ for (const scenario of cases) {
     });
 }
 
+// Production pattern: 0031 / 05-04-2026 is a Sunday, with a canonical
+// authoritative illegal total of 4.98 hours and daytime card evidence.
+// Classification comes from the actual interval/date, not from a hard-coded
+// holiday bucket.
+const productionPattern0031 = row(
+    '2026-04-05',
+    4.98,
+    [['12:30', '19:10']],
+    true
+);
+const mappedProductionPattern0031 = buildWeeklyIllegalOvertimeUpdate(
+    productionPattern0031,
+    {},
+    4.98,
+    new Set(),
+    { clearOverlappingLegal: true }
+);
+const productionPatternBuckets = Object.values(ILLEGAL_FIELDS)
+    .map((field) => mappedProductionPattern0031[field]);
+assert.deepEqual(productionPatternBuckets, [0, 0, 4.98, 0]);
+assert.equal(Number(productionPatternBuckets.reduce((sum, value) => sum + value, 0).toFixed(2)),
+    4.98);
+OVERLAPPING_LEGAL_FIELDS.forEach((field) => {
+    assert.equal(mappedProductionPattern0031[field], 0, `0031 pattern: ${field} leakage`);
+});
+
 console.log('seventh-day illegal-overtime overlay matrix tests passed');
