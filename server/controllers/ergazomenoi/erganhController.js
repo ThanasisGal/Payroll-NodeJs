@@ -2212,6 +2212,9 @@ async function runWeeklyRepoPostCheck({
                 'kathgoria_adeias kathgoria_adeias_apologistika argia argia_apologistika ' +
                 'astheneia astheneia_apologistika apologistiko_biblio is_locked ' +
                 'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                'apo_ora_01_apologistika eos_ora_01_apologistika ' +
+                'apo_ora_02_apologistika eos_ora_02_apologistika ' +
+                'apo_ora_03_apologistika eos_ora_03_apologistika ' +
                 'ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
                 'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ' +
                 'ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika'

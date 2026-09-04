@@ -113,6 +113,20 @@ function isMisthotosEmployee(profile = {}) {
 }
 
 function buildSeventhDayAttendanceUpdate(row = {}) {
+    const approvedAsCards = {};
+    for (let pairIndex = 1; pairIndex <= 3; pairIndex += 1) {
+        const pairNumber = String(pairIndex).padStart(2, '0');
+        approvedAsCards[`cards_apo_ora_${pairNumber}`] =
+            row[`apo_ora_${pairNumber}_apologistika`];
+        approvedAsCards[`cards_eos_ora_${pairNumber}`] =
+            row[`eos_ora_${pairNumber}_apologistika`];
+    }
+    const approvedVerification = resolveCardPairVerification(approvedAsCards);
+    if (approvedVerification.completePairs.length > 0 &&
+        approvedVerification.unresolvedPairs.length === 0) {
+        return { apologistiko_biblio: true };
+    }
+
     const verification = resolveCardPairVerification(row);
     const update = { apologistiko_biblio: true };
     for (let pairIndex = 1; pairIndex <= 3; pairIndex += 1) {
