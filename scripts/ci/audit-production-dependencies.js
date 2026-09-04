@@ -255,10 +255,34 @@ function runAuditCommand() {
     return parseJson(command.stdout, 'npm audit output');
 }
 
+function acquireAuditReport(runAttempt = runAuditCommand) {
+    let firstFailure;
+    try {
+        const audit = runAttempt();
+        validateAuditSchema(audit);
+        return audit;
+    } catch (error) {
+        firstFailure = error;
+    }
+
+    try {
+        const audit = runAttempt();
+        validateAuditSchema(audit);
+        return audit;
+    } catch (error) {
+        const reason = String(error?.message || firstFailure?.message || 'unknown error')
+            .replace(/\s+/g, ' ')
+            .slice(0, 200);
+        throw contractError(
+            `Production dependency audit unavailable after 2 attempts: ${reason}`
+        );
+    }
+}
+
 function main() {
     try {
         const config = parseJson(fs.readFileSync(EXCEPTIONS_PATH, 'utf8'), 'Exception file');
-        const result = evaluateAudit(runAuditCommand(), config, new Date());
+        const result = evaluateAudit(acquireAuditReport(), config, new Date());
         printSummary(result);
         if (!result.passed) process.exitCode = 1;
     } catch (error) {
@@ -276,5 +300,6 @@ module.exports = {
     validateAuditSchema,
     extractHighCriticalFindings,
     evaluateAudit,
-    runAuditCommand
+    runAuditCommand,
+    acquireAuditReport
 };
