@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-    buildWeeklyRepoPostCheckWritePlan
+    buildWeeklyRepoPostCheckWritePlan,
+    buildSeventhDayAttendanceUpdate
 } = require('./apasxoliseisWeeklyPostCheckWritePlanService');
 const {
     buildWeeklyIllegalOvertimePersistenceMapping,
@@ -192,6 +193,7 @@ let update = updateFor(result, '2026-08-08');
 assert.equal(update.compensation_breakdown_apologistika.hours.sixthDayHours, 8);
 assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 1);
 assert.deepEqual(ILLEGAL_FIELDS.map((field) => update[field]), [1, 0, 0, 0]);
+assert.equal(Object.hasOwn(update, 'apo_ora_01_apologistika'), false);
 
 const seventhRows = week([7, 7, 7, 7, 7, 7, 10]);
 Object.assign(seventhRows[5], { kathgoria_ergasias: 'ΕΡΓ',
@@ -215,7 +217,10 @@ const boundaryContextRows = [
     row('2026-04-02', 7, false),
     row('2026-04-03', 7, false),
     row('2026-04-04', 7, false),
-    row('2026-04-05', 4.98, true, ['12:30', '19:10'])
+    row('2026-04-05', 4.98, true, ['12:30', '17:59'], {
+        apo_ora_01_apologistika: '12:30',
+        eos_ora_01_apologistika: '19:10'
+    })
 ];
 result = buildWeeklyRepoPostCheckWritePlan({
     sessionTeam: 'THA',
@@ -236,6 +241,16 @@ result = buildWeeklyRepoPostCheckWritePlan({
 update = updateFor(result, '2026-04-05');
 assert.deepEqual(ILLEGAL_FIELDS.map((field) => update[field]), [0, 0, 4.98, 0]);
 assert.equal(update.compensation_breakdown_apologistika.hours.illegalOvertimeHours, 4.98);
+OVERLAPPING_LEGAL_FIELDS.forEach((field) => assert.equal(update[field], 0));
+assert.equal(Object.hasOwn(update, 'apo_ora_01_apologistika'), false);
+assert.equal(Object.hasOwn(update, 'eos_ora_01_apologistika'), false);
+
+const recoveredApproved = buildSeventhDayAttendanceUpdate({
+    apo_ora_01_apologistika: '12:30', eos_ora_01_apologistika: '',
+    cards_apo_ora_01: '12:30', cards_eos_ora_01: '17:59'
+});
+assert.equal(recoveredApproved.apo_ora_01_apologistika, '12:30');
+assert.equal(recoveredApproved.eos_ora_01_apologistika, '17:59');
 assert.ok(result.bulkOps.every(({ updateOne }) =>
     !boundaryContextRows.slice(0, 2).some((contextRow) => contextRow._id === updateOne.filter._id)
 ));
@@ -251,6 +266,7 @@ assert.match(postCheckRunner,
     /hmeromhnia:[\s\S]*?\$gte: naturalContextStart,[\s\S]*?\$lte: naturalContextEnd/);
 assert.match(postCheckRunner,
     /buildWeeklyRepoPostCheckWritePlan\(\{[\s\S]*?rows,[\s\S]*?weeklyContextRows,/);
+assert.match(postCheckRunner, /apo_ora_01_apologistika eos_ora_01_apologistika/);
 
 const overlayRows = week([7, 7, 7, 7, 7, 7, 4], { 6: ['22:00', '02:00'] });
 Object.assign(overlayRows[5], { kathgoria_ergasias: 'ΕΡΓ',
