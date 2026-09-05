@@ -2,7 +2,8 @@ const assert = require('assert');
 const {
     parseJson,
     validateExceptionConfig,
-    evaluateAudit
+    evaluateAudit,
+    acquireAuditReport
 } = require('./audit-production-dependencies');
 
 const NOW = new Date('2026-07-25T12:00:00.000Z');
@@ -64,6 +65,46 @@ const exact = {
 function mustFail(name, fn, pattern) {
     assert.throws(fn, pattern, name);
 }
+
+function auditAttempts(responses) {
+    let executions = 0;
+    return {
+        run() {
+            const response = responses[executions++];
+            if (response instanceof Error) throw response;
+            return response;
+        },
+        executions: () => executions
+    };
+}
+
+let attempts = auditAttempts([audit([])]);
+assert.strictEqual(evaluateAudit(acquireAuditReport(attempts.run), config([]), NOW).passed, true);
+assert.strictEqual(attempts.executions(), 1);
+
+attempts = auditAttempts([new Error('temporary registry failure'), audit([])]);
+assert.strictEqual(evaluateAudit(acquireAuditReport(attempts.run), config([]), NOW).passed, true);
+assert.strictEqual(attempts.executions(), 2);
+
+attempts = auditAttempts([{ error: { code: 'E503' } }, new Error('registry unavailable')]);
+mustFail(
+    'two operational failures fail closed',
+    () => acquireAuditReport(attempts.run),
+    /Production dependency audit unavailable after 2 attempts: registry unavailable/
+);
+assert.strictEqual(attempts.executions(), 2);
+
+attempts = auditAttempts([
+    audit([{ package: 'new-package', advisoryId: 'GHSA-1111-2222-3333', severity: 'high' }])
+]);
+assert.strictEqual(evaluateAudit(acquireAuditReport(attempts.run), config([]), NOW).passed, false);
+assert.strictEqual(attempts.executions(), 1);
+
+attempts = auditAttempts([
+    audit([{ package: 'critical-package', advisoryId: 'GHSA-4444-5555-6666', severity: 'critical' }])
+]);
+assert.strictEqual(evaluateAudit(acquireAuditReport(attempts.run), config([]), NOW).passed, false);
+assert.strictEqual(attempts.executions(), 1);
 
 assert.strictEqual(evaluateAudit(audit([]), config([]), NOW).passed, true);
 mustFail('stale production exception', () => evaluateAudit(audit([]), config(), NOW), /Stale exception/);
