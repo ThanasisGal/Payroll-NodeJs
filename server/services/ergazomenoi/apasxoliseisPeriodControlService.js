@@ -438,8 +438,14 @@ async function runWithStaleStage2MaterializationWriteFence({ scope, expectedToke
     });
 }
 async function fencePeriodForWrite({ scope: input, expectedToken = null, now = new Date(), session,
-    periodControlModel = PeriodControlModel }) {
+    periodControlModel = PeriodControlModel, expectedWriteFenceVersion }) {
     if (!session) throw periodError('PERIOD_CONTROL_TRANSACTION_REQUIRED', 503, 'Δεν είναι διαθέσιμη η ασφαλής μεταβολή περιόδου.');
+    if (expectedWriteFenceVersion !== undefined && (
+        !Number.isSafeInteger(expectedWriteFenceVersion) || expectedWriteFenceVersion < 0 ||
+        expectedToken?.exists !== true || expectedToken.stored_status !== 'OPEN' ||
+        !Number.isSafeInteger(expectedToken.version) || expectedToken.version < 1
+    )) throw periodError('PERIOD_CONTROL_INVALID_WRITE_FENCE_TOKEN', 409,
+        'Απαιτείται έγκυρη έκδοση ανοικτής περιόδου και write fence.');
     const scope = normalizeScope(input);
     const deadline = calculatePeriodDeadline(scope.period_end);
     const overdue = isPastDeadline(deadline, now);
@@ -462,6 +468,7 @@ async function fencePeriodForWrite({ scope: input, expectedToken = null, now = n
     } else {
         const filter = { ...filterForScope(scope), status: 'OPEN' };
         if (expectedToken?.exists === true) filter.version = Number(expectedToken.version);
+        if (expectedWriteFenceVersion !== undefined) filter.write_fence_version = expectedWriteFenceVersion;
         record = await periodControlModel.findOneAndUpdate(filter, {
             $inc: { write_fence_version: 1 }, $set: { updated_at: now }
         }, { new: true, session });
@@ -489,12 +496,13 @@ async function fencePeriodForWrite({ scope: input, expectedToken = null, now = n
 }
 async function runWithPeriodWriteFence({ scope, expectedToken = null, now = new Date(), work,
     periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
-    transactionRunner = runTransaction }) {
+    transactionRunner = runTransaction, expectedWriteFenceVersion }) {
     if (typeof work !== 'function') throw new TypeError('Period-fenced work callback is required.');
     if (typeof indexGuard === 'function') await indexGuard();
     try {
         return await transactionRunner(async (session) => {
-            const fenced = await fencePeriodForWrite({ scope, expectedToken, now, session, periodControlModel });
+            const fenced = await fencePeriodForWrite({ scope, expectedToken, now, session,
+                periodControlModel, expectedWriteFenceVersion });
             return { result: await work({ session, state: fenced.state, token: fenced.token }), ...fenced };
         });
     } catch (error) {

@@ -147,17 +147,19 @@ function mergeProtectionContexts(contexts, executions = null) {
 async function loadAppliedRepoTransferProtectionContext({
     scopes,
     executionModel = ExecutionModel,
-    includeExecutions = false
+    includeExecutions = false,
+    session
 } = {}) {
     const normalizedScopes = normalizeScopes(scopes);
     const query = buildAppliedExecutionQuery(normalizedScopes);
     if (!query) {
         return deepFreeze({ entriesByRowId: {}, diagnostics: [], hasConflicts: false });
     }
-    const executions = await executionModel
+    let executionQuery = executionModel
         .find(trustServerGeneratedInOperators(query))
-        .select(EXECUTION_PROTECTION_FIELDS.join(' '))
-        .lean();
+        .select(EXECUTION_PROTECTION_FIELDS.join(' '));
+    if (session != null) executionQuery = executionQuery.session(session);
+    const executions = await executionQuery.lean();
     const contexts = normalizedScopes.map((scope) =>
         buildAppliedRepoTransferProtectionContext({
             executions: executions.filter(

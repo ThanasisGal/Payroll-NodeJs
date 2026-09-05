@@ -194,3 +194,27 @@ test('multi-company batch remains one query with exact scoped clauses', async ()
     assert.equal(model.calls.query.$or[0].company_kod, 'COMPANY');
     assert.equal(model.calls.query.$or[1].company_kod, 'OTHER');
 });
+
+
+test('optional session reaches execution query before lean without changing protection', async () => {
+    const legacy = fakeModel([execution()]);
+    const expected = await loadAppliedRepoTransferProtectionContext({ scopes: [scope()], executionModel: legacy });
+    // Legacy fake intentionally has no session method: omission remains valid.
+    const suppliedSession = { transaction: true };
+    const calls = [];
+    const executionModel = { find(query) {
+        assert.deepEqual(query, legacy.calls.query);
+        return { select(projection) {
+            assert.equal(projection, legacy.calls.projection);
+            return { session(actual) {
+                assert.equal(actual, suppliedSession); calls.push('session');
+                return { async lean() { calls.push('lean'); return [execution()]; } };
+            } };
+        } };
+    } };
+    const result = await loadAppliedRepoTransferProtectionContext({
+        scopes: [scope()], executionModel, session: suppliedSession
+    });
+    assert.deepEqual(calls, ['session', 'lean']);
+    assert.deepEqual(result, expected);
+});

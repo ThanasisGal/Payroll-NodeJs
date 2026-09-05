@@ -48,11 +48,21 @@ test('manual review keeps safe nonidentity updates and its existing audit flow',
     assert.ok(manual.includes('newValues'));
 });
 
-test('single-row generic restore prefetches and sanitizes audit oldValues before persistence', () => {
+test('restore authorizes both set and unset with fresh protection inside the transaction', () => {
     assert.equal((restore.match(/loadAppliedProtectionForRows\(\[oldRecord\]\)/g) || []).length, 1);
-    assert.equal((restore.match(/sanitizeAppliedRepoTransferUpdate\(\{/g) || []).length, 1);
+    assert.equal((restore.match(/sanitizeAppliedRepoTransferUpdate\(\{/g) || []).length, 2);
     assert.ok(restore.indexOf('sanitizeAppliedRepoTransferUpdate({') < restore.indexOf('.updateOne('));
-    assert.ok(restore.includes('update: requestedRestoreValues'));
+    const fence = restore.indexOf('await runWithPeriodWriteFence({');
+    const rowRead = restore.indexOf('const fresh = await', fence);
+    const contextRead = restore.indexOf('const freshProtectionContext = await loadAppliedRepoTransferProtectionContext({', rowRead);
+    const sanitize = restore.indexOf('const freshProtection = sanitizeAppliedRepoTransferUpdate({', contextRead);
+    const finalSet = restore.indexOf('Object.entries(freshProtection.sanitizedUpdate)', sanitize);
+    assert.ok(fence >= 0 && rowRead > fence && contextRead > rowRead && sanitize > contextRead && finalSet > sanitize);
+    assert.match(restore.slice(rowRead, contextRead), /\.session\(session\)\.lean\(\)/);
+    assert.match(restore.slice(contextRead, sanitize), /loadedRowIds: \[fresh\._id\]/);
+    assert.match(restore.slice(contextRead, sanitize), /session\s*\}\)/);
+    assert.ok(restore.includes('protectionContext: freshProtectionContext'));
+    assert.ok(restore.includes('update: { ...requestedRestoreValues, ...unsetProtectionInput }'));
     assert.ok(restore.includes('$set: restoreValues'));
 });
 

@@ -12042,12 +12042,29 @@ class erganhController {
 
             const periodAccess = await assertActiveEmploymentReviewPeriodNormal(req, oldRecord.ypokatasthma, null, { start: oldRecord.hmeromhnia });
 
+            // Own undefined is not missing, but cannot be round-tripped by
+            // BSON audit persistence. Abort rather than silently omitting it.
+            const assertAuditRepresentable = (value) => {
+                if (value === undefined) throw Object.assign(new Error('Μη αναπαραστάσιμη τιμή ιστορικού.'),
+                    { code: 'REVIEW_AUDIT_UNREPRESENTABLE_VALUE', statusCode: 409 });
+                if (value && Object.getPrototypeOf(value) === Object.prototype && !Object.keys(value).length) {
+                    throw Object.assign(new Error('Το schema ιστορικού παραλείπει κενά αντικείμενα.'),
+                        { code: 'REVIEW_AUDIT_UNREPRESENTABLE_VALUE', statusCode: 409 });
+                }
+                if (value && typeof value === 'object') Object.values(value).forEach(assertAuditRepresentable);
+            };
             const requestedRestoreValues = { ...(audit.oldValues || {}) };
+            Object.values(requestedRestoreValues).forEach(assertAuditRepresentable);
+            const previouslyMissingKeys = Object.keys(audit.newValues || {})
+                .filter((key) => !Object.hasOwn(requestedRestoreValues, key));
+            // Validation only: own undefined attempts differ from every valid
+            // applied identity value. Never send these placeholders to MongoDB.
+            const unsetProtectionInput = Object.fromEntries(previouslyMissingKeys.map((key) => [key, undefined]));
             const appliedProtectionContext = await loadAppliedProtectionForRows([oldRecord]);
             const protectedRestoreUpdate = sanitizeAppliedRepoTransferUpdate({
                 rowId: oldRecord._id,
                 currentRow: oldRecord,
-                update: requestedRestoreValues,
+                update: { ...requestedRestoreValues, ...unsetProtectionInput },
                 protectionContext: appliedProtectionContext
             });
             if (blocksInteractiveAppliedIdentityChange(protectedRestoreUpdate)) {
@@ -12057,27 +12074,53 @@ class erganhController {
                         'Η επαναφορά θα άλλαζε ταυτότητα ρεπό που προστατεύεται από εφαρμοσμένη μεταφορά.'
                 });
             }
-            const restoreValues = { ...protectedRestoreUpdate.sanitizedUpdate };
-
-            restoreValues.is_locked = true;
-            restoreValues.locked_by = changedBy;
-            restoreValues.locked_at = new Date();
-
             await runWithPeriodWriteFence({
                 scope: periodAccess.scope,
                 expectedToken: periodAccess.token,
                 work: async ({ session }) => {
-                    await ProdhlomenaOrariaModel.updateOne(
+                    const fresh = await ProdhlomenaOrariaModel.findOne({
+                        _id: id, team: sessionTeam, company_kod: companyId
+                    }).session(session).lean();
+                    if (!fresh) throw Object.assign(new Error('Η εγγραφή δεν βρέθηκε.'), { statusCode: 409 });
+                    const freshProtectionContext = await loadAppliedRepoTransferProtectionContext({
+                        scopes: [{ team: fresh.team, company_kod: fresh.company_kod,
+                            ypokatasthma: fresh.ypokatasthma, loadedRowIds: [fresh._id] }],
+                        session
+                    });
+                    const freshProtection = sanitizeAppliedRepoTransferUpdate({
+                        rowId: fresh._id, currentRow: fresh,
+                        update: { ...requestedRestoreValues, ...unsetProtectionInput },
+                        protectionContext: freshProtectionContext
+                    });
+                    if (blocksInteractiveAppliedIdentityChange(freshProtection)) {
+                        throw Object.assign(new Error('Η επαναφορά συγκρούεται με προστατευμένη μεταφορά ρεπό.'),
+                            { statusCode: 409 });
+                    }
+                    const restoreValues = Object.fromEntries(Object.entries(freshProtection.sanitizedUpdate)
+                        .filter(([key]) => Object.hasOwn(requestedRestoreValues, key)));
+                    restoreValues.is_locked = true;
+                    restoreValues.locked_by = changedBy;
+                    restoreValues.locked_at = new Date();
+                    // Restore keeps its historical row-locking behavior. Lock
+                    // metadata must not appear in both $set and $unset.
+                    const unsetFields = previouslyMissingKeys.filter((key) => !Object.hasOwn(restoreValues, key));
+                    const restoreUpdate = { $set: restoreValues };
+                    if (unsetFields.length) restoreUpdate.$unset = Object.fromEntries(unsetFields.map((key) => [key, '']));
+                    const affectedFields = [...new Set([...Object.keys(restoreValues), ...unsetFields])];
+                    const beforeRestore = Object.fromEntries(affectedFields
+                        .filter((key) => Object.hasOwn(fresh, key)).map((key) => [key, fresh[key]]));
+                    Object.values(beforeRestore).forEach(assertAuditRepresentable);
+                    const result = await ProdhlomenaOrariaModel.updateOne(
                         { _id: id, team: sessionTeam, company_kod: companyId },
-                        { $set: restoreValues },
-                        { session }
+                        restoreUpdate, { session }
                     );
+                    if (result.matchedCount !== 1) throw Object.assign(new Error('Η εγγραφή άλλαξε.'), { statusCode: 409 });
                     await ProdhlomenaOrariaAuditModel.create([{
                         team: sessionTeam, company_kod: companyId,
                         prodhlomena_oraria_id: oldRecord._id, kodikos: oldRecord.kodikos,
                         ypokatasthma: oldRecord.ypokatasthma, hmeromhnia: oldRecord.hmeromhnia,
                         changedBy, reason: `RESTORE FROM AUDIT ${auditId}`,
-                        oldValues: audit.newValues || {}, newValues: restoreValues
+                        oldValues: beforeRestore, newValues: restoreValues
                     }], { session });
                 }
             });
