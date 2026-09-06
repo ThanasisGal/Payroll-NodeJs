@@ -314,8 +314,30 @@ const {
     getWeeklyCanonicalDecisionIndexState
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDecisionIndexGuardService');
 const {
-    buildWeeklyIllegalOvertimePersistenceMapping
-} = require('../../services/ergazomenoi/apasxoliseisWeeklyIllegalOvertimeMappingService');
+    timeToMinutesSafe,
+    minutesToTimeSafe,
+    hasTime,
+    addDaysUtc,
+    dateKeyUtc,
+    isSundayOrHoliday,
+    getBreakOffsetMinutes,
+    isDeclaredContinuousSchedule,
+    isCardsContinuousSchedule,
+    isZeroLengthTimePair,
+    getRawCardIntervals,
+    getRawDailyCardsMinutes,
+    shouldSubtractExternalBreak,
+    expandIntervalFromTimes,
+    emptyClassifiedMinutes,
+    addClassifiedMinute,
+    toHours,
+    buildWeeklyIllegalOvertimeUpdate,
+    getCardIntervals,
+    isMinuteNight,
+    isMinuteSundayOrHoliday,
+    getApologistikaIntervals,
+    getPayrollCalculationIntervals
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyIllegalOvertimeCalculationService');
 const {
     buildDailyCompensationBreakdown
 } = require('../../services/ergazomenoi/apasxoliseisDailyCompensationBreakdownService');
@@ -531,27 +553,9 @@ function diffHours(apo, eos) {
     return (eosMin - apoMin) / 60;
 }
 
-function timeToMinutesSafe(time) {
-    if (!time) return null;
 
-    const s = String(time).trim();
-    if (!/^\d{2}:\d{2}$/.test(s)) return null;
 
-    const [hh, mm] = s.split(':').map(Number);
-    if (isNaN(hh) || isNaN(mm)) return null;
 
-    return hh * 60 + mm;
-}
-
-function minutesToTimeSafe(totalMinutes) {
-    if (totalMinutes === null || totalMinutes === undefined) return '';
-
-    const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-    const hh = Math.floor(normalized / 60);
-    const mm = normalized % 60;
-
-    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-}
 
 function durationMinutesSafe(apoOra, eosOra) {
     const apo = timeToMinutesSafe(apoOra);
@@ -623,9 +627,7 @@ function checkEarlyOrLateCard(context, pairNo) {
     return {};
 }
 
-function hasTime(value) {
-    return value !== null && value !== undefined && String(value).trim() !== '';
-}
+
 
 function getRawDeclaredIntervals(rec) {
     return [
@@ -995,30 +997,11 @@ function checkNightHours(context) {
     };
 }
 
-function addDaysUtc(date, days) {
-    const d = new Date(date);
-    d.setUTCDate(d.getUTCDate() + days);
-    return d;
-}
 
-function dateKeyUtc(date) {
-    const d = new Date(date);
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(
-        d.getUTCDate()
-    ).padStart(2, '0')}`;
-}
 
-function isSundayOrHoliday(date, argiesDateSet) {
-    const d = new Date(date);
 
-    // Κυριακή σε UTC
-    const isSunday = d.getUTCDay() === 0;
 
-    // Αργία από ArgiesModel
-    const isHoliday = argiesDateSet.has(dateKeyUtc(d));
 
-    return isSunday || isHoliday;
-}
 
 function calculateSundayHolidayMinutesForInterval(baseDate, apoOra, eosOra, argiesDateSet) {
     const apo = timeToMinutesSafe(apoOra);
@@ -2423,75 +2406,15 @@ function isPartTimeEmployee(ergazomenos) {
     );
 }
 
-function getBreakOffsetMinutes(ergazomenos) {
-    const dialleimaEntos = ergazomenos.dialleima_entos_ektos_orarioy === true;
-    const dialleimaMinutes = parseInt(ergazomenos.dialleima_se_lepta || 0, 10) || 0;
 
-    return dialleimaEntos ? 0 : dialleimaMinutes;
-}
 
-function isDeclaredContinuousSchedule(rec) {
-    return (
-        hasTime(rec.apo_ora_01) &&
-        hasTime(rec.eos_ora_01) &&
-        !hasTime(rec.apo_ora_02) &&
-        !hasTime(rec.eos_ora_02) &&
-        !hasTime(rec.apo_ora_03) &&
-        !hasTime(rec.eos_ora_03)
-    );
-}
 
-function isCardsContinuousSchedule(rec) {
-    return (
-        hasTime(rec.cards_apo_ora_01) &&
-        hasTime(rec.cards_eos_ora_01) &&
-        !hasTime(rec.cards_apo_ora_02) &&
-        !hasTime(rec.cards_eos_ora_02) &&
-        !hasTime(rec.cards_apo_ora_03) &&
-        !hasTime(rec.cards_eos_ora_03)
-    );
-}
 
-function isZeroLengthTimePair(apoOra, eosOra) {
-    const apo = timeToMinutesSafe(apoOra);
-    const eos = timeToMinutesSafe(eosOra);
 
-    return apo !== null && eos !== null && apo === eos;
-}
 
-function getRawCardIntervals(rec) {
-    return [
-        {
-            index: 1,
-            apo: rec.cards_apo_ora_01,
-            eos: rec.cards_eos_ora_01
-        },
-        {
-            index: 2,
-            apo: rec.cards_apo_ora_02,
-            eos: rec.cards_eos_ora_02
-        },
-        {
-            index: 3,
-            apo: rec.cards_apo_ora_03,
-            eos: rec.cards_eos_ora_03
-        }
-    ]
-        .map((interval) => {
-            if (isZeroLengthTimePair(interval.apo, interval.eos)) return null;
 
-            const expanded = expandIntervalFromTimes(interval.apo, interval.eos);
 
-            if (!expanded) return null;
 
-            return {
-                ...interval,
-                start: expanded.start,
-                end: expanded.end
-            };
-        })
-        .filter(Boolean);
-}
 
 function normalizeZeroLengthCardPairs(rec = {}) {
     let normalized = rec;
@@ -2518,44 +2441,11 @@ function normalizeZeroLengthCardPairs(rec = {}) {
     return normalized;
 }
 
-function getRawDailyCardsMinutes(rec) {
-    return getRawCardIntervals(rec).reduce(
-        (total, interval) => total + Math.max(0, interval.end - interval.start),
-        0
-    );
-}
 
-function shouldSubtractExternalBreak(rec, ergazomenos) {
-    if (!ergazomenos) return false;
 
-    const breakMinutes = getBreakOffsetMinutes(ergazomenos);
 
-    if (breakMinutes <= 0) return false;
-    if (!isDeclaredContinuousSchedule(rec)) return false;
-    if (!isCardsContinuousSchedule(rec)) return false;
 
-    const rawCardsMinutes = getRawDailyCardsMinutes(rec);
 
-    // Αν οι πραγματικές ώρες καρτών μείον το διάλειμμα πέφτουν κάτω από 4 ώρες,
-    // δεν αφαιρούμε διάλειμμα για τη συγκεκριμένη ημερομηνία.
-    return rawCardsMinutes - breakMinutes >= 4 * 60;
-}
-
-function expandIntervalFromTimes(apoOra, eosOra) {
-    const apo = timeToMinutesSafe(apoOra);
-    const eos = timeToMinutesSafe(eosOra);
-
-    if (apo === null || eos === null) return null;
-
-    let start = apo;
-    let end = eos;
-
-    if (end <= start) {
-        end += 1440;
-    }
-
-    return { start, end };
-}
 
 function getDailyCardsMinutes(rec, ergazomenos = null) {
     return getCardIntervals(rec, ergazomenos).reduce(
@@ -2762,66 +2652,13 @@ function isRegularWorkingDayForOverwork(rec, ergazomenos = null) {
     return true;
 }
 
-function emptyClassifiedMinutes() {
-    return {
-        normal: 0,
-        night: 0,
-        holiday: 0,
-        holidayNight: 0
-    };
-}
 
-function addClassifiedMinute(bucket, rec, minuteFromBaseDate, argiesDateSet) {
-    const isNight = isMinuteNight(minuteFromBaseDate);
-    const isHoliday = isMinuteSundayOrHoliday(rec.hmeromhnia, minuteFromBaseDate, argiesDateSet);
 
-    if (isNight && isHoliday) {
-        bucket.holidayNight++;
-    } else if (isHoliday) {
-        bucket.holiday++;
-    } else if (isNight) {
-        bucket.night++;
-    } else {
-        bucket.normal++;
-    }
-}
 
-function toHours(minutes) {
-    return +(minutes / 60).toFixed(2);
-}
 
-function buildWeeklyIllegalOvertimeUpdate(
-    rec,
-    workTerms,
-    illegalOvertimeHours,
-    argiesDateSet,
-    options = {}
-) {
-    const targetMinutes = Math.max(0, Math.round(Number(illegalOvertimeHours || 0) * 60));
-    const workedMinutes = [];
 
-    for (const interval of getPayrollCalculationIntervals(rec, workTerms)) {
-        for (let minute = interval.start; minute < interval.end; minute++) {
-            workedMinutes.push(minute);
-        }
-    }
 
-    const illegalMinutes = workedMinutes.slice(Math.max(0, workedMinutes.length - targetMinutes));
-    const classified = emptyClassifiedMinutes();
-    for (const minute of illegalMinutes) {
-        addClassifiedMinute(classified, rec, minute, argiesDateSet);
-    }
 
-    return buildWeeklyIllegalOvertimePersistenceMapping(
-        {
-            normal: toHours(classified.normal),
-            night: toHours(classified.night),
-            holiday: toHours(classified.holiday),
-            holidayNight: toHours(classified.holidayNight)
-        },
-        { ...options, authoritativeTotalHours: Number(illegalOvertimeHours || 0) }
-    );
-}
 
 function chunkArray(arr, size = 300) {
     const chunks = [];
@@ -3132,53 +2969,15 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     return buildResult();
 }
 
-function getCardIntervals(rec, ergazomenos = null) {
-    const intervals = getRawCardIntervals(rec);
 
-    if (!shouldSubtractExternalBreak(rec, ergazomenos)) {
-        return intervals;
-    }
-
-    const breakMinutes = getBreakOffsetMinutes(ergazomenos);
-
-    return intervals
-        .map((interval) => {
-            if (interval.index !== 1) return interval;
-
-            const adjustedEnd = interval.end - breakMinutes;
-
-            if (adjustedEnd <= interval.start) {
-                return null;
-            }
-
-            return {
-                ...interval,
-                eos: minutesToTimeSafe(adjustedEnd),
-                end: adjustedEnd,
-                externalBreakSubtractedMinutes: breakMinutes
-            };
-        })
-        .filter(Boolean);
-}
 
 function expandIntervalMinutes(apoOra, eosOra) {
     return expandIntervalFromTimes(apoOra, eosOra);
 }
 
-function isMinuteNight(minuteFromBaseDate) {
-    const minute = minuteFromBaseDate % 1440;
 
-    // Νύχτα: 22:01 - 06:00.
-    // Πρακτικά σε λεπτά: >= 22:00 και <= 06:00.
-    return minute >= 22 * 60 || minute < 6 * 60;
-}
 
-function isMinuteSundayOrHoliday(baseDate, minuteFromBaseDate, argiesDateSet) {
-    const dayOffset = Math.floor(minuteFromBaseDate / 1440);
-    const d = addDaysUtc(baseDate, dayOffset);
 
-    return isSundayOrHoliday(d, argiesDateSet);
-}
 
 function calculateOverworkClassifiedMinutes(
     rec,
@@ -3305,38 +3104,7 @@ function getApologistikaMinutes(rec = {}) {
     );
 }
 
-function getApologistikaIntervals(rec = {}) {
-    return [
-        {
-            index: 1,
-            apo: rec.apo_ora_01_apologistika,
-            eos: rec.eos_ora_01_apologistika
-        },
-        {
-            index: 2,
-            apo: rec.apo_ora_02_apologistika,
-            eos: rec.eos_ora_02_apologistika
-        },
-        {
-            index: 3,
-            apo: rec.apo_ora_03_apologistika,
-            eos: rec.eos_ora_03_apologistika
-        }
-    ]
-        .map((interval) => {
-            const expanded = expandIntervalFromTimes(interval.apo, interval.eos);
 
-            if (!expanded) return null;
-
-            return {
-                ...interval,
-                start: expanded.start,
-                end: expanded.end,
-                source: 'APOLOGISTIKA'
-            };
-        })
-        .filter(Boolean);
-}
 
 function getEffectiveWorkIntervalsForApologistika(rec, ergazomenos = null) {
     const apologistikaIntervals = getApologistikaIntervals(rec);
@@ -3369,33 +3137,7 @@ function getEffectiveDailyWorkMinutesForApologistika(rec, ergazomenos = null) {
 // - Με πλήρεις κάρτες χρησιμοποιούμε τις πραγματικές κάρτες και μόνο ως
 //   fallback ήδη έγκυρα απολογιστικά διαστήματα.
 // ============================================================
-function getPayrollCalculationIntervals(rec, ergazomenos = null) {
-    const verification = resolveCardPairVerification(rec);
-    const apologistikaIntervals = getApologistikaIntervals(rec);
 
-    if (rec?.orphan_card_resolution?.status === 'HR_APPROVED' &&
-        apologistikaIntervals.length > 0) {
-        return apologistikaIntervals;
-    }
-
-    if (verification.hasUnresolvedCardEvidence) {
-        return verification.completePairs.map((pair) => ({
-            index: Number(pair.pairNumber),
-            apo: pair.start,
-            eos: pair.end,
-            start: pair.startMinutes,
-            end: pair.isOvernight ? pair.endMinutes + 1440 : pair.endMinutes,
-            source: 'CARD_PARTIALLY_VERIFIED'
-        }));
-    }
-
-    const rawIntervals = getCardIntervals(rec, ergazomenos);
-    if (rawIntervals.length > 0) {
-        return rawIntervals;
-    }
-
-    return apologistikaIntervals;
-}
 
 function getPayrollDailyWorkMinutes(rec, ergazomenos = null) {
     const grossMinutes = getPayrollCalculationIntervals(rec, ergazomenos).reduce(
