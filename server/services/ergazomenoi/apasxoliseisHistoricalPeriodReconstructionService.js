@@ -116,18 +116,44 @@ async function loadRows({ scope, start, end, fields, prodhlomenaModel = Prodhlom
         ypokatasthma: scope.ypokatasthma,
         hmeromhnia: mongoose.trusted({ $gte: start, $lte: end }) })
         .select(fields.join(' ')).sort({ kodikos: 1, hmeromhnia: 1, _id: 1 });
-    if (session && typeof query.session === 'function') query = query.session(session);
+    if (session) query = query.session(session);
     return typeof query.lean === 'function' ? query.lean() : query;
 }
 function hash(value) {
     return crypto.createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
 }
-async function calculateHolidayDependencies({ scope, start, end, rows, models = {} }) {
-    const employeeModel = models.employeeModel || ErgazomenoiModel;
-    const historyModel = models.historyModel === undefined
-        ? IstorikoProslhpseonAllagonModel : models.historyModel;
-    const companiesModel = models.companiesModel || CompaniesModel;
-    const argiesModel = models.argiesModel || ArgiesModel;
+// Adapt legacy dependency loaders without changing their queries or results.
+// One queue per dependency run also serializes provider Promise.all reads on a
+// transaction session. Without a session, preserve the original model objects.
+function sessionBoundDependencyModels(models, session) {
+    if (!session) return models;
+    let pending = Promise.resolve();
+    const bind = (model) => model && Object.fromEntries(['find', 'findOne'].map((method) => [
+        method, (...args) => {
+            const query = model[method](...args).session(session);
+            const adapter = {
+                select(...values) { query.select(...values); return adapter; },
+                sort(...values) { query.sort(...values); return adapter; },
+                lean() {
+                    const result = pending.then(() => query.lean());
+                    pending = result.then(() => undefined, () => undefined);
+                    return result;
+                }
+            };
+            return adapter;
+        }
+    ]));
+    return Object.fromEntries(Object.entries(models).map(([key, model]) => [key, bind(model)]));
+}
+async function calculateHolidayDependencies({ scope, start, end, rows, models = {}, session = null }) {
+    const { employeeModel, historyModel, companiesModel, argiesModel } =
+        sessionBoundDependencyModels({
+            employeeModel: models.employeeModel || ErgazomenoiModel,
+            historyModel: models.historyModel === undefined
+                ? IstorikoProslhpseonAllagonModel : models.historyModel,
+            companiesModel: models.companiesModel || CompaniesModel,
+            argiesModel: models.argiesModel || ArgiesModel
+        }, session);
     const codes = [...new Set(rows.map((row) => String(row.kodikos || '').trim()).filter(Boolean))];
     if (!codes.length) return { fingerprint: hash([]), legacy_compatible: true };
     const employees = await employeeModel.find({ team: scope.team, company_kod: scope.company_kod,
@@ -209,16 +235,21 @@ async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = Prodh
     session = null, models = {}, holidayDependencyResolver = calculateHolidayDependencies }) {
     const periodStart = dateOnly(scope.period_start), periodEnd = dateOnly(scope.period_end);
     const window = dependencyWindow(periodStart);
-    const [sourceRows, dependencyRows, resultRows] = await Promise.all([
-        loadRows({ scope, start: periodStart, end: periodEnd, fields: SOURCE_FIELDS, prodhlomenaModel, session }),
-        loadRows({ scope, start: window.start, end: window.end, fields: DEPENDENCY_FIELDS, prodhlomenaModel, session }),
-        loadRows({ scope, start: periodStart, end: periodEnd, fields: RESULT_FIELDS, prodhlomenaModel, session })
-    ]);
+    const rowLoads = [
+        () => loadRows({ scope, start: periodStart, end: periodEnd, fields: SOURCE_FIELDS, prodhlomenaModel, session }),
+        () => loadRows({ scope, start: window.start, end: window.end, fields: DEPENDENCY_FIELDS, prodhlomenaModel, session }),
+        () => loadRows({ scope, start: periodStart, end: periodEnd, fields: RESULT_FIELDS, prodhlomenaModel, session })
+    ];
+    const loaded = [];
+    if (session) {
+        for (const load of rowLoads) loaded.push(await load());
+    } else loaded.push(...await Promise.all(rowLoads.map((load) => load())));
+    const [sourceRows, dependencyRows, resultRows] = loaded;
     const dependencyStart = window.start || periodStart;
     const holidayRows = await loadRows({ scope, start: dependencyStart, end: periodEnd,
         fields: ['_id', 'kodikos', 'hmeromhnia'], prodhlomenaModel, session });
     const holiday = await holidayDependencyResolver({ scope, start: dependencyStart,
-        end: periodEnd, rows: holidayRows, models });
+        end: periodEnd, rows: holidayRows, models, session });
     const legacyDependencyFingerprint = fingerprintRows(dependencyRows, DEPENDENCY_FIELDS, {
         calculationSemanticsVersion: EMPLOYMENT_CALCULATION_SEMANTICS_VERSION
     });
