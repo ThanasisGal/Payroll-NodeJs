@@ -1,6 +1,7 @@
 const { Schema: _Schema, model } = require('mongoose');
 
 const Schema = _Schema;
+const { employmentProfileFields, attachEmploymentProfileValidation } = require('./employeeEmploymentProfileFields');
 
 const ErgazomenoiSchema = new Schema(
     {
@@ -344,6 +345,9 @@ ErgazomenoiSchema.index(
     { team: 1, company_kod: 1, kodikos: 1 },
     { partialFilterExpression: { archived: true } }
 );
+
+ErgazomenoiSchema.add(employmentProfileFields());
+attachEmploymentProfileValidation(ErgazomenoiSchema);
 
 const ErgazomenoiModel = model('Ergazomenoi', ErgazomenoiSchema);
 
@@ -859,6 +863,9 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
         collection: 'Istoriko_Proslhpseon_Allagon'
     }
 );
+
+IstorikoProslhpseonAllagonSchema.add(employmentProfileFields({ history: true }));
+attachEmploymentProfileValidation(IstorikoProslhpseonAllagonSchema);
 
 const IstorikoProslhpseonAllagonModel = model(
     'IstorikoProslhpseonAllagon',

@@ -1,7 +1,7 @@
-require('dotenv').config();
 const ExcelJS = require('exceljs');
 const mongoose = require('mongoose');
 const path = require('path');
+const { buildTblProsopExistingUpdate } = require('./server/utils/ergazomenoi/tblProsopImportUpdate');
 
 // ── Εισαγωγή του υπάρχοντος Model (ΟΧΙ νέο Schema) ───────────────────────────
 const { ErgazomenoiModel } = require('./server/models/ergazomenoi');
@@ -379,6 +379,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
 
 // ── Κύρια συνάρτηση ───────────────────────────────────────────────────────────
 async function main() {
+    require('dotenv').config();
     const PHASE = process.env.PHASE || '1';
     const FILE_PATH = path.resolve(process.env.EXCEL_PATH || './tblProsop.xlsx');
 
@@ -456,8 +457,11 @@ async function main() {
             const existing = await ErgazomenoiModel.findOne(filter).lean();
 
             if (existing) {
-                // ── UPDATE: replaceOne διατηρεί σειρά πεδίων ─────────────────
-                await ErgazomenoiModel.replaceOne(filter, doc);
+                // Update only supplied spreadsheet fields; retain insert defaults/local facts.
+                const update = buildTblProsopExistingUpdate(row, doc);
+                if (Object.keys(update.$set).length) {
+                    await ErgazomenoiModel.updateOne({ ...filter, _id: existing._id }, update);
+                }
                 updated++;
                 console.log(`  🔄  [UPDATE] ${doc.eponymo} ${doc.onoma} (AMKA: ${doc.amka})`);
             } else {
@@ -485,7 +489,10 @@ async function main() {
     console.log('👋  Αποσύνδεση από MongoDB Atlas\n');
 }
 
-main().catch((err) => {
+module.exports = { mapRowToDocument, buildTblProsopExistingUpdate };
+
+// Importing the mapper in tests never loads .env, Excel files or a database.
+if (require.main === module) main().catch((err) => {
     console.error('💥  Κρίσιμο σφάλμα:', err);
     process.exit(1);
 });
