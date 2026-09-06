@@ -165,7 +165,7 @@
 					</label>
 				</div>
 				<div class="col-1">
-					<input type="number" name="dialleima_se_lepta" id="dialleima_se_lepta" class="form-control input-contents right-align" value="<%= safe('dialleima_se_lepta') %>" min="0" max="45" />
+					<input type="number" name="dialleima_se_lepta" id="dialleima_se_lepta" class="form-control input-contents right-align" value="<%= recordData.dialleima_se_lepta ?? '' %>" min="0" max="30" />
 				</div>
 
 				<div class="col-0-3"></div>
@@ -192,7 +192,9 @@
 				</div>
 			</div>
 
-			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+			<%- include('../../../../employmentProfileBreakRows') %>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
 				<div class="col-2 left-align">
 					<label for="typos_orarioy" class="col-form-label label-font-size">
 					Τύπος Ωραρίου
@@ -295,7 +297,9 @@
 				</div>
 			</div>
 
-			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+			<%- include('../../../../employmentProfileArrangementRows') %>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
 				<div class="col-2 left-align">
 					<label for="apasxolhsh_gia_proth_fora" class="col-form-label label-font-size">
 					Απασχόληση για 1η φορά

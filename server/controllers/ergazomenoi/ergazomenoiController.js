@@ -1,3 +1,4 @@
+const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
 
@@ -862,6 +863,7 @@ class ergazomenoiController {
             }
 
             res.render('ergazomenoi/ergazomenoi/edit', {
+                employmentProfileUi: await getEmploymentProfileUiContext(),
                 locals,
                 perifereies,
                 companyData,
@@ -1271,6 +1273,7 @@ class ergazomenoiController {
 
             const data = await PerifereiesModel.find().sort('kodikos');
             res.render('ergazomenoi/ergazomenoi/add', {
+                employmentProfileUi: await getEmploymentProfileUiContext(),
                 locals,
                 companyData,
                 data,
