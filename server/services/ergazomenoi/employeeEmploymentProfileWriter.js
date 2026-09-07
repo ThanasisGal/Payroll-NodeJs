@@ -4,10 +4,13 @@ const mongoose = require('mongoose');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { IDENTITY_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged } = require('../../utils/ergazomenoi/employmentProfileTransition');
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
+// Selected internally from fresh transactional reads; callers cannot force it.
+const MODE_LEGACY_MAINTENANCE = 'MODE_LEGACY_MAINTENANCE';
 
 async function transactionCapability(connection) {
     const hello = await connection.db.admin().command({ hello: 1 });
@@ -136,10 +139,6 @@ async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, ope
 }
 
 
-const IDENTITY_FIELDS = ['hmeromhnia_proslhpshs', 'hmeromhnia_allaghs_symbashs',
-    'hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos',
-    'hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos',
-    'hmeromhnia_lhxhs_symbashs', 'hmeromhnia_apoxorhshs'];
 const HISTORY_CURRENT_FIELDS = new Set([...BASE_HISTORY_FIELDS, ...IDENTITY_FIELDS, ...C.FACT_FIELDS,
     'afora_allagh_oron_ergasias', 'afora_proslhpsh', 'afora_allagh_dialleimatos', 'hmeromhnia_isxyos_dialleimatos_apo',
     'kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas', 'apasxolhsh_basei_symbashs',
@@ -148,6 +147,19 @@ function cleanMaintenancePatch(patch = {}) {
     return Object.fromEntries(Object.entries(patch).filter(([field, value]) => value !== undefined &&
         !C.FACT_FIELDS.includes(field) && !['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
             'createdAt', T.ANCHOR, 'employment_profile_source'].includes(field)));
+}
+function legacyMaintenancePatch(patch = {}, stored, history = false) {
+    const changes = cleanMaintenancePatch(patch);
+    // Baseline current mapping included scalar profile facts; history did not.
+    // Never fill a missing legacy fact merely because the form supplied a default.
+    if (!history) for (const field of C.FACT_FIELDS) {
+        if (!NEW_CURRENT_FIELDS.includes(field) && Object.hasOwn(stored, field) && patch[field] !== undefined) changes[field] = patch[field];
+    }
+    for (const field of [...NEW_CURRENT_FIELDS, ...T.STANDARD_FIELDS]) {
+        if (NEW_CURRENT_FIELDS.includes(field) || (stored && !Object.hasOwn(stored, field))) delete changes[field];
+    }
+    if (history && patch.employment_profile_source !== undefined) changes.employment_profile_source = patch.employment_profile_source;
+    return changes;
 }
 function selectMaintenanceMode(rows, identity) {
     if (!identity || !IDENTITY_FIELDS.every(field => Object.hasOwn(identity, field))) C.invalid('historyIdentity', 'complete identity required');
@@ -195,8 +207,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             const datedRows = rows.filter((row) => effectiveStart(row));
             // Maintenance supplies existing server-mapped fields, never raw request data.
             // Resolve the exact identity inside the transaction, including on retries.
-            const patch = cleanMaintenancePatch(maintenance?.employeeChanges);
-            const historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
+            const legacyMaintenance = !editorOperation && maintenance && !newEmployee && !T.versioned(current, rows) &&
+                !semanticEmploymentProfileChanged(current, maintenance, input);
+            const patch = legacyMaintenance ? legacyMaintenancePatch(maintenance.employeeChanges, current) : cleanMaintenancePatch(maintenance?.employeeChanges);
+            let historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
             const selection = !editorOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION
                 ? selectMaintenanceMode(rows, maintenance.identity) : { mode, historyId };
             const selectedHistoryId = selection.historyId;
@@ -241,10 +255,11 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                         (!Object.prototype.hasOwnProperty.call(input, field) || input[field] === undefined));
                     if (missing.length) throw failure('EMPLOYEE_PROFILE_LEGACY_CORRECTION_REQUIRES_FACTS');
                 }
+                if (legacyMaintenance) historyPatch = legacyMaintenancePatch(maintenance.historyChanges, target, true);
                 const source = { ...(latest && !editorOperation ? { ...current, ...target } : target), ...historyPatch };
-                const snapshot = buildCompleteProfileSnapshot({ input, current: source, effectiveFrom: from });
-                const capturedBaseline = latest ? T.capture(current, rows, from) : null;
-                const facts = Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
+                const snapshot = legacyMaintenance ? {} : buildCompleteProfileSnapshot({ input, current: source, effectiveFrom: from });
+                const capturedBaseline = latest && !legacyMaintenance ? T.capture(current, rows, from) : null;
+                const facts = legacyMaintenance ? {} : Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
                 const currentChanges = latest ? { ...patch, ...facts, ...(capturedBaseline ? { [T.ANCHOR]: capturedBaseline } : {}) } :
                     Object.fromEntries(Object.entries(patch).filter(([field]) => !HISTORY_CURRENT_FIELDS.has(field)));
                 if (Object.keys(currentChanges).length) {
@@ -254,8 +269,8 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 }
                 // Include the existing Maintenance contract mapping; preserve all
                 // identity dates, sequence, creation time and surrounding rows.
-                const correction = { ...historyPatch, ...snapshot, afora_allagh_dialleimatos: true,
-                    hmeromhnia_isxyos_dialleimatos_apo: from };
+                const correction = legacyMaintenance ? { ...historyPatch } : { ...historyPatch, ...snapshot,
+                    afora_allagh_dialleimatos: true, hmeromhnia_isxyos_dialleimatos_apo: from };
                 // Corrections cannot move any identity date or overwrite the sequence.
                 for (const field of IDENTITY_FIELDS) delete correction[field];
                 if (editorOperation) {
@@ -276,20 +291,21 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 { $set: correction }, { session });
                 if (update.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_HISTORY_STALE');
                 result = { facts, history: { ...target, ...correction }, currentUpdated: latest,
-                    employee: { ...current, ...currentChanges }, mode: selection.mode };
+                    employee: { ...current, ...currentChanges }, mode: legacyMaintenance ? MODE_LEGACY_MAINTENANCE : selection.mode };
                 return;
             }
             if (datedRows.some((row) => effectiveStart(row) >= from)) throw failure('EMPLOYEE_PROFILE_NON_APPEND_CHANGE');
             const openRows = datedRows.filter((row) => !effectiveEnd(row) || effectiveEnd(row) >= from);
             if (openRows.length > 1) throw failure('EMPLOYEE_PROFILE_HISTORY_OVERLAP');
-            const snapshot = buildCompleteProfileSnapshot({ input,
+            if (legacyMaintenance) historyPatch = legacyMaintenancePatch(maintenance.historyChanges, null, true);
+            const snapshot = legacyMaintenance ? {} : buildCompleteProfileSnapshot({ input,
                 current: { ...(current || newEmployee), ...patch, ...historyPatch }, effectiveFrom: from });
-            const facts = Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
+            const facts = legacyMaintenance ? {} : Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
             const until = C.calendarDate(historyPatch.hmeromhnia_isxyos_oron_ergasias_eos);
             if (until && until < from) C.invalid('hmeromhnia_isxyos_oron_ergasias_eos', 'end precedes start');
-            snapshot.hmeromhnia_isxyos_oron_ergasias_eos = until;
-            const baseline = T.capture(current, rows, from);
-            const currentUpdate = { ...patch, ...facts, ...(baseline ? { [T.ANCHOR]: baseline } : {}),
+            if (!legacyMaintenance) snapshot.hmeromhnia_isxyos_oron_ergasias_eos = until;
+            const baseline = legacyMaintenance ? null : T.capture(current, rows, from);
+            const currentUpdate = legacyMaintenance ? patch : { ...patch, ...facts, ...(baseline ? { [T.ANCHOR]: baseline } : {}),
                 hmeromhnia_isxyos_oron_ergasias_apo: snapshot.hmeromhnia_isxyos_oron_ergasias_apo,
                 hmeromhnia_isxyos_oron_ergasias_eos: until };
             let employee;
@@ -314,10 +330,13 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 afora_proslhpsh: historyPatch.afora_proslhpsh ?? !current };
             // Carry original omission context into schema validation for inherited legacy breaks.
             const historyDocument = typeof historyModel === 'function' ? new historyModel(record) : record;
-            if (historyDocument.$locals) historyDocument.$locals.employmentProfileValidation = { input,
+            // Mongoose defaults are not legacy facts. A baseline-compatible history
+            // insertion must also remain physically unversioned after construction.
+            if (legacyMaintenance && historyDocument.set) for (const field of C.FACT_FIELDS) historyDocument.set(field, undefined);
+            if (!legacyMaintenance && historyDocument.$locals) historyDocument.$locals.employmentProfileValidation = { input,
                 current: { ...(current || newEmployee), ...patch, ...historyPatch } };
             const [history] = await historyModel.create([historyDocument], { session });
-            result = { facts, history, employee, mode: selection.mode };
+            result = { facts, history, employee, mode: legacyMaintenance ? MODE_LEGACY_MAINTENANCE : selection.mode };
         };
         await write();
         // Created documents are used by the existing post-commit PDF workflow.
@@ -325,4 +344,4 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
         return result;
     }, activeSession);
 }
-module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, transactionCapability, writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileCorrections, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode };
+module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE, transactionCapability, writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileCorrections, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode };

@@ -116,6 +116,122 @@ async function initial(input = {}) {
     const { db, res } = await submit('add', { ...form(), ...input });
     assert.equal(res.code, 200, res.body?.errorMessage); return db.state();
 }
+const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const Transition = require('../../utils/ergazomenoi/employmentProfileTransition');
+async function legacyInitial() {
+    const stored = plain(await initial({ dialleima_se_lepta: 30 }));
+    for (const field of Transition.NEW_CURRENT_FIELDS) delete stored.employee[field];
+    for (const field of [...C.FACT_FIELDS, T.ANCHOR, 'afora_allagh_dialleimatos', 'hmeromhnia_isxyos_dialleimatos_apo']) delete stored.history[0][field];
+    stored.history[0].employment_profile_source = 'ERGOMENOI_CONTROLLER';
+    return stored;
+}
+function assertLegacy(stored) {
+    for (const field of Transition.NEW_CURRENT_FIELDS) assert.equal(Object.hasOwn(stored.employee, field), false, field);
+    for (const row of stored.history) for (const field of [...C.FACT_FIELDS, T.ANCHOR]) assert.equal(Object.hasOwn(row, field), false, field);
+}
+for (const [name, extra] of [
+    ['personal only', { email: 'maintenance@example.invalid' }],
+    ['neutral serialized defaults', { [C.ENABLED]: false, [C.DAYS]: [],
+        ...Object.fromEntries([C.TYPE, C.FROM, C.UNTIL, C.START, C.END, C.CATEGORY, ...C.BREAK_PAIRS.flat()].map(field => [field, ''])) }],
+    ['unchanged work terms', { dialleima_se_lepta: 30, synexes_diakekomeno: false, typos_orarioy: false,
+        dialleima_entos_ektos_orarioy: false, evelikth_proselefsh_edit: 0 }]
+]) test(`LEGACY maintenance controller: ${name} stays physically legacy and corrects the same history`, async () => {
+    const stored = await legacyInitial();
+    const { db, res } = await submit('edit', { ...form(), ...extra }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assertLegacy(db.state()); assert.equal(db.state().history.length, 1);
+    assert.equal(db.state().history[0]._id, stored.history[0]._id);
+    assert.equal(db.state().history[0].aa_eggrafhs, stored.history[0].aa_eggrafhs);
+    assert.equal(db.state().history[0].createdAt, stored.history[0].createdAt);
+    assert.equal(db.state().employee.nomimosMisthos, 1200);
+    assert.equal(db.state().history[0].nomimosMisthos, 1200);
+    assert.equal(db.state().history[0].employment_profile_source, 'ERGOMENOI_CONTROLLER');
+    if (extra.email) assert.equal(db.state().employee.email, extra.email);
+    assert.equal(db.writes(), 2); assert.equal(db.ended(), true);
+});
+test('LEGACY real putFieldValues collection through profileInput/controller preserves missing facts', async () => {
+    const stored = await legacyInitial(); delete stored.employee.dialleima_se_lepta;
+    delete stored.employee.evelikth_proselefsh; delete stored.employee.synexes_diakekomeno;
+    const code = fs.readFileSync(__dirname + '/../../../public/js/ergazomenoi/genika/putFieldValues.js', 'utf8');
+    const start = code.indexOf('        const formData = {}');
+    const body = code.slice(start, code.indexOf('// ✅ CONVERT PDFs TO BASE64', start));
+    const inputs = Object.entries({ ...form(), [C.ENABLED]: false, dialleima_se_lepta: '',
+        evelikth_proselefsh_edit: '', synexes_diakekomeno: false, email: 'changed@example.invalid' }).map(([name, value]) => ({
+        name, tagName: 'INPUT', type: typeof value === 'boolean' ? 'checkbox' :
+            typeof value === 'number' || ['dialleima_se_lepta', 'evelikth_proselefsh_edit'].includes(name) ? 'number' : 'text',
+        value: String(value), checked: value === true, hasAttribute: () => false
+    }));
+    const payload = vm.runInNewContext(`(() => { ${body}\nreturn formData; })()`, {
+        document: { querySelectorAll: () => [{ querySelectorAll: () => inputs }] },
+        window: require('../../../public/js/ergazomenoi/genika/employmentProfileUi')
+    });
+    assert.equal(payload[C.ENABLED], false); assert.equal(payload.dialleima_se_lepta, 0);
+    const { db, res } = await submit('edit', payload, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage); assertLegacy(db.state());
+    for (const field of ['dialleima_se_lepta', 'evelikth_proselefsh', 'synexes_diakekomeno']) assert.equal(Object.hasOwn(db.state().employee, field), false);
+    assert.equal(db.state().employee.email, 'changed@example.invalid');
+});
+for (const [name, changes, field, expected] of [
+    ['break', { dialleima_se_lepta: 20 }, 'dialleima_se_lepta', 20],
+    ['weekly hours', { ores_ergasias_ebdomadas: 32 }, 'ores_ergasias_ebdomadas', 32],
+    ['working days', { hmeres_ergasias_ebdomadas: 4 }, 'hmeres_ergasias_ebdomadas', 4],
+    ['continuous work', { synexes_diakekomeno: true }, 'synexes_diakekomeno', true],
+    ['arrangement', enabled, C.ENABLED, true],
+    ['interval', { dialleima_apo_ora_01: '12:00', dialleima_eos_ora_01: '12:30' }, 'dialleima_apo_ora_01', '12:00']
+]) test(`LEGACY real ${name} change creates first V1 with an immutable before-image`, async () => {
+    const stored = await legacyInitial();
+    const { db, res } = await submit('edit', { ...form(), ...changes }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().employee[C.SCHEMA_VERSION], 1);
+    assert.equal(db.state().history[0][C.SCHEMA_VERSION], 1);
+    assert.equal(db.state().employee[field], expected); assert.equal(db.state().history[0][field], expected);
+    assert.equal(db.state().employee[T.ANCHOR].facts.dialleima_se_lepta, 30);
+    assert.equal(db.state().employee[T.ANCHOR].facts.ores_ergasias_ebdomadas, 40);
+    const before = plain(db.state().employee[T.ANCHOR]);
+    const edited = await submit('edit', { ...form(), ...changes, email: 'v1@example.invalid' }, memory(db.state()));
+    assert.equal(edited.res.code, 200, edited.res.body?.errorMessage);
+    assert.equal(edited.db.state().history.length, 1);
+    assert.deepEqual(edited.db.state().employee[T.ANCHOR], before);
+    assert.equal(edited.db.state().employee[C.SCHEMA_VERSION], 1);
+    for (const key of C.FACT_FIELDS) assert.deepEqual(edited.db.state().employee[key], edited.db.state().history[0][key], key);
+});
+test('LEGACY maintenance history failure rolls back the successful current write', async () => {
+    const stored = await legacyInitial(), db = memory(stored, 'history');
+    const { res } = await submit('edit', { ...form(), email: 'rollback@example.invalid' }, db);
+    assert.equal(res.code, 500); assert.equal(db.writes(), 2);
+    assert.deepEqual(db.state(), stored); assert.equal(db.ended(), true);
+});
+test('LEGACY no matching history retains baseline insertion without V1 defaults', async () => {
+    const stored = await legacyInitial(); stored.history = [];
+    const { db, res } = await submit('edit', { ...form(), [C.ENABLED]: false }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage); assertLegacy(db.state());
+    assert.equal(db.state().history.length, 1); assert.equal(db.state().history[0].aa_eggrafhs, '0001');
+});
+test('LEGACY maintenance preserves sparse history and baseline ordinary contract updates', async () => {
+    const stored = await legacyInitial();
+    for (const field of T.STANDARD_FIELDS) delete stored.history[0][field];
+    const { db, res } = await submit('edit', { ...form(), nomimosMisthos: 1250, poso_symbashs_01: 1250 }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage); assertLegacy(db.state());
+    for (const field of T.STANDARD_FIELDS) assert.equal(Object.hasOwn(db.state().history[0], field), false, field);
+    for (const row of [db.state().employee, db.state().history[0]]) {
+        assert.equal(row.nomimosMisthos, 1250); assert.equal(row.poso_symbashs_01, 1250);
+    }
+});
+test('LEGACY effective date change creates first V1 append and preserves prior legacy facts', async () => {
+    const stored = await legacyInitial(), previous = plain(stored.history[0]);
+    const { db, res } = await submit('edit', { ...form(), hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-15' }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage); assert.equal(db.state().history.length, 2);
+    assert.equal(db.state().history[1][C.SCHEMA_VERSION], 1);
+    assert.equal(db.state().employee[T.ANCHOR].before.slice(0, 10), '2026-09-15');
+    previous.hmeromhnia_isxyos_oron_ergasias_eos = '2026-09-14T00:00:00.000Z';
+    assert.deepEqual(db.state().history[0], previous);
+});
+for (const kind of ['employee', 'history']) test(`LEGACY maintenance stale ${kind} rolls back`, async () => {
+    const stored = await legacyInitial(), db = memory(stored);
+    db[`${kind}Model`].updateOne = async () => ({ matchedCount: 0 });
+    const { res } = await submit('edit', { ...form(), email: 'stale@example.invalid' }, db);
+    assert.equal(res.code, 409); assert.match(res.body.reason, /STALE/); assert.deepEqual(db.state(), stored);
+});
 const addCases = [
     ['legacy/default', {}, null], ['disabled', { [C.ENABLED]: false }, null], ['enabled', enabled, null],
     ['unknown type', { ...enabled, [C.TYPE]: 'unknown' }, C.TYPE],
