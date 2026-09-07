@@ -738,6 +738,7 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/contracts/deployFrontendArtifactCoverage.contract.test.js"
             "server/contracts/testJsDeploymentExclusion.contract.test.js"
             "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.atomicRepoTransferUi.test.js"
             "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.holidayBadge.test.js"
