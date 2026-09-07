@@ -58,7 +58,8 @@ test('dates are strict calendar days, optional end and inclusive same-day validi
 test('days are unique integer ISO weekdays; empty means all scheduled workdays', () => {
     assert.deepEqual(normalize(enabled())[C.DAYS], []);
     assert.deepEqual(normalize({ ...enabled(), [C.DAYS]: [7, 1, 4] })[C.DAYS], [1, 4, 7]);
-    for (const days of [[0], [8], [1, 1], ['1'], [1.5], null, '1']) fails({ ...enabled(), [C.DAYS]: days }, C.DAYS);
+    assert.deepEqual(normalize({ [C.DAYS]: ['7', 1, 7, '1'] })[C.DAYS], [1, 7]);
+    for (const days of [[0], [8], [1.5], null, '1', [true], ['01']]) fails({ ...enabled(), [C.DAYS]: days }, C.DAYS);
 });
 test('server owns policy and complete schema versions', () => {
     const result = normalize({ ...enabled(), [C.TYPE_VERSION]: 'HR-spoof', [C.SCHEMA_VERSION]: 900 });
@@ -100,7 +101,8 @@ test('new break submissions allow 0 and 15..30; reads preserve legacy >30', () =
     for (let n = 15; n <= 30; n++) assert.equal(normalize({ dialleima_se_lepta: n }).dialleima_se_lepta, n);
     for (const n of [31, 45, -1, 15.5, NaN, true]) fails({ dialleima_se_lepta: n });
     assert.equal(C.readEmploymentProfile({ dialleima_se_lepta: 45 }).facts.dialleima_se_lepta, 45);
-    assert.throws(() => normalize({}, { dialleima_se_lepta: 45 }));
+    assert.equal(normalize({}, { dialleima_se_lepta: 45 }).dialleima_se_lepta, 45);
+    assert.throws(() => normalize({ dialleima_se_lepta: 45 }, { dialleima_se_lepta: 45 }));
 });
 test('Mongoose document validation uses the common server contract', async () => {
     await assert.rejects(new ErgazomenoiModel({ [C.ENABLED]: true }).validate());

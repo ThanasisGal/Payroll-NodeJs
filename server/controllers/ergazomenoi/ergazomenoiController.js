@@ -1,4 +1,6 @@
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
+const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentHistoryOperations } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
 
@@ -975,80 +977,26 @@ class ergazomenoiController {
                     )
             });
 
-            for (const update of updates) {
-                const { _id, state, data = {} } = update;
-
-                if (state === 'deleted') {
-                    if (!_id) continue;
-
-                    await IstorikoProslhpseonAllagonModel.deleteOne({
-                        _id,
-                        team: userTeam,
-                        company_kod: companyId,
-                        kodikos
-                    });
-
-                    continue;
-                }
-
-                if (state === 'inserted') {
-                    await IstorikoProslhpseonAllagonModel.create({
-                        team: userTeam,
-                        company_kod: companyId,
-                        kodikos,
-                        aa_eggrafhs: '0000',
-                        ...buildUpdateData(data)
-                    });
-
-                    continue;
-                }
-
-                const historySixthDayPremiumRate = parseSixthDayPremiumRate(
-                    data.pososto_prosayxhshs_6hs_hmeras
-                );
-                if (historySixthDayPremiumRate === null) {
-                    return res.status(400).json({
-                        success: false,
-                        reason: 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE',
-                        message:
-                            'Η προσαύξηση 6ης ημέρας του ιστορικού πρέπει να είναι μη αρνητικός αριθμός.'
-                    });
-                }
-                data.pososto_prosayxhshs_6hs_hmeras =
-                    historySixthDayPremiumRate;
-
-                if (state === 'modified') {
-                    if (!_id) continue;
-
-                    await IstorikoProslhpseonAllagonModel.updateOne(
-                        {
-                            _id,
-                            team: userTeam,
-                            company_kod: companyId,
-                            kodikos
-                        },
-                        {
-                            $set: buildUpdateData(data)
-                        }
-                    );
-                }
+            if (!Array.isArray(updates) || updates.some(update => !['modified', 'inserted', 'deleted'].includes(update.state))) {
+                return res.status(400).json({ success: false, message: 'Μη έγκυρη μεταβολή ιστορικού.' });
             }
-
-            const allRecords = await IstorikoProslhpseonAllagonModel.find({
-                team: userTeam,
-                company_kod: companyId,
-                kodikos
-            }).sort({ aa_eggrafhs: 1, createdAt: 1, _id: 1 });
-
-            let counter = 1;
-
-            for (const record of allRecords) {
-                await IstorikoProslhpseonAllagonModel.updateOne(
-                    { _id: record._id },
-                    { $set: { aa_eggrafhs: String(counter).padStart(4, '0') } }
-                );
-                counter++;
-            }
+            const operations = updates.map(({ _id, state, data = {} }) => {
+                if (state === 'deleted') return { state, historyId: _id };
+                const rate = parseSixthDayPremiumRate(data.pososto_prosayxhshs_6hs_hmeras);
+                if (Object.prototype.hasOwnProperty.call(data, 'pososto_prosayxhshs_6hs_hmeras') && rate === null) {
+                    const error = new Error('Invalid sixth day premium rate');
+                    error.code = 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'; error.statusCode = 400; throw error;
+                }
+                const historyChanges = historyEditorChanges(buildUpdateData(data), data);
+                return { state, historyId: _id, input: profileInput(data, 'edit'),
+                    effectiveFrom: data.hmeromhnia_isxyos_oron_ergasias_apo || data.hmeromhnia_allaghs_orarioy_apo,
+                    maintenance: { historyChanges, employeeChanges: historyChanges, submittedFields: Object.keys(data),
+                        identity: getIstorikoDateIdentity(data) } };
+            });
+            await writeEmployeeEmploymentHistoryOperations({
+                scope: { team: userTeam, company_kod: companyId, kodikos: String(kodikos) },
+                employeeId: String(ergazomenos._id), operations
+            });
 
             return res.status(200).json({
                 success: true,
@@ -1057,6 +1005,11 @@ class ergazomenoiController {
         } catch (error) {
             console.error('updateIstorikoData error:', error);
 
+            if (isEmploymentProfileError(error)) return profileError(res, error);
+            if (error.code === 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE') return res.status(400).json({
+                success: false, reason: error.code,
+                message: 'Η προσαύξηση 6ης ημέρας του ιστορικού πρέπει να είναι μη αρνητικός αριθμός.'
+            });
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ενημέρωση του Ιστορικού.',
@@ -1334,7 +1287,6 @@ class ergazomenoiController {
         const sessionUserId = req.session.userId;
 
         let aa_kod = null,
-            aa_eggr = null,
             kodikosValue = 0;
 
         const { formData = {} } = req.body || {};
@@ -1399,28 +1351,6 @@ class ergazomenoiController {
             }
             aa_kod = kodValue;
             kodikosValue = kodValue;
-        } catch (error) {
-            console.log('Σφάλμα :', error);
-        }
-
-        try {
-            const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({
-                team: sessionUserTeam,
-                company_kod: sessionCompanyInUse,
-                kodikos: kodikosValue
-            })
-                .sort({ _id: -1 })
-                .limit(1);
-            let aaValue =
-                lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs
-                    ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10)
-                    : null;
-            if (aaValue !== null) {
-                aaValue++;
-            } else {
-                aaValue = 1;
-            }
-            aa_eggr = aaValue;
         } catch (error) {
             console.log('Σφάλμα :', error);
         }
@@ -1745,11 +1675,91 @@ class ergazomenoiController {
         newErgazomenos.shmeioseis_apozhmioshs = formData.shmeioseis_apozhmioshs;
         newErgazomenos.parathrhseis = formData.parathrhseis;
 
+        const newIstoriko = IstorikoProslhpseonAllagonModel({
+            team: sessionUserTeam,
+            company_kod: sessionCompanyInUse,
+            kodikos: aa_kod.toString().padStart(4, '0'),
+            hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
+            hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
+            hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
+            hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
+            hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
+            hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
+            afora_proslhpsh: true,
+
+            // Snapshot όρων εργασίας κατά την αρχική εισαγωγή εργαζόμενου.
+            // Αυτά τα πεδία είναι απαραίτητα για να μη διαβάζει ο απολογιστικός
+            // υπολογισμός μόνο την τρέχουσα εικόνα του εργαζόμενου.
+            ...buildIstorikoWorkTermsSnapshot(formData),
+
+            misthologiko_klimakio: formData.misthologiko_klimakio,
+
+            symbash: formData.symbash_stathera,
+            kathgoria_symbashs: formData.kathgoria_symbashs_stathera,
+            eidikothta_symbashs: formData.eidikothta_symbashs_stathera
+        });
+
+        for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
+            const idNum = i.toString().padStart(2, '0');
+
+            // Σειρά fields ανά row
+            const fieldsInOrder = [
+                'stoixeio_symbashs',
+                'poso_symbashs',
+                'poso_symbashs_basei_oron_ergasias'
+            ];
+
+            fieldsInOrder.forEach((fieldStoixeio) => {
+                const fieldName = `${fieldStoixeio}_${idNum}`;
+
+                // Assign main field
+                if (numberFields.has(fieldStoixeio)) {
+                    newIstoriko[fieldName] = formData[fieldName] || 0;
+                } else {
+                    newIstoriko[fieldName] = formData[fieldName] || null;
+                }
+
+                // Assign hidden field (μόνο για stoixeio_symbashs)
+                if (fieldsWithHidden.has(fieldStoixeio)) {
+                    const hiddenFieldName = `${fieldName}_hidden`;
+                    newIstoriko[hiddenFieldName] = formData[hiddenFieldName] || null;
+                }
+            });
+        }
+
+        newIstoriko.synolo_symbashs = formData.synolo_symbashs;
+        newIstoriko.synolo_symbashs_basei_oron_ergasias =
+            formData.synolo_symbashs_basei_oron_ergasias;
+        newIstoriko.nomimosMisthos = formData.nomimosMisthos;
+        newIstoriko.nomimoHmeromisthio = formData.nomimoHmeromisthio;
+        newIstoriko.nomimoOromisthio = formData.nomimoOromisthio;
+        newIstoriko.pragmatikosMisthos = formData.pragmatikosMisthos;
+        newIstoriko.pragmatikoHmeromisthio = formData.pragmatikoHmeromisthio;
+        newIstoriko.pragmatikoOromisthio = formData.pragmatikoOromisthio;
+
+        fieldsKrathseon.forEach((fieldKrathsh) => {
+            for (let i = 1; i <= arithmosKrathseon; i++) {
+                const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
+                newIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
+            }
+        });
+
+        newIstoriko.createdAt = Date.now();
+        newIstoriko.updatedAt = Date.now();
+
         let savedErgazomenos = null; // ✅ Δήλωση
 
         try {
-            savedErgazomenos = await ErgazomenoiModel.create(newErgazomenos); // ✅ Αποθήκευση
+            const result = await writeEmployeeEmploymentProfile({
+                scope: { team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: newErgazomenos.kodikos },
+                input: profileInput(formData, 'add'), newEmployee: newErgazomenos.toObject(),
+                effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
+                    formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
+                maintenance: { historyChanges: newIstoriko.toObject() }
+            });
+            savedErgazomenos = result.employee;
         } catch (error) {
+            if (isEmploymentProfileError(error)) return profileError(res, error);
             return res.status(500).json({
                 success: false,
                 errorMessage: 'Σφάλμα κατά τη αποθήκευση του εργαζόμενου'
@@ -2010,89 +2020,6 @@ class ergazomenoiController {
                 eosDate: formData.hmeromhnia_allaghs_orarioy_eos,
                 hmeres: formData.hmeres_ergasias_ebdomadas,
                 ores: formData.ores_ergasias_ebdomadas
-            });
-        }
-
-        const newIstoriko = IstorikoProslhpseonAllagonModel({
-            team: sessionUserTeam,
-            company_kod: sessionCompanyInUse,
-            kodikos: aa_kod.toString().padStart(4, '0'),
-            aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),
-            hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
-            hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
-            hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
-            hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
-            hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
-            hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
-            afora_proslhpsh: true,
-
-            // Snapshot όρων εργασίας κατά την αρχική εισαγωγή εργαζόμενου.
-            // Αυτά τα πεδία είναι απαραίτητα για να μη διαβάζει ο απολογιστικός
-            // υπολογισμός μόνο την τρέχουσα εικόνα του εργαζόμενου.
-            ...buildIstorikoWorkTermsSnapshot(formData),
-
-            misthologiko_klimakio: formData.misthologiko_klimakio,
-
-            symbash: formData.symbash_stathera,
-            kathgoria_symbashs: formData.kathgoria_symbashs_stathera,
-            eidikothta_symbashs: formData.eidikothta_symbashs_stathera
-        });
-
-        for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
-            const idNum = i.toString().padStart(2, '0');
-
-            // Σειρά fields ανά row
-            const fieldsInOrder = [
-                'stoixeio_symbashs',
-                'poso_symbashs',
-                'poso_symbashs_basei_oron_ergasias'
-            ];
-
-            fieldsInOrder.forEach((fieldStoixeio) => {
-                const fieldName = `${fieldStoixeio}_${idNum}`;
-
-                // Assign main field
-                if (numberFields.has(fieldStoixeio)) {
-                    newIstoriko[fieldName] = formData[fieldName] || 0;
-                } else {
-                    newIstoriko[fieldName] = formData[fieldName] || null;
-                }
-
-                // Assign hidden field (μόνο για stoixeio_symbashs)
-                if (fieldsWithHidden.has(fieldStoixeio)) {
-                    const hiddenFieldName = `${fieldName}_hidden`;
-                    newIstoriko[hiddenFieldName] = formData[hiddenFieldName] || null;
-                }
-            });
-        }
-
-        newIstoriko.synolo_symbashs = formData.synolo_symbashs;
-        newIstoriko.synolo_symbashs_basei_oron_ergasias =
-            formData.synolo_symbashs_basei_oron_ergasias;
-        newIstoriko.nomimosMisthos = formData.nomimosMisthos;
-        newIstoriko.nomimoHmeromisthio = formData.nomimoHmeromisthio;
-        newIstoriko.nomimoOromisthio = formData.nomimoOromisthio;
-        newIstoriko.pragmatikosMisthos = formData.pragmatikosMisthos;
-        newIstoriko.pragmatikoHmeromisthio = formData.pragmatikoHmeromisthio;
-        newIstoriko.pragmatikoOromisthio = formData.pragmatikoOromisthio;
-
-        fieldsKrathseon.forEach((fieldKrathsh) => {
-            for (let i = 1; i <= arithmosKrathseon; i++) {
-                const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
-                newIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
-            }
-        });
-
-        newIstoriko.createdAt = Date.now();
-        newIstoriko.updatedAt = Date.now();
-
-        try {
-            await IstorikoProslhpseonAllagonModel.create(newIstoriko);
-        } catch (error) {
-            console.log('Σφάλμα κατά την αποθήκευση του ιστορικού:', error);
-            return res.status(500).json({
-                success: false,
-                errorMessage: 'Σφάλμα κατά την αποθήκευση του ιστορικού'
             });
         }
 
@@ -3384,9 +3311,6 @@ class ergazomenoiController {
 
         const omadaErgasias = req.session?.userTeam;
         const kodikosEtaireias = req.session?.companyInUse;
-        let aa_eggr = null,
-            recExist = false,
-            existingIstorikoRecord = null;
 
         const scopedAccess = await requireScopedEmployeeForUpdate({
             req,
@@ -3417,45 +3341,6 @@ class ergazomenoiController {
         formData.team = omadaErgasias;
         formData.company_kod = kodikosEtaireias;
         formData.kodikosHidden = kodikosErgazomenoy;
-
-        // =========================================================================
-        // ✅ 1) ΑΝΑΓΝΩΣΗ ΙΣΤΟΡΙΚΟΥ
-        // =========================================================================
-        try {
-            const existRecord = await IstorikoProslhpseonAllagonModel.findOne({
-                team: omadaErgasias,
-                company_kod: kodikosEtaireias,
-                kodikos: kodikosErgazomenoy,
-                // Ταυτότητα ιστορικής εγγραφής.
-                // Περιλαμβάνει πλέον και τις ημερομηνίες αλλαγής ωραρίου, ώστε μία
-                // αλλαγή 5ήμερο->6ήμερο ή 40h->30h να μη θεωρηθεί ίδιο ιστορικό record.
-                ...getIstorikoDateIdentity(formData)
-            });
-
-            recExist = !!existRecord;
-            existingIstorikoRecord = existRecord;
-
-            const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({
-                team: omadaErgasias,
-                company_kod: kodikosEtaireias,
-                kodikos: kodikosErgazomenoy
-            })
-                .sort({ _id: -1 })
-                .limit(1);
-
-            let aaValue =
-                lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs
-                    ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10)
-                    : null;
-
-            aa_eggr = aaValue !== null ? aaValue + 1 : 1;
-        } catch (error) {
-            console.error('❌ Σφάλμα κατά την ανάγνωση ιστορικού:', error);
-            return res.status(500).json({
-                success: false,
-                errorMessage: 'Σφάλμα κατά την ανάγνωση ιστορικού εργαζόμενου'
-            });
-        }
 
         // =========================================================================
         // ✅ 2) FILTERED DATA ΕΡΓΑΖΟΜΕΝΟΥ
@@ -3753,6 +3638,62 @@ class ergazomenoiController {
             }
         });
 
+        const updateFieldsIstoriko = {
+            hmeromhnia_proslhpshs: toDateOrNull(formData.hmeromhnia_proslhpshs),
+            hmeromhnia_allaghs_symbashs: toDateOrNull(formData.hmeromhnia_allaghs_symbashs),
+            hmeromhnia_allaghs_orarioy_apo: toDateOrNull(
+                formData.hmeromhnia_allaghs_orarioy_apo
+            ),
+            hmeromhnia_allaghs_orarioy_eos: toDateOrNull(
+                formData.hmeromhnia_allaghs_orarioy_eos
+            ),
+            hmeromhnia_isxyos_oron_ergasias_apo: toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) ||
+                toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo),
+            hmeromhnia_isxyos_oron_ergasias_eos:
+                toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null,
+            hmeromhnia_lhxhs_symbashs: toDateOrNull(formData.hmeromhnia_lhxhs_symbashs),
+            hmeromhnia_apoxorhshs: toDateOrNull(formData.hmeromhnia_apoxorhshs),
+            afora_proslhpsh:
+                formData.hmeromhnia_proslhpshs === formData.hmeromhnia_allaghs_symbashs,
+
+            // Snapshot όρων εργασίας για τη συγκεκριμένη μεταβολή.
+            ...buildIstorikoWorkTermsSnapshot(formData),
+
+            misthologiko_klimakio: formData.misthologiko_klimakio,
+            symbash: formData.symbash,
+            kathgoria_symbashs: formData.kathgoria_symbashs,
+            eidikothta_symbashs: formData.eidikothta_symbashs,
+            synolo_symbashs: formData.synolo_symbashs,
+            synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
+            nomimosMisthos: formData.nomimosMisthos,
+            nomimoHmeromisthio: formData.nomimoHmeromisthio,
+            nomimoOromisthio: formData.nomimoOromisthio,
+            pragmatikosMisthos: formData.pragmatikosMisthos,
+            pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
+            pragmatikoOromisthio: formData.pragmatikoOromisthio,
+            updatedAt: Date.now()
+        };
+
+        fieldsStoixeionSymbashs.forEach((fieldStoixeio) => {
+            for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
+                const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+                if (numberFields.has(fieldStoixeio)) {
+                    updateFieldsIstoriko[fieldNameStoixeioy] =
+                        formData[fieldNameStoixeioy] || 0;
+                } else {
+                    updateFieldsIstoriko[fieldNameStoixeioy] =
+                        formData[fieldNameStoixeioy] || null;
+                }
+            }
+        });
+
+        fieldsKrathseis.forEach((fieldKrathsh) => {
+            for (let i = 1; i <= arithmosKrathseon; i++) {
+                const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
+                updateFieldsIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
+            }
+        });
+
         // =========================================================================
         // ✅ 5) UPDATE ΕΡΓΑΖΟΜΕΝΟΥ ΣΤΗ ΒΔ
         // =========================================================================
@@ -3817,11 +3758,14 @@ class ergazomenoiController {
                 }
             });
 
-            updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate(
-                employeeScope,
-                { $set: filteredDataErgazomenoi },
-                { returnDocument: 'after' } // ✅ Επιστρέφει το updated document
-            );
+            const result = await writeEmployeeEmploymentProfile({
+                scope: { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy },
+                input: profileInput(formData, 'edit'), employeeId: ergazomenoiId,
+                effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo || formData.hmeromhnia_allaghs_orarioy_apo,
+                maintenance: { employeeChanges: filteredDataErgazomenoi,
+                    historyChanges: updateFieldsIstoriko, identity: getIstorikoDateIdentity(formData) }
+            });
+            updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);
 
             if (!updatedErgazomenos) {
                 return res.status(404).json({
@@ -3831,6 +3775,7 @@ class ergazomenoiController {
             }
         } catch (error) {
             console.error('❌ Σφάλμα κατά την ενημέρωση εργαζόμενου:', error);
+            if (isEmploymentProfileError(error)) return profileError(res, error);
             return res.status(500).json({
                 success: false,
                 errorMessage: 'Σφάλμα κατά την ενημέρωση εργαζόμενου'
@@ -3979,187 +3924,6 @@ class ergazomenoiController {
             await Promise.all(orarioPromises);
         } catch (error) {
             console.error('❌ Σφάλμα κατά την ενημέρωση των ωραρίων:', error);
-        }
-
-        // =========================================================================
-        // ✅ 7) ΕΝΗΜΕΡΩΣΗ ΙΣΤΟΡΙΚΟΥ
-        // =========================================================================
-        // Λογική:
-        // 1. Αν υπάρχει ήδη εγγραφή με την ίδια ταυτότητα ημερομηνιών, τη θεωρούμε
-        //    διόρθωση της ίδιας μεταβολής και την ενημερώνουμε.
-        // 2. Αν δεν υπάρχει, τότε πρόκειται για νέα ιστορική μεταβολή:
-        //    - κλείνουμε την προηγούμενη ανοιχτή/επικαλυπτόμενη περίοδο μία ημέρα πριν
-        //      από τη νέα ημερομηνία έναρξης
-        //    - δημιουργούμε νέα εγγραφή snapshot.
-        //
-        // Έτσι αποφεύγουμε το λάθος όπου όλος ο μήνας διαβάζει μόνο την τρέχουσα
-        // κατάσταση του εργαζομένου ή όπου υπάρχουν overlapping records.
-        // =========================================================================
-        {
-            const istorikoIdentity = getIstorikoDateIdentity(formData);
-            const effectiveApo =
-                toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) ||
-                toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo);
-
-            const filteredDataIstoriko = {
-                team: formData.team,
-                company_kod: formData.company_kod,
-                kodikos: formData.kodikosHidden,
-                aa_eggrafhs:
-                    recExist && existingIstorikoRecord?.aa_eggrafhs
-                        ? existingIstorikoRecord.aa_eggrafhs
-                        : aa_eggr.toString().padStart(4, '0'),
-                ...istorikoIdentity,
-                createdAt:
-                    recExist && existingIstorikoRecord?.createdAt
-                        ? existingIstorikoRecord.createdAt
-                        : Date.now()
-            };
-
-            const updateFieldsIstoriko = {
-                hmeromhnia_proslhpshs: toDateOrNull(formData.hmeromhnia_proslhpshs),
-                hmeromhnia_allaghs_symbashs: toDateOrNull(formData.hmeromhnia_allaghs_symbashs),
-                hmeromhnia_allaghs_orarioy_apo: toDateOrNull(
-                    formData.hmeromhnia_allaghs_orarioy_apo
-                ),
-                hmeromhnia_allaghs_orarioy_eos: toDateOrNull(
-                    formData.hmeromhnia_allaghs_orarioy_eos
-                ),
-                hmeromhnia_isxyos_oron_ergasias_apo: effectiveApo,
-                hmeromhnia_isxyos_oron_ergasias_eos:
-                    toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null,
-                hmeromhnia_lhxhs_symbashs: toDateOrNull(formData.hmeromhnia_lhxhs_symbashs),
-                hmeromhnia_apoxorhshs: toDateOrNull(formData.hmeromhnia_apoxorhshs),
-                afora_proslhpsh:
-                    formData.hmeromhnia_proslhpshs === formData.hmeromhnia_allaghs_symbashs,
-
-                // Snapshot όρων εργασίας για τη συγκεκριμένη μεταβολή.
-                ...buildIstorikoWorkTermsSnapshot(formData),
-
-                misthologiko_klimakio: formData.misthologiko_klimakio,
-                symbash: formData.symbash,
-                kathgoria_symbashs: formData.kathgoria_symbashs,
-                eidikothta_symbashs: formData.eidikothta_symbashs,
-                synolo_symbashs: formData.synolo_symbashs,
-                synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
-                nomimosMisthos: formData.nomimosMisthos,
-                nomimoHmeromisthio: formData.nomimoHmeromisthio,
-                nomimoOromisthio: formData.nomimoOromisthio,
-                pragmatikosMisthos: formData.pragmatikosMisthos,
-                pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
-                pragmatikoOromisthio: formData.pragmatikoOromisthio,
-                updatedAt: Date.now()
-            };
-
-            fieldsStoixeionSymbashs.forEach((fieldStoixeio) => {
-                for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
-                    const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
-                    if (numberFields.has(fieldStoixeio)) {
-                        updateFieldsIstoriko[fieldNameStoixeioy] =
-                            formData[fieldNameStoixeioy] || 0;
-                    } else {
-                        updateFieldsIstoriko[fieldNameStoixeioy] =
-                            formData[fieldNameStoixeioy] || null;
-                    }
-                }
-            });
-
-            fieldsKrathseis.forEach((fieldKrathsh) => {
-                for (let i = 1; i <= arithmosKrathseon; i++) {
-                    const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
-                    updateFieldsIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
-                }
-            });
-
-            try {
-                if (recExist && existingIstorikoRecord?._id) {
-                    // ------------------------------------------------------------
-                    // Διόρθωση υπάρχουσας ιστορικής εγγραφής.
-                    // Παράδειγμα: ο χρήστης είχε βάλει 5 ημέρες και διορθώνει σε 6
-                    // στην ίδια ημερομηνία αλλαγής.
-                    // ------------------------------------------------------------
-                    await IstorikoProslhpseonAllagonModel.findByIdAndUpdate(
-                        existingIstorikoRecord._id,
-                        { $set: updateFieldsIstoriko },
-                        { returnDocument: 'after' }
-                    );
-                } else {
-                    // ------------------------------------------------------------
-                    // Νέα ιστορική μεταβολή.
-                    // Πριν τη δημιουργήσουμε, κλείνουμε την προηγούμενη περίοδο
-                    // που είναι ανοιχτή ή επικαλύπτει τη νέα ημερομηνία έναρξης.
-                    // ------------------------------------------------------------
-                    if (effectiveApo) {
-                        const previousEos = new Date(effectiveApo);
-                        previousEos.setUTCDate(previousEos.getUTCDate() - 1);
-                        previousEos.setUTCHours(0, 0, 0, 0);
-
-                        if (previousEos.getTime() < effectiveApo.getTime()) {
-                            await IstorikoProslhpseonAllagonModel.findOneAndUpdate(
-                                {
-                                    team: formData.team,
-                                    company_kod: formData.company_kod,
-                                    kodikos: formData.kodikosHidden,
-                                    afora_allagh_oron_ergasias: true,
-                                    hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({
-                                        $lt: effectiveApo
-                                    }),
-                                    $or: [
-                                        { hmeromhnia_isxyos_oron_ergasias_eos: null },
-                                        {
-                                            hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
-                                                $exists: false
-                                            })
-                                        },
-                                        {
-                                            hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
-                                                $gte: effectiveApo
-                                            })
-                                        }
-                                    ]
-                                },
-                                {
-                                    $set: {
-                                        hmeromhnia_isxyos_oron_ergasias_eos: previousEos,
-                                        updatedAt: Date.now()
-                                    }
-                                },
-                                {
-                                    sort: { hmeromhnia_isxyos_oron_ergasias_apo: -1 },
-                                    returnDocument: 'after'
-                                }
-                            );
-                        }
-                    }
-
-                    await IstorikoProslhpseonAllagonModel.findOneAndUpdate(
-                        {
-                            team: formData.team,
-                            company_kod: formData.company_kod,
-                            kodikos: formData.kodikosHidden,
-                            ...istorikoIdentity
-                        },
-                        {
-                            // Δεν χρησιμοποιούμε $setOnInsert εδώ με τα ίδια πεδία που
-                            // υπάρχουν και στο $set, γιατί η MongoDB το θεωρεί conflict
-                            // στο ίδιο path, π.χ. hmeromhnia_proslhpshs.
-                            // Για upsert περνάμε όλα τα αναγκαία πεδία μέσα στο $set.
-                            $set: {
-                                ...filteredDataIstoriko,
-                                ...updateFieldsIstoriko,
-                                updatedAt: Date.now()
-                            }
-                        },
-                        { returnDocument: 'after', upsert: true }
-                    );
-                }
-            } catch (error) {
-                console.error('❌ Σφάλμα κατά την ενημέρωση ιστορικού:', error);
-                return res.status(500).json({
-                    success: false,
-                    errorMessage: 'Σφάλμα κατά την ενημέρωση ιστορικού'
-                });
-            }
         }
 
         // =========================================================================

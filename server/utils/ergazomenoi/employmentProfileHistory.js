@@ -1,7 +1,6 @@
 'use strict';
 
 const C = require('./employmentProfileContract');
-const { buildBreakConfigurationHistoryChange } = require('./resolveBreakConfigurationForDate');
 const { buildCanonicalWorkTermsSnapshotFields } = require('./getOrarioTermsForDate');
 
 const BASE_HISTORY_FIELDS = [
@@ -21,12 +20,9 @@ function buildCompleteProfileSnapshot({ input = {}, current = {}, effectiveFrom 
     const from = C.calendarDate(effectiveFrom, 'effectiveFrom');
     if (!from) C.invalid('effectiveFrom', 'required');
     const facts = C.normalizeEmploymentProfileSubmission(input, current);
-    const breakChange = buildBreakConfigurationHistoryChange({
-        currentEmployee: current, formData: { ...facts, hmeromhnia_metabolhs: from }
-    });
     const merged = { ...current, ...input };
     return {
-        ...Object.fromEntries(BASE_HISTORY_FIELDS.filter((field) => merged[field] !== undefined).map((field) => [field, merged[field]])),
+        ...Object.fromEntries(BASE_HISTORY_FIELDS.map((field) => [field, merged[field] ?? null])),
         ...buildCanonicalWorkTermsSnapshotFields(merged, current),
         hmeres_ergasias_ebdomadas: merged.hmeres_ergasias_ebdomadas ?? 0,
         ores_ergasias_ebdomadas: merged.ores_ergasias_ebdomadas ?? 0,
@@ -38,7 +34,6 @@ function buildCompleteProfileSnapshot({ input = {}, current = {}, effectiveFrom 
         hmeromhnia_isxyos_oron_ergasias_eos: null,
         // Every complete snapshot records break facts, including explicit zero.
         // This also anchors subsequent interval-only changes in the existing mechanism.
-        ...(breakChange.snapshot || {}),
         afora_allagh_dialleimatos: true,
         hmeromhnia_isxyos_dialleimatos_apo: from
     };
@@ -84,4 +79,4 @@ function resolveEmploymentProfileFactsForDate(date, history = [], { scheduledWor
         source: recorded ? 'COMPLETE_PROFILE_HISTORY' : 'LEGACY_PROFILE_NOT_RECORDED',
         historyId: row?._id || null, unrecordedFields: read.unrecordedFields };
 }
-module.exports = { buildCompleteProfileSnapshot, resolveEmploymentProfileFactsForDate, effectiveStart, effectiveEnd };
+module.exports = { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, resolveEmploymentProfileFactsForDate, effectiveStart, effectiveEnd };

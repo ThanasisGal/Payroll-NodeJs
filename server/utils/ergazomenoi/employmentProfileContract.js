@@ -96,10 +96,11 @@ function normalizeEmploymentProfileSubmission(input = {}, current = {}) {
     facts[ENABLED] = boolean(facts[ENABLED], ENABLED);
     for (const field of [TYPE, START, END, CATEGORY, ...BREAK_PAIRS.flat()]) facts[field] = text(facts[field], field);
     for (const field of [FROM, UNTIL]) facts[field] = calendarDate(facts[field], field);
-    if (!Array.isArray(facts[DAYS]) || facts[DAYS].some((n) => !Number.isInteger(n) || n < 1 || n > 7) ||
-        new Set(facts[DAYS]).size !== facts[DAYS].length) invalid(DAYS, 'expected unique integers 1..7');
+    if (!Array.isArray(facts[DAYS]) || facts[DAYS].some((n) =>
+        !((typeof n === 'number' && Number.isInteger(n)) || (typeof n === 'string' && /^[1-7]$/.test(n))) ||
+        Number(n) < 1 || Number(n) > 7)) invalid(DAYS, 'expected integers 1..7');
     // [] means every scheduled working day; 1 = Monday, 7 = Sunday.
-    facts[DAYS] = [...facts[DAYS]].sort((a, b) => a - b);
+    facts[DAYS] = [...new Set(facts[DAYS].map(Number))].sort((a, b) => a - b);
     if (facts[TYPE] && !has(ARRANGEMENT_TYPES, facts[TYPE])) invalid(TYPE, 'unknown arrangement type');
     if (facts[ENABLED] && !facts[TYPE]) invalid(TYPE, 'required when enabled');
     if (facts[ENABLED] && !facts[FROM]) invalid(FROM, 'required when enabled');
@@ -109,7 +110,9 @@ function normalizeEmploymentProfileSubmission(input = {}, current = {}) {
     for (const field of ['dialleima_entos_ektos_orarioy', 'synexes_diakekomeno', 'typos_orarioy']) facts[field] = boolean(facts[field], field);
     for (const field of ['dialleima_se_lepta', 'evelikth_proselefsh', 'symbatikes_ores_ergasias']) facts[field] = number(facts[field], field);
     const minutes = facts.dialleima_se_lepta;
-    if (!Number.isInteger(minutes) || (minutes !== 0 && (minutes < 15 || minutes > 30))) invalid('dialleima_se_lepta', 'expected 0 or 15..30 minutes');
+    const preservedLegacyDuration = input.dialleima_se_lepta === undefined &&
+        Number(current.dialleima_se_lepta) === minutes && Number.isInteger(minutes) && minutes > 30;
+    if (!preservedLegacyDuration && (!Number.isInteger(minutes) || (minutes !== 0 && (minutes < 15 || minutes > 30)))) invalid('dialleima_se_lepta', 'expected 0 or 15..30 minutes');
     const breaks = BREAK_PAIRS.map(([a, b]) => interval(facts[a], facts[b], a)).filter(Boolean);
     const segments = breaks.flatMap((pair) => pair.segments).sort((a, b) => a[0] - b[0]);
     if (segments.some((segment, i) => i > 0 && segment[0] < segments[i - 1][1])) invalid('dialleima', 'overlapping intervals');

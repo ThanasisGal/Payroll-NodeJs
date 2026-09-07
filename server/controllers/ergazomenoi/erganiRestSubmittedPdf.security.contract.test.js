@@ -104,7 +104,10 @@ test('employee update is covered by CSRF and uses session-scoped filter', () => 
         /return \{\s*_id: employeeId,\s*team: sessionTeam,\s*company_kod: companyId/
     );
     assert.match(employeeController, /requireScopedEmployeeForUpdate\(/);
-    assert.match(employeeController, /findOneAndUpdate\(\s*employeeScope/);
+    assert.match(employeeController, /input: profileInput\(formData, 'edit'\), employeeId: ergazomenoiId/);
+    const writer = read('server/services/ergazomenoi/employeeEmploymentProfileWriter.js');
+    assert.match(writer, /employeeModel\.findOne\(employeeId \? \{ \.\.\.filter, _id: employeeId \} : filter\)\.session\(session\)/);
+    assert.match(writer, /updateOne\(\{ \.\.\.filter, _id: current\._id \}/);
 });
 
 test('employee history identity comes from the scoped database employee', () => {
@@ -126,7 +129,7 @@ test('employee history identity comes from the scoped database employee', () => 
         'formData.kodikosHidden = kodikosErgazomenoy'
     );
     const historyLookupIndex = updateHandler.indexOf(
-        'IstorikoProslhpseonAllagonModel.findOne({'
+        'await writeEmployeeEmploymentProfile({'
     );
     assert.ok(canonicalSyncIndex >= 0);
     assert.ok(historyLookupIndex >= 0);

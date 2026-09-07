@@ -33,7 +33,17 @@ function employmentProfileFields({ history = false } = {}) {
 function attachEmploymentProfileValidation(schema) {
     schema.pre('validate', function () {
         if (this.isNew || contract.FACT_FIELDS.some((field) => this.isModified(field))) {
-            contract.normalizeEmploymentProfileSubmission(this.toObject());
+            const validated = this.$locals.employmentProfileValidation;
+            if (validated) {
+                const facts = contract.normalizeEmploymentProfileSubmission(validated.input, validated.current);
+                for (const field of contract.FACT_FIELDS) {
+                    if (JSON.stringify(this.toObject()[field]) !== JSON.stringify(facts[field])) {
+                        contract.invalid(field, 'snapshot differs from validated facts');
+                    }
+                }
+            } else {
+                contract.normalizeEmploymentProfileSubmission(this.toObject());
+            }
         }
     });
 }

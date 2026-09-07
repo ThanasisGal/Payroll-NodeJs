@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sections.forEach((section) => {
             const inputs = section.querySelectorAll('input, select, textarea');
             inputs.forEach((input) => {
+                if (window.serializeEmploymentProfileField(input, formData, false)) return;
                 // =====================================================================
                 // ✅ INPUT HANDLING
                 // =====================================================================

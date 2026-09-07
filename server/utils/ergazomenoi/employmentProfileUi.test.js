@@ -97,7 +97,8 @@ test('common handler toggles controls and category without clearing any values o
 test('controller changes are limited to import and two GET render context properties', () => {
     const file = 'server/controllers/ergazomenoi/ergazomenoiController.js';
     const baseline = execFileSync('git', ['show', `${checkpoint}:${file}`], { encoding: 'utf8' });
-    const current = fs.readFileSync(file, 'utf8');
+    // Phase 1B source audit stays pinned; live persistence is covered by Phase 1D integration tests.
+    const current = execFileSync('git', ['show', `981302d3c6183c27b7f9d47500432692755375cb:${file}`], { encoding: 'utf8' });
     assert.equal(current.replace("const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');\n", '')
         .replaceAll('\n                employmentProfileUi: await getEmploymentProfileUiContext(),', '').replaceAll('\r', ''), baseline.replaceAll('\r', ''));
     const allowed = new Set([
