@@ -1,0 +1,42 @@
+<%
+const profileRecord = (typeof rec !== 'undefined' && rec) || {};
+const enabled = profileRecord.afora_egkekrimenh_rythmish_ergasias === true;
+const ui = typeof employmentProfileUi !== 'undefined' ? employmentProfileUi : { types: [], categories: [] };
+const profileValue = key => {
+    const value = profileRecord[key];
+    if (value == null) return '';
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? '' : value.toISOString().slice(0, 10);
+    return key.startsWith('hmnia_') ? String(value).slice(0, 10) : value;
+};
+const selectedType = ui.types.find(option => option.value === profileRecord.typos_egkekrimenhs_rythmishs);
+%>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+    <div class="col-2 left-align"><label for="afora_egkekrimenh_rythmish_ergasias" class="col-form-label label-font-size">Εγκεκριμένη Ρύθμιση Εργασίας</label></div><div class="col-1 left-align checkbox-flex-center"><input type="checkbox" id="afora_egkekrimenh_rythmish_ergasias" name="afora_egkekrimenh_rythmish_ergasias" class="form-check-input custom-checkbox checkbox-class" value="true" <%= enabled ? 'checked' : '' %> /><label for="afora_egkekrimenh_rythmish_ergasias" id="label-afora_egkekrimenh_rythmish_ergasias" class="margin-left-0_75rem font-size-vw-0_875"><%= enabled ? 'ΝΑΙ' : 'ΟΧΙ' %></label></div>
+    <div class="col-3"></div>
+    <div class="col-2 left-align"><label for="typos_egkekrimenhs_rythmishs" class="col-form-label label-font-size">Τύπος Ρύθμισης</label></div><div class="col-3-75"><select id="typos_egkekrimenhs_rythmishs" name="typos_egkekrimenhs_rythmishs" class="form-select selectpicker-dropdown-normal input-contents left-align w-100" data-approved-arrangement-control <%= enabled ? '' : 'disabled' %>>
+<option value=""></option>
+<% ui.types.forEach(option => { %><option value="<%= option.value %>" data-leave-category="<%= option.usesLeaveCategory %>" <%= profileRecord.typos_egkekrimenhs_rythmishs === option.value ? 'selected' : '' %>><%= option.label %></option><% }); %>
+</select></div>
+</div>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+    <div class="col-2 left-align"><label for="hmnia_enarxhs_egkekrimenhs_rythmishs" class="col-form-label label-font-size">Ισχύς Ρύθμισης Από</label></div><div class="col-1-5 left-align"><input type="date" id="hmnia_enarxhs_egkekrimenhs_rythmishs" name="hmnia_enarxhs_egkekrimenhs_rythmishs" class="date-control" value="<%= profileValue('hmnia_enarxhs_egkekrimenhs_rythmishs') %>" data-approved-arrangement-control <%= enabled ? '' : 'disabled' %> /></div>
+    <div class="col-2-5"></div>
+    <div class="col-2 left-align"><label for="hmnia_lhxhs_egkekrimenhs_rythmishs" class="col-form-label label-font-size">Ισχύς Ρύθμισης Έως</label></div><div class="col-1-5 left-align"><input type="date" id="hmnia_lhxhs_egkekrimenhs_rythmishs" name="hmnia_lhxhs_egkekrimenhs_rythmishs" class="date-control" value="<%= profileValue('hmnia_lhxhs_egkekrimenhs_rythmishs') %>" data-approved-arrangement-control <%= enabled ? '' : 'disabled' %> /></div>
+</div>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+    <div class="col-2 left-align"><label for="diakoph_apo_ora_egkekrimenhs_rythmishs" class="col-form-label label-font-size">Εγκεκριμένη Διακοπή Από</label></div><div class="col-1-1 left-align"><input type="time" id="diakoph_apo_ora_egkekrimenhs_rythmishs" name="diakoph_apo_ora_egkekrimenhs_rythmishs" class="date-control" value="<%= profileValue('diakoph_apo_ora_egkekrimenhs_rythmishs') %>" data-approved-arrangement-control <%= enabled ? '' : 'disabled' %> /></div>
+    <div class="col-2-5"></div><div class="col-0-4"></div>
+    <div class="col-2 left-align"><label for="diakoph_eos_ora_egkekrimenhs_rythmishs" class="col-form-label label-font-size">Εγκεκριμένη Διακοπή Έως</label></div><div class="col-1-1 left-align"><input type="time" id="diakoph_eos_ora_egkekrimenhs_rythmishs" name="diakoph_eos_ora_egkekrimenhs_rythmishs" class="date-control" value="<%= profileValue('diakoph_eos_ora_egkekrimenhs_rythmishs') %>" data-approved-arrangement-control <%= enabled ? '' : 'disabled' %> /></div>
+</div>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+    <div class="col-2 left-align"><span id="approved-arrangement-days-label" class="col-form-label label-font-size">Ημέρες Εφαρμογής</span></div><div class="col-3-75"><div class="d-flex flex-wrap align-items-center gap-2 font-size-vw-0_875" role="group" aria-labelledby="approved-arrangement-days-label" title="Χωρίς επιλογή: όλες οι εργάσιμες">
+<% ['ΔΕ','ΤΡ','ΤΕ','ΠΕ','ΠΑ','ΣΑ','ΚΥ'].forEach((day, index) => { %>
+<label class="d-inline-flex align-items-center gap-1" for="approved-arrangement-day-<%= index + 1 %>"><input type="checkbox" class="form-check-input custom-checkbox checkbox-class m-0" id="approved-arrangement-day-<%= index + 1 %>" name="hmeres_efarmoghs_egkekrimenhs_rythmishs" value="<%= index + 1 %>" data-approved-arrangement-control <%= enabled ? '' : 'disabled' %> <%= (profileRecord.hmeres_efarmoghs_egkekrimenhs_rythmishs || []).includes(index + 1) ? 'checked' : '' %> /><%= day %></label>
+<% }); %></div></div>
+    <div class="col-0-25"></div>
+    <div class="col-2 left-align"><label for="kathgoria_adeias_egkekrimenhs_rythmishs" class="col-form-label label-font-size">Κατηγορία Άδειας</label></div><div class="col-3-75"><select id="kathgoria_adeias_egkekrimenhs_rythmishs" name="kathgoria_adeias_egkekrimenhs_rythmishs" class="form-select selectpicker-dropdown-normal input-contents left-align w-100" data-approved-arrangement-control <%= enabled && selectedType?.usesLeaveCategory ? '' : 'disabled' %>>
+<option value=""></option>
+<% if (profileRecord.kathgoria_adeias_egkekrimenhs_rythmishs && !ui.categories.some(option => option.kodikos === profileRecord.kathgoria_adeias_egkekrimenhs_rythmishs)) { %><option value="<%= profileRecord.kathgoria_adeias_egkekrimenhs_rythmishs %>" selected><%= profileRecord.kathgoria_adeias_egkekrimenhs_rythmishs %></option><% } %>
+<% ui.categories.forEach(option => { %><option value="<%= option.kodikos %>" <%= profileRecord.kathgoria_adeias_egkekrimenhs_rythmishs === option.kodikos ? 'selected' : '' %>><%= option.perigrafh %></option><% }); %>
+</select></div>
+</div>

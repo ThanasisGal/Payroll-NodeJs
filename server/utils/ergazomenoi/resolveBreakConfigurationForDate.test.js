@@ -7,6 +7,9 @@ const {
     resolveOrphanCardResolution
 } = require('../../services/ergazomenoi/apasxoliseisOrphanCardResolutionService');
 
+const { buildCompleteProfileSnapshot } = require('./employmentProfileHistory');
+const C = require('./employmentProfileContract');
+
 const history = [
     { _id: 'june', aa_eggrafhs: '0002', afora_allagh_dialleimatos: true,
         hmeromhnia_isxyos_dialleimatos_apo: new Date('2026-06-01T00:00:00Z'),
@@ -33,11 +36,21 @@ assert.strictEqual(legacy.source, 'LEGACY_EMPLOYEE_FALLBACK');
 assert.strictEqual(legacy.break_inside_schedule, false);
 assert.strictEqual(legacy.break_minutes, 30);
 
-assert.throws(() => buildBreakConfigurationHistoryChange({
+const midMonthChange = buildBreakConfigurationHistoryChange({
     currentEmployee: { dialleima_entos_ektos_orarioy: false, dialleima_se_lepta: 30 },
-    formData: { dialleima_entos_ektos_orarioy: true, dialleima_se_lepta: 20,
+    formData: { dialleima_entos_ektos_orarioy: false, dialleima_se_lepta: 15,
         hmeromhnia_metabolhs: '2026-07-15' }
-}), (error) => error.code === 'BREAK_CONFIGURATION_EFFECTIVE_DATE_MUST_BE_MONTH_START');
+});
+const completeMidMonth = buildCompleteProfileSnapshot({
+    input: midMonthChange.snapshot, effectiveFrom: '2026-07-15'
+});
+assert.strictEqual(midMonthChange.effectiveFrom.toISOString(), '2026-07-15T00:00:00.000Z');
+assert.strictEqual(resolveBreakConfigurationForDate('2026-07-14',
+    [...history, completeMidMonth], {}).break_minutes, 20);
+assert.strictEqual(resolveBreakConfigurationForDate('2026-07-15',
+    [...history, completeMidMonth], {}).break_minutes, 15);
+assert.strictEqual(resolveBreakConfigurationForDate('2026-07-16',
+    [...history, completeMidMonth], {}).break_minutes, 15);
 const change = buildBreakConfigurationHistoryChange({
     currentEmployee: { dialleima_entos_ektos_orarioy: false, dialleima_se_lepta: 30 },
     formData: { dialleima_entos_ektos_orarioy: true, dialleima_se_lepta: 20,
@@ -66,4 +79,21 @@ const julyDecision = resolveOrphanCardResolution({ row: julyRow, contextRows: [j
 assert.strictEqual(julyDecision.proposal.end, '22:51');
 assert.strictEqual(julyDecision.canAutomaticReuse, true);
 
-console.log('month-effective break configuration resolver tests passed');
+console.log('calendar-effective break configuration resolver tests passed');
+
+// A non-month-start LEGACY row was ineligible before foundation and stays so.
+const legacyMidMonth = { _id: 'legacy-mid', aa_eggrafhs: '9999', ...midMonthChange.snapshot };
+for (const date of ['2026-07-14', '2026-07-15', '2026-07-31', '2026-08-01']) {
+    const resolved = resolveBreakConfigurationForDate(date, [...history, legacyMidMonth], {});
+    assert.strictEqual(resolved.history_id, 'july');
+    assert.strictEqual(resolved.break_minutes, 20);
+}
+// Merely adding a version/default to an incomplete old record cannot certify V1.
+assert.strictEqual(resolveBreakConfigurationForDate('2026-07-16', [...history,
+    { ...legacyMidMonth, [C.SCHEMA_VERSION]: 1 }], {}).history_id, 'july');
+// Legacy month-start rows ignore profile-end dates as they did in the baseline.
+assert.strictEqual(resolveBreakConfigurationForDate('2026-07-31',
+    [{ ...history[1], hmeromhnia_isxyos_oron_ergasias_eos: '2026-07-02' }], {}).history_id, 'july');
+const bounded = { ...completeMidMonth, hmeromhnia_isxyos_oron_ergasias_eos: '2026-07-20' };
+assert.strictEqual(resolveBreakConfigurationForDate('2026-07-20', [bounded], {}).break_minutes, 15);
+assert.strictEqual(resolveBreakConfigurationForDate('2026-07-21', [bounded], {}).source, 'UNRECORDED_PROFILE');

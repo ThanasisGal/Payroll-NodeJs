@@ -33,7 +33,7 @@ function resolveSelectedProfile({ payload = {}, employee = {}, profileHistory = 
         selected = getOrarioTermsForDate(effectiveDate, [history], employee);
     } else if (reference.kind === 'CURRENT_EMPLOYEE' &&
         [historyId(employee), String(employee.kodikos || '')].includes(String(reference.id))) {
-        selected = getOrarioTermsForDate(new Date(0), [], employee);
+        selected = getOrarioTermsForDate(employee.hmeromhnia_isxyos_oron_ergasias_apo || new Date(0), [], employee);
     } else return { ok: false, reason: 'CANONICAL_DECISION_PROFILE_REFERENCE_INVALID' };
     const profile = { ...selected, profile_changed_inside_week: false };
     if (selectedProfileFingerprint(profile) !== payload.selected_profile_fingerprint) {

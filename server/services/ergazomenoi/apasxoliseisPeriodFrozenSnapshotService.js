@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const SNAPSHOT_SCHEMA_VERSION = 'employment-period-frozen:v3';
 const DEFAULT_SOURCE_VERSION = 'employment-calculation:v2';
@@ -93,6 +94,12 @@ function pick(source = {}, fields = []) {
     return canonicalize(Object.fromEntries(fields.filter((field) => source[field] !== undefined)
         .map((field) => [field, source[field]])));
 }
+function pickProfile(row, fields, includeLegacyBreakHistory = false) {
+    // Explicit legacy break history needs its eligibility fields even without V1.
+    const temporal = T.versioned(row) ||
+        (includeLegacyBreakHistory && row.afora_allagh_dialleimatos === true);
+    return pick(row, temporal ? T.profileSelect(fields.join(' ')).split(/\s+/) : fields);
+}
 function sorted(rows, key) {
     return rows.map(canonicalize).sort((a, b) => String(key(a)).localeCompare(String(key(b))));
 }
@@ -100,7 +107,7 @@ function buildEmploymentPeriodFrozenSnapshot(input = {}) {
     const scope = canonicalize(input.scope || {});
     const dailyResults = sorted((input.dailyResults || []).map((row) => pick(row, DAILY_FIELDS)),
         (row) => `${row.ypokatasthma}|${row.kodikos}|${row.hmeromhnia}|${row._id}`);
-    const employeesByCode = new Map((input.employees || []).map((employee) => [String(employee.kodikos || ''), pick(employee, EMPLOYEE_FIELDS)]));
+    const employeesByCode = new Map((input.employees || []).map((employee) => [String(employee.kodikos || ''), pickProfile(employee, EMPLOYEE_FIELDS)]));
     const employees = [...new Set(dailyResults.map((row) => String(row.kodikos || '')).filter(Boolean))]
         .sort().map((kodikos) => employeesByCode.get(kodikos) || { kodikos });
     const snapshot = canonicalize({
@@ -112,7 +119,7 @@ function buildEmploymentPeriodFrozenSnapshot(input = {}) {
             rows: sorted((input.weeklyDailyResults || input.dailyResults || [])
                 .map((row) => pick(row, DAILY_FIELDS)),
             (row) => `${row.ypokatasthma}|${row.kodikos}|${row.hmeromhnia}|${row._id}`),
-            profile_history: sorted((input.profileHistory || []).map((row) => pick(row, HISTORY_FIELDS)),
+            profile_history: sorted((input.profileHistory || []).map((row) => pickProfile(row, HISTORY_FIELDS, true)),
                 (row) => `${row.kodikos}|${row.hmeromhnia_isxyos_oron_ergasias_apo || ''}|${row._id}`),
             calendar_facts: sorted((input.calendarFacts || []).map(canonicalize),
                 (row) => `${row.hmeromhnia}|${row.ypokatasthma || ''}`),

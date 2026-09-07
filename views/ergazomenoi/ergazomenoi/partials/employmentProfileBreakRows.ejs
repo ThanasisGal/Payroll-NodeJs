@@ -1,0 +1,16 @@
+<% const profileRecord = (typeof rec !== 'undefined' && rec) || {}; const profileValue = key => profileRecord[key] ?? ''; %>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+    <div class="col-2 left-align"><label for="dialleima_apo_ora_01" class="col-form-label label-font-size">Διάλειμμα Από 1</label></div><div class="col-1-1 left-align"><input type="time" id="dialleima_apo_ora_01" name="dialleima_apo_ora_01" class="date-control" value="<%= profileValue('dialleima_apo_ora_01') %>" /></div>
+    <div class="col-2-5"></div><div class="col-0-4"></div>
+    <div class="col-2 left-align"><label for="dialleima_eos_ora_01" class="col-form-label label-font-size">Διάλειμμα Έως 1</label></div><div class="col-1-1 left-align"><input type="time" id="dialleima_eos_ora_01" name="dialleima_eos_ora_01" class="date-control" value="<%= profileValue('dialleima_eos_ora_01') %>" /></div>
+</div>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+    <div class="col-2 left-align"><label for="dialleima_apo_ora_02" class="col-form-label label-font-size">Διάλειμμα Από 2</label></div><div class="col-1-1 left-align"><input type="time" id="dialleima_apo_ora_02" name="dialleima_apo_ora_02" class="date-control" value="<%= profileValue('dialleima_apo_ora_02') %>" /></div>
+    <div class="col-2-5"></div><div class="col-0-4"></div>
+    <div class="col-2 left-align"><label for="dialleima_eos_ora_02" class="col-form-label label-font-size">Διάλειμμα Έως 2</label></div><div class="col-1-1 left-align"><input type="time" id="dialleima_eos_ora_02" name="dialleima_eos_ora_02" class="date-control" value="<%= profileValue('dialleima_eos_ora_02') %>" /></div>
+</div>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+    <div class="col-2 left-align"><label for="dialleima_apo_ora_03" class="col-form-label label-font-size">Διάλειμμα Από 3</label></div><div class="col-1-1 left-align"><input type="time" id="dialleima_apo_ora_03" name="dialleima_apo_ora_03" class="date-control" value="<%= profileValue('dialleima_apo_ora_03') %>" /></div>
+    <div class="col-2-5"></div><div class="col-0-4"></div>
+    <div class="col-2 left-align"><label for="dialleima_eos_ora_03" class="col-form-label label-font-size">Διάλειμμα Έως 3</label></div><div class="col-1-1 left-align"><input type="time" id="dialleima_eos_ora_03" name="dialleima_eos_ora_03" class="date-control" value="<%= profileValue('dialleima_eos_ora_03') %>" /></div>
+</div>

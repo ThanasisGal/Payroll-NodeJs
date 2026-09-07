@@ -121,7 +121,8 @@ assert.ok(
 );
 assert.ok(calculationSource.includes('ProdhlomenaOrariaModel.find(prodhlomenaQuery)'));
 assert.ok(calculationSource.includes('buildEmploymentDailyPreliminaryUpdate({'));
-assert.ok(calculationSource.includes('buildEmploymentDailyCalculationUpdate({'));
+// The deployed baseline already delegates the final calculation through the Stage 1 holiday wrapper.
+assert.ok(calculationSource.includes('buildStage1EffectiveHolidayDailyCalculationUpdate({'));
 assert.ok(dailyAdapterSource.includes('operations.resolveCardPairVerification(calculationRow)'));
 assert.ok(dailyAdapterSource.includes('operations.buildPartialVerifiedCardUpdate(calculationRow).update'));
 assert.ok(!calculationSource.includes('buildIncompleteCardSafeUpdate()'));
@@ -133,20 +134,13 @@ assert.ok(/resolveCardPairVerification\(\s*row\s*\)/.test(postCheckWritePlan));
 assert.ok(postCheckWritePlan.includes('buildPartialVerifiedCardUpdate(row).update'));
 assert.ok(!postCheckWritePlan.includes('buildIncompleteCardSafeUpdate()'));
 
-const payrollIntervalsStart = source.indexOf(
-    'function getPayrollCalculationIntervals(rec, ergazomenos = null)'
-);
-const payrollIntervalsEnd = source.indexOf(
-    'function getPayrollDailyWorkMinutes',
-    payrollIntervalsStart
-);
-assert.ok(
-    payrollIntervalsStart >= 0 && payrollIntervalsEnd > payrollIntervalsStart
-);
-const payrollIntervalsSource = source.slice(
-    payrollIntervalsStart,
-    payrollIntervalsEnd
-);
+// Interval fact extraction was moved to the shared service before Phase 1.
+const intervalServiceSource = fs.readFileSync(path.join(__dirname, '..', '..', 'services', 'ergazomenoi',
+    'apasxoliseisWeeklyIllegalOvertimeCalculationService.js'), 'utf8');
+const payrollIntervalsStart = intervalServiceSource.indexOf('function getPayrollCalculationIntervals(');
+const payrollIntervalsEnd = intervalServiceSource.indexOf('\nmodule.exports', payrollIntervalsStart + 1);
+assert.ok(payrollIntervalsStart >= 0 && payrollIntervalsEnd > payrollIntervalsStart);
+const payrollIntervalsSource = intervalServiceSource.slice(payrollIntervalsStart, payrollIntervalsEnd);
 assert.ok(payrollIntervalsSource.includes('resolveCardPairVerification(rec)'));
 assert.ok(payrollIntervalsSource.includes('verification.completePairs.map'));
 assert.ok(payrollIntervalsSource.includes("source: 'CARD_PARTIALLY_VERIFIED'"));

@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sections.forEach((section) => {
             const inputs = section.querySelectorAll('input, select, textarea');
             inputs.forEach((input) => {
+                if (window.serializeEmploymentProfileField(input, formData, true)) return;
                 if (input.tagName === 'INPUT') {
                     if (input.type === 'checkbox') {
                         formData[input.name] = input.checked === true;

@@ -1,3 +1,6 @@
+const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { getOrarioTermsForDate: resolveTemporalWorkTerms } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('../../utils/ergazomenoi/employmentProfileHistory');
 // module.exports = erganhController;
 
 const mongoose = require('mongoose');
@@ -1341,7 +1344,7 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
         payrollResults, payrollPhaseFacts, policyRules] = await Promise.all([
         ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(range) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
         ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(weeklyRange) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
-        ErgazomenoiModel.find(base).select('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth').lean(),
+        ErgazomenoiModel.find(base).select(temporalProfile.profileSelect('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth')).lean(),
         ProdhlomenaOrariaDeviationsModel.find({ ...base, period_apo: asDateOnlyUtc(scope.period_start), period_eos: asDateOnlyUtc(scope.period_end, true) }).sort({ kodikos: 1, week_apo: 1 }).lean(),
         ApasxoliseisWeeklyCanonicalDecisionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), decision_status: 'RECORDED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
         ApasxoliseisWeeklyRepoTransferExecutionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), execution_status: 'APPLIED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
@@ -2079,7 +2082,7 @@ async function runWeeklyRepoPostCheck({
     }
 
     const employees = await ErgazomenoiModel.find(employeeQuery)
-        .select(
+        .select(temporalProfile.profileSelect(
             'company_kod ypokatasthma kodikos eponymo onoma ' +
                 'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                 'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
@@ -2090,7 +2093,7 @@ async function runWeeklyRepoPostCheck({
                 'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy ' +
                 'hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy ' +
                 'afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth'
-        )
+        ))
         .sort({ kodikos: 1 })
         .lean();
 
@@ -2115,6 +2118,7 @@ async function runWeeklyRepoPostCheck({
             company_kod: companyId,
             kodikos: mongoose.trusted({ $in: kodikoi }),
             $or: mongoose.trusted([
+                temporalProfile.legacyBreakQuery(naturalContextEnd, mongoose.trusted),
                 {
                     hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({ $lte: naturalContextEnd }),
                     $or: mongoose.trusted([
@@ -2146,7 +2150,7 @@ async function runWeeklyRepoPostCheck({
                 }
             ])
         })
-            .select(
+            .select(temporalProfile.profileSelect(
                 'kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
                     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
@@ -2156,7 +2160,7 @@ async function runWeeklyRepoPostCheck({
                     'pososto_prosayxhshs_6hs_hmeras ' +
                     'nomimoOromisthio pragmatikoOromisthio ' +
                     'employment_profile_source afora_allagh_oron_ergasias createdAt'
-            )
+            ))
             .sort({
                 kodikos: 1,
                 hmeromhnia_isxyos_oron_ergasias_apo: 1,
@@ -2546,6 +2550,7 @@ function getIstorikoTermsEos(row = {}) {
 }
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
+    if (temporalProfile.versioned(ergazomenos, istorikoRows)) return resolveTemporalWorkTerms(date, istorikoRows, ergazomenos);
     const targetDate = normalizeDateOnlyForCalc(date);
 
     if (!targetDate) {
@@ -2598,6 +2603,7 @@ function getEffectiveEmployeeForDate(rec, ergazomenos = {}, istorikoRows = []) {
     // ergazomenos να συνεχίσουν να δουλεύουν χωρίς μεγάλο refactor.
     return {
         ...ergazomenos,
+        ...(temporalProfile.versioned(ergazomenos, istorikoRows) ? resolveTemporalFacts(rec?.hmeromhnia, istorikoRows, { currentEmployee: ergazomenos }).facts : {}),
         ...workTerms,
         _workTermsSource: workTerms.source,
         _workTermsIstorikoId: workTerms.istorikoId
@@ -4594,7 +4600,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
               company_kod: req.session.companyInUse,
               kodikos: mongoose.trusted({ $in: kodikoi })
           })
-              .select(
+              .select(temporalProfile.profileSelect(
                   'kodikos eponymo onoma ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                       'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                       'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
@@ -4604,7 +4610,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
                       'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy ' +
                       'hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy ' +
                       'afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth'
-              )
+              ))
               .lean()
         : [];
 
@@ -4630,6 +4636,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
             company_kod: req.session.companyInUse,
             kodikos: mongoose.trusted({ $in: kodikoi }),
             $or: mongoose.trusted([
+                temporalProfile.legacyBreakQuery(periodEnd, mongoose.trusted),
                 {
                     hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({ $lte: periodEnd }),
                     $or: mongoose.trusted([
@@ -4656,7 +4663,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
                 }
             ])
         })
-            .select(
+            .select(temporalProfile.profileSelect(
                 'kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
                     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
@@ -4665,7 +4672,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
                     'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
                     'nomimoOromisthio pragmatikoOromisthio ' +
                     'employment_profile_source afora_allagh_oron_ergasias createdAt'
-            )
+            ))
             .sort({
                 kodikos: 1,
                 hmeromhnia_isxyos_oron_ergasias_apo: 1,
@@ -5611,7 +5618,10 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
     baselineSnapshot }) {
     const employee = (baselineSnapshot.employees || []).find((item) =>
         String(item.kodikos) === String(employeeKodikos)) || {};
-    const effectiveEmployeeForRow = (row) => ({ ...employee, ...(row.effective_profile_resolved || {}),
+    const effectiveEmployeeForRow = (row) => ({ ...employee,
+        ...(temporalProfile.versioned(employee, baselineSnapshot.weekly_calculation_context?.profile_history || [])
+            ? getEffectiveEmployeeForDate(row, employee, baselineSnapshot.weekly_calculation_context?.profile_history || []) : {}),
+        ...(row.effective_profile_resolved || {}),
         kodikos: employeeKodikos, ypokatasthma: row.ypokatasthma || baselineSnapshot.scope?.ypokatasthma });
     const firstEffectiveEmployee = effectiveEmployeeForRow(frozenRows[0] || {});
     const argiesDateSet = new Set((baselineSnapshot.weekly_calculation_context?.calendar_facts || [])
@@ -6673,7 +6683,7 @@ class erganhController {
                 company_kod: companyId,
                 kodikos: mongoose.trusted({ $in: kodikoiRows })
             })
-                .select(
+                .select(temporalProfile.profileSelect(
                     'kodikos eponymo onoma pososto_prosayxhshs_6hs_hmeras ' +
                         'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                         'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
@@ -6685,7 +6695,7 @@ class erganhController {
                         + ' hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy'
                         + ' afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth'
                         + ` ${CANONICAL_EMPLOYEE_PROFILE_FIELDS}`
-                )
+                ))
                 .lean();
 
             const ergByKodikos = new Map(ergazomenoi.map((e) => [e.kodikos, e]));
@@ -6724,6 +6734,7 @@ class erganhController {
                     company_kod: companyId,
                     kodikos: mongoose.trusted({ $in: kodikoiRows }),
                     $or: mongoose.trusted([
+                temporalProfile.legacyBreakQuery(reviewAnalysisEnd, mongoose.trusted),
                         {
                             hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({
                                 $lte: reviewAnalysisEnd
@@ -10242,7 +10253,7 @@ class erganhController {
             }
 
             const ergazomenoi = await ErgazomenoiModel.find(employeeQuery)
-                .select(
+                .select(temporalProfile.profileSelect(
                     'company_kod kodikos eponymo onoma ypokatasthma ' +
                         'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                         'aa_eggrafhs hmeres_ergasias_ebdomadas ' +
@@ -10255,7 +10266,7 @@ class erganhController {
                         'typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy ' +
                         'hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth ' +
                         'kodikos_ergazomenoy_alloy_ergodoth'
-                )
+                ))
                 .sort({ kodikos: 1 })
                 .lean();
 
@@ -10354,14 +10365,14 @@ class erganhController {
                 };
 
                 const istorikoRows = await IstorikoProslhpseonAllagonModel.find(istorikoQuery)
-                    .select(
+                    .select(temporalProfile.profileSelect(
                         'kodikos aa_eggrafhs hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                             'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                             'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                             'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
                             'typos_apasxolhshs typos_ebdomadas ' +
                             'afora_allagh_oron_ergasias createdAt'
-                    )
+                    ))
                     .sort({
                         kodikos: 1,
                         hmeromhnia_isxyos_oron_ergasias_apo: 1,

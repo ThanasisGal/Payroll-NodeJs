@@ -133,14 +133,14 @@
         <table class="table table-striped table-bordered table-sm table-hover mb-0" id="myTableHeader">
             <thead class="backgroundColor-brown font-size-rem-1_1 center-align">
                 <tr class="color-brown">
-                    <th scope="col" class="color-brown col-1">Κωδ.<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-2-5">Επώνυμο<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-1-5">Όνομα<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-1-5">Πατρώνυμο<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-2">Ειδικότητα<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-1">Α.Φ.Μ.<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-1-5">Α.M.K.A.<i class="sort-icon bi"></i></th>
-                    <th scope="col" class="color-brown col-1">Α.Δ.Τ.<i class="sort-icon bi"></i></th>
+                    <th data-sort-key="kodikos" data-dir="asc" scope="col" class="color-brown col-1">Κωδ.<i class="sort-icon bi bi-sort-numeric-down"></i></th>
+                    <th data-sort-key="eponymo" scope="col" class="color-brown col-2-5">Επώνυμο<i class="sort-icon bi"></i></th>
+                    <th data-sort-key="onoma" scope="col" class="color-brown col-1-5">Όνομα<i class="sort-icon bi"></i></th>
+                    <th data-sort-key="patronymo" scope="col" class="color-brown col-1-5">Πατρώνυμο<i class="sort-icon bi"></i></th>
+                    <th data-sort-key="eidikothta" scope="col" class="color-brown col-2">Ειδικότητα<i class="sort-icon bi"></i></th>
+                    <th data-sort-key="afm" scope="col" class="color-brown col-1">Α.Φ.Μ.<i class="sort-icon bi"></i></th>
+                    <th data-sort-key="amka" scope="col" class="color-brown col-1-5">Α.M.K.A.<i class="sort-icon bi"></i></th>
+                    <th data-sort-key="adt" scope="col" class="color-brown col-1">Α.Δ.Τ.<i class="sort-icon bi"></i></th>
                 </tr>
             </thead>
         </table>
@@ -272,5 +272,6 @@
 </script>
 <script src="<%= script('common/blockInvalidClick') %>"></script>
 <script src="<%= script('common/sortTable') %>"></script>
+<%- include('./partials/employmentTableNavigation') %>
 <script src="<%= script('ergazomenoi/genika/selectRowInTable') %>"></script>
 <script src="<%= script('common/ergazomenoiAnenerghToggle') %>"></script>
