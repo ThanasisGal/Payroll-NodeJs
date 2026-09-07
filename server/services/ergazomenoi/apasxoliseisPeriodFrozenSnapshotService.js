@@ -94,8 +94,11 @@ function pick(source = {}, fields = []) {
     return canonicalize(Object.fromEntries(fields.filter((field) => source[field] !== undefined)
         .map((field) => [field, source[field]])));
 }
-function pickProfile(row, fields) {
-    return pick(row, T.versioned(row) ? T.profileSelect(fields.join(' ')).split(/\s+/) : fields);
+function pickProfile(row, fields, includeLegacyBreakHistory = false) {
+    // Explicit legacy break history needs its eligibility fields even without V1.
+    const temporal = T.versioned(row) ||
+        (includeLegacyBreakHistory && row.afora_allagh_dialleimatos === true);
+    return pick(row, temporal ? T.profileSelect(fields.join(' ')).split(/\s+/) : fields);
 }
 function sorted(rows, key) {
     return rows.map(canonicalize).sort((a, b) => String(key(a)).localeCompare(String(key(b))));
@@ -116,7 +119,7 @@ function buildEmploymentPeriodFrozenSnapshot(input = {}) {
             rows: sorted((input.weeklyDailyResults || input.dailyResults || [])
                 .map((row) => pick(row, DAILY_FIELDS)),
             (row) => `${row.ypokatasthma}|${row.kodikos}|${row.hmeromhnia}|${row._id}`),
-            profile_history: sorted((input.profileHistory || []).map((row) => pickProfile(row, HISTORY_FIELDS)),
+            profile_history: sorted((input.profileHistory || []).map((row) => pickProfile(row, HISTORY_FIELDS, true)),
                 (row) => `${row.kodikos}|${row.hmeromhnia_isxyos_oron_ergasias_apo || ''}|${row._id}`),
             calendar_facts: sorted((input.calendarFacts || []).map(canonicalize),
                 (row) => `${row.hmeromhnia}|${row.ypokatasthma || ''}`),
