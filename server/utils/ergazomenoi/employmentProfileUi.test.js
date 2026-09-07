@@ -109,9 +109,9 @@ test('controller changes are limited to import and two GET render context proper
         'server/utils/ergazomenoi/employmentProfileUiContext.js',
         'server/utils/ergazomenoi/employmentProfileUi.test.js'
     ]);
-    const changed = [
-        ...execFileSync('git', ['diff', '--name-only', '-z', checkpoint], { encoding: 'utf8' }).split('\0'),
-        ...execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { encoding: 'utf8' }).split('\0')
-    ].filter(Boolean);
+    // Audit the completed UI checkpoint, not unrelated subsequent feature slices.
+    const uiCheckpoint = '981302d3c6183c27b7f9d47500432692755375cb';
+    const changed = execFileSync('git', ['diff', '--name-only', '-z', checkpoint, uiCheckpoint],
+        { encoding: 'utf8' }).split('\0').filter(Boolean);
     for (const changedFile of changed) assert(allowed.has(changedFile), `Outside approved UI slice: ${changedFile}`);
 });

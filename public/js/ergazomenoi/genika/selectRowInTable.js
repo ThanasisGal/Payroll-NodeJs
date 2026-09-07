@@ -1,87 +1,16 @@
 // Επιλεγμένη γραμμή (id από data-id)
 let selectedRowId = null;
-const EMPLOYEE_MAINTENANCE_RETURN_KEY = 'employee-maintenance-return:v1';
-
-function employeeListReturnUrl() {
-    return `${window.location.pathname}${window.location.search}`;
-}
 
 function employeeTableScrollContainer() {
     return document.getElementById('myTable')?.closest('.overflow-auto') || null;
 }
 
-function storeEmployeeMaintenanceReturn(employeeId) {
-    if (!/^[a-f\d]{24}$/i.test(String(employeeId || ''))) return;
-    const scrollContainer = employeeTableScrollContainer();
-    try {
-        sessionStorage.setItem(EMPLOYEE_MAINTENANCE_RETURN_KEY, JSON.stringify({
-            employeeId: String(employeeId), returnUrl: employeeListReturnUrl(),
-            scrollTop: Number.isFinite(scrollContainer?.scrollTop)
-                ? scrollContainer.scrollTop : null,
-            redirectPending: false
-        }));
-    } catch (error) {
-        console.warn('[employee-maintenance-return] Temporary state unavailable.', error);
-    }
-}
-
-function restoreEmployeeMaintenanceReturn(rows) {
-    let state;
-    try {
-        state = JSON.parse(sessionStorage.getItem(EMPLOYEE_MAINTENANCE_RETURN_KEY) || 'null');
-    } catch (error) {
-        sessionStorage.removeItem(EMPLOYEE_MAINTENANCE_RETURN_KEY);
-        return { restored: false, redirected: false };
-    }
-    const employeeId = String(state?.employeeId || '');
-    if (!/^[a-f\d]{24}$/i.test(employeeId)) {
-        sessionStorage.removeItem(EMPLOYEE_MAINTENANCE_RETURN_KEY);
-        return { restored: false, redirected: false };
-    }
-
-    let returnUrl;
-    try { returnUrl = new URL(state.returnUrl, window.location.origin); }
-    catch (error) { returnUrl = null; }
-    const allowedPath = returnUrl && [
-        '/ergazomenoi/ergazomenoi', '/ergazomenoi/ergazomenoi/search',
-        '/ergazomenoi/ergazomenoi/search/'
-    ].includes(returnUrl.pathname) && returnUrl.origin === window.location.origin;
-    if (!allowedPath) {
-        sessionStorage.removeItem(EMPLOYEE_MAINTENANCE_RETURN_KEY);
-        return { restored: false, redirected: false };
-    }
-    const targetUrl = `${returnUrl.pathname}${returnUrl.search}`;
-    if (employeeListReturnUrl() !== targetUrl) {
-        sessionStorage.setItem(EMPLOYEE_MAINTENANCE_RETURN_KEY,
-            JSON.stringify({ ...state, redirectPending: true }));
-        window.location.replace(targetUrl);
-        return { restored: false, redirected: true };
-    }
-
-    sessionStorage.removeItem(EMPLOYEE_MAINTENANCE_RETURN_KEY);
-    const selectedRow = [...rows].find((row) => row.getAttribute('data-id') === employeeId);
-    if (!selectedRow) return { restored: false, redirected: false };
-    selectedRow.classList.add('selected-row');
-    selectedRowId = employeeId;
-    const scrollContainer = employeeTableScrollContainer();
-    if (scrollContainer) {
-        if (typeof state.scrollTop === 'number' && Number.isFinite(state.scrollTop) &&
-            state.scrollTop >= 0) {
-            scrollContainer.scrollTop = state.scrollTop;
-        } else if (typeof selectedRow.getBoundingClientRect === 'function' &&
-            typeof scrollContainer.getBoundingClientRect === 'function') {
-            scrollContainer.scrollTop += selectedRow.getBoundingClientRect().top -
-                scrollContainer.getBoundingClientRect().top;
-        } else if (Number.isFinite(selectedRow.offsetTop)) {
-            scrollContainer.scrollTop = selectedRow.offsetTop;
-        }
-    }
-    return { restored: true, redirected: false };
-}
-
 document.addEventListener('DOMContentLoaded', function () {
     const rows = document.querySelectorAll('#myTable tbody tr');
     // const btnSelect = document.getElementById("select-btn");
+    const btnAdd = document.getElementById('add-btn');
+    const table = document.getElementById('myTable');
+    const header = document.getElementById('myTableHeader');
     const btnEdit = document.getElementById('edit-btn');
     const btnDelete = document.getElementById('delete-btn');
 
@@ -136,11 +65,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (basePath) {
                 e.preventDefault();
-                if (basePath === baseEdit) storeEmployeeMaintenanceReturn(selectedRowId);
-                location.href = `${basePath}/${selectedRowId}`;
+                location.href = departureUrl(`${basePath}/${selectedRowId}`);
             }
         });
     };
+
+    function departureUrl(path) {
+        return window.EmployeeTableReturn?.begin(path, selectedRowId,
+            employeeTableScrollContainer()?.scrollTop,
+            window.TableSort?.getSortState(table, header)) || path;
+    }
+    if (btnAdd) btnAdd.addEventListener('click', event => {
+        if (!isAllowed(btnAdd)) return;
+        event.preventDefault();
+        location.href = departureUrl('/ergazomenoi/ergazomenoi/add');
+    });
 
     // Επιλογή/αποεπιλογή γραμμών (μία ενεργή)
     rows.forEach((row) => {
@@ -355,7 +294,30 @@ document.addEventListener('DOMContentLoaded', function () {
     // bindGuardedNav(btnSelect, baseSelect);
     bindGuardedNav(btnEdit, baseEdit);
 
-    const restored = restoreEmployeeMaintenanceReturn(rows);
-    if (restored.redirected) return;
-    updateButtons();
+    let restoring = false;
+    function restore(persisted = false) {
+        if (restoring) return;
+        const state = window.EmployeeTableReturn?.returning(persisted);
+        if (state?.redirected) return;
+        if (!state) { updateButtons(); return; }
+        restoring = true;
+        // Reorder first. Row identity, never a position/index, drives selection.
+        if (state.sort) window.TableSort?.applySortState(table, header, state.sort);
+        rows.forEach(row => row.classList.remove('selected-row'));
+        const selected = [...rows].find(row => state.employeeId && row.getAttribute('data-id') === state.employeeId);
+        selectedRowId = selected ? state.employeeId : null;
+        selected?.classList.add('selected-row');
+        updateButtons();
+        // Let layout and browser history scroll restoration finish before our scroll.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            const container = employeeTableScrollContainer();
+            if (container && Number.isFinite(state.scrollTop) && state.scrollTop >= 0) {
+                container.scrollTop = state.scrollTop;
+            }
+            window.EmployeeTableReturn.clear(state.token);
+            restoring = false;
+        }));
+    }
+    restore();
+    window.addEventListener('pageshow', event => { if (event.persisted) restore(true); });
 });

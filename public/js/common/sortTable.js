@@ -1,10 +1,24 @@
 // /common/sortTable.js
-document.addEventListener('DOMContentLoaded', function () {
+(function () {
+    'use strict';
+    const headers = header => Array.from(header?.querySelectorAll('th') || []);
+    function getSortState(table, header) {
+        if (!table) return null;
+        const column = headers(header).findIndex(th => ['asc', 'desc'].includes(th.dataset.dir));
+        const th = headers(header)[column];
+        return th ? { key: th.dataset.sortKey, column, direction: th.dataset.dir } : null;
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
     // click στα headers
     document.querySelectorAll('#myTableHeader th').forEach((th, index) => {
 		th.addEventListener('click', function () {
-			sortTable(index, this);
+			applySortState(document.getElementById('myTable'), document.getElementById('myTableHeader'), {
+                column: index, direction: this.dataset.dir === 'asc' ? 'desc' : 'asc'
+            });
       	});
+    });
+
     });
 
     const getCellText = (cell) =>
@@ -21,16 +35,18 @@ document.addEventListener('DOMContentLoaded', function () {
 		return false;
     }
 
-    function sortTable(column, thElement) {
-		const table = document.getElementById('myTable');
-		if (!table || !table.tBodies[0]) return;
+    // Exact application shares the click comparator and icon updates; never toggles.
+    function applySortState(table, header, state) {
+        const ths = headers(header);
+        const column = state?.key !== undefined
+            ? ths.findIndex(th => th.dataset.sortKey === state.key) : state?.column;
+        const thElement = ths[column];
+        if (!table?.tBodies[0] || !Number.isInteger(column) || !thElement ||
+            !['asc', 'desc'].includes(state?.direction)) return false;
+        const dir = state.direction;
 
 		const tbody = table.tBodies[0];
 		const rows = Array.from(tbody.rows);
-
-		// 1) Διάβασε ΠΡΙΝ κάνεις reset
-		const prevDir = thElement.dataset.dir || '';     // 'asc' | 'desc' | ''
-		const dir = prevDir === 'asc' ? 'desc' : 'asc';  // toggle
 
 		// 2) Αν είναι numeric στήλη
 		const numeric = detectNumericColumn(table, column);
@@ -57,15 +73,16 @@ document.addEventListener('DOMContentLoaded', function () {
 		rows.forEach(tr => tbody.appendChild(tr));
 
 		// 4) ΜΕΤΑ το sort, καθάρισε όλα τα εικονίδια/dirs
-		resetSortIcons();
+		resetSortIcons(header);
 
 		// 5) Γράψε το νέο dir στο τρέχον <th> και ενημέρωσε εικονίδιο
 		thElement.dataset.dir = dir;
 		updateSortIcon(thElement, dir, numeric);
+        return true;
     }
 
-    function resetSortIcons() {
-		document.querySelectorAll('#myTableHeader th').forEach(th => {
+    function resetSortIcons(header) {
+		headers(header).forEach(th => {
 			th.removeAttribute('data-dir');
 			const icon = th.querySelector('.sort-icon');
 			if (icon) icon.className = 'sort-icon bi';
@@ -82,4 +99,5 @@ document.addEventListener('DOMContentLoaded', function () {
 			icon.classList.add(isNumericCol ? 'bi-sort-numeric-down-alt' : 'bi-sort-alpha-down-alt');
 		}
     }
-});
+    window.TableSort = { getSortState, applySortState };
+})();
