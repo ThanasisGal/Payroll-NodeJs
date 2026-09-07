@@ -1,6 +1,7 @@
 /* Presentation only: no requests, persistence, or payroll semantics. */
 (function () {
     'use strict';
+    const MULTI_BREAK_CATEGORIES = new Set(['0004', '0005']);
     // Serialization only. Disabled dependent controls are omitted, never cleared by a visual toggle.
     function serializeEmploymentProfileField(input, payload, preserveLegacyDuration = false) {
         if (input.hasAttribute('data-approved-arrangement-control') && input.disabled) return true;
@@ -15,6 +16,15 @@
         return false;
     }
     function initEmploymentProfileUi(root) {
+        const specialCategory = root.getElementById('eidikh_kathgoria_ergazomenoy');
+        if (specialCategory) {
+            const extraBreakInputs = root.querySelectorAll('[data-extra-profile-break]');
+            function updateBreakIntervalAvailability() {
+                extraBreakInputs.forEach(input => { input.disabled = !MULTI_BREAK_CATEGORIES.has(specialCategory.value); });
+            }
+            specialCategory.addEventListener('change', updateBreakIntervalAvailability);
+            updateBreakIntervalAvailability(); // Also reused by the existing async dropdown change event.
+        }
         const master = root.getElementById('afora_egkekrimenh_rythmish_ergasias');
         if (!master) return;
         const type = root.getElementById('typos_egkekrimenhs_rythmishs');
