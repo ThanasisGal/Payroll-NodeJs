@@ -1,4 +1,5 @@
 const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { hasExactExternalBreaks } = require('../../utils/ergazomenoi/subtractExternalBreakIntervals');
 const { getOrarioTermsForDate: resolveTemporalWorkTerms } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('../../utils/ergazomenoi/employmentProfileHistory');
 // module.exports = erganhController;
@@ -2737,7 +2738,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     const declaredMinutes = getDailyDeclaredMinutes(rec);
     const dailyCardsMinutes = getPayrollDailyWorkMinutes(rec, ergazomenos);
     const approvedOrphanBreakOffsetMinutes =
-        rec?.orphan_card_resolution?.status === 'HR_APPROVED'
+        rec?.orphan_card_resolution?.status === 'HR_APPROVED' && !hasExactExternalBreaks(ergazomenos)
             ? getBreakOffsetMinutes(ergazomenos)
             : 0;
 
@@ -2765,6 +2766,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     // υπερωρία (όχι υπερεργασία και όχι παράνομη υπερωρία).
     // ============================================================
     let firstLegalOvertimeMinute = null;
+    let lastLegalOvertimeMinute = null;
     let totalLegalOvertimeMinutes = 0;
 
     const addLegalOvertimeMinute = (minute) => {
@@ -2772,12 +2774,13 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
             firstLegalOvertimeMinute = minute;
         }
 
+        lastLegalOvertimeMinute = minute;
         totalLegalOvertimeMinutes++;
         addClassifiedMinute(nomimiYperoria, rec, minute, argiesDateSet);
     };
 
     const buildResult = () => {
-        const legalOvertimeBreakOffsetMinutes = shouldSubtractExternalBreak(rec, ergazomenos)
+        const legalOvertimeBreakOffsetMinutes = !hasExactExternalBreaks(ergazomenos) && shouldSubtractExternalBreak(rec, ergazomenos)
             ? getBreakOffsetMinutes(ergazomenos)
             : 0;
 
@@ -2789,9 +2792,9 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
         const legalOvertimeEndTime =
             totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
                 ? minutesToTimeSafe(
-                      firstLegalOvertimeMinute +
-                          legalOvertimeBreakOffsetMinutes +
-                          totalLegalOvertimeMinutes
+                      hasExactExternalBreaks(ergazomenos)
+                          ? lastLegalOvertimeMinute + 1
+                          : firstLegalOvertimeMinute + legalOvertimeBreakOffsetMinutes + totalLegalOvertimeMinutes
                   )
                 : '';
 
@@ -3150,7 +3153,7 @@ function getPayrollDailyWorkMinutes(rec, ergazomenos = null) {
         (total, interval) => total + Math.max(0, interval.end - interval.start),
         0
     );
-    if (rec?.orphan_card_resolution?.status !== 'HR_APPROVED') return grossMinutes;
+    if (rec?.orphan_card_resolution?.status !== 'HR_APPROVED' || hasExactExternalBreaks(ergazomenos)) return grossMinutes;
     return Math.max(0, grossMinutes - getBreakOffsetMinutes(ergazomenos));
 }
 
@@ -3197,7 +3200,8 @@ function checkOresApoysias(context) {
     // Το χρησιμοποιούμε μόνο ως βάση υπολογισμού.
     // ============================================================
     const approvedOrphan = rec?.orphan_card_resolution?.status === 'HR_APPROVED';
-    const cardsHours = approvedOrphan
+    const exactExternalBreak = hasExactExternalBreaks(ergazomenos);
+    const cardsHours = approvedOrphan || exactExternalBreak
         ? getPayrollDailyWorkMinutes(rec, ergazomenos) / 60
         : Number(rec.cards_ores_ergasias || 0);
 
@@ -3224,7 +3228,7 @@ function checkOresApoysias(context) {
     // διάλειμμα εκτός = 0.50
     // => ores_ergasias_apologistika = 9.50
     // ============================================================
-    const effectiveCardsHours = approvedOrphan
+    const effectiveCardsHours = approvedOrphan || exactExternalBreak
         ? Math.max(0, cardsHours)
         : Math.max(0, cardsHours - breakHours);
 
