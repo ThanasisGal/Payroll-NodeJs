@@ -1,6 +1,8 @@
 'use strict';
 
 const C = require('./employmentProfileContract');
+const T = require('./employmentProfileTemporal');
+const { resolveBreakConfigurationForDate } = require('./resolveBreakConfigurationForDate');
 const { buildCanonicalWorkTermsSnapshotFields } = require('./getOrarioTermsForDate');
 
 const BASE_HISTORY_FIELDS = [
@@ -50,18 +52,31 @@ function effectiveEnd(row) {
 
 // Separate opt-in facts resolver: existing Employment Check formulas are not wired
 // to arrangement semantics in Phase 1. Missing history never borrows today's facts.
-function resolveEmploymentProfileFactsForDate(date, history = [], { scheduledWorkingDay = false } = {}) {
+function resolveEmploymentProfileFactsForDate(date, history = [], { scheduledWorkingDay = false, currentEmployee = {} } = {}) {
     const target = C.calendarDate(date);
     if (!target) C.invalid('date', 'required');
-    const candidates = history.filter((row) => {
+    let candidates = history.filter((row) => {
         const from = effectiveStart(row); const until = effectiveEnd(row);
         return from && from <= target && (!until || target <= until);
     });
+    if (candidates.some(T.complete)) candidates = candidates.filter(T.complete);
     if (candidates.length > 1) C.invalid('history', 'overlapping profile versions');
     const row = candidates[0];
+    const fallback = T.fallback(date, currentEmployee, history);
+    const resolved = { ...fallback.facts, ...(row || {}) };
+    // Arrangement provenance is historical V1 only; never use current/anchor arrangement fallback.
+    for (const field of C.ARRANGEMENT_FIELDS) if (!T.complete(row)) delete resolved[field];
     const read = C.readEmploymentProfile(row || {});
-    const facts = read.facts;
+    const facts = C.readEmploymentProfile(resolved).facts;
+    for (const field of T.STANDARD_FIELDS) facts[field] = resolved[field] ?? null;
     const recorded = Boolean(row && read.recorded);
+    if (!recorded) facts[C.SCHEMA_VERSION] = null;
+    if (T.versioned(currentEmployee, history)) {
+        const breaks = resolveBreakConfigurationForDate(date, history, currentEmployee);
+        facts.dialleima_se_lepta = breaks.break_minutes;
+        facts.dialleima_entos_ektos_orarioy = breaks.break_inside_schedule;
+        for (const field of C.BREAK_PAIRS.flat()) facts[field] = breaks[field];
+    }
     let active = false;
     if (recorded && facts[C.ENABLED] === true) {
         const from = C.calendarDate(facts[C.FROM]); const until = C.calendarDate(facts[C.UNTIL]);
@@ -76,7 +91,8 @@ function resolveEmploymentProfileFactsForDate(date, history = [], { scheduledWor
         for (const field of C.ARRANGEMENT_FIELDS) facts[field] = absent[field];
     }
     return { facts, arrangementEffective: active, recorded,
-        source: recorded ? 'COMPLETE_PROFILE_HISTORY' : 'LEGACY_PROFILE_NOT_RECORDED',
+        source: recorded ? 'COMPLETE_PROFILE_HISTORY' : row ? 'LEGACY_PROFILE_NOT_RECORDED' :
+            fallback.source === 'LEGACY_EMPLOYEE_FALLBACK' ? 'LEGACY_PROFILE_NOT_RECORDED' : fallback.source,
         historyId: row?._id || null, unrecordedFields: read.unrecordedFields };
 }
 module.exports = { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, resolveEmploymentProfileFactsForDate, effectiveStart, effectiveEnd };

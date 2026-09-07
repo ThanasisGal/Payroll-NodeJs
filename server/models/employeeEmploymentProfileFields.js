@@ -25,6 +25,7 @@ function employmentProfileFields({ history = false } = {}) {
         fields.afora_allagh_dialleimatos = { type: Boolean };
         fields.hmeromhnia_isxyos_dialleimatos_apo = { type: Date };
     }
+    if (!history) fields.employment_profile_pre_v1 = { type: require('mongoose').Schema.Types.Mixed, default: undefined };
     return fields;
 }
 

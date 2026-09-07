@@ -3,6 +3,7 @@
 const mongoose = require('mongoose');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
+const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
@@ -146,7 +147,7 @@ const HISTORY_CURRENT_FIELDS = new Set([...BASE_HISTORY_FIELDS, ...IDENTITY_FIEL
 function cleanMaintenancePatch(patch = {}) {
     return Object.fromEntries(Object.entries(patch).filter(([field, value]) => value !== undefined &&
         !C.FACT_FIELDS.includes(field) && !['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
-            'createdAt', 'employment_profile_source'].includes(field)));
+            'createdAt', T.ANCHOR, 'employment_profile_source'].includes(field)));
 }
 function selectMaintenanceMode(rows, identity) {
     if (!identity || !IDENTITY_FIELDS.every(field => Object.hasOwn(identity, field))) C.invalid('historyIdentity', 'complete identity required');
@@ -212,6 +213,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 const end = editorOperation && (Object.hasOwn(target, 'hmeromhnia_isxyos_oron_ergasias_eos') ||
                     historyPatch.hmeromhnia_isxyos_oron_ergasias_eos != null)
                     ? C.calendarDate(historyPatch.hmeromhnia_isxyos_oron_ergasias_eos) : effectiveEnd(target);
+                const baseline = T.anchor(current);
+                if (editorOperation && baseline && originalFrom.getTime() === T.day(baseline.before).getTime() && from.getTime() !== originalFrom.getTime()) {
+                    throw failure('EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED');
+                }
                 const boundaryChanged = from.getTime() !== originalFrom.getTime() ||
                     (end?.getTime() ?? null) !== (effectiveEnd(target)?.getTime() ?? null);
                 if (editorOperation && boundaryChanged && (!latest || from < originalFrom ||
@@ -238,8 +243,9 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 }
                 const source = { ...(latest && !editorOperation ? { ...current, ...target } : target), ...historyPatch };
                 const snapshot = buildCompleteProfileSnapshot({ input, current: source, effectiveFrom: from });
+                const capturedBaseline = latest ? T.capture(current, rows, from) : null;
                 const facts = Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
-                const currentChanges = latest ? { ...patch, ...facts } :
+                const currentChanges = latest ? { ...patch, ...facts, ...(capturedBaseline ? { [T.ANCHOR]: capturedBaseline } : {}) } :
                     Object.fromEntries(Object.entries(patch).filter(([field]) => !HISTORY_CURRENT_FIELDS.has(field)));
                 if (Object.keys(currentChanges).length) {
                     const update = await employeeModel.updateOne({ ...filter, _id: current._id },
@@ -282,7 +288,8 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             const until = C.calendarDate(historyPatch.hmeromhnia_isxyos_oron_ergasias_eos);
             if (until && until < from) C.invalid('hmeromhnia_isxyos_oron_ergasias_eos', 'end precedes start');
             snapshot.hmeromhnia_isxyos_oron_ergasias_eos = until;
-            const currentUpdate = { ...patch, ...facts,
+            const baseline = T.capture(current, rows, from);
+            const currentUpdate = { ...patch, ...facts, ...(baseline ? { [T.ANCHOR]: baseline } : {}),
                 hmeromhnia_isxyos_oron_ergasias_apo: snapshot.hmeromhnia_isxyos_oron_ergasias_apo,
                 hmeromhnia_isxyos_oron_ergasias_eos: until };
             let employee;

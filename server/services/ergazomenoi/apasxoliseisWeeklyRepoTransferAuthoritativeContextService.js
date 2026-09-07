@@ -1,3 +1,4 @@
+const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const mongoose = require('mongoose');
 const { CompaniesModel } = require('../../models/companies');
 const { ArgiesModel } = require('../../models/stathera_arxeia');
@@ -27,7 +28,7 @@ const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
     'ores_prostheths_ergasias_apologistika ores_apoysias_apologistika';
 
 const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
-    '_id company_kod kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
+    profileSelect('_id company_kod kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
     'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
     'pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
@@ -36,16 +37,16 @@ const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     'dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh ' +
     'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy ' +
     'hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy ' +
-    'afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth';
+    'afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth');
 
 const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
-    '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
+    profileSelect('_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
     'kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
     'nomimoOromisthio pragmatikoOromisthio ' +
-    'employment_profile_source afora_allagh_oron_ergasias createdAt updatedAt';
+    'employment_profile_source afora_allagh_oron_ergasias createdAt updatedAt');
 
 function clampDateStartUtc(value) { const date = new Date(value); date.setUTCHours(0, 0, 0, 0); return date; }
 function normalizeDateOnly(value) { return value ? dateKeyUtc(value) : null; }

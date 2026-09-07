@@ -1,4 +1,5 @@
 'use strict';
+const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const mongoose = require('mongoose');
 const Models = require('../../models/ergazomenoi');
@@ -40,7 +41,7 @@ const {
 
 const MAX_HISTORY_RECORDS = 100;
 const MAX_DECISION_HISTORY = 100;
-const CANONICAL_EMPLOYEE_PROFILE_FIELDS = [
+const CANONICAL_EMPLOYEE_PROFILE_FIELDS = profileSelect([
     '_id', 'kodikos', 'ypokatasthma',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas',
     'mo_oron_hmerhsias_ergasias', 'kathestos_apasxolhshs',
@@ -51,8 +52,8 @@ const CANONICAL_EMPLOYEE_PROFILE_FIELDS = [
     'afora_daneismo_ergazomenoy', 'typos_ergodoth_daneismoy',
     'hmnia_enarxhs_daneismoy', 'hmnia_lhxhs_daneismoy',
     'afm_daneizomenoy_ergodoth', 'kodikos_ergazomenoy_alloy_ergodoth'
-].join(' ');
-const HISTORY_SELECT_FIELDS = [
+].join(' '));
+const HISTORY_SELECT_FIELDS = profileSelect([
     'kodikos', 'aa_eggrafhs', 'hmeromhnia_allaghs_symbashs',
     'hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos',
     'hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos',
@@ -63,7 +64,7 @@ const HISTORY_SELECT_FIELDS = [
     'afora_allagh_oron_ergasias', 'afora_allagh_dialleimatos',
     'hmeromhnia_isxyos_dialleimatos_apo',
     'dialleima_se_lepta', 'dialleima_entos_ektos_orarioy', 'createdAt'
-].join(' ');
+].join(' '));
 const ALLOWED_COMMAND_FIELDS = new Set([
     'ypokatasthma', 'employee_kodikos', 'week_start', 'request_id',
     'decision_type', 'decision_payload', 'notes', 'reuse_scope',
@@ -138,7 +139,7 @@ function buildProfileCandidates(employee = {}, histories = []) {
     }
     const currentId = historyId(employee) || text(employee.kodikos, 100);
     if (currentId) {
-        const profile = { ...getOrarioTermsForDate(new Date(0), [], employee),
+        const profile = { ...getOrarioTermsForDate(employee.hmeromhnia_isxyos_oron_ergasias_apo || new Date(0), [], employee),
             profile_changed_inside_week: false };
         candidates.push({
             reference: { kind: 'CURRENT_EMPLOYEE', id: currentId },

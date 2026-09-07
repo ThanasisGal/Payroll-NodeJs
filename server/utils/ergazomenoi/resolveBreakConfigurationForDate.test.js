@@ -96,4 +96,4 @@ assert.strictEqual(resolveBreakConfigurationForDate('2026-07-31',
     [{ ...history[1], hmeromhnia_isxyos_oron_ergasias_eos: '2026-07-02' }], {}).history_id, 'july');
 const bounded = { ...completeMidMonth, hmeromhnia_isxyos_oron_ergasias_eos: '2026-07-20' };
 assert.strictEqual(resolveBreakConfigurationForDate('2026-07-20', [bounded], {}).break_minutes, 15);
-assert.strictEqual(resolveBreakConfigurationForDate('2026-07-21', [bounded], {}).source, 'LEGACY_EMPLOYEE_FALLBACK');
+assert.strictEqual(resolveBreakConfigurationForDate('2026-07-21', [bounded], {}).source, 'UNRECORDED_PROFILE');

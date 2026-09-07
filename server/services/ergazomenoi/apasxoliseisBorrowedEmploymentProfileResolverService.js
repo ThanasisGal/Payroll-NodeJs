@@ -1,4 +1,5 @@
 'use strict';
+const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const mongoose = require('mongoose');
 const { CompaniesModel } = require('../../models/companies');
@@ -136,7 +137,7 @@ function resolveEffectiveEmploymentProfileForReviewDate({
 }
 
 function queryLean(query, fields) {
-    return query.select(fields).lean();
+    return query.select(fields === '_id afm' ? fields : profileSelect(fields)).lean();
 }
 
 async function preloadBorrowedEmploymentProfileContexts({

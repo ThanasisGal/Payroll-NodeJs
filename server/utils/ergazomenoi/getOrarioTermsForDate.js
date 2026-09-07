@@ -1,3 +1,6 @@
+const T = require('./employmentProfileTemporal');
+const C = require('./employmentProfileContract');
+const { resolveBreakConfigurationForDate } = require('./resolveBreakConfigurationForDate');
 // ============================================================================
 // getOrarioTermsForDate.js
 // ============================================================================
@@ -159,6 +162,7 @@ function getEffectiveTermsApo(record = {}) {
 }
 
 function getEffectiveTermsEos(record = {}) {
+    if (T.complete(record)) return T.end(record);
     return (
         normalizeDateOnly(record.hmeromhnia_isxyos_oron_ergasias_eos) ||
         normalizeDateOnly(record.hmeromhnia_allaghs_orarioy_eos)
@@ -272,18 +276,34 @@ function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}, previousR
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
     const targetDate = normalizeDateOnly(date);
+    const temporal = T.fallback(date, ergazomenos, istorikoRows);
+    const originalEmployee = ergazomenos;
+    ergazomenos = temporal.facts;
+    const breakConfig = T.versioned(originalEmployee, istorikoRows)
+        ? resolveBreakConfigurationForDate(date, istorikoRows, originalEmployee) : null;
+    const breakFacts = breakConfig ? { dialleima_se_lepta: breakConfig.break_minutes,
+        dialleima_entos_ektos_orarioy: breakConfig.break_inside_schedule,
+        ...Object.fromEntries(C.BREAK_PAIRS.flat().map(field => [field, breakConfig[field]])) } : {};
+    const additionalFacts = (record = {}) => T.versioned(originalEmployee, istorikoRows)
+        ? Object.fromEntries(T.ANCHOR_FIELDS.map(field => [field, record[field] ?? ergazomenos[field] ?? null])) : {};
+    const arrangementFacts = (record = {}) => T.versioned(originalEmployee, istorikoRows)
+        ? Object.fromEntries(C.ARRANGEMENT_FIELDS.map(field => [field,
+            T.complete(record) ? record[field] : C.readEmploymentProfile().facts[field]])) : {};
+    const fallbackTerms = () => ({ ...arrangementFacts(), ...additionalFacts(), ...breakFacts, ...buildFallbackTerms(ergazomenos),
+        ...(T.versioned(originalEmployee, istorikoRows) ? { source: temporal.source } : {}) });
 
     if (!targetDate) {
-        return buildFallbackTerms(ergazomenos);
+        return fallbackTerms();
     }
 
     const validRows = Array.isArray(istorikoRows) ? istorikoRows : [];
 
-    const matchingRows = validRows.filter((row) =>
+    let matchingRows = validRows.filter((row) =>
         isEffectiveTermsRowForDate(row, targetDate));
+    if (matchingRows.some(T.complete)) matchingRows = matchingRows.filter(T.complete);
 
     if (matchingRows.length === 0) {
-        return buildFallbackTerms(ergazomenos);
+        return fallbackTerms();
     }
 
     // Αν υπάρχουν overlapping εγγραφές, παίρνουμε την πιο πρόσφατη ημερομηνία
@@ -295,7 +315,9 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
         return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
     });
 
-    return buildTermsFromHistoryRecord(matchingRows[0], ergazomenos, matchingRows.slice(1));
+    return { ...arrangementFacts(matchingRows[0]), ...additionalFacts(matchingRows[0]), ...breakFacts, ...buildTermsFromHistoryRecord(
+        T.versioned(originalEmployee, istorikoRows) ? { ...ergazomenos, ...matchingRows[0] } : matchingRows[0],
+        ergazomenos, matchingRows.slice(1)) };
 }
 
 module.exports = {

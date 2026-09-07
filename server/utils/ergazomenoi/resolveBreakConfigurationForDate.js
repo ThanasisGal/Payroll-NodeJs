@@ -1,6 +1,7 @@
 'use strict';
 
 const C = require('./employmentProfileContract');
+const T = require('./employmentProfileTemporal');
 
 function dateOnlyUtc(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -43,6 +44,8 @@ function stableIdentity(row = {}) {
 }
 
 function resolveBreakConfigurationForDate(date, historyRows = [], employee = {}) {
+    const intervals = source => T.versioned(employee, historyRows)
+        ? Object.fromEntries(C.BREAK_PAIRS.flat().map(field => [field, source[field] ?? null])) : {};
     const targetDate = dateOnlyUtc(date);
     if (!targetDate) throw new TypeError('Invalid break configuration target date');
     const candidates = historyRows.filter((row) => {
@@ -55,18 +58,21 @@ function resolveBreakConfigurationForDate(date, historyRows = [], employee = {})
         return effective && (isCompleteProfile || effective.getUTCDate() === 1) &&
             effective <= targetDate && (!end || targetDate <= end);
     }).sort((left, right) => {
+        const versionDiff = Number(T.complete(right)) - Number(T.complete(left));
+        if (versionDiff) return versionDiff;
         const dateDiff = dateOnlyUtc(right.hmeromhnia_isxyos_dialleimatos_apo) -
             dateOnlyUtc(left.hmeromhnia_isxyos_dialleimatos_apo);
         return dateDiff || stableIdentity(right).localeCompare(stableIdentity(left));
     });
     if (candidates.length > 0) {
         const selected = candidates[0];
-        return Object.freeze({ ...normalizeBreakConfiguration(selected),
+        return Object.freeze({ ...normalizeBreakConfiguration(selected), ...intervals(selected),
             effective_from: dateOnlyUtc(selected.hmeromhnia_isxyos_dialleimatos_apo),
             source: 'BREAK_CONFIGURATION_HISTORY', history_id: selected._id || null });
     }
-    return Object.freeze({ ...normalizeBreakConfiguration(employee), effective_from: null,
-        source: 'LEGACY_EMPLOYEE_FALLBACK', history_id: null });
+    const fallback = T.fallback(date, employee, historyRows);
+    return Object.freeze({ ...normalizeBreakConfiguration(fallback.facts), ...intervals(fallback.facts), effective_from: null,
+        source: fallback.source, history_id: null });
 }
 
 module.exports = { dateOnlyUtc, monthStartUtc,
