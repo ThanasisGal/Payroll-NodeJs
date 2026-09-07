@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { harness } = require('./fixtures/targetedCanonicalIntegrationFixture');
 const service = require('./apasxoliseisTargetedCanonicalPostCheckIntegrationService');
 const mongoose = require('mongoose');
+const { CALCULATION_SOURCE_VERSION } = require('./apasxoliseisWeeklyIllegalOvertimeCalculationService');
 const dryRun = (h) => service.loadAndBuildTargetedCanonicalPostCheckDryRun({ target: h.target, models: h.models });
 const load = (h, session) => service.loadAuthoritativeContext({ target: h.target, models: h.models, session });
 
@@ -60,6 +61,22 @@ for (const [name, mutate, code] of [
     }, 'BORROWING_COMPANY_AMBIGUOUS']
 ]) test(`fail closed: ${name}`, async () => {
     const h = harness(); mutate(h); await assert.rejects(() => load(h), { code });
+});
+
+test('exact-break calculation semantics invalidate the previous canonical context fingerprint', async () => {
+    const h = harness();
+    const { snapshot } = await load(h);
+    assert.equal(CALCULATION_SOURCE_VERSION, 'weekly-illegal-overtime:45b046b:v2');
+    assert.equal(snapshot.semantics.illegalOvertimeSourceVersion, CALCULATION_SOURCE_VERSION);
+    const previousSnapshot = { ...snapshot, semantics: { ...snapshot.semantics,
+        illegalOvertimeSourceVersion: 'weekly-illegal-overtime:45b046b:v1' } };
+    const previousFingerprint = service.fingerprintContext(previousSnapshot);
+    const currentFingerprint = service.fingerprintContext(snapshot);
+    assert.notEqual(currentFingerprint, previousFingerprint);
+    const resolve = service.createCurrentContextFingerprintResolver({ models: h.models });
+    const freshFingerprint = await resolve({ target: h.target, periodScope: h.scope, session: {} });
+    assert.equal(freshFingerprint, currentFingerprint);
+    assert.notEqual(freshFingerprint, previousFingerprint);
 });
 
 test('fingerprint deterministic across query/object order and Date/ObjectId representations', async () => {

@@ -1,9 +1,11 @@
 'use strict';
 
-// Exact pure extraction from main 45b046b33e209f26be59cba6a634db4800f86519.
-const CALCULATION_SOURCE_VERSION = 'weekly-illegal-overtime:45b046b:v1';
+// Legacy duration-only behavior extracted from 45b046b33e209f26be59cba6a634db4800f86519.
+// Exact profile breaks now use temporal subtraction before payroll classification.
+const CALCULATION_SOURCE_VERSION = 'weekly-illegal-overtime:45b046b:v2';
 const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
 const { buildWeeklyIllegalOvertimePersistenceMapping } = require('./apasxoliseisWeeklyIllegalOvertimeMappingService');
+const { hasExactExternalBreaks, subtractExternalBreakIntervals } = require('../../utils/ergazomenoi/subtractExternalBreakIntervals');
 
 function timeToMinutesSafe(time) {
     if (!time) return null;
@@ -229,6 +231,10 @@ function buildWeeklyIllegalOvertimeUpdate(
 function getCardIntervals(rec, ergazomenos = null) {
     const intervals = getRawCardIntervals(rec);
 
+    if (hasExactExternalBreaks(ergazomenos)) {
+        return subtractExternalBreakIntervals(intervals, ergazomenos);
+    }
+
     if (!shouldSubtractExternalBreak(rec, ergazomenos)) {
         return intervals;
     }
@@ -309,22 +315,23 @@ function getPayrollCalculationIntervals(rec, ergazomenos = null) {
 
     if (rec?.orphan_card_resolution?.status === 'HR_APPROVED' &&
         apologistikaIntervals.length > 0) {
-        return apologistikaIntervals;
+        return subtractExternalBreakIntervals(apologistikaIntervals, ergazomenos);
     }
 
     if (verification.hasUnresolvedCardEvidence) {
-        return verification.completePairs.map((pair) => ({
+        return subtractExternalBreakIntervals(verification.completePairs.map((pair) => ({
             index: Number(pair.pairNumber),
             apo: pair.start,
             eos: pair.end,
             start: pair.startMinutes,
             end: pair.isOvernight ? pair.endMinutes + 1440 : pair.endMinutes,
             source: 'CARD_PARTIALLY_VERIFIED'
-        }));
+        })), ergazomenos);
     }
 
     const rawIntervals = getCardIntervals(rec, ergazomenos);
-    if (rawIntervals.length > 0) {
+    if (rawIntervals.length > 0 ||
+        (hasExactExternalBreaks(ergazomenos) && getRawCardIntervals(rec).length > 0)) {
         return rawIntervals;
     }
 
