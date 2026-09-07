@@ -10,6 +10,8 @@ const viewsRoot = path.join(repositoryRoot, 'views');
 const deployScript = fs.readFileSync(deployScriptPath, 'utf8');
 
 const expectedCoverage = [
+    'ergazomenoi/genika/employmentProfileUi',
+    'ergazomenoi/genika/employeeTableReturnState',
     'admin/userPrivilegesManagement',
     'kinhseis/apasxolhseis/payrollPhasesPanel',
     'Krathseis/nestingTables',
