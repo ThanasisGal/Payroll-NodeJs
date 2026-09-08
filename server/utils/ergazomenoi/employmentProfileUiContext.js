@@ -12,6 +12,7 @@ async function getEmploymentProfileUiContext(model = KathgoriesAdeiasModel) {
     const categories = await model.find(buildHrSelectableLeaveCategoryQuery()).select('kodikos perigrafh').sort({ aa: 1 }).lean();
     return {
         types: Object.keys(ARRANGEMENT_TYPES).map(value => ({ value, label: labels[value],
+            disabled: value === 'OTHER_APPROVED_ARRANGEMENT',
             usesLeaveCategory: value === 'APPROVED_LEAVE_INTERRUPTION' })),
         categories
     };

@@ -134,3 +134,31 @@ assert.ok(CorrectiveModel.schema.indexes().some(([, options]) => options.name ==
 assert.deepStrictEqual(CorrectiveModel.schema.path('status').enumValues, ['ACTIVE', 'CLOSED']);
 assert.ok(AuditModel.schema.path('event_type').enumValues.includes('SUBMISSION_NEEDED_DETERMINATION'));
 console.log('employment period frozen/corrective pure contracts: PASS');
+
+// Stage 3A persists facts only; absent/null defaults must retain the exact base fingerprint.
+{
+    const field = 'egkekrimenh_anaplhrosh_apologistika';
+    const row = { kodikos: '001', hmeromhnia: '2026-09-07', cards_ores_ergasias: 8 };
+    const baseline = buildEmploymentPeriodFrozenSnapshot({ dailyResults: [row] });
+    assert.strictEqual(baseline.frozen_snapshot_fingerprint,
+        '48e932966e0d9e9adaebd609006882fbe7b605b88fbe831b0fffd6c2af8c0434');
+    const { ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
+    for (const value of [null, new ProdhlomenaOrariaModel()[field], ProdhlomenaOrariaModel.hydrate({})[field]]) {
+        const inactive = buildEmploymentPeriodFrozenSnapshot({ dailyResults: [{ ...row, [field]: value }] });
+        assert.deepStrictEqual(inactive, baseline);
+    }
+    const fact = {
+        diastimata_elleimmatos: [{ apo_lepto: 660, eos_lepto: 720 }, { apo_lepto: 840, eos_lepto: 900 }],
+        diastimata_anaplhroshs: [{ apo_lepto: 1080, eos_lepto: 1140 }, { apo_lepto: 1170, eos_lepto: 1230 }],
+        antistoixismena_lepta: 120, ypoloipomena_lepta: 0
+    };
+    const original = JSON.parse(JSON.stringify(fact));
+    const active = buildEmploymentPeriodFrozenSnapshot({ dailyResults: [{ ...row, [field]: fact }] });
+    assert.deepStrictEqual(active.snapshot.daily_results[0][field], original);
+    assert.deepStrictEqual(active.snapshot.weekly_calculation_context.rows[0][field], original);
+    assert.deepStrictEqual(projectFrozenReview(active.snapshot).rows[0][field], original);
+    assert.notStrictEqual(active.frozen_snapshot_fingerprint, baseline.frozen_snapshot_fingerprint);
+    fact.diastimata_anaplhroshs[0].eos_lepto++;
+    assert.deepStrictEqual(active.snapshot.daily_results[0][field], original);
+    assert.strictEqual(require('mongoose').connection.readyState, 0);
+}

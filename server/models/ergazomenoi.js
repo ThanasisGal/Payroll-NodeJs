@@ -2,6 +2,8 @@ const { Schema: _Schema, model } = require('mongoose');
 
 const Schema = _Schema;
 const { employmentProfileFields, attachEmploymentProfileValidation } = require('./employeeEmploymentProfileFields');
+const { validTimeShiftSegments, validTimeShiftCompensation } = require('../utils/ergazomenoi/approvedTimeShiftCompensation');
+const { validApprovedHourlyLeaveSegments } = require('../utils/ergazomenoi/approvedHourlyLeaveSegments');
 
 const ErgazomenoiSchema = new Schema(
     {
@@ -351,6 +353,28 @@ attachEmploymentProfileValidation(ErgazomenoiSchema);
 
 const ErgazomenoiModel = model('Ergazomenoi', ErgazomenoiSchema);
 
+// Persistence only: calculation stages decide when to populate/reset this fact.
+const timeShiftSegmentArray = () => ({
+    type: [new Schema({
+        apo_lepto: { type: Number, required: true },
+        eos_lepto: { type: Number, required: true }
+    }, { _id: false })],
+    default: () => [],
+    set: value => {
+        if (value !== undefined && !Array.isArray(value)) {
+            throw new TypeError('Time shift segments must be an array.');
+        }
+        return value;
+    },
+    validate: { validator: validTimeShiftSegments, message: 'Invalid time shift segments.' }
+});
+const timeShiftCompensationSchema = new Schema({
+    diastimata_elleimmatos: timeShiftSegmentArray(),
+    diastimata_anaplhroshs: timeShiftSegmentArray(),
+    antistoixismena_lepta: { type: Number, default: 0 },
+    ypoloipomena_lepta: { type: Number, default: 0 }
+}, { _id: false });
+
 const ProdhlomenaOrariaSchema = new Schema(
     {
         team: { type: String, trim: true },
@@ -399,7 +423,38 @@ const ProdhlomenaOrariaSchema = new Schema(
         ores_ergasias_apologistika: { type: Number, default: 0 },
         ores_pragmatikhs_ergasias_apologistika: { type: Number, default: 0 },
         ores_adeias_pistomenes_apologistika: { type: Number, default: 0 },
+        egkekrimenh_oroadeia_apologistika: { type: Boolean, default: false },
+        apo_ora_egkekrimenhs_oroadeias_apologistika: { type: String },
+        eos_ora_egkekrimenhs_oroadeias_apologistika: { type: String },
+        explicit_hourly_leave_hours: { type: Number, default: 0 },
+        // Future writer contract: this array holds every exact credited segment.
+        // Zero segments: false flag, empty singular times, zero total hours.
+        // One segment: singular times may mirror it; multiple: singular times stay empty.
+        // Only Stage 2 will write those related facts; validation does not calculate them.
+        egkekrimena_diastimata_oroadeias_apologistika: {
+            type: [new Schema({
+                apo_lepto: { type: Number, required: true },
+                eos_lepto: { type: Number, required: true }
+            }, { _id: false })],
+            default: () => [],
+            set: value => {
+                if (value !== undefined && !Array.isArray(value)) {
+                    throw new TypeError('Approved hourly leave segments must be an array.');
+                }
+                return value;
+            },
+            validate: {
+                validator: validApprovedHourlyLeaveSegments,
+                message: 'Approved hourly leave segments must have safe integer bounds, positive duration and ascending non-overlapping order.'
+            }
+        },
         ores_argias_pistomenes_apologistika: { type: Number, default: 0 },
+        egkekrimenh_anaplhrosh_apologistika: {
+            type: timeShiftCompensationSchema,
+            default: null,
+            validate: { validator: validTimeShiftCompensation,
+                message: 'Time shift compensation intervals and minute totals must agree.' }
+        },
         compensation_breakdown_apologistika: { type: Schema.Types.Mixed, default: null },
         ores_nyxtas_apologistika: { type: Number, default: 0 },
         ores_argion_prosayxhsh_apologistika: { type: Number, default: 0 },
@@ -453,6 +508,21 @@ ProdhlomenaOrariaSchema.index({
     company_kod: 1,
     hmeromhnia: 1,
     kodikos: 1
+});
+
+// Mongoose init receives the raw document synchronously, before array casting.
+// Hydration bypasses setters and otherwise wraps non-arrays into document arrays.
+ProdhlomenaOrariaSchema.pre('init', function rejectMalformedArrangementArrays(raw) {
+    const timeShift = raw.egkekrimenh_anaplhrosh_apologistika;
+    for (const [path, value] of [
+        ['egkekrimena_diastimata_oroadeias_apologistika', raw.egkekrimena_diastimata_oroadeias_apologistika],
+        ['egkekrimenh_anaplhrosh_apologistika.diastimata_elleimmatos', timeShift?.diastimata_elleimmatos],
+        ['egkekrimenh_anaplhrosh_apologistika.diastimata_anaplhroshs', timeShift?.diastimata_anaplhroshs]
+    ]) {
+        if (value !== undefined && !Array.isArray(value)) {
+            throw new TypeError(`${path} must be an array.`);
+        }
+    }
 });
 
 const ProdhlomenaOrariaModel = model('ProdhlomenaOraria', ProdhlomenaOrariaSchema);

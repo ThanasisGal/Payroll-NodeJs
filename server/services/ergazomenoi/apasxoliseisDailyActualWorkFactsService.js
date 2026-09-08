@@ -1,3 +1,4 @@
+const { validApprovedHourlyLeaveSegments } = require('../../utils/ergazomenoi/approvedHourlyLeaveSegments');
 // Pure daily facts used by weekly compliance and payroll calculations.
 
 const REASON = Object.freeze({
@@ -62,8 +63,13 @@ function resolveDailyActualWorkFacts(row = {}, {
     const declared = nonNegativeNumber(row.ores_ergasias);
     const cards = nonNegativeNumber(row.cards_ores_ergasias);
     const calculatedWork = nonNegativeNumber(row.ores_ergasias_apologistika);
+    const approvedSegments = row.egkekrimena_diastimata_oroadeias_apologistika;
     const explicitHourlyLeave = nonNegativeNumber(
-        row.explicit_hourly_leave_hours ?? row.ores_apoysias
+        row.egkekrimenh_oroadeia_apologistika === true && approvedSegments !== undefined
+            ? validApprovedHourlyLeaveSegments(approvedSegments)
+                ? approvedSegments.reduce((sum, segment) => sum + segment.eos_lepto - segment.apo_lepto, 0) / 60
+                : NaN
+            : row.explicit_hourly_leave_hours ?? row.ores_apoysias
     );
     const reasons = [];
     const warnings = [];
@@ -178,7 +184,11 @@ function resolveDailyActualWorkFacts(row = {}, {
         )
             ? calculatedWork.value
             : cards.value;
-    if (leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE) {
+    if (row.egkekrimenh_oroadeia_apologistika === true && explicitHourlyLeave.value > 0 && hasCompleteCardEvidence) {
+        actualWorkHours = effectiveWorkedHours;
+        leaveHours = explicitHourlyLeave.value;
+        if (actualWorkHours > 0) warnings.push(WARNING.MIXED_WORK_AND_HOURLY_LEAVE);
+    } else if (leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE) {
         leaveHours = declared.value;
     } else if (category === 'ΕΡΓ') {
         actualWorkHours = effectiveWorkedHours;
@@ -230,6 +240,8 @@ function resolveDailyActualWorkFacts(row = {}, {
         holidayCreditedHours,
         sicknessHours,
         countsAsActualWorkDay: actualWorkHours > 0,
+        ...(row.egkekrimenh_oroadeia_apologistika === true
+            ? { contractualCoveredHours: actualWorkHours + leaveHours + holidayCreditedHours + sicknessHours } : {}),
         reasons: [...new Set(reasons)],
         warnings: [...new Set(warnings)]
     });

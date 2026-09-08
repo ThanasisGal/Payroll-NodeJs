@@ -1,8 +1,11 @@
 'use strict';
 
+const { resolveEmploymentProfileFactsForDate } = require('../../utils/ergazomenoi/employmentProfileHistory');
+
 const mongoose = require('mongoose');
 const {
     employeeKey,
+    isActiveLoan,
     preloadBorrowedEmploymentProfileContexts,
     resolveEffectiveEmploymentProfileForReviewDate
 } = require('./apasxoliseisBorrowedEmploymentProfileResolverService');
@@ -19,6 +22,23 @@ const HOLIDAY_CONTEXT_BLOCK_REASON = Object.freeze({
     EFFECTIVE_COMPANY_MISSING: 'EFFECTIVE_HOLIDAY_COMPANY_MISSING',
     CONTEXT_NOT_PRELOADED: 'EFFECTIVE_HOLIDAY_CONTEXT_NOT_PRELOADED'
 });
+
+function resolveArrangementContext({ employee, reviewDate, normalHistory = [], scheduledWorkingDay, borrowedContext }) {
+    const borrowed = isActiveLoan(reviewDate, employee) ? borrowedContext : null;
+    if (isActiveLoan(reviewDate, employee) && (!borrowed || borrowed.reason)) {
+        throw Object.assign(new Error('Απαιτείται έλεγχος των ιστορικών στοιχείων δανεισμού.'),
+            { code: 'APPROVED_HOURLY_LEAVE_PROFILE_REQUIRED', statusCode: 409 });
+    }
+    const history = borrowed ? borrowed.borrowingHistory : normalHistory;
+    // Unsupported/absent arrangements must not introduce new temporal validation
+    // into the legacy calculation path. This gate never activates an arrangement.
+    if (!history.some(row => ['APPROVED_LEAVE_INTERRUPTION', 'APPROVED_TIME_SHIFT_INTERRUPTION'].includes(row.typos_egkekrimenhs_rythmishs))) {
+        return { arrangementEffective: false, facts: {} };
+    }
+    return resolveEmploymentProfileFactsForDate(reviewDate, history, {
+        scheduledWorkingDay, currentEmployee: borrowed ? borrowed.borrowingEmployee : employee
+    });
+}
 
 function canonicalCompanyId(value) {
     const id = String(value || '').trim();
@@ -107,6 +127,10 @@ async function preloadEffectiveHolidayContextProvider({
     ])));
 
     return Object.freeze({
+        resolveArrangementForEmployeeDate({ employee, reviewDate, normalHistory = [], scheduledWorkingDay }) {
+            return resolveArrangementContext({ employee, reviewDate, normalHistory, scheduledWorkingDay,
+                borrowedContext: borrowedContexts.get(employeeKey(employee)) });
+        },
         resolveForEmployeeDate({ employee, reviewDate, normalHistory = [] } = {}) {
             const key = employeeKey(employee);
             const reviewDateKey = dateKey(reviewDate);
@@ -143,6 +167,7 @@ async function preloadEffectiveHolidayContextProvider({
 }
 
 module.exports = {
+    resolveArrangementContext,
     HOLIDAY_CONTEXT_STATUS,
     HOLIDAY_CONTEXT_BLOCK_REASON,
     preloadEffectiveHolidayContextProvider

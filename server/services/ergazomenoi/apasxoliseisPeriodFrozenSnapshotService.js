@@ -5,7 +5,15 @@ const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const SNAPSHOT_SCHEMA_VERSION = 'employment-period-frozen:v3';
 const DEFAULT_SOURCE_VERSION = 'employment-calculation:v2';
+const APPROVED_LEAVE_FIELDS = Object.freeze([
+    'egkekrimenh_oroadeia_apologistika', 'egkekrimena_diastimata_oroadeias_apologistika',
+    'apo_ora_egkekrimenhs_oroadeias_apologistika', 'eos_ora_egkekrimenhs_oroadeias_apologistika',
+    'explicit_hourly_leave_hours',
+]);
+const TIME_SHIFT_FIELD = 'egkekrimenh_anaplhrosh_apologistika';
 const DAILY_FIELDS = Object.freeze([
+    TIME_SHIFT_FIELD,
+    ...APPROVED_LEAVE_FIELDS,
     '_id', 'kodikos', 'ypokatasthma', 'hmeromhnia', 'apologistiko_biblio', 'kathgoria_ergasias_apologistika',
     'kathgoria_ergasias', 'repo', 'repo_effective_identity', 'repo_original_identity',
     'ores_ergasias', 'ores_apoysias', 'adeia', 'kathgoria_adeias', 'astheneia',
@@ -94,6 +102,13 @@ function pick(source = {}, fields = []) {
     return canonicalize(Object.fromEntries(fields.filter((field) => source[field] !== undefined)
         .map((field) => [field, source[field]])));
 }
+function pickDaily(row) {
+    // Inactive defaults must not change existing frozen projections/fingerprints.
+    const fields = row.egkekrimenh_oroadeia_apologistika === true
+        ? DAILY_FIELDS : DAILY_FIELDS.filter(field => !APPROVED_LEAVE_FIELDS.includes(field));
+    return pick(row, row[TIME_SHIFT_FIELD] == null
+        ? fields.filter(field => field !== TIME_SHIFT_FIELD) : fields);
+}
 function pickProfile(row, fields, includeLegacyBreakHistory = false) {
     // Explicit legacy break history needs its eligibility fields even without V1.
     const temporal = T.versioned(row) ||
@@ -105,7 +120,7 @@ function sorted(rows, key) {
 }
 function buildEmploymentPeriodFrozenSnapshot(input = {}) {
     const scope = canonicalize(input.scope || {});
-    const dailyResults = sorted((input.dailyResults || []).map((row) => pick(row, DAILY_FIELDS)),
+    const dailyResults = sorted((input.dailyResults || []).map((row) => pickDaily(row)),
         (row) => `${row.ypokatasthma}|${row.kodikos}|${row.hmeromhnia}|${row._id}`);
     const employeesByCode = new Map((input.employees || []).map((employee) => [String(employee.kodikos || ''), pickProfile(employee, EMPLOYEE_FIELDS)]));
     const employees = [...new Set(dailyResults.map((row) => String(row.kodikos || '')).filter(Boolean))]
@@ -117,7 +132,7 @@ function buildEmploymentPeriodFrozenSnapshot(input = {}) {
         employees,
         weekly_calculation_context: {
             rows: sorted((input.weeklyDailyResults || input.dailyResults || [])
-                .map((row) => pick(row, DAILY_FIELDS)),
+                .map((row) => pickDaily(row)),
             (row) => `${row.ypokatasthma}|${row.kodikos}|${row.hmeromhnia}|${row._id}`),
             profile_history: sorted((input.profileHistory || []).map((row) => pickProfile(row, HISTORY_FIELDS, true)),
                 (row) => `${row.kodikos}|${row.hmeromhnia_isxyos_oron_ergasias_apo || ''}|${row._id}`),

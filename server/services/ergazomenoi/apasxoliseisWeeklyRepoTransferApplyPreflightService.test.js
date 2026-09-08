@@ -56,8 +56,51 @@ function modelValidation(record) { try { return new ExecutionModel(record).valid
             error.statusCode === 409);
         assert.strictEqual(reconstructionCalls, 0);
     }
-    assert.strictEqual(CURRENT_GUARD_FIELDS.length, 57); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
+    assert.strictEqual(CURRENT_GUARD_FIELDS.length, 60); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
     for (const field of ['cards_ores_ergasias','cards_apo_ora_01','kathgoria_ergasias','ores_nyxtas_apologistika']) { assert.strictEqual(accepted.plan.source.expected_current[field], currentValues[field]); assert.strictEqual(accepted.plan.target.expected_current[field], currentValues[field]); }
+    const arrangementGuardFields = ['egkekrimenh_anaplhrosh_apologistika',
+        'egkekrimenh_oroadeia_apologistika', 'egkekrimena_diastimata_oroadeias_apologistika'];
+    for (const field of arrangementGuardFields) assert.ok(CURRENT_GUARD_FIELDS.includes(field), field);
+    // Keep the mutually exclusive arrangement types in separate representative snapshots.
+    for (const arrangementValues of [
+        { egkekrimenh_oroadeia_apologistika: true,
+            egkekrimena_diastimata_oroadeias_apologistika: [
+                { apo_lepto: 660, eos_lepto: 720 }, { apo_lepto: 840, eos_lepto: 900 }] },
+        { egkekrimenh_anaplhrosh_apologistika: {
+            diastimata_elleimmatos: [{ apo_lepto: 720, eos_lepto: 840 }],
+            diastimata_anaplhroshs: [{ apo_lepto: 960, eos_lepto: 1020 }],
+            antistoixismena_lepta: 60, ypoloipomena_lepta: 60 } }
+    ]) {
+        const approveArrangement = ({ snap, rebuilt, decision }) => {
+            for (const side of ['source', 'target']) {
+                Object.assign(snap[side].current_values, structuredClone(arrangementValues));
+                Object.assign(rebuilt[side].current_values, structuredClone(arrangementValues));
+            }
+            decision.snapshot_fingerprint = fingerprintSnapshot(snap);
+        };
+        const guarded = await run(approveArrangement);
+        for (const side of ['source', 'target']) {
+            for (const field of arrangementGuardFields) {
+                assert.ok(Object.hasOwn(guarded.plan[side].expected_current, field), field);
+                assert.deepStrictEqual(guarded.plan[side].expected_current[field], arrangementValues[field] ?? null);
+            }
+            for (const field of Object.keys(arrangementValues)) {
+                await run((context) => {
+                    approveArrangement(context);
+                    const current = context.rebuilt[side].current_values;
+                    if (typeof current[field] === 'boolean') current[field] = false;
+                    else if (Array.isArray(current[field])) current[field][0].apo_lepto += 15;
+                    else {
+                        current[field].diastimata_anaplhroshs[0].eos_lepto += 15;
+                        current[field].antistoixismena_lepta += 15;
+                        current[field].ypoloipomena_lepta -= 15;
+                    }
+                    assert.notStrictEqual(fingerprintSnapshot(context.rebuilt), context.decision.snapshot_fingerprint);
+                }, side === 'source' ? 'SOURCE_STALE' : 'TARGET_STALE');
+            }
+        }
+    }
+    assert.strictEqual(mongoose.connection.readyState, 0);
     assert.deepStrictEqual(Object.keys(payload), ['decision_id','request_id']);
     await run(({ decision }) => { decision.decision_code = 'REJECT_PROPOSAL'; }, 'DECISION_NOT_APPROVED');
     await run(({ decision }) => { decision.decision_code = 'NEEDS_MORE_REVIEW'; }, 'DECISION_NOT_APPROVED');

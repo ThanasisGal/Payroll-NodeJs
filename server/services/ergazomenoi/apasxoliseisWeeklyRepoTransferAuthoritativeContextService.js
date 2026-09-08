@@ -14,6 +14,7 @@ const {
 
 const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
     '_id team company_kod ypokatasthma kodikos hmeromhnia ' +
+    'egkekrimenh_anaplhrosh_apologistika egkekrimenh_oroadeia_apologistika egkekrimena_diastimata_oroadeias_apologistika ' +
     'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
     'ores_ergasias repo adeia kathgoria_adeias ores_apoysias astheneia ' +
     'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +

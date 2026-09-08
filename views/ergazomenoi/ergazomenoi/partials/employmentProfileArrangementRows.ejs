@@ -15,7 +15,7 @@ const selectedType = ui.types.find(option => option.value === profileRecord.typo
     <div class="col-3"></div>
     <div class="col-2 left-align"><label for="typos_egkekrimenhs_rythmishs" class="col-form-label label-font-size">Τύπος Ρύθμισης</label></div><div class="col-3-75"><select id="typos_egkekrimenhs_rythmishs" name="typos_egkekrimenhs_rythmishs" class="form-select selectpicker-dropdown-normal input-contents left-align w-100" data-approved-arrangement-control <%= enabled ? '' : 'disabled' %>>
 <option value=""></option>
-<% ui.types.forEach(option => { %><option value="<%= option.value %>" data-leave-category="<%= option.usesLeaveCategory %>" <%= profileRecord.typos_egkekrimenhs_rythmishs === option.value ? 'selected' : '' %>><%= option.label %></option><% }); %>
+<% ui.types.forEach(option => { %><option value="<%= option.value %>" data-leave-category="<%= option.usesLeaveCategory %>" <%= option.disabled ? 'disabled' : '' %> <%= profileRecord.typos_egkekrimenhs_rythmishs === option.value ? 'selected' : '' %>><%= option.label %></option><% }); %>
 </select></div>
 </div>
 <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
