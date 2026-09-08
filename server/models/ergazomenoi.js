@@ -510,6 +510,21 @@ ProdhlomenaOrariaSchema.index({
     kodikos: 1
 });
 
+// Mongoose init receives the raw document synchronously, before array casting.
+// Hydration bypasses setters and otherwise wraps non-arrays into document arrays.
+ProdhlomenaOrariaSchema.pre('init', function rejectMalformedArrangementArrays(raw) {
+    const timeShift = raw.egkekrimenh_anaplhrosh_apologistika;
+    for (const [path, value] of [
+        ['egkekrimena_diastimata_oroadeias_apologistika', raw.egkekrimena_diastimata_oroadeias_apologistika],
+        ['egkekrimenh_anaplhrosh_apologistika.diastimata_elleimmatos', timeShift?.diastimata_elleimmatos],
+        ['egkekrimenh_anaplhrosh_apologistika.diastimata_anaplhroshs', timeShift?.diastimata_anaplhroshs]
+    ]) {
+        if (value !== undefined && !Array.isArray(value)) {
+            throw new TypeError(`${path} must be an array.`);
+        }
+    }
+});
+
 const ProdhlomenaOrariaModel = model('ProdhlomenaOraria', ProdhlomenaOrariaSchema);
 
 const ProdhlomenaOrariaAuditSchema = new Schema(

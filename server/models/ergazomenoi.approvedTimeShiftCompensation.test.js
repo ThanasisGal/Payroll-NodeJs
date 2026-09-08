@@ -107,3 +107,30 @@ test('revalidation catches nested edits and invalid hydrated order', async () =>
     assert.deepEqual(restored.toObject()[field], value);
     assert.equal(mongoose.connection.readyState, 0);
 });
+
+for (const malformedFields of [[shortage], [compensation], [shortage, compensation]]) {
+    test(`raw hydration rejects non-array ${malformedFields.join(' and ')}`, async () => {
+        const value = fact();
+        for (const key of malformedFields) value[key] = value[key][0];
+        const payload = { [field]: value };
+        const before = structuredClone(payload);
+        await assert.rejects(new Model(payload).validate());
+        assert.throws(() => Model.hydrate(payload), {
+            name: 'TypeError', message: `${field}.${malformedFields[0]} must be an array.`
+        }); // Raw shape is rejected during init, before array casting.
+        await assert.rejects(async () => { await Model.hydrate(payload).validate(); });
+        assert.deepEqual(payload, before);
+        assert.equal(mongoose.connection.readyState, 0);
+    });
+}
+
+test('legacy hydration without either arrangement result remains valid', async () => {
+    const payload = { kodikos: '0001', ores_ergasias: 8 };
+    const before = structuredClone(payload);
+    const doc = Model.hydrate(payload);
+    await doc.validate();
+    assert.equal(doc[field], null);
+    assert.deepEqual(doc.toObject().egkekrimena_diastimata_oroadeias_apologistika, []);
+    assert.deepEqual(payload, before);
+    assert.equal(mongoose.connection.readyState, 0);
+});

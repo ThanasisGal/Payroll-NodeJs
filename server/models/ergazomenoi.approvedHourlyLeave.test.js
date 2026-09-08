@@ -132,3 +132,15 @@ test('explicit daily hourly leave values survive validation and hydration withou
     assert.equal(restored.ores_adeias_pistomenes_apologistika, 0);
     assert.equal(mongoose.connection.readyState, 0);
 });
+
+test('raw hydration rejects a non-array hourly-leave segment object', async () => {
+    const payload = { [segmentField]: segment(720, 840) };
+    const before = structuredClone(payload);
+    await assert.rejects(new ProdhlomenaOrariaModel(payload).validate());
+    assert.throws(() => ProdhlomenaOrariaModel.hydrate(payload), {
+        name: 'TypeError', message: `${segmentField} must be an array.`
+    });
+    await assert.rejects(async () => { await ProdhlomenaOrariaModel.hydrate(payload).validate(); });
+    assert.deepEqual(payload, before);
+    assert.equal(mongoose.connection.readyState, 0);
+});
