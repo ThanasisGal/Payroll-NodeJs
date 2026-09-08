@@ -25,6 +25,9 @@ const input = (html, id) => html.match(new RegExp(`<(?:input|select)\\b[^>]*\\bi
 for (const mode of ['add', 'edit']) {
     test(`${mode}: optional fields render within existing employment accordion and in prescribed order`, async () => {
         const html = await render(mode);
+        const heading = 'Κατανομή Διαλείμματος σε Χρονικά Διαστήματα';
+        assert.equal(html.split(heading).length - 1, 1);
+        assert(html.indexOf(heading) < html.indexOf('id="dialleima_apo_ora_01"'));
         const original = execFileSync('git', ['show', `${checkpoint}:${partial(mode)}`], { encoding: 'utf8' });
         assert.equal((html.match(/class="accordion-item/g) || []).length, (original.match(/class="accordion-item/g) || []).length);
         assert(!html.includes('class="card'));
@@ -70,6 +73,21 @@ test('Edit displays stored arrangement, exact dates/times/days/category and lega
 test('type labels and identifiers come from the central contract', async () => {
     const ui = await context(); assert.deepEqual(ui.types.map(t => t.value), Object.keys(C.ARRANGEMENT_TYPES));
     assert.deepEqual(ui.types.map(t => t.label), ['Εγκεκριμένη Άδεια / Ωροάδεια', 'Διακοπή με Αναπλήρωση Χρόνου', 'Άλλη Εγκεκριμένη Ρύθμιση']);
+    assert.deepEqual(ui.types.map(t => t.disabled), [false, false, true]);
+});
+for (const mode of ['add', 'edit']) test(`${mode}: only OTHER is disabled; stored OTHER stays selected without mutation`, async () => {
+    const rec = { [C.ENABLED]: true, [C.TYPE]: 'OTHER_APPROVED_ARRANGEMENT', [C.FROM]: '2026-09-01' };
+    const before = structuredClone(rec);
+    for (const record of [{}, rec]) {
+        const html = await render(mode, record);
+        for (const value of Object.keys(C.ARRANGEMENT_TYPES)) {
+            const option = html.match(new RegExp(`<option\\b[^>]*value="${value}"[^>]*>`))?.[0];
+            assert(option);
+            assert.equal(/\bdisabled\b/.test(option), value === 'OTHER_APPROVED_ARRANGEMENT');
+            assert.equal(/\bselected\b/.test(option), record[C.TYPE] === value);
+        }
+    }
+    assert.deepEqual(rec, before);
 });
 function element(value = '') {
     return { value, checked: false, disabled: false, dataset: {}, listeners: {}, textContent: '',

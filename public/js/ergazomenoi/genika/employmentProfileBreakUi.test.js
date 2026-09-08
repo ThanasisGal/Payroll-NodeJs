@@ -5,6 +5,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ejs = require('ejs');
 const { chromium } = require('playwright');
+const C = require('../../../../server/utils/ergazomenoi/employmentProfileContract');
+const { getEmploymentProfileUiContext } = require('../../../../server/utils/ergazomenoi/employmentProfileUiContext');
 const template = path.resolve('views/ergazomenoi/ergazomenoi/partials/employmentProfileBreakRows.ejs');
 const ui = fs.readFileSync(__dirname + '/employmentProfileUi.js', 'utf8');
 const categoryId = 'eidikh_kathgoria_ergazomenoy';
@@ -24,17 +26,50 @@ async function fixture(t, category, edit = true, pending = false) {
 }
 async function states(page) {
     return page.locator('input[type=time]').evaluateAll(inputs => inputs.map(input => ({
-        id: input.id, disabled: input.disabled, value: input.value, extra: input.hasAttribute('data-extra-profile-break')
+        id: input.id, disabled: input.disabled, value: input.value, extra: input.hasAttribute('data-third-profile-break')
     })));
 }
 function availability(rows, all) {
     assert.equal(rows.length, 6);
     for (const row of rows) {
-        const extra = !row.id.endsWith('01');
+        const extra = row.id.endsWith('03');
         assert.equal(row.extra, extra, row.id);
         assert.equal(row.disabled, extra && !all, row.id);
     }
 }
+test('ordinary category accepts two separate fifteen-minute breaks', async t => {
+    const page = await fixture(t, '0009', false);
+    await page.addScriptTag({ content: ui });
+    for (const [id, value] of Object.entries({ dialleima_apo_ora_01: '10:00', dialleima_eos_ora_01: '10:15',
+        dialleima_apo_ora_02: '12:00', dialleima_eos_ora_02: '12:15' })) await page.locator(`#${id}`).fill(value);
+    availability(await states(page), false);
+    const payload = Object.fromEntries((await states(page)).map(row => [row.id, row.value]));
+    const normalized = C.normalizeEmploymentProfileSubmission({ ...payload, dialleima_se_lepta: 30 });
+    assert.equal(normalized.dialleima_se_lepta, 30);
+    assert.equal(normalized.dialleima_apo_ora_02, '12:00');
+});
+test('legacy disabled OTHER option survives initialization, toggles and actual Add/Edit serialization', async t => {
+    const page = await browser.newPage(); t.after(() => page.close());
+    const file = path.resolve('views/ergazomenoi/ergazomenoi/partials/employmentProfileArrangementRows.ejs');
+    const model = { find() { return this; }, select() { return this; }, sort() { return this; }, lean: async () => [] };
+    const employmentProfileUi = await getEmploymentProfileUiContext(model);
+    const rec = { [C.ENABLED]: true, [C.TYPE]: 'OTHER_APPROVED_ARRANGEMENT', [C.FROM]: '2026-09-01' };
+    await page.setContent('<div class="card-body">' + ejs.render(fs.readFileSync(file, 'utf8'),
+        { rec, employmentProfileUi }, { filename: file }) + '</div>');
+    await page.addScriptTag({ content: ui });
+    await page.locator(`#${C.ENABLED}`).uncheck();
+    await page.locator(`#${C.ENABLED}`).check();
+    assert.equal(await page.locator(`#${C.TYPE}`).inputValue(), rec[C.TYPE]);
+    assert.equal(await page.locator(`option[value="${rec[C.TYPE]}"]`).isDisabled(), true);
+    for (const file of ['getFieldValues.js', 'putFieldValues.js']) {
+        const code = fs.readFileSync(__dirname + '/' + file, 'utf8');
+        const start = code.indexOf('        const formData = {}');
+        const body = code.slice(start, code.indexOf('// ✅ CONVERT PDFs TO BASE64', start));
+        const payload = await page.evaluate(body => new Function(body + '\nreturn formData;')(), body);
+        assert.equal(payload[C.TYPE], rec[C.TYPE], file);
+        assert.equal(C.normalizeEmploymentProfileSubmission(payload)[C.TYPE], rec[C.TYPE]);
+    }
+});
 for (const edit of [false, true]) for (const category of ['0004', '0005', '0009', '', null]) {
     test(`${edit ? 'Edit' : 'Add'} initial category ${JSON.stringify(category)}: correct EJS and shared handler availability`, async t => {
         const page = await fixture(t, category, edit);
