@@ -330,7 +330,7 @@ function getPayrollCalculationIntervals(rec, ergazomenos = null) {
     }
 
     const rawIntervals = getCardIntervals(rec, ergazomenos);
-    if (rec.egkekrimenh_oroadeia_apologistika === true) {
+    if (rec.egkekrimenh_oroadeia_apologistika === true || rec.egkekrimenh_anaplhrosh_apologistika) {
         let previousStart = -Infinity;
         const declaredStart = timeToMinutesSafe(rec.apo_ora_01);
         const declaredEnd = timeToMinutesSafe(rec.eos_ora_01);

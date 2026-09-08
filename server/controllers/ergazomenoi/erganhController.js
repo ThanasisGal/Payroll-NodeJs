@@ -1,3 +1,4 @@
+const { deriveApprovedTimeShift } = require('../../services/ergazomenoi/apasxoliseisApprovedTimeShiftService');
 const { resolveArrangementContext } = require('../../services/ergazomenoi/apasxoliseisEffectiveHolidayContextProviderService');
 const { deriveApprovedHourlyLeave, scheduledWorkingDay } = require('../../services/ergazomenoi/apasxoliseisApprovedHourlyLeaveService');
 const { buildHrSelectableLeaveCategoryQuery } = require('../../services/ergazomenoi/apasxoliseisHrLeaveCategoryPolicyService');
@@ -1394,11 +1395,22 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
             'resolution_blocked', 'resolution_reason', 'profile_company_id',
             'profile_employee_id', 'profile_history_id', 'review_date'
         ].map((field) => [field, profile[field] ?? currentEmployee[field]]).filter(([, value]) => value !== undefined));
-        if (hasApprovedLeaveProfile && profile.resolution_blocked !== true) {
+        const hasTimeShiftProfile = [...currentHistory,
+            ...(borrowedProfileContexts.get(borrowedProfileEmployeeKey(currentEmployee))?.borrowingHistory || [])]
+            .some(item => item.typos_egkekrimenhs_rythmishs === 'APPROVED_TIME_SHIFT_INTERRUPTION');
+        if ((hasApprovedLeaveProfile || hasTimeShiftProfile) && profile.resolution_blocked !== true) {
             const resolvedArrangement = resolveArrangementContext({ employee: currentEmployee,
                 reviewDate: row.hmeromhnia, normalHistory: currentHistory,
                 scheduledWorkingDay: scheduledWorkingDay(row),
                 borrowedContext: borrowedProfileContexts.get(borrowedProfileEmployeeKey(currentEmployee)) });
+            if (resolvedArrangement.arrangementEffective &&
+                resolvedArrangement.facts.typos_egkekrimenhs_rythmishs === 'APPROVED_TIME_SHIFT_INTERRUPTION') {
+                resolvedProfile.approved_time_shift_context = { resolvedArrangement,
+                    hrAuthoritative: row.orphan_card_resolution?.status === 'HR_APPROVED',
+                    breakProfile: Object.fromEntries(['dialleima_se_lepta', 'dialleima_entos_ektos_orarioy',
+                        ...['01', '02', '03'].flatMap(pair => [`dialleima_apo_ora_${pair}`, `dialleima_eos_ora_${pair}`])]
+                        .map(field => [field, resolvedArrangement.facts[field]])) };
+            }
             if (resolvedArrangement.arrangementEffective &&
                 resolvedArrangement.facts.typos_egkekrimenhs_rythmishs === 'APPROVED_LEAVE_INTERRUPTION') {
                 resolvedProfile.approved_hourly_leave_context = { resolvedArrangement,
@@ -2220,7 +2232,7 @@ async function runWeeklyRepoPostCheck({
     const loadedRows = await ProdhlomenaOrariaModel.find(postCheckRowsQuery)
         .select(
             'team company_kod kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika repo repo_apologistika ' +
-                'egkekrimenh_oroadeia_apologistika egkekrimena_diastimata_oroadeias_apologistika ' +
+                'egkekrimenh_anaplhrosh_apologistika egkekrimenh_oroadeia_apologistika egkekrimena_diastimata_oroadeias_apologistika ' +
                 'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                 'ores_ergasias ores_ergasias_apologistika cards_ores_ergasias ores_apoysias adeia adeia_apologistika ' +
                 'kathgoria_adeias kathgoria_adeias_apologistika argia argia_apologistika ' +
@@ -2238,7 +2250,7 @@ async function runWeeklyRepoPostCheck({
 
     // Declared clock pairs are new to this projection and are needed only for
     // approved-leave overnight timestamps; keep legacy break selection unchanged.
-    for (const row of loadedRows) if (row.egkekrimenh_oroadeia_apologistika !== true) {
+    for (const row of loadedRows) if (row.egkekrimenh_oroadeia_apologistika !== true && !row.egkekrimenh_anaplhrosh_apologistika) {
         for (const pair of ['01', '02', '03']) {
             delete row[`apo_ora_${pair}`]; delete row[`eos_ora_${pair}`];
         }
@@ -2763,6 +2775,8 @@ function isPartialEmploymentForAdditionalWork(workTerms = {}) {
 }
 
 function calculateAdditionalAndOverworkForDay(context, weeklyState) {
+    const compensation = context.approvedTimeShift?.matchedCompensationIntervals || [];
+    const isCompensation = minute => compensation.some(x => minute >= x.apo_lepto && minute < x.eos_lepto);
     const { rec, ergazomenos, argiesDateSet } = context;
 
     const rules = getWorkTimeRules(ergazomenos);
@@ -2893,6 +2907,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
                     regularWorkedSoFarToday++;
                 }
 
+                if (workedSoFarToday <= partialLegalOvertimeEndMinutes && isCompensation(minute)) continue;
                 if (workedSoFarToday <= partialDeclaredLimitMinutes) {
                     continue;
                 }
@@ -2963,6 +2978,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
                 continue;
             }
 
+            if (isCompensation(minute)) continue;
             const isOverworkZone =
                 regularDay &&
                 workedSoFarToday > overworkStartMinutes &&
@@ -3193,14 +3209,22 @@ function getPayrollDailyWorkMinutes(rec, ergazomenos = null) {
 
 // Preserve the pre-Stage-2 operation input for employees outside this feature.
 // Newly selected authority metadata is still available to the leave derivation.
-function approvedLeaveCalculationRow(row, fact) {
-    if (fact?.arrangementEffective || row.egkekrimenh_oroadeia_apologistika === true) return row;
+function approvedLeaveCalculationRow(row, fact, timeShift) {
+    if (fact?.arrangementEffective || timeShift?.arrangementEffective || row.egkekrimenh_oroadeia_apologistika === true) return row;
     const addedAuthorityFields = new Set(['kathgoria_ergasias', 'adeia_apologistika',
         'kathgoria_adeias_apologistika', 'orphan_card_resolution']);
     return Object.fromEntries(Object.entries(row).filter(([field]) => !addedAuthorityFields.has(field)));
 }
 
 function checkOresApoysias(context) {
+    if (context.approvedTimeShift?.shortageMinutes > 0) {
+        const remainder = context.approvedTimeShift.unexplainedMinutes;
+        const tolerance = Number(context.proorhApoxorhshMinutes) || 0;
+        return {
+            ores_ergasias_apologistika: +(getPayrollDailyWorkMinutes(context.rec, context.ergazomenos) / 60).toFixed(2),
+            ores_apoysias_apologistika: remainder > tolerance ? +(remainder / 60).toFixed(2) : 0
+        };
+    }
     if (context.approvedHourlyLeave?.creditedMinutes > 0) {
         const remainder = context.approvedHourlyLeave.unexplainedMinutes;
         const tolerance = Number(context.proorhApoxorhshMinutes) || 0;
@@ -5678,6 +5702,7 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
             ? getEffectiveEmployeeForDate(row, employee, baselineSnapshot.weekly_calculation_context?.profile_history || []) : {}),
         ...(row.effective_profile_resolved || {}),
         ...(row.effective_profile_resolved?.approved_hourly_leave_context?.breakProfile || {}),
+        ...(row.effective_profile_resolved?.approved_time_shift_context?.breakProfile || {}),
         kodikos: employeeKodikos, ypokatasthma: row.ypokatasthma || baselineSnapshot.scope?.ypokatasthma });
     const firstEffectiveEmployee = effectiveEmployeeForRow(frozenRows[0] || {});
     const argiesDateSet = new Set((baselineSnapshot.weekly_calculation_context?.calendar_facts || [])
@@ -5691,6 +5716,7 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
         weeklyOverworkCapMinutes: getWorkTimeRules(firstEffectiveEmployee).weeklyOverworkCapMinutes,
         weeklyLegalLimitMinutes: getWorkTimeRules(firstEffectiveEmployee).weeklyLegalLimitMinutes,
         usedOverworkMinutes: 0, isFirstPartialWeek: false };
+    const approvedTimeShiftByRowId = new Map();
     const approvedHourlyLeaveByRowId = new Map();
     for (const row of frozenRows) {
         const effectiveEmployee = effectiveEmployeeForRow(row);
@@ -5698,9 +5724,15 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
         const approvedHourlyLeave = frozenLeaveContext ? deriveApprovedHourlyLeave({ row,
             effectiveEmployee, ...frozenLeaveContext,
             hrAuthoritative: Boolean(protectionContext?.entriesByRowId?.[String(row._id)]) }) : null;
+        const frozenTimeShiftContext = row.effective_profile_resolved?.approved_time_shift_context;
+        const approvedTimeShift = frozenTimeShiftContext ? deriveApprovedTimeShift({ row,
+            effectiveEmployee, ...frozenTimeShiftContext,
+            hrAuthoritative: frozenTimeShiftContext.hrAuthoritative === true ||
+                Boolean(protectionContext?.entriesByRowId?.[String(row._id)]) }) : null;
+        approvedTimeShiftByRowId.set(String(row._id), approvedTimeShift);
         approvedHourlyLeaveByRowId.set(String(row._id), approvedHourlyLeave);
         const preliminary = buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee,
-            approvedHourlyLeave,
+            approvedHourlyLeave, approvedTimeShift,
             argiesDateSet, operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
         if (isRegularWorkingDayForOverwork(preliminary.workingRow, effectiveEmployee)) {
             state.weeklyRegularCardsMinutes += getPayrollDailyWorkMinutes(preliminary.workingRow, effectiveEmployee);
@@ -5711,6 +5743,7 @@ function runFrozenAuthoritativeEmploymentWeek({ employeeKodikos, weekStart, froz
         const effectiveEmployee = effectiveEmployeeForRow(row);
         const plan = buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesDateSet,
             approvedHourlyLeave: approvedHourlyLeaveByRowId.get(String(row._id)),
+            approvedTimeShift: approvedTimeShiftByRowId.get(String(row._id)),
             weeklyState: state, appliedProtectionContext: protectionContext,
             operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
         return { ...row, ...plan.sanitizedUpdate };
@@ -6711,7 +6744,7 @@ class erganhController {
                             'astheneia astheneia_apologistika apousia_apologistika ' +
                             'ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ' +
                             'ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika ' +
-                            'compensation_breakdown_apologistika egkekrimenh_oroadeia_apologistika explicit_hourly_leave_hours egkekrimena_diastimata_oroadeias_apologistika apo_ora_egkekrimenhs_oroadeias_apologistika eos_ora_egkekrimenhs_oroadeias_apologistika ' +
+                            'egkekrimenh_anaplhrosh_apologistika compensation_breakdown_apologistika egkekrimenh_oroadeia_apologistika explicit_hourly_leave_hours egkekrimena_diastimata_oroadeias_apologistika apo_ora_egkekrimenhs_oroadeias_apologistika eos_ora_egkekrimenhs_oroadeias_apologistika ' +
                             'ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
                             'is_locked locked_by locked_at unlocked_by unlocked_at'
                     )
@@ -6724,7 +6757,7 @@ class erganhController {
                     ? ProdhlomenaOrariaModel.find(deviationContextFilter)
                           .select(
                               'team company_kod ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
-                                  'repo repo_apologistika adeia kathgoria_adeias ores_apoysias explicit_hourly_leave_hours egkekrimenh_oroadeia_apologistika hr_declared_leave adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika argia argia_apologistika ' +
+                                  'egkekrimenh_anaplhrosh_apologistika repo repo_apologistika adeia kathgoria_adeias ores_apoysias explicit_hourly_leave_hours egkekrimenh_oroadeia_apologistika hr_declared_leave adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika argia argia_apologistika ' +
                                   'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                                   'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
                                   'ores_ergasias ores_ergasias_apologistika ores_apoysias_apologistika cards_ores_ergasias orphan_card_resolution is_locked'
@@ -10501,7 +10534,7 @@ class erganhController {
                     .select(
                         '_id kodikos ypokatasthma hmeromhnia repo argia is_locked ' +
                             'kathgoria_ergasias adeia_apologistika kathgoria_adeias_apologistika orphan_card_resolution ' +
-                            'egkekrimenh_oroadeia_apologistika egkekrimena_diastimata_oroadeias_apologistika ' +
+                            'egkekrimenh_anaplhrosh_apologistika egkekrimenh_oroadeia_apologistika egkekrimena_diastimata_oroadeias_apologistika ' +
                             'apo_ora_egkekrimenhs_oroadeias_apologistika eos_ora_egkekrimenhs_oroadeias_apologistika explicit_hourly_leave_hours ' +
                             'kathgoria_ergasias_apologistika repo_apologistika ' +
                             'adeia kathgoria_adeias ores_apoysias hr_declared_leave astheneia astheneia_apologistika apousia_apologistika argia_apologistika ' +
@@ -10566,6 +10599,7 @@ class erganhController {
                 `[calcApasxolhseisPeriodoy] Προδηλωμένα προς έλεγχο: ${prodhlomena.length}`
             );
 
+            const approvedTimeShiftByRowId = new Map();
             const approvedHourlyLeaveByRowId = new Map();
             const leaveCategories = await Models_A.KathgoriesAdeiasModel.find(
                 buildHrSelectableLeaveCategoryQuery()).select('kodikos perigrafh').lean();
@@ -10629,10 +10663,14 @@ class erganhController {
                 const approvedHourlyLeave = deriveApprovedHourlyLeave({ row: rec,
                     effectiveEmployee: effectiveErgazomenos, resolvedArrangement, leaveCategories,
                     hrAuthoritative: Boolean(appliedProtectionContext?.entriesByRowId?.[String(rec._id)]) });
+                const approvedTimeShift = deriveApprovedTimeShift({ row: rec,
+                    effectiveEmployee: effectiveErgazomenos, resolvedArrangement,
+                    hrAuthoritative: Boolean(appliedProtectionContext?.entriesByRowId?.[String(rec._id)]) });
+                approvedTimeShiftByRowId.set(String(rec._id), approvedTimeShift);
                 approvedHourlyLeaveByRowId.set(String(rec._id), approvedHourlyLeave);
 
-                const preliminary = buildEmploymentDailyPreliminaryUpdate({ row: approvedLeaveCalculationRow(rec, approvedHourlyLeave),
-                    approvedHourlyLeave,
+                const preliminary = buildEmploymentDailyPreliminaryUpdate({ row: approvedLeaveCalculationRow(rec, approvedHourlyLeave, approvedTimeShift),
+                    approvedHourlyLeave, approvedTimeShift,
                     effectiveEmployee: effectiveErgazomenos,
                     argiesDateSet: effectiveArgiesDateSet, proorhProseleyshMinutes,
                     proorhApoxorhshMinutes, operations: AUTHORITATIVE_DAILY_CALCULATION_OPERATIONS });
@@ -10673,8 +10711,9 @@ class erganhController {
                 const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
                 const weeklyState = weeklyStateMap.get(weekKey);
                 const dailyPlan = buildStage1EffectiveHolidayDailyCalculationUpdate({
-                    row: approvedLeaveCalculationRow(rec, approvedHourlyLeaveByRowId.get(String(rec._id))),
+                    row: approvedLeaveCalculationRow(rec, approvedHourlyLeaveByRowId.get(String(rec._id)), approvedTimeShiftByRowId.get(String(rec._id))),
                     approvedHourlyLeave: approvedHourlyLeaveByRowId.get(String(rec._id)),
+                    approvedTimeShift: approvedTimeShiftByRowId.get(String(rec._id)),
                     effectiveEmployee: effectiveErgazomenos,
                     holidayContext: holidayResolution.holidayContext, weeklyState,
                     appliedProtectionContext, proorhProseleyshMinutes, proorhApoxorhshMinutes,

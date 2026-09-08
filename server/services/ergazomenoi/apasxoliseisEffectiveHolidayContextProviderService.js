@@ -32,7 +32,7 @@ function resolveArrangementContext({ employee, reviewDate, normalHistory = [], s
     const history = borrowed ? borrowed.borrowingHistory : normalHistory;
     // Unsupported/absent arrangements must not introduce new temporal validation
     // into the legacy calculation path. This gate never activates an arrangement.
-    if (!history.some(row => row.typos_egkekrimenhs_rythmishs === 'APPROVED_LEAVE_INTERRUPTION')) {
+    if (!history.some(row => ['APPROVED_LEAVE_INTERRUPTION', 'APPROVED_TIME_SHIFT_INTERRUPTION'].includes(row.typos_egkekrimenhs_rythmishs))) {
         return { arrangementEffective: false, facts: {} };
     }
     return resolveEmploymentProfileFactsForDate(reviewDate, history, {
