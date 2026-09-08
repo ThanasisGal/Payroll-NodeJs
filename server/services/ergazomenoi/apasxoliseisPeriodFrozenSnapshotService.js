@@ -10,7 +10,9 @@ const APPROVED_LEAVE_FIELDS = Object.freeze([
     'apo_ora_egkekrimenhs_oroadeias_apologistika', 'eos_ora_egkekrimenhs_oroadeias_apologistika',
     'explicit_hourly_leave_hours',
 ]);
+const TIME_SHIFT_FIELD = 'egkekrimenh_anaplhrosh_apologistika';
 const DAILY_FIELDS = Object.freeze([
+    TIME_SHIFT_FIELD,
     ...APPROVED_LEAVE_FIELDS,
     '_id', 'kodikos', 'ypokatasthma', 'hmeromhnia', 'apologistiko_biblio', 'kathgoria_ergasias_apologistika',
     'kathgoria_ergasias', 'repo', 'repo_effective_identity', 'repo_original_identity',
@@ -102,8 +104,10 @@ function pick(source = {}, fields = []) {
 }
 function pickDaily(row) {
     // Inactive defaults must not change existing frozen projections/fingerprints.
-    return pick(row, row.egkekrimenh_oroadeia_apologistika === true
-        ? DAILY_FIELDS : DAILY_FIELDS.filter(field => !APPROVED_LEAVE_FIELDS.includes(field)));
+    const fields = row.egkekrimenh_oroadeia_apologistika === true
+        ? DAILY_FIELDS : DAILY_FIELDS.filter(field => !APPROVED_LEAVE_FIELDS.includes(field));
+    return pick(row, row[TIME_SHIFT_FIELD] == null
+        ? fields.filter(field => field !== TIME_SHIFT_FIELD) : fields);
 }
 function pickProfile(row, fields, includeLegacyBreakHistory = false) {
     // Explicit legacy break history needs its eligibility fields even without V1.

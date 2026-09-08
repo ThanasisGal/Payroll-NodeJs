@@ -2,6 +2,7 @@ const { Schema: _Schema, model } = require('mongoose');
 
 const Schema = _Schema;
 const { employmentProfileFields, attachEmploymentProfileValidation } = require('./employeeEmploymentProfileFields');
+const { validTimeShiftSegments, validTimeShiftCompensation } = require('../utils/ergazomenoi/approvedTimeShiftCompensation');
 const { validApprovedHourlyLeaveSegments } = require('../utils/ergazomenoi/approvedHourlyLeaveSegments');
 
 const ErgazomenoiSchema = new Schema(
@@ -352,6 +353,28 @@ attachEmploymentProfileValidation(ErgazomenoiSchema);
 
 const ErgazomenoiModel = model('Ergazomenoi', ErgazomenoiSchema);
 
+// Persistence only: calculation stages decide when to populate/reset this fact.
+const timeShiftSegmentArray = () => ({
+    type: [new Schema({
+        apo_lepto: { type: Number, required: true },
+        eos_lepto: { type: Number, required: true }
+    }, { _id: false })],
+    default: () => [],
+    set: value => {
+        if (value !== undefined && !Array.isArray(value)) {
+            throw new TypeError('Time shift segments must be an array.');
+        }
+        return value;
+    },
+    validate: { validator: validTimeShiftSegments, message: 'Invalid time shift segments.' }
+});
+const timeShiftCompensationSchema = new Schema({
+    diastimata_elleimmatos: timeShiftSegmentArray(),
+    diastimata_anaplhroshs: timeShiftSegmentArray(),
+    antistoixismena_lepta: { type: Number, default: 0 },
+    ypoloipomena_lepta: { type: Number, default: 0 }
+}, { _id: false });
+
 const ProdhlomenaOrariaSchema = new Schema(
     {
         team: { type: String, trim: true },
@@ -426,6 +449,12 @@ const ProdhlomenaOrariaSchema = new Schema(
             }
         },
         ores_argias_pistomenes_apologistika: { type: Number, default: 0 },
+        egkekrimenh_anaplhrosh_apologistika: {
+            type: timeShiftCompensationSchema,
+            default: null,
+            validate: { validator: validTimeShiftCompensation,
+                message: 'Time shift compensation intervals and minute totals must agree.' }
+        },
         compensation_breakdown_apologistika: { type: Schema.Types.Mixed, default: null },
         ores_nyxtas_apologistika: { type: Number, default: 0 },
         ores_argion_prosayxhsh_apologistika: { type: Number, default: 0 },
