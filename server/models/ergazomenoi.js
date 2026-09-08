@@ -2,6 +2,7 @@ const { Schema: _Schema, model } = require('mongoose');
 
 const Schema = _Schema;
 const { employmentProfileFields, attachEmploymentProfileValidation } = require('./employeeEmploymentProfileFields');
+const { validApprovedHourlyLeaveSegments } = require('../utils/ergazomenoi/approvedHourlyLeaveSegments');
 
 const ErgazomenoiSchema = new Schema(
     {
@@ -403,6 +404,27 @@ const ProdhlomenaOrariaSchema = new Schema(
         apo_ora_egkekrimenhs_oroadeias_apologistika: { type: String },
         eos_ora_egkekrimenhs_oroadeias_apologistika: { type: String },
         explicit_hourly_leave_hours: { type: Number, default: 0 },
+        // Future writer contract: this array holds every exact credited segment.
+        // Zero segments: false flag, empty singular times, zero total hours.
+        // One segment: singular times may mirror it; multiple: singular times stay empty.
+        // Only Stage 2 will write those related facts; validation does not calculate them.
+        egkekrimena_diastimata_oroadeias_apologistika: {
+            type: [new Schema({
+                apo_lepto: { type: Number, required: true },
+                eos_lepto: { type: Number, required: true }
+            }, { _id: false })],
+            default: () => [],
+            set: value => {
+                if (value !== undefined && !Array.isArray(value)) {
+                    throw new TypeError('Approved hourly leave segments must be an array.');
+                }
+                return value;
+            },
+            validate: {
+                validator: validApprovedHourlyLeaveSegments,
+                message: 'Approved hourly leave segments must have safe integer bounds, positive duration and ascending non-overlapping order.'
+            }
+        },
         ores_argias_pistomenes_apologistika: { type: Number, default: 0 },
         compensation_breakdown_apologistika: { type: Schema.Types.Mixed, default: null },
         ores_nyxtas_apologistika: { type: Number, default: 0 },
