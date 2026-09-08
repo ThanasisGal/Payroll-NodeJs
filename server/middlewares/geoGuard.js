@@ -1,4 +1,5 @@
 const geoip = require("geoip-lite");
+const logger = require('../utils/logger');
 const { allowedCountries } = require("../../config/geo.json");
 
 async function geoGuard(req, res, next) {
