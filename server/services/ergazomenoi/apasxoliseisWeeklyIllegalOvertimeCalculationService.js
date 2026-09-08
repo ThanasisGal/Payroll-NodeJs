@@ -330,6 +330,19 @@ function getPayrollCalculationIntervals(rec, ergazomenos = null) {
     }
 
     const rawIntervals = getCardIntervals(rec, ergazomenos);
+    if (rec.egkekrimenh_oroadeia_apologistika === true) {
+        let previousStart = -Infinity;
+        const declaredStart = timeToMinutesSafe(rec.apo_ora_01);
+        const declaredEnd = timeToMinutesSafe(rec.eos_ora_01);
+        if (declaredStart !== null && declaredEnd !== null && declaredEnd < declaredStart &&
+            rawIntervals[0]?.start < declaredStart && rawIntervals[0]?.start < declaredEnd) previousStart = 1440;
+        return rawIntervals.map(interval => {
+            let { start, end } = interval;
+            while (start < previousStart) { start += 1440; end += 1440; }
+            previousStart = start;
+            return { ...interval, start, end };
+        });
+    }
     if (rawIntervals.length > 0 ||
         (hasExactExternalBreaks(ergazomenos) && getRawCardIntervals(rec).length > 0)) {
         return rawIntervals;

@@ -1,5 +1,7 @@
 'use strict';
 
+const { FLAG, approvedHourlyLeaveUpdate } = require('./apasxoliseisApprovedHourlyLeaveService');
+
 const {
     buildAutoAttendanceReset,
     resolveSafeStartOnlyOrphan
@@ -24,13 +26,18 @@ const DAILY_OPERATIONS = Object.freeze([...PRELIMINARY_OPERATIONS, 'checkNightHo
     'calculateAdditionalAndOverworkForDay', 'sanitizeAppliedRepoTransferUpdate']);
 
 function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
-    proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, operations }) {
+    proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, approvedHourlyLeave = null, operations }) {
     assertOperations(operations, PRELIMINARY_OPERATIONS);
+    if (row[FLAG] === true && row.is_locked !== true && !approvedHourlyLeave) {
+        throw Object.assign(new Error('Απαιτούνται τα ιστορικά στοιχεία της εγκεκριμένης ωροάδειας για επανυπολογισμό.'), {
+            code: 'APPROVED_HOURLY_LEAVE_CONTEXT_REQUIRED', statusCode: 409
+        });
+    }
     const calculationRow = operations.normalizeZeroLengthCardPairs(row);
     const context = { rec: calculationRow, ergazomenos: effectiveEmployee, argiesDateSet,
         proorhProseleyshMinutes, proorhApoxorhshMinutes,
         evelikthProselefshMinutes: parseInt(effectiveEmployee?.evelikth_proselefsh || 0, 10) || 0 };
-    if (calculationRow.is_locked === true) {
+    if (calculationRow.is_locked === true || (approvedHourlyLeave?.arrangementEffective && approvedHourlyLeave.protected)) {
         return Object.freeze({ calculationRow, update: {}, unresolved: false,
             rawCardEvidenceUnresolved: false, safeOrphan: null, manualOwnership: 'LOCKED_HR_ROW',
             context, workingRow: calculationRow });
@@ -64,22 +71,33 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
         Object.assign(update, operations.checkBrokenProgramVsContinuousCards(context));
         Object.assign(update, operations.checkNoDeclaredScheduleCards(context));
     }
+    if (approvedHourlyLeave?.creditedMinutes > 0) {
+        update.apologistiko_biblio = true;
+        for (const pair of ['01', '02', '03']) {
+            update[`apo_ora_${pair}_apologistika`] = calculationRow[`cards_apo_ora_${pair}`] || '';
+            update[`eos_ora_${pair}_apologistika`] = calculationRow[`cards_eos_ora_${pair}`] || '';
+        }
+    }
     return Object.freeze({ calculationRow, update, unresolved, rawCardEvidenceUnresolved:
         verification.hasUnresolvedCardEvidence, safeOrphan, context,
         workingRow: { ...calculationRow, ...update } });
 }
 
 function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesDateSet, weeklyState,
-    appliedProtectionContext, proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, operations }) {
+    appliedProtectionContext, proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, approvedHourlyLeave = null, operations }) {
     assertOperations(operations, DAILY_OPERATIONS);
     const preliminary = buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
-        proorhProseleyshMinutes, proorhApoxorhshMinutes, operations });
+        proorhProseleyshMinutes, proorhApoxorhshMinutes, approvedHourlyLeave, operations });
     if (preliminary.manualOwnership) {
         return Object.freeze({ ...preliminary, update: {}, sanitizedUpdate: {},
             protectionDiagnostics: [] });
     }
     const update = { ...preliminary.update };
-    const workingContext = { ...preliminary.context, rec: preliminary.workingRow };
+    const leaveUpdate = approvedHourlyLeave && !approvedHourlyLeave.protected &&
+        (approvedHourlyLeave.arrangementEffective || row[FLAG] === true)
+        ? approvedHourlyLeaveUpdate(approvedHourlyLeave) : {};
+    const workingContext = { ...preliminary.context, approvedHourlyLeave,
+        rec: { ...preliminary.workingRow, ...leaveUpdate } };
     Object.assign(update, operations.checkNightHours(workingContext));
     Object.assign(update, operations.checkSundayHolidayHours(workingContext));
     if (!preliminary.unresolved) {
@@ -88,11 +106,13 @@ function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesD
     }
     if (weeklyState) Object.assign(update,
         operations.calculateAdditionalAndOverworkForDay(workingContext, weeklyState));
+    Object.assign(update, leaveUpdate);
     const protectedUpdate = operations.sanitizeAppliedRepoTransferUpdate({ rowId: row._id,
         currentRow: row, update, protectionContext: appliedProtectionContext });
     return Object.freeze({ ...preliminary, update,
         sanitizedUpdate: protectedUpdate.sanitizedUpdate,
-        protectionDiagnostics: protectedUpdate.diagnostics || [] });
+        protectionDiagnostics: [...(protectedUpdate.diagnostics || []),
+            ...(approvedHourlyLeave?.requiresHrReview ? [approvedHourlyLeave.reason] : [])] });
 }
 
 function buildStage1EffectiveHolidayDailyCalculationUpdate({ row, holidayContext, ...options }) {
