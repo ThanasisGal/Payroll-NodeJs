@@ -1246,3 +1246,18 @@ function run() {
 }
 
 run();
+
+// Η πραγματική παρουσία 250 λεπτών τέμνει μόνο 10 λεπτά του διαλείμματος.
+{
+    const rows = fullTimeWeek();
+    Object.assign(rows[1], { cards_apo_ora_01: '12:30', cards_eos_ora_01: '16:40',
+        cards_ores_ergasias: 250 / 60 });
+    materializeAutoSource(rows, 1, { ores_ergasias_apologistika: 4,
+        ores_pragmatikhs_ergasias_apologistika: 4 });
+    const { getPayrollCalculationIntervals } = require('./apasxoliseisWeeklyIllegalOvertimeCalculationService');
+    const profile = { typos_apasxolhshs: 'PLHRHS', dialleima_se_lepta: 30,
+        dialleima_entos_ektos_orarioy: false, external_break_minutes: 30 };
+    assert.strictEqual(getPayrollCalculationIntervals(rows[1], profile)
+        .reduce((sum, x) => sum + x.end - x.start, 0), 240);
+    assertEligible(analyze(rows, profile), dateKey(1), dateKey(4), 'ΑΝ');
+}

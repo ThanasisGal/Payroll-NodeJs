@@ -63,13 +63,13 @@ for (const [name, mutate, code] of [
     const h = harness(); mutate(h); await assert.rejects(() => load(h), { code });
 });
 
-test('exact-break calculation semantics invalidate the previous canonical context fingerprint', async () => {
+test('central break policy invalidates the previous canonical context fingerprint', async () => {
     const h = harness();
     const { snapshot } = await load(h);
-    assert.equal(CALCULATION_SOURCE_VERSION, 'weekly-illegal-overtime:45b046b:v2');
+    assert.equal(CALCULATION_SOURCE_VERSION, 'weekly-illegal-overtime:45b046b:v3');
     assert.equal(snapshot.semantics.illegalOvertimeSourceVersion, CALCULATION_SOURCE_VERSION);
     const previousSnapshot = { ...snapshot, semantics: { ...snapshot.semantics,
-        illegalOvertimeSourceVersion: 'weekly-illegal-overtime:45b046b:v1' } };
+        illegalOvertimeSourceVersion: 'weekly-illegal-overtime:45b046b:v2' } };
     const previousFingerprint = service.fingerprintContext(previousSnapshot);
     const currentFingerprint = service.fingerprintContext(snapshot);
     assert.notEqual(currentFingerprint, previousFingerprint);

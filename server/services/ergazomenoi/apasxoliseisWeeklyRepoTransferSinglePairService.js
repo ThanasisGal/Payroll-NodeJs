@@ -1,3 +1,4 @@
+const { getPayrollCalculationIntervals } = require('./apasxoliseisWeeklyIllegalOvertimeCalculationService');
 // Pure weekly analyzer for one semantic repo-transfer pair.
 // This module must stay free of DB, controller, route, network, and write dependencies.
 
@@ -431,20 +432,16 @@ function isProvisionalAutoCalculatedSourceWork({
         .filter((interval) => interval.isComplete && !interval.isZeroLength)
         .reduce((sum, interval) => sum + interval.durationMinutes / 60, 0);
     const declaredHours = toFiniteNumber(row.ores_ergasias);
-    const declaredBreakHours = facts.declared.breaks
-        .filter((interval) => interval.isComplete && !interval.isZeroLength)
-        .reduce((sum, interval) => sum + interval.durationMinutes / 60, 0);
-    const profileBreakMinutes = toFiniteNumber(employmentProfile.external_break_minutes);
-    const knownBreakHours = profileBreakMinutes > 0
-        ? profileBreakMinutes / 60
-        : declaredBreakHours;
-    const cardHoursAfterKnownBreak = Math.max(cardHours - knownBreakHours, 0);
+    const canonicalCardHours = getPayrollCalculationIntervals(row, {
+        ...employmentProfile,
+        dialleima_se_lepta: employmentProfile.dialleima_se_lepta ?? employmentProfile.external_break_minutes
+    }).reduce((sum, interval) => sum + interval.end - interval.start, 0) / 60;
     const workHoursCompatible =
         workHoursState.kind === 'ZERO' ||
         (workHoursState.kind === 'POSITIVE' &&
             [
                 cardHours,
-                cardHoursAfterKnownBreak,
+                canonicalCardHours,
                 apologistikaIntervalHours,
                 declaredHours
             ].some((expected) =>
@@ -453,7 +450,7 @@ function isProvisionalAutoCalculatedSourceWork({
     const actualWorkHoursCompatible =
         actualWorkHoursState.kind === 'ZERO' ||
         (actualWorkHoursState.kind === 'POSITIVE' &&
-            [cardHours, cardHoursAfterKnownBreak, apologistikaIntervalHours]
+            [cardHours, canonicalCardHours, apologistikaIntervalHours]
                 .some((expected) => numbersMatch(actualWorkHoursState.value, expected)));
     const unrelatedPositiveHours = apologistikaState.numericStates.some((state) => {
         if (state.kind !== 'POSITIVE') return false;

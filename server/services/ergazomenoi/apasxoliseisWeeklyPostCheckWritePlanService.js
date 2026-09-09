@@ -308,7 +308,7 @@ function buildWeeklyRepoPostCheckWritePlan({
                 });
                 for (const reason of repoCountState.diagnostics) repoStateReasons.add(reason);
 
-                if (hasUnresolvedCardPair) Object.assign(update, buildPartialVerifiedCardUpdate(row).update);
+                if (hasUnresolvedCardPair) Object.assign(update, buildPartialVerifiedCardUpdate(row, dailyProfile).update);
                 if (!hasUnresolvedCardPair && isNonZeroHours(row.ores_ergasias) &&
                     cardsOresIsNonZero && String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΜΕ') {
                     update.kathgoria_ergasias_apologistika = '';

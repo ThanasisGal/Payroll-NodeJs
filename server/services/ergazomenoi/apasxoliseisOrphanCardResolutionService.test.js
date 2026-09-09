@@ -195,7 +195,7 @@ assert.strictEqual(splitManual.proposal.scheduleKind, 'SPLIT');
 assert.strictEqual(splitManual.proposal.durationSource, 'HR_MANUAL_SPLIT_INTERVAL');
 assert.strictEqual(splitManual.proposal.start, '08:15');
 assert.strictEqual(splitManual.proposal.end, '17:45');
-assert.strictEqual(splitManual.proposal.workDurationHours, 9);
+assert.strictEqual(splitManual.proposal.workDurationHours, 9.5);
 assert.strictEqual(splitManual.proposal.manualIntervalMatchesRule, false);
 assert.strictEqual(splitManual.reuseScope, 'ONE_TIME');
 assert.strictEqual(splitManual.reusableEligible, false);

@@ -19,13 +19,15 @@ const { buildNoCardsDisplayContext } =
     require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 
 const FINGERPRINT_VERSION = 'HISTORICAL_PERIOD_FACTS_V1';
-const EMPLOYMENT_CALCULATION_SEMANTICS_VERSION = 'employment-calculation-semantics:v2';
+const EMPLOYMENT_CALCULATION_SEMANTICS_VERSION = 'employment-calculation-semantics:v3';
 const SOURCE_FIELDS = Object.freeze([
     'team', 'company_kod', 'ypokatasthma', 'kodikos', 'hmeromhnia',
     'kathgoria_ergasias', 'apo_ora_01', 'eos_ora_01', 'apo_ora_02', 'eos_ora_02',
     'apo_ora_03', 'eos_ora_03', 'ores_ergasias', 'repo', 'adeia', 'kathgoria_adeias',
     'astheneia', 'argia', 'cards_apo_ora_01', 'cards_eos_ora_01', 'cards_apo_ora_02',
     'cards_eos_ora_02', 'cards_apo_ora_03', 'cards_eos_ora_03', 'cards_ores_ergasias',
+    'dialleima_apo_ora_01', 'dialleima_eos_ora_01', 'dialleima_apo_ora_02',
+    'dialleima_eos_ora_02', 'dialleima_apo_ora_03', 'dialleima_eos_ora_03',
     'is_locked'
 ]);
 const DEPENDENCY_FIELDS = Object.freeze([...SOURCE_FIELDS,

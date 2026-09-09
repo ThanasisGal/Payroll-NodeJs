@@ -3,7 +3,6 @@ const { resolveArrangementContext } = require('../../services/ergazomenoi/apasxo
 const { deriveApprovedHourlyLeave, scheduledWorkingDay } = require('../../services/ergazomenoi/apasxoliseisApprovedHourlyLeaveService');
 const { buildHrSelectableLeaveCategoryQuery } = require('../../services/ergazomenoi/apasxoliseisHrLeaveCategoryPolicyService');
 const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
-const { hasExactExternalBreaks } = require('../../utils/ergazomenoi/subtractExternalBreakIntervals');
 const { getOrarioTermsForDate: resolveTemporalWorkTerms } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('../../utils/ergazomenoi/employmentProfileHistory');
 // module.exports = erganhController;
@@ -328,13 +327,11 @@ const {
     addDaysUtc,
     dateKeyUtc,
     isSundayOrHoliday,
-    getBreakOffsetMinutes,
     isDeclaredContinuousSchedule,
     isCardsContinuousSchedule,
     isZeroLengthTimePair,
     getRawCardIntervals,
     getRawDailyCardsMinutes,
-    shouldSubtractExternalBreak,
     expandIntervalFromTimes,
     emptyClassifiedMinutes,
     addClassifiedMinute,
@@ -2234,6 +2231,7 @@ async function runWeeklyRepoPostCheck({
             'team company_kod kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika repo repo_apologistika ' +
                 'egkekrimenh_anaplhrosh_apologistika egkekrimenh_oroadeia_apologistika egkekrimena_diastimata_oroadeias_apologistika ' +
                 'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
                 'ores_ergasias ores_ergasias_apologistika cards_ores_ergasias ores_apoysias adeia adeia_apologistika ' +
                 'kathgoria_adeias kathgoria_adeias_apologistika argia argia_apologistika ' +
                 'astheneia astheneia_apologistika apologistiko_biblio is_locked ' +
@@ -2247,14 +2245,6 @@ async function runWeeklyRepoPostCheck({
         )
         .sort({ kodikos: 1, hmeromhnia: 1 })
         .lean();
-
-    // Declared clock pairs are new to this projection and are needed only for
-    // approved-leave overnight timestamps; keep legacy break selection unchanged.
-    for (const row of loadedRows) if (row.egkekrimenh_oroadeia_apologistika !== true && !row.egkekrimenh_anaplhrosh_apologistika) {
-        for (const pair of ['01', '02', '03']) {
-            delete row[`apo_ora_${pair}`]; delete row[`eos_ora_${pair}`];
-        }
-    }
 
     const weeklyContextRows = loadedRows.filter((row) => {
         const employee = employeesByKodikos.get(String(row.kodikos || ''));
@@ -2785,11 +2775,6 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
 
     const declaredMinutes = getDailyDeclaredMinutes(rec);
     const dailyCardsMinutes = getPayrollDailyWorkMinutes(rec, ergazomenos);
-    const approvedOrphanBreakOffsetMinutes =
-        rec?.orphan_card_resolution?.status === 'HR_APPROVED' && !hasExactExternalBreaks(ergazomenos)
-            ? getBreakOffsetMinutes(ergazomenos)
-            : 0;
-
     // Στην πλήρη απασχόληση η μικρότερη προδήλωση δεν επιτρέπεται να κατεβάζει
     // τη συμβατική ημερήσια βάση και να δημιουργεί πλασματική υπερεργασία.
     // Η απόκλιση από το προδηλωμένο πρόγραμμα ελέγχεται χωριστά.
@@ -2828,23 +2813,10 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     };
 
     const buildResult = () => {
-        const legalOvertimeBreakOffsetMinutes = !hasExactExternalBreaks(ergazomenos) && shouldSubtractExternalBreak(rec, ergazomenos)
-            ? getBreakOffsetMinutes(ergazomenos)
-            : 0;
-
-        const legalOvertimeStartTime =
-            totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
-                ? minutesToTimeSafe(firstLegalOvertimeMinute + legalOvertimeBreakOffsetMinutes)
-                : '';
-
-        const legalOvertimeEndTime =
-            totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
-                ? minutesToTimeSafe(
-                      hasExactExternalBreaks(ergazomenos)
-                          ? lastLegalOvertimeMinute + 1
-                          : firstLegalOvertimeMinute + legalOvertimeBreakOffsetMinutes + totalLegalOvertimeMinutes
-                  )
-                : '';
+        const legalOvertimeStartTime = totalLegalOvertimeMinutes > 0
+            ? minutesToTimeSafe(firstLegalOvertimeMinute) : '';
+        const legalOvertimeEndTime = totalLegalOvertimeMinutes > 0
+            ? minutesToTimeSafe(lastLegalOvertimeMinute + 1) : '';
 
         return {
             ores_prostheths_ergasias_apologistika: toHours(prosthetiMinutes),
@@ -2891,9 +2863,8 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     //   πάνω από 11h                -> παράνομη υπερωρία
     // ============================================================
     if (isPartialEmployment) {
-        const partialDeclaredLimitMinutes = Math.min(baseWorkMinutes, 8 * 60) +
-            approvedOrphanBreakOffsetMinutes;
-        const partialAdditionalEndMinutes = 8 * 60 + approvedOrphanBreakOffsetMinutes;
+        const partialDeclaredLimitMinutes = Math.min(baseWorkMinutes, 8 * 60);
+        const partialAdditionalEndMinutes = 8 * 60;
         const partialLegalOvertimeEndMinutes = partialAdditionalEndMinutes + 3 * 60;
 
         let workedSoFarToday = 0;
@@ -2938,10 +2909,10 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     // 6ήμερο: από το συμβατικό ημερήσιο όριο μέχρι το dailyLegalLimit = υπερεργασία.
     // Αν για οποιονδήποτε λόγο η βάση ημέρας είναι ίση ή μεγαλύτερη από το dailyLegalLimit,
     // δίνουμε τουλάχιστον 1 ώρα ζώνη υπερεργασίας πριν ξεκινήσει η υπερωρία.
-    const overworkStartMinutes = baseWorkMinutes + approvedOrphanBreakOffsetMinutes;
+    const overworkStartMinutes = baseWorkMinutes;
     const overworkEndMinutes = Math.max(
-        rules.dailyLegalLimitMinutes + approvedOrphanBreakOffsetMinutes,
-        baseWorkMinutes + 60 + approvedOrphanBreakOffsetMinutes
+        rules.dailyLegalLimitMinutes,
+        baseWorkMinutes + 60
     );
 
     const legalOvertimeStartMinutes = overworkEndMinutes;
@@ -3199,12 +3170,9 @@ function getEffectiveDailyWorkMinutesForApologistika(rec, ergazomenos = null) {
 
 
 function getPayrollDailyWorkMinutes(rec, ergazomenos = null) {
-    const grossMinutes = getPayrollCalculationIntervals(rec, ergazomenos).reduce(
-        (total, interval) => total + Math.max(0, interval.end - interval.start),
-        0
+    return getPayrollCalculationIntervals(rec, ergazomenos).reduce(
+        (total, interval) => total + Math.max(0, interval.end - interval.start), 0
     );
-    if (rec?.orphan_card_resolution?.status !== 'HR_APPROVED' || hasExactExternalBreaks(ergazomenos)) return grossMinutes;
-    return Math.max(0, grossMinutes - getBreakOffsetMinutes(ergazomenos));
 }
 
 // Preserve the pre-Stage-2 operation input for employees outside this feature.
@@ -3268,44 +3236,10 @@ function checkOresApoysias(context) {
     const declaredHours = toHours(declaredMinutes);
 
     // ============================================================
-    // a = Ώρες καρτών από ProdhlomenaOrariaModel.cards_ores_ergasias.
-    //
-    // ΠΡΟΣΟΧΗ:
-    // Δεν αλλάζουμε το cards_ores_ergasias.
-    // Το χρησιμοποιούμε μόνο ως βάση υπολογισμού.
-    // ============================================================
-    const approvedOrphan = rec?.orphan_card_resolution?.status === 'HR_APPROVED';
-    const exactExternalBreak = hasExactExternalBreaks(ergazomenos);
-    const cardsHours = approvedOrphan || exactExternalBreak
-        ? getPayrollDailyWorkMinutes(rec, ergazomenos) / 60
-        : Number(rec.cards_ores_ergasias || 0);
-
-    // ============================================================
-    // c = Διάλειμμα σε ώρες.
-    //
-    // getBreakOffsetMinutes(ergazomenos):
-    // - αν dialleima_entos_ektos_orarioy === true  -> επιστρέφει 0
-    // - αν dialleima_entos_ektos_orarioy === false -> επιστρέφει dialleima_se_lepta
-    //
-    // Άρα εφαρμόζει ακριβώς τη λογική:
-    // αν το διάλειμμα είναι ΕΝΤΟΣ ωραρίου, c = 0
-    // αν το διάλειμμα είναι ΕΚΤΟΣ ωραρίου, c = dialleima_se_lepta
-    // ============================================================
-    const breakMinutes = getBreakOffsetMinutes(ergazomenos);
-    const breakHours = breakMinutes / 60;
-
-    // ============================================================
-    // e = a - c
-    //
-    // Αυτό ενημερώνει το ores_ergasias_apologistika.
-    // Παράδειγμα:
-    // cards_ores_ergasias = 10.00
-    // διάλειμμα εκτός = 0.50
-    // => ores_ergasias_apologistika = 9.50
-    // ============================================================
-    const effectiveCardsHours = approvedOrphan || exactExternalBreak
-        ? Math.max(0, cardsHours)
-        : Math.max(0, cardsHours - breakHours);
+    // Οι πραγματικές ώρες προέρχονται από τα ίδια καθαρά χρονικά διαστήματα
+    // που χρησιμοποιούν νύχτα, αργίες και υπερωρίες. Το μικτό πεδίο καρτών
+    // παραμένει αμετάβλητο και δεν αφαιρείται δεύτερη φορά διάρκεια.
+    const effectiveCardsHours = getPayrollDailyWorkMinutes(rec, ergazomenos) / 60;
 
     // ============================================================
     // d = Επιτρεπόμενη πρόωρη αποχώρηση σε ώρες.
@@ -6730,6 +6664,7 @@ class erganhController {
                     .select(
                         'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                            'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
                             'orphan_card_resolution ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
@@ -6759,6 +6694,7 @@ class erganhController {
                               'team company_kod ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                                   'egkekrimenh_anaplhrosh_apologistika repo repo_apologistika adeia kathgoria_adeias ores_apoysias explicit_hourly_leave_hours egkekrimenh_oroadeia_apologistika hr_declared_leave adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika argia argia_apologistika ' +
                                   'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                                  'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
                                   'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
                                   'ores_ergasias ores_ergasias_apologistika ores_apoysias_apologistika cards_ores_ergasias orphan_card_resolution is_locked'
                           )
@@ -10540,6 +10476,7 @@ class erganhController {
                             'adeia kathgoria_adeias ores_apoysias hr_declared_leave astheneia astheneia_apologistika apousia_apologistika argia_apologistika ' +
                             'ores_ergasias cards_ores_ergasias ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                            'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 ' +
                             'cards_apo_ora_02 cards_eos_ora_02 ' +
                             'cards_apo_ora_03 cards_eos_ora_03'

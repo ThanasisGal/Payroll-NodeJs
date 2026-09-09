@@ -133,7 +133,8 @@ function resolveDailyActualWorkFacts(row = {}, {
     }
     if (hasIncompleteCardInterval && hasSupportedOrphanEvidence) {
         const verifiedActualWorkHours = hasCompleteCardEvidence
-            ? cardVerification.verifiedHours
+            ? calculatedHoursAreAuthoritative && calculatedWork.ok
+                ? calculatedWork.value : cardVerification.verifiedHours
             : 0;
         return Object.freeze({
             category: 'ΕΡΓ',
@@ -152,7 +153,8 @@ function resolveDailyActualWorkFacts(row = {}, {
     }
     if (hasIncompleteCardInterval) {
         const verifiedActualWorkHours = hasCompleteCardEvidence
-            ? cardVerification.verifiedHours
+            ? calculatedHoursAreAuthoritative && calculatedWork.ok
+                ? calculatedWork.value : cardVerification.verifiedHours
             : 0;
         return Object.freeze({
             category,
