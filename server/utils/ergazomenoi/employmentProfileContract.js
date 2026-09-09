@@ -90,6 +90,24 @@ function readEmploymentProfile(source = {}) {
     return { facts, recorded: source[SCHEMA_VERSION] === EMPLOYMENT_PROFILE_SCHEMA_VERSION && unrecordedFields.length === 0,
         unrecordedFields };
 }
+// Add/Edit validates even omitted durations; historical snapshot inheritance may
+// retain an unchanged legacy value. Both paths use the same category policy.
+function normalizeEmploymentBreakSubmission(input = {}, current = {}, { allowLegacyDuration = true } = {}) {
+    const category = input.eidikh_kathgoria_ergazomenoy !== undefined
+        ? input.eidikh_kathgoria_ergazomenoy : current.eidikh_kathgoria_ergazomenoy;
+    const alwaysInside = ['0004', '0005'].includes(String(category ?? '').trim());
+    const max = alwaysInside ? 45 : 30;
+    const value = field => input[field] !== undefined ? input[field] : current[field];
+    const minutes = number(value('dialleima_se_lepta') ?? 0, 'dialleima_se_lepta');
+    const inside = boolean(value('dialleima_entos_ektos_orarioy') ?? false, 'dialleima_entos_ektos_orarioy');
+    const preservedLegacyDuration = allowLegacyDuration && input.dialleima_se_lepta === undefined &&
+        category === current.eidikh_kathgoria_ergazomenoy &&
+        Number(current.dialleima_se_lepta) === minutes && Number.isInteger(minutes) && minutes > max;
+    if (!preservedLegacyDuration && (!Number.isInteger(minutes) || (minutes !== 0 && (minutes < 15 || minutes > max)))) {
+        invalid('dialleima_se_lepta', `expected 0 or 15..${max} minutes`);
+    }
+    return { dialleima_se_lepta: minutes, dialleima_entos_ektos_orarioy: alwaysInside || inside };
+}
 function normalizeEmploymentProfileSubmission(input = {}, current = {}) {
     const facts = readEmploymentProfile(current).facts;
     for (const field of FACT_FIELDS) if (has(input, field) && input[field] !== undefined) facts[field] = input[field];
@@ -107,12 +125,10 @@ function normalizeEmploymentProfileSubmission(input = {}, current = {}) {
     if (facts[UNTIL] && (!facts[FROM] || facts[UNTIL] < facts[FROM])) invalid(UNTIL, 'end precedes start');
     const interruption = interval(facts[START], facts[END], START);
     if (facts[ENABLED] && ARRANGEMENT_TYPES[facts[TYPE]].requiresInterruption && !interruption) invalid(START, 'interruption required');
-    for (const field of ['dialleima_entos_ektos_orarioy', 'synexes_diakekomeno', 'typos_orarioy']) facts[field] = boolean(facts[field], field);
-    for (const field of ['dialleima_se_lepta', 'evelikth_proselefsh', 'symbatikes_ores_ergasias']) facts[field] = number(facts[field], field);
+    for (const field of ['synexes_diakekomeno', 'typos_orarioy']) facts[field] = boolean(facts[field], field);
+    for (const field of ['evelikth_proselefsh', 'symbatikes_ores_ergasias']) facts[field] = number(facts[field], field);
+    Object.assign(facts, normalizeEmploymentBreakSubmission(input, current));
     const minutes = facts.dialleima_se_lepta;
-    const preservedLegacyDuration = input.dialleima_se_lepta === undefined &&
-        Number(current.dialleima_se_lepta) === minutes && Number.isInteger(minutes) && minutes > 30;
-    if (!preservedLegacyDuration && (!Number.isInteger(minutes) || (minutes !== 0 && (minutes < 15 || minutes > 30)))) invalid('dialleima_se_lepta', 'expected 0 or 15..30 minutes');
     const breaks = BREAK_PAIRS.map(([a, b]) => interval(facts[a], facts[b], a)).filter(Boolean);
     const segments = breaks.flatMap((pair) => pair.segments).sort((a, b) => a[0] - b[0]);
     if (segments.some((segment, i) => i > 0 && segment[0] < segments[i - 1][1])) invalid('dialleima', 'overlapping intervals');
@@ -125,4 +141,4 @@ function normalizeEmploymentProfileSubmission(input = {}, current = {}) {
 module.exports = { EMPLOYMENT_PROFILE_SCHEMA_VERSION, ARRANGEMENT_TYPE_VERSION, ARRANGEMENT_TYPES,
     ENABLED, TYPE, FROM, UNTIL, START, END, DAYS, CATEGORY, TYPE_VERSION, SCHEMA_VERSION,
     ARRANGEMENT_FIELDS, BREAK_FIELDS, BREAK_PAIRS, FACT_FIELDS, calendarDate, invalid,
-    readEmploymentProfile, normalizeEmploymentProfileSubmission };
+    readEmploymentProfile, normalizeEmploymentBreakSubmission, normalizeEmploymentProfileSubmission };

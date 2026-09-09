@@ -37,9 +37,9 @@ for (const mode of ['add', 'edit']) {
         assert.equal(collect(mode, [input])[C.UNTIL], null);
     });
 }
-test('unchanged legacy duration is omitted only on Edit; new submitted 45 remains visible to server validation', () => {
+test('unchanged legacy duration is submitted on Add and Edit for category validation', () => {
     const duration = field('dialleima_se_lepta', { type: 'number', defaultValue: '45', value: '45', hasAttribute: () => false });
-    assert.equal(Object.hasOwn(collect('edit', [duration]), duration.name), false);
+    assert.equal(collect('edit', [duration])[duration.name], 45);
     assert.equal(collect('add', [duration])[duration.name], 45);
     duration.value = '50'; assert.equal(collect('edit', [duration])[duration.name], 50);
     duration.value = '30'; assert.equal(collect('edit', [duration])[duration.name], 30);

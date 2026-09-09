@@ -129,3 +129,55 @@ for (const category of ['0004', '0005', '0009']) test(`actual async Edit dropdow
     availability(await states(page), ['0004', '0005'].includes(category));
     assert.deepEqual((await states(page)).map(row => row.value), ['12:00', '12:15', '12:00', '12:15', '12:00', '12:15']);
 });
+
+for (const mode of ['add', 'edit']) test(`${mode}: actual break controls enforce category limits, serialization and category changes`, async t => {
+    const page = await browser.newPage(); t.after(() => page.close());
+    const file = path.resolve(`views/ergazomenoi/ergazomenoi/partials/${mode}/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs`);
+    const rec = { eidikh_kathgoria_ergazomenoy: '0004', dialleima_se_lepta: 45, dialleima_entos_ektos_orarioy: false };
+    await page.setContent('<div class="card-body"><select id="eidikh_kathgoria_ergazomenoy" name="eidikh_kathgoria_ergazomenoy">' +
+        ['0004', '0005', '0009'].map(value => `<option>${value}</option>`).join('') + '</select>' +
+        ejs.render(fs.readFileSync(file, 'utf8'), { rec, companyInUse: '', userTeam: '' }, { filename: file }) + '</div>');
+    await page.addScriptTag({ content: ui });
+    const duration = page.locator('#dialleima_se_lepta');
+    const inside = page.locator('#dialleima_entos_ektos_orarioy');
+    const code = fs.readFileSync(__dirname + '/' + (mode === 'add' ? 'getFieldValues.js' : 'putFieldValues.js'), 'utf8');
+    const start = code.indexOf('        const formData = {}');
+    const collect = code.slice(start, code.indexOf('// ✅ CONVERT PDFs TO BASE64', start));
+    const submitStart = code.indexOf('        event.preventDefault();');
+    const submitGuard = code.slice(submitStart, start);
+    for (const category of ['0004', '0005', '0009']) {
+        await page.selectOption('#eidikh_kathgoria_ergazomenoy', category);
+        const special = category !== '0009';
+        assert.equal(await duration.getAttribute('max'), special ? '45' : '30');
+        assert.equal(await inside.isDisabled(), special);
+        if (special) {
+            assert.equal(await inside.isChecked(), true);
+            assert.equal(await page.locator('#label-dialleima_entos_ektos_orarioy').textContent(), 'ΕΝΤΟΣ');
+        } else {
+            await inside.uncheck(); assert.equal(await inside.isChecked(), false);
+            await inside.check(); assert.equal(await inside.isChecked(), true);
+        }
+        for (const minutes of [0, 1, 14, 15, 30, 31, 45, 46]) {
+            await duration.fill(String(minutes));
+            const valid = minutes === 0 || (minutes >= 15 && minutes <= (special ? 45 : 30));
+            assert.equal(await duration.evaluate(el => el.checkValidity()), valid);
+            // Execute the real pre-collection guard: invalid input never reaches collection.
+            assert.equal(await page.evaluate(body => new Function('event', body + '\nreturn true;')({
+                preventDefault() {}, stopPropagation() {}
+            }) === true, submitGuard), valid);
+        }
+    }
+    await page.selectOption('#eidikh_kathgoria_ergazomenoy', '0004');
+    await duration.fill('45');
+    const payload = await page.evaluate(body => new Function(body + '\nreturn formData;')(), collect);
+    assert.equal(payload.dialleima_se_lepta, 45); // Also on Edit with an unchanged default of 45.
+    assert.equal(payload.dialleima_entos_ektos_orarioy, true); // Disabled checkbox still serialized.
+    await page.selectOption('#eidikh_kathgoria_ergazomenoy', '0009');
+    assert.equal(await duration.inputValue(), '45');
+    assert.equal(await duration.evaluate(el => el.checkValidity()), false);
+    await duration.fill('30');
+    assert.equal(await duration.evaluate(el => el.checkValidity()), true);
+    await inside.uncheck();
+    const ordinary = await page.evaluate(body => new Function(body + '\nreturn formData;')(), collect);
+    assert.equal(ordinary.dialleima_entos_ektos_orarioy, false);
+});

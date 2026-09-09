@@ -29,6 +29,8 @@ function buildCompleteProfileSnapshot({ input = {}, current = {}, effectiveFrom 
         hmeres_ergasias_ebdomadas: merged.hmeres_ergasias_ebdomadas ?? 0,
         ores_ergasias_ebdomadas: merged.ores_ergasias_ebdomadas ?? 0,
         mo_oron_hmerhsias_ergasias: merged.mo_oron_hmerhsias_ergasias ?? 0,
+        ...(merged.eidikh_kathgoria_ergazomenoy !== undefined
+            ? { eidikh_kathgoria_ergazomenoy: merged.eidikh_kathgoria_ergazomenoy } : {}),
         ...facts,
         afora_allagh_oron_ergasias: true,
         employment_profile_source: 'EMPLOYEE_PROFILE_FOUNDATION',
