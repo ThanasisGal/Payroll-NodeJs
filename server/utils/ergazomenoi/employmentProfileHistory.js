@@ -42,6 +42,11 @@ function buildCompleteProfileSnapshot({ input = {}, current = {}, effectiveFrom 
 }
 
 function effectiveStart(row) {
+    // An explicit empty start on a non-terms Maintenance record is not a
+    // profile version. Keep schedule fallback for genuinely older records.
+    const start = row.hmeromhnia_isxyos_oron_ergasias_apo;
+    if (Object.hasOwn(row, 'hmeromhnia_isxyos_oron_ergasias_apo') &&
+        (start == null || start === '') && row.afora_allagh_oron_ergasias === false) return null;
     return C.calendarDate(row.hmeromhnia_isxyos_oron_ergasias_apo || row.hmeromhnia_allaghs_orarioy_apo);
 }
 function effectiveEnd(row) {

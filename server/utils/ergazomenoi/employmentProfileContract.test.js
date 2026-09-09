@@ -146,3 +146,55 @@ test('schema version alone cannot turn missing facts into a recorded decision', 
     const result = H.resolveEmploymentProfileFactsForDate('2026-09-01', [sparse], { scheduledWorkingDay: true });
     assert.equal(result.recorded, false); assert.equal(result.arrangementEffective, false);
 });
+
+test('profile timeline excludes explicit empty non-terms starts without changing legacy fallback', () => {
+    const schedule = { hmeromhnia_allaghs_orarioy_apo: '2026-05-25' };
+    for (const empty of [null, '', undefined]) {
+        assert.equal(H.effectiveStart({ ...schedule,
+            hmeromhnia_isxyos_oron_ergasias_apo: empty, afora_allagh_oron_ergasias: false }), null);
+    }
+    for (const row of [schedule, { ...schedule, afora_allagh_oron_ergasias: false },
+        { ...schedule, hmeromhnia_isxyos_oron_ergasias_apo: null, afora_allagh_oron_ergasias: true },
+        { ...schedule, hmeromhnia_isxyos_oron_ergasias_apo: null }]) {
+        assert.equal(H.effectiveStart(row).toISOString(), '2026-05-25T00:00:00.000Z');
+    }
+    const complete = H.buildCompleteProfileSnapshot({ effectiveFrom: '2026-06-01' });
+    assert.equal(C.readEmploymentProfile(complete).recorded, true);
+    assert.equal(H.effectiveStart({ ...complete, ...schedule }).toISOString(), '2026-06-01T00:00:00.000Z');
+    assert.equal(H.effectiveStart({ ...complete, ...schedule, afora_allagh_oron_ergasias: false }).toISOString(),
+        '2026-06-01T00:00:00.000Z');
+});
+
+test('break-only legacy history stays outside the profile timeline and retains its own break start', () => {
+    const { resolveBreakConfigurationForDate } = require('./resolveBreakConfigurationForDate');
+    const row = { _id: 'break-only', afora_allagh_oron_ergasias: false,
+        afora_allagh_dialleimatos: true, hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-25',
+        hmeromhnia_isxyos_dialleimatos_apo: '2026-06-01', dialleima_se_lepta: 30 };
+    assert.equal(H.effectiveStart(row), null);
+    for (const date of ['2026-05-25', '2026-05-31', '2026-06-01', '2026-06-15']) {
+        const profile = H.resolveEmploymentProfileFactsForDate(date, [row]);
+        assert.equal(profile.historyId, null);
+        assert.equal(profile.recorded, false);
+        const breaks = resolveBreakConfigurationForDate(date, [row]);
+        assert.equal(breaks.break_minutes, date < '2026-06-01' ? 0 : 30);
+        assert.equal(breaks.history_id, date < '2026-06-01' ? null : row._id);
+        if (date >= '2026-06-01') {
+            assert.equal(breaks.source, 'BREAK_CONFIGURATION_HISTORY');
+            assert.equal(breaks.effective_from.toISOString(), '2026-06-01T00:00:00.000Z');
+        }
+    }
+});
+
+test('missing legacy profile dates retain schedule fallback and inclusive timeline boundaries', () => {
+    const row = { _id: 'legacy', afora_allagh_oron_ergasias: false,
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-25', hmeromhnia_allaghs_orarioy_eos: '2026-06-30' };
+    assert.equal(Object.hasOwn(row, 'hmeromhnia_isxyos_oron_ergasias_apo'), false);
+    assert.equal(H.effectiveStart(row).toISOString(), '2026-05-25T00:00:00.000Z');
+    assert.equal(H.effectiveEnd(row).toISOString(), '2026-06-30T00:00:00.000Z');
+    assert.equal(H.effectiveEnd({ ...row, hmeromhnia_isxyos_oron_ergasias_eos: null }), null);
+    for (const date of ['2026-05-24', '2026-05-25', '2026-06-30', '2026-07-01']) {
+        assert.equal(H.resolveEmploymentProfileFactsForDate(date, [row]).historyId,
+            date >= '2026-05-25' && date <= '2026-06-30' ? row._id : null);
+    }
+});

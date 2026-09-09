@@ -212,3 +212,31 @@ test('normal latest legacy Maintenance correction keeps its identity and creates
     assert.equal(db.state().employee.dialleima_se_lepta, 20);
     assert.equal(C.readEmploymentProfile(db.state().history[0]).recorded, true);
 });
+
+test('no-change Maintenance selects real May version and preserves non-terms history noise', async () => {
+    const { IDENTITY_FIELDS } = require('../../utils/ergazomenoi/employmentProfileTransition');
+    const { selectMaintenanceMode, MODE_LEGACY_MAINTENANCE } = require('./employeeEmploymentProfileWriter');
+    const identity = Object.fromEntries(IDENTITY_FIELDS.map(field => [field, null]));
+    Object.assign(identity, { hmeromhnia_allaghs_orarioy_apo: new Date('2026-05-25'),
+        hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-05-25'),
+        hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-10-05') });
+    const real = { ...scope, ...identity, _id: 'real', aa_eggrafhs: '0002', afora_allagh_oron_ergasias: true };
+    const noise = { ...real, _id: 'noise', aa_eggrafhs: '0003', afora_allagh_oron_ergasias: false,
+        hmeromhnia_isxyos_oron_ergasias_apo: null, hmeromhnia_isxyos_oron_ergasias_eos: null };
+    const initial = { employee: { ...real, _id: 'employee' }, history: [noise, real] };
+    assert.deepEqual(selectMaintenanceMode(initial.history, identity), { mode: MODE_CORRECT_EXISTING, historyId: 'real' });
+    const db = database(initial);
+    const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
+        effectiveFrom: '2026-05-25', maintenance: { identity, employeeChanges: {}, historyChanges: {} } });
+    assert.equal(result.mode, MODE_LEGACY_MAINTENANCE);
+    assert.equal(result.history._id, 'real');
+    assert.deepEqual(db.state(), initial);
+    // A genuine overlapping terms row must still fail the existing guard.
+    const overlap = { ...noise, afora_allagh_oron_ergasias: true };
+    const conflicting = database({ ...initial, history: [real, overlap] });
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...conflicting.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-05-25',
+        maintenance: { identity, employeeChanges: {}, historyChanges: {} } }),
+    error => error.code === 'EMPLOYEE_PROFILE_HISTORY_OVERLAP');
+    assert.equal(conflicting.writes(), 0);
+});
