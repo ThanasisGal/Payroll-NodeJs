@@ -1759,14 +1759,30 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     echo "📦 INSTALLING DEPENDENCIES"
     echo "=========================================="
     
+    NODE24_BIN=/opt/node-v24.12.0/bin
+    DEPENDENCY_ORIGINAL_PATH="$PATH"
+    if [[ ! -x "$NODE24_BIN/node" || ! -x "$NODE24_BIN/npm" ]]; then
+        echo "[EC2] NODE24_RUNTIME_GUARD_FAILED: missing runtime executables" >&2
+        exit 1
+    fi
+    export PATH="$NODE24_BIN:$PATH"
+    hash -r
+    if [[ "$(command -v node)" != "$NODE24_BIN/node" \
+        || "$(command -v npm)" != "$NODE24_BIN/npm" \
+        || "$(node --version)" != "v24.12.0" \
+        || "$(node -p 'process.versions.modules')" != "137" ]]; then
+        echo "[EC2] NODE24_RUNTIME_GUARD_FAILED: runtime identity mismatch" >&2
+        exit 1
+    fi
+
     echo "[EC2] Configuring npm for network reliability..."
-    npm config set fetch-retry-mintimeout 20000
-    npm config set fetch-retry-maxtimeout 120000
-    npm config set fetch-retries 5
-    npm config set fetch-timeout 300000
+    "$NODE24_BIN/npm" config set fetch-retry-mintimeout 20000
+    "$NODE24_BIN/npm" config set fetch-retry-maxtimeout 120000
+    "$NODE24_BIN/npm" config set fetch-retries 5
+    "$NODE24_BIN/npm" config set fetch-timeout 300000
     
     echo "[EC2] Cleaning npm cache..."
-    npm cache clean --force
+    "$NODE24_BIN/npm" cache clean --force
     
     echo "[EC2] Installing dependencies with retry logic..."
     MAX_ATTEMPTS=3
@@ -1781,14 +1797,14 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
         
         if [ -f package-lock.json ]; then
             echo "[EC2] Using npm ci (clean install with retries)..."
-            if npm ci --omit=dev --prefer-offline --no-audit 2>&1; then
+            if "$NODE24_BIN/npm" ci --omit=dev --prefer-offline --no-audit 2>&1; then
                 echo "[EC2] ✅ npm ci succeeded!"
                 INSTALL_SUCCESS=true
                 break
             fi
         else
             echo "[EC2] Using npm install..."
-            if npm install --omit=dev --prefer-offline --no-audit 2>&1; then
+            if "$NODE24_BIN/npm" install --omit=dev --prefer-offline --no-audit 2>&1; then
                 echo "[EC2] ✅ npm install succeeded!"
                 INSTALL_SUCCESS=true
                 break
@@ -1801,13 +1817,13 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
             echo "[EC2] ⚠️  Trying one last time with online registry..."
             
             if [ -f package-lock.json ]; then
-                if npm ci --omit=dev --no-audit 2>&1; then
+                if "$NODE24_BIN/npm" ci --omit=dev --no-audit 2>&1; then
                     echo "[EC2] ✅ Online install succeeded!"
                     INSTALL_SUCCESS=true
                     break
                 fi
             else
-                if npm install --omit=dev --no-audit 2>&1; then
+                if "$NODE24_BIN/npm" install --omit=dev --no-audit 2>&1; then
                     echo "[EC2] ✅ Online install succeeded!"
                     INSTALL_SUCCESS=true
                     break
@@ -1831,9 +1847,16 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
         
         echo ""
         echo "[EC2] Verifying critical packages..."
-        npm list cookie multer --depth=0 || true
+        "$NODE24_BIN/npm" list cookie multer --depth=0 || true
     fi
     
+    if ! "$NODE24_BIN/node" -e "require('libxmljs2')" >/dev/null 2>&1; then
+        echo "[EC2] LIBXMLJS2_NODE24_GUARD_FAILED: deployment stopped before PM2 reload" >&2
+        exit 1
+    fi
+    export PATH="$DEPENDENCY_ORIGINAL_PATH"
+    hash -r
+
     echo ""
     echo "=========================================="
     echo "🔄 RESTARTING APPLICATION"
