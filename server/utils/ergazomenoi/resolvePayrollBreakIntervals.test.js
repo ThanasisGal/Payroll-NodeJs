@@ -99,3 +99,15 @@ test('ίδια αμετάβλητα δεδομένα δίνουν ακριβώς
     assert.deepEqual(resolve(data), resolve(data));
     assert.deepEqual(data, before);
 });
+
+for (const category of ['0004', '0005']) test(`${category}: 45-minute inside break keeps 240-minute fallback and split-schedule exclusion`, () => {
+    const profile = { eidikh_kathgoria_ergazomenoy: category, dialleima_se_lepta: 45, dialleima_entos_ektos_orarioy: true };
+    const continuous = resolve(input(750, 1230, {}, profile));
+    assert.equal(continuous.breakIntervals[0].start, 750 + 240);
+    assert.equal(continuous.breakIntervals[0].end, 750 + 240 + 45);
+    assert.equal(continuous.removedMinutes, 0);
+    const split = resolve({ row: { apo_ora_01: '08:00', eos_ora_01: '12:00', apo_ora_02: '16:00', eos_ora_02: '20:00' },
+        effectiveEmployee: profile, workIntervals: [{ start: 480, end: 720 }, { start: 960, end: 1200 }] });
+    assert.equal(split.splitSchedule, true); assert.equal(split.netMinutes, 480);
+    assert.equal(split.removedMinutes, 0); assert.deepEqual(split.breakIntervals, []);
+});

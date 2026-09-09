@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
+        if (!window.validateEmploymentProfileBreak(document)) return;
 
         const formData = {};
         const filePromises = [];
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sections.forEach((section) => {
             const inputs = section.querySelectorAll('input, select, textarea');
             inputs.forEach((input) => {
-                if (window.serializeEmploymentProfileField(input, formData, true)) return;
+                if (window.serializeEmploymentProfileField(input, formData)) return;
                 if (input.tagName === 'INPUT') {
                     if (input.type === 'checkbox') {
                         formData[input.name] = input.checked === true;

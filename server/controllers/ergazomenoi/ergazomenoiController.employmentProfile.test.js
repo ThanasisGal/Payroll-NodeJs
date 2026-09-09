@@ -312,14 +312,14 @@ test('EDIT retrospective insertion fails with visible validation and no changes'
     assert.equal(res.code, 409); assert.equal(res.body.reason, 'EMPLOYEE_PROFILE_NON_APPEND_CHANGE');
     assert.match(res.body.errorMessage, /αναδρομική/); assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
 });
-for (const append of [false, true]) test(`EDIT legacy 45 survives omission, append=${append}`, async () => {
+for (const append of [false, true]) test(`EDIT ordinary legacy 45 requires correction even when omitted, append=${append}`, async () => {
     const stored = await initial(); stored.employee.dialleima_se_lepta = 45; stored.history[0].dialleima_se_lepta = 45;
     const data = { ...form(), ...(append ? { hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-15' } : {}) };
-    const { db, res } = await submit('edit', data, memory(stored));
-    assert.equal(res.code, 200, res.body?.errorMessage); assert.equal(db.state().employee.dialleima_se_lepta, 45);
-    assert.equal(db.state().history.at(-1).dialleima_se_lepta, 45);
-    const rejected = await submit('edit', { ...data, dialleima_se_lepta: 45 }, memory(stored));
-    assert.equal(rejected.res.code, 400); assert.deepEqual(rejected.db.state(), stored);
+    for (const input of [data, { ...data, dialleima_se_lepta: 45 }]) {
+        const { db, res } = await submit('edit', input, memory(stored));
+        assert.equal(res.code, 400); assert.equal(res.body.field, 'dialleima_se_lepta');
+        assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
+    }
 });
 test('EDIT scope still rejects forged employee identity before writes', async () => {
     const db = memory(await initial()); const req = { body: { formData: form() },
@@ -626,4 +626,67 @@ test('empty history batch preserves baseline renumbering without profile changes
     assert.equal(db.state().history[0].aa_eggrafhs, '0002');
     assert.equal(db.state().history[1].aa_eggrafhs, '0001');
     db.state().history.forEach((row, i) => assert.deepEqual(withoutSequence(row), withoutSequence(stored.history[i])));
+});
+
+for (const mode of ['add', 'edit']) for (const category of ['0004', '0005', '0009']) {
+    for (const minutes of [0, 14, 15, 30, 31, 45, 46]) for (const inside of [false, true]) {
+        test(`${mode}: category ${category}, break ${minutes}, inside ${inside} reaches employee and history`, async () => {
+            const db = mode === 'add' ? memory() : memory(await initial());
+            const before = plain(db.state());
+            const input = { ...form(), eidikh_kathgoria_stathera: category, eidikh_kathgoria_ergazomenoy: category,
+                dialleima_se_lepta: minutes, dialleima_entos_ektos_orarioy: inside };
+            const { res } = await submit(mode, input, db);
+            const special = category !== '0009';
+            const valid = minutes === 0 || (minutes >= 15 && minutes <= (special ? 45 : 30));
+            if (!valid) {
+                assert.equal(res.code, 400); assert.equal(res.body.field, 'dialleima_se_lepta');
+                assert.equal(db.writes(), 0); assert.deepEqual(db.state(), before); return;
+            }
+            assert.equal(res.code, 200, res.body?.errorMessage);
+            for (const row of [db.state().employee, db.state().history.at(-1)]) {
+                assert.equal(row.dialleima_se_lepta, minutes);
+                assert.equal(row.dialleima_entos_ektos_orarioy, special || inside);
+                assert.equal(row.eidikh_kathgoria_ergazomenoy, category);
+            }
+        });
+    }
+}
+test('EDIT category change from 0004 to ordinary cannot preserve an omitted 45-minute duration', async () => {
+    const stored = await initial({ eidikh_kathgoria_stathera: '0004', dialleima_se_lepta: 45 });
+    const { db, res } = await submit('edit', { ...form(), eidikh_kathgoria_ergazomenoy: '0009' }, memory(stored));
+    assert.equal(res.code, 400); assert.equal(res.body.field, 'dialleima_se_lepta');
+    assert.equal(db.writes(), 0); assert.deepEqual(db.state(), stored);
+});
+test('legacy Maintenance normalizes outside to inside before choosing the profile/history path', async () => {
+    const stored = await legacyInitial(); stored.employee.eidikh_kathgoria_ergazomenoy = '0004';
+    stored.history[0].eidikh_kathgoria_ergazomenoy = '0004';
+    const { db, res } = await submit('edit', { ...form(), eidikh_kathgoria_ergazomenoy: '0004',
+        dialleima_se_lepta: 30, dialleima_entos_ektos_orarioy: false }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    for (const row of [db.state().employee, db.state().history.at(-1)]) {
+        assert.equal(row.dialleima_entos_ektos_orarioy, true);
+        assert.equal(row.dialleima_se_lepta, 30);
+    }
+});
+
+test('unchanged legacy inside break cannot be overwritten by a forged outside Maintenance patch', async () => {
+    const stored = await legacyInitial();
+    for (const row of [stored.employee, stored.history[0]]) Object.assign(row, {
+        eidikh_kathgoria_ergazomenoy: '0005', dialleima_se_lepta: 30, dialleima_entos_ektos_orarioy: true
+    });
+    const { db, res } = await submit('edit', { ...form(), eidikh_kathgoria_ergazomenoy: '0005',
+        dialleima_se_lepta: 30, dialleima_entos_ektos_orarioy: false }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    for (const row of [db.state().employee, db.state().history.at(-1)]) {
+        assert.equal(row.dialleima_entos_ektos_orarioy, true);
+        assert.equal(row.dialleima_se_lepta, 30);
+    }
+});
+
+test('EDIT category whitespace cannot bypass the policy before Mongoose trims the stored code', async () => {
+    const { db, res } = await submit('edit', { ...form(), eidikh_kathgoria_ergazomenoy: ' 0004 ',
+        dialleima_se_lepta: 45, dialleima_entos_ektos_orarioy: false }, memory(await initial()));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().employee.dialleima_entos_ektos_orarioy, true);
+    assert.equal(db.state().history.at(-1).dialleima_entos_ektos_orarioy, true);
 });

@@ -140,7 +140,7 @@ async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, ope
 
 
 const HISTORY_CURRENT_FIELDS = new Set([...BASE_HISTORY_FIELDS, ...IDENTITY_FIELDS, ...C.FACT_FIELDS,
-    'afora_allagh_oron_ergasias', 'afora_proslhpsh', 'afora_allagh_dialleimatos', 'hmeromhnia_isxyos_dialleimatos_apo',
+    'eidikh_kathgoria_ergazomenoy', 'afora_allagh_oron_ergasias', 'afora_proslhpsh', 'afora_allagh_dialleimatos', 'hmeromhnia_isxyos_dialleimatos_apo',
     'kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas', 'apasxolhsh_basei_symbashs',
     'pososto_prosayxhshs_6hs_hmeras', 'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias']);
 function cleanMaintenancePatch(patch = {}) {
@@ -198,12 +198,27 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
     if (!from) C.invalid('effectiveFrom', 'required');
     return inProfileTransaction(connection, capabilityProbe, async session => {
         let result;
+        const submittedInput = input, submittedMaintenance = maintenance;
         const write = async () => {
+            let input = submittedInput, maintenance = submittedMaintenance;
             const current = await employeeModel.findOne(employeeId ? { ...filter, _id: employeeId } : filter).session(session).lean();
             if (employeeId && String(current?._id) !== String(employeeId)) throw failure('EMPLOYEE_PROFILE_STALE');
             if (newEmployee && current) throw failure('EMPLOYEE_PROFILE_ALREADY_EXISTS');
             if (!newEmployee && !current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
             const rows = await historyModel.find(filter).session(session).lean();
+            // Enforce the form policy before even the legacy Maintenance shortcut.
+            // Use mapped employee category (Add and Edit have different form names).
+            if (!editorOperation && (newEmployee || maintenance)) {
+                const context = { ...(current || newEmployee), ...Object.fromEntries(
+                    Object.entries(maintenance?.employeeChanges || {}).filter(([, value]) => value !== undefined)) };
+                const breaks = C.normalizeEmploymentBreakSubmission(input, context, { allowLegacyDuration: false });
+                input = { ...input, ...breaks };
+                // The legacy path writes the mapped patch rather than snapshot facts.
+                if (maintenance) maintenance = { ...maintenance,
+                    employeeChanges: { ...maintenance.employeeChanges, ...breaks } };
+                if (context.eidikh_kathgoria_ergazomenoy !== undefined) maintenance = { ...maintenance,
+                    historyChanges: { ...maintenance?.historyChanges, eidikh_kathgoria_ergazomenoy: context.eidikh_kathgoria_ergazomenoy } };
+            }
             const datedRows = rows.filter((row) => effectiveStart(row));
             // Maintenance supplies existing server-mapped fields, never raw request data.
             // Resolve the exact identity inside the transaction, including on retries.
