@@ -1,11 +1,10 @@
 'use strict';
 
-// Legacy duration-only behavior extracted from 45b046b33e209f26be59cba6a634db4800f86519.
-// Exact profile breaks now use temporal subtraction before payroll classification.
-const CALCULATION_SOURCE_VERSION = 'weekly-illegal-overtime:45b046b:v2';
+// Ενιαία χρονική αφαίρεση διαλείμματος πριν από κάθε ταξινόμηση μισθοδοσίας.
+const CALCULATION_SOURCE_VERSION = 'weekly-illegal-overtime:45b046b:v3';
 const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
 const { buildWeeklyIllegalOvertimePersistenceMapping } = require('./apasxoliseisWeeklyIllegalOvertimeMappingService');
-const { hasExactExternalBreaks, subtractExternalBreakIntervals } = require('../../utils/ergazomenoi/subtractExternalBreakIntervals');
+const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
 
 function timeToMinutesSafe(time) {
     if (!time) return null;
@@ -136,19 +135,8 @@ function getRawDailyCardsMinutes(rec) {
 }
 
 function shouldSubtractExternalBreak(rec, ergazomenos) {
-    if (!ergazomenos) return false;
-
-    const breakMinutes = getBreakOffsetMinutes(ergazomenos);
-
-    if (breakMinutes <= 0) return false;
-    if (!isDeclaredContinuousSchedule(rec)) return false;
-    if (!isCardsContinuousSchedule(rec)) return false;
-
-    const rawCardsMinutes = getRawDailyCardsMinutes(rec);
-
-    // Αν οι πραγματικές ώρες καρτών μείον το διάλειμμα πέφτουν κάτω από 4 ώρες,
-    // δεν αφαιρούμε διάλειμμα για τη συγκεκριμένη ημερομηνία.
-    return rawCardsMinutes - breakMinutes >= 4 * 60;
+    return resolvePayrollBreakIntervals({ row: rec, effectiveEmployee: ergazomenos,
+        workIntervals: getRawCardIntervals(rec) }).removedMinutes > 0;
 }
 
 function expandIntervalFromTimes(apoOra, eosOra) {
@@ -229,36 +217,8 @@ function buildWeeklyIllegalOvertimeUpdate(
 }
 
 function getCardIntervals(rec, ergazomenos = null) {
-    const intervals = getRawCardIntervals(rec);
-
-    if (hasExactExternalBreaks(ergazomenos)) {
-        return subtractExternalBreakIntervals(intervals, ergazomenos);
-    }
-
-    if (!shouldSubtractExternalBreak(rec, ergazomenos)) {
-        return intervals;
-    }
-
-    const breakMinutes = getBreakOffsetMinutes(ergazomenos);
-
-    return intervals
-        .map((interval) => {
-            if (interval.index !== 1) return interval;
-
-            const adjustedEnd = interval.end - breakMinutes;
-
-            if (adjustedEnd <= interval.start) {
-                return null;
-            }
-
-            return {
-                ...interval,
-                eos: minutesToTimeSafe(adjustedEnd),
-                end: adjustedEnd,
-                externalBreakSubtractedMinutes: breakMinutes
-            };
-        })
-        .filter(Boolean);
+    return resolvePayrollBreakIntervals({ row: rec, effectiveEmployee: ergazomenos,
+        workIntervals: getRawCardIntervals(rec) }).workIntervals;
 }
 
 function isMinuteNight(minuteFromBaseDate) {
@@ -312,43 +272,42 @@ function getApologistikaIntervals(rec = {}) {
 function getPayrollCalculationIntervals(rec, ergazomenos = null) {
     const verification = resolveCardPairVerification(rec);
     const apologistikaIntervals = getApologistikaIntervals(rec);
+    const resolve = workIntervals => resolvePayrollBreakIntervals({
+        row: rec, effectiveEmployee: ergazomenos, workIntervals
+    }).workIntervals;
 
     if (rec?.orphan_card_resolution?.status === 'HR_APPROVED' &&
         apologistikaIntervals.length > 0) {
-        return subtractExternalBreakIntervals(apologistikaIntervals, ergazomenos);
+        return resolve(apologistikaIntervals);
     }
 
     if (verification.hasUnresolvedCardEvidence) {
-        return subtractExternalBreakIntervals(verification.completePairs.map((pair) => ({
+        return resolve(verification.completePairs.map((pair) => ({
             index: Number(pair.pairNumber),
             apo: pair.start,
             eos: pair.end,
             start: pair.startMinutes,
             end: pair.isOvernight ? pair.endMinutes + 1440 : pair.endMinutes,
             source: 'CARD_PARTIALLY_VERIFIED'
-        })), ergazomenos);
+        })));
     }
 
-    const rawIntervals = getCardIntervals(rec, ergazomenos);
+    const rawIntervals = getRawCardIntervals(rec);
     if (rec.egkekrimenh_oroadeia_apologistika === true || rec.egkekrimenh_anaplhrosh_apologistika) {
         let previousStart = -Infinity;
         const declaredStart = timeToMinutesSafe(rec.apo_ora_01);
         const declaredEnd = timeToMinutesSafe(rec.eos_ora_01);
         if (declaredStart !== null && declaredEnd !== null && declaredEnd < declaredStart &&
             rawIntervals[0]?.start < declaredStart && rawIntervals[0]?.start < declaredEnd) previousStart = 1440;
-        return rawIntervals.map(interval => {
+        return resolve(rawIntervals.map(interval => {
             let { start, end } = interval;
             while (start < previousStart) { start += 1440; end += 1440; }
             previousStart = start;
             return { ...interval, start, end };
-        });
+        }));
     }
-    if (rawIntervals.length > 0 ||
-        (hasExactExternalBreaks(ergazomenos) && getRawCardIntervals(rec).length > 0)) {
-        return rawIntervals;
-    }
-
-    return apologistikaIntervals;
+    // Η πλήρης αφαίρεση παρουσίας δεν επιτρέπει επαναφορά εγκεκριμένων ωρών.
+    return resolve(rawIntervals.length > 0 ? rawIntervals : apologistikaIntervals);
 }
 
 module.exports = { CALCULATION_SOURCE_VERSION,

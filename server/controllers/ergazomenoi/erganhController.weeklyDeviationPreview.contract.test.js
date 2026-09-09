@@ -124,14 +124,14 @@ assert.ok(calculationSource.includes('buildEmploymentDailyPreliminaryUpdate({'))
 // The deployed baseline already delegates the final calculation through the Stage 1 holiday wrapper.
 assert.ok(calculationSource.includes('buildStage1EffectiveHolidayDailyCalculationUpdate({'));
 assert.ok(dailyAdapterSource.includes('operations.resolveCardPairVerification(calculationRow)'));
-assert.ok(dailyAdapterSource.includes('operations.buildPartialVerifiedCardUpdate(calculationRow).update'));
+assert.ok(dailyAdapterSource.includes('operations.buildPartialVerifiedCardUpdate(calculationRow, effectiveEmployee).update'));
 assert.ok(!calculationSource.includes('buildIncompleteCardSafeUpdate()'));
 assert.strictEqual(
     (calculationSource.match(/checkIncompleteCardPairAgainstDeclared\(/g) || []).length,
     0
 );
 assert.ok(/resolveCardPairVerification\(\s*row\s*\)/.test(postCheckWritePlan));
-assert.ok(postCheckWritePlan.includes('buildPartialVerifiedCardUpdate(row).update'));
+assert.ok(postCheckWritePlan.includes('buildPartialVerifiedCardUpdate(row, dailyProfile).update'));
 assert.ok(!postCheckWritePlan.includes('buildIncompleteCardSafeUpdate()'));
 
 // Interval fact extraction was moved to the shared service before Phase 1.

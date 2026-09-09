@@ -60,13 +60,21 @@ const VECTOR_HASHES = {
     "exact legacy parity 2026-04-05 07:00-11:30": "04fcff93c9af88466add7d97a39068f489f0a73453ef7eacb6f5c2bab8f2f79d",
     "exact extraction parity for multiple, overnight and partially verified slots": "7bead52fb15e9c9bd5def5e1e6ba58fbb7c419436aff5d6ce500bd0d88325c54"
 };
+// Οι τέσσερις χρονικές περιπτώσεις αλλάζουν από τη νέα θέση του διαλείμματος
+// και τη συνεπή τοποθέτηση διαδοχικών καρτών μετά τα μεσάνυχτα.
+// Τα υπόλοιπα ιστορικά αποτυπώματα διατηρούνται αμετάβλητα.
+const TEMPORAL_POLICY_HASHES = {
+    'exact legacy parity 2026-04-03 21:59-06:01': '31c08e074d2984faa17d291b054115ee1374327f643699fc04d11f9190cba56a',
+    'exact legacy parity 2026-04-04 21:59-06:01': '38a417e464b2d024b85d1963910238b4d2d2ecd0e4e5a67fa9e6dde85c7c7690',
+    'exact legacy parity 2026-04-05 21:59-06:01': 'a22a581c7b5abf8d37664d34ddcbe91d4ecc7c64d0b36cedfdc9ec9be36dc99d',
+    'exact extraction parity for multiple, overnight and partially verified slots': 'fb54c630ebfc0e2d6e757733cc2d59b96612c378196ddfa64114648a9eefabbe'
+};
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 test('unchanged extracted function bodies match immutable production baseline', () => {
     const names = Object.keys(service).filter((name) => typeof service[name] === 'function').sort();
     assert.deepEqual(names, Object.keys(SOURCE_HASHES).sort());
-    // These two selectors now subtract exact profile breaks. Their duration-only
-    // behavior remains covered by every immutable output fixture below.
-    const temporalSelectors = new Set(['getCardIntervals', 'getPayrollCalculationIntervals']);
+    // Μόνο οι επιλυτές διαλείμματος άλλαξαν. Όρια και ταξινομητές παραμένουν αμετάβλητοι.
+    const temporalSelectors = new Set(['getCardIntervals', 'getPayrollCalculationIntervals', 'shouldSubtractExternalBreak']);
     for (const name of names.filter(name => !temporalSelectors.has(name))) {
         assert.equal(sha256(service[name].toString().replace(/\r\n/g, '\n')), SOURCE_HASHES[name], name);
     }
@@ -91,7 +99,8 @@ for (const day of ['2026-04-03', '2026-04-04', '2026-04-05']) {
                 assert.deepEqual(row, before);
             }
         }
-        assert.equal(sha256(JSON.stringify(outputs)), VECTOR_HASHES[`exact legacy parity ${day} ${start}-${end}`]);
+        const key = `exact legacy parity ${day} ${start}-${end}`;
+        assert.equal(sha256(JSON.stringify(outputs)), TEMPORAL_POLICY_HASHES[key] || VECTOR_HASHES[key]);
     });
 }
 
@@ -107,5 +116,22 @@ test('exact extraction parity for multiple, overnight and partially verified slo
             outputs.push(service.buildWeeklyIllegalOvertimeUpdate(...args));
         }
     }
-    assert.equal(sha256(JSON.stringify(outputs)), VECTOR_HASHES['exact extraction parity for multiple, overnight and partially verified slots']);
+    assert.equal(sha256(JSON.stringify(outputs)), TEMPORAL_POLICY_HASHES['exact extraction parity for multiple, overnight and partially verified slots']);
+});
+
+test('το τελευταίο λεπτό 06:00–06:01 παραμένει ημερήσιο αντί να περικοπεί από το διάλειμμα', () => {
+    const rec = { hmeromhnia: '2026-04-04', cards_apo_ora_01: '21:59', cards_eos_ora_01: '06:01' };
+    const profile = { dialleima_se_lepta: 30, dialleima_entos_ektos_orarioy: false };
+    assert.deepEqual(service.getPayrollCalculationIntervals(rec, profile).map(({start,end}) => [start,end]),
+        [[1319, 1559], [1589, 1801]]);
+    const buckets = service.emptyClassifiedMinutes();
+    for (const {start,end} of service.getPayrollCalculationIntervals(rec, profile))
+        for (let m = start; m < end; m++) service.addClassifiedMinute(buckets, rec, m, new Set());
+    assert.deepEqual(buckets, {normal: 1, night: 120, holiday: 1, holidayNight: 330});
+});
+test('διαδοχικές κάρτες μετά τα μεσάνυχτα ανήκουν στην επόμενη ημερομηνία', () => {
+    const rec = { hmeromhnia: '2026-04-04', cards_apo_ora_01: '08:00', cards_eos_ora_01: '12:00',
+        cards_apo_ora_02: '22:00', cards_eos_ora_02: '02:30', cards_apo_ora_03: '04:00', cards_eos_ora_03: '06:00' };
+    assert.deepEqual(service.getPayrollCalculationIntervals(rec, {dialleima_se_lepta: 30})
+        .map(({start,end}) => [start,end]), [[480,720], [1320,1560], [1680,1800]]);
 });

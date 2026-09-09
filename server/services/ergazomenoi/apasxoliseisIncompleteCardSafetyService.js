@@ -1,3 +1,4 @@
+const { getPayrollCalculationIntervals } = require('./apasxoliseisWeeklyIllegalOvertimeCalculationService');
 const CARD_PAIR_NUMBERS = Object.freeze(['01', '02', '03']);
 const {
     CARD_VERIFICATION_STATUS,
@@ -70,7 +71,7 @@ function buildIncompleteCardSafeUpdate() {
     return update;
 }
 
-function buildPartialVerifiedCardUpdate(row = {}) {
+function buildPartialVerifiedCardUpdate(row = {}, effectiveEmployee = {}) {
     const verification = resolveCardPairVerification(row, {
         pairNumbers: CARD_PAIR_NUMBERS
     });
@@ -79,12 +80,10 @@ function buildPartialVerifiedCardUpdate(row = {}) {
 
     update.apologistiko_biblio = false;
     update.kathgoria_ergasias_apologistika = hasVerifiedWork ? 'ΕΡΓ' : '';
-    update.ores_ergasias_apologistika = Number(
-        verification.verifiedHours.toFixed(2)
-    );
-    update.ores_pragmatikhs_ergasias_apologistika = Number(
-        verification.verifiedHours.toFixed(2)
-    );
+    const netMinutes = getPayrollCalculationIntervals(row, effectiveEmployee)
+        .reduce((sum, interval) => sum + interval.end - interval.start, 0);
+    update.ores_ergasias_apologistika = Number((netMinutes / 60).toFixed(2));
+    update.ores_pragmatikhs_ergasias_apologistika = update.ores_ergasias_apologistika;
 
     for (const pair of verification.completePairs) {
         update[`apo_ora_${pair.pairNumber}_apologistika`] = pair.start;

@@ -1,5 +1,7 @@
 'use strict';
 
+const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
+
 const { FIELD: TIME_SHIFT_FIELD, approvedTimeShiftUpdate } = require('./apasxoliseisApprovedTimeShiftService');
 const { FLAG, approvedHourlyLeaveUpdate } = require('./apasxoliseisApprovedHourlyLeaveService');
 
@@ -57,17 +59,25 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
           })
         : null;
     const unresolved = verification.hasUnresolvedCardEvidence && !safeOrphan;
-    if (safeOrphan) Object.assign(update, {
-        apologistiko_biblio: safeOrphan.requiresBook,
-        kathgoria_ergasias_apologistika: 'ΕΡΓ',
-        apo_ora_01_apologistika: safeOrphan.start,
-        eos_ora_01_apologistika: safeOrphan.end,
-        apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
-        apo_ora_03_apologistika: '', eos_ora_03_apologistika: '',
-        ores_ergasias_apologistika: Number((safeOrphan.durationMinutes / 60).toFixed(2)),
-        ores_pragmatikhs_ergasias_apologistika: Number((safeOrphan.durationMinutes / 60).toFixed(2))
-    });
-    else if (unresolved) Object.assign(update, operations.buildPartialVerifiedCardUpdate(calculationRow).update);
+    if (safeOrphan) {
+        const [hour, minute] = safeOrphan.start.split(':').map(Number);
+        const start = hour * 60 + minute;
+        const netHours = Number((resolvePayrollBreakIntervals({
+            row: calculationRow, effectiveEmployee,
+            workIntervals: [{ start, end: start + safeOrphan.durationMinutes }]
+        }).netMinutes / 60).toFixed(2));
+        Object.assign(update, {
+            apologistiko_biblio: safeOrphan.requiresBook,
+            kathgoria_ergasias_apologistika: 'ΕΡΓ',
+            apo_ora_01_apologistika: safeOrphan.start,
+            eos_ora_01_apologistika: safeOrphan.end,
+            apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
+            apo_ora_03_apologistika: '', eos_ora_03_apologistika: '',
+            ores_ergasias_apologistika: netHours,
+            ores_pragmatikhs_ergasias_apologistika: netHours
+        });
+    }
+    else if (unresolved) Object.assign(update, operations.buildPartialVerifiedCardUpdate(calculationRow, effectiveEmployee).update);
     else {
         const splitUpdate = operations.checkBrokenProgramVsBrokenCards(context);
         Object.assign(update, splitUpdate);
@@ -116,6 +126,11 @@ function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesD
     }
     if (weeklyState) Object.assign(update,
         operations.calculateAdditionalAndOverworkForDay(workingContext, weeklyState));
+    // Οι επόμενοι έλεγχοι δεν πρέπει να αντικαταστήσουν τα ήδη επιλυμένα καθαρά λεπτά.
+    if (preliminary.safeOrphan) Object.assign(update, {
+        ores_ergasias_apologistika: preliminary.update.ores_ergasias_apologistika,
+        ores_pragmatikhs_ergasias_apologistika: preliminary.update.ores_pragmatikhs_ergasias_apologistika
+    });
     Object.assign(update, leaveUpdate, timeShiftUpdate);
     const protectedUpdate = operations.sanitizeAppliedRepoTransferUpdate({ rowId: row._id,
         currentRow: row, update, protectionContext: appliedProtectionContext });

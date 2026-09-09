@@ -2,7 +2,7 @@
 
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
-const { exactExternalBreaks } = require('../../utils/ergazomenoi/subtractExternalBreakIntervals');
+const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
 const { isInternalPossibleLeaveCategory } = require('./apasxoliseisHrLeaveCategoryPolicyService');
 const { validApprovedHourlyLeaveSegments } = require('../../utils/ergazomenoi/approvedHourlyLeaveSegments');
 
@@ -84,11 +84,12 @@ function deriveApprovedHourlyLeave({ row, effectiveEmployee = {}, resolvedArrang
     const end = finish > start ? finish : finish + 1440;
     const last = declaredIntervals.at(-1)?.eos_lepto || 0;
     const projected = [];
-    const externalBreakIntervals = [];
+    const resolvedBreak = resolvePayrollBreakIntervals({ row, effectiveEmployee,
+        workIntervals: actualIntervals.map(x => ({ start: x.apo_lepto, end: x.eos_lepto })) });
+    const externalBreakIntervals = resolvedBreak.insideSchedule ? [] : resolvedBreak.breakIntervals
+        .map(x => ({ apo_lepto: x.start, eos_lepto: x.end }));
     for (let day = -1; day <= Math.floor(last / 1440); day++) {
         projected.push({ apo_lepto: start + day * 1440, eos_lepto: end + day * 1440 });
-        for (const interval of exactExternalBreaks(effectiveEmployee)) externalBreakIntervals.push({
-            apo_lepto: interval.start + day * 1440, eos_lepto: interval.end + day * 1440 });
     }
     const eligibleIntervals = intersection(declaredIntervals, projected);
     const candidate = exclude(eligibleIntervals, [...actualIntervals, ...externalBreakIntervals, ...existingCreditedIntervals]);

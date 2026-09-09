@@ -1,3 +1,4 @@
+const { getPayrollCalculationIntervals, getRawCardIntervals } = require('./apasxoliseisWeeklyIllegalOvertimeCalculationService');
 const {
     dateKeyUtc,
     addDaysUtc,
@@ -288,16 +289,36 @@ function buildWeeklyRepoDeviationPreview({
             Number(actualRepo) !== Number(expectedRepo) ||
             repoStateReasons.length > 0
         ) {
-            const dailyFacts = uniqueRows.map((row) => resolveDailyActualWorkFacts(row));
+            const calculatedRows = new Set();
+            const canonicalRows = uniqueRows.map(row => {
+                if (row.is_locked === true) return row;
+                const profile = typeof resolveDailyProfile === 'function'
+                    ? resolveDailyProfile(row) || effectiveProfile : effectiveProfile;
+                const intervals = getPayrollCalculationIntervals(row, {
+                    ...profile,
+                    dialleima_se_lepta: profile.dialleima_se_lepta ?? profile.external_break_minutes
+                });
+                // Οι ημέρες χωρίς χρονικά γεγονότα διατηρούν την υπάρχουσα πολιτική.
+                if (!intervals.length && !getRawCardIntervals(row).length) return row;
+                const hours = Number((intervals.reduce((sum, x) => sum + x.end - x.start, 0) / 60).toFixed(2));
+                const calculatedRow = { ...row, ores_ergasias_apologistika: hours,
+                    ores_pragmatikhs_ergasias_apologistika: hours };
+                calculatedRows.add(calculatedRow);
+                return calculatedRow;
+            });
+            const dailyFacts = canonicalRows.map((row) => resolveDailyActualWorkFacts(row, {
+                isCalculatedWorkHoursAuthoritativeForRow: row => calculatedRows.has(row)
+            }));
             const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
-                weekRows: uniqueRows,
-                effectiveProfile
+                weekRows: canonicalRows,
+                effectiveProfile,
+                isCalculatedWorkHoursAuthoritativeForRow: row => calculatedRows.has(row)
             });
             const canonicalResolution =
                 typeof resolveCanonicalAnalysis === 'function'
                     ? resolveCanonicalAnalysis({
                           base,
-                          weekRows: uniqueRows,
+                          weekRows: canonicalRows,
                           weeklyProfile,
                           effectiveProfile,
                           automaticAnalysis: sixthSeventhDay
@@ -306,7 +327,7 @@ function buildWeeklyRepoDeviationPreview({
             const resolvedSixthSeventhDay =
                 canonicalResolution?.analysis || sixthSeventhDay;
             const repoTransfer = analyzeWeeklyRepoTransferForEmploymentContract({
-                weekRows: uniqueRows,
+                weekRows: canonicalRows,
                 employmentProfile: effectiveProfile,
                 holidayByDateKey,
                 existingAuditCountByRowKey

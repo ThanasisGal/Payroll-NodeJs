@@ -19,6 +19,8 @@ const DAILY_FIELDS = Object.freeze([
     'ores_ergasias', 'ores_apoysias', 'adeia', 'kathgoria_adeias', 'astheneia',
     'argia', 'argia_apologistika', 'is_locked',
     'apo_ora_01', 'eos_ora_01', 'apo_ora_02', 'eos_ora_02', 'apo_ora_03', 'eos_ora_03',
+    'dialleima_apo_ora_01', 'dialleima_eos_ora_01', 'dialleima_apo_ora_02',
+    'dialleima_eos_ora_02', 'dialleima_apo_ora_03', 'dialleima_eos_ora_03',
     'repo_apologistika', 'adeia_apologistika', 'kathgoria_adeias_apologistika', 'astheneia_apologistika',
     'apo_ora_01_apologistika', 'eos_ora_01_apologistika', 'apo_ora_02_apologistika',
     'eos_ora_02_apologistika', 'apo_ora_03_apologistika', 'eos_ora_03_apologistika',

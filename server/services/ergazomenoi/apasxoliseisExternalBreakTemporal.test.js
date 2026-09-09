@@ -89,9 +89,9 @@ test('a fully removed card interval never resurrects apologistika fallback work'
         apo_ora_01_apologistika: '03:00', eos_ora_01_apologistika: '03:30' };
     assert.deepEqual(S.getPayrollCalculationIntervals(r, profile()), []);
 });
-test('no exact interval, invalid/zero-length pair: legacy duration fallback remains', () => {
+test('no exact interval, invalid/zero-length pair: break follows 240 continuous minutes', () => {
     for (const p of [profile('', ''), profile('03:00', '03:00'), profile('25:00', '25:30')]) {
-        assert.deepEqual(geometry(S.getCardIntervals(row(), p)), [[1380, 1860]]);
+        assert.deepEqual(geometry(S.getCardIntervals(row(), p)), [[1380, 1620], [1650, 1890]]);
     }
     assert.deepEqual(geometry(S.getCardIntervals(row('2026-09-03', '09:00', '12:00'), profile('', ''))), [[540, 720]]);
 });
@@ -125,7 +125,7 @@ test('split and partially verified cards remove only actual intersections', () =
 test('daily declared breaks do not replace the existing profile authority', () => {
     const r = { ...row(), dialleima_apo_ora_01: '06:30', dialleima_eos_ora_01: '07:00' };
     assert.deepEqual(geometry(S.getCardIntervals(r, profile())), [[1380, 1620], [1650, 1890]]);
-    assert.deepEqual(geometry(S.getCardIntervals(r, profile('', ''))), [[1380, 1860]]);
+    assert.deepEqual(geometry(S.getCardIntervals(r, profile('', ''))), [[1380, 1830], [1860, 1890]]);
 });
 test('calendar-date profile resolver supplies historical exact pairs, not current pairs', () => {
     const history = [buildCompleteProfileSnapshot({ input: profile('03:00', '03:30'), effectiveFrom: '2026-09-01' })];

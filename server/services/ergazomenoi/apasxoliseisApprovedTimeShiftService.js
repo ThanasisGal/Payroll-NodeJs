@@ -3,7 +3,7 @@
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { shiftIntervals, scheduledWorkingDay } = require('./apasxoliseisApprovedHourlyLeaveService');
 const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
-const { exactExternalBreaks } = require('../../utils/ergazomenoi/subtractExternalBreakIntervals');
+const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
 const { validTimeShiftCompensation } = require('../../utils/ergazomenoi/approvedTimeShiftCompensation');
 const FIELD = 'egkekrimenh_anaplhrosh_apologistika';
 const duration = intervals => intervals.reduce((sum, x) => sum + (x.eos_lepto - x.apo_lepto), 0);
@@ -56,11 +56,14 @@ function deriveApprovedTimeShift({ row, effectiveEmployee = {}, resolvedArrangem
     const arrangement = shiftIntervals({ apo_ora_01: resolvedArrangement.facts[C.START],
         eos_ora_01: resolvedArrangement.facts[C.END] });
     if (!arrangement.length) return { ...empty, requiresHrReview: true, reason: 'INVALID_APPROVED_TIME_SHIFT_INTERVAL' };
-    const projected = [], breaks = [];
+    const projected = [];
+    const resolvedBreak = resolvePayrollBreakIntervals({ row, effectiveEmployee,
+        workIntervals: actual.map(x => ({ start: x.apo_lepto, end: x.eos_lepto })) });
+    const breaks = resolvedBreak.insideSchedule ? [] : resolvedBreak.breakIntervals
+        .map(x => ({ apo_lepto: x.start, eos_lepto: x.end }));
     const last = Math.max(declared.at(-1).eos_lepto, actual.at(-1)?.eos_lepto || 0);
     for (let day = -1; day <= Math.floor(last / 1440); day++) {
         projected.push(...arrangement.map(x => ({ apo_lepto: x.apo_lepto + day * 1440, eos_lepto: x.eos_lepto + day * 1440 })));
-        breaks.push(...exactExternalBreaks(effectiveEmployee).map(x => ({ apo_lepto: x.start + day * 1440, eos_lepto: x.end + day * 1440 })));
     }
     const eligibleInterruptionIntervals = intersect(declared, projected);
     const shortageIntervals = exclude(eligibleInterruptionIntervals, [...actual, ...breaks, ...existingCreditedIntervals]);

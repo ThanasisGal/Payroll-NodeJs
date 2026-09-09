@@ -1,5 +1,7 @@
 'use strict';
 
+const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
+
 const {
     CARD_PAIR_STATE,
     resolveCardPairVerification
@@ -149,6 +151,14 @@ function buildProposal(row = {}, override = {}, effectiveEmployee = {}, breakCon
         return { eligible: false, reason: declared.reason || 'INVALID_EFFECTIVE_DAILY_AVERAGE' };
     }
     const breakContext = resolveEffectiveBreakContext(row, effectiveEmployee, breakConfiguration);
+    const netMinutesForBounds = bounds => resolvePayrollBreakIntervals({ row,
+        effectiveEmployee: { ...row, ...(row.effective_profile_resolved || {}), ...effectiveEmployee,
+            ...(breakConfiguration || row.effective_break_configuration || {}),
+            dialleima_entos_ektos_orarioy: breakContext.insideSchedule,
+            dialleima_se_lepta: breakContext.declaredBreakMinutes },
+        workIntervals: [{ start: timeToMinutes(bounds.start),
+            end: timeToMinutes(bounds.start) + bounds.durationMinutes }]
+    }).netMinutes;
     if (manualSplitInterval) {
         const bounds = intervalBounds(row.hmeromhnia, requestedStart, requestedEnd);
         if (!bounds) return { eligible: false, reason: 'INVALID_PROPOSED_INTERVAL' };
@@ -160,15 +170,16 @@ function buildProposal(row = {}, override = {}, effectiveEmployee = {}, breakCon
                 row.effective_profile_istoriko_id || null,
             scheduleKind: SCHEDULE_KIND.SPLIT, rule: null,
             automaticStart: null, automaticEnd: null, manualIntervalMatchesRule: false,
-            netWorkMinutes: Math.max(0,
-                bounds.durationMinutes - breakContext.externalBreakMinutes),
+            netWorkMinutes: netMinutesForBounds(bounds),
             ...breakContext, ...bounds };
     }
     const duration = declared.eligible ? declared.durationMinutes : averageFallback.durationMinutes;
-    const automaticSpanMinutes = duration + breakContext.externalBreakMinutes;
+    // Αναζητούμε την ελάχιστη παρουσία που δίνει την απαιτούμενη καθαρή εργασία.
+    // Η αφαίρεση και η θέση του διαλείμματος ανήκουν αποκλειστικά στον επιλυτή.
+    let automaticSpanMinutes = duration;
     let automaticStart;
     let automaticEnd;
-    {
+    for (; automaticSpanMinutes < 1440; automaticSpanMinutes += 1) {
         if (orphan.state === CARD_PAIR_STATE.START_ONLY) {
             const anchor = timeToMinutes(orphan.start);
             automaticStart = orphan.start;
@@ -179,13 +190,15 @@ function buildProposal(row = {}, override = {}, effectiveEmployee = {}, breakCon
             const value = ((anchor - automaticSpanMinutes) % 1440 + 1440) % 1440;
             automaticStart = `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
         }
+        const automaticBounds = intervalBounds(row.hmeromhnia, automaticStart, automaticEnd);
+        if (automaticBounds && netMinutesForBounds(automaticBounds) >= duration) break;
     }
+    if (automaticSpanMinutes >= 1440) return { eligible: false, reason: 'INVALID_PROPOSED_INTERVAL' };
     const start = requestedStart || automaticStart;
     const end = requestedEnd || automaticEnd;
     const bounds = intervalBounds(row.hmeromhnia, start, end);
     if (!bounds) return { eligible: false, reason: 'INVALID_PROPOSED_INTERVAL' };
-    const netWorkMinutes = Math.max(0,
-        bounds.durationMinutes - breakContext.externalBreakMinutes);
+    const netWorkMinutes = netMinutesForBounds(bounds);
     const rule = declared.eligible
         ? orphan.state === CARD_PAIR_STATE.START_ONLY
             ? ORPHAN_RULE.ACTUAL_START_PLUS_DECLARED_DURATION

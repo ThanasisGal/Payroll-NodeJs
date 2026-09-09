@@ -76,9 +76,9 @@ assert.strictEqual(splitManual.approval.proposal.durationSource, 'HR_MANUAL_SPLI
 assert.strictEqual(splitManual.approval.proposal.manualIntervalMatchesRule, false);
 assert.strictEqual(splitManual.approval.reuseScope, 'ONE_TIME');
 assert.strictEqual(splitManual.approval.reusableDecisionRule, null);
-assert.strictEqual(splitManual.result.derivedUpdate.ores_ergasias_apologistika, 9);
+assert.strictEqual(splitManual.result.derivedUpdate.ores_ergasias_apologistika, 9.5);
 assert.strictEqual(splitManual.result.derivedUpdate.ores_nyxtas_apologistika, 0);
-assert.strictEqual(splitManual.result.derivedUpdate.ores_argion_prosayxhsh_apologistika, 9);
+assert.strictEqual(splitManual.result.derivedUpdate.ores_argion_prosayxhsh_apologistika, 9.5);
 
 const riskRow = row();
 const riskContextRows = [{ _id: 'previous', hmeromhnia: new Date('2026-06-13T00:00:00Z'),

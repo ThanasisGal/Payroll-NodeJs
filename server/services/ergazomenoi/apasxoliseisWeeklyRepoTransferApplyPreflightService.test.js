@@ -56,7 +56,11 @@ function modelValidation(record) { try { return new ExecutionModel(record).valid
             error.statusCode === 409);
         assert.strictEqual(reconstructionCalls, 0);
     }
-    assert.strictEqual(CURRENT_GUARD_FIELDS.length, 60); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
+    assert.strictEqual(CURRENT_GUARD_FIELDS.length, 66); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
+    const breakGuardFields = ['dialleima_apo_ora_01', 'dialleima_eos_ora_01',
+        'dialleima_apo_ora_02', 'dialleima_eos_ora_02',
+        'dialleima_apo_ora_03', 'dialleima_eos_ora_03'];
+    for (const field of breakGuardFields) assert.ok(CURRENT_GUARD_FIELDS.includes(field), field);
     for (const field of ['cards_ores_ergasias','cards_apo_ora_01','kathgoria_ergasias','ores_nyxtas_apologistika']) { assert.strictEqual(accepted.plan.source.expected_current[field], currentValues[field]); assert.strictEqual(accepted.plan.target.expected_current[field], currentValues[field]); }
     const arrangementGuardFields = ['egkekrimenh_anaplhrosh_apologistika',
         'egkekrimenh_oroadeia_apologistika', 'egkekrimena_diastimata_oroadeias_apologistika'];
