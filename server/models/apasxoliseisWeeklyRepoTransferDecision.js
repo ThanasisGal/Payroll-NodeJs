@@ -1,5 +1,16 @@
 const { Schema, model } = require('mongoose');
 
+const PeriodProjectionSchema = new Schema(
+    {
+        period_start: { type: Date, immutable: true },
+        period_end: { type: Date, immutable: true },
+        side: { type: String, trim: true, immutable: true },
+        accounting_rows: { type: [Schema.Types.Mixed], default: undefined, immutable: true },
+        projection_fingerprint: { type: String, trim: true, immutable: true }
+    },
+    { _id: false, versionKey: false }
+);
+
 const WeeklyRepoTransferDecisionSchema = new Schema(
     {
         proposal_identity: { type: String, required: true, trim: true, immutable: true },
@@ -30,7 +41,23 @@ const WeeklyRepoTransferDecisionSchema = new Schema(
         created_by_user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, immutable: true },
         created_by_user_name: { type: String, required: true, trim: true, immutable: true },
         created_by_user_role: { type: String, trim: true, default: '', immutable: true },
-        created_at: { type: Date, default: Date.now, immutable: true }
+        created_at: { type: Date, default: Date.now, immutable: true },
+        resolution_kind: { type: String, trim: true, immutable: true },
+        deferred_week_id: { type: String, trim: true, immutable: true },
+        resolution_status: { type: String, trim: true, immutable: true },
+        resolution_period_start: { type: Date, immutable: true },
+        resolution_period_end: { type: Date, immutable: true },
+        source_period_start: { type: Date, immutable: true },
+        source_period_end: { type: Date, immutable: true },
+        target_period_start: { type: Date, immutable: true },
+        target_period_end: { type: Date, immutable: true },
+        resolution_reason: { type: String, trim: true, immutable: true },
+        resolution_fingerprint: { type: String, trim: true, immutable: true },
+        resolved_by_user_id: { type: Schema.Types.ObjectId, ref: 'User', immutable: true },
+        resolved_by_user_name: { type: String, trim: true, immutable: true },
+        resolved_by_user_role: { type: String, trim: true, immutable: true },
+        resolved_at: { type: Date, immutable: true },
+        period_projections: { type: [PeriodProjectionSchema], default: undefined, immutable: true }
     },
     { collection: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions', versionKey: false }
 );
