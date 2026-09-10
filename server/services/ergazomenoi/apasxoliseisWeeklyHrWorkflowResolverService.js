@@ -27,13 +27,15 @@ const {
 const {
     resolveFullTimeFromWorkTerms
 } = require('./apasxoliseisReviewEmploymentProfileService');
+const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
 
 const NEXT_STAGE = Object.freeze({
     LEAVE_CLASSIFICATION: 'LEAVE_CLASSIFICATION',
     REPO_RESOLUTION: 'REPO_RESOLUTION',
     REMAINING_POSSIBLE_LEAVE_REVIEW: 'REMAINING_POSSIBLE_LEAVE_REVIEW',
     FINAL_WEEKLY_CHECK: 'FINAL_WEEKLY_CHECK',
-    BLOCKED: 'BLOCKED'
+    BLOCKED: 'BLOCKED',
+    DEFERRED_TO_NEXT_PERIOD: DEFERRED_WEEK_STATUS
 });
 
 function uniqueDateKeys(values = []) {
@@ -70,7 +72,10 @@ function resolveWeeklyHrWorkflow({
     selected_repo_transfers = [],
     remaining_possible_leave_review_completed = false,
     expected_date_keys = null,
-    actionable_date_keys = null
+    actionable_date_keys = null,
+    period_scope = null,
+    scope = {},
+    employment_date_scope = null
 } = {}) {
     const rows = Array.isArray(weekRows) ? [...weekRows] : [];
     const orderedRows = rows.slice().sort((left, right) =>
@@ -88,14 +93,24 @@ function resolveWeeklyHrWorkflow({
         : [];
     const expectedDates = Array.isArray(expected_date_keys)
         ? uniqueDateKeys(expected_date_keys) : naturalWeekDates;
-    const actionableDateSet = Array.isArray(actionable_date_keys)
-        ? new Set(uniqueDateKeys(actionable_date_keys)) : null;
+    const boundary = deriveDeferredWeekScope({ scope: { ...scope,
+        week_start: weekStart, week_end: weekEnd }, periodScope: period_scope,
+        employmentDateScope: employment_date_scope });
+    const deferred = isDeferredWeekPending({ boundary });
+    const requiredDates = deferred ? expectedDates.filter(date => date <= boundary.period_end) : expectedDates;
+    const ownership = period_scope || employment_date_scope;
+    const ownedDates = ownership?.period_start && ownership?.period_end
+        ? expectedDates.filter(date => date >= dateKeyUtc(ownership.period_start) &&
+            date <= dateKeyUtc(ownership.period_end)) : null;
+    const actionableDateSet = ownedDates ? new Set(ownedDates.filter(date =>
+        !Array.isArray(actionable_date_keys) || actionable_date_keys.includes(date)))
+        : Array.isArray(actionable_date_keys) ? new Set(uniqueDateKeys(actionable_date_keys)) : null;
     const blockingReasons = [];
     const warnings = [];
 
-    if (orderedRows.length !== expectedDates.length || dates.some((date) => !date) ||
-        new Set(dates).size !== expectedDates.length ||
-        expectedDates.some((date) => !dates.includes(date))) {
+    if ((!deferred && orderedRows.length !== expectedDates.length) || dates.some((date) => !date) ||
+        new Set(dates).size !== dates.length || dates.some(date => !expectedDates.includes(date)) ||
+        requiredDates.some((date) => !dates.includes(date))) {
         blockingReasons.push('INCOMPLETE_NATURAL_WEEK');
     }
 
@@ -157,8 +172,13 @@ function resolveWeeklyHrWorkflow({
         const date = dateKeyUtc(row.hmeromhnia);
         const facts = resolveDailyActualWorkFacts(row);
         actualFactsByDate.set(date, facts);
-        const dateIsActionable = !actionableDateSet || actionableDateSet.has(date);
+        const dateIsActionable = (!actionableDateSet || actionableDateSet.has(date)) &&
+            (!deferred || date <= boundary.period_end);
         if (dateIsActionable) blockingReasons.push(...(facts.reasons || []));
+        const dailyProfile = effectiveProfilesByDate?.[date] || profile;
+        if (deferred && dateIsActionable && dailyProfile.resolution_blocked === true) {
+            blockingReasons.push(dailyProfile.resolution_reason || 'EMPLOYMENT_PROFILE_BLOCKED');
+        }
         warnings.push(...(facts.warnings || []));
         if (dateIsActionable &&
             (facts.warnings || []).includes('INCOMPLETE_CARD_INTERVAL') &&
@@ -219,8 +239,8 @@ function resolveWeeklyHrWorkflow({
     const actualWorkdayCount = [...actualFactsByDate.values()].filter(
         (facts) => facts.countsAsActualWorkDay === true
     ).length;
-    const repoTransferAllowed = actualWorkdayCount !== 7;
-    const repoTransferProhibitionReason = repoTransferAllowed
+    const repoTransferAllowed = !deferred && actualWorkdayCount !== 7;
+    const repoTransferProhibitionReason = deferred ? DEFERRED_WEEK_STATUS : repoTransferAllowed
         ? null
         : 'SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN';
     const directRepoCandidates = [];
@@ -301,6 +321,8 @@ function resolveWeeklyHrWorkflow({
     let nextRequiredHrStage = NEXT_STAGE.FINAL_WEEKLY_CHECK;
     if (blockingReasons.length > 0) {
         nextRequiredHrStage = NEXT_STAGE.BLOCKED;
+    } else if (deferred) {
+        nextRequiredHrStage = NEXT_STAGE.DEFERRED_TO_NEXT_PERIOD;
     } else if (possibleLeaveDays.length > 0 && leave_classification_completed !== true) {
         nextRequiredHrStage = NEXT_STAGE.LEAVE_CLASSIFICATION;
     } else if (!repoTransferAllowed) {
@@ -323,6 +345,12 @@ function resolveWeeklyHrWorkflow({
     if (repoTransferProhibitionReason) warnings.push(repoTransferProhibitionReason);
 
     return deepFreeze({
+        ...(boundary && (deferred || boundary.handoff_from_previous_period) ? { deferred_week: boundary,
+            deferred_action_required: true,
+            deferred_possible_leave_dates: deferred ? unclassifiedPossibleLeaveDays
+                .filter(date => boundary.current_period_dates.includes(date)) : [],
+            full_week_hr_repo_status: deferred ? DEFERRED_WEEK_STATUS : null,
+            current_period_hr_action_required_for_this_reason: false } : {}),
         week_start: weekStart,
         week_end: weekEnd,
         contractual_workdays: expectedRepoResolution.effectiveWeeklyWorkdays,

@@ -44,7 +44,8 @@ assert.doesNotMatch(dailySaveFunction, /loadResults\(|location\.reload/);
 
 const scopeHelpers = source.slice(source.indexOf('function stage1DateKey'),
     source.indexOf('async function fetchWeeklyHrStage1'));
-const scopeSandbox = {};
+const scopeSandbox = { currentEmploymentPeriodControl: { scope: {
+    period_start: '2026-06-01', period_end: '2026-06-30' } } };
 vm.runInNewContext(`${scopeHelpers}\nthis.helpers = { buildWeeklyHrStage1Scopes, formatStage1DateKey };`, scopeSandbox);
 const juneRows = Array.from({ length: 30 }, (_, index) => ({
     _id: `row-${index + 1}`, employee_id: 'employee-x', kodikos: '0004',

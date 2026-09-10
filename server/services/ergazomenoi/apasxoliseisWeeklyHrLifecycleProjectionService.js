@@ -3,6 +3,7 @@
 // Pure presentation projection. It coordinates existing authoritative resolvers and never writes.
 
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
+const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
 const { isPossibleLeave } = require('./apasxoliseisLeaveProvenanceService');
 const {
     deriveStoredStage1Decisions,
@@ -35,7 +36,8 @@ const BUSINESS_STATUS = Object.freeze({
     COMPLETED: 'COMPLETED',
     OPEN: 'OPEN',
     BLOCKED: 'BLOCKED',
-    STALE: 'STALE'
+    STALE: 'STALE',
+    DEFERRED_TO_NEXT_PERIOD: DEFERRED_WEEK_STATUS
 });
 const PRESENTATION_STATUS = Object.freeze({
     COMPLETED: 'COMPLETED',
@@ -242,6 +244,68 @@ function buildWeeklyHrLifecycleProjection({
 } = {}) {
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const fingerprint = buildStage1Fingerprint(rows).fingerprint;
+    const boundary = deriveDeferredWeekScope({ scope, periodScope, employmentDateScope });
+    if (isDeferredWeekPending({ boundary })) {
+        const workflow = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile,
+            effectiveProfilesByDate, scope, period_scope: periodScope || employmentDateScope,
+            employment_date_scope: employmentDateScope,
+            expected_date_keys: employmentDateScope?.employment_owned_dates || null,
+            actionable_date_keys: boundary.current_period_writable_dates });
+        const slice = { period_start: boundary.period_start, period_end: boundary.period_end,
+            actionable_dates: boundary.current_period_writable_dates,
+            context_only_dates: [...boundary.previous_period_context_dates, ...boundary.next_period_context_dates] };
+        const persistedSlice = findStage1PeriodSlice(persistedStage1State,
+            boundary.period_start, boundary.period_end);
+        const fingerprints = buildStage1PeriodSliceFingerprints({ weekRows: rows, slice });
+        const persistedStatus = persistedSlice ? resolveStage1PeriodSliceStatus({
+            current_context_fingerprint: fingerprints.context_fingerprint,
+            current_completion_fingerprint: fingerprints.completion_fingerprint,
+            persisted_slice: persistedSlice }) : resolveStage1Status({
+            current_fingerprint: fingerprint, persisted_stage1_state: persistedStage1State });
+        // Keep known calculation-configuration failures; repo classification itself is deferred.
+        const diagnostics = analyzeWeeklySixthSeventhDay({ weekRows: rows, effectiveProfile,
+            effectiveProfilesByDate,
+            expectedDateKeys: employmentDateScope?.employment_owned_dates || null,
+            actionableDateKeys: boundary.current_period_writable_dates,
+            companyKod: scope.company_kod || rows[0]?.company_kod || '', companyPolicyRules });
+        const configurationBlockers = (diagnostics.reasons || []).filter(reason =>
+            ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE',
+                'ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'].includes(reason));
+        const blockers = unique([...(workflow.blocking_reasons || []), ...configurationBlockers,
+            ...(stage2StateDiagnostic ? [stage2StateDiagnostic] : []),
+            // Existing decisions must be revalidated through their normal full-week path.
+            ...(persistedStage2DecisionState || persistedStage3State
+                ? ['EXISTING_WEEKLY_DECISION_REQUIRES_FULL_WEEK_VALIDATION'] : [])]);
+        const stale = persistedStatus === BUSINESS_STATUS.STALE;
+        const hasBlocker = stale || blockers.length > 0;
+        const stages = Object.fromEntries(['stage1', 'stage2', 'stage3', 'stage4'].map((key, index) => {
+            const activeBlocker = (index === 0 || index === 3) && hasBlocker;
+            return [key, stageResult(`STAGE${index + 1}`, {
+                business_status: activeBlocker ? (stale ? BUSINESS_STATUS.STALE : BUSINESS_STATUS.BLOCKED)
+                    : DEFERRED_WEEK_STATUS,
+                presentation_status: activeBlocker ? (stale ? 'STALE' : 'BLOCKED') : DEFERRED_WEEK_STATUS,
+                enabled: activeBlocker && index === 0, open_by_default: activeBlocker && index === 0,
+                pending_count: activeBlocker ? Math.max(1, blockers.length) : 0,
+                pending_reasons: activeBlocker ? blockers : [], blockers: activeBlocker ? blockers : [],
+                persisted_status: index === 0 ? persistedStatus : 'OPEN',
+                ...(index === 0 ? { attestation_scope: 'PERIOD_SLICE', period_slice: slice,
+                    current_fingerprint: fingerprint,
+                    current_context_fingerprint: fingerprints.context_fingerprint,
+                    current_completion_fingerprint: fingerprints.completion_fingerprint } : {}),
+                deferred_action_required: true, final_weekly_analysis_available: false
+            })];
+        }));
+        return Object.freeze({ projection_version: 'weekly-hr-derived-lifecycle:v1', read_only: true,
+            persisted_stage1_status: persistedStatus,
+            stage1_persistence_state: persistedStage1State ? 'PRESENT' : 'NO_STATE',
+            current_stage: hasBlocker ? 'STAGE1' : null,
+            total_pending_count: hasBlocker ? Math.max(1, blockers.length) : 0,
+            requires_hr_action: hasBlocker,
+            deferred_week: boundary, deferred_action_required: true,
+            deferred_possible_leave_dates: workflow.deferred_possible_leave_dates || [],
+            employment_date_scope: employmentDateScope,
+            stage1_no_classification_preview_items: Object.freeze([]), stages: Object.freeze(stages) });
+    }
     const periodSlice = periodScope ? deriveStage1PeriodSlice({ weekRows: rows,
         week_start: scope.week_start, week_end: scope.week_end,
         period_start: periodScope.period_start, period_end: periodScope.period_end,
@@ -600,6 +664,7 @@ function buildWeeklyHrLifecycleProjection({
         current_stage: activeStage?.stage || null,
         total_pending_count: totalPending,
         requires_hr_action: Boolean(activeStage),
+        ...(boundary?.handoff_from_previous_period ? { deferred_week: boundary, deferred_action_required: true } : {}),
         employment_date_scope: employmentDateScope,
         stage1_no_classification_preview_items: stage1NoClassificationPreviewItems,
         stages: Object.freeze(stages)
@@ -607,6 +672,7 @@ function buildWeeklyHrLifecycleProjection({
 }
 
 function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
+    if (projection.deferred_week?.status === DEFERRED_WEEK_STATUS) return projection;
     const completedStages = Object.fromEntries(
         ['stage1', 'stage2', 'stage3', 'stage4'].map((key, index) => {
             const stage = projection?.stages?.[key] || {};

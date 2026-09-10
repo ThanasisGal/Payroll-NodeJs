@@ -157,7 +157,7 @@ test('το όριο περιόδου Ιουνίου επιστρέφει πρι�
     assert.match(exportLoader,
         /restrictBoundaryContextToPeriodEmployees\(\s*enrichedRows,\s*boundaryContextRows\s*\)/);
     assert.match(exportLoader,
-        /employmentDateScope\?\.authoritative_date_set\?\.length \|\| 0\) > 0 &&[\s\S]*employmentDateScope\?\.context_only_dates\?\.length \|\| 0\) > 0/);
+        /periodScope:\s*employmentDateScope\?\.authoritative_date_set\?\.length &&[\s\S]*employmentDateScope\?\.context_only_dates\?\.length \? ownershipPeriod : null/);
     assert.ok(exportLoader.indexOf('projection.rows.__stage2DailyResolutionsByDate = stage2DailyResolutionsByDate;') <
         exportLoader.indexOf('if (includeLifecycle === false) return projection.rows;'));
     assert.match(controller,

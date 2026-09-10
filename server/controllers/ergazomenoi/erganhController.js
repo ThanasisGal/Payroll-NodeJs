@@ -227,7 +227,11 @@ const {
     isWeekFullyWithinEmploymentPeriod,
     restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,
-    buildFullMonthBoundaryContextPreflight
+    buildFullMonthBoundaryContextPreflight,
+    deriveDeferredWeekScope,
+    isDeferredWeekPending,
+    DEFERRED_WEEK_STATUS,
+    DEFERRED_WEEK_MESSAGE
 } = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
 const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
@@ -1179,13 +1183,21 @@ function assertReviewDecisionMutualExclusion(row = {}) {
     }
 }
 
-async function activeEmploymentReviewPeriodScope(req, branchOverride = '') {
+async function activeEmploymentReviewPeriodDates(req) {
     const period = await PeriodsModel.findOne({
         xrhsh: req.session.yearInUse,
         kodikos: req.session.periodInUse
     }).select('apo eos').lean();
+    if (!period?.apo || !period?.eos) {
+        throw weeklyHrApiError('INVALID_PERIOD_SCOPE', 400, 'Δεν βρέθηκε η ενεργή περίοδος.');
+    }
+    return { period_start: period.apo, period_end: period.eos };
+}
+
+async function activeEmploymentReviewPeriodScope(req, branchOverride = '') {
+    const dates = await activeEmploymentReviewPeriodDates(req);
     const branch = String(branchOverride || req.body?.ypokatasthma || req.query?.ypokatasthma || '').trim();
-    if (!period?.apo || !period?.eos || !branch || branch.toUpperCase() === 'ALL' || branch.includes(',')) {
+    if (!branch || branch.toUpperCase() === 'ALL' || branch.includes(',')) {
         const error = new Error('Δεν ήταν δυνατό να προσδιοριστεί η περίοδος και το παράρτημα.');
         error.code = 'INVALID_PERIOD_SCOPE'; error.statusCode = 400; throw error;
     }
@@ -1203,8 +1215,8 @@ async function activeEmploymentReviewPeriodScope(req, branchOverride = '') {
         team: req.session.userTeam,
         company_kod: String(req.session.companyInUse || ''),
         ypokatasthma: normalizedBranch,
-        period_start: period.apo,
-        period_end: period.eos
+        period_start: dates.period_start,
+        period_end: dates.period_end
     };
 }
 
@@ -4229,10 +4241,11 @@ async function loadFinalizedWeeklyHrPresentationSnapshot(req, input = {}) {
 }
 
 async function loadWeeklyHrContext({ req, input, session = null,
-    presentationSnapshot = null }) {
+    presentationSnapshot = null, allowDeferredPresentation = false }) {
     const branch = String(input.ypokatasthma || '').trim().padStart(4, '0');
     const employeeId = String(input.employee_id || '').trim();
     const week = normalizeNaturalWeek(input.week_start, input.week_end);
+    const periodScope = await activeEmploymentReviewPeriodScope(req, branch);
     if (!mongoose.isValidObjectId(employeeId)) {
         throw weeklyHrApiError('INVALID_WEEK_SCOPE', 400, 'Μη έγκυρη ταυτότητα εργαζομένου.');
     }
@@ -4281,8 +4294,8 @@ async function loadWeeklyHrContext({ req, input, session = null,
     const employmentDateScope = deriveEmploymentOwnedDateScope({
         natural_week_start: week.startKey,
         natural_week_end: week.endKey,
-        period_start: input.period_start || week.startKey,
-        period_end: input.period_end || week.endKey,
+        period_start: periodScope.period_start,
+        period_end: periodScope.period_end,
         hire_date: employee.hmeromhnia_proslhpshs,
         departure_date: employee.hmeromhnia_apoxorhshs
     });
@@ -4290,8 +4303,15 @@ async function loadWeeklyHrContext({ req, input, session = null,
     const expectedDateSet = new Set(expectedDates);
     const rows = loadedRows.filter((row) => expectedDateSet.has(dateKeyUtc(row.hmeromhnia)));
     const dates = rows.map((row) => dateKeyUtc(row.hmeromhnia));
-    if (rows.length !== expectedDates.length || new Set(dates).size !== expectedDates.length ||
-        expectedDates.some((date) => !dates.includes(date))) {
+    const deferredScope = allowDeferredPresentation ? deriveDeferredWeekScope({
+        scope: { ...base, employee_id: employee._id,
+            week_start: week.startKey, week_end: week.endKey },
+        employmentDateScope }) : null;
+    const deferredPending = isDeferredWeekPending({ boundary: deferredScope });
+    const requiredDates = deferredPending
+        ? expectedDates.filter(date => date <= deferredScope.period_end) : expectedDates;
+    if ((!deferredPending && rows.length !== expectedDates.length) || new Set(dates).size !== dates.length ||
+        requiredDates.some((date) => !dates.includes(date))) {
         throw weeklyHrApiError('INCOMPLETE_NATURAL_WEEK', 409,
             'Δεν βρέθηκαν όλες οι ημερήσιες εγγραφές της πραγματικής σχέσης εργασίας.');
     }
@@ -4306,7 +4326,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
         getDailyRepoProfileInfo({ row, istorikoRows: histories, ergazomenos: employee,
             resolveProfileForDate }).profile
     ]));
-    return { base, employee, rows, week, employmentDateScope,
+    return { base, employee, rows, week, employmentDateScope, periodScope,
         effectiveProfile: profile.effectiveProfile,
         effectiveProfilesByDate };
 }
@@ -4318,8 +4338,8 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
         ...weekly.base, employee_id: weekly.employee._id,
         week_start: weekly.week.start, week_end: weekly.week.end
     })).lean();
-    const periodScope = input.period_start && input.period_end
-        ? { period_start: input.period_start, period_end: input.period_end } : null;
+    const periodScope = weekly.employmentDateScope?.context_only_dates?.length
+        ? weekly.periodScope : null;
     const lifecycle = buildWeeklyHrLifecycleProjection({
         weekRows: weekly.rows.map((row) => ({ ...row, team: weekly.base.team,
             company_kod: weekly.base.company_kod, employee_id: weekly.employee._id })),
@@ -4413,8 +4433,8 @@ async function loadWeeklyHrStage2CompletionContext({ req, input, session = null 
         ...weekly.base, employee_id: weekly.employee._id,
         week_start: weekly.week.start, week_end: weekly.week.end
     })).lean();
-    const periodScope = input.period_start && input.period_end
-        ? { period_start: input.period_start, period_end: input.period_end } : null;
+    const periodScope = weekly.employmentDateScope?.context_only_dates?.length
+        ? weekly.periodScope : null;
     const scope = { ...weekly.base, employee_id: weekly.employee._id,
         employee_kodikos: weekly.employee.kodikos,
         week_start: weekly.week.start, week_end: weekly.week.end,
@@ -4589,6 +4609,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
             }
         }
     }
+    const ownershipPeriod = await activeEmploymentReviewPeriodDates(req);
     const reviewFilter = buildProdhlomenaReviewFilter(req);
     const { employees: lifecycleEmployees } = await applyEmploymentDepartureScopeToFilters({
         filters: [reviewFilter],
@@ -4958,8 +4979,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
         const employmentDateScope = deriveEmploymentOwnedDateScope({
             natural_week_start: naturalWeekStart,
             natural_week_end: naturalWeekEnd,
-            period_start: periodStart || naturalWeekStart,
-            period_end: periodEnd || naturalWeekEnd,
+            period_start: ownershipPeriod.period_start,
+            period_end: ownershipPeriod.period_end,
             hire_date: employee.hmeromhnia_proslhpshs,
             departure_date: employee.hmeromhnia_apoxorhshs
         });
@@ -5121,8 +5142,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
         const employmentDateScope = deriveEmploymentOwnedDateScope({
             natural_week_start: naturalWeekStart,
             natural_week_end: naturalWeekEnd,
-            period_start: periodStart || naturalWeekStart,
-            period_end: periodEnd || naturalWeekEnd,
+            period_start: ownershipPeriod.period_start,
+            period_end: ownershipPeriod.period_end,
             hire_date: employee.hmeromhnia_proslhpshs,
             departure_date: employee.hmeromhnia_apoxorhshs
         });
@@ -5165,13 +5186,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true } = {}) {
                 week_start: naturalWeekStart,
                 week_end: naturalWeekEnd
             },
-            periodScope: periodStart && periodEnd &&
-                (dateKeyUtc(naturalWeekStart) < dateKeyUtc(periodStart) ||
-                    dateKeyUtc(naturalWeekEnd) > dateKeyUtc(periodEnd)) &&
-                (employmentDateScope?.authoritative_date_set?.length || 0) > 0 &&
-                (employmentDateScope?.context_only_dates?.length || 0) > 0
-                ? { period_start: periodStart, period_end: periodEnd }
-                : null,
+            periodScope: employmentDateScope?.authoritative_date_set?.length &&
+                employmentDateScope?.context_only_dates?.length ? ownershipPeriod : null,
             employmentDateScope,
             companyPolicyRules
         }));
@@ -6442,6 +6458,7 @@ class erganhController {
                 limit = 50
             } = req.query;
 
+            const ownershipPeriod = await activeEmploymentReviewPeriodDates(req);
             const pageNum = Math.max(parseInt(page, 10) || 1, 1);
             const limitNum = Math.min(Math.max(parseInt(limit, 10) || 5000, 10), 10000);
             const skip = (pageNum - 1) * limitNum;
@@ -7051,6 +7068,7 @@ class erganhController {
                     ? buildWeeklyRepoDeviationPreview({
                           rows: deviationContextRows,
                           periodStart: reviewPeriodStart,
+                          periodScope: ownershipPeriod,
                           periodEnd: reviewPeriodEnd,
                           asOfDate: req.session.appDate,
                           resolveCanonicalAnalysis: ({
@@ -7337,7 +7355,16 @@ class erganhController {
             ].map(([scopeKey, lifecycleProjection]) => {
                 const [employeeKodikos = '', weekStart = ''] = String(scopeKey).split('|');
                 return {
-                    scope: { employee_kodikos: employeeKodikos, week_start: weekStart },
+                    scope: { employee_kodikos: employeeKodikos, week_start: weekStart,
+                        ...(lifecycleProjection.deferred_week ? {
+                            team: lifecycleProjection.deferred_week.team,
+                            company_kod: lifecycleProjection.deferred_week.company_kod,
+                            ypokatasthma: lifecycleProjection.deferred_week.ypokatasthma,
+                            employee_id: lifecycleProjection.deferred_week.employee_id,
+                            week_end: lifecycleProjection.deferred_week.week_end,
+                            period_start: lifecycleProjection.deferred_week.period_start,
+                            period_end: lifecycleProjection.deferred_week.period_end
+                        } : {}) },
                     lifecycle_projection: lifecycleProjection
                 };
             });
@@ -8544,6 +8571,10 @@ class erganhController {
                 end: decision.week_end,
                 kind: 'WEEKLY_CONTEXT'
             });
+            if (isDeferredWeekPending({ boundary: deriveDeferredWeekScope({ scope: decision,
+                periodScope: periodAccess.scope }) })) {
+                throw weeklyHrApiError(DEFERRED_WEEK_STATUS, 409, DEFERRED_WEEK_MESSAGE);
+            }
             validateApplySession(req.session);
             const runtime = getWeeklyRepoTransferApplyRuntimeState();
             if (!runtime.enabled) {
@@ -10764,6 +10795,7 @@ class erganhController {
                     sameRunDailyCalculatedRowIds
                 });
                 const runtimeResult = await runPossibleLeaveRepoAutoRuntime({
+                    periodScope: periodControlScope,
                     rows: autoRows,
                     groups: atomicProjection.groups,
                     approvals: activeReusableApprovals,
@@ -10882,10 +10914,13 @@ class erganhController {
 
     static getWeeklyHrWorkflowStage1 = async (req, res) => {
         try {
+            const actualPeriod = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
+            const input = { ...req.query, period_start: dateKeyUtc(actualPeriod.period_start),
+                period_end: dateKeyUtc(actualPeriod.period_end) };
             const presentationSnapshot = await loadFinalizedWeeklyHrPresentationSnapshot(
-                req, req.query);
-            const context = await loadWeeklyHrContext({ req, input: req.query,
-                presentationSnapshot });
+                req, input);
+            const context = await loadWeeklyHrContext({ req, input,
+                presentationSnapshot, allowDeferredPresentation: true });
             await assertActiveEmploymentReviewPeriodPresentationReadable(
                 req, context.base.ypokatasthma, {
                     kind: 'WEEKLY_CONTEXT', start: context.week.start, end: context.week.end,
@@ -10895,8 +10930,8 @@ class erganhController {
                         )).map((row) => row.hmeromhnia),
                     requiredAuthoritativeDates:
                         context.employmentDateScope?.authoritative_date_set || null,
-                    periodStart: req.query.period_start,
-                    periodEnd: req.query.period_end
+                    periodStart: input.period_start,
+                    periodEnd: input.period_end
                 });
             const state = await ApasxoliseisWeeklyHrWorkflowStateModel.findOne({
                 ...context.base, employee_id: context.employee._id,
@@ -10907,10 +10942,13 @@ class erganhController {
                 effectiveProfile: context.effectiveProfile,
                 effectiveProfilesByDate: context.effectiveProfilesByDate,
                 persistedStage1State: state?.stage1 || null, indexState,
+                period_scope: context.employmentDateScope,
+                employment_date_scope: context.employmentDateScope,
+                scope: { ...context.base, employee_id: context.employee._id },
                 expected_date_keys:
                     context.employmentDateScope?.employment_owned_dates || null });
-            const periodScope = req.query.period_start && req.query.period_end
-                ? { period_start: req.query.period_start, period_end: req.query.period_end } : null;
+            const periodScope = context.employmentDateScope?.context_only_dates?.length
+                ? context.periodScope : null;
             const lifecycleInput = {
                 weekRows: context.rows.map((row) => ({ ...row,
                     team: context.base.team,
