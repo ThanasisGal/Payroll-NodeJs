@@ -1,11 +1,51 @@
 const {
     dateKeyUtc,
     startOfWeekMondayUtc,
-    endOfWeekSundayUtc
+    endOfWeekSundayUtc,
+    getNaturalWeekPeriodBoundary
 } = require('../../utils/date/mondaySundayWeek');
 const {
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
+
+const DEFERRED_WEEK_STATUS = 'DEFERRED_TO_NEXT_PERIOD';
+const DEFERRED_WEEK_MESSAGE = 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ';
+
+// Period ownership is stable even when future context is loaded later.
+function isDeferredWeekPending({ boundary } = {}) {
+    return boundary?.status === DEFERRED_WEEK_STATUS;
+}
+
+// Derived from the existing natural-week scope: no second ledger or persistence.
+function deriveDeferredWeekScope({ scope = {}, periodScope = null, employmentDateScope = null } = {}) {
+    const period = periodScope || employmentDateScope;
+    if (!period || !isFullCalendarMonthRange(period.period_start, period.period_end)) return null;
+    const boundary = getNaturalWeekPeriodBoundary({
+        week_start: scope.week_start || employmentDateScope?.natural_week_start,
+        week_end: scope.week_end || employmentDateScope?.natural_week_end,
+        period_start: period.period_start, period_end: period.period_end });
+    if (!boundary || (!boundary.is_trailing_week && !boundary.is_leading_week)) return null;
+    const owned = employmentDateScope?.employment_owned_dates;
+    if (Array.isArray(owned) && !owned.some(date => boundary.is_trailing_week
+        ? date > boundary.period_end : date < boundary.period_start)) return null;
+    const sourceEnd = boundary.is_trailing_week ? boundary.period_end
+        : dateKeyUtc(new Date(new Date(`${boundary.period_start}T00:00:00.000Z`).getTime() - 86400000));
+    const identity = { team: String(scope.team || ''), company_kod: String(scope.company_kod || ''),
+        ypokatasthma: normalizeBranch(scope.ypokatasthma), employee_id: String(scope.employee_id || ''),
+        week_start: boundary.week_start, week_end: boundary.week_end,
+        source_period_start: `${sourceEnd.slice(0, 7)}-01`, source_period_end: sourceEnd };
+    return Object.freeze({ ...boundary, ...identity,
+        deferred_week_id: JSON.stringify(Object.values(identity)),
+        identity_complete: ['team', 'company_kod', 'ypokatasthma', 'employee_id']
+            .every(key => Boolean(identity[key])),
+        status: boundary.is_trailing_week ? DEFERRED_WEEK_STATUS : 'READ_ONLY_HANDOFF',
+        display_message: DEFERRED_WEEK_MESSAGE,
+        deferred_action_required: true,
+        handoff_from_previous_period: boundary.is_leading_week,
+        current_period_writable_dates: Object.freeze(boundary.current_period_dates
+            .filter(date => !Array.isArray(owned) || owned.includes(date))),
+        previous_period_writable_dates: Object.freeze([]) });
+}
 
 function normalizeBranch(value) {
     const raw = String(value ?? '').trim();
@@ -215,6 +255,10 @@ function buildFullMonthBoundaryContextPreflight({ period_start, period_end,
 }
 
 module.exports = {
+    DEFERRED_WEEK_STATUS,
+    DEFERRED_WEEK_MESSAGE,
+    isDeferredWeekPending,
+    deriveDeferredWeekScope,
     buildPostDepartureExclusionDescriptors,
     endOfDepartureDay,
     startOfHireDay,

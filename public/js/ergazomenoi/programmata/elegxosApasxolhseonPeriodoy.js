@@ -705,14 +705,24 @@ function renderReviewNoPendingEmployees(
     if (!tbody || lifecycleReady !== true || String(selectedKodikos || '').trim()) return false;
     tbody.innerHTML = `<tr class="employment-review-no-pending-employees">
         <td colspan="13" class="text-center text-muted py-4">
-            Δεν υπάρχουν εργαζόμενοι με εκκρεμότητες ελέγχου.
+            Δεν υπάρχουν ημερήσιες εγγραφές της ενεργής περιόδου για τα επιλεγμένα φίλτρα.
         </td>
     </tr>`;
     return true;
 }
 
+function filterPeriodOwnedReviewRows(rows = [], period = null) {
+    const start = stage1DateKey(period?.period_start);
+    const end = stage1DateKey(period?.period_end);
+    if (!start || !end) return [];
+    return rows.filter(row => {
+        const date = stage1DateKey(row?.hmeromhnia);
+        return date && date >= start && date <= end;
+    });
+}
+
 function getVisibleReviewRows(rows = currentReviewRows) {
-    return filterGeneralReviewRows(rows, {
+    return filterGeneralReviewRows(filterPeriodOwnedReviewRows(rows, currentReviewOwnershipPeriod()), {
         selectedKodikos: document.getElementById('kodikos')?.value || '',
         lifecycleReady: currentReviewLifecycleProjectionReady,
         lifecyclePayloads: [...weeklyHrStage1Payloads.values()]
@@ -2442,7 +2452,8 @@ function isHrVisibleDeviation(deviation = {}) {
     const stage4 = weeklyLifecyclePayloadForDeviation(deviation)
         ?.lifecycle_projection?.stages?.stage4;
     return stage4?.business_status === 'BLOCKED' ||
-        String(deviation.status || '').trim() !== 'OPEN_WEEK_PENDING_COMPLETION';
+        !['OPEN_WEEK_PENDING_COMPLETION', 'DEFERRED_TO_NEXT_PERIOD'].includes(
+            String(deviation.status || '').trim());
 }
 
 function renderStage4StatusCell(dev = {}) {
@@ -3213,7 +3224,13 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
         possibleLeaveState === possibleLeavePresentationStates.LEGACY
     ) {
         return {
-            text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
+            text: (typeof currentCanonicalLifecyclePayloads === 'undefined' ? [] : currentCanonicalLifecyclePayloads)
+                .some(payload => payload.lifecycle_projection?.deferred_week?.status === 'DEFERRED_TO_NEXT_PERIOD' &&
+                    payload.lifecycle_projection?.requires_hr_action === false &&
+                    String(payload.scope?.employee_kodikos || '') === String(row.kodikos || '') &&
+                    String(payload.scope?.ypokatasthma || '').padStart(4, '0') === String(row.ypokatasthma || '').padStart(4, '0') &&
+                    payload.lifecycle_projection.deferred_possible_leave_dates?.includes(stage1DateKey(row.hmeromhnia)))
+                ? 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ' : 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
             className: 'cell-adeia-suggestion',
             source: 'derived'
         };
@@ -5731,6 +5748,7 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.',
     OPEN_WEEK_PENDING_COMPLETION:
         'Η τελευταία εβδομάδα δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.',
+    DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
     CROSS_MONTH_REPO_TRANSFER_NOT_ALLOWED:
         'Η μεταφορά ρεπό δεν επιτρέπεται ανάμεσα σε ημέρες διαφορετικών μηνών.',
     NO_SOURCE_CANDIDATE:
@@ -8344,6 +8362,24 @@ function fullMonthBoundaryRanges(startValue, endValue) {
 let currentEmploymentReviewBoundaryContextPreflight = null;
 let currentEmploymentReviewBoundaryContextDialogHtml = '';
 
+let currentBoundaryInfoSearchResult = 0;
+let lastAutoOpenedBoundaryInfoSearchResult = 0;
+
+function beginBoundaryInfoSearchResult() {
+    currentBoundaryInfoSearchResult += 1;
+    currentEmploymentReviewBoundaryContextDialogHtml = '';
+    const button = document.getElementById('employmentReviewBoundaryContextButton');
+    button?.classList.add('d-none');
+    if (button) button.onclick = null;
+}
+
+function autoOpenBoundaryInfoForSearchResult() {
+    if (!currentReviewLifecycleProjectionReady || !currentEmploymentReviewBoundaryContextDialogHtml ||
+        currentBoundaryInfoSearchResult === lastAutoOpenedBoundaryInfoSearchResult) return Promise.resolve();
+    lastAutoOpenedBoundaryInfoSearchResult = currentBoundaryInfoSearchResult;
+    return showEmploymentReviewBoundaryContextDialog();
+}
+
 function compactStage1DateRange(dates = []) {
     if (!dates.length) return '';
     const first = formatStage1DateKey(dates[0]);
@@ -8399,8 +8435,13 @@ function showEmploymentReviewBoundaryContextDialog() {
 function renderEmploymentReviewBoundaryContextSummary(searchStart, searchEnd) {
     const button = document.getElementById('employmentReviewBoundaryContextButton');
     if (!button) return;
-    const ranges = fullMonthBoundaryRanges(searchStart, searchEnd);
-    if (currentEmploymentReviewBoundaryContextPreflight?.disabled === true || !ranges ||
+    const period = currentReviewOwnershipPeriod();
+    const periodStart = period?.period_start || searchStart;
+    const periodEnd = period?.period_end || searchEnd;
+    const groups = groupDeferredWeeksForDisplay(
+        currentEmploymentReviewLifecyclePresentation?.deferred_weeks || []);
+    const ranges = fullMonthBoundaryRanges(periodStart, periodEnd);
+    if ((currentEmploymentReviewBoundaryContextPreflight?.disabled === true && !groups.length) || !ranges ||
         (!ranges.previous.length && !ranges.next.length)) {
         currentEmploymentReviewBoundaryContextDialogHtml = '';
         button.classList.add('d-none'); button.onclick = null; return;
@@ -8408,7 +8449,7 @@ function renderEmploymentReviewBoundaryContextSummary(searchStart, searchEnd) {
     const monthNames = ['Ιανουαρίου', 'Φεβρουαρίου', 'Μαρτίου', 'Απριλίου', 'Μαΐου',
         'Ιουνίου', 'Ιουλίου', 'Αυγούστου', 'Σεπτεμβρίου', 'Οκτωβρίου', 'Νοεμβρίου',
         'Δεκεμβρίου'];
-    const monthName = monthNames[Number(stage1DateKey(searchStart).slice(5, 7)) - 1];
+    const monthName = monthNames[Number(stage1DateKey(periodStart).slice(5, 7)) - 1];
     const payloads = [...weeklyHrStage1Payloads.values()];
     const summarize = (dates, sideKey) => {
         const serverSide = currentEmploymentReviewBoundaryContextPreflight?.[sideKey];
@@ -8452,11 +8493,13 @@ function renderEmploymentReviewBoundaryContextSummary(searchStart, searchEnd) {
             ...summarize(ranges.next, 'next') }
     ].filter((side) => side.dates.length);
     const requiredSides = sides.filter((side) => side.affected > 0);
-    if (!requiredSides.length) {
+    if (!requiredSides.length && !groups.length) {
         currentEmploymentReviewBoundaryContextDialogHtml = '';
         button.classList.add('d-none'); button.onclick = null; return;
     }
-    const usedRanges = requiredSides.map((side) => compactStage1DateRange(side.dates)).join(' και ');
+    const usedRanges = [...new Set([...requiredSides.map(side => compactStage1DateRange(side.dates)),
+        ...groups.map(group => compactStage1DateRange(group.handoff_from_previous_period
+            ? group.previous_period_context_dates : group.next_period_context_dates))])].filter(Boolean).join(' και ');
     const details = sides.map((side) => `<div class="employment-review-boundary-side">
         <div><strong>${side.label}:</strong> ${escapeHtml(compactStage1DateRange(side.dates))}
             · <span class="badge ${side.status === 'NOT_REQUIRED' ? 'text-bg-secondary' : 'text-bg-warning'}">${escapeHtml(boundaryCoverageStatusLabel(side.status))}</span>
@@ -8469,10 +8512,25 @@ function renderEmploymentReviewBoundaryContextSummary(searchStart, searchEnd) {
     </div>`).join('');
     currentEmploymentReviewBoundaryContextDialogHtml = `<div class="text-start employment-review-boundary-dialog"><div class="fw-semibold">Για τον πλήρη εβδομαδιαίο έλεγχο του ${monthName} χρησιμοποιούνται πληροφοριακά στοιχεία από ${escapeHtml(usedRanges)}.</div>
         <div>Οι ημερομηνίες εκτός ${monthName} χρησιμοποιούνται μόνο για τον εβδομαδιαίο έλεγχο και δεν θα τροποποιηθούν.</div>
-        <div class="employment-review-boundary-sides mt-2">${details}</div></div>`;
+        <div class="employment-review-boundary-sides mt-2">${renderDeferredWeekGroups(groups)}${details}</div></div>`;
     button.classList.remove('d-none');
     button.onclick = () => { showEmploymentReviewBoundaryContextDialog(); };
-    showEmploymentReviewBoundaryContextDialog();
+}
+
+function currentReviewOwnershipPeriod() {
+    const scope = typeof currentEmploymentPeriodControl === 'undefined'
+        ? null : (currentEmploymentPeriodControl?.final_submission_summary ||
+            currentEmploymentPeriodControl?.scope);
+    return scope?.period_start && scope?.period_end ? scope : null;
+}
+
+function isCurrentPeriodReviewDate(row, payload = null) {
+    const date = stage1DateKey(row?.hmeromhnia);
+    const authoritativeDates = payload?.employment_date_scope?.authoritative_date_set;
+    if (Array.isArray(authoritativeDates)) return authoritativeDates.includes(date);
+    const period = currentReviewOwnershipPeriod();
+    return Boolean(date && period && date >= stage1DateKey(period.period_start) &&
+        date <= stage1DateKey(period.period_end));
 }
 
 function naturalWeekScopeForRow(row, searchStart = '', searchEnd = '') {
@@ -8486,11 +8544,15 @@ function naturalWeekScopeForRow(row, searchStart = '', searchEnd = '') {
     const rangeStart = stage1DateKey(searchStart);
     const rangeEnd = stage1DateKey(searchEnd);
     if (!rangeStart || !rangeEnd || weekEnd < rangeStart || weekStart > rangeEnd) return null;
-    const crossesBoundary = weekStart < rangeStart || weekEnd > rangeEnd;
+    const period = currentReviewOwnershipPeriod();
+    if (!period) return null;
+    const crossesBoundary = weekStart < stage1DateKey(period.period_start) ||
+        weekEnd > stage1DateKey(period.period_end);
     return { ypokatasthma: row.ypokatasthma, employee_id: String(row.employee_id),
         employee_kodikos: row.kodikos, week_start: monday.toISOString().slice(0, 10),
         week_end: sunday.toISOString().slice(0, 10),
-        ...(crossesBoundary ? { period_start: rangeStart, period_end: rangeEnd } : {}) };
+        ...(crossesBoundary ? { period_start: stage1DateKey(period.period_start),
+            period_end: stage1DateKey(period.period_end) } : {}) };
 }
 
 function weeklyHrStage1Key(scope) {
@@ -8876,6 +8938,7 @@ function weeklyHrHasOnlyOrphanBlockers(payload = {}) {
 function weeklyHrOrphanRows(payload = {}) {
     return (payload.rows || []).map((row) => currentReviewRows.find((candidate) =>
         String(candidate._id) === String(row._id)) || row).filter((row) =>
+        isCurrentPeriodReviewDate(row, payload) &&
         row?.orphan_card_resolution_preview?.orphanVisible === true &&
         row?.orphan_card_resolution?.status !== 'HR_APPROVED');
 }
@@ -8939,10 +9002,12 @@ const workflowStageNames = Object.freeze({
     STAGE4: 'ΣΤΑΔΙΟ 4 — Τελικός Εβδομαδιαίος Έλεγχος'
 });
 const workflowStageStatusLabels = Object.freeze({
+    DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
     COMPLETED: 'ΟΛΟΚΛΗΡΩΜΕΝΟ', ACTIVE: 'ΕΝΕΡΓΟ', OPEN: 'ΑΝΟΙΧΤΟ',
     BLOCKED: 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ', STALE: 'ΜΗ ΕΓΚΥΡΟ / STALE', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
 });
 const workflowStageStatusClasses = Object.freeze({
+    DEFERRED_TO_NEXT_PERIOD: 'text-bg-info',
     COMPLETED: 'text-bg-success', ACTIVE: 'text-bg-primary', OPEN: 'text-bg-secondary',
     BLOCKED: 'text-bg-danger', STALE: 'text-bg-warning', LOCKED: 'text-bg-secondary'
 });
@@ -8964,12 +9029,18 @@ function derivePeriodLifecyclePresentation(payloads = []) {
     const projectionsByWeeklyScope = new Map();
     rawProjections.forEach((entry, index) => {
         const scope = entry.payload?.scope || {};
-        const scopeKey = [scope.employee_kodikos, scope.week_start, scope.week_end]
-            .map((value) => String(value || '').trim()).join('|');
-        projectionsByWeeklyScope.set(scopeKey === '||' ? `UNSCOPED:${index}` : scopeKey, entry);
+        const scopeParts = [scope.team, scope.company_kod, scope.ypokatasthma,
+            scope.employee_id, scope.employee_kodikos, scope.week_start, scope.week_end]
+            .map((value) => String(value || '').trim());
+        projectionsByWeeklyScope.set(scopeParts.some(Boolean)
+            ? JSON.stringify(scopeParts) : `UNSCOPED:${index}`, entry);
     });
     const projections = [...projectionsByWeeklyScope.values()];
-    const statusPriority = ['BLOCKED', 'STALE', 'OPEN', 'COMPLETED'];
+    const deferredWeeks = [...new Map(projections.filter(({ lifecycle }) => lifecycle.deferred_week)
+        .map(({ payload, lifecycle }) => [lifecycle.deferred_week.deferred_week_id,
+            { ...lifecycle.deferred_week, employee_kodikos: payload.scope?.employee_kodikos || '',
+                possible_leave_dates: lifecycle.deferred_possible_leave_dates || [] }])).values()];
+    const statusPriority = ['BLOCKED', 'STALE', 'OPEN', 'DEFERRED_TO_NEXT_PERIOD', 'COMPLETED'];
     const stages = Object.fromEntries(stageKeys.map((stageKey) => {
         const key = stageKey.toLowerCase();
         const entries = projections.map(({ payload, lifecycle }) => ({
@@ -9014,12 +9085,13 @@ function derivePeriodLifecyclePresentation(payloads = []) {
         }];
     }));
     const firstUnresolvedIndex = stageKeys.findIndex((stageKey) =>
-        stages[stageKey].business_status !== 'COMPLETED');
+        !['COMPLETED', 'DEFERRED_TO_NEXT_PERIOD'].includes(stages[stageKey].business_status));
     stageKeys.forEach((stageKey, index) => {
         const stage = stages[stageKey];
         stage.pending_items.sort(compareLifecyclePendingItems);
         if (firstUnresolvedIndex < 0 || index < firstUnresolvedIndex) {
-            stage.presentation_status = 'COMPLETED';
+            stage.presentation_status = stage.business_status === 'DEFERRED_TO_NEXT_PERIOD'
+                ? 'DEFERRED_TO_NEXT_PERIOD' : 'COMPLETED';
         } else if (index > firstUnresolvedIndex) {
             stage.presentation_status = 'LOCKED';
         } else if (stage.business_status === 'BLOCKED') {
@@ -9029,7 +9101,7 @@ function derivePeriodLifecyclePresentation(payloads = []) {
         } else {
             stage.presentation_status = 'ACTIVE';
         }
-        stage.enabled = stage.presentation_status !== 'LOCKED';
+        stage.enabled = !['LOCKED', 'DEFERRED_TO_NEXT_PERIOD'].includes(stage.presentation_status);
         stage.open_by_default = index === firstUnresolvedIndex;
     });
     const current = stageKeys.find((stageKey) => stages[stageKey].open_by_default) || null;
@@ -9037,8 +9109,64 @@ function derivePeriodLifecyclePresentation(payloads = []) {
         current_stage: current,
         total_pending_count: current ? stages[current].pending_count : 0,
         requires_hr_action: Boolean(current),
+        deferred_weeks: deferredWeeks,
         stages
     };
+}
+
+// Presentation only: keep deferred_weeks and employee-level lifecycle identities intact.
+function groupDeferredWeeksForDisplay(entries = []) {
+    const groups = new Map();
+    for (const entry of entries) {
+        const identity = Object.fromEntries(['team', 'company_kod', 'ypokatasthma',
+            'week_start', 'week_end', 'period_start', 'period_end']
+            .map(key => [key, String(entry[key] || '')]));
+        identity.handoff_from_previous_period = entry.handoff_from_previous_period === true;
+        const key = JSON.stringify(Object.values(identity));
+        if (!groups.has(key)) groups.set(key, { ...identity, display_group_key: key,
+            display_message: entry.display_message, employee_entries: new Map() });
+        groups.get(key).employee_entries.set(entry.deferred_week_id, entry);
+    }
+    return [...groups.values()].map(group => {
+        const employeeEntries = [...group.employee_entries.values()];
+        const employees = new Map();
+        for (const entry of employeeEntries) {
+            const key = entry.employee_id || entry.employee_kodikos || entry.deferred_week_id;
+            if (!employees.has(key)) employees.set(key, new Set());
+            for (const date of entry.possible_leave_dates || []) employees.get(key).add(date);
+        }
+        const uniqueDates = field => [...new Set(employeeEntries.flatMap(entry => entry[field] || []))].sort();
+        return { ...group, employee_entries: employeeEntries,
+            next_period_context_dates: uniqueDates('next_period_context_dates'),
+            previous_period_context_dates: uniqueDates('previous_period_context_dates'),
+            employee_count: employees.size,
+            employee_kodikoi: [...new Set(employeeEntries.map(entry => entry.employee_kodikos)
+                .filter(Boolean))].sort(),
+            possible_leave_count: [...employees.values()].reduce((sum, dates) => sum + dates.size, 0),
+            possible_leave_employee_count: [...employees.values()].filter(dates => dates.size > 0).length };
+    }).sort((a, b) => a.display_group_key.localeCompare(b.display_group_key));
+}
+
+function renderDeferredWeekGroups(groups = []) {
+    return groups.map(group => {
+        const contextDates = group.handoff_from_previous_period
+            ? group.previous_period_context_dates : group.next_period_context_dates;
+        const contextRange = contextDates.length
+            ? `${formatStage1DateKey(contextDates[0])}–${formatStage1DateKey(contextDates.at(-1))}` : '—';
+        return `<div class="mb-2" data-deferred-week-group="${escapeHtml(group.display_group_key)}">
+            <strong>${escapeHtml(group.handoff_from_previous_period
+                ? 'ΕΒΔΟΜΑΔΙΑΙΟΣ ΕΛΕΓΧΟΣ ΑΠΟ ΠΡΟΗΓΟΥΜΕΝΗ ΠΕΡΙΟΔΟ' : group.display_message)}</strong>
+            <div class="small">${group.handoff_from_previous_period ? 'Πρώτη οριακή εβδομάδα' : 'Τελευταία οριακή εβδομάδα'}: ${escapeHtml(formatStage1DateKey(group.week_start))}–${escapeHtml(formatStage1DateKey(group.week_end))}</div>
+            <div class="small">${group.handoff_from_previous_period
+                ? 'Ημέρες προηγούμενης περιόδου' : 'Ημέρες επόμενης περιόδου'}: ${escapeHtml(contextRange)}</div>
+            <div class="small">${group.handoff_from_previous_period
+                ? 'Οι ημέρες της προηγούμενης περιόδου χρησιμοποιούνται μόνο για ανάγνωση και δεν τροποποιούνται από την ενεργή περίοδο.'
+                : `Οι ημέρες ${escapeHtml(contextRange)} ανήκουν στην επόμενη περίοδο και χρησιμοποιούνται μόνο για τον πλήρη εβδομαδιαίο έλεγχο. Δεν τροποποιούνται από την περίοδο ${escapeHtml(['Ιανουαρίου', 'Φεβρουαρίου', 'Μαρτίου', 'Απριλίου', 'Μαΐου', 'Ιουνίου', 'Ιουλίου', 'Αυγούστου', 'Σεπτεμβρίου', 'Οκτωβρίου', 'Νοεμβρίου', 'Δεκεμβρίου'][Number(String(group.period_start).slice(5, 7)) - 1])}. Ο εβδομαδιαίος έλεγχος θα ολοκληρωθεί στην επόμενη περίοδο.`}</div>
+            <div class="small">Επηρεαζόμενοι εργαζόμενοι: ${escapeHtml(group.employee_count)}</div>
+            ${group.possible_leave_count ? `<div class="small">Πιθανές άδειες σε αναμονή: ${escapeHtml(group.possible_leave_count)}</div>` : ''}
+            <details class="small"><summary>Κωδικοί εργαζομένων</summary>${escapeHtml(group.employee_kodikoi.join(', '))}</details>
+        </div>`;
+    }).join('');
 }
 
 function stage2LifecycleClassificationLabel(value) {
@@ -9059,6 +9187,11 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     const container = document.getElementById('policyPreviewGroupsContainer');
     const stage = lifecycle?.stages?.STAGE2;
     if (!container || !stage) return false;
+    if (stage.business_status === 'DEFERRED_TO_NEXT_PERIOD') {
+        container.innerHTML = '<div class="text-info-emphasis small">' +
+            'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ — Η απόφαση ρεπό θα εξεταστεί στην επόμενη περίοδο.</div>';
+        return true;
+    }
     if (container.querySelector?.(
         '.atomic-repo-transfer-section, .policy-preview-card, .employment-review-pending-summary'
     )) return false;
@@ -9356,6 +9489,7 @@ function updateEmploymentReviewWorkflowPresentation() {
         .sort(compareWeeklyHrStage1Payloads);
     const lifecycle = derivePeriodLifecyclePresentation(allPayloads);
     currentEmploymentReviewLifecyclePresentation = lifecycle;
+    renderEmploymentReviewBoundaryContextSummary();
     currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(allPayloads);
     currentCanonicalDailyEmploymentTypeByKey = buildCanonicalDailyEmploymentTypeByKey(allPayloads);
     if (currentReviewRows.length) renderCurrentReviewRows();
@@ -9365,7 +9499,8 @@ function updateEmploymentReviewWorkflowPresentation() {
         return lifecycle;
     }
     const currentLabel = lifecycle.current_stage
-        ? workflowStageNames[lifecycle.current_stage] : 'Όλα τα στάδια ολοκληρωμένα';
+        ? workflowStageNames[lifecycle.current_stage] : lifecycle.deferred_weeks.some(week => week.status === 'DEFERRED_TO_NEXT_PERIOD')
+            ? 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ' : 'Όλα τα στάδια ολοκληρωμένα';
     if (summary) {
         summary.innerHTML = `<div class="d-flex flex-wrap gap-3 small">
             <span><strong>Τρέχον Στάδιο:</strong> ${escapeHtml(currentLabel)}</span>
@@ -9564,7 +9699,6 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
         <thead><tr><th>Επιλογή</th><th>Κωδικός</th><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Κατάσταση</th><th>Πιθανές άδειες</th></tr></thead>
         <tbody>${[...cards, ...errors].join('')}</tbody></table></div>`;
     currentReviewLifecycleProjectionReady = true;
-    renderEmploymentReviewBoundaryContextSummary(search_start, search_end);
     updateEmploymentReviewWorkflowPresentation();
 }
 
@@ -9983,6 +10117,7 @@ async function loadResults() {
         currentApprovalHistoryFilters.userName = '';
         currentApprovalHistoryFilters.searchText = '';
 
+        beginBoundaryInfoSearchResult();
         const rows = payload.rows || [];
         currentCanonicalLifecyclePayloads = Array.isArray(
             payload.canonicalLifecycleProjections
@@ -10008,6 +10143,7 @@ async function loadResults() {
             search_start: params.get('apo_hmeromhnia'),
             search_end: params.get('eos_hmeromhnia')
         });
+        await autoOpenBoundaryInfoForSearchResult();
         await window.EmploymentReviewOrphanQualityCheck?.run({
             params,
             csrfToken,
@@ -10823,6 +10959,10 @@ function validateReviewSave(updates) {
 }
 
 function showDetailsModal(row) {
+    if (!isCurrentPeriodReviewDate(row)) {
+        return employmentReviewSwal({ icon: 'info', title: 'Πληροφοριακή ημέρα άλλης περιόδου',
+            text: 'Η ημέρα ανήκει μόνο στο εβδομαδιαίο πλαίσιο ανάγνωσης. Δεν επιτρέπεται μεταβολή από την ενεργή περίοδο.' });
+    }
     const reusableOrphanReason = row?.orphan_card_resolution_preview
         ?.automaticReusableApplied === true
         ? String(row.orphan_card_resolution_preview.reusableDecisionReason || '') : '';

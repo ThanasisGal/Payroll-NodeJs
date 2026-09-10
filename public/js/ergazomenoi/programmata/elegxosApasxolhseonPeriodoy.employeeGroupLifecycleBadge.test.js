@@ -190,7 +190,7 @@ test('η κενή γενική λίστα εμφανίζει σαφή ένδει
     assert.equal(helpers.renderReviewNoPendingEmployees(tbody, {
         lifecycleReady: true, selectedKodikos: ''
     }), true);
-    assert.match(tbody.innerHTML, /Δεν υπάρχουν εργαζόμενοι με εκκρεμότητες ελέγχου\./);
+    assert.match(tbody.innerHTML, /Δεν υπάρχουν ημερήσιες εγγραφές της ενεργής περιόδου για τα επιλεγμένα φίλτρα\./);
     const selectedTbody = { innerHTML: '' };
     assert.equal(helpers.renderReviewNoPendingEmployees(selectedTbody, {
         lifecycleReady: true, selectedKodikos: '0014'

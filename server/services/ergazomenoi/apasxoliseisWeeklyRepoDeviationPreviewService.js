@@ -1,4 +1,6 @@
 const { getPayrollCalculationIntervals, getRawCardIntervals } = require('./apasxoliseisWeeklyIllegalOvertimeCalculationService');
+const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
+const { resolveWeeklyHrWorkflow } = require('./apasxoliseisWeeklyHrWorkflowResolverService');
 const {
     dateKeyUtc,
     addDaysUtc,
@@ -123,6 +125,7 @@ function buildWeeklyRepoDeviationPreview({
     rows = [],
     periodStart,
     periodEnd,
+    periodScope = null,
     asOfDate,
     resolveWeeklyProfile,
     resolveEmploymentPeriod,
@@ -206,10 +209,31 @@ function buildWeeklyRepoDeviationPreview({
             continue;
         }
 
-        if (weekEnd > asOfKey) {
+        const deferred = deriveDeferredWeekScope({ scope: { ...first,
+            week_start: weekStart, week_end: weekEnd },
+            periodScope: periodScope || { period_start: requestedStart, period_end: requestedEnd } });
+        const deferredPending = isDeferredWeekPending({ boundary: deferred });
+        if (deferredPending || weekEnd > asOfKey) {
+            const deferredProfile = deferredPending && resolveWeeklyProfile
+                ? resolveWeeklyProfile({ ypokatasthma: first.ypokatasthma,
+                    kodikos: first.kodikos, weekStart, weekEnd, weekRows: uniqueRows }) || {} : null;
+            const deferredWorkflow = deferredProfile ? resolveWeeklyHrWorkflow({
+                weekRows: orderedRows, effectiveProfile: deferredProfile.effectiveProfile || {},
+                effectiveProfilesByDate: Object.fromEntries(orderedRows.map(row => [dateKeyUtc(row.hmeromhnia),
+                    resolveDailyProfile ? resolveDailyProfile(row) || deferredProfile.effectiveProfile : deferredProfile.effectiveProfile])),
+                period_scope: periodScope || { period_start: requestedStart, period_end: requestedEnd },
+                scope: first }) : null;
+            if (deferredWorkflow?.blocking_reasons?.length) {
+                deviations.push({ ...base, status: STATUS.NEEDS_HR_DECISION, complete: false,
+                    is_deviation: false, reasons: deferredWorkflow.blocking_reasons,
+                    deferred_week: deferred, deferred_action_required: true });
+                continue;
+            }
             pendingWeeks.push({
                 ...base,
-                status: STATUS.OPEN_WEEK_PENDING_COMPLETION,
+                status: deferredPending
+                    ? DEFERRED_WEEK_STATUS : STATUS.OPEN_WEEK_PENDING_COMPLETION,
+                ...(deferredPending ? { deferred_week: deferred, deferred_action_required: true } : {}),
                 complete: false,
                 is_deviation: false,
                 reasons: []

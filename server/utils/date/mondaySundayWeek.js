@@ -60,6 +60,23 @@ function getMondaySundayWeekRange(value) {
         : null;
 }
 
+function getNaturalWeekPeriodBoundary({ week_start, week_end, period_start, period_end } = {}) {
+    const range = getMondaySundayWeekRange(week_start);
+    const start = dateKeyUtc(period_start);
+    const end = dateKeyUtc(period_end);
+    if (!range || dateKeyUtc(week_start) !== range.weekStartKey ||
+        dateKeyUtc(week_end) !== range.weekEndKey || !start || !end || start > end ||
+        range.weekStartKey > end || range.weekEndKey < start) return null;
+    const dates = Array.from({ length: 7 }, (_, index) => dateKeyUtc(addDaysUtc(range.weekStart, index)));
+    return Object.freeze({ week_start: range.weekStartKey, week_end: range.weekEndKey,
+        period_start: start, period_end: end,
+        is_trailing_week: range.weekStartKey <= end && range.weekEndKey > end,
+        is_leading_week: range.weekStartKey < start,
+        current_period_dates: Object.freeze(dates.filter(date => date >= start && date <= end)),
+        previous_period_context_dates: Object.freeze(dates.filter(date => date < start)),
+        next_period_context_dates: Object.freeze(dates.filter(date => date > end)) });
+}
+
 function getMonthReadContextRange(year, month) {
     if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
         return null;
@@ -82,5 +99,6 @@ module.exports = {
     startOfWeekMondayUtc,
     endOfWeekSundayUtc,
     getMondaySundayWeekRange,
+    getNaturalWeekPeriodBoundary,
     getMonthReadContextRange
 };

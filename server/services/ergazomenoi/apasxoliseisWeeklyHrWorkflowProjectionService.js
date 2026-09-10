@@ -44,7 +44,7 @@ function resolverRowsFromStoredDecisions(weekRows, decisions) {
 function buildWeeklyHrWorkflowProjection({ weekRows = [], effectiveProfile = {},
     effectiveProfilesByDate = {},
     persistedStage1State = null, indexState = { ready: false },
-    expected_date_keys = null } = {}) {
+    expected_date_keys = null, period_scope = null, scope = {}, employment_date_scope = null } = {}) {
     const currentFingerprint = buildStage1Fingerprint(weekRows).fingerprint;
     const stage1Status = resolveStage1Status({
         current_fingerprint: currentFingerprint,
@@ -57,6 +57,7 @@ function buildWeeklyHrWorkflowProjection({ weekRows = [], effectiveProfile = {},
         effectiveProfile,
         effectiveProfilesByDate,
         expected_date_keys,
+        period_scope, scope, employment_date_scope,
         leave_classification_completed: completed,
         ...(completed ? decisions : {})
     });

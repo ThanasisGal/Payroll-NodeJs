@@ -540,10 +540,11 @@ assert.deepEqual(juneCross.stages.stage1.period_slice.actionable_dates,
     ['2026-06-29', '2026-06-30']);
 assert.deepEqual(juneCross.stages.stage1.period_slice.context_only_dates,
     ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05']);
-assert.deepEqual(juneCross.stages.stage1.pending_dates, ['2026-06-29']);
-assert.equal(juneCross.stages.stage1.presentation_status, 'ACTIVE');
+assert.deepEqual(juneCross.stages.stage1.pending_dates, []);
+assert.deepEqual(juneCross.deferred_possible_leave_dates, ['2026-06-29']);
+assert.equal(juneCross.stages.stage1.presentation_status, 'DEFERRED_TO_NEXT_PERIOD');
 for (const stage of ['stage2', 'stage3', 'stage4']) {
-    assert.equal(juneCross.stages[stage].presentation_status, 'LOCKED');
+    assert.equal(juneCross.stages[stage].presentation_status, 'DEFERRED_TO_NEXT_PERIOD');
 }
 const completedJuneCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMonth,
     effectiveProfile: profile, scope: crossScope,
@@ -554,10 +555,10 @@ const completedJuneCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMon
         completion_fingerprint: juneCross.stages.stage1.current_completion_fingerprint,
         effective_fingerprint: juneCross.stages.stage1.current_completion_fingerprint,
         version: 1 }] } });
-assert.equal(completedJuneCross.stages.stage1.business_status, 'COMPLETED');
+assert.equal(completedJuneCross.stages.stage1.business_status, 'DEFERRED_TO_NEXT_PERIOD');
+assert.equal(completedJuneCross.requires_hr_action, false);
 assert.deepEqual(completedJuneCross.stages.stage3.pending_dates, []);
-assert.deepEqual(completedJuneCross.stages.stage3.stage2_automatic_resolved_dates,
-    ['2026-06-29']);
+assert.equal(completedJuneCross.stages.stage3.final_weekly_analysis_available, false);
 const junePersistedSlice = { status: 'OPEN', version: 4, period_slices: [{
     period_start: '2026-06-01', period_end: '2026-06-30', status: 'COMPLETED',
     context_fingerprint: juneCross.stages.stage1.current_context_fingerprint,
@@ -616,14 +617,10 @@ const reducedFrozenLifecycle = buildWeeklyHrLifecycleProjection({
 });
 assert.equal(reducedFrozenLifecycle.stages.stage1.business_status, 'STALE');
 const finalizedJune = buildFinalizedWeeklyHrLifecyclePresentation(reducedFrozenLifecycle);
-assert.equal(finalizedJune.current_stage, null);
-assert.equal(finalizedJune.total_pending_count, 0);
-assert.equal(finalizedJune.requires_hr_action, false);
-for (const stage of Object.values(finalizedJune.stages)) {
-    assert.equal(stage.business_status, 'COMPLETED');
-    assert.equal(stage.presentation_status, 'COMPLETED');
-    assert.equal(stage.pending_count, 0);
-}
+// Finalization must not silently complete a deferred obligation or hide stale state.
+assert.equal(finalizedJune.deferred_action_required, true);
+assert.equal(finalizedJune.stages.stage1.business_status, 'STALE');
+assert.equal(finalizedJune.requires_hr_action, true);
 const julyCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMonth,
     effectiveProfile: profile, scope: crossScope,
     periodScope: { period_start: '2026-07-01', period_end: '2026-07-31' },
@@ -646,8 +643,8 @@ const juneContextOnlyStage2 = buildWeeklyHrLifecycleProjection({
         ...crossScope, employee_kodikos: '0004', employee_id: 'employee-0004'
     }, periodScope: { period_start: '2026-06-01', period_end: '2026-06-30' }
 });
-assert.equal(juneContextOnlyStage2.stages.stage1.business_status, 'COMPLETED');
-assert.equal(juneContextOnlyStage2.stages.stage2.business_status, 'COMPLETED');
+assert.equal(juneContextOnlyStage2.stages.stage1.business_status, 'DEFERRED_TO_NEXT_PERIOD');
+assert.equal(juneContextOnlyStage2.stages.stage2.business_status, 'DEFERRED_TO_NEXT_PERIOD');
 assert.equal(juneContextOnlyStage2.stages.stage2.pending_count, 0);
 assert.deepEqual(juneContextOnlyStage2.stages.stage2.pending_dates, []);
 assert.equal(juneContextOnlyStage2.requires_hr_action, false);
@@ -838,12 +835,10 @@ const aprilContextOnlyOrphan = buildWeeklyHrLifecycleProjection({
 assert.notEqual(aprilContextOnlyOrphan.stages.stage1.business_status, 'BLOCKED');
 assert.deepEqual(aprilContextOnlyOrphan.stages.stage1.period_slice.context_only_dates,
     ['2026-05-01', '2026-05-02', '2026-05-03']);
-assert.equal(aprilContextOnlyOrphan.stages.stage4.business_status, 'COMPLETED');
+assert.equal(aprilContextOnlyOrphan.stages.stage4.business_status, 'DEFERRED_TO_NEXT_PERIOD');
 assert.ok(!aprilContextOnlyOrphan.stages.stage4.blockers.includes(
     'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
-assert.equal(aprilContextOnlyOrphan.stages.stage4.final_weekly_analysis.dailyFacts.length, 7);
-assert.ok(aprilContextOnlyOrphan.stages.stage4.final_weekly_analysis.dailyFacts.some((day) =>
-    day.hmeromhnia === '2026-05-01'));
+assert.equal(aprilContextOnlyOrphan.stages.stage4.final_weekly_analysis_available, false);
 
 const aprilAuthoritativeOrphan = buildWeeklyHrLifecycleProjection({
     weekRows: orphanAt(aprilBoundaryFiveDayWeek('authoritative'), 1),
@@ -874,7 +869,7 @@ assert.deepEqual([...aprilBothOrphans.stages.stage1.blockers].sort(), [
     'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'
 ].sort());
 assert.deepEqual(aprilBothOrphans.stages.stage4.blockers,
-    ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION']);
+    aprilBothOrphans.stages.stage1.blockers);
 
 const fullWeekUnscopedOrphan = buildWeeklyHrLifecycleProjection({
     weekRows: orphanAt(aprilBoundaryFiveDayWeek('unscoped-orphan'), 4),
@@ -896,9 +891,8 @@ const aprilContextSixthDay = buildWeeklyHrLifecycleProjection({
     weekRows: aprilContextSixthDayRows, effectiveProfile: profile,
     scope: aprilBoundaryScope, periodScope: aprilBoundaryPeriod
 });
-assert.equal(aprilContextSixthDay.stages.stage4.business_status, 'COMPLETED');
-assert.equal(aprilContextSixthDay.stages.stage4.final_weekly_analysis.sixthDay.hmeromhnia,
-    '2026-05-02');
+assert.equal(aprilContextSixthDay.stages.stage4.business_status, 'DEFERRED_TO_NEXT_PERIOD');
+assert.equal(aprilContextSixthDay.stages.stage4.final_weekly_analysis_available, false);
 
 const aprilWeekGlobalBlocker = buildWeeklyHrLifecycleProjection({
     weekRows: aprilContextSixthDayRows,

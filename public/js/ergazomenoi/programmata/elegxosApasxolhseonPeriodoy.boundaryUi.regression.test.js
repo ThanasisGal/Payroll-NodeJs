@@ -101,7 +101,7 @@ assert.doesNotMatch(boundarySection, /\bfetch\s*\(/);
 assert.doesNotMatch(boundarySection, /CardPairResolver|resolveCardPair|preHire|postDeparture/);
 
 assert.match(source,
-    /renderWeeklyHrStage1[\s\S]*?renderEmploymentReviewBoundaryContextSummary\(search_start, search_end\);/);
+    /updateEmploymentReviewWorkflowPresentation[\s\S]*?renderEmploymentReviewBoundaryContextSummary\(\);/);
 assert.match(source,
     /didClose: \(\) => requestAnimationFrame\(\(\) => refreshEmploymentReviewStickyLayout\(\)\)/);
 assert.match(source,
@@ -117,5 +117,111 @@ assert.match(css, /\.employment-review-boundary-dialog details summary\s*\{/);
 assert.match(css, /\.employment-review-boundary-dialog\s*\{[\s\S]*?overflow: visible;/);
 assert.match(css,
     /\.swal2-popup\.employment-review-boundary-popup\s*\{[\s\S]*?max-height: calc\(100vh - 2rem\);[\s\S]*?overflow: hidden;/);
+
+const buttonClasses = new Set(['d-none']);
+const button = { classList: { add(value) { buttonClasses.add(value); },
+    remove(value) { buttonClasses.delete(value); } }, onclick: null };
+let selectedEmployee = '';
+let openedDialog = null;
+let swalOpenCount = 0;
+const uiSandbox = {
+    // Match the actual /period-control/current HTTP response, which has no scope field.
+    currentEmploymentPeriodControl: { success: true, final_submission_summary: {
+        branch: '0000', period_start: '2026-04-01', period_end: '2026-04-30' } },
+    currentEmploymentReviewLifecyclePresentation: { deferred_weeks: [] },
+    currentReviewRows: [], currentReviewLifecycleProjectionReady: true,
+    weeklyHrStage1Payloads: new Map(),
+    document: { getElementById: id => id === 'kodikos' ? { value: selectedEmployee } : button },
+    escapeHtml: String, employmentReviewSwal: options => { swalOpenCount++; openedDialog = options; }
+};
+const dateScopeSource = source.slice(source.indexOf('function stage1DateKey('),
+    source.indexOf('function weeklyHrStage1Key('));
+const groupSource = source.slice(source.indexOf('function groupDeferredWeeksForDisplay('),
+    source.indexOf('function stage2LifecycleClassificationLabel('));
+const filterSource = source.slice(source.indexOf('function filterPeriodOwnedReviewRows('),
+    source.indexOf('function renderCurrentReviewRows('));
+const generalFilter = source.slice(source.indexOf('function filterGeneralReviewRows('),
+    source.indexOf('function renderReviewNoPendingEmployees('));
+vm.runInNewContext(`${dateScopeSource}\n${groupSource}\n${filterSource}\n${generalFilter}
+    this.presentation = { getVisibleReviewRows, renderEmploymentReviewBoundaryContextSummary,
+        beginBoundaryInfoSearchResult, autoOpenBoundaryInfoForSearchResult };`, uiSandbox);
+for (const [weekStart, expected] of [
+    ['2026-04-27', ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30']],
+    ['2026-03-30', ['2026-04-01', '2026-04-02', '2026-04-03', '2026-04-04', '2026-04-05']],
+    ['2026-04-06', ['2026-04-06', '2026-04-07', '2026-04-08', '2026-04-09', '2026-04-10', '2026-04-11', '2026-04-12']]
+]) {
+    const contextRows = Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(`${weekStart}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + index);
+        return { hmeromhnia: date.toISOString().slice(0, 10), kodikos: '0001' };
+    });
+    uiSandbox.currentReviewRows = contextRows;
+    const before = JSON.stringify(contextRows);
+    for (const employee of ['', '0001']) {
+        selectedEmployee = employee;
+        assert.deepStrictEqual(Array.from(uiSandbox.presentation.getVisibleReviewRows(), row => row.hmeromhnia), expected);
+    }
+    assert.strictEqual(contextRows.length, 7);
+    assert.strictEqual(JSON.stringify(contextRows), before);
+}
+// Full April: three employees remain visible despite zero HR pending issues.
+uiSandbox.currentEmploymentReviewLifecyclePresentation.total_pending_count = 0;
+uiSandbox.currentEmploymentReviewLifecyclePresentation.requires_hr_action = false;
+uiSandbox.currentReviewRows = ['0001', '0002', '0003'].flatMap(kodikos =>
+    Array.from({ length: 30 }, (_, index) => ({ kodikos,
+        hmeromhnia: `2026-04-${String(index + 1).padStart(2, '0')}` })));
+selectedEmployee = '';
+const fullAprilRows = uiSandbox.presentation.getVisibleReviewRows();
+assert.strictEqual(fullAprilRows.length, 90);
+assert.strictEqual(new Set(fullAprilRows.map(row => row.kodikos)).size, 3);
+assert.strictEqual(uiSandbox.currentEmploymentReviewLifecyclePresentation.total_pending_count, 0);
+assert.strictEqual(uiSandbox.currentEmploymentReviewLifecyclePresentation.requires_hr_action, false);
+
+const deferredEntry = { team: 'T', company_kod: '0004', ypokatasthma: '0000',
+    employee_id: 'E', employee_kodikos: '0001', deferred_week_id: 'unchanged-E',
+    week_start: '2026-04-27', week_end: '2026-05-03',
+    period_start: '2026-04-01', period_end: '2026-04-30',
+    next_period_context_dates: ['2026-05-01', '2026-05-02', '2026-05-03'],
+    previous_period_context_dates: [], possible_leave_dates: ['2026-04-30'],
+    display_message: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ' };
+uiSandbox.currentEmploymentReviewLifecyclePresentation.deferred_weeks = [deferredEntry];
+uiSandbox.weeklyHrStage1Payloads.set('previous', { scope: {
+    week_start: '2026-03-30', week_end: '2026-04-05', employee_id: 'E', employee_kodikos: '0001'
+}, employment_date_scope: { context_only_dates: ['2026-03-30', '2026-03-31'] } });
+uiSandbox.presentation.beginBoundaryInfoSearchResult();
+uiSandbox.presentation.renderEmploymentReviewBoundaryContextSummary('2026-04-27', '2026-05-03');
+assert.strictEqual(buttonClasses.has('d-none'), false);
+uiSandbox.presentation.autoOpenBoundaryInfoForSearchResult();
+assert.strictEqual(swalOpenCount, 1);
+for (let render = 0; render < 3; render++) {
+    uiSandbox.presentation.renderEmploymentReviewBoundaryContextSummary();
+    uiSandbox.presentation.autoOpenBoundaryInfoForSearchResult();
+}
+assert.strictEqual(swalOpenCount, 1);
+button.onclick();
+assert.strictEqual(swalOpenCount, 2);
+assert.strictEqual(openedDialog.title, 'Πληροφορίες οριακών εβδομάδων');
+assert.match(openedDialog.html, /Τελευταία οριακή εβδομάδα: 27\/04\/2026–03\/05\/2026/);
+assert.match(openedDialog.html, /Ημέρες επόμενης περιόδου: 01\/05\/2026–03\/05\/2026/);
+assert.match(openedDialog.html, /Δεν τροποποιούνται από την περίοδο Απριλίου/);
+assert.match(openedDialog.html, /Ο εβδομαδιαίος έλεγχος θα ολοκληρωθεί στην επόμενη περίοδο/);
+assert.match(openedDialog.html, /30\/03\/2026–31\/03\/2026/);
+assert.match(openedDialog.html, /Επηρεαζόμενοι εργαζόμενοι: 1/);
+assert.match(openedDialog.html, /Πιθανές άδειες σε αναμονή: 1/);
+uiSandbox.presentation.beginBoundaryInfoSearchResult();
+uiSandbox.presentation.renderEmploymentReviewBoundaryContextSummary();
+uiSandbox.presentation.autoOpenBoundaryInfoForSearchResult();
+assert.strictEqual(swalOpenCount, 3, 'A new successful search opens once even with identical filters');
+uiSandbox.currentEmploymentReviewLifecyclePresentation.deferred_weeks = [];
+uiSandbox.weeklyHrStage1Payloads.clear();
+uiSandbox.presentation.beginBoundaryInfoSearchResult();
+uiSandbox.presentation.renderEmploymentReviewBoundaryContextSummary();
+uiSandbox.presentation.autoOpenBoundaryInfoForSearchResult();
+assert.strictEqual(swalOpenCount, 3, 'No boundary information must not open a dialog');
+assert.strictEqual(buttonClasses.has('d-none'), true);
+assert.strictEqual(button.onclick, null);
+assert.strictEqual(deferredEntry.deferred_week_id, 'unchanged-E');
+assert.doesNotMatch(view, /id="employmentReviewDeferredWeeks"/);
+assert.doesNotMatch(source, /deferredContainer\.innerHTML/);
 
 console.log('Boundary UI regression tests: PASS');
