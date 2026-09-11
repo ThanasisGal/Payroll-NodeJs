@@ -1286,7 +1286,8 @@ async function detectPayrollPhases({
     includeWeeklyAnalysisContext = false,
     asOfDate = null,
     asOfDateSource = '',
-    clock = () => new Date()
+    clock = () => new Date(),
+    preparedContext = null
 }) {
     const warnings = [];
     const hasExplicitPeriodRange = Boolean(periodApoOverride || periodEosOverride);
@@ -1304,7 +1305,7 @@ async function detectPayrollPhases({
         throw error;
     }
 
-    const employee = await ErgazomenoiModel.findOne({
+    const employee = preparedContext?.employee || await ErgazomenoiModel.findOne({
         team,
         company_kod,
         kodikos
@@ -1371,7 +1372,8 @@ async function detectPayrollPhases({
         return emptyPayload;
     }
 
-    const contractHistoryRows = await loadContractStatusHistory({
+    const contractHistoryRows = preparedContext?.contractStatusHistoryRows ||
+        await loadContractStatusHistory({
         team,
         company_kod,
         kodikos,
@@ -1385,7 +1387,8 @@ async function detectPayrollPhases({
         warnings
     });
 
-    const istorikoRows = await getIstorikoOronErgasiasForPeriod({
+    const istorikoRows = preparedContext?.workingTermsHistoryRows ||
+        await getIstorikoOronErgasiasForPeriod({
         team,
         company_kod,
         kodikos,
@@ -1416,9 +1419,17 @@ async function detectPayrollPhases({
         orariaFilter.ypokatasthma = toTrimmedString(ypokatasthma);
     }
 
-    const orariaRows = await ProdhlomenaOrariaModel.find(orariaFilter)
-        .sort({ hmeromhnia: 1 })
-        .lean();
+    const orariaRows = preparedContext?.rows
+        ? preparedContext.rows.filter((row) => {
+            const date = normalizeDateOnly(row.hmeromhnia);
+            return date && date >= analysisFrom && date <= analysisTo &&
+                (!toTrimmedString(ypokatasthma) ||
+                    toTrimmedString(row.ypokatasthma) === toTrimmedString(ypokatasthma));
+        }).sort((left, right) => normalizeDateOnly(left.hmeromhnia) -
+            normalizeDateOnly(right.hmeromhnia))
+        : await ProdhlomenaOrariaModel.find(orariaFilter)
+            .sort({ hmeromhnia: 1 })
+            .lean();
     const orariaByDate = new Map(orariaRows.map((row) => [formatDateYMD(row.hmeromhnia), row]));
 
     if (orariaRows.length === 0) {
@@ -1503,7 +1514,8 @@ async function detectPayrollPhasesForDateRange({
     eos,
     asOfDate = null,
     asOfDateSource = '',
-    clock
+    clock,
+    preparedContext
 }) {
     return detectPayrollPhases({
         team,
@@ -1515,7 +1527,8 @@ async function detectPayrollPhasesForDateRange({
         includeWeeklyAnalysisContext: true,
         asOfDate,
         asOfDateSource,
-        clock
+        clock,
+        preparedContext
     });
 }
 

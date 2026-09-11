@@ -14683,6 +14683,29 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-action-btn {
     opacity: 1;
+    white-space: nowrap;
+    width: auto;
+    min-width: max-content;
+}
+.employment-review-swal-popup .swal2-actions .swal2-styled {
+    white-space: nowrap;
+    width: auto;
+    min-width: max-content;
+    border-width: 1px;
+    border-style: solid;
+}
+
+.employment-review-swal-popup .swal2-cancel {
+    color: #41464b !important;
+    background-color: #e9ecef !important;
+    border-color: #ced4da !important;
+}
+
+.employment-review-swal-popup .swal2-cancel:hover,
+.employment-review-swal-popup .swal2-cancel:focus {
+    color: #ffffff !important;
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
 }
 
 .employment-review-action-primary {
@@ -15235,6 +15258,31 @@ body.loader-active > *:not(.app-loader) {
 .employment-review-boundary-dialog {
     overflow: visible;
 }
+
+.employment-review-boundary-table th,
+.employment-review-boundary-table .employment-review-boundary-week {
+    white-space: nowrap;
+}
+
+.employment-review-boundary-table .employment-review-boundary-code,
+.employment-review-boundary-table .employment-review-boundary-action {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.employment-review-boundary-table .employment-review-boundary-status,
+.employment-review-boundary-table .employment-review-boundary-week {
+    text-align: left;
+    vertical-align: middle;
+}
+
+.employment-review-boundary-table.without-action .employment-review-boundary-week { width: 30%; }
+.employment-review-boundary-table.without-action .employment-review-boundary-code { width: 15%; }
+.employment-review-boundary-table.without-action .employment-review-boundary-status { width: 55%; }
+.employment-review-boundary-table.has-action .employment-review-boundary-week { width: 26%; }
+.employment-review-boundary-table.has-action .employment-review-boundary-code { width: 12%; }
+.employment-review-boundary-table.has-action .employment-review-boundary-status { width: 42%; }
+.employment-review-boundary-table.has-action .employment-review-boundary-action { width: 20%; }
 
 .employment-review-boundary-context-button {
     flex: 0 0 auto;

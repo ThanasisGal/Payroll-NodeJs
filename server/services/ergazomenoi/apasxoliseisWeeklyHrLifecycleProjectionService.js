@@ -243,7 +243,12 @@ function buildWeeklyHrLifecycleProjection({
     companyPolicyRules = []
 } = {}) {
     const rows = Array.isArray(weekRows) ? weekRows : [];
-    const fingerprint = buildStage1Fingerprint(rows).fingerprint;
+    const fingerprintRows = rows.map((row) =>
+        Object.prototype.hasOwnProperty.call(row || {}, 'kathgoria_ergasias_original')
+            ? { ...row, kathgoria_ergasias: row.kathgoria_ergasias_original }
+            : row
+    );
+    const fingerprint = buildStage1Fingerprint(fingerprintRows).fingerprint;
     const boundary = deriveDeferredWeekScope({ scope, periodScope, employmentDateScope });
     if (isDeferredWeekPending({ boundary })) {
         const workflow = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile,
@@ -256,7 +261,10 @@ function buildWeeklyHrLifecycleProjection({
             context_only_dates: [...boundary.previous_period_context_dates, ...boundary.next_period_context_dates] };
         const persistedSlice = findStage1PeriodSlice(persistedStage1State,
             boundary.period_start, boundary.period_end);
-        const fingerprints = buildStage1PeriodSliceFingerprints({ weekRows: rows, slice });
+        const fingerprints = buildStage1PeriodSliceFingerprints({
+            weekRows: fingerprintRows,
+            slice
+        });
         const persistedStatus = persistedSlice ? resolveStage1PeriodSliceStatus({
             current_context_fingerprint: fingerprints.context_fingerprint,
             current_completion_fingerprint: fingerprints.completion_fingerprint,
@@ -311,7 +319,10 @@ function buildWeeklyHrLifecycleProjection({
         period_start: periodScope.period_start, period_end: periodScope.period_end,
         employment_date_scope: employmentDateScope }) : null;
     const sliceFingerprints = periodSlice
-        ? buildStage1PeriodSliceFingerprints({ weekRows: rows, slice: periodSlice }) : null;
+        ? buildStage1PeriodSliceFingerprints({
+            weekRows: fingerprintRows,
+            slice: periodSlice
+        }) : null;
     const persistedSlice = periodSlice ? findStage1PeriodSlice(persistedStage1State,
         periodSlice.period_start, periodSlice.period_end) : null;
     const persistedStatus = periodSlice ? resolveStage1PeriodSliceStatus({

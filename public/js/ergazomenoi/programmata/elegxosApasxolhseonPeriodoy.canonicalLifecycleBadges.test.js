@@ -19,7 +19,8 @@ const loadEnd = frontend.indexOf('function pairNo(', loadStart);
 const loadSource = frontend.slice(loadStart, loadEnd);
 assert.ok(loadSource.indexOf('payload.canonicalLifecycleProjections') >= 0);
 assert.ok(loadSource.indexOf('payload.canonicalLifecycleProjections') <
-    loadSource.indexOf('await renderWeeklyHrStage1(rows'));
+    loadSource.indexOf('prepareWeeklyHrStage1LazyLoad(rows'));
+assert.doesNotMatch(loadSource, /await renderWeeklyHrStage1\(rows/);
 
 const updateStart = frontend.indexOf('function updateEmploymentReviewWorkflowPresentation()');
 const updateEnd = frontend.indexOf('function renderWeeklyHrStage1BulkToolbar()', updateStart);

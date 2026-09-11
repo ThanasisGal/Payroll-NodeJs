@@ -418,7 +418,9 @@ function buildWeeklyRepoTransferSinglePairProposal({
         employmentProfile,
         holidayByDateKey,
         existingAuditCountByRowKey,
-        sameRunDailyCalculatedRowIds
+        sameRunDailyCalculatedRowIds,
+        selectedSourceRowId: dependencies.selectedSourceRowId,
+        selectedTargetRowId: dependencies.selectedTargetRowId
     });
 
     if (analysis.eligibility_status !== ELIGIBILITY_STATUS.ELIGIBLE) {

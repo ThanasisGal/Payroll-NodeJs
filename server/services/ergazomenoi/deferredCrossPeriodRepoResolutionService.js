@@ -244,10 +244,12 @@ function buildDeferredCrossPeriodRepoResolution({ deferredWeek, fullWeekContext,
         week_start: weekRows[0].hmeromhnia, week_end: weekRows[6].hmeromhnia,
         source_period: sourceRange, target_period: targetRange,
         source_row_id: normalizedSource.row_id, target_row_id: normalizedTarget.row_id };
+    const canonicalActor = { user_id: actor.user_id, user_name: actor.user_name,
+        user_role: actor.user_role };
     const canonicalResolutionInput = stableValue({ identity: identityInput, deferred_week: deferredWeek,
         full_week_context: weekRows, source: normalizedSource, target: normalizedTarget,
         source_period: sourceRange, target_period: targetRange, resolution_period: resolutionRange,
-        hr_resolution: actor,
+        hr_resolution: canonicalActor,
         before_values: canonicalRowValues(beforeValues), proposed_accounting_after_values: proposedRows,
         frozen_snapshot_fingerprint: text(frozenSnapshotFingerprint) });
     return deepFreeze({ resolution_kind: RESOLUTION_KIND, proposal_identity: fingerprint(identityInput),

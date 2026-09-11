@@ -87,20 +87,18 @@ for (const difference of [
     assert.equal(separated.length, 2);
 }
 const html = display.renderDeferredWeekGroups(groups);
-assert.equal((html.match(/data-deferred-week-group=/g) || []).length, 1);
-assert.equal((html.match(/ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ/g) || []).length, 1);
-assert.match(html, /Τελευταία οριακή εβδομάδα: 27\/04\/2026–03\/05\/2026/);
-assert.match(html, /Ημέρες επόμενης περιόδου: 01\/05\/2026–03\/05\/2026/);
-assert.match(html, /Επηρεαζόμενοι εργαζόμενοι: 20/);
-assert.match(html, /Πιθανές άδειες σε αναμονή: 6/);
-assert.match(html, /<details.*<summary>Κωδικοί εργαζομένων<\/summary>/);
+assert.equal((html.match(/<tbody>[\s\S]*<tr>/g) || []).length, 1);
+assert.equal((html.match(/27\/04\/2026–03\/05\/2026/g) || []).length, 20);
+assert.match(html, /<th class="text-center">Κωδικός<\/th>/);
+assert.match(html, /Ο έλεγχος γίνεται στον επόμενο μήνα/);
+assert.doesNotMatch(html, /<th[^>]*>Ενέργεια<\/th>|data-deferred-repo-resolve/);
 const handoff = display.groupDeferredWeeksForDisplay(april.deferred_weeks.map(entry => ({ ...entry,
     handoff_from_previous_period: true, period_start: '2026-05-01', period_end: '2026-05-31',
     previous_period_context_dates: ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30'],
     next_period_context_dates: [] })));
 assert.equal(handoff.length, 1);
 assert.equal(handoff[0].employee_count, 20);
-assert.match(display.renderDeferredWeekGroups(handoff), /Ημέρες προηγούμενης περιόδου: 27\/04\/2026–30\/04\/2026/);
+assert.match(display.renderDeferredWeekGroups(handoff), /Δεν χρειάζεται ενέργεια/);
 
 const view = fs.readFileSync(path.join(__dirname,
     '../../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');

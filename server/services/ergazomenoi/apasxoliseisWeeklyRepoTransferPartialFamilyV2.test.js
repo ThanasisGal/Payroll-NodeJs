@@ -406,8 +406,10 @@ for (const invalidTimes of [
     const result = analyze(rows);
     assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
     assert.deepStrictEqual(result.semantic_proposal.blocked_target_reasons, [
+        'TARGET_HAS_AUTHORITATIVE_ACTUAL_WORK',
         'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS',
-        'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'
+        'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR',
+        'TARGET_ZERO_WORK_NOT_AUTHORITATIVELY_PROVEN'
     ]);
     assert.deepStrictEqual(
         result.semantic_proposal.blocked_target_candidates.map((target) => ({
@@ -417,7 +419,11 @@ for (const invalidTimes of [
         [
             {
                 date: date(2),
-                reasons: ['TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR']
+                reasons: [
+                    'TARGET_HAS_AUTHORITATIVE_ACTUAL_WORK',
+                    'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR',
+                    'TARGET_ZERO_WORK_NOT_AUTHORITATIVELY_PROVEN'
+                ]
             },
             {
                 date: date(4),
