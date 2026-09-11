@@ -3,6 +3,8 @@
 const { dateKey } = require('./wtoDailySubmissionProjectionService');
 const { RESOLUTION_KIND, hasValidResolutionFingerprint } = require('./deferredCrossPeriodRepoResolutionService');
 const { projectionFingerprint } = require('./wtoDailyAccountingOverlayService');
+const { resolveEffectiveDeferredCrossPeriodDecision } =
+    require('./deferredCrossPeriodRepoDecisionRevisionService');
 
 const READY = 'READY';
 const REQUIRED = 'WTODAILY_DEFERRED_BOUNDARY_RESOLUTION_REQUIRED';
@@ -35,18 +37,23 @@ function resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks = [], decision
     const start = dateKey(periodStart, 'period start');
     const end = dateKey(periodEnd, 'period end');
     const affected = deferredWeeks.filter((week) => affectsPeriod(week, start, end));
-    const unresolved = affected.filter((week) => {
+    const requiredWeeks = affected.filter((week) => week.requirement_status === 'REQUIRED');
+    const unresolved = requiredWeeks.filter((week) => {
+        if (week.assessment_error) return true;
         const deferredWeekId = String(week.deferred_week_id || '');
         const candidates = (decisions || []).filter((decision) =>
             decision?.resolution_kind === RESOLUTION_KIND && decision?.deferred_week_id === deferredWeekId);
-        if (candidates.length !== 1) return true;
         try {
-            return !isValidDecision(candidates[0], deferredWeekId, start, end);
+            const effective = resolveEffectiveDeferredCrossPeriodDecision(candidates, deferredWeekId);
+            return !effective || !isValidDecision(effective, deferredWeekId, start, end);
         } catch {
             return true;
         }
     });
     return Object.freeze({ status: unresolved.length ? REQUIRED : READY,
+        boundary_statuses: Object.freeze(affected.map((week) => ({ deferred_week_id: String(week.deferred_week_id || ''),
+            status: week.requirement_status !== 'REQUIRED' ? (week.requirement_status || 'NOT_REQUIRED') :
+                unresolved.includes(week) ? 'REQUIRED' : 'RESOLVED' }))),
         unresolved_deferred_week_ids: Object.freeze(unresolved.map((week) => String(week.deferred_week_id || ''))) });
 }
 

@@ -31,6 +31,7 @@ vm.runInContext(`${source}
 this.renderSeventhDayBadgesForTest = renderSeventhDayBadges;
 this.resolveSeventhDayRowPresentationForTest = resolveSeventhDayRowPresentation;
 this.buildWeeklyHrStage1ScopesForTest = buildWeeklyHrStage1Scopes;
+this.setCurrentEmploymentPeriodControlForTest = value => { currentEmploymentPeriodControl = value; };
 this.weeklyHrStage1PayloadsForTest = weeklyHrStage1Payloads;`, sandbox,
 { filename: sourcePath });
 
@@ -163,6 +164,9 @@ assert.equal(renderWith(lifecyclePayload({ stage4: {
 }), '');
 
 payloads.clear();
+sandbox.setCurrentEmploymentPeriodControlForTest({ scope: {
+    period_start: '2026-04-01', period_end: '2026-04-30'
+} });
 
 const presentationScopes = sandbox.buildWeeklyHrStage1ScopesForTest([{
     employee_id: 'employee-0031', kodikos: '0031', ypokatasthma: '0000',

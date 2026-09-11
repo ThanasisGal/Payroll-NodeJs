@@ -105,12 +105,20 @@ for (const field of ['resolution_kind', 'deferred_week_id', 'resolution_status',
 assert.ok(DecisionModel.schema.path('canonical_snapshot'));
 assert.equal(DecisionModel.schema.path('canonical_snapshot').options.required, true);
 assert.equal(DecisionModel.schema.path('resolved_by_user_id').instance, 'ObjectId');
+assert.equal(DecisionModel.schema.options.autoIndex, false);
+assert.equal(DecisionModel.schema.options.autoCreate, false);
 for (const field of ['resolution_kind', 'deferred_week_id', 'resolution_status',
     'resolution_fingerprint', 'resolved_by_user_id', 'period_projections']) {
     assert.notEqual(DecisionModel.schema.path(field).options.required, true);
 }
-assert.equal(DecisionModel.schema.indexes().some(([keys]) => Object.keys(keys).some((key) =>
-    key.startsWith('resolution_') || key === 'deferred_week_id')), false);
+const deferredUniqueIndex = DecisionModel.schema.indexes().find(([, options]) =>
+    options.name === 'unique_deferred_cross_period_resolution_revision');
+assert.deepEqual(deferredUniqueIndex[0], { team: 1, company_kod: 1, ypokatasthma: 1,
+    deferred_week_id: 1, resolution_revision: 1 });
+assert.equal(deferredUniqueIndex[1].unique, true);
+assert.deepEqual(deferredUniqueIndex[1].partialFilterExpression, {
+    resolution_kind: 'DEFERRED_CROSS_PERIOD_REPO_RESOLUTION', resolution_status: 'RESOLVED'
+});
 
 const repeat = buildDeferredCrossPeriodRepoResolution(input());
 assert.equal(repeat.proposal_identity, decision.proposal_identity);
@@ -131,7 +139,7 @@ changedCardRows[0].cards_apo_ora_01 = '08:02';
 assert.notEqual(buildDeferredCrossPeriodRepoResolution(input({
     fullWeekContext: { daily_rows: changedCardRows }
 })).resolution_fingerprint, decision.resolution_fingerprint);
-assert.notEqual(buildDeferredCrossPeriodRepoResolution(input({
+assert.equal(buildDeferredCrossPeriodRepoResolution(input({
     hr: { ...hr, resolution_reason: 'Άλλη ρητή αιτιολογία' }
 })).resolution_fingerprint, decision.resolution_fingerprint);
 const changedAccountingRows = frozenRows.map((row) => ({ ...row }));
@@ -262,6 +270,28 @@ assert.throws(() => applyWtoDailyAccountingOverlay({ frozenDailyResults: frozenR
     decisions: [decision, collidingDecision] }),
 (error) => error.code === 'WTODAILY_OVERLAY_ROW_CONFLICT');
 
+const revisedDecision = buildDeferredCrossPeriodRepoResolution(input({
+    target: { row_id: 'row-5', hmeromhnia: '2026-05-02' },
+    beforeValues: [beforeValues[0], { row_id: 'row-5', hmeromhnia: '2026-05-02',
+        kathgoria_ergasias_apologistika: 'ΕΡΓ' }],
+    proposedAccountingAfterValues: [proposedAccountingAfterValues[0], {
+        row_id: 'row-5', hmeromhnia: '2026-05-02', apologistiko_biblio: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ', adeia_apologistika: false,
+        astheneia_apologistika: false, kathgoria_adeias_apologistika: '',
+        apo_ora_01_apologistika: '', eos_ora_01_apologistika: '' }]
+}));
+const firstRevision = { ...decision, _id: 'decision-1', resolution_revision: 1 };
+const secondRevision = { ...revisedDecision, _id: 'decision-2', resolution_revision: 2,
+    supersedes_decision_id: 'decision-1',
+    supersedes_resolution_fingerprint: decision.resolution_fingerprint };
+const mayFrozenForRevision = frozenRows.map((row) => row._id === 'row-5'
+    ? { ...row, kathgoria_ergasias_apologistika: 'ΕΡΓ' } : row);
+const revisedOverlay = applyWtoDailyAccountingOverlay({ frozenDailyResults: mayFrozenForRevision,
+    periodStart: targetPeriod.period_start, periodEnd: targetPeriod.period_end,
+    decisions: [firstRevision, secondRevision] });
+assert.equal(revisedOverlay.find((row) => row._id === 'row-4').kathgoria_ergasias_apologistika, 'ΕΡΓ');
+assert.equal(revisedOverlay.find((row) => row._id === 'row-5').kathgoria_ergasias_apologistika, 'ΑΝ');
+
 const invalidProjectionDecision = JSON.parse(JSON.stringify(decision));
 invalidProjectionDecision.period_projections[0].accounting_rows.push({
     row_id: 'row-4', hmeromhnia: '2026-05-01', kathgoria_ergasias_apologistika: 'ΑΝ'
@@ -275,31 +305,32 @@ assert.throws(() => applyWtoDailyAccountingOverlay({ frozenDailyResults: frozenR
     decisions: [invalidProjectionDecision] }),
 (error) => error.code === 'WTODAILY_OVERLAY_ROW_OUTSIDE_PERIOD');
 
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek], decisions: [],
+const requiredDeferredWeek = { ...deferredWeek, requirement_status: 'REQUIRED' };
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek], decisions: [],
     periodStart: sourcePeriod.period_start, periodEnd: sourcePeriod.period_end }).status, REQUIRED);
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek], decisions: [decision],
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek], decisions: [decision],
     periodStart: sourcePeriod.period_start, periodEnd: sourcePeriod.period_end }).status, READY);
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek], decisions: [decision],
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek], decisions: [decision],
     periodStart: targetPeriod.period_start, periodEnd: targetPeriod.period_end }).status, READY);
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek], decisions: [decision, decision],
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek], decisions: [decision, decision],
     periodStart: sourcePeriod.period_start, periodEnd: sourcePeriod.period_end }).status, REQUIRED);
 const missingAprilProjection = { ...decision,
     period_projections: decision.period_projections.filter((item) => item.side !== 'SOURCE_PERIOD') };
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek],
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek],
     decisions: [missingAprilProjection], periodStart: sourcePeriod.period_start,
     periodEnd: sourcePeriod.period_end }).status, REQUIRED);
 const alteredProjection = JSON.parse(JSON.stringify(decision));
 alteredProjection.period_projections[0].projection_fingerprint = '0'.repeat(64);
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek],
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek],
     decisions: [alteredProjection], periodStart: sourcePeriod.period_start,
     periodEnd: sourcePeriod.period_end }).status, REQUIRED);
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek],
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek],
     decisions: [duplicateProjectionDecision], periodStart: sourcePeriod.period_start,
     periodEnd: sourcePeriod.period_end }).status, REQUIRED);
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek],
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek],
     decisions: [{ ...decision, resolution_fingerprint: '0'.repeat(64) }],
     periodStart: sourcePeriod.period_start, periodEnd: sourcePeriod.period_end }).status, REQUIRED);
-assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [deferredWeek],
+assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [requiredDeferredWeek],
     decisions: [{ ...decision, stale: true }], periodStart: sourcePeriod.period_start,
     periodEnd: sourcePeriod.period_end }).status, REQUIRED);
 

@@ -44,6 +44,29 @@ function possibleLeave(row) {
         kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' };
 }
 
+for (const authoritativeCategory of ['ΑΝ', 'ΜΕ']) {
+    const rawRows = week(`raw-${authoritativeCategory}`);
+    rawRows[1] = { ...rawRows[1], kathgoria_ergasias: authoritativeCategory };
+    const enrichedRows = rawRows.map((row) => ({ ...row }));
+    enrichedRows[1].kathgoria_ergasias_original = authoritativeCategory;
+    enrichedRows[1].kathgoria_ergasias = 'ΕΡΓ';
+    const rawFingerprint = buildStage1Fingerprint(rawRows).fingerprint;
+    const enrichedFingerprint = buildStage1Fingerprint(enrichedRows).fingerprint;
+    const lifecycle = buildWeeklyHrLifecycleProjection({
+        weekRows: enrichedRows,
+        effectiveProfile: profile,
+        persistedStage1State: {
+            status: 'COMPLETED',
+            completion_fingerprint: rawFingerprint,
+            effective_fingerprint: rawFingerprint
+        }
+    });
+    assert.notEqual(enrichedFingerprint, rawFingerprint);
+    assert.equal(enrichedRows[1].kathgoria_ergasias, 'ΕΡΓ');
+    assert.equal(lifecycle.stages.stage1.current_fingerprint, rawFingerprint);
+    assert.equal(lifecycle.stages.stage1.business_status, 'COMPLETED');
+}
+
 const employee0004 = week('0004');
 Object.assign(employee0004[2], { kathgoria_ergasias: 'ΑΝ', repo: true,
     ores_ergasias: 0, cards_ores_ergasias: 419 / 60,

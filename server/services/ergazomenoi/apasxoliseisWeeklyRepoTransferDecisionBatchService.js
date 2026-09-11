@@ -23,9 +23,13 @@ const {
     getWeeklyRepoProfileInfo
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const {
-    buildCanonicalSnapshot,
-    fingerprintSnapshot
+    buildCanonicalSnapshot, fingerprintSnapshot
 } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
+const {
+    resolveWeeklyRepoTransferDecisionFromPreparedWeek,
+    buildAppliedOnlyWeeklyRepoTransferDecisionRecords,
+    appliedHistoryPresentation
+} = require('./apasxoliseisWeeklyRepoTransferPreparedStage2ResolverService');
 const { validateApplySession } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
 const { getWeeklyRepoTransferApplyRuntimeState } = require('./apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
 const { getWeeklyRepoTransferApplyIndexState } = require('./apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
@@ -64,99 +68,6 @@ function validateBatchFilters(filters = {}) {
     if (rangeReason) throw requestError('Το επιλεγμένο εύρος ημερομηνιών δεν υποστηρίζεται.');
     return { ypokatasthma, start, end };
 }
-function presentation(record, currentFingerprint) {
-    return {
-        id: String(record._id || ''),
-        decision_code: record.decision_code,
-        decision_status: record.decision_status,
-        notes: record.notes || '',
-        created_by_user_name: record.created_by_user_name || '',
-        created_at: record.created_at || null,
-        employee_kodikos: record.employee_kodikos || '',
-        week_start: record.week_start || null,
-        week_end: record.week_end || null,
-        is_current: Boolean(currentFingerprint && record.snapshot_fingerprint === currentFingerprint)
-    };
-}
-function executionPresentation(execution) {
-    return execution ? {
-        id: String(execution._id || ''),
-        decision_id: String(execution.decision_id || ''),
-        execution_status: execution.execution_status,
-        applied_at: execution.applied_at || null,
-        created_by_user_name: execution.created_by_user_name || '',
-        authorization_metadata: execution.authorization_metadata || null
-    } : null;
-}
-function appliedHistoryPresentation(decision, execution, employee = null) {
-    if (!decision || !execution || execution.execution_status !== 'APPLIED') return null;
-    const snapshot = decision.canonical_snapshot || {};
-    const source = snapshot.source || {};
-    const target = snapshot.target || {};
-    const after = execution.after_snapshot || {};
-    return {
-        decision_id: String(decision._id || ''),
-        execution_id: String(execution._id || ''),
-        proposal_id: String(decision.proposal_id || ''),
-        employee_id: String(decision.employee_id || snapshot.employee_id || ''),
-        employee_kodikos: text(decision.employee_kodikos || snapshot.employee_kodikos, 50),
-        employee_name: [
-            text(employee?.eponymo, 100),
-            text(employee?.onoma, 100)
-        ].filter(Boolean).join(' '),
-        week_start: decision.week_start || snapshot.week_start || null,
-        week_end: decision.week_end || snapshot.week_end || null,
-        source: {
-            prodhlomena_oraria_id: String(
-                decision.source_prodhlomena_oraria_id ||
-                source.prodhlomena_oraria_id ||
-                ''
-            ),
-            hmeromhnia: source.hmeromhnia || null,
-            result: text(
-                after.source?.kathgoria_ergasias_apologistika ||
-                source.proposed_values?.kathgoria_ergasias_apologistika,
-                20
-            )
-        },
-        target: {
-            prodhlomena_oraria_id: String(
-                decision.target_prodhlomena_oraria_id ||
-                target.prodhlomena_oraria_id ||
-                ''
-            ),
-            hmeromhnia: target.hmeromhnia || null,
-            result: text(
-                after.target?.kathgoria_ergasias_apologistika ||
-                target.proposed_values?.kathgoria_ergasias_apologistika,
-                20
-            ),
-            repo_apologistika:
-                after.target?.repo_apologistika === true ||
-                target.proposed_values?.repo_apologistika === true
-        },
-        applied_at: execution.applied_at || null,
-        applied_by_user_name: text(execution.created_by_user_name, 200),
-        ...(execution.authorization_metadata
-            ? { automatic_resolution: execution.authorization_metadata } : {})
-    };
-}
-function applyCapability({ applyState, runtimeEnabled, indexReady, context = null }) {
-    const canApply = applyState === 'READY_TO_APPLY';
-    return {
-        apply_state: applyState,
-        can_apply: canApply,
-        apply_allowed: canApply,
-        apply_readiness: {
-            status: canApply ? 'READY' : 'BLOCKED',
-            reason: canApply ? null : applyState
-        },
-        runtime_enabled: runtimeEnabled === true,
-        index_ready: indexReady === true,
-        apply_context: context
-    };
-}
-
 async function loadWeeklyRepoTransferDecisionBatch({
     session,
     filters,
@@ -314,35 +225,6 @@ async function loadWeeklyRepoTransferDecisionBatch({
         presentationStart: normalized.start.date,
         presentationEnd: normalized.end.date
     });
-    const current = projection.groups.map((group) => {
-        const sourceId = String(group.items[0].prodhlomena_oraria_id);
-        const weekRows = inputs.weeklyInputs.find((input) => input.weekRows.some((row) => String(row._id) === sourceId))?.weekRows || [];
-        const employeeCode = text(group.items[0].employee_kodikos);
-        const weekStart = group.group_key.match(/week=([^:|]+)/)?.[1] || '';
-        const contextInfo = weeklyContexts.get(`${employeeCode}|${weekStart}`);
-        const effectiveHolidayContext = weeklyHolidayContexts.get(
-            `${employeeCode}|${weekStart}`) || {};
-        if (!contextInfo || weekRows.length === 0) {
-            throw requestError('Δεν ήταν δυνατή η ανακατασκευή της τρέχουσας πρότασης.', 409);
-        }
-        const context = {
-            candidates: [weekRows.find((row) => String(row._id) === sourceId), weekRows.find((row) => String(row._id) === String(group.items[1].prodhlomena_oraria_id))],
-            weekRows,
-            employee: contextInfo.employee,
-            employmentProfile: contextInfo.profile,
-            weeklyProfileInfo: contextInfo.profileInfo,
-            history: historyByCode.get(employeeCode) || [],
-            audits: weekRows.flatMap((row) => auditsByRowId.get(String(row._id)) || []),
-            week: { start: group.group_key.match(/week=([^:|]+)/)?.[1], end: group.group_key.match(/week=[^:|]+:([^|]+)/)?.[1] },
-            companyFlags: effectiveHolidayContext.companyFlags || {},
-            companyKodikos: effectiveHolidayContext.company_kodikos || '',
-            holidayByDateKey: inputs.weeklyInputs.find((input) =>
-                input.weekRows.some((row) => String(row._id) === sourceId))
-                ?.holidayByDateKey || new Map()
-        };
-        const snapshot = canonicalSnapshotBuilder({ scope, context, group });
-        return { group, fingerprint: snapshotFingerprintBuilder(snapshot) };
-    });
     const decisionFilter = {
         team: scope.team,
         company_kod: scope.company_kod,
@@ -367,14 +249,6 @@ async function loadWeeklyRepoTransferDecisionBatch({
               'source_prodhlomena_oraria_id target_prodhlomena_oraria_id after_snapshot authorization_metadata'
           ).lean()
         : [];
-    const executionByDecisionId = new Map(executions.map((execution) => [String(execution.decision_id), execution]));
-    const executedDecisionIds = new Set(executionByDecisionId.keys());
-    const decisionsByProposalId = new Map();
-    decisions.forEach((decision) => {
-        const proposalId = String(decision.proposal_id || '');
-        if (!decisionsByProposalId.has(proposalId)) decisionsByProposalId.set(proposalId, []);
-        decisionsByProposalId.get(proposalId).push(decision);
-    });
     let authorized = true;
     try { validateApplySession(session); } catch { authorized = false; }
     let runtimeState = { enabled: false };
@@ -383,118 +257,38 @@ async function loadWeeklyRepoTransferDecisionBatch({
     if (runtimeState.enabled) {
         try { indexState = await indexStateLoader(); } catch { indexState = { ready: false }; }
     }
-    const currentProposalIds = new Set(current.map(({ group }) => String(group.group_id || '')));
-    const currentRecords = current.map(({ group, fingerprint }) => {
-            const sourceItem = group.items.find((item) =>
-                item.role === 'SOURCE_BECOMES_WORK') || {};
-            const targetItem = group.items.find((item) =>
-                item.role === 'TARGET_BECOMES_REPO') || {};
-            const proposalWeekStart = group.group_key.match(/week=([^:|]+)/)?.[1] || '';
-            const proposalWeekEnd = group.group_key.match(/week=[^:|]+:([^|]+)/)?.[1] || '';
-            const proposalDecisions = decisionsByProposalId.get(String(group.group_id || '')) || [];
-            const history = proposalDecisions.map((decision) => presentation(decision, fingerprint));
-            const rawCurrent = proposalDecisions.find((decision) => decision.snapshot_fingerprint === fingerprint) || null;
-            const currentDecisionExecution = rawCurrent
-                ? executionByDecisionId.get(String(rawCurrent._id)) || null : null;
-            const executedDecision = proposalDecisions.find((decision) => executedDecisionIds.has(String(decision._id))) || null;
-            const execution = executedDecision ? executionByDecisionId.get(String(executedDecision._id)) || null : null;
-            let apply_state = 'NOT_APPROVED';
-            if (execution) apply_state = 'ALREADY_APPLIED';
-            else if (rawCurrent?.decision_code === 'APPROVE_PROPOSAL' && rawCurrent?.decision_status === 'RECORDED') {
-                if (!authorized) apply_state = 'NOT_AUTHORIZED';
-                else if (!runtimeState.enabled) apply_state = 'RUNTIME_DISABLED';
-                else if (!indexState.ready) apply_state = 'INDEXES_NOT_READY';
-                else apply_state = 'READY_TO_APPLY';
-            } else if (!rawCurrent && proposalDecisions.some((decision) => decision.decision_code === 'APPROVE_PROPOSAL')) {
-                apply_state = 'STALE_DECISION';
-            }
-            const applyContext = rawCurrent ? {
-                team: text(rawCurrent.team || scope.team, 50),
-                company_kodikos: text(session.companyKodikos, 50),
-                ypokatasthma: text(rawCurrent.ypokatasthma || normalized.ypokatasthma, 20),
-                week_start: rawCurrent.week_start || null,
-                week_end: rawCurrent.week_end || null
-            } : null;
-            return {
-                proposal_id: group.group_id,
-                current_proposal_fingerprint: fingerprint,
-                current_decision_fingerprint: rawCurrent?.snapshot_fingerprint || null,
-                current_proposal: {
-                    employee_kodikos: text(sourceItem.employee_kodikos ||
-                        targetItem.employee_kodikos, 50),
-                    week_start: proposalWeekStart >= normalized.start.key &&
-                        proposalWeekEnd <= normalized.end.key ? proposalWeekStart : null,
-                    week_end: proposalWeekStart >= normalized.start.key &&
-                        proposalWeekEnd <= normalized.end.key ? proposalWeekEnd : null,
-                    command: {
-                        proposal_id: group.group_id,
-                        expected_source_id: String(sourceItem.prodhlomena_oraria_id || ''),
-                        expected_target_id: String(targetItem.prodhlomena_oraria_id || ''),
-                        expected_proposal_version: String(
-                            group.pair_contract?.proposal_version || ''),
-                        expected_choice_code: String(group.pair_contract?.choice_code || '')
-                    },
-                    source: {
-                        prodhlomena_oraria_id: String(sourceItem.prodhlomena_oraria_id || ''),
-                        current_category: String(sourceItem.kathgoria_ergasias || ''),
-                        proposed_values: { ...(sourceItem.proposed_values || {}) },
-                        proposed_classification: String(sourceItem.proposed_values
-                            ?.kathgoria_ergasias_apologistika || '')
-                    },
-                    target: {
-                        prodhlomena_oraria_id: String(targetItem.prodhlomena_oraria_id || ''),
-                        current_category: String(targetItem.kathgoria_ergasias || ''),
-                        proposed_values: { ...(targetItem.proposed_values || {}) },
-                        proposed_classification: String(targetItem.proposed_values
-                            ?.kathgoria_ergasias_apologistika || '')
-                    }
-                },
-                current_decision_execution: executionPresentation(currentDecisionExecution),
-                current_decision: history.find((decision) => decision.is_current) || null,
-                current_execution: executionPresentation(execution),
-                applied_history: appliedHistoryPresentation(
-                    executedDecision,
-                    execution,
-                    employeeByCode.get(text(executedDecision?.employee_kodikos))
-                ),
-                ...applyCapability({
-                    applyState: apply_state,
-                    runtimeEnabled: runtimeState.enabled,
-                    indexReady: indexState.ready,
-                    context: applyContext
-                }),
-                history,
-                history_count: history.length
-            };
-        });
-    const appliedOnlyRecords = [...decisionsByProposalId.entries()]
-        .filter(([proposalId, proposalDecisions]) => !currentProposalIds.has(proposalId) && proposalDecisions.some((decision) => executedDecisionIds.has(String(decision._id))))
-        .map(([proposalId, proposalDecisions]) => {
-            const executedDecision = proposalDecisions.find((decision) => executedDecisionIds.has(String(decision._id)));
-            const execution = executionByDecisionId.get(String(executedDecision._id));
-            const history = proposalDecisions.map((decision) => presentation(decision, null));
-            return {
-                proposal_id: proposalId,
-                current_decision: null,
-                current_execution: executionPresentation(execution),
-                applied_history: appliedHistoryPresentation(
-                    executedDecision,
-                    execution,
-                    employeeByCode.get(text(executedDecision?.employee_kodikos))
-                ),
-                ...applyCapability({
-                    applyState: 'ALREADY_APPLIED',
-                    runtimeEnabled: runtimeState.enabled,
-                    indexReady: indexState.ready
-                }),
-                history,
-                history_count: history.length
-            };
-        })
-        .sort((left, right) => new Date(right.current_execution.applied_at || 0) - new Date(left.current_execution.applied_at || 0));
+    const applyProtection = { authorized, runtimeEnabled: runtimeState.enabled,
+        indexReady: indexState.ready };
+    const resolvedPreparedWeeks = inputs.weeklyInputs.map((weeklyInput) => {
+        const employeeCode = text(weeklyInput.diagnosticContext?.employee_kodikos ||
+            weeklyInput.weekRows?.[0]?.kodikos);
+        const weekStart = dateKeyUtc(weeklyInput.diagnosticContext?.week_start ||
+            weeklyInput.weekRows?.[0]?.hmeromhnia);
+        const contextInfo = weeklyContexts.get(`${employeeCode}|${weekStart}`) || {};
+        const effectiveHolidayContext = weeklyHolidayContexts.get(
+            `${employeeCode}|${weekStart}`) || {};
+        return resolveWeeklyRepoTransferDecisionFromPreparedWeek({ weeklyInput,
+            scope: { ...scope, company_kodikos: session.companyKodikos,
+                ypokatasthma: normalized.ypokatasthma },
+            canonicalDecisionContext: { employee: contextInfo.employee,
+                weeklyProfileInfo: contextInfo.profileInfo,
+                history: historyByCode.get(employeeCode) || [],
+                audits: weeklyInput.weekRows.flatMap((row) =>
+                    auditsByRowId.get(String(row._id)) || []),
+                companyFlags: effectiveHolidayContext.companyFlags || {},
+                companyKodikos: effectiveHolidayContext.company_kodikos || '' },
+            decisions, executions, applyProtection,
+            presentationStart: normalized.start.date, presentationEnd: normalized.end.date,
+            canonicalSnapshotBuilder, snapshotFingerprintBuilder });
+    });
+    const currentRecords = resolvedPreparedWeeks.map((resolved) => resolved.record).filter(Boolean);
+    const currentProposalIds = new Set(currentRecords.map((record) =>
+        String(record.proposal_id || '')));
+    const appliedOnlyRecords = buildAppliedOnlyWeeklyRepoTransferDecisionRecords({ decisions,
+        executions, currentProposalIds, employeeByCode, applyProtection });
     return {
         records: [...currentRecords, ...appliedOnlyRecords],
-        current_groups_count: current.length,
+        current_groups_count: currentRecords.length,
         applied_only_count: appliedOnlyRecords.length,
         projection_status: projection.projection_status,
         reason_counts: projection.reason_counts,

@@ -171,6 +171,53 @@ function inputDiagnostic(reason, identity = {}) {
     };
 }
 
+function buildWeeklyRepoTransferAtomicInputForPreparedWeek({ bucket, periodEndKey,
+    asOfDateKey = '', resolveEmploymentProfile, holidayByDateKey = new Map(),
+    resolveHolidayByDateKey = null, existingAuditCountByRowKey = new Map() } = {}) {
+    if (!bucket || !Array.isArray(bucket.rows)) {
+        return { reason: INPUT_REASON.INVALID_ROW,
+            diagnostic: inputDiagnostic(INPUT_REASON.INVALID_ROW, bucket || {}) };
+    }
+    if (asOfDateKey && bucket.weekEnd >= asOfDateKey) {
+        return { reason: INPUT_REASON.OPEN_WEEK,
+            diagnostic: inputDiagnostic(INPUT_REASON.OPEN_WEEK, bucket) };
+    }
+    if (bucket.weekEnd > periodEndKey) {
+        return { reason: INPUT_REASON.PARTIAL_WEEK,
+            diagnostic: inputDiagnostic(INPUT_REASON.PARTIAL_WEEK, bucket) };
+    }
+    const dateKeys = bucket.rows.map((entry) => entry.dateKey);
+    if (new Set(dateKeys).size !== dateKeys.length) {
+        return { reason: INPUT_REASON.DUPLICATE_DATE,
+            diagnostic: inputDiagnostic(INPUT_REASON.DUPLICATE_DATE, bucket) };
+    }
+    const expectedDateKeys = Array.from({ length: 7 }, (_, index) =>
+        addDaysDateKey(bucket.weekStart, index));
+    if (bucket.rows.length !== 7 || expectedDateKeys.some((key) => !dateKeys.includes(key))) {
+        return { reason: INPUT_REASON.INCOMPLETE_WEEK,
+            diagnostic: inputDiagnostic(INPUT_REASON.INCOMPLETE_WEEK, bucket) };
+    }
+    const employmentProfile = typeof resolveEmploymentProfile === 'function'
+        ? resolveEmploymentProfile({ team: bucket.team, company_kod: bucket.companyKod,
+            ypokatasthma: bucket.ypokatasthma, employee_kodikos: bucket.employeeKodikos,
+            week_start: bucket.weekStart, week_end: bucket.weekEnd }) : null;
+    if (!isPlainObject(employmentProfile)) {
+        return { reason: INPUT_REASON.PROFILE_NOT_RESOLVED,
+            diagnostic: inputDiagnostic(INPUT_REASON.PROFILE_NOT_RESOLVED, bucket) };
+    }
+    const weekRows = bucket.rows.slice()
+        .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
+        .map((entry) => entry.row);
+    return { weeklyInput: { weekRows, employmentProfile,
+        holidayByDateKey: typeof resolveHolidayByDateKey === 'function'
+            ? resolveHolidayByDateKey({ employee_kodikos: bucket.employeeKodikos,
+                week_start: bucket.weekStart, week_end: bucket.weekEnd,
+                weekRows: bucket.rows.map((entry) => entry.row) })
+            : holidayByDateKey,
+        existingAuditCountByRowKey,
+        diagnosticContext: inputDiagnostic(null, bucket) } };
+}
+
 function buildWeeklyRepoTransferAtomicInputs({
     rows = [],
     periodStart = null,
@@ -214,70 +261,13 @@ function buildWeeklyRepoTransferAtomicInputs({
     [...buckets.values()]
         .sort((left, right) => left.key.localeCompare(right.key))
         .forEach((bucket) => {
-            if (asOfDateKey && bucket.weekEnd >= asOfDateKey) {
-                inputReasonCodes.push(INPUT_REASON.OPEN_WEEK);
-                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.OPEN_WEEK, bucket));
-                return;
-            }
-            if (bucket.weekEnd > periodEndKey) {
-                inputReasonCodes.push(INPUT_REASON.PARTIAL_WEEK);
-                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.PARTIAL_WEEK, bucket));
-                return;
-            }
-
-            const dateKeys = bucket.rows.map((entry) => entry.dateKey);
-            if (new Set(dateKeys).size !== dateKeys.length) {
-                inputReasonCodes.push(INPUT_REASON.DUPLICATE_DATE);
-                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.DUPLICATE_DATE, bucket));
-                return;
-            }
-
-            const expectedDateKeys = Array.from({ length: 7 }, (_, index) =>
-                addDaysDateKey(bucket.weekStart, index)
-            );
-            if (
-                bucket.rows.length !== 7 ||
-                expectedDateKeys.some((dateKey) => !dateKeys.includes(dateKey))
-            ) {
-                inputReasonCodes.push(INPUT_REASON.INCOMPLETE_WEEK);
-                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.INCOMPLETE_WEEK, bucket));
-                return;
-            }
-
-            const employmentProfile =
-                typeof resolveEmploymentProfile === 'function'
-                    ? resolveEmploymentProfile({
-                          team: bucket.team,
-                          company_kod: bucket.companyKod,
-                          ypokatasthma: bucket.ypokatasthma,
-                          employee_kodikos: bucket.employeeKodikos,
-                          week_start: bucket.weekStart,
-                          week_end: bucket.weekEnd
-                      })
-                    : null;
-            if (!isPlainObject(employmentProfile)) {
-                inputReasonCodes.push(INPUT_REASON.PROFILE_NOT_RESOLVED);
-                inputDiagnostics.push(inputDiagnostic(INPUT_REASON.PROFILE_NOT_RESOLVED, bucket));
-                return;
-            }
-
-            weeklyInputs.push({
-                weekRows: bucket.rows
-                    .slice()
-                    .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
-                    .map((entry) => entry.row),
-                employmentProfile,
-                holidayByDateKey: typeof resolveHolidayByDateKey === 'function'
-                    ? resolveHolidayByDateKey({
-                          employee_kodikos: bucket.employeeKodikos,
-                          week_start: bucket.weekStart,
-                          week_end: bucket.weekEnd,
-                          weekRows: bucket.rows.map((entry) => entry.row)
-                      })
-                    : holidayByDateKey,
-                existingAuditCountByRowKey,
-                diagnosticContext: inputDiagnostic(null, bucket)
-            });
+            const resolved = buildWeeklyRepoTransferAtomicInputForPreparedWeek({ bucket,
+                periodEndKey, asOfDateKey, resolveEmploymentProfile, holidayByDateKey,
+                resolveHolidayByDateKey, existingAuditCountByRowKey });
+            if (resolved.reason) {
+                inputReasonCodes.push(resolved.reason);
+                inputDiagnostics.push(resolved.diagnostic);
+            } else weeklyInputs.push(resolved.weeklyInput);
         });
 
     return { weeklyInputs, inputReasonCodes, inputDiagnostics };
@@ -673,6 +663,7 @@ function composePolicyPreviewResponse({ baseResponse = {}, atomicGroupProjection
 
 module.exports = {
     buildWeeklyRepoTransferAtomicInputs,
+    buildWeeklyRepoTransferAtomicInputForPreparedWeek,
     buildWeeklyRepoTransferAtomicPageProjection,
     composePolicyPreviewResponse,
     PAGE_PROJECTION_STATUS,

@@ -4,6 +4,8 @@ const { dateKey } = require('./wtoDailySubmissionProjectionService');
 const { RESOLUTION_KIND, ACCOUNTING_TIME_FIELDS, fingerprint,
     hasValidResolutionFingerprint, stableValue } =
     require('./deferredCrossPeriodRepoResolutionService');
+const { resolveEffectiveDeferredCrossPeriodDecision } =
+    require('./deferredCrossPeriodRepoDecisionRevisionService');
 
 const OVERLAY_ALLOWED_FIELDS = ACCOUNTING_TIME_FIELDS;
 
@@ -35,14 +37,18 @@ function applyWtoDailyAccountingOverlay({ frozenDailyResults, periodStart, perio
         const rowDate = dateKey(row.hmeromhnia, 'frozen row date');
         if (id) rowIndex.set(`${id}|${rowDate}`, index);
     });
-    const crossPeriodDecisions = decisions.filter((decision) => decision?.resolution_kind === RESOLUTION_KIND);
-    const decisionIds = new Set();
+    const grouped = new Map();
+    decisions.filter((decision) => decision?.resolution_kind === RESOLUTION_KIND).forEach((decision) => {
+        const key = String(decision?.deferred_week_id || '').trim();
+        if (!key) throw overlayError('WTODAILY_OVERLAY_DECISION_AMBIGUITY', 'Υπάρχει απόφαση χωρίς deferred εβδομάδα.');
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(decision);
+    });
+    const crossPeriodDecisions = [...grouped.entries()].map(([key, group]) => {
+        try { return resolveEffectiveDeferredCrossPeriodDecision(group, key); }
+        catch (error) { throw overlayError('WTODAILY_OVERLAY_DECISION_AMBIGUITY', error.message); }
+    });
     for (const decision of crossPeriodDecisions) {
-        const deferredWeekId = String(decision?.deferred_week_id || '').trim();
-        if (!deferredWeekId || decisionIds.has(deferredWeekId)) {
-            throw overlayError('WTODAILY_OVERLAY_DECISION_AMBIGUITY', 'Υπάρχουν πολλαπλές ή ατελείς αποφάσεις για την ίδια deferred εβδομάδα.');
-        }
-        decisionIds.add(deferredWeekId);
         if (decision?.resolution_status !== 'RESOLVED' || decision?.conflict === true || decision?.stale === true) {
             throw overlayError('WTODAILY_OVERLAY_DECISION_CONFLICT', 'Η απόφαση επικάλυψης είναι ανεπίλυτη, stale ή σε σύγκρουση.');
         }

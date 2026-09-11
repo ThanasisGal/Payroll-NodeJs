@@ -1414,6 +1414,12 @@ router.get(
     requireEmploymentReviewAccess,
     erganhController.getEmploymentReviewPeriodControl
 );
+router.get('/api/prodhlomena-oraria/review/deferred-cross-period/preview', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.previewDeferredCrossPeriodRepoResolution);
+router.post('/api/prodhlomena-oraria/review/deferred-cross-period/resolve', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.resolveDeferredCrossPeriodRepoResolution);
 
 router.post(
     '/api/prodhlomena-oraria/review/period-control/:action(lock|unlock)',
@@ -1600,6 +1606,13 @@ router.get(
     checkAuth,
     requireEmploymentReviewAccess,
     erganhController.getWeeklyHrWorkflowStage1
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage1/bulk-review',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.getWeeklyHrWorkflowStage1Bulk
 );
 
 router.post(

@@ -91,6 +91,7 @@ assert.ok(boundarySectionStart >= 0 && boundarySectionEnd > boundarySectionStart
     'Boundary dialog and summary section must be present');
 const boundarySection = source.slice(boundarySectionStart, boundarySectionEnd);
 assert.match(boundarySection, /function showEmploymentReviewBoundaryContextDialog\(\)/);
+assert.match(boundarySection, /width: '56rem'/);
 assert.match(boundarySection, /function renderEmploymentReviewBoundaryContextSummary\([^)]*\)/);
 assert.match(boundarySection, /currentEmploymentReviewBoundaryContextPreflight\?\.\[sideKey\]/);
 assert.match(boundarySection,
@@ -115,6 +116,8 @@ assert.match(css, /\.employment-review-boundary-context-button\s*\{/);
 assert.match(css, /\.employment-review-boundary-sides\s*\{[\s\S]*?display: grid;/);
 assert.match(css, /\.employment-review-boundary-dialog details summary\s*\{/);
 assert.match(css, /\.employment-review-boundary-dialog\s*\{[\s\S]*?overflow: visible;/);
+assert.match(css, /\.employment-review-boundary-table th,[\s\S]*?white-space: nowrap;/);
+assert.match(css, /\.employment-review-boundary-table \.employment-review-boundary-week[\s\S]*?white-space: nowrap;/);
 assert.match(css,
     /\.swal2-popup\.employment-review-boundary-popup\s*\{[\s\S]*?max-height: calc\(100vh - 2rem\);[\s\S]*?overflow: hidden;/);
 
@@ -144,7 +147,7 @@ const generalFilter = source.slice(source.indexOf('function filterGeneralReviewR
     source.indexOf('function renderReviewNoPendingEmployees('));
 vm.runInNewContext(`${dateScopeSource}\n${groupSource}\n${filterSource}\n${generalFilter}
     this.presentation = { getVisibleReviewRows, renderEmploymentReviewBoundaryContextSummary,
-        beginBoundaryInfoSearchResult, autoOpenBoundaryInfoForSearchResult };`, uiSandbox);
+        beginBoundaryInfoSearchResult, autoOpenBoundaryInfoForSearchResult, renderDeferredWeekGroups };`, uiSandbox);
 for (const [weekStart, expected] of [
     ['2026-04-27', ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30']],
     ['2026-03-30', ['2026-04-01', '2026-04-02', '2026-04-03', '2026-04-04', '2026-04-05']],
@@ -201,13 +204,21 @@ assert.strictEqual(swalOpenCount, 1);
 button.onclick();
 assert.strictEqual(swalOpenCount, 2);
 assert.strictEqual(openedDialog.title, 'Πληροφορίες οριακών εβδομάδων');
-assert.match(openedDialog.html, /Τελευταία οριακή εβδομάδα: 27\/04\/2026–03\/05\/2026/);
-assert.match(openedDialog.html, /Ημέρες επόμενης περιόδου: 01\/05\/2026–03\/05\/2026/);
-assert.match(openedDialog.html, /Δεν τροποποιούνται από την περίοδο Απριλίου/);
-assert.match(openedDialog.html, /Ο εβδομαδιαίος έλεγχος θα ολοκληρωθεί στην επόμενη περίοδο/);
-assert.match(openedDialog.html, /30\/03\/2026–31\/03\/2026/);
-assert.match(openedDialog.html, /Επηρεαζόμενοι εργαζόμενοι: 1/);
-assert.match(openedDialog.html, /Πιθανές άδειες σε αναμονή: 1/);
+assert.match(openedDialog.html, /Προς επόμενο μήνα/);
+assert.match(openedDialog.html, /27\/04\/2026–03\/05\/2026/);
+assert.match(openedDialog.html, /Ο έλεγχος γίνεται στον επόμενο μήνα/);
+assert.match(openedDialog.html, /Οι ημέρες άλλου μήνα εμφανίζονται μόνο για τον εβδομαδιαίο έλεγχο/);
+assert.doesNotMatch(openedDialog.html, /Με δεδομένα καρτών|χωρίς δεδομένα καρτών|Πιθανές άδειες σε αναμονή/);
+assert.match(openedDialog.html, /<th class="text-center">Κωδικός<\/th>/);
+assert.doesNotMatch(openedDialog.html, /<th>Εργαζόμενος<\/th>|<th[^>]*>Ενέργεια<\/th>/);
+const actionTable = uiSandbox.presentation.renderDeferredWeekGroups([{
+    handoff_from_previous_period: true, week_start: '2025-12-29', week_end: '2026-01-04',
+    employee_entries: [{ deferred_week_id: 'week-1', employee_kodikos: '0031',
+        resolution_status: 'REQUIRED', source_candidates: [{ prodhlomena_oraria_id: 's' }],
+        target_candidates: [{ prodhlomena_oraria_id: 't' }] }]
+}]);
+assert.match(actionTable, /<th class="text-center">Ενέργεια<\/th>/);
+assert.match(actionTable, /data-deferred-repo-resolve="week-1"/);
 uiSandbox.presentation.beginBoundaryInfoSearchResult();
 uiSandbox.presentation.renderEmploymentReviewBoundaryContextSummary();
 uiSandbox.presentation.autoOpenBoundaryInfoForSearchResult();

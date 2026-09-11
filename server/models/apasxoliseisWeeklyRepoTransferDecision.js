@@ -57,9 +57,14 @@ const WeeklyRepoTransferDecisionSchema = new Schema(
         resolved_by_user_name: { type: String, trim: true, immutable: true },
         resolved_by_user_role: { type: String, trim: true, immutable: true },
         resolved_at: { type: Date, immutable: true },
+        resolution_revision: { type: Number, min: 1, immutable: true },
+        supersedes_decision_id: { type: Schema.Types.ObjectId, ref: 'ApasxoliseisWeeklyRepoTransferDecision', immutable: true },
+        supersedes_resolution_fingerprint: { type: String, trim: true, immutable: true },
+        correction_reason: { type: String, trim: true, maxlength: 2000, immutable: true },
         period_projections: { type: [PeriodProjectionSchema], default: undefined, immutable: true }
     },
-    { collection: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions', versionKey: false }
+    { collection: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions', versionKey: false,
+        autoIndex: false, autoCreate: false }
 );
 
 WeeklyRepoTransferDecisionSchema.index(
@@ -71,5 +76,16 @@ WeeklyRepoTransferDecisionSchema.index(
     { unique: true, name: 'unique_repo_transfer_request' }
 );
 WeeklyRepoTransferDecisionSchema.index({ team: 1, company_kod: 1, ypokatasthma: 1, week_start: 1 });
+WeeklyRepoTransferDecisionSchema.index(
+    { team: 1, company_kod: 1, ypokatasthma: 1, deferred_week_id: 1, resolution_revision: 1 },
+    {
+        unique: true,
+        name: 'unique_deferred_cross_period_resolution_revision',
+        partialFilterExpression: {
+            resolution_kind: 'DEFERRED_CROSS_PERIOD_REPO_RESOLUTION',
+            resolution_status: 'RESOLVED'
+        }
+    }
+);
 
 module.exports = model('ApasxoliseisWeeklyRepoTransferDecision', WeeklyRepoTransferDecisionSchema);

@@ -6,6 +6,10 @@ const {
 } = require('./apasxoliseisWeeklyRepoTransferDecisionBatchService');
 const { buildWeeklyHrLifecycleProjection } = require(
     './apasxoliseisWeeklyHrLifecycleProjectionService');
+const { buildWeeklyRepoTransferAtomicInputs } = require(
+    './apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
+const { resolveWeeklyRepoTransferDecisionFromPreparedWeek } = require(
+    './apasxoliseisWeeklyRepoTransferPreparedStage2ResolverService');
 
 function query(result, counter, name) {
     counter[name] = (counter[name] || 0) + 1;
@@ -563,6 +567,57 @@ async function testBorrowingProfileDrivesBatchAndAmbiguityDoesNotFallback() {
     (error) => error.statusCode === 409 && error.message === 'BORROWING_COMPANY_AMBIGUOUS');
 }
 
+async function testSingleAndPreparedCoreBusinessRecordDeepEquality() {
+    const rows = week('2026-07-06', '0001');
+    const deps = dependencies(rows);
+    const reference = await loadWeeklyRepoTransferDecisionBatch({ session,
+        filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12',
+            ypokatasthma: '0000' }, ...deps, canonicalSnapshotBuilder: () => ({}),
+        snapshotFingerprintBuilder: () => 'same' });
+    const built = buildWeeklyRepoTransferAtomicInputs({ rows,
+        periodStart: '2026-07-06', periodEnd: '2026-07-12',
+        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5, mo_oron_hmerhsias_ergasias: 8,
+            external_break_minutes: 0 }) });
+    const prepared = resolveWeeklyRepoTransferDecisionFromPreparedWeek({
+        weeklyInput: built.weeklyInputs[0], scope: { team: 'THA',
+            company_kod: session.companyInUse, company_kodikos: session.companyKodikos,
+            ypokatasthma: '0000' }, canonicalDecisionContext: { employee: {
+            _id: 'employee', kodikos: '0001' }, history: [], audits: [], companyFlags: {},
+            companyKodikos: session.companyKodikos }, presentationStart: '2026-07-06',
+        presentationEnd: '2026-07-12', canonicalSnapshotBuilder: () => ({}),
+        snapshotFingerprintBuilder: () => 'same', applyProtection: {
+            authorized: false, runtimeEnabled: false, indexReady: false } });
+    assert.deepStrictEqual(prepared.record, reference.records[0]);
+}
+
+async function testNeedsReviewSinglePreparedEquality() {
+    const rows = week('2026-07-06', '0001');
+    Object.assign(rows[6], { cards_ores_ergasias: 8, cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: '17:00' });
+    const deps = dependencies(rows);
+    const reference = await loadWeeklyRepoTransferDecisionBatch({ session,
+        filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12',
+            ypokatasthma: '0000' }, ...deps, canonicalSnapshotBuilder: () => ({}),
+        snapshotFingerprintBuilder: () => 'same' });
+    const built = buildWeeklyRepoTransferAtomicInputs({ rows,
+        periodStart: '2026-07-06', periodEnd: '2026-07-12',
+        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5, mo_oron_hmerhsias_ergasias: 8,
+            external_break_minutes: 0 }) });
+    const prepared = resolveWeeklyRepoTransferDecisionFromPreparedWeek({
+        weeklyInput: built.weeklyInputs[0], scope: { team: 'THA',
+            company_kod: session.companyInUse, company_kodikos: session.companyKodikos,
+            ypokatasthma: '0000' }, canonicalDecisionContext: { employee: {
+            _id: 'employee', kodikos: '0001' }, history: [], audits: [], companyFlags: {} },
+        presentationStart: '2026-07-06', presentationEnd: '2026-07-12',
+        canonicalSnapshotBuilder: () => ({}), snapshotFingerprintBuilder: () => 'same' });
+    assert.equal(prepared.record, null);
+    assert.deepStrictEqual(reference.records, []);
+    assert.deepStrictEqual(prepared.projection.reason_counts, reference.reason_counts);
+    assert.ok(reference.reason_counts.MULTIPLE_SOURCE_CANDIDATES > 0);
+}
+
 async function run() {
     await testZeroProposalsUsesOneBatchOfQueries();
     await testManyProposalsKeepConstantQueryCounts();
@@ -576,6 +631,8 @@ async function run() {
     await testFilterAndScopeRejections();
     await testFirstCrossMonthWeekUsesMondayReadContextOnly();
     await testBorrowingProfileDrivesBatchAndAmbiguityDoesNotFallback();
+    await testSingleAndPreparedCoreBusinessRecordDeepEquality();
+    await testNeedsReviewSinglePreparedEquality();
     console.log('weekly repo transfer decision batch tests passed');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -89,8 +89,8 @@ assert.match(stage1Read, /buildWeeklyLifecycleWithStage2State/);
 assert.match(stage1Read, /loadFinalizedWeeklyHrPresentationSnapshot/);
 assert.match(stage1Read, /presentationSnapshot/);
 assert.match(stage1Read, /buildFinalizedWeeklyHrLifecyclePresentation/);
-assert.match(stage1Read, /current_proposal_fingerprint/);
-assert.match(stage1Read, /current_proposal\?\.employee_kodikos/);
+assert.match(stage1Read, /resolveWeeklyRepoTransferDecisionFromPreparedWeek/);
+assert.match(stage1Read, /preparedStage2ByWeek/);
 const weeklyContext = controller.slice(controller.indexOf('async function loadWeeklyHrContext'),
     controller.indexOf('async function loadWeeklyHrStage3DecisionContext'));
 assert.match(weeklyContext, /presentationSnapshot\?\.weekly_calculation_context\?\.rows/);
@@ -135,9 +135,8 @@ assert.match(browser, /const changes = draftsToSave\.map/);
 assert.match(browser, /saveStage1DailyClassificationDrafts\(\[holidaySaveButton\.dataset\.rowId\]\)/);
 assert.match(browser, /draftsToSave\.some\(\(\[rowId\]\)[\s\S]*affectedKeys\.add\(key\)/);
 assert.match(browser, /requestedSet && Number\(result\.failed_count \|\| 0\) > 0[\s\S]*Η ημερήσια αλλαγή δεν αποθηκεύτηκε/);
-assert.match(browser, /Δεν εντοπίστηκαν δεδομένα Ψηφιακών Καρτών για το χρονικό διάστημα/);
-assert.match(browser, /Εντοπίστηκαν δεδομένα Ψηφιακών Καρτών για το χρονικό διάστημα/);
-assert.match(browser, /compactBoundaryCoverageDateRange\(side\.dates\)/);
+assert.match(browser, /Οι ημέρες άλλου μήνα εμφανίζονται μόνο για τον εβδομαδιαίο έλεγχο/);
+assert.doesNotMatch(browser, /Με δεδομένα καρτών:.*χωρίς δεδομένα καρτών:/);
 assert.doesNotMatch(browser, /Δεν υπάρχει διαθέσιμη καταγραφή που να επιβεβαιώνει την κάλυψη λήψης/);
 assert.match(browser, /payload\.finalized === true\s*\? \{ disabled: true \}/);
 assert.match(browser, /period_slice\?\.actionable_dates/);
@@ -151,8 +150,6 @@ assert.match(browser, /returnFocus: false,[\s\S]*popup: 'employment-review-bound
 assert.match(browser, /const htmlContainer = Swal\.getHtmlContainer\(\);/);
 assert.match(browser, /didClose: \(\) => requestAnimationFrame\(\(\) => refreshEmploymentReviewStickyLayout\(\)\)/);
 assert.match(browser, /const preservedScrollTop = scrollContainer\.scrollTop;[\s\S]*updateWeeklyDeviationStickyMetrics\(\);[\s\S]*scrollContainer\.scrollTop = preservedScrollTop;/);
-assert.match(browser, /boundaryCoverageStatusLabel\(side\.status\)/);
-assert.doesNotMatch(browser, />\$\{side\.status\}</);
 assert.match(view, /id="employmentReviewBoundaryContextButton"/);
 assert.match(view, /Πληροφορίες οριακών εβδομάδων/);
 assert.match(view, /employment-review-boundary-context-button/);
@@ -177,7 +174,7 @@ const boundaryDialogOptions = vm.runInNewContext(`(() => {
     let currentEmploymentReviewBoundaryContextDialogHtml = '<div>boundary</div>';
     const Swal = { getHtmlContainer: () => ({ style: {
         setProperty: (...args) => appliedBoundaryStyles.push(args)
-    } }) };
+    }, querySelectorAll: () => [] }) };
     const employmentReviewSwal = (options) => options;
     const requestAnimationFrame = () => {};
     const refreshEmploymentReviewStickyLayout = () => {};

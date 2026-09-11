@@ -552,6 +552,9 @@ function buildRowInfo(row, contexts) {
         apologistikaState,
         employmentProfile: contexts.employmentProfile
     });
+    const actualWorkFacts = resolveDailyActualWorkFacts(row, {
+        calculatedWorkHoursAuthoritative: sameRunDailyCalculated || row.is_locked === true
+    });
 
     return {
         row,
@@ -569,7 +572,8 @@ function buildRowInfo(row, contexts) {
         sameRunDailyCalculated,
         blockingSickness,
         blockingManualOrAuditedState,
-        apologistikaState
+        apologistikaState,
+        actualWorkFacts
     };
 }
 
@@ -619,6 +623,14 @@ function sourceExclusions(info) {
 
 function targetExclusions(info) {
     const reasons = [];
+    if (Number(info.actualWorkFacts?.actualWorkHours || 0) > 0 ||
+        info.actualWorkFacts?.countsAsActualWorkDay === true) {
+        reasons.push('TARGET_HAS_AUTHORITATIVE_ACTUAL_WORK');
+    }
+    if ((info.actualWorkFacts?.reasons || []).length > 0 ||
+        info.actualWorkFacts?.cardVerificationStatus === 'UNRESOLVED') {
+        reasons.push('TARGET_ZERO_WORK_NOT_AUTHORITATIVELY_PROVEN');
+    }
     if (info.row.is_locked === true) reasons.push('TARGET_LOCKED');
     if (info.manualOverride && info.row.is_locked !== true) reasons.push('TARGET_MANUAL_OVERRIDE');
     if (info.blockingDeclaredLeave || info.blockingSickness) {
@@ -681,7 +693,13 @@ function rowReference(info, semanticTargetCategory) {
         prodhlomena_oraria_id: normalizeId(info.row._id || info.row.id),
         hmeromhnia: info.dateKey,
         current_category: toTrimmedString(info.row.kathgoria_ergasias),
-        semantic_target_category: semanticTargetCategory
+        semantic_target_category: semanticTargetCategory,
+        card_intervals: info.facts.cards.cardIntervalsNormalized.map((interval) => ({
+            from: interval.start, to: interval.end
+        })),
+        actual_work_hours: Number(info.actualWorkFacts?.actualWorkHours || 0),
+        selection_reason: semanticTargetCategory === 'ΕΡΓ'
+            ? 'εργασία σε δηλωμένο ρεπό' : 'χωρίς πραγματική εργασία'
     };
 }
 
@@ -917,13 +935,19 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
             info.cardHours > 0
         );
     });
-    const cleanSources = potentialSources.filter((info) => sourceExclusions(info).length === 0);
+    let cleanSources = potentialSources.filter((info) => sourceExclusions(info).length === 0);
     const potentialTargets = rowInfos.filter(
         (info) =>
             toTrimmedString(info.row.kathgoria_ergasias) === 'ΕΡΓ' &&
             info.cardHours === 0
     );
-    const cleanTargets = potentialTargets.filter((info) => targetExclusions(info).length === 0);
+    let cleanTargets = potentialTargets.filter((info) => targetExclusions(info).length === 0);
+    const selectableSources = cleanSources;
+    const selectableTargets = cleanTargets;
+    if (input.allowCrossPeriod === true && input.selectedSourceRowId) cleanSources = cleanSources.filter(
+        (info) => String(info.row?._id || info.row?.row_id) === String(input.selectedSourceRowId));
+    if (input.allowCrossPeriod === true && input.selectedTargetRowId) cleanTargets = cleanTargets.filter(
+        (info) => String(info.row?._id || info.row?.row_id) === String(input.selectedTargetRowId));
     const counts = {
         source_candidates: cleanSources.length,
         target_candidates: cleanTargets.length
@@ -941,7 +965,11 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
                 cleanSources.length > 1 ? 'MULTIPLE_SOURCE_CANDIDATES' : 'NO_SOURCE_CANDIDATE',
                 ...unsafeReasons
             ],
-            counts
+            counts,
+            ...(input.allowCrossPeriod === true ? { semanticProposal: {
+                selectable_source_candidates: selectableSources.map((info) => rowReference(info, 'ΕΡΓ')),
+                selectable_target_candidates: selectableTargets.map((info) => rowReference(info, targetCategory))
+            } } : {})
         });
     }
 
@@ -957,11 +985,16 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
                 cleanTargets.length > 1 ? 'MULTIPLE_TARGET_CANDIDATES' : 'NO_TARGET_CANDIDATE',
                 ...unsafeReasons
             ],
-            counts
+            counts,
+            ...(input.allowCrossPeriod === true ? { semanticProposal: {
+                selectable_source_candidates: selectableSources.map((info) => rowReference(info, 'ΕΡΓ')),
+                selectable_target_candidates: selectableTargets.map((info) => rowReference(info, targetCategory))
+            } } : {})
         });
     }
 
     if (
+        input.allowCrossPeriod !== true &&
         cleanSources[0].dateKey.slice(0, 7) !==
         cleanTargets[0].dateKey.slice(0, 7)
     ) {
@@ -1319,11 +1352,17 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
         })
     );
     const strictSources = rowInfos.filter(partialSourceFacts);
-    const cleanSources = strictSources.filter((info) => sourceExclusions(info).length === 0);
+    let cleanSources = strictSources.filter((info) => sourceExclusions(info).length === 0);
     const strictTargets = rowInfos.filter(partialTargetFacts);
-    const cleanTargets = strictTargets.filter(
+    let cleanTargets = strictTargets.filter(
         (info) => partialTargetExclusions(info).length === 0
     );
+    const selectableSources = cleanSources;
+    const selectableTargets = cleanTargets;
+    if (input.allowCrossPeriod === true && input.selectedSourceRowId) cleanSources = cleanSources.filter(
+        (info) => String(info.row?._id || info.row?.row_id) === String(input.selectedSourceRowId));
+    if (input.allowCrossPeriod === true && input.selectedTargetRowId) cleanTargets = cleanTargets.filter(
+        (info) => String(info.row?._id || info.row?.row_id) === String(input.selectedTargetRowId));
     const common = {
         ...establishedResult,
         scenario_version: SCENARIO_VERSION_V2,
@@ -1356,7 +1395,10 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
             },
             source: null,
             target: null,
-            semantic_proposal: null
+            semantic_proposal: input.allowCrossPeriod === true ? {
+                selectable_source_candidates: selectableSources.map((info) => rowReference(info, 'ΕΡΓ')),
+                selectable_target_candidates: selectableTargets.map((info) => rowReference(info, 'ΜΕ'))
+            } : null
         });
     }
 
@@ -1434,7 +1476,10 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
             },
             source: null,
             target: null,
-            semantic_proposal: null
+            semantic_proposal: input.allowCrossPeriod === true ? {
+                selectable_source_candidates: selectableSources.map((info) => rowReference(info, 'ΕΡΓ')),
+                selectable_target_candidates: selectableTargets.map((info) => rowReference(info, 'ΜΕ'))
+            } : null
         });
     }
 
@@ -1459,6 +1504,12 @@ function analyzeWeeklyRepoTransferSinglePair(input = {}) {
     return analyzeWeeklyRepoTransferSinglePairV1(input);
 }
 
+function analyzeDeferredCrossPeriodRepoTransfer(input = {}) {
+    return resolveRepoTransferContractVersion(input.employmentProfile) === 'v1'
+        ? analyzeWeeklyRepoTransferSinglePairV1({ ...input, allowCrossPeriod: true })
+        : analyzeWeeklyRepoTransferSinglePairV2({ ...input, allowCrossPeriod: true });
+}
+
 module.exports = {
     analyzeWeeklyRepoTransferSinglePair,
     analyzeWeeklyRepoTransferSinglePairV1,
@@ -1472,5 +1523,6 @@ module.exports = {
     EMPLOYMENT_FAMILY,
     employmentFamily,
     resolveRepoTransferContractVersion,
-    analyzeWeeklyRepoTransferForEmploymentContract
+    analyzeWeeklyRepoTransferForEmploymentContract,
+    analyzeDeferredCrossPeriodRepoTransfer
 };
