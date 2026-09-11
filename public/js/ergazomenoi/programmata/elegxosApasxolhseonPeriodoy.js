@@ -9473,12 +9473,6 @@ function getStage2LifecycleReasonLabel(reasonCode) {
 const STAGE3_NON_WORK_DEFAULT_REASON =
     'Μετά από έλεγχο του προδηλωμένου ωραρίου, των πραγματικών στοιχείων απασχόλησης και του καθεστώτος μερικής/εκ περιτροπής απασχόλησης, η ημέρα χαρακτηρίζεται ως ΜΗ ΕΡΓΑΣΙΑ. Δεν προέκυψε άδεια, ασθένεια ή απουσία.';
 
-function stage3DeclaredText(item) {
-    const intervals = (item.declared_intervals || []).map((interval) =>
-        `${interval.start || '—'}–${interval.end || '—'}`).join(', ');
-    return `${intervals || 'Χωρίς διάστημα'} / ${formatPolicyPreviewHours(item.declared_hours || 0)} ώρες`;
-}
-
 function stage3ClassificationOptions(item) {
     const labels = { LEAVE: 'ΑΔΕΙΑ', SICKNESS: 'ΑΣΘΕΝΕΙΑ', ABSENCE: 'ΑΠΟΥΣΙΑ',
         NON_WORK: 'ΜΗ ΕΡΓΑΣΙΑ' };
@@ -9522,6 +9516,30 @@ function stage3IntervalsText(row = {}, prefix = '') {
         end: String(row?.[`${prefix}eos_ora_0${index}`] || '')
     })).filter((interval) => interval.start || interval.end)
         .map((interval) => `${interval.start || '—'}–${interval.end || '—'}`).join(', ');
+}
+
+function stage3HoursText(value) {
+    return formatPolicyPreviewHours(Number(value || 0)).replace('.', ',');
+}
+
+function stage3DeclaredPresentation(row = {}, daily = {}, pendingItem = {}) {
+    const intervals = stage3IntervalsText(row) || (pendingItem.declared_intervals || [])
+        .map((interval) => `${interval.start || '—'}–${interval.end || '—'}`).join(', ');
+    if (intervals) {
+        const hours = daily.declared_hours ?? pendingItem.declared_hours ?? row.ores_ergasias ?? 0;
+        return `${intervals} / ${stage3HoursText(hours)} ώρες`;
+    }
+    if (row.repo === true || String(row.kathgoria_ergasias || '').trim().toUpperCase() === 'ΑΝ') {
+        return 'ΡΕΠΟ';
+    }
+    return 'Δεν υπάρχει προδηλωμένο ωράριο';
+}
+
+function stage3ActualWorkPresentation(row = {}, daily = {}, pendingItem = {}) {
+    const cards = stage3IntervalsText(row, 'cards_');
+    const hours = daily.actual_work_hours ?? pendingItem.actual_work_hours ??
+        row.ores_pragmatikhs_ergasias_apologistika ?? 0;
+    return `${cards || 'Χωρίς κάρτες'} / ${stage3HoursText(hours)} ώρες`;
 }
 
 function stage3DailyPresentation(group, dateKey) {
@@ -9582,9 +9600,6 @@ function renderStage3WeekRow(group, dateKey, pendingByDate, period) {
     const pendingItem = pendingByDate.get(dateKey) || null;
     const outsidePeriod = Boolean(period?.period_start && period?.period_end &&
         (dateKey < stage1DateKey(period.period_start) || dateKey > stage1DateKey(period.period_end)));
-    const declared = stage3IntervalsText(row) || '—';
-    const cards = stage3IntervalsText(row, 'cards_');
-    const actualHours = Number(daily.actual_work_hours ?? row.ores_pragmatikhs_ergasias_apologistika ?? 0);
     const status = stage3StatusBadges(row, daily, pendingItem).map((label) =>
         `<span class="badge ${label === 'ΠΡΟΣ ΑΠΟΦΑΣΗ' ? 'text-bg-warning' :
             label === 'ΑΜΦΙΣΗΜΑ ΣΤΟΙΧΕΙΑ' ? 'text-bg-danger' : 'text-bg-secondary'} me-1">${label}</span>`
@@ -9592,27 +9607,32 @@ function renderStage3WeekRow(group, dateKey, pendingByDate, period) {
     return `<tr class="${pendingItem ? 'table-warning stage3-pending-day' : ''} ${outsidePeriod
         ? 'table-secondary stage3-context-only-day' : ''}" data-stage3-week-date="${dateKey}">
         <td>${escapeHtml(formatStage1DateKey(dateKey))}</td><td>${escapeHtml(stage3DayName(dateKey))}</td>
-        <td>${escapeHtml(declared)}</td>
-        <td>${escapeHtml(cards || 'Χωρίς κάρτες')} / ${escapeHtml(formatPolicyPreviewHours(actualHours))} ώρες</td>
+        <td>${escapeHtml(stage3DeclaredPresentation(row, daily, pendingItem || {}))}</td>
+        <td>${escapeHtml(stage3ActualWorkPresentation(row, daily, pendingItem || {}))}</td>
         <td>${escapeHtml(stage3ApologistikoClassification(row, daily))}</td>
         <td>${status}${outsidePeriod ? '<div class="small text-muted">Άλλος μήνας — μόνο για πλαίσιο</div>' : ''}</td>
     </tr>`;
 }
 
-function renderStage3DecisionItem(item) {
-    return `<div class="border-top pt-2 mt-2 stage3-decision-item" data-stage3-row-id="${escapeHtml(item.row_id)}">
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong>${escapeHtml(
-            formatStage1DateKey(item.date))}</strong><span class="badge text-bg-warning">ΠΡΟΣ ΑΠΟΦΑΣΗ</span></div>
-        <div class="small mb-2"><strong>Γιατί απαιτείται απόφαση:</strong> ${escapeHtml(
-            stage3DecisionReason(item))}</div>
-        <div class="d-flex flex-wrap align-items-start gap-2">
-            <div><select class="form-select form-select-sm weekly-hr-stage3-classification"
+function renderStage3DecisionItem(group, item) {
+    const row = (group.payload?.rows || []).find((candidate) =>
+        stage1DateKey(candidate.hmeromhnia) === item.date) || {};
+    const daily = stage3DailyPresentation(group, item.date);
+    return `<tr class="table-warning stage3-decision-item" data-stage3-row-id="${escapeHtml(item.row_id)}">
+        <td><strong>${escapeHtml(formatStage1DateKey(item.date))}</strong><br>
+            <span class="badge text-bg-warning">ΠΡΟΣ ΑΠΟΦΑΣΗ</span></td>
+        <td>${escapeHtml(stage3DayName(item.date))}</td>
+        <td>${escapeHtml(item.employment_label || 'Άγνωστο')}</td>
+        <td>${escapeHtml(stage3DeclaredPresentation(row, daily, item))}</td>
+        <td>${escapeHtml(stage3ActualWorkPresentation(row, daily, item))}</td>
+        <td class="small"><strong>Γιατί απαιτείται απόφαση:</strong><br>${escapeHtml(
+            stage3DecisionReason(item))}</td>
+        <td><select class="form-select form-select-sm weekly-hr-stage3-classification"
                 data-row-id="${escapeHtml(item.row_id)}">${stage3ClassificationOptions(item)}</select>
-                <select class="form-select form-select-sm mt-1 weekly-hr-stage3-leave-category d-none"
-                    data-row-id="${escapeHtml(item.row_id)}">${stage1LeaveCategoryOptions('')}</select></div>
-            <button type="button" class="btn btn-sm btn-primary weekly-hr-stage3-resolve"
-                data-row-id="${escapeHtml(item.row_id)}">Αποθήκευση</button>
-        </div></div>`;
+            <select class="form-select form-select-sm mt-1 weekly-hr-stage3-leave-category d-none"
+                data-row-id="${escapeHtml(item.row_id)}">${stage1LeaveCategoryOptions('')}</select></td>
+        <td><button type="button" class="btn btn-sm btn-primary weekly-hr-stage3-resolve"
+            data-row-id="${escapeHtml(item.row_id)}">Αποθήκευση</button></td></tr>`;
 }
 
 function renderWeeklyHrStage3(lifecycle) {
@@ -9627,15 +9647,26 @@ function renderWeeklyHrStage3(lifecycle) {
             const dates = enumerateStage1DateKeys(group.scope.week_start, group.scope.week_end);
             const period = group.scope.period_start && group.scope.period_end ? group.scope : activePeriod;
             return `<section class="border rounded px-2 py-2 mb-2 stage3-week-group" data-stage3-week-key="${escapeHtml(group.key)}">
-                <div class="small mb-2"><strong>Εργαζόμενος ${escapeHtml(group.scope.employee_kodikos || '')}</strong>
-                    ${group.employee_name ? ` — ${escapeHtml(group.employee_name)}` : ''}<br>
+                <div class="small mb-2"><strong>${escapeHtml(group.employee_name || 'Εργαζόμενος')} — Κωδικός ${escapeHtml(
+                    group.scope.employee_kodikos || '')}</strong><br>
                     <strong>Εβδομάδα:</strong> ${escapeHtml(formatStage1DateKey(group.scope.week_start))}–${escapeHtml(
-                        formatStage1DateKey(group.scope.week_end))}</div>
+                        formatStage1DateKey(group.scope.week_end))} · <span class="badge text-bg-warning">${escapeHtml(
+                            group.pending_items.length)} προς απόφαση</span></div>
+                <div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
+                    <thead><tr><th>Ημερομηνία</th><th>Ημέρα</th><th>Καθεστώς ημέρας</th>
+                        <th>Προδηλωμένο ωράριο</th><th>Πραγματική εργασία / κάρτες</th><th>Αιτία</th>
+                        <th>Τελικός χαρακτηρισμός</th><th>Ενέργεια</th></tr></thead>
+                    <tbody>${group.pending_items.map((item) => renderStage3DecisionItem(group, item)).join('')}</tbody>
+                </table></div>
+                <button type="button" class="btn btn-link btn-sm px-0 mt-1 stage3-week-context-toggle"
+                    data-stage3-week-context-target="${escapeHtml(group.key)}" aria-expanded="false">Εμφάνιση όλης της εβδομάδας</button>
+                <div class="stage3-full-week-context d-none" data-stage3-full-week-context="${escapeHtml(group.key)}">
+                <div class="small text-muted mb-1">Πλήρες πλαίσιο εβδομάδας</div>
                 <div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-table">
                     <thead><tr><th>Ημερομηνία</th><th>Ημέρα</th><th>Προδηλωμένο</th>
                         <th>Κάρτες / Πραγματική εργασία</th><th>Απολογιστικός χαρακτηρισμός</th><th>Κατάσταση</th></tr></thead>
                     <tbody>${dates.map((date) => renderStage3WeekRow(group, date, pendingByDate, period)).join('')}</tbody>
-                </table></div>${group.pending_items.map(renderStage3DecisionItem).join('')}</section>`;
+                </table></div></div></section>`;
         }).join('')
         : '<div class="text-muted small employment-review-stage3-empty">' +
             'Δεν υπάρχουν ανέλεγκτες πιθανές άδειες.</div>';
@@ -10238,6 +10269,18 @@ document.addEventListener('click', (event) => {
     if (event.target.closest('.weekly-hr-stage1-page-next')) {
         weeklyHrStage1Page += 1;
         renderWeeklyHrStage1Presentation(); return;
+    }
+    const stage3ContextToggle = event.target.closest('.stage3-week-context-toggle');
+    if (stage3ContextToggle) {
+        const context = stage3ContextToggle.closest('.stage3-week-group')
+            ?.querySelector('.stage3-full-week-context');
+        if (!context) return;
+        const willOpen = context.classList.contains('d-none');
+        context.classList.toggle('d-none', !willOpen);
+        stage3ContextToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        stage3ContextToggle.textContent = willOpen
+            ? 'Απόκρυψη όλης της εβδομάδας' : 'Εμφάνιση όλης της εβδομάδας';
+        return;
     }
     const stage3Resolve = event.target.closest('.weekly-hr-stage3-resolve');
     if (stage3Resolve) {

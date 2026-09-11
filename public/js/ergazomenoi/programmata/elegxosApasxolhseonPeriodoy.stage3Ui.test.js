@@ -78,14 +78,15 @@ const sandbox = {
         return dates;
     },
     escapeHtml: (value) => String(value ?? ''),
-    formatPolicyPreviewHours: (value) => String(value),
+    formatPolicyPreviewHours: (value) => Number(value).toFixed(2),
     stage3ClassificationOptions: (item) => (item.allowed_classifications || [])
         .map((value) => `<option value="${value}">${value}</option>`).join(''),
     stage1LeaveCategoryOptions: () => '<option value="REGULAR">Κανονική</option>',
     document: { getElementById: () => sandbox.container },
     container: { innerHTML: '' }
 };
-vm.runInNewContext(`${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3 };`, sandbox);
+vm.runInNewContext(`${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
+    stage3DeclaredPresentation };`, sandbox);
 
 function weekRows(start, pendingDates = []) {
     return sandbox.enumerateStage1DateKeys(start,
@@ -120,8 +121,21 @@ const mayItems = [pending('0012', '2026-05-11', '2026-05-17', '2026-05-14')];
 sandbox.currentCanonicalLifecyclePayloads.push(payload('0012', '2026-05-11', '2026-05-17', ['2026-05-14']));
 sandbox.helpers.renderWeeklyHrStage3({ stages: { STAGE3: { pending_items: mayItems } } });
 assert.equal((sandbox.container.innerHTML.match(/data-stage3-week-date=/g) || []).length, 7,
-    'μία pending ημέρα αποδίδει ολόκληρη την εβδομάδα');
+    'το προαιρετικό πλαίσιο περιέχει ολόκληρη την εβδομάδα');
+assert.match(sandbox.container.innerHTML, /stage3-full-week-context d-none/,
+    'το πλήρες εβδομαδιαίο πλαίσιο είναι κλειστό από προεπιλογή');
+assert.match(sandbox.container.innerHTML, /Εμφάνιση όλης της εβδομάδας/);
 assert.match(sandbox.container.innerHTML, /data-stage3-week-date="2026-05-14"[\s\S]*ΠΡΟΣ ΑΠΟΦΑΣΗ/);
+assert.equal((sandbox.container.innerHTML.match(/class="table-warning stage3-decision-item"/g) || []).length, 1,
+    'από προεπιλογή υπάρχει μόνο μία γραμμή προς απόφαση');
+assert.match(sandbox.container.innerHTML, /Εργαζόμενος 0012 — Κωδικός 0012/);
+assert.match(sandbox.container.innerHTML, /1 προς απόφαση/);
+assert.match(sandbox.container.innerHTML, /08:00–16:00 \/ 8,00 ώρες/);
+assert.match(sandbox.container.innerHTML, /Πραγματική εργασία \/ κάρτες/);
+assert.match(sandbox.container.innerHTML, /Καθεστώς ημέρας/);
+
+assert.equal(sandbox.helpers.stage3DeclaredPresentation({ repo: true }), 'ΡΕΠΟ');
+assert.equal(sandbox.helpers.stage3DeclaredPresentation({}), 'Δεν υπάρχει προδηλωμένο ωράριο');
 
 const sameWeek = [...mayItems, pending('0012', '2026-05-11', '2026-05-17', '2026-05-15')];
 assert.equal(sandbox.helpers.groupStage3PendingItems(sameWeek, sandbox.currentCanonicalLifecyclePayloads).length, 1);
@@ -135,6 +149,7 @@ assert.equal((sandbox.container.innerHTML.match(/data-stage3-week-date=/g) || []
 assert.equal((sandbox.container.innerHTML.match(/Άλλος μήνας — μόνο για πλαίσιο/g) || []).length, 4);
 assert.equal((sandbox.container.innerHTML.match(/weekly-hr-stage3-classification/g) || []).length, 1,
     'οι ημέρες πλαισίου δεν αποκτούν χειριστήριο απόφασης');
+assert.match(source, /Απόκρυψη όλης της εβδομάδας/);
 
 const renderSection = source.slice(source.indexOf('function renderWeeklyHrStage3'),
     source.indexOf('function findStage3PendingItem'));
