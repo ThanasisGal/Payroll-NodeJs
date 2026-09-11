@@ -7557,6 +7557,24 @@ class erganhController {
                         start: identity[6], end: identity[7] }];
                 } catch { return ['', null]; }
             }).filter(([, value]) => value)).values()];
+            const deferredFrozenSnapshots = deferredSourcePeriods.length
+                ? await ApasxoliseisPeriodFrozenSnapshotModel.find({
+                    team: sessionTeam, company_kod: companyId,
+                    ypokatasthma: String(ypokatasthma || '').padStart(4, '0'),
+                    $or: mongoose.trusted(deferredSourcePeriods.map((period) => ({
+                        period_start: new Date(`${period.start}T00:00:00Z`),
+                        period_end: new Date(`${period.end}T00:00:00Z`)
+                    })))
+                }).select('period_start period_end frozen_snapshot.daily_results.effective_profile_employee_id')
+                    .lean() : [];
+            const frozenIdentityKeys = new Set(deferredFrozenSnapshots.flatMap((snapshot) =>
+                (snapshot.frozen_snapshot?.daily_results || []).map((row) => [
+                    String(row.effective_profile_employee_id || ''),
+                    dateKeyUtc(snapshot.period_start), dateKeyUtc(snapshot.period_end)
+                ].join('|'))).filter((key) => !key.startsWith('|')));
+            const workflowIdentityKeys = new Set((preparedLifecycleContext.workflowStates || [])
+                .map((state) => [String(state.employee_id || ''), dateKeyUtc(state.week_start),
+                    dateKeyUtc(state.week_end)].join('|')));
             const submittedSourcePeriodRows = deferredSourcePeriods.length
                 ? await ErgazomenoiErganhModel.find({ team: sessionTeam,
                     companykod_object: companyId,
@@ -7584,11 +7602,18 @@ class erganhController {
             ]));
             const requirementByDeferredId = new Map(await Promise.all(deferredIds.map(async (deferredWeekId) => {
                 try {
+                    const identity = JSON.parse(deferredWeekId);
+                    const authoritativeIdentityPresent = workflowIdentityKeys.has([
+                        String(identity[3] || ''), String(identity[4] || ''),
+                        String(identity[5] || '')].join('|')) || frozenIdentityKeys.has([
+                        String(identity[3] || ''), String(identity[6] || ''),
+                        String(identity[7] || '')].join('|'));
                     const assessed = bulkAssessmentById.get(deferredWeekId);
                     if (!assessed) throw Object.assign(new Error('Λείπει προετοιμασμένο επταήμερο.'),
                         { code: 'DEFERRED_RESOLUTION_FULL_WEEK_REQUIRED' });
                     if (assessed.requirement_status === REQUIREMENT_STATUS.ERGANI_CORRECTION_REQUIRED) {
-                        return [deferredWeekId, { status: REQUIREMENT_STATUS.ERGANI_CORRECTION_REQUIRED }];
+                        return [deferredWeekId, { status: REQUIREMENT_STATUS.ERGANI_CORRECTION_REQUIRED,
+                            authoritative_frozen_identity_present: authoritativeIdentityPresent }];
                     }
                     const effective = resolveEffectiveDeferredCrossPeriodDecision(
                         resolvedRecordsByDeferredId.get(deferredWeekId) || [], deferredWeekId);
@@ -7598,15 +7623,17 @@ class erganhController {
                         const rowDate = (rowId) => weekRows.find((row) =>
                             String(row.row_id || row._id) === String(rowId || ''))?.hmeromhnia || '';
                         return [deferredWeekId, { status: REQUIREMENT_STATUS.RESOLVED,
+                            authoritative_frozen_identity_present: authoritativeIdentityPresent,
                             source_date: rowDate(identity.source_row_id),
                             target_date: rowDate(identity.target_row_id) }];
                     }
                     return [deferredWeekId, { status: assessed.requirement_status,
+                        authoritative_frozen_identity_present: authoritativeIdentityPresent,
                         source_candidates: assessed.source_candidates || [],
                         target_candidates: assessed.target_candidates || [], reasons: assessed.reasons || [] }];
                 }
                 catch (error) { return [deferredWeekId, { status: error.code === 'DEFERRED_WEEK_IDENTITY_MISMATCH'
-                    ? 'NOT_REQUIRED' : 'REQUIRED' }]; }
+                    ? 'NOT_REQUIRED' : 'REQUIRED', authoritative_frozen_identity_present: false }]; }
             })));
             canonicalLifecycleProjections = canonicalLifecycleProjections.map((entry) => {
                 const deferred = entry.lifecycle_projection?.deferred_week;
@@ -7614,6 +7641,8 @@ class erganhController {
                 const assessment = requirementByDeferredId.get(deferred.deferred_week_id) || { status: 'NOT_REQUIRED' };
                 return { ...entry, lifecycle_projection: { ...entry.lifecycle_projection,
                     deferred_week: { ...deferred, resolution_status: assessment.status,
+                        authoritative_frozen_identity_present:
+                            assessment.authoritative_frozen_identity_present === true,
                         source_candidates: assessment.source_candidates || [],
                         target_candidates: assessment.target_candidates || [],
                         resolution_reasons: assessment.reasons || [],

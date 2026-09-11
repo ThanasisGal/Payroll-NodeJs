@@ -6226,7 +6226,11 @@ function renderActionableIssueGroups(issueGroups = []) {
 
     return `
         <div class="atomic-repo-transfer-diagnostic-summary">
-            <div class="fw-semibold">Εκκρεμότητες που απαιτούν ενέργεια</div>
+            <div class="fw-semibold">${currentEmploymentReviewLifecyclePresentation?.stages?.STAGE2
+                ?.business_status === 'COMPLETED' && Number(currentEmploymentReviewLifecyclePresentation
+                    ?.stages?.STAGE2?.pending_count || 0) === 0
+                ? 'Περιπτώσεις προς ενημερωτικό έλεγχο'
+                : 'Εκκρεμότητες που απαιτούν ενέργεια'}</div>
             <div class="actionable-issue-groups">
                 ${groups
                     .map((group, groupIndex) => {
@@ -6599,6 +6603,7 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
 function highlightActionableIssueTarget(target) {
     target.classList.remove('actionable-issue-target-highlight');
     target.classList.add('actionable-issue-target-highlight');
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     const scrollContainer = target.closest('.employment-review-scroll-container');
     if (scrollContainer) {
         const containerRect = scrollContainer.getBoundingClientRect();
@@ -6620,6 +6625,10 @@ function highlightActionableIssueTarget(target) {
 }
 
 function openActionableIssueInTable(issueCase = {}, feedback = null) {
+    const stage4Collapse = document.getElementById('employmentReviewStage4Collapse');
+    if (stage4Collapse) {
+        bootstrap.Collapse.getOrCreateInstance(stage4Collapse, { toggle: false }).show();
+    }
     const employeeKodikos = String(issueCase.employee_kodikos || '').trim();
     const ypokatasthma = String(issueCase.ypokatasthma || '').trim();
     const groupRow = [...document.querySelectorAll('#resultsTable .employee-group-row')]
@@ -9183,11 +9192,19 @@ function renderDeferredWeekGroups(groups = []) {
             <div class="small">${targets.length === 1 ? 'Προτεινόμενη ημέρα ρεπό' : 'Διαθέσιμες ημέρες χωρίς εργασία'}: ${escapeHtml(targets.map(t => formatStage1DateKey(t.hmeromhnia)).join(', ') || '—')}</div>` :
             entry.resolution_status === 'RESOLVED' && entry.resolved_source_date && entry.resolved_target_date
                 ? `<div class="small">${escapeHtml(formatStage1DateKey(entry.resolved_source_date))} → Εργασία · ${escapeHtml(formatStage1DateKey(entry.resolved_target_date))} → Ρεπό</div>` : '';
-        const action = group.handoff_from_previous_period && entry.resolution_status === 'REQUIRED'
+        const hasAuthoritativeIdentity = entry.authoritative_frozen_identity_present === true &&
+            Boolean(source?.prodhlomena_oraria_id);
+        const hasValidTarget = targets.some((target) => target?.prodhlomena_oraria_id);
+        const canSelectRepo = group.handoff_from_previous_period &&
+            entry.resolution_status === 'REQUIRED' && hasAuthoritativeIdentity && hasValidTarget;
+        const unavailable = group.handoff_from_previous_period &&
+            entry.resolution_status === 'REQUIRED' && !canSelectRepo
+            ? '<div class="small text-muted">Η επιλογή ρεπό δεν είναι διαθέσιμη επειδή λείπει authoritative ταυτότητα ή έγκυρη ημέρα-στόχος.</div>' : '';
+        const action = canSelectRepo
             ? `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary" data-deferred-repo-resolve="${escapeHtml(entry.deferred_week_id)}">${targets.length === 1 && (entry.source_candidates || []).length === 1 ? 'Προεπισκόπηση' : 'Επιλογή ρεπό'}</button>`
             : group.handoff_from_previous_period && entry.resolution_status === 'RESOLVED'
                 ? `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning" data-deferred-repo-resolve="${escapeHtml(entry.deferred_week_id)}">Αλλαγή επιλογής</button>` : '';
-        return { group, entry, exact, action };
+        return { group, entry, exact: `${exact}${unavailable}`, action };
     }));
     const hasAction = rows.some((row) => row.action);
     const body = rows.map(({ group, entry, exact, action }) => `<tr>
@@ -9481,7 +9498,8 @@ function stage3ClassificationOptions(item) {
 }
 
 function stage3WeekKey(value = {}) {
-    return [value.employee_id || value.employee_kodikos || '', value.week_start || ''].join('|');
+    return [value.employee_id || value.employee_kodikos || '', value.week_start || '',
+        value.week_end || ''].join('|');
 }
 
 function stage3PayloadForItem(item, payloads = currentCanonicalLifecyclePayloads) {
@@ -9502,6 +9520,13 @@ function groupStage3PendingItems(items = [], payloads = currentCanonicalLifecycl
     }
     return [...groups.values()].map((group) => ({ ...group,
         pending_items: group.pending_items.sort(compareLifecyclePendingItems) }));
+}
+
+function stage3HasFullWeekContext(group = {}) {
+    const dates = (group.payload?.rows || []).map((row) => stage1DateKey(row.hmeromhnia));
+    const expected = enumerateStage1DateKeys(group.scope.week_start, group.scope.week_end);
+    return expected.length === 7 && dates.length === 7 &&
+        expected.every((date) => dates.includes(date));
 }
 
 function stage3DayName(dateKey) {
@@ -9646,6 +9671,7 @@ function renderWeeklyHrStage3(lifecycle) {
             const pendingByDate = new Map(group.pending_items.map((item) => [item.date, item]));
             const dates = enumerateStage1DateKeys(group.scope.week_start, group.scope.week_end);
             const period = group.scope.period_start && group.scope.period_end ? group.scope : activePeriod;
+            const hasFullWeekContext = stage3HasFullWeekContext(group);
             return `<section class="border rounded px-2 py-2 mb-2 stage3-week-group" data-stage3-week-key="${escapeHtml(group.key)}">
                 <div class="small mb-2"><strong>${escapeHtml(group.employee_name || 'Εργαζόμενος')} — Κωδικός ${escapeHtml(
                     group.scope.employee_kodikos || '')}</strong><br>
@@ -9658,7 +9684,7 @@ function renderWeeklyHrStage3(lifecycle) {
                         <th>Τελικός χαρακτηρισμός</th><th>Ενέργεια</th></tr></thead>
                     <tbody>${group.pending_items.map((item) => renderStage3DecisionItem(group, item)).join('')}</tbody>
                 </table></div>
-                <button type="button" class="btn btn-link btn-sm px-0 mt-1 stage3-week-context-toggle"
+                ${hasFullWeekContext ? `<button type="button" class="btn btn-link btn-sm px-0 mt-1 stage3-week-context-toggle"
                     data-stage3-week-context-target="${escapeHtml(group.key)}" aria-expanded="false">Εμφάνιση όλης της εβδομάδας</button>
                 <div class="stage3-full-week-context d-none" data-stage3-full-week-context="${escapeHtml(group.key)}">
                 <div class="small text-muted mb-1">Πλήρες πλαίσιο εβδομάδας</div>
@@ -9666,7 +9692,9 @@ function renderWeeklyHrStage3(lifecycle) {
                     <thead><tr><th>Ημερομηνία</th><th>Ημέρα</th><th>Προδηλωμένο</th>
                         <th>Κάρτες / Πραγματική εργασία</th><th>Απολογιστικός χαρακτηρισμός</th><th>Κατάσταση</th></tr></thead>
                     <tbody>${dates.map((date) => renderStage3WeekRow(group, date, pendingByDate, period)).join('')}</tbody>
-                </table></div></div></section>`;
+                </table></div></div>`
+                    : '<div class="small text-muted mt-1">Δεν είναι διαθέσιμο το πλήρες εβδομαδιαίο πλαίσιο.</div>'}
+                </section>`;
         }).join('')
         : '<div class="text-muted small employment-review-stage3-empty">' +
             'Δεν υπάρχουν ανέλεγκτες πιθανές άδειες.</div>';
@@ -9805,10 +9833,15 @@ function updateEmploymentReviewWorkflowPresentation() {
             ` <span class="small ms-2">${stage.pending_count} εκκρεμότητες</span>`;
         header.innerHTML = `${escapeHtml(workflowStageNames[stage.stage])}
             ${badge}${pendingText}`;
-        button.disabled = presentationStatus === 'LOCKED';
-        button.setAttribute('aria-disabled', presentationStatus === 'LOCKED' ? 'true' : 'false');
-        if (presentationStatus === 'LOCKED') {
+        const stageViewLocked = presentationStatus === 'LOCKED' && stage.stage !== 'STAGE4';
+        button.disabled = stageViewLocked;
+        button.setAttribute('aria-disabled', stageViewLocked ? 'true' : 'false');
+        if (stageViewLocked) {
             bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false }).hide();
+        }
+        if (stage.stage === 'STAGE4') {
+            const previewNotice = document.getElementById('employmentReviewStage4PreviewNotice');
+            previewNotice?.classList.toggle('d-none', presentationStatus !== 'LOCKED');
         }
     });
     renderWeeklyHrStage2LifecycleFallback(lifecycle);
@@ -9874,7 +9907,7 @@ function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const warning = stale
         ? '<div class="small text-warning-emphasis">Τα ημερήσια δεδομένα άλλαξαν μετά την τελευταία ολοκλήρωση. Απαιτείται νέος έλεγχος του Σταδίου 1.</div>' : '';
     const indexWarning = payload.write_enabled ? '' :
-        '<div class="small text-muted">Η λειτουργία εγγραφής δεν έχει ακόμη ενεργοποιηθεί στη βάση.</div>';
+        '<div class="small text-muted">Η αποθήκευση του Σταδίου 1 δεν είναι ακόμη διαθέσιμη επειδή δεν έχουν ενεργοποιηθεί οι απαιτούμενες δικλείδες της εβδομαδιαίας ροής HR.</div>';
     const relevantDates = stage1RelevantDates(payload);
     const displayDates = Array.isArray(filteredDates) ? filteredDates :
         payload.period_slice?.actionable_dates?.length

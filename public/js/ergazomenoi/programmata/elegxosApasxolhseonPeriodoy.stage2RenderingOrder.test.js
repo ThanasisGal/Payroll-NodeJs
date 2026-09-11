@@ -128,6 +128,16 @@ const loadResults = source.slice(source.indexOf('async function loadResults()'),
 assert.match(loadResults, /renderPreCalculationDataIssues\(rows\);\s*return;/);
 assert.match(loadResults, /finally\s*\{[\s\S]*renderWeeklyHrStage2LifecycleFallback\(currentEmploymentReviewLifecyclePresentation\)/);
 assert.ok(mutations.some((entry) => entry.after === ''));
+
+const navigation = source.slice(source.indexOf('function highlightActionableIssueTarget'),
+    source.indexOf('function bindActionableIssueEvents'));
+assert.match(navigation, /employmentReviewStage4Collapse/);
+assert.match(navigation, /bootstrap\.Collapse\.getOrCreateInstance[\s\S]*\.show\(\)/);
+assert.match(navigation, /employeeKodikos[\s\S]*weekStart[\s\S]*weekEnd/);
+assert.match(navigation, /scrollIntoView\(\{ behavior: 'smooth', block: 'center' \}\)/);
+assert.match(navigation, /actionable-issue-target-highlight/);
+assert.match(navigation, /Η περίπτωση δεν είναι ορατή με τα τρέχοντα φίλτρα\./);
+assert.match(source, /Περιπτώσεις προς ενημερωτικό έλεγχο/);
 assert.match(mutations.at(-1).after, /Εκκρεμότητες Μεταφοράς Ρεπό/);
 
 console.log('Stage-2 asynchronous rendering-order integration test passed');

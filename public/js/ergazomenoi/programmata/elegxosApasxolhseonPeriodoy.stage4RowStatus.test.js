@@ -7,6 +7,8 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname,
     'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const view = fs.readFileSync(path.join(__dirname,
+    '../../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
 const start = source.indexOf('function weeklyLifecyclePayloadForDeviation');
 const end = source.indexOf('function hasAdeiaSuggestion', start);
 const payloads = [];
@@ -73,5 +75,11 @@ assert.doesNotMatch(deviationRenderer, /weekly-deviation-status-column/);
 assert.doesNotMatch(deviationRenderer, /class="weekly-deviation-status"/);
 assert.match(deviationRenderer,
     /class="weekly-deviation-comment">\$\{renderStage4StatusCell\(dev\)\}\$\{renderDeviationNoteCell\(dev\)\}/);
+
+const workflowPresentation = source.slice(source.indexOf('function updateEmploymentReviewWorkflowPresentation'),
+    source.indexOf('function renderWeeklyHrStage1BulkToolbar'));
+assert.match(workflowPresentation, /presentationStatus === 'LOCKED' && stage\.stage !== 'STAGE4'/);
+assert.match(workflowPresentation, /employmentReviewStage4PreviewNotice/);
+assert.match(view, /Προσωρινή προεπισκόπηση — το Στάδιο 4 μπορεί να ελεγχθεί, αλλά δεν μπορεί ακόμη να ολοκληρωθεί\./);
 
 console.log('Stage 4 per-row blocked status presentation tests passed');
