@@ -1,6 +1,8 @@
 'use strict';
 const assert = require('assert'); const fs = require('fs'); const path = require('path');
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const controller = fs.readFileSync(path.join(__dirname,
+    '../../../../server/controllers/ergazomenoi/erganhController.js'), 'utf8');
 for (const text of ['Πληροφορίες οριακών εβδομάδων', 'Χρειάζεται επιλογή ρεπό',
     'Επιλογή ρεπό', 'Έλεγχος αλλαγής ρεπό', 'Ημερομηνία', 'Προδηλωμένο', 'Κάρτα',
     'Πριν', 'Μετά', 'Μήνας', 'Η οριστικοποιημένη μισθοδοσία δεν αλλάζει.',
@@ -13,7 +15,9 @@ const boundaryTable = source.slice(source.indexOf('function renderDeferredWeekGr
 assert.match(method, /deferred-cross-period\/preview/); assert.match(method, /deferred-cross-period\/resolve/);
 assert.doesNotMatch(method, /submitFinalWTODayilyA|period-control\/submission\/final/);
 assert.ok(!source.includes('deferred-cross-period-persistent-panel'));
-assert.match(source, /entry\.resolution_status === 'REQUIRED'[\s\S]*data-deferred-repo-resolve/);
+assert.match(source, /const canSelectRepo =[\s\S]*entry\.resolution_status === 'REQUIRED'[\s\S]*hasAuthoritativeIdentity[\s\S]*hasValidTarget/);
+assert.match(controller, /authoritative_frozen_identity_present:\s*authoritativeIdentityPresent/);
+assert.match(controller, /authoritative_frozen_identity_present:\s*false/);
 assert.match(source, /Δεν χρειάζεται ενέργεια/);
 assert.match(method, /day\.current_accounting/); assert.match(method, /day\.proposed_accounting/);
 assert.doesNotMatch(method, /<pre>|JSON\.stringify\([^)]*preview|Επιλογή SOURCE|πραγματικού ρεπό \(TARGET\)|Ρητή επιβεβαίωση επίλυσης|Υπολογισμός προεπισκόπησης|['"]Cancel['"]/);

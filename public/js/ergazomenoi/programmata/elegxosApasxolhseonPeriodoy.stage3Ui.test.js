@@ -14,7 +14,8 @@ assert.match(source, /inputValidator:[\s\S]*String\(value \|\| ''\)\.trim\(\)/);
 assert.match(source, /weekly-hr-stage3-classification/);
 assert.match(source, /weekly-hr-stage3-leave-category/);
 assert.match(source, /weekly-hr-stage3-resolve/);
-assert.match(source, /Απαιτείται τελική εξέταση πιθανής άδειας\./);
+assert.match(source, /Γιατί απαιτείται απόφαση:/);
+assert.match(source, /ΠΡΟΣ ΑΠΟΦΑΣΗ/);
 assert.doesNotMatch(source.slice(source.indexOf('function renderWeeklyHrStage3'),
     source.indexOf('function updateEmploymentReviewWorkflowPresentation')),
     />REMAINING_POSSIBLE_LEAVE_REVIEW_REQUIRED</);
@@ -61,4 +62,111 @@ assert.equal(pruned, 1);
 assert.equal(rendered, 1);
 assert.equal(opened, 1);
 assert.doesNotMatch(focusSource, /weeklyHrStage1Selected\.add|completeWeeklyHrStage1/);
-console.log('Stage-3 actionable UI contracts passed');
+
+const helperSource = source.slice(source.indexOf('function stage3WeekKey'),
+    source.indexOf('function findStage3PendingItem'));
+const sandbox = {
+    currentCanonicalLifecyclePayloads: [],
+    currentReviewOwnershipPeriod: () => ({ period_start: '2026-05-01', period_end: '2026-05-31' }),
+    compareLifecyclePendingItems: (left, right) => left.date.localeCompare(right.date),
+    stage1DateKey: (value) => String(value || '').slice(0, 10),
+    formatStage1DateKey: (value) => String(value || '').slice(0, 10).split('-').reverse().join('/'),
+    enumerateStage1DateKeys: (start, end) => {
+        const dates = [];
+        for (const date = new Date(`${start}T00:00:00.000Z`); date.toISOString().slice(0, 10) <= end;
+            date.setUTCDate(date.getUTCDate() + 1)) dates.push(date.toISOString().slice(0, 10));
+        return dates;
+    },
+    escapeHtml: (value) => String(value ?? ''),
+    formatPolicyPreviewHours: (value) => Number(value).toFixed(2),
+    stage3ClassificationOptions: (item) => (item.allowed_classifications || [])
+        .map((value) => `<option value="${value}">${value}</option>`).join(''),
+    stage1LeaveCategoryOptions: () => '<option value="REGULAR">Κανονική</option>',
+    document: { getElementById: () => sandbox.container },
+    container: { innerHTML: '' }
+};
+vm.runInNewContext(`${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
+    stage3DeclaredPresentation, stage3WeekKey };`, sandbox);
+
+function weekRows(start, pendingDates = []) {
+    return sandbox.enumerateStage1DateKeys(start,
+        new Date(new Date(`${start}T00:00:00.000Z`).getTime() + 6 * 86400000)
+            .toISOString().slice(0, 10)).map((date, index) => ({
+        _id: `row-${date}`, hmeromhnia: date, apo_ora_01: index < 5 ? '08:00' : '',
+        eos_ora_01: index < 5 ? '16:00' : '', kathgoria_ergasias_apologistika: index < 5 ? 'ΕΡΓ' : 'ΑΝ',
+        kathgoria_adeias_apologistika: pendingDates.includes(date) ? 'POSSIBLE_LEAVE' : '',
+        repo_apologistika: index >= 5, ores_pragmatikhs_ergasias_apologistika: index < 5 ? 8 : 0
+    }));
+}
+
+function payload(employee, start, end, pendingDates) {
+    const rows = weekRows(start, pendingDates);
+    return { scope: { employee_id: employee, employee_kodikos: employee, week_start: start,
+        week_end: end, period_start: '2026-05-01', period_end: '2026-05-31' },
+        employee_name: `Εργαζόμενος ${employee}`, rows,
+        stage1_daily_presentation: rows.map((row) => ({ date: row.hmeromhnia,
+            actual_work_hours: row.ores_pragmatikhs_ergasias_apologistika,
+            current_apologistiko_classification: row.kathgoria_ergasias_apologistika })) };
+}
+
+function pending(employee, start, end, date) {
+    return { employee_id: employee, employee_kodikos: employee, week_start: start, week_end: end,
+        period_start: '2026-05-01', period_end: '2026-05-31', row_id: `row-${date}`, date,
+        declared_hours: 8, actual_work_hours: 0,
+        allowed_classifications: ['LEAVE', 'SICKNESS', 'ABSENCE'], input_fingerprint: 'f',
+        expected_stage3_version: 0 };
+}
+
+const mayItems = [pending('0012', '2026-05-11', '2026-05-17', '2026-05-14')];
+sandbox.currentCanonicalLifecyclePayloads.push(payload('0012', '2026-05-11', '2026-05-17', ['2026-05-14']));
+sandbox.helpers.renderWeeklyHrStage3({ stages: { STAGE3: { pending_items: mayItems } } });
+assert.equal((sandbox.container.innerHTML.match(/data-stage3-week-date=/g) || []).length, 7,
+    'το προαιρετικό πλαίσιο περιέχει ολόκληρη την εβδομάδα');
+assert.match(sandbox.container.innerHTML, /stage3-full-week-context d-none/,
+    'το πλήρες εβδομαδιαίο πλαίσιο είναι κλειστό από προεπιλογή');
+assert.match(sandbox.container.innerHTML, /Εμφάνιση όλης της εβδομάδας/);
+assert.match(sandbox.container.innerHTML, /data-stage3-week-date="2026-05-14"[\s\S]*ΠΡΟΣ ΑΠΟΦΑΣΗ/);
+assert.equal((sandbox.container.innerHTML.match(/class="table-warning stage3-decision-item"/g) || []).length, 1,
+    'από προεπιλογή υπάρχει μόνο μία γραμμή προς απόφαση');
+assert.match(sandbox.container.innerHTML, /Εργαζόμενος 0012 — Κωδικός 0012/);
+assert.match(sandbox.container.innerHTML, /1 προς απόφαση/);
+assert.match(sandbox.container.innerHTML, /08:00–16:00 \/ 8,00 ώρες/);
+assert.match(sandbox.container.innerHTML, /Πραγματική εργασία \/ κάρτες/);
+assert.match(sandbox.container.innerHTML, /Καθεστώς ημέρας/);
+
+assert.equal(sandbox.helpers.stage3DeclaredPresentation({ repo: true }), 'ΡΕΠΟ');
+assert.equal(sandbox.helpers.stage3DeclaredPresentation({}), 'Δεν υπάρχει προδηλωμένο ωράριο');
+assert.notEqual(sandbox.helpers.stage3WeekKey({ employee_id: 'E', week_start: '2026-05-11',
+    week_end: '2026-05-17' }), sandbox.helpers.stage3WeekKey({ employee_id: 'E',
+    week_start: '2026-05-11', week_end: '2026-05-18' }));
+
+const sameWeek = [...mayItems, pending('0012', '2026-05-11', '2026-05-17', '2026-05-15')];
+assert.equal(sandbox.helpers.groupStage3PendingItems(sameWeek, sandbox.currentCanonicalLifecyclePayloads).length, 1);
+const otherWeek = pending('0012', '2026-05-18', '2026-05-24', '2026-05-19');
+assert.equal(sandbox.helpers.groupStage3PendingItems([...sameWeek, otherWeek], []).length, 2);
+
+const crossMonth = pending('0013', '2026-04-27', '2026-05-03', '2026-05-01');
+sandbox.currentCanonicalLifecyclePayloads.push(payload('0013', '2026-04-27', '2026-05-03', ['2026-05-01']));
+sandbox.helpers.renderWeeklyHrStage3({ stages: { STAGE3: { pending_items: [crossMonth] } } });
+assert.equal((sandbox.container.innerHTML.match(/data-stage3-week-date=/g) || []).length, 7);
+assert.equal((sandbox.container.innerHTML.match(/Άλλος μήνας — μόνο για πλαίσιο/g) || []).length, 4);
+assert.equal((sandbox.container.innerHTML.match(/weekly-hr-stage3-classification/g) || []).length, 1,
+    'οι ημέρες πλαισίου δεν αποκτούν χειριστήριο απόφασης');
+assert.match(source, /Απόκρυψη όλης της εβδομάδας/);
+
+sandbox.currentCanonicalLifecyclePayloads.length = 0;
+sandbox.helpers.renderWeeklyHrStage3({ stages: { STAGE3: { pending_items: mayItems } } });
+assert.match(sandbox.container.innerHTML, /Δεν είναι διαθέσιμο το πλήρες εβδομαδιαίο πλαίσιο\./);
+assert.doesNotMatch(sandbox.container.innerHTML, /stage3-week-context-toggle/);
+assert.doesNotMatch(sandbox.container.innerHTML, /weekly-hr-stage3-table/);
+
+const renderSection = source.slice(source.indexOf('function renderWeeklyHrStage3'),
+    source.indexOf('function findStage3PendingItem'));
+assert.doesNotMatch(renderSection, /fetch\(|axios|XMLHttpRequest/,
+    'η παρουσίαση δεν προσθέτει HTTP N+1');
+assert.match(source, /final_classification:\s*selection/);
+assert.match(source, /body:\s*JSON\.stringify\(\{ ypokatasthma: item\.ypokatasthma/);
+assert.match(source, /renderWeeklyHrStage2LifecycleFallback\(lifecycle\);[\s\S]*renderWeeklyHrStage3\(lifecycle\)/);
+assert.match(source, /renderStage4|STAGE4/);
+assert.match(source, /pending_count: entries\.reduce/);
+console.log('Stage-3 weekly decision context and actionable UI contracts passed');

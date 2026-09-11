@@ -214,11 +214,23 @@ assert.doesNotMatch(openedDialog.html, /<th>Εργαζόμενος<\/th>|<th[^>]
 const actionTable = uiSandbox.presentation.renderDeferredWeekGroups([{
     handoff_from_previous_period: true, week_start: '2025-12-29', week_end: '2026-01-04',
     employee_entries: [{ deferred_week_id: 'week-1', employee_kodikos: '0031',
+        authoritative_frozen_identity_present: true,
         resolution_status: 'REQUIRED', source_candidates: [{ prodhlomena_oraria_id: 's' }],
         target_candidates: [{ prodhlomena_oraria_id: 't' }] }]
 }]);
 assert.match(actionTable, /<th class="text-center">Ενέργεια<\/th>/);
 assert.match(actionTable, /data-deferred-repo-resolve="week-1"/);
+const invalidActionTable = uiSandbox.presentation.renderDeferredWeekGroups([{
+    handoff_from_previous_period: true, week_start: '2025-12-29', week_end: '2026-01-04',
+    employee_entries: [{ deferred_week_id: 'week-missing-target', employee_kodikos: '0031',
+        authoritative_frozen_identity_present: true,
+        resolution_status: 'REQUIRED', source_candidates: [{ prodhlomena_oraria_id: 's' }],
+        target_candidates: [] }]
+}]);
+assert.doesNotMatch(invalidActionTable, /data-deferred-repo-resolve/);
+assert.doesNotMatch(invalidActionTable, /<th class="text-center">Ενέργεια<\/th>/);
+assert.match(invalidActionTable, /Διαθέσιμες ημέρες χωρίς εργασία[\s\S]*—/);
+assert.match(invalidActionTable, /Η επιλογή ρεπό δεν είναι διαθέσιμη/);
 uiSandbox.presentation.beginBoundaryInfoSearchResult();
 uiSandbox.presentation.renderEmploymentReviewBoundaryContextSummary();
 uiSandbox.presentation.autoOpenBoundaryInfoForSearchResult();

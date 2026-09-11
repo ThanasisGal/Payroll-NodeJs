@@ -45,4 +45,7 @@ assert.deepEqual(result({ ...duplicateSources,
     period_slice: { actionable_dates: [] }
 }), uniqueSortedDates);
 
+assert.match(source, /Η αποθήκευση του Σταδίου 1 δεν είναι ακόμη διαθέσιμη επειδή δεν έχουν ενεργοποιηθεί οι απαιτούμενες δικλείδες της εβδομαδιαίας ροής HR\./);
+assert.doesNotMatch(source, /Η λειτουργία εγγραφής δεν έχει ακόμη ενεργοποιηθεί στη βάση\./);
+
 console.log('Stage 1 actionable dates regression tests: PASS');
