@@ -51,15 +51,18 @@ const committedSuccessPath = frontendApply.slice(frontendApply.indexOf('Swal.clo
 assert.ok(!committedSuccessPath.includes('button.disabled = false'));
 assert.ok(/generallyEnabled[\s\S]*=== 'true'/.test(read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.js')));
 const batchSource = read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService.js');
+const preparedResolverSource = read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferPreparedStage2ResolverService.js');
 assert.ok(batchSource.includes('week_start: mongoose.trusted({ $lte: normalized.end.date })'));
 assert.ok(batchSource.includes('week_end: mongoose.trusted({ $gte: normalized.start.date })'));
 assert.ok(!batchSource.includes('proposal_id: mongoose.trusted({ $in: proposalIds })'));
 assert.strictEqual((batchSource.match(/executionModel\.find\(/g) || []).length, 1);
-assert.ok(batchSource.includes('executedDecisionIds'));
-assert.ok(batchSource.indexOf("if (execution) apply_state = 'ALREADY_APPLIED'") < batchSource.indexOf("if (!authorized) apply_state = 'NOT_AUTHORIZED'"));
+assert.ok(preparedResolverSource.includes('const executionByDecisionId = new Map'));
+assert.ok(preparedResolverSource.includes('executionByDecisionId.has(String(decision._id))'));
+assert.ok(preparedResolverSource.indexOf("if (execution) applyState = 'ALREADY_APPLIED'") < preparedResolverSource.indexOf("if (applyProtection.authorized !== true) applyState = 'NOT_AUTHORIZED'"));
 assert.ok(batchSource.includes('appliedOnlyRecords'));
-assert.ok(batchSource.includes("current_decision: null"));
-assert.ok(!/\.(updateOne|updateMany|findOneAndUpdate|bulkWrite|save|createIndex|createIndexes|syncIndexes)\s*\(/.test(batchSource));
+assert.ok(preparedResolverSource.includes("current_decision: null"));
+assert.ok(!/\.(updateOne|updateMany|findOneAndUpdate|bulkWrite|save|createIndex|createIndexes|syncIndexes)\s*\(/.test(
+    `${batchSource}\n${preparedResolverSource}`));
 const renderGroupSource = read(runtimeFiles[3]).slice(read(runtimeFiles[3]).indexOf('function renderAtomicRepoTransferGroup'), read(runtimeFiles[3]).indexOf('function bindAtomicRepoTransferEvents'));
 assert.ok(renderGroupSource.includes("applyState === 'ALREADY_APPLIED' && decisionState?.current_execution"));
 assert.ok(renderGroupSource.indexOf("applyState === 'ALREADY_APPLIED'") < renderGroupSource.indexOf("!isCurrentApproval ? ''"));
