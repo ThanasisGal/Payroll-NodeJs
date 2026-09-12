@@ -239,9 +239,22 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             if ([...correctableIdentityFields].some(field => field !== 'hmeromhnia_apoxorhshs')) {
                 C.invalid('correctableIdentityFields', 'unsupported maintenance identity correction');
             }
-            const selection = !editorOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION
-                ? (rows.length ? selectMaintenanceMode(rows, maintenance.identity) :
-                    { mode: MODE_NEW_VERSION, historyId: null }) : { mode, historyId };
+            let selection = { mode, historyId };
+            if (!editorOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION) {
+                const originalHistoryId = maintenance.originalHistoryId;
+                if (originalHistoryId) {
+                    const originalTarget = rows.find(row => String(row._id) === String(originalHistoryId));
+                    if (!originalTarget || !effectiveStart(originalTarget)) {
+                        throw failure('EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH');
+                    }
+                    selection = effectiveStart(originalTarget).getTime() === from.getTime()
+                        ? { mode: MODE_CORRECT_EXISTING, historyId: String(originalTarget._id) }
+                        : { mode: MODE_NEW_VERSION, historyId: null };
+                } else {
+                    selection = rows.length ? selectMaintenanceMode(rows, maintenance.identity) :
+                        { mode: MODE_NEW_VERSION, historyId: null };
+                }
+            }
             const selectedHistoryId = selection.historyId;
             if (selection.mode === MODE_CORRECT_EXISTING) {
                 const target = rows.find((row) => String(row._id) === selectedHistoryId);

@@ -30,7 +30,27 @@ function finishEmployeeUpdateAfterUploads(uploadResults, redirect) {
     return true;
 }
 
+function withCompactOrdinarySwalClasses(options) {
+    if (!options || typeof options !== 'object' || options.customClass || options.didOpen ||
+        options.willOpen || options.toast) return options;
+    const icon = options.icon;
+    const variant = icon === 'error' ? 'error' : icon === 'success' ? 'success' :
+        icon === 'warning' ? 'warning' : 'info';
+    return { ...options, customClass: {
+        confirmButton: `class-${variant} custom-confirm-button custom-swal-button`,
+        title: 'custom-title', popup: 'custom-swal-popup', htmlContainer: 'custom-html-container'
+    } };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    const Swal = new Proxy(window.Swal, {
+        get(target, property) {
+            if (property === 'fire') return options =>
+                target.fire(withCompactOrdinarySwalClasses(options));
+            const value = target[property];
+            return typeof value === 'function' ? value.bind(target) : value;
+        }
+    });
     const isEmpty = (v) => !String(v ?? '').trim();
     const isEmptyArray = (v) => !Array.isArray(v) || v.length === 0;
     let message = '';

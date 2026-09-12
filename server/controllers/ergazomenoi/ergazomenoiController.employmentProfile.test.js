@@ -332,6 +332,46 @@ test('EDIT new version has complete work terms, contract values and all profile 
     assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_eos.slice(0, 10), '2026-09-14');
     assert.equal(db.state().history[0][C.ENABLED], false);
 });
+test('EDIT loaded historyId creates a new version when synchronized effective date moves forward', async () => {
+    const stored = await initial();
+    const original = plain(stored.history[0]);
+    const { db, res } = await submit('edit', { ...form(), istorikoId: original._id,
+        hmeromhnia_allaghs_symbashs: '2026-09-13',
+        hmeromhnia_allaghs_orarioy_apo: '2026-09-13',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-13',
+        hmeromhnia_allaghs_orarioy_eos: '2026-09-19',
+        kathestos_apasxolhshs: '1', kathestos_apasxolhshs_stathera: '1',
+        hmeres_ergasias_ebdomadas: 3, ores_ergasias_ebdomadas: 24,
+        mo_oron_hmerhsias_ergasias: 8 }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().history.length, 2);
+    assert.equal(db.state().history[0]._id, original._id);
+    assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_eos.slice(0, 10), '2026-09-12');
+    assert.equal(db.state().history[1].hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-13');
+    assert.equal(db.state().history[1].typos_apasxolhshs, '1');
+    for (const record of [db.state().history[1], db.state().employee]) {
+        assert.equal(record.kathestos_apasxolhshs, '1');
+        assert.equal(record.hmeres_ergasias_ebdomadas, 3);
+        assert.equal(record.ores_ergasias_ebdomadas, 24);
+    }
+});
+
+test('EDIT loaded historyId still rejects retrospective and non-exact duplicate dates', async () => {
+    const stored = await twoVersions();
+    for (const [istorikoId, effectiveFrom] of [
+        [stored.history[1]._id, '2026-08-01'],
+        [stored.history[0]._id, '2026-09-15']
+    ]) {
+        const db = memory(stored);
+        const { res } = await submit('edit', { ...form(), istorikoId,
+            hmeromhnia_allaghs_symbashs: effectiveFrom,
+            hmeromhnia_allaghs_orarioy_apo: effectiveFrom,
+            hmeromhnia_isxyos_oron_ergasias_apo: effectiveFrom }, db);
+        assert.equal(res.code, 409);
+        assert.equal(res.body.reason, 'EMPLOYEE_PROFILE_NON_APPEND_CHANGE');
+        assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
+    }
+});
 test('EDIT correction history failure rolls back personal fields and profile together', async () => {
     const stored = await initial(enabled); const db = memory(stored, 'history');
     const { res } = await submit('edit', { ...form(), [C.ENABLED]: false, eponymoHidden: 'Changed' }, db);
