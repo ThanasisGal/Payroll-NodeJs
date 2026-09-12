@@ -1525,13 +1525,33 @@ document.addEventListener('DOMContentLoaded', () => {
                                     title: uploadResult?.success
                                         ? 'Επιτυχής προσωρινή καταχώριση XML'
                                         : 'Αποτυχία προσωρινής καταχώρισης XML',
-                                    text: uploadResult?.message || uploadResult?.error || ''
+                                    text: uploadResult?.message || uploadResult?.error || '',
+                                    confirmButtonText: 'OK',
+                                    customClass: {
+                                        confirmButton: uploadResult?.success
+                                            ? 'class-success custom-confirm-button custom-swal-button'
+                                            : 'class-error custom-confirm-button custom-swal-button',
+                                        title: 'custom-title',
+                                        popup: 'custom-swal-popup',
+                                        htmlContainer: 'custom-html-container'
+                                    }
                                 })
                             });
                         } catch (error) {
                             maResult = { success: false, error: error?.message || String(error) };
-                            await Swal.fire({ backdrop: false, icon: 'error',
-                                title: 'Αποτυχία προσωρινής καταχώρισης XML', text: maResult.error });
+                            await Swal.fire({
+                                backdrop: false,
+                                icon: 'error',
+                                title: 'Αποτυχία προσωρινής καταχώρισης XML',
+                                text: maResult.error,
+                                confirmButtonText: 'OK',
+                                customClass: {
+                                    confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                                    title: 'custom-title',
+                                    popup: 'custom-swal-popup',
+                                    htmlContainer: 'custom-html-container'
+                                }
+                            });
                         }
                     }
 
