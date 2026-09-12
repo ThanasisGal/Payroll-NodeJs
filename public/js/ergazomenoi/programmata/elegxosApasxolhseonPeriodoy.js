@@ -9316,8 +9316,11 @@ function stage2LifecycleNonWorkTerms(value) {
 }
 
 async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
+    const scope = getActiveEmploymentReviewScope();
     const query = new URLSearchParams({ exception_page: exceptionPage,
-        preview_fingerprint: currentWeeklyHrStage2BulkPreview?.preview_fingerprint || '' });
+        preview_fingerprint: currentWeeklyHrStage2BulkPreview?.preview_fingerprint || '',
+        period_start: scope.apo_hmeromhnia, period_end: scope.eos_hmeromhnia,
+        ypokatasthma: scope.ypokatasthma });
     const response = await fetch('/api/prodhlomena-oraria/review/weekly-hr-workflow/' +
         `stage2/bulk-preview?${query.toString()}`, { headers: { Accept: 'application/json',
             'CSRF-Token': csrfToken }, credentials: 'same-origin' });
@@ -9396,26 +9399,57 @@ async function completeWeeklyHrStage2BulkFromUi() {
         `stage2-bulk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     weeklyHrStage2BulkSubmitting = true;
     renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
+    let progressAlert = null;
     try {
         const token = await ensureCsrfToken();
-        const response = await fetch('/api/prodhlomena-oraria/review/weekly-hr-workflow/' +
-            'stage2/bulk-complete', { method: 'POST', credentials: 'same-origin', headers: {
-                'Content-Type': 'application/json', Accept: 'application/json',
-                'CSRF-Token': token, 'x-csrf-token': token }, body: JSON.stringify({
+        const endpoint = '/api/prodhlomena-oraria/review/weekly-hr-workflow/' +
+            'stage2/bulk-complete';
+        const commonBody = {
                 period_start: scope.apo_hmeromhnia, period_end: scope.eos_hmeromhnia,
                 ypokatasthma: scope.ypokatasthma,
                 bulk_request_id: weeklyHrStage2BulkRequestId,
                 reason_or_notes: String(confirmation.value || '').trim(),
-                expected_preview_fingerprint: preview.preview_fingerprint }) });
-        const result = await response.json();
-        if (!response.ok || !result.success) throw new Error(result.message ||
-            'Η μαζική ενημέρωση Stage 2 απέτυχε.');
-        await employmentReviewSwal({ icon: result.failed || result.stale ? 'warning' : 'success',
-            title: 'Μαζική ενημέρωση Stage 2', text: `Εφαρμόστηκαν: ${result.applied}. ` +
-                `Ήδη ολοκληρωμένες: ${result.already_completed}. Παρωχημένες: ${result.stale}. ` +
-                `Αποτυχίες: ${result.failed}.` });
+                expected_preview_fingerprint: preview.preview_fingerprint };
+        const totals = { applied: 0, already_completed: 0, stale: 0, failed: 0,
+            skipped_manual: 0 };
+        let continuationToken = null; let processed = 0; let hasMore = true;
+        progressAlert = employmentReviewSwal({ title: 'Μαζική ενημέρωση Stage 2',
+            html: `Επεξεργασία 0 / ${preview.safe_bulk_count}`, allowOutsideClick: false,
+            allowEscapeKey: false, showConfirmButton: false,
+            didOpen: () => Swal.showLoading() });
+        while (hasMore) {
+            const body = { ...commonBody, continuation_token: continuationToken };
+            let response;
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    response = await fetch(endpoint, { method: 'POST',
+                        credentials: 'same-origin', headers: { 'Content-Type': 'application/json',
+                            Accept: 'application/json', 'CSRF-Token': token,
+                            'x-csrf-token': token }, body: JSON.stringify(body) });
+                    break;
+                } catch (error) {
+                    if (attempt === 1) throw error;
+                }
+            }
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.message ||
+                'Η μαζική ενημέρωση Stage 2 απέτυχε.');
+            for (const key of Object.keys(totals)) totals[key] += Number(result[key] || 0);
+            processed += Number(result.processed_in_batch || 0);
+            hasMore = result.has_more === true;
+            continuationToken = result.continuation_token || null;
+            Swal.update({ html: `Επεξεργασία ${processed} / ${preview.safe_bulk_count}` });
+        }
+        Swal.close();
+        if (progressAlert) await progressAlert;
+        progressAlert = null;
+        await employmentReviewSwal({ icon: totals.failed || totals.stale ? 'warning' : 'success',
+            title: 'Μαζική ενημέρωση Stage 2', text: `Εφαρμόστηκαν: ${totals.applied}. ` +
+                `Ήδη ολοκληρωμένες: ${totals.already_completed}. Παρωχημένες: ${totals.stale}. ` +
+                `Αποτυχίες: ${totals.failed}.` });
         await loadResults();
     } catch (error) {
+        if (progressAlert) { Swal.close(); await progressAlert; progressAlert = null; }
         await employmentReviewSwal({ icon: 'error', title: 'Η μαζική ενημέρωση απέτυχε',
             text: error.message });
     } finally { weeklyHrStage2BulkSubmitting = false; }

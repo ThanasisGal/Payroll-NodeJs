@@ -481,18 +481,15 @@ const { buildWeeklyHrStage2BulkPreview, publicWeeklyHrStage2BulkPreview } = requ
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkPreviewService');
 const { completeWeeklyHrWorkflowStage2Bulk } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2BulkCompletionService');
+const { WeeklyHrStage2BulkStateCache } = require(
+    '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkStateCacheService');
 const { writeCanonicalDailyClassification } = require(
     '../../services/ergazomenoi/apasxoliseisCanonicalDailyClassificationWriterService');
-const STAGE2_BULK_PREVIEW_CACHE_LIMIT = 50;
-const stage2BulkPreviewExceptionCache = new Map();
-function cacheStage2BulkPreviewExceptions(preview) {
-    if (!preview?.preview_fingerprint) return;
-    stage2BulkPreviewExceptionCache.set(preview.preview_fingerprint, {
-        createdAt: Date.now(), exceptions: preview._all_exceptions || [],
-        pageSize: preview.exception_page_size || 50 });
-    while (stage2BulkPreviewExceptionCache.size > STAGE2_BULK_PREVIEW_CACHE_LIMIT) {
-        stage2BulkPreviewExceptionCache.delete(stage2BulkPreviewExceptionCache.keys().next().value);
-    }
+const stage2BulkStateCache = new WeeklyHrStage2BulkStateCache();
+function stage2BulkRequestScope(req, input = {}) {
+    return { team: req.session.userTeam, company_kod: req.session.companyInUse,
+        ypokatasthma: input.ypokatasthma, period_start: input.period_start,
+        period_end: input.period_end, user_id: req.session.userId };
 }
 const {
     resolveWeeklyHrStage3Day: executeWeeklyHrStage3Day
@@ -7706,9 +7703,12 @@ class erganhController {
                         period_writable: ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(
                             stage2PeriodAccess.state?.effective_mode) };
                 });
+            const stage2PreviewScope = stage2BulkRequestScope(req, {
+                ypokatasthma, period_start: reviewPeriodStart, period_end: reviewPeriodEnd });
             const internalStage2BulkPreview = buildWeeklyHrStage2BulkPreview({
-                contexts: stage2BulkContexts });
-            cacheStage2BulkPreviewExceptions(internalStage2BulkPreview);
+                contexts: stage2BulkContexts, preview_scope: stage2PreviewScope });
+            stage2BulkStateCache.put({ preview: internalStage2BulkPreview,
+                scope: stage2PreviewScope });
             const stage2BulkPreview = publicWeeklyHrStage2BulkPreview(
                 internalStage2BulkPreview);
             const canonicalLifecycleRows = enrichedRows;
@@ -11965,18 +11965,12 @@ class erganhController {
     static previewWeeklyHrWorkflowStage2Bulk = async (req, res) => {
         try {
             const fingerprint = String(req.query.preview_fingerprint || '');
-            const cached = stage2BulkPreviewExceptionCache.get(fingerprint);
-            if (!cached || Date.now() - cached.createdAt > 10 * 60 * 1000) {
-                throw weeklyHrApiError('STAGE2_BULK_PREVIEW_EXPIRED', 409,
-                    'Η προεπισκόπηση έληξε. Εκτελέστε ξανά την αναζήτηση.');
-            }
-            const pageSize = Math.min(50, cached.pageSize); const page = Math.max(1,
-                Number(req.query.exception_page) || 1); const offset = (page - 1) * pageSize;
+            const pageResult = stage2BulkStateCache.exceptionPage({
+                preview_fingerprint: fingerprint,
+                scope: stage2BulkRequestScope(req, req.query),
+                exception_page: req.query.exception_page });
             return res.json({ success: true, preview_fingerprint: fingerprint,
-                exceptions: cached.exceptions.slice(offset, offset + pageSize),
-                exception_page: page, exception_page_size: pageSize,
-                exception_page_count: Math.max(1,
-                    Math.ceil(cached.exceptions.length / pageSize)) });
+                ...pageResult });
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'STAGE2_BULK_PREVIEW_FAILED',
@@ -11991,7 +11985,12 @@ class erganhController {
             const actor = { user_id: req.session.userId,
                 user_name: req.session.userName || req.session.username ||
                     String(req.session.userId || ''), role: req.session.userRole };
+            const batch = stage2BulkStateCache.batch({
+                preview_fingerprint: req.body.expected_preview_fingerprint,
+                continuation_token: req.body.continuation_token,
+                scope: stage2BulkRequestScope(req, req.body) });
             const result = await completeWeeklyHrWorkflowStage2Bulk({ ...req.body, actor,
+                batch_scopes: batch.scopes,
                 commonGuard: async () => {
                     await assertWeeklyHrWorkflowIndexesReady();
                     prepared = await loadWeeklyHrStage2BulkPreparedContexts({ req, input: req.body });
@@ -12001,10 +12000,14 @@ class erganhController {
                     expected_scope_fingerprint, bulk_kind }) => {
                     const currentScope = buildWeeklyHrStage2BulkPreview({ contexts: [context] })
                         .safe_scope_ids[0];
-                    if (!currentScope || currentScope.scope_fingerprint !==
-                        expected_scope_fingerprint) throw weeklyHrApiError(
+                    const alreadyCompleted = context?.workflowState?.stage2?.status ===
+                        'COMPLETED' || Boolean(context?.preparedStage2Record?.current_execution);
+                    if ((!currentScope && !alreadyCompleted) || (currentScope &&
+                        currentScope.scope_fingerprint !== expected_scope_fingerprint)) {
+                        throw weeklyHrApiError(
                         'STAGE2_INPUT_CHANGED', 409,
                         'Τα authoritative δεδομένα του Stage 2 άλλαξαν.');
+                    }
                     if (bulk_kind === 'SAFE_PAIR_TRANSFER') {
                         const command = context.preparedStage2Record?.current_proposal?.command;
                         const preparedPair = context.preparedStage2Pair;
@@ -12077,7 +12080,11 @@ class erganhController {
                             return fenced.result;
                         } });
                 } });
-            return res.json({ success: true, ...result });
+            return res.json({ success: true, ...result,
+                skipped_manual: batch.skipped_manual,
+                processed_in_batch: batch.processed_in_batch,
+                remaining: batch.remaining, has_more: batch.has_more,
+                continuation_token: batch.continuation_token });
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'WEEKLY_HR_STAGE2_BULK_COMPLETION_FAILED',

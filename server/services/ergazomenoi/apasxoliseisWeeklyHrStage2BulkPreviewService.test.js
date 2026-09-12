@@ -85,4 +85,14 @@ function context(index, kind = 'safe') {
     const publicPreview = publicWeeklyHrStage2BulkPreview(preview);
     assert.equal(Object.hasOwn(publicPreview, 'safe_scope_ids'), false);
 }
+{
+    const contexts = [context(1)];
+    const left = buildWeeklyHrStage2BulkPreview({ contexts, preview_scope: {
+        team: 'team-a', company_kod: 'company-a', ypokatasthma: '0001',
+        period_start: '2026-05-01', period_end: '2026-05-31' } });
+    const right = buildWeeklyHrStage2BulkPreview({ contexts, preview_scope: {
+        team: 'team-a', company_kod: 'company-b', ypokatasthma: '0001',
+        period_start: '2026-05-01', period_end: '2026-05-31' } });
+    assert.notEqual(left.preview_fingerprint, right.preview_fingerprint);
+}
 console.log('weekly HR Stage-2 bulk preview tests passed');

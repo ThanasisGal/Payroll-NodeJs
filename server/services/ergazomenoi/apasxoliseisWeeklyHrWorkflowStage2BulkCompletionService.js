@@ -31,8 +31,8 @@ function statusFor(error) {
 
 async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, ypokatasthma,
     bulk_request_id, reason_or_notes, expected_preview_fingerprint, actor,
-    loadPreparedContexts, completePreparedScope, commonGuard = async () => {},
-    chunk_size = WRITE_CHUNK_SIZE } = {}) {
+    batch_scopes = [], loadPreparedContexts, completePreparedScope,
+    commonGuard = async () => {} } = {}) {
     assertCriticalEmploymentDecisionRole({ userRole: actor?.role });
     const requestId = String(bulk_request_id || '').trim();
     const reason = String(reason_or_notes || '').trim();
@@ -47,29 +47,28 @@ async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, yp
         fail('STAGE2_BULK_SAFE_COMMAND_UNAVAILABLE',
             'Δεν είναι διαθέσιμη ασφαλής μαζική ολοκλήρωση Stage 2.', 503);
     }
+    if (!Array.isArray(batch_scopes) || batch_scopes.length > WRITE_CHUNK_SIZE) {
+        fail('STAGE2_BULK_BATCH_INVALID',
+            `Κάθε παρτίδα επιτρέπεται να περιέχει έως ${WRITE_CHUNK_SIZE} scopes.`);
+    }
     await commonGuard({ period_start, period_end, ypokatasthma, actor });
     const contexts = await loadPreparedContexts({ period_start, period_end, ypokatasthma });
-    const preview = buildWeeklyHrStage2BulkPreview({ contexts });
-    if (preview.preview_fingerprint !== expected_preview_fingerprint) {
-        fail('STAGE2_BULK_PREVIEW_CHANGED',
-            'Η προεπισκόπηση Stage 2 άλλαξε. Απαιτείται νέα φόρτωση.', 409);
-    }
     const byIdentity = new Map(contexts.map((context) => [identityKey({
         employee_id: String(context.scope?.employee_id || ''),
         week_start: dateKeyUtc(context.scope?.week_start),
         week_end: dateKeyUtc(context.scope?.week_end)
     }), context]));
     const results = [];
-    const size = Math.max(1, Math.min(200, Number(chunk_size) || WRITE_CHUNK_SIZE));
-    for (let offset = 0; offset < preview.safe_scope_ids.length; offset += size) {
-        const chunk = preview.safe_scope_ids.slice(offset, offset + size);
-        for (const scope of chunk) {
+    for (const scope of batch_scopes) {
             const context = byIdentity.get(identityKey(scope));
             try {
                 const currentScope = buildWeeklyHrStage2BulkPreview({ contexts: [context] })
                     .safe_scope_ids[0];
-                if (!currentScope || currentScope.scope_fingerprint !== scope.scope_fingerprint ||
-                    currentScope.bulk_kind !== scope.bulk_kind) {
+                const alreadyCompleted = context?.workflowState?.stage2?.status === 'COMPLETED' ||
+                    Boolean(context?.preparedStage2Record?.current_execution);
+                if ((!currentScope && !alreadyCompleted) || (currentScope &&
+                    (currentScope.scope_fingerprint !== scope.scope_fingerprint ||
+                    currentScope.bulk_kind !== scope.bulk_kind))) {
                     const stale = new Error('Το scope άλλαξε μετά την προεπισκόπηση.');
                     stale.code = 'STAGE2_INPUT_CHANGED'; throw stale;
                 }
@@ -83,15 +82,13 @@ async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, yp
                 results.push({ scope, status: statusFor(error),
                     code: String(error?.code || 'STAGE2_BULK_SCOPE_FAILED') });
             }
-        }
     }
     const count = (status) => results.filter((item) => item.status === status).length;
     const diagnosticResults = results.filter((item) =>
         ['STALE', 'FAILED'].includes(item.status)).slice(0, 100);
-    return { total_scopes: preview.total_scopes, applied: count('APPLIED'),
-        already_completed: preview.already_resolved_count + count('ALREADY_COMPLETED'),
-        skipped_manual: preview.manual_exception_count, stale: count('STALE'),
-        failed: count('FAILED'), preview_fingerprint: preview.preview_fingerprint,
+    return { applied: count('APPLIED'), already_completed: count('ALREADY_COMPLETED'),
+        skipped_manual: 0, stale: count('STALE'), failed: count('FAILED'),
+        preview_fingerprint: expected_preview_fingerprint,
         result_details: diagnosticResults, result_details_truncated:
             diagnosticResults.length < results.filter((item) =>
                 ['STALE', 'FAILED'].includes(item.status)).length };

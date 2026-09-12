@@ -20,4 +20,7 @@ assert.doesNotMatch(controller.match(/static completeWeeklyHrWorkflowStage2Bulk[
 assert.match(controller, /writeCanonicalDailyClassification/);
 assert.match(controller, /runWithPeriodWriteFence/);
 assert.match(controller, /expected_scope_fingerprint/);
+assert.match(controller, /stage2BulkStateCache\.batch/);
+assert.match(controller, /continuation_token: batch\.continuation_token/);
+assert.match(controller, /stage2BulkRequestScope/);
 console.log('weekly HR Stage-2 bulk controller contract tests passed');

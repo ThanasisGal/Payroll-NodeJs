@@ -39,4 +39,13 @@ assert.match(source, /stage2\/bulk-complete/);
 const loadResultsSource = source.match(/async function loadResults\([\s\S]*?\n}/)?.[0] || '';
 assert.match(loadResultsSource, /payload\.stage2BulkPreview/);
 assert.doesNotMatch(loadResultsSource, /await loadWeeklyHrStage2BulkPreview/);
+const completionStart = source.indexOf('async function completeWeeklyHrStage2BulkFromUi');
+const completionEnd = source.indexOf('function renderWeeklyHrStage2LifecycleFallback',
+    completionStart);
+const completionSource = source.slice(completionStart, completionEnd);
+assert.match(completionSource, /while \(hasMore\)/);
+assert.match(completionSource, /continuation_token: continuationToken/);
+assert.match(completionSource, /processed_in_batch/);
+assert.match(completionSource, /Swal\.update\(\{ html: `Επεξεργασία/);
+assert.equal((completionSource.match(/stage2\/bulk-complete/g) || []).length, 1);
 console.log('weekly HR Stage-2 compact bulk UI tests passed');

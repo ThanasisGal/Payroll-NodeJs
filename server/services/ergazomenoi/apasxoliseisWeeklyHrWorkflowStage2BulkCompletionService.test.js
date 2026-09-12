@@ -34,6 +34,7 @@ function context(index, kind = 'safe') {
     const args = { period_start: '2026-05-01', period_end: '2026-05-31', ypokatasthma: '0001',
         bulk_request_id: 'bulk-stage2-0001', reason_or_notes: 'Μαζική ενημέρωση',
         expected_preview_fingerprint: preview.preview_fingerprint,
+        batch_scopes: preview.safe_scope_ids,
         actor: { role: 'HR' }, commonGuard: async () => { guards++; },
         loadPreparedContexts: async () => { loads++; return contexts; },
         completePreparedScope: async ({ context: item, request_id,
@@ -47,7 +48,7 @@ function context(index, kind = 'safe') {
         } };
     const first = await completeWeeklyHrWorkflowStage2Bulk(args);
     assert.deepEqual({ applied: first.applied, stale: first.stale, failed: first.failed,
-        skipped: first.skipped_manual }, { applied: 2, stale: 1, failed: 0, skipped: 1 });
+        skipped: first.skipped_manual }, { applied: 2, stale: 1, failed: 0, skipped: 0 });
     assert.equal(loads, 1); assert.equal(guards, 1);
     assert.equal(new Set(calls).size, 3);
     assert.equal(checkedFingerprints.every((value) => /^[a-f0-9]{64}$/.test(value)), true);
@@ -57,13 +58,15 @@ function context(index, kind = 'safe') {
     assert.equal(loads, 2); assert.equal(guards, 2);
     assert.equal(childRequestId('bulk-stage2-0001', preview.safe_scope_ids[0]), calls[0]);
     await assert.rejects(() => completeWeeklyHrWorkflowStage2Bulk({ ...args,
-        expected_preview_fingerprint: 'b'.repeat(64) }), { code: 'STAGE2_BULK_PREVIEW_CHANGED' });
+        batch_scopes: Array.from({ length: 101 }, () => preview.safe_scope_ids[0]) }),
+    { code: 'STAGE2_BULK_BATCH_INVALID' });
     {
         const concurrentContexts = [context(8)];
         const concurrentPreview = buildWeeklyHrStage2BulkPreview({ contexts: concurrentContexts });
         const claimed = new Set();
         const concurrentArgs = { ...args, bulk_request_id: 'bulk-stage2-concurrent-0001',
             expected_preview_fingerprint: concurrentPreview.preview_fingerprint,
+            batch_scopes: concurrentPreview.safe_scope_ids,
             loadPreparedContexts: async () => concurrentContexts,
             completePreparedScope: async ({ request_id }) => {
                 const idempotent = claimed.has(request_id); claimed.add(request_id);

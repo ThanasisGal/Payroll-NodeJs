@@ -50,7 +50,12 @@ function preparedSafePair(context = {}) {
         decision_required: record?.current_decision?.decision_code !== 'APPROVE_PROPOSAL' };
 }
 
-function buildWeeklyHrStage2BulkPreview({ contexts = [], exception_page = 1,
+function canonicalPreviewScope(scope = {}) {
+    return { team: text(scope.team), company_kod: text(scope.company_kod),
+        ypokatasthma: text(scope.ypokatasthma),
+        period_start: dateKeyUtc(scope.period_start), period_end: dateKeyUtc(scope.period_end) };
+}
+function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exception_page = 1,
     exception_page_size = EXCEPTION_PAGE_SIZE } = {}) {
     if (!Array.isArray(contexts)) throw new TypeError('contexts must be an array.');
     const safe = []; const resolved = []; const exceptions = [];
@@ -106,7 +111,8 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], exception_page = 1,
     resolved.sort((a, b) => identityKey(a).localeCompare(identityKey(b)));
     exceptions.sort((a, b) => identityKey(a).localeCompare(identityKey(b)));
     const previewFingerprint = crypto.createHash('sha256').update(stableStringify({
-        contract: 'weekly-hr-stage2-bulk-preview:v1',
+        contract: 'weekly-hr-stage2-bulk-preview:v2',
+        scope: canonicalPreviewScope(preview_scope),
         safe: safe.map(({ employee_id, week_start, week_end, scope_fingerprint }) =>
             ({ employee_id, week_start, week_end, scope_fingerprint })),
         resolved: resolved.map(({ employee_id, week_start, week_end }) =>
@@ -135,4 +141,5 @@ function publicWeeklyHrStage2BulkPreview(preview = {}) {
 }
 
 module.exports = { EXCEPTION_PAGE_SIZE, scopeIdentity, identityKey, preparedSafePair,
+    canonicalPreviewScope,
     buildWeeklyHrStage2BulkPreview, publicWeeklyHrStage2BulkPreview };
