@@ -1,5 +1,19 @@
 // public\js\ergazomenoi\genika\putFieldValues.js
 
+async function runTemporaryTerminationXmlAfterEmployeeSave({
+    employeeSaveSucceeded,
+    employeeId,
+    xmlReference,
+    processCode,
+    upload,
+    present
+}) {
+    if (!employeeSaveSucceeded || !employeeId) return { success: false, skipped: true };
+    const result = await upload(employeeId, xmlReference, false, processCode, 'xml');
+    await present(result);
+    return result;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const isEmpty = (v) => !String(v ?? '').trim();
     const isEmptyArray = (v) => !Array.isArray(v) || v.length === 0;
@@ -1543,22 +1557,43 @@ document.addEventListener('DOMContentLoaded', () => {
                                 console.warn('[MA-UPLOAD] Δεν εμφανίστηκε το progress UI.');
                             }
                             try {
-                                maResult = await uploadMaToErganh(
-                                    data.data._id,
-                                    maUrlToSend,
-                                    result.value?.isPermanent === true,
-                                    maXmlData?.processCode ||
+                                const processCode = maXmlData?.processCode ||
                                         (result.value?.ma_222 === true
                                             ? '222'
                                             : result.value?.ma_217 === true
                                               ? '217'
                                               : result.value?.ma_221 === true
                                                 ? '221'
-                                                : result.value?.ma_220 === true
+                                              : result.value?.ma_220 === true
                                                   ? '220'
-                                                  : undefined),
-                                    result.value?.erganiUploadMethod || 'xml'
-                                );
+                                                  : undefined);
+                                const isTemporaryTerminationXml =
+                                    result.value?.isPermanent !== true &&
+                                    result.value?.erganiUploadMethod === 'xml' &&
+                                    ['217', '222'].includes(String(processCode));
+                                maResult = isTemporaryTerminationXml
+                                    ? await runTemporaryTerminationXmlAfterEmployeeSave({
+                                          employeeSaveSucceeded: data?.success === true,
+                                          employeeId: data.data._id,
+                                          xmlReference: maUrlToSend,
+                                          processCode,
+                                          upload: uploadMaToErganh,
+                                          present: async (uploadResult) => Swal.fire({
+                                              backdrop: false,
+                                              icon: uploadResult?.success ? 'success' : 'error',
+                                              title: uploadResult?.success
+                                                  ? 'Επιτυχής προσωρινή καταχώριση XML'
+                                                  : 'Αποτυχία προσωρινής καταχώρισης XML',
+                                              text: uploadResult?.message || uploadResult?.error || ''
+                                          })
+                                      })
+                                    : await uploadMaToErganh(
+                                          data.data._id,
+                                          maUrlToSend,
+                                          result.value?.isPermanent === true,
+                                          processCode,
+                                          result.value?.erganiUploadMethod || 'xml'
+                                      );
 
                                 if (
                                     !isE7NRestSubmit &&

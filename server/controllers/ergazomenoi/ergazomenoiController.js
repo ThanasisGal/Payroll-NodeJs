@@ -1,5 +1,5 @@
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentHistoryOperations } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { MODE_CORRECT_EXISTING, writeEmployeeEmploymentProfile, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -833,6 +833,10 @@ class ergazomenoiController {
             console.time('ENRICH');
 
             const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
+            const originalEmploymentHistoryId = selectMaintenanceMode(
+                rawIstorikoData,
+                getIstorikoDateIdentity(ergazomenoiData)
+            ).historyId || '';
 
             console.timeEnd('ENRICH');
 
@@ -871,6 +875,7 @@ class ergazomenoiController {
                 companyData,
                 genikesParametroi,
                 istorikoData,
+                originalEmploymentHistoryId,
                 orariaData,
                 ergazomenoiData: {
                     ...ergazomenoiData,
@@ -3762,8 +3767,12 @@ class ergazomenoiController {
                 scope: { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy },
                 input: profileInput(formData, 'edit'), employeeId: ergazomenoiId,
                 effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo || formData.hmeromhnia_allaghs_orarioy_apo,
+                mode: formData.istorikoId ? MODE_CORRECT_EXISTING : undefined,
+                historyId: formData.istorikoId || null,
                 maintenance: { employeeChanges: filteredDataErgazomenoi,
-                    historyChanges: updateFieldsIstoriko, identity: getIstorikoDateIdentity(formData) }
+                    historyChanges: updateFieldsIstoriko,
+                    identity: formData.istorikoId ? undefined : getIstorikoDateIdentity(formData),
+                    correctableIdentityFields: formData.istorikoId ? ['hmeromhnia_apoxorhshs'] : [] }
             });
             updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);
 

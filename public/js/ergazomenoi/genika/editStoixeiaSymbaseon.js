@@ -228,6 +228,8 @@ async function clearSingleStoixeioRow(idNum) {
     const row = document.getElementById(`row_${idNum}`);
     const tom = selectEl?.tomselect;
 
+    if (selectEl?.dataset) delete selectEl.dataset.manualExtraApodoxes;
+
     if (tom) {
         try {
             removeLockedTomStyle(tom);
@@ -2455,6 +2457,7 @@ function findExistingExtraApodoxesRow() {
         const idNum = i.toString().padStart(2, '0');
         const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
         const hiddenEl = document.getElementById(`stoixeio_symbashs_${idNum}_hidden`);
+        if (selectEl?.dataset?.manualExtraApodoxes === 'true') return idNum;
         const selectedValue =
             selectEl?.tomselect?.getValue?.() || selectEl?.value || hiddenEl?.value || '';
         if (!selectedValue) continue;
@@ -2550,6 +2553,7 @@ async function applyExtraApodoxesToRow(idNum, extraItem, diafora) {
     const label = String(
         extraItem.label || extraItem.text || `${kodikos} - ${extraItem.perigrafh || ''}`
     );
+    if (selectEl?.dataset) selectEl.dataset.manualExtraApodoxes = 'true';
 
     // Μπλοκάρουμε προσωρινά τους αυτόματους handlers του stoixeio change,
     // γιατί αλλιώς μπορούν να ξαναγράψουν το posoBasei της EXTRA γραμμής σε 0.00.

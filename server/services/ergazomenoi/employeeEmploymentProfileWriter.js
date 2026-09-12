@@ -226,6 +226,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 !semanticEmploymentProfileChanged(current, maintenance, input);
             const patch = legacyMaintenance ? legacyMaintenancePatch(maintenance.employeeChanges, current) : cleanMaintenancePatch(maintenance?.employeeChanges);
             let historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
+            const correctableIdentityFields = new Set(maintenance?.correctableIdentityFields || []);
+            if ([...correctableIdentityFields].some(field => field !== 'hmeromhnia_apoxorhshs')) {
+                C.invalid('correctableIdentityFields', 'unsupported maintenance identity correction');
+            }
             const selection = !editorOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION
                 ? selectMaintenanceMode(rows, maintenance.identity) : { mode, historyId };
             const selectedHistoryId = selection.historyId;
@@ -287,7 +291,9 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 const correction = legacyMaintenance ? { ...historyPatch } : { ...historyPatch, ...snapshot,
                     afora_allagh_dialleimatos: true, hmeromhnia_isxyos_dialleimatos_apo: from };
                 // Corrections cannot move any identity date or overwrite the sequence.
-                for (const field of IDENTITY_FIELDS) delete correction[field];
+                for (const field of IDENTITY_FIELDS) {
+                    if (!correctableIdentityFields.has(field)) delete correction[field];
+                }
                 if (editorOperation) {
                     for (const field of IDENTITY_FIELDS) {
                         const value = historyPatch[field];

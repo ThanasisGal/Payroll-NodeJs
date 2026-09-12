@@ -98,7 +98,7 @@ function handler(mode, db) {
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     const constants = source.slice(source.indexOf('const fieldsStoixeionSymbashs'), source.indexOf('function parseS3Uri'));
     return vm.runInNewContext(`${constants}\n${helpers}\n(${body}\nreturn res.json({ success: true });\n})`, {
-        Date, console: { log() {}, error() {} }, mongoose, ...Terms, ...M, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
+        Date, console: { log() {}, error() {} }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
         ErgazomenoiModel: db.employeeModel, IstorikoProslhpseonAllagonModel: db.historyModel,
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps })
     });
@@ -274,6 +274,20 @@ test('EDIT omission preserves new fields and exact correction creates no duplica
     for (const field of C.FACT_FIELDS) assert.deepEqual(db.state().employee[field], stored.employee[field], field);
     assert.equal(db.state().history[0]._id, stored.history[0]._id);
 });
+for (const terminationType of ['ma_217', 'ma_222', 'ma_227']) test(
+    `EDIT ${terminationType} uses original historyId when departure identity changes`, async () => {
+        const stored = await initial();
+        stored.employee.hmeromhnia_apoxorhshs = null;
+        stored.history[0].hmeromhnia_apoxorhshs = null;
+        const originalId = stored.history[0]._id;
+        const { db, res } = await submit('edit', { ...form(), istorikoId: originalId,
+            hmeromhnia_apoxorhshs: '2026-09-10', terminationType }, memory(stored));
+        assert.equal(res.code, 200, res.body?.errorMessage);
+        assert.equal(db.state().history.length, 1);
+        assert.equal(db.state().history[0]._id, originalId);
+        assert.equal(db.state().history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
+    }
+);
 for (const [name, input, check] of [
     ['false', { [C.ENABLED]: false }, row => { assert.equal(row[C.ENABLED], false); assert.equal(row[C.TYPE], enabled[C.TYPE]); }],
     ['clear category', { [C.CATEGORY]: '' }, row => assert.equal(row[C.CATEGORY], null)],
@@ -423,7 +437,7 @@ test('all controller methods outside the three persistence seams are byte-identi
     const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
     const methods = code => new Map(code.split(/(?=^    static )/m).map(part => [part.match(/^    static (\w+)/)?.[1], part]));
     const before = methods(baseline), after = methods(source);
-    for (const [name, code] of before) if (name && !['postErgazomenoiForm', 'postErgazomenoiUpdate', 'updateIstorikoData'].includes(name)) {
+    for (const [name, code] of before) if (name && !['editErgazomenoiForm', 'postErgazomenoiForm', 'postErgazomenoiUpdate', 'updateIstorikoData'].includes(name)) {
         assert.equal(after.get(name), code, name);
     }
 });

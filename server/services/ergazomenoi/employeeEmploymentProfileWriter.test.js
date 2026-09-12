@@ -213,6 +213,47 @@ test('normal latest legacy Maintenance correction keeps its identity and creates
     assert.equal(C.readEmploymentProfile(db.state().history[0]).recorded, true);
 });
 
+for (const terminationType of ['ma_217', 'ma_222', 'ma_227']) test(
+    `exact Maintenance termination ${terminationType} corrects departure on the same history row`,
+    async () => {
+        const initial = correctionState();
+        initial.employee.hmeromhnia_apoxorhshs = null;
+        initial.history[1].hmeromhnia_apoxorhshs = null;
+        const db = database(initial);
+        const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+            employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'latest',
+            effectiveFrom: '2026-09-01', input: {}, maintenance: {
+                employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+                historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+                correctableIdentityFields: ['hmeromhnia_apoxorhshs']
+            } });
+        assert.equal(result.history._id, 'latest');
+        assert.equal(db.state().history.length, 2);
+        assert.equal(db.state().history[0].hmeromhnia_apoxorhshs ?? null, null);
+        assert.equal(new Date(db.state().history[1].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
+        assert.equal(new Date(db.state().employee.hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
+    }
+);
+
+test('exact older termination correction targets only its historyId with a later row present', async () => {
+    const initial = correctionState();
+    initial.history[0].hmeromhnia_apoxorhshs = null;
+    const db = database(initial);
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'old',
+        effectiveFrom: '2026-04-01', input: Object.fromEntries(C.FACT_FIELDS
+            .filter(field => ![C.SCHEMA_VERSION, C.TYPE_VERSION].includes(field))
+            .map(field => [field, initial.history[0][field]])), maintenance: {
+            employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-06-30') },
+            historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-06-30') },
+            correctableIdentityFields: ['hmeromhnia_apoxorhshs']
+        } });
+    assert.equal(db.state().history.length, 2);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-06-30');
+    assert.deepEqual(db.state().history[1], initial.history[1]);
+    assert.deepEqual(db.state().employee, initial.employee);
+});
+
 test('no-change Maintenance selects real May version and preserves non-terms history noise', async () => {
     const { IDENTITY_FIELDS } = require('../../utils/ergazomenoi/employmentProfileTransition');
     const { selectMaintenanceMode, MODE_LEGACY_MAINTENANCE } = require('./employeeEmploymentProfileWriter');
