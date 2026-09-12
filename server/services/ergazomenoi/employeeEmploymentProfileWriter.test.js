@@ -281,3 +281,52 @@ test('no-change Maintenance selects real May version and preserves non-terms his
     error => error.code === 'EMPLOYEE_PROFILE_HISTORY_OVERLAP');
     assert.equal(conflicting.writes(), 0);
 });
+
+function noHistoryMaintenanceState(dates = {}) {
+    return { employee: { _id: 'employee', ...scope, eponymo: 'Imported',
+        hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_allaghs_orarioy_apo: null,
+        hmeromhnia_proslhpshs: null,
+        ...dates }, history: [] };
+}
+
+test('imported employee without history creates one baseline from existing effective date', async () => {
+    const db = database(noHistoryMaintenanceState({
+        hmeromhnia_isxyos_oron_ergasias_apo: '2025-05-01' }));
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
+        maintenance: { employeeChanges: { email: 'saved@example.invalid' }, historyChanges: {} } });
+    assert.equal(db.state().history.length, 1);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo)
+        .toISOString().slice(0, 10), '2025-05-01');
+});
+
+test('first no-history maintenance persists departure in employee and the single baseline', async () => {
+    const db = database(noHistoryMaintenanceState({ hmeromhnia_proslhpshs: '2025-05-01' }));
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
+        maintenance: { employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+            historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') } } });
+    assert.equal(db.state().history.length, 1);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
+    assert.equal(new Date(db.state().employee.hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
+});
+
+for (const [name, dates, expected] of [
+    ['schedule start fallback', { hmeromhnia_allaghs_orarioy_apo: '2025-06-01',
+        hmeromhnia_proslhpshs: '2025-05-01' }, '2025-06-01'],
+    ['hire date fallback', { hmeromhnia_proslhpshs: '2025-05-01' }, '2025-05-01']
+]) test(`no-history baseline uses ${name}`, async () => {
+    const db = database(noHistoryMaintenanceState(dates));
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
+        maintenance: { employeeChanges: {}, historyChanges: {} } });
+    assert.equal(db.state().history.length, 1);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo)
+        .toISOString().slice(0, 10), expected);
+});
+
+test('no-history baseline without any safe effective date fails before writes', async () => {
+    const initial = noHistoryMaintenanceState(); const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', maintenance: { employeeChanges: {}, historyChanges: {} } }),
+    error => error.code === 'INVALID_EMPLOYMENT_PROFILE' && error.field === 'effectiveFrom');
+    assert.equal(db.writes(), 0); assert.deepEqual(db.state(), initial);
+});

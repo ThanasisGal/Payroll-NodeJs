@@ -1758,8 +1758,7 @@ class ergazomenoiController {
             const result = await writeEmployeeEmploymentProfile({
                 scope: { team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: newErgazomenos.kodikos },
                 input: profileInput(formData, 'add'), newEmployee: newErgazomenos.toObject(),
-                effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
-                    formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
+                effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo || formData.hmeromhnia_allaghs_orarioy_apo,
                 maintenance: { historyChanges: newIstoriko.toObject() }
             });
             savedErgazomenos = result.employee;
@@ -3766,7 +3765,8 @@ class ergazomenoiController {
             const result = await writeEmployeeEmploymentProfile({
                 scope: { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy },
                 input: profileInput(formData, 'edit'), employeeId: ergazomenoiId,
-                effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo || formData.hmeromhnia_allaghs_orarioy_apo,
+                effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
+                    formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
                 mode: formData.istorikoId ? MODE_CORRECT_EXISTING : undefined,
                 historyId: formData.istorikoId || null,
                 maintenance: { employeeChanges: filteredDataErgazomenoi,

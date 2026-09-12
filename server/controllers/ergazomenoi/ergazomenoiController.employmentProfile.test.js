@@ -207,6 +207,23 @@ test('LEGACY no matching history retains baseline insertion without V1 defaults'
     assert.equal(res.code, 200, res.body?.errorMessage); assertLegacy(db.state());
     assert.equal(db.state().history.length, 1); assert.equal(db.state().history[0].aa_eggrafhs, '0001');
 });
+test('imported legacy employee with no history saves departure in one baseline transaction', async () => {
+    const stored = await legacyInitial();
+    stored.history = [];
+    stored.employee.hmeromhnia_proslhpshs = '2025-05-01T00:00:00.000Z';
+    delete stored.employee.hmeromhnia_isxyos_oron_ergasias_apo;
+    delete stored.employee.hmeromhnia_allaghs_orarioy_apo;
+    const importedForm = { ...form(), istorikoId: '', hmeromhnia_proslhpshs: '2025-05-01',
+        hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_allaghs_orarioy_apo: null,
+        hmeromhnia_apoxorhshs: '2026-09-10' };
+    const { db, res } = await submit('edit', importedForm, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().history.length, 1);
+    assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2025-05-01');
+    assert.equal(db.state().history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
+});
 test('LEGACY maintenance preserves sparse history and baseline ordinary contract updates', async () => {
     const stored = await legacyInitial();
     for (const field of T.STANDARD_FIELDS) delete stored.history[0][field];
