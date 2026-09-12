@@ -380,6 +380,9 @@ let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentEmploymentReviewLifecyclePresentation = null;
 let currentCanonicalLifecyclePayloads = [];
+let currentWeeklyHrStage2BulkPreview = null;
+let weeklyHrStage2BulkSubmitting = false;
+let weeklyHrStage2BulkRequestId = '';
 let weeklyHrStage1LazyLoad = null;
 let currentStage2DailyResolutionByKey = new Map();
 let currentCanonicalDailyEmploymentTypeByKey = new Map();
@@ -9312,6 +9315,102 @@ function stage2LifecycleNonWorkTerms(value) {
             insteadOf: 'του προδηλωμένου ρεπό' };
 }
 
+async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
+    const query = new URLSearchParams({ period_start: params.get('apo_hmeromhnia') || '',
+        period_end: params.get('eos_hmeromhnia') || '',
+        ypokatasthma: params.get('ypokatasthma') || '', exception_page: exceptionPage });
+    const response = await fetch('/api/prodhlomena-oraria/review/weekly-hr-workflow/' +
+        `stage2/bulk-preview?${query.toString()}`, { headers: { Accept: 'application/json',
+            'CSRF-Token': csrfToken }, credentials: 'same-origin' });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message ||
+        'Η προεπισκόπηση μαζικής ενημέρωσης Stage 2 απέτυχε.');
+    if (currentWeeklyHrStage2BulkPreview?.preview_fingerprint !== payload.preview_fingerprint) {
+        weeklyHrStage2BulkRequestId = '';
+    }
+    currentWeeklyHrStage2BulkPreview = payload;
+    return payload;
+}
+
+function renderWeeklyHrStage2BulkSummary(container) {
+    const preview = currentWeeklyHrStage2BulkPreview;
+    if (!preview) return false;
+    const exceptions = Array.isArray(preview.exceptions) ? preview.exceptions.slice(0, 50) : [];
+    const exceptionRows = exceptions.map((item) => `<tr class="weekly-hr-stage2-exception">
+        <td>${escapeHtml(item.employee_kodikos || '—')}</td>
+        <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(
+            formatStage1DateKey(item.week_end))}</td>
+        <td>${escapeHtml(getStage2LifecycleReasonLabel(item.code) || item.message || item.code)}</td>
+    </tr>`).join('');
+    const canBulk = Number(preview.safe_bulk_count || 0) > 0 &&
+        userCanRecordCanonicalDecision() && !weeklyHrStage2BulkSubmitting;
+    container.innerHTML = `<section class="card border rounded employment-review-stage2-bulk"
+        aria-label="Μαζική ενημέρωση μεταφοράς ρεπό"><div class="card-body py-2">
+        <div class="fw-semibold mb-2">ΣΤΑΔΙΟ 2 — Μεταφορά Ρεπό</div>
+        <div class="d-flex flex-wrap gap-3 small mb-2">
+            <span>Ασφαλείς περιπτώσεις για μαζική ενημέρωση: <strong>${escapeHtml(
+                preview.safe_bulk_count || 0)}</strong></span>
+            <span>Ήδη επιλυμένες: <strong>${escapeHtml(
+                preview.already_resolved_count || 0)}</strong></span>
+            <span>Εξαιρέσεις που απαιτούν HR: <strong>${escapeHtml(
+                preview.manual_exception_count || 0)}</strong></span>
+        </div>
+        ${Number(preview.safe_bulk_count || 0) > 0
+            ? `<button type="button" class="btn btn-sm employment-review-action-btn
+                employment-review-action-success weekly-hr-stage2-bulk-complete"
+                ${canBulk ? '' : 'disabled aria-disabled="true"'}>Μαζική ενημέρωση ${escapeHtml(
+                    preview.safe_bulk_count)} περιπτώσεων</button>`
+            : Number(preview.manual_exception_count || 0) === 0
+                ? '<div class="text-muted small">Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό.</div>' : ''}
+        ${exceptions.length ? `<details class="mt-3"><summary>Εξαιρέσεις που απαιτούν έλεγχο</summary>
+            <div class="table-responsive mt-2"><table class="table table-sm mb-0"><thead><tr>
+            <th>Κωδικός</th><th>Εβδομάδα</th><th>Αιτία</th></tr></thead><tbody>${exceptionRows}
+            </tbody></table></div><div class="small text-muted mt-1">Σελίδα ${escapeHtml(
+                preview.exception_page)} από ${escapeHtml(preview.exception_page_count)} · έως 50 ανά σελίδα</div>
+            </details>` : ''}</div></section>`;
+    return true;
+}
+
+async function completeWeeklyHrStage2BulkFromUi() {
+    const preview = currentWeeklyHrStage2BulkPreview;
+    if (!preview || weeklyHrStage2BulkSubmitting || !preview.safe_bulk_count) return;
+    const confirmation = await employmentReviewSwal({ icon: 'warning',
+        title: 'Μαζική ενημέρωση μεταφοράς ρεπό', input: 'textarea',
+        inputLabel: `Θα ενημερωθούν ${preview.safe_bulk_count} ασφαλείς περιπτώσεις.`,
+        showCancelButton: true, confirmButtonText: 'Μαζική ενημέρωση', cancelButtonText: 'Ακύρωση',
+        inputValidator: (value) => String(value || '').trim() ? undefined :
+            'Η αιτιολογία είναι υποχρεωτική.' });
+    if (!confirmation.isConfirmed) return;
+    const scope = getActiveEmploymentReviewScope();
+    weeklyHrStage2BulkRequestId = weeklyHrStage2BulkRequestId ||
+        `stage2-bulk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    weeklyHrStage2BulkSubmitting = true;
+    renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
+    try {
+        const token = await ensureCsrfToken();
+        const response = await fetch('/api/prodhlomena-oraria/review/weekly-hr-workflow/' +
+            'stage2/bulk-complete', { method: 'POST', credentials: 'same-origin', headers: {
+                'Content-Type': 'application/json', Accept: 'application/json',
+                'CSRF-Token': token, 'x-csrf-token': token }, body: JSON.stringify({
+                period_start: scope.apo_hmeromhnia, period_end: scope.eos_hmeromhnia,
+                ypokatasthma: scope.ypokatasthma,
+                bulk_request_id: weeklyHrStage2BulkRequestId,
+                reason_or_notes: String(confirmation.value || '').trim(),
+                expected_preview_fingerprint: preview.preview_fingerprint }) });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message ||
+            'Η μαζική ενημέρωση Stage 2 απέτυχε.');
+        await employmentReviewSwal({ icon: result.failed || result.stale ? 'warning' : 'success',
+            title: 'Μαζική ενημέρωση Stage 2', text: `Εφαρμόστηκαν: ${result.applied}. ` +
+                `Ήδη ολοκληρωμένες: ${result.already_completed}. Παρωχημένες: ${result.stale}. ` +
+                `Αποτυχίες: ${result.failed}.` });
+        await loadResults();
+    } catch (error) {
+        await employmentReviewSwal({ icon: 'error', title: 'Η μαζική ενημέρωση απέτυχε',
+            text: error.message });
+    } finally { weeklyHrStage2BulkSubmitting = false; }
+}
+
 function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     const container = document.getElementById('policyPreviewGroupsContainer');
     const stage = lifecycle?.stages?.STAGE2;
@@ -9321,9 +9420,21 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
             'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ — Η απόφαση ρεπό θα εξεταστεί στην επόμενη περίοδο.</div>';
         return true;
     }
-    if (container.querySelector?.(
-        '.atomic-repo-transfer-section, .policy-preview-card, .employment-review-pending-summary'
-    )) return false;
+    if (!currentWeeklyHrStage2BulkPreview) {
+        const pendingItems = Array.isArray(stage.pending_items) ? stage.pending_items : [];
+        currentWeeklyHrStage2BulkPreview = { total_scopes: pendingItems.length,
+            safe_bulk_count: 0, already_resolved_count: 0,
+            manual_exception_count: Number(stage.pending_count || pendingItems.length),
+            exceptions: pendingItems.slice(0, 50).map((item) => ({ ...item,
+                code: item.reason_code || item.reasons?.[0] || 'STAGE2_BULK_PREVIEW_UNAVAILABLE' })),
+            exception_page: 1, exception_page_count:
+                Math.max(1, Math.ceil(pendingItems.length / 50)) };
+    }
+    if (renderWeeklyHrStage2BulkSummary(container)) {
+        container.querySelector('.weekly-hr-stage2-bulk-complete')?.addEventListener(
+            'click', completeWeeklyHrStage2BulkFromUi);
+        return true;
+    }
     if (Number(stage.pending_count || 0) <= 0) {
         container.innerHTML = '<div class="text-muted small employment-review-stage2-empty">' +
             'Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό.</div>';
@@ -10496,6 +10607,14 @@ async function loadResults() {
         currentCanonicalLifecyclePayloads = Array.isArray(
             payload.canonicalLifecycleProjections
         ) ? payload.canonicalLifecycleProjections : [];
+        currentWeeklyHrStage2BulkPreview = null;
+        if (hasAuthoritativeResult) {
+            try {
+                await loadWeeklyHrStage2BulkPreview(params);
+            } catch (stage2BulkError) {
+                console.warn('[loadResults] Stage 2 bulk preview unavailable:', stage2BulkError);
+            }
+        }
         currentEmploymentReviewBoundaryContextPreflight = payload.finalized === true
             ? { disabled: true } : payload.boundaryContextPreflight || null;
         if (payload.finalized !== true && hasAuthoritativeResult) {

@@ -1647,6 +1647,21 @@ router.post(
     erganhController.completeWeeklyHrWorkflowStage2
 );
 
+router.get(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage2/bulk-preview',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    erganhController.previewWeeklyHrWorkflowStage2Bulk
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage2/bulk-complete',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.completeWeeklyHrWorkflowStage2Bulk
+);
+
 router.post(
     '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/resolve-day',
     checkAuth,

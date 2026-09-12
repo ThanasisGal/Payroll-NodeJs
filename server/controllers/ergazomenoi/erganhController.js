@@ -477,6 +477,12 @@ const {
 const {
     completeWeeklyHrWorkflowStage2
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2CompletionService');
+const { buildWeeklyHrStage2BulkPreview } = require(
+    '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkPreviewService');
+const { completeWeeklyHrWorkflowStage2Bulk } = require(
+    '../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2BulkCompletionService');
+const { writeCanonicalDailyClassification } = require(
+    '../../services/ergazomenoi/apasxoliseisCanonicalDailyClassificationWriterService');
 const {
     resolveWeeklyHrStage3Day: executeWeeklyHrStage3Day
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3ResolutionService');
@@ -4485,6 +4491,65 @@ async function loadWeeklyHrStage2CompletionContext({ req, input, session = null 
             lifecycle.stages.stage1.current_completion_fingerprint,
         stage1_version: Number(state?.stage1?.version || 0),
         stage2_version: Number(state?.stage2?.version || 0) } };
+}
+
+async function loadWeeklyHrStage2BulkPreparedContexts({ req, input }) {
+    const periodAccess = await assertActiveEmploymentReviewPeriodReadable(req, input.ypokatasthma);
+    const periodStart = dateKeyUtc(periodAccess.scope.period_start);
+    const periodEnd = dateKeyUtc(periodAccess.scope.period_end);
+    if (dateKeyUtc(input.period_start) !== periodStart || dateKeyUtc(input.period_end) !== periodEnd) {
+        throw weeklyHrApiError('STAGE2_BULK_PERIOD_SCOPE_MISMATCH', 409,
+            'Η μαζική εντολή δεν ταυτίζεται με την ενεργή περίοδο.');
+    }
+    req.query = { ...req.query, ypokatasthma: input.ypokatasthma,
+        apo_hmeromhnia: periodStart, eos_hmeromhnia: periodEnd, kodikos: '' };
+    const rows = await getReviewRowsForExport(req, { includeLifecycle: true,
+        tolerateIncompleteLifecycle: true });
+    const rowsByWeek = new Map();
+    for (const row of rows.__preparedPolicyContextRows || rows) {
+        const key = `${String(row.kodikos || '').trim()}|${dateKeyUtc(
+            startOfWeekMondayUtc(row.hmeromhnia))}`;
+        if (!rowsByWeek.has(key)) rowsByWeek.set(key, []);
+        rowsByWeek.get(key).push(row);
+    }
+    const states = new Map((rows.__workflowStates || []).map((state) => [
+        `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`, state
+    ]));
+    const audits = new Map();
+    for (const audit of rows.__workflowAudits || []) {
+        const key = `${String(audit.employee_kodikos || '').trim()}|${dateKeyUtc(audit.week_start)}`;
+        if (!audits.has(key)) audits.set(key, []);
+        audits.get(key).push(audit);
+    }
+    const contexts = [];
+    for (const [key, lifecycle] of rows.__lifecycleByWeek || new Map()) {
+        const weekRows = (rowsByWeek.get(key) || []).slice().sort((left, right) =>
+            dateKeyUtc(left.hmeromhnia).localeCompare(dateKeyUtc(right.hmeromhnia)));
+        if (!weekRows.length || !lifecycle?.scope) continue;
+        const state = states.get(key) || {};
+        const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
+            dateKeyUtc(row.hmeromhnia), { hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
+                ores_ergasias_ebdomadas: row.effective_weekly_hours,
+                mo_oron_hmerhsias_ergasias: row.effective_daily_hours,
+                kathestos_apasxolhshs: row.effective_kathestos_apasxolhshs,
+                typos_apasxolhshs: row.effective_typos_apasxolhshs,
+                typos_ebdomadas: row.effective_typos_ebdomadas,
+                pososto_prosayxhshs_6hs_hmeras: row.effective_sixth_day_rate,
+                eidikh_kathgoria_ergazomenoy: row.effective_special_category,
+                eidikh_periptosh: row.effective_special_case } ]));
+        const effectiveProfile = effectiveProfilesByDate[dateKeyUtc(weekRows.at(-1).hmeromhnia)] || {};
+        contexts.push({ scope: lifecycle.scope, rows: weekRows, lifecycle,
+            effectiveProfile, effectiveProfilesByDate,
+            employmentDateScope: lifecycle.employment_date_scope || null,
+            periodScope: lifecycle.employment_date_scope?.context_only_dates?.length
+                ? periodAccess.scope : null,
+            workflowState: state, audits: audits.get(key) || [],
+            upstream: { stage1_current_fingerprint:
+                lifecycle.stages?.stage1?.current_completion_fingerprint,
+            stage1_version: Number(state.stage1?.version || 0),
+            stage2_version: Number(state.stage2?.version || 0) } });
+    }
+    return { contexts, periodAccess };
 }
 
 async function assertActiveEmploymentReviewStage1CompletionReadable(req, initial, input) {
@@ -11761,6 +11826,90 @@ class erganhController {
                 code: error.code || 'WEEKLY_HR_STAGE2_COMPLETION_FAILED',
                 message: error.statusCode ? error.message :
                     'Αποτυχία canonical ολοκλήρωσης του Stage 2.' });
+        }
+    };
+
+    static previewWeeklyHrWorkflowStage2Bulk = async (req, res) => {
+        try {
+            const { contexts } = await loadWeeklyHrStage2BulkPreparedContexts({
+                req, input: req.query });
+            return res.json({ success: true, ...buildWeeklyHrStage2BulkPreview({ contexts,
+                exception_page: req.query.exception_page }) });
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ success: false,
+                code: error.code || 'STAGE2_BULK_PREVIEW_FAILED',
+                message: error.statusCode ? error.message :
+                    'Αποτυχία προεπισκόπησης μαζικής ενημέρωσης Stage 2.' });
+        }
+    };
+
+    static completeWeeklyHrWorkflowStage2Bulk = async (req, res) => {
+        try {
+            let prepared = null;
+            const actor = { user_id: req.session.userId,
+                user_name: req.session.userName || req.session.username ||
+                    String(req.session.userId || ''), role: req.session.userRole };
+            const result = await completeWeeklyHrWorkflowStage2Bulk({ ...req.body, actor,
+                commonGuard: async () => {
+                    await assertWeeklyHrWorkflowIndexesReady();
+                    prepared = await loadWeeklyHrStage2BulkPreparedContexts({ req, input: req.body });
+                },
+                loadPreparedContexts: async () => prepared.contexts,
+                completePreparedScope: async ({ context, request_id, reason_or_notes }) => {
+                    const mutableRows = context.rows.map((row) => ({ ...row }));
+                    const stateModel = { findOne: () => ({ session() { return this; },
+                        lean: async () => context.workflowState }),
+                    collection: ApasxoliseisWeeklyHrWorkflowStateModel.collection };
+                    const auditModel = { findOne: (filter) => ({ session() { return this; },
+                        lean: async () => context.audits.find((audit) =>
+                            audit.request_id === filter.request_id) || null }),
+                    create: (...args) => ApasxoliseisWeeklyHrWorkflowAuditModel.create(...args) };
+                    const runStage2Fence = prepared.periodAccess.state.effective_mode ===
+                        'HISTORICAL_RECONSTRUCTION_STALE'
+                        ? runWithStaleStage2MaterializationWriteFence : runWithPeriodWriteFence;
+                    return completeWeeklyHrWorkflowStage2({ initialContext: context, actor,
+                        reason_or_notes, request_id, stateModel, auditModel,
+                        loadFreshContext: async () => context,
+                        writeDaily: async (input) => {
+                            const written = await writeCanonicalDailyClassification(input);
+                            const target = mutableRows.find((row) =>
+                                String(row._id) === String(input.row._id));
+                            if (target && written.updates) Object.assign(target, written.updates,
+                                { is_locked: true, locked_by: actor.user_name });
+                            return written;
+                        },
+                        loadPostWriteContext: async () => {
+                            const lifecycle = buildWeeklyHrLifecycleProjection({
+                                weekRows: mutableRows, effectiveProfile: context.effectiveProfile,
+                                effectiveProfilesByDate: context.effectiveProfilesByDate,
+                                persistedStage1State: context.workflowState.stage1 || null,
+                                persistedStage3State: context.workflowState.stage3 || null,
+                                scope: context.scope, periodScope: context.periodScope,
+                                employmentDateScope: context.employmentDateScope });
+                            return { ...context, rows: mutableRows, lifecycle,
+                                upstream: { ...context.upstream,
+                                    stage1_current_fingerprint:
+                                        lifecycle.stages.stage1.current_completion_fingerprint } };
+                        },
+                        transactionRunner: async (work) => {
+                            const fenced = await runStage2Fence({
+                                scope: prepared.periodAccess.scope, expectedToken: {
+                                    ...prepared.periodAccess.token,
+                                    write_fence_version: Number(prepared.periodAccess.state
+                                        .write_fence_version || 0) },
+                                indexGuard: null,
+                                work: ({ session }) => work({ session }) });
+                            prepared.periodAccess = { scope: prepared.periodAccess.scope,
+                                state: fenced.state, token: fenced.token };
+                            return fenced.result;
+                        } });
+                } });
+            return res.json({ success: true, ...result });
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ success: false,
+                code: error.code || 'WEEKLY_HR_STAGE2_BULK_COMPLETION_FAILED',
+                message: error.statusCode ? error.message :
+                    'Αποτυχία μαζικής ολοκλήρωσης του Stage 2.' });
         }
     };
 
