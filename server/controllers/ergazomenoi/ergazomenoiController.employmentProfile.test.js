@@ -98,7 +98,7 @@ function handler(mode, db) {
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     const constants = source.slice(source.indexOf('const fieldsStoixeionSymbashs'), source.indexOf('function parseS3Uri'));
     return vm.runInNewContext(`${constants}\n${helpers}\n(${body}\nreturn res.json({ success: true });\n})`, {
-        Date, console: { log() {}, error() {} }, mongoose, ...Terms, ...M, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
+        Date, console: { log() {}, error() {} }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
         ErgazomenoiModel: db.employeeModel, IstorikoProslhpseonAllagonModel: db.historyModel,
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps })
     });
@@ -207,6 +207,23 @@ test('LEGACY no matching history retains baseline insertion without V1 defaults'
     assert.equal(res.code, 200, res.body?.errorMessage); assertLegacy(db.state());
     assert.equal(db.state().history.length, 1); assert.equal(db.state().history[0].aa_eggrafhs, '0001');
 });
+test('imported legacy employee with no history saves departure in one baseline transaction', async () => {
+    const stored = await legacyInitial();
+    stored.history = [];
+    stored.employee.hmeromhnia_proslhpshs = '2025-05-01T00:00:00.000Z';
+    delete stored.employee.hmeromhnia_isxyos_oron_ergasias_apo;
+    delete stored.employee.hmeromhnia_allaghs_orarioy_apo;
+    const importedForm = { ...form(), istorikoId: '', hmeromhnia_proslhpshs: '2025-05-01',
+        hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_allaghs_orarioy_apo: null,
+        hmeromhnia_apoxorhshs: '2026-09-10' };
+    const { db, res } = await submit('edit', importedForm, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().history.length, 1);
+    assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2025-05-01');
+    assert.equal(db.state().history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
+});
 test('LEGACY maintenance preserves sparse history and baseline ordinary contract updates', async () => {
     const stored = await legacyInitial();
     for (const field of T.STANDARD_FIELDS) delete stored.history[0][field];
@@ -274,6 +291,20 @@ test('EDIT omission preserves new fields and exact correction creates no duplica
     for (const field of C.FACT_FIELDS) assert.deepEqual(db.state().employee[field], stored.employee[field], field);
     assert.equal(db.state().history[0]._id, stored.history[0]._id);
 });
+for (const terminationType of ['ma_217', 'ma_222', 'ma_227']) test(
+    `EDIT ${terminationType} uses original historyId when departure identity changes`, async () => {
+        const stored = await initial();
+        stored.employee.hmeromhnia_apoxorhshs = null;
+        stored.history[0].hmeromhnia_apoxorhshs = null;
+        const originalId = stored.history[0]._id;
+        const { db, res } = await submit('edit', { ...form(), istorikoId: originalId,
+            hmeromhnia_apoxorhshs: '2026-09-10', terminationType }, memory(stored));
+        assert.equal(res.code, 200, res.body?.errorMessage);
+        assert.equal(db.state().history.length, 1);
+        assert.equal(db.state().history[0]._id, originalId);
+        assert.equal(db.state().history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
+    }
+);
 for (const [name, input, check] of [
     ['false', { [C.ENABLED]: false }, row => { assert.equal(row[C.ENABLED], false); assert.equal(row[C.TYPE], enabled[C.TYPE]); }],
     ['clear category', { [C.CATEGORY]: '' }, row => assert.equal(row[C.CATEGORY], null)],
@@ -300,6 +331,46 @@ test('EDIT new version has complete work terms, contract values and all profile 
     assert.equal(next.hmeromhnia_isxyos_dialleimatos_apo.slice(0, 10), '2026-09-15');
     assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_eos.slice(0, 10), '2026-09-14');
     assert.equal(db.state().history[0][C.ENABLED], false);
+});
+test('EDIT loaded historyId creates a new version when synchronized effective date moves forward', async () => {
+    const stored = await initial();
+    const original = plain(stored.history[0]);
+    const { db, res } = await submit('edit', { ...form(), istorikoId: original._id,
+        hmeromhnia_allaghs_symbashs: '2026-09-13',
+        hmeromhnia_allaghs_orarioy_apo: '2026-09-13',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-13',
+        hmeromhnia_allaghs_orarioy_eos: '2026-09-19',
+        kathestos_apasxolhshs: '1', kathestos_apasxolhshs_stathera: '1',
+        hmeres_ergasias_ebdomadas: 3, ores_ergasias_ebdomadas: 24,
+        mo_oron_hmerhsias_ergasias: 8 }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().history.length, 2);
+    assert.equal(db.state().history[0]._id, original._id);
+    assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_eos.slice(0, 10), '2026-09-12');
+    assert.equal(db.state().history[1].hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-13');
+    assert.equal(db.state().history[1].typos_apasxolhshs, '1');
+    for (const record of [db.state().history[1], db.state().employee]) {
+        assert.equal(record.kathestos_apasxolhshs, '1');
+        assert.equal(record.hmeres_ergasias_ebdomadas, 3);
+        assert.equal(record.ores_ergasias_ebdomadas, 24);
+    }
+});
+
+test('EDIT loaded historyId still rejects retrospective and non-exact duplicate dates', async () => {
+    const stored = await twoVersions();
+    for (const [istorikoId, effectiveFrom] of [
+        [stored.history[1]._id, '2026-08-01'],
+        [stored.history[0]._id, '2026-09-15']
+    ]) {
+        const db = memory(stored);
+        const { res } = await submit('edit', { ...form(), istorikoId,
+            hmeromhnia_allaghs_symbashs: effectiveFrom,
+            hmeromhnia_allaghs_orarioy_apo: effectiveFrom,
+            hmeromhnia_isxyos_oron_ergasias_apo: effectiveFrom }, db);
+        assert.equal(res.code, 409);
+        assert.equal(res.body.reason, 'EMPLOYEE_PROFILE_NON_APPEND_CHANGE');
+        assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
+    }
 });
 test('EDIT correction history failure rolls back personal fields and profile together', async () => {
     const stored = await initial(enabled); const db = memory(stored, 'history');
@@ -423,7 +494,7 @@ test('all controller methods outside the three persistence seams are byte-identi
     const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
     const methods = code => new Map(code.split(/(?=^    static )/m).map(part => [part.match(/^    static (\w+)/)?.[1], part]));
     const before = methods(baseline), after = methods(source);
-    for (const [name, code] of before) if (name && !['postErgazomenoiForm', 'postErgazomenoiUpdate', 'updateIstorikoData'].includes(name)) {
+    for (const [name, code] of before) if (name && !['editErgazomenoiForm', 'postErgazomenoiForm', 'postErgazomenoiUpdate', 'updateIstorikoData'].includes(name)) {
         assert.equal(after.get(name), code, name);
     }
 });

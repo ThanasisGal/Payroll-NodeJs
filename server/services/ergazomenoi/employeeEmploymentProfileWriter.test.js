@@ -185,17 +185,39 @@ test('old incomplete legacy correction requires explicit missing facts instead o
     assert.equal(db.state().history[0][C.SCHEMA_VERSION], 1);
     assert.deepEqual(db.state().employee, initial.employee);
 });
-test('correction rejects overlapping history and mismatched current identity', async () => {
-    for (const overlap of [true, false]) {
-        const initial = correctionState();
-        if (overlap) initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = null;
-        else initial.employee.hmeromhnia_isxyos_oron_ergasias_apo = new Date('2026-10-01');
-        const db = database(initial);
-        await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
-            mode: MODE_CORRECT_EXISTING, historyId: 'latest', effectiveFrom: '2026-09-01' }),
-        overlap ? /HISTORY_OVERLAP/ : /CURRENT_IDENTITY_MISMATCH/);
-        assert.equal(db.writes(), 0);
-    }
+test('correction rejects mismatched current identity', async () => {
+    const initial = correctionState();
+    initial.employee.hmeromhnia_isxyos_oron_ergasias_apo = new Date('2026-10-01');
+    const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        mode: MODE_CORRECT_EXISTING, historyId: 'latest', effectiveFrom: '2026-09-01' }),
+    /CURRENT_IDENTITY_MISMATCH/);
+    assert.equal(db.writes(), 0);
+});
+
+test('exact non-boundary termination correction is allowed over pre-existing legacy overlap', async () => {
+    const initial = correctionState();
+    initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = null;
+    initial.history[1].hmeromhnia_apoxorhshs = null;
+    initial.employee.hmeromhnia_apoxorhshs = null;
+    const unrelatedBefore = structuredClone(initial.history[0]);
+    const db = database(initial);
+    const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'latest',
+        effectiveFrom: '2026-09-01', input: {}, maintenance: {
+            employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+            historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+            correctableIdentityFields: ['hmeromhnia_apoxorhshs']
+        } });
+    assert.equal(result.history._id, 'latest');
+    assert.equal(db.state().history.length, 2);
+    assert.deepEqual(db.state().history[0], unrelatedBefore);
+    assert.equal(new Date(db.state().history[1].hmeromhnia_apoxorhshs)
+        .toISOString().slice(0, 10), '2026-09-10');
+    assert.deepEqual(db.state().history[1].hmeromhnia_isxyos_oron_ergasias_apo,
+        initial.history[1].hmeromhnia_isxyos_oron_ergasias_apo);
+    assert.deepEqual(db.state().history[1].hmeromhnia_isxyos_oron_ergasias_eos,
+        initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos);
 });
 test('normal latest legacy Maintenance correction keeps its identity and creates no duplicate', async () => {
     const from = new Date('2026-04-01');
@@ -211,6 +233,47 @@ test('normal latest legacy Maintenance correction keeps its identity and creates
     assert.deepEqual(db.state().history[0].hmeromhnia_allaghs_orarioy_apo, from);
     assert.equal(db.state().employee.dialleima_se_lepta, 20);
     assert.equal(C.readEmploymentProfile(db.state().history[0]).recorded, true);
+});
+
+for (const terminationType of ['ma_217', 'ma_222', 'ma_227']) test(
+    `exact Maintenance termination ${terminationType} corrects departure on the same history row`,
+    async () => {
+        const initial = correctionState();
+        initial.employee.hmeromhnia_apoxorhshs = null;
+        initial.history[1].hmeromhnia_apoxorhshs = null;
+        const db = database(initial);
+        const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+            employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'latest',
+            effectiveFrom: '2026-09-01', input: {}, maintenance: {
+                employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+                historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+                correctableIdentityFields: ['hmeromhnia_apoxorhshs']
+            } });
+        assert.equal(result.history._id, 'latest');
+        assert.equal(db.state().history.length, 2);
+        assert.equal(db.state().history[0].hmeromhnia_apoxorhshs ?? null, null);
+        assert.equal(new Date(db.state().history[1].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
+        assert.equal(new Date(db.state().employee.hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
+    }
+);
+
+test('exact older termination correction targets only its historyId with a later row present', async () => {
+    const initial = correctionState();
+    initial.history[0].hmeromhnia_apoxorhshs = null;
+    const db = database(initial);
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'old',
+        effectiveFrom: '2026-04-01', input: Object.fromEntries(C.FACT_FIELDS
+            .filter(field => ![C.SCHEMA_VERSION, C.TYPE_VERSION].includes(field))
+            .map(field => [field, initial.history[0][field]])), maintenance: {
+            employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-06-30') },
+            historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-06-30') },
+            correctableIdentityFields: ['hmeromhnia_apoxorhshs']
+        } });
+    assert.equal(db.state().history.length, 2);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-06-30');
+    assert.deepEqual(db.state().history[1], initial.history[1]);
+    assert.deepEqual(db.state().employee, initial.employee);
 });
 
 test('no-change Maintenance selects real May version and preserves non-terms history noise', async () => {
@@ -231,12 +294,60 @@ test('no-change Maintenance selects real May version and preserves non-terms his
     assert.equal(result.mode, MODE_LEGACY_MAINTENANCE);
     assert.equal(result.history._id, 'real');
     assert.deepEqual(db.state(), initial);
-    // A genuine overlapping terms row must still fail the existing guard.
+    // A pre-existing overlap is not newly introduced by this non-boundary correction.
     const overlap = { ...noise, afora_allagh_oron_ergasias: true };
     const conflicting = database({ ...initial, history: [real, overlap] });
-    await assert.rejects(writeEmployeeEmploymentProfile({ ...conflicting.dependencies, scope,
+    await writeEmployeeEmploymentProfile({ ...conflicting.dependencies, scope,
         employeeId: 'employee', effectiveFrom: '2026-05-25',
-        maintenance: { identity, employeeChanges: {}, historyChanges: {} } }),
-    error => error.code === 'EMPLOYEE_PROFILE_HISTORY_OVERLAP');
-    assert.equal(conflicting.writes(), 0);
+        maintenance: { identity, employeeChanges: {}, historyChanges: {} } });
+    assert.deepEqual(conflicting.state().history, [real, overlap]);
+});
+
+function noHistoryMaintenanceState(dates = {}) {
+    return { employee: { _id: 'employee', ...scope, eponymo: 'Imported',
+        hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_allaghs_orarioy_apo: null,
+        hmeromhnia_proslhpshs: null,
+        ...dates }, history: [] };
+}
+
+test('imported employee without history creates one baseline from existing effective date', async () => {
+    const db = database(noHistoryMaintenanceState({
+        hmeromhnia_isxyos_oron_ergasias_apo: '2025-05-01' }));
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
+        maintenance: { employeeChanges: { email: 'saved@example.invalid' }, historyChanges: {} } });
+    assert.equal(db.state().history.length, 1);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo)
+        .toISOString().slice(0, 10), '2025-05-01');
+});
+
+test('first no-history maintenance persists departure in employee and the single baseline', async () => {
+    const db = database(noHistoryMaintenanceState({ hmeromhnia_proslhpshs: '2025-05-01' }));
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
+        maintenance: { employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+            historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') } } });
+    assert.equal(db.state().history.length, 1);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
+    assert.equal(new Date(db.state().employee.hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
+});
+
+for (const [name, dates, expected] of [
+    ['schedule start fallback', { hmeromhnia_allaghs_orarioy_apo: '2025-06-01',
+        hmeromhnia_proslhpshs: '2025-05-01' }, '2025-06-01'],
+    ['hire date fallback', { hmeromhnia_proslhpshs: '2025-05-01' }, '2025-05-01']
+]) test(`no-history baseline uses ${name}`, async () => {
+    const db = database(noHistoryMaintenanceState(dates));
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
+        maintenance: { employeeChanges: {}, historyChanges: {} } });
+    assert.equal(db.state().history.length, 1);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo)
+        .toISOString().slice(0, 10), expected);
+});
+
+test('no-history baseline without any safe effective date fails before writes', async () => {
+    const initial = noHistoryMaintenanceState(); const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', maintenance: { employeeChanges: {}, historyChanges: {} } }),
+    error => error.code === 'INVALID_EMPLOYMENT_PROFILE' && error.field === 'effectiveFrom');
+    assert.equal(db.writes(), 0); assert.deepEqual(db.state(), initial);
 });

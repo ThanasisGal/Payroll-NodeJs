@@ -67,6 +67,10 @@ function createDynamicHarness({
     const savedHidden = { value: hiddenValue };
     const firstAmount = { value: '12.00' };
     const secondAmount = { value: '10.00' };
+    const actualHourly = { value: manualExtraRow === '01' ? '6.6000' : '6.0720' };
+    const actualDaily = { value: manualExtraRow === '01' ? '52.8000' : '48.5760' };
+    const actualSalary = { value: manualExtraRow === '01' ? '1144.00' : '1052.48' };
+    let manualSnapshotActive = manualExtraRow === '01';
     const row = {
         hidden: false,
         classList: {
@@ -137,6 +141,7 @@ function createDynamicHarness({
         wrapper: { classList: { remove() {} } }
     };
     const select = { value: selectValue, dataset: { preloadAll: String(preloadAll) }, tomselect: tom };
+    if (manualExtraRow === '01') select.dataset.manualExtraApodoxes = 'true';
     const elements = {
         stoixeio_symbashs_01: select,
         stoixeio_symbashs_01_hidden: hidden,
@@ -145,6 +150,9 @@ function createDynamicHarness({
         poso_symbashs_01: firstAmount,
         poso_symbashs_basei_oron_ergasias_01: secondAmount,
         row_01: row
+        ,pragmatikoOromisthio: actualHourly
+        ,pragmatikoHmeromisthio: actualDaily
+        ,pragmatikosMisthos: actualSalary
     };
     const sandbox = {
         document: {
@@ -165,6 +173,11 @@ function createDynamicHarness({
         },
         calculateTotal() {
             calls.calculateTotal += 1;
+            if (!select.dataset.manualExtraApodoxes) {
+                actualHourly.value = '6.0720';
+                actualDaily.value = '48.5760';
+                actualSalary.value = '1052.48';
+            }
         },
         applyNomimaFromSymbashTotals() {
             calls.applyNomima += 1;
@@ -173,10 +186,11 @@ function createDynamicHarness({
             return false;
         },
         findExistingExtraApodoxesRow() {
-            return manualExtraRow;
+            return sandbox.actualFindExistingExtraApodoxesRow();
         },
         clearManualPragmatikoOromisthioSnapshot() {
             calls.clearManualSnapshot += 1;
+            manualSnapshotActive = false;
         },
         async recalculateActualWagesAfterLegalChange() {
             calls.recalculateActualWages += 1;
@@ -191,6 +205,10 @@ function createDynamicHarness({
     vm.createContext(sandbox);
     vm.runInContext(
         [
+            'const MANUAL_EXTRA_APODOXES_TEXT = "EXTRA ΑΠΟΔΟΧΕΣ ΔΥΝΑΜΕΝΕΣ ΝΑ ΑΝΑΙΡΕΘΟΥΝ";',
+            'function getEffectiveRowCount() { return 1; }',
+            'function normalizeGreekSearchText(value) { return String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toUpperCase().replace(/\\s+/g, " ").trim(); }',
+            extractFunction(dynamicSource, 'findExistingExtraApodoxesRow').replace('function findExistingExtraApodoxesRow', 'function actualFindExistingExtraApodoxesRow'),
             extractFunction(dynamicSource, 'syncHiddenTarget'),
             extractFunction(dynamicSource, 'syncStoixeioRowTrash'),
             extractFunction(dynamicSource, 'reloadStoixeioRowOptions'),
@@ -219,6 +237,10 @@ function createDynamicHarness({
         select,
         eventListeners,
         selectNewValue,
+        actualHourly,
+        actualDaily,
+        actualSalary,
+        manualSnapshotActive: () => manualSnapshotActive,
         instanceCount: 1
     };
 }
@@ -291,11 +313,36 @@ test('trash of the manual EXTRA row clears its active manual snapshot', async ()
     await harness.sandbox.clearSingleStoixeioRow('01');
 
     assert.equal(harness.calls.clearManualSnapshot, 1);
+    assert.equal(harness.select.dataset.manualExtraApodoxes, undefined);
     assert.equal(harness.calls.recalculateActualWages, 1);
     assert.equal(harness.firstAmount.value, '');
     assert.equal(harness.secondAmount.value, '');
     assert.match(dynamicSource,
         /setTimeout\(async \(\) => \{\s*if \(!_manualPragmatikoOromisthioActive \|\| !_manualPragmatikoOromisthioSnapshot\) return;\s*setManualExtraAmountToRow/);
+});
+
+test('F9/F10 EXTRA lifecycle is fully removed by the first trash and stays removed after pending work', async () => {
+    const harness = createDynamicHarness({ tomValue: '0013', hiddenValue: '0013',
+        manualExtraRow: '01' });
+
+    // Αντιπροσωπεύει το ήδη προγραμματισμένο τελευταίο σφράγισμα του F10.
+    queueMicrotask(() => {
+        if (harness.manualSnapshotActive()) {
+            harness.select.dataset.manualExtraApodoxes = 'true';
+            harness.actualHourly.value = '6.6000';
+        }
+    });
+
+    await harness.sandbox.clearSingleStoixeioRow('01');
+    await Promise.resolve();
+
+    assert.equal(harness.sandbox.actualFindExistingExtraApodoxesRow(), null);
+    assert.equal(harness.manualSnapshotActive(), false);
+    assert.equal(harness.actualHourly.value, '6.0720');
+    assert.equal(harness.actualDaily.value, '48.5760');
+    assert.equal(harness.actualSalary.value, '1052.48');
+    assert.equal(harness.calls.clearManualSnapshot, 1);
+    assert.equal(harness.calls.clear, 1);
 });
 
 test('two clear/reselect cycles reuse one TomSelect and one change listener', async () => {

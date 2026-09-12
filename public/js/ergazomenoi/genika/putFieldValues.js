@@ -1,6 +1,56 @@
 // public\js\ergazomenoi\genika\putFieldValues.js
 
+async function runTemporaryTerminationXmlAfterEmployeeSave({
+    employeeSaveSucceeded,
+    employeeId,
+    maXmlData,
+    processCode,
+    upload,
+    present
+}) {
+    if (!employeeSaveSucceeded || !employeeId) return { success: false, skipped: true };
+    const xmlReference = maXmlData?.s3Url || maXmlData?.downloadUrl ||
+        maXmlData?.relativePath || maXmlData?.s3Key || null;
+    if (maXmlData?.success !== true || !xmlReference) {
+        const result = { success: false, error: maXmlData?.error ||
+            'Δεν δημιουργήθηκε χρησιμοποιήσιμο XML προσωρινής λήξης.' };
+        await present(result);
+        return result;
+    }
+    const result = await upload(employeeId, xmlReference, false, processCode, 'xml');
+    await present(result);
+    return result;
+}
+
+function finishEmployeeUpdateAfterUploads(uploadResults, redirect) {
+    if (uploadResults?.e3Result?.success === false ||
+        uploadResults?.maResult?.success === false ||
+        uploadResults?.wtoResult?.success === false) return false;
+    redirect();
+    return true;
+}
+
+function withCompactOrdinarySwalClasses(options) {
+    if (!options || typeof options !== 'object' || options.customClass || options.didOpen ||
+        options.willOpen || options.toast) return options;
+    const icon = options.icon;
+    const variant = icon === 'error' ? 'error' : icon === 'success' ? 'success' :
+        icon === 'warning' ? 'warning' : 'info';
+    return { ...options, customClass: {
+        confirmButton: `class-${variant} custom-confirm-button custom-swal-button`,
+        title: 'custom-title', popup: 'custom-swal-popup', htmlContainer: 'custom-html-container'
+    } };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    const Swal = new Proxy(window.Swal, {
+        get(target, property) {
+            if (property === 'fire') return options =>
+                target.fire(withCompactOrdinarySwalClasses(options));
+            const value = target[property];
+            return typeof value === 'function' ? value.bind(target) : value;
+        }
+    });
     const isEmpty = (v) => !String(v ?? '').trim();
     const isEmptyArray = (v) => !Array.isArray(v) || v.length === 0;
     let message = '';
@@ -1472,8 +1522,62 @@ document.addEventListener('DOMContentLoaded', () => {
                         result.value?.ma_221 === true ||
                         result.value?.ma_220 === true;
 
+                    const temporaryTerminationProcessCode =
+                        result.value?.ma_222 === true ? '222' :
+                            result.value?.ma_217 === true ? '217' : null;
+                    const temporaryTerminationXmlRequested = Boolean(
+                        temporaryTerminationProcessCode &&
+                        result.value?.isPermanent !== true &&
+                        result.value?.erganiUploadMethod === 'xml'
+                    );
+
+                    if (temporaryTerminationXmlRequested) {
+                        try {
+                            maResult = await runTemporaryTerminationXmlAfterEmployeeSave({
+                                employeeSaveSucceeded: data?.success === true,
+                                employeeId: data.data?._id,
+                                maXmlData,
+                                processCode: temporaryTerminationProcessCode,
+                                upload: uploadMaToErganh,
+                                present: async (uploadResult) => Swal.fire({
+                                    backdrop: false,
+                                    icon: uploadResult?.success ? 'success' : 'error',
+                                    title: uploadResult?.success
+                                        ? 'Επιτυχής προσωρινή καταχώριση XML'
+                                        : 'Αποτυχία προσωρινής καταχώρισης XML',
+                                    text: uploadResult?.message || uploadResult?.error || '',
+                                    confirmButtonText: 'OK',
+                                    customClass: {
+                                        confirmButton: uploadResult?.success
+                                            ? 'class-success custom-confirm-button custom-swal-button'
+                                            : 'class-error custom-confirm-button custom-swal-button',
+                                        title: 'custom-title',
+                                        popup: 'custom-swal-popup',
+                                        htmlContainer: 'custom-html-container'
+                                    }
+                                })
+                            });
+                        } catch (error) {
+                            maResult = { success: false, error: error?.message || String(error) };
+                            await Swal.fire({
+                                backdrop: false,
+                                icon: 'error',
+                                title: 'Αποτυχία προσωρινής καταχώρισης XML',
+                                text: maResult.error,
+                                confirmButtonText: 'OK',
+                                customClass: {
+                                    confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                                    title: 'custom-title',
+                                    popup: 'custom-swal-popup',
+                                    htmlContainer: 'custom-html-container'
+                                }
+                            });
+                        }
+                    }
+
                     if (
                         userWantsMA &&
+                        !temporaryTerminationXmlRequested &&
                         data.data?._id &&
                         (isE7NRestSubmit ||
                             isE5NRestSubmit ||
@@ -1543,22 +1647,23 @@ document.addEventListener('DOMContentLoaded', () => {
                                 console.warn('[MA-UPLOAD] Δεν εμφανίστηκε το progress UI.');
                             }
                             try {
-                                maResult = await uploadMaToErganh(
-                                    data.data._id,
-                                    maUrlToSend,
-                                    result.value?.isPermanent === true,
-                                    maXmlData?.processCode ||
+                                const processCode = maXmlData?.processCode ||
                                         (result.value?.ma_222 === true
                                             ? '222'
                                             : result.value?.ma_217 === true
                                               ? '217'
                                               : result.value?.ma_221 === true
                                                 ? '221'
-                                                : result.value?.ma_220 === true
+                                              : result.value?.ma_220 === true
                                                   ? '220'
-                                                  : undefined),
-                                    result.value?.erganiUploadMethod || 'xml'
-                                );
+                                                  : undefined);
+                                maResult = await uploadMaToErganh(
+                                          data.data._id,
+                                          maUrlToSend,
+                                          result.value?.isPermanent === true,
+                                          processCode,
+                                          result.value?.erganiUploadMethod || 'xml'
+                                      );
 
                                 if (
                                     !isE7NRestSubmit &&
@@ -1771,16 +1876,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         const uploadResults = await runXmlUploads();
 
-                        if (
-                            uploadResults?.e3Result?.success === false ||
-                            uploadResults?.maResult?.success === false ||
-                            uploadResults?.wtoResult?.success === false
-                        ) {
+                        if (!finishEmployeeUpdateAfterUploads(uploadResults, () => {
+                            window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                        })) {
                             console.warn('[REDIRECT] Skipped because ERGANI REST upload failed.');
                             return;
                         }
-
-                        window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
 
                         // =====================================================================
                         // ✅ CASE B: createContract=true αλλά showPreview=false → swal + modal
@@ -1796,18 +1897,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             const uploadResults = await runXmlUploads();
 
-                            if (
-                                uploadResults?.e3Result?.success === false ||
-                                uploadResults?.maResult?.success === false ||
-                                uploadResults?.wtoResult?.success === false
-                            ) {
+                            if (!finishEmployeeUpdateAfterUploads(uploadResults, () => {
+                                window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                            })) {
                                 console.warn(
                                     '[REDIRECT] Skipped because ERGANI REST upload failed.'
                                 );
                                 return;
                             }
 
-                            window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                         } else {
                             await showSuccessSwal();
 
@@ -1830,18 +1928,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             const uploadResults = await runXmlUploads();
 
-                            if (
-                                uploadResults?.e3Result?.success === false ||
-                                uploadResults?.maResult?.success === false ||
-                                uploadResults?.wtoResult?.success === false
-                            ) {
+                            if (!finishEmployeeUpdateAfterUploads(uploadResults, () => {
+                                window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                            })) {
                                 console.warn(
                                     '[REDIRECT] Skipped because ERGANI REST upload failed.'
                                 );
                                 return;
                             }
 
-                            window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                         }
                         return;
 
@@ -1858,11 +1953,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         const uploadResults = await runXmlUploads();
 
-                        if (
-                            uploadResults?.e3Result?.success === false ||
-                            uploadResults?.maResult?.success === false ||
-                            uploadResults?.wtoResult?.success === false
-                        ) {
+                        if (!finishEmployeeUpdateAfterUploads(uploadResults, () => {
+                            window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                        })) {
                             console.warn('[REDIRECT] Skipped because ERGANI REST upload failed.');
                             return;
                         }
@@ -1871,7 +1964,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             '[REDIRECT] Redirecting to:',
                             data.redirectUrl || '/ergazomenoi/ergazomenoi'
                         );
-                        window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                     }
                 }
                 return;

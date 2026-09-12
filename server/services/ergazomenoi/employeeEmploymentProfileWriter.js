@@ -194,8 +194,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
     if (mode === MODE_NEW_VERSION && historyId !== null) C.invalid('historyId', 'not allowed for new version');
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map((key) => [key, scope[key]]));
     for (const field of Object.keys(input)) if (!C.FACT_FIELDS.includes(field)) C.invalid(field, 'not an employment profile fact');
-    const from = C.calendarDate(effectiveFrom, 'effectiveFrom');
-    if (!from) C.invalid('effectiveFrom', 'required');
+    let from = effectiveFrom ? C.calendarDate(effectiveFrom, 'effectiveFrom') : null;
     return inProfileTransaction(connection, capabilityProbe, async session => {
         let result;
         const submittedInput = input, submittedMaintenance = maintenance;
@@ -206,6 +205,16 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             if (newEmployee && current) throw failure('EMPLOYEE_PROFILE_ALREADY_EXISTS');
             if (!newEmployee && !current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
             const rows = await historyModel.find(filter).session(session).lean();
+            if (!from && maintenance && current && rows.length === 0) {
+                const proposed = { ...current, ...Object.fromEntries(Object.entries(
+                    maintenance.employeeChanges || {}).filter(([, value]) => value !== undefined)) };
+                for (const field of ['hmeromhnia_isxyos_oron_ergasias_apo',
+                    'hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_proslhpshs']) {
+                    from = C.calendarDate(proposed[field], field);
+                    if (from) break;
+                }
+            }
+            if (!from) C.invalid('effectiveFrom', 'required safe baseline date');
             // Enforce the form policy before even the legacy Maintenance shortcut.
             // Use mapped employee category (Add and Edit have different form names).
             if (!editorOperation && (newEmployee || maintenance)) {
@@ -226,8 +235,26 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 !semanticEmploymentProfileChanged(current, maintenance, input);
             const patch = legacyMaintenance ? legacyMaintenancePatch(maintenance.employeeChanges, current) : cleanMaintenancePatch(maintenance?.employeeChanges);
             let historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
-            const selection = !editorOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION
-                ? selectMaintenanceMode(rows, maintenance.identity) : { mode, historyId };
+            const correctableIdentityFields = new Set(maintenance?.correctableIdentityFields || []);
+            if ([...correctableIdentityFields].some(field => field !== 'hmeromhnia_apoxorhshs')) {
+                C.invalid('correctableIdentityFields', 'unsupported maintenance identity correction');
+            }
+            let selection = { mode, historyId };
+            if (!editorOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION) {
+                const originalHistoryId = maintenance.originalHistoryId;
+                if (originalHistoryId) {
+                    const originalTarget = rows.find(row => String(row._id) === String(originalHistoryId));
+                    if (!originalTarget || !effectiveStart(originalTarget)) {
+                        throw failure('EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH');
+                    }
+                    selection = effectiveStart(originalTarget).getTime() === from.getTime()
+                        ? { mode: MODE_CORRECT_EXISTING, historyId: String(originalTarget._id) }
+                        : { mode: MODE_NEW_VERSION, historyId: null };
+                } else {
+                    selection = rows.length ? selectMaintenanceMode(rows, maintenance.identity) :
+                        { mode: MODE_NEW_VERSION, historyId: null };
+                }
+            }
             const selectedHistoryId = selection.historyId;
             if (selection.mode === MODE_CORRECT_EXISTING) {
                 const target = rows.find((row) => String(row._id) === selectedHistoryId);
@@ -252,7 +279,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                     (end && end < from) || !C.readEmploymentProfile(target).recorded)) {
                     throw failure('EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED');
                 }
-                if (datedRows.some((row) => String(row._id) !== selectedHistoryId &&
+                if (boundaryChanged && datedRows.some((row) => String(row._id) !== selectedHistoryId &&
                     (!end || effectiveStart(row) <= end) && (!effectiveEnd(row) || effectiveEnd(row) >= from))) {
                     throw failure('EMPLOYEE_PROFILE_HISTORY_OVERLAP');
                 }
@@ -287,7 +314,9 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 const correction = legacyMaintenance ? { ...historyPatch } : { ...historyPatch, ...snapshot,
                     afora_allagh_dialleimatos: true, hmeromhnia_isxyos_dialleimatos_apo: from };
                 // Corrections cannot move any identity date or overwrite the sequence.
-                for (const field of IDENTITY_FIELDS) delete correction[field];
+                for (const field of IDENTITY_FIELDS) {
+                    if (!correctableIdentityFields.has(field)) delete correction[field];
+                }
                 if (editorOperation) {
                     for (const field of IDENTITY_FIELDS) {
                         const value = historyPatch[field];
@@ -313,6 +342,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             const openRows = datedRows.filter((row) => !effectiveEnd(row) || effectiveEnd(row) >= from);
             if (openRows.length > 1) throw failure('EMPLOYEE_PROFILE_HISTORY_OVERLAP');
             if (legacyMaintenance) historyPatch = legacyMaintenancePatch(maintenance.historyChanges, null, true);
+            if (maintenance && rows.length === 0 &&
+                !C.calendarDate(historyPatch.hmeromhnia_isxyos_oron_ergasias_apo)) {
+                historyPatch.hmeromhnia_isxyos_oron_ergasias_apo = from;
+            }
             const snapshot = legacyMaintenance ? {} : buildCompleteProfileSnapshot({ input,
                 current: { ...(current || newEmployee), ...patch, ...historyPatch }, effectiveFrom: from });
             const facts = legacyMaintenance ? {} : Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
