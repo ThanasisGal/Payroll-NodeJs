@@ -52,23 +52,22 @@ function validateProposed(values) {
     }
     return Object.freeze(result);
 }
-async function preflightWeeklyRepoTransferApply({ session, payload, executionModel, decisionModel, reconstruct = reconstructWeeklyRepoTransferDecision, fingerprint = fingerprintSnapshot }) {
+function preflightWeeklyRepoTransferApplyPrepared({ session, payload, requestExecution = null,
+    decision = null, decisionExecution = null, rebuilt, fingerprint = fingerprintSnapshot,
+    currentRowById = null }) {
     const command = validateApplyCommand(payload); const scope = validateApplySession(session); const identity = commandIdentity(command);
-    const requestExecution = await lean(executionModel.findOne({ team: scope.team, company_kod: scope.company_kod, request_id: command.request_id }));
     if (requestExecution) {
         if (requestExecution.command_identity === identity) return { execution: requestExecution, idempotent: true };
         throw applyError('REQUEST_ID_CONFLICT', 409);
     }
-    const decision = await lean(decisionModel.findOne({ _id: command.decision_id, team: scope.team, company_kod: scope.company_kod }));
     if (!decision) throw applyError('DECISION_NOT_FOUND', 404);
     if (decision.decision_code !== 'APPROVE_PROPOSAL' || decision.decision_status !== 'RECORDED') throw applyError('DECISION_NOT_APPROVED', 409);
-    if (await lean(executionModel.findOne({ team: scope.team, company_kod: scope.company_kod, decision_id: command.decision_id }))) throw applyError('DECISION_ALREADY_APPLIED', 409);
+    if (decisionExecution) throw applyError('DECISION_ALREADY_APPLIED', 409);
     const immutableSnapshot = decision.canonical_snapshot;
     if (![PROPOSAL_VERSION, PROPOSAL_VERSION_V2].includes(immutableSnapshot?.proposal_version)) {
         throw applyError('LEGACY_RECORDED_DECISION_REQUIRES_REAPPROVAL', 409);
     }
-    const reconstructionCommand = { proposal_id: immutableSnapshot.proposal_id, expected_source_id: immutableSnapshot.source.prodhlomena_oraria_id, expected_target_id: immutableSnapshot.target.prodhlomena_oraria_id, expected_proposal_version: immutableSnapshot.proposal_version, expected_choice_code: immutableSnapshot.choice_code };
-    const rebuilt = await reconstruct({ scope, command: reconstructionCommand });
+    if (!rebuilt) throw applyError('STALE_FINGERPRINT', 409);
     if (rebuilt.fingerprint !== decision.snapshot_fingerprint || fingerprint(immutableSnapshot) !== decision.snapshot_fingerprint) throw applyError('STALE_FINGERPRINT', 409);
     const current = rebuilt.snapshot;
     if (String(current.source.prodhlomena_oraria_id) !== String(immutableSnapshot.source.prodhlomena_oraria_id) || String(decision.source_prodhlomena_oraria_id) !== String(immutableSnapshot.source.prodhlomena_oraria_id)) throw applyError('PAIR_IDENTITY_MISMATCH', 409);
@@ -80,7 +79,56 @@ async function preflightWeeklyRepoTransferApply({ session, payload, executionMod
     if (current.source.lock_state || immutableSnapshot.source.lock_state) throw applyError('SOURCE_LOCKED', 409);
     if (current.target.lock_state || immutableSnapshot.target.lock_state) throw applyError('TARGET_LOCKED', 409);
     const sourceAfter = validateProposed(immutableSnapshot.source.proposed_values); const targetAfter = validateProposed(immutableSnapshot.target.proposed_values);
-    return { idempotent: false, plan: Object.freeze({ decision, scope, source: Object.freeze({ id: String(immutableSnapshot.source.prodhlomena_oraria_id), date: immutableSnapshot.source.hmeromhnia, before: validateCurrentApplyValues(immutableSnapshot.source.current_values), after: sourceAfter, expected_current: Object.freeze(pickCurrentGuardValues(immutableSnapshot.source.current_values)) }), target: Object.freeze({ id: String(immutableSnapshot.target.prodhlomena_oraria_id), date: immutableSnapshot.target.hmeromhnia, before: validateCurrentApplyValues(immutableSnapshot.target.current_values), after: targetAfter, expected_current: Object.freeze(pickCurrentGuardValues(immutableSnapshot.target.current_values)) }), actor: Object.freeze({ id: scope.created_by_user_id, name: scope.created_by_user_name, role: scope.created_by_user_role }), request_id: command.request_id, command_identity: identity }) };
+    const sourceId = String(immutableSnapshot.source.prodhlomena_oraria_id);
+    const targetId = String(immutableSnapshot.target.prodhlomena_oraria_id);
+    const rowVersion = (id) => {
+        const value = currentRowById instanceof Map ? currentRowById.get(id)?.__v : undefined;
+        return Number.isInteger(value) ? value : undefined;
+    };
+    return { idempotent: false, plan: Object.freeze({ decision, scope,
+        source: Object.freeze({ id: sourceId, date: immutableSnapshot.source.hmeromhnia,
+            before: validateCurrentApplyValues(immutableSnapshot.source.current_values),
+            after: sourceAfter,
+            expected_current: Object.freeze(pickCurrentGuardValues(
+                immutableSnapshot.source.current_values)), version: rowVersion(sourceId) }),
+        target: Object.freeze({ id: targetId, date: immutableSnapshot.target.hmeromhnia,
+            before: validateCurrentApplyValues(immutableSnapshot.target.current_values),
+            after: targetAfter,
+            expected_current: Object.freeze(pickCurrentGuardValues(
+                immutableSnapshot.target.current_values)), version: rowVersion(targetId) }),
+        actor: Object.freeze({ id: scope.created_by_user_id, name: scope.created_by_user_name,
+            role: scope.created_by_user_role }), request_id: command.request_id,
+        command_identity: identity }) };
 }
 
-module.exports = { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, pick, pickCurrentGuardValues, validateCurrentApplyValues, validateProposed, preflightWeeklyRepoTransferApply };
+async function preflightWeeklyRepoTransferApply({ session, payload, executionModel, decisionModel, reconstruct = reconstructWeeklyRepoTransferDecision, fingerprint = fingerprintSnapshot }) {
+    const command = validateApplyCommand(payload); const scope = validateApplySession(session);
+    const requestExecution = await lean(executionModel.findOne({ team: scope.team,
+        company_kod: scope.company_kod, request_id: command.request_id }));
+    if (requestExecution) return preflightWeeklyRepoTransferApplyPrepared({ session,
+        payload: command, requestExecution, fingerprint });
+    const decision = await lean(decisionModel.findOne({ _id: command.decision_id,
+        team: scope.team, company_kod: scope.company_kod }));
+    if (decision && ![PROPOSAL_VERSION, PROPOSAL_VERSION_V2].includes(
+        decision.canonical_snapshot?.proposal_version)) {
+        return preflightWeeklyRepoTransferApplyPrepared({ session, payload: command,
+            decision, fingerprint });
+    }
+    const decisionExecution = decision ? await lean(executionModel.findOne({ team: scope.team,
+        company_kod: scope.company_kod, decision_id: command.decision_id })) : null;
+    let rebuilt = null;
+    if (decision?.canonical_snapshot) {
+        const snapshot = decision.canonical_snapshot;
+        rebuilt = await reconstruct({ scope, command: { proposal_id: snapshot.proposal_id,
+            expected_source_id: snapshot.source.prodhlomena_oraria_id,
+            expected_target_id: snapshot.target.prodhlomena_oraria_id,
+            expected_proposal_version: snapshot.proposal_version,
+            expected_choice_code: snapshot.choice_code } });
+    }
+    return preflightWeeklyRepoTransferApplyPrepared({ session, payload: command,
+        requestExecution, decision, decisionExecution, rebuilt, fingerprint });
+}
+
+module.exports = { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, pick,
+    pickCurrentGuardValues, validateCurrentApplyValues, validateProposed,
+    preflightWeeklyRepoTransferApplyPrepared, preflightWeeklyRepoTransferApply };

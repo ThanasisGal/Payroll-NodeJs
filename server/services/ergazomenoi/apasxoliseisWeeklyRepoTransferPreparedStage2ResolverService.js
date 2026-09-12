@@ -77,7 +77,8 @@ function resolveWeeklyRepoTransferDecisionFromPreparedWeek({ weeklyInput, scope 
         holidayByDateKey: weeklyInput.holidayByDateKey || new Map(),
         week: { start: group.group_key.match(/week=([^:|]+)/)?.[1],
             end: group.group_key.match(/week=[^:|]+:([^|]+)/)?.[1] } };
-    const fingerprint = snapshotFingerprintBuilder(canonicalSnapshotBuilder({ scope, context, group }));
+    const snapshot = canonicalSnapshotBuilder({ scope, context, group });
+    const fingerprint = snapshotFingerprintBuilder(snapshot);
     const proposalDecisions = decisions.filter((decision) =>
         String(decision.proposal_id || '') === String(group.group_id || ''));
     const executionByDecisionId = new Map(executions.map((execution) =>
@@ -108,7 +109,9 @@ function resolveWeeklyRepoTransferDecisionFromPreparedWeek({ weeklyInput, scope 
     const start = context.week.start || ''; const end = context.week.end || '';
     const inside = !presentationStart || !presentationEnd ||
         (start >= dateKeyUtc(presentationStart) && end <= dateKeyUtc(presentationEnd));
-    return { projection, fingerprint, group, record: { proposal_id: group.group_id,
+    return { projection, fingerprint, group,
+        prepared: Object.freeze({ snapshot, fingerprint, group }),
+        record: { proposal_id: group.group_id,
         current_proposal_fingerprint: fingerprint,
         current_decision_fingerprint: rawCurrent?.snapshot_fingerprint || null,
         current_proposal: { employee_kodikos: text(sourceItem.employee_kodikos ||
