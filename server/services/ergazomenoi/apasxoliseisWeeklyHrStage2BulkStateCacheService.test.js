@@ -75,11 +75,39 @@ function preview(count, exceptionCount = 0) {
 }
 {
     let now = 0;
-    const cache = new WeeklyHrStage2BulkStateCache({ ttlMs: 10, now: () => now });
+    const cache = new WeeklyHrStage2BulkStateCache({ ttlMs: 10, hardTtlMs: 100,
+        now: () => now });
     cache.put({ preview: preview(1), scope });
     now = 11;
     assert.throws(() => cache.batch({ preview_fingerprint: 'a'.repeat(64), scope }),
     { code: 'STAGE2_BULK_PREVIEW_EXPIRED', statusCode: 409 });
+}
+{
+    let now = 0;
+    const activeCache = new WeeklyHrStage2BulkStateCache({ ttlMs: 10, hardTtlMs: 1000,
+        now: () => now });
+    activeCache.put({ preview: preview(9500), scope });
+    let continuation = '';
+    for (let index = 0; index < 95; index++) {
+        now += 9;
+        const batch = activeCache.batch({ preview_fingerprint: 'a'.repeat(64), scope,
+            continuation_token: continuation });
+        continuation = batch.continuation_token;
+    }
+    assert.equal(now > 10, true);
+    now += 11;
+    assert.throws(() => activeCache.batch({ preview_fingerprint: 'a'.repeat(64), scope }),
+    { code: 'STAGE2_BULK_PREVIEW_EXPIRED' });
+
+    now = 0;
+    const hardCache = new WeeklyHrStage2BulkStateCache({ ttlMs: 10,
+        hardTtlMs: 25, now: () => now });
+    hardCache.put({ preview: preview(500), scope });
+    now = 9; hardCache.batch({ preview_fingerprint: 'a'.repeat(64), scope });
+    now = 18; hardCache.batch({ preview_fingerprint: 'a'.repeat(64), scope });
+    now = 26;
+    assert.throws(() => hardCache.batch({ preview_fingerprint: 'a'.repeat(64), scope }),
+    { code: 'STAGE2_BULK_PREVIEW_EXPIRED' });
 }
 
 console.log('weekly HR Stage-2 scoped continuation cache tests passed');

@@ -23,4 +23,16 @@ assert.match(controller, /expected_scope_fingerprint/);
 assert.match(controller, /stage2BulkStateCache\.batch/);
 assert.match(controller, /continuation_token: batch\.continuation_token/);
 assert.match(controller, /stage2BulkRequestScope/);
+const targetedLoader = controller.match(
+    /async function loadWeeklyHrStage2BatchPreparedContexts[\s\S]*?\n}\n\nasync function loadWeeklyHrStage2BulkPreparedContexts/)?.[0] || '';
+assert.match(targetedLoader, /batchScopes\.length > 100/);
+assert.match(targetedLoader, /loadWeeklyHrStage2TargetedReadGroups/);
+assert.match(targetedLoader, /decisionByRequestId/);
+assert.match(targetedLoader, /executionByDecisionId/);
+assert.doesNotMatch(targetedLoader, /getReviewRowsForExport/);
+assert.doesNotMatch(targetedLoader, /\.findOne\(/);
+const bulkController = controller.match(
+    /static completeWeeklyHrWorkflowStage2Bulk[\s\S]*?\n    };/)?.[0] || '';
+assert.match(bulkController, /loadWeeklyHrStage2BatchPreparedContexts/);
+assert.doesNotMatch(bulkController, /loadWeeklyHrStage2BulkPreparedContexts|getReviewRowsForExport/);
 console.log('weekly HR Stage-2 bulk controller contract tests passed');

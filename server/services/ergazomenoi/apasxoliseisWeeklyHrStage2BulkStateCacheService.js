@@ -5,6 +5,7 @@ const { stableStringify } = require('./apasxoliseisStage3FingerprintService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_HARD_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_MAX_ENTRIES = 50;
 const DEFAULT_MAX_CACHED_SCOPES = 20000;
 const MAX_SCOPES_PER_BATCH = 100;
@@ -29,21 +30,28 @@ function cacheError(code, statusCode, message) {
 }
 
 class WeeklyHrStage2BulkStateCache {
-    constructor({ ttlMs = DEFAULT_TTL_MS, maxEntries = DEFAULT_MAX_ENTRIES,
+    constructor({ ttlMs = DEFAULT_TTL_MS, hardTtlMs = DEFAULT_HARD_TTL_MS,
+        maxEntries = DEFAULT_MAX_ENTRIES,
         maxCachedScopes = DEFAULT_MAX_CACHED_SCOPES,
         now = () => Date.now() } = {}) {
         this.ttlMs = ttlMs;
+        this.hardTtlMs = hardTtlMs;
         this.maxEntries = maxEntries;
         this.maxCachedScopes = maxCachedScopes;
         this.now = now;
         this.entries = new Map();
     }
 
-    put({ preview, scope }) {
+    put({ preview, scope, contexts = [] }) {
         const fingerprint = text(preview?.preview_fingerprint);
         if (!fingerprint) return null;
-        const entry = { createdAt: this.now(), scope: canonicalScope(scope),
+        const now = this.now();
+        const contextByIdentity = new Map((Array.isArray(contexts) ? contexts : []).map(
+            (context) => [`${text(context?.scope?.employee_id)}|${dateKeyUtc(
+                context?.scope?.week_start)}|${dateKeyUtc(context?.scope?.week_end)}`, context]));
+        const entry = { createdAt: now, lastAccessAt: now, scope: canonicalScope(scope),
             safeScopes: Array.isArray(preview.safe_scope_ids) ? preview.safe_scope_ids : [],
+            contextByIdentity,
             exceptions: Array.isArray(preview._all_exceptions) ? preview._all_exceptions : [],
             pageSize: Math.min(50, Number(preview.exception_page_size) || 50) };
         const key = entryKey(fingerprint, entry.scope);
@@ -62,7 +70,9 @@ class WeeklyHrStage2BulkStateCache {
         const fingerprint = text(preview_fingerprint);
         const key = entryKey(fingerprint, scope);
         const entry = this.entries.get(key);
-        if (!entry || this.now() - entry.createdAt > this.ttlMs) {
+        const now = this.now();
+        if (!entry || now - entry.lastAccessAt > this.ttlMs ||
+            now - entry.createdAt > this.hardTtlMs) {
             if (entry) this.entries.delete(key);
             const fingerprintExists = [...this.entries.keys()].some((candidate) =>
                 candidate.startsWith(`${fingerprint}:`));
@@ -100,9 +110,13 @@ class WeeklyHrStage2BulkStateCache {
                 'Η συνέχεια της μαζικής ενημέρωσης δεν είναι πλέον έγκυρη.');
         }
         const scopes = entry.safeScopes.slice(offset, offset + size);
+        const preparedContexts = scopes.map((item) => entry.contextByIdentity.get(
+            `${text(item.employee_id)}|${dateKeyUtc(item.week_start)}|${dateKeyUtc(item.week_end)}`
+        )).filter(Boolean);
         const nextOffset = offset + scopes.length;
         const remaining = Math.max(0, entry.safeScopes.length - nextOffset);
-        return { scopes, offset, processed_in_batch: scopes.length, remaining,
+        entry.lastAccessAt = this.now();
+        return { scopes, preparedContexts, offset, processed_in_batch: scopes.length, remaining,
             has_more: remaining > 0, continuation_token: remaining > 0
                 ? this.continuationToken(fingerprint, entry, nextOffset) : null,
             total_safe_scopes: entry.safeScopes.length,
@@ -113,6 +127,7 @@ class WeeklyHrStage2BulkStateCache {
         const entry = this.requireEntry({ preview_fingerprint, scope });
         const page = Math.max(1, Number(exception_page) || 1);
         const offset = (page - 1) * entry.pageSize;
+        entry.lastAccessAt = this.now();
         return { exceptions: entry.exceptions.slice(offset, offset + entry.pageSize),
             exception_page: page, exception_page_size: entry.pageSize,
             exception_page_count: Math.max(1,
@@ -120,6 +135,7 @@ class WeeklyHrStage2BulkStateCache {
     }
 }
 
-module.exports = { DEFAULT_TTL_MS, DEFAULT_MAX_ENTRIES, DEFAULT_MAX_CACHED_SCOPES,
+module.exports = { DEFAULT_TTL_MS, DEFAULT_HARD_TTL_MS, DEFAULT_MAX_ENTRIES,
+    DEFAULT_MAX_CACHED_SCOPES,
     MAX_SCOPES_PER_BATCH,
     canonicalScope, WeeklyHrStage2BulkStateCache };

@@ -9413,11 +9413,17 @@ async function completeWeeklyHrStage2BulkFromUi() {
         const totals = { applied: 0, already_completed: 0, stale: 0, failed: 0,
             skipped_manual: 0 };
         let continuationToken = null; let processed = 0; let hasMore = true;
+        let batchIterations = 0;
+        const maxBatchIterations = Math.ceil(Number(preview.safe_bulk_count || 0) / 100) + 2;
         progressAlert = employmentReviewSwal({ title: 'Μαζική ενημέρωση Stage 2',
             html: `Επεξεργασία 0 / ${preview.safe_bulk_count}`, allowOutsideClick: false,
             allowEscapeKey: false, showConfirmButton: false,
             didOpen: () => Swal.showLoading() });
         while (hasMore) {
+            batchIterations++;
+            if (batchIterations > maxBatchIterations) throw new Error(
+                'Η μαζική ενημέρωση διακόπηκε επειδή ξεπέρασε το ασφαλές όριο παρτίδων.');
+            const previousContinuationToken = continuationToken;
             const body = { ...commonBody, continuation_token: continuationToken };
             let response;
             for (let attempt = 0; attempt < 2; attempt++) {
@@ -9438,6 +9444,10 @@ async function completeWeeklyHrStage2BulkFromUi() {
             processed += Number(result.processed_in_batch || 0);
             hasMore = result.has_more === true;
             continuationToken = result.continuation_token || null;
+            if (hasMore && (Number(result.processed_in_batch || 0) <= 0 ||
+                !continuationToken || continuationToken === previousContinuationToken)) {
+                throw new Error('Η μαζική ενημέρωση δεν επέστρεψε έγκυρη συνέχεια.');
+            }
             Swal.update({ html: `Επεξεργασία ${processed} / ${preview.safe_bulk_count}` });
         }
         Swal.close();
