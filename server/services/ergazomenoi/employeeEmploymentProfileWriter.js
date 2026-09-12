@@ -266,7 +266,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                     (end && end < from) || !C.readEmploymentProfile(target).recorded)) {
                     throw failure('EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED');
                 }
-                if (datedRows.some((row) => String(row._id) !== selectedHistoryId &&
+                if (boundaryChanged && datedRows.some((row) => String(row._id) !== selectedHistoryId &&
                     (!end || effectiveStart(row) <= end) && (!effectiveEnd(row) || effectiveEnd(row) >= from))) {
                     throw failure('EMPLOYEE_PROFILE_HISTORY_OVERLAP');
                 }

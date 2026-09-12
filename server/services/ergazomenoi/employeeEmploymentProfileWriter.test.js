@@ -185,17 +185,39 @@ test('old incomplete legacy correction requires explicit missing facts instead o
     assert.equal(db.state().history[0][C.SCHEMA_VERSION], 1);
     assert.deepEqual(db.state().employee, initial.employee);
 });
-test('correction rejects overlapping history and mismatched current identity', async () => {
-    for (const overlap of [true, false]) {
-        const initial = correctionState();
-        if (overlap) initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = null;
-        else initial.employee.hmeromhnia_isxyos_oron_ergasias_apo = new Date('2026-10-01');
-        const db = database(initial);
-        await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
-            mode: MODE_CORRECT_EXISTING, historyId: 'latest', effectiveFrom: '2026-09-01' }),
-        overlap ? /HISTORY_OVERLAP/ : /CURRENT_IDENTITY_MISMATCH/);
-        assert.equal(db.writes(), 0);
-    }
+test('correction rejects mismatched current identity', async () => {
+    const initial = correctionState();
+    initial.employee.hmeromhnia_isxyos_oron_ergasias_apo = new Date('2026-10-01');
+    const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        mode: MODE_CORRECT_EXISTING, historyId: 'latest', effectiveFrom: '2026-09-01' }),
+    /CURRENT_IDENTITY_MISMATCH/);
+    assert.equal(db.writes(), 0);
+});
+
+test('exact non-boundary termination correction is allowed over pre-existing legacy overlap', async () => {
+    const initial = correctionState();
+    initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = null;
+    initial.history[1].hmeromhnia_apoxorhshs = null;
+    initial.employee.hmeromhnia_apoxorhshs = null;
+    const unrelatedBefore = structuredClone(initial.history[0]);
+    const db = database(initial);
+    const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'latest',
+        effectiveFrom: '2026-09-01', input: {}, maintenance: {
+            employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+            historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+            correctableIdentityFields: ['hmeromhnia_apoxorhshs']
+        } });
+    assert.equal(result.history._id, 'latest');
+    assert.equal(db.state().history.length, 2);
+    assert.deepEqual(db.state().history[0], unrelatedBefore);
+    assert.equal(new Date(db.state().history[1].hmeromhnia_apoxorhshs)
+        .toISOString().slice(0, 10), '2026-09-10');
+    assert.deepEqual(db.state().history[1].hmeromhnia_isxyos_oron_ergasias_apo,
+        initial.history[1].hmeromhnia_isxyos_oron_ergasias_apo);
+    assert.deepEqual(db.state().history[1].hmeromhnia_isxyos_oron_ergasias_eos,
+        initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos);
 });
 test('normal latest legacy Maintenance correction keeps its identity and creates no duplicate', async () => {
     const from = new Date('2026-04-01');
@@ -272,14 +294,13 @@ test('no-change Maintenance selects real May version and preserves non-terms his
     assert.equal(result.mode, MODE_LEGACY_MAINTENANCE);
     assert.equal(result.history._id, 'real');
     assert.deepEqual(db.state(), initial);
-    // A genuine overlapping terms row must still fail the existing guard.
+    // A pre-existing overlap is not newly introduced by this non-boundary correction.
     const overlap = { ...noise, afora_allagh_oron_ergasias: true };
     const conflicting = database({ ...initial, history: [real, overlap] });
-    await assert.rejects(writeEmployeeEmploymentProfile({ ...conflicting.dependencies, scope,
+    await writeEmployeeEmploymentProfile({ ...conflicting.dependencies, scope,
         employeeId: 'employee', effectiveFrom: '2026-05-25',
-        maintenance: { identity, employeeChanges: {}, historyChanges: {} } }),
-    error => error.code === 'EMPLOYEE_PROFILE_HISTORY_OVERLAP');
-    assert.equal(conflicting.writes(), 0);
+        maintenance: { identity, employeeChanges: {}, historyChanges: {} } });
+    assert.deepEqual(conflicting.state().history, [real, overlap]);
 });
 
 function noHistoryMaintenanceState(dates = {}) {
