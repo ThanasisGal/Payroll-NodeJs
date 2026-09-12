@@ -30,13 +30,16 @@ function context(index, kind = 'safe') {
     const contexts = [context(0), context(1), context(2), context(3, 'manual')];
     const preview = buildWeeklyHrStage2BulkPreview({ contexts });
     const completed = new Set(); let loads = 0; let guards = 0; const calls = [];
+    const checkedFingerprints = [];
     const args = { period_start: '2026-05-01', period_end: '2026-05-31', ypokatasthma: '0001',
         bulk_request_id: 'bulk-stage2-0001', reason_or_notes: 'Μαζική ενημέρωση',
         expected_preview_fingerprint: preview.preview_fingerprint,
         actor: { role: 'HR' }, commonGuard: async () => { guards++; },
         loadPreparedContexts: async () => { loads++; return contexts; },
-        completePreparedScope: async ({ context: item, request_id }) => {
+        completePreparedScope: async ({ context: item, request_id,
+            expected_scope_fingerprint }) => {
             calls.push(request_id); const key = String(item.scope.employee_id);
+            checkedFingerprints.push(expected_scope_fingerprint);
             if (key === 'employee-1') throw Object.assign(new Error('stale'),
                 { code: 'STAGE2_INPUT_CHANGED' });
             const idempotent = completed.has(request_id); completed.add(request_id);
@@ -47,6 +50,7 @@ function context(index, kind = 'safe') {
         skipped: first.skipped_manual }, { applied: 2, stale: 1, failed: 0, skipped: 1 });
     assert.equal(loads, 1); assert.equal(guards, 1);
     assert.equal(new Set(calls).size, 3);
+    assert.equal(checkedFingerprints.every((value) => /^[a-f0-9]{64}$/.test(value)), true);
     const retry = await completeWeeklyHrWorkflowStage2Bulk(args);
     assert.equal(retry.already_completed, 2);
     assert.equal(retry.stale, 1);

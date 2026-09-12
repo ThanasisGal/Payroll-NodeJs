@@ -22,7 +22,11 @@ sandbox.currentWeeklyHrStage2BulkPreview = { total_scopes: 10000, safe_bulk_coun
         code: 'MANUAL_REVIEW' })) };
 assert.equal(sandbox.render(container), true);
 assert.match(container.innerHTML, /Μαζική ενημέρωση 9500 περιπτώσεων/);
-assert.equal((container.innerHTML.match(/weekly-hr-stage2-exception/g) || []).length, 50);
+assert.match(container.innerHTML, /Αυτόματες/);
+assert.match(container.innerHTML, /Μεταφορές source\/target/);
+assert.equal((container.innerHTML.match(/class="weekly-hr-stage2-exception"/g) || []).length, 50);
+assert.match(container.innerHTML, /Προηγούμενη/);
+assert.match(container.innerHTML, /Επόμενη/);
 assert.doesNotMatch(container.innerHTML, /employment-review-stage2-proposal/);
 assert.doesNotMatch(container.innerHTML, /Προτάσεις Μεταφοράς Ρεπό|Ροή έγκρισης HR/);
 sandbox.currentWeeklyHrStage2BulkPreview = { safe_bulk_count: 0,
@@ -32,4 +36,7 @@ assert.match(container.innerHTML, /Δεν υπάρχουν εκκρεμείς μ
 assert.doesNotMatch(container.innerHTML, /<article/);
 assert.match(source, /stage2\/bulk-preview/);
 assert.match(source, /stage2\/bulk-complete/);
+const loadResultsSource = source.match(/async function loadResults\([\s\S]*?\n}/)?.[0] || '';
+assert.match(loadResultsSource, /payload\.stage2BulkPreview/);
+assert.doesNotMatch(loadResultsSource, /await loadWeeklyHrStage2BulkPreview/);
 console.log('weekly HR Stage-2 compact bulk UI tests passed');

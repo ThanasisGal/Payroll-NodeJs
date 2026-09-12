@@ -22,6 +22,8 @@ function childRequestId(bulkRequestId, scope) {
     return `stage2-bulk:${crypto.createHash('sha256').update(suffix).digest('hex')}`;
 }
 function statusFor(error) {
+    if (['DECISION_ALREADY_APPLIED', 'DUPLICATE_EXECUTION',
+        'STAGE2_ALREADY_COMPLETED'].includes(error?.code)) return 'ALREADY_COMPLETED';
     if (['STAGE2_INPUT_CHANGED', 'STAGE2_VERSION_CONFLICT', 'DAILY_REVIEW_INPUT_CHANGED',
         'PERIOD_CONTROL_STATE_CONFLICT'].includes(error?.code)) return 'STALE';
     return 'FAILED';
@@ -64,9 +66,17 @@ async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, yp
         for (const scope of chunk) {
             const context = byIdentity.get(identityKey(scope));
             try {
+                const currentScope = buildWeeklyHrStage2BulkPreview({ contexts: [context] })
+                    .safe_scope_ids[0];
+                if (!currentScope || currentScope.scope_fingerprint !== scope.scope_fingerprint ||
+                    currentScope.bulk_kind !== scope.bulk_kind) {
+                    const stale = new Error('Το scope άλλαξε μετά την προεπισκόπηση.');
+                    stale.code = 'STAGE2_INPUT_CHANGED'; throw stale;
+                }
                 const result = await completePreparedScope({ context, actor,
                     reason_or_notes: reason, request_id: childRequestId(requestId, scope),
-                    expected_scope_fingerprint: scope.scope_fingerprint });
+                    expected_scope_fingerprint: scope.scope_fingerprint,
+                    bulk_kind: scope.bulk_kind });
                 results.push({ scope, status: result?.idempotent === true
                     ? 'ALREADY_COMPLETED' : 'APPLIED' });
             } catch (error) {
@@ -76,10 +86,15 @@ async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, yp
         }
     }
     const count = (status) => results.filter((item) => item.status === status).length;
+    const diagnosticResults = results.filter((item) =>
+        ['STALE', 'FAILED'].includes(item.status)).slice(0, 100);
     return { total_scopes: preview.total_scopes, applied: count('APPLIED'),
         already_completed: preview.already_resolved_count + count('ALREADY_COMPLETED'),
         skipped_manual: preview.manual_exception_count, stale: count('STALE'),
-        failed: count('FAILED'), preview_fingerprint: preview.preview_fingerprint, results };
+        failed: count('FAILED'), preview_fingerprint: preview.preview_fingerprint,
+        result_details: diagnosticResults, result_details_truncated:
+            diagnosticResults.length < results.filter((item) =>
+                ['STALE', 'FAILED'].includes(item.status)).length };
 }
 
 module.exports = { WRITE_CHUNK_SIZE, childRequestId,

@@ -477,12 +477,23 @@ const {
 const {
     completeWeeklyHrWorkflowStage2
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2CompletionService');
-const { buildWeeklyHrStage2BulkPreview } = require(
+const { buildWeeklyHrStage2BulkPreview, publicWeeklyHrStage2BulkPreview } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkPreviewService');
 const { completeWeeklyHrWorkflowStage2Bulk } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2BulkCompletionService');
 const { writeCanonicalDailyClassification } = require(
     '../../services/ergazomenoi/apasxoliseisCanonicalDailyClassificationWriterService');
+const STAGE2_BULK_PREVIEW_CACHE_LIMIT = 50;
+const stage2BulkPreviewExceptionCache = new Map();
+function cacheStage2BulkPreviewExceptions(preview) {
+    if (!preview?.preview_fingerprint) return;
+    stage2BulkPreviewExceptionCache.set(preview.preview_fingerprint, {
+        createdAt: Date.now(), exceptions: preview._all_exceptions || [],
+        pageSize: preview.exception_page_size || 50 });
+    while (stage2BulkPreviewExceptionCache.size > STAGE2_BULK_PREVIEW_CACHE_LIMIT) {
+        stage2BulkPreviewExceptionCache.delete(stage2BulkPreviewExceptionCache.keys().next().value);
+    }
+}
 const {
     resolveWeeklyHrStage3Day: executeWeeklyHrStage3Day
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3ResolutionService');
@@ -4493,6 +4504,82 @@ async function loadWeeklyHrStage2CompletionContext({ req, input, session = null 
         stage2_version: Number(state?.stage2?.version || 0) } };
 }
 
+async function prepareWeeklyHrStage2PairRecords({ req, rowsByWeek, employeeByCode,
+    historyByCode, auditsByRowId, holidayContext, decisions = null, executions = null }) {
+    const allRows = [...rowsByWeek.values()].flat();
+    const start = allRows.map((row) => dateKeyUtc(row.hmeromhnia)).filter(Boolean).sort()[0];
+    const end = allRows.map((row) => dateKeyUtc(row.hmeromhnia)).filter(Boolean).sort().at(-1);
+    const base = { team: req.session.userTeam,
+        company_kod: String(req.session.companyInUse || ''),
+        ypokatasthma: String(req.query.ypokatasthma || req.body?.ypokatasthma || '')
+            .trim().padStart(4, '0') };
+    if (!decisions) decisions = start && end ? await
+        ApasxoliseisWeeklyRepoTransferDecisionModel.find({ ...base,
+            decision_status: 'RECORDED',
+            week_start: mongoose.trusted({ $lte: new Date(`${end}T00:00:00Z`) }),
+            week_end: mongoose.trusted({ $gte: new Date(`${start}T00:00:00Z`) }) }).lean() : [];
+    if (!executions) {
+        const decisionIds = decisions.map((item) => item._id).filter(Boolean);
+        executions = decisionIds.length ? await ApasxoliseisWeeklyRepoTransferExecutionModel.find({
+            team: base.team, company_kod: base.company_kod,
+            decision_id: mongoose.trusted({ $in: decisionIds }) }).lean() : [];
+    }
+    let authorized = true;
+    try { validateApplySession(req.session); } catch (_) { authorized = false; }
+    let runtimeState = { enabled: false }; let indexState = { ready: false };
+    try { runtimeState = await getWeeklyRepoTransferApplyRuntimeState(); } catch (_) {}
+    if (runtimeState.enabled) {
+        try { indexState = await getWeeklyRepoTransferApplyIndexState(); } catch (_) {}
+    }
+    const records = new Map();
+    for (const [key, rawRows] of rowsByWeek) {
+        const weekRows = rawRows.slice().sort((a, b) =>
+            dateKeyUtc(a.hmeromhnia).localeCompare(dateKeyUtc(b.hmeromhnia)));
+        const first = weekRows[0] || {}; const effective = weekRows.at(-1) || {};
+        const weekStart = dateKeyUtc(startOfWeekMondayUtc(first.hmeromhnia));
+        const weekEnd = dateKeyUtc(endOfWeekSundayUtc(first.hmeromhnia));
+        const resolvedInput = buildWeeklyRepoTransferAtomicInputForPreparedWeek({ bucket: {
+            ...base, companyKod: base.company_kod, employeeKodikos: String(first.kodikos || ''),
+            weekStart, weekEnd, rows: weekRows.map((row) => ({ row,
+                dateKey: dateKeyUtc(row.hmeromhnia) })) }, periodEndKey: weekEnd,
+        asOfDateKey: dateKeyUtc(req.session.appDate),
+        holidayByDateKey: holidayContext?.argiesByDateKey || new Map(),
+        existingAuditCountByRowKey: new Map(weekRows.map((row) => [String(row._id),
+            (auditsByRowId.get(String(row._id)) || []).length])),
+        resolveEmploymentProfile: () => ({
+            typos_apasxolhshs: effective.effective_typos_apasxolhshs || '',
+            pososto_prosayxhshs_6hs_hmeras: effective.effective_sixth_day_rate,
+            hmeres_ergasias_ebdomadas: effective.effective_weekly_workdays,
+            mo_oron_hmerhsias_ergasias: Number(effective.effective_daily_hours || 0),
+            external_break_minutes: Number(effective.effective_external_break_minutes || 0),
+            eidikh_kathgoria_ergazomenoy: effective.effective_special_category || '',
+            eidikh_periptosh: effective.effective_special_case || '',
+            profile_source: effective.effective_profile_source || '',
+            resolution_blocked: effective.effective_profile_resolution_blocked === true,
+            resolution_reason: effective.effective_profile_resolution_reason || '',
+            profile_istoriko_id: effective.effective_profile_istoriko_id || null,
+            profile_effective_date: effective.effective_profile_date || null,
+            profile_changed_inside_week: new Set(weekRows.map((row) =>
+                String(row.effective_profile_istoriko_id || ''))).size > 1 }) });
+        if (resolvedInput.reason) continue;
+        const employeeCode = String(first.kodikos || '').trim();
+        const resolved = resolveWeeklyRepoTransferDecisionFromPreparedWeek({
+            weeklyInput: resolvedInput.weeklyInput,
+            scope: { ...base, company_kodikos: req.session.companyKodikos },
+            canonicalDecisionContext: { employee: employeeByCode.get(employeeCode) || first,
+                history: historyByCode.get(employeeCode) || [],
+                audits: weekRows.flatMap((row) => auditsByRowId.get(String(row._id)) || []),
+                companyFlags: holidayContext?.companyFlags || {},
+                companyKodikos: holidayContext?.company_kodikos || '' },
+            decisions, executions, applyProtection: { authorized,
+                runtimeEnabled: runtimeState.enabled, indexReady: indexState.ready },
+            presentationStart: weekStart, presentationEnd: weekEnd });
+        if (resolved.record) records.set(key, resolved);
+    }
+    return { records, runtimeReady: runtimeState.enabled === true,
+        indexReady: indexState.ready === true };
+}
+
 async function loadWeeklyHrStage2BulkPreparedContexts({ req, input }) {
     const periodAccess = await assertActiveEmploymentReviewPeriodReadable(req, input.ypokatasthma);
     const periodStart = dateKeyUtc(periodAccess.scope.period_start);
@@ -4548,6 +4635,20 @@ async function loadWeeklyHrStage2BulkPreparedContexts({ req, input }) {
                 lifecycle.stages?.stage1?.current_completion_fingerprint,
             stage1_version: Number(state.stage1?.version || 0),
             stage2_version: Number(state.stage2?.version || 0) } });
+    }
+    const pairRecords = await prepareWeeklyHrStage2PairRecords({ req, rowsByWeek,
+        employeeByCode: rows.__employeeByCode || new Map(),
+        historyByCode: rows.__historyByCode || new Map(), auditsByRowId,
+        holidayContext: rows.__atomicHolidayContext || {},
+        decisions: rows.__rawRepoTransferDecisions || [],
+        executions: rows.__rawRepoTransferExecutions || [] });
+    for (const context of contexts) {
+        const key = `${String(context.scope.employee_kodikos || '').trim()}|${dateKeyUtc(
+            context.scope.week_start)}`;
+        context.preparedStage2Record = pairRecords.records.get(key)?.record || null;
+        context.preparedStage2Pair = pairRecords.records.get(key)?.prepared || null;
+        context.period_writable = ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(
+            periodAccess.state?.effective_mode);
     }
     return { contexts, periodAccess };
 }
@@ -7122,10 +7223,11 @@ class erganhController {
                           $in: deviationContextRows.map((row) => row._id)
                       })
                   })
-                      .select('prodhlomena_oraria_id')
+                      .select('_id prodhlomena_oraria_id changedAt')
                       .lean()
                 : [];
             const deviationAuditCountByRowKey = new Map();
+            const deviationAuditsByRowId = new Map();
             deviationAuditRows.forEach((audit) => {
                 const rowId = String(audit.prodhlomena_oraria_id || '').trim();
                 if (!rowId) return;
@@ -7133,6 +7235,8 @@ class erganhController {
                     rowId,
                     (deviationAuditCountByRowKey.get(rowId) || 0) + 1
                 );
+                if (!deviationAuditsByRowId.has(rowId)) deviationAuditsByRowId.set(rowId, []);
+                deviationAuditsByRowId.get(rowId).push(audit);
             });
 
             const canonicalDecisionRangeFilter =
@@ -7579,6 +7683,34 @@ class erganhController {
                 ownershipPeriod, lifecycleByKodikos, employeeByCode: ergByKodikos,
                 periodStart: reviewPeriodStart, periodEnd: reviewPeriodEnd
             });
+            const preparedStage2Pairs = await prepareWeeklyHrStage2PairRecords({ req,
+                rowsByWeek: preparedLifecycleContext.rowsByEmployeeWeek,
+                employeeByCode: ergByKodikos, historyByCode: istorikoRowsByKodikos,
+                auditsByRowId: deviationAuditsByRowId,
+                holidayContext: noCardsDisplayContext });
+            const stage2PeriodAccess = await assertActiveEmploymentReviewPeriodReadable(
+                req, ypokatasthma);
+            const stage2BulkContexts = [...preparedLifecycleContext.lifecycleByWeek]
+                .map(([key, lifecycle]) => {
+                    const weekRows = preparedLifecycleContext.rowsByEmployeeWeek.get(key) || [];
+                    const state = preparedLifecycleContext.workflowByEmployeeWeek.get(key) || {};
+                    return { scope: lifecycle.scope, rows: weekRows, lifecycle,
+                        effectiveProfilesByDate: Object.fromEntries(weekRows.map((row) => [
+                            dateKeyUtc(row.hmeromhnia), {
+                                typos_apasxolhshs: row.effective_typos_apasxolhshs,
+                                kathestos_apasxolhshs: row.effective_kathestos_apasxolhshs } ])),
+                        workflowState: state, upstream: { stage1_current_fingerprint:
+                            lifecycle.stages?.stage1?.current_completion_fingerprint },
+                        preparedStage2Record: preparedStage2Pairs.records.get(key)?.record || null,
+                        preparedStage2Pair: preparedStage2Pairs.records.get(key)?.prepared || null,
+                        period_writable: ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(
+                            stage2PeriodAccess.state?.effective_mode) };
+                });
+            const internalStage2BulkPreview = buildWeeklyHrStage2BulkPreview({
+                contexts: stage2BulkContexts });
+            cacheStage2BulkPreviewExceptions(internalStage2BulkPreview);
+            const stage2BulkPreview = publicWeeklyHrStage2BulkPreview(
+                internalStage2BulkPreview);
             const canonicalLifecycleRows = enrichedRows;
             canonicalLifecycleRows.__lifecycleByWeek = preparedLifecycleContext.lifecycleByWeek;
             canonicalLifecycleRows.__workflowStates = preparedLifecycleContext.workflowStates;
@@ -7726,6 +7858,7 @@ class erganhController {
                 pendingDeviationWeeks,
                 legacyDeviations,
                 canonicalLifecycleProjections,
+                stage2BulkPreview,
                 boundaryContextPreflight,
                 deviationPolicyVersion: deviationPreview.policyVersion
             });
@@ -11831,10 +11964,19 @@ class erganhController {
 
     static previewWeeklyHrWorkflowStage2Bulk = async (req, res) => {
         try {
-            const { contexts } = await loadWeeklyHrStage2BulkPreparedContexts({
-                req, input: req.query });
-            return res.json({ success: true, ...buildWeeklyHrStage2BulkPreview({ contexts,
-                exception_page: req.query.exception_page }) });
+            const fingerprint = String(req.query.preview_fingerprint || '');
+            const cached = stage2BulkPreviewExceptionCache.get(fingerprint);
+            if (!cached || Date.now() - cached.createdAt > 10 * 60 * 1000) {
+                throw weeklyHrApiError('STAGE2_BULK_PREVIEW_EXPIRED', 409,
+                    'Η προεπισκόπηση έληξε. Εκτελέστε ξανά την αναζήτηση.');
+            }
+            const pageSize = Math.min(50, cached.pageSize); const page = Math.max(1,
+                Number(req.query.exception_page) || 1); const offset = (page - 1) * pageSize;
+            return res.json({ success: true, preview_fingerprint: fingerprint,
+                exceptions: cached.exceptions.slice(offset, offset + pageSize),
+                exception_page: page, exception_page_size: pageSize,
+                exception_page_count: Math.max(1,
+                    Math.ceil(cached.exceptions.length / pageSize)) });
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'STAGE2_BULK_PREVIEW_FAILED',
@@ -11855,7 +11997,38 @@ class erganhController {
                     prepared = await loadWeeklyHrStage2BulkPreparedContexts({ req, input: req.body });
                 },
                 loadPreparedContexts: async () => prepared.contexts,
-                completePreparedScope: async ({ context, request_id, reason_or_notes }) => {
+                completePreparedScope: async ({ context, request_id, reason_or_notes,
+                    expected_scope_fingerprint, bulk_kind }) => {
+                    const currentScope = buildWeeklyHrStage2BulkPreview({ contexts: [context] })
+                        .safe_scope_ids[0];
+                    if (!currentScope || currentScope.scope_fingerprint !==
+                        expected_scope_fingerprint) throw weeklyHrApiError(
+                        'STAGE2_INPUT_CHANGED', 409,
+                        'Τα authoritative δεδομένα του Stage 2 άλλαξαν.');
+                    if (bulk_kind === 'SAFE_PAIR_TRANSFER') {
+                        const command = context.preparedStage2Record?.current_proposal?.command;
+                        const preparedPair = context.preparedStage2Pair;
+                        if (!command || !preparedPair || preparedPair.fingerprint !==
+                            context.preparedStage2Record.current_proposal_fingerprint) {
+                            throw weeklyHrApiError('STAGE2_INPUT_CHANGED', 409,
+                                'Η canonical πρόταση μεταφοράς άλλαξε.');
+                        }
+                        const existingDecision = context.preparedStage2Record.current_decision;
+                        const created = existingDecision?.decision_code === 'APPROVE_PROPOSAL'
+                            ? { decision: existingDecision, idempotent: true }
+                            : await createWeeklyRepoTransferDecision({
+                                session: req.session, payload: { ...command,
+                                    decision_code: 'APPROVE_PROPOSAL', notes: reason_or_notes,
+                                    request_id }, reconstruct: async () => preparedPair,
+                                periodGuard: async () => {} });
+                        const applied = await applyWeeklyRepoTransfer({ session: req.session,
+                            payload: { decision_id: created.decision.id, request_id },
+                            periodWriteGuard: async () => {}, periodFence: ({ session }) =>
+                                fencePeriodForWrite({ scope: prepared.periodAccess.scope,
+                                    session }) });
+                        return { completed: true, idempotent:
+                            created.idempotent === true || applied.idempotent === true };
+                    }
                     const mutableRows = context.rows.map((row) => ({ ...row }));
                     const stateModel = { findOne: () => ({ session() { return this; },
                         lean: async () => context.workflowState }),

@@ -9316,9 +9316,8 @@ function stage2LifecycleNonWorkTerms(value) {
 }
 
 async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
-    const query = new URLSearchParams({ period_start: params.get('apo_hmeromhnia') || '',
-        period_end: params.get('eos_hmeromhnia') || '',
-        ypokatasthma: params.get('ypokatasthma') || '', exception_page: exceptionPage });
+    const query = new URLSearchParams({ exception_page: exceptionPage,
+        preview_fingerprint: currentWeeklyHrStage2BulkPreview?.preview_fingerprint || '' });
     const response = await fetch('/api/prodhlomena-oraria/review/weekly-hr-workflow/' +
         `stage2/bulk-preview?${query.toString()}`, { headers: { Accept: 'application/json',
             'CSRF-Token': csrfToken }, credentials: 'same-origin' });
@@ -9328,8 +9327,9 @@ async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
     if (currentWeeklyHrStage2BulkPreview?.preview_fingerprint !== payload.preview_fingerprint) {
         weeklyHrStage2BulkRequestId = '';
     }
-    currentWeeklyHrStage2BulkPreview = payload;
-    return payload;
+    currentWeeklyHrStage2BulkPreview = { ...currentWeeklyHrStage2BulkPreview, ...payload };
+    renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
+    return currentWeeklyHrStage2BulkPreview;
 }
 
 function renderWeeklyHrStage2BulkSummary(container) {
@@ -9350,6 +9350,10 @@ function renderWeeklyHrStage2BulkSummary(container) {
         <div class="d-flex flex-wrap gap-3 small mb-2">
             <span>Ασφαλείς περιπτώσεις για μαζική ενημέρωση: <strong>${escapeHtml(
                 preview.safe_bulk_count || 0)}</strong></span>
+            <span class="ms-2">Αυτόματες: <strong>${escapeHtml(
+                preview.safe_automatic_count || 0)}</strong></span>
+            <span>Μεταφορές source/target: <strong>${escapeHtml(
+                preview.safe_pair_count || 0)}</strong></span>
             <span>Ήδη επιλυμένες: <strong>${escapeHtml(
                 preview.already_resolved_count || 0)}</strong></span>
             <span>Εξαιρέσεις που απαιτούν HR: <strong>${escapeHtml(
@@ -9365,8 +9369,14 @@ function renderWeeklyHrStage2BulkSummary(container) {
         ${exceptions.length ? `<details class="mt-3"><summary>Εξαιρέσεις που απαιτούν έλεγχο</summary>
             <div class="table-responsive mt-2"><table class="table table-sm mb-0"><thead><tr>
             <th>Κωδικός</th><th>Εβδομάδα</th><th>Αιτία</th></tr></thead><tbody>${exceptionRows}
-            </tbody></table></div><div class="small text-muted mt-1">Σελίδα ${escapeHtml(
-                preview.exception_page)} από ${escapeHtml(preview.exception_page_count)} · έως 50 ανά σελίδα</div>
+            </tbody></table></div><div class="d-flex gap-2 align-items-center small text-muted mt-1">
+            <button type="button" class="btn btn-sm weekly-hr-stage2-exceptions-prev"
+                ${Number(preview.exception_page || 1) <= 1 ? 'disabled' : ''}>Προηγούμενη</button>
+            <span>Σελίδα ${escapeHtml(preview.exception_page)} από ${escapeHtml(
+                preview.exception_page_count)} · έως 50 ανά σελίδα</span>
+            <button type="button" class="btn btn-sm weekly-hr-stage2-exceptions-next"
+                ${Number(preview.exception_page || 1) >= Number(preview.exception_page_count || 1)
+                    ? 'disabled' : ''}>Επόμενη</button></div>
             </details>` : ''}</div></section>`;
     return true;
 }
@@ -9433,6 +9443,12 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     if (renderWeeklyHrStage2BulkSummary(container)) {
         container.querySelector('.weekly-hr-stage2-bulk-complete')?.addEventListener(
             'click', completeWeeklyHrStage2BulkFromUi);
+        container.querySelector('.weekly-hr-stage2-exceptions-prev')?.addEventListener(
+            'click', () => loadWeeklyHrStage2BulkPreview(currentPolicyPreviewBaseParams,
+                Math.max(1, Number(currentWeeklyHrStage2BulkPreview.exception_page || 1) - 1)));
+        container.querySelector('.weekly-hr-stage2-exceptions-next')?.addEventListener(
+            'click', () => loadWeeklyHrStage2BulkPreview(currentPolicyPreviewBaseParams,
+                Number(currentWeeklyHrStage2BulkPreview.exception_page || 1) + 1));
         return true;
     }
     if (Number(stage.pending_count || 0) <= 0) {
@@ -10607,14 +10623,7 @@ async function loadResults() {
         currentCanonicalLifecyclePayloads = Array.isArray(
             payload.canonicalLifecycleProjections
         ) ? payload.canonicalLifecycleProjections : [];
-        currentWeeklyHrStage2BulkPreview = null;
-        if (hasAuthoritativeResult) {
-            try {
-                await loadWeeklyHrStage2BulkPreview(params);
-            } catch (stage2BulkError) {
-                console.warn('[loadResults] Stage 2 bulk preview unavailable:', stage2BulkError);
-            }
-        }
+        currentWeeklyHrStage2BulkPreview = payload.stage2BulkPreview || null;
         currentEmploymentReviewBoundaryContextPreflight = payload.finalized === true
             ? { disabled: true } : payload.boundaryContextPreflight || null;
         if (payload.finalized !== true && hasAuthoritativeResult) {
