@@ -9,7 +9,8 @@ const { buildWeeklyHrStage2BulkPreview, publicWeeklyHrStage2BulkPreview,
 const FP = 'a'.repeat(64);
 function assertCounterInvariants(preview) {
     assert.equal(preview.safe_bulk_count + preview.already_resolved_count +
-        preview.manual_exception_count, preview.total_scopes);
+        preview.manual_exception_count + preview.technical_conflict_count,
+    preview.total_scopes);
     assert.equal(preview.safe_bulk_count,
         preview.safe_pair_count + preview.safe_automatic_count);
 }
@@ -33,7 +34,9 @@ function context(index, kind = 'safe') {
     upstream: { stage1_current_fingerprint: FP }, lifecycle: { stages: {
         stage2: {}, stage3: { pending_dates: [], stage2_automatic_resolution_items:
             [{ date, classification: 'REST_REPO' }] } } } };
-    if (kind === 'manual') value.stage2StateDiagnostic = 'INCOMPLETE_NATURAL_WEEK';
+    if (kind === 'manual') value.lifecycle.stages.stage2 = { business_status: 'OPEN',
+        pending_count: 1, pending_items: [{}], pending_reasons: ['MULTIPLE_TARGET_CANDIDATES'],
+        blockers: [], has_transferable_pair: true, has_bounded_selection: false };
     if (kind === 'resolved') value.workflowState.stage2 = { status: 'COMPLETED' };
     if (kind === 'pair') {
         value.lifecycle.stages.stage2 = { pending_count: 1, pending_items: [{}],
@@ -47,6 +50,39 @@ function context(index, kind = 'safe') {
                 expected_proposal_version: 'v2', expected_choice_code: 'ONLY_PAIR' } } };
     }
     return value;
+}
+{
+    const already = context(2001);
+    Object.assign(already.rows[0], { apologistiko_biblio: true,
+        repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΑΝ',
+        kathgoria_adeias_apologistika: '', adeia_apologistika: false,
+        astheneia_apologistika: false, apousia_apologistika: false,
+        ores_ergasias_apologistika: 0 });
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: [already] });
+    assert.equal(preview.already_resolved_count, 1);
+    assert.equal(preview.manual_exception_count, 0);
+    assert.equal(preview.automatic_reconciliation.already_materialized, 1);
+    assertCounterInvariants(preview);
+}
+{
+    const noLonger = context(2002);
+    noLonger.lifecycle.stages.stage3.stage2_automatic_resolution_items = [];
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: [noLonger] });
+    assert.equal(preview.no_longer_applicable_count, 1);
+    assert.equal(preview.already_resolved_count, 1);
+    assert.equal(preview.manual_exception_count, 0);
+    assertCounterInvariants(preview);
+}
+{
+    const conflict = context(2003);
+    conflict.lifecycle.stages.stage2.business_status = 'COMPLETED';
+    conflict.rows[0].kathgoria_ergasias_apologistika = 'ΜΕ';
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: [conflict] });
+    assert.equal(preview.technical_conflict_count, 1);
+    assert.equal(preview.manual_exception_count, 0);
+    assert.equal(conflict.lifecycle.stages.stage2.business_status, 'COMPLETED');
+    assert.equal(preview._technical_conflicts[0].code, 'STAGE2_CANONICAL_ROW_CHANGED');
+    assertCounterInvariants(preview);
 }
 {
     const pairs = Array.from({ length: 500 }, (_, i) => context(i, 'pair'));

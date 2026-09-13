@@ -20,8 +20,10 @@ function mergeEmploymentReviewSwalClasses(...classNames) {
 
 function employmentReviewSwal(options = {}) {
     const customClass = options.customClass || {};
+    const { confirmButton: requestedConfirmClass, denyButton: requestedDenyClass,
+        cancelButton: requestedCancelClass, ...nonButtonClasses } = customClass;
     const semanticConfirmClass = /(?:^|\s)class-(?:success|error|danger|info|warning|normal)(?:\s|$)/
-        .test(String(customClass.confirmButton || ''))
+        .test(String(requestedConfirmClass || ''))
         ? ''
         : ({
         success: 'class-success',
@@ -29,9 +31,14 @@ function employmentReviewSwal(options = {}) {
         info: 'class-info',
         warning: 'class-warning'
     }[options.icon] || 'class-warning');
-    const cancelButtonClass = options.showCancelButton === true || customClass.cancelButton
+    const confirmButtonClass = options.showConfirmButton === false ? undefined
+        : mergeEmploymentReviewSwalClasses(requestedConfirmClass, semanticConfirmClass,
+            'custom-confirm-button', 'custom-swal-button');
+    const denyButtonClass = options.showDenyButton === false ? undefined : requestedDenyClass;
+    const cancelButtonClass = options.showCancelButton === false ? undefined
+        : options.showCancelButton === true || requestedCancelClass
         ? mergeEmploymentReviewSwalClasses(
-            customClass.cancelButton || 'class-normal',
+            requestedCancelClass || 'class-normal',
             'custom-cancel-button',
             'custom-swal-button'
         )
@@ -40,25 +47,21 @@ function employmentReviewSwal(options = {}) {
     return Swal.fire({
         ...options,
         customClass: {
-            ...customClass,
+            ...nonButtonClasses,
             title: mergeEmploymentReviewSwalClasses(
                 employmentReviewSwalCommonClasses.title,
-                customClass.title
+                nonButtonClasses.title
             ),
             popup: mergeEmploymentReviewSwalClasses(
                 employmentReviewSwalCommonClasses.popup,
-                customClass.popup
+                nonButtonClasses.popup
             ),
             htmlContainer: mergeEmploymentReviewSwalClasses(
                 employmentReviewSwalCommonClasses.htmlContainer,
-                customClass.htmlContainer
+                nonButtonClasses.htmlContainer
             ),
-            confirmButton: mergeEmploymentReviewSwalClasses(
-                customClass.confirmButton,
-                semanticConfirmClass,
-                'custom-confirm-button',
-                'custom-swal-button'
-            ),
+            ...(confirmButtonClass ? { confirmButton: confirmButtonClass } : {}),
+            ...(denyButtonClass ? { denyButton: denyButtonClass } : {}),
             ...(cancelButtonClass ? { cancelButton: cancelButtonClass } : {})
         }
     });

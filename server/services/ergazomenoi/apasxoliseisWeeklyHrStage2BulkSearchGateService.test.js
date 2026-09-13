@@ -21,10 +21,8 @@ const { loadWeeklyHrStage2BulkSearchPresentation } = require(
 
     const may = await loadWeeklyHrStage2BulkSearchPresentation({ finalizedReadOnly: false,
         loadWritablePresentation: async () => { writableGuardCalls++;
-            return { preview: { total_scopes: 85, safe_bulk_count: 0,
-                already_resolved_count: 66, manual_exception_count: 19 } }; } });
-    assert.deepEqual(may.preview, { total_scopes: 85, safe_bulk_count: 0,
-        already_resolved_count: 66, manual_exception_count: 19 });
+            return { preview: { total_scopes: 85 } }; } });
+    assert.deepEqual(may.preview, { total_scopes: 85 });
     assert.equal(writableGuardCalls, 1);
     console.log('weekly HR Stage-2 finalized search gate tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

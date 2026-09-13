@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
-const { buildCanonicalClassificationUpdates,
+const { buildCanonicalClassificationUpdates, planCanonicalDailyClassification,
     writeCanonicalDailyClassification } = require('./apasxoliseisCanonicalDailyClassificationWriterService');
 
 assert.deepEqual(buildCanonicalClassificationUpdates({ classification: 'NON_WORK' }), {
@@ -19,6 +19,8 @@ assert.deepEqual(buildCanonicalClassificationUpdates({ classification: 'REST_REP
     astheneia_apologistika: false, apousia_apologistika: false,
     ores_ergasias_apologistika: 0
 });
+assert.deepEqual(planCanonicalDailyClassification({ classification: 'REST_REPO', row: {} }),
+    buildCanonicalClassificationUpdates({ classification: 'REST_REPO' }));
 assert.equal(buildCanonicalClassificationUpdates({ classification: 'SICKNESS' })
     .astheneia_apologistika, true);
 assert.throws(() => buildCanonicalClassificationUpdates({ classification: 'LEAVE' }),

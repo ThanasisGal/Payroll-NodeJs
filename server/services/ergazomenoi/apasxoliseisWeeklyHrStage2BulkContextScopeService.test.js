@@ -19,7 +19,8 @@ const completedLifecycle = { requires_hr_action: false,
 const contextWithoutScope = { scope: undefined, rows: [row], lifecycle: completedLifecycle,
     workflowState: { stage2: { status: 'COMPLETED' } } };
 const before = buildWeeklyHrStage2BulkPreview({ contexts: [contextWithoutScope] });
-assert.equal(before._all_exceptions[0].code, 'STAGE2_AUTHORITATIVE_CONTEXT_MISSING');
+assert.equal(before._technical_conflicts[0].code, 'STAGE2_AUTHORITATIVE_CONTEXT_MISSING');
+assert.equal(before.manual_exception_count, 0);
 
 const scope = buildWeeklyHrStage2BulkContextScope({ key: '0001|2026-05-04',
     lifecycle: completedLifecycle, weekRows: [row] });
@@ -34,6 +35,7 @@ assert.equal(resolved._all_exceptions.some((item) =>
 const nonApplicable = buildWeeklyHrStage2BulkPreview({ contexts: [{
     scope, rows: [row], lifecycle: completedLifecycle, workflowState: {} }] });
 assert.equal(nonApplicable.already_resolved_count, 1);
+assert.equal(nonApplicable.no_longer_applicable_count, 1);
 assert.equal(nonApplicable.manual_exception_count, 0);
 
 const deferredScope = buildWeeklyHrStage2BulkContextScope({ key: '0001|2026-05-04',
@@ -47,12 +49,14 @@ assert.equal(deferredScope.period_end, '2026-05-31');
 
 const genuinelyMissing = buildWeeklyHrStage2BulkPreview({ contexts: [{
     scope: { ...scope, employee_id: '' }, rows: [row], lifecycle: completedLifecycle }] });
-assert.equal(genuinelyMissing._all_exceptions[0].code,
+assert.equal(genuinelyMissing._technical_conflicts[0].code,
     'STAGE2_AUTHORITATIVE_CONTEXT_MISSING');
+assert.equal(genuinelyMissing.manual_exception_count, 0);
 
 for (const preview of [before, resolved, nonApplicable, genuinelyMissing]) {
     assert.equal(preview.safe_bulk_count + preview.already_resolved_count +
-        preview.manual_exception_count, preview.total_scopes);
+        preview.manual_exception_count + preview.technical_conflict_count,
+    preview.total_scopes);
     assert.equal(preview.safe_bulk_count,
         preview.safe_pair_count + preview.safe_automatic_count);
 }

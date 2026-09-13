@@ -71,6 +71,14 @@ assert.match(container.innerHTML, />Έλεγχος<\/button>/);
 assert.doesNotMatch(container.innerHTML, /MANUAL_REVIEW/);
 assert.doesNotMatch(container.innerHTML, /<article/);
 
+sandbox.currentWeeklyHrStage2BulkPreview = { total_scopes: 85, safe_bulk_count: 0,
+    safe_pair_count: 0, safe_automatic_count: 0, already_resolved_count: 66,
+    manual_exception_count: 0, technical_conflict_count: 19, exceptions: [] };
+sandbox.render(container);
+assert.match(container.innerHTML, /Περιπτώσεις που χρειάζονται έλεγχο: <strong>0<\/strong>/);
+assert.doesNotMatch(container.innerHTML, /<details/);
+assert.doesNotMatch(container.innerHTML, /weekly-hr-stage2-exception-review/);
+
 permission = false;
 sandbox.userCanRecordCanonicalDecision = () => false;
 sandbox.currentWeeklyHrStage2BulkPreview = { total_scopes: 2, safe_bulk_count: 2,

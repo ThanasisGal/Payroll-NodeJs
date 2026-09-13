@@ -3,7 +3,8 @@
 const crypto = require('crypto');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { stableStringify } = require('./apasxoliseisStage3FingerprintService');
-const { normalizeItems, fingerprint: scopeFingerprint } = require(
+const { AUTOMATIC_INSPECTION, inspectAutomaticMaterialization,
+    fingerprint: scopeFingerprint } = require(
     './apasxoliseisWeeklyHrWorkflowStage2CompletionService'
 );
 
@@ -59,12 +60,14 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
     exception_page_size = EXCEPTION_PAGE_SIZE } = {}) {
     if (!Array.isArray(contexts)) throw new TypeError('contexts must be an array.');
     const safe = []; const resolved = []; const exceptions = [];
+    const alreadyMaterialized = []; const noLongerApplicable = []; const technicalConflicts = [];
     let safePairCount = 0; let safeAutomaticCount = 0;
     for (const context of contexts) {
         const identity = scopeIdentity(context);
         if (!identity.employee_id || !identity.week_start || !identity.week_end ||
             !context?.lifecycle || !Array.isArray(context?.rows)) {
-            exceptions.push(exceptionSummary(context, 'STAGE2_AUTHORITATIVE_CONTEXT_MISSING'));
+            technicalConflicts.push(exceptionSummary(context,
+                'STAGE2_AUTHORITATIVE_CONTEXT_MISSING'));
             continue;
         }
         if (context.workflowState?.stage2?.status === 'COMPLETED') {
@@ -73,7 +76,7 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
         const diagnostic = context.stage2StateDiagnostic || context.lifecycle?.stages?.stage2
             ?.diagnostic || context.lifecycle?.stages?.stage2?.blockers?.[0];
         if (diagnostic) {
-            exceptions.push(exceptionSummary(context, diagnostic)); continue;
+            technicalConflicts.push(exceptionSummary(context, diagnostic)); continue;
         }
         const lifecycleStage2 = context.lifecycle?.stages?.stage2 || {};
         if (Number(lifecycleStage2.pending_count || 0) > 0 ||
@@ -92,33 +95,50 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
                 lifecycleStage2.pending_reasons?.[0] || 'REPO_TRANSFER_DECISION_REQUIRED'));
             continue;
         }
-        try {
-            const items = normalizeItems(context);
-            if (!items.length) { resolved.push(identity); continue; }
+        if (!(context.lifecycle?.stages?.stage3?.stage2_automatic_resolution_items || []).length) {
+            noLongerApplicable.push(identity); resolved.push(identity); continue;
+        }
+        const inspection = inspectAutomaticMaterialization(context);
+        if (inspection.status === AUTOMATIC_INSPECTION.NO_LONGER_APPLICABLE) {
+            noLongerApplicable.push(identity); resolved.push(identity); continue;
+        }
+        if (inspection.status === AUTOMATIC_INSPECTION.ALREADY_MATERIALIZED) {
+            alreadyMaterialized.push(identity); resolved.push(identity); continue;
+        }
+        if (inspection.status === AUTOMATIC_INSPECTION.TECHNICAL_CONFLICT) {
+            technicalConflicts.push(exceptionSummary(context, inspection.code)); continue;
+        }
+        if (inspection.status === AUTOMATIC_INSPECTION.READY_TO_MATERIALIZE) {
             if (context.workflowState?.stage1?.status !== 'COMPLETED' ||
                 !text(context.upstream?.stage1_current_fingerprint)) {
-                exceptions.push(exceptionSummary(context, 'STAGE2_UPSTREAM_STAGE1_STALE'));
+                technicalConflicts.push(exceptionSummary(context, 'STAGE2_UPSTREAM_STAGE1_STALE'));
                 continue;
             }
             safeAutomaticCount++;
             safe.push({ ...identity, bulk_kind: 'SAFE_AUTOMATIC_MATERIALIZATION',
-                scope_fingerprint: scopeFingerprint(context, items) });
-        } catch (error) {
-            exceptions.push(exceptionSummary(context, error.code, error.message));
+                scope_fingerprint: scopeFingerprint(context, inspection.items) });
+            continue;
         }
+        technicalConflicts.push(exceptionSummary(context, 'STAGE2_AUTOMATIC_INSPECTION_FAILED'));
     }
     safe.sort((a, b) => identityKey(a).localeCompare(identityKey(b)));
     resolved.sort((a, b) => identityKey(a).localeCompare(identityKey(b)));
+    noLongerApplicable.sort((a, b) => identityKey(a).localeCompare(identityKey(b)));
+    technicalConflicts.sort((a, b) => identityKey(a).localeCompare(identityKey(b)));
     exceptions.sort((a, b) => identityKey(a).localeCompare(identityKey(b)));
     const previewFingerprint = crypto.createHash('sha256').update(stableStringify({
-        contract: 'weekly-hr-stage2-bulk-preview:v2',
+        contract: 'weekly-hr-stage2-bulk-preview:v3',
         scope: canonicalPreviewScope(preview_scope),
         safe: safe.map(({ employee_id, week_start, week_end, scope_fingerprint }) =>
             ({ employee_id, week_start, week_end, scope_fingerprint })),
         resolved: resolved.map(({ employee_id, week_start, week_end }) =>
             ({ employee_id, week_start, week_end })),
         exceptions: exceptions.map(({ employee_id, week_start, week_end, code }) =>
-            ({ employee_id, week_start, week_end, code }))
+            ({ employee_id, week_start, week_end, code })),
+        no_longer_applicable: noLongerApplicable,
+        technical_conflicts: technicalConflicts.map(
+            ({ employee_id, week_start, week_end, code }) =>
+                ({ employee_id, week_start, week_end, code }))
     })).digest('hex');
     const pageSize = Math.max(1, Math.min(EXCEPTION_PAGE_SIZE,
         Number(exception_page_size) || EXCEPTION_PAGE_SIZE));
@@ -127,16 +147,26 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
     return { total_scopes: contexts.length, safe_bulk_count: safe.length,
         safe_pair_count: safePairCount, safe_automatic_count: safeAutomaticCount,
         already_resolved_count: resolved.length, manual_exception_count: exceptions.length,
+        no_longer_applicable_count: noLongerApplicable.length,
+        technical_conflict_count: technicalConflicts.length,
+        automatic_reconciliation: {
+            ready_to_materialize: safeAutomaticCount,
+            already_materialized: alreadyMaterialized.length,
+            no_longer_applicable: noLongerApplicable.length,
+            real_user_action_required: exceptions.length,
+            technical_conflict: technicalConflicts.length
+        },
         safe_scope_ids: safe, preview_fingerprint: previewFingerprint,
         exceptions: exceptions.slice(offset, offset + pageSize),
         exception_page: page, exception_page_size: pageSize,
         exception_page_count: Math.max(1, Math.ceil(exceptions.length / pageSize)),
-        _all_exceptions: exceptions };
+        _all_exceptions: exceptions, _technical_conflicts: technicalConflicts };
 }
 
 function publicWeeklyHrStage2BulkPreview(preview = {}) {
     const { safe_scope_ids: _privateSafeScopeIds,
-        _all_exceptions: _privateAllExceptions, ...publicPreview } = preview;
+        _all_exceptions: _privateAllExceptions,
+        _technical_conflicts: _privateTechnicalConflicts, ...publicPreview } = preview;
     return publicPreview;
 }
 
