@@ -28,6 +28,26 @@ function entryKey(fingerprint, scope) {
 function cacheError(code, statusCode, message) {
     return Object.assign(new Error(message), { code, statusCode });
 }
+function identityKey(value = {}) {
+    return `${text(value.employee_id || value.scope?.employee_id)}|${dateKeyUtc(
+        value.week_start || value.scope?.week_start)}|${dateKeyUtc(
+        value.week_end || value.scope?.week_end)}`;
+}
+function commandScope(seed = {}) {
+    const { row_ids: _rowIds, ...scope } = seed;
+    return scope;
+}
+function minimalSeed(scope = {}, context = null) {
+    const rowIds = [...new Set((Array.isArray(context?.rows) ? context.rows : [])
+        .map((row) => text(row?._id)).filter(Boolean))];
+    if (rowIds.length > 7) throw cacheError('STAGE2_BULK_SEED_ROW_BOUND_EXCEEDED', 409,
+        'Το εβδομαδιαίο seed υπερβαίνει το όριο των επτά ημερήσιων εγγραφών.');
+    return Object.freeze({ employee_id: text(scope.employee_id),
+        employee_kodikos: text(scope.employee_kodikos),
+        week_start: dateKeyUtc(scope.week_start), week_end: dateKeyUtc(scope.week_end),
+        row_ids: Object.freeze(rowIds), bulk_kind: text(scope.bulk_kind),
+        scope_fingerprint: text(scope.scope_fingerprint) });
+}
 
 class WeeklyHrStage2BulkStateCache {
     constructor({ ttlMs = DEFAULT_TTL_MS, hardTtlMs = DEFAULT_HARD_TTL_MS,
@@ -47,11 +67,11 @@ class WeeklyHrStage2BulkStateCache {
         if (!fingerprint) return null;
         const now = this.now();
         const contextByIdentity = new Map((Array.isArray(contexts) ? contexts : []).map(
-            (context) => [`${text(context?.scope?.employee_id)}|${dateKeyUtc(
-                context?.scope?.week_start)}|${dateKeyUtc(context?.scope?.week_end)}`, context]));
+            (context) => [identityKey(context), context]));
+        const safeScopes = (Array.isArray(preview.safe_scope_ids) ? preview.safe_scope_ids : [])
+            .map((item) => minimalSeed(item, contextByIdentity.get(identityKey(item))));
         const entry = { createdAt: now, lastAccessAt: now, scope: canonicalScope(scope),
-            safeScopes: Array.isArray(preview.safe_scope_ids) ? preview.safe_scope_ids : [],
-            contextByIdentity,
+            safeScopes,
             exceptions: Array.isArray(preview._all_exceptions) ? preview._all_exceptions : [],
             pageSize: Math.min(50, Number(preview.exception_page_size) || 50) };
         const key = entryKey(fingerprint, entry.scope);
@@ -109,14 +129,12 @@ class WeeklyHrStage2BulkStateCache {
             if (!found) throw cacheError('STAGE2_BULK_CONTINUATION_INVALID', 409,
                 'Η συνέχεια της μαζικής ενημέρωσης δεν είναι πλέον έγκυρη.');
         }
-        const scopes = entry.safeScopes.slice(offset, offset + size);
-        const preparedContexts = scopes.map((item) => entry.contextByIdentity.get(
-            `${text(item.employee_id)}|${dateKeyUtc(item.week_start)}|${dateKeyUtc(item.week_end)}`
-        )).filter(Boolean);
-        const nextOffset = offset + scopes.length;
+        const cachedSeeds = entry.safeScopes.slice(offset, offset + size);
+        const scopes = cachedSeeds.map(commandScope);
+        const nextOffset = offset + cachedSeeds.length;
         const remaining = Math.max(0, entry.safeScopes.length - nextOffset);
         entry.lastAccessAt = this.now();
-        return { scopes, preparedContexts, offset, processed_in_batch: scopes.length, remaining,
+        return { scopes, cachedSeeds, offset, processed_in_batch: scopes.length, remaining,
             has_more: remaining > 0, continuation_token: remaining > 0
                 ? this.continuationToken(fingerprint, entry, nextOffset) : null,
             total_safe_scopes: entry.safeScopes.length,

@@ -461,7 +461,8 @@ const { buildWeeklyLifecycleWithStage2State } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleStage2StateService'
 );
 const { resolveWeeklyRepoTransferStage2StateFromPreparedBatch,
-    resolveWeeklyRepoTransferDecisionFromPreparedWeek } = require(
+    resolveWeeklyRepoTransferDecisionFromPreparedWeek,
+    buildWeeklyRepoTransferPreparedLookups } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferPreparedStage2ResolverService');
 const {
     getWeeklyHrWorkflowIndexState,
@@ -4525,6 +4526,7 @@ async function prepareWeeklyHrStage2PairRecords({ req, rowsByWeek, employeeByCod
             team: base.team, company_kod: base.company_kod,
             decision_id: mongoose.trusted({ $in: decisionIds }) }).lean() : [];
     }
+    const preparedLookups = buildWeeklyRepoTransferPreparedLookups({ decisions, executions });
     let authorized = true;
     try { validateApplySession(req.session); } catch (_) { authorized = false; }
     let runtimeState = { enabled: false }; let indexState = { ready: false };
@@ -4572,7 +4574,7 @@ async function prepareWeeklyHrStage2PairRecords({ req, rowsByWeek, employeeByCod
                 audits: weekRows.flatMap((row) => auditsByRowId.get(String(row._id)) || []),
                 companyFlags: holidayContext?.companyFlags || {},
                 companyKodikos: holidayContext?.company_kodikos || '' },
-            decisions, executions, applyProtection: { authorized,
+            decisions, executions, preparedLookups, applyProtection: { authorized,
                 runtimeEnabled: runtimeState.enabled, indexReady: indexState.ready },
             presentationStart: weekStart, presentationEnd: weekEnd });
         if (resolved.record) records.set(key, resolved);
@@ -4582,7 +4584,7 @@ async function prepareWeeklyHrStage2PairRecords({ req, rowsByWeek, employeeByCod
 }
 
 async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes,
-    cachedContexts }) {
+    cachedSeeds }) {
     const periodAccess = await assertActiveEmploymentReviewPeriodReadable(req, input.ypokatasthma);
     const periodStart = dateKeyUtc(periodAccess.scope.period_start);
     const periodEnd = dateKeyUtc(periodAccess.scope.period_end);
@@ -4591,15 +4593,15 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             'Η μαζική εντολή δεν ταυτίζεται με την ενεργή περίοδο.');
     }
     if (!Array.isArray(batchScopes) || batchScopes.length > 100 ||
-        !Array.isArray(cachedContexts) || cachedContexts.length !== batchScopes.length) {
+        !Array.isArray(cachedSeeds) || cachedSeeds.length !== batchScopes.length) {
         throw weeklyHrApiError('STAGE2_BULK_BATCH_CONTEXT_MISSING', 409,
             'Η στοχευμένη παρτίδα Stage 2 δεν είναι πλέον διαθέσιμη.');
     }
     const base = { team: req.session.userTeam,
         company_kod: String(req.session.companyInUse || ''),
         ypokatasthma: String(input.ypokatasthma || '').trim().padStart(4, '0') };
-    const rowIds = [...new Set(cachedContexts.flatMap((context) =>
-        (context.rows || []).map((row) => row._id).filter(Boolean)))];
+    const rowIds = [...new Set(cachedSeeds.flatMap((seed) =>
+        (seed.row_ids || []).filter(Boolean)))];
     const employeeIds = [...new Set(batchScopes.map((scope) => scope.employee_id).filter(Boolean))];
     const employeeCodes = [...new Set(batchScopes.map((scope) =>
         String(scope.employee_kodikos || '').trim()).filter(Boolean))];
@@ -4675,21 +4677,25 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
     const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
         team: base.team, employees });
     const rowsByWeek = new Map();
-    const contexts = cachedContexts.map((cached) => {
-        const missingAuthoritativeRow = (cached.rows || []).some((row) =>
-            !freshById.has(String(row._id)));
-        let rows = (cached.rows || []).map((row) => freshById.has(String(row._id))
-            ? { ...row, ...freshById.get(String(row._id)) } : null).filter(Boolean);
-        const pairKey = `${String(cached.scope.employee_kodikos || '').trim()}|${dateKeyUtc(
-            cached.scope.week_start)}`;
-        const stateKey = `${String(cached.scope.employee_id)}|${dateKeyUtc(
-            cached.scope.week_start)}`;
+    const contexts = cachedSeeds.map((seed) => {
+        const missingAuthoritativeRow = (seed.row_ids || []).some((rowId) =>
+            !freshById.has(String(rowId)));
+        let rows = (seed.row_ids || []).map((rowId) => freshById.get(String(rowId)) || null)
+            .filter(Boolean).sort((left, right) =>
+                dateKeyUtc(left.hmeromhnia).localeCompare(dateKeyUtc(right.hmeromhnia)));
+        const scope = { ...base, employee_id: seed.employee_id,
+            employee_kodikos: seed.employee_kodikos, week_start: seed.week_start,
+            week_end: seed.week_end };
+        const pairKey = `${String(seed.employee_kodikos || '').trim()}|${dateKeyUtc(
+            seed.week_start)}`;
+        const stateKey = `${String(seed.employee_id)}|${dateKeyUtc(seed.week_start)}`;
         const state = stateByKey.get(stateKey) || {};
-        if (missingAuthoritativeRow || !rows.length) return { ...cached, rows,
+        if (missingAuthoritativeRow || !rows.length) return { scope, rows,
             workflowState: state, stage2StateDiagnostic: 'STAGE2_INPUT_CHANGED' };
-        const employeeCode = String(cached.scope.employee_kodikos || '').trim();
+        const employeeCode = String(seed.employee_kodikos || '').trim();
         const employee = employeeByCode.get(employeeCode) || {};
-        if (!employee._id) return { ...cached, rows, workflowState: state,
+        if (!employee._id || String(employee._id) !== String(seed.employee_id)) return { scope,
+            rows, workflowState: state,
             stage2StateDiagnostic: 'STAGE2_INPUT_CHANGED' };
         const employeeHistory = historyByCode.get(employeeCode) || [];
         const effectiveProfilesByDate = Object.fromEntries(rows.map((row) => [
@@ -4721,18 +4727,21 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
                         Number.parseInt(employee.dialleima_se_lepta || 0, 10) || 0, 0) };
         });
         rowsByWeek.set(pairKey, rows);
-        const employmentDateScope = cached.employmentDateScope ||
-            cached.lifecycle?.employment_date_scope || null;
-        const periodScope = cached.periodScope ||
-            (employmentDateScope?.context_only_dates?.length ? periodAccess.scope : null);
+        const employmentDateScope = deriveEmploymentOwnedDateScope({
+            natural_week_start: seed.week_start, natural_week_end: seed.week_end,
+            period_start: periodStart, period_end: periodEnd,
+            hire_date: employee.hmeromhnia_proslhpshs,
+            departure_date: employee.hmeromhnia_apoxorhshs });
+        const periodScope = employmentDateScope?.context_only_dates?.length
+            ? periodAccess.scope : null;
         const lifecycle = buildWeeklyHrLifecycleProjection({ weekRows: rows,
             effectiveProfile, effectiveProfilesByDate,
             persistedStage1State: state.stage1 || null,
-            persistedStage3State: state.stage3 || null, scope: cached.scope,
+            persistedStage3State: state.stage3 || null, scope,
             periodScope, employmentDateScope });
-        return { ...cached, rows, lifecycle, workflowState: state,
+        return { scope, rows, lifecycle, workflowState: state,
             effectiveProfile, effectiveProfilesByDate, periodScope, employmentDateScope,
-            audits: workflowAuditsByKey.get(stateKey) || [], upstream: { ...cached.upstream,
+            audits: workflowAuditsByKey.get(stateKey) || [], upstream: {
                 stage1_current_fingerprint:
                     lifecycle.stages?.stage1?.current_completion_fingerprint,
                 stage1_version: Number(state.stage1?.version || 0),
@@ -12181,7 +12190,7 @@ class erganhController {
                     await assertWeeklyHrWorkflowIndexesReady();
                     prepared = await loadWeeklyHrStage2BatchPreparedContexts({ req,
                         input: req.body, batchScopes: batch.scopes,
-                        cachedContexts: batch.preparedContexts });
+                        cachedSeeds: batch.cachedSeeds });
                 },
                 loadPreparedContexts: async () => prepared.contexts,
                 completePreparedScope: async ({ context, request_id, reason_or_notes,

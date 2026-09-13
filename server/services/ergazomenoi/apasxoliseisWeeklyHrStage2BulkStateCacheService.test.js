@@ -14,6 +14,18 @@ function preview(count, exceptionCount = 0) {
         _all_exceptions: Array.from({ length: exceptionCount }, (_, index) => ({
             employee_id: `manual-${index}` })) };
 }
+function contexts(count) {
+    return Array.from({ length: count }, (_, index) => ({
+        scope: { employee_id: `employee-${index}`, employee_kodikos: `${index}`,
+            week_start: '2026-05-04', week_end: '2026-05-10' },
+        rows: Array.from({ length: 7 }, (__, rowIndex) => ({
+            _id: `row-${index}-${rowIndex}`, payload: { deliberately: 'large' } })),
+        lifecycle: { deliberately: 'large' },
+        effectiveProfilesByDate: { deliberately: 'large' },
+        preparedStage2Pair: { deliberately: 'large' },
+        preparedStage2Record: { deliberately: 'large' }
+    }));
+}
 
 {
     const cache = new WeeklyHrStage2BulkStateCache();
@@ -30,6 +42,26 @@ function preview(count, exceptionCount = 0) {
     assert.equal(batches, 95);
     assert.equal(total, 9500);
     assert.equal(max, MAX_SCOPES_PER_BATCH);
+}
+{
+    const cache = new WeeklyHrStage2BulkStateCache();
+    cache.put({ preview: preview(10000), scope, contexts: contexts(10000) });
+    const entry = [...cache.entries.values()][0];
+    assert.equal(entry.safeScopes.length, 10000);
+    const allowed = ['employee_id', 'employee_kodikos', 'week_start', 'week_end',
+        'row_ids', 'bulk_kind', 'scope_fingerprint'].sort();
+    for (const seed of entry.safeScopes) {
+        assert.deepEqual(Object.keys(seed).sort(), allowed);
+        assert.equal(seed.row_ids.length, 7);
+        assert.equal(seed.row_ids.length <= 7, true);
+        for (const forbidden of ['rows', 'lifecycle', 'effectiveProfilesByDate',
+            'preparedStage2Pair', 'preparedStage2Record']) {
+            assert.equal(Object.hasOwn(seed, forbidden), false);
+        }
+    }
+    const batch = cache.batch({ preview_fingerprint: 'a'.repeat(64), scope });
+    assert.equal(batch.cachedSeeds.length, MAX_SCOPES_PER_BATCH);
+    assert.equal(Object.hasOwn(batch.scopes[0], 'row_ids'), false);
 }
 {
     const cache = new WeeklyHrStage2BulkStateCache();

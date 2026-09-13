@@ -2,7 +2,8 @@
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
 const { resolveWeeklyRepoTransferStage2StateFromPreparedBatch,
-    resolveWeeklyRepoTransferDecisionFromPreparedWeek } = require(
+    resolveWeeklyRepoTransferDecisionFromPreparedWeek,
+    buildWeeklyRepoTransferPreparedLookups } = require(
     './apasxoliseisWeeklyRepoTransferPreparedStage2ResolverService');
 const current = { current_proposal_fingerprint: 'fp', current_proposal: {
     employee_kodikos: '001', week_start: '2026-04-27', week_end: '2026-05-03' } };
@@ -71,6 +72,12 @@ const applied = resolveWeeklyRepoTransferDecisionFromPreparedWeek({ ...base,
     applyProtection: { authorized: true, runtimeEnabled: true, indexReady: true } }).record;
 assert.equal(applied.apply_state, 'ALREADY_APPLIED');
 assert.equal(applied.current_execution.decision_id, String(decision._id));
+const preparedLookups = buildWeeklyRepoTransferPreparedLookups({
+    decisions: [decision], executions: [execution] });
+const indexedApplied = resolveWeeklyRepoTransferDecisionFromPreparedWeek({ ...base,
+    decisions: [], executions: [], preparedLookups,
+    applyProtection: { authorized: true, runtimeEnabled: true, indexReady: true } }).record;
+assert.deepEqual(indexedApplied, applied);
 const protectedApply = resolveWeeklyRepoTransferDecisionFromPreparedWeek({ ...base,
     decisions: [decision], applyProtection: { authorized: false, runtimeEnabled: true,
         indexReady: true } }).record;
@@ -91,4 +98,32 @@ const changedResult = resolveWeeklyRepoTransferDecisionFromPreparedWeek({ ...bas
     weeklyInput: profileChanged });
 assert.equal(changedResult.record, null);
 assert.ok(changedResult.projection.reason_counts.PROFILE_CHANGED_INSIDE_WEEK > 0);
+
+const instrumentation = {};
+const scaleDecisions = Array.from({ length: 2000 }, (_, index) => ({ ...decision,
+    _id: new mongoose.Types.ObjectId(), proposal_id: `unrelated-${index}` }));
+scaleDecisions[0] = decision;
+const scaleExecutions = scaleDecisions.map((item) => ({ ...execution,
+    _id: new mongoose.Types.ObjectId(), decision_id: item._id }));
+let perScopeDecisionArrayScans = 0; let perScopeExecutionArrayScans = 0;
+scaleDecisions.filter = (...args) => {
+    perScopeDecisionArrayScans++;
+    return Array.prototype.filter.apply(scaleDecisions, args);
+};
+scaleExecutions.map = (...args) => {
+    perScopeExecutionArrayScans++;
+    return Array.prototype.map.apply(scaleExecutions, args);
+};
+const scaleLookups = buildWeeklyRepoTransferPreparedLookups({ decisions: scaleDecisions,
+    executions: scaleExecutions, instrumentation });
+for (let scopeIndex = 0; scopeIndex < 10000; scopeIndex++) {
+    resolveWeeklyRepoTransferDecisionFromPreparedWeek({ ...base,
+        decisions: scaleDecisions, executions: scaleExecutions,
+        preparedLookups: scaleLookups });
+}
+assert.equal(instrumentation.decisions_array_indexed, 1);
+assert.equal(instrumentation.executions_array_indexed, 1);
+assert.equal(instrumentation.resolver_lookup_count, 10000);
+assert.equal(perScopeDecisionArrayScans, 0);
+assert.equal(perScopeExecutionArrayScans, 0);
 console.log('prepared Stage 2 resolver tests passed');

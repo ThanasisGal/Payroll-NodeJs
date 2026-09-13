@@ -27,10 +27,19 @@ const targetedLoader = controller.match(
     /async function loadWeeklyHrStage2BatchPreparedContexts[\s\S]*?\n}\n\nasync function loadWeeklyHrStage2BulkPreparedContexts/)?.[0] || '';
 assert.match(targetedLoader, /batchScopes\.length > 100/);
 assert.match(targetedLoader, /loadWeeklyHrStage2TargetedReadGroups/);
+assert.match(targetedLoader, /cachedSeeds/);
+assert.match(targetedLoader, /seed\.row_ids/);
+assert.match(targetedLoader, /deriveEmploymentOwnedDateScope/);
 assert.match(targetedLoader, /decisionByRequestId/);
 assert.match(targetedLoader, /executionByDecisionId/);
 assert.doesNotMatch(targetedLoader, /getReviewRowsForExport/);
 assert.doesNotMatch(targetedLoader, /\.findOne\(/);
+assert.doesNotMatch(targetedLoader, /cachedContexts|cached\.rows|cached\.lifecycle/);
+const pairPreparation = controller.match(
+    /async function prepareWeeklyHrStage2PairRecords[\s\S]*?\n}\n\nasync function loadWeeklyHrStage2BatchPreparedContexts/)?.[0] || '';
+assert.match(pairPreparation, /buildWeeklyRepoTransferPreparedLookups\(\{ decisions, executions }\)/);
+assert.match(pairPreparation, /preparedLookups/);
+assert.equal((pairPreparation.match(/buildWeeklyRepoTransferPreparedLookups/g) || []).length, 1);
 const bulkController = controller.match(
     /static completeWeeklyHrWorkflowStage2Bulk[\s\S]*?\n    };/)?.[0] || '';
 assert.match(bulkController, /loadWeeklyHrStage2BatchPreparedContexts/);
