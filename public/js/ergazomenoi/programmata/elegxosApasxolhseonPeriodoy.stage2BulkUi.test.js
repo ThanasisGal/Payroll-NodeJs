@@ -25,6 +25,8 @@ assert.match(container.innerHTML, /Μαζική ενημέρωση 9500 περι
 assert.match(container.innerHTML, /Αυτόματες/);
 assert.match(container.innerHTML, /Μεταφορές source\/target/);
 assert.equal((container.innerHTML.match(/class="weekly-hr-stage2-exception"/g) || []).length, 50);
+assert.match(container.innerHTML, /<td>0<\/td>/);
+assert.match(container.innerHTML, /2026-05-04–2026-05-10/);
 assert.match(container.innerHTML, /Προηγούμενη/);
 assert.match(container.innerHTML, /Επόμενη/);
 assert.doesNotMatch(container.innerHTML, /employment-review-stage2-proposal/);

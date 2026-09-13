@@ -486,6 +486,8 @@ const { completeWeeklyHrWorkflowStage2Bulk } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2BulkCompletionService');
 const { WeeklyHrStage2BulkStateCache } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkStateCacheService');
+const { buildWeeklyHrStage2BulkContextScope } = require(
+    '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkContextScopeService');
 const { loadWeeklyHrStage2TargetedReadGroups } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2TargetedBatchLoaderService');
 const { writeCanonicalDailyClassification } = require(
@@ -7886,7 +7888,10 @@ class erganhController {
                 .map(([key, lifecycle]) => {
                     const weekRows = preparedLifecycleContext.rowsByEmployeeWeek.get(key) || [];
                     const state = preparedLifecycleContext.workflowByEmployeeWeek.get(key) || {};
-                    return { scope: lifecycle.scope, rows: weekRows, lifecycle,
+                    const employeeKodikos = String(key).split('|')[0];
+                    const scope = buildWeeklyHrStage2BulkContextScope({ key, lifecycle, weekRows,
+                        preparedEmployee: ergByKodikos.get(employeeKodikos) || null });
+                    return { scope, rows: weekRows, lifecycle,
                         effectiveProfilesByDate: Object.fromEntries(weekRows.map((row) => [
                             dateKeyUtc(row.hmeromhnia), {
                                 typos_apasxolhshs: row.effective_typos_apasxolhshs,
@@ -7913,18 +7918,12 @@ class erganhController {
             let canonicalLifecycleProjections = [
                 ...(canonicalLifecycleRows.__lifecycleByWeek || new Map())
             ].map(([scopeKey, lifecycleProjection]) => {
-                const [employeeKodikos = '', weekStart = ''] = String(scopeKey).split('|');
+                const employeeKodikos = String(scopeKey).split('|')[0];
+                const weekRows = preparedLifecycleContext.rowsByEmployeeWeek.get(scopeKey) || [];
                 return {
-                    scope: { employee_kodikos: employeeKodikos, week_start: weekStart,
-                        ...(lifecycleProjection.deferred_week ? {
-                            team: lifecycleProjection.deferred_week.team,
-                            company_kod: lifecycleProjection.deferred_week.company_kod,
-                            ypokatasthma: lifecycleProjection.deferred_week.ypokatasthma,
-                            employee_id: lifecycleProjection.deferred_week.employee_id,
-                            week_end: lifecycleProjection.deferred_week.week_end,
-                            period_start: lifecycleProjection.deferred_week.period_start,
-                            period_end: lifecycleProjection.deferred_week.period_end
-                        } : {}) },
+                    scope: buildWeeklyHrStage2BulkContextScope({ key: scopeKey,
+                        lifecycle: lifecycleProjection, weekRows,
+                        preparedEmployee: ergByKodikos.get(employeeKodikos) || null }),
                     lifecycle_projection: lifecycleProjection
                 };
             });

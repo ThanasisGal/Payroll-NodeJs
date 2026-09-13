@@ -7,6 +7,12 @@ const { buildWeeklyHrStage2BulkPreview, publicWeeklyHrStage2BulkPreview,
 );
 
 const FP = 'a'.repeat(64);
+function assertCounterInvariants(preview) {
+    assert.equal(preview.safe_bulk_count + preview.already_resolved_count +
+        preview.manual_exception_count, preview.total_scopes);
+    assert.equal(preview.safe_bulk_count,
+        preview.safe_pair_count + preview.safe_automatic_count);
+}
 function context(index, kind = 'safe') {
     const week = index % 5;
     const start = new Date(Date.UTC(2026, 4, 4 + week * 7));
@@ -48,6 +54,7 @@ function context(index, kind = 'safe') {
     assert.equal(preview.safe_pair_count, 500);
     assert.equal(preview.safe_automatic_count, 0);
     assert.equal(preview.safe_bulk_count, 500);
+    assertCounterInvariants(preview);
 }
 {
     const mixed = [...Array.from({ length: 450 }, (_, i) => context(i, 'pair')),
@@ -56,6 +63,7 @@ function context(index, kind = 'safe') {
     assert.equal(preview.safe_pair_count, 450);
     assert.equal(preview.safe_automatic_count, 50);
     assert.equal(preview.safe_bulk_count, 500);
+    assertCounterInvariants(preview);
     const ambiguous = context(999, 'pair');
     ambiguous.lifecycle.stages.stage2.has_bounded_selection = false;
     assert.equal(buildWeeklyHrStage2BulkPreview({ contexts: [ambiguous] })
@@ -69,6 +77,7 @@ function context(index, kind = 'safe') {
     assert.equal(preview.total_scopes, 510);
     assert.equal(preview.safe_bulk_count, 500);
     assert.equal(preview.manual_exception_count, 10);
+    assertCounterInvariants(preview);
     assert.equal(preview.exceptions.length, 10);
     assert.equal(preview.exception_page_size, EXCEPTION_PAGE_SIZE);
     assert.match(preview.preview_fingerprint, /^[a-f0-9]{64}$/);
@@ -82,6 +91,7 @@ function context(index, kind = 'safe') {
     assert.equal(preview.manual_exception_count, 500);
     assert.equal(preview.exceptions.length, 50);
     assert.equal(preview.safe_scope_ids.length, 9500);
+    assertCounterInvariants(preview);
     const publicPreview = publicWeeklyHrStage2BulkPreview(preview);
     assert.equal(Object.hasOwn(publicPreview, 'safe_scope_ids'), false);
 }
