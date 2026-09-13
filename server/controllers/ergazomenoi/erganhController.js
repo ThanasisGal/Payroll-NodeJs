@@ -492,6 +492,8 @@ const { loadWeeklyHrStage2TargetedReadGroups } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2TargetedBatchLoaderService');
 const { loadWeeklyHrStage2BulkSearchPresentation } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkSearchGateService');
+const { buildWeeklyHrStage2BulkDetails } = require(
+    '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkDetailsService');
 const { writeCanonicalDailyClassification } = require(
     '../../services/ergazomenoi/apasxoliseisCanonicalDailyClassificationWriterService');
 const stage2BulkStateCache = new WeeklyHrStage2BulkStateCache();
@@ -4743,7 +4745,7 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             persistedStage1State: state.stage1 || null,
             persistedStage3State: state.stage3 || null, scope,
             periodScope, employmentDateScope });
-        return { scope, rows, lifecycle, workflowState: state,
+        return { scope, rows, lifecycle, workflowState: state, employee,
             effectiveProfile, effectiveProfilesByDate, periodScope, employmentDateScope,
             audits: workflowAuditsByKey.get(stateKey) || [], upstream: {
                 stage1_current_fingerprint:
@@ -12173,6 +12175,20 @@ class erganhController {
     static previewWeeklyHrWorkflowStage2Bulk = async (req, res) => {
         try {
             const fingerprint = String(req.query.preview_fingerprint || '');
+            if (req.query.details === '1') {
+                const seedPage = stage2BulkStateCache.detailPageSeeds({
+                    preview_fingerprint: fingerprint,
+                    scope: stage2BulkRequestScope(req, req.query), page: req.query.page,
+                    page_size: req.query.page_size });
+                const batchScopes = seedPage.cachedSeeds.map(({ row_ids: _rowIds, ...seed }) => seed);
+                const prepared = await loadWeeklyHrStage2BatchPreparedContexts({ req,
+                    input: req.query, batchScopes, cachedSeeds: seedPage.cachedSeeds });
+                const details = buildWeeklyHrStage2BulkDetails({ contexts: prepared.contexts,
+                    cachedSeeds: seedPage.cachedSeeds, page_size: seedPage.page_size });
+                return res.json({ success: true, preview_fingerprint: fingerprint,
+                    details, page: seedPage.page, page_size: seedPage.page_size,
+                    page_count: seedPage.page_count });
+            }
             const pageResult = stage2BulkStateCache.exceptionPage({
                 preview_fingerprint: fingerprint,
                 scope: stage2BulkRequestScope(req, req.query),

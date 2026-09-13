@@ -100,6 +100,9 @@ function context(index, kind = 'safe') {
     assert.equal(preview.safe_pair_count, 500);
     assert.equal(preview.safe_automatic_count, 0);
     assert.equal(preview.safe_bulk_count, 500);
+    assert.equal(preview.safe_employee_count, 100);
+    assert.equal(preview.safe_week_count, 500);
+    assert.equal(preview.safe_day_change_count, 1000);
     assertCounterInvariants(preview);
 }
 {

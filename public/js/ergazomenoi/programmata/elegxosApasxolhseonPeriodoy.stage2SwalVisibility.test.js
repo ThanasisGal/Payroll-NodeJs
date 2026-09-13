@@ -13,6 +13,10 @@ const sweetAlertCss = fs.readFileSync(
     path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.css'), 'utf8');
 const sweetAlertJs = fs.readFileSync(
     path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js'), 'utf8');
+assert.match(mainCss,
+    /\.swal2-popup\.employment-review-swal-popup \.swal2-html-container[\s\S]*?font-size:\s*0\.95rem\s*!important/);
+assert.match(mainCss,
+    /\.swal2-popup\.employment-review-swal-popup \.swal2-html-container[\s\S]*?line-height:\s*1\.45/);
 
 function visibleButtonState(page) {
     return page.evaluate(() => Object.fromEntries(['confirm', 'deny', 'cancel'].map((kind) => {

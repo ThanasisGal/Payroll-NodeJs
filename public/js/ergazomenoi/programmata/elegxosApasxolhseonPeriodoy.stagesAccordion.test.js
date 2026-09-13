@@ -50,12 +50,14 @@ assert.match(view, /STAGE4[\s\S]*resultsTable/);
 
 const helperStart = source.indexOf('const workflowStageNames');
 const helperEnd = source.indexOf('function renderWeeklyHrStage3');
-const stage2Container = { innerHTML: '' };
+const stage2Container = { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] };
 const stage2Collapse = { className: 'accordion-collapse collapse' };
 const decisionCalls = [];
 const loadResultsCalls = [];
 const fallbackErrors = [];
 const sandbox = {
+    currentWeeklyHrStage2BulkPreview: null,
+    currentCanonicalLifecyclePayloads: [], weeklyHrStage2BulkSubmitting: false,
     document: { getElementById: (id) => id === 'policyPreviewGroupsContainer'
         ? stage2Container : id === 'employmentReviewStage2Collapse' ? stage2Collapse : null },
     escapeHtml: (value) => String(value ?? ''),
@@ -65,6 +67,8 @@ const sandbox = {
     atomicRepoTransferDiagnosticLabels: {},
     formatPolicyPreviewUnknownCode: (value) => String(value || ''),
     userCanRecordRepoTransferDecision: () => true,
+    userCanRecordCanonicalDecision: () => false,
+    canRecordEmploymentDecisionForCurrentPeriod: () => false,
     userCanApplyRepoTransferDecision: () => false,
     submitRepoTransferDecision: async (...args) => { decisionCalls.push(args); return true; },
     submitRepoTransferApply: async () => false,
@@ -89,6 +93,30 @@ assert.equal(lifecycle.stages.STAGE2.presentation_status, 'ACTIVE');
 assert.equal(lifecycle.stages.STAGE3.presentation_status, 'LOCKED');
 assert.equal(lifecycle.stages.STAGE3.enabled, false);
 assert.equal(lifecycle.stages.STAGE4.presentation_status, 'LOCKED');
+
+const readyAutomaticLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
+    lifecycle_projection: { stages: {
+        stage1: stage('COMPLETED'), stage2: stage('COMPLETED'),
+        stage3: stage('OPEN', 26), stage4: stage('COMPLETED')
+    } } }], null, { safe_bulk_count: 19, manual_exception_count: 0 });
+assert.equal(readyAutomaticLifecycle.current_stage, 'STAGE2');
+assert.equal(readyAutomaticLifecycle.stages.STAGE2.presentation_status, 'ACTIVE');
+assert.equal(readyAutomaticLifecycle.stages.STAGE2.pending_count, 19);
+assert.equal(readyAutomaticLifecycle.stages.STAGE2.user_action_required, true);
+assert.equal(readyAutomaticLifecycle.stages.STAGE3.presentation_status, 'LOCKED');
+assert.equal(readyAutomaticLifecycle.stages.STAGE3.enabled, false);
+const stage3AfterStage2 = sandbox.derive([{ scope: { employee_kodikos: '0004' },
+    lifecycle_projection: { stages: {
+        stage1: stage('COMPLETED'), stage2: stage('COMPLETED'),
+        stage3: stage('OPEN', 26), stage4: stage('COMPLETED')
+    } } }], null, { safe_bulk_count: 0, manual_exception_count: 0 });
+assert.equal(stage3AfterStage2.current_stage, 'STAGE3');
+const manualStage2 = sandbox.derive([{ scope: { employee_kodikos: '0004' },
+    lifecycle_projection: { stages: {
+        stage1: stage('COMPLETED'), stage2: stage('COMPLETED'),
+        stage3: stage('OPEN', 26), stage4: stage('COMPLETED')
+    } } }], null, { safe_bulk_count: 0, manual_exception_count: 1 });
+assert.equal(manualStage2.current_stage, 'STAGE2');
 
 const staleLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
     lifecycle_projection: { stages: {
@@ -145,12 +173,14 @@ const unsortedStage3 = sandbox.derive([
     } } })));
 assert.deepEqual(Array.from(unsortedStage3.stages.STAGE3.pending_items, (item) => item.date),
     ['2026-06-03', '2026-06-09', '2026-06-10', '2026-06-22']);
-assert.match(source, /button\.disabled = presentationStatus === 'LOCKED'/);
-assert.match(source, /aria-disabled[\s\S]{0,100}LOCKED/);
+assert.match(source, /button\.disabled = stageViewLocked/);
+assert.match(source, /aria-disabled[\s\S]{0,100}stageViewLocked/);
+assert.match(source, /ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ/);
+assert.match(source, /ΑΝΑΜΟΝΗ ΟΛΟΚΛΗΡΩΣΗΣ ΠΡΟΗΓΟΥΜΕΝΟΥ ΣΤΑΔΙΟΥ/);
 
 const rendered = sandbox.renderWeeklyHrStage2LifecycleFallback(lifecycle);
 assert.equal(rendered, true);
-assert.match(stage2Container.innerHTML, /Εκκρεμότητες Μεταφοράς Ρεπό/);
+assert.match(stage2Container.innerHTML, /Περιπτώσεις που χρειάζονται έλεγχο/);
 assert.match(stage2Container.innerHTML, /0004/);
 assert.match(stage2Container.innerHTML, /Απαιτείται επίλυση μεταφοράς ρεπό\./);
 assert.doesNotMatch(stage2Container.innerHTML, /REPO_RESOLUTION_REQUIRED/);
@@ -165,12 +195,11 @@ assert.equal(stage2Container.innerHTML, stage2HtmlBeforeToggle);
 
 stage2Container.innerHTML = '<section>Προτάσεις Μεταφοράς Ρεπό · ' +
     'Μεταφορές ρεπό προς απόφαση: 9</section>';
+sandbox.currentWeeklyHrStage2BulkPreview = null;
 assert.equal(sandbox.renderWeeklyHrStage2LifecycleFallback({ stages: { STAGE2: {
     business_status: 'COMPLETED', pending_count: 0, pending_items: []
 } } }), true);
-assert.equal(stage2Container.innerHTML,
-    '<div class="text-muted small employment-review-stage2-empty">' +
-    'Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό.</div>');
+assert.match(stage2Container.innerHTML, /Προεπισκόπηση μαζικής ενημέρωσης/);
 assert.doesNotMatch(stage2Container.innerHTML, /Προτάσεις Μεταφοράς Ρεπό/);
 assert.doesNotMatch(stage2Container.innerHTML, /Μεταφορές ρεπό προς απόφαση/);
 
@@ -182,6 +211,7 @@ const pendingLifecycle = { stages: { STAGE2: { business_status: 'OPEN', pending_
         { employee_kodikos: 'B', week_start: '2026-06-08', week_end: '2026-06-14',
             pending_count: 1, reasons: ['REPO_RESOLUTION_REQUIRED'] }
     ] } } };
+sandbox.currentWeeklyHrStage2BulkPreview = null;
 assert.equal(sandbox.renderWeeklyHrStage2LifecycleFallback(pendingLifecycle), true);
 assert.match(stage2Container.innerHTML, /<td>A<\/td>/);
 assert.match(stage2Container.innerHTML, /<td>B<\/td>/);
@@ -222,16 +252,11 @@ const structuredArticle = {
 };
 stage2Container.querySelectorAll = (selector) =>
     selector === '.employment-review-stage2-proposal' ? [structuredArticle] : [];
+sandbox.currentWeeklyHrStage2BulkPreview = null;
 assert.equal(sandbox.renderWeeklyHrStage2LifecycleFallback(structuredLifecycle), true);
-assert.match(stage2Container.innerHTML, /Βρέθηκε προδηλωμένο ρεπό/);
-assert.match(stage2Container.innerHTML, /14:07–22:37/);
-assert.match(stage2Container.innerHTML, /2026-07-13.*ΡΕΠΟ → ΕΡΓΑΣΙΑ/);
-assert.match(stage2Container.innerHTML, /2026-07-14.*ΕΡΓΑΣΙΑ → ΡΕΠΟ/);
-assert.match(stage2Container.innerHTML, /Ελέγξτε αν η 2026-07-14 ήταν πράγματι το ρεπό/);
-assert.doesNotMatch(stage2Container.innerHTML,
-    /Απαιτείται έλεγχος της περίπτωσης\./);
-assert.match(stage2Container.innerHTML, />Αποδοχή πρότασης<\/button>/);
-assert.match(stage2Container.innerHTML, />Δεν ισχύει<\/button>/);
+assert.match(stage2Container.innerHTML, /<td>0029<\/td>/);
+assert.match(stage2Container.innerHTML, />Έλεγχος<\/button>/);
+assert.doesNotMatch(stage2Container.innerHTML, /employment-review-stage2-proposal/);
 const authoritativePendingHtml = stage2Container.innerHTML;
 stage2Collapse.className = 'accordion-collapse collapse show';
 stage2Collapse.className = 'accordion-collapse collapse';
@@ -260,137 +285,4 @@ assert.match(buttonRule, /margin\s*:\s*0\s*!important/);
 assert.match(headerContentRule, /flex-wrap\s*:\s*wrap/);
 assert.doesNotMatch(buttonRule, /(?:^|\n)\s*height\s*:\s*[0-9.]+(?:px|rem|vh|vw)\s*;/);
 
-(async () => {
-    await decisionButtons[0].listener();
-    assert.deepEqual(decisionCalls.map((call) => call[1]), ['APPROVE_PROPOSAL']);
-    assert.equal(loadResultsCalls.length, 1);
-    await decisionButtons[1].listener();
-    assert.deepEqual(decisionCalls.map((call) => call[1]),
-        ['APPROVE_PROPOSAL', 'REJECT_PROPOSAL']);
-    assert.equal(loadResultsCalls.length, 2);
-    assert.equal(fallbackErrors.length, 0);
-    assert.ok(decisionCalls.every((call) => call[0].group_id === 'proposal-0029'));
-    assert.ok(decisionCalls.every((call) =>
-        call[0].pair_contract.choice_code === 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR'));
-
-    for (const employmentType of ['MERIKH', 'EK_PERITROPHS']) {
-        const nonWorkLifecycle = structuredClone(structuredLifecycle);
-        const item = nonWorkLifecycle.stages.STAGE2.pending_items[0];
-        item.source.declaration_classification = 'ΜΕ';
-        item.proposal.target_new_classification = 'ΜΕ';
-        assert.equal(sandbox.renderWeeklyHrStage2LifecycleFallback(nonWorkLifecycle), true);
-        assert.match(stage2Container.innerHTML, /Βρέθηκε προδηλωμένη μη εργασία/,
-            employmentType);
-        assert.match(stage2Container.innerHTML, /η μη εργασία που δόθηκε αντί της προδηλωμένης μη εργασίας/,
-            employmentType);
-        assert.doesNotMatch(stage2Container.innerHTML, /προδηλωμένο ρεπό/, employmentType);
-    }
-
-    const approvedLifecycle = structuredClone(structuredLifecycle);
-    const approvedItem = approvedLifecycle.stages.STAGE2.pending_items[0];
-    approvedItem.decision_state = 'APPROVED_PENDING_APPLY';
-    approvedItem.can_apply = true;
-    approvedItem.apply_state = 'READY_TO_APPLY';
-    approvedItem.decision_id = 'decision-0029';
-    const applyButton = { disabled: false,
-        addEventListener(_event, listener) { this.listener = listener; } };
-    const applyArticle = { querySelectorAll: () => [],
-        querySelector: (selector) => selector === '.stage2-lifecycle-apply-btn'
-            ? applyButton : null };
-    stage2Container.querySelectorAll = () => [applyArticle];
-    sandbox.userCanApplyRepoTransferDecision = () => true;
-    let fallbackApplyGroup = null;
-    let successfulApplyCalls = 0;
-    sandbox.submitRepoTransferApply = async (group) => {
-        successfulApplyCalls += 1;
-        fallbackApplyGroup = group;
-        return true;
-    };
-    assert.equal(sandbox.renderWeeklyHrStage2LifecycleFallback(approvedLifecycle), true);
-    await applyButton.listener();
-    assert.equal(successfulApplyCalls, 1);
-    assert.equal(loadResultsCalls.length, 3);
-    assert.equal(fallbackErrors.length, 0);
-    const sourceItem = fallbackApplyGroup.items.find((item) =>
-        item.role === 'SOURCE_BECOMES_WORK');
-    const targetItem = fallbackApplyGroup.items.find((item) =>
-        item.role === 'TARGET_BECOMES_REPO');
-    assert.equal(sourceItem.kathgoria_ergasias, 'ΑΝ');
-    assert.equal(sourceItem.proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
-    assert.equal(sourceItem.proposed_values.ores_ergasias_apologistika, 8.5);
-    assert.equal(sourceItem.proposed_values.apo_ora_01_apologistika, '14:07');
-    assert.equal(sourceItem.proposed_values.eos_ora_01_apologistika, '22:37');
-    assert.equal(targetItem.kathgoria_ergasias, 'ΕΡΓ');
-    assert.equal(targetItem.proposed_values.kathgoria_ergasias_apologistika, 'ΑΝ');
-    assert.deepEqual(sourceItem.proposed_values,
-        batchShapedCurrentProposal.source.proposed_values);
-    assert.deepEqual(targetItem.proposed_values,
-        batchShapedCurrentProposal.target.proposed_values);
-
-    let decisionPostAttempts = 0;
-    fallbackErrors.length = 0;
-    sandbox.submitRepoTransferDecision = async () => {
-        decisionPostAttempts += 1;
-        throw new Error('decision submit failed');
-    };
-    await decisionButtons[0].listener();
-    assert.equal(decisionPostAttempts, 1);
-    assert.equal(fallbackErrors.at(-1).title, 'Δεν καταγράφηκε η απόφαση');
-
-    fallbackErrors.length = 0;
-    sandbox.submitRepoTransferDecision = async () => {
-        decisionPostAttempts += 1;
-        return true;
-    };
-    sandbox.loadResults = async () => { throw new Error('decision refresh failed'); };
-    await decisionButtons[1].listener();
-    assert.equal(decisionPostAttempts, 2);
-    assert.equal(fallbackErrors.at(-1).icon, 'warning');
-    assert.match(fallbackErrors.at(-1).title,
-        /Η απόφαση καταγράφηκε, αλλά η προβολή δεν ανανεώθηκε/);
-    assert.doesNotMatch(fallbackErrors.at(-1).title, /Δεν καταγράφηκε/);
-    assert.match(fallbackErrors.at(-1).text, /Αναζήτηση/);
-
-    let applyPostAttempts = 0;
-    let applyRefreshAttempts = 0;
-    fallbackErrors.length = 0;
-    sandbox.loadResults = async () => { applyRefreshAttempts += 1; };
-    sandbox.submitRepoTransferApply = async () => {
-        applyPostAttempts += 1;
-        return false;
-    };
-    await applyButton.listener();
-    assert.equal(applyPostAttempts, 1);
-    assert.equal(applyRefreshAttempts, 0);
-    assert.equal(fallbackErrors.length, 0);
-
-    fallbackErrors.length = 0;
-    sandbox.submitRepoTransferApply = async () => {
-        applyPostAttempts += 1;
-        throw new Error('apply submit failed');
-    };
-    await applyButton.listener();
-    assert.equal(applyPostAttempts, 2);
-    assert.equal(applyRefreshAttempts, 0);
-    assert.equal(fallbackErrors.length, 1);
-    assert.equal(fallbackErrors.at(-1).title, 'Δεν εφαρμόστηκε η μεταφορά');
-
-    fallbackErrors.length = 0;
-    sandbox.submitRepoTransferApply = async () => {
-        applyPostAttempts += 1;
-        return true;
-    };
-    sandbox.loadResults = async () => {
-        applyRefreshAttempts += 1;
-        throw new Error('apply refresh failed');
-    };
-    await applyButton.listener();
-    assert.equal(applyPostAttempts, 3);
-    assert.equal(applyRefreshAttempts, 1);
-    assert.equal(fallbackErrors.at(-1).icon, 'warning');
-    assert.match(fallbackErrors.at(-1).title,
-        /Η εφαρμογή ολοκληρώθηκε, αλλά η προβολή δεν ανανεώθηκε/);
-    assert.doesNotMatch(fallbackErrors.at(-1).title, /Δεν εφαρμόστηκε/);
-    assert.match(fallbackErrors.at(-1).text, /Αναζήτηση/);
-    console.log('employment review four-stage accordion projection tests passed');
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+console.log('employment review four-stage accordion projection tests passed');

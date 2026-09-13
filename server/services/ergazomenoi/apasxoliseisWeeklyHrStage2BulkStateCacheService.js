@@ -9,6 +9,8 @@ const DEFAULT_HARD_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_MAX_ENTRIES = 50;
 const DEFAULT_MAX_CACHED_SCOPES = 20000;
 const MAX_SCOPES_PER_BATCH = 100;
+const MAX_PREVIEW_DETAILS_PER_PAGE = 50;
+const MAX_ROWS_PER_WEEK = 7;
 
 function text(value) { return String(value ?? '').trim(); }
 function canonicalScope(scope = {}) {
@@ -151,9 +153,26 @@ class WeeklyHrStage2BulkStateCache {
             exception_page_count: Math.max(1,
                 Math.ceil(entry.exceptions.length / entry.pageSize)) };
     }
+
+    detailPageSeeds({ preview_fingerprint, scope, page = 1,
+        page_size = MAX_PREVIEW_DETAILS_PER_PAGE }) {
+        const entry = this.requireEntry({ preview_fingerprint, scope });
+        const size = Math.max(MAX_ROWS_PER_WEEK, Math.min(MAX_PREVIEW_DETAILS_PER_PAGE,
+            Number(page_size) || MAX_PREVIEW_DETAILS_PER_PAGE));
+        // A weekly seed contains at most seven rows. Bounding scopes by floor(size / 7)
+        // guarantees that the response can never contain more requested daily details.
+        const scopesPerPage = Math.max(1, Math.floor(size / MAX_ROWS_PER_WEEK));
+        const currentPage = Math.max(1, Number(page) || 1);
+        const offset = (currentPage - 1) * scopesPerPage;
+        entry.lastAccessAt = this.now();
+        return { cachedSeeds: entry.safeScopes.slice(offset, offset + scopesPerPage),
+            page: currentPage, page_size: size, page_count: Math.max(1,
+                Math.ceil(entry.safeScopes.length / scopesPerPage)),
+            total_safe_scopes: entry.safeScopes.length };
+    }
 }
 
 module.exports = { DEFAULT_TTL_MS, DEFAULT_HARD_TTL_MS, DEFAULT_MAX_ENTRIES,
     DEFAULT_MAX_CACHED_SCOPES,
-    MAX_SCOPES_PER_BATCH,
+    MAX_SCOPES_PER_BATCH, MAX_PREVIEW_DETAILS_PER_PAGE,
     canonicalScope, WeeklyHrStage2BulkStateCache };

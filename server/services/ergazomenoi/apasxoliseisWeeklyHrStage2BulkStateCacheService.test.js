@@ -62,6 +62,10 @@ function contexts(count) {
     const batch = cache.batch({ preview_fingerprint: 'a'.repeat(64), scope });
     assert.equal(batch.cachedSeeds.length, MAX_SCOPES_PER_BATCH);
     assert.equal(Object.hasOwn(batch.scopes[0], 'row_ids'), false);
+    const detailPage = cache.detailPageSeeds({ preview_fingerprint: 'a'.repeat(64), scope,
+        page: 1, page_size: 50 });
+    assert.equal(detailPage.cachedSeeds.length, 7);
+    assert.equal(detailPage.cachedSeeds.flatMap((seed) => seed.row_ids).length <= 50, true);
 }
 {
     const cache = new WeeklyHrStage2BulkStateCache();

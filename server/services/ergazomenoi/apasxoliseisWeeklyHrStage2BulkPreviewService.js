@@ -61,7 +61,7 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
     if (!Array.isArray(contexts)) throw new TypeError('contexts must be an array.');
     const safe = []; const resolved = []; const exceptions = [];
     const alreadyMaterialized = []; const noLongerApplicable = []; const technicalConflicts = [];
-    let safePairCount = 0; let safeAutomaticCount = 0;
+    let safePairCount = 0; let safeAutomaticCount = 0; let safeDayChangeCount = 0;
     for (const context of contexts) {
         const identity = scopeIdentity(context);
         if (!identity.employee_id || !identity.week_start || !identity.week_end ||
@@ -84,6 +84,7 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
             const pair = preparedSafePair(context);
             if (pair) {
                 safePairCount++;
+                safeDayChangeCount += 2;
                 safe.push({ ...identity, bulk_kind: 'SAFE_PAIR_TRANSFER',
                     scope_fingerprint: crypto.createHash('sha256').update(stableStringify({
                         contract: 'weekly-hr-stage2-safe-pair:v1', identity,
@@ -115,6 +116,7 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
                 continue;
             }
             safeAutomaticCount++;
+            safeDayChangeCount += inspection.items.length;
             safe.push({ ...identity, bulk_kind: 'SAFE_AUTOMATIC_MATERIALIZATION',
                 scope_fingerprint: scopeFingerprint(context, inspection.items) });
             continue;
@@ -146,6 +148,8 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
     const offset = (page - 1) * pageSize;
     return { total_scopes: contexts.length, safe_bulk_count: safe.length,
         safe_pair_count: safePairCount, safe_automatic_count: safeAutomaticCount,
+        safe_employee_count: new Set(safe.map((item) => item.employee_id)).size,
+        safe_week_count: safe.length, safe_day_change_count: safeDayChangeCount,
         already_resolved_count: resolved.length, manual_exception_count: exceptions.length,
         no_longer_applicable_count: noLongerApplicable.length,
         technical_conflict_count: technicalConflicts.length,

@@ -9051,7 +9051,8 @@ function compareLifecyclePendingItems(left = {}, right = {}) {
         String(left.row_id || '').localeCompare(String(right.row_id || ''));
 }
 
-function derivePeriodLifecyclePresentation(payloads = [], periodControl = null) {
+function derivePeriodLifecyclePresentation(payloads = [], periodControl = null,
+    stage2BulkPreview = null) {
     const stageKeys = ['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'];
     const rawProjections = (Array.isArray(payloads) ? payloads : [])
         .map((payload) => ({ payload, lifecycle: payload?.lifecycle_projection }))
@@ -9114,10 +9115,18 @@ function derivePeriodLifecyclePresentation(payloads = [], periodControl = null) 
                 stage.persisted_status).filter(Boolean))]
         }];
     }));
-    const firstUnresolvedIndex = stageKeys.findIndex((stageKey) =>
-        !['COMPLETED', 'DEFERRED_TO_NEXT_PERIOD'].includes(stages[stageKey].business_status));
     const finalizedPeriod = String(periodControl?.stored_status || periodControl?.state?.stored_status ||
         periodControl?.effective_mode || '') === 'FINALIZED';
+    const stage2ActionCount = finalizedPeriod ? 0 : Number(
+        stage2BulkPreview?.safe_bulk_count || 0) + Number(
+        stage2BulkPreview?.manual_exception_count || 0);
+    if (stage2ActionCount > 0) {
+        stages.STAGE2.business_status = 'OPEN';
+        stages.STAGE2.pending_count = stage2ActionCount;
+        stages.STAGE2.user_action_required = true;
+    }
+    const firstUnresolvedIndex = stageKeys.findIndex((stageKey) =>
+        !['COMPLETED', 'DEFERRED_TO_NEXT_PERIOD'].includes(stages[stageKey].business_status));
     stageKeys.forEach((stageKey, index) => {
         const stage = stages[stageKey];
         stage.pending_items.sort(compareLifecyclePendingItems);
@@ -9472,8 +9481,8 @@ function renderWeeklyHrStage2BulkSummary(container) {
             <button type="button" class="btn btn-sm employment-review-action-btn
                 employment-review-action-success weekly-hr-stage2-bulk-complete"
                 ${canBulk ? '' : 'disabled aria-disabled="true"'}>${safeCount > 0
-                    ? `Μαζική ενημέρωση ${escapeHtml(safeCount)} περιπτώσεων`
-                    : 'Μαζική ενημέρωση ρεπό'}</button>
+                    ? `Προεπισκόπηση ${escapeHtml(safeCount)} ενημερώσεων`
+                    : 'Προεπισκόπηση μαζικής ενημέρωσης'}</button>
             ${safeCount === 0
                 ? '<span class="text-muted small">Δεν υπάρχουν αυτή τη στιγμή περιπτώσεις που μπορούν να ενημερωθούν αυτόματα.</span>'
                 : unavailableReason ? `<span class="text-muted small">${escapeHtml(
@@ -9494,16 +9503,75 @@ function renderWeeklyHrStage2BulkSummary(container) {
     return true;
 }
 
-async function completeWeeklyHrStage2BulkFromUi() {
+function weeklyHrStage2BulkPreviewDetailsHtml(preview, pageResult) {
+    const details = Array.isArray(pageResult.details) ? pageResult.details.slice(0, 50) : [];
+    const rows = details.map((item) => `<tr><td>${escapeHtml(item.employee ||
+        item.employee_kodikos || '—')}</td><td>${escapeHtml(formatStage1DateKey(
+        item.week_start))}–${escapeHtml(formatStage1DateKey(item.week_end))}</td><td>${escapeHtml(
+        formatStage1DateKey(item.date))}</td><td>${escapeHtml(item.before)}</td><td>${escapeHtml(
+        item.after)}</td><td>${escapeHtml(item.safety_reason)}</td></tr>`).join('');
+    return `<div class="text-start"><div class="alert alert-info py-2">Δεν έχει γίνει ακόμη καμία αλλαγή.</div>
+        <div class="d-flex flex-wrap gap-3 mb-2"><span>Περιπτώσεις προς ενημέρωση: <strong>${escapeHtml(
+            preview.safe_bulk_count || 0)}</strong></span><span>Εργαζόμενοι που επηρεάζονται: <strong>${escapeHtml(
+            preview.safe_employee_count || 0)}</strong></span><span>Εβδομάδες που επηρεάζονται: <strong>${escapeHtml(
+            preview.safe_week_count || 0)}</strong></span><span>Ημερήσιες αλλαγές: <strong>${escapeHtml(
+            preview.safe_day_change_count || 0)}</strong></span></div>
+        <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Ημερομηνία</th><th>Πριν</th><th>Μετά</th><th>Γιατί είναι ασφαλές</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="d-flex justify-content-between align-items-center"><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-preview-prev" ${pageResult.page <= 1 ? 'disabled' : ''}>Προηγούμενη</button><span>Σελίδα ${escapeHtml(pageResult.page)} από ${escapeHtml(pageResult.page_count)}</span><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-preview-next" ${pageResult.page >= pageResult.page_count ? 'disabled' : ''}>Επόμενη</button></div>
+        <div class="mt-3">Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά ότι τα στοιχεία δεν έχουν μεταβληθεί. Αν κάποια περίπτωση έχει αλλάξει, δεν θα ενημερωθεί και θα εμφανιστεί στα αποτελέσματα για νέο έλεγχο.</div></div>`;
+}
+
+async function loadWeeklyHrStage2BulkDetailPage(page = 1) {
+    const preview = currentWeeklyHrStage2BulkPreview;
+    const scope = getActiveEmploymentReviewScope();
+    const query = new URLSearchParams({ details: '1', page, page_size: 50,
+        preview_fingerprint: preview?.preview_fingerprint || '',
+        period_start: scope.apo_hmeromhnia, period_end: scope.eos_hmeromhnia,
+        ypokatasthma: scope.ypokatasthma });
+    const response = await fetch('/api/prodhlomena-oraria/review/weekly-hr-workflow/' +
+        `stage2/bulk-preview?${query.toString()}`, { headers: { Accept: 'application/json',
+            'CSRF-Token': csrfToken }, credentials: 'same-origin' });
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error('PREVIEW_CHANGED');
+    return result;
+}
+
+async function previewWeeklyHrStage2BulkFromUi() {
     const preview = currentWeeklyHrStage2BulkPreview;
     if (!preview || weeklyHrStage2BulkSubmitting || !preview.safe_bulk_count) return;
-    const confirmation = await employmentReviewSwal({ icon: 'warning',
-        title: 'Μαζική ενημέρωση μεταφοράς ρεπό', input: 'textarea',
-        inputLabel: `Θα ενημερωθούν ${preview.safe_bulk_count} ασφαλείς περιπτώσεις.`,
-        showCancelButton: true, confirmButtonText: 'Μαζική ενημέρωση', cancelButtonText: 'Ακύρωση',
-        inputValidator: (value) => String(value || '').trim() ? undefined :
-            'Η αιτιολογία είναι υποχρεωτική.' });
-    if (!confirmation.isConfirmed) return;
+    let page = 1;
+    try {
+        while (true) {
+            const pageResult = await loadWeeklyHrStage2BulkDetailPage(page);
+            let requestedPage = null;
+            const confirmation = await employmentReviewSwal({ icon: 'info',
+                title: 'Προεπισκόπηση μαζικής ενημέρωσης',
+                html: weeklyHrStage2BulkPreviewDetailsHtml(preview, pageResult),
+                input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
+                confirmButtonText: `Εφαρμογή ${preview.safe_bulk_count} ενημερώσεων`,
+                cancelButtonText: 'Ακύρωση',
+                inputValidator: (value) => String(value || '').trim() ? undefined :
+                    'Η αιτιολογία είναι υποχρεωτική.',
+                didOpen: () => {
+                    document.querySelector('.weekly-hr-stage2-preview-prev')?.addEventListener(
+                        'click', () => { requestedPage = page - 1; Swal.close(); });
+                    document.querySelector('.weekly-hr-stage2-preview-next')?.addEventListener(
+                        'click', () => { requestedPage = page + 1; Swal.close(); });
+                } });
+            if (requestedPage) { page = requestedPage; continue; }
+            if (!confirmation.isConfirmed) return;
+            return completeWeeklyHrStage2BulkFromUi(String(confirmation.value || '').trim());
+        }
+    } catch (_) {
+        await employmentReviewSwal({ icon: 'warning', title: 'Απαιτείται νέα Αναζήτηση',
+            text: 'Τα στοιχεία έχουν αλλάξει από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση πριν συνεχίσετε.' });
+    }
+}
+
+async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
+    const preview = currentWeeklyHrStage2BulkPreview;
+    if (!preview || weeklyHrStage2BulkSubmitting || !preview.safe_bulk_count ||
+        !String(reasonOrNotes || '').trim()) return;
     const scope = getActiveEmploymentReviewScope();
     weeklyHrStage2BulkRequestId = weeklyHrStage2BulkRequestId ||
         `stage2-bulk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -9518,7 +9586,7 @@ async function completeWeeklyHrStage2BulkFromUi() {
                 period_start: scope.apo_hmeromhnia, period_end: scope.eos_hmeromhnia,
                 ypokatasthma: scope.ypokatasthma,
                 bulk_request_id: weeklyHrStage2BulkRequestId,
-                reason_or_notes: String(confirmation.value || '').trim(),
+                reason_or_notes: String(reasonOrNotes || '').trim(),
                 expected_preview_fingerprint: preview.preview_fingerprint };
         const totals = { applied: 0, already_completed: 0, stale: 0, failed: 0,
             skipped_manual: 0 };
@@ -9549,8 +9617,13 @@ async function completeWeeklyHrStage2BulkFromUi() {
                 }
             }
             const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(
-                'Δεν ήταν δυνατή η μαζική ενημέρωση μεταφοράς ρεπό.');
+            if (!response.ok || !result.success) {
+                const refreshRequired = ['STAGE2_BULK_PREVIEW_EXPIRED',
+                    'STAGE2_BULK_PREVIEW_SCOPE_MISMATCH', 'STAGE2_INPUT_CHANGED',
+                    'STAGE2_BULK_PERIOD_SCOPE_MISMATCH'].includes(String(result.code || ''));
+                throw new Error(refreshRequired ? 'PREVIEW_CHANGED' :
+                    'Δεν ήταν δυνατή η μαζική ενημέρωση μεταφοράς ρεπό.');
+            }
             for (const key of Object.keys(totals)) totals[key] += Number(result[key] || 0);
             processed += Number(result.processed_in_batch || 0);
             hasMore = result.has_more === true;
@@ -9569,13 +9642,18 @@ async function completeWeeklyHrStage2BulkFromUi() {
             title: 'Μαζική ενημέρωση μεταφοράς ρεπό',
             text: `Ολοκληρώθηκαν: ${totals.applied}. ` +
                 `Ήταν ήδη τακτοποιημένες: ${totals.already_completed}. ` +
-                `Χρειάζονται νέο έλεγχο: ${totals.stale}. ` +
+                `Παραλείφθηκαν επειδή άλλαξαν στοιχεία: ${totals.stale}. ` +
+                `Χρειάζονται νέο έλεγχο: ${totals.skipped_manual}. ` +
                 `Δεν ολοκληρώθηκαν: ${totals.failed}.` });
         await loadResults();
     } catch (error) {
         if (progressAlert) { Swal.close(); await progressAlert; progressAlert = null; }
-        await employmentReviewSwal({ icon: 'error', title: 'Η μαζική ενημέρωση απέτυχε',
-            text: 'Δεν ήταν δυνατή η ολοκλήρωση της μαζικής ενημέρωσης. Δοκιμάστε ξανά.' });
+        const changed = error?.message === 'PREVIEW_CHANGED';
+        await employmentReviewSwal(changed
+            ? { icon: 'warning', title: 'Απαιτείται νέα Αναζήτηση',
+                text: 'Τα στοιχεία έχουν αλλάξει από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση πριν συνεχίσετε.' }
+            : { icon: 'error', title: 'Η μαζική ενημέρωση απέτυχε',
+                text: 'Δεν ήταν δυνατή η ολοκλήρωση της μαζικής ενημέρωσης. Δοκιμάστε ξανά.' });
     } finally { weeklyHrStage2BulkSubmitting = false; }
 }
 
@@ -9600,7 +9678,7 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     }
     if (renderWeeklyHrStage2BulkSummary(container)) {
         container.querySelector('.weekly-hr-stage2-bulk-complete')?.addEventListener(
-            'click', completeWeeklyHrStage2BulkFromUi);
+            'click', previewWeeklyHrStage2BulkFromUi);
         container.querySelector('.weekly-hr-stage2-exceptions-prev')?.addEventListener(
             'click', () => loadWeeklyHrStage2BulkPreview(currentPolicyPreviewBaseParams,
                 Math.max(1, Number(currentWeeklyHrStage2BulkPreview.exception_page || 1) - 1)));
@@ -10076,7 +10154,8 @@ function updateEmploymentReviewWorkflowPresentation() {
         .sort(compareWeeklyHrStage1Payloads);
     const payloads = visibleWeeklyHrPayloads(allPayloads)
         .sort(compareWeeklyHrStage1Payloads);
-    const lifecycle = derivePeriodLifecyclePresentation(allPayloads, currentEmploymentPeriodControl);
+    const lifecycle = derivePeriodLifecyclePresentation(allPayloads, currentEmploymentPeriodControl,
+        currentWeeklyHrStage2BulkPreview);
     currentEmploymentReviewLifecyclePresentation = lifecycle;
     renderEmploymentReviewBoundaryContextSummary();
     currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(allPayloads);
@@ -10115,11 +10194,16 @@ function updateEmploymentReviewWorkflowPresentation() {
             ? (presentationStatus === 'LOCKED' ? 'LOCKED' : presentationStatus === 'COMPLETED'
                 ? 'COMPLETED' : stage.business_status)
             : presentationStatus;
+        const badgeLabel = stage.user_action_required === true
+            ? 'ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ'
+            : stage.presentation_status === 'LOCKED' && stage.stage === 'STAGE3'
+                ? 'ΑΝΑΜΟΝΗ ΟΛΟΚΛΗΡΩΣΗΣ ΠΡΟΗΓΟΥΜΕΝΟΥ ΣΤΑΔΙΟΥ'
+                : workflowStageStatusLabels[badgeStatus];
         const badge = noHrAction
             ? '<span class="badge text-bg-success ms-2">' +
                 'ΔΕΝ ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ ΑΠΟ ΤΟ HR</span>'
             : `<span class="badge ${workflowStageStatusClasses[badgeStatus]} ms-2">${escapeHtml(
-                workflowStageStatusLabels[badgeStatus])}</span>`;
+                badgeLabel)}</span>`;
         const pendingText = presentationStatus === 'LOCKED' || noHrAction ? '' :
             ` <span class="small ms-2">${stage.pending_count} εκκρεμότητες</span>`;
         header.innerHTML = `${escapeHtml(workflowStageNames[stage.stage])}

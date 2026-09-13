@@ -10,6 +10,7 @@ const end = source.indexOf('async function completeWeeklyHrStage2BulkFromUi');
 assert.ok(start >= 0 && end > start);
 const renderSource = source.slice(start, end);
 let permission = true; let periodAllowsChanges = true; let modalOptions = null;
+const fetchCalls = [];
 const sandbox = { currentWeeklyHrStage2BulkPreview: null,
     currentCanonicalLifecyclePayloads: [],
     weeklyHrStage2BulkSubmitting: false, userCanRecordCanonicalDecision: () => true,
@@ -19,6 +20,14 @@ const sandbox = { currentWeeklyHrStage2BulkPreview: null,
     employmentReviewSwal: async (options) => { modalOptions = options;
         return { isConfirmed: false, isDenied: false }; },
     submitRepoTransferDecision: async () => false, loadResults: async () => {},
+    getActiveEmploymentReviewScope: () => ({ apo_hmeromhnia: '2026-05-01',
+        eos_hmeromhnia: '2026-05-31', ypokatasthma: '0001' }),
+    URLSearchParams, csrfToken: 'token', Swal: { close: () => {} },
+    fetch: async (url, options = {}) => { fetchCalls.push({ url, options }); return {
+        ok: true, json: async () => ({ success: true, page: 1, page_count: 1,
+            details: [{ employee: '0001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ', week_start: '2026-05-04',
+                week_end: '2026-05-10', date: '2026-05-06', before: 'Πιθανή άδεια',
+                after: 'Ρεπό', safety_reason: 'Μονοσήμαντη αλλαγή.' }] }) }; },
     escapeHtml: (value) => String(value), formatStage1DateKey: (value) => {
         const [year, month, day] = String(value).slice(0, 10).split('-');
         return year && month && day ? `${day}/${month}/${year}` : String(value);
@@ -28,7 +37,8 @@ const sandbox = { currentWeeklyHrStage2BulkPreview: null,
     getStage2LifecycleReasonLabel: (value, showUnknown = true) => showUnknown
         ? String(value) : 'Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.' };
 vm.runInNewContext(`${renderSource}\nthis.render = renderWeeklyHrStage2BulkSummary;\n` +
-    'this.reviewException = reviewWeeklyHrStage2Exception;', sandbox);
+    'this.reviewException = reviewWeeklyHrStage2Exception;\n' +
+    'this.previewBulk = previewWeeklyHrStage2BulkFromUi;', sandbox);
 const container = { innerHTML: '' };
 sandbox.currentWeeklyHrStage2BulkPreview = { total_scopes: 10000, safe_bulk_count: 9500,
     already_resolved_count: 0, manual_exception_count: 500, exception_page: 1,
@@ -36,7 +46,7 @@ sandbox.currentWeeklyHrStage2BulkPreview = { total_scopes: 10000, safe_bulk_coun
         employee_kodikos: String(index), week_start: '2026-05-04', week_end: '2026-05-10',
         code: 'MANUAL_REVIEW' })) };
 assert.equal(sandbox.render(container), true);
-assert.match(container.innerHTML, /Μαζική ενημέρωση 9500 περιπτώσεων/);
+assert.match(container.innerHTML, /Προεπισκόπηση 9500 ενημερώσεων/);
 assert.doesNotMatch(container.innerHTML.match(/weekly-hr-stage2-bulk-complete[^>]*>/)?.[0] || '',
     /disabled/);
 assert.match(container.innerHTML, /Έτοιμες για μαζική ενημέρωση/);
@@ -58,7 +68,7 @@ sandbox.currentWeeklyHrStage2BulkPreview = { total_scopes: 85, safe_bulk_count: 
         employee_kodikos: String(index + 1).padStart(4, '0'), week_start: '2026-05-04',
         week_end: '2026-05-10', code: 'MANUAL_REVIEW' })) };
 sandbox.render(container);
-assert.match(container.innerHTML, /Μαζική ενημέρωση ρεπό/);
+assert.match(container.innerHTML, /Προεπισκόπηση μαζικής ενημέρωσης/);
 assert.match(container.innerHTML.match(/weekly-hr-stage2-bulk-complete[^>]*>/)?.[0] || '',
     /disabled/);
 assert.match(container.innerHTML,
@@ -96,6 +106,20 @@ assert.match(container.innerHTML, /Η κατάσταση της περιόδου
 assert.doesNotMatch(container.innerHTML, /checkbox|Τακτοποίηση επιλεγμένων/);
 
 (async () => {
+    sandbox.currentWeeklyHrStage2BulkPreview = { safe_bulk_count: 19,
+        safe_employee_count: 4, safe_week_count: 19, safe_day_change_count: 25,
+        preview_fingerprint: 'a'.repeat(64) };
+    await sandbox.previewBulk();
+    assert.equal(fetchCalls.length, 1);
+    assert.match(fetchCalls[0].url, /stage2\/bulk-preview/);
+    assert.doesNotMatch(fetchCalls[0].url, /bulk-complete/);
+    assert.equal(fetchCalls[0].options.method || 'GET', 'GET');
+    assert.match(modalOptions.title, /Προεπισκόπηση μαζικής ενημέρωσης/);
+    assert.match(modalOptions.html, /Δεν έχει γίνει ακόμη καμία αλλαγή/);
+    assert.match(modalOptions.html, /0001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ/);
+    assert.match(modalOptions.html, /Πιθανή άδεια/);
+    assert.match(modalOptions.html, /Ρεπό/);
+    assert.match(modalOptions.confirmButtonText, /Εφαρμογή 19 ενημερώσεων/);
     await sandbox.reviewException({ employee_id: 'employee-1', employee_kodikos: '0001',
         week_start: '2026-05-04', week_end: '2026-05-10', code: 'MANUAL_REVIEW' });
     assert.match(modalOptions.title, /Έλεγχος περίπτωσης/);
@@ -150,6 +174,17 @@ const completionStart = source.indexOf('async function completeWeeklyHrStage2Bul
 const completionEnd = source.indexOf('function renderWeeklyHrStage2LifecycleFallback',
     completionStart);
 const completionSource = source.slice(completionStart, completionEnd);
+const previewStart = source.indexOf('async function previewWeeklyHrStage2BulkFromUi');
+const previewSource = source.slice(previewStart, completionStart);
+assert.match(previewSource, /Προεπισκόπηση μαζικής ενημέρωσης/);
+assert.match(previewSource, /Εφαρμογή \$\{preview\.safe_bulk_count\} ενημερώσεων/);
+assert.match(previewSource, /loadWeeklyHrStage2BulkDetailPage/);
+assert.doesNotMatch(previewSource, /stage2\/bulk-complete/);
+assert.match(source, /Δεν έχει γίνει ακόμη καμία αλλαγή/);
+assert.match(source, /Εργαζόμενοι που επηρεάζονται/);
+assert.match(source, /Ημερήσιες αλλαγές/);
+assert.match(source, /Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά/);
+assert.match(source, /details\.slice\(0, 50\)/);
 assert.match(completionSource, /while \(hasMore\)/);
 assert.match(completionSource, /continuation_token: continuationToken/);
 assert.match(completionSource, /processed_in_batch/);
