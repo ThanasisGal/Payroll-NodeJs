@@ -9721,21 +9721,21 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
         currentWeeklyHrStage2BulkLastResultDetails = resultDetails;
         const reasonLabels = {
             STAGE2_INPUT_CHANGED:
-                'Τα στοιχεία της εβδομάδας άλλαξαν μετά την προεπισκόπηση.',
+                'Τα στοιχεία της εβδομάδας άλλαξαν μετά την προεπισκόπηση',
             STAGE2_VERSION_CONFLICT:
-                'Η κατάσταση της εβδομάδας άλλαξε πριν ολοκληρωθεί η ενημέρωση.',
+                'Η κατάσταση της εβδομάδας άλλαξε πριν ολοκληρωθεί η ενημέρωση',
             DAILY_REVIEW_INPUT_CHANGED:
-                'Μία ημερήσια εγγραφή άλλαξε πριν αποθηκευτεί η ενημέρωση.',
+                'Μία ημερήσια εγγραφή άλλαξε πριν αποθηκευτεί η ενημέρωση',
             PERIOD_CONTROL_STATE_CONFLICT:
-                'Η κατάσταση της περιόδου άλλαξε πριν ολοκληρωθεί η ενημέρωση.'
+                'Η κατάσταση της περιόδου άλλαξε πριν ολοκληρωθεί η ενημέρωση'
         };
         const groupedReasons = new Map();
         for (const detail of resultDetails) {
             const status = String(detail?.status || '');
             const label = status === 'FAILED'
-                ? 'Η ενημέρωση δεν ολοκληρώθηκε για ορισμένες περιπτώσεις.'
+                ? 'Η ενημέρωση δεν ολοκληρώθηκε για ορισμένες περιπτώσεις'
                 : reasonLabels[String(detail?.code || '')] ||
-                    'Τα στοιχεία άλλαξαν πριν ολοκληρωθεί η ενημέρωση.';
+                    'Τα στοιχεία άλλαξαν πριν ολοκληρωθεί η ενημέρωση';
             groupedReasons.set(label, Number(groupedReasons.get(label) || 0) + 1);
         }
         const reasonsHtml = groupedReasons.size

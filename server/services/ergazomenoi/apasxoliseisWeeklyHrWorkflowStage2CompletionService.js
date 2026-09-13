@@ -223,7 +223,10 @@ async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
             version: Number(current.stage1.version || 0) + 1 };
         const stage2Filter = current.stage2 ? { 'stage2.version': Number(previous.version || 0) }
             : { 'stage2.version': { $exists: false } };
-        const update = await stateModel.collection.updateOne({ ...filter,
+        const persistedIdentity = { team: current.team, company_kod: current.company_kod,
+            ypokatasthma: current.ypokatasthma, employee_id: current.employee_id,
+            week_start: current.week_start, week_end: current.week_end };
+        const update = await stateModel.collection.updateOne({ ...persistedIdentity,
             'stage1.version': Number(current.stage1.version || 0), ...stage2Filter },
         { $set: { stage1: rebasedStage1, stage2: nextStage } }, { session });
         if (Number(update?.matchedCount ?? update?.n ?? 0) !== 1) fail('STAGE2_VERSION_CONFLICT',

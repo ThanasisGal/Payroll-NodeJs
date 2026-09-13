@@ -388,7 +388,7 @@ async function testStage2BulkCompletionCsrfFlow() {
     const staleResult = completionAlerts.find((item) => /Ολοκληρώθηκαν:/.test(item.html || ''));
     assert.match(staleResult.html, /Παραλείφθηκαν επειδή άλλαξαν στοιχεία: 19/);
     assert.match(staleResult.html,
-        /Η κατάσταση της περιόδου άλλαξε πριν ολοκληρωθεί η ενημέρωση\.: 19/);
+        /Η κατάσταση της περιόδου άλλαξε πριν ολοκληρωθεί η ενημέρωση: 19/);
     assert.doesNotMatch(staleResult.html, /PERIOD_CONTROL_STATE_CONFLICT/);
     assert.equal(completionSandbox.currentWeeklyHrStage2BulkLastResultDetails.length, 19);
 
@@ -410,9 +410,9 @@ async function testStage2BulkCompletionCsrfFlow() {
     await completionSandbox.completeBulk(reason);
     const mixedResult = completionAlerts.find((item) => /Ολοκληρώθηκαν:/.test(item.html || ''));
     assert.match(mixedResult.html,
-        /Τα στοιχεία της εβδομάδας άλλαξαν μετά την προεπισκόπηση\.: 12/);
+        /Τα στοιχεία της εβδομάδας άλλαξαν μετά την προεπισκόπηση: 12/);
     assert.match(mixedResult.html,
-        /Μία ημερήσια εγγραφή άλλαξε πριν αποθηκευτεί η ενημέρωση\.: 7/);
+        /Μία ημερήσια εγγραφή άλλαξε πριν αποθηκευτεί η ενημέρωση: 7/);
     assert.doesNotMatch(mixedResult.html,
         /STAGE2_INPUT_CHANGED|DAILY_REVIEW_INPUT_CHANGED/);
 
