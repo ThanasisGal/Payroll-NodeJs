@@ -1,7 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { completeWeeklyHrWorkflowStage2 } = require(
+const { inspectAutomaticMaterialization, buildWeeklyHrStage2FingerprintInput,
+    fingerprint, completeWeeklyHrWorkflowStage2 } = require(
     './apasxoliseisWeeklyHrWorkflowStage2CompletionService'
 );
 
@@ -63,6 +64,21 @@ function harness(classification, failure = '') {
 }
 
 (async () => {
+    {
+        const minimal = context('REST_REPO');
+        const expanded = structuredClone(minimal);
+        expanded.effectiveProfilesByDate['2026-06-09'] = {
+            typos_apasxolhshs: '0', loader_metadata: 'representation only' };
+        const minimalItems = inspectAutomaticMaterialization(minimal).items;
+        const expandedItems = inspectAutomaticMaterialization(expanded).items;
+        assert.deepEqual(buildWeeklyHrStage2FingerprintInput(minimal, minimalItems),
+            buildWeeklyHrStage2FingerprintInput(expanded, expandedItems));
+        assert.equal(fingerprint(minimal, minimalItems), fingerprint(expanded, expandedItems));
+        const changed = structuredClone(minimal);
+        changed.upstream.stage1_current_fingerprint = FP2;
+        const changedItems = inspectAutomaticMaterialization(changed).items;
+        assert.notEqual(fingerprint(minimal, minimalItems), fingerprint(changed, changedItems));
+    }
     for (const [classification, expected] of [['REST_REPO', ['ΑΝ', true]],
         ['NON_WORK', ['ΜΕ', false]]]) {
         const h = harness(classification);

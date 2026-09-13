@@ -3668,6 +3668,61 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     };
 }
 
+function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
+    reviewPhaseCode = '' } = {}) {
+    const normalizedRow = normalizeReviewNonFullNonWorkRow(
+        row, effectiveProfile, reviewPhaseCode);
+    const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
+    return { ...normalizedRow,
+        kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
+        kathgoria_ergasias: effectiveKathgoria,
+        kathgoria_ergasias_effective: effectiveKathgoria,
+        effective_is_full_time: resolveReviewIsFullTimeProfile(
+            effectiveProfile, reviewPhaseCode),
+        effective_kathestos_apasxolhshs:
+            reviewPhaseCode || effectiveProfile.kathestos_apasxolhshs || '',
+        effective_typos_apasxolhshs:
+            reviewPhaseCode || effectiveProfile.typos_apasxolhshs || '',
+        effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
+        effective_weekly_workdays:
+            Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
+        effective_weekly_hours: Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
+        effective_daily_hours: Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
+        effective_sixth_day_rate:
+            effectiveProfile.pososto_prosayxhshs_6hs_hmeras ?? null,
+        effective_special_category: effectiveProfile.eidikh_kathgoria_ergazomenoy || '',
+        effective_special_case: effectiveProfile.eidikh_periptosh || '',
+        effective_hourly_rate: effectiveProfile.pragmatikoOromisthio ?? null,
+        effective_profile_source: reviewPhaseCode ? 'SCHEDULE_PHASE' :
+            effectiveProfile.resolution_source || effectiveProfile.source || '',
+        effective_profile_resolution_blocked: effectiveProfile.resolution_blocked === true,
+        effective_profile_resolution_reason: effectiveProfile.resolution_reason || '',
+        effective_profile_company_id: effectiveProfile.profile_company_id || null,
+        effective_profile_employee_id: effectiveProfile.profile_employee_id || null,
+        effective_schedule_phase_code: reviewPhaseCode,
+        effective_profile_date: getProfileDateForDeviation(
+            effectiveProfile, normalizedRow.hmeromhnia),
+        effective_profile_istoriko_id: effectiveProfile.istorikoId || null };
+}
+
+function weeklyHrStage2LifecycleProfileFromRow(row = {}) {
+    return { hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
+        ores_ergasias_ebdomadas: row.effective_weekly_hours,
+        mo_oron_hmerhsias_ergasias: row.effective_daily_hours,
+        kathestos_apasxolhshs: row.effective_kathestos_apasxolhshs,
+        typos_apasxolhshs: row.effective_typos_apasxolhshs,
+        typos_ebdomadas: row.effective_typos_ebdomadas,
+        pososto_prosayxhshs_6hs_hmeras: row.effective_sixth_day_rate,
+        eidikh_kathgoria_ergazomenoy: row.effective_special_category,
+        eidikh_periptosh: row.effective_special_case,
+        source: row.effective_profile_source,
+        resolution_source: row.effective_profile_source,
+        resolution_blocked: row.effective_profile_resolution_blocked === true,
+        resolution_reason: row.effective_profile_resolution_reason || '',
+        profile_company_id: row.effective_profile_company_id || null,
+        profile_employee_id: row.effective_profile_employee_id || null };
+}
+
 function findReviewOperationalPhaseForDate(phases = [], dateKey = '') {
     if (!dateKey) return null;
 
@@ -4615,6 +4670,8 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
     const weekEnds = batchScopes.map((scope) => dateKeyUtc(scope.week_end)).sort();
     const rangeStart = new Date(`${weekStarts[0]}T00:00:00Z`);
     const rangeEnd = new Date(`${weekEnds.at(-1)}T23:59:59Z`);
+    const phaseRangeStart = startOfWeekMondayUtc(periodStart);
+    const phaseRangeEnd = endOfWeekSundayUtc(periodEnd);
     const targeted = await loadWeeklyHrStage2TargetedReadGroups({ batchScopes,
         readGroups: {
             freshRows: () => rowIds.length ? ProdhlomenaOrariaModel.find({ ...base,
@@ -4635,6 +4692,13 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
                 .select(CANONICAL_HISTORY_SELECT_FIELDS)
                 .sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, createdAt: 1 })
                 .lean() : [],
+            phaseRows: () => employeeCodes.length ? ProdhlomenaOrariaModel.find({ ...base,
+                kodikos: mongoose.trusted({ $in: employeeCodes }),
+                hmeromhnia: mongoose.trusted({ $gte: phaseRangeStart, $lte: phaseRangeEnd }) })
+                .select(REVIEW_SELECT_FIELDS).sort({ kodikos: 1, hmeromhnia: 1 }).lean() : [],
+            companyPolicyRules: () => ApasxoliseisCompanyPolicyRuleModel.find({
+                team: base.team, company_kod: base.company_kod
+            }).sort({ policy_code: 1, effective_from: 1 }).lean(),
             states: () => employeeIds.length ? ApasxoliseisWeeklyHrWorkflowStateModel.find({ ...base,
                 employee_id: mongoose.trusted({ $in: employeeIds }),
                 week_start: mongoose.trusted({ $gte: rangeStart, $lte: rangeEnd }) }).lean() : [],
@@ -4651,8 +4715,8 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
                 week_start: mongoose.trusted({ $lte: rangeEnd }),
                 week_end: mongoose.trusted({ $gte: rangeStart }) }).lean() : []
         } });
-    const { freshRows, employees, histories, states, workflowAudits, rowAudits,
-        decisions } = targeted;
+    const { freshRows, employees, histories, phaseRows, companyPolicyRules, states,
+        workflowAudits, rowAudits, decisions } = targeted;
     const decisionIds = decisions.map((decision) => decision._id).filter(Boolean);
     const executions = decisionIds.length ? await ApasxoliseisWeeklyRepoTransferExecutionModel
         .find({ team: base.team, company_kod: base.company_kod,
@@ -4682,6 +4746,19 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
     }
     const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
         team: base.team, employees });
+    const phaseRowsByEmployee = new Map();
+    for (const row of phaseRows) {
+        const code = String(row.kodikos || '').trim();
+        if (!phaseRowsByEmployee.has(code)) phaseRowsByEmployee.set(code, []);
+        phaseRowsByEmployee.get(code).push(row);
+    }
+    const preparedPhaseHistories = buildPreparedPhaseHistoryMaps({
+        historyByEmployee: historyByCode, employeeByCode,
+        periodStart, periodEnd });
+    const phaseContextByKodikos = await buildReviewPhaseContextByKodikos({
+        team: base.team, company_kod: base.company_kod, kodikoi: employeeCodes,
+        ypokatasthma: base.ypokatasthma, periodStart, periodEnd,
+        employeeByCode, ...preparedPhaseHistories, rowsByEmployee: phaseRowsByEmployee });
     const rowsByWeek = new Map();
     const contexts = cachedSeeds.map((seed) => {
         const missingAuthoritativeRow = (seed.row_ids || []).some((rowId) =>
@@ -4704,34 +4781,25 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             rows, workflowState: state,
             stage2StateDiagnostic: 'STAGE2_INPUT_CHANGED' };
         const employeeHistory = historyByCode.get(employeeCode) || [];
-        const effectiveProfilesByDate = Object.fromEntries(rows.map((row) => [
+        const resolvedProfilesByDate = Object.fromEntries(rows.map((row) => [
             dateKeyUtc(row.hmeromhnia), resolveEffectiveEmploymentProfileForReviewDate({
                 reviewDate: row.hmeromhnia, normalEmployee: employee,
                 normalHistory: employeeHistory,
                 borrowedContext: borrowedContexts.get(
                     borrowedProfileEmployeeKey(employee)) || null }) ]));
-        const effectiveProfile = effectiveProfilesByDate[
-            dateKeyUtc(rows.at(-1)?.hmeromhnia)] || {};
         rows = rows.map((row) => {
-            const profile = effectiveProfilesByDate[dateKeyUtc(row.hmeromhnia)] || {};
-            return { ...row,
-                effective_kathestos_apasxolhshs: profile.kathestos_apasxolhshs || '',
-                effective_typos_apasxolhshs: profile.typos_apasxolhshs || '',
-                effective_typos_ebdomadas: profile.typos_ebdomadas || '',
-                effective_weekly_workdays: Number(profile.hmeres_ergasias_ebdomadas) || 0,
-                effective_weekly_hours: Number(profile.ores_ergasias_ebdomadas) || 0,
-                effective_daily_hours: Number(profile.mo_oron_hmerhsias_ergasias) || 0,
-                effective_sixth_day_rate: profile.pososto_prosayxhshs_6hs_hmeras ?? null,
-                effective_special_category: profile.eidikh_kathgoria_ergazomenoy || '',
-                effective_special_case: profile.eidikh_periptosh || '',
-                effective_profile_source: profile.resolution_source || profile.source || '',
-                effective_profile_resolution_blocked: profile.resolution_blocked === true,
-                effective_profile_resolution_reason: profile.resolution_reason || '',
-                effective_profile_istoriko_id: profile.istorikoId || null,
+            const profile = resolvedProfilesByDate[dateKeyUtc(row.hmeromhnia)] || {};
+            const preparedRow = prepareWeeklyHrStage2LifecycleRow({ row, effectiveProfile: profile,
+                reviewPhaseCode: getReviewPhaseCodeForRow(row, phaseContextByKodikos) });
+            return { ...preparedRow,
                 effective_external_break_minutes:
                     employee.dialleima_entos_ektos_orarioy === true ? 0 : Math.max(
                         Number.parseInt(employee.dialleima_se_lepta || 0, 10) || 0, 0) };
         });
+        const effectiveProfilesByDate = Object.fromEntries(rows.map((row) => [
+            dateKeyUtc(row.hmeromhnia), weeklyHrStage2LifecycleProfileFromRow(row) ]));
+        const effectiveProfile = effectiveProfilesByDate[
+            dateKeyUtc(rows.at(-1)?.hmeromhnia)] || {};
         rowsByWeek.set(pairKey, rows);
         const employmentDateScope = deriveEmploymentOwnedDateScope({
             natural_week_start: seed.week_start, natural_week_end: seed.week_end,
@@ -4744,7 +4812,7 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             effectiveProfile, effectiveProfilesByDate,
             persistedStage1State: state.stage1 || null,
             persistedStage3State: state.stage3 || null, scope,
-            periodScope, employmentDateScope });
+            periodScope, employmentDateScope, companyPolicyRules });
         return { scope, rows, lifecycle, workflowState: state, employee,
             effectiveProfile, effectiveProfilesByDate, periodScope, employmentDateScope,
             audits: workflowAuditsByKey.get(stateKey) || [], upstream: {
@@ -5010,22 +5078,7 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
             hire_date: employee.hmeromhnia_proslhpshs,
             departure_date: employee.hmeromhnia_apoxorhshs });
         const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
-            dateKeyUtc(row.hmeromhnia), {
-                hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
-                ores_ergasias_ebdomadas: row.effective_weekly_hours,
-                mo_oron_hmerhsias_ergasias: row.effective_daily_hours,
-                kathestos_apasxolhshs: row.effective_kathestos_apasxolhshs,
-                typos_apasxolhshs: row.effective_typos_apasxolhshs,
-                typos_ebdomadas: row.effective_typos_ebdomadas,
-                pososto_prosayxhshs_6hs_hmeras: row.effective_sixth_day_rate,
-                eidikh_kathgoria_ergazomenoy: row.effective_special_category,
-                eidikh_periptosh: row.effective_special_case,
-                source: row.effective_profile_source,
-                resolution_source: row.effective_profile_source,
-                resolution_blocked: row.effective_profile_resolution_blocked === true,
-                resolution_reason: row.effective_profile_resolution_reason || '',
-                profile_company_id: row.effective_profile_company_id || null,
-                profile_employee_id: row.effective_profile_employee_id || null }
+            dateKeyUtc(row.hmeromhnia), weeklyHrStage2LifecycleProfileFromRow(row)
         ]));
         const state = workflowByEmployeeWeek.get(key) || {};
         lifecycleByWeek.set(key, buildWeeklyHrLifecycleProjection({
@@ -5266,25 +5319,14 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             row.hmeromhnia, erg || {}, istorikoRowsForEmployee
         );
         const reviewPhaseCode = getReviewPhaseCodeForRow(row, phaseContextByKodikos);
-        const normalizedRow = normalizeReviewNonFullNonWorkRow(
-            row,
-            effectiveProfile,
-            reviewPhaseCode
-        );
-        const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
-        const leaveProvenance = classifyLeaveProvenance(normalizedRow);
-        const effectiveIsFullTime = resolveReviewIsFullTimeProfile(
-            effectiveProfile,
-            reviewPhaseCode
-        );
+        const preparedRow = prepareWeeklyHrStage2LifecycleRow({ row,
+            effectiveProfile, reviewPhaseCode });
+        const leaveProvenance = classifyLeaveProvenance(preparedRow);
 
         return {
-            ...normalizedRow,
-            kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
-            kathgoria_ergasias: effectiveKathgoria,
-            kathgoria_ergasias_effective: effectiveKathgoria,
+            ...preparedRow,
             noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus(
-                normalizedRow,
+                preparedRow,
                 noCardsDisplayContext
             ),
             leave_provenance: leaveProvenance,
@@ -5293,40 +5335,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             eponymo: erg.eponymo || '',
             onoma: erg.onoma || '',
             employeeName: `${erg.eponymo || ''} ${erg.onoma || ''}`.trim(),
-            exportYpokatasthma: normalizedRow.ypokatasthma || erg.ypokatasthma || '',
-            effective_is_full_time: effectiveIsFullTime,
-            effective_kathestos_apasxolhshs:
-                reviewPhaseCode || effectiveProfile.kathestos_apasxolhshs || '',
-            effective_typos_apasxolhshs:
-                reviewPhaseCode || effectiveProfile.typos_apasxolhshs || '',
-            effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
-            effective_weekly_workdays:
-                Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
-            effective_weekly_hours:
-                Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
-            effective_daily_hours:
-                Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
-            effective_sixth_day_rate:
-                effectiveProfile.pososto_prosayxhshs_6hs_hmeras ?? null,
-            effective_special_category:
-                effectiveProfile.eidikh_kathgoria_ergazomenoy || '',
-            effective_special_case: effectiveProfile.eidikh_periptosh || '',
-            effective_hourly_rate: effectiveProfile.pragmatikoOromisthio ?? null,
-            effective_profile_source:
-                reviewPhaseCode ? 'SCHEDULE_PHASE' :
-                    effectiveProfile.resolution_source || effectiveProfile.source || '',
-            effective_profile_resolution_blocked:
-                effectiveProfile.resolution_blocked === true,
-            effective_profile_resolution_reason: effectiveProfile.resolution_reason || '',
-            effective_profile_company_id: effectiveProfile.profile_company_id || null,
-            effective_profile_employee_id: effectiveProfile.profile_employee_id || null,
-            effective_schedule_phase_code: reviewPhaseCode,
-            effective_profile_date: getProfileDateForDeviation(
-                effectiveProfile,
-                normalizedRow.hmeromhnia
-            ),
-            effective_profile_istoriko_id: effectiveProfile.istorikoId || null
-            ,effective_external_break_minutes: erg.dialleima_entos_ektos_orarioy === true
+            exportYpokatasthma: preparedRow.ypokatasthma || erg.ypokatasthma || '',
+            effective_external_break_minutes: erg.dialleima_entos_ektos_orarioy === true
                 ? 0 : Math.max(Number.parseInt(erg.dialleima_se_lepta || 0, 10) || 0, 0)
         };
     };
@@ -7527,32 +7537,21 @@ class erganhController {
                     r.hmeromhnia, istorikoRowsForEmployee, erg || {}
                 );
                 const reviewPhaseCode = getReviewPhaseCodeForRow(r, phaseContextByKodikos);
-                const normalizedRow = normalizeReviewNonFullNonWorkRow(
-                    r,
-                    effectiveProfile,
-                    reviewPhaseCode
-                );
-                const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
-                const leaveProvenance = classifyLeaveProvenance(normalizedRow);
-                const effectiveIsFullTime = resolveReviewIsFullTimeProfile(
-                    effectiveProfile,
-                    reviewPhaseCode
-                );
+                const preparedRow = prepareWeeklyHrStage2LifecycleRow({ row: r,
+                    effectiveProfile, reviewPhaseCode });
+                const leaveProvenance = classifyLeaveProvenance(preparedRow);
 
                 return {
-                    ...normalizedRow,
-                    kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
-                    kathgoria_ergasias: effectiveKathgoria,
-                    kathgoria_ergasias_effective: effectiveKathgoria,
+                    ...preparedRow,
                     noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus(
-                        normalizedRow,
+                        preparedRow,
                         noCardsDisplayContext
                     ),
                     leave_provenance: leaveProvenance,
                     is_auto_calculated_leave:
                         leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE,
                     ...buildReviewHolidayResponseFields(
-                        normalizedRow,
+                        preparedRow,
                         noCardsDisplayContext
                     ),
                     employee_id: erg?._id || null,
@@ -7565,34 +7564,7 @@ class erganhController {
                     // Η ημερήσια schedule phase καθορίζει τη σημασία του
                     // προδηλωμένου «ΜΕ». Η απολογιστική στήλη παραμένει
                     // ουδέτερη όταν δεν υπάρχει πραγματική μεταβολή.
-                    effective_is_full_time: effectiveIsFullTime,
-                    effective_kathestos_apasxolhshs:
-                        reviewPhaseCode || effectiveProfile.kathestos_apasxolhshs || '',
-                    effective_typos_apasxolhshs:
-                        reviewPhaseCode || effectiveProfile.typos_apasxolhshs || '',
-                    effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
-                    effective_weekly_workdays:
-                        Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
-                    effective_weekly_hours:
-                        Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
-                    effective_daily_hours:
-                        Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
-                    effective_profile_source:
-                        reviewPhaseCode ? 'SCHEDULE_PHASE' :
-                            effectiveProfile.resolution_source || effectiveProfile.source || '',
-                    effective_profile_resolution_blocked:
-                        effectiveProfile.resolution_blocked === true,
-                    effective_profile_resolution_reason:
-                        effectiveProfile.resolution_reason || '',
-                    effective_profile_company_id: effectiveProfile.profile_company_id || null,
-                    effective_profile_employee_id: effectiveProfile.profile_employee_id || null,
-                    effective_schedule_phase_code: reviewPhaseCode,
-                    effective_profile_date: getProfileDateForDeviation(
-                        effectiveProfile,
-                        normalizedRow.hmeromhnia
-                    ),
-                    effective_profile_istoriko_id: effectiveProfile.istorikoId || null
-                    ,effective_break_configuration: breakConfiguration
+                    effective_break_configuration: breakConfiguration
                 };
             };
             const enrichedRows = rows.map(enrichLoadedReviewRow);

@@ -128,8 +128,8 @@ function normalizeItems(context = {}) {
     if (inspection.status !== AUTOMATIC_INSPECTION.READY_TO_MATERIALIZE) return [];
     return inspection.items.map(({ itemState: _itemState, ...item }) => item);
 }
-function fingerprint(context, items) {
-    return crypto.createHash('sha256').update(stableStringify({
+function buildWeeklyHrStage2FingerprintInput(context, items) {
+    return {
         contract: 'weekly-hr-stage2-materialization:v1',
         scope: { employee_id: String(context.scope.employee_id),
             week_start: dateKeyUtc(context.scope.week_start),
@@ -139,7 +139,11 @@ function fingerprint(context, items) {
             classification: item.classification, row_id: String(item.row._id),
             employment_type: item.employmentType,
             date_effective_profile: item.profileSignature }))
-    })).digest('hex');
+    };
+}
+function fingerprint(context, items) {
+    return crypto.createHash('sha256').update(stableStringify(
+        buildWeeklyHrStage2FingerprintInput(context, items))).digest('hex');
 }
 function normalizeActor(actor = {}) {
     const role = assertCriticalEmploymentDecisionRole({ userRole: actor.role });
@@ -248,5 +252,5 @@ async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
 }
 
 module.exports = { ACTION, AUTOMATIC_INSPECTION, effectiveProfileSignature,
-    inspectAutomaticMaterialization,
+    inspectAutomaticMaterialization, buildWeeklyHrStage2FingerprintInput,
     normalizeItems, fingerprint, completeWeeklyHrWorkflowStage2 };
