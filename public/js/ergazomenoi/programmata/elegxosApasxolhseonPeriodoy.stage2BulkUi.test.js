@@ -5,28 +5,72 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const viewSource = fs.readFileSync(path.join(__dirname,
+    '../../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
+const cssSource = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
 const start = source.indexOf('function stage2BulkChangeUnavailableReason');
 const end = source.indexOf('async function completeWeeklyHrStage2BulkFromUi');
 assert.ok(start >= 0 && end > start);
 const renderSource = source.slice(start, end);
 let permission = true; let periodAllowsChanges = true; let modalOptions = null;
+let modalAction = 'cancel'; let completionCalls = 0;
 let fetchResult = { ok: true, body: { success: true, page: 1, page_count: 1,
     details: [{ employee: '0001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ', week_start: '2026-05-04',
         week_end: '2026-05-10', date: '2026-05-06', before: 'Πιθανή άδεια',
-        after: 'Ρεπό', safety_reason: 'Μονοσήμαντη αλλαγή.' }] } };
+        after: 'Ρεπό', safety_reason: 'Μονοσήμαντη αλλαγή.' },
+    { employee: '0001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ', week_start: '2026-05-04',
+        week_end: '2026-05-10', date: '2026-05-08', before: 'Εργασία',
+        after: 'Ρεπό', safety_reason:
+            'Η αλλαγή προκύπτει μονοσήμαντα από τον ολοκληρωμένο εβδομαδιαίο έλεγχο.' }] } };
 const fetchCalls = [];
+function fakeElement(id) {
+    return { id, innerHTML: '', textContent: '', value: '', disabled: false, onclick: null,
+        listeners: {}, classList: { add() {}, remove() {}, toggle() {} },
+        setCustomValidity() {}, reportValidity() {}, focus() {},
+        addEventListener(type, listener, options) {
+            this.listeners[type] = { listener, once: options?.once === true };
+        },
+        dispatch(type) {
+            const registered = this.listeners[type];
+            if (!registered) return;
+            if (registered.once) delete this.listeners[type];
+            registered.listener();
+        } };
+}
+const elements = Object.fromEntries([
+    'weeklyHrStage2BulkPreviewModal', 'weeklyHrStage2PreviewReason',
+    'weeklyHrStage2PreviewPrevious', 'weeklyHrStage2PreviewNext',
+    'weeklyHrStage2PreviewApply', 'weeklyHrStage2BulkPreviewBody',
+    'weeklyHrStage2PreviewCaseCount', 'weeklyHrStage2PreviewEmployeeCount',
+    'weeklyHrStage2PreviewWeekCount', 'weeklyHrStage2PreviewDayCount',
+    'weeklyHrStage2PreviewPageLabel'
+].map((id) => [id, fakeElement(id)]));
+const modalInstance = { show() {
+    queueMicrotask(() => {
+        if (modalAction === 'apply') {
+            elements.weeklyHrStage2PreviewReason.value = 'Ελεγμένη προεπισκόπηση';
+            elements.weeklyHrStage2PreviewApply.onclick();
+        } else if (modalAction === 'paginate') {
+            Promise.resolve(elements.weeklyHrStage2PreviewNext.onclick()).then(() =>
+                elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal'));
+        } else elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal');
+    });
+}, hide() { elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal'); } };
 const sandbox = { currentWeeklyHrStage2BulkPreview: null,
     currentCanonicalLifecyclePayloads: [],
     weeklyHrStage2BulkSubmitting: false, userCanRecordCanonicalDecision: () => true,
     userCanRecordRepoTransferDecision: () => false,
     canRecordEmploymentDecisionForCurrentPeriod: () => periodAllowsChanges,
-    document: { getElementById: () => ({ value: permission ? '1' : '0' }) },
+    document: { getElementById: (id) => ['canReviewEdit', 'canRecordRepoTransferDecision'].includes(id)
+        ? { value: permission ? '1' : '0' } : elements[id] || null },
+    bootstrap: { Modal: { getOrCreateInstance: () => modalInstance } },
     employmentReviewSwal: async (options) => { modalOptions = options;
         return { isConfirmed: false, isDenied: false }; },
+    completeWeeklyHrStage2BulkFromUi: async () => { completionCalls++; },
     submitRepoTransferDecision: async () => false, loadResults: async () => {},
     getActiveEmploymentReviewScope: () => ({ apo_hmeromhnia: '2026-05-01',
         eos_hmeromhnia: '2026-05-31', ypokatasthma: '0001' }),
-    URLSearchParams, csrfToken: 'token', Swal: { close: () => {} },
+    URLSearchParams, csrfToken: 'token', Swal: { close: () => {} }, queueMicrotask,
     fetch: async (url, options = {}) => { fetchCalls.push({ url, options }); return {
         ok: fetchResult.ok, json: async () => fetchResult.body }; },
     escapeHtml: (value) => String(value), formatStage1DateKey: (value) => {
@@ -102,6 +146,7 @@ assert.match(container.innerHTML, /Δεν έχετε δικαίωμα αλλαγ
 assert.doesNotMatch(container.innerHTML.replace(/<[^>]*>/g, ' '),
     /source|target|\bHR\b|Stage ?2|bulk|scope|fingerprint|canonical|runtime|index|payload|stale|failed/i);
 permission = true; periodAllowsChanges = false;
+sandbox.userCanRecordCanonicalDecision = () => periodAllowsChanges;
 sandbox.render(container);
 assert.match(container.innerHTML, /Η κατάσταση της περιόδου δεν επιτρέπει αλλαγές/);
 assert.doesNotMatch(container.innerHTML, /checkbox|Τακτοποίηση επιλεγμένων/);
@@ -115,12 +160,45 @@ assert.doesNotMatch(container.innerHTML, /checkbox|Τακτοποίηση επι
     assert.match(fetchCalls[0].url, /stage2\/bulk-preview/);
     assert.doesNotMatch(fetchCalls[0].url, /bulk-complete/);
     assert.equal(fetchCalls[0].options.method || 'GET', 'GET');
-    assert.match(modalOptions.title, /Προεπισκόπηση μαζικής ενημέρωσης/);
-    assert.match(modalOptions.html, /Δεν έχει γίνει ακόμη καμία αλλαγή/);
-    assert.match(modalOptions.html, /0001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ/);
-    assert.match(modalOptions.html, /Πιθανή άδεια/);
-    assert.match(modalOptions.html, /Ρεπό/);
-    assert.match(modalOptions.confirmButtonText, /Εφαρμογή 19 ενημερώσεων/);
+    assert.equal(completionCalls, 0);
+    assert.match(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
+        /weekly-hr-stage2-preview-case/);
+    assert.match(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
+        /0001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ/);
+    assert.match(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
+        /Εβδομάδα <span>04\/05\/2026–10\/05\/2026<\/span>/);
+    assert.match(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
+        /06\/05\/2026/);
+    assert.match(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
+        /Πιθανή άδεια[\s\S]*→[\s\S]*Ρεπό/);
+    assert.equal((elements.weeklyHrStage2BulkPreviewBody.innerHTML.match(
+        /weekly-hr-stage2-preview-case"/g) || []).length, 1);
+    assert.doesNotMatch(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
+        /Η αλλαγή προκύπτει μονοσήμαντα από τον ολοκληρωμένο εβδομαδιαίο έλεγχο/);
+    assert.equal(elements.weeklyHrStage2PreviewApply.textContent,
+        'Εφαρμογή 19 ενημερώσεων');
+    assert.equal(elements.weeklyHrStage2PreviewCaseCount.textContent, 19);
+    assert.equal(elements.weeklyHrStage2PreviewEmployeeCount.textContent, 4);
+    assert.equal(elements.weeklyHrStage2PreviewWeekCount.textContent, 19);
+    assert.equal(elements.weeklyHrStage2PreviewDayCount.textContent, 25);
+    assert.doesNotMatch(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
+        /<table|Γιατί είναι ασφαλές/);
+
+    modalAction = 'apply';
+    await sandbox.previewBulk();
+    assert.equal(completionCalls, 1);
+
+    fetchResult.body.page_count = 2;
+    modalAction = 'paginate';
+    const callsBeforePagination = fetchCalls.length;
+    await sandbox.previewBulk();
+    const paginationCalls = fetchCalls.slice(callsBeforePagination);
+    assert.equal(paginationCalls.length, 2);
+    assert.ok(paginationCalls.every((call) => (call.options.method || 'GET') === 'GET'));
+    assert.ok(paginationCalls.every((call) => !call.url.includes('bulk-complete')));
+    assert.match(paginationCalls[1].url, /page=2/);
+    modalAction = 'cancel';
+    fetchResult.body.page_count = 1;
 
     fetchResult = { ok: false, body: { success: false, code: 'STAGE2_INPUT_CHANGED' } };
     await sandbox.previewBulk();
@@ -191,14 +269,26 @@ const completionEnd = source.indexOf('function renderWeeklyHrStage2LifecycleFall
 const completionSource = source.slice(completionStart, completionEnd);
 const previewStart = source.indexOf('async function previewWeeklyHrStage2BulkFromUi');
 const previewSource = source.slice(previewStart, completionStart);
-assert.match(previewSource, /Προεπισκόπηση μαζικής ενημέρωσης/);
-assert.match(previewSource, /Εφαρμογή \$\{preview\.safe_bulk_count\} ενημερώσεων/);
+assert.match(viewSource, /Προεπισκόπηση μαζικής ενημέρωσης ρεπό/);
+assert.match(renderSource, /Εφαρμογή \$\{preview\.safe_bulk_count \|\| 0\} ενημερώσεων/);
 assert.match(previewSource, /loadWeeklyHrStage2BulkDetailPage/);
 assert.doesNotMatch(previewSource, /stage2\/bulk-complete/);
-assert.match(source, /Δεν έχει γίνει ακόμη καμία αλλαγή/);
-assert.match(source, /Εργαζόμενοι που επηρεάζονται/);
-assert.match(source, /Ημερήσιες αλλαγές/);
-assert.match(source, /Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά/);
+assert.match(viewSource, /modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable/);
+assert.match(viewSource, /id="weeklyHrStage2BulkPreviewModal"/);
+assert.match(viewSource, /aria-labelledby="weeklyHrStage2BulkPreviewModalLabel"/);
+assert.match(viewSource, /Προεπισκόπηση μαζικής ενημέρωσης ρεπό/);
+assert.match(viewSource, /Δεν έχει γίνει ακόμη καμία αλλαγή/);
+assert.match(viewSource, /Εργαζόμενοι/);
+assert.match(viewSource, /Ημερήσιες αλλαγές/);
+assert.match(viewSource, /‹ Προηγούμενη/);
+assert.match(viewSource, /Επόμενη ›/);
+assert.match(viewSource, /data-bs-dismiss="modal">Ακύρωση/);
+assert.match(viewSource, /Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά/);
+assert.doesNotMatch(previewSource, /employmentReviewSwal\(\{ icon: 'info'/);
+assert.match(cssSource, /max-width: min\(1200px, 94vw\)/);
+assert.match(cssSource, /\.employment-review-stage2-bulk-preview-modal \.modal-body \{[\s\S]*overflow-y: auto/);
+assert.match(cssSource, /\.weekly-hr-stage2-preview-date \{[\s\S]*white-space: nowrap/);
+assert.match(cssSource, /font-size: 0\.95rem/);
 assert.match(source, /details\.slice\(0, 50\)/);
 assert.match(completionSource, /while \(hasMore\)/);
 assert.match(completionSource, /continuation_token: continuationToken/);

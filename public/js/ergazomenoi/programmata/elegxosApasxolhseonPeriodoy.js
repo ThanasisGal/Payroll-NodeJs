@@ -9505,20 +9505,105 @@ function renderWeeklyHrStage2BulkSummary(container) {
 
 function weeklyHrStage2BulkPreviewDetailsHtml(preview, pageResult) {
     const details = Array.isArray(pageResult.details) ? pageResult.details.slice(0, 50) : [];
-    const rows = details.map((item) => `<tr><td>${escapeHtml(item.employee ||
-        item.employee_kodikos || '—')}</td><td>${escapeHtml(formatStage1DateKey(
-        item.week_start))}–${escapeHtml(formatStage1DateKey(item.week_end))}</td><td>${escapeHtml(
-        formatStage1DateKey(item.date))}</td><td>${escapeHtml(item.before)}</td><td>${escapeHtml(
-        item.after)}</td><td>${escapeHtml(item.safety_reason)}</td></tr>`).join('');
-    return `<div class="text-start"><div class="alert alert-info py-2">Δεν έχει γίνει ακόμη καμία αλλαγή.</div>
-        <div class="d-flex flex-wrap gap-3 mb-2"><span>Περιπτώσεις προς ενημέρωση: <strong>${escapeHtml(
-            preview.safe_bulk_count || 0)}</strong></span><span>Εργαζόμενοι που επηρεάζονται: <strong>${escapeHtml(
-            preview.safe_employee_count || 0)}</strong></span><span>Εβδομάδες που επηρεάζονται: <strong>${escapeHtml(
-            preview.safe_week_count || 0)}</strong></span><span>Ημερήσιες αλλαγές: <strong>${escapeHtml(
-            preview.safe_day_change_count || 0)}</strong></span></div>
-        <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Ημερομηνία</th><th>Πριν</th><th>Μετά</th><th>Γιατί είναι ασφαλές</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <div class="d-flex justify-content-between align-items-center"><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-preview-prev" ${pageResult.page <= 1 ? 'disabled' : ''}>Προηγούμενη</button><span>Σελίδα ${escapeHtml(pageResult.page)} από ${escapeHtml(pageResult.page_count)}</span><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-preview-next" ${pageResult.page >= pageResult.page_count ? 'disabled' : ''}>Επόμενη</button></div>
-        <div class="mt-3">Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά ότι τα στοιχεία δεν έχουν μεταβληθεί. Αν κάποια περίπτωση έχει αλλάξει, δεν θα ενημερωθεί και θα εμφανιστεί στα αποτελέσματα για νέο έλεγχο.</div></div>`;
+    const groups = new Map();
+    for (const item of details) {
+        const key = [item.employee_kodikos || item.employee || '', item.week_start || '',
+            item.week_end || ''].join('|');
+        if (!groups.has(key)) groups.set(key, { employee: item.employee ||
+            item.employee_kodikos || '—', week_start: item.week_start,
+            week_end: item.week_end, changes: [] });
+        groups.get(key).changes.push(item);
+    }
+    return [...groups.values()].map((group) => {
+        const changes = group.changes.map((item) => {
+            const defaultReason = 'Η αλλαγή προκύπτει μονοσήμαντα από τον ολοκληρωμένο εβδομαδιαίο έλεγχο.';
+            const specialReason = item.safety_reason && item.safety_reason !== defaultReason
+                ? `<details class="weekly-hr-stage2-preview-reason-detail"><summary>ⓘ Γιατί προτείνεται</summary><div>${escapeHtml(item.safety_reason)}</div></details>` : '';
+            return `<div class="weekly-hr-stage2-preview-change">
+                <time class="weekly-hr-stage2-preview-date" datetime="${escapeHtml(item.date)}">${escapeHtml(
+                    formatStage1DateKey(item.date))}</time>
+                <div class="weekly-hr-stage2-preview-transition"><span>${escapeHtml(item.before)}</span>
+                    <span class="weekly-hr-stage2-preview-arrow" aria-hidden="true">→</span>
+                    <span class="fw-semibold">${escapeHtml(item.after)}</span>${specialReason}</div>
+            </div>`;
+        }).join('');
+        return `<article class="weekly-hr-stage2-preview-case">
+            <header class="weekly-hr-stage2-preview-case-header">
+                <div class="weekly-hr-stage2-preview-employee">${escapeHtml(group.employee)}</div>
+                <div class="weekly-hr-stage2-preview-week">Εβδομάδα <span>${escapeHtml(
+                    formatStage1DateKey(group.week_start))}–${escapeHtml(formatStage1DateKey(
+                    group.week_end))}</span></div>
+            </header><div class="weekly-hr-stage2-preview-changes">${changes}</div>
+        </article>`;
+    }).join('');
+}
+
+function renderWeeklyHrStage2BulkPreviewModal(preview, pageResult) {
+    const values = {
+        weeklyHrStage2PreviewCaseCount: preview.safe_bulk_count || 0,
+        weeklyHrStage2PreviewEmployeeCount: preview.safe_employee_count || 0,
+        weeklyHrStage2PreviewWeekCount: preview.safe_week_count || 0,
+        weeklyHrStage2PreviewDayCount: preview.safe_day_change_count || 0,
+        weeklyHrStage2PreviewPageLabel: `Σελίδα ${pageResult.page} από ${pageResult.page_count}`,
+        weeklyHrStage2PreviewApply: `Εφαρμογή ${preview.safe_bulk_count || 0} ενημερώσεων`
+    };
+    for (const [id, value] of Object.entries(values)) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    }
+    const body = document.getElementById('weeklyHrStage2BulkPreviewBody');
+    if (body) body.innerHTML = weeklyHrStage2BulkPreviewDetailsHtml(preview, pageResult);
+    const previous = document.getElementById('weeklyHrStage2PreviewPrevious');
+    const next = document.getElementById('weeklyHrStage2PreviewNext');
+    if (previous) previous.disabled = Number(pageResult.page || 1) <= 1;
+    if (next) next.disabled = Number(pageResult.page || 1) >= Number(pageResult.page_count || 1);
+}
+
+async function showWeeklyHrStage2BulkPreviewModal(preview, firstPageResult) {
+    const modalElement = document.getElementById('weeklyHrStage2BulkPreviewModal');
+    const reason = document.getElementById('weeklyHrStage2PreviewReason');
+    const previous = document.getElementById('weeklyHrStage2PreviewPrevious');
+    const next = document.getElementById('weeklyHrStage2PreviewNext');
+    const apply = document.getElementById('weeklyHrStage2PreviewApply');
+    if (!modalElement || !reason || !previous || !next || !apply || !globalThis.bootstrap?.Modal) {
+        throw new Error('PREVIEW_LOAD_FAILED');
+    }
+    const modal = globalThis.bootstrap.Modal.getOrCreateInstance(modalElement,
+        { backdrop: true, keyboard: true, focus: true });
+    let pageResult = firstPageResult;
+    let outcome = { isConfirmed: false, value: '' };
+    let paginationError = null;
+    reason.value = '';
+    reason.classList.remove('is-invalid');
+    reason.setCustomValidity('');
+    const loadPage = async (page) => {
+        previous.disabled = true; next.disabled = true;
+        try {
+            pageResult = await loadWeeklyHrStage2BulkDetailPage(page);
+            renderWeeklyHrStage2BulkPreviewModal(preview, pageResult);
+        } catch (error) {
+            paginationError = error;
+            modal.hide();
+        }
+    };
+    previous.onclick = () => loadPage(Math.max(1, Number(pageResult.page || 1) - 1));
+    next.onclick = () => loadPage(Number(pageResult.page || 1) + 1);
+    apply.onclick = () => {
+        const value = String(reason.value || '').trim();
+        reason.setCustomValidity(value ? '' : 'Η αιτιολογία είναι υποχρεωτική.');
+        reason.classList.toggle('is-invalid', !value);
+        if (!value) { reason.reportValidity(); reason.focus(); return; }
+        outcome = { isConfirmed: true, value };
+        modal.hide();
+    };
+    renderWeeklyHrStage2BulkPreviewModal(preview, pageResult);
+    await new Promise((resolve) => {
+        modalElement.addEventListener('hidden.bs.modal', resolve, { once: true });
+        modal.show();
+    });
+    previous.onclick = null; next.onclick = null; apply.onclick = null;
+    if (paginationError) throw paginationError;
+    return outcome;
 }
 
 async function loadWeeklyHrStage2BulkDetailPage(page = 1) {
@@ -9544,29 +9629,11 @@ async function loadWeeklyHrStage2BulkDetailPage(page = 1) {
 async function previewWeeklyHrStage2BulkFromUi() {
     const preview = currentWeeklyHrStage2BulkPreview;
     if (!preview || weeklyHrStage2BulkSubmitting || !preview.safe_bulk_count) return;
-    let page = 1;
     try {
-        while (true) {
-            const pageResult = await loadWeeklyHrStage2BulkDetailPage(page);
-            let requestedPage = null;
-            const confirmation = await employmentReviewSwal({ icon: 'info',
-                title: 'Προεπισκόπηση μαζικής ενημέρωσης',
-                html: weeklyHrStage2BulkPreviewDetailsHtml(preview, pageResult),
-                input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
-                confirmButtonText: `Εφαρμογή ${preview.safe_bulk_count} ενημερώσεων`,
-                cancelButtonText: 'Ακύρωση',
-                inputValidator: (value) => String(value || '').trim() ? undefined :
-                    'Η αιτιολογία είναι υποχρεωτική.',
-                didOpen: () => {
-                    document.querySelector('.weekly-hr-stage2-preview-prev')?.addEventListener(
-                        'click', () => { requestedPage = page - 1; Swal.close(); });
-                    document.querySelector('.weekly-hr-stage2-preview-next')?.addEventListener(
-                        'click', () => { requestedPage = page + 1; Swal.close(); });
-                } });
-            if (requestedPage) { page = requestedPage; continue; }
-            if (!confirmation.isConfirmed) return;
-            return completeWeeklyHrStage2BulkFromUi(String(confirmation.value || '').trim());
-        }
+        const pageResult = await loadWeeklyHrStage2BulkDetailPage(1);
+        const confirmation = await showWeeklyHrStage2BulkPreviewModal(preview, pageResult);
+        if (!confirmation.isConfirmed) return;
+        return completeWeeklyHrStage2BulkFromUi(String(confirmation.value || '').trim());
     } catch (error) {
         const changed = error?.message === 'PREVIEW_CHANGED';
         await employmentReviewSwal(changed
