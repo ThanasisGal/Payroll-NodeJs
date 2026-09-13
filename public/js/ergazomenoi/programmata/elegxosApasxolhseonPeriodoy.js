@@ -9655,7 +9655,7 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
     renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
     let progressAlert = null;
     try {
-        const token = await ensureCsrfToken();
+        const token = await getPolicyPreviewCsrfToken();
         const endpoint = '/api/prodhlomena-oraria/review/weekly-hr-workflow/' +
             'stage2/bulk-complete';
         const commonBody = {

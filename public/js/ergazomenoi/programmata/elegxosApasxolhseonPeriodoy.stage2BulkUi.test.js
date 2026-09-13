@@ -309,6 +309,8 @@ assert.match(completionSource, /processed_in_batch \|\| 0\) <= 0/);
 assert.match(completionSource, /continuationToken === previousContinuationToken/);
 assert.match(completionSource, /maxBatchIterations/);
 assert.equal((completionSource.match(/stage2\/bulk-complete/g) || []).length, 1);
+assert.match(completionSource, /await getPolicyPreviewCsrfToken\(\)/);
+assert.doesNotMatch(completionSource, /\bensureCsrfToken\s*\(/);
 assert.match(source, /weekly-hr-stage2-exception-review/);
 assert.match(source, /reviewWeeklyHrStage2Exception/);
 const reasonStart = source.indexOf('function getStage2LifecycleReasonLabel');
@@ -321,4 +323,64 @@ assert.equal(reasonSandbox.reasonLabel('UNKNOWN_INTERNAL_REASON', false),
     'Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.');
 assert.doesNotMatch(reasonSandbox.reasonLabel('UNKNOWN_INTERNAL_REASON', false),
     /UNKNOWN_INTERNAL_REASON/);
-console.log('weekly HR Stage-2 compact bulk UI tests passed');
+
+async function testStage2BulkCompletionCsrfFlow() {
+    const completionFetchCalls = [];
+    const completionAlerts = [];
+    let csrfCalls = 0;
+    let reloadCalls = 0;
+    const completionSandbox = {
+        currentWeeklyHrStage2BulkPreview: { safe_bulk_count: 19,
+            preview_fingerprint: 'b'.repeat(64) },
+        weeklyHrStage2BulkSubmitting: false,
+        weeklyHrStage2BulkRequestId: 'stage2-bulk-test-request',
+        currentEmploymentReviewLifecyclePresentation: {},
+        getActiveEmploymentReviewScope: () => ({ apo_hmeromhnia: '2026-05-01',
+            eos_hmeromhnia: '2026-05-31', ypokatasthma: '0000' }),
+        getPolicyPreviewCsrfToken: async () => { csrfCalls++; return 'valid-csrf-token'; },
+        renderWeeklyHrStage2LifecycleFallback: () => {},
+        employmentReviewSwal: async (options) => { completionAlerts.push(options); return {}; },
+        Swal: { showLoading() {}, update() {}, close() {} },
+        loadResults: async () => { reloadCalls++; },
+        fetch: async (url, options) => {
+            completionFetchCalls.push({ url, options });
+            return { ok: true, json: async () => ({ success: true, applied: 19,
+                already_completed: 0, stale: 0, failed: 0, skipped_manual: 0,
+                processed_in_batch: 19, has_more: false, continuation_token: null }) };
+        },
+        Date, Math, JSON, Number, String, Error
+    };
+    vm.runInNewContext(`${completionSource}\nthis.completeBulk = completeWeeklyHrStage2BulkFromUi;`,
+        completionSandbox);
+    const reason = 'Ελεγμένη δοκιμή μαζικής ενημέρωσης';
+    await completionSandbox.completeBulk(reason);
+    assert.equal(csrfCalls, 1);
+    assert.equal(completionFetchCalls.length, 1);
+    const request = completionFetchCalls[0];
+    assert.match(request.url, /stage2\/bulk-complete$/);
+    assert.equal(request.options.method, 'POST');
+    assert.equal(request.options.headers['CSRF-Token'], 'valid-csrf-token');
+    assert.equal(request.options.headers['x-csrf-token'], 'valid-csrf-token');
+    const body = JSON.parse(request.options.body);
+    assert.equal(body.bulk_request_id, 'stage2-bulk-test-request');
+    assert.equal(body.reason_or_notes, reason);
+    assert.equal(body.expected_preview_fingerprint, 'b'.repeat(64));
+    assert.equal(reloadCalls, 1);
+
+    completionFetchCalls.length = 0;
+    completionAlerts.length = 0;
+    completionSandbox.weeklyHrStage2BulkSubmitting = false;
+    completionSandbox.getPolicyPreviewCsrfToken = async () => {
+        csrfCalls++; throw new Error('TOKEN_UNAVAILABLE');
+    };
+    await completionSandbox.completeBulk(reason);
+    assert.equal(completionFetchCalls.length, 0);
+    assert.match(completionAlerts.at(-1).title, /Η μαζική ενημέρωση απέτυχε/);
+    assert.equal(completionAlerts.at(-1).text,
+        'Δεν ήταν δυνατή η ολοκλήρωση της μαζικής ενημέρωσης. Δοκιμάστε ξανά.');
+    assert.doesNotMatch(completionAlerts.at(-1).text, /TOKEN_UNAVAILABLE/);
+}
+
+testStage2BulkCompletionCsrfFlow()
+    .then(() => console.log('weekly HR Stage-2 compact bulk UI tests passed'))
+    .catch((error) => { console.error(error); process.exitCode = 1; });
