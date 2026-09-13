@@ -490,6 +490,8 @@ const { buildWeeklyHrStage2BulkContextScope } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkContextScopeService');
 const { loadWeeklyHrStage2TargetedReadGroups } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2TargetedBatchLoaderService');
+const { loadWeeklyHrStage2BulkSearchPresentation } = require(
+    '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkSearchGateService');
 const { writeCanonicalDailyClassification } = require(
     '../../services/ergazomenoi/apasxoliseisCanonicalDailyClassificationWriterService');
 const stage2BulkStateCache = new WeeklyHrStage2BulkStateCache();
@@ -6966,6 +6968,7 @@ class erganhController {
             const pageNum = Math.max(parseInt(page, 10) || 1, 1);
             const limitNum = Math.min(Math.max(parseInt(limit, 10) || 5000, 10), 10000);
             const skip = (pageNum - 1) * limitNum;
+            let finalizedReadOnly = false;
 
             if (apo_hmeromhnia && eos_hmeromhnia && ypokatasthma) {
                 const frozenScope = await activeEmploymentReviewPeriodScope(req, ypokatasthma);
@@ -6974,6 +6977,7 @@ class erganhController {
                 if (samePeriod) {
                     const frozenState = await getPeriodControl({ scope: frozenScope });
                     if (frozenState.stored_status === 'FINALIZED' && frozenState.frozen_snapshot_id) {
+                        finalizedReadOnly = true;
                         const frozenDocument = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
                             _id: frozenState.frozen_snapshot_id, ...frozenScope
                         }).lean();
@@ -7877,40 +7881,49 @@ class erganhController {
                 ownershipPeriod, lifecycleByKodikos, employeeByCode: ergByKodikos,
                 periodStart: reviewPeriodStart, periodEnd: reviewPeriodEnd
             });
-            const preparedStage2Pairs = await prepareWeeklyHrStage2PairRecords({ req,
-                rowsByWeek: preparedLifecycleContext.rowsByEmployeeWeek,
-                employeeByCode: ergByKodikos, historyByCode: istorikoRowsByKodikos,
-                auditsByRowId: deviationAuditsByRowId,
-                holidayContext: noCardsDisplayContext });
-            const stage2PeriodAccess = await assertActiveEmploymentReviewPeriodReadable(
-                req, ypokatasthma);
-            const stage2BulkContexts = [...preparedLifecycleContext.lifecycleByWeek]
-                .map(([key, lifecycle]) => {
-                    const weekRows = preparedLifecycleContext.rowsByEmployeeWeek.get(key) || [];
-                    const state = preparedLifecycleContext.workflowByEmployeeWeek.get(key) || {};
-                    const employeeKodikos = String(key).split('|')[0];
-                    const scope = buildWeeklyHrStage2BulkContextScope({ key, lifecycle, weekRows,
-                        preparedEmployee: ergByKodikos.get(employeeKodikos) || null });
-                    return { scope, rows: weekRows, lifecycle,
-                        effectiveProfilesByDate: Object.fromEntries(weekRows.map((row) => [
-                            dateKeyUtc(row.hmeromhnia), {
-                                typos_apasxolhshs: row.effective_typos_apasxolhshs,
-                                kathestos_apasxolhshs: row.effective_kathestos_apasxolhshs } ])),
-                        workflowState: state, upstream: { stage1_current_fingerprint:
-                            lifecycle.stages?.stage1?.current_completion_fingerprint },
-                        preparedStage2Record: preparedStage2Pairs.records.get(key)?.record || null,
-                        preparedStage2Pair: preparedStage2Pairs.records.get(key)?.prepared || null,
-                        period_writable: ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(
-                            stage2PeriodAccess.state?.effective_mode) };
-                });
             const stage2PreviewScope = stage2BulkRequestScope(req, {
                 ypokatasthma, period_start: reviewPeriodStart, period_end: reviewPeriodEnd });
-            const internalStage2BulkPreview = buildWeeklyHrStage2BulkPreview({
-                contexts: stage2BulkContexts, preview_scope: stage2PreviewScope });
-            stage2BulkStateCache.put({ preview: internalStage2BulkPreview,
-                scope: stage2PreviewScope, contexts: stage2BulkContexts });
-            const stage2BulkPreview = publicWeeklyHrStage2BulkPreview(
-                internalStage2BulkPreview);
+            const stage2BulkPresentation = await loadWeeklyHrStage2BulkSearchPresentation({
+                finalizedReadOnly,
+                loadWritablePresentation: async () => {
+                    const preparedStage2Pairs = await prepareWeeklyHrStage2PairRecords({ req,
+                        rowsByWeek: preparedLifecycleContext.rowsByEmployeeWeek,
+                        employeeByCode: ergByKodikos, historyByCode: istorikoRowsByKodikos,
+                        auditsByRowId: deviationAuditsByRowId,
+                        holidayContext: noCardsDisplayContext });
+                    const stage2PeriodAccess = await assertActiveEmploymentReviewPeriodReadable(
+                        req, ypokatasthma);
+                    const contexts = [...preparedLifecycleContext.lifecycleByWeek]
+                        .map(([key, lifecycle]) => {
+                            const weekRows = preparedLifecycleContext.rowsByEmployeeWeek.get(key) || [];
+                            const state = preparedLifecycleContext.workflowByEmployeeWeek.get(key) || {};
+                            const employeeKodikos = String(key).split('|')[0];
+                            const scope = buildWeeklyHrStage2BulkContextScope({ key, lifecycle,
+                                weekRows, preparedEmployee:
+                                    ergByKodikos.get(employeeKodikos) || null });
+                            return { scope, rows: weekRows, lifecycle,
+                                effectiveProfilesByDate: Object.fromEntries(weekRows.map((row) => [
+                                    dateKeyUtc(row.hmeromhnia), {
+                                        typos_apasxolhshs: row.effective_typos_apasxolhshs,
+                                        kathestos_apasxolhshs:
+                                            row.effective_kathestos_apasxolhshs } ])),
+                                workflowState: state, upstream: { stage1_current_fingerprint:
+                                    lifecycle.stages?.stage1?.current_completion_fingerprint },
+                                preparedStage2Record:
+                                    preparedStage2Pairs.records.get(key)?.record || null,
+                                preparedStage2Pair:
+                                    preparedStage2Pairs.records.get(key)?.prepared || null,
+                                period_writable: ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(
+                                    stage2PeriodAccess.state?.effective_mode) };
+                        });
+                    const internalPreview = buildWeeklyHrStage2BulkPreview({ contexts,
+                        preview_scope: stage2PreviewScope });
+                    stage2BulkStateCache.put({ preview: internalPreview,
+                        scope: stage2PreviewScope, contexts });
+                    return { preview: publicWeeklyHrStage2BulkPreview(internalPreview) };
+                }
+            });
+            const stage2BulkPreview = stage2BulkPresentation?.preview || null;
             const canonicalLifecycleRows = enrichedRows;
             canonicalLifecycleRows.__lifecycleByWeek = preparedLifecycleContext.lifecycleByWeek;
             canonicalLifecycleRows.__workflowStates = preparedLifecycleContext.workflowStates;
@@ -8053,6 +8066,7 @@ class erganhController {
                 legacyDeviations,
                 canonicalLifecycleProjections,
                 stage2BulkPreview,
+                finalized: finalizedReadOnly,
                 boundaryContextPreflight,
                 deviationPolicyVersion: deviationPreview.policyVersion
             });

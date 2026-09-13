@@ -9370,13 +9370,26 @@ async function reviewWeeklyHrStage2Exception(exception = {}) {
     const sourceDate = review.found?.source?.date;
     const targetDate = review.found?.target?.date;
     const finding = sourceDate && targetDate
-        ? `Βρέθηκε εργασία στις ${formatStage1DateKey(sourceDate)} και πιθανή ημέρα ρεπό στις ${
+        ? `Βρέθηκε εργασία στις ${formatStage1DateKey(sourceDate)} και ημέρα ρεπό στις ${
             formatStage1DateKey(targetDate)}.`
         : 'Η εβδομάδα χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.';
     const reason = getStage2LifecycleReasonLabel(exception.code, false);
+    const sourceBefore = review.found?.canonical_source?.current_category;
+    const sourceAfter = review.found?.canonical_source?.proposed_values
+        ?.kathgoria_ergasias_apologistika;
+    const targetBefore = review.found?.canonical_target?.current_category;
+    const targetAfter = review.found?.canonical_target?.proposed_values
+        ?.kathgoria_ergasias_apologistika;
+    const proposedChange = review.canDecide
+        ? `<div class="mt-2"><strong>Τι θα αλλάξει:</strong><br>${escapeHtml(
+            formatStage1DateKey(sourceDate))}<br>${escapeHtml(stage2LifecycleClassificationLabel(
+            sourceBefore))} → ${escapeHtml(stage2LifecycleClassificationLabel(sourceAfter))}<br>${escapeHtml(
+            formatStage1DateKey(targetDate))}<br>${escapeHtml(stage2LifecycleClassificationLabel(
+            targetBefore))} → ${escapeHtml(stage2LifecycleClassificationLabel(targetAfter))}</div>`
+        : '';
     const choices = review.canDecide
         ? '<div class="mt-2"><strong>Διαθέσιμες επιλογές</strong><br>' +
-            'Αποδοχή της πρότασης ή δήλωση ότι δεν ισχύει.</div>'
+            'Εφαρμογή της μεταφοράς ή δήλωση ότι η μεταφορά δεν ισχύει.</div>'
         : '<div class="mt-2">Δεν υπάρχει διαθέσιμη ασφαλής αυτόματη απόφαση. ' +
             'Ελέγξτε τα στοιχεία της εβδομάδας.</div>';
     const result = await employmentReviewSwal({ icon: 'info', title: 'Έλεγχος περίπτωσης',
@@ -9385,9 +9398,9 @@ async function reviewWeeklyHrStage2Exception(exception = {}) {
             formatStage1DateKey(exception.week_start))}–${escapeHtml(formatStage1DateKey(
             exception.week_end))}</div><div class="mt-2"><strong>Τι βρέθηκε:</strong> ${escapeHtml(
             finding)}</div><div class="mt-2"><strong>Γιατί χρειάζεται έλεγχος:</strong> ${escapeHtml(
-            reason)}</div>${choices}</div>`,
-        showConfirmButton: review.canDecide, confirmButtonText: 'Αποδοχή πρότασης',
-        showDenyButton: review.canDecide, denyButtonText: 'Δεν ισχύει',
+            reason)}</div>${proposedChange}${choices}</div>`,
+        showConfirmButton: review.canDecide, confirmButtonText: 'Εφαρμογή μεταφοράς',
+        showDenyButton: review.canDecide, denyButtonText: 'Η μεταφορά δεν ισχύει',
         showCancelButton: true, cancelButtonText: review.canDecide ? 'Ακύρωση' : 'Κλείσιμο' });
     if (!review.canDecide || (!result.isConfirmed && !result.isDenied)) return false;
     const group = { group_id: review.command.proposal_id,
@@ -9430,7 +9443,7 @@ function renderWeeklyHrStage2BulkSummary(container) {
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(
             formatStage1DateKey(item.week_end))}</td>
         <td>${escapeHtml(getStage2LifecycleReasonLabel(item.code, false))}</td>
-        <td><button type="button" class="btn btn-sm weekly-hr-stage2-exception-review"
+        <td><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-exception-review"
             data-exception-index="${index}">Έλεγχος</button></td>
     </tr>`).join('');
     const safeCount = Number(preview.safe_bulk_count || 0);

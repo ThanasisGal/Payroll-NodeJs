@@ -15071,7 +15071,12 @@ body.loader-active > *:not(.app-loader) {
 .swal2-popup.employment-review-swal-popup .swal2-textarea,
 .swal2-popup.employment-review-swal-popup .swal2-validation-message,
 .swal2-popup.employment-review-swal-popup .swal2-input-label {
-    font-size: 0.85rem !important;
+    font-size: 0.95rem !important;
+}
+
+.swal2-popup.employment-review-swal-popup .swal2-html-container,
+.swal2-popup.employment-review-swal-popup .employment-review-swal-html-container {
+    line-height: 1.45;
 }
 
 .employment-review-swal-popup .swal2-confirm.class-info,

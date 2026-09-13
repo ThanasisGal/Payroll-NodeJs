@@ -25,9 +25,11 @@ assert.match(controller, /continuation_token: batch\.continuation_token/);
 assert.match(controller, /stage2BulkRequestScope/);
 assert.match(controller, /buildWeeklyHrStage2BulkContextScope/);
 const mainSearchBulkContexts = controller.match(
-    /const stage2BulkContexts =[\s\S]*?const stage2PreviewScope/)?.[0] || '';
+    /loadWritablePresentation: async \(\) => \{[\s\S]*?return \{ preview:/)?.[0] || '';
 assert.match(mainSearchBulkContexts, /buildWeeklyHrStage2BulkContextScope/);
 assert.doesNotMatch(mainSearchBulkContexts, /scope: lifecycle\.scope/);
+assert.match(mainSearchBulkContexts, /assertActiveEmploymentReviewPeriodReadable/);
+assert.match(controller, /loadWeeklyHrStage2BulkSearchPresentation/);
 const targetedLoader = controller.match(
     /async function loadWeeklyHrStage2BatchPreparedContexts[\s\S]*?\n}\n\nasync function loadWeeklyHrStage2BulkPreparedContexts/)?.[0] || '';
 assert.match(targetedLoader, /batchScopes\.length > 100/);
