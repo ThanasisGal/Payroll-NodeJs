@@ -20,7 +20,8 @@ const sandbox = { currentWeeklyHrStage2BulkPreview: null,
         return { isConfirmed: false, isDenied: false }; },
     submitRepoTransferDecision: async () => false, loadResults: async () => {},
     escapeHtml: (value) => String(value), formatStage1DateKey: (value) => String(value),
-    getStage2LifecycleReasonLabel: (value) => String(value) };
+    getStage2LifecycleReasonLabel: (value, showUnknown = true) => showUnknown
+        ? String(value) : 'Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.' };
 vm.runInNewContext(`${renderSource}\nthis.render = renderWeeklyHrStage2BulkSummary;\n` +
     'this.reviewException = reviewWeeklyHrStage2Exception;', sandbox);
 const container = { innerHTML: '' };
@@ -33,8 +34,11 @@ assert.equal(sandbox.render(container), true);
 assert.match(container.innerHTML, /Μαζική ενημέρωση 9500 περιπτώσεων/);
 assert.doesNotMatch(container.innerHTML.match(/weekly-hr-stage2-bulk-complete[^>]*>/)?.[0] || '',
     /disabled/);
-assert.match(container.innerHTML, /Αυτόματες/);
-assert.match(container.innerHTML, /Μεταφορές source\/target/);
+assert.match(container.innerHTML, /Έτοιμες για μαζική ενημέρωση/);
+assert.match(container.innerHTML, /Αυτόματες τακτοποιήσεις/);
+assert.match(container.innerHTML, /Μεταφορές ρεπό/);
+assert.match(container.innerHTML, /Ήδη τακτοποιημένες/);
+assert.match(container.innerHTML, /Περιπτώσεις που χρειάζονται έλεγχο/);
 assert.equal((container.innerHTML.match(/class="weekly-hr-stage2-exception"/g) || []).length, 50);
 assert.match(container.innerHTML, /<td>0<\/td>/);
 assert.match(container.innerHTML, /2026-05-04–2026-05-10/);
@@ -57,6 +61,7 @@ assert.match(container.innerHTML,
 assert.equal((container.innerHTML.match(/weekly-hr-stage2-exception-review/g) || []).length, 19);
 assert.match(container.innerHTML, /Ενέργεια/);
 assert.match(container.innerHTML, />Έλεγχος<\/button>/);
+assert.doesNotMatch(container.innerHTML, /MANUAL_REVIEW/);
 assert.doesNotMatch(container.innerHTML, /<article/);
 
 permission = false;
@@ -68,7 +73,8 @@ sandbox.render(container);
 assert.match(container.innerHTML.match(/weekly-hr-stage2-bulk-complete[^>]*>/)?.[0] || '',
     /disabled/);
 assert.match(container.innerHTML, /Δεν έχετε δικαίωμα αλλαγής/);
-assert.doesNotMatch(container.innerHTML, /runtime|index|fingerprint|canonical|payload|scope/);
+assert.doesNotMatch(container.innerHTML.replace(/<[^>]*>/g, ' '),
+    /source|target|\bHR\b|Stage ?2|bulk|scope|fingerprint|canonical|runtime|index|payload|stale|failed/i);
 permission = true; periodAllowsChanges = false;
 sandbox.render(container);
 assert.match(container.innerHTML, /Η κατάσταση της περιόδου δεν επιτρέπει αλλαγές/);
@@ -83,6 +89,9 @@ assert.doesNotMatch(container.innerHTML, /checkbox|Τακτοποίηση επι
     assert.match(modalOptions.html, /Τι βρέθηκε/);
     assert.match(modalOptions.html, /Γιατί χρειάζεται έλεγχος/);
     assert.equal(modalOptions.showConfirmButton, false);
+    assert.match(modalOptions.html,
+        /Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή/);
+    assert.doesNotMatch(modalOptions.html, /MANUAL_REVIEW/);
     assert.doesNotMatch(modalOptions.html,
         /source|target|scope|fingerprint|canonical|payload|runtime|index/i);
     sandbox.userCanRecordRepoTransferDecision = () => true;
@@ -99,7 +108,7 @@ assert.doesNotMatch(container.innerHTML, /checkbox|Τακτοποίηση επι
     assert.equal(modalOptions.confirmButtonText, 'Αποδοχή πρότασης');
     assert.equal(modalOptions.showDenyButton, true);
     assert.equal(modalOptions.denyButtonText, 'Δεν ισχύει');
-    assert.match(modalOptions.html, /Ασφαλείς επιλογές HR/);
+    assert.match(modalOptions.html, /Διαθέσιμες επιλογές/);
     assert.doesNotMatch(modalOptions.html,
         /source|target|scope|fingerprint|canonical|payload|runtime|index/i);
 })().catch((error) => { console.error(error); process.exitCode = 1; });
@@ -115,11 +124,27 @@ const completionSource = source.slice(completionStart, completionEnd);
 assert.match(completionSource, /while \(hasMore\)/);
 assert.match(completionSource, /continuation_token: continuationToken/);
 assert.match(completionSource, /processed_in_batch/);
-assert.match(completionSource, /Swal\.update\(\{ html: `Επεξεργασία/);
+assert.match(completionSource, /Μαζική ενημέρωση μεταφοράς ρεπό/);
+assert.match(completionSource, /Επεξεργασία \$\{processed\.toLocaleString\('el-GR'\)} από/);
+assert.match(completionSource, /Ολοκληρώθηκαν:/);
+assert.match(completionSource, /Ήταν ήδη τακτοποιημένες:/);
+assert.match(completionSource, /Χρειάζονται νέο έλεγχο:/);
+assert.match(completionSource, /Δεν ολοκληρώθηκαν:/);
+assert.doesNotMatch(completionSource, /Μαζική ενημέρωση Stage 2|Εφαρμόστηκαν:|Παρωχημένες:|Αποτυχίες:/);
 assert.match(completionSource, /processed_in_batch \|\| 0\) <= 0/);
 assert.match(completionSource, /continuationToken === previousContinuationToken/);
 assert.match(completionSource, /maxBatchIterations/);
 assert.equal((completionSource.match(/stage2\/bulk-complete/g) || []).length, 1);
 assert.match(source, /weekly-hr-stage2-exception-review/);
 assert.match(source, /reviewWeeklyHrStage2Exception/);
+const reasonStart = source.indexOf('function getStage2LifecycleReasonLabel');
+const reasonEnd = source.indexOf('const STAGE3_NON_WORK_DEFAULT_REASON', reasonStart);
+const reasonSandbox = { policyPreviewReasonLabels: {}, atomicRepoTransferDiagnosticLabels: {},
+    formatPolicyPreviewUnknownCode: (value) => value };
+vm.runInNewContext(`${source.slice(reasonStart, reasonEnd)}\n` +
+    'this.reasonLabel = getStage2LifecycleReasonLabel;', reasonSandbox);
+assert.equal(reasonSandbox.reasonLabel('UNKNOWN_INTERNAL_REASON', false),
+    'Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.');
+assert.doesNotMatch(reasonSandbox.reasonLabel('UNKNOWN_INTERNAL_REASON', false),
+    /UNKNOWN_INTERNAL_REASON/);
 console.log('weekly HR Stage-2 compact bulk UI tests passed');

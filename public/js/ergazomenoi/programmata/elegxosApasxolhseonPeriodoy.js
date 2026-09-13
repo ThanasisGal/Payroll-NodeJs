@@ -9325,8 +9325,8 @@ async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
         `stage2/bulk-preview?${query.toString()}`, { headers: { Accept: 'application/json',
             'CSRF-Token': csrfToken }, credentials: 'same-origin' });
     const payload = await response.json();
-    if (!response.ok || !payload.success) throw new Error(payload.message ||
-        'Η προεπισκόπηση μαζικής ενημέρωσης Stage 2 απέτυχε.');
+    if (!response.ok || !payload.success) throw new Error(
+        'Δεν ήταν δυνατή η φόρτωση των περιπτώσεων μεταφοράς ρεπό.');
     if (currentWeeklyHrStage2BulkPreview?.preview_fingerprint !== payload.preview_fingerprint) {
         weeklyHrStage2BulkRequestId = '';
     }
@@ -9337,10 +9337,10 @@ async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
 
 function stage2BulkChangeUnavailableReason() {
     if (document.getElementById('canRecordRepoTransferDecision')?.value !== '1') {
-        return 'Δεν έχετε δικαίωμα αλλαγής των περιπτώσεων του Σταδίου 2.';
+        return 'Δεν έχετε δικαίωμα αλλαγής αυτών των περιπτώσεων.';
     }
     if (!canRecordEmploymentDecisionForCurrentPeriod()) {
-        return 'Η κατάσταση της περιόδου δεν επιτρέπει αλλαγές στο Στάδιο 2.';
+        return 'Η κατάσταση της περιόδου δεν επιτρέπει αλλαγές στις μεταφορές ρεπό.';
     }
     if (weeklyHrStage2BulkSubmitting) return 'Η μαζική ενημέρωση βρίσκεται ήδη σε εξέλιξη.';
     return '';
@@ -9372,11 +9372,10 @@ async function reviewWeeklyHrStage2Exception(exception = {}) {
     const finding = sourceDate && targetDate
         ? `Βρέθηκε εργασία στις ${formatStage1DateKey(sourceDate)} και πιθανή ημέρα ρεπό στις ${
             formatStage1DateKey(targetDate)}.`
-        : 'Η εβδομάδα χρειάζεται επιβεβαίωση από το HR πριν από οποιαδήποτε αλλαγή.';
-    const reason = getStage2LifecycleReasonLabel(exception.code) || exception.message ||
-        'Η περίπτωση δεν μπορεί να ενημερωθεί αυτόματα.';
+        : 'Η εβδομάδα χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.';
+    const reason = getStage2LifecycleReasonLabel(exception.code, false);
     const choices = review.canDecide
-        ? '<div class="mt-2"><strong>Ασφαλείς επιλογές HR</strong><br>' +
+        ? '<div class="mt-2"><strong>Διαθέσιμες επιλογές</strong><br>' +
             'Αποδοχή της πρότασης ή δήλωση ότι δεν ισχύει.</div>'
         : '<div class="mt-2">Δεν υπάρχει διαθέσιμη ασφαλής αυτόματη απόφαση. ' +
             'Ελέγξτε τα στοιχεία της εβδομάδας.</div>';
@@ -9417,7 +9416,7 @@ async function reviewWeeklyHrStage2Exception(exception = {}) {
         return recorded === true;
     } catch (error) {
         await employmentReviewSwal({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση',
-            text: error?.message || 'Η καταγραφή απέτυχε.' });
+            text: 'Δεν ήταν δυνατή η καταγραφή της απόφασης. Δοκιμάστε ξανά.' });
         return false;
     }
 }
@@ -9430,7 +9429,7 @@ function renderWeeklyHrStage2BulkSummary(container) {
         <td>${escapeHtml(item.employee_kodikos || '—')}</td>
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(
             formatStage1DateKey(item.week_end))}</td>
-        <td>${escapeHtml(getStage2LifecycleReasonLabel(item.code) || item.message || item.code)}</td>
+        <td>${escapeHtml(getStage2LifecycleReasonLabel(item.code, false))}</td>
         <td><button type="button" class="btn btn-sm weekly-hr-stage2-exception-review"
             data-exception-index="${index}">Έλεγχος</button></td>
     </tr>`).join('');
@@ -9440,17 +9439,17 @@ function renderWeeklyHrStage2BulkSummary(container) {
     const unavailableReason = safeCount > 0 && !canBulk ? stage2BulkChangeUnavailableReason() : '';
     container.innerHTML = `<section class="card border rounded employment-review-stage2-bulk"
         aria-label="Μαζική ενημέρωση μεταφοράς ρεπό"><div class="card-body py-2">
-        <div class="fw-semibold mb-2">ΣΤΑΔΙΟ 2 — Μεταφορά Ρεπό</div>
+        <div class="fw-semibold mb-2">Μεταφορά Ρεπό</div>
         <div class="d-flex flex-wrap gap-3 small mb-2">
-            <span>Ασφαλείς περιπτώσεις για μαζική ενημέρωση: <strong>${escapeHtml(
+            <span>Έτοιμες για μαζική ενημέρωση: <strong>${escapeHtml(
                 preview.safe_bulk_count || 0)}</strong></span>
-            <span class="ms-2">Αυτόματες: <strong>${escapeHtml(
+            <span class="ms-2">Αυτόματες τακτοποιήσεις: <strong>${escapeHtml(
                 preview.safe_automatic_count || 0)}</strong></span>
-            <span>Μεταφορές source/target: <strong>${escapeHtml(
+            <span>Μεταφορές ρεπό: <strong>${escapeHtml(
                 preview.safe_pair_count || 0)}</strong></span>
-            <span>Ήδη επιλυμένες: <strong>${escapeHtml(
+            <span>Ήδη τακτοποιημένες: <strong>${escapeHtml(
                 preview.already_resolved_count || 0)}</strong></span>
-            <span>Εξαιρέσεις που απαιτούν HR: <strong>${escapeHtml(
+            <span>Περιπτώσεις που χρειάζονται έλεγχο: <strong>${escapeHtml(
                 preview.manual_exception_count || 0)}</strong></span>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -9464,7 +9463,7 @@ function renderWeeklyHrStage2BulkSummary(container) {
                 : unavailableReason ? `<span class="text-muted small">${escapeHtml(
                     unavailableReason)}</span>` : ''}
         </div>
-        ${exceptions.length ? `<details class="mt-3"><summary>Εξαιρέσεις που απαιτούν έλεγχο</summary>
+        ${exceptions.length ? `<details class="mt-3"><summary>Περιπτώσεις που χρειάζονται έλεγχο</summary>
             <div class="table-responsive mt-2"><table class="table table-sm mb-0"><thead><tr>
             <th>Κωδικός</th><th>Εβδομάδα</th><th>Αιτία</th><th>Ενέργεια</th></tr></thead><tbody>${exceptionRows}
             </tbody></table></div><div class="d-flex gap-2 align-items-center small text-muted mt-1">
@@ -9510,8 +9509,9 @@ async function completeWeeklyHrStage2BulkFromUi() {
         let continuationToken = null; let processed = 0; let hasMore = true;
         let batchIterations = 0;
         const maxBatchIterations = Math.ceil(Number(preview.safe_bulk_count || 0) / 100) + 2;
-        progressAlert = employmentReviewSwal({ title: 'Μαζική ενημέρωση Stage 2',
-            html: `Επεξεργασία 0 / ${preview.safe_bulk_count}`, allowOutsideClick: false,
+        progressAlert = employmentReviewSwal({ title: 'Μαζική ενημέρωση μεταφοράς ρεπό',
+            html: `Επεξεργασία 0 από ${Number(preview.safe_bulk_count || 0).toLocaleString(
+                'el-GR')} περιπτώσεις`, allowOutsideClick: false,
             allowEscapeKey: false, showConfirmButton: false,
             didOpen: () => Swal.showLoading() });
         while (hasMore) {
@@ -9533,8 +9533,8 @@ async function completeWeeklyHrStage2BulkFromUi() {
                 }
             }
             const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.message ||
-                'Η μαζική ενημέρωση Stage 2 απέτυχε.');
+            if (!response.ok || !result.success) throw new Error(
+                'Δεν ήταν δυνατή η μαζική ενημέρωση μεταφοράς ρεπό.');
             for (const key of Object.keys(totals)) totals[key] += Number(result[key] || 0);
             processed += Number(result.processed_in_batch || 0);
             hasMore = result.has_more === true;
@@ -9543,20 +9543,23 @@ async function completeWeeklyHrStage2BulkFromUi() {
                 !continuationToken || continuationToken === previousContinuationToken)) {
                 throw new Error('Η μαζική ενημέρωση δεν επέστρεψε έγκυρη συνέχεια.');
             }
-            Swal.update({ html: `Επεξεργασία ${processed} / ${preview.safe_bulk_count}` });
+            Swal.update({ html: `Επεξεργασία ${processed.toLocaleString('el-GR')} από ${Number(
+                preview.safe_bulk_count || 0).toLocaleString('el-GR')} περιπτώσεις` });
         }
         Swal.close();
         if (progressAlert) await progressAlert;
         progressAlert = null;
         await employmentReviewSwal({ icon: totals.failed || totals.stale ? 'warning' : 'success',
-            title: 'Μαζική ενημέρωση Stage 2', text: `Εφαρμόστηκαν: ${totals.applied}. ` +
-                `Ήδη ολοκληρωμένες: ${totals.already_completed}. Παρωχημένες: ${totals.stale}. ` +
-                `Αποτυχίες: ${totals.failed}.` });
+            title: 'Μαζική ενημέρωση μεταφοράς ρεπό',
+            text: `Ολοκληρώθηκαν: ${totals.applied}. ` +
+                `Ήταν ήδη τακτοποιημένες: ${totals.already_completed}. ` +
+                `Χρειάζονται νέο έλεγχο: ${totals.stale}. ` +
+                `Δεν ολοκληρώθηκαν: ${totals.failed}.` });
         await loadResults();
     } catch (error) {
         if (progressAlert) { Swal.close(); await progressAlert; progressAlert = null; }
         await employmentReviewSwal({ icon: 'error', title: 'Η μαζική ενημέρωση απέτυχε',
-            text: error.message });
+            text: 'Δεν ήταν δυνατή η ολοκλήρωση της μαζικής ενημέρωσης. Δοκιμάστε ξανά.' });
     } finally { weeklyHrStage2BulkSubmitting = false; }
 }
 
@@ -9748,13 +9751,15 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     return true;
 }
 
-function getStage2LifecycleReasonLabel(reasonCode) {
+function getStage2LifecycleReasonLabel(reasonCode, showUnknownCode = true) {
     const key = String(reasonCode || '').trim();
     if (key === 'REPO_TRANSFER_DECISION_REQUIRED') {
         return 'Απαιτείται απόφαση για τη συνδεδεμένη πρόταση μεταφοράς ρεπό.';
     }
-    return policyPreviewReasonLabels[key] || atomicRepoTransferDiagnosticLabels[key] ||
-        formatPolicyPreviewUnknownCode(key);
+    const knownLabel = policyPreviewReasonLabels[key] || atomicRepoTransferDiagnosticLabels[key];
+    if (knownLabel) return knownLabel;
+    return showUnknownCode ? formatPolicyPreviewUnknownCode(key) :
+        'Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.';
 }
 
 const STAGE3_NON_WORK_DEFAULT_REASON =
