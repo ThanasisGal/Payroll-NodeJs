@@ -57,6 +57,11 @@ function rowMatchesUpdates(row = {}, updates = {}) {
     return Object.entries(updates).every(([field, value]) =>
         stableStringify(row[field]) === stableStringify(value));
 }
+function effectiveProfileSignature(dailyProfile = {}) {
+    return stableStringify({ employment_type: normalizeEmploymentType(
+        dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
+    ) });
+}
 function inspectAutomaticMaterialization(context = {}) {
     const rows = new Map((context.rows || []).map((row) => [dateKeyUtc(row.hmeromhnia), row]));
     const stage3Pending = new Set(context.lifecycle?.stages?.stage3?.pending_dates || []);
@@ -103,7 +108,7 @@ function inspectAutomaticMaterialization(context = {}) {
                     'Η canonical ημερήσια εγγραφή έχει ήδη αλλάξει.', 409);
             }
             return { date, classification, row, employmentType,
-                profileSignature: stableStringify(dailyProfile || {}), itemState };
+                profileSignature: effectiveProfileSignature(dailyProfile), itemState };
         }).sort((left, right) => left.date.localeCompare(right.date));
         const states = new Set(inspected.map((item) => item.itemState));
         if (states.size !== 1) fail('STAGE2_PARTIAL_MATERIALIZATION_CONFLICT',
@@ -242,5 +247,6 @@ async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
     });
 }
 
-module.exports = { ACTION, AUTOMATIC_INSPECTION, inspectAutomaticMaterialization,
+module.exports = { ACTION, AUTOMATIC_INSPECTION, effectiveProfileSignature,
+    inspectAutomaticMaterialization,
     normalizeItems, fingerprint, completeWeeklyHrWorkflowStage2 };

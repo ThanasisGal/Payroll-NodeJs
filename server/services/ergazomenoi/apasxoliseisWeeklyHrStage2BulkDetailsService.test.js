@@ -5,6 +5,8 @@ const { buildWeeklyHrStage2BulkPreview } = require(
     './apasxoliseisWeeklyHrStage2BulkPreviewService');
 const { buildWeeklyHrStage2BulkDetails } = require(
     './apasxoliseisWeeklyHrStage2BulkDetailsService');
+const { WeeklyHrStage2BulkStateCache } = require(
+    './apasxoliseisWeeklyHrStage2BulkStateCacheService');
 
 function context(index) {
     const date = `2026-05-${String(4 + index).padStart(2, '0')}`;
@@ -37,6 +39,35 @@ assert.match(details[0].employee, /0000 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ/);
 assert.equal(details[0].before, 'Πιθανή άδεια');
 assert.equal(details[0].after, 'Ρεπό');
 assert.equal(details.length <= 50, true);
+
+// The main search intentionally keeps only the profile fields needed by Stage 2, while the
+// targeted loader returns the complete effective profile. Equal business state must therefore
+// produce the same guarded fingerprint on the first details request.
+const fullProfileContext = context(0);
+fullProfileContext.effectiveProfilesByDate['2026-05-04'] = {
+    typos_apasxolhshs: '0', employee_id: 'employee-0', valid_from: '2026-01-01',
+    unrelated_loader_field: 'not part of the Stage-2 safety decision'
+};
+const requestScope = { team: 'team-a', company_kod: 'company-a', ypokatasthma: '0001',
+    period_start: '2026-05-01', period_end: '2026-05-31', user_id: 'user-a' };
+const cache = new WeeklyHrStage2BulkStateCache();
+cache.put({ preview, scope: requestScope, contexts });
+const firstPage = cache.detailPageSeeds({ preview_fingerprint: preview.preview_fingerprint,
+    scope: requestScope, page: 1, page_size: 50 });
+const freshDetails = buildWeeklyHrStage2BulkDetails({ contexts: [fullProfileContext],
+    cachedSeeds: [firstPage.cachedSeeds[0]] });
+assert.equal(freshDetails.length, 1);
+assert.equal(firstPage.page, 1);
+assert.equal(firstPage.page_size, 50);
+
+const changedProfileContext = context(0);
+changedProfileContext.effectiveProfilesByDate['2026-05-04'] = {
+    typos_apasxolhshs: '1', employee_id: 'employee-0', valid_from: '2026-01-01'
+};
+assert.throws(() => buildWeeklyHrStage2BulkDetails({ contexts: [changedProfileContext],
+    cachedSeeds: [firstPage.cachedSeeds[0]] }),
+{ code: 'STAGE2_INPUT_CHANGED', statusCode: 409 });
+
 const changed = context(0);
 changed.rows[0].kathgoria_ergasias_apologistika = 'ΜΕ';
 assert.throws(() => buildWeeklyHrStage2BulkDetails({ contexts: [changed],

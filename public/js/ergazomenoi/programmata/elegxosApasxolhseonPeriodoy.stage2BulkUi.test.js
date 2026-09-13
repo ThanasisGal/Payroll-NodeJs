@@ -10,6 +10,10 @@ const end = source.indexOf('async function completeWeeklyHrStage2BulkFromUi');
 assert.ok(start >= 0 && end > start);
 const renderSource = source.slice(start, end);
 let permission = true; let periodAllowsChanges = true; let modalOptions = null;
+let fetchResult = { ok: true, body: { success: true, page: 1, page_count: 1,
+    details: [{ employee: '0001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ', week_start: '2026-05-04',
+        week_end: '2026-05-10', date: '2026-05-06', before: 'Πιθανή άδεια',
+        after: 'Ρεπό', safety_reason: 'Μονοσήμαντη αλλαγή.' }] } };
 const fetchCalls = [];
 const sandbox = { currentWeeklyHrStage2BulkPreview: null,
     currentCanonicalLifecyclePayloads: [],
@@ -24,10 +28,7 @@ const sandbox = { currentWeeklyHrStage2BulkPreview: null,
         eos_hmeromhnia: '2026-05-31', ypokatasthma: '0001' }),
     URLSearchParams, csrfToken: 'token', Swal: { close: () => {} },
     fetch: async (url, options = {}) => { fetchCalls.push({ url, options }); return {
-        ok: true, json: async () => ({ success: true, page: 1, page_count: 1,
-            details: [{ employee: '0001 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ', week_start: '2026-05-04',
-                week_end: '2026-05-10', date: '2026-05-06', before: 'Πιθανή άδεια',
-                after: 'Ρεπό', safety_reason: 'Μονοσήμαντη αλλαγή.' }] }) }; },
+        ok: fetchResult.ok, json: async () => fetchResult.body }; },
     escapeHtml: (value) => String(value), formatStage1DateKey: (value) => {
         const [year, month, day] = String(value).slice(0, 10).split('-');
         return year && month && day ? `${day}/${month}/${year}` : String(value);
@@ -120,6 +121,20 @@ assert.doesNotMatch(container.innerHTML, /checkbox|Τακτοποίηση επι
     assert.match(modalOptions.html, /Πιθανή άδεια/);
     assert.match(modalOptions.html, /Ρεπό/);
     assert.match(modalOptions.confirmButtonText, /Εφαρμογή 19 ενημερώσεων/);
+
+    fetchResult = { ok: false, body: { success: false, code: 'STAGE2_INPUT_CHANGED' } };
+    await sandbox.previewBulk();
+    assert.equal(modalOptions.title, 'Απαιτείται νέα Αναζήτηση');
+    assert.match(modalOptions.text, /Τα στοιχεία έχουν αλλάξει/);
+
+    fetchResult = { ok: false,
+        body: { success: false, code: 'STAGE2_BULK_PREVIEW_FAILED' } };
+    await sandbox.previewBulk();
+    assert.equal(modalOptions.title, 'Η προεπισκόπηση δεν φορτώθηκε');
+    assert.equal(modalOptions.text,
+        'Δεν ήταν δυνατή η φόρτωση της προεπισκόπησης. Δοκιμάστε ξανά.');
+    assert.doesNotMatch(modalOptions.text, /STAGE2_BULK_PREVIEW_FAILED/);
+
     await sandbox.reviewException({ employee_id: 'employee-1', employee_kodikos: '0001',
         week_start: '2026-05-04', week_end: '2026-05-10', code: 'MANUAL_REVIEW' });
     assert.match(modalOptions.title, /Έλεγχος περίπτωσης/);

@@ -9532,7 +9532,12 @@ async function loadWeeklyHrStage2BulkDetailPage(page = 1) {
         `stage2/bulk-preview?${query.toString()}`, { headers: { Accept: 'application/json',
             'CSRF-Token': csrfToken }, credentials: 'same-origin' });
     const result = await response.json();
-    if (!response.ok || !result.success) throw new Error('PREVIEW_CHANGED');
+    if (!response.ok || !result.success) {
+        const refreshRequired = ['STAGE2_BULK_PREVIEW_EXPIRED',
+            'STAGE2_BULK_PREVIEW_SCOPE_MISMATCH', 'STAGE2_INPUT_CHANGED',
+            'STAGE2_BULK_PERIOD_SCOPE_MISMATCH'].includes(String(result.code || ''));
+        throw new Error(refreshRequired ? 'PREVIEW_CHANGED' : 'PREVIEW_LOAD_FAILED');
+    }
     return result;
 }
 
@@ -9562,9 +9567,13 @@ async function previewWeeklyHrStage2BulkFromUi() {
             if (!confirmation.isConfirmed) return;
             return completeWeeklyHrStage2BulkFromUi(String(confirmation.value || '').trim());
         }
-    } catch (_) {
-        await employmentReviewSwal({ icon: 'warning', title: 'Απαιτείται νέα Αναζήτηση',
-            text: 'Τα στοιχεία έχουν αλλάξει από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση πριν συνεχίσετε.' });
+    } catch (error) {
+        const changed = error?.message === 'PREVIEW_CHANGED';
+        await employmentReviewSwal(changed
+            ? { icon: 'warning', title: 'Απαιτείται νέα Αναζήτηση',
+                text: 'Τα στοιχεία έχουν αλλάξει από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση πριν συνεχίσετε.' }
+            : { icon: 'error', title: 'Η προεπισκόπηση δεν φορτώθηκε',
+                text: 'Δεν ήταν δυνατή η φόρτωση της προεπισκόπησης. Δοκιμάστε ξανά.' });
     }
 }
 
