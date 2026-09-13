@@ -9335,18 +9335,109 @@ async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
     return currentWeeklyHrStage2BulkPreview;
 }
 
+function stage2BulkChangeUnavailableReason() {
+    if (document.getElementById('canRecordRepoTransferDecision')?.value !== '1') {
+        return 'Δεν έχετε δικαίωμα αλλαγής των περιπτώσεων του Σταδίου 2.';
+    }
+    if (!canRecordEmploymentDecisionForCurrentPeriod()) {
+        return 'Η κατάσταση της περιόδου δεν επιτρέπει αλλαγές στο Στάδιο 2.';
+    }
+    if (weeklyHrStage2BulkSubmitting) return 'Η μαζική ενημέρωση βρίσκεται ήδη σε εξέλιξη.';
+    return '';
+}
+
+function stage2BulkExceptionReviewContext(exception = {}) {
+    const payload = (currentCanonicalLifecyclePayloads || []).find((candidate) => {
+        const scope = candidate?.scope || {};
+        return String(scope.employee_id || '') === String(exception.employee_id || '') &&
+            String(scope.week_start || '').slice(0, 10) ===
+                String(exception.week_start || '').slice(0, 10) &&
+            String(scope.week_end || '').slice(0, 10) ===
+                String(exception.week_end || '').slice(0, 10);
+    }) || null;
+    const stage = payload?.lifecycle_projection?.stages?.stage2 || {};
+    const found = (stage.pending_items || [])[0] || null;
+    const command = found?.decision_command || {};
+    const canDecide = Boolean(found?.source && found?.target && command.proposal_id &&
+        command.expected_source_id && command.expected_target_id &&
+        command.expected_proposal_version && command.expected_choice_code &&
+        userCanRecordRepoTransferDecision());
+    return { payload, found, command, canDecide };
+}
+
+async function reviewWeeklyHrStage2Exception(exception = {}) {
+    const review = stage2BulkExceptionReviewContext(exception);
+    const sourceDate = review.found?.source?.date;
+    const targetDate = review.found?.target?.date;
+    const finding = sourceDate && targetDate
+        ? `Βρέθηκε εργασία στις ${formatStage1DateKey(sourceDate)} και πιθανή ημέρα ρεπό στις ${
+            formatStage1DateKey(targetDate)}.`
+        : 'Η εβδομάδα χρειάζεται επιβεβαίωση από το HR πριν από οποιαδήποτε αλλαγή.';
+    const reason = getStage2LifecycleReasonLabel(exception.code) || exception.message ||
+        'Η περίπτωση δεν μπορεί να ενημερωθεί αυτόματα.';
+    const choices = review.canDecide
+        ? '<div class="mt-2"><strong>Ασφαλείς επιλογές HR</strong><br>' +
+            'Αποδοχή της πρότασης ή δήλωση ότι δεν ισχύει.</div>'
+        : '<div class="mt-2">Δεν υπάρχει διαθέσιμη ασφαλής αυτόματη απόφαση. ' +
+            'Ελέγξτε τα στοιχεία της εβδομάδας.</div>';
+    const result = await employmentReviewSwal({ icon: 'info', title: 'Έλεγχος περίπτωσης',
+        html: `<div class="text-start"><div><strong>Εργαζόμενος:</strong> ${escapeHtml(
+            exception.employee_kodikos || '—')}</div><div><strong>Εβδομάδα:</strong> ${escapeHtml(
+            formatStage1DateKey(exception.week_start))}–${escapeHtml(formatStage1DateKey(
+            exception.week_end))}</div><div class="mt-2"><strong>Τι βρέθηκε:</strong> ${escapeHtml(
+            finding)}</div><div class="mt-2"><strong>Γιατί χρειάζεται έλεγχος:</strong> ${escapeHtml(
+            reason)}</div>${choices}</div>`,
+        showConfirmButton: review.canDecide, confirmButtonText: 'Αποδοχή πρότασης',
+        showDenyButton: review.canDecide, denyButtonText: 'Δεν ισχύει',
+        showCancelButton: true, cancelButtonText: review.canDecide ? 'Ακύρωση' : 'Κλείσιμο' });
+    if (!review.canDecide || (!result.isConfirmed && !result.isDenied)) return false;
+    const group = { group_id: review.command.proposal_id,
+        pair_contract: { proposal_version: review.command.expected_proposal_version,
+            choice_code: review.command.expected_choice_code },
+        items: [
+            { role: 'SOURCE_BECOMES_WORK',
+                prodhlomena_oraria_id: review.command.expected_source_id,
+                employee_kodikos: exception.employee_kodikos,
+                hmeromhnia: review.found.source.date,
+                current_category: review.found.canonical_source?.current_category,
+                kathgoria_ergasias: review.found.canonical_source?.current_category,
+                proposed_values: review.found.canonical_source?.proposed_values || {} },
+            { role: 'TARGET_BECOMES_REPO',
+                prodhlomena_oraria_id: review.command.expected_target_id,
+                employee_kodikos: exception.employee_kodikos,
+                hmeromhnia: review.found.target.date,
+                current_category: review.found.canonical_target?.current_category,
+                kathgoria_ergasias: review.found.canonical_target?.current_category,
+                proposed_values: review.found.canonical_target?.proposed_values || {} }
+        ] };
+    try {
+        const recorded = await submitRepoTransferDecision(group,
+            result.isConfirmed ? 'APPROVE_PROPOSAL' : 'REJECT_PROPOSAL', { mode: 'hr' });
+        if (recorded === true) await loadResults();
+        return recorded === true;
+    } catch (error) {
+        await employmentReviewSwal({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση',
+            text: error?.message || 'Η καταγραφή απέτυχε.' });
+        return false;
+    }
+}
+
 function renderWeeklyHrStage2BulkSummary(container) {
     const preview = currentWeeklyHrStage2BulkPreview;
     if (!preview) return false;
     const exceptions = Array.isArray(preview.exceptions) ? preview.exceptions.slice(0, 50) : [];
-    const exceptionRows = exceptions.map((item) => `<tr class="weekly-hr-stage2-exception">
+    const exceptionRows = exceptions.map((item, index) => `<tr class="weekly-hr-stage2-exception">
         <td>${escapeHtml(item.employee_kodikos || '—')}</td>
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(
             formatStage1DateKey(item.week_end))}</td>
         <td>${escapeHtml(getStage2LifecycleReasonLabel(item.code) || item.message || item.code)}</td>
+        <td><button type="button" class="btn btn-sm weekly-hr-stage2-exception-review"
+            data-exception-index="${index}">Έλεγχος</button></td>
     </tr>`).join('');
-    const canBulk = Number(preview.safe_bulk_count || 0) > 0 &&
+    const safeCount = Number(preview.safe_bulk_count || 0);
+    const canBulk = safeCount > 0 &&
         userCanRecordCanonicalDecision() && !weeklyHrStage2BulkSubmitting;
+    const unavailableReason = safeCount > 0 && !canBulk ? stage2BulkChangeUnavailableReason() : '';
     container.innerHTML = `<section class="card border rounded employment-review-stage2-bulk"
         aria-label="Μαζική ενημέρωση μεταφοράς ρεπό"><div class="card-body py-2">
         <div class="fw-semibold mb-2">ΣΤΑΔΙΟ 2 — Μεταφορά Ρεπό</div>
@@ -9362,16 +9453,20 @@ function renderWeeklyHrStage2BulkSummary(container) {
             <span>Εξαιρέσεις που απαιτούν HR: <strong>${escapeHtml(
                 preview.manual_exception_count || 0)}</strong></span>
         </div>
-        ${Number(preview.safe_bulk_count || 0) > 0
-            ? `<button type="button" class="btn btn-sm employment-review-action-btn
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-sm employment-review-action-btn
                 employment-review-action-success weekly-hr-stage2-bulk-complete"
-                ${canBulk ? '' : 'disabled aria-disabled="true"'}>Μαζική ενημέρωση ${escapeHtml(
-                    preview.safe_bulk_count)} περιπτώσεων</button>`
-            : Number(preview.manual_exception_count || 0) === 0
-                ? '<div class="text-muted small">Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό.</div>' : ''}
+                ${canBulk ? '' : 'disabled aria-disabled="true"'}>${safeCount > 0
+                    ? `Μαζική ενημέρωση ${escapeHtml(safeCount)} περιπτώσεων`
+                    : 'Μαζική ενημέρωση ρεπό'}</button>
+            ${safeCount === 0
+                ? '<span class="text-muted small">Δεν υπάρχουν αυτή τη στιγμή περιπτώσεις που μπορούν να ενημερωθούν αυτόματα.</span>'
+                : unavailableReason ? `<span class="text-muted small">${escapeHtml(
+                    unavailableReason)}</span>` : ''}
+        </div>
         ${exceptions.length ? `<details class="mt-3"><summary>Εξαιρέσεις που απαιτούν έλεγχο</summary>
             <div class="table-responsive mt-2"><table class="table table-sm mb-0"><thead><tr>
-            <th>Κωδικός</th><th>Εβδομάδα</th><th>Αιτία</th></tr></thead><tbody>${exceptionRows}
+            <th>Κωδικός</th><th>Εβδομάδα</th><th>Αιτία</th><th>Ενέργεια</th></tr></thead><tbody>${exceptionRows}
             </tbody></table></div><div class="d-flex gap-2 align-items-center small text-muted mt-1">
             <button type="button" class="btn btn-sm weekly-hr-stage2-exceptions-prev"
                 ${Number(preview.exception_page || 1) <= 1 ? 'disabled' : ''}>Προηγούμενη</button>
@@ -9493,6 +9588,10 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
         container.querySelector('.weekly-hr-stage2-exceptions-next')?.addEventListener(
             'click', () => loadWeeklyHrStage2BulkPreview(currentPolicyPreviewBaseParams,
                 Number(currentWeeklyHrStage2BulkPreview.exception_page || 1) + 1));
+        container.querySelectorAll('.weekly-hr-stage2-exception-review').forEach((button) =>
+            button.addEventListener('click', () => reviewWeeklyHrStage2Exception(
+                currentWeeklyHrStage2BulkPreview.exceptions?.[
+                    Number(button.dataset.exceptionIndex)] || {})));
         return true;
     }
     if (Number(stage.pending_count || 0) <= 0) {
