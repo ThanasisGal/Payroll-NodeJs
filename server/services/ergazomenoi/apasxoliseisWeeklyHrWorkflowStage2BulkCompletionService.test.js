@@ -30,12 +30,13 @@ function context(index, kind = 'safe') {
     const contexts = [context(0), context(1), context(2), context(3, 'manual')];
     const preview = buildWeeklyHrStage2BulkPreview({ contexts });
     const completed = new Set(); let loads = 0; let guards = 0; const calls = [];
-    const checkedFingerprints = [];
+    const checkedFingerprints = []; const progress = [];
     const args = { period_start: '2026-05-01', period_end: '2026-05-31', ypokatasthma: '0001',
         bulk_request_id: 'bulk-stage2-0001', reason_or_notes: 'Μαζική ενημέρωση',
         expected_preview_fingerprint: preview.preview_fingerprint,
         batch_scopes: preview.safe_scope_ids,
         actor: { role: 'HR' }, commonGuard: async () => { guards++; },
+        onProgress: async (event) => { progress.push(event); },
         loadPreparedContexts: async () => { loads++; return contexts; },
         completePreparedScope: async ({ context: item, request_id,
             expected_scope_fingerprint }) => {
@@ -51,7 +52,15 @@ function context(index, kind = 'safe') {
         skipped: first.skipped_manual }, { applied: 2, stale: 1, failed: 0, skipped: 0 });
     assert.equal(loads, 1); assert.equal(guards, 1);
     assert.equal(new Set(calls).size, 3);
+    assert.deepEqual(progress, [
+        { processed: 1, total: 3, status: 'APPLIED' },
+        { processed: 2, total: 3, status: 'STALE' },
+        { processed: 3, total: 3, status: 'APPLIED' }
+    ]);
+    assert.equal(progress.some((event) => Object.keys(event).some((key) =>
+        /employee|scope|name|kodikos/i.test(key))), false);
     assert.equal(checkedFingerprints.every((value) => /^[a-f0-9]{64}$/.test(value)), true);
+    progress.length = 0;
     const retry = await completeWeeklyHrWorkflowStage2Bulk(args);
     assert.equal(retry.already_completed, 2);
     assert.equal(retry.stale, 1);

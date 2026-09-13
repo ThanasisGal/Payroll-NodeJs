@@ -299,7 +299,9 @@ assert.match(completionSource, /while \(hasMore\)/);
 assert.match(completionSource, /continuation_token: continuationToken/);
 assert.match(completionSource, /processed_in_batch/);
 assert.match(completionSource, /Μαζική ενημέρωση μεταφοράς ρεπό/);
-assert.match(completionSource, /Επεξεργασία \$\{processed\.toLocaleString\('el-GR'\)} από/);
+assert.match(completionSource, /Επεξεργασία \$\{globalProcessed\.toLocaleString/);
+assert.match(completionSource, /application\/x-ndjson/);
+assert.match(completionSource, /response\.body\.getReader\(\)/);
 assert.match(completionSource, /Ολοκληρώθηκαν:/);
 assert.match(completionSource, /Ήταν ήδη τακτοποιημένες:/);
 assert.match(completionSource, /Χρειάζονται νέο έλεγχο:/);
@@ -332,6 +334,7 @@ async function testStage2BulkCompletionCsrfFlow() {
     const completionAlerts = [];
     let csrfCalls = 0;
     let reloadCalls = 0;
+    const progressUpdates = [];
     const completionSandbox = {
         currentWeeklyHrStage2BulkPreview: { safe_bulk_count: 19,
             preview_fingerprint: 'b'.repeat(64) },
@@ -344,7 +347,7 @@ async function testStage2BulkCompletionCsrfFlow() {
         getPolicyPreviewCsrfToken: async () => { csrfCalls++; return 'valid-csrf-token'; },
         renderWeeklyHrStage2LifecycleFallback: () => {},
         employmentReviewSwal: async (options) => { completionAlerts.push(options); return {}; },
-        Swal: { showLoading() {}, update() {}, close() {} },
+        Swal: { showLoading() {}, update(value) { progressUpdates.push(value); }, close() {} },
         loadResults: async () => { reloadCalls++; return true; },
         escapeHtml: (value) => String(value),
         fetch: async (url, options) => {
@@ -353,13 +356,14 @@ async function testStage2BulkCompletionCsrfFlow() {
                 already_completed: 0, stale: 0, failed: 0, skipped_manual: 0,
                 processed_in_batch: 19, has_more: false, continuation_token: null }) };
         },
-        Date, Math, JSON, Number, String, Error
+        Date, Math, JSON, Number, String, Error, TextDecoder, Uint8Array
     };
     vm.runInNewContext(`${completionSource}\nthis.completeBulk = completeWeeklyHrStage2BulkFromUi;`,
         completionSandbox);
     const reason = 'Ελεγμένη δοκιμή μαζικής ενημέρωσης';
     await completionSandbox.completeBulk(reason);
     assert.equal(csrfCalls, 1);
+    assert.match(completionAlerts[0].html, /Επεξεργασία 0 από 19 περιπτώσεις/);
     assert.equal(completionFetchCalls.length, 1);
     const request = completionFetchCalls[0];
     assert.match(request.url, /stage2\/bulk-complete$/);
@@ -372,6 +376,58 @@ async function testStage2BulkCompletionCsrfFlow() {
     assert.equal(body.expected_preview_fingerprint, 'b'.repeat(64));
     assert.equal(reloadCalls, 1);
     assert.equal(completionSandbox.weeklyHrStage2BulkSubmitting, false);
+
+    const ndjsonResponse = (events) => {
+        const chunks = [Buffer.from(events.map((event) => JSON.stringify(event)).join('\n') + '\n')];
+        return { ok: true, headers: { get: () => 'application/x-ndjson; charset=utf-8' },
+            body: { getReader: () => ({ read: async () => chunks.length
+                ? { value: new Uint8Array(chunks.shift()), done: false }
+                : { value: undefined, done: true } }) } };
+    };
+    completionFetchCalls.length = 0;
+    progressUpdates.length = 0;
+    completionSandbox.weeklyHrStage2BulkSubmitting = false;
+    completionSandbox.currentWeeklyHrStage2BulkPreview.safe_bulk_count = 19;
+    completionSandbox.fetch = async (url, options) => {
+        completionFetchCalls.push({ url, options });
+        return ndjsonResponse([
+            ...Array.from({ length: 19 }, (_, index) => ({ type: 'progress',
+                processed_in_batch: index + 1, total_in_batch: 19 })),
+            { type: 'result', success: true, applied: 19, already_completed: 0,
+                stale: 0, failed: 0, skipped_manual: 0, processed_in_batch: 19,
+                has_more: false, continuation_token: null }
+        ]);
+    };
+    await completionSandbox.completeBulk(reason);
+    assert.equal(completionFetchCalls.length, 1);
+    assert.equal(completionFetchCalls[0].options.headers.Accept,
+        'application/x-ndjson, application/json');
+    assert.deepEqual(progressUpdates.map((item) => Number(item.html.match(/Επεξεργασία (\d+)/)[1])),
+        Array.from({ length: 19 }, (_, index) => index + 1));
+
+    completionFetchCalls.length = 0;
+    progressUpdates.length = 0;
+    completionSandbox.weeklyHrStage2BulkSubmitting = false;
+    completionSandbox.currentWeeklyHrStage2BulkPreview.safe_bulk_count = 250;
+    let streamedBatch = 0;
+    completionSandbox.fetch = async (url, options) => {
+        completionFetchCalls.push({ url, options });
+        const counts = [100, 100, 50]; const count = counts[streamedBatch];
+        const hasMore = streamedBatch < 2; streamedBatch++;
+        return ndjsonResponse([
+            ...Array.from({ length: count }, (_, index) => ({ type: 'progress',
+                processed_in_batch: index + 1, total_in_batch: count })),
+            { type: 'result', success: true, applied: count, already_completed: 0,
+                stale: 0, failed: 0, skipped_manual: 0, processed_in_batch: count,
+                has_more: hasMore,
+                continuation_token: hasMore ? `continuation-${streamedBatch}` : null }
+        ]);
+    };
+    await completionSandbox.completeBulk(reason);
+    assert.equal(completionFetchCalls.length, 3);
+    assert.deepEqual(progressUpdates.map((item) => Number(item.html.match(/Επεξεργασία (\d+)/)[1])),
+        Array.from({ length: 250 }, (_, index) => index + 1));
+    completionSandbox.currentWeeklyHrStage2BulkPreview.safe_bulk_count = 19;
 
     completionFetchCalls.length = 0;
     completionAlerts.length = 0;

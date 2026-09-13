@@ -32,7 +32,7 @@ function statusFor(error) {
 async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, ypokatasthma,
     bulk_request_id, reason_or_notes, expected_preview_fingerprint, actor,
     batch_scopes = [], loadPreparedContexts, completePreparedScope,
-    commonGuard = async () => {} } = {}) {
+    commonGuard = async () => {}, onProgress = null } = {}) {
     assertCriticalEmploymentDecisionRole({ userRole: actor?.role });
     const requestId = String(bulk_request_id || '').trim();
     const reason = String(reason_or_notes || '').trim();
@@ -59,8 +59,10 @@ async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, yp
         week_end: dateKeyUtc(context.scope?.week_end)
     }), context]));
     const results = [];
+    let processed = 0;
     for (const scope of batch_scopes) {
             const context = byIdentity.get(identityKey(scope));
+            let status;
             try {
                 const currentScope = buildWeeklyHrStage2BulkPreview({ contexts: [context] })
                     .safe_scope_ids[0];
@@ -76,12 +78,16 @@ async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, yp
                     reason_or_notes: reason, request_id: childRequestId(requestId, scope),
                     expected_scope_fingerprint: scope.scope_fingerprint,
                     bulk_kind: scope.bulk_kind });
-                results.push({ scope, status: result?.idempotent === true
-                    ? 'ALREADY_COMPLETED' : 'APPLIED' });
+                status = result?.idempotent === true ? 'ALREADY_COMPLETED' : 'APPLIED';
+                results.push({ scope, status });
             } catch (error) {
-                results.push({ scope, status: statusFor(error),
+                status = statusFor(error);
+                results.push({ scope, status,
                     code: String(error?.code || 'STAGE2_BULK_SCOPE_FAILED') });
             }
+            processed += 1;
+            if (typeof onProgress === 'function') await onProgress({ processed,
+                total: batch_scopes.length, status });
     }
     const count = (status) => results.filter((item) => item.status === status).length;
     const diagnosticResults = results.filter((item) =>

@@ -502,6 +502,35 @@ function stage2BulkRequestScope(req, input = {}) {
         ypokatasthma: input.ypokatasthma, period_start: input.period_start,
         period_end: input.period_end, user_id: req.session.userId };
 }
+function createWeeklyHrStage2BulkResponseStream(req, res) {
+    const requested = String(req.get?.('accept') || req.headers?.accept || '')
+        .toLowerCase().includes('application/x-ndjson');
+    let started = false;
+    const write = (event) => {
+        if (!started) {
+            res.status(200);
+            res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('X-Accel-Buffering', 'no');
+            if (typeof res.flushHeaders === 'function') res.flushHeaders();
+            started = true;
+        }
+        res.write(`${JSON.stringify(event)}\n`);
+        if (typeof res.flush === 'function') res.flush();
+    };
+    return Object.freeze({ requested, get started() { return started; },
+        progress: ({ processed, total }) => write({ type: 'progress',
+            processed_in_batch: processed, total_in_batch: total }),
+        result: (response) => { write({ type: 'result', ...response }); res.end(); },
+        error: (error) => {
+            if (!started) return false;
+            write({ type: 'error', code: error.code || 'STAGE2_BULK_COMPLETION_FAILED',
+                message: error.statusCode ? error.message :
+                    'Αποτυχία μαζικής ολοκλήρωσης Stage 2.' });
+            res.end(); return true;
+        }
+    });
+}
 const {
     resolveWeeklyHrStage3Day: executeWeeklyHrStage3Day
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3ResolutionService');
@@ -12176,6 +12205,7 @@ class erganhController {
     };
 
     static completeWeeklyHrWorkflowStage2Bulk = async (req, res) => {
+        const responseStream = createWeeklyHrStage2BulkResponseStream(req, res);
         try {
             let prepared = null;
             const actor = { user_id: req.session.userId,
@@ -12187,6 +12217,8 @@ class erganhController {
                 scope: stage2BulkRequestScope(req, req.body) });
             const result = await completeWeeklyHrWorkflowStage2Bulk({ ...req.body, actor,
                 batch_scopes: batch.scopes,
+                onProgress: responseStream.requested
+                    ? async (progress) => responseStream.progress(progress) : null,
                 commonGuard: async () => {
                     await assertWeeklyHrWorkflowIndexesReady();
                     prepared = await loadWeeklyHrStage2BatchPreparedContexts({ req,
@@ -12296,12 +12328,18 @@ class erganhController {
                             return fenced.result;
                         } });
                 } });
-            return res.json({ success: true, ...result,
+            const response = { success: true, ...result,
                 skipped_manual: batch.skipped_manual,
                 processed_in_batch: batch.processed_in_batch,
                 remaining: batch.remaining, has_more: batch.has_more,
-                continuation_token: batch.continuation_token });
+                continuation_token: batch.continuation_token };
+            if (responseStream.requested) {
+                responseStream.result(response);
+                return;
+            }
+            return res.json(response);
         } catch (error) {
+            if (responseStream.error(error)) return;
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'WEEKLY_HR_STAGE2_BULK_COMPLETION_FAILED',
                 message: error.statusCode ? error.message :
@@ -18618,6 +18656,11 @@ Object.defineProperty(erganhController, '__cardsDownloadTestHooks', {
 
 Object.defineProperty(erganhController, '__employmentReviewReportTestHooks', {
     value: Object.freeze({ buildEmploymentReviewReportForRequest }),
+    enumerable: false
+});
+
+Object.defineProperty(erganhController, '__weeklyHrStage2BulkStreamTestHooks', {
+    value: Object.freeze({ createWeeklyHrStage2BulkResponseStream }),
     enumerable: false
 });
 

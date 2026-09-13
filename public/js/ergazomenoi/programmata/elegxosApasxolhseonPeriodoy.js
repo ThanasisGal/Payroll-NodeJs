@@ -9688,14 +9688,53 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
                 try {
                     response = await fetch(endpoint, { method: 'POST',
                         credentials: 'same-origin', headers: { 'Content-Type': 'application/json',
-                            Accept: 'application/json', 'CSRF-Token': token,
+                            Accept: 'application/x-ndjson, application/json', 'CSRF-Token': token,
                             'x-csrf-token': token }, body: JSON.stringify(body) });
                     break;
                 } catch (error) {
                     if (attempt === 1) throw error;
                 }
             }
-            const result = await response.json();
+            const contentType = String(response.headers?.get?.('content-type') || '')
+                .toLowerCase();
+            const streamed = contentType.includes('application/x-ndjson');
+            let result;
+            if (streamed) {
+                if (!response.body?.getReader) throw new Error(
+                    'Δεν είναι διαθέσιμη η ανάγνωση πραγματικής προόδου.');
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                const consumeLine = (line) => {
+                    if (!line.trim()) return;
+                    const event = JSON.parse(line);
+                    if (event.type === 'progress') {
+                        const globalProcessed = processed + Number(
+                            event.processed_in_batch || 0);
+                        Swal.update({ html: `Επεξεργασία ${globalProcessed.toLocaleString(
+                            'el-GR')} από ${Number(preview.safe_bulk_count || 0).toLocaleString(
+                            'el-GR')} περιπτώσεις` });
+                    } else if (event.type === 'result') result = event;
+                    else if (event.type === 'error') {
+                        const streamError = new Error(event.message ||
+                            'Δεν ήταν δυνατή η μαζική ενημέρωση μεταφοράς ρεπό.');
+                        streamError.code = event.code || 'STAGE2_BULK_COMPLETION_FAILED';
+                        throw streamError;
+                    }
+                };
+                while (true) {
+                    const chunk = await reader.read();
+                    buffer += decoder.decode(chunk.value || new Uint8Array(),
+                        { stream: !chunk.done });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    lines.forEach(consumeLine);
+                    if (chunk.done) break;
+                }
+                consumeLine(buffer);
+                if (!result) throw new Error(
+                    'Η μαζική ενημέρωση δεν επέστρεψε τελικό αποτέλεσμα.');
+            } else result = await response.json();
             if (!response.ok || !result.success) {
                 const refreshRequired = ['STAGE2_BULK_PREVIEW_EXPIRED',
                     'STAGE2_BULK_PREVIEW_SCOPE_MISMATCH', 'STAGE2_INPUT_CHANGED',
@@ -9712,8 +9751,9 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
                 !continuationToken || continuationToken === previousContinuationToken)) {
                 throw new Error('Η μαζική ενημέρωση δεν επέστρεψε έγκυρη συνέχεια.');
             }
-            Swal.update({ html: `Επεξεργασία ${processed.toLocaleString('el-GR')} από ${Number(
-                preview.safe_bulk_count || 0).toLocaleString('el-GR')} περιπτώσεις` });
+            if (!streamed) Swal.update({ html: `Επεξεργασία ${processed.toLocaleString(
+                'el-GR')} από ${Number(preview.safe_bulk_count || 0).toLocaleString(
+                'el-GR')} περιπτώσεις` });
         }
         Swal.close();
         if (progressAlert) await progressAlert;

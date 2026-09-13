@@ -346,6 +346,33 @@ const deterministicFullAfterStage2Projection = buildWeeklyHrLifecycleProjection(
 assert.equal(deterministicFullAfterStage2Projection.stages.stage1.business_status, 'COMPLETED');
 assert.equal(deterministicFullAfterStage2Projection.stages.stage2.business_status, 'COMPLETED');
 assert.notEqual(deterministicFullAfterStage2Projection.current_stage, 'STAGE1');
+
+// A raw post-materialization diagnostic remains visible, but it cannot reopen an
+// authoritative Stage 1 whose effective fingerprint matches the canonical rows.
+const postStage2ConflictRows = week('post-stage2-conflict');
+Object.assign(postStage2ConflictRows[0], {
+    kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: true
+});
+const postStage2ConflictFingerprint = buildStage1Fingerprint(postStage2ConflictRows).fingerprint;
+const authoritativePostStage2 = buildWeeklyHrLifecycleProjection({
+    weekRows: postStage2ConflictRows, effectiveProfile: profile,
+    persistedStage1State: { status: 'COMPLETED', version: 2,
+        completion_fingerprint: 'a'.repeat(64),
+        effective_fingerprint: postStage2ConflictFingerprint }
+});
+assert.ok(authoritativePostStage2.stages.stage1.blockers.includes('CATEGORY_REPO_CONFLICT'));
+assert.equal(authoritativePostStage2.stages.stage1.business_status, 'COMPLETED');
+const nonAuthoritativeConflict = buildWeeklyHrLifecycleProjection({
+    weekRows: postStage2ConflictRows, effectiveProfile: profile
+});
+assert.equal(nonAuthoritativeConflict.stages.stage1.business_status, 'BLOCKED');
+const genuinelyStaleConflict = buildWeeklyHrLifecycleProjection({
+    weekRows: postStage2ConflictRows, effectiveProfile: profile,
+    persistedStage1State: { status: 'COMPLETED', version: 2,
+        completion_fingerprint: 'a'.repeat(64), effective_fingerprint: 'b'.repeat(64) }
+});
+assert.equal(genuinelyStaleConflict.stages.stage1.business_status, 'STALE');
+assert.equal(genuinelyStaleConflict.stages.stage2.presentation_status, 'LOCKED');
 assert.deepEqual(buildStage1NoClassificationPreviewItems({
     rows: deterministicFullRepo, possibleDates: ['2026-06-22'], effectiveProfile: profile,
     repoTransfer: { source: { hmeromhnia: '2026-06-25' },

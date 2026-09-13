@@ -363,10 +363,10 @@ function buildWeeklyHrLifecycleProjection({
     const stage1Blockers = unique(stage1Workflow.blocking_reasons || []);
     const stage1BusinessStatus = persistedStatus === BUSINESS_STATUS.STALE
         ? BUSINESS_STATUS.STALE
-        : stage1Blockers.length
-            ? BUSINESS_STATUS.BLOCKED
-            : persistedStatus === BUSINESS_STATUS.COMPLETED
-                ? BUSINESS_STATUS.COMPLETED
+        : persistedStatus === BUSINESS_STATUS.COMPLETED
+            ? BUSINESS_STATUS.COMPLETED
+            : stage1Blockers.length
+                ? BUSINESS_STATUS.BLOCKED
             : stage1PendingDates.length
                 ? BUSINESS_STATUS.OPEN
                 : BUSINESS_STATUS.COMPLETED;
