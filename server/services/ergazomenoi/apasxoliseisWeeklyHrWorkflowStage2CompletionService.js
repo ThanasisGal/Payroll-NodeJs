@@ -32,20 +32,26 @@ function text(value, max = Infinity) { return String(value ?? '').trim().slice(0
 function stage2Items(context = {}) {
     return context.lifecycle?.stages?.stage3?.stage2_automatic_resolution_items || [];
 }
-function currentCanonicalState(row = {}) {
+function currentCanonicalState(row = {}, actualFacts = {}) {
+    const noAuthoritativeWorkEvidence = actualFacts.countsAsActualWorkDay !== true &&
+        Number(actualFacts.cardHours || 0) === 0 &&
+        !(actualFacts.completeCardPairNumbers || []).length &&
+        !(actualFacts.unresolvedCardPairNumbers || []).length &&
+        !(actualFacts.reasons || []).length;
     return { apologistiko_biblio: row.apologistiko_biblio ?? false,
         repo_apologistika: row.repo_apologistika ?? false,
         kathgoria_ergasias_apologistika: text(row.kathgoria_ergasias_apologistika),
         kathgoria_adeias_apologistika: text(row.kathgoria_adeias_apologistika),
         adeia_apologistika: row.adeia_apologistika ?? false,
         astheneia_apologistika: row.astheneia_apologistika ?? false,
-        apousia_apologistika: row.apousia_apologistika ?? null,
-        ores_ergasias_apologistika: Number(row.ores_ergasias_apologistika || 0) };
+        apousia_apologistika: row.apousia_apologistika === true,
+        ores_ergasias_apologistika: noAuthoritativeWorkEvidence
+            ? 0 : Number(row.ores_ergasias_apologistika || 0) };
 }
 const EXPECTED_INITIAL_CANONICAL_STATE = Object.freeze({ apologistiko_biblio: false,
     repo_apologistika: false, kathgoria_ergasias_apologistika: '',
     kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE', adeia_apologistika: false,
-    astheneia_apologistika: false, apousia_apologistika: null,
+    astheneia_apologistika: false, apousia_apologistika: false,
     ores_ergasias_apologistika: 0 });
 function rowMatchesUpdates(row = {}, updates = {}) {
     return Object.entries(updates).every(([field, value]) =>
@@ -84,7 +90,7 @@ function inspectAutomaticMaterialization(context = {}) {
                 fail('STAGE2_ACTUAL_WORK_OR_CARD_EVIDENCE',
                     'Υπάρχει πραγματική εργασία ή μη ασφαλές στοιχείο κάρτας.', 409);
             }
-            const current = currentCanonicalState(row);
+            const current = currentCanonicalState(row, facts);
             const intendedUpdates = planCanonicalDailyClassification({ row, classification });
             const itemState = stableStringify(current) ===
                 stableStringify(EXPECTED_INITIAL_CANONICAL_STATE)

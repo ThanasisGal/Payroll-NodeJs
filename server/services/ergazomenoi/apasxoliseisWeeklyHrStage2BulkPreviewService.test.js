@@ -52,6 +52,16 @@ function context(index, kind = 'safe') {
     return value;
 }
 {
+    const realShapeInitial = context(2000);
+    Object.assign(realShapeInitial.rows[0], { apousia_apologistika: false,
+        ores_ergasias_apologistika: 8 });
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: [realShapeInitial] });
+    assert.equal(preview.safe_automatic_count, 1);
+    assert.equal(preview.technical_conflict_count, 0);
+    assert.equal(preview.automatic_reconciliation.ready_to_materialize, 1);
+    assertCounterInvariants(preview);
+}
+{
     const already = context(2001);
     Object.assign(already.rows[0], { apologistiko_biblio: true,
         repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΑΝ',
