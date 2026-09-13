@@ -386,6 +386,7 @@ let currentCanonicalLifecyclePayloads = [];
 let currentWeeklyHrStage2BulkPreview = null;
 let weeklyHrStage2BulkSubmitting = false;
 let weeklyHrStage2BulkRequestId = '';
+let currentWeeklyHrStage2BulkLastResultDetails = [];
 let weeklyHrStage1LazyLoad = null;
 let currentStage2DailyResolutionByKey = new Map();
 let currentCanonicalDailyEmploymentTypeByKey = new Map();
@@ -9651,6 +9652,7 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
     const scope = getActiveEmploymentReviewScope();
     weeklyHrStage2BulkRequestId = weeklyHrStage2BulkRequestId ||
         `stage2-bulk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    currentWeeklyHrStage2BulkLastResultDetails = [];
     weeklyHrStage2BulkSubmitting = true;
     renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
     let progressAlert = null;
@@ -9666,6 +9668,7 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
                 expected_preview_fingerprint: preview.preview_fingerprint };
         const totals = { applied: 0, already_completed: 0, stale: 0, failed: 0,
             skipped_manual: 0 };
+        const resultDetails = [];
         let continuationToken = null; let processed = 0; let hasMore = true;
         let batchIterations = 0;
         const maxBatchIterations = Math.ceil(Number(preview.safe_bulk_count || 0) / 100) + 2;
@@ -9701,6 +9704,7 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
                     'Δεν ήταν δυνατή η μαζική ενημέρωση μεταφοράς ρεπό.');
             }
             for (const key of Object.keys(totals)) totals[key] += Number(result[key] || 0);
+            if (Array.isArray(result.result_details)) resultDetails.push(...result.result_details);
             processed += Number(result.processed_in_batch || 0);
             hasMore = result.has_more === true;
             continuationToken = result.continuation_token || null;
@@ -9714,14 +9718,45 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
         Swal.close();
         if (progressAlert) await progressAlert;
         progressAlert = null;
+        currentWeeklyHrStage2BulkLastResultDetails = resultDetails;
+        const reasonLabels = {
+            STAGE2_INPUT_CHANGED:
+                'Τα στοιχεία της εβδομάδας άλλαξαν μετά την προεπισκόπηση.',
+            STAGE2_VERSION_CONFLICT:
+                'Η κατάσταση της εβδομάδας άλλαξε πριν ολοκληρωθεί η ενημέρωση.',
+            DAILY_REVIEW_INPUT_CHANGED:
+                'Μία ημερήσια εγγραφή άλλαξε πριν αποθηκευτεί η ενημέρωση.',
+            PERIOD_CONTROL_STATE_CONFLICT:
+                'Η κατάσταση της περιόδου άλλαξε πριν ολοκληρωθεί η ενημέρωση.'
+        };
+        const groupedReasons = new Map();
+        for (const detail of resultDetails) {
+            const status = String(detail?.status || '');
+            const label = status === 'FAILED'
+                ? 'Η ενημέρωση δεν ολοκληρώθηκε για ορισμένες περιπτώσεις.'
+                : reasonLabels[String(detail?.code || '')] ||
+                    'Τα στοιχεία άλλαξαν πριν ολοκληρωθεί η ενημέρωση.';
+            groupedReasons.set(label, Number(groupedReasons.get(label) || 0) + 1);
+        }
+        const reasonsHtml = groupedReasons.size
+            ? `<div class="mt-3 text-start"><strong>Αιτίες παραλείψεων</strong><ul class="mb-0">${[
+                ...groupedReasons.entries()
+            ].map(([label, count]) => `<li>${escapeHtml(label)}: ${count}</li>`).join('')}</ul></div>`
+            : '';
+        weeklyHrStage2BulkSubmitting = false;
+        renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
         await employmentReviewSwal({ icon: totals.failed || totals.stale ? 'warning' : 'success',
             title: 'Μαζική ενημέρωση μεταφοράς ρεπό',
-            text: `Ολοκληρώθηκαν: ${totals.applied}. ` +
+            html: `<div>Ολοκληρώθηκαν: ${totals.applied}. ` +
                 `Ήταν ήδη τακτοποιημένες: ${totals.already_completed}. ` +
                 `Παραλείφθηκαν επειδή άλλαξαν στοιχεία: ${totals.stale}. ` +
                 `Χρειάζονται νέο έλεγχο: ${totals.skipped_manual}. ` +
-                `Δεν ολοκληρώθηκαν: ${totals.failed}.` });
-        await loadResults();
+                `Δεν ολοκληρώθηκαν: ${totals.failed}.</div>${reasonsHtml}` });
+        const refreshed = await loadResults({ preserveStage2BulkDiagnostics: true });
+        if (refreshed === false) await employmentReviewSwal({ icon: 'warning',
+            title: 'Η προβολή δεν ανανεώθηκε',
+            text: 'Η ενημέρωση ολοκληρώθηκε, αλλά η προβολή δεν ανανεώθηκε. ' +
+                'Κάντε νέα Αναζήτηση για να δείτε την τρέχουσα κατάσταση.' });
     } catch (error) {
         if (progressAlert) { Swal.close(); await progressAlert; progressAlert = null; }
         const changed = error?.message === 'PREVIEW_CHANGED';
@@ -9730,7 +9765,10 @@ async function completeWeeklyHrStage2BulkFromUi(reasonOrNotes) {
                 text: 'Τα στοιχεία έχουν αλλάξει από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση πριν συνεχίσετε.' }
             : { icon: 'error', title: 'Η μαζική ενημέρωση απέτυχε',
                 text: 'Δεν ήταν δυνατή η ολοκλήρωση της μαζικής ενημέρωσης. Δοκιμάστε ξανά.' });
-    } finally { weeklyHrStage2BulkSubmitting = false; }
+    } finally {
+        weeklyHrStage2BulkSubmitting = false;
+        renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
+    }
 }
 
 function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
@@ -10872,8 +10910,9 @@ document.addEventListener('change', (event) => {
 });
 
 
-async function loadResults() {
+async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
     try {
+        if (!preserveStage2BulkDiagnostics) currentWeeklyHrStage2BulkLastResultDetails = [];
         currentReviewLifecycleProjectionReady = false;
         currentEmploymentReviewBoundaryContextPreflight = null;
         const advancedBranch = String(
@@ -10888,7 +10927,7 @@ async function loadResults() {
             advancedBranch.toUpperCase() === 'ALL' ||
             advancedBranch.includes(',');
         branchValidation?.classList.toggle('d-none', !invalidBranch);
-        if (invalidBranch) return;
+        if (invalidBranch) return false;
 
         const periodControl = await loadEmploymentPeriodControl(advancedBranch);
         const hasAuthoritativeResult = hasAuthoritativeEmploymentCalculation(periodControl);
@@ -10926,7 +10965,7 @@ async function loadResults() {
                 title: 'Σφάλμα',
                 text: payload.message || 'Αποτυχία ανάκτησης δεδομένων.'
             });
-            return;
+            return false;
         }
 
         ensureReviewTableStructure();
@@ -11065,6 +11104,7 @@ async function loadResults() {
         } else {
             renderPolicyPreviewGroups(null);
         }
+        return true;
     } catch (error) {
         console.error(error);
         renderPolicyPreviewGroups(null, {
@@ -11076,6 +11116,7 @@ async function loadResults() {
             title: 'Σφάλμα',
             text: error.message
         });
+        return false;
     } finally {
         renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
     }

@@ -304,6 +304,9 @@ assert.match(completionSource, /Ολοκληρώθηκαν:/);
 assert.match(completionSource, /Ήταν ήδη τακτοποιημένες:/);
 assert.match(completionSource, /Χρειάζονται νέο έλεγχο:/);
 assert.match(completionSource, /Δεν ολοκληρώθηκαν:/);
+assert.match(completionSource, /currentWeeklyHrStage2BulkLastResultDetails = resultDetails/);
+assert.match(completionSource, /Αιτίες παραλείψεων/);
+assert.match(completionSource, /Η κατάσταση της περιόδου άλλαξε πριν ολοκληρωθεί η ενημέρωση/);
 assert.doesNotMatch(completionSource, /Μαζική ενημέρωση Stage 2|Εφαρμόστηκαν:|Παρωχημένες:|Αποτυχίες:/);
 assert.match(completionSource, /processed_in_batch \|\| 0\) <= 0/);
 assert.match(completionSource, /continuationToken === previousContinuationToken/);
@@ -334,6 +337,7 @@ async function testStage2BulkCompletionCsrfFlow() {
             preview_fingerprint: 'b'.repeat(64) },
         weeklyHrStage2BulkSubmitting: false,
         weeklyHrStage2BulkRequestId: 'stage2-bulk-test-request',
+        currentWeeklyHrStage2BulkLastResultDetails: [],
         currentEmploymentReviewLifecyclePresentation: {},
         getActiveEmploymentReviewScope: () => ({ apo_hmeromhnia: '2026-05-01',
             eos_hmeromhnia: '2026-05-31', ypokatasthma: '0000' }),
@@ -341,7 +345,8 @@ async function testStage2BulkCompletionCsrfFlow() {
         renderWeeklyHrStage2LifecycleFallback: () => {},
         employmentReviewSwal: async (options) => { completionAlerts.push(options); return {}; },
         Swal: { showLoading() {}, update() {}, close() {} },
-        loadResults: async () => { reloadCalls++; },
+        loadResults: async () => { reloadCalls++; return true; },
+        escapeHtml: (value) => String(value),
         fetch: async (url, options) => {
             completionFetchCalls.push({ url, options });
             return { ok: true, json: async () => ({ success: true, applied: 19,
@@ -366,6 +371,67 @@ async function testStage2BulkCompletionCsrfFlow() {
     assert.equal(body.reason_or_notes, reason);
     assert.equal(body.expected_preview_fingerprint, 'b'.repeat(64));
     assert.equal(reloadCalls, 1);
+    assert.equal(completionSandbox.weeklyHrStage2BulkSubmitting, false);
+
+    completionFetchCalls.length = 0;
+    completionAlerts.length = 0;
+    completionSandbox.weeklyHrStage2BulkSubmitting = false;
+    completionSandbox.fetch = async (url, options) => {
+        completionFetchCalls.push({ url, options });
+        return { ok: true, json: async () => ({ success: true, applied: 0,
+            already_completed: 0, stale: 19, failed: 0, skipped_manual: 0,
+            processed_in_batch: 19, has_more: false, continuation_token: null,
+            result_details: Array.from({ length: 19 }, () => ({ status: 'STALE',
+                code: 'PERIOD_CONTROL_STATE_CONFLICT', scope: {} })) }) };
+    };
+    await completionSandbox.completeBulk(reason);
+    const staleResult = completionAlerts.find((item) => /Ολοκληρώθηκαν:/.test(item.html || ''));
+    assert.match(staleResult.html, /Παραλείφθηκαν επειδή άλλαξαν στοιχεία: 19/);
+    assert.match(staleResult.html,
+        /Η κατάσταση της περιόδου άλλαξε πριν ολοκληρωθεί η ενημέρωση\.: 19/);
+    assert.doesNotMatch(staleResult.html, /PERIOD_CONTROL_STATE_CONFLICT/);
+    assert.equal(completionSandbox.currentWeeklyHrStage2BulkLastResultDetails.length, 19);
+
+    completionFetchCalls.length = 0;
+    completionAlerts.length = 0;
+    completionSandbox.weeklyHrStage2BulkSubmitting = false;
+    completionSandbox.fetch = async (url, options) => {
+        completionFetchCalls.push({ url, options });
+        return { ok: true, json: async () => ({ success: true, applied: 0,
+            already_completed: 0, stale: 19, failed: 0, skipped_manual: 0,
+            processed_in_batch: 19, has_more: false, continuation_token: null,
+            result_details: [
+                ...Array.from({ length: 12 }, () => ({ status: 'STALE',
+                    code: 'STAGE2_INPUT_CHANGED', scope: {} })),
+                ...Array.from({ length: 7 }, () => ({ status: 'STALE',
+                    code: 'DAILY_REVIEW_INPUT_CHANGED', scope: {} }))
+            ] }) };
+    };
+    await completionSandbox.completeBulk(reason);
+    const mixedResult = completionAlerts.find((item) => /Ολοκληρώθηκαν:/.test(item.html || ''));
+    assert.match(mixedResult.html,
+        /Τα στοιχεία της εβδομάδας άλλαξαν μετά την προεπισκόπηση\.: 12/);
+    assert.match(mixedResult.html,
+        /Μία ημερήσια εγγραφή άλλαξε πριν αποθηκευτεί η ενημέρωση\.: 7/);
+    assert.doesNotMatch(mixedResult.html,
+        /STAGE2_INPUT_CHANGED|DAILY_REVIEW_INPUT_CHANGED/);
+
+    completionFetchCalls.length = 0;
+    completionAlerts.length = 0;
+    completionSandbox.weeklyHrStage2BulkSubmitting = false;
+    completionSandbox.fetch = async (url, options) => {
+        completionFetchCalls.push({ url, options });
+        return { ok: true, json: async () => ({ success: true, applied: 19,
+            already_completed: 0, stale: 0, failed: 0, skipped_manual: 0,
+            processed_in_batch: 19, has_more: false, continuation_token: null }) };
+    };
+    completionSandbox.loadResults = async () => { reloadCalls++; return false; };
+    await completionSandbox.completeBulk(reason);
+    assert.equal(completionFetchCalls.length, 1);
+    assert.match(completionAlerts.at(-1).text,
+        /Η ενημέρωση ολοκληρώθηκε, αλλά η προβολή δεν ανανεώθηκε/);
+    assert.doesNotMatch(completionAlerts.at(-1).text, /Η μαζική ενημέρωση απέτυχε/);
+    assert.equal(completionSandbox.weeklyHrStage2BulkSubmitting, false);
 
     completionFetchCalls.length = 0;
     completionAlerts.length = 0;
@@ -375,10 +441,25 @@ async function testStage2BulkCompletionCsrfFlow() {
     };
     await completionSandbox.completeBulk(reason);
     assert.equal(completionFetchCalls.length, 0);
+    assert.equal(completionSandbox.weeklyHrStage2BulkSubmitting, false);
     assert.match(completionAlerts.at(-1).title, /Η μαζική ενημέρωση απέτυχε/);
     assert.equal(completionAlerts.at(-1).text,
         'Δεν ήταν δυνατή η ολοκλήρωση της μαζικής ενημέρωσης. Δοκιμάστε ξανά.');
     assert.doesNotMatch(completionAlerts.at(-1).text, /TOKEN_UNAVAILABLE/);
+
+    completionFetchCalls.length = 0;
+    completionAlerts.length = 0;
+    completionSandbox.weeklyHrStage2BulkSubmitting = false;
+    completionSandbox.getPolicyPreviewCsrfToken = async () => 'valid-csrf-token';
+    completionSandbox.fetch = async (url, options) => {
+        completionFetchCalls.push({ url, options });
+        return { ok: false, json: async () => ({ success: false,
+            code: 'WEEKLY_HR_STAGE2_BULK_COMPLETION_FAILED' }) };
+    };
+    await completionSandbox.completeBulk(reason);
+    assert.equal(completionFetchCalls.length, 1);
+    assert.equal(completionSandbox.weeklyHrStage2BulkSubmitting, false);
+    assert.match(completionAlerts.at(-1).title, /Η μαζική ενημέρωση απέτυχε/);
 }
 
 testStage2BulkCompletionCsrfFlow()
