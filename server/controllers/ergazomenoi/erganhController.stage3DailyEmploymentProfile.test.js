@@ -9,8 +9,8 @@ const { buildWeeklyHrLifecycleProjection } = require(
 const { buildStage3InputFingerprint } = require(
     '../../services/ergazomenoi/apasxoliseisStage3FingerprintService');
 
-const { prepareWeeklyHrStage2LifecycleRow, weeklyHrStage2LifecycleProfileFromRow } =
-    Controller.__stage3DailyEmploymentProfileTestHooks;
+const { prepareWeeklyHrStage2LifecycleRow, weeklyHrStage2LifecycleProfileFromRow,
+    resolveWeeklyHrSearchDailyProfile } = Controller.__stage3DailyEmploymentProfileTestHooks;
 
 function dateAt(start, offset) {
     const value = new Date(`${start}T00:00:00.000Z`);
@@ -43,9 +43,15 @@ function resolvedDailyProfiles(rows, employee, history) {
         const authoritative = getDailyRepoProfileInfo({
             row, istorikoRows: history, ergazomenos: employee
         }).profile;
-        const prepared = prepareWeeklyHrStage2LifecycleRow({
-            row, effectiveProfile: authoritative, reviewPhaseCode: '0'
+        const searchResolved = resolveWeeklyHrSearchDailyProfile({
+            row, employee, istorikoRows: history
         });
+        const prepared = prepareWeeklyHrStage2LifecycleRow({
+            row, effectiveProfile: searchResolved, reviewPhaseCode: '0'
+        });
+        assert.equal(prepared.effective_profile_source, 'SCHEDULE_PHASE');
+        assert.equal(prepared.effective_daily_employment_source,
+            authoritative.daily_employment_snapshot_source);
         return [row.hmeromhnia, {
             authoritative,
             search: weeklyHrStage2LifecycleProfileFromRow(prepared)
@@ -160,6 +166,20 @@ for (const item of completedBoundary.stages.stage3.pending_items) {
     });
     assert.equal(item.input_fingerprint, authoritative.fingerprint);
 }
+
+const snapshotRow = { ...boundaryRows[5], kathestos_apasxolhshs_hmeras: '0' };
+const snapshotProfiles = resolvedDailyProfiles([snapshotRow], employee, boundaryHistory);
+const snapshotSearch = buildStage3InputFingerprint(baseFingerprintContext({
+    row: snapshotRow, dailyProfile: snapshotProfiles[snapshotRow.hmeromhnia].search,
+    start: '2026-04-27'
+}));
+const snapshotAuthoritative = buildStage3InputFingerprint(baseFingerprintContext({
+    row: snapshotRow, dailyProfile: snapshotProfiles[snapshotRow.hmeromhnia].authoritative,
+    start: '2026-04-27'
+}));
+assert.equal(snapshotSearch.material.daily_employment.source, 'PRODHLomena_ORARIA');
+assert.deepEqual(snapshotSearch.material, snapshotAuthoritative.material);
+assert.equal(snapshotSearch.fingerprint, snapshotAuthoritative.fingerprint);
 
 const genuineBase = baseFingerprintContext({ row: boundaryRows[5],
     dailyProfile: boundaryProfiles['2026-05-02'].authoritative,

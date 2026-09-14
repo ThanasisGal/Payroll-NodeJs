@@ -3771,6 +3771,12 @@ function weeklyHrStage2LifecycleProfileFromRow(row = {}) {
         profile_employee_id: row.effective_profile_employee_id || null };
 }
 
+function resolveWeeklyHrSearchDailyProfile({ row = {}, employee = {}, istorikoRows = [],
+    resolveProfileForDate = null } = {}) {
+    return getDailyRepoProfileInfo({ row, istorikoRows, ergazomenos: employee,
+        resolveProfileForDate }).profile;
+}
+
 function findReviewOperationalPhaseForDate(phases = [], dateKey = '') {
     if (!dateKey) return null;
 
@@ -7588,9 +7594,11 @@ class erganhController {
                 const erg = ergByKodikos.get(r.kodikos);
                 const istorikoRowsForEmployee =
                     istorikoRowsByKodikos.get(String(r.kodikos || '').trim()) || [];
-                const effectiveProfile = resolveReviewProfile(
-                    r.hmeromhnia, erg || {}, istorikoRowsForEmployee
-                );
+                const resolveProfileForDate = (date) => resolveReviewProfile(
+                    date, erg || {}, istorikoRowsForEmployee);
+                const effectiveProfile = resolveWeeklyHrSearchDailyProfile({ row: r,
+                    employee: erg || {}, istorikoRows: istorikoRowsForEmployee,
+                    resolveProfileForDate });
                 const breakConfiguration = resolveBreakConfigurationForDate(
                     r.hmeromhnia, istorikoRowsForEmployee, erg || {}
                 );
@@ -18791,7 +18799,8 @@ Object.defineProperty(erganhController, '__weeklyHrStage2BulkStreamTestHooks', {
 Object.defineProperty(erganhController, '__stage3DailyEmploymentProfileTestHooks', {
     value: Object.freeze({
         prepareWeeklyHrStage2LifecycleRow,
-        weeklyHrStage2LifecycleProfileFromRow
+        weeklyHrStage2LifecycleProfileFromRow,
+        resolveWeeklyHrSearchDailyProfile
     }),
     enumerable: false
 });
