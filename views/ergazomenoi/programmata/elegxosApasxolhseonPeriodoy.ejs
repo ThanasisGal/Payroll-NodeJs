@@ -43,16 +43,24 @@
                     <span id="employmentPeriodProtocol"></span>
                 </span>
             </div>
-            <div id="employmentPeriodControlActions" class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-danger" id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-warning" id="historicalReconstructionBtn">Ανακατασκευή Εκπρόθεσμης Περιόδου</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-warning" id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="finalizeEmploymentPeriodBtn">Οριστικοποίηση περιόδου</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="submitFinalWTODayilyABtn">Τελική υποβολή Απολογιστικού Πίνακα στο ΕΡΓΑΝΗ</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-primary" id="openCorrectivePayrollBtn">Άνοιγμα διορθωτικής μισθοδοσίας</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-primary" id="calculateCorrectivePayrollBtn">Καταχώρηση διορθωτικών στοιχείων και υπολογισμός</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-secondary" id="closeCorrectivePayrollBtn">Κλείσιμο διορθωτικής μισθοδοσίας</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="postCorrectivePayrollBtn">Καταχώριση διορθωτικής μισθοδοσίας</button>
+            <div id="employmentPeriodControlActions" class="dropdown d-flex flex-wrap gap-2 d-none">
+                <button type="button" id="employmentPeriodActionsDropdown"
+                    class="btn btn-sm dropdown-toggle employment-review-action-btn employment-review-action-secondary"
+                    data-bs-toggle="dropdown" aria-expanded="false">
+                    Ενέργειες περιόδου
+                </button>
+                <div class="dropdown-menu dropdown-menu-end employment-period-actions-menu"
+                    aria-labelledby="employmentPeriodActionsDropdown">
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-danger" data-employment-period-action id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-warning" data-employment-period-action id="historicalReconstructionBtn">Ανακατασκευή Εκπρόθεσμης Περιόδου</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-warning" data-employment-period-action id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-success" data-employment-period-action id="finalizeEmploymentPeriodBtn">Οριστικοποίηση περιόδου</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-success" data-employment-period-action id="submitFinalWTODayilyABtn">Τελική υποβολή Απολογιστικού Πίνακα στο ΕΡΓΑΝΗ</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-primary" data-employment-period-action id="openCorrectivePayrollBtn">Άνοιγμα διορθωτικής μισθοδοσίας</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-primary" data-employment-period-action id="calculateCorrectivePayrollBtn">Καταχώρηση διορθωτικών στοιχείων και υπολογισμός</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-secondary" data-employment-period-action id="closeCorrectivePayrollBtn">Κλείσιμο διορθωτικής μισθοδοσίας</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-success" data-employment-period-action id="postCorrectivePayrollBtn">Καταχώριση διορθωτικής μισθοδοσίας</button>
+                </div>
             </div>
         </div>
         <div id="employmentPeriodControlMessage" class="small text-muted mt-1"></div>

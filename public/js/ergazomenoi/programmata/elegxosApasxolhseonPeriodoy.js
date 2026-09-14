@@ -7985,6 +7985,14 @@ const correctiveDeltaLabels = Object.freeze({
     premiumTotalAmount: 'Σύνολο προσαυξήσεων', grossWorkAmount: 'Συνολικό ποσό'
 });
 
+function syncEmploymentPeriodActionsVisibility() {
+    const container = document.getElementById('employmentPeriodControlActions');
+    if (!container) return;
+    const hasVisibleAction = [...container.querySelectorAll('[data-employment-period-action]')]
+        .some((button) => !button.classList.contains('d-none'));
+    container.classList.toggle('d-none', !hasVisibleAction);
+}
+
 function renderEmploymentPeriodControl(state) {
     currentEmploymentPeriodControl = state || null;
     const panel = document.getElementById('employmentPeriodControlPanel');
@@ -8045,6 +8053,7 @@ function renderEmploymentPeriodControl(state) {
     document.getElementById('postCorrectivePayrollBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.post_corrective_payroll === true)
     );
+    syncEmploymentPeriodActionsVisibility();
     const message = document.getElementById('employmentPeriodControlMessage');
     if (message) {
         message.textContent = state?.index_readiness?.ready === false

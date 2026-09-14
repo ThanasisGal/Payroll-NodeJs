@@ -14782,6 +14782,18 @@ body.loader-active > *:not(.app-loader) {
     background: var(--bs-primary-bg-subtle, #cfe2ff);
 }
 
+.employment-period-actions-menu {
+    min-width: 17rem;
+    padding: 0.35rem;
+}
+
+.employment-period-actions-menu .dropdown-item {
+    width: 100%;
+    margin: 0.15rem 0;
+    text-align: left;
+    white-space: normal;
+}
+
 .employment-review-action-secondary:disabled {
     background: var(--bs-secondary-bg-subtle, #e9ecef);
 }

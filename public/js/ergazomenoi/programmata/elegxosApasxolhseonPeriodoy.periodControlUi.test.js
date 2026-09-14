@@ -29,6 +29,51 @@ const renderedView = ejs.render(view, {
         await page.addScriptTag({ content: sweetAlertJs });
         await page.addScriptTag({ content: browserSource });
 
+        await page.evaluate(() => renderEmploymentPeriodControl({
+            effective_mode: 'NORMAL', allowed_actions: { lock_period: true },
+            index_readiness: { ready: true }
+        }));
+        const actionsTrigger = page.locator('#employmentPeriodActionsDropdown');
+        const lockAction = page.locator(
+            '#employmentPeriodControlActions .dropdown-menu #lockEmploymentPeriodBtn');
+        assert.strictEqual(await actionsTrigger.isVisible(), true);
+        assert.strictEqual((await actionsTrigger.textContent()).trim(), 'Ενέργειες περιόδου');
+        assert.strictEqual(await actionsTrigger.getAttribute('data-bs-toggle'), 'dropdown');
+        assert.strictEqual(await actionsTrigger.getAttribute('aria-expanded'), 'false');
+        assert.ok((await actionsTrigger.getAttribute('class')).includes(
+            'employment-review-action-secondary'));
+        assert.ok(!(await actionsTrigger.getAttribute('class')).includes(
+            'employment-review-action-danger'));
+        assert.strictEqual(await lockAction.count(), 1);
+        assert.ok((await lockAction.getAttribute('class')).includes(
+            'employment-review-action-danger'));
+        assert.ok(!(await lockAction.getAttribute('class')).includes('d-none'));
+        assert.strictEqual(await page.locator('body > #lockEmploymentPeriodBtn').count(), 0,
+            'δεν υπάρχει δεύτερο standalone lock action');
+
+        await page.evaluate(() => renderEmploymentPeriodControl({
+            effective_mode: 'FINALIZED', allowed_actions: {}, index_readiness: { ready: true }
+        }));
+        assert.ok((await lockAction.getAttribute('class')).includes('d-none'));
+        assert.strictEqual(await page.locator('#employmentPeriodControlActions').isVisible(), false,
+            'χωρίς επιτρεπόμενες ενέργειες δεν εμφανίζεται κενό writable menu');
+
+        await page.evaluate(() => {
+            document.getElementById('canReviewEdit').value = '0';
+            renderEmploymentPeriodControl({ effective_mode: 'NORMAL',
+                allowed_actions: { lock_period: true }, index_readiness: { ready: true } });
+        });
+        assert.ok((await lockAction.getAttribute('class')).includes('d-none'),
+            'η υπάρχουσα permission predicate παραμένει ενεργή');
+        await page.evaluate(() => { document.getElementById('canReviewEdit').value = '1'; });
+
+        assert.strictEqual((browserSource.match(
+            /getElementById\('lockEmploymentPeriodBtn'\)\?\.addEventListener/g
+        ) || []).length, 1);
+        assert.match(browserSource,
+            /getElementById\('lockEmploymentPeriodBtn'\)\?\.addEventListener\('click',[\s\S]{0,160}transitionEmploymentPeriod\('lock'\)/);
+        assert.doesNotMatch(view, /id="lockEmploymentPeriodBtn"[^>]*onclick=/);
+
         async function transitionModalContract(periodControl, action) {
             await page.evaluate(({ control, transitionAction }) => {
                 currentEmploymentPeriodControl = control;
