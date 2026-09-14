@@ -107,6 +107,7 @@ function command(initial, h, overrides = {}) {
         'c'.repeat(64));
     assert.equal(firstHarness.store.audits[0].previous_stage1_version, 1);
     assert.equal(firstHarness.store.audits[0].new_stage1_version, 2);
+    assert.match(firstHarness.store.audits[0].command_identity, /^[a-f0-9]{64}$/);
     const replay = await command(firstContext, firstHarness);
     assert.equal(replay.idempotent, true);
     assert.equal(firstHarness.store.state.stage1.version, 2);
@@ -139,6 +140,13 @@ function command(initial, h, overrides = {}) {
     const completed = await command(lastContext, lastHarness);
     assert.equal(completed.stage3_status, 'COMPLETED');
     assert.match(completed.completion_fingerprint, /^[a-f0-9]{64}$/);
+
+    const overriddenIdentityContext = context();
+    const overriddenIdentityHarness = harness(overriddenIdentityContext, []);
+    await command(overriddenIdentityContext, overriddenIdentityHarness, {
+        request_id: 'stage3:identity-override-0001', command_identity: '9'.repeat(64)
+    });
+    assert.equal(overriddenIdentityHarness.store.audits[0].command_identity, '9'.repeat(64));
 
     const employee0029 = context({ date: '2026-06-30', remaining: ['2026-06-30'] });
     employee0029.scope.employee_kodikos = '0029';

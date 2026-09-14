@@ -89,6 +89,7 @@ function sessionEnvelope(value) {
 async function resolveWeeklyHrStage3Day({
     initialContext, expected_input_fingerprint, expected_stage3_version, final_classification,
     leave_category = '', reason_or_notes, request_id, actor: rawActor,
+    command_identity = '',
     loadFreshContext, loadPostWriteContext, transactionRunner,
     writeDaily = writeCanonicalDailyClassification,
     stateModel = StateModel, auditModel = AuditModel, now = () => new Date()
@@ -115,8 +116,10 @@ async function resolveWeeklyHrStage3Day({
         fail('STAGE3_VERSION_CONFLICT',
             'Η έκδοση του Stage 3 άλλαξε πριν από την αποθήκευση.', 409);
     }
-    const identity = stage3CommandIdentity({ context: initialContext,
+    const identity = text(command_identity) || stage3CommandIdentity({ context: initialContext,
         fingerprint: initialFingerprint, finalClassification, actor, reason });
+    if (!/^[a-f0-9]{64}$/.test(identity)) fail('INVALID_STAGE3_COMMAND_IDENTITY',
+        'Μη έγκυρη ταυτότητα εντολής Stage 3.');
 
     return transactionRunner(async (transactionValue) => {
         const envelope = sessionEnvelope(transactionValue);

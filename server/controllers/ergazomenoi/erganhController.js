@@ -538,6 +538,11 @@ const {
     buildWeeklyHrStage3BulkPreview
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewService');
 const {
+    normalizeStage3BulkApplyCommand,
+    inspectStage3BulkIdempotency,
+    applyWeeklyHrStage3Bulk
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3BulkApplyService');
+const {
     resolveDailyActualWorkFacts: resolveStage3DailyActualWorkFacts
 } = require('../../services/ergazomenoi/apasxoliseisDailyActualWorkFactsService');
 const {
@@ -1256,30 +1261,32 @@ function assertReviewDecisionMutualExclusion(row = {}) {
     }
 }
 
-async function activeEmploymentReviewPeriodDates(req) {
-    const period = await PeriodsModel.findOne({
+async function activeEmploymentReviewPeriodDates(req, session = null) {
+    const query = PeriodsModel.findOne({
         xrhsh: req.session.yearInUse,
         kodikos: req.session.periodInUse
-    }).select('apo eos').lean();
+    }).select('apo eos');
+    const period = await (session ? query.session(session) : query).lean();
     if (!period?.apo || !period?.eos) {
         throw weeklyHrApiError('INVALID_PERIOD_SCOPE', 400, 'Δεν βρέθηκε η ενεργή περίοδος.');
     }
     return { period_start: period.apo, period_end: period.eos };
 }
 
-async function activeEmploymentReviewPeriodScope(req, branchOverride = '') {
-    const dates = await activeEmploymentReviewPeriodDates(req);
+async function activeEmploymentReviewPeriodScope(req, branchOverride = '', session = null) {
+    const dates = await activeEmploymentReviewPeriodDates(req, session);
     const branch = String(branchOverride || req.body?.ypokatasthma || req.query?.ypokatasthma || '').trim();
     if (!branch || branch.toUpperCase() === 'ALL' || branch.includes(',')) {
         const error = new Error('Δεν ήταν δυνατό να προσδιοριστεί η περίοδος και το παράρτημα.');
         error.code = 'INVALID_PERIOD_SCOPE'; error.statusCode = 400; throw error;
     }
     const normalizedBranch = branch.padStart(4, '0');
-    const branchRecord = await YpokatasthmataModel.findOne({
+    const branchQuery = YpokatasthmataModel.findOne({
         team: req.session.userTeam,
         companykod_object: String(req.session.companyInUse || ''),
         kodikos: normalizedBranch
-    }).select('_id').lean();
+    }).select('_id');
+    const branchRecord = await (session ? branchQuery.session(session) : branchQuery).lean();
     if (!branchRecord) {
         const error = new Error('Το παράρτημα δεν ανήκει στην ενεργή εταιρεία.');
         error.code = 'PERIOD_CONTROL_SCOPE_FORBIDDEN'; error.statusCode = 403; throw error;
@@ -4388,7 +4395,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
     const branch = String(input.ypokatasthma || '').trim().padStart(4, '0');
     const employeeId = String(input.employee_id || '').trim();
     const week = normalizeNaturalWeek(input.week_start, input.week_end);
-    const periodScope = await activeEmploymentReviewPeriodScope(req, branch);
+    const periodScope = await activeEmploymentReviewPeriodScope(req, branch, session);
     if (!mongoose.isValidObjectId(employeeId)) {
         throw weeklyHrApiError('INVALID_WEEK_SCOPE', 400, 'Μη έγκυρη ταυτότητα εργαζομένου.');
     }
@@ -4425,7 +4432,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
         }).select(CANONICAL_HISTORY_SELECT_FIELDS)
             .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 })).lean();
     const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
-        team: base.team, employees: [employee]
+        team: base.team, employees: [employee], session
     });
     const resolveProfileForDate = (reviewDate) =>
         resolveEffectiveEmploymentProfileForReviewDate({
@@ -12475,6 +12482,67 @@ class erganhController {
                 code: error.code || 'STAGE3_BULK_PREVIEW_FAILED',
                 message: error.statusCode ? error.message :
                     'Αποτυχία προεπισκόπησης μαζικών αποφάσεων Stage 3.' });
+        }
+    };
+
+    static applyWeeklyHrStage3Bulk = async (req, res) => {
+        try {
+            await assertWeeklyHrWorkflowIndexesReady();
+            const command = normalizeStage3BulkApplyCommand(req.body);
+            const actor = { user_id: req.session.userId,
+                user_name: req.session.userName || req.session.username ||
+                    String(req.session.userId || ''), role: req.session.userRole };
+            const requestScope = { team: req.session.userTeam,
+                company_kod: req.session.companyInUse };
+            const prior = await inspectStage3BulkIdempotency({ command: req.body,
+                requestScope, actor });
+            if (prior) return res.json({ success: true, ...prior });
+            const firstInput = { ...command.items[0], ypokatasthma: command.ypokatasthma,
+                period_start: command.period_start, period_end: command.period_end };
+            const initial = await loadWeeklyHrStage3DecisionContext({ req, input: firstInput });
+            const periodAccess = await assertActiveEmploymentReviewStage3DayWritable(
+                req, initial, firstInput
+            );
+            const runFence = periodAccess.state.effective_mode ===
+                'HISTORICAL_RECONSTRUCTION_STALE'
+                ? runWithStaleStage3ResolutionWriteFence : runWithPeriodWriteFence;
+            const loadContext = (item, bulkCommand, { session } = {}) =>
+                loadWeeklyHrStage3DecisionContext({ req, session, input: { ...item,
+                    ypokatasthma: bulkCommand.ypokatasthma,
+                    period_start: bulkCommand.period_start,
+                    period_end: bulkCommand.period_end } });
+            const result = await applyWeeklyHrStage3Bulk({ command: req.body,
+                requestScope, actor,
+                loadAuthoritativeContext: loadContext,
+                runAtomic: (work) => runFence({ scope: periodAccess.scope,
+                    expectedToken: { ...periodAccess.token,
+                        write_fence_version: Number(periodAccess.state.write_fence_version || 0) },
+                    work: ({ session, state }) => work({ session,
+                        period_control_version: Number(state?.version || 0),
+                        period_write_fence_version: Number(state?.write_fence_version || 0) })
+                }).then((fenced) => fenced.result),
+                resolveOne: ({ item, command: bulkCommand, current, actor,
+                    request_id, command_identity, expected_input_fingerprint,
+                    expected_stage3_version, envelope }) => executeWeeklyHrStage3Day({
+                    initialContext: current,
+                    expected_input_fingerprint, expected_stage3_version,
+                    final_classification: bulkCommand.final_classification,
+                    leave_category: bulkCommand.leave_category,
+                    reason_or_notes: bulkCommand.reason_or_notes, request_id,
+                    command_identity, actor,
+                    loadFreshContext: ({ session }) => loadContext(item, bulkCommand, { session }),
+                    loadPostWriteContext: ({ session }) => loadContext(item, bulkCommand, { session }),
+                    transactionRunner: (work) => work(envelope)
+                }) });
+            return res.json({ success: true, ...result });
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ success: false,
+                code: error.code || 'STAGE3_BULK_APPLY_FAILED',
+                message: error.statusCode ? error.message :
+                    'Αποτυχία μαζικής εφαρμογής αποφάσεων Stage 3.',
+                applied_count: 0,
+                ...(Array.isArray(error.invalid_items)
+                    ? { invalid_items: error.invalid_items } : {}) });
         }
     };
 

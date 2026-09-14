@@ -136,14 +136,16 @@ function resolveEffectiveEmploymentProfileForReviewDate({
         matches[0]?._id || null, normalEmployee);
 }
 
-function queryLean(query, fields) {
-    return query.select(fields === '_id afm' ? fields : profileSelect(fields)).lean();
+function queryLean(query, fields, session = null) {
+    const selected = query.select(fields === '_id afm' ? fields : profileSelect(fields));
+    return (session && selected?.session ? selected.session(session) : selected).lean();
 }
 
 async function preloadBorrowedEmploymentProfileContexts({
     team,
     employees = [],
-    models = {}
+    models = {},
+    session = null
 } = {}) {
     const companiesModel = models.companiesModel || CompaniesModel;
     const employeeModel = models.employeeModel || ErgazomenoiModel;
@@ -158,7 +160,7 @@ async function preloadBorrowedEmploymentProfileContexts({
         String(row.afm_daneizomenoy_ergodoth || '').trim()).filter(Boolean))];
     const companies = afms.length
         ? await queryLean(companiesModel.find({ team, afm: mongoose.trusted({ $in: afms }) }),
-            '_id afm')
+            '_id afm', session)
         : [];
     const byAfm = new Map();
     for (const company of companies) {
@@ -191,7 +193,8 @@ async function preloadBorrowedEmploymentProfileContexts({
         '_id team company_kod kodikos ypokatasthma hmeres_ergasias_ebdomadas ' +
         'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
         'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
-        'nomimoOromisthio pragmatikoOromisthio eidikh_kathgoria_ergazomenoy eidikh_periptosh')
+        'nomimoOromisthio pragmatikoOromisthio eidikh_kathgoria_ergazomenoy eidikh_periptosh',
+        session)
         : [];
 
     for (const item of requested) {
@@ -214,7 +217,7 @@ async function preloadBorrowedEmploymentProfileContexts({
         'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
         'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
         'nomimoOromisthio pragmatikoOromisthio employment_profile_source ' +
-        'afora_allagh_oron_ergasias createdAt')
+        'afora_allagh_oron_ergasias createdAt', session)
         : [];
     for (const item of resolved) {
         item.context.borrowingHistory = histories.filter((row) =>
