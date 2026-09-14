@@ -14798,6 +14798,191 @@ body.loader-active > *:not(.app-loader) {
     background: var(--bs-warning-bg-subtle, #fff3cd);
 }
 
+.employment-review-stage2-bulk-preview-modal .modal-dialog {
+    max-width: min(1200px, 94vw);
+}
+
+.employment-review-stage2-bulk-preview-modal .modal-content {
+    max-height: calc(100vh - 2rem);
+}
+
+.employment-review-stage2-bulk-preview-modal .modal-header,
+.employment-review-stage2-bulk-preview-modal .modal-footer {
+    flex-shrink: 0;
+}
+
+.employment-review-stage2-bulk-preview-modal .modal-body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+
+.weekly-hr-stage2-preview-heading {
+    min-width: 0;
+}
+
+.weekly-hr-stage2-preview-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0;
+}
+
+.weekly-hr-stage2-preview-summary span {
+    padding: 0 1rem;
+}
+
+.weekly-hr-stage2-preview-summary span:first-child {
+    padding-left: 0;
+}
+
+.weekly-hr-stage2-preview-summary span + span {
+    border-left: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.weekly-hr-stage2-preview-case {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+}
+
+.weekly-hr-stage2-preview-case + .weekly-hr-stage2-preview-case {
+    margin-top: 0.75rem;
+}
+
+.weekly-hr-stage2-preview-case-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 0.5rem 1.5rem;
+    margin-bottom: 0.65rem;
+}
+
+.weekly-hr-stage2-preview-employee {
+    min-width: 0;
+    font-weight: 600;
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+.weekly-hr-stage2-preview-week,
+.weekly-hr-stage2-preview-week span {
+    color: var(--bs-secondary-color, #6c757d);
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+.weekly-hr-stage2-preview-change {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: 0.5rem 1rem;
+    padding: 0.45rem 0;
+}
+
+.weekly-hr-stage2-preview-change + .weekly-hr-stage2-preview-change {
+    border-top: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.1));
+}
+
+.weekly-hr-stage2-preview-date {
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+.weekly-hr-stage2-preview-transition {
+    min-width: 0;
+}
+
+.weekly-hr-stage2-preview-arrow {
+    display: inline-block;
+    margin: 0 0.55rem;
+}
+
+.weekly-hr-stage2-preview-reason-detail {
+    margin-top: 0.35rem;
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: 0.9rem;
+}
+
+.weekly-hr-stage2-preview-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+}
+
+.weekly-hr-stage2-preview-controls {
+    display: grid;
+    grid-template-columns: auto minmax(16rem, 1fr) auto;
+    align-items: end;
+    gap: 1rem 1.5rem;
+}
+
+.weekly-hr-stage2-preview-pagination,
+.weekly-hr-stage2-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    white-space: nowrap;
+}
+
+.weekly-hr-stage2-preview-safety {
+    width: 100%;
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: 0.9rem;
+}
+
+.weekly-hr-stage2-preview-reason {
+    min-width: 0;
+}
+
+@media (max-width: 991.98px) {
+    .weekly-hr-stage2-preview-controls {
+        grid-template-columns: 1fr auto;
+    }
+
+    .weekly-hr-stage2-preview-reason {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .employment-review-stage2-bulk-preview-modal .modal-dialog {
+        max-width: 94vw;
+        margin-right: auto;
+        margin-left: auto;
+    }
+
+    .weekly-hr-stage2-preview-case-header,
+    .weekly-hr-stage2-preview-change,
+    .weekly-hr-stage2-preview-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .weekly-hr-stage2-preview-week,
+    .weekly-hr-stage2-preview-week span {
+        white-space: normal;
+    }
+
+    .weekly-hr-stage2-preview-reason {
+        grid-column: auto;
+    }
+
+    .weekly-hr-stage2-preview-summary span {
+        padding: 0 0.75rem;
+    }
+
+    .weekly-hr-stage2-preview-summary span:first-child {
+        padding-left: 0;
+    }
+
+    .weekly-hr-stage2-preview-pagination,
+    .weekly-hr-stage2-preview-actions {
+        justify-content: space-between;
+    }
+}
+
 .weekly-hr-stage1-table {
     font-size: 0.82rem;
     margin-bottom: 0;
@@ -15071,7 +15256,12 @@ body.loader-active > *:not(.app-loader) {
 .swal2-popup.employment-review-swal-popup .swal2-textarea,
 .swal2-popup.employment-review-swal-popup .swal2-validation-message,
 .swal2-popup.employment-review-swal-popup .swal2-input-label {
-    font-size: 0.85rem !important;
+    font-size: 0.95rem !important;
+}
+
+.swal2-popup.employment-review-swal-popup .swal2-html-container,
+.swal2-popup.employment-review-swal-popup .employment-review-swal-html-container {
+    line-height: 1.45;
 }
 
 .employment-review-swal-popup .swal2-confirm.class-info,

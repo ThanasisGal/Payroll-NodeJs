@@ -22,15 +22,20 @@ Object.defineProperty(container, 'innerHTML', {
     }
 });
 container.querySelector = (selector) => selector.split(',').some((candidate) =>
-    html.includes(candidate.trim().slice(1))) ? {} : null;
+    html.includes(candidate.trim().slice(1))) ? { addEventListener() {} } : null;
+container.querySelectorAll = () => [];
 const sandbox = {
+    currentWeeklyHrStage2BulkPreview: null, currentCanonicalLifecyclePayloads: [],
+    weeklyHrStage2BulkSubmitting: false,
     document: { getElementById: (id) => id === 'policyPreviewGroupsContainer' ? container : null },
     escapeHtml: (value) => String(value ?? ''),
     formatStage1DateKey: (value) => String(value || '').split('-').reverse().join('/'),
     getPolicyPreviewReasonLabel: (value) => String(value || ''),
     policyPreviewReasonLabels: { REPO_RESOLUTION_REQUIRED: 'Απαιτείται επίλυση μεταφοράς ρεπό.' },
     atomicRepoTransferDiagnosticLabels: {},
-    formatPolicyPreviewUnknownCode: (value) => String(value || '')
+    formatPolicyPreviewUnknownCode: (value) => String(value || ''),
+    userCanRecordCanonicalDecision: () => false,
+    canRecordEmploymentDecisionForCurrentPeriod: () => false
 };
 vm.createContext(sandbox);
 vm.runInContext(`${source.slice(helperStart, helperEnd)}
@@ -80,7 +85,7 @@ assert.equal(completedStage2Lifecycle.stages.STAGE2.pending_count, 0);
 assert.equal(completedStage2Lifecycle.stages.STAGE2.pending_items.length, 0);
 container.innerHTML = '';
 assert.equal(sandbox.renderFallback(completedStage2Lifecycle), true);
-assert.match(container.innerHTML, /Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό\./);
+assert.match(container.innerHTML, /Προεπισκόπηση μαζικής ενημέρωσης/);
 const completedHtmlBeforeToggle = container.innerHTML;
 let stage2CollapseState = 'show';
 stage2CollapseState = 'hidden';
@@ -88,9 +93,9 @@ assert.equal(container.innerHTML, completedHtmlBeforeToggle);
 
 // 1-2: lifecycle presentation is available before the asynchronous policy renderer completes.
 container.innerHTML = '';
+sandbox.currentWeeklyHrStage2BulkPreview = null;
 assert.equal(sandbox.renderFallback(lifecycle), true);
-assert.match(container.innerHTML, /Εκκρεμότητες Μεταφοράς Ρεπό/);
-assert.doesNotMatch(container.innerHTML, /Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό\./);
+assert.match(container.innerHTML, /Περιπτώσεις που χρειάζονται έλεγχο/);
 assert.match(container.innerHTML, /01\/06\/2026–07\/06\/2026/);
 assert.match(container.innerHTML, /Απαιτείται επίλυση μεταφοράς ρεπό\./);
 assert.doesNotMatch(container.innerHTML, /REPO_RESOLUTION_REQUIRED/);
@@ -101,18 +106,18 @@ assert.equal(container.innerHTML, '');
 
 // 4: loadResults finally is the final orchestration point and restores the fallback.
 assert.equal(sandbox.renderFallback(lifecycle), true);
-assert.match(container.innerHTML, /Εκκρεμότητες Μεταφοράς Ρεπό/);
+assert.match(container.innerHTML, /Περιπτώσεις που χρειάζονται έλεγχο/);
 assert.equal((container.innerHTML.match(/Απαιτείται επίλυση μεταφοράς ρεπό\./g) || []).length, 3);
 
-// Real atomic/policy content always wins and is never replaced by the fallback.
+// The compact workspace remains the single Stage-2 presentation.
 container.innerHTML = '<section class="atomic-repo-transfer-section">atomic card</section>';
-assert.equal(sandbox.renderFallback(lifecycle), false);
-assert.equal(container.innerHTML, '<section class="atomic-repo-transfer-section">atomic card</section>');
+assert.equal(sandbox.renderFallback(lifecycle), true);
+assert.doesNotMatch(container.innerHTML, /atomic-repo-transfer-section/);
 assert.doesNotMatch(container.innerHTML, /Δεν υπάρχουν εκκρεμείς μεταφορές ρεπό\./);
 
 container.innerHTML = '<section class="policy-preview-card">policy card</section>';
-assert.equal(sandbox.renderFallback(lifecycle), false);
-assert.equal(container.innerHTML, '<section class="policy-preview-card">policy card</section>');
+assert.equal(sandbox.renderFallback(lifecycle), true);
+assert.doesNotMatch(container.innerHTML, /policy-preview-card/);
 
 // A later no-card refresh can clear, then restore, the same derived fallback.
 container.innerHTML = '';
@@ -123,8 +128,13 @@ collapse.className = 'accordion-collapse collapse';
 collapse.className = 'accordion-collapse collapse show';
 assert.equal(container.innerHTML, beforeCollapseToggle);
 
-const loadResults = source.slice(source.indexOf('async function loadResults()'),
-    source.indexOf('function pairNo('));
+const loadResultsStart = source.indexOf('async function loadResults(');
+const loadResultsEnd = source.indexOf('function pairNo(', loadResultsStart);
+assert.notEqual(loadResultsStart, -1, 'loadResults start boundary must exist');
+assert.notEqual(loadResultsEnd, -1, 'loadResults end boundary must exist');
+assert.ok(loadResultsEnd > loadResultsStart,
+    'loadResults end boundary must follow its start boundary');
+const loadResults = source.slice(loadResultsStart, loadResultsEnd);
 assert.match(loadResults, /renderPreCalculationDataIssues\(rows\);\s*return;/);
 assert.match(loadResults, /finally\s*\{[\s\S]*renderWeeklyHrStage2LifecycleFallback\(currentEmploymentReviewLifecyclePresentation\)/);
 assert.ok(mutations.some((entry) => entry.after === ''));
@@ -138,6 +148,6 @@ assert.match(navigation, /scrollIntoView\(\{ behavior: 'smooth', block: 'center'
 assert.match(navigation, /actionable-issue-target-highlight/);
 assert.match(navigation, /Η περίπτωση δεν είναι ορατή με τα τρέχοντα φίλτρα\./);
 assert.match(source, /Περιπτώσεις προς ενημερωτικό έλεγχο/);
-assert.match(mutations.at(-1).after, /Εκκρεμότητες Μεταφοράς Ρεπό/);
+assert.match(mutations.at(-1).after, /Περιπτώσεις που χρειάζονται έλεγχο/);
 
 console.log('Stage-2 asynchronous rendering-order integration test passed');

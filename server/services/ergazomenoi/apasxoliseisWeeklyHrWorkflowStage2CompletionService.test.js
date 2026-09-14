@@ -1,7 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { completeWeeklyHrWorkflowStage2 } = require(
+const { inspectAutomaticMaterialization, buildWeeklyHrStage2FingerprintInput,
+    fingerprint, completeWeeklyHrWorkflowStage2 } = require(
     './apasxoliseisWeeklyHrWorkflowStage2CompletionService'
 );
 
@@ -63,6 +64,21 @@ function harness(classification, failure = '') {
 }
 
 (async () => {
+    {
+        const minimal = context('REST_REPO');
+        const expanded = structuredClone(minimal);
+        expanded.effectiveProfilesByDate['2026-06-09'] = {
+            typos_apasxolhshs: '0', loader_metadata: 'representation only' };
+        const minimalItems = inspectAutomaticMaterialization(minimal).items;
+        const expandedItems = inspectAutomaticMaterialization(expanded).items;
+        assert.deepEqual(buildWeeklyHrStage2FingerprintInput(minimal, minimalItems),
+            buildWeeklyHrStage2FingerprintInput(expanded, expandedItems));
+        assert.equal(fingerprint(minimal, minimalItems), fingerprint(expanded, expandedItems));
+        const changed = structuredClone(minimal);
+        changed.upstream.stage1_current_fingerprint = FP2;
+        const changedItems = inspectAutomaticMaterialization(changed).items;
+        assert.notEqual(fingerprint(minimal, minimalItems), fingerprint(changed, changedItems));
+    }
     for (const [classification, expected] of [['REST_REPO', ['ΑΝ', true]],
         ['NON_WORK', ['ΜΕ', false]]]) {
         const h = harness(classification);
@@ -148,6 +164,46 @@ function harness(classification, failure = '') {
         await assert.rejects(() => completeWeeklyHrWorkflowStage2({ ...h.args,
             loadFreshContext: async () => actualWork }),
         { code: 'STAGE2_ACTUAL_WORK_OR_CARD_EVIDENCE' });
+    }
+    {
+        const h = harness('REST_REPO');
+        h.initial.scope.employee_id = '507f191e810c19729de860eb';
+        h.initial.scope.week_start = '2026-06-08';
+        h.initial.scope.week_end = '2026-06-14';
+        const persistedEmployeeId = { bsonType: 'ObjectId', value: '507f191e810c19729de860eb' };
+        const persistedWeekStart = new Date('2026-06-08T00:00:00Z');
+        const persistedWeekEnd = new Date('2026-06-14T00:00:00Z');
+        const persistedState = { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+            employee_id: persistedEmployeeId, week_start: persistedWeekStart,
+            week_end: persistedWeekEnd, stage1: { status: 'COMPLETED',
+                completion_fingerprint: FP1, effective_fingerprint: FP1, version: 4 } };
+        let updateFilter;
+        h.args.stateModel = { findOne: () => ({ session() { return this; },
+            async lean() { return persistedState; } }), collection: { async updateOne(filter) {
+            updateFilter = filter; return { matchedCount: 1 };
+        } } };
+        const result = await completeWeeklyHrWorkflowStage2(h.args);
+        assert.equal(result.completed, true);
+        assert.strictEqual(updateFilter.employee_id, persistedEmployeeId);
+        assert.strictEqual(updateFilter.week_start, persistedWeekStart);
+        assert.strictEqual(updateFilter.week_end, persistedWeekEnd);
+        assert.equal(updateFilter['stage1.version'], 4);
+        assert.deepEqual(updateFilter['stage2.version'], { $exists: false });
+
+        const conflict = harness('REST_REPO');
+        conflict.initial.scope.employee_id = '507f191e810c19729de860eb';
+        conflict.initial.scope.week_start = '2026-06-08';
+        conflict.initial.scope.week_end = '2026-06-14';
+        conflict.args.stateModel = { findOne: () => ({ session() { return this; },
+            async lean() { return { ...persistedState, stage2: { status: 'OPEN', version: 2 } }; } }),
+        collection: { async updateOne(filter) {
+            assert.strictEqual(filter.employee_id, persistedEmployeeId);
+            assert.equal(filter['stage1.version'], 4);
+            assert.equal(filter['stage2.version'], 2);
+            return { matchedCount: 0 };
+        } } };
+        await assert.rejects(() => completeWeeklyHrWorkflowStage2(conflict.args),
+            { code: 'STAGE2_VERSION_CONFLICT' });
     }
     console.log('weekly HR Stage-2 atomic materialization tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

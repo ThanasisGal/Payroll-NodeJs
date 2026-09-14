@@ -375,6 +375,69 @@
             </div>
         </div>
     </div>
+
+    <div
+        class="modal fade employment-review-stage2-bulk-preview-modal"
+        id="weeklyHrStage2BulkPreviewModal"
+        tabindex="-1"
+        aria-labelledby="weeklyHrStage2BulkPreviewModalLabel"
+        aria-hidden="true"
+    >
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header align-items-start">
+                    <div class="weekly-hr-stage2-preview-heading flex-grow-1">
+                        <h5 class="modal-title" id="weeklyHrStage2BulkPreviewModalLabel">
+                            Προεπισκόπηση μαζικής ενημέρωσης ρεπό
+                        </h5>
+                        <div class="alert alert-info py-2 px-3 mt-2 mb-2" role="status">
+                            Δεν έχει γίνει ακόμη καμία αλλαγή.
+                        </div>
+                        <div class="weekly-hr-stage2-preview-summary" aria-label="Σύνοψη προεπισκόπησης">
+                            <span><strong id="weeklyHrStage2PreviewCaseCount">0</strong> Περιπτώσεις</span>
+                            <span><strong id="weeklyHrStage2PreviewEmployeeCount">0</strong> Εργαζόμενοι</span>
+                            <span><strong id="weeklyHrStage2PreviewWeekCount">0</strong> Εβδομάδες</span>
+                            <span><strong id="weeklyHrStage2PreviewDayCount">0</strong> Ημερήσιες αλλαγές</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Κλείσιμο"></button>
+                </div>
+                <div class="modal-body" id="weeklyHrStage2BulkPreviewBody"></div>
+                <div class="modal-footer weekly-hr-stage2-preview-footer">
+                    <div class="weekly-hr-stage2-preview-safety">
+                        Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά ότι τα στοιχεία δεν έχουν μεταβληθεί.
+                        Αν κάποια περίπτωση έχει αλλάξει, δεν θα ενημερωθεί και θα εμφανιστεί για νέο έλεγχο.
+                    </div>
+                    <div class="weekly-hr-stage2-preview-controls">
+                        <div class="weekly-hr-stage2-preview-pagination" aria-label="Σελιδοποίηση προεπισκόπησης">
+                            <button type="button" id="weeklyHrStage2PreviewPrevious"
+                                class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap">
+                                ‹ Προηγούμενη
+                            </button>
+                            <span id="weeklyHrStage2PreviewPageLabel" aria-live="polite">Σελίδα 1 από 1</span>
+                            <button type="button" id="weeklyHrStage2PreviewNext"
+                                class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap">
+                                Επόμενη ›
+                            </button>
+                        </div>
+                        <div class="weekly-hr-stage2-preview-reason">
+                            <label for="weeklyHrStage2PreviewReason" class="form-label mb-1">Αιτιολογία</label>
+                            <textarea id="weeklyHrStage2PreviewReason" class="form-control form-control-sm" rows="2" required></textarea>
+                            <div class="invalid-feedback">Η αιτιολογία είναι υποχρεωτική.</div>
+                        </div>
+                        <div class="weekly-hr-stage2-preview-actions">
+                            <button type="button" class="btn employment-review-action-btn employment-review-action-secondary nowrap"
+                                data-bs-dismiss="modal">Ακύρωση</button>
+                            <button type="button" id="weeklyHrStage2PreviewApply"
+                                class="btn employment-review-action-btn employment-review-action-success nowrap">
+                                Εφαρμογή ενημερώσεων
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     </section>
     <% } %>
     <input

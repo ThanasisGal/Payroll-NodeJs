@@ -41,6 +41,12 @@ function buildCanonicalClassificationUpdates({ classification, leave_category = 
             Number.isFinite(Number(row.ores_ergasias)) ? Number(row.ores_ergasias) : 0) } : {}) };
 }
 
+function planCanonicalDailyClassification({ row = {}, classification,
+    leave_category = '' } = {}) {
+    return applyCanonicalAbsenceMetrics(row,
+        buildCanonicalClassificationUpdates({ classification, leave_category, row }));
+}
+
 async function writeCanonicalDailyClassification({
     row, classification, leave_category = '', reason, actor_name, session,
     prodhlomenaModel = ProdhlomenaOrariaModel,
@@ -48,8 +54,7 @@ async function writeCanonicalDailyClassification({
 } = {}) {
     if (!session) throw error('DAILY_CLASSIFICATION_TRANSACTION_REQUIRED',
         'Απαιτείται ασφαλής συναλλαγή.', 503);
-    const updates = applyCanonicalAbsenceMetrics(row,
-        buildCanonicalClassificationUpdates({ classification, leave_category, row }));
+    const updates = planCanonicalDailyClassification({ row, classification, leave_category });
     const oldValues = {}; const newValues = {};
     for (const [field, value] of Object.entries(updates)) {
         if (String(row?.[field] ?? '') !== String(value ?? '')) {
@@ -77,5 +82,5 @@ async function writeCanonicalDailyClassification({
         updates, row: { ...row, ...updates } };
 }
 
-module.exports = { ALLOWED, buildCanonicalClassificationUpdates,
+module.exports = { ALLOWED, buildCanonicalClassificationUpdates, planCanonicalDailyClassification,
     writeCanonicalDailyClassification };

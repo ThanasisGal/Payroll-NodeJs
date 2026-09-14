@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
 const { fingerprintSnapshot } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const { commandIdentity } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
-const { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, validateCurrentApplyValues, validateProposed, preflightWeeklyRepoTransferApply } = require('./apasxoliseisWeeklyRepoTransferApplyPreflightService');
+const { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, validateCurrentApplyValues, validateProposed, preflightWeeklyRepoTransferApplyPrepared, preflightWeeklyRepoTransferApply } = require('./apasxoliseisWeeklyRepoTransferApplyPreflightService');
 const { PROPOSAL_VERSION } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
 const SOURCE = '507f1f77bcf86cd799439012', TARGET = '507f1f77bcf86cd799439013', DECISION = '507f1f77bcf86cd799439011';
 const session = { userTeam: 'team', companyInUse: 'company', userId: '507f191e810c19729de860ea', userName: 'Actor', userStatus: 'A', userRole: 'A' };
@@ -43,6 +43,17 @@ function modelValidation(record) { try { return new ExecutionModel(record).valid
     assert.deepStrictEqual(Object.keys(validateCurrentApplyValues({ ...values, apo_ora_02_apologistika: undefined })), APPLY_FIELDS); assert.strictEqual(validateCurrentApplyValues({ ...values, apo_ora_02_apologistika: undefined }).apo_ora_02_apologistika, null);
     for (const [field, value] of [['apo_ora_02_apologistika', {}],['repo_apologistika', 'false'],['ores_ergasias_apologistika', '8'],['ores_ergasias_apologistika', NaN],['ores_ergasias_apologistika', Infinity]]) assert.throws(() => validateCurrentApplyValues({ ...values, [field]: value }), (error) => error.code === 'INVALID_CURRENT_VALUE');
     const accepted = await run(); assert.strictEqual(accepted.plan.source.id, SOURCE);
+    {
+        const { decision, rebuilt } = setup();
+        const prepared = preflightWeeklyRepoTransferApplyPrepared({ session, payload,
+            decision, rebuilt: { snapshot: rebuilt, fingerprint: decision.snapshot_fingerprint } });
+        assert.strictEqual(prepared.plan.target.id, TARGET);
+        const stale = { snapshot: { ...rebuilt,
+            source: { ...rebuilt.source, current_values: { ...rebuilt.source.current_values,
+                cards_ores_ergasias: 7 } } }, fingerprint: 'b'.repeat(64) };
+        assert.throws(() => preflightWeeklyRepoTransferApplyPrepared({ session, payload,
+            decision, rebuilt: stale }), (error) => error.code === 'STALE_FINGERPRINT');
+    }
     {
         const legacy = setup();
         legacy.decision.canonical_snapshot = snapshot('repo-transfer-single-pair-proposal:v4');

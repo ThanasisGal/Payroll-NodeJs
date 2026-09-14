@@ -9,7 +9,7 @@ function duplicate(error) { return error?.code === 11000 || error?.name === 'Mon
 async function lean(query) { return query && typeof query.lean === 'function' ? query.lean() : query; }
 async function applyWeeklyRepoTransfer({ session, payload, decisionModel = DecisionModel, executionModel = ExecutionModel,
     preflight = preflightWeeklyRepoTransferApply, writer = writeWeeklyRepoTransferAtomically, periodWriteGuard, periodFence,
-    authorizationMetadata = null }) {
+    authorizationMetadata = null, writerOptions = null }) {
     const command = validateApplyCommand(payload); const scope = validateApplySession(session); const identity = commandIdentity(command);
     const result = await preflight({ session, payload: command, decisionModel, executionModel });
     if (result.idempotent) return { execution: presentation(result.execution), idempotent: true };
@@ -17,7 +17,8 @@ async function applyWeeklyRepoTransfer({ session, payload, decisionModel = Decis
     const plan = authorizationMetadata
         ? Object.freeze({ ...result.plan, authorization_metadata: authorizationMetadata })
         : result.plan;
-    try { return { execution: presentation(await writer({ plan, periodFence })), idempotent: false }; }
+    try { return { execution: presentation(await writer({ plan, periodFence,
+        ...(writerOptions || {}) })), idempotent: false }; }
     catch (error) {
         const byRequest = await lean(executionModel.findOne({ team: scope.team, company_kod: scope.company_kod, request_id: command.request_id }));
         const byDecision = await lean(executionModel.findOne({ decision_id: command.decision_id, team: scope.team, company_kod: scope.company_kod }));

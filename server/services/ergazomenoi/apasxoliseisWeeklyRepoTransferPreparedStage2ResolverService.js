@@ -57,8 +57,30 @@ function applyCapability({ applyState, runtimeEnabled, indexReady, context = nul
         index_ready: indexReady === true, apply_context: context };
 }
 
+function buildWeeklyRepoTransferPreparedLookups({ decisions = [], executions = [],
+    instrumentation = null } = {}) {
+    const decisionsByProposalId = new Map();
+    for (const decision of decisions) {
+        const proposalId = String(decision.proposal_id || '');
+        if (!decisionsByProposalId.has(proposalId)) decisionsByProposalId.set(proposalId, []);
+        decisionsByProposalId.get(proposalId).push(decision);
+    }
+    const executionByDecisionId = new Map();
+    for (const execution of executions) {
+        executionByDecisionId.set(String(execution.decision_id || ''), execution);
+    }
+    if (instrumentation) {
+        instrumentation.decisions_array_indexed =
+            Number(instrumentation.decisions_array_indexed || 0) + 1;
+        instrumentation.executions_array_indexed =
+            Number(instrumentation.executions_array_indexed || 0) + 1;
+    }
+    return { decisionsByProposalId, executionByDecisionId, instrumentation };
+}
+
 function resolveWeeklyRepoTransferDecisionFromPreparedWeek({ weeklyInput, scope = {},
     canonicalDecisionContext = {}, decisions = [], executions = [], applyProtection = {},
+    preparedLookups = null,
     presentationStart = null, presentationEnd = null,
     canonicalSnapshotBuilder = buildCanonicalSnapshot,
     snapshotFingerprintBuilder = fingerprintSnapshot } = {}) {
@@ -77,11 +99,20 @@ function resolveWeeklyRepoTransferDecisionFromPreparedWeek({ weeklyInput, scope 
         holidayByDateKey: weeklyInput.holidayByDateKey || new Map(),
         week: { start: group.group_key.match(/week=([^:|]+)/)?.[1],
             end: group.group_key.match(/week=[^:|]+:([^|]+)/)?.[1] } };
-    const fingerprint = snapshotFingerprintBuilder(canonicalSnapshotBuilder({ scope, context, group }));
-    const proposalDecisions = decisions.filter((decision) =>
-        String(decision.proposal_id || '') === String(group.group_id || ''));
-    const executionByDecisionId = new Map(executions.map((execution) =>
-        [String(execution.decision_id || ''), execution]));
+    const snapshot = canonicalSnapshotBuilder({ scope, context, group });
+    const fingerprint = snapshotFingerprintBuilder(snapshot);
+    const proposalDecisions = preparedLookups?.decisionsByProposalId instanceof Map
+        ? preparedLookups.decisionsByProposalId.get(String(group.group_id || '')) || []
+        : decisions.filter((decision) =>
+            String(decision.proposal_id || '') === String(group.group_id || ''));
+    const executionByDecisionId = preparedLookups?.executionByDecisionId instanceof Map
+        ? preparedLookups.executionByDecisionId
+        : new Map(executions.map((execution) =>
+            [String(execution.decision_id || ''), execution]));
+    if (preparedLookups?.instrumentation) {
+        preparedLookups.instrumentation.resolver_lookup_count = Number(
+            preparedLookups.instrumentation.resolver_lookup_count || 0) + 1;
+    }
     const history = proposalDecisions.map((decision) => presentation(decision, fingerprint));
     const rawCurrent = proposalDecisions.find((decision) =>
         decision.snapshot_fingerprint === fingerprint) || null;
@@ -108,7 +139,9 @@ function resolveWeeklyRepoTransferDecisionFromPreparedWeek({ weeklyInput, scope 
     const start = context.week.start || ''; const end = context.week.end || '';
     const inside = !presentationStart || !presentationEnd ||
         (start >= dateKeyUtc(presentationStart) && end <= dateKeyUtc(presentationEnd));
-    return { projection, fingerprint, group, record: { proposal_id: group.group_id,
+    return { projection, fingerprint, group,
+        prepared: Object.freeze({ snapshot, fingerprint, group }),
+        record: { proposal_id: group.group_id,
         current_proposal_fingerprint: fingerprint,
         current_decision_fingerprint: rawCurrent?.snapshot_fingerprint || null,
         current_proposal: { employee_kodikos: text(sourceItem.employee_kodikos ||
@@ -173,6 +206,7 @@ function resolveWeeklyRepoTransferStage2StateFromPreparedBatch({ records = [], s
         dateKeyUtc(record.current_proposal?.week_end) === end) || null;
 }
 
-module.exports = { resolveWeeklyRepoTransferDecisionFromPreparedWeek,
+module.exports = { buildWeeklyRepoTransferPreparedLookups,
+    resolveWeeklyRepoTransferDecisionFromPreparedWeek,
     buildAppliedOnlyWeeklyRepoTransferDecisionRecords,
     resolveWeeklyRepoTransferStage2StateFromPreparedBatch, appliedHistoryPresentation };

@@ -79,10 +79,13 @@ function commandIdentity(command) {
 function presentation(record, currentFingerprint = null) { return { id: String(record._id || ''), proposal_id: record.proposal_id, decision_code: record.decision_code, decision_status: record.decision_status, notes: record.notes || '', ypokatasthma: record.ypokatasthma, employee_kodikos: record.employee_kodikos, week_start: record.week_start, week_end: record.week_end, created_by_user_name: record.created_by_user_name, created_at: record.created_at, is_current: Boolean(currentFingerprint && record.snapshot_fingerprint === currentFingerprint) }; }
 
 async function createWeeklyRepoTransferDecision({ session, payload, decisionModel = DecisionModel, approvalModel = PolicyApprovalModel,
-    reconstruct = reconstructWeeklyRepoTransferDecision, periodGuard, mutationRunner }) {
+    reconstruct = reconstructWeeklyRepoTransferDecision, periodGuard, mutationRunner,
+    preloadedDecisionByRequestId = null, preloadedDecisionByProposalIdentity = null }) {
     const scope = scopeFromSession(session); const command = validateCommand(payload);
     const normalizedCommandIdentity = commandIdentity(command);
-    const retry = await decisionModel.findOne({
+    const retry = preloadedDecisionByRequestId instanceof Map
+        ? preloadedDecisionByRequestId.get(command.request_id) || null
+        : await decisionModel.findOne({
         team: scope.team,
         company_kod: scope.company_kod,
         request_id: command.request_id
@@ -134,7 +137,9 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
         }
     }
     const snapshot = final.snapshot;
-    const existingDecision = await decisionModel.findOne({
+    const existingDecision = preloadedDecisionByProposalIdentity instanceof Map
+        ? preloadedDecisionByProposalIdentity.get(final.fingerprint) || null
+        : await decisionModel.findOne({
         team: scope.team,
         company_kod: scope.company_kod,
         ypokatasthma: snapshot.ypokatasthma,
@@ -162,6 +167,12 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
         const created = typeof mutationRunner === 'function'
             ? await mutationRunner((dbSession) => createRecord(dbSession))
             : await createRecord();
+        if (preloadedDecisionByRequestId instanceof Map) {
+            preloadedDecisionByRequestId.set(command.request_id, created);
+        }
+        if (preloadedDecisionByProposalIdentity instanceof Map) {
+            preloadedDecisionByProposalIdentity.set(final.fingerprint, created);
+        }
         return { decision: presentation(created, final.fingerprint), idempotent: false };
     }
     catch (error) {

@@ -1,0 +1,157 @@
+'use strict';
+
+const assert = require('assert');
+const { buildWeeklyHrStage2BulkPreview, publicWeeklyHrStage2BulkPreview,
+    EXCEPTION_PAGE_SIZE } = require(
+    './apasxoliseisWeeklyHrStage2BulkPreviewService'
+);
+
+const FP = 'a'.repeat(64);
+function assertCounterInvariants(preview) {
+    assert.equal(preview.safe_bulk_count + preview.already_resolved_count +
+        preview.manual_exception_count + preview.technical_conflict_count,
+    preview.total_scopes);
+    assert.equal(preview.safe_bulk_count,
+        preview.safe_pair_count + preview.safe_automatic_count);
+}
+function context(index, kind = 'safe') {
+    const week = index % 5;
+    const start = new Date(Date.UTC(2026, 4, 4 + week * 7));
+    const end = new Date(start.getTime() + 6 * 86400000);
+    const date = start.toISOString().slice(0, 10);
+    const row = { _id: `row-${index}`, hmeromhnia: start, updatedAt: start,
+        repo: false, kathgoria_ergasias: 'ΕΡΓ', cards_apo_ora_01: '',
+        cards_eos_ora_01: '', cards_ores_ergasias: 0,
+        apologistiko_biblio: false, repo_apologistika: false,
+        kathgoria_ergasias_apologistika: '', kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE',
+        adeia_apologistika: false, astheneia_apologistika: false,
+        apousia_apologistika: null, ores_ergasias_apologistika: 0 };
+    const value = { scope: { employee_id: `employee-${Math.floor(index / 5)}`,
+        employee_kodikos: String(Math.floor(index / 5)).padStart(4, '0'),
+        week_start: start, week_end: end }, rows: [row],
+    effectiveProfilesByDate: { [date]: { typos_apasxolhshs: '0' } },
+    workflowState: { stage1: { status: 'COMPLETED' } },
+    upstream: { stage1_current_fingerprint: FP }, lifecycle: { stages: {
+        stage2: {}, stage3: { pending_dates: [], stage2_automatic_resolution_items:
+            [{ date, classification: 'REST_REPO' }] } } } };
+    if (kind === 'manual') value.lifecycle.stages.stage2 = { business_status: 'OPEN',
+        pending_count: 1, pending_items: [{}], pending_reasons: ['MULTIPLE_TARGET_CANDIDATES'],
+        blockers: [], has_transferable_pair: true, has_bounded_selection: false };
+    if (kind === 'resolved') value.workflowState.stage2 = { status: 'COMPLETED' };
+    if (kind === 'pair') {
+        value.lifecycle.stages.stage2 = { pending_count: 1, pending_items: [{}],
+            pending_reasons: ['REPO_TRANSFER_DECISION_REQUIRED'], blockers: [],
+            has_transferable_pair: true, has_bounded_selection: true };
+        value.period_writable = true;
+        value.preparedStage2Record = { current_proposal_fingerprint: 'b'.repeat(64),
+            runtime_enabled: true, index_ready: true, apply_state: 'NOT_APPROVED',
+            current_proposal: { command: { proposal_id: `proposal-${index}`,
+                expected_source_id: `source-${index}`, expected_target_id: `target-${index}`,
+                expected_proposal_version: 'v2', expected_choice_code: 'ONLY_PAIR' } } };
+    }
+    return value;
+}
+{
+    const realShapeInitial = context(2000);
+    Object.assign(realShapeInitial.rows[0], { apousia_apologistika: false,
+        ores_ergasias_apologistika: 8 });
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: [realShapeInitial] });
+    assert.equal(preview.safe_automatic_count, 1);
+    assert.equal(preview.technical_conflict_count, 0);
+    assert.equal(preview.automatic_reconciliation.ready_to_materialize, 1);
+    assertCounterInvariants(preview);
+}
+{
+    const already = context(2001);
+    Object.assign(already.rows[0], { apologistiko_biblio: true,
+        repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΑΝ',
+        kathgoria_adeias_apologistika: '', adeia_apologistika: false,
+        astheneia_apologistika: false, apousia_apologistika: false,
+        ores_ergasias_apologistika: 0 });
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: [already] });
+    assert.equal(preview.already_resolved_count, 1);
+    assert.equal(preview.manual_exception_count, 0);
+    assert.equal(preview.automatic_reconciliation.already_materialized, 1);
+    assertCounterInvariants(preview);
+}
+{
+    const noLonger = context(2002);
+    noLonger.lifecycle.stages.stage3.stage2_automatic_resolution_items = [];
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: [noLonger] });
+    assert.equal(preview.no_longer_applicable_count, 1);
+    assert.equal(preview.already_resolved_count, 1);
+    assert.equal(preview.manual_exception_count, 0);
+    assertCounterInvariants(preview);
+}
+{
+    const conflict = context(2003);
+    conflict.lifecycle.stages.stage2.business_status = 'COMPLETED';
+    conflict.rows[0].kathgoria_ergasias_apologistika = 'ΜΕ';
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: [conflict] });
+    assert.equal(preview.technical_conflict_count, 1);
+    assert.equal(preview.manual_exception_count, 0);
+    assert.equal(conflict.lifecycle.stages.stage2.business_status, 'COMPLETED');
+    assert.equal(preview._technical_conflicts[0].code, 'STAGE2_CANONICAL_ROW_CHANGED');
+    assertCounterInvariants(preview);
+}
+{
+    const pairs = Array.from({ length: 500 }, (_, i) => context(i, 'pair'));
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: pairs });
+    assert.equal(preview.safe_pair_count, 500);
+    assert.equal(preview.safe_automatic_count, 0);
+    assert.equal(preview.safe_bulk_count, 500);
+    assert.equal(preview.safe_employee_count, 100);
+    assert.equal(preview.safe_week_count, 500);
+    assert.equal(preview.safe_day_change_count, 1000);
+    assertCounterInvariants(preview);
+}
+{
+    const mixed = [...Array.from({ length: 450 }, (_, i) => context(i, 'pair')),
+        ...Array.from({ length: 50 }, (_, i) => context(500 + i))];
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts: mixed });
+    assert.equal(preview.safe_pair_count, 450);
+    assert.equal(preview.safe_automatic_count, 50);
+    assert.equal(preview.safe_bulk_count, 500);
+    assertCounterInvariants(preview);
+    const ambiguous = context(999, 'pair');
+    ambiguous.lifecycle.stages.stage2.has_bounded_selection = false;
+    assert.equal(buildWeeklyHrStage2BulkPreview({ contexts: [ambiguous] })
+        .manual_exception_count, 1);
+}
+
+{
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts:
+        [...Array.from({ length: 500 }, (_, i) => context(i)),
+            ...Array.from({ length: 10 }, (_, i) => context(500 + i, 'manual'))] });
+    assert.equal(preview.total_scopes, 510);
+    assert.equal(preview.safe_bulk_count, 500);
+    assert.equal(preview.manual_exception_count, 10);
+    assertCounterInvariants(preview);
+    assert.equal(preview.exceptions.length, 10);
+    assert.equal(preview.exception_page_size, EXCEPTION_PAGE_SIZE);
+    assert.match(preview.preview_fingerprint, /^[a-f0-9]{64}$/);
+}
+{
+    const contexts = Array.from({ length: 10000 }, (_, i) =>
+        context(i, i < 9500 ? 'safe' : 'manual'));
+    const preview = buildWeeklyHrStage2BulkPreview({ contexts });
+    assert.equal(preview.total_scopes, 10000);
+    assert.equal(preview.safe_bulk_count, 9500);
+    assert.equal(preview.manual_exception_count, 500);
+    assert.equal(preview.exceptions.length, 50);
+    assert.equal(preview.safe_scope_ids.length, 9500);
+    assertCounterInvariants(preview);
+    const publicPreview = publicWeeklyHrStage2BulkPreview(preview);
+    assert.equal(Object.hasOwn(publicPreview, 'safe_scope_ids'), false);
+}
+{
+    const contexts = [context(1)];
+    const left = buildWeeklyHrStage2BulkPreview({ contexts, preview_scope: {
+        team: 'team-a', company_kod: 'company-a', ypokatasthma: '0001',
+        period_start: '2026-05-01', period_end: '2026-05-31' } });
+    const right = buildWeeklyHrStage2BulkPreview({ contexts, preview_scope: {
+        team: 'team-a', company_kod: 'company-b', ypokatasthma: '0001',
+        period_start: '2026-05-01', period_end: '2026-05-31' } });
+    assert.notEqual(left.preview_fingerprint, right.preview_fingerprint);
+}
+console.log('weekly HR Stage-2 bulk preview tests passed');

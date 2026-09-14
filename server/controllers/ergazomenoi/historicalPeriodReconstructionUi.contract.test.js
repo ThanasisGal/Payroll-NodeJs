@@ -102,7 +102,7 @@ assert.match(renderedOptions[4].customClass.htmlContainer, /(?:^|\s)historical-r
 assert.match(renderedOptions[4].customClass.cancelButton, /(?:^|\s)custom-cancel-button(?:\s|$)/);
 assert.strictEqual(renderedOptions[4].customClass.input, 'historical-reconstruction-swal__reason');
 
-assert.match(stylesheet, /\.swal2-popup\.employment-review-swal-popup[\s\S]*?font-size:\s*0\.85rem\s*!important;/);
+assert.match(stylesheet, /\.swal2-popup\.employment-review-swal-popup[\s\S]*?font-size:\s*0\.95rem\s*!important;/);
 assert.match(stylesheet, /\.custom-swal-popup\.historical-reconstruction-swal\s*\{[\s\S]*?width:\s*min\(600px,\s*calc\(100vw - 2rem\)\)\s*!important;/);
 assert.match(stylesheet, /\.historical-reconstruction-swal__reason\s*\{[\s\S]*?width:\s*96%\s*!important;[\s\S]*?max-width:\s*96%\s*!important;[\s\S]*?box-sizing:\s*border-box;/);
 assert.match(stylesheet, /\.employment-review-action-danger\s*\{[\s\S]*?background:\s*var\(--bs-danger-bg-subtle,\s*#f8d7da\);[\s\S]*?border-color:\s*#f1aeb5;/);

@@ -2826,8 +2826,12 @@ async function testLightweightHrLoadingRequests() {
 }
 
 function testPreAndPostCalculationWorkflowGating() {
-    const loadResultsStart = source.indexOf('async function loadResults()');
+    const loadResultsStart = source.indexOf('async function loadResults(');
     const loadResultsEnd = source.indexOf('function pairNo(n)', loadResultsStart);
+    assert.notEqual(loadResultsStart, -1, 'loadResults start boundary must exist');
+    assert.notEqual(loadResultsEnd, -1, 'loadResults end boundary must exist');
+    assert.ok(loadResultsEnd > loadResultsStart,
+        'loadResults end boundary must follow its start boundary');
     const loadResultsSource = source.slice(loadResultsStart, loadResultsEnd);
     assert.ok(loadResultsSource.includes(
         'if (payload.finalized !== true && !hasAuthoritativeResult)'

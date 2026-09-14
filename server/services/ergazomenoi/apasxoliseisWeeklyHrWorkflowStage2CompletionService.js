@@ -10,7 +10,7 @@ const { assertCriticalEmploymentDecisionRole } = require(
 const { stableStringify } = require('./apasxoliseisStage3FingerprintService');
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
 const { normalizeEmploymentType } = require('./apasxoliseisReviewEmploymentProfileService');
-const { writeCanonicalDailyClassification } = require(
+const { writeCanonicalDailyClassification, planCanonicalDailyClassification } = require(
     './apasxoliseisCanonicalDailyClassificationWriterService'
 );
 
@@ -18,6 +18,12 @@ const ACTION = 'STAGE2_COMPLETED';
 const WORKFLOW_VERSION = 'weekly-hr-workflow:v1';
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:._-]{7,99}$/;
 const CLASSIFICATIONS = new Set(['REST_REPO', 'NON_WORK']);
+const AUTOMATIC_INSPECTION = Object.freeze({
+    READY_TO_MATERIALIZE: 'READY_TO_MATERIALIZE',
+    ALREADY_MATERIALIZED: 'ALREADY_MATERIALIZED',
+    NO_LONGER_APPLICABLE: 'NO_LONGER_APPLICABLE',
+    TECHNICAL_CONFLICT: 'TECHNICAL_CONFLICT'
+});
 
 function fail(code, message, statusCode = 400) {
     throw Object.assign(new Error(message), { code, statusCode });
@@ -26,60 +32,104 @@ function text(value, max = Infinity) { return String(value ?? '').trim().slice(0
 function stage2Items(context = {}) {
     return context.lifecycle?.stages?.stage3?.stage2_automatic_resolution_items || [];
 }
-function normalizeItems(context = {}) {
+function currentCanonicalState(row = {}, actualFacts = {}) {
+    const noAuthoritativeWorkEvidence = actualFacts.countsAsActualWorkDay !== true &&
+        Number(actualFacts.cardHours || 0) === 0 &&
+        !(actualFacts.completeCardPairNumbers || []).length &&
+        !(actualFacts.unresolvedCardPairNumbers || []).length &&
+        !(actualFacts.reasons || []).length;
+    return { apologistiko_biblio: row.apologistiko_biblio ?? false,
+        repo_apologistika: row.repo_apologistika ?? false,
+        kathgoria_ergasias_apologistika: text(row.kathgoria_ergasias_apologistika),
+        kathgoria_adeias_apologistika: text(row.kathgoria_adeias_apologistika),
+        adeia_apologistika: row.adeia_apologistika ?? false,
+        astheneia_apologistika: row.astheneia_apologistika ?? false,
+        apousia_apologistika: row.apousia_apologistika === true,
+        ores_ergasias_apologistika: noAuthoritativeWorkEvidence
+            ? 0 : Number(row.ores_ergasias_apologistika || 0) };
+}
+const EXPECTED_INITIAL_CANONICAL_STATE = Object.freeze({ apologistiko_biblio: false,
+    repo_apologistika: false, kathgoria_ergasias_apologistika: '',
+    kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE', adeia_apologistika: false,
+    astheneia_apologistika: false, apousia_apologistika: false,
+    ores_ergasias_apologistika: 0 });
+function rowMatchesUpdates(row = {}, updates = {}) {
+    return Object.entries(updates).every(([field, value]) =>
+        stableStringify(row[field]) === stableStringify(value));
+}
+function effectiveProfileSignature(dailyProfile = {}) {
+    return stableStringify({ employment_type: normalizeEmploymentType(
+        dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
+    ) });
+}
+function inspectAutomaticMaterialization(context = {}) {
     const rows = new Map((context.rows || []).map((row) => [dateKeyUtc(row.hmeromhnia), row]));
     const stage3Pending = new Set(context.lifecycle?.stages?.stage3?.pending_dates || []);
-    return stage2Items(context).map((item) => {
-        const date = dateKeyUtc(item.date);
-        const classification = text(item.classification).toUpperCase();
-        const row = rows.get(date);
-        if (!date || !row || !CLASSIFICATIONS.has(classification)) {
-            fail('STAGE2_UNSAFE_RESOLUTION_ITEM',
-                'Το Stage 2 επέστρεψε μη ασφαλές automatic resolution.', 409);
-        }
-        if (stage3Pending.has(date)) fail('STAGE2_DATE_MOVED_TO_STAGE3',
-            'Η ημέρα αποτελεί πλέον εκκρεμότητα του Stage 3.', 409);
-        const dailyProfile = context.effectiveProfilesByDate?.[date];
-        const employmentType = normalizeEmploymentType(
-            dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
-        );
-        if ((classification === 'REST_REPO' && employmentType !== '0') ||
-            (classification === 'NON_WORK' && !['1', '2'].includes(employmentType))) {
-            fail('STAGE2_DAILY_PROFILE_CHANGED',
-                'Το ημερομηνιακά ισχύον καθεστώς απασχόλησης άλλαξε.', 409);
-        }
-        const facts = resolveDailyActualWorkFacts(row);
-        if (facts.countsAsActualWorkDay === true || Number(facts.cardHours || 0) > 0 ||
-            (facts.completeCardPairNumbers || []).length ||
-            (facts.unresolvedCardPairNumbers || []).length || (facts.reasons || []).length) {
-            fail('STAGE2_ACTUAL_WORK_OR_CARD_EVIDENCE',
-                'Υπάρχει πραγματική εργασία ή μη ασφαλές στοιχείο κάρτας.', 409);
-        }
-        const current = { apologistiko_biblio: row.apologistiko_biblio ?? false,
-            repo_apologistika: row.repo_apologistika ?? false,
-            kathgoria_ergasias_apologistika:
-                text(row.kathgoria_ergasias_apologistika),
-            kathgoria_adeias_apologistika:
-                text(row.kathgoria_adeias_apologistika),
-            adeia_apologistika: row.adeia_apologistika ?? false,
-            astheneia_apologistika: row.astheneia_apologistika ?? false,
-            apousia_apologistika: row.apousia_apologistika ?? null,
-            ores_ergasias_apologistika: Number(row.ores_ergasias_apologistika || 0) };
-        const expected = { apologistiko_biblio: false, repo_apologistika: false,
-            kathgoria_ergasias_apologistika: '',
-            kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE',
-            adeia_apologistika: false, astheneia_apologistika: false,
-            apousia_apologistika: null, ores_ergasias_apologistika: 0 };
-        if (stableStringify(current) !== stableStringify(expected)) {
-            fail('STAGE2_CANONICAL_ROW_CHANGED',
-                'Η canonical ημερήσια εγγραφή έχει ήδη αλλάξει.', 409);
-        }
-        return { date, classification, row, employmentType,
-            profileSignature: stableStringify(dailyProfile || {}) };
-    }).sort((left, right) => left.date.localeCompare(right.date));
+    const requestedItems = stage2Items(context);
+    if (!requestedItems.length) return { status: AUTOMATIC_INSPECTION.NO_LONGER_APPLICABLE,
+        items: [] };
+    try {
+        const inspected = requestedItems.map((item) => {
+            const date = dateKeyUtc(item.date);
+            const classification = text(item.classification).toUpperCase();
+            const row = rows.get(date);
+            if (!date || !row || !CLASSIFICATIONS.has(classification)) {
+                fail('STAGE2_UNSAFE_RESOLUTION_ITEM',
+                    'Το Stage 2 επέστρεψε μη ασφαλές automatic resolution.', 409);
+            }
+            if (stage3Pending.has(date)) fail('STAGE2_DATE_MOVED_TO_STAGE3',
+                'Η ημέρα αποτελεί πλέον εκκρεμότητα του Stage 3.', 409);
+            const dailyProfile = context.effectiveProfilesByDate?.[date];
+            const employmentType = normalizeEmploymentType(
+                dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
+            );
+            if ((classification === 'REST_REPO' && employmentType !== '0') ||
+                (classification === 'NON_WORK' && !['1', '2'].includes(employmentType))) {
+                fail('STAGE2_DAILY_PROFILE_CHANGED',
+                    'Το ημερομηνιακά ισχύον καθεστώς απασχόλησης άλλαξε.', 409);
+            }
+            const facts = resolveDailyActualWorkFacts(row);
+            if (facts.countsAsActualWorkDay === true || Number(facts.cardHours || 0) > 0 ||
+                (facts.completeCardPairNumbers || []).length ||
+                (facts.unresolvedCardPairNumbers || []).length || (facts.reasons || []).length) {
+                fail('STAGE2_ACTUAL_WORK_OR_CARD_EVIDENCE',
+                    'Υπάρχει πραγματική εργασία ή μη ασφαλές στοιχείο κάρτας.', 409);
+            }
+            const current = currentCanonicalState(row, facts);
+            const intendedUpdates = planCanonicalDailyClassification({ row, classification });
+            const itemState = stableStringify(current) ===
+                stableStringify(EXPECTED_INITIAL_CANONICAL_STATE)
+                ? AUTOMATIC_INSPECTION.READY_TO_MATERIALIZE
+                : rowMatchesUpdates(row, intendedUpdates)
+                    ? AUTOMATIC_INSPECTION.ALREADY_MATERIALIZED
+                    : AUTOMATIC_INSPECTION.TECHNICAL_CONFLICT;
+            if (itemState === AUTOMATIC_INSPECTION.TECHNICAL_CONFLICT) {
+                fail('STAGE2_CANONICAL_ROW_CHANGED',
+                    'Η canonical ημερήσια εγγραφή έχει ήδη αλλάξει.', 409);
+            }
+            return { date, classification, row, employmentType,
+                profileSignature: effectiveProfileSignature(dailyProfile), itemState };
+        }).sort((left, right) => left.date.localeCompare(right.date));
+        const states = new Set(inspected.map((item) => item.itemState));
+        if (states.size !== 1) fail('STAGE2_PARTIAL_MATERIALIZATION_CONFLICT',
+            'Η αυτόματη τακτοποίηση έχει εφαρμοστεί μόνο σε μέρος της εβδομάδας.', 409);
+        return { status: inspected[0].itemState, items: inspected };
+    } catch (error) {
+        return { status: AUTOMATIC_INSPECTION.TECHNICAL_CONFLICT, items: [],
+            code: error.code || 'STAGE2_AUTOMATIC_INSPECTION_FAILED' };
+    }
 }
-function fingerprint(context, items) {
-    return crypto.createHash('sha256').update(stableStringify({
+function normalizeItems(context = {}) {
+    const inspection = inspectAutomaticMaterialization(context);
+    if (inspection.status === AUTOMATIC_INSPECTION.TECHNICAL_CONFLICT) {
+        fail(inspection.code || 'STAGE2_AUTOMATIC_INSPECTION_FAILED',
+            'Η αυτόματη τακτοποίηση δεν είναι πλέον ασφαλής.', 409);
+    }
+    if (inspection.status !== AUTOMATIC_INSPECTION.READY_TO_MATERIALIZE) return [];
+    return inspection.items.map(({ itemState: _itemState, ...item }) => item);
+}
+function buildWeeklyHrStage2FingerprintInput(context, items) {
+    return {
         contract: 'weekly-hr-stage2-materialization:v1',
         scope: { employee_id: String(context.scope.employee_id),
             week_start: dateKeyUtc(context.scope.week_start),
@@ -89,7 +139,11 @@ function fingerprint(context, items) {
             classification: item.classification, row_id: String(item.row._id),
             employment_type: item.employmentType,
             date_effective_profile: item.profileSignature }))
-    })).digest('hex');
+    };
+}
+function fingerprint(context, items) {
+    return crypto.createHash('sha256').update(stableStringify(
+        buildWeeklyHrStage2FingerprintInput(context, items))).digest('hex');
 }
 function normalizeActor(actor = {}) {
     const role = assertCriticalEmploymentDecisionRole({ userRole: actor.role });
@@ -169,7 +223,10 @@ async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
             version: Number(current.stage1.version || 0) + 1 };
         const stage2Filter = current.stage2 ? { 'stage2.version': Number(previous.version || 0) }
             : { 'stage2.version': { $exists: false } };
-        const update = await stateModel.collection.updateOne({ ...filter,
+        const persistedIdentity = { team: current.team, company_kod: current.company_kod,
+            ypokatasthma: current.ypokatasthma, employee_id: current.employee_id,
+            week_start: current.week_start, week_end: current.week_end };
+        const update = await stateModel.collection.updateOne({ ...persistedIdentity,
             'stage1.version': Number(current.stage1.version || 0), ...stage2Filter },
         { $set: { stage1: rebasedStage1, stage2: nextStage } }, { session });
         if (Number(update?.matchedCount ?? update?.n ?? 0) !== 1) fail('STAGE2_VERSION_CONFLICT',
@@ -197,4 +254,6 @@ async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
     });
 }
 
-module.exports = { ACTION, normalizeItems, fingerprint, completeWeeklyHrWorkflowStage2 };
+module.exports = { ACTION, AUTOMATIC_INSPECTION, effectiveProfileSignature,
+    inspectAutomaticMaterialization, buildWeeklyHrStage2FingerprintInput,
+    normalizeItems, fingerprint, completeWeeklyHrWorkflowStage2 };
