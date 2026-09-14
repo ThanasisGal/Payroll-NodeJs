@@ -14,6 +14,9 @@ assert.match(source, /inputValidator:[\s\S]*String\(value \|\| ''\)\.trim\(\)/);
 assert.match(source, /weekly-hr-stage3-classification/);
 assert.match(source, /weekly-hr-stage3-leave-category/);
 assert.match(source, /weekly-hr-stage3-resolve/);
+assert.match(source, /Προεπισκόπηση απόφασης/);
+assert.match(source, /Εφαρμογή χαρακτηρισμού/);
+assert.match(source, /cancelButtonText:\s*'Επιστροφή'/);
 assert.match(source, /Γιατί απαιτείται απόφαση:/);
 assert.match(source, /ΠΡΟΣ ΑΠΟΦΑΣΗ/);
 assert.doesNotMatch(source.slice(source.indexOf('function renderWeeklyHrStage3'),
@@ -63,7 +66,7 @@ assert.equal(rendered, 1);
 assert.equal(opened, 1);
 assert.doesNotMatch(focusSource, /weeklyHrStage1Selected\.add|completeWeeklyHrStage1/);
 
-const helperSource = source.slice(source.indexOf('function stage3WeekKey'),
+const helperSource = source.slice(source.indexOf('function stage3DecisionClassificationLabel'),
     source.indexOf('function findStage3PendingItem'));
 const sandbox = {
     currentCanonicalLifecyclePayloads: [],
@@ -87,7 +90,9 @@ const sandbox = {
     container: { innerHTML: '' }
 };
 vm.runInNewContext(`${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
-    stage3DeclaredPresentation, stage3DecisionExplanation, stage3WeekKey };`, sandbox);
+    stage3DeclaredPresentation, stage3DecisionExplanation, stage3PayloadForItem,
+    stage3DailyPresentation, stage3ApologistikoClassification,
+    stage3DecisionClassificationLabel, stage3DecisionExplanationHtml, stage3WeekKey };`, sandbox);
 
 function weekRows(start, pendingDates = []) {
     return sandbox.enumerateStage1DateKeys(start,
@@ -113,7 +118,8 @@ function payload(employee, start, end, pendingDates) {
 }
 
 function pending(employee, start, end, date) {
-    return { employee_id: employee, employee_kodikos: employee, week_start: start, week_end: end,
+    return { employee_id: employee, employee_kodikos: employee, ypokatasthma: '0000',
+        week_start: start, week_end: end,
         period_start: '2026-05-01', period_end: '2026-05-31', row_id: `row-${date}`, date,
         declared_hours: 8, actual_work_hours: 0,
         allowed_classifications: ['LEAVE', 'SICKNESS', 'ABSENCE'],
@@ -203,4 +209,119 @@ assert.match(source, /body:\s*JSON\.stringify\(\{ ypokatasthma: item\.ypokatasth
 assert.match(source, /renderWeeklyHrStage2LifecycleFallback\(lifecycle\);[\s\S]*renderWeeklyHrStage3\(lifecycle\)/);
 assert.match(source, /renderStage4|STAGE4/);
 assert.match(source, /pending_count: entries\.reduce/);
-console.log('Stage-3 weekly decision context and actionable UI contracts passed');
+
+function extractFunction(name) {
+    const start = source.indexOf(`function ${name}(`);
+    const asyncStart = source.indexOf(`async function ${name}(`);
+    const functionStart = asyncStart >= 0 && (start < 0 || asyncStart < start) ? asyncStart : start;
+    assert.notEqual(functionStart, -1, `Δεν βρέθηκε η ${name}`);
+    let parentheses = 0;
+    let parametersStarted = false;
+    let bodyStart = -1;
+    for (let index = functionStart; index < source.length; index += 1) {
+        if (source[index] === '(') { parentheses += 1; parametersStarted = true; }
+        else if (source[index] === ')') parentheses -= 1;
+        else if (source[index] === '{' && parametersStarted && parentheses === 0) {
+            bodyStart = index; break;
+        }
+    }
+    assert.notEqual(bodyStart, -1, `Δεν βρέθηκε το σώμα της ${name}`);
+    let depth = 0;
+    for (let index = bodyStart; index < source.length; index += 1) {
+        if (source[index] === '{') depth += 1;
+        if (source[index] === '}' && --depth === 0) return source.slice(functionStart, index + 1);
+    }
+    assert.fail(`Δεν ολοκληρώθηκε η ${name}`);
+}
+
+async function verifyStage3PreviewContract() {
+    const previewCalls = [];
+    let submitCalls = 0;
+    const previewItem = pending('0007', '2026-04-27', '2026-05-03', '2026-05-02');
+    const previewRow = {
+        querySelector(selector) {
+            if (selector === '.weekly-hr-stage3-classification') return { value: 'LEAVE' };
+            if (selector === '.weekly-hr-stage3-leave-category') return {
+                value: 'KANONIKH', selectedOptions: [{ textContent: 'Κανονική άδεια <δοκιμή>' }]
+            };
+            return null;
+        }
+    };
+    const previewSandbox = {
+        findStage3PendingItem: () => previewItem,
+        document: { querySelector: () => previewRow }, CSS: { escape: String },
+        stage3DecisionPreviewHtml: (_item, decision) => {
+            assert.equal(decision.selection, 'LEAVE');
+            assert.equal(decision.leaveCategoryLabel, 'Κανονική άδεια <δοκιμή>');
+            return '<div>preview</div>';
+        },
+        employmentReviewSwal: async (options) => { previewCalls.push(options); return { isConfirmed: false }; },
+        submitWeeklyHrStage3Decision: async () => { submitCalls += 1; }
+    };
+    vm.runInNewContext(`${extractFunction('previewWeeklyHrStage3Decision')};
+        this.preview = previewWeeklyHrStage3Decision;`, previewSandbox);
+    await previewSandbox.preview(previewItem.row_id);
+    assert.equal(submitCalls, 0, 'επιστροφή από την προεπισκόπηση δεν υποβάλλει απόφαση');
+    assert.equal(previewCalls.length, 1);
+    assert.equal(previewCalls[0].confirmButtonText, 'Εφαρμογή χαρακτηρισμού');
+    assert.equal(previewCalls[0].cancelButtonText, 'Επιστροφή');
+    assert.equal(previewCalls[0].input, 'textarea');
+    assert.equal(typeof previewSandbox.fetch, 'undefined', 'η προεπισκόπηση δεν χρειάζεται fetch');
+
+    previewSandbox.employmentReviewSwal = async () => ({ isConfirmed: true,
+        value: '<img src=x onerror=alert(1)>' });
+    await previewSandbox.preview(previewItem.row_id);
+    assert.equal(submitCalls, 1, 'μόνο η ρητή επιβεβαίωση καλεί την υπάρχουσα υποβολή');
+
+    const previewPayload = payload('0007', '2026-04-27', '2026-05-03', ['2026-05-02']);
+    previewPayload.employee_name = '<b>ΠΑΠΑΔΟΠΟΥΛΟΣ ΝΙΚΟΣ</b>';
+    sandbox.currentCanonicalLifecyclePayloads.push(previewPayload);
+    Object.assign(sandbox, sandbox.helpers);
+    vm.runInNewContext(`${extractFunction('stage3DecisionPreviewHtml')};
+        this.previewHtml = stage3DecisionPreviewHtml;`, sandbox);
+    const previewHtml = sandbox.previewHtml(previewItem, {
+        selection: 'LEAVE', leaveCategoryLabel: 'Κανονική <άδεια>'
+    });
+    assert.match(previewHtml, /Κωδικός: 0007/);
+    assert.match(previewHtml, /02\/05\/2026/);
+    assert.match(previewHtml, /Τι διαπιστώθηκε/);
+    assert.match(previewHtml, /Πριν[\s\S]*Χωρίς οριστικό χαρακτηρισμό[\s\S]*→[\s\S]*Μετά[\s\S]*Άδεια/);
+    assert.match(previewHtml, /Κατηγορία άδειας:[\s\S]*Κανονική &lt;άδεια&gt;/);
+    assert.doesNotMatch(previewHtml, /<b>ΠΑΠΑΔΟΠΟΥΛΟΣ|<άδεια>/);
+
+    let request = null;
+    let fetchCount = 0;
+    const submitButton = { disabled: false };
+    const submitSandbox = {
+        findStage3PendingItem: () => previewItem,
+        document: { querySelector: () => ({ querySelector: () => submitButton }) },
+        CSS: { escape: String }, csrfToken: 'csrf', crypto: { randomUUID: () => 'uuid' },
+        fetch: async (url, options) => { fetchCount += 1; request = { url, options };
+            return { ok: true, json: async () => ({ success: true }) }; },
+        loadResults: async () => {}, focusWeeklyHrStage1StaleAfterStage3Save: () => 0,
+        employmentReviewSwal: async () => {}
+    };
+    vm.runInNewContext(`${extractFunction('submitWeeklyHrStage3Decision')};
+        this.submit = submitWeeklyHrStage3Decision;`, submitSandbox);
+    await submitSandbox.submit(previewItem.row_id, { selection: 'LEAVE',
+        leaveCategory: 'KANONIKH', reasonOrNotes: '<σημείωση>' });
+    assert.equal(fetchCount, 1, 'η επιβεβαίωση εκτελεί ακριβώς μία υπάρχουσα υποβολή');
+    assert.equal(request.url,
+        '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/resolve-day');
+    assert.equal(request.options.method, 'POST');
+    const body = JSON.parse(request.options.body);
+    assert.deepEqual(Object.keys(body), ['ypokatasthma', 'employee_id', 'week_start', 'week_end',
+        'period_start', 'period_end', 'row_id', 'decision_date', 'expected_input_fingerprint',
+        'expected_stage3_version', 'final_classification', 'leave_category', 'reason_or_notes',
+        'request_id']);
+    assert.equal(body.final_classification, 'LEAVE');
+    assert.equal(body.leave_category, 'KANONIKH');
+    assert.equal(body.reason_or_notes, '<σημείωση>');
+    assert.equal(body.expected_input_fingerprint, 'f');
+    assert.equal(body.expected_stage3_version, 0);
+    assert.equal(body.request_id, 'stage3-ui:uuid');
+}
+
+verifyStage3PreviewContract().then(() => {
+    console.log('Stage-3 weekly decision context and actionable UI contracts passed');
+});

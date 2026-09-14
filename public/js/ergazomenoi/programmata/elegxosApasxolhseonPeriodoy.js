@@ -10020,6 +10020,13 @@ function stage3ClassificationOptions(item) {
         .map((value) => `<option value="${value}">${labels[value]}</option>`).join('');
 }
 
+function stage3DecisionClassificationLabel(value) {
+    return { LEAVE: 'Άδεια', SICKNESS: 'Ασθένεια', ABSENCE: 'Απουσία',
+        NON_WORK: 'Μη εργασία', ΑΔΕΙΑ: 'Άδεια', ΑΣΘΕΝΕΙΑ: 'Ασθένεια',
+        ΑΠΟΥΣΙΑ: 'Απουσία', ΜΕ: 'Μη εργασία', ΑΝ: 'Ρεπό', ΕΡΓ: 'Εργασία' }[
+        String(value || '').trim().toUpperCase()] || '';
+}
+
 function stage3WeekKey(value = {}) {
     return [value.employee_id || value.employee_kodikos || '', value.week_start || '',
         value.week_end || ''].join('|');
@@ -10219,8 +10226,8 @@ function renderStage3DecisionItem(group, item) {
                 data-row-id="${escapeHtml(item.row_id)}">${stage3ClassificationOptions(item)}</select>
             <select class="form-select form-select-sm mt-1 weekly-hr-stage3-leave-category d-none"
                 data-row-id="${escapeHtml(item.row_id)}">${stage1LeaveCategoryOptions('')}</select></td>
-        <td><button type="button" class="btn btn-sm btn-primary weekly-hr-stage3-resolve"
-            data-row-id="${escapeHtml(item.row_id)}">Αποθήκευση</button></td></tr>`;
+        <td><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-stage3-resolve"
+            data-row-id="${escapeHtml(item.row_id)}">Προεπισκόπηση απόφασης</button></td></tr>`;
 }
 
 function renderWeeklyHrStage3(lifecycle) {
@@ -10293,7 +10300,41 @@ function focusWeeklyHrStage1StaleAfterStage3Save() {
     return staleCount;
 }
 
-async function submitWeeklyHrStage3Decision(rowId) {
+function stage3DecisionPreviewHtml(item, decision = {}) {
+    const payload = stage3PayloadForItem(item);
+    const group = { payload, scope: payload?.scope || item };
+    const sourceRow = (payload?.rows || []).find((candidate) =>
+        stage1DateKey(candidate.hmeromhnia) === item.date) || {};
+    const daily = stage3DailyPresentation(group, item.date);
+    const possibleLeavePending = String(sourceRow.kathgoria_adeias_apologistika || '').trim() ===
+        'POSSIBLE_LEAVE';
+    const before = possibleLeavePending ? 'Χωρίς οριστικό χαρακτηρισμό' :
+        stage3DecisionClassificationLabel(stage3ApologistikoClassification(sourceRow, daily)) ||
+            'Χωρίς οριστικό χαρακτηρισμό';
+    const after = stage3DecisionClassificationLabel(decision.selection) ||
+        'Χωρίς επιλεγμένο χαρακτηρισμό';
+    const leaveCategory = String(decision.leaveCategoryLabel || '').trim();
+    return `<div class="text-start stage3-decision-preview">
+        <div class="stage3-decision-preview-identity"><strong>${escapeHtml(
+            payload?.employee_name || 'Εργαζόμενος')}</strong><br>
+            <span>Κωδικός: ${escapeHtml(item.employee_kodikos ||
+                payload?.scope?.employee_kodikos || '')}</span><br>
+            <span>${escapeHtml(formatStage1DateKey(item.date))}</span></div>
+        <div class="stage3-decision-preview-section"><strong>Τι διαπιστώθηκε</strong>
+            ${stage3DecisionExplanationHtml(item)}</div>
+        <div class="stage3-decision-preview-section"><strong>Τι θα αλλάξει</strong>
+            <div class="stage3-decision-before-after">
+                <div><span class="small text-muted">Πριν</span><strong>${escapeHtml(before)}</strong></div>
+                <div class="stage3-decision-arrow" aria-hidden="true">→</div>
+                <div><span class="small text-muted">Μετά</span><strong>${escapeHtml(after)}</strong></div>
+            </div>
+            ${decision.selection === 'LEAVE' && leaveCategory
+                ? `<div class="small mt-2"><strong>Κατηγορία άδειας:</strong> ${escapeHtml(
+                    leaveCategory)}</div>` : ''}
+        </div></div>`;
+}
+
+async function previewWeeklyHrStage3Decision(rowId) {
     const item = findStage3PendingItem(rowId);
     const row = document.querySelector(`[data-stage3-row-id="${CSS.escape(String(rowId))}"]`);
     const selection = row?.querySelector('.weekly-hr-stage3-classification')?.value || '';
@@ -10303,14 +10344,29 @@ async function submitWeeklyHrStage3Decision(rowId) {
         await employmentReviewSwal({ icon: 'warning', title: 'Απαιτείται κατηγορία άδειας' });
         return;
     }
-    const prompt = await employmentReviewSwal({ title: 'Τελική επίλυση Stage 3',
+    const leaveCategorySelect = row?.querySelector('.weekly-hr-stage3-leave-category');
+    const leaveCategoryLabel = leaveCategorySelect?.selectedOptions?.[0]?.textContent || '';
+    const preview = await employmentReviewSwal({ icon: 'info', title: 'Προεπισκόπηση απόφασης',
+        html: stage3DecisionPreviewHtml(item, { selection, leaveCategoryLabel }),
         input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
         inputValue: selection === 'NON_WORK' ? STAGE3_NON_WORK_DEFAULT_REASON :
             'Τελική εξέταση πιθανής άδειας στο Στάδιο 3.',
-        confirmButtonText: 'Αποθήκευση', cancelButtonText: 'Ακύρωση',
+        confirmButtonText: 'Εφαρμογή χαρακτηρισμού', cancelButtonText: 'Επιστροφή',
+        customClass: { confirmButton: 'class-success' },
         inputValidator: (value) => String(value || '').trim() ? undefined :
             'Η αιτιολογία είναι υποχρεωτική.' });
-    if (!prompt.isConfirmed) return;
+    if (!preview.isConfirmed) return;
+    return submitWeeklyHrStage3Decision(rowId, { selection, leaveCategory,
+        reasonOrNotes: String(preview.value || '').trim() });
+}
+
+async function submitWeeklyHrStage3Decision(rowId, decision = {}) {
+    const item = findStage3PendingItem(rowId);
+    const row = document.querySelector(`[data-stage3-row-id="${CSS.escape(String(rowId))}"]`);
+    const selection = String(decision.selection || '');
+    const leaveCategory = String(decision.leaveCategory || '');
+    const reasonOrNotes = String(decision.reasonOrNotes || '').trim();
+    if (!item || !selection || !reasonOrNotes || (selection === 'LEAVE' && !leaveCategory)) return;
     const button = row.querySelector('.weekly-hr-stage3-resolve');
     button.disabled = true;
     try {
@@ -10328,12 +10384,15 @@ async function submitWeeklyHrStage3Decision(rowId) {
                     expected_input_fingerprint: item.input_fingerprint,
                     expected_stage3_version: Number(item.expected_stage3_version || 0),
                     final_classification: selection, leave_category: leaveCategory,
-                    reason_or_notes: String(prompt.value || '').trim(),
+                    reason_or_notes: reasonOrNotes,
                     request_id: `stage3-ui:${crypto.randomUUID()}` })
             });
         const result = await response.json();
-        if (!response.ok || !result.success) throw new Error(result.message ||
-            'Η απόφαση Stage 3 δεν αποθηκεύτηκε.');
+        if (!response.ok || !result.success) {
+            const submitError = new Error(result.message || 'Η απόφαση Stage 3 δεν αποθηκεύτηκε.');
+            submitError.code = result.code || '';
+            throw submitError;
+        }
         await loadResults();
         const staleCount = focusWeeklyHrStage1StaleAfterStage3Save();
         await employmentReviewSwal(staleCount > 0
@@ -10343,7 +10402,11 @@ async function submitWeeklyHrStage3Decision(rowId) {
                     : `Η αλλαγή δημιούργησε ${staleCount} Παρωχημένες εβδομάδες στο Στάδιο 1. Επανελέγξτε και ολοκληρώστε τις πριν συνεχίσετε.` }
             : { icon: 'success', title: 'Η απόφαση αποθηκεύτηκε.' });
     } catch (error) {
-        await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία', text: error.message });
+        const changedSinceSearch = /STALE|INPUT_CHANGED/.test(String(error.code || '').toUpperCase());
+        await employmentReviewSwal({ icon: 'error', title: changedSinceSearch
+            ? 'Τα στοιχεία έχουν αλλάξει' : 'Αποτυχία', text: changedSinceSearch
+                ? 'Τα στοιχεία της ημέρας ή της εβδομάδας άλλαξαν από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση και δοκιμάστε ξανά.'
+                : error.message });
         button.disabled = false;
     }
 }
@@ -10897,7 +10960,7 @@ document.addEventListener('click', (event) => {
     }
     const stage3Resolve = event.target.closest('.weekly-hr-stage3-resolve');
     if (stage3Resolve) {
-        submitWeeklyHrStage3Decision(stage3Resolve.dataset.rowId);
+        previewWeeklyHrStage3Decision(stage3Resolve.dataset.rowId);
         return;
     }
     if (event.target.closest('.weekly-hr-select-all-days')) {
