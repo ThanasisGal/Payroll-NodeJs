@@ -17,7 +17,8 @@ const sandbox = {
     stage1DateKey: (value) => String(value || '').slice(0, 10),
     reviewHrReasonLabel: (reason) => ({
         ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION:
-            'Υπάρχει ορφανό χτύπημα κάρτας που πρέπει να επιλυθεί πριν συνεχιστεί ο έλεγχος.'
+            'Υπάρχει ορφανό χτύπημα κάρτας που πρέπει να επιλυθεί πριν συνεχιστεί ο έλεγχος.',
+        CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.'
     }[reason] || 'Απαιτείται έλεγχος της περίπτωσης.'),
     escapeHtml: (value) => String(value ?? '')
 };
@@ -43,6 +44,7 @@ addStage4('0012', '2026-04-20', { business_status: 'BLOCKED', pending_count: 1,
 const blockedHtml = sandbox.renderStatus(blocked);
 assert.match(blockedHtml, /text-bg-danger[^>]*>ΜΠΛΟΚΑΡΙΣΜΕΝΟ</);
 assert.match(blockedHtml, /ορφανό χτύπημα κάρτας/);
+assert.match(blockedHtml, /Ελέγξτε την αιτία και διορθώστε τα στοιχεία πριν συνεχίσετε/);
 
 const completed = { kodikos: '0013', week_apo: '2026-04-20', week_eos: '2026-04-26' };
 addStage4('0013', '2026-04-20', { business_status: 'COMPLETED', pending_count: 0 });
@@ -54,6 +56,9 @@ addStage4('0014', '2026-04-20', { business_status: 'BLOCKED', pending_count: 1,
     blockers: ['CARD_VERIFICATION_PENDING'] });
 assert.match(sandbox.renderStatus(blocked), /ΜΠΛΟΚΑΡΙΣΜΕΝΟ/);
 assert.match(sandbox.renderStatus(secondBlocked), /ΜΠΛΟΚΑΡΙΣΜΕΝΟ/);
+assert.match(sandbox.renderStatus(secondBlocked), /επιβεβαίωση των στοιχείων της κάρτας εργασίας/);
+assert.match(sandbox.renderStatus(secondBlocked),
+    /Ελέγξτε την αιτία και διορθώστε τα στοιχεία πριν συνεχίσετε/);
 
 const zeroPending = { kodikos: '0015', week_apo: '2026-04-20',
     week_eos: '2026-04-26', status: 'OPEN_WEEK_PENDING_COMPLETION' };

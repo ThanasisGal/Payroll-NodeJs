@@ -34,6 +34,7 @@ const missing = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
     'INCOMPLETE_NATURAL_WEEK'
 ]));
 assert.match(missing, /Λείπουν απαραίτητα στοιχεία απασχόλησης/);
+assert.match(missing, /Συμπληρώστε ή διορθώστε τα στοιχεία πριν συνεχίσετε/);
 
 for (const message of [orphan, repo, missing]) {
     assert.doesNotMatch(message,

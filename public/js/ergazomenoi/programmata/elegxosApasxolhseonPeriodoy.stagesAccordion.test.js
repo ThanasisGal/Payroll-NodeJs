@@ -201,6 +201,14 @@ assert.match(attentionElement.innerHTML, /Προβολή 26 εκκρεμοτήτ
 assert.equal(progressElement.classList.contains('d-none'), false);
 assert.equal(attentionElement.classList.contains('d-none'), false);
 
+guideSandbox.renderGuide(staleLifecycle);
+assert.match(attentionElement.innerHTML, /Τα στοιχεία άλλαξαν/);
+assert.match(attentionElement.innerHTML,
+    /Τα στοιχεία της εβδομάδας άλλαξαν από την τελευταία αναζήτηση/);
+assert.match(attentionElement.innerHTML,
+    /Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα/);
+assert.doesNotMatch(attentionElement.innerHTML, /STALE|Παρωχημέν|ΜΗ ΕΓΚΥΡΟ/);
+
 const mayStage3Lifecycle = { current_stage: 'STAGE3', stages: {
     STAGE1: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },
     STAGE2: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },

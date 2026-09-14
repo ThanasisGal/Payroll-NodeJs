@@ -2479,11 +2479,12 @@ function renderStage4StatusCell(dev = {}) {
     ].map((reason) => String(reason || '').trim()).filter(Boolean))];
     const messages = [...new Set(reasons.map(reviewHrReasonLabel).filter(Boolean))];
 
+    const explanation = messages.length
+        ? messages.map((message) => `<div>${escapeHtml(message)}</div>`).join('')
+        : '<div>Δεν μπορεί να ολοκληρωθεί ο εβδομαδιαίος έλεγχος με τα διαθέσιμα στοιχεία.</div>';
     return '<span class="badge text-bg-danger">ΜΠΛΟΚΑΡΙΣΜΕΝΟ</span>' +
-        (messages.length
-            ? `<div class="small text-danger-emphasis mt-1">${messages
-                .map((message) => `<div>${escapeHtml(message)}</div>`).join('')}</div>`
-            : '');
+        `<div class="small text-danger-emphasis mt-1">${explanation}` +
+        '<div>Ελέγξτε την αιτία και διορθώστε τα στοιχεία πριν συνεχίσετε.</div></div>';
 }
 
 function hasAdeiaSuggestion(row) {
@@ -8953,7 +8954,7 @@ function weeklyHrBlockedExplanation(payload = {}) {
     if (reasons.has('INCOMPLETE_NATURAL_WEEK') ||
         reasons.has('MISSING_AUTHORITATIVE_EMPLOYMENT_FACTS') ||
         reasons.has('MISSING_EFFECTIVE_EMPLOYMENT_PROFILE')) {
-        return 'Λείπουν απαραίτητα στοιχεία απασχόλησης για την εβδομάδα.';
+        return 'Λείπουν απαραίτητα στοιχεία απασχόλησης για την εβδομάδα. Συμπληρώστε ή διορθώστε τα στοιχεία πριν συνεχίσετε.';
     }
     return reasons.size > 0
         ? 'Απαιτείται επίλυση των στοιχείων της εβδομάδας πριν συνεχιστεί ο έλεγχος.'
@@ -9045,7 +9046,7 @@ const workflowStageShortNames = Object.freeze({
 const workflowStageStatusLabels = Object.freeze({
     DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
     COMPLETED: 'ΟΛΟΚΛΗΡΩΜΕΝΟ', ACTIVE: 'ΕΝΕΡΓΟ', OPEN: 'ΑΝΟΙΧΤΟ',
-    BLOCKED: 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ', STALE: 'ΜΗ ΕΓΚΥΡΟ / STALE', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
+    BLOCKED: 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ', STALE: 'ΤΑ ΣΤΟΙΧΕΙΑ ΑΛΛΑΞΑΝ', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
 });
 const workflowStageStatusClasses = Object.freeze({
     DEFERRED_TO_NEXT_PERIOD: 'text-bg-info',
@@ -10430,8 +10431,8 @@ async function submitWeeklyHrStage3Decision(rowId, decision = {}) {
         await employmentReviewSwal(staleCount > 0
             ? { icon: 'warning', title: 'Απαιτείται επανέλεγχος Σταδίου 1',
                 text: staleCount === 1
-                    ? 'Η αλλαγή δημιούργησε 1 Παρωχημένη εβδομάδα στο Στάδιο 1. Επανελέγξτε και ολοκληρώστε την πριν συνεχίσετε.'
-                    : `Η αλλαγή δημιούργησε ${staleCount} Παρωχημένες εβδομάδες στο Στάδιο 1. Επανελέγξτε και ολοκληρώστε τις πριν συνεχίσετε.` }
+                    ? 'Τα στοιχεία άλλαξαν για 1 εβδομάδα στο Στάδιο 1. Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα.'
+                    : `Τα στοιχεία άλλαξαν για ${staleCount} εβδομάδες στο Στάδιο 1. Κάντε νέα Αναζήτηση και επανελέγξτε τις εβδομάδες.` }
             : { icon: 'success', title: 'Η απόφαση αποθηκεύτηκε.' });
     } catch (error) {
         const changedSinceSearch = /STALE|INPUT_CHANGED/.test(String(error.code || '').toUpperCase());
@@ -10465,6 +10466,11 @@ function employmentReviewAttentionPresentation(lifecycle = {}) {
     if (!currentStage || !stage) return {
         title: 'Ο έλεγχος ολοκληρώθηκε.', detail: 'Δεν υπάρχουν άλλες εκκρεμότητες.',
         actionLabel: '', actionStage: ''
+    };
+    if (stage.business_status === 'STALE') return {
+        title: 'Τα στοιχεία άλλαξαν.',
+        detail: 'Τα στοιχεία της εβδομάδας άλλαξαν από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα.',
+        actionLabel: 'Προβολή εβδομάδας', actionStage: currentStage
     };
     if (stage.business_status === 'BLOCKED') {
         const reason = getStage2LifecycleReasonLabel(stage.pending_reasons?.[0], false);
@@ -10642,9 +10648,9 @@ function renderWeeklyHrStage1BulkToolbar() {
         <div class="d-flex flex-wrap gap-3 small mb-2 align-items-center">
             <strong>Συνολικές σχετικές εβδομάδες: ${counts.total}</strong>
             <label class="form-check form-check-inline mb-0"><input id="stage1FilterOpen" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="open" ${stage1DisplayFilters.open ? 'checked' : ''}><span class="form-check-label">Ανοιχτές: ${counts.open}</span></label>
-            <label class="form-check form-check-inline mb-0"><input id="stage1FilterStale" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="stale" ${stage1DisplayFilters.stale ? 'checked' : ''}><span class="form-check-label">Παρωχημένες: ${counts.stale}</span></label>
+            <label class="form-check form-check-inline mb-0"><input id="stage1FilterStale" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="stale" ${stage1DisplayFilters.stale ? 'checked' : ''}><span class="form-check-label">Τα στοιχεία άλλαξαν: ${counts.stale}</span></label>
             <label class="form-check form-check-inline mb-0"><input id="stage1FilterCompleted" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="completed" ${stage1DisplayFilters.completed ? 'checked' : ''}><span class="form-check-label">Ολοκληρωμένες: ${counts.completed}</span></label>
-            <label class="form-check form-check-inline mb-0"><input id="stage1FilterBlocked" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="blocked" ${stage1DisplayFilters.blocked ? 'checked' : ''}><span class="form-check-label">Μπλοκαρισμένες: ${counts.blocked}</span></label>
+            <label class="form-check form-check-inline mb-0"><input id="stage1FilterBlocked" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="blocked" ${stage1DisplayFilters.blocked ? 'checked' : ''}><span class="form-check-label">Χρειάζονται διόρθωση: ${counts.blocked}</span></label>
             <span class="border-start ps-3 d-flex flex-wrap gap-3">
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterLeave" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="leave" ${stage1DisplayFilters.leave ? 'checked' : ''}><span class="form-check-label">Άδειες</span></label>
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterSickness" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="sickness" ${stage1DisplayFilters.sickness ? 'checked' : ''}><span class="form-check-label">Ασθένειες</span></label>
@@ -10692,13 +10698,13 @@ function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const stale = businessStatus === 'STALE';
     const statusText = weeklyHrHasOnlyOrphanBlockers(payload)
         ? 'Απαιτείται επίλυση ορφανού χτυπήματος' : ({ OPEN: 'Ανοιχτό', COMPLETED: 'Ολοκληρωμένο',
-        BLOCKED: 'Μπλοκαρισμένο', STALE: 'Παρωχημένο' }[businessStatus] || businessStatus);
+        BLOCKED: 'Μπλοκαρισμένο', STALE: 'Τα στοιχεία άλλαξαν' }[businessStatus] || businessStatus);
     const blockedExplanation = weeklyHrBlockedExplanation(payload);
     const eligible = isWeeklyHrStage1Eligible(payload);
     const selected = eligible && weeklyHrStage1Selected.has(key);
     const selection = `<input type="checkbox" class="form-check-input weekly-hr-stage1-select" aria-label="Επιλογή εβδομάδας" data-stage1-key="${escapeHtml(key)}" ${selected ? 'checked' : ''} ${eligible ? '' : 'disabled'}>`;
     const warning = stale
-        ? '<div class="small text-warning-emphasis">Τα ημερήσια δεδομένα άλλαξαν μετά την τελευταία ολοκλήρωση. Απαιτείται νέος έλεγχος του Σταδίου 1.</div>' : '';
+        ? '<div class="small text-warning-emphasis">Τα στοιχεία της εβδομάδας άλλαξαν από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα.</div>' : '';
     const indexWarning = weeklyHrStage1IndexWarning(payload);
     const relevantDates = stage1RelevantDates(payload);
     const displayDates = Array.isArray(filteredDates) ? filteredDates :
