@@ -128,8 +128,13 @@ collapse.className = 'accordion-collapse collapse';
 collapse.className = 'accordion-collapse collapse show';
 assert.equal(container.innerHTML, beforeCollapseToggle);
 
-const loadResults = source.slice(source.indexOf('async function loadResults()'),
-    source.indexOf('function pairNo('));
+const loadResultsStart = source.indexOf('async function loadResults(');
+const loadResultsEnd = source.indexOf('function pairNo(', loadResultsStart);
+assert.notEqual(loadResultsStart, -1, 'loadResults start boundary must exist');
+assert.notEqual(loadResultsEnd, -1, 'loadResults end boundary must exist');
+assert.ok(loadResultsEnd > loadResultsStart,
+    'loadResults end boundary must follow its start boundary');
+const loadResults = source.slice(loadResultsStart, loadResultsEnd);
 assert.match(loadResults, /renderPreCalculationDataIssues\(rows\);\s*return;/);
 assert.match(loadResults, /finally\s*\{[\s\S]*renderWeeklyHrStage2LifecycleFallback\(currentEmploymentReviewLifecyclePresentation\)/);
 assert.ok(mutations.some((entry) => entry.after === ''));

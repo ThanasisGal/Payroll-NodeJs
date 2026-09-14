@@ -14,8 +14,11 @@ assert.match(controller,
 assert.match(controller,
     /return res\.json\(\{[\s\S]*?canonicalLifecycleProjections[\s\S]*?boundaryContextPreflight/);
 
-const loadStart = frontend.indexOf('async function loadResults()');
+const loadStart = frontend.indexOf('async function loadResults(');
 const loadEnd = frontend.indexOf('function pairNo(', loadStart);
+assert.notEqual(loadStart, -1, 'loadResults start boundary must exist');
+assert.notEqual(loadEnd, -1, 'loadResults end boundary must exist');
+assert.ok(loadEnd > loadStart, 'loadResults end boundary must follow its start boundary');
 const loadSource = frontend.slice(loadStart, loadEnd);
 assert.ok(loadSource.indexOf('payload.canonicalLifecycleProjections') >= 0);
 assert.ok(loadSource.indexOf('payload.canonicalLifecycleProjections') <
