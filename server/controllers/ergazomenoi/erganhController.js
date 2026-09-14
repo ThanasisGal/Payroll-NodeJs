@@ -535,6 +535,9 @@ const {
     resolveWeeklyHrStage3Day: executeWeeklyHrStage3Day
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3ResolutionService');
 const {
+    buildWeeklyHrStage3BulkPreview
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewService');
+const {
     resolveDailyActualWorkFacts: resolveStage3DailyActualWorkFacts
 } = require('../../services/ergazomenoi/apasxoliseisDailyActualWorkFactsService');
 const {
@@ -4504,7 +4507,9 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
         employee_kodikos: weekly.employee.kodikos,
         week_start: weekly.week.start, week_end: weekly.week.end,
         ...(periodScope || {}) };
-    return { scope, row: { ...row, team: weekly.base.team,
+    return { scope, employee_name:
+        `${weekly.employee.eponymo || ''} ${weekly.employee.onoma || ''}`.trim(),
+        row: { ...row, team: weekly.base.team,
         company_kod: weekly.base.company_kod },
         weekRows: weekly.rows,
         dailyProfile: weekly.effectiveProfilesByDate[decisionDate] || weekly.effectiveProfile,
@@ -12439,6 +12444,37 @@ class erganhController {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'STAGE1_DAILY_CLASSIFICATION_BULK_FAILED',
                 message: error.statusCode ? error.message : 'Αποτυχία μαζικής αποθήκευσης χαρακτηρισμών.' });
+        }
+    };
+
+    static previewWeeklyHrStage3Bulk = async (req, res) => {
+        try {
+            await assertWeeklyHrWorkflowIndexesReady();
+            let leaveCategoryLabel = '';
+            if (String(req.body?.final_classification || '').trim().toUpperCase() === 'LEAVE') {
+                const category = await Models_A.KathgoriesAdeiasModel.findOne({
+                    kodikos: String(req.body?.leave_category || '').trim(),
+                    ...buildHrSelectableLeaveCategoryQuery()
+                }).select('kodikos perigrafh').lean();
+                leaveCategoryLabel = category
+                    ? `${category.kodikos} - ${category.perigrafh}` : '';
+            }
+            const preview = await buildWeeklyHrStage3BulkPreview({ command: req.body,
+                requestScope: { team: req.session.userTeam,
+                    company_kod: req.session.companyInUse }, leaveCategoryLabel,
+                loadAuthoritativeContext: async (item, command) => {
+                    const input = { ...item, ypokatasthma: command.ypokatasthma,
+                        period_start: command.period_start, period_end: command.period_end };
+                    const initial = await loadWeeklyHrStage3DecisionContext({ req, input });
+                    await assertActiveEmploymentReviewStage3DayWritable(req, initial, input);
+                    return initial;
+                } });
+            return res.json({ success: true, ...preview });
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ success: false,
+                code: error.code || 'STAGE3_BULK_PREVIEW_FAILED',
+                message: error.statusCode ? error.message :
+                    'Αποτυχία προεπισκόπησης μαζικών αποφάσεων Stage 3.' });
         }
     };
 
