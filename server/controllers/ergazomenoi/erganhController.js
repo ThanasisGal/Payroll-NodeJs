@@ -8,6 +8,9 @@ const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('
 // module.exports = erganhController;
 
 const mongoose = require('mongoose');
+const {
+    getOrCreateRequestRead
+} = require('../../services/ergazomenoi/employmentReviewRequestReadContextService');
 
 const { Builder, By, Key, until } = require('selenium-webdriver');
 const ExcelJS = require('exceljs');
@@ -1254,40 +1257,49 @@ function assertReviewDecisionMutualExclusion(row = {}) {
 }
 
 async function activeEmploymentReviewPeriodDates(req) {
-    const period = await PeriodsModel.findOne({
-        xrhsh: req.session.yearInUse,
-        kodikos: req.session.periodInUse
-    }).select('apo eos').lean();
-    if (!period?.apo || !period?.eos) {
-        throw weeklyHrApiError('INVALID_PERIOD_SCOPE', 400, 'Δεν βρέθηκε η ενεργή περίοδος.');
-    }
-    return { period_start: period.apo, period_end: period.eos };
+    const key = ['active-period-dates', req.session.userTeam,
+        req.session.companyInUse, req.session.yearInUse, req.session.periodInUse];
+    return getOrCreateRequestRead(req, key, async () => {
+        const period = await PeriodsModel.findOne({
+            xrhsh: req.session.yearInUse,
+            kodikos: req.session.periodInUse
+        }).select('apo eos').lean();
+        if (!period?.apo || !period?.eos) {
+            throw weeklyHrApiError('INVALID_PERIOD_SCOPE', 400, 'Δεν βρέθηκε η ενεργή περίοδος.');
+        }
+        return { period_start: period.apo, period_end: period.eos };
+    });
 }
 
 async function activeEmploymentReviewPeriodScope(req, branchOverride = '') {
-    const dates = await activeEmploymentReviewPeriodDates(req);
     const branch = String(branchOverride || req.body?.ypokatasthma || req.query?.ypokatasthma || '').trim();
     if (!branch || branch.toUpperCase() === 'ALL' || branch.includes(',')) {
         const error = new Error('Δεν ήταν δυνατό να προσδιοριστεί η περίοδος και το παράρτημα.');
         error.code = 'INVALID_PERIOD_SCOPE'; error.statusCode = 400; throw error;
     }
     const normalizedBranch = branch.padStart(4, '0');
-    const branchRecord = await YpokatasthmataModel.findOne({
-        team: req.session.userTeam,
-        companykod_object: String(req.session.companyInUse || ''),
-        kodikos: normalizedBranch
-    }).select('_id').lean();
-    if (!branchRecord) {
-        const error = new Error('Το παράρτημα δεν ανήκει στην ενεργή εταιρεία.');
-        error.code = 'PERIOD_CONTROL_SCOPE_FORBIDDEN'; error.statusCode = 403; throw error;
-    }
-    return {
-        team: req.session.userTeam,
-        company_kod: String(req.session.companyInUse || ''),
-        ypokatasthma: normalizedBranch,
-        period_start: dates.period_start,
-        period_end: dates.period_end
-    };
+    const key = ['active-period-scope', req.session.userTeam,
+        req.session.companyInUse, req.session.yearInUse, req.session.periodInUse,
+        normalizedBranch];
+    return getOrCreateRequestRead(req, key, async () => {
+        const dates = await activeEmploymentReviewPeriodDates(req);
+        const branchRecord = await YpokatasthmataModel.findOne({
+            team: req.session.userTeam,
+            companykod_object: String(req.session.companyInUse || ''),
+            kodikos: normalizedBranch
+        }).select('_id').lean();
+        if (!branchRecord) {
+            const error = new Error('Το παράρτημα δεν ανήκει στην ενεργή εταιρεία.');
+            error.code = 'PERIOD_CONTROL_SCOPE_FORBIDDEN'; error.statusCode = 403; throw error;
+        }
+        return {
+            team: req.session.userTeam,
+            company_kod: String(req.session.companyInUse || ''),
+            ypokatasthma: normalizedBranch,
+            period_start: dates.period_start,
+            period_end: dates.period_end
+        };
+    });
 }
 
 async function assertActiveEmploymentReviewPeriodNormal(req, branchOverride = '', expectedToken = null, requiredRange = null) {
