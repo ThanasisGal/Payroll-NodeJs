@@ -380,6 +380,7 @@ let currentPolicyPreviewRowsById = new Map();
 let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentEmploymentReviewLifecyclePresentation = null;
+let employmentReviewStageAutoOpenPending = false;
 let currentCanonicalLifecyclePayloads = [];
 let currentWeeklyHrStage2BulkPreview = null;
 let weeklyHrStage2BulkSubmitting = false;
@@ -10556,7 +10557,17 @@ function focusEmploymentReviewStage(stageKey) {
     return true;
 }
 
+function requestEmploymentReviewCurrentStageAutoOpen() {
+    employmentReviewStageAutoOpenPending = true;
+}
+
+function cancelEmploymentReviewCurrentStageAutoOpen() {
+    employmentReviewStageAutoOpenPending = false;
+}
+
 function syncEmploymentReviewStageAccordionState(lifecycle = {}) {
+    if (!employmentReviewStageAutoOpenPending) return false;
+    employmentReviewStageAutoOpenPending = false;
     Object.values(lifecycle.stages || {}).forEach((stage) => {
         const collapse = document.querySelector(
             `[data-workflow-stage="${CSS.escape(String(stage.stage))}"] .accordion-collapse`
@@ -10566,6 +10577,7 @@ function syncEmploymentReviewStageAccordionState(lifecycle = {}) {
         if (stage.open_by_default === true) instance.show();
         else instance.hide();
     });
+    return true;
 }
 
 function renderEmploymentReviewWorkflowGuide(lifecycle = {}) {
@@ -11129,8 +11141,12 @@ async function completeWeeklyHrStage1BulkFromUi() {
 document.addEventListener('click', (event) => {
     const attentionAction = event.target.closest('[data-employment-review-attention-stage]');
     if (attentionAction) {
+        cancelEmploymentReviewCurrentStageAutoOpen();
         focusEmploymentReviewStage(attentionAction.dataset.employmentReviewAttentionStage);
         return;
+    }
+    if (event.target.closest('[data-workflow-stage] .accordion-button')) {
+        cancelEmploymentReviewCurrentStageAutoOpen();
     }
     if (event.target.closest('[data-workflow-stage="STAGE1"] .accordion-button')) {
         loadPreparedWeeklyHrStage1().catch((error) => {
@@ -12899,7 +12915,14 @@ document.getElementById('postCorrectivePayrollBtn')?.addEventListener('click', (
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
 document.getElementById('exportAuditDossierPdfBtn')?.addEventListener('click', exportAuditDossierPdf);
-document.getElementById('searchBtn')?.addEventListener('click', loadResults);
+document.getElementById('searchBtn')?.addEventListener('click', async () => {
+    requestEmploymentReviewCurrentStageAutoOpen();
+    try {
+        await loadResults();
+    } finally {
+        cancelEmploymentReviewCurrentStageAutoOpen();
+    }
+});
 
 window.EmploymentReviewHrTest = {
     setGroups(groups, completedGroupIds = []) {

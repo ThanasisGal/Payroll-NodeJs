@@ -170,6 +170,7 @@ const progressElement = { innerHTML: '', classList: classList() };
 const attentionElement = { innerHTML: '', classList: classList() };
 const guideSandbox = {
     currentWeeklyHrStage2BulkPreview: null,
+    employmentReviewStageAutoOpenPending: false,
     workflowStageShortNames: { STAGE1: 'Άδειες', STAGE2: 'Μεταφορά Ρεπό',
         STAGE3: 'Υπόλοιπες Άδειες', STAGE4: 'Τελικός Έλεγχος' },
     escapeHtml: (value) => String(value ?? '').replaceAll('<', '&lt;'),
@@ -182,7 +183,9 @@ vm.runInNewContext(`${source.slice(guideStart, guideEnd)}
 this.renderGuide = renderEmploymentReviewWorkflowGuide;
 this.attention = employmentReviewAttentionPresentation;
 this.focusStage = focusEmploymentReviewStage;
-this.syncAccordion = syncEmploymentReviewStageAccordionState;`, guideSandbox);
+this.syncAccordion = syncEmploymentReviewStageAccordionState;
+this.requestAutoOpen = requestEmploymentReviewCurrentStageAutoOpen;
+this.cancelAutoOpen = cancelEmploymentReviewCurrentStageAutoOpen;`, guideSandbox);
 guideSandbox.renderGuide(stage3AfterStage2);
 assert.match(progressElement.innerHTML, /1\. Άδειες/);
 assert.match(progressElement.innerHTML, /2\. Μεταφορά Ρεπό/);
@@ -284,13 +287,20 @@ const syncLifecycle = { stages: {
     STAGE4: { stage: 'STAGE4', business_status: 'BLOCKED', presentation_status: 'LOCKED',
         open_by_default: false }
 } };
-guideSandbox.syncAccordion(syncLifecycle);
+guideSandbox.requestAutoOpen();
+assert.equal(guideSandbox.syncAccordion(syncLifecycle), true);
 assert.deepEqual(accordionCalls.STAGE1, { show: 0, hide: 1 });
 assert.deepEqual(accordionCalls.STAGE2, { show: 0, hide: 1 });
 assert.deepEqual(accordionCalls.STAGE3, { show: 1, hide: 0 });
 assert.deepEqual(accordionCalls.STAGE4, { show: 0, hide: 1 });
 
 Object.values(accordionCalls).forEach((calls) => { calls.show = 0; calls.hide = 0; });
+assert.equal(guideSandbox.syncAccordion(syncLifecycle), false,
+    'η ασύγχρονη ανανέωση δεν επαναφέρει το τρέχον στάδιο');
+assert.equal(Object.values(accordionCalls).reduce((sum, calls) =>
+    sum + calls.show + calls.hide, 0), 0);
+
+guideSandbox.requestAutoOpen();
 syncLifecycle.stages.STAGE2 = { stage: 'STAGE2', business_status: 'BLOCKED',
     presentation_status: 'ACTIVE', open_by_default: true };
 syncLifecycle.stages.STAGE3.open_by_default = false;
@@ -299,6 +309,7 @@ assert.equal(accordionCalls.STAGE2.show, 1, 'το τρέχον blocker ανοί�
 assert.equal(accordionCalls.STAGE3.hide, 1);
 
 Object.values(accordionCalls).forEach((calls) => { calls.show = 0; calls.hide = 0; });
+guideSandbox.requestAutoOpen();
 guideSandbox.syncAccordion(completedLifecycle);
 assert.equal(Object.values(accordionCalls).reduce((sum, calls) => sum + calls.show, 0), 0,
     'ολοκληρωμένο lifecycle δεν ανοίγει αυθαίρετο στάδιο');
@@ -307,6 +318,15 @@ const syncSource = source.slice(source.indexOf('function syncEmploymentReviewSta
     source.indexOf('function renderEmploymentReviewWorkflowGuide'));
 assert.doesNotMatch(syncSource, /fetch|submit|scrollIntoView|\.focus\s*\(/);
 assert.match(syncSource, /bootstrap\.Collapse\.getOrCreateInstance/);
+assert.match(syncSource, /if \(!employmentReviewStageAutoOpenPending\) return false/);
+
+Object.values(accordionCalls).forEach((calls) => { calls.show = 0; calls.hide = 0; });
+guideSandbox.requestAutoOpen();
+guideSandbox.cancelAutoOpen();
+assert.equal(guideSandbox.syncAccordion(syncLifecycle), false,
+    'η χειροκίνητη επιλογή ακυρώνει εκκρεμή αυτόματη επιλογή');
+assert.equal(Object.values(accordionCalls).reduce((sum, calls) =>
+    sum + calls.show + calls.hide, 0), 0);
 
 let shown = 0;
 let focused = 0;
@@ -377,6 +397,16 @@ assert.equal((firstSearchSource.match(/\bloadResults\s*\(/g) || []).length, 1,
 assert.equal((firstSearchSource.match(/fetch\(`\/api\/prodhlomena-oraria\/review\?/g) || []).length, 1,
     'η διόρθωση δεν επαναλαμβάνει το κύριο αίτημα Αναζήτησης');
 assert.match(source, /renderWeeklyHrStage3\(lifecycle\);\s*syncEmploymentReviewStageAccordionState\(lifecycle\)/);
+const accordionClickSource = source.slice(source.indexOf("document.addEventListener('click', (event) =>"),
+    source.indexOf("document.addEventListener('change',", source.indexOf("document.addEventListener('click', (event) =>")));
+assert.match(accordionClickSource,
+    /\[data-workflow-stage\] \.accordion-button[\s\S]{0,120}cancelEmploymentReviewCurrentStageAutoOpen\(\)/);
+assert.match(accordionClickSource,
+    /STAGE1[\s\S]{0,160}loadPreparedWeeklyHrStage1\(\)/);
+const searchBindingSource = source.slice(source.indexOf("document.getElementById('searchBtn')"),
+    source.indexOf('window.EmploymentReviewHrTest'));
+assert.match(searchBindingSource,
+    /requestEmploymentReviewCurrentStageAutoOpen\(\)[\s\S]*await loadResults\(\)[\s\S]*finally[\s\S]*cancelEmploymentReviewCurrentStageAutoOpen\(\)/);
 const workflowUpdateSource = source.match(
     /function updateEmploymentReviewWorkflowPresentation\(\) \{[\s\S]*?\n}/
 )?.[0] || '';
