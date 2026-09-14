@@ -10270,12 +10270,12 @@ function renderStage3DecisionItem(group, item) {
         <td>${escapeHtml(item.employment_label || 'Άγνωστο')}</td>
         <td>${escapeHtml(stage3DeclaredPresentation(row, daily, item))}</td>
         <td>${escapeHtml(stage3ActualWorkPresentation(row, daily, item))}</td>
-        <td class="small"><strong>Γιατί απαιτείται απόφαση:</strong>${stage3DecisionExplanationHtml(item)}</td>
-        <td><select class="form-select form-select-sm weekly-hr-stage3-classification"
+        <td class="small stage3-decision-reason"><strong>Γιατί απαιτείται απόφαση:</strong>${stage3DecisionExplanationHtml(item)}</td>
+        <td class="stage3-decision-classification"><select class="form-select form-select-sm weekly-hr-stage3-classification"
                 data-row-id="${escapeHtml(item.row_id)}">${stage3ClassificationOptions(item)}</select>
             <select class="form-select form-select-sm mt-1 weekly-hr-stage3-leave-category d-none"
                 data-row-id="${escapeHtml(item.row_id)}">${stage1LeaveCategoryOptions('')}</select></td>
-        <td><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-stage3-resolve"
+        <td class="stage3-decision-action"><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-stage3-resolve"
             data-row-id="${escapeHtml(item.row_id)}">Προεπισκόπηση απόφασης</button></td></tr>`;
 }
 
@@ -10312,7 +10312,13 @@ function renderWeeklyHrStage3(lifecycle) {
                             group.pending_items.length)} προς απόφαση</span></div>
                 </div>
                 ${stage3BoundaryWeekGuidance(group)}
-                <div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
+                <div class="table-responsive stage3-decisions-table-wrapper"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
+                    <colgroup>
+                        <col class="stage3-col-date"><col class="stage3-col-day">
+                        <col class="stage3-col-day-status"><col class="stage3-col-declared">
+                        <col class="stage3-col-actual"><col class="stage3-col-reason">
+                        <col class="stage3-col-classification"><col class="stage3-col-action">
+                    </colgroup>
                     <thead><tr><th>Ημερομηνία</th><th>Ημέρα</th><th>Καθεστώς ημέρας</th>
                         <th>Προδηλωμένο ωράριο</th><th>Πραγματική εργασία / κάρτες</th><th>Αιτία</th>
                         <th>Τελικός χαρακτηρισμός</th><th>Ενέργεια</th></tr></thead>

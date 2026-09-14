@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const css = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
 
 const defaultReason = 'Μετά από έλεγχο του προδηλωμένου ωραρίου, των πραγματικών στοιχείων απασχόλησης και του καθεστώτος μερικής/εκ περιτροπής απασχόλησης, η ημέρα χαρακτηρίζεται ως ΜΗ ΕΡΓΑΣΙΑ. Δεν προέκυψε άδεια, ασθένεια ή απουσία.';
 assert.ok(source.includes(defaultReason));
@@ -149,6 +150,19 @@ assert.match(sandbox.container.innerHTML, /1 προς απόφαση/);
 assert.match(sandbox.container.innerHTML, /08:00–16:00 \/ 8,00 ώρες/);
 assert.match(sandbox.container.innerHTML, /Πραγματική εργασία \/ κάρτες/);
 assert.match(sandbox.container.innerHTML, /Καθεστώς ημέρας/);
+assert.equal((sandbox.container.innerHTML.match(/<th>/g) || []).length, 14,
+    'διατηρούνται οι οκτώ στήλες αποφάσεων και οι έξι στήλες πλαισίου');
+assert.match(sandbox.container.innerHTML, /stage3-decisions-table-wrapper/);
+assert.match(sandbox.container.innerHTML, /stage3-col-reason/);
+assert.match(sandbox.container.innerHTML, /stage3-decision-reason/);
+assert.match(sandbox.container.innerHTML, /stage3-decision-classification/);
+assert.match(sandbox.container.innerHTML, /stage3-decision-action/);
+assert.match(css, /\.weekly-hr-stage3-decisions-table\s*\{[^}]*min-width:\s*82rem[^}]*table-layout:\s*fixed/s);
+assert.match(css, /\.stage3-col-reason\s*\{\s*width:\s*24%/);
+assert.match(css, /\.stage3-col-classification\s*\{\s*width:\s*17%/);
+assert.match(css, /\.stage3-col-action\s*\{\s*width:\s*11%/);
+assert.match(css,
+    /\.stage3-decision-classification \.form-select,[^}]*\.stage3-decision-action \.weekly-hr-stage3-resolve\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0/s);
 assert.match(sandbox.container.innerHTML, /Υπήρχε προδηλωμένη εργασία 8,00 ωρών/);
 assert.match(sandbox.container.innerHTML, /Δεν προέκυψε πραγματική εργασία από κάρτες/);
 assert.match(sandbox.container.innerHTML, /Η εβδομαδιαία ανάπαυση έχει ήδη καλυφθεί/);
