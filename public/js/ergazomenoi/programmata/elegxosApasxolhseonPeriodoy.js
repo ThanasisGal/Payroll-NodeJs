@@ -9043,7 +9043,7 @@ const workflowStageStatusLabels = Object.freeze({
 });
 const workflowStageStatusClasses = Object.freeze({
     DEFERRED_TO_NEXT_PERIOD: 'text-bg-info',
-    COMPLETED: 'text-bg-success', ACTIVE: 'text-bg-primary', OPEN: 'text-bg-secondary',
+    COMPLETED: 'text-bg-success', ACTIVE: 'text-bg-warning', OPEN: 'text-bg-secondary',
     BLOCKED: 'text-bg-danger', STALE: 'text-bg-warning', LOCKED: 'text-bg-secondary'
 });
 
@@ -10056,6 +10056,27 @@ function groupStage3PendingItems(items = [], payloads = currentCanonicalLifecycl
         pending_items: group.pending_items.sort(compareLifecyclePendingItems) }));
 }
 
+function buildStage3EmployeeNameLookup(rows = currentReviewRows) {
+    const names = new Map();
+    for (const row of rows || []) {
+        const name = String(row?.employee_name || row?.employeeName ||
+            `${row?.eponymo || ''} ${row?.onoma || ''}`).trim();
+        if (!name) continue;
+        [row?.kodikos, row?.employee_kodikos, row?.employee_id, row?.ergazomenos_id]
+            .map((value) => String(value || '').trim()).filter(Boolean)
+            .forEach((key) => names.set(key, name));
+    }
+    return names;
+}
+
+function stage3EmployeeDisplayName(group = {}, names = new Map()) {
+    const payloadName = String(group.employee_name || '').trim();
+    if (payloadName && !/^Εργαζόμενος$/i.test(payloadName)) return payloadName;
+    const identifiers = [group.scope?.employee_kodikos, group.scope?.employee_id]
+        .map((value) => String(value || '').trim()).filter(Boolean);
+    return identifiers.map((identifier) => names.get(identifier)).find(Boolean) || 'Εργαζόμενος';
+}
+
 function stage3HasFullWeekContext(group = {}) {
     const dates = (group.payload?.rows || []).map((row) => stage1DateKey(row.hmeromhnia));
     const expected = enumerateStage1DateKeys(group.scope.week_start, group.scope.week_end);
@@ -10239,6 +10260,7 @@ function renderWeeklyHrStage3(lifecycle) {
     if (!container) return;
     const items = lifecycle?.stages?.STAGE3?.pending_items || [];
     const groups = groupStage3PendingItems(items);
+    const employeeNames = buildStage3EmployeeNameLookup();
     const activePeriod = currentReviewOwnershipPeriod();
     container.innerHTML = groups.length
         ? groups.map((group) => {
@@ -10249,7 +10271,7 @@ function renderWeeklyHrStage3(lifecycle) {
             return `<section class="border rounded px-2 py-2 mb-2 stage3-week-group" data-stage3-week-key="${escapeHtml(group.key)}">
                 <div class="stage3-employee-heading mb-2">
                     <div class="stage3-employee-identity"><strong class="stage3-employee-name">${escapeHtml(
-                        group.employee_name || 'Εργαζόμενος')}</strong>
+                        stage3EmployeeDisplayName(group, employeeNames))}</strong>
                         <span class="stage3-employee-code">Κωδικός: ${escapeHtml(
                             group.scope.employee_kodikos || '')}</span></div>
                     <div class="stage3-week-summary"><strong>Εβδομάδα:</strong> ${escapeHtml(
@@ -10424,9 +10446,10 @@ function employmentReviewWaitingReason(stageKey) {
 }
 
 function employmentReviewProgressState(stage = {}) {
-    if (stage.business_status === 'BLOCKED') return 'blocked';
     if (stage.presentation_status === 'COMPLETED') return 'completed';
-    if (stage.presentation_status === 'ACTIVE' || stage.open_by_default === true) return 'current';
+    if (stage.presentation_status === 'ACTIVE' || stage.open_by_default === true) {
+        return stage.business_status === 'BLOCKED' ? 'blocked' : 'current';
+    }
     return 'waiting';
 }
 
@@ -10536,6 +10559,11 @@ function updateEmploymentReviewWorkflowPresentation() {
     currentCanonicalDailyEmploymentTypeByKey = buildCanonicalDailyEmploymentTypeByKey(allPayloads);
     if (currentReviewRows.length) renderCurrentReviewRows();
     const summary = document.getElementById('employmentReviewWorkflowSummary');
+    if (summary) {
+        summary.replaceChildren();
+        summary.classList.add('d-none');
+        summary.setAttribute('aria-hidden', 'true');
+    }
     if (!allPayloads.length) {
         summary?.classList.add('d-none');
         document.getElementById('employmentReviewWorkflowProgress')?.classList.add('d-none');
@@ -10543,19 +10571,6 @@ function updateEmploymentReviewWorkflowPresentation() {
         return lifecycle;
     }
     renderEmploymentReviewWorkflowGuide(lifecycle);
-    const currentLabel = lifecycle.current_stage
-        ? workflowStageNames[lifecycle.current_stage] : Object.values(lifecycle.stages)
-            .every(stage => stage.presentation_status === 'COMPLETED')
-            ? 'Όλα τα στάδια ολοκληρωμένα' : lifecycle.deferred_weeks.some(week => week.status === 'DEFERRED_TO_NEXT_PERIOD')
-            ? 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ' : 'Όλα τα στάδια ολοκληρωμένα';
-    if (summary) {
-        summary.innerHTML = `<div class="d-flex flex-wrap gap-3 small">
-            <span><strong>Τρέχον Στάδιο:</strong> ${escapeHtml(currentLabel)}</span>
-            <span><strong>Συνολικές εκκρεμότητες:</strong> ${escapeHtml(lifecycle.total_pending_count)}</span>
-            <span><strong>Απαιτείται HR ενέργεια:</strong> ${lifecycle.requires_hr_action ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
-        </div>`;
-        summary.classList.remove('d-none');
-    }
     Object.values(lifecycle.stages).forEach((stage) => {
         const item = document.querySelector(`[data-workflow-stage="${stage.stage}"]`);
         const button = item?.querySelector('.accordion-button');
@@ -10563,6 +10578,9 @@ function updateEmploymentReviewWorkflowPresentation() {
         const collapseElement = item?.querySelector('.accordion-collapse');
         if (!button || !header || !collapseElement) return;
         const presentationStatus = stage.presentation_status;
+        const progressState = employmentReviewProgressState(stage);
+        item.classList.toggle('workflow-stage-current', progressState === 'current');
+        item.classList.toggle('workflow-stage-blocked', progressState === 'blocked');
         const noHrAction = ['STAGE1', 'STAGE2', 'STAGE3'].includes(stage.stage) &&
             stage.business_status === 'COMPLETED' &&
             Number(stage.pending_count || 0) === 0 &&

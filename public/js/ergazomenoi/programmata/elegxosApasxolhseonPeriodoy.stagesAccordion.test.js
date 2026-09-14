@@ -114,6 +114,10 @@ const stage3AfterStage2 = sandbox.derive([{ scope: { employee_kodikos: '0004' },
         stage3: stage('OPEN', 26), stage4: stage('COMPLETED')
     } } }], null, { safe_bulk_count: 0, manual_exception_count: 0 });
 assert.equal(stage3AfterStage2.current_stage, 'STAGE3');
+assert.equal(stage3AfterStage2.stages.STAGE1.open_by_default, false);
+assert.equal(stage3AfterStage2.stages.STAGE2.open_by_default, false);
+assert.equal(stage3AfterStage2.stages.STAGE3.open_by_default, true);
+assert.equal(stage3AfterStage2.stages.STAGE4.open_by_default, false);
 const manualStage2 = sandbox.derive([{ scope: { employee_kodikos: '0004' },
     lifecycle_projection: { stages: {
         stage1: stage('COMPLETED'), stage2: stage('COMPLETED'),
@@ -196,6 +200,23 @@ assert.match(attentionElement.innerHTML, /Προβολή 26 εκκρεμοτήτ
 assert.equal(progressElement.classList.contains('d-none'), false);
 assert.equal(attentionElement.classList.contains('d-none'), false);
 
+const mayStage3Lifecycle = { current_stage: 'STAGE3', stages: {
+    STAGE1: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },
+    STAGE2: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },
+    STAGE3: { presentation_status: 'ACTIVE', business_status: 'OPEN', open_by_default: true,
+        pending_count: 26 },
+    STAGE4: { presentation_status: 'LOCKED', business_status: 'BLOCKED',
+        open_by_default: false }
+} };
+guideSandbox.renderGuide(mayStage3Lifecycle);
+const stage4Progress = progressElement.innerHTML.match(
+    /<li class="employment-review-progress-step[^>]*>[^]*?4\. Τελικός Έλεγχος[^]*?<\/li>/
+)?.[0] || '';
+assert.match(stage4Progress, /is-waiting/);
+assert.doesNotMatch(stage4Progress, /is-blocked|Χρειάζεται διόρθωση/);
+assert.match(stage4Progress,
+    /Αναμονή ολοκλήρωσης του Σταδίου 3 — Υπόλοιπες Άδειες/);
+
 guideSandbox.currentWeeklyHrStage2BulkPreview = {
     safe_bulk_count: 19, manual_exception_count: 0, already_resolved_count: 66
 };
@@ -260,6 +281,14 @@ assert.match(source, /button\.disabled = stageViewLocked/);
 assert.match(source, /aria-disabled[\s\S]{0,100}stageViewLocked/);
 assert.match(source, /ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ/);
 assert.match(source, /employmentReviewWaitingReason\(stage\.stage\)/);
+const workflowUpdateSource = source.match(
+    /function updateEmploymentReviewWorkflowPresentation\(\) \{[\s\S]*?\n}/
+)?.[0] || '';
+assert.match(workflowUpdateSource, /summary\.replaceChildren\(\)/);
+assert.match(workflowUpdateSource, /summary\.classList\.add\('d-none'\)/);
+assert.doesNotMatch(workflowUpdateSource, /summary\.innerHTML|Τρέχον Στάδιο:|Απαιτείται HR ενέργεια:/);
+assert.match(source, /ACTIVE:\s*'text-bg-warning'/);
+assert.match(source, /weekly-hr-stage3-resolve[^>]*[\s\S]{0,180}Προεπισκόπηση απόφασης/);
 
 const rendered = sandbox.renderWeeklyHrStage2LifecycleFallback(lifecycle);
 assert.equal(rendered, true);
@@ -370,5 +399,11 @@ assert.doesNotMatch(buttonRule, /(?:^|\n)\s*height\s*:\s*[0-9.]+(?:px|rem|vh|vw)
 assert.match(getCssRule('.employment-review-progress-step.is-completed'), /--bs-success/);
 assert.match(getCssRule('.employment-review-progress-step.is-current'), /--bs-warning/);
 assert.match(getCssRule('.employment-review-progress-step.is-blocked'), /--bs-danger/);
+assert.match(getCssRule('.employment-review-progress-step'), /--bs-secondary/);
+assert.match(getCssRule('#employmentReviewStagesAccordion > .workflow-stage-current > .accordion-header > .accordion-button'),
+    /--bs-warning/);
+assert.match(getCssRule('#employmentReviewStagesAccordion > .workflow-stage-blocked > .accordion-header > .accordion-button'),
+    /--bs-danger/);
+assert.match(getCssRule('.employment-review-action-primary'), /--bs-primary/);
 
 console.log('employment review four-stage accordion projection tests passed');

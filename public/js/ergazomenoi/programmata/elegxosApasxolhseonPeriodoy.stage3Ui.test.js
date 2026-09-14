@@ -70,6 +70,7 @@ const helperSource = source.slice(source.indexOf('function stage3DecisionClassif
     source.indexOf('function findStage3PendingItem'));
 const sandbox = {
     currentCanonicalLifecyclePayloads: [],
+    currentReviewRows: [],
     currentReviewOwnershipPeriod: () => ({ period_start: '2026-05-01', period_end: '2026-05-31' }),
     compareLifecyclePendingItems: (left, right) => left.date.localeCompare(right.date),
     stage1DateKey: (value) => String(value || '').slice(0, 10),
@@ -90,6 +91,7 @@ const sandbox = {
     container: { innerHTML: '' }
 };
 vm.runInNewContext(`${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
+    buildStage3EmployeeNameLookup, stage3EmployeeDisplayName,
     stage3DeclaredPresentation, stage3DecisionExplanation, stage3PayloadForItem,
     stage3DailyPresentation, stage3ApologistikoClassification,
     stage3DecisionClassificationLabel, stage3DecisionExplanationHtml, stage3WeekKey };`, sandbox);
@@ -163,6 +165,25 @@ assert.deepEqual(Array.from(sandbox.helpers.stage3DecisionExplanation({
     'Δεν προέκυψε ασφαλής αυτόματη τελική ταξινόμηση για τη συγκεκριμένη ημέρα.',
     'Χρειάζεται τελικός χαρακτηρισμός από το HR: Άδεια, Ασθένεια, Απουσία.'
 ]);
+
+const loadedEmployeeRow = { kodikos: '0007', eponymo: 'ΣΠΥΡΙΔΩΝΟΣ', onoma: 'ΑΡΕΤΗ' };
+const employeeNamePayload = payload('0007', '2026-05-18', '2026-05-24', ['2026-05-19']);
+employeeNamePayload.employee_name = '';
+sandbox.currentCanonicalLifecyclePayloads.push(employeeNamePayload);
+sandbox.currentReviewRows.push(loadedEmployeeRow);
+sandbox.helpers.renderWeeklyHrStage3({ stages: { STAGE3: { pending_items: [
+    pending('0007', '2026-05-18', '2026-05-24', '2026-05-19')
+] } } });
+assert.match(sandbox.container.innerHTML, /stage3-employee-name">ΣΠΥΡΙΔΩΝΟΣ ΑΡΕΤΗ/);
+assert.match(sandbox.container.innerHTML, /stage3-employee-code">Κωδικός: 0007/);
+assert.equal(typeof sandbox.fetch, 'undefined', 'η επίλυση ονόματος δεν χρειάζεται HTTP αίτημα');
+const escapedNames = sandbox.helpers.buildStage3EmployeeNameLookup([
+    { kodikos: '0099', eponymo: '<script>', onoma: 'ΔΟΚΙΜΗ' }
+]);
+assert.equal(sandbox.escapeHtml(sandbox.helpers.stage3EmployeeDisplayName({ employee_name: '',
+    scope: { employee_kodikos: '0099' } }, escapedNames)), '&lt;script&gt; ΔΟΚΙΜΗ');
+sandbox.currentCanonicalLifecyclePayloads.pop();
+sandbox.currentReviewRows.pop();
 
 assert.equal(sandbox.helpers.stage3DeclaredPresentation({ repo: true }), 'ΡΕΠΟ');
 assert.equal(sandbox.helpers.stage3DeclaredPresentation({}), 'Δεν υπάρχει προδηλωμένο ωράριο');
