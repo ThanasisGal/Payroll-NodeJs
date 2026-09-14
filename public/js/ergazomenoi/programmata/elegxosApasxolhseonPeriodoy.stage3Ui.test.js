@@ -77,7 +77,8 @@ const sandbox = {
             date.setUTCDate(date.getUTCDate() + 1)) dates.push(date.toISOString().slice(0, 10));
         return dates;
     },
-    escapeHtml: (value) => String(value ?? ''),
+    escapeHtml: (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;'),
     formatPolicyPreviewHours: (value) => Number(value).toFixed(2),
     stage3ClassificationOptions: (item) => (item.allowed_classifications || [])
         .map((value) => `<option value="${value}">${value}</option>`).join(''),
@@ -86,7 +87,7 @@ const sandbox = {
     container: { innerHTML: '' }
 };
 vm.runInNewContext(`${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
-    stage3DeclaredPresentation, stage3WeekKey };`, sandbox);
+    stage3DeclaredPresentation, stage3DecisionExplanation, stage3WeekKey };`, sandbox);
 
 function weekRows(start, pendingDates = []) {
     return sandbox.enumerateStage1DateKeys(start,
@@ -104,6 +105,8 @@ function payload(employee, start, end, pendingDates) {
     return { scope: { employee_id: employee, employee_kodikos: employee, week_start: start,
         week_end: end, period_start: '2026-05-01', period_end: '2026-05-31' },
         employee_name: `Εργαζόμενος ${employee}`, rows,
+        employment_date_scope: { authoritative_date_set: rows.map((row) => row.hmeromhnia),
+            context_only_dates: [] },
         stage1_daily_presentation: rows.map((row) => ({ date: row.hmeromhnia,
             actual_work_hours: row.ores_pragmatikhs_ergasias_apologistika,
             current_apologistiko_classification: row.kathgoria_ergasias_apologistika })) };
@@ -113,7 +116,11 @@ function pending(employee, start, end, date) {
     return { employee_id: employee, employee_kodikos: employee, week_start: start, week_end: end,
         period_start: '2026-05-01', period_end: '2026-05-31', row_id: `row-${date}`, date,
         declared_hours: 8, actual_work_hours: 0,
-        allowed_classifications: ['LEAVE', 'SICKNESS', 'ABSENCE'], input_fingerprint: 'f',
+        allowed_classifications: ['LEAVE', 'SICKNESS', 'ABSENCE'],
+        presentation_facts: { declared_work_present: true, declared_hours: 8,
+            actual_work_hours: 0, actual_work_missing: true,
+            weekly_rest_already_satisfied: true, current_period_writable: true,
+            context_only: false, final_human_decision_required: true }, input_fingerprint: 'f',
         expected_stage3_version: 0 };
 }
 
@@ -128,11 +135,28 @@ assert.match(sandbox.container.innerHTML, /Εμφάνιση όλης της εβ
 assert.match(sandbox.container.innerHTML, /data-stage3-week-date="2026-05-14"[\s\S]*ΠΡΟΣ ΑΠΟΦΑΣΗ/);
 assert.equal((sandbox.container.innerHTML.match(/class="table-warning stage3-decision-item"/g) || []).length, 1,
     'από προεπιλογή υπάρχει μόνο μία γραμμή προς απόφαση');
-assert.match(sandbox.container.innerHTML, /Εργαζόμενος 0012 — Κωδικός 0012/);
+assert.match(sandbox.container.innerHTML, /stage3-employee-name">Εργαζόμενος 0012/);
+assert.match(sandbox.container.innerHTML, /stage3-employee-code">Κωδικός: 0012/);
 assert.match(sandbox.container.innerHTML, /1 προς απόφαση/);
 assert.match(sandbox.container.innerHTML, /08:00–16:00 \/ 8,00 ώρες/);
 assert.match(sandbox.container.innerHTML, /Πραγματική εργασία \/ κάρτες/);
 assert.match(sandbox.container.innerHTML, /Καθεστώς ημέρας/);
+assert.match(sandbox.container.innerHTML, /Υπήρχε προδηλωμένη εργασία 8,00 ωρών/);
+assert.match(sandbox.container.innerHTML, /Δεν προέκυψε πραγματική εργασία από κάρτες/);
+assert.match(sandbox.container.innerHTML, /Η εβδομαδιαία ανάπαυση έχει ήδη καλυφθεί/);
+assert.match(sandbox.container.innerHTML,
+    /Χρειάζεται τελικός χαρακτηρισμός από το HR: Άδεια, Ασθένεια, Απουσία/);
+assert.deepEqual(Array.from(sandbox.helpers.stage3DecisionExplanation({
+    declared_hours: 8, actual_work_hours: 0,
+    allowed_classifications: ['LEAVE', 'SICKNESS', 'ABSENCE'],
+    presentation_facts: { declared_work_present: true, declared_hours: 8,
+        actual_work_missing: true }
+}).map((line) => line.text)), [
+    'Υπήρχε προδηλωμένη εργασία 8,00 ωρών.',
+    'Δεν προέκυψε πραγματική εργασία από κάρτες ή άλλα διαθέσιμα στοιχεία.',
+    'Δεν προέκυψε ασφαλής αυτόματη τελική ταξινόμηση για τη συγκεκριμένη ημέρα.',
+    'Χρειάζεται τελικός χαρακτηρισμός από το HR: Άδεια, Ασθένεια, Απουσία.'
+]);
 
 assert.equal(sandbox.helpers.stage3DeclaredPresentation({ repo: true }), 'ΡΕΠΟ');
 assert.equal(sandbox.helpers.stage3DeclaredPresentation({}), 'Δεν υπάρχει προδηλωμένο ωράριο');
@@ -146,12 +170,22 @@ const otherWeek = pending('0012', '2026-05-18', '2026-05-24', '2026-05-19');
 assert.equal(sandbox.helpers.groupStage3PendingItems([...sameWeek, otherWeek], []).length, 2);
 
 const crossMonth = pending('0013', '2026-04-27', '2026-05-03', '2026-05-01');
-sandbox.currentCanonicalLifecyclePayloads.push(payload('0013', '2026-04-27', '2026-05-03', ['2026-05-01']));
+const crossMonthPayload = payload('0013', '2026-04-27', '2026-05-03', ['2026-05-01']);
+crossMonthPayload.employee_name = '<img src=x onerror=alert(1)>';
+crossMonthPayload.scope.employee_kodikos = '<script>alert(2)</script>';
+crossMonthPayload.employment_date_scope = {
+    authoritative_date_set: ['2026-05-01', '2026-05-02', '2026-05-03'],
+    context_only_dates: ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30']
+};
+sandbox.currentCanonicalLifecyclePayloads.push(crossMonthPayload);
 sandbox.helpers.renderWeeklyHrStage3({ stages: { STAGE3: { pending_items: [crossMonth] } } });
 assert.equal((sandbox.container.innerHTML.match(/data-stage3-week-date=/g) || []).length, 7);
-assert.equal((sandbox.container.innerHTML.match(/Άλλος μήνας — μόνο για πλαίσιο/g) || []).length, 4);
+assert.equal((sandbox.container.innerHTML.match(/Άλλη περίοδος — μόνο πλαίσιο/g) || []).length, 4);
+assert.equal((sandbox.container.innerHTML.match(/Τρέχουσα περίοδος — επιτρέπεται απόφαση/g) || []).length, 3);
 assert.equal((sandbox.container.innerHTML.match(/weekly-hr-stage3-classification/g) || []).length, 1,
     'οι ημέρες πλαισίου δεν αποκτούν χειριστήριο απόφασης');
+assert.doesNotMatch(sandbox.container.innerHTML, /<img|<script/);
+assert.match(sandbox.container.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/);
 assert.match(source, /Απόκρυψη όλης της εβδομάδας/);
 
 sandbox.currentCanonicalLifecyclePayloads.length = 0;

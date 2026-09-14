@@ -10142,23 +10142,64 @@ function stage3DecisionReason(item = {}) {
     return 'Η ημέρα παραμένει πιθανή άδεια χωρίς οριστικό χαρακτηρισμό.';
 }
 
+function stage3DecisionExplanation(item = {}) {
+    const facts = item.presentation_facts || {};
+    const allowedLabels = { LEAVE: 'Άδεια', SICKNESS: 'Ασθένεια', ABSENCE: 'Απουσία',
+        NON_WORK: 'Μη εργασία' };
+    const allowed = (item.allowed_classifications || []).map((value) => allowedLabels[value])
+        .filter(Boolean);
+    const lines = [];
+    if (facts.declared_work_present === true) {
+        lines.push({ type: 'information', text: `Υπήρχε προδηλωμένη εργασία ${stage3HoursText(
+            facts.declared_hours ?? item.declared_hours)} ωρών.` });
+    }
+    if (facts.actual_work_missing === true) {
+        lines.push({ type: 'information',
+            text: 'Δεν προέκυψε πραγματική εργασία από κάρτες ή άλλα διαθέσιμα στοιχεία.' });
+    }
+    if (facts.weekly_rest_already_satisfied === true) {
+        lines.push({ type: 'resolved',
+            text: 'Η εβδομαδιαία ανάπαυση έχει ήδη καλυφθεί σε άλλη ημέρα της φυσικής εβδομάδας, επομένως η συγκεκριμένη ημέρα δεν χρειάζεται να χαρακτηριστεί ως ΡΕΠΟ.' });
+    } else {
+        lines.push({ type: 'information',
+            text: 'Δεν προέκυψε ασφαλής αυτόματη τελική ταξινόμηση για τη συγκεκριμένη ημέρα.' });
+    }
+    if (stage3HasExistingSafetyState({}, item)) {
+        lines.push({ type: 'blocker',
+            text: 'Ορισμένα διαθέσιμα στοιχεία είναι ελλιπή ή αμφίσημα και χρειάζονται προσεκτική ανθρώπινη εξέταση.' });
+    }
+    lines.push({ type: 'decision', text: `Χρειάζεται τελικός χαρακτηρισμός από το HR${
+        allowed.length ? `: ${allowed.join(', ')}.` : '.'}` });
+    return lines;
+}
+
+function stage3DecisionExplanationHtml(item = {}) {
+    return `<div class="stage3-decision-explanation">${stage3DecisionExplanation(item)
+        .map((line) => `<div class="stage3-decision-explanation-line stage3-decision-explanation-${escapeHtml(
+            line.type)}">${escapeHtml(line.text)}</div>`).join('')}</div>`;
+}
+
 function renderStage3WeekRow(group, dateKey, pendingByDate, period) {
     const row = (group.payload?.rows || []).find((item) => stage1DateKey(item.hmeromhnia) === dateKey) || {};
     const daily = stage3DailyPresentation(group, dateKey);
     const pendingItem = pendingByDate.get(dateKey) || null;
-    const outsidePeriod = Boolean(period?.period_start && period?.period_end &&
-        (dateKey < stage1DateKey(period.period_start) || dateKey > stage1DateKey(period.period_end)));
+    const dateScope = group.payload?.employment_date_scope || {};
+    const currentPeriodWritable = (dateScope.authoritative_date_set || []).includes(dateKey);
+    const contextOnly = (dateScope.context_only_dates || []).includes(dateKey);
     const status = stage3StatusBadges(row, daily, pendingItem).map((label) =>
         `<span class="badge ${label === 'ΠΡΟΣ ΑΠΟΦΑΣΗ' ? 'text-bg-warning' :
             label === 'ΑΜΦΙΣΗΜΑ ΣΤΟΙΧΕΙΑ' ? 'text-bg-danger' : 'text-bg-secondary'} me-1">${label}</span>`
     ).join('') || '<span class="text-muted">—</span>';
-    return `<tr class="${pendingItem ? 'table-warning stage3-pending-day' : ''} ${outsidePeriod
+    const ownershipLabel = currentPeriodWritable
+        ? '<div class="small text-primary mt-1">Τρέχουσα περίοδος — επιτρέπεται απόφαση</div>'
+        : contextOnly ? '<div class="small text-muted mt-1">Άλλη περίοδος — μόνο πλαίσιο</div>' : '';
+    return `<tr class="${pendingItem ? 'table-warning stage3-pending-day' : ''} ${contextOnly
         ? 'table-secondary stage3-context-only-day' : ''}" data-stage3-week-date="${dateKey}">
         <td>${escapeHtml(formatStage1DateKey(dateKey))}</td><td>${escapeHtml(stage3DayName(dateKey))}</td>
         <td>${escapeHtml(stage3DeclaredPresentation(row, daily, pendingItem || {}))}</td>
         <td>${escapeHtml(stage3ActualWorkPresentation(row, daily, pendingItem || {}))}</td>
         <td>${escapeHtml(stage3ApologistikoClassification(row, daily))}</td>
-        <td>${status}${outsidePeriod ? '<div class="small text-muted">Άλλος μήνας — μόνο για πλαίσιο</div>' : ''}</td>
+        <td>${status}${ownershipLabel}</td>
     </tr>`;
 }
 
@@ -10173,8 +10214,7 @@ function renderStage3DecisionItem(group, item) {
         <td>${escapeHtml(item.employment_label || 'Άγνωστο')}</td>
         <td>${escapeHtml(stage3DeclaredPresentation(row, daily, item))}</td>
         <td>${escapeHtml(stage3ActualWorkPresentation(row, daily, item))}</td>
-        <td class="small"><strong>Γιατί απαιτείται απόφαση:</strong><br>${escapeHtml(
-            stage3DecisionReason(item))}</td>
+        <td class="small"><strong>Γιατί απαιτείται απόφαση:</strong>${stage3DecisionExplanationHtml(item)}</td>
         <td><select class="form-select form-select-sm weekly-hr-stage3-classification"
                 data-row-id="${escapeHtml(item.row_id)}">${stage3ClassificationOptions(item)}</select>
             <select class="form-select form-select-sm mt-1 weekly-hr-stage3-leave-category d-none"
@@ -10196,11 +10236,16 @@ function renderWeeklyHrStage3(lifecycle) {
             const period = group.scope.period_start && group.scope.period_end ? group.scope : activePeriod;
             const hasFullWeekContext = stage3HasFullWeekContext(group);
             return `<section class="border rounded px-2 py-2 mb-2 stage3-week-group" data-stage3-week-key="${escapeHtml(group.key)}">
-                <div class="small mb-2"><strong>${escapeHtml(group.employee_name || 'Εργαζόμενος')} — Κωδικός ${escapeHtml(
-                    group.scope.employee_kodikos || '')}</strong><br>
-                    <strong>Εβδομάδα:</strong> ${escapeHtml(formatStage1DateKey(group.scope.week_start))}–${escapeHtml(
+                <div class="stage3-employee-heading mb-2">
+                    <div class="stage3-employee-identity"><strong class="stage3-employee-name">${escapeHtml(
+                        group.employee_name || 'Εργαζόμενος')}</strong>
+                        <span class="stage3-employee-code">Κωδικός: ${escapeHtml(
+                            group.scope.employee_kodikos || '')}</span></div>
+                    <div class="stage3-week-summary"><strong>Εβδομάδα:</strong> ${escapeHtml(
+                        formatStage1DateKey(group.scope.week_start))}–${escapeHtml(
                         formatStage1DateKey(group.scope.week_end))} · <span class="badge text-bg-warning">${escapeHtml(
                             group.pending_items.length)} προς απόφαση</span></div>
+                </div>
                 <div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
                     <thead><tr><th>Ημερομηνία</th><th>Ημέρα</th><th>Καθεστώς ημέρας</th>
                         <th>Προδηλωμένο ωράριο</th><th>Πραγματική εργασία / κάρτες</th><th>Αιτία</th>

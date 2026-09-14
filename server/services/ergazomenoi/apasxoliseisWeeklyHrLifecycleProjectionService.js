@@ -538,6 +538,13 @@ function buildWeeklyHrLifecycleProjection({
             reason: nonFullResolvedDates.includes(date)
                 ? 'STAGE1_REVIEWED_NON_FULL_WITHOUT_ACTUAL_WORK'
                 : 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }));
+    const authoritativeWeeklyRestDates = unique(stage1ResolvedRows.filter((row) =>
+        row.repo_apologistika === true ||
+        String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΑΝ')
+        .map((row) => dateKeyUtc(row.hmeromhnia))).sort();
+    const unresolvedRepoCount = Number(afterStage1.unresolved_repo_count);
+    const weeklyRestAlreadySatisfied = Number.isFinite(unresolvedRepoCount) &&
+        unresolvedRepoCount === 0 && authoritativeWeeklyRestDates.length > 0;
     const stage3Dates = resolveStage3ActionableDates({
         rawRemainingDates: unique([
             ...(afterStage1.remaining_possible_leave_days || []),
@@ -562,6 +569,8 @@ function buildWeeklyHrLifecycleProjection({
         employee_kodikos: scope.employee_kodikos || rows[0]?.kodikos,
         week_start: scope.week_start || afterStage1.week_start,
         week_end: scope.week_end || afterStage1.week_end };
+    const authoritativeDates = new Set(employmentDateScope?.authoritative_date_set || []);
+    const contextOnlyDates = new Set(employmentDateScope?.context_only_dates || []);
     const stage3PendingItems = remainingDates.map((date) => {
         const row = rows.find((candidate) => dateKeyUtc(candidate?.hmeromhnia) === date) || {};
         const dailyProfile = effectiveProfilesByDate?.[date] || effectiveProfile;
@@ -603,6 +612,18 @@ function buildWeeklyHrLifecycleProjection({
             })).filter((interval) => interval.start || interval.end)),
             actual_work_hours: Number(actualFacts.actualWorkHours || 0),
             actual_work_status: actualFacts.cardVerificationStatus,
+            presentation_facts: Object.freeze({
+                declared_work_present: Number(actualFacts.declaredWorkHours || 0) > 0,
+                declared_hours: Number(actualFacts.declaredWorkHours || 0),
+                actual_work_hours: Number(actualFacts.actualWorkHours || 0),
+                actual_work_missing: Number(actualFacts.actualWorkHours || 0) === 0,
+                weekly_rest_already_satisfied: weeklyRestAlreadySatisfied,
+                weekly_rest_satisfied_by_dates: Object.freeze(
+                    weeklyRestAlreadySatisfied ? authoritativeWeeklyRestDates : []),
+                current_period_writable: authoritativeDates.has(date),
+                context_only: contextOnlyDates.has(date),
+                final_human_decision_required: true
+            }),
             allowed_classifications: Object.freeze(employmentType === '0'
                 ? ['LEAVE', 'SICKNESS', 'ABSENCE']
                 : ['1', '2'].includes(employmentType)

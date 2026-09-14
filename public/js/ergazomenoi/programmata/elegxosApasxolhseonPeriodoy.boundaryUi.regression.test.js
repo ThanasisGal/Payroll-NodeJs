@@ -81,7 +81,8 @@ assert.strictEqual(helpers.boundaryCoverageStatusLabel('NO_CARD_DATA_FOUND'),
 assert.strictEqual(helpers.boundaryCoverageStatusLabel('NOT_REQUIRED'), 'Δεν απαιτείται');
 
 assert.match(source, /let currentEmploymentReviewBoundaryContextPreflight = null;/);
-assert.match(source, /async function loadResults\(\)[\s\S]*?currentEmploymentReviewBoundaryContextPreflight = null;/);
+assert.match(source,
+    /async function loadResults\([^)]*\)[\s\S]*?currentEmploymentReviewBoundaryContextPreflight = null;/);
 assert.match(source,
     /currentEmploymentReviewBoundaryContextPreflight = payload\.finalized === true[\s\S]*?payload\.boundaryContextPreflight \|\| null;/);
 
@@ -246,5 +247,14 @@ assert.strictEqual(button.onclick, null);
 assert.strictEqual(deferredEntry.deferred_week_id, 'unchanged-E');
 assert.doesNotMatch(view, /id="employmentReviewDeferredWeeks"/);
 assert.doesNotMatch(source, /deferredContainer\.innerHTML/);
+assert.match(source, /employment_date_scope \|\| \{\}/);
+assert.match(source, /authoritative_date_set \|\| \[\]/);
+assert.match(source, /Τρέχουσα περίοδος — επιτρέπεται απόφαση/);
+assert.match(source, /context_only_dates \|\| \[\]/);
+assert.match(source, /Άλλη περίοδος — μόνο πλαίσιο/);
+const stage3DecisionSection = source.slice(source.indexOf('function renderStage3DecisionItem('),
+    source.indexOf('function renderWeeklyHrStage3('));
+assert.doesNotMatch(stage3DecisionSection, /context_only_dates|period_start|period_end/,
+    'οι πληροφοριακές ημέρες δεν αποκτούν ξεχωριστή διαδρομή απόφασης');
 
 console.log('Boundary UI regression tests: PASS');

@@ -874,6 +874,53 @@ assert.equal(employee0002ActualLifecycle.stages.stage1.blockers.includes(
 assert.deepEqual(employee0002ActualLifecycle.stages.stage1.pending_dates, ['2026-06-03']);
 assert.equal(employee0002ActualLifecycle.employment_date_scope.is_full_natural_week, true);
 
+const mayBoundaryRows = week('may-boundary', '2026-04-27');
+for (const index of [0, 1]) Object.assign(mayBoundaryRows[index], {
+    kathgoria_ergasias: 'ΑΝ', kathgoria_ergasias_apologistika: 'ΑΝ',
+    ores_ergasias: 0, ores_ergasias_apologistika: 0, cards_ores_ergasias: 0,
+    cards_apo_ora_01: '', cards_eos_ora_01: '', apo_ora_01: '', eos_ora_01: '',
+    repo: true, repo_apologistika: true
+});
+for (const index of [5, 6]) mayBoundaryRows[index] = possibleLeave(mayBoundaryRows[index]);
+const mayBoundaryEmploymentScope = {
+    natural_week_start: '2026-04-27', natural_week_end: '2026-05-03',
+    period_start: '2026-05-01', period_end: '2026-05-31',
+    employment_start: '2026-04-27', employment_end: '2026-05-03',
+    employment_owned_dates: mayBoundaryRows.map((row) => row.hmeromhnia),
+    authoritative_date_set: ['2026-05-01', '2026-05-02', '2026-05-03'],
+    context_only_dates: ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30'],
+    is_full_natural_week: true
+};
+const mayBoundaryInitial = buildWeeklyHrLifecycleProjection({
+    weekRows: mayBoundaryRows, effectiveProfile: profile,
+    employmentDateScope: mayBoundaryEmploymentScope
+});
+const mayBoundaryLifecycle = buildWeeklyHrLifecycleProjection({
+    weekRows: mayBoundaryRows, effectiveProfile: profile,
+    employmentDateScope: mayBoundaryEmploymentScope,
+    persistedStage1State: { status: 'COMPLETED',
+        completion_fingerprint: mayBoundaryInitial.stages.stage1.current_fingerprint,
+        effective_fingerprint: mayBoundaryInitial.stages.stage1.current_fingerprint }
+});
+assert.equal(mayBoundaryLifecycle.stages.stage1.business_status, 'COMPLETED');
+assert.equal(mayBoundaryLifecycle.stages.stage2.business_status, 'COMPLETED');
+assert.equal(mayBoundaryLifecycle.stages.stage3.business_status, 'OPEN');
+assert.equal(mayBoundaryLifecycle.stages.stage3.pending_count, 2);
+assert.deepEqual(mayBoundaryLifecycle.stages.stage3.pending_dates,
+    ['2026-05-02', '2026-05-03']);
+for (const item of mayBoundaryLifecycle.stages.stage3.pending_items) {
+    assert.deepEqual(item.allowed_classifications, ['LEAVE', 'SICKNESS', 'ABSENCE']);
+    assert.equal(item.presentation_facts.weekly_rest_already_satisfied, true);
+    assert.equal(item.presentation_facts.current_period_writable, true);
+    assert.equal(item.presentation_facts.context_only, false);
+    assert.equal(item.presentation_facts.final_human_decision_required, true);
+    assert.ok(item.input_fingerprint);
+}
+assert.deepEqual(mayBoundaryLifecycle.employment_date_scope.context_only_dates,
+    ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30']);
+assert.deepEqual(mayBoundaryLifecycle.employment_date_scope.authoritative_date_set,
+    ['2026-05-01', '2026-05-02', '2026-05-03']);
+
 const aprilBoundaryPeriod = {
     period_start: '2026-04-01', period_end: '2026-04-30'
 };
