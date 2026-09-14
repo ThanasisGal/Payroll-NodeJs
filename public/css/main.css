@@ -15641,6 +15641,7 @@ body.loader-active > *:not(.app-loader) {
     min-width: 82rem;
     table-layout: fixed;
 }
+.weekly-hr-stage3-decisions-table .stage3-col-select { width: 2.25rem; }
 
 .weekly-hr-stage3-decisions-table .stage3-col-date { width: 9%; }
 .weekly-hr-stage3-decisions-table .stage3-col-day { width: 6%; }
@@ -15669,6 +15670,32 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage3-decisions-table .stage3-decision-action {
     text-align: center;
 }
+.weekly-hr-stage3-decisions-table .stage3-decision-select {
+    text-align: center;
+    vertical-align: middle;
+}
+.weekly-hr-stage3-bulk-toolbar .weekly-hr-stage3-bulk-field { min-width: 12rem; }
+.weekly-hr-stage3-bulk-toolbar .weekly-hr-stage3-selected-count { min-width: 7rem; }
+
+.swal2-popup.employment-review-stage3-bulk-preview-popup {
+    width: min(46rem, calc(100vw - 2rem)) !important;
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100dvh - 2rem) !important;
+    padding: 0.65rem 0.9rem 0.75rem !important;
+    overflow: hidden !important;
+}
+.swal2-popup.employment-review-stage3-bulk-preview-popup .swal2-html-container {
+    min-height: 0;
+    max-height: calc(100dvh - 19rem) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+}
+.swal2-popup.employment-review-stage3-bulk-preview-popup .swal2-actions {
+    flex-shrink: 0;
+}
+.stage3-bulk-preview-entries { max-height: 15rem; overflow-y: auto; }
+.stage3-bulk-preview-employee + .stage3-bulk-preview-employee { margin-top: .65rem; }
 
 .stage3-decision-explanation {
     display: grid;

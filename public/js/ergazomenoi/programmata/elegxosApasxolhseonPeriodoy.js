@@ -386,6 +386,12 @@ let currentWeeklyHrStage2BulkPreview = null;
 let weeklyHrStage2BulkSubmitting = false;
 let weeklyHrStage2BulkRequestId = '';
 let currentWeeklyHrStage2BulkLastResultDetails = [];
+const weeklyHrStage3BulkSelected = new Set();
+let weeklyHrStage3BulkClassification = '';
+let weeklyHrStage3BulkLeaveCategory = '';
+let weeklyHrStage3FrozenApplyCommand = null;
+let weeklyHrStage3BulkRetryPending = false;
+let weeklyHrStage3BulkSubmitting = false;
 let weeklyHrStage1LazyLoad = null;
 let currentStage2DailyResolutionByKey = new Map();
 let currentCanonicalDailyEmploymentTypeByKey = new Map();
@@ -10271,7 +10277,12 @@ function renderStage3DecisionItem(group, item) {
     const row = (group.payload?.rows || []).find((candidate) =>
         stage1DateKey(candidate.hmeromhnia) === item.date) || {};
     const daily = stage3DailyPresentation(group, item.date);
+    const eligible = isWeeklyHrStage3BulkEligible(item);
+    const employeeName = stage3EmployeeDisplayName(group, buildStage3EmployeeNameLookup());
     return `<tr class="table-warning stage3-decision-item" data-stage3-row-id="${escapeHtml(item.row_id)}">
+        <td class="stage3-decision-select">${eligible ? `<input type="checkbox" class="form-check-input weekly-hr-stage3-bulk-select"
+            data-row-id="${escapeHtml(item.row_id)}" ${weeklyHrStage3BulkSelected.has(String(item.row_id)) ? 'checked' : ''}
+            aria-label="Επιλογή ${escapeHtml(formatStage1DateKey(item.date))} για ${escapeHtml(employeeName)}">` : ''}</td>
         <td><strong>${escapeHtml(formatStage1DateKey(item.date))}</strong><br>
             <span class="badge text-bg-warning">ΠΡΟΣ ΑΠΟΦΑΣΗ</span></td>
         <td>${escapeHtml(stage3DayName(item.date))}</td>
@@ -10300,10 +10311,11 @@ function renderWeeklyHrStage3(lifecycle) {
     if (!container) return;
     const items = lifecycle?.stages?.STAGE3?.pending_items || [];
     const groups = groupStage3PendingItems(items);
+    pruneWeeklyHrStage3BulkSelection(items);
     const employeeNames = buildStage3EmployeeNameLookup();
     const activePeriod = currentReviewOwnershipPeriod();
     container.innerHTML = groups.length
-        ? groups.map((group) => {
+        ? `${renderWeeklyHrStage3BulkToolbar()}${groups.map((group) => {
             const pendingByDate = new Map(group.pending_items.map((item) => [item.date, item]));
             const dates = enumerateStage1DateKeys(group.scope.week_start, group.scope.week_end);
             const period = group.scope.period_start && group.scope.period_end ? group.scope : activePeriod;
@@ -10322,12 +10334,12 @@ function renderWeeklyHrStage3(lifecycle) {
                 ${stage3BoundaryWeekGuidance(group)}
                 <div class="table-responsive stage3-decisions-table-wrapper"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
                     <colgroup>
-                        <col class="stage3-col-date"><col class="stage3-col-day">
+                        <col class="stage3-col-select"><col class="stage3-col-date"><col class="stage3-col-day">
                         <col class="stage3-col-day-status"><col class="stage3-col-declared">
                         <col class="stage3-col-actual"><col class="stage3-col-reason">
                         <col class="stage3-col-classification"><col class="stage3-col-action">
                     </colgroup>
-                    <thead><tr><th>Ημερομηνία</th><th>Ημέρα</th><th>Καθεστώς ημέρας</th>
+                    <thead><tr><th><span class="visually-hidden">Επιλογή</span></th><th>Ημερομηνία</th><th>Ημέρα</th><th>Καθεστώς ημέρας</th>
                         <th>Προδηλωμένο ωράριο</th><th>Πραγματική εργασία / κάρτες</th><th>Αιτία</th>
                         <th>Τελικός χαρακτηρισμός</th><th>Ενέργεια</th></tr></thead>
                     <tbody>${group.pending_items.map((item) => renderStage3DecisionItem(group, item)).join('')}</tbody>
@@ -10343,7 +10355,7 @@ function renderWeeklyHrStage3(lifecycle) {
                 </table></div></div>`
                     : '<div class="small text-muted mt-1">Δεν είναι διαθέσιμο το πλήρες εβδομαδιαίο πλαίσιο.</div>'}
                 </section>`;
-        }).join('')
+        }).join('')}`
         : '<div class="text-muted small employment-review-stage3-empty">' +
             'Δεν υπάρχουν ανέλεγκτες πιθανές άδειες.</div>';
 }
@@ -10351,6 +10363,99 @@ function renderWeeklyHrStage3(lifecycle) {
 function findStage3PendingItem(rowId) {
     return (currentEmploymentReviewLifecyclePresentation?.stages?.STAGE3?.pending_items || [])
         .find((item) => String(item.row_id) === String(rowId));
+}
+
+function isWeeklyHrStage3BulkEligible(item = {}) {
+    return Boolean(String(item.row_id || '').trim() && String(item.employee_id || '').trim() &&
+        String(item.date || '').trim() && String(item.week_start || '').trim() &&
+        String(item.week_end || '').trim() && Array.isArray(item.allowed_classifications) &&
+        item.allowed_classifications.length > 0 && item.presentation_facts?.context_only !== true &&
+        item.current_period_writable !== false);
+}
+
+function weeklyHrStage3BulkSelectedItems() {
+    return (currentEmploymentReviewLifecyclePresentation?.stages?.STAGE3?.pending_items || [])
+        .filter((item) => weeklyHrStage3BulkSelected.has(String(item.row_id)) &&
+            isWeeklyHrStage3BulkEligible(item));
+}
+
+function weeklyHrStage3BulkAllowedClassifications(items = weeklyHrStage3BulkSelectedItems()) {
+    const order = ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'];
+    if (!items.length) return [];
+    return order.filter((value) => items.every((item) =>
+        (item.allowed_classifications || []).includes(value)));
+}
+
+function weeklyHrStage3BulkClassificationLabel(value) {
+    return { LEAVE: 'ΑΔΕΙΑ', SICKNESS: 'ΑΣΘΕΝΕΙΑ', ABSENCE: 'ΑΠΟΥΣΙΑ',
+        NON_WORK: 'ΜΗ ΕΡΓΑΣΙΑ' }[String(value || '')] || '';
+}
+
+function invalidateWeeklyHrStage3FrozenApply() {
+    weeklyHrStage3FrozenApplyCommand = null;
+    weeklyHrStage3BulkRetryPending = false;
+}
+
+function resetWeeklyHrStage3BulkState() {
+    weeklyHrStage3BulkSelected.clear();
+    weeklyHrStage3BulkClassification = '';
+    weeklyHrStage3BulkLeaveCategory = '';
+    invalidateWeeklyHrStage3FrozenApply();
+    weeklyHrStage3BulkSubmitting = false;
+}
+
+function pruneWeeklyHrStage3BulkSelection(items = []) {
+    const eligible = new Set(items.filter(isWeeklyHrStage3BulkEligible)
+        .map((item) => String(item.row_id)));
+    [...weeklyHrStage3BulkSelected].forEach((rowId) => {
+        if (!eligible.has(rowId)) weeklyHrStage3BulkSelected.delete(rowId);
+    });
+    const allowed = weeklyHrStage3BulkAllowedClassifications(items.filter((item) =>
+        weeklyHrStage3BulkSelected.has(String(item.row_id))));
+    if (!allowed.includes(weeklyHrStage3BulkClassification)) {
+        weeklyHrStage3BulkClassification = '';
+        weeklyHrStage3BulkLeaveCategory = '';
+        invalidateWeeklyHrStage3FrozenApply();
+    }
+}
+
+function renderWeeklyHrStage3BulkToolbar() {
+    const selectedCount = weeklyHrStage3BulkSelectedItems().length;
+    const allowed = weeklyHrStage3BulkAllowedClassifications();
+    const options = allowed.map((value) => `<option value="${value}" ${
+        weeklyHrStage3BulkClassification === value ? 'selected' : ''}>${escapeHtml(
+        weeklyHrStage3BulkClassificationLabel(value))}</option>`).join('');
+    const leaveVisible = weeklyHrStage3BulkClassification === 'LEAVE';
+    const ready = selectedCount > 0 && allowed.includes(weeklyHrStage3BulkClassification) &&
+        (!leaveVisible || Boolean(weeklyHrStage3BulkLeaveCategory));
+    return `<div class="weekly-hr-stage3-bulk-toolbar border rounded bg-light px-2 py-2 mb-2">
+        <div class="d-flex flex-wrap align-items-end gap-2">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Επιλογή εγγραφών Σταδίου 3">
+                <button type="button" class="btn btn-outline-secondary weekly-hr-stage3-select-visible">Επιλογή όλων των ορατών</button>
+                <button type="button" class="btn btn-outline-secondary weekly-hr-stage3-clear-selection">Αποεπιλογή όλων</button>
+            </div>
+            <div class="small fw-semibold weekly-hr-stage3-selected-count" aria-live="polite">Επιλεγμένες: ${selectedCount}</div>
+            <div class="weekly-hr-stage3-bulk-field"><label class="form-label small mb-1" for="weeklyHrStage3BulkClassification">Τελικός χαρακτηρισμός</label>
+                <select id="weeklyHrStage3BulkClassification" class="form-select form-select-sm" ${selectedCount ? '' : 'disabled'}>
+                    <option value="">Επιλέξτε...</option>${options}</select></div>
+            <div class="weekly-hr-stage3-bulk-field weekly-hr-stage3-bulk-leave ${leaveVisible ? '' : 'd-none'}">
+                <label class="form-label small mb-1" for="weeklyHrStage3BulkLeaveCategory">Κατηγορία άδειας</label>
+                <select id="weeklyHrStage3BulkLeaveCategory" class="form-select form-select-sm">${stage1LeaveCategoryOptions(
+                    weeklyHrStage3BulkLeaveCategory)}</select></div>
+            <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-stage3-bulk-preview" ${
+                ready && !weeklyHrStage3BulkSubmitting ? '' : 'disabled'}>Προεπισκόπηση μαζικής ενημέρωσης</button>
+            <button type="button" class="btn btn-sm btn-outline-primary weekly-hr-stage3-bulk-retry ${
+                weeklyHrStage3BulkRetryPending ? '' : 'd-none'}" ${weeklyHrStage3BulkSubmitting ? 'disabled' : ''}>Επανάληψη ελέγχου εφαρμογής</button>
+        </div></div>`;
+}
+
+function updateWeeklyHrStage3BulkToolbar() {
+    const container = document.getElementById('weeklyHrStage3Container');
+    const current = container?.querySelector('.weekly-hr-stage3-bulk-toolbar');
+    if (!container || !current) return;
+    const holder = document.createElement('div');
+    holder.innerHTML = renderWeeklyHrStage3BulkToolbar();
+    current.replaceWith(holder.firstElementChild);
 }
 
 function focusWeeklyHrStage1StaleAfterStage3Save() {
@@ -10483,6 +10588,176 @@ async function submitWeeklyHrStage3Decision(rowId, decision = {}) {
                 ? 'Τα στοιχεία της ημέρας ή της εβδομάδας άλλαξαν από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση και δοκιμάστε ξανά.'
                 : error.message });
         button.disabled = false;
+    }
+}
+
+function weeklyHrStage3BulkPreviewCommand() {
+    const items = weeklyHrStage3BulkSelectedItems();
+    if (!items.length) return null;
+    const first = items[0];
+    return { ypokatasthma: first.ypokatasthma, period_start: first.period_start,
+        period_end: first.period_end, final_classification: weeklyHrStage3BulkClassification,
+        leave_category: weeklyHrStage3BulkClassification === 'LEAVE'
+            ? weeklyHrStage3BulkLeaveCategory : '',
+        items: items.map((item) => ({ employee_id: item.employee_id,
+            employee_kodikos: item.employee_kodikos, week_start: item.week_start,
+            week_end: item.week_end, row_id: item.row_id, decision_date: item.date,
+            expected_input_fingerprint: item.input_fingerprint,
+            expected_stage3_version: Number(item.expected_stage3_version || 0) })) };
+}
+
+function weeklyHrStage3InvalidItemsHtml(items = []) {
+    return `<div class="text-start stage3-bulk-invalid-items">${items.map((item) => {
+        const pending = findStage3PendingItem(item.row_id);
+        const employeeName = item.employee_name || stage3PayloadForItem(pending)?.employee_name ||
+            'Εργαζόμενος';
+        return `<div class="border-bottom py-2"><strong>${escapeHtml(employeeName)}${
+            item.employee_kodikos ? ` — ${escapeHtml(item.employee_kodikos)}` : ''}</strong><br>
+            <span>${escapeHtml(formatStage1DateKey(item.decision_date))}</span><br>
+            <span class="text-muted">${escapeHtml(item.message ||
+                'Η εγγραφή χρειάζεται νέο έλεγχο.')}</span></div>`;
+    }).join('')}</div>`;
+}
+
+function weeklyHrStage3BulkPreviewHtml(preview = {}) {
+    const employees = new Map();
+    for (const item of preview.items || []) {
+        const key = String(item.employee_id || item.employee_kodikos || '');
+        if (!employees.has(key)) employees.set(key, { name: item.employee_name || 'Εργαζόμενος',
+            code: item.employee_kodikos || '', dates: [] });
+        employees.get(key).dates.push(item.decision_date);
+    }
+    const entries = [...employees.values()].map((employee) =>
+        `<div class="stage3-bulk-preview-employee"><strong>${escapeHtml(employee.name)}${
+            employee.code ? ` — Κωδικός: ${escapeHtml(employee.code)}` : ''}</strong>
+            <ul class="mb-0">${employee.dates.sort().map((date) =>
+                `<li>${escapeHtml(formatStage1DateKey(date))}</li>`).join('')}</ul></div>`).join('');
+    const category = preview.leave_category?.label || preview.leave_category?.value || '';
+    return `<div class="text-start stage3-bulk-preview">
+        <div class="mb-2"><strong>${escapeHtml(preview.selected_count || 0)} επιλεγμένες εγγραφές</strong><br>
+            <span>${escapeHtml(preview.employee_count || 0)} εργαζόμενοι</span></div>
+        <div class="mb-2"><strong>Τελικός χαρακτηρισμός:</strong> ${escapeHtml(
+            weeklyHrStage3BulkClassificationLabel(preview.classification))}${category
+                ? `<br><strong>Κατηγορία:</strong> ${escapeHtml(category)}` : ''}</div>
+        <div class="stage3-bulk-preview-entries border rounded p-2">${entries}</div></div>`;
+}
+
+function weeklyHrStage3BulkRequestId() {
+    const uuid = globalThis.crypto?.randomUUID?.() ||
+        `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+    return `stage3-bulk-ui:${uuid}`;
+}
+
+async function previewWeeklyHrStage3Bulk() {
+    const command = weeklyHrStage3BulkPreviewCommand();
+    if (!command || weeklyHrStage3BulkSubmitting) return;
+    weeklyHrStage3BulkSubmitting = true;
+    invalidateWeeklyHrStage3FrozenApply();
+    updateWeeklyHrStage3BulkToolbar();
+    try {
+        const response = await fetch(
+            '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/bulk-preview', {
+                method: 'POST', headers: { 'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken }, body: JSON.stringify(command)
+            });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw Object.assign(new Error(result.message ||
+            'Η μαζική προεπισκόπηση δεν ήταν διαθέσιμη.'), { code: result.code || '',
+            result, responseReceived: true });
+        if (!result.can_apply) {
+            await employmentReviewSwal({ icon: 'warning',
+                title: 'Δεν μπορούν να εφαρμοστούν όλες οι επιλεγμένες αλλαγές.',
+                html: weeklyHrStage3InvalidItemsHtml(result.invalid_items),
+                showConfirmButton: false, showCancelButton: true, cancelButtonText: 'Κλείσιμο',
+                customClass: { popup: 'employment-review-stage3-bulk-preview-popup' } });
+            return;
+        }
+        const confirmation = await employmentReviewSwal({ icon: 'info',
+            title: 'Μαζική προεπισκόπηση', html: weeklyHrStage3BulkPreviewHtml(result),
+            input: 'textarea', inputLabel: 'Αιτιολογία',
+            inputValue: 'Μαζική τελική εξέταση επιλεγμένων εκκρεμοτήτων Σταδίου 3.',
+            inputAttributes: { rows: '3' }, showCancelButton: true,
+            confirmButtonText: `Εφαρμογή σε ${result.selected_count} επιλεγμένες εγγραφές`,
+            cancelButtonText: 'Επιστροφή',
+            customClass: { popup: 'employment-review-stage3-bulk-preview-popup',
+                confirmButton: 'class-success' },
+            inputValidator: (value) => String(value || '').trim() ? undefined :
+                'Η αιτιολογία είναι υποχρεωτική.' });
+        if (!confirmation.isConfirmed) return;
+        weeklyHrStage3FrozenApplyCommand = Object.freeze({ ...command,
+            bulk_request_id: weeklyHrStage3BulkRequestId(),
+            expected_preview_fingerprint: result.preview_fingerprint,
+            reason_or_notes: String(confirmation.value || '').trim() });
+        weeklyHrStage3BulkSubmitting = false;
+        await applyFrozenWeeklyHrStage3Bulk();
+    } catch (error) {
+        await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία προεπισκόπησης',
+            text: error.message });
+    } finally {
+        weeklyHrStage3BulkSubmitting = false;
+        updateWeeklyHrStage3BulkToolbar();
+    }
+}
+
+async function handleWeeklyHrStage3BulkApplyFailure(result = {}) {
+    const changed = ['STAGE3_BULK_PREVIEW_STALE', 'STAGE3_BULK_VALIDATION_FAILED']
+        .includes(String(result.code || ''));
+    if (changed) {
+        invalidateWeeklyHrStage3FrozenApply();
+        await employmentReviewSwal({ icon: 'warning',
+            title: 'Τα στοιχεία άλλαξαν και χρειάζεται νέος έλεγχος.',
+            ...(result.invalid_items?.length
+                ? { html: weeklyHrStage3InvalidItemsHtml(result.invalid_items) }
+                : { text: result.message || 'Κάντε νέα προεπισκόπηση.' }) });
+        return;
+    }
+    invalidateWeeklyHrStage3FrozenApply();
+    await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία',
+        text: result.message || 'Η μαζική ενημέρωση δεν ολοκληρώθηκε.' });
+}
+
+async function applyFrozenWeeklyHrStage3Bulk() {
+    const frozen = weeklyHrStage3FrozenApplyCommand;
+    if (!frozen || weeklyHrStage3BulkSubmitting) return;
+    weeklyHrStage3BulkSubmitting = true;
+    weeklyHrStage3BulkRetryPending = false;
+    updateWeeklyHrStage3BulkToolbar();
+    try {
+        let response; let result;
+        try {
+            response = await fetch(
+                '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/bulk-apply', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json',
+                        'CSRF-Token': csrfToken }, body: JSON.stringify(frozen)
+                });
+            result = await response.json();
+        } catch (error) {
+            weeklyHrStage3BulkRetryPending = true;
+            const retry = await employmentReviewSwal({ icon: 'warning',
+                title: 'Δεν ήταν δυνατό να επιβεβαιωθεί η εφαρμογή.',
+                text: 'Η ίδια ακριβώς εντολή μπορεί να ελεγχθεί ξανά με ασφάλεια.',
+                showCancelButton: true, confirmButtonText: 'Επανάληψη ελέγχου εφαρμογής',
+                cancelButtonText: 'Κλείσιμο' });
+            if (retry.isConfirmed) {
+                weeklyHrStage3BulkSubmitting = false;
+                return applyFrozenWeeklyHrStage3Bulk();
+            }
+            return;
+        }
+        if (!response.ok || !result.success) {
+            await handleWeeklyHrStage3BulkApplyFailure(result);
+            return;
+        }
+        const idempotent = result.idempotent === true;
+        const appliedCount = Number(result.applied_count || 0);
+        resetWeeklyHrStage3BulkState();
+        await loadResults();
+        await employmentReviewSwal({ icon: 'success', title: idempotent
+            ? 'Η μαζική ενημέρωση είχε ήδη ολοκληρωθεί.'
+            : `Εφαρμόστηκαν ${appliedCount} χαρακτηρισμοί.` });
+    } finally {
+        weeklyHrStage3BulkSubmitting = false;
+        updateWeeklyHrStage3BulkToolbar();
     }
 }
 
@@ -11194,6 +11469,31 @@ document.addEventListener('click', (event) => {
         previewWeeklyHrStage3Decision(stage3Resolve.dataset.rowId);
         return;
     }
+    if (event.target.closest('.weekly-hr-stage3-select-visible')) {
+        invalidateWeeklyHrStage3FrozenApply();
+        document.querySelectorAll('.weekly-hr-stage3-bulk-select:not(:disabled)')
+            .forEach((checkbox) => {
+                if (checkbox.closest('[hidden], .d-none')) return;
+                checkbox.checked = true;
+                weeklyHrStage3BulkSelected.add(String(checkbox.dataset.rowId));
+            });
+        updateWeeklyHrStage3BulkToolbar(); return;
+    }
+    if (event.target.closest('.weekly-hr-stage3-clear-selection')) {
+        invalidateWeeklyHrStage3FrozenApply();
+        weeklyHrStage3BulkSelected.clear();
+        weeklyHrStage3BulkClassification = '';
+        weeklyHrStage3BulkLeaveCategory = '';
+        document.querySelectorAll('.weekly-hr-stage3-bulk-select')
+            .forEach((checkbox) => { checkbox.checked = false; });
+        updateWeeklyHrStage3BulkToolbar(); return;
+    }
+    if (event.target.closest('.weekly-hr-stage3-bulk-preview')) {
+        previewWeeklyHrStage3Bulk(); return;
+    }
+    if (event.target.closest('.weekly-hr-stage3-bulk-retry')) {
+        applyFrozenWeeklyHrStage3Bulk(); return;
+    }
     if (event.target.closest('.weekly-hr-select-all-days')) {
         visibleWeeklyHrPayloads().forEach((payload) => stage1RelevantDates(payload).forEach((date) => {
             const row = stage1RowForDate(payload, date); if (row) weeklyHrStage1DaySelected.add(String(row._id));
@@ -11268,6 +11568,27 @@ document.addEventListener('change', (event) => {
         updateStage3LeaveCategoryVisibility(stage3Classification);
         return;
     }
+    const stage3BulkCheckbox = event.target.closest('.weekly-hr-stage3-bulk-select');
+    if (stage3BulkCheckbox && !stage3BulkCheckbox.disabled) {
+        invalidateWeeklyHrStage3FrozenApply();
+        if (stage3BulkCheckbox.checked) weeklyHrStage3BulkSelected.add(
+            String(stage3BulkCheckbox.dataset.rowId));
+        else weeklyHrStage3BulkSelected.delete(String(stage3BulkCheckbox.dataset.rowId));
+        pruneWeeklyHrStage3BulkSelection(
+            currentEmploymentReviewLifecyclePresentation?.stages?.STAGE3?.pending_items || []);
+        updateWeeklyHrStage3BulkToolbar(); return;
+    }
+    if (event.target.closest('#weeklyHrStage3BulkClassification')) {
+        invalidateWeeklyHrStage3FrozenApply();
+        weeklyHrStage3BulkClassification = String(event.target.value || '');
+        if (weeklyHrStage3BulkClassification !== 'LEAVE') weeklyHrStage3BulkLeaveCategory = '';
+        updateWeeklyHrStage3BulkToolbar(); return;
+    }
+    if (event.target.closest('#weeklyHrStage3BulkLeaveCategory')) {
+        invalidateWeeklyHrStage3FrozenApply();
+        weeklyHrStage3BulkLeaveCategory = String(event.target.value || '');
+        updateWeeklyHrStage3BulkToolbar(); return;
+    }
     const dayCheckbox = event.target.closest('.weekly-hr-stage1-day-select');
     if (dayCheckbox) {
         if (dayCheckbox.checked) weeklyHrStage1DaySelected.add(dayCheckbox.dataset.rowId);
@@ -11306,6 +11627,7 @@ document.addEventListener('input', (event) => {
 
 
 async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
+    resetWeeklyHrStage3BulkState();
     window.AppLoader?.begin('Φόρτωση Ελέγχου Απασχολήσεων...', 0);
     try {
         if (!preserveStage2BulkDiagnostics) currentWeeklyHrStage2BulkLastResultDetails = [];

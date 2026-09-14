@@ -88,6 +88,10 @@ const sandbox = {
     stage3ClassificationOptions: (item) => (item.allowed_classifications || [])
         .map((value) => `<option value="${value}">${value}</option>`).join(''),
     stage1LeaveCategoryOptions: () => '<option value="REGULAR">Κανονική</option>',
+    isWeeklyHrStage3BulkEligible: (item) => Boolean(item.row_id && item.allowed_classifications?.length),
+    weeklyHrStage3BulkSelected: new Set(),
+    pruneWeeklyHrStage3BulkSelection: () => {},
+    renderWeeklyHrStage3BulkToolbar: () => '<div class="weekly-hr-stage3-bulk-toolbar"></div>',
     document: { getElementById: () => sandbox.container },
     container: { innerHTML: '' }
 };
@@ -150,8 +154,8 @@ assert.match(sandbox.container.innerHTML, /1 προς απόφαση/);
 assert.match(sandbox.container.innerHTML, /08:00–16:00 \/ 8,00 ώρες/);
 assert.match(sandbox.container.innerHTML, /Πραγματική εργασία \/ κάρτες/);
 assert.match(sandbox.container.innerHTML, /Καθεστώς ημέρας/);
-assert.equal((sandbox.container.innerHTML.match(/<th>/g) || []).length, 14,
-    'διατηρούνται οι οκτώ στήλες αποφάσεων και οι έξι στήλες πλαισίου');
+assert.equal((sandbox.container.innerHTML.match(/<th>/g) || []).length, 15,
+    'διατηρούνται οι οκτώ στήλες αποφάσεων, η επιλογή και οι έξι στήλες πλαισίου');
 assert.match(sandbox.container.innerHTML, /stage3-decisions-table-wrapper/);
 assert.match(sandbox.container.innerHTML, /stage3-col-reason/);
 assert.match(sandbox.container.innerHTML, /stage3-decision-reason/);
