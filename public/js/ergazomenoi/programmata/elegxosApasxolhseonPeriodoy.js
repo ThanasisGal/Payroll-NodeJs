@@ -366,10 +366,8 @@ const weeklyHrStage1DaySelected = new Set();
 const weeklyHrStage1DayDrafts = new Map();
 let weeklyHrStage1DaySaving = false;
 const stage1DisplayFilters = {
-    open: true,
-    stale: true,
-    completed: false,
-    blocked: true,
+    employeeQuery: '',
+    status: 'ALL',
     leave: false,
     sickness: false,
     absence: false
@@ -8691,14 +8689,29 @@ function stage1HasClassificationFilter(filters = stage1DisplayFilters) {
     return filters.leave || filters.sickness || filters.absence;
 }
 
+function normalizeStage1EmployeeSearch(value) {
+    return String(value || '').trim().normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('el-GR');
+}
+
+function stage1PayloadMatchesEmployeeSearch(payload, filters = stage1DisplayFilters) {
+    const query = normalizeStage1EmployeeSearch(filters.employeeQuery);
+    if (!query) return true;
+    const employeeName = payload?.employee_name || payload?.scope?.employee_name ||
+        payload?.rows?.[0]?.employee_name || '';
+    const employeeCode = payload?.scope?.employee_kodikos ||
+        payload?.employee_kodikos || payload?.rows?.[0]?.kodikos || '';
+    return [employeeName, employeeCode]
+        .some((value) => normalizeStage1EmployeeSearch(value).includes(query));
+}
+
 function stage1PayloadMatchesStatusFilter(payload, filters = stage1DisplayFilters) {
-    const statusFilter = {
-        OPEN: filters.open,
-        STALE: filters.stale,
-        COMPLETED: filters.completed,
-        BLOCKED: filters.blocked
-    };
-    return statusFilter[weeklyHrStage1BusinessStatus(payload)] === true;
+    const selectedStatus = String(filters.status || 'ALL');
+    if (selectedStatus === 'ALL') return true;
+    if (selectedStatus === 'NEEDS_ACTION') {
+        return weeklyHrStage1BusinessStatus(payload) === 'OPEN';
+    }
+    return weeklyHrStage1BusinessStatus(payload) === selectedStatus;
 }
 
 function stage1FilteredDatesForPayload(payload, filters = stage1DisplayFilters) {
@@ -8717,9 +8730,10 @@ function stage1FilteredDatesForPayload(payload, filters = stage1DisplayFilters) 
 function stage1ApplyDisplayFilters(payloads = [], filters = stage1DisplayFilters) {
     const classificationFiltering = stage1HasClassificationFilter(filters);
     return payloads.flatMap((payload) => {
+        if (!stage1PayloadMatchesEmployeeSearch(payload, filters) ||
+            !stage1PayloadMatchesStatusFilter(payload, filters)) return [];
         if (!classificationFiltering) {
-            return stage1PayloadMatchesStatusFilter(payload, filters)
-                ? [{ payload, dates: null }] : [];
+            return [{ payload, dates: null }];
         }
         const dates = stage1FilteredDatesForPayload(payload, filters);
         return dates.length ? [{ payload, dates }] : [];
@@ -9004,6 +9018,8 @@ function weeklyHrStage1Counts() {
     const payloads = stage1PayloadsForDisplay();
     const visiblePayloads = visibleWeeklyHrStage1Payloads();
     return { total: payloads.length,
+        needsAction: payloads.filter((item) =>
+            weeklyHrStage1BusinessStatus(item) === 'OPEN').length,
         open: payloads.filter((item) => weeklyHrStage1BusinessStatus(item) === 'OPEN').length,
         stale: payloads.filter((item) => weeklyHrStage1BusinessStatus(item) === 'STALE').length,
         completed: payloads.filter((item) =>
@@ -10318,7 +10334,7 @@ function focusWeeklyHrStage1StaleAfterStage3Save() {
         weeklyHrStage1BusinessStatus(payload) === 'STALE').length;
     if (!staleCount) return 0;
     Object.assign(stage1DisplayFilters, {
-        open: false, stale: true, completed: false, blocked: false,
+        employeeQuery: '', status: 'STALE',
         leave: false, sickness: false, absence: false
     });
     weeklyHrStage1Selected.clear();
@@ -10645,12 +10661,23 @@ function renderWeeklyHrStage1BulkToolbar() {
     const counts = weeklyHrStage1Counts();
     const disabled = counts.selected === 0 || weeklyHrStage1BulkSubmitting;
     return `<div class="card mb-0 weekly-hr-stage1-bulk-toolbar"><div class="card-body pt-2 pb-0">
-        <div class="d-flex flex-wrap gap-3 small mb-2 align-items-center">
-            <strong>Συνολικές σχετικές εβδομάδες: ${counts.total}</strong>
-            <label class="form-check form-check-inline mb-0"><input id="stage1FilterOpen" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="open" ${stage1DisplayFilters.open ? 'checked' : ''}><span class="form-check-label">Ανοιχτές: ${counts.open}</span></label>
-            <label class="form-check form-check-inline mb-0"><input id="stage1FilterStale" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="stale" ${stage1DisplayFilters.stale ? 'checked' : ''}><span class="form-check-label">Τα στοιχεία άλλαξαν: ${counts.stale}</span></label>
-            <label class="form-check form-check-inline mb-0"><input id="stage1FilterCompleted" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="completed" ${stage1DisplayFilters.completed ? 'checked' : ''}><span class="form-check-label">Ολοκληρωμένες: ${counts.completed}</span></label>
-            <label class="form-check form-check-inline mb-0"><input id="stage1FilterBlocked" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="blocked" ${stage1DisplayFilters.blocked ? 'checked' : ''}><span class="form-check-label">Χρειάζονται διόρθωση: ${counts.blocked}</span></label>
+        <div class="d-flex flex-wrap gap-2 small mb-2 align-items-end">
+            <div class="flex-grow-1" style="min-width: 15rem; max-width: 24rem">
+                <label class="form-label mb-1" for="stage1EmployeeSearch">Αναζήτηση εργαζομένου</label>
+                <input id="stage1EmployeeSearch" class="form-control form-control-sm" type="search"
+                    value="${escapeHtml(stage1DisplayFilters.employeeQuery)}"
+                    placeholder="Όνομα ή κωδικός εργαζομένου" autocomplete="off">
+            </div>
+            <div style="min-width: 14rem">
+                <label class="form-label mb-1" for="stage1StatusFilter">Κατάσταση</label>
+                <select id="stage1StatusFilter" class="form-select form-select-sm">
+                    <option value="ALL" ${stage1DisplayFilters.status === 'ALL' ? 'selected' : ''}>Όλες (${counts.total})</option>
+                    <option value="NEEDS_ACTION" ${stage1DisplayFilters.status === 'NEEDS_ACTION' ? 'selected' : ''}>Χρειάζονται ενέργεια (${counts.needsAction})</option>
+                    <option value="BLOCKED" ${stage1DisplayFilters.status === 'BLOCKED' ? 'selected' : ''}>Χρειάζονται διόρθωση (${counts.blocked})</option>
+                    <option value="STALE" ${stage1DisplayFilters.status === 'STALE' ? 'selected' : ''}>Τα στοιχεία άλλαξαν (${counts.stale})</option>
+                    <option value="COMPLETED" ${stage1DisplayFilters.status === 'COMPLETED' ? 'selected' : ''}>Ολοκληρωμένες (${counts.completed})</option>
+                </select>
+            </div>
             <span class="border-start ps-3 d-flex flex-wrap gap-3">
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterLeave" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="leave" ${stage1DisplayFilters.leave ? 'checked' : ''}><span class="form-check-label">Άδειες</span></label>
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterSickness" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="sickness" ${stage1DisplayFilters.sickness ? 'checked' : ''}><span class="form-check-label">Ασθένειες</span></label>
@@ -10747,13 +10774,16 @@ function renderWeeklyHrStage1Presentation() {
     const start = (weeklyHrStage1Page - 1) * WEEKLY_HR_STAGE1_PAGE_SIZE;
     const cards = filtered.slice(start, start + WEEKLY_HR_STAGE1_PAGE_SIZE)
         .map(({ payload, dates }) => renderWeeklyHrStage1Card(payload, dates));
+    const emptyFilteredResult = stage1PayloadsForDisplay().length > 0 && filtered.length === 0
+        ? '<div class="small text-muted py-3 text-center">Δεν βρέθηκαν εγγραφές με τα επιλεγμένα φίλτρα.</div>'
+        : '';
     const pagination = `<div class="d-flex align-items-center justify-content-between gap-2 py-2 weekly-hr-stage1-pagination">
         <span class="small text-muted">Σύνολο: ${filtered.length} · Σελίδα ${weeklyHrStage1Page} από ${totalPages}</span>
         <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-secondary weekly-hr-stage1-page-prev" ${weeklyHrStage1Page <= 1 ? 'disabled' : ''}>Προηγούμενη</button>
         <button type="button" class="btn btn-outline-secondary weekly-hr-stage1-page-next" ${weeklyHrStage1Page >= totalPages ? 'disabled' : ''}>Επόμενη</button></div></div>`;
     container.innerHTML = `${renderWeeklyHrStage1BulkToolbar()}<div class="weekly-hr-stage1-table-shell"><table class="table table-sm table-bordered align-middle weekly-hr-stage1-table">
         <thead><tr><th>Επιλογή</th><th>Κωδικός</th><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Κατάσταση</th><th>Πιθανές άδειες</th></tr></thead>
-        <tbody>${cards.join('')}</tbody></table></div>${pagination}`;
+        <tbody>${cards.join('')}</tbody></table>${emptyFilteredResult}</div>${pagination}`;
 }
 
 async function refreshWeeklyHrStage1Scope(scope) {
@@ -11174,6 +11204,13 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+    if (event.target.closest('#stage1StatusFilter')) {
+        stage1DisplayFilters.status = event.target.value;
+        weeklyHrStage1Page = 1;
+        pruneHiddenWeeklyHrStage1Selections();
+        renderWeeklyHrStage1Presentation();
+        return;
+    }
     const displayFilter = event.target.closest('.stage1-display-filter');
     if (displayFilter) {
         const filterName = displayFilter.dataset.stage1Filter;
@@ -11215,6 +11252,17 @@ document.addEventListener('change', (event) => {
     if (checkbox.checked) weeklyHrStage1Selected.add(checkbox.dataset.stage1Key);
     else weeklyHrStage1Selected.delete(checkbox.dataset.stage1Key);
     updateWeeklyHrStage1BulkToolbar();
+});
+
+document.addEventListener('input', (event) => {
+    if (!event.target.closest('#stage1EmployeeSearch')) return;
+    stage1DisplayFilters.employeeQuery = event.target.value;
+    weeklyHrStage1Page = 1;
+    pruneHiddenWeeklyHrStage1Selections();
+    renderWeeklyHrStage1Presentation();
+    const search = document.getElementById('stage1EmployeeSearch');
+    search?.focus({ preventScroll: true });
+    search?.setSelectionRange(search.value.length, search.value.length);
 });
 
 
