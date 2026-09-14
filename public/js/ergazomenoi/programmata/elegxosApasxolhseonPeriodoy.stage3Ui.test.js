@@ -311,6 +311,17 @@ async function verifyStage3PreviewContract() {
     assert.equal(previewCalls[0].confirmButtonText, 'Εφαρμογή χαρακτηρισμού');
     assert.equal(previewCalls[0].cancelButtonText, 'Επιστροφή');
     assert.equal(previewCalls[0].input, 'textarea');
+    assert.equal(previewCalls[0].inputAttributes.rows, '3');
+    assert.equal(previewCalls[0].customClass.popup,
+        'employment-review-stage3-preview-popup');
+    assert.match(css,
+        /\.swal2-popup\.employment-review-stage3-preview-popup\s*\{[^}]*max-height:\s*calc\(100dvh - 2rem\)[^}]*overflow:\s*hidden/s);
+    assert.match(css,
+        /\.employment-review-stage3-preview-popup \.swal2-html-container\s*\{[^}]*max-height:\s*calc\(100dvh - 18rem\)\s*!important[^}]*overflow-y:\s*auto\s*!important/s);
+    assert.match(css,
+        /\.employment-review-stage3-preview-popup \.swal2-textarea\s*\{[^}]*min-height:\s*3\.75rem[^}]*height:\s*4\.25rem[^}]*resize:\s*vertical/s);
+    assert.match(css,
+        /\.employment-review-stage3-preview-popup \.swal2-actions\s*\{[^}]*margin:\s*0\.45rem auto 0/s);
     assert.equal(typeof previewSandbox.fetch, 'undefined', 'η προεπισκόπηση δεν χρειάζεται fetch');
 
     previewSandbox.employmentReviewSwal = async () => ({ isConfirmed: true,

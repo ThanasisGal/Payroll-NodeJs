@@ -10425,7 +10425,9 @@ async function previewWeeklyHrStage3Decision(rowId) {
         inputValue: selection === 'NON_WORK' ? STAGE3_NON_WORK_DEFAULT_REASON :
             'Τελική εξέταση πιθανής άδειας στο Στάδιο 3.',
         confirmButtonText: 'Εφαρμογή χαρακτηρισμού', cancelButtonText: 'Επιστροφή',
-        customClass: { confirmButton: 'class-success' },
+        inputAttributes: { rows: '3' },
+        customClass: { popup: 'employment-review-stage3-preview-popup',
+            confirmButton: 'class-success' },
         inputValidator: (value) => String(value || '').trim() ? undefined :
             'Η αιτιολογία είναι υποχρεωτική.' });
     if (!preview.isConfirmed) return;
