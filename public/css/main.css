@@ -15622,6 +15622,102 @@ body.loader-active > *:not(.app-loader) {
     gap: 0.75rem;
 }
 
+.employment-review-workflow-progress {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.45rem;
+    background: var(--bs-body-bg, #fff);
+}
+
+.employment-review-workflow-progress ol {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.employment-review-progress-step {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+.employment-review-progress-step > span:last-child {
+    display: grid;
+    min-width: 0;
+}
+
+.employment-review-progress-step small {
+    line-height: 1.2;
+}
+
+.employment-review-progress-marker {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.employment-review-progress-step.is-completed {
+    color: var(--bs-success, #198754);
+}
+
+.employment-review-progress-step.is-current {
+    color: var(--bs-warning-text-emphasis, #664d03);
+}
+
+.employment-review-progress-step.is-blocked {
+    color: var(--bs-danger, #dc3545);
+}
+
+.employment-review-progress-arrow {
+    flex: 0 0 auto;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+.employment-review-attention-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--bs-warning-border-subtle, #ffe69c);
+    border-left: 0.25rem solid var(--bs-warning, #ffc107);
+    border-radius: 0.4rem;
+    background: var(--bs-warning-bg-subtle, #fff3cd);
+}
+
+.employment-review-attention-summary h4 {
+    margin: 0 0 0.15rem;
+    font-size: 0.9rem;
+}
+
+.employment-review-attention-summary p {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+@media (max-width: 767.98px) {
+    .employment-review-workflow-progress ol {
+        display: grid;
+        align-items: start;
+    }
+
+    .employment-review-progress-arrow {
+        display: none;
+    }
+
+    .employment-review-attention-summary {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
 .stage3-decision-preview-identity,
 .stage3-decision-preview-section {
     padding: 0.65rem 0.75rem;

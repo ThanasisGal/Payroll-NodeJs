@@ -43,6 +43,9 @@ assert.equal((view.match(/data-bs-parent="#employmentReviewStagesAccordion"/g) |
 assert.equal((view.match(/class="accordion-item" data-workflow-stage="STAGE[1-4]"/g) || []).length, 4);
 assert.equal(getDirectStageItems(view).length, 4);
 assert.match(view, /employmentReviewWorkflowSummary/);
+assert.match(view, /id="employmentReviewWorkflowProgress"/);
+assert.match(view, /aria-label="Πρόοδος Ελέγχου Απασχολήσεων"/);
+assert.match(view, /id="employmentReviewAttentionSummary"/);
 assert.match(view, /STAGE1[\s\S]*weeklyHrStage1Container/);
 assert.match(view, /STAGE2[\s\S]*policyPreviewGroupsContainer/);
 assert.match(view, /STAGE3[\s\S]*weeklyHrStage3Container/);
@@ -150,6 +153,86 @@ const completedLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' }
 assert.equal(completedLifecycle.current_stage, null);
 assert.equal(completedLifecycle.requires_hr_action, false);
 assert.equal(completedLifecycle.total_pending_count, 0);
+
+const guideStart = source.indexOf('function employmentReviewWaitingReason');
+const guideEnd = source.indexOf('function updateEmploymentReviewWorkflowPresentation');
+assert.notEqual(guideStart, -1);
+assert.notEqual(guideEnd, -1);
+assert.ok(guideEnd > guideStart);
+const classList = () => ({ values: new Set(['d-none']),
+    remove(value) { this.values.delete(value); }, add(value) { this.values.add(value); },
+    contains(value) { return this.values.has(value); } });
+const progressElement = { innerHTML: '', classList: classList() };
+const attentionElement = { innerHTML: '', classList: classList() };
+const guideSandbox = {
+    currentWeeklyHrStage2BulkPreview: null,
+    workflowStageShortNames: { STAGE1: 'Άδειες', STAGE2: 'Μεταφορά Ρεπό',
+        STAGE3: 'Υπόλοιπες Άδειες', STAGE4: 'Τελικός Έλεγχος' },
+    escapeHtml: (value) => String(value ?? '').replaceAll('<', '&lt;'),
+    getStage2LifecycleReasonLabel: () => 'Διορθώστε τα στοιχεία του τρέχοντος σταδίου.',
+    document: { getElementById: (id) => id === 'employmentReviewWorkflowProgress'
+        ? progressElement : id === 'employmentReviewAttentionSummary' ? attentionElement : null },
+    CSS: { escape: (value) => value }, bootstrap: { Collapse: { getOrCreateInstance: () => ({ show() {} }) } }
+};
+vm.runInNewContext(`${source.slice(guideStart, guideEnd)}
+this.renderGuide = renderEmploymentReviewWorkflowGuide;
+this.attention = employmentReviewAttentionPresentation;
+this.focusStage = focusEmploymentReviewStage;`, guideSandbox);
+guideSandbox.renderGuide(stage3AfterStage2);
+assert.match(progressElement.innerHTML, /1\. Άδειες/);
+assert.match(progressElement.innerHTML, /2\. Μεταφορά Ρεπό/);
+assert.match(progressElement.innerHTML, /3\. Υπόλοιπες Άδειες/);
+assert.match(progressElement.innerHTML, /4\. Τελικός Έλεγχος/);
+assert.equal((progressElement.innerHTML.match(/is-completed/g) || []).length, 2);
+assert.match(progressElement.innerHTML, /is-current[^>]*aria-current="step"/);
+assert.match(progressElement.innerHTML, /is-waiting/);
+assert.doesNotMatch(progressElement.innerHTML, /ΚΛΕΙΔΩΜΕΝΟ/);
+assert.match(progressElement.innerHTML,
+    /Αναμονή ολοκλήρωσης του Σταδίου 3 — Υπόλοιπες Άδειες/);
+assert.match(attentionElement.innerHTML, /Τι χρειάζεται την προσοχή σας/);
+assert.match(attentionElement.innerHTML, /26 ημέρες χρειάζονται τελικό χαρακτηρισμό/);
+assert.match(attentionElement.innerHTML, /Τα προηγούμενα στάδια έχουν ολοκληρωθεί/);
+assert.match(attentionElement.innerHTML, /Προβολή 26 εκκρεμοτήτων/);
+assert.equal(progressElement.classList.contains('d-none'), false);
+assert.equal(attentionElement.classList.contains('d-none'), false);
+
+guideSandbox.currentWeeklyHrStage2BulkPreview = {
+    safe_bulk_count: 19, manual_exception_count: 0, already_resolved_count: 66
+};
+guideSandbox.renderGuide(readyAutomaticLifecycle);
+assert.match(attentionElement.innerHTML, /19 περιπτώσεις είναι έτοιμες για ασφαλή ενημέρωση/);
+assert.match(attentionElement.innerHTML, /0 χρειάζονται χειροκίνητο έλεγχο/);
+assert.match(attentionElement.innerHTML, /66 έχουν ήδη τακτοποιηθεί/);
+assert.match(attentionElement.innerHTML, /Προεπισκόπηση 19 ενημερώσεων/);
+
+guideSandbox.renderGuide(completedLifecycle);
+assert.match(attentionElement.innerHTML, /Ο έλεγχος ολοκληρώθηκε/);
+assert.doesNotMatch(attentionElement.innerHTML, /data-employment-review-attention-stage/);
+const blockedLifecycle = { current_stage: 'STAGE2', stages: {
+    STAGE1: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },
+    STAGE2: { presentation_status: 'ACTIVE', business_status: 'BLOCKED', open_by_default: true,
+        pending_reasons: ['BLOCKER'] },
+    STAGE3: { presentation_status: 'LOCKED', business_status: 'OPEN' },
+    STAGE4: { presentation_status: 'LOCKED', business_status: 'OPEN' }
+} };
+guideSandbox.renderGuide(blockedLifecycle);
+assert.match(progressElement.innerHTML, /is-blocked/);
+assert.match(progressElement.innerHTML, /Χρειάζεται διόρθωση/);
+assert.match(attentionElement.innerHTML, /Διορθώστε τα στοιχεία του τρέχοντος σταδίου/);
+
+let shown = 0;
+let focused = 0;
+let scrolled = 0;
+const focusItem = { querySelector: (selector) => selector === '.accordion-button'
+    ? { disabled: false, focus() { focused += 1; } } : { },
+scrollIntoView() { scrolled += 1; } };
+guideSandbox.document.querySelector = () => focusItem;
+guideSandbox.bootstrap.Collapse.getOrCreateInstance = () => ({ show() { shown += 1; } });
+assert.equal(guideSandbox.focusStage('STAGE3'), true);
+assert.equal(shown, 1);
+assert.equal(focused, 1);
+assert.equal(scrolled, 1);
+assert.doesNotMatch(source.slice(guideStart, guideEnd), /fetch\s*\(/);
 const progressedLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
     lifecycle_projection: { stages: {
         stage1: stage('COMPLETED'), stage2: stage('OPEN', 1),
@@ -176,7 +259,7 @@ assert.deepEqual(Array.from(unsortedStage3.stages.STAGE3.pending_items, (item) =
 assert.match(source, /button\.disabled = stageViewLocked/);
 assert.match(source, /aria-disabled[\s\S]{0,100}stageViewLocked/);
 assert.match(source, /ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ/);
-assert.match(source, /ΑΝΑΜΟΝΗ ΟΛΟΚΛΗΡΩΣΗΣ ΠΡΟΗΓΟΥΜΕΝΟΥ ΣΤΑΔΙΟΥ/);
+assert.match(source, /employmentReviewWaitingReason\(stage\.stage\)/);
 
 const rendered = sandbox.renderWeeklyHrStage2LifecycleFallback(lifecycle);
 assert.equal(rendered, true);
@@ -284,5 +367,8 @@ assert.match(buttonRule, /white-space\s*:\s*normal/);
 assert.match(buttonRule, /margin\s*:\s*0\s*!important/);
 assert.match(headerContentRule, /flex-wrap\s*:\s*wrap/);
 assert.doesNotMatch(buttonRule, /(?:^|\n)\s*height\s*:\s*[0-9.]+(?:px|rem|vh|vw)\s*;/);
+assert.match(getCssRule('.employment-review-progress-step.is-completed'), /--bs-success/);
+assert.match(getCssRule('.employment-review-progress-step.is-current'), /--bs-warning/);
+assert.match(getCssRule('.employment-review-progress-step.is-blocked'), /--bs-danger/);
 
 console.log('employment review four-stage accordion projection tests passed');

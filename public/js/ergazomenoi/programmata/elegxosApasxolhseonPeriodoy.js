@@ -9032,6 +9032,10 @@ const workflowStageNames = Object.freeze({
     STAGE3: 'ΣΤΑΔΙΟ 3 — Υπόλοιπες Πιθανές Άδειες',
     STAGE4: 'ΣΤΑΔΙΟ 4 — Τελικός Εβδομαδιαίος Έλεγχος'
 });
+const workflowStageShortNames = Object.freeze({
+    STAGE1: 'Άδειες', STAGE2: 'Μεταφορά Ρεπό',
+    STAGE3: 'Υπόλοιπες Άδειες', STAGE4: 'Τελικός Έλεγχος'
+});
 const workflowStageStatusLabels = Object.freeze({
     DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
     COMPLETED: 'ΟΛΟΚΛΗΡΩΜΕΝΟ', ACTIVE: 'ΕΝΕΡΓΟ', OPEN: 'ΑΝΟΙΧΤΟ',
@@ -10411,6 +10415,114 @@ async function submitWeeklyHrStage3Decision(rowId, decision = {}) {
     }
 }
 
+function employmentReviewWaitingReason(stageKey) {
+    const stageOrder = ['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'];
+    const index = stageOrder.indexOf(stageKey);
+    if (index <= 0) return 'Αναμονή προηγούμενου βήματος';
+    const previous = stageOrder[index - 1];
+    return `Αναμονή ολοκλήρωσης του Σταδίου ${index} — ${workflowStageShortNames[previous]}`;
+}
+
+function employmentReviewProgressState(stage = {}) {
+    if (stage.business_status === 'BLOCKED') return 'blocked';
+    if (stage.presentation_status === 'COMPLETED') return 'completed';
+    if (stage.presentation_status === 'ACTIVE' || stage.open_by_default === true) return 'current';
+    return 'waiting';
+}
+
+function employmentReviewAttentionPresentation(lifecycle = {}) {
+    const currentStage = lifecycle.current_stage;
+    const stage = lifecycle.stages?.[currentStage] || null;
+    if (!currentStage || !stage) return {
+        title: 'Ο έλεγχος ολοκληρώθηκε.', detail: 'Δεν υπάρχουν άλλες εκκρεμότητες.',
+        actionLabel: '', actionStage: ''
+    };
+    if (stage.business_status === 'BLOCKED') {
+        const reason = getStage2LifecycleReasonLabel(stage.pending_reasons?.[0], false);
+        return {
+            title: 'Χρειάζεται διόρθωση πριν συνεχίσετε.',
+            detail: reason || 'Ελέγξτε το πρόβλημα που εμφανίζεται στο τρέχον στάδιο.',
+            actionLabel: 'Προβολή προβλήματος', actionStage: currentStage
+        };
+    }
+    const count = Number(stage.pending_count || 0);
+    if (currentStage === 'STAGE1') return {
+        title: `${count} ${count === 1 ? 'ημέρα χρειάζεται' : 'ημέρες χρειάζονται'} αρχικό χαρακτηρισμό.`,
+        detail: 'Ολοκληρώστε τις εκκρεμότητες αδειών για να συνεχίσετε.',
+        actionLabel: `Προβολή ${count} ${count === 1 ? 'εκκρεμότητας' : 'εκκρεμοτήτων'}`,
+        actionStage: currentStage
+    };
+    if (currentStage === 'STAGE2') {
+        const preview = currentWeeklyHrStage2BulkPreview || {};
+        const safe = Number(preview.safe_bulk_count || 0);
+        const manual = Number(preview.manual_exception_count || 0);
+        const resolved = Number(preview.already_resolved_count || 0);
+        const details = [];
+        if (Object.hasOwn(preview, 'safe_bulk_count')) details.push(
+            `${safe} ${safe === 1 ? 'περίπτωση είναι έτοιμη' : 'περιπτώσεις είναι έτοιμες'} για ασφαλή ενημέρωση.`);
+        if (Object.hasOwn(preview, 'manual_exception_count')) details.push(
+            `${manual} ${manual === 1 ? 'χρειάζεται' : 'χρειάζονται'} χειροκίνητο έλεγχο.`);
+        if (Object.hasOwn(preview, 'already_resolved_count')) details.push(
+            `${resolved} ${resolved === 1 ? 'έχει' : 'έχουν'} ήδη τακτοποιηθεί.`);
+        return { title: count === 1 ? '1 περίπτωση χρειάζεται έλεγχο μεταφοράς ρεπό.' :
+            `${count} περιπτώσεις χρειάζονται έλεγχο μεταφοράς ρεπό.`,
+        detail: details.join(' ') || 'Ελέγξτε τις διαθέσιμες περιπτώσεις πριν συνεχίσετε.',
+        actionLabel: safe > 0
+            ? `Προεπισκόπηση ${safe} ${safe === 1 ? 'ενημέρωσης' : 'ενημερώσεων'}`
+            : `Προβολή ${count} ${count === 1 ? 'περίπτωσης' : 'περιπτώσεων'}`,
+        actionStage: currentStage };
+    }
+    if (currentStage === 'STAGE3') return {
+        title: `${count} ${count === 1 ? 'ημέρα χρειάζεται' : 'ημέρες χρειάζονται'} τελικό χαρακτηρισμό.`,
+        detail: 'Τα προηγούμενα στάδια έχουν ολοκληρωθεί.',
+        actionLabel: `Προβολή ${count} ${count === 1 ? 'εκκρεμότητας' : 'εκκρεμοτήτων'}`,
+        actionStage: currentStage
+    };
+    return { title: count > 0
+        ? `${count} ${count === 1 ? 'περίπτωση χρειάζεται' : 'περιπτώσεις χρειάζονται'} τελικό έλεγχο.`
+        : 'Ο τελικός έλεγχος είναι έτοιμος.',
+    detail: 'Ελέγξτε το τελικό εβδομαδιαίο αποτέλεσμα.',
+    actionLabel: 'Προβολή τελικού ελέγχου', actionStage: currentStage };
+}
+
+function focusEmploymentReviewStage(stageKey) {
+    const item = document.querySelector(`[data-workflow-stage="${CSS.escape(String(stageKey))}"]`);
+    const button = item?.querySelector('.accordion-button');
+    const collapse = item?.querySelector('.accordion-collapse');
+    if (!button || !collapse || button.disabled) return false;
+    bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false }).show();
+    button.focus({ preventScroll: true });
+    item.scrollIntoView({ behavior: 'auto', block: 'start' });
+    return true;
+}
+
+function renderEmploymentReviewWorkflowGuide(lifecycle = {}) {
+    const progress = document.getElementById('employmentReviewWorkflowProgress');
+    const attention = document.getElementById('employmentReviewAttentionSummary');
+    if (!progress || !attention) return;
+    const stageKeys = ['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'];
+    progress.innerHTML = `<ol>${stageKeys.map((stageKey, index) => {
+        const stage = lifecycle.stages?.[stageKey] || {};
+        const state = employmentReviewProgressState(stage);
+        const marker = state === 'completed' ? '✓' : state === 'current' ? '●' : '○';
+        const statusLabel = state === 'completed' ? 'Ολοκληρώθηκε' : state === 'current'
+            ? 'Χρειάζεται ενέργεια τώρα' : state === 'blocked' ? 'Χρειάζεται διόρθωση' :
+                employmentReviewWaitingReason(stageKey);
+        return `<li class="employment-review-progress-step is-${state}"${state === 'current'
+            ? ' aria-current="step"' : ''}><span class="employment-review-progress-marker">${marker}</span>
+            <span><strong>${index + 1}. ${escapeHtml(workflowStageShortNames[stageKey])}</strong>
+            <small>${escapeHtml(statusLabel)}</small></span></li>`;
+    }).join('<li class="employment-review-progress-arrow" aria-hidden="true">→</li>')}</ol>`;
+    progress.classList.remove('d-none');
+    const presentation = employmentReviewAttentionPresentation(lifecycle);
+    attention.innerHTML = `<div><h4>Τι χρειάζεται την προσοχή σας</h4>
+        <p><strong>${escapeHtml(presentation.title)}</strong> ${escapeHtml(presentation.detail)}</p></div>
+        ${presentation.actionStage ? `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary"
+            data-employment-review-attention-stage="${escapeHtml(presentation.actionStage)}">${escapeHtml(
+                presentation.actionLabel)}</button>` : ''}`;
+    attention.classList.remove('d-none');
+}
+
 function updateEmploymentReviewWorkflowPresentation() {
     const allPayloads = [...currentCanonicalLifecyclePayloads]
         .sort(compareWeeklyHrStage1Payloads);
@@ -10426,8 +10538,11 @@ function updateEmploymentReviewWorkflowPresentation() {
     const summary = document.getElementById('employmentReviewWorkflowSummary');
     if (!allPayloads.length) {
         summary?.classList.add('d-none');
+        document.getElementById('employmentReviewWorkflowProgress')?.classList.add('d-none');
+        document.getElementById('employmentReviewAttentionSummary')?.classList.add('d-none');
         return lifecycle;
     }
+    renderEmploymentReviewWorkflowGuide(lifecycle);
     const currentLabel = lifecycle.current_stage
         ? workflowStageNames[lifecycle.current_stage] : Object.values(lifecycle.stages)
             .every(stage => stage.presentation_status === 'COMPLETED')
@@ -10458,8 +10573,8 @@ function updateEmploymentReviewWorkflowPresentation() {
             : presentationStatus;
         const badgeLabel = stage.user_action_required === true
             ? 'ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ'
-            : stage.presentation_status === 'LOCKED' && stage.stage === 'STAGE3'
-                ? 'ΑΝΑΜΟΝΗ ΟΛΟΚΛΗΡΩΣΗΣ ΠΡΟΗΓΟΥΜΕΝΟΥ ΣΤΑΔΙΟΥ'
+            : stage.presentation_status === 'LOCKED'
+                ? employmentReviewWaitingReason(stage.stage)
                 : workflowStageStatusLabels[badgeStatus];
         const badge = noHrAction
             ? '<span class="badge text-bg-success ms-2">' +
@@ -10933,6 +11048,11 @@ async function completeWeeklyHrStage1BulkFromUi() {
 }
 
 document.addEventListener('click', (event) => {
+    const attentionAction = event.target.closest('[data-employment-review-attention-stage]');
+    if (attentionAction) {
+        focusEmploymentReviewStage(attentionAction.dataset.employmentReviewAttentionStage);
+        return;
+    }
     if (event.target.closest('[data-workflow-stage="STAGE1"] .accordion-button')) {
         loadPreparedWeeklyHrStage1().catch((error) => {
             console.warn('[weeklyHrStage1LazyLoad]', error);
