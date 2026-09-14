@@ -9061,7 +9061,7 @@ const workflowStageShortNames = Object.freeze({
 });
 const workflowStageStatusLabels = Object.freeze({
     DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
-    COMPLETED: 'ΟΛΟΚΛΗΡΩΜΕΝΟ', ACTIVE: 'ΕΝΕΡΓΟ', OPEN: 'ΑΝΟΙΧΤΟ',
+    COMPLETED: 'ΟΛΟΚΛΗΡΩΘΗΚΕ', ACTIVE: 'ΧΡΕΙΑΖΕΤΑΙ Η ΠΡΟΣΟΧΗ ΣΑΣ', OPEN: 'ΑΝΟΙΧΤΟ',
     BLOCKED: 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ', STALE: 'ΤΑ ΣΤΟΙΧΕΙΑ ΑΛΛΑΞΑΝ', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
 });
 const workflowStageStatusClasses = Object.freeze({
@@ -10578,7 +10578,7 @@ function renderEmploymentReviewWorkflowGuide(lifecycle = {}) {
         const state = employmentReviewProgressState(stage);
         const marker = state === 'completed' ? '✓' : state === 'current' ? '●' : '○';
         const statusLabel = state === 'completed' ? 'Ολοκληρώθηκε' : state === 'current'
-            ? 'Χρειάζεται ενέργεια τώρα' : state === 'blocked' ? 'Χρειάζεται διόρθωση' :
+            ? 'Χρειάζεται η προσοχή σας' : state === 'blocked' ? 'Χρειάζεται διόρθωση' :
                 employmentReviewWaitingReason(stageKey);
         return `<li class="employment-review-progress-step is-${state}"${state === 'current'
             ? ' aria-current="step"' : ''}><span class="employment-review-progress-marker">${marker}</span>
@@ -10639,13 +10639,13 @@ function updateEmploymentReviewWorkflowPresentation() {
                 ? 'COMPLETED' : stage.business_status)
             : presentationStatus;
         const badgeLabel = stage.user_action_required === true
-            ? 'ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ'
+            ? 'ΧΡΕΙΑΖΕΤΑΙ Η ΠΡΟΣΟΧΗ ΣΑΣ'
             : stage.presentation_status === 'LOCKED'
                 ? stage.stage === 'STAGE4' ? 'ΑΝΑΜΟΝΗ' : employmentReviewWaitingReason(stage.stage)
                 : workflowStageStatusLabels[badgeStatus];
         const badge = noHrAction
             ? '<span class="badge text-bg-success ms-2">' +
-                'ΔΕΝ ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ ΑΠΟ ΤΟ HR</span>'
+                'ΟΛΟΚΛΗΡΩΘΗΚΕ</span>'
             : `<span class="badge ${workflowStageStatusClasses[badgeStatus]} ms-2">${escapeHtml(
                 badgeLabel)}</span>`;
         const pendingText = presentationStatus === 'LOCKED' || noHrAction ? '' :

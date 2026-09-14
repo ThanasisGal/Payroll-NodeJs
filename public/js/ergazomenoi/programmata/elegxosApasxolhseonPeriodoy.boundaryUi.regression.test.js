@@ -112,6 +112,10 @@ assert.match(source,
 assert.match(view, /<button type="button" id="employmentReviewBoundaryContextButton"/);
 assert.match(view, /Πληροφορίες οριακών εβδομάδων/);
 assert.doesNotMatch(view, /<button[^>]*id="employmentReviewBoundaryContextButton"[^>]*type="submit"/);
+assert.match(view,
+    /<div class="d-none" aria-hidden="true">\s*<button type="button" id="employmentReviewBoundaryContextButton"/);
+assert.match(source, /Η εβδομάδα περιλαμβάνει ημέρες από άλλη περίοδο\./);
+assert.match(source, /Οι ημέρες αυτές εμφανίζονται μόνο για πλαίσιο και δεν αλλάζουν από εδώ\./);
 
 assert.match(css, /\.employment-review-boundary-context-button\s*\{/);
 assert.match(css, /\.employment-review-boundary-sides\s*\{[\s\S]*?display: grid;/);

@@ -190,6 +190,8 @@ assert.match(progressElement.innerHTML, /3\. Υπόλοιπες Άδειες/);
 assert.match(progressElement.innerHTML, /4\. Τελικός Έλεγχος/);
 assert.equal((progressElement.innerHTML.match(/is-completed/g) || []).length, 2);
 assert.match(progressElement.innerHTML, /is-current[^>]*aria-current="step"/);
+assert.match(progressElement.innerHTML, /Χρειάζεται η προσοχή σας/);
+assert.doesNotMatch(progressElement.innerHTML, /Χρειάζεται ενέργεια τώρα/);
 assert.match(progressElement.innerHTML, /is-waiting/);
 assert.doesNotMatch(progressElement.innerHTML, /ΚΛΕΙΔΩΜΕΝΟ/);
 assert.match(progressElement.innerHTML,
@@ -344,7 +346,10 @@ assert.deepEqual(Array.from(unsortedStage3.stages.STAGE3.pending_items, (item) =
     ['2026-06-03', '2026-06-09', '2026-06-10', '2026-06-22']);
 assert.match(source, /button\.disabled = stageViewLocked/);
 assert.match(source, /aria-disabled[\s\S]{0,100}stageViewLocked/);
-assert.match(source, /ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ/);
+assert.match(source, /ΧΡΕΙΑΖΕΤΑΙ Η ΠΡΟΣΟΧΗ ΣΑΣ/);
+assert.match(source, /ΟΛΟΚΛΗΡΩΘΗΚΕ/);
+assert.doesNotMatch(source, /ΔΕΝ ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ ΑΠΟ ΤΟ HR/);
+assert.doesNotMatch(source, /Χρειάζεται ενέργεια τώρα/);
 assert.match(source, /employmentReviewWaitingReason\(stage\.stage\)/);
 const firstSearchStart = source.indexOf('async function loadResults(');
 const firstSearchEnd = source.indexOf('function pairNo(', firstSearchStart);
