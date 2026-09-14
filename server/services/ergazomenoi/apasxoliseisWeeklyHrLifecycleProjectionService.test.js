@@ -98,6 +98,21 @@ assert.deepEqual(lifecycle0001.stages.stage1.pending_dates, ['2026-06-16']);
 for (const key of ['stage2', 'stage3', 'stage4']) {
     assert.equal(lifecycle0001.stages[key].presentation_status, 'LOCKED');
 }
+const lifecycle0001WithIncompleteStage2 = buildWeeklyHrLifecycleProjection({
+    weekRows: employee0001, effectiveProfile: profile,
+    stage2StateDiagnostic: 'INCOMPLETE_EMPLOYEE_WEEK'
+});
+assert.equal(lifecycle0001WithIncompleteStage2.stages.stage1.business_status, 'OPEN');
+assert.equal(lifecycle0001WithIncompleteStage2.stages.stage1.presentation_status, 'ACTIVE');
+assert.equal(lifecycle0001WithIncompleteStage2.stages.stage2.business_status, 'BLOCKED');
+assert.equal(lifecycle0001WithIncompleteStage2.stages.stage2.presentation_status, 'LOCKED');
+assert.equal(lifecycle0001WithIncompleteStage2.stages.stage2.stage2_applicability,
+    'NOT_APPLICABLE');
+assert.equal(lifecycle0001WithIncompleteStage2.stages.stage2.pending_count, 1);
+assert.deepEqual(lifecycle0001WithIncompleteStage2.stages.stage2.pending_reasons,
+    ['INCOMPLETE_EMPLOYEE_WEEK']);
+assert.deepEqual(lifecycle0001WithIncompleteStage2.stages.stage2.blockers,
+    ['INCOMPLETE_EMPLOYEE_WEEK']);
 
 const employee0009 = week('0009');
 employee0009[1] = possibleLeave(employee0009[1]);
@@ -672,6 +687,18 @@ assert.equal(juneContextOnlyStage2.stages.stage2.pending_count, 0);
 assert.deepEqual(juneContextOnlyStage2.stages.stage2.pending_dates, []);
 assert.equal(juneContextOnlyStage2.requires_hr_action, false);
 assert.equal(juneContextOnlyStage2.total_pending_count, 0);
+const juneContextOnlyIncompleteStage2 = buildWeeklyHrLifecycleProjection({
+    weekRows: contextOnlyStage2, effectiveProfile: profile, scope: {
+        ...crossScope, employee_kodikos: '0004', employee_id: 'employee-0004'
+    }, periodScope: { period_start: '2026-06-01', period_end: '2026-06-30' },
+    stage2StateDiagnostic: 'PARTIAL_WEEK_OUTSIDE_FILTER_RANGE'
+});
+assert.equal(juneContextOnlyIncompleteStage2.stages.stage1.business_status,
+    'DEFERRED_TO_NEXT_PERIOD');
+assert.equal(juneContextOnlyIncompleteStage2.stages.stage2.business_status,
+    'DEFERRED_TO_NEXT_PERIOD');
+assert.deepEqual(juneContextOnlyIncompleteStage2.stages.stage2.blockers,
+    ['PARTIAL_WEEK_OUTSIDE_FILTER_RANGE']);
 
 function employmentScope(start, end, dates) {
     return { natural_week_start: start, natural_week_end: end,

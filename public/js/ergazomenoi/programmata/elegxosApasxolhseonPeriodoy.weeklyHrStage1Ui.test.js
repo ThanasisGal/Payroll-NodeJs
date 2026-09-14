@@ -11,6 +11,20 @@ const css = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.cs
 
 assert.match(view, /id="weeklyHrStage1Container"/);
 assert.match(source, /weekly-hr-stage1-table/);
+const indexWarningHelper = source.match(
+    /function weeklyHrStage1IndexWarning\([\s\S]*?\n}/)?.[0];
+assert.ok(indexWarningHelper);
+const indexWarningSandbox = {};
+vm.runInNewContext(`${indexWarningHelper}\nthis.warning = weeklyHrStage1IndexWarning;`,
+    indexWarningSandbox);
+assert.equal(indexWarningSandbox.warning({ write_enabled: undefined,
+    code: 'INCOMPLETE_NATURAL_WEEK' }), '');
+assert.equal(indexWarningSandbox.warning({ write_enabled: true }), '');
+assert.match(indexWarningSandbox.warning({ write_enabled: false,
+    write_disabled_code: 'WEEKLY_HR_WORKFLOW_INDEXES_NOT_READY' }),
+    /δεν έχουν ενεργοποιηθεί οι απαιτούμενες δικλείδες/);
+assert.equal(indexWarningSandbox.warning({ write_enabled: false,
+    write_disabled_code: 'OTHER_FAILURE' }), '');
 assert.match(source, /<tr class="weekly-hr-stage1-card"/);
 assert.match(source, /Πιθανές άδειες/);
 assert.match(source, /weekly-hr-stage1-day-classification/);
@@ -544,7 +558,7 @@ assert.match(failedBulk.html, /Αποτέλεσμα/);
 assert.match(failedBulk.html, /Αιτία/);
 assert.match(failedBulk.html, /01\/06\/2026–07\/06\/2026/);
 assert.match(failedBulk.html, /Απαιτείται ρητή ανακατασκευή ή επανεκτίμηση/);
-assert.match(source, /Απαιτείται τελική εξέταση πιθανής άδειας\./);
+assert.match(source, /Τελική εξέταση πιθανής άδειας στο Στάδιο 3\./);
 assert.match(source, /Δεν υπάρχουν ανέλεγκτες πιθανές άδειες\./);
 
 const expectedDefaultReason =

@@ -280,7 +280,6 @@ function buildWeeklyHrLifecycleProjection({
             ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE',
                 'ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'].includes(reason));
         const blockers = unique([...(workflow.blocking_reasons || []), ...configurationBlockers,
-            ...(stage2StateDiagnostic ? [stage2StateDiagnostic] : []),
             // Existing decisions must be revalidated through their normal full-week path.
             ...(persistedStage2DecisionState || persistedStage3State
                 ? ['EXISTING_WEEKLY_DECISION_REQUIRES_FULL_WEEK_VALIDATION'] : [])]);
@@ -288,13 +287,16 @@ function buildWeeklyHrLifecycleProjection({
         const hasBlocker = stale || blockers.length > 0;
         const stages = Object.fromEntries(['stage1', 'stage2', 'stage3', 'stage4'].map((key, index) => {
             const activeBlocker = (index === 0 || index === 3) && hasBlocker;
+            const stage2Diagnostics = index === 1 && stage2StateDiagnostic
+                ? [stage2StateDiagnostic] : [];
             return [key, stageResult(`STAGE${index + 1}`, {
                 business_status: activeBlocker ? (stale ? BUSINESS_STATUS.STALE : BUSINESS_STATUS.BLOCKED)
                     : DEFERRED_WEEK_STATUS,
                 presentation_status: activeBlocker ? (stale ? 'STALE' : 'BLOCKED') : DEFERRED_WEEK_STATUS,
                 enabled: activeBlocker && index === 0, open_by_default: activeBlocker && index === 0,
                 pending_count: activeBlocker ? Math.max(1, blockers.length) : 0,
-                pending_reasons: activeBlocker ? blockers : [], blockers: activeBlocker ? blockers : [],
+                pending_reasons: activeBlocker ? blockers : stage2Diagnostics,
+                blockers: activeBlocker ? blockers : stage2Diagnostics,
                 persisted_status: index === 0 ? persistedStatus : 'OPEN',
                 ...(index === 0 ? { attestation_scope: 'PERIOD_SLICE', period_slice: slice,
                     current_fingerprint: fingerprint,
@@ -437,11 +439,15 @@ function buildWeeklyHrLifecycleProjection({
     const stage2ResolvedByDecision = Boolean(appliedStage2Decision || rejectedStage2Decision);
     const repoReasons = unique(repoTransfer.reasons || []);
     const stage2Diagnostics = stage2StateDiagnostic ? [stage2StateDiagnostic] : [];
-    // Candidate exclusions and repo deficits are diagnostics. A Stage-2 blocker
-    // exists only in the context of an otherwise actionable transfer contract.
-    const stage2Blockers = stage2ActionableForScope &&
-        repoTransfer.eligibility_status === 'INVALID_INPUT' ? repoReasons : [];
-    const stage2PendingCount = stage2ActionableForScope && !stage2ResolvedByDecision ? 1 : 0;
+    // Candidate exclusions and repo deficits block only an otherwise actionable
+    // transfer. A preparation diagnostic independently keeps Stage 2 fail-closed.
+    const stage2Blockers = unique([
+        ...(stage2ActionableForScope && repoTransfer.eligibility_status === 'INVALID_INPUT'
+            ? repoReasons : []),
+        ...stage2Diagnostics
+    ]);
+    const stage2PendingCount = stage2Diagnostics.length ||
+        (stage2ActionableForScope && !stage2ResolvedByDecision) ? 1 : 0;
     const sourceRow = rows.find((row) => dateKeyUtc(row.hmeromhnia) ===
         dateKeyUtc(repoTransfer.source?.hmeromhnia));
     const targetRow = rows.find((row) => dateKeyUtc(row.hmeromhnia) ===
@@ -492,7 +498,9 @@ function buildWeeklyHrLifecycleProjection({
         pending_dates: Object.freeze(stage2PendingCount ? stage2CandidateDates : []),
         pending_items: Object.freeze(stage2PendingItems),
         pending_reasons: Object.freeze(stage2PendingCount ? unique([
-            'REPO_TRANSFER_DECISION_REQUIRED', ...repoReasons, ...stage2Diagnostics
+            ...(stage2ActionableForScope ? ['REPO_TRANSFER_DECISION_REQUIRED',
+                ...repoReasons] : []),
+            ...stage2Diagnostics
         ]) : []),
         blockers: Object.freeze(stage2Blockers),
         stage2_applicability: stage2ActionableForScope

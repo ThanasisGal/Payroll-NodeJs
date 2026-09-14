@@ -11538,12 +11538,6 @@ class erganhController {
                 const key = `${String(requested.employee_kodikos || '').trim()}|${dateKeyUtc(requested.week_start)}`;
                 const weekRows = rowsByWeek.get(key) || [];
                 const lifecycleProjection = lifecycleByWeek.get(key);
-                if (preparedStage2ErrorsByWeek.has(key)) {
-                    payloads.push({ success: false, scope: requested,
-                        code: 'INCOMPLETE_NATURAL_WEEK',
-                        diagnostic: preparedStage2ErrorsByWeek.get(key) });
-                    continue;
-                }
                 if (!weekRows.length || !lifecycleProjection) continue;
                 const state = workflowStateByWeek.get(key) || {};
                 const stage1 = lifecycleProjection.stages?.stage1 || {};
@@ -11590,6 +11584,8 @@ class erganhController {
                     effectiveProfile, effectiveProfilesByDate,
                     persistedStage1State: state.stage1 || null,
                     persistedStage2DecisionState: preparedStage2ByWeek.get(key) || null,
+                    stage2StateDiagnostic:
+                        preparedStage2ErrorsByWeek.get(key)?.reason || null,
                     persistedStage3State: state.stage3 || null,
                     scope: lifecycleProjection.scope || requested,
                     periodScope: employmentDateScope.context_only_dates?.length

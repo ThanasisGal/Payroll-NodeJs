@@ -9892,6 +9892,13 @@ function updateWeeklyHrStage1BulkToolbar() {
     if (toolbar) toolbar.outerHTML = renderWeeklyHrStage1BulkToolbar();
 }
 
+function weeklyHrStage1IndexWarning(payload = {}) {
+    return payload.write_enabled === false &&
+        payload.write_disabled_code === 'WEEKLY_HR_WORKFLOW_INDEXES_NOT_READY'
+        ? '<div class="small text-muted">Η αποθήκευση του Σταδίου 1 δεν είναι ακόμη διαθέσιμη επειδή δεν έχουν ενεργοποιηθεί οι απαιτούμενες δικλείδες της εβδομαδιαίας ροής HR.</div>'
+        : '';
+}
+
 function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const scope = payload.scope;
     const key = weeklyHrStage1Key(scope);
@@ -9906,8 +9913,7 @@ function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const selection = `<input type="checkbox" class="form-check-input weekly-hr-stage1-select" aria-label="Επιλογή εβδομάδας" data-stage1-key="${escapeHtml(key)}" ${selected ? 'checked' : ''} ${eligible ? '' : 'disabled'}>`;
     const warning = stale
         ? '<div class="small text-warning-emphasis">Τα ημερήσια δεδομένα άλλαξαν μετά την τελευταία ολοκλήρωση. Απαιτείται νέος έλεγχος του Σταδίου 1.</div>' : '';
-    const indexWarning = payload.write_enabled ? '' :
-        '<div class="small text-muted">Η αποθήκευση του Σταδίου 1 δεν είναι ακόμη διαθέσιμη επειδή δεν έχουν ενεργοποιηθεί οι απαιτούμενες δικλείδες της εβδομαδιαίας ροής HR.</div>';
+    const indexWarning = weeklyHrStage1IndexWarning(payload);
     const relevantDates = stage1RelevantDates(payload);
     const displayDates = Array.isArray(filteredDates) ? filteredDates :
         payload.period_slice?.actionable_dates?.length
