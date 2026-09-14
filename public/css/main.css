@@ -14374,17 +14374,25 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-page-shell {
+    --employment-review-footer-gap: 5px;
+    --employment-review-top-gap: 1rem;
+    --employment-review-shadow-clearance: 0.75rem;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+        "period-status"
+        "workspace";
     gap: 0.5rem;
     width: 100% !important;
     max-width: 100%;
     min-width: 0;
-    height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) - 1.5rem);
-    max-height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) - 1.5rem);
+    height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) -
+        var(--employment-review-top-gap) - var(--employment-review-footer-gap));
+    max-height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) -
+        var(--employment-review-top-gap) - var(--employment-review-footer-gap));
     margin-left: 0;
     margin-right: 0;
-    padding-bottom: 0;
+    padding-bottom: var(--employment-review-shadow-clearance);
     overflow: hidden;
     box-sizing: border-box;
 }
@@ -14402,6 +14410,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 #employmentPeriodControlPanel {
+    grid-area: period-status;
     margin: 0;
     padding: 0.55rem 0.75rem;
     overflow-wrap: anywhere;
@@ -14428,11 +14437,19 @@ body.loader-active > *:not(.app-loader) {
     height: 100%;
     min-height: 0;
     overflow: hidden;
+    border-radius: var(--bs-border-radius-xl) !important;
+}
+
+.employment-review-card.z-depth-5 {
+    box-shadow:
+        0 0.35rem 0.7rem rgba(33, 37, 41, 0.2),
+        0 0.15rem 0.3rem rgba(33, 37, 41, 0.14) !important;
 }
 
 .employment-review-workspace {
+    grid-area: workspace;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .employment-review-card > .card-header,
@@ -14450,6 +14467,7 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-card > .card-footer {
     padding-block: 0.45rem;
+    border-radius: 0 0 var(--bs-border-radius-xl) var(--bs-border-radius-xl);
 }
 
 .review-card-body {

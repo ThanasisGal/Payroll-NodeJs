@@ -3390,8 +3390,12 @@ function testMinimalWorkspaceEjsContract() {
 }
 
 function testEmploymentReviewScrollContainerContract() {
-    assert.ok(/\.employment-review-page-shell\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)[^}]*overflow:\s*hidden/s.test(cssSource));
-    assert.ok(/\.employment-review-card\s*\{[^}]*display:\s*flex[^}]*height:\s*100%[^}]*min-height:\s*0[^}]*overflow:\s*hidden/s.test(cssSource));
+    assert.ok(/\.employment-review-page-shell\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)[^}]*grid-template-areas:[^}]*"period-status"[^}]*"workspace"[^}]*overflow:\s*hidden/s.test(cssSource));
+    assert.ok(/\.employment-review-page-shell\s*\{[^}]*--employment-review-footer-gap:\s*5px[^}]*padding-bottom:\s*var\(--employment-review-shadow-clearance\)/s.test(cssSource));
+    assert.ok(/#employmentPeriodControlPanel\s*\{[^}]*grid-area:\s*period-status/s.test(cssSource));
+    assert.ok(/\.employment-review-workspace\s*\{[^}]*grid-area:\s*workspace[^}]*overflow:\s*visible/s.test(cssSource));
+    assert.ok(/\.employment-review-card\s*\{[^}]*display:\s*flex[^}]*height:\s*100%[^}]*min-height:\s*0[^}]*overflow:\s*hidden[^}]*border-radius:/s.test(cssSource));
+    assert.ok(/\.employment-review-card\.z-depth-5\s*\{[^}]*box-shadow:/s.test(cssSource));
     assert.ok(/\.review-card-body\s*\{[^}]*display:\s*flex[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*hidden/s.test(cssSource));
     assert.ok(/\.employment-review-scroll-container\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*auto/s.test(cssSource));
     assert.ok(!cssSource.includes('--employment-review-viewport-offset'));
