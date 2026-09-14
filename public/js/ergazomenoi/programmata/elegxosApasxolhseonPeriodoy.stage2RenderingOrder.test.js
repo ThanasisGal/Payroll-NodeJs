@@ -135,7 +135,8 @@ assert.notEqual(loadResultsEnd, -1, 'loadResults end boundary must exist');
 assert.ok(loadResultsEnd > loadResultsStart,
     'loadResults end boundary must follow its start boundary');
 const loadResults = source.slice(loadResultsStart, loadResultsEnd);
-assert.match(loadResults, /renderPreCalculationDataIssues\(rows\);\s*return;/);
+assert.match(loadResults,
+    /renderPreCalculationDataIssues\(rows\);\s*updateEmploymentReviewWorkflowPresentation\(\);\s*return true;/);
 assert.match(loadResults, /finally\s*\{[\s\S]*renderWeeklyHrStage2LifecycleFallback\(currentEmploymentReviewLifecyclePresentation\)/);
 assert.ok(mutations.some((entry) => entry.after === ''));
 

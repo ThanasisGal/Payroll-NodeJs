@@ -326,6 +326,32 @@ assert.match(source, /button\.disabled = stageViewLocked/);
 assert.match(source, /aria-disabled[\s\S]{0,100}stageViewLocked/);
 assert.match(source, /ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ/);
 assert.match(source, /employmentReviewWaitingReason\(stage\.stage\)/);
+const firstSearchStart = source.indexOf('async function loadResults(');
+const firstSearchEnd = source.indexOf('function pairNo(', firstSearchStart);
+assert.notEqual(firstSearchStart, -1);
+assert.notEqual(firstSearchEnd, -1);
+assert.ok(firstSearchEnd > firstSearchStart);
+const firstSearchSource = source.slice(firstSearchStart, firstSearchEnd);
+const canonicalReadyAt = firstSearchSource.indexOf('currentCanonicalLifecyclePayloads =');
+const stage2PreviewReadyAt = firstSearchSource.indexOf('currentWeeklyHrStage2BulkPreview =');
+const finalPresentationAt = firstSearchSource.lastIndexOf(
+    'updateEmploymentReviewWorkflowPresentation();');
+const successfulReturnAt = firstSearchSource.lastIndexOf('return true;');
+const loaderBeginAt = firstSearchSource.indexOf('window.AppLoader?.begin(');
+const loaderEndAt = firstSearchSource.lastIndexOf('window.AppLoader?.end();');
+assert.ok(canonicalReadyAt >= 0 && stage2PreviewReadyAt > canonicalReadyAt);
+assert.ok(loaderBeginAt >= 0 && loaderBeginAt < canonicalReadyAt);
+assert.ok(finalPresentationAt > stage2PreviewReadyAt);
+assert.ok(successfulReturnAt > finalPresentationAt,
+    'η πρώτη Αναζήτηση ολοκληρώνει την παρουσίαση πριν επιλυθεί το promise της');
+assert.ok(loaderEndAt > successfulReturnAt,
+    'ο loader κλείνει στο finally μετά την τελική παρουσίαση');
+assert.doesNotMatch(firstSearchSource, /loadPreparedWeeklyHrStage1|focusEmploymentReviewStage|\.click\s*\(/);
+assert.equal((firstSearchSource.match(/\bloadResults\s*\(/g) || []).length, 1,
+    'η πρώτη Αναζήτηση δεν εξαρτάται από δεύτερη loadResults');
+assert.equal((firstSearchSource.match(/fetch\(`\/api\/prodhlomena-oraria\/review\?/g) || []).length, 1,
+    'η διόρθωση δεν επαναλαμβάνει το κύριο αίτημα Αναζήτησης');
+assert.match(source, /renderWeeklyHrStage3\(lifecycle\);\s*syncEmploymentReviewStageAccordionState\(lifecycle\)/);
 const workflowUpdateSource = source.match(
     /function updateEmploymentReviewWorkflowPresentation\(\) \{[\s\S]*?\n}/
 )?.[0] || '';

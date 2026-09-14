@@ -11207,6 +11207,7 @@ document.addEventListener('change', (event) => {
 
 
 async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
+    window.AppLoader?.begin('Φόρτωση Ελέγχου Απασχολήσεων...', 0);
     try {
         if (!preserveStage2BulkDiagnostics) currentWeeklyHrStage2BulkLastResultDetails = [];
         currentReviewLifecycleProjectionReady = false;
@@ -11339,7 +11340,8 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
 
         if (payload.finalized !== true && !hasAuthoritativeResult) {
             renderPreCalculationDataIssues(rows);
-            return;
+            updateEmploymentReviewWorkflowPresentation();
+            return true;
         }
 
         if (payload.finalized !== true) {
@@ -11400,6 +11402,7 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         } else {
             renderPolicyPreviewGroups(null);
         }
+        updateEmploymentReviewWorkflowPresentation();
         return true;
     } catch (error) {
         console.error(error);
@@ -11415,6 +11418,7 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         return false;
     } finally {
         renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
+        window.AppLoader?.end();
     }
 }
 
