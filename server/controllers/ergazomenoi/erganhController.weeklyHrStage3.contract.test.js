@@ -23,6 +23,8 @@ const previewSection = controller.slice(controller.indexOf('static previewWeekly
 assert.match(previewSection, /buildWeeklyHrStage3BulkPreview/);
 assert.match(previewSection, /loadWeeklyHrStage3DecisionContext/);
 assert.match(previewSection, /assertActiveEmploymentReviewStage3DayWritable/);
+assert.match(controller, /persistedStage2State:\s*state\?\.stage2 \|\| null/);
+assert.match(controller, /resolved_dates:\s*stage3FingerprintResolvedDates\(stage3\)/);
 assert.doesNotMatch(previewSection, /runWithPeriodWriteFence|runWithStaleStage3ResolutionWriteFence|executeWeeklyHrStage3Day|writeCanonicalDailyClassification/);
 assert.match(routes, /weekly-hr-workflow\/stage3\/bulk-preview'[\s\S]*checkAuth[\s\S]*requireEmploymentReviewAccess[\s\S]*requireCriticalEmploymentDecisionRole[\s\S]*previewWeeklyHrStage3Bulk/);
 assert.match(controller, /static applyWeeklyHrStage3Bulk/);

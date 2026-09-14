@@ -109,7 +109,7 @@ async function resolveWeeklyHrStage3Day({
     assertDecisionAllowed(initialContext, finalClassification);
     const initialFingerprint = buildStage3InputFingerprint(initialContext).fingerprint;
     if (text(expected_input_fingerprint) !== initialFingerprint) fail('STAGE3_INPUT_CHANGED',
-        'Τα δεδομένα της ημέρας άλλαξαν. Επαναλάβετε τον έλεγχο.', 409);
+        'Χρειάζεται ανανέωση πριν συνεχίσετε. Πατήστε «Αναζήτηση» και δοκιμάστε ξανά.', 409);
     const expectedStage3Version = Number(expected_stage3_version);
     if (!Number.isInteger(expectedStage3Version) || expectedStage3Version < 0 ||
         expectedStage3Version !== Number(initialContext.upstream?.stage3_version || 0)) {
@@ -139,7 +139,7 @@ async function resolveWeeklyHrStage3Day({
         assertDecisionAllowed(fresh, finalClassification);
         const freshFingerprint = buildStage3InputFingerprint(fresh).fingerprint;
         if (freshFingerprint !== initialFingerprint) fail('STAGE3_INPUT_CHANGED',
-            'Τα authoritative δεδομένα άλλαξαν πριν από την αποθήκευση.', 409);
+            'Χρειάζεται ανανέωση πριν συνεχίσετε. Πατήστε «Αναζήτηση» και δοκιμάστε ξανά.', 409);
         if (Number(fresh.upstream?.stage3_version || 0) !== expectedStage3Version) {
             fail('STAGE3_VERSION_CONFLICT',
                 'Η έκδοση του Stage 3 άλλαξε πριν από την αποθήκευση.', 409);

@@ -10583,9 +10583,9 @@ async function submitWeeklyHrStage3Decision(rowId, decision = {}) {
             : { icon: 'success', title: 'Η απόφαση αποθηκεύτηκε.' });
     } catch (error) {
         const changedSinceSearch = /STALE|INPUT_CHANGED/.test(String(error.code || '').toUpperCase());
-        await employmentReviewSwal({ icon: 'error', title: changedSinceSearch
-            ? 'Τα στοιχεία έχουν αλλάξει' : 'Αποτυχία', text: changedSinceSearch
-                ? 'Τα στοιχεία της ημέρας ή της εβδομάδας άλλαξαν από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση και δοκιμάστε ξανά.'
+        await employmentReviewSwal({ icon: changedSinceSearch ? 'warning' : 'error',
+            title: changedSinceSearch ? 'Χρειάζεται ανανέωση πριν συνεχίσετε.' : 'Αποτυχία',
+            text: changedSinceSearch ? 'Πατήστε «Αναζήτηση» και δοκιμάστε ξανά.'
                 : error.message });
         button.disabled = false;
     }
@@ -10609,10 +10609,14 @@ function weeklyHrStage3BulkPreviewCommand() {
 function weeklyHrStage3InvalidItemsHtml(items = []) {
     return `<div class="text-start stage3-bulk-invalid-items">${items.map((item) => {
         const pending = findStage3PendingItem(item.row_id);
-        const employeeName = item.employee_name || stage3PayloadForItem(pending)?.employee_name ||
-            'Εργαζόμενος';
-        return `<div class="border-bottom py-2"><strong>${escapeHtml(employeeName)}${
-            item.employee_kodikos ? ` — ${escapeHtml(item.employee_kodikos)}` : ''}</strong><br>
+        const payload = stage3PayloadForItem(pending);
+        const names = buildStage3EmployeeNameLookup(currentReviewRows);
+        const employeeName = String(item.employee_name || payload?.employee_name ||
+            names.get(String(pending?.employee_kodikos || item.employee_kodikos || '')) ||
+            names.get(String(pending?.employee_id || '')) || '').trim();
+        const employeeCode = item.employee_kodikos || pending?.employee_kodikos || '';
+        return `<div class="border-bottom py-2"><strong>${employeeName
+            ? `${escapeHtml(employeeName)} — ` : ''}Κωδικός: ${escapeHtml(employeeCode)}</strong><br>
             <span>${escapeHtml(formatStage1DateKey(item.decision_date))}</span><br>
             <span class="text-muted">${escapeHtml(item.message ||
                 'Η εγγραφή χρειάζεται νέο έλεγχο.')}</span></div>`;
@@ -10666,7 +10670,7 @@ async function previewWeeklyHrStage3Bulk() {
             result, responseReceived: true });
         if (!result.can_apply) {
             await employmentReviewSwal({ icon: 'warning',
-                title: 'Δεν μπορούν να εφαρμοστούν όλες οι επιλεγμένες αλλαγές.',
+                title: 'Χρειάζεται ανανέωση πριν συνεχίσετε.',
                 html: weeklyHrStage3InvalidItemsHtml(result.invalid_items),
                 showConfirmButton: false, showCancelButton: true, cancelButtonText: 'Κλείσιμο',
                 customClass: { popup: 'employment-review-stage3-bulk-preview-popup' } });
@@ -10705,7 +10709,7 @@ async function handleWeeklyHrStage3BulkApplyFailure(result = {}) {
     if (changed) {
         invalidateWeeklyHrStage3FrozenApply();
         await employmentReviewSwal({ icon: 'warning',
-            title: 'Τα στοιχεία άλλαξαν και χρειάζεται νέος έλεγχος.',
+            title: 'Χρειάζεται ανανέωση πριν συνεχίσετε.',
             ...(result.invalid_items?.length
                 ? { html: weeklyHrStage3InvalidItemsHtml(result.invalid_items) }
                 : { text: result.message || 'Κάντε νέα προεπισκόπηση.' }) });

@@ -6,7 +6,8 @@ const {
     buildStage1NoClassificationPreviewItems,
     buildWeeklyHrLifecycleProjection,
     buildFinalizedWeeklyHrLifecyclePresentation,
-    resolveStage3ActionableDates
+    resolveStage3ActionableDates,
+    stage3FingerprintResolvedDates
 } = require('./apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildEmploymentPeriodFrozenSnapshot } = require(
     './apasxoliseisPeriodFrozenSnapshotService');
@@ -18,6 +19,7 @@ const {
 const {
     buildStage1Fingerprint
 } = require('./apasxoliseisStage1FingerprintService');
+const { buildStage3InputFingerprint } = require('./apasxoliseisStage3FingerprintService');
 
 const profile = { hmeres_ergasias_ebdomadas: 5, typos_apasxolhshs: '0',
     pososto_prosayxhshs_6hs_hmeras: 40, pragmatikoOromisthio: 10 };
@@ -181,6 +183,53 @@ assert.deepEqual(completed0014.stages.stage3.resolved_before_stage3_dates, []);
 assert.deepEqual(completed0014.stages.stage3.pending_dates, ['2026-06-17']);
 assert.equal(completed0014.stages.stage3.remaining_possible_leave_count, 1);
 assert.equal(completed0014.stages.stage3.business_status, 'OPEN');
+
+function authoritativeStage3FingerprintContext({ projection, rows, selectedDate,
+    scope, stage2Version = 0 }) {
+    const stage1 = projection.stages.stage1;
+    const stage3 = projection.stages.stage3;
+    const row = rows.find((candidate) => candidate.hmeromhnia === selectedDate);
+    return { scope, row, dailyProfile: profile, isResidual: true,
+        stage2: { fingerprint: stage3.stage2_fingerprint, status: stage3.stage2_status,
+            resolution: stage3.stage2_resolution,
+            resolved_dates: stage3.stage2_automatic_resolved_dates || [] },
+        upstream: { stage1_attestation_scope: stage1.attestation_scope,
+            stage1_period_start: stage1.period_slice?.period_start || '',
+            stage1_period_end: stage1.period_slice?.period_end || '',
+            stage1_context_fingerprint: stage1.current_context_fingerprint,
+            stage1_current_fingerprint: stage1.current_completion_fingerprint,
+            stage1_completion_fingerprint: stage1.period_slice?.completion_fingerprint ||
+                employee0014Fingerprint,
+            stage1_effective_fingerprint: stage1.period_slice?.effective_fingerprint ||
+                employee0014Fingerprint,
+            stage1_version: Number(stage1.period_slice?.version || 0),
+            stage2_fingerprint: stage3.stage2_fingerprint, stage2_version: stage2Version } };
+}
+
+const equivalentFingerprintsByStage2Version = new Map();
+for (const stage2Version of [0, 6]) {
+    const scope = { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
+        employee_id: 'employee-0014', employee_kodikos: '0014',
+        week_start: '2026-06-15', week_end: '2026-06-21' };
+    const projection = buildWeeklyHrLifecycleProjection({ weekRows: employee0014,
+        effectiveProfile: profile, persistedStage1State: { status: 'COMPLETED',
+            completion_fingerprint: employee0014Fingerprint },
+        persistedStage2State: { version: stage2Version }, scope });
+    const pending = projection.stages.stage3.pending_items[0];
+    const authoritative = authoritativeStage3FingerprintContext({ projection,
+        rows: employee0014, selectedDate: pending.date, scope, stage2Version });
+    assert.equal(pending.input_fingerprint,
+        buildStage3InputFingerprint(authoritative).fingerprint,
+        `Search και authoritative πλαίσιο συμφωνούν για Stage 2 version ${stage2Version}`);
+    equivalentFingerprintsByStage2Version.set(stage2Version, pending.input_fingerprint);
+    assert.equal(pending.expected_stage3_version, 0);
+}
+assert.notEqual(equivalentFingerprintsByStage2Version.get(0),
+    equivalentFingerprintsByStage2Version.get(6),
+    'πραγματική μεταβολή της έκδοσης Stage 2 αλλάζει το αποτύπωμα');
+assert.deepEqual(stage3FingerprintResolvedDates({ stage2_automatic_resolved_dates: [
+    '2026-06-18', '2026-06-16', '2026-06-18'
+] }), ['2026-06-16', '2026-06-18']);
 
 // A full-time candidate that Stage 2 deterministically resolves as the missing
 // rest/repo identity is not a Stage-3 residual.

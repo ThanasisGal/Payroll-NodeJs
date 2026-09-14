@@ -455,7 +455,8 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowProjectionService');
 const {
     buildWeeklyHrLifecycleProjection,
-    buildFinalizedWeeklyHrLifecyclePresentation
+    buildFinalizedWeeklyHrLifecyclePresentation,
+    stage3FingerprintResolvedDates
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildWeeklyLifecycleWithStage2State } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleStage2StateService'
@@ -4496,6 +4497,7 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
         effectiveProfile: weekly.effectiveProfile,
         effectiveProfilesByDate: weekly.effectiveProfilesByDate,
         persistedStage1State: state?.stage1 || null,
+        persistedStage2State: state?.stage2 || null,
         persistedStage3State: state?.stage3 || null,
         scope: { ...weekly.base, employee_id: weekly.employee._id,
             employee_kodikos: weekly.employee.kodikos,
@@ -4525,7 +4527,7 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
         remaining_dates: [...(stage3.pending_dates || [])],
         stage2: { fingerprint: stage3.stage2_fingerprint,
             status: stage3.stage2_status, resolution: stage3.stage2_resolution,
-            resolved_dates: stage3.stage2_resolved_dates || [] },
+            resolved_dates: stage3FingerprintResolvedDates(stage3) },
         upstream: { stage1_attestation_scope: lifecycle.stages.stage1.attestation_scope,
             stage1_period_start: lifecycle.stages.stage1.period_slice?.period_start || '',
             stage1_period_end: lifecycle.stages.stage1.period_slice?.period_end || '',
@@ -4597,6 +4599,7 @@ async function loadWeeklyHrStage2CompletionContext({ req, input, session = null 
         effectiveProfile: weekly.effectiveProfile,
         effectiveProfilesByDate: weekly.effectiveProfilesByDate,
         persistedStage1State: state?.stage1 || null,
+        persistedStage2State: state?.stage2 || null,
         persistedStage3State: state?.stage3 || null, scope, periodScope,
         employmentDateScope: weekly.employmentDateScope
     });
@@ -4852,6 +4855,7 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
         const lifecycle = buildWeeklyHrLifecycleProjection({ weekRows: rows,
             effectiveProfile, effectiveProfilesByDate,
             persistedStage1State: state.stage1 || null,
+            persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null, scope,
             periodScope, employmentDateScope, companyPolicyRules });
         return { scope, rows, lifecycle, workflowState: state, employee,
@@ -5127,6 +5131,7 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
                 company_kod: String(req.session.companyInUse || '') })),
             effectiveProfile: effectiveProfilesByDate[dateKeyUtc(weekRows.at(-1)?.hmeromhnia)] || {},
             effectiveProfilesByDate, persistedStage1State: state.stage1 || null,
+            persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null,
             scope: { team: req.session.userTeam,
                 company_kod: String(req.session.companyInUse || ''),
@@ -5731,6 +5736,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             effectiveProfile,
             effectiveProfilesByDate,
             persistedStage1State: state.stage1 || null,
+            persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null,
             scope: {
                 team: req.session.userTeam,
@@ -11735,6 +11741,7 @@ class erganhController {
                 effectiveProfile: context.effectiveProfile,
                 effectiveProfilesByDate: context.effectiveProfilesByDate,
                 persistedStage1State: state?.stage1 || null,
+                persistedStage2State: state?.stage2 || null,
                 persistedStage3State: state?.stage3 || null,
                 scope: { ...context.base, employee_id: context.employee._id,
                     employee_kodikos: context.employee.kodikos,
@@ -12004,6 +12011,7 @@ class erganhController {
                 try { lifecycleWithStage2 = buildWeeklyHrLifecycleProjection({ weekRows,
                     effectiveProfile, effectiveProfilesByDate,
                     persistedStage1State: state.stage1 || null,
+                    persistedStage2State: state.stage2 || null,
                     persistedStage2DecisionState: preparedStage2ByWeek.get(key) || null,
                     stage2StateDiagnostic:
                         preparedStage2ErrorsByWeek.get(key)?.reason || null,
@@ -12319,6 +12327,7 @@ class erganhController {
                                 weekRows: mutableRows, effectiveProfile: context.effectiveProfile,
                                 effectiveProfilesByDate: context.effectiveProfilesByDate,
                                 persistedStage1State: context.workflowState.stage1 || null,
+                                persistedStage2State: context.workflowState.stage2 || null,
                                 persistedStage3State: context.workflowState.stage3 || null,
                                 scope: context.scope, periodScope: context.periodScope,
                                 employmentDateScope: context.employmentDateScope });

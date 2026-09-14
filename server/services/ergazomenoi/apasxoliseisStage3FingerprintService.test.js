@@ -31,7 +31,9 @@ for (const changed of [
     { dailyProfile: { ...base.dailyProfile, kathestos_apasxolhshs: '0' } },
     { isResidual: false },
     { upstream: { ...base.upstream, stage1_effective_fingerprint: 'c'.repeat(64) } },
-    { upstream: { ...base.upstream, stage1_version: 2 } }
+    { upstream: { ...base.upstream, stage1_version: 2 } },
+    { upstream: { ...base.upstream, stage2_version: 1 } },
+    { stage2: { ...base.stage2, resolved_dates: ['2026-06-02'] } }
 ]) {
     assert.notEqual(buildStage3InputFingerprint({ ...base, ...changed }).fingerprint, first);
 }

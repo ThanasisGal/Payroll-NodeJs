@@ -52,6 +52,11 @@ function unique(values = []) {
     return [...new Set(values.filter(Boolean))];
 }
 
+function stage3FingerprintResolvedDates(stage3 = {}) {
+    return unique(stage3.stage2_automatic_resolved_dates || []).map(dateKeyUtc)
+        .filter(Boolean).sort();
+}
+
 function stage2ProposalForScope(state = null, scope = {}) {
     const proposal = state?.current_proposal;
     const sameEmployee = String(proposal?.employee_kodikos || '') ===
@@ -234,6 +239,7 @@ function buildWeeklyHrLifecycleProjection({
     effectiveProfile = {},
     effectiveProfilesByDate = {},
     persistedStage1State = null,
+    persistedStage2State = null,
     persistedStage2DecisionState = null,
     stage2StateDiagnostic = null,
     persistedStage3State = null,
@@ -582,7 +588,8 @@ function buildWeeklyHrLifecycleProjection({
             isResidual: true, remaining_dates: remainingDates,
             stage2: { fingerprint: stage2Fingerprint, status: stage2.business_status,
                 resolution: stage2.stage2_applicability,
-                resolved_dates: stage2AutomaticResolvedDates },
+                resolved_dates: stage3FingerprintResolvedDates({
+                    stage2_automatic_resolved_dates: stage2AutomaticResolvedDates }) },
             upstream: { stage1_attestation_scope: periodSlice ? 'PERIOD_SLICE' : 'WEEKLY',
                 stage1_period_start: periodSlice?.period_start || '',
                 stage1_period_end: periodSlice?.period_end || '',
@@ -600,7 +607,7 @@ function buildWeeklyHrLifecycleProjection({
                 stage1_version: Number(periodSlice
                     ? persistedSlice?.version || 0 : persistedStage1State?.version || 0),
                 stage2_fingerprint: stage2Fingerprint,
-                stage2_version: 0 } };
+                stage2_version: Number(persistedStage2State?.version || 0) } };
         return Object.freeze({ row_id: String(row?._id || ''), date,
             employment_type: employmentType,
             employment_label: employmentType === '0' ? 'Πλήρης' : employmentType === '1'
@@ -737,6 +744,7 @@ module.exports = {
     BUSINESS_STATUS,
     PRESENTATION_STATUS,
     applySequentialPresentation,
+    stage3FingerprintResolvedDates,
     resolveStage3ActionableDates,
     resolveSafeNonFullNonWorkDates,
     buildStage1NoClassificationPreviewItems,

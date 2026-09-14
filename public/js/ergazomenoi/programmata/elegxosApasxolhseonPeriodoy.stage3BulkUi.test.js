@@ -32,6 +32,7 @@ function sandboxFor(items = [item()]) {
         weeklyHrStage3BulkSubmitting: false,
         currentEmploymentReviewLifecyclePresentation: { stages: { STAGE3: { pending_items: items } } },
         currentCanonicalLifecyclePayloads: [],
+        currentReviewRows: [{ employee_kodikos: '0007', employee_name: 'ΣΠΥΡΙΔΩΝΟΣ ΑΡΕΤΗ' }],
         weeklyHrLeaveCategories: [{ value: 'ΑΔΚΑΝ', label: 'ΑΔΚΑΝ - Κανονική άδεια' }],
         document: { getElementById: () => null, createElement: () => ({ innerHTML: '',
             firstElementChild: null }) },
@@ -40,6 +41,8 @@ function sandboxFor(items = [item()]) {
             ABSENCE: 'Απουσία', NON_WORK: 'Μη εργασία' })[value] || '',
         findStage3PendingItem: (rowId) => items.find((entry) => entry.row_id === rowId),
         stage3PayloadForItem: () => null,
+        buildStage3EmployeeNameLookup: (rows) => new Map(rows.map((row) =>
+            [row.employee_kodikos, row.employee_name])),
         escapeHtml: (value) => String(value ?? ''),
         formatStage1DateKey: (value) => String(value || '').split('-').reverse().join('/'),
         csrfToken: 'csrf-test',
@@ -116,12 +119,14 @@ async function invalidPreviewNeverApplies() {
         return { ok: true, json: async () => ({ success: true, can_apply: false,
             selected_count: 1, preview_fingerprint: '', items: [], invalid_items: [{ row_id: 'row-1',
                 employee_kodikos: '0007', decision_date: '2026-06-03',
-                message: 'Τα στοιχεία της ημέρας άλλαξαν. Κάντε νέα Αναζήτηση.' }] }) };
+                message: 'Κάντε νέα Αναζήτηση και δοκιμάστε ξανά.' }] }) };
     };
     await context.sandbox.bulk.preview();
     assert.equal(context.fetchCalls.length, 1);
-    assert.match(context.alerts[0].title, /Δεν μπορούν να εφαρμοστούν όλες/);
-    assert.match(context.alerts[0].html, /Τα στοιχεία της ημέρας άλλαξαν/);
+    assert.equal(context.alerts[0].title, 'Χρειάζεται ανανέωση πριν συνεχίσετε.');
+    assert.match(context.alerts[0].html, /ΣΠΥΡΙΔΩΝΟΣ ΑΡΕΤΗ — Κωδικός: 0007/);
+    assert.match(context.alerts[0].html, /Κάντε νέα Αναζήτηση και δοκιμάστε ξανά/);
+    assert.doesNotMatch(context.alerts[0].html, /Τα στοιχεία της ημέρας άλλαξαν/);
     assert.equal(context.sandbox.weeklyHrStage3BulkSelected.size, 1);
 }
 

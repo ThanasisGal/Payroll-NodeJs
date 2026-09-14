@@ -82,6 +82,8 @@ async function preview(contexts, input, options = {}) {
     assert.equal(staleResult.can_apply, false);
     assert.equal(staleResult.preview_fingerprint, '');
     assert.equal(staleResult.invalid_items[0].code, 'STAGE3_INPUT_CHANGED');
+    assert.equal(staleResult.invalid_items[0].message,
+        'Κάντε νέα Αναζήτηση και δοκιμάστε ξανά.');
 
     const decided = makeContext({ index: 3, residual: false });
     const contextOnly = makeContext({ index: 4, contextOnly: true });

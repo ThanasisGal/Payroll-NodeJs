@@ -171,7 +171,7 @@ function assertAuthoritativePreviewItem({ context, item, command }) {
         'Ο κοινός χαρακτηρισμός δεν επιτρέπεται για αυτή την εγγραφή.', 409);
     const currentFingerprint = buildStage3InputFingerprint(context).fingerprint;
     if (currentFingerprint !== item.expected_input_fingerprint) fail('STAGE3_INPUT_CHANGED',
-        'Τα στοιχεία της ημέρας άλλαξαν. Κάντε νέα Αναζήτηση.', 409);
+        'Κάντε νέα Αναζήτηση και δοκιμάστε ξανά.', 409);
     if (Number(context.upstream?.stage3_version || 0) !== item.expected_stage3_version) {
         fail('STAGE3_VERSION_CONFLICT',
             'Η έκδοση του Σταδίου 3 άλλαξε. Κάντε νέα Αναζήτηση.', 409);
