@@ -36,7 +36,7 @@ const focusSource = source.match(
     /function focusWeeklyHrStage1StaleAfterStage3Save\(\) \{[\s\S]*?\n}/
 )?.[0] || '';
 const selected = new Set(['hidden-open', 'stale-week']);
-const filters = { open: true, stale: true, completed: true, blocked: true,
+const filters = { employeeQuery: 'προηγούμενη αναζήτηση', status: 'ALL',
     leave: true, sickness: true, absence: true };
 let pruned = 0;
 let rendered = 0;
@@ -58,7 +58,7 @@ const focusSandbox = {
 vm.runInNewContext(`${focusSource}\nthis.focus = focusWeeklyHrStage1StaleAfterStage3Save;`,
     focusSandbox);
 assert.equal(focusSandbox.focus(), 1);
-assert.deepEqual(filters, { open: false, stale: true, completed: false, blocked: false,
+assert.deepEqual(filters, { employeeQuery: '', status: 'STALE',
     leave: false, sickness: false, absence: false });
 assert.equal(selected.size, 0);
 assert.equal(pruned, 1);
@@ -154,6 +154,8 @@ assert.match(sandbox.container.innerHTML, /Δεν προέκυψε πραγμα�
 assert.match(sandbox.container.innerHTML, /Η εβδομαδιαία ανάπαυση έχει ήδη καλυφθεί/);
 assert.match(sandbox.container.innerHTML,
     /Χρειάζεται τελικός χαρακτηρισμός από το HR: Άδεια, Ασθένεια, Απουσία/);
+assert.doesNotMatch(sandbox.container.innerHTML, /stage3-boundary-week-guidance/,
+    'μια κανονική εβδομάδα δεν εμφανίζει περιττή επεξήγηση άλλης περιόδου');
 assert.deepEqual(Array.from(sandbox.helpers.stage3DecisionExplanation({
     declared_hours: 8, actual_work_hours: 0,
     allowed_classifications: ['LEAVE', 'SICKNESS', 'ABSENCE'],
@@ -209,8 +211,16 @@ sandbox.helpers.renderWeeklyHrStage3({ stages: { STAGE3: { pending_items: [cross
 assert.equal((sandbox.container.innerHTML.match(/data-stage3-week-date=/g) || []).length, 7);
 assert.equal((sandbox.container.innerHTML.match(/Άλλη περίοδος — μόνο πλαίσιο/g) || []).length, 4);
 assert.equal((sandbox.container.innerHTML.match(/Τρέχουσα περίοδος — επιτρέπεται απόφαση/g) || []).length, 3);
+assert.equal((sandbox.container.innerHTML.match(/stage3-boundary-week-guidance/g) || []).length, 1,
+    'η επεξήγηση εμφανίζεται μία φορά ανά επηρεαζόμενη εβδομάδα');
+assert.match(sandbox.container.innerHTML,
+    /Η εβδομάδα περιλαμβάνει ημέρες από άλλη περίοδο\./);
+assert.match(sandbox.container.innerHTML,
+    /Οι ημέρες αυτές εμφανίζονται μόνο για πλαίσιο και δεν αλλάζουν από εδώ\./);
 assert.equal((sandbox.container.innerHTML.match(/weekly-hr-stage3-classification/g) || []).length, 1,
     'οι ημέρες πλαισίου δεν αποκτούν χειριστήριο απόφασης');
+assert.doesNotMatch(sandbox.container.innerHTML,
+    /context_only|authoritative_date_set|boundary ownership|period scope|source period|lifecycle scope/);
 assert.doesNotMatch(sandbox.container.innerHTML, /<img|<script/);
 assert.match(sandbox.container.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/);
 assert.match(source, /Απόκρυψη όλης της εβδομάδας/);

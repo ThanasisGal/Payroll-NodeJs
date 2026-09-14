@@ -10278,6 +10278,14 @@ function renderStage3DecisionItem(group, item) {
             data-row-id="${escapeHtml(item.row_id)}">Προεπισκόπηση απόφασης</button></td></tr>`;
 }
 
+function stage3BoundaryWeekGuidance(group = {}) {
+    const contextDates = group.payload?.employment_date_scope?.context_only_dates || [];
+    if (!contextDates.length) return '';
+    return '<div class="small text-muted border-start border-3 ps-2 mb-2 stage3-boundary-week-guidance">' +
+        'Η εβδομάδα περιλαμβάνει ημέρες από άλλη περίοδο. ' +
+        'Οι ημέρες αυτές εμφανίζονται μόνο για πλαίσιο και δεν αλλάζουν από εδώ.</div>';
+}
+
 function renderWeeklyHrStage3(lifecycle) {
     const container = document.getElementById('weeklyHrStage3Container');
     if (!container) return;
@@ -10302,6 +10310,7 @@ function renderWeeklyHrStage3(lifecycle) {
                         formatStage1DateKey(group.scope.week_end))} · <span class="badge text-bg-warning">${escapeHtml(
                             group.pending_items.length)} προς απόφαση</span></div>
                 </div>
+                ${stage3BoundaryWeekGuidance(group)}
                 <div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
                     <thead><tr><th>Ημερομηνία</th><th>Ημέρα</th><th>Καθεστώς ημέρας</th>
                         <th>Προδηλωμένο ωράριο</th><th>Πραγματική εργασία / κάρτες</th><th>Αιτία</th>

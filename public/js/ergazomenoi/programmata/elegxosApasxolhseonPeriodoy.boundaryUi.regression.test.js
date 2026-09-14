@@ -252,8 +252,12 @@ assert.match(source, /authoritative_date_set \|\| \[\]/);
 assert.match(source, /Τρέχουσα περίοδος — επιτρέπεται απόφαση/);
 assert.match(source, /context_only_dates \|\| \[\]/);
 assert.match(source, /Άλλη περίοδος — μόνο πλαίσιο/);
+assert.match(source, /Η εβδομάδα περιλαμβάνει ημέρες από άλλη περίοδο\./);
+assert.match(source, /Οι ημέρες αυτές εμφανίζονται μόνο για πλαίσιο και δεν αλλάζουν από εδώ\./);
+assert.match(source,
+    /function stage3BoundaryWeekGuidance[\s\S]*?context_only_dates \|\| \[\][\s\S]*?if \(!contextDates\.length\) return '';/);
 const stage3DecisionSection = source.slice(source.indexOf('function renderStage3DecisionItem('),
-    source.indexOf('function renderWeeklyHrStage3('));
+    source.indexOf('function stage3BoundaryWeekGuidance('));
 assert.doesNotMatch(stage3DecisionSection, /context_only_dates|period_start|period_end/,
     'οι πληροφοριακές ημέρες δεν αποκτούν ξεχωριστή διαδρομή απόφασης');
 
