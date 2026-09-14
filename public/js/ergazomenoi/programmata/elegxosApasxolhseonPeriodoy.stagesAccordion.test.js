@@ -225,6 +225,18 @@ assert.match(stage4Progress, /is-waiting/);
 assert.doesNotMatch(stage4Progress, /is-blocked|Χρειάζεται διόρθωση/);
 assert.match(stage4Progress,
     /Αναμονή ολοκλήρωσης του Σταδίου 3 — Υπόλοιπες Άδειες/);
+const workflowPresentationSource = source.slice(
+    source.indexOf('function updateEmploymentReviewWorkflowPresentation'),
+    source.indexOf('function renderWeeklyHrStage1BulkToolbar')
+);
+assert.match(workflowPresentationSource,
+    /stage\.stage === 'STAGE4' \? 'ΑΝΑΜΟΝΗ'/);
+assert.match(workflowPresentationSource,
+    /previewNotice\?\.classList\.toggle\('d-none', presentationStatus !== 'LOCKED'\)/);
+assert.doesNotMatch(workflowPresentationSource,
+    /presentationStatus === 'ACTIVE'[\s\S]{0,120}employmentReviewStage4PreviewNotice/);
+assert.equal(mayStage3Lifecycle.stages.STAGE4.presentation_status, 'LOCKED');
+assert.equal(completedLifecycle.stages.STAGE4.presentation_status, 'COMPLETED');
 
 guideSandbox.currentWeeklyHrStage2BulkPreview = {
     safe_bulk_count: 19, manual_exception_count: 0, already_resolved_count: 66

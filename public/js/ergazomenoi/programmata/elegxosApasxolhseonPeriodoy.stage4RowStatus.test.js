@@ -85,6 +85,15 @@ const workflowPresentation = source.slice(source.indexOf('function updateEmploym
     source.indexOf('function renderWeeklyHrStage1BulkToolbar'));
 assert.match(workflowPresentation, /presentationStatus === 'LOCKED' && stage\.stage !== 'STAGE4'/);
 assert.match(workflowPresentation, /employmentReviewStage4PreviewNotice/);
-assert.match(view, /Προσωρινή προεπισκόπηση — το Στάδιο 4 μπορεί να ελεγχθεί, αλλά δεν μπορεί ακόμη να ολοκληρωθεί\./);
+assert.match(workflowPresentation,
+    /stage\.presentation_status === 'LOCKED'[\s\S]*?stage\.stage === 'STAGE4' \? 'ΑΝΑΜΟΝΗ'/);
+assert.match(workflowPresentation,
+    /previewNotice\?\.classList\.toggle\('d-none', presentationStatus !== 'LOCKED'\)/);
+assert.match(view, /Προεπισκόπηση — μόνο για ενημέρωση\./);
+assert.match(view,
+    /Ο Τελικός Έλεγχος θα είναι διαθέσιμος μόλις ολοκληρωθεί το προηγούμενο στάδιο\./);
+assert.doesNotMatch(view, /Προσωρινή προεπισκόπηση/);
+assert.doesNotMatch(view.match(
+    /id="employmentReviewStage4PreviewNotice"[\s\S]*?<\/div>/)?.[0] || '', /LOCKED|STAGE4/);
 
 console.log('Stage 4 per-row blocked status presentation tests passed');

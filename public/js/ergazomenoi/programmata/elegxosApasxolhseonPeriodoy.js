@@ -10632,7 +10632,7 @@ function updateEmploymentReviewWorkflowPresentation() {
         const badgeLabel = stage.user_action_required === true
             ? 'ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ'
             : stage.presentation_status === 'LOCKED'
-                ? employmentReviewWaitingReason(stage.stage)
+                ? stage.stage === 'STAGE4' ? 'ΑΝΑΜΟΝΗ' : employmentReviewWaitingReason(stage.stage)
                 : workflowStageStatusLabels[badgeStatus];
         const badge = noHrAction
             ? '<span class="badge text-bg-success ms-2">' +
