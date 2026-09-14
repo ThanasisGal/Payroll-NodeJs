@@ -181,7 +181,8 @@ const guideSandbox = {
 vm.runInNewContext(`${source.slice(guideStart, guideEnd)}
 this.renderGuide = renderEmploymentReviewWorkflowGuide;
 this.attention = employmentReviewAttentionPresentation;
-this.focusStage = focusEmploymentReviewStage;`, guideSandbox);
+this.focusStage = focusEmploymentReviewStage;
+this.syncAccordion = syncEmploymentReviewStageAccordionState;`, guideSandbox);
 guideSandbox.renderGuide(stage3AfterStage2);
 assert.match(progressElement.innerHTML, /1\. Άδειες/);
 assert.match(progressElement.innerHTML, /2\. Μεταφορά Ρεπό/);
@@ -240,6 +241,50 @@ guideSandbox.renderGuide(blockedLifecycle);
 assert.match(progressElement.innerHTML, /is-blocked/);
 assert.match(progressElement.innerHTML, /Χρειάζεται διόρθωση/);
 assert.match(attentionElement.innerHTML, /Διορθώστε τα στοιχεία του τρέχοντος σταδίου/);
+
+const accordionCalls = Object.fromEntries(['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4']
+    .map((stageKey) => [stageKey, { show: 0, hide: 0 }]));
+const collapseByStage = Object.fromEntries(Object.keys(accordionCalls)
+    .map((stageKey) => [stageKey, { stageKey }]));
+guideSandbox.document.querySelector = (selector) => collapseByStage[
+    Object.keys(collapseByStage).find((stageKey) => selector.includes(stageKey))
+] || null;
+guideSandbox.bootstrap.Collapse.getOrCreateInstance = (collapse, options) => {
+    assert.equal(options.toggle, false);
+    return { show() { accordionCalls[collapse.stageKey].show += 1; },
+        hide() { accordionCalls[collapse.stageKey].hide += 1; } };
+};
+const syncLifecycle = { stages: {
+    STAGE1: { stage: 'STAGE1', business_status: 'COMPLETED', open_by_default: false },
+    STAGE2: { stage: 'STAGE2', business_status: 'COMPLETED', open_by_default: false },
+    STAGE3: { stage: 'STAGE3', business_status: 'OPEN', presentation_status: 'ACTIVE',
+        open_by_default: true },
+    STAGE4: { stage: 'STAGE4', business_status: 'BLOCKED', presentation_status: 'LOCKED',
+        open_by_default: false }
+} };
+guideSandbox.syncAccordion(syncLifecycle);
+assert.deepEqual(accordionCalls.STAGE1, { show: 0, hide: 1 });
+assert.deepEqual(accordionCalls.STAGE2, { show: 0, hide: 1 });
+assert.deepEqual(accordionCalls.STAGE3, { show: 1, hide: 0 });
+assert.deepEqual(accordionCalls.STAGE4, { show: 0, hide: 1 });
+
+Object.values(accordionCalls).forEach((calls) => { calls.show = 0; calls.hide = 0; });
+syncLifecycle.stages.STAGE2 = { stage: 'STAGE2', business_status: 'BLOCKED',
+    presentation_status: 'ACTIVE', open_by_default: true };
+syncLifecycle.stages.STAGE3.open_by_default = false;
+guideSandbox.syncAccordion(syncLifecycle);
+assert.equal(accordionCalls.STAGE2.show, 1, 'το τρέχον blocker ανοίγει');
+assert.equal(accordionCalls.STAGE3.hide, 1);
+
+Object.values(accordionCalls).forEach((calls) => { calls.show = 0; calls.hide = 0; });
+guideSandbox.syncAccordion(completedLifecycle);
+assert.equal(Object.values(accordionCalls).reduce((sum, calls) => sum + calls.show, 0), 0,
+    'ολοκληρωμένο lifecycle δεν ανοίγει αυθαίρετο στάδιο');
+assert.equal(Object.values(accordionCalls).reduce((sum, calls) => sum + calls.hide, 0), 4);
+const syncSource = source.slice(source.indexOf('function syncEmploymentReviewStageAccordionState'),
+    source.indexOf('function renderEmploymentReviewWorkflowGuide'));
+assert.doesNotMatch(syncSource, /fetch|submit|scrollIntoView|\.focus\s*\(/);
+assert.match(syncSource, /bootstrap\.Collapse\.getOrCreateInstance/);
 
 let shown = 0;
 let focused = 0;

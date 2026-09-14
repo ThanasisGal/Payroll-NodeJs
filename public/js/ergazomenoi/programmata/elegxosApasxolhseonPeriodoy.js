@@ -10519,6 +10519,18 @@ function focusEmploymentReviewStage(stageKey) {
     return true;
 }
 
+function syncEmploymentReviewStageAccordionState(lifecycle = {}) {
+    Object.values(lifecycle.stages || {}).forEach((stage) => {
+        const collapse = document.querySelector(
+            `[data-workflow-stage="${CSS.escape(String(stage.stage))}"] .accordion-collapse`
+        );
+        if (!collapse) return;
+        const instance = bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false });
+        if (stage.open_by_default === true) instance.show();
+        else instance.hide();
+    });
+}
+
 function renderEmploymentReviewWorkflowGuide(lifecycle = {}) {
     const progress = document.getElementById('employmentReviewWorkflowProgress');
     const attention = document.getElementById('employmentReviewAttentionSummary');
@@ -10606,9 +10618,6 @@ function updateEmploymentReviewWorkflowPresentation() {
         const stageViewLocked = presentationStatus === 'LOCKED' && stage.stage !== 'STAGE4';
         button.disabled = stageViewLocked;
         button.setAttribute('aria-disabled', stageViewLocked ? 'true' : 'false');
-        if (stageViewLocked) {
-            bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false }).hide();
-        }
         if (stage.stage === 'STAGE4') {
             const previewNotice = document.getElementById('employmentReviewStage4PreviewNotice');
             previewNotice?.classList.toggle('d-none', presentationStatus !== 'LOCKED');
@@ -10616,6 +10625,7 @@ function updateEmploymentReviewWorkflowPresentation() {
     });
     renderWeeklyHrStage2LifecycleFallback(lifecycle);
     renderWeeklyHrStage3(lifecycle);
+    syncEmploymentReviewStageAccordionState(lifecycle);
     return lifecycle;
 }
 
