@@ -158,9 +158,9 @@ assert.match(sandbox.container.innerHTML, /stage3-decision-reason/);
 assert.match(sandbox.container.innerHTML, /stage3-decision-classification/);
 assert.match(sandbox.container.innerHTML, /stage3-decision-action/);
 assert.match(css, /\.weekly-hr-stage3-decisions-table\s*\{[^}]*min-width:\s*82rem[^}]*table-layout:\s*fixed/s);
-assert.match(css, /\.stage3-col-reason\s*\{\s*width:\s*24%/);
+assert.match(css, /\.stage3-col-reason\s*\{\s*width:\s*22%/);
 assert.match(css, /\.stage3-col-classification\s*\{\s*width:\s*17%/);
-assert.match(css, /\.stage3-col-action\s*\{\s*width:\s*11%/);
+assert.match(css, /\.stage3-col-action\s*\{\s*width:\s*13%/);
 assert.match(css,
     /\.stage3-decision-classification \.form-select,[^}]*\.stage3-decision-action \.weekly-hr-stage3-resolve\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0/s);
 assert.match(sandbox.container.innerHTML, /Υπήρχε προδηλωμένη εργασία 8,00 ωρών/);

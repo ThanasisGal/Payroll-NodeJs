@@ -15647,9 +15647,9 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage3-decisions-table .stage3-col-day-status { width: 10%; }
 .weekly-hr-stage3-decisions-table .stage3-col-declared { width: 12%; }
 .weekly-hr-stage3-decisions-table .stage3-col-actual { width: 12%; }
-.weekly-hr-stage3-decisions-table .stage3-col-reason { width: 24%; }
+.weekly-hr-stage3-decisions-table .stage3-col-reason { width: 22%; }
 .weekly-hr-stage3-decisions-table .stage3-col-classification { width: 17%; }
-.weekly-hr-stage3-decisions-table .stage3-col-action { width: 11%; }
+.weekly-hr-stage3-decisions-table .stage3-col-action { width: 13%; }
 
 .weekly-hr-stage3-decisions-table th,
 .weekly-hr-stage3-decisions-table td {
