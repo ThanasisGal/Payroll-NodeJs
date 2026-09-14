@@ -367,6 +367,85 @@ async function verifyStage3PreviewContract() {
     assert.equal(body.request_id, 'stage3-ui:uuid');
 }
 
-verifyStage3PreviewContract().then(() => {
+async function verifyStage3LeaveCategoriesWithoutStage1() {
+    let categoryFetches = 0;
+    const categorySandbox = {
+        weeklyHrLeaveCategories: [], csrfToken: 'csrf',
+        escapeHtml: (value) => String(value ?? '').replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;'),
+        fetch: async (url, options) => {
+            categoryFetches += 1;
+            assert.equal(url, '/api/dropdown/ergazomenoi/kathgoria_adeias');
+            assert.equal(options.headers['CSRF-Token'], 'csrf');
+            return { json: async () => [
+                { value: 'ΑΔΚΑΝ', label: 'ΑΔΚΑΝ - Κανονική άδεια' },
+                { value: 'ΑΔΑΣ', label: 'ΑΔΑΣ - Ασθένεια' },
+                { value: 'POSSIBLE_LEAVE', label: 'ΠΙΘΑΝΗ ΑΔΕΙΑ' }
+            ] };
+        }
+    };
+    vm.runInNewContext(`${extractFunction('isHrSelectableLeaveCategoryOption')};
+        ${extractFunction('formatStage1LeaveCategoryLabel')};
+        ${extractFunction('stage1LeaveCategoryOptions')};
+        ${extractFunction('loadWeeklyHrLeaveCategories')};
+        ${extractFunction('updateStage3LeaveCategoryVisibility')};
+        this.loadCategories = loadWeeklyHrLeaveCategories;
+        this.categoryOptions = stage1LeaveCategoryOptions;
+        this.updateVisibility = updateStage3LeaveCategoryVisibility;`, categorySandbox);
+
+    assert.equal((categorySandbox.categoryOptions('').match(/<option/g) || []).length, 1,
+        'πριν φορτωθεί η κοινή πηγή υπάρχει μόνο το placeholder');
+    await categorySandbox.loadCategories();
+    const options = categorySandbox.categoryOptions('');
+    assert.match(options, /value="ΑΔΚΑΝ"/);
+    assert.match(options, /value="ΑΔΑΣ"/);
+    assert.doesNotMatch(options, /POSSIBLE_LEAVE|ΠΙΘΑΝΗ ΑΔΕΙΑ/);
+    assert.equal((options.match(/<option/g) || []).length, 3);
+    await categorySandbox.loadCategories();
+    assert.equal(categoryFetches, 1, 'η κοινή λίστα επαναχρησιμοποιείται χωρίς δεύτερο αίτημα');
+
+    const makeRow = (selectedValue) => {
+        const classes = new Set(['d-none']);
+        const category = { value: selectedValue, classList: {
+            toggle(name, force) { if (force) classes.add(name); else classes.delete(name); },
+            contains(name) { return classes.has(name); }
+        } };
+        const row = { querySelector: () => category };
+        const classification = { value: 'LEAVE', closest: () => row };
+        return { category, classification };
+    };
+    const first = makeRow('ΑΔΚΑΝ');
+    const second = makeRow('ΑΔΑΣ');
+    categorySandbox.updateVisibility(first.classification);
+    categorySandbox.updateVisibility(second.classification);
+    assert.equal(first.category.classList.contains('d-none'), false);
+    assert.equal(second.category.classList.contains('d-none'), false);
+    assert.equal(first.category.value, 'ΑΔΚΑΝ');
+    assert.equal(second.category.value, 'ΑΔΑΣ');
+    first.classification.value = 'ABSENCE';
+    categorySandbox.updateVisibility(first.classification);
+    assert.equal(first.category.classList.contains('d-none'), true);
+    assert.equal(first.category.value, 'ΑΔΚΑΝ',
+        'διατηρείται η υπάρχουσα συμπεριφορά χωρίς κοινή κατάσταση επιλογής');
+    first.classification.value = 'LEAVE';
+    categorySandbox.updateVisibility(first.classification);
+    assert.equal(first.category.classList.contains('d-none'), false);
+    assert.match(categorySandbox.categoryOptions(first.category.value),
+        /value="ΑΔΚΑΝ" selected/);
+
+    const loadResultsStart = source.indexOf('async function loadResults(');
+    const loadResultsSource = source.slice(loadResultsStart,
+        source.indexOf('function pairNo(', loadResultsStart));
+    const categoryLoadAt = loadResultsSource.indexOf('await loadWeeklyHrLeaveCategories()');
+    assert.ok(categoryLoadAt >= 0);
+    assert.ok(categoryLoadAt < loadResultsSource.lastIndexOf(
+        'updateEmploymentReviewWorkflowPresentation();'),
+    'η κοινή λίστα φορτώνεται πριν αποδοθεί το Stage 3, χωρίς να ανοιχτεί το Stage 1');
+    assert.doesNotMatch(extractFunction('updateStage3LeaveCategoryVisibility'),
+        /fetch|submit|POST|loadPreparedWeeklyHrStage1/);
+}
+
+Promise.all([verifyStage3PreviewContract(), verifyStage3LeaveCategoriesWithoutStage1()]).then(() => {
     console.log('Stage-3 weekly decision context and actionable UI contracts passed');
 });

@@ -10048,6 +10048,14 @@ function stage3ClassificationOptions(item) {
         .map((value) => `<option value="${value}">${labels[value]}</option>`).join('');
 }
 
+function updateStage3LeaveCategoryVisibility(classificationSelect) {
+    const stage3Row = classificationSelect?.closest('[data-stage3-row-id]');
+    const leaveCategorySelect = stage3Row?.querySelector('.weekly-hr-stage3-leave-category');
+    if (!leaveCategorySelect) return null;
+    leaveCategorySelect.classList.toggle('d-none', classificationSelect.value !== 'LEAVE');
+    return leaveCategorySelect;
+}
+
 function stage3DecisionClassificationLabel(value) {
     return { LEAVE: 'Άδεια', SICKNESS: 'Ασθένεια', ABSENCE: 'Απουσία',
         NON_WORK: 'Μη εργασία', ΑΔΕΙΑ: 'Άδεια', ΑΣΘΕΝΕΙΑ: 'Ασθένεια',
@@ -11255,9 +11263,7 @@ document.addEventListener('change', (event) => {
     }
     const stage3Classification = event.target.closest('.weekly-hr-stage3-classification');
     if (stage3Classification) {
-        const stage3Row = stage3Classification.closest('[data-stage3-row-id]');
-        stage3Row?.querySelector('.weekly-hr-stage3-leave-category')?.classList.toggle(
-            'd-none', stage3Classification.value !== 'LEAVE');
+        updateStage3LeaveCategoryVisibility(stage3Classification);
         return;
     }
     const dayCheckbox = event.target.closest('.weekly-hr-stage1-day-select');
@@ -11378,6 +11384,8 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         currentCanonicalLifecyclePayloads = Array.isArray(
             payload.canonicalLifecycleProjections
         ) ? payload.canonicalLifecycleProjections : [];
+        await loadWeeklyHrLeaveCategories().catch((error) =>
+            console.warn('[weeklyHrLeaveCategories]', error));
         currentWeeklyHrStage2BulkPreview = payload.stage2BulkPreview || null;
         currentEmploymentReviewBoundaryContextPreflight = payload.finalized === true
             ? { disabled: true } : payload.boundaryContextPreflight || null;
