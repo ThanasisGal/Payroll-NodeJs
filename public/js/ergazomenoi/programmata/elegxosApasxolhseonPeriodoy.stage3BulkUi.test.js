@@ -159,6 +159,13 @@ Promise.all([validApplyAndSingleRefresh(), invalidPreviewNeverApplies(),
     uncertainNetworkRetriesFrozenCommand()]).then(() => {
     assert.match(source, /weekly-hr-stage3-bulk-select/);
     assert.match(source, /Επιλογή όλων των ορατών/);
+    assert.match(source, /btn btn-brown rounded-4 buttons-content weekly-hr-stage3-select-visible/);
+    assert.match(source, /bi bi-check2-all/);
+    assert.match(source, /btn btn-brown rounded-4 buttons-content weekly-hr-stage3-clear-selection/);
+    assert.match(source, /bi bi-eraser/);
+    const toolbarSource = source.slice(source.indexOf('function renderWeeklyHrStage3BulkToolbar'),
+        source.indexOf('function updateWeeklyHrStage3BulkToolbar'));
+    assert.doesNotMatch(toolbarSource, /btn-outline-secondary/);
     assert.match(source, /weeklyHrStage3BulkAllowedClassifications/);
     assert.match(source, /stage3\/bulk-preview/);
     assert.match(source, /stage3\/bulk-apply/);

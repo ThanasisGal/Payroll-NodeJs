@@ -10431,8 +10431,8 @@ function renderWeeklyHrStage3BulkToolbar() {
     return `<div class="weekly-hr-stage3-bulk-toolbar border rounded bg-light px-2 py-2 mb-2">
         <div class="d-flex flex-wrap align-items-end gap-2">
             <div class="btn-group btn-group-sm" role="group" aria-label="Επιλογή εγγραφών Σταδίου 3">
-                <button type="button" class="btn btn-outline-secondary weekly-hr-stage3-select-visible">Επιλογή όλων των ορατών</button>
-                <button type="button" class="btn btn-outline-secondary weekly-hr-stage3-clear-selection">Αποεπιλογή όλων</button>
+                <button type="button" class="btn btn-brown rounded-4 buttons-content weekly-hr-stage3-select-visible"><i class="bi bi-check2-all"></i> Επιλογή όλων των ορατών</button>
+                <button type="button" class="btn btn-brown rounded-4 buttons-content weekly-hr-stage3-clear-selection"><i class="bi bi-eraser"></i> Αποεπιλογή όλων</button>
             </div>
             <div class="small fw-semibold weekly-hr-stage3-selected-count" aria-live="polite">Επιλεγμένες: ${selectedCount}</div>
             <div class="weekly-hr-stage3-bulk-field"><label class="form-label small mb-1" for="weeklyHrStage3BulkClassification">Τελικός χαρακτηρισμός</label>
