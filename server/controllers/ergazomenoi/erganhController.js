@@ -3735,6 +3735,11 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
         effective_hourly_rate: effectiveProfile.pragmatikoOromisthio ?? null,
         effective_profile_source: reviewPhaseCode ? 'SCHEDULE_PHASE' :
             effectiveProfile.resolution_source || effectiveProfile.source || '',
+        effective_daily_employment_source:
+            effectiveProfile.daily_employment_snapshot_source || '',
+        effective_daily_employment_effective_from:
+            effectiveProfile.hmeromhnia_isxyos_oron_ergasias_apo ||
+            effectiveProfile.hmeromhnia_allaghs_orarioy_apo || null,
         effective_profile_resolution_blocked: effectiveProfile.resolution_blocked === true,
         effective_profile_resolution_reason: effectiveProfile.resolution_reason || '',
         effective_profile_company_id: effectiveProfile.profile_company_id || null,
@@ -3757,6 +3762,9 @@ function weeklyHrStage2LifecycleProfileFromRow(row = {}) {
         eidikh_periptosh: row.effective_special_case,
         source: row.effective_profile_source,
         resolution_source: row.effective_profile_source,
+        daily_employment_snapshot_source: row.effective_daily_employment_source || '',
+        hmeromhnia_isxyos_oron_ergasias_apo:
+            row.effective_daily_employment_effective_from || null,
         resolution_blocked: row.effective_profile_resolution_blocked === true,
         resolution_reason: row.effective_profile_resolution_reason || '',
         profile_company_id: row.effective_profile_company_id || null,
@@ -4825,12 +4833,15 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             rows, workflowState: state,
             stage2StateDiagnostic: 'STAGE2_INPUT_CHANGED' };
         const employeeHistory = historyByCode.get(employeeCode) || [];
-        const resolvedProfilesByDate = Object.fromEntries(rows.map((row) => [
-            dateKeyUtc(row.hmeromhnia), resolveEffectiveEmploymentProfileForReviewDate({
-                reviewDate: row.hmeromhnia, normalEmployee: employee,
-                normalHistory: employeeHistory,
+        const resolveProfileForDate = (reviewDate) =>
+            resolveEffectiveEmploymentProfileForReviewDate({
+                reviewDate, normalEmployee: employee, normalHistory: employeeHistory,
                 borrowedContext: borrowedContexts.get(
-                    borrowedProfileEmployeeKey(employee)) || null }) ]));
+                    borrowedProfileEmployeeKey(employee)) || null });
+        const resolvedProfilesByDate = Object.fromEntries(rows.map((row) => [
+            dateKeyUtc(row.hmeromhnia), getDailyRepoProfileInfo({ row,
+                istorikoRows: employeeHistory, ergazomenos: employee,
+                resolveProfileForDate }).profile ]));
         rows = rows.map((row) => {
             const profile = resolvedProfilesByDate[dateKeyUtc(row.hmeromhnia)] || {};
             const preparedRow = prepareWeeklyHrStage2LifecycleRow({ row, effectiveProfile: profile,
@@ -18774,6 +18785,14 @@ Object.defineProperty(erganhController, '__employmentReviewReportTestHooks', {
 
 Object.defineProperty(erganhController, '__weeklyHrStage2BulkStreamTestHooks', {
     value: Object.freeze({ createWeeklyHrStage2BulkResponseStream }),
+    enumerable: false
+});
+
+Object.defineProperty(erganhController, '__stage3DailyEmploymentProfileTestHooks', {
+    value: Object.freeze({
+        prepareWeeklyHrStage2LifecycleRow,
+        weeklyHrStage2LifecycleProfileFromRow
+    }),
     enumerable: false
 });
 
