@@ -375,6 +375,14 @@ function testControllerImportsSharedProfileDateHelper() {
         path.join(__dirname, '..', '..', 'controllers', 'ergazomenoi', 'erganhController.js'),
         'utf8'
     );
+    const section = (startMarker, endMarker, label) => {
+        const start = controllerSource.indexOf(startMarker);
+        const end = controllerSource.indexOf(endMarker, start);
+        assert.notEqual(start, -1, `${label} start boundary must exist`);
+        assert.notEqual(end, -1, `${label} end boundary must exist`);
+        assert.ok(end > start, `${label} end boundary must follow its start boundary`);
+        return controllerSource.slice(start, end);
+    };
     const importStart = controllerSource.indexOf('const {\n    ATOMIC_REPO_TRANSFER_ROW_FIELDS');
     const importEnd = controllerSource.indexOf(
         "} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');",
@@ -384,11 +392,32 @@ function testControllerImportsSharedProfileDateHelper() {
 
     assert.ok(importStart >= 0 && importEnd > importStart);
     assert.ok(sharedImport.includes('getProfileDateForDeviation'));
-    assert.strictEqual(
-        (controllerSource.match(/getProfileDateForDeviation\s*\(/g) || []).length,
-        3
-    );
     assert.doesNotMatch(controllerSource, /function\s+getProfileDateForDeviation\s*\(/);
+
+    const sharedPreparation = section(
+        'function prepareWeeklyHrStage2LifecycleRow(',
+        'function weeklyHrStage2LifecycleProfileFromRow(',
+        'shared Stage2 lifecycle preparation'
+    );
+    assert.match(sharedPreparation,
+        /effective_profile_date:\s*getProfileDateForDeviation\s*\(/);
+
+    const preparationPaths = [
+        section('async function loadWeeklyHrStage2BatchPreparedContexts(',
+            'async function loadWeeklyHrStage2BulkPreparedContexts(',
+            'targeted Stage2 batch preparation'),
+        section('async function getReviewRowsForExport(',
+            'async function buildEmploymentReviewReportForRequest(',
+            'review export preparation'),
+        section('    static getProdhlomenaOrariaForReview = async (req, res) => {',
+            '    static getProdhlomenaOrariaOrphanQualityCheck = async (req, res) => {',
+            'employment review loading')
+    ];
+    preparationPaths.forEach((pathSource) => {
+        assert.match(pathSource, /prepareWeeklyHrStage2LifecycleRow\s*\(/);
+        assert.doesNotMatch(pathSource,
+            /effective_profile_date:\s*getProfileDateForDeviation\s*\(/);
+    });
 }
 
 function queryResult(value) {
