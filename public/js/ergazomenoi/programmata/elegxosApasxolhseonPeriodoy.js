@@ -8274,7 +8274,7 @@ async function submitFinalWTODayilyA() {
         text: `Πρωτόκολλο: ${payload.protocol || '-'}` });
 }
 
-async function loadEmploymentPeriodControl(ypokatasthma) {
+async function loadEmploymentPeriodControl(ypokatasthma, { render = true } = {}) {
     const scope = getActiveEmploymentReviewScope();
     const requestedBranch = String(ypokatasthma || '').trim();
     if (requestedBranch && requestedBranch !== scope.ypokatasthma) {
@@ -8285,7 +8285,7 @@ async function loadEmploymentPeriodControl(ypokatasthma) {
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Δεν ήταν δυνατή η ανάκτηση της κατάστασης περιόδου.');
-    renderEmploymentPeriodControl(payload);
+    if (render) renderEmploymentPeriodControl(payload);
     return payload;
 }
 
@@ -11235,15 +11235,6 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         branchValidation?.classList.toggle('d-none', !invalidBranch);
         if (invalidBranch) return false;
 
-        const periodControl = await loadEmploymentPeriodControl(advancedBranch);
-        const hasAuthoritativeResult = hasAuthoritativeEmploymentCalculation(periodControl);
-
-        currentAtomicRepoTransferProjection = null;
-        currentPolicyPreviewRowsById = new Map();
-        currentPreCalculationDataIssueGroups = [];
-        if (hasAuthoritativeResult) renderPolicyPreviewGroups(null, { loading: true });
-        else document.getElementById('policyPreviewGroupsContainer')?.replaceChildren();
-
         const params = new URLSearchParams({
             apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
             eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
@@ -11253,14 +11244,27 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
             limit: 5000
         });
 
-        const response = await fetch(`/api/prodhlomena-oraria/review?${params.toString()}`, {
+        renderEmploymentPeriodControl(null);
+        const periodControlPromise = loadEmploymentPeriodControl(advancedBranch, { render: false });
+        const reviewResponsePromise = fetch(`/api/prodhlomena-oraria/review?${params.toString()}`, {
             method: 'GET',
             headers: {
                 'CSRF-Token': csrfToken
             }
-        });
+        }).then(async (response) => ({ response, payload: await response.json() }));
+        const [periodControl, reviewResult] = await Promise.all([
+            periodControlPromise,
+            reviewResponsePromise
+        ]);
+        const { response, payload } = reviewResult;
+        renderEmploymentPeriodControl(periodControl);
+        const hasAuthoritativeResult = hasAuthoritativeEmploymentCalculation(periodControl);
 
-        const payload = await response.json();
+        currentAtomicRepoTransferProjection = null;
+        currentPolicyPreviewRowsById = new Map();
+        currentPreCalculationDataIssueGroups = [];
+        if (hasAuthoritativeResult) renderPolicyPreviewGroups(null, { loading: true });
+        else document.getElementById('policyPreviewGroupsContainer')?.replaceChildren();
 
         if (!payload.success) {
             renderPolicyPreviewGroups(null, {

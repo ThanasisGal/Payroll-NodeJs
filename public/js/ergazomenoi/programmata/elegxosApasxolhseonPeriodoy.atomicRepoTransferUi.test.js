@@ -2427,7 +2427,8 @@ function testSharedLifecyclePanelAndActiveWorkspaceScopeContract() {
     const simpleIndex = viewSource.indexOf('id="hrReviewWorkspace"');
     const advancedIndex = viewSource.indexOf('id="advancedReviewWorkspace"');
     assert.ok(panelIndex >= 0 && panelIndex < simpleIndex && panelIndex < advancedIndex);
-    assert.ok(source.includes('await loadEmploymentPeriodControl(advancedBranch)'));
+    assert.ok(source.includes(
+        'loadEmploymentPeriodControl(advancedBranch, { render: false })'));
     assert.ok(source.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ BASELINE'"));
     assert.ok(source.includes("state?.past_deadline ? 'ΕΚΠΡΟΘΕΣΜΗ' : 'ΕΝΤΟΣ ΠΡΟΘΕΣΜΙΑΣ'"));
     assert.ok(source.includes("actions.historical_reconstruct === true || actions.historical_reassess === true"));
