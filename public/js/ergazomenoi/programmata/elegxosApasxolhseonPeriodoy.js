@@ -2906,11 +2906,8 @@ function buildScenarioReviewParams(baseParams, page) {
 }
 
 async function fetchScenarioClassifications(baseParams) {
-    const scenarioRows = [];
     const maxPages = 50;
-    let totalPages = 1;
-
-    for (let page = 1; page <= totalPages && page <= maxPages; page += 1) {
+    const fetchPage = async (page) => {
         const params = buildScenarioReviewParams(baseParams, page);
         const response = await fetch(`/api/prodhlomena-oraria/review/scenarios?${params.toString()}`, {
             method: 'GET',
@@ -2924,24 +2921,24 @@ async function fetchScenarioClassifications(baseParams) {
         if (!payload.success) {
             throw new Error(payload.message || 'Αποτυχία ανάκτησης scenario classifications.');
         }
+        return payload;
+    };
 
-        scenarioRows.push(...(payload.rows || []));
-
-        const payloadTotalPages = Number(payload.totalPages || 0);
-        const payloadTotal = Number(payload.total || 0);
-        const payloadLimit = Number(payload.limit || 200);
-
-        totalPages =
-            payloadTotalPages > 0
-                ? payloadTotalPages
-                : payloadTotal > 0
-                  ? Math.ceil(payloadTotal / payloadLimit)
-                  : page;
-
-        if ((payload.rows || []).length === 0) break;
-    }
-
-    return scenarioRows;
+    const firstPage = await fetchPage(1);
+    const payloadTotalPages = Number(firstPage.totalPages || 0);
+    const payloadTotal = Number(firstPage.total || 0);
+    const payloadLimit = Number(firstPage.limit || 200);
+    if ((firstPage.rows || []).length === 0) return [];
+    const totalPages = Math.min(maxPages,
+        payloadTotalPages > 0
+            ? payloadTotalPages
+            : payloadTotal > 0
+              ? Math.ceil(payloadTotal / payloadLimit)
+              : 1);
+    const remainingPages = await Promise.all(
+        Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => fetchPage(index + 2))
+    );
+    return [firstPage, ...remainingPages].flatMap((payload) => payload.rows || []);
 }
 
 function buildScenarioClassificationsMap(scenarioRows = []) {
@@ -11299,9 +11296,22 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         currentWeeklyHrStage2BulkPreview = payload.stage2BulkPreview || null;
         currentEmploymentReviewBoundaryContextPreflight = payload.finalized === true
             ? { disabled: true } : payload.boundaryContextPreflight || null;
+        const shouldLoadWritableHelpers =
+            payload.finalized !== true && hasAuthoritativeResult;
+        const scenarioPromise = shouldLoadWritableHelpers
+            ? fetchScenarioClassifications(params)
+            : Promise.resolve([]);
+        const policyHelperPromises = shouldLoadWritableHelpers
+            ? {
+                grouping: fetchPolicyPreviewGrouping(params),
+                approvals: refreshPolicyPreviewApprovals(params),
+                dryRun: fetchPolicyPreviewApplyDryRun(params),
+                repoDecisions: refreshRepoTransferDecisions()
+            }
+            : null;
         if (payload.finalized !== true && hasAuthoritativeResult) {
             try {
-                const scenarioRows = await fetchScenarioClassifications(params);
+                const scenarioRows = await scenarioPromise;
                 const scenarioByProdhlomenaId = buildScenarioClassificationsMap(scenarioRows);
                 attachScenarioClassifications(rows, scenarioByProdhlomenaId);
             } catch (scenarioError) {
@@ -11358,10 +11368,12 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         }
 
         if (payload.finalized !== true) {
-        const [groupingResult, approvalsResult, dryRunResult] = await Promise.allSettled([
-            fetchPolicyPreviewGrouping(params),
-            refreshPolicyPreviewApprovals(params),
-            fetchPolicyPreviewApplyDryRun(params)
+        const [groupingResult, approvalsResult, dryRunResult, repoDecisionsResult] =
+            await Promise.allSettled([
+            policyHelperPromises.grouping,
+            policyHelperPromises.approvals,
+            policyHelperPromises.dryRun,
+            policyHelperPromises.repoDecisions
         ]);
 
         if (approvalsResult.status === 'rejected') {
@@ -11393,10 +11405,9 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         if (groupingResult.status === 'fulfilled') {
             attachPolicyPreviewResults(rows, groupingResult.value.previewRows);
             currentAtomicRepoTransferProjection = groupingResult.value.atomicGroupProjection || null;
-            try {
-                await refreshRepoTransferDecisions();
-            } catch (repoTransferDecisionsError) {
-                console.warn('[loadResults] Repo-transfer decisions unavailable:', repoTransferDecisionsError);
+            if (repoDecisionsResult.status === 'rejected') {
+                console.warn('[loadResults] Repo-transfer decisions unavailable:',
+                    repoDecisionsResult.reason);
                 currentRepoTransferDecisionsByProposalId = new Map();
             }
             renderCurrentReviewRows();

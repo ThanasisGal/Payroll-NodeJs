@@ -2841,8 +2841,10 @@ function testPreAndPostCalculationWorkflowGating() {
     assert.ok(loadResultsSource.includes(
         'if (payload.finalized !== true && hasAuthoritativeResult)'
     ));
-    assert.ok(loadResultsSource.indexOf('renderPreCalculationDataIssues(rows);') <
-        loadResultsSource.indexOf('fetchPolicyPreviewGrouping(params)'));
+    assert.match(loadResultsSource,
+        /const shouldLoadWritableHelpers\s*=\s*payload\.finalized !== true && hasAuthoritativeResult;/);
+    assert.match(loadResultsSource,
+        /const policyHelperPromises = shouldLoadWritableHelpers\s*\?\s*\{/);
 
     const provisionalState = {
         effective_mode: 'NORMAL',
