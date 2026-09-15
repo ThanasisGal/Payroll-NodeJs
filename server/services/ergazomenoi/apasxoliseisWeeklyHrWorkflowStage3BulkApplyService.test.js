@@ -8,9 +8,10 @@ const { buildWeeklyHrStage3BulkPreview } = require(
     './apasxoliseisWeeklyHrStage3BulkPreviewService'
 );
 const { applyWeeklyHrStage3Bulk, bulkCommandIdentity,
-    inspectStage3BulkIdempotency } = require(
+    bulkRequestPrefix, inspectStage3BulkIdempotency } = require(
     './apasxoliseisWeeklyHrWorkflowStage3BulkApplyService'
 );
+const WorkflowAuditModel = require('../../models/apasxoliseisWeeklyHrWorkflowAudit');
 
 const actor = { user_id: new mongoose.Types.ObjectId().toString(),
     user_name: 'HR User', role: 'HR' };
@@ -156,6 +157,41 @@ async function apply(command, h) {
     const sameWeekContexts = makeWeek({ dates: ['2026-06-03', '2026-06-04'] });
     const sameWeekItems = sameWeekContexts.map(item);
     const sameWeekCommand = await commandWithPreview(sameWeekContexts, sameWeekItems);
+    const previousSanitizeFilter = mongoose.get('sanitizeFilter');
+    try {
+        mongoose.set('sanitizeFilter', true);
+        const prefix = bulkRequestPrefix(sameWeekCommand.bulk_request_id);
+        assert.match(prefix, /^stage3-bulk:[a-f0-9]{16}:$/);
+        assert.equal(prefix, `stage3-bulk:${digest(sameWeekCommand.bulk_request_id).slice(0, 16)}:`);
+        const oldQuery = WorkflowAuditModel.find({ request_id: { $regex: `^${prefix}` } });
+        oldQuery._castConditions();
+        assert.equal(oldQuery.error()?.name, 'CastError');
+
+        const matchingId = `${prefix}${'a'.repeat(64)}`;
+        const otherPrefix = bulkRequestPrefix('stage3-bulk:different-request');
+        const otherId = `${otherPrefix}${'b'.repeat(64)}`;
+        const fixture = [{ request_id: otherId }];
+        const captured = [];
+        const auditModel = { find(filter) {
+            const query = WorkflowAuditModel.find(filter);
+            query.lean = async () => {
+                query._castConditions();
+                if (query.error()) throw query.error();
+                const condition = query.getFilter().request_id;
+                captured.push(condition);
+                return fixture.filter((audit) => new RegExp(condition.$regex).test(audit.request_id));
+            };
+            return query;
+        } };
+        const noPrior = await inspectStage3BulkIdempotency({ command: sameWeekCommand,
+            requestScope, actor, auditModel });
+        assert.equal(noPrior, null);
+        assert.deepEqual(captured[0].$regex, `^${prefix}`);
+        assert.equal(new RegExp(captured[0].$regex).test(matchingId), true);
+        assert.equal(new RegExp(captured[0].$regex).test(otherId), false);
+    } finally {
+        mongoose.set('sanitizeFilter', previousSanitizeFilter);
+    }
     const sameWeekHarness = harness(sameWeekContexts);
     const sameWeek = await apply(sameWeekCommand, sameWeekHarness);
     assert.equal(sameWeek.applied_count, 2);

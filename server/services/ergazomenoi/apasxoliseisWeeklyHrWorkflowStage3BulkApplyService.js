@@ -145,7 +145,7 @@ async function inspectStage3BulkIdempotency({ command: rawCommand, requestScope 
     const expectedChildren = expectedChildrenFor(command, requestScope, actor);
     const prior = await lean(auditModel.find({ team: requestScope.team,
         company_kod: requestScope.company_kod,
-        request_id: { $regex: `^${bulkRequestPrefix(command.bulk_request_id)}` } }), session) || [];
+        request_id: mongoose.trusted({ $regex: `^${bulkRequestPrefix(command.bulk_request_id)}` }) }), session) || [];
     return idempotentResult(expectedChildren, prior);
 }
 async function applyWeeklyHrStage3Bulk({ command: rawCommand, requestScope = {}, actor: rawActor,
