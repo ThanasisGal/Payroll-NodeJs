@@ -4600,7 +4600,10 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
             stage2_fingerprint: stage3.stage2_fingerprint,
             stage2_version: Number(state?.stage2?.version || 0),
             stage3_version: Number(state?.stage3?.version || 0) },
-        lifecycle, workflowState: state };
+        lifecycle, workflowState: state,
+        simulation_inputs: { effectiveProfile,
+            effectiveProfilesByDate: preparedProfilesByDate,
+            periodScope, employmentDateScope: weekly.employmentDateScope } };
 }
 
 async function assertActiveEmploymentReviewStage3DayWritable(req, initial, input) {
@@ -12568,6 +12571,7 @@ class erganhController {
                     ? `${category.kodikos} - ${category.perigrafh}` : '';
             }
             const preview = await buildWeeklyHrStage3BulkPreview({ command: req.body,
+                simulateSequential: true,
                 requestScope: { team: req.session.userTeam,
                     company_kod: req.session.companyInUse }, leaveCategoryLabel,
                 loadAuthoritativeContext: async (item, command) => {

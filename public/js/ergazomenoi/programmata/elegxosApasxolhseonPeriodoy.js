@@ -10628,14 +10628,26 @@ function weeklyHrStage3BulkPreviewHtml(preview = {}) {
     for (const item of preview.items || []) {
         const key = String(item.employee_id || item.employee_kodikos || '');
         if (!employees.has(key)) employees.set(key, { name: item.employee_name || 'Εργαζόμενος',
-            code: item.employee_kodikos || '', dates: [] });
-        employees.get(key).dates.push(item.decision_date);
+            code: item.employee_kodikos || '', items: [] });
+        employees.get(key).items.push(item);
     }
+    const selectedLabel = weeklyHrStage3BulkClassificationLabel(preview.classification);
+    const automaticLabel = (value) => value === 'REST_REPO'
+        ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ' : 'ΜΗ ΕΡΓΑΣΙΑ';
     const entries = [...employees.values()].map((employee) =>
         `<div class="stage3-bulk-preview-employee"><strong>${escapeHtml(employee.name)}${
             employee.code ? ` — Κωδικός: ${escapeHtml(employee.code)}` : ''}</strong>
-            <ul class="mb-0">${employee.dates.sort().map((date) =>
-                `<li>${escapeHtml(formatStage1DateKey(date))}</li>`).join('')}</ul></div>`).join('');
+            <ul class="mb-0">${employee.items.sort((a, b) =>
+                a.decision_date.localeCompare(b.decision_date)).map((item) =>
+                `<li>${escapeHtml(formatStage1DateKey(item.decision_date))}: ${
+                    item.outcome === 'AUTO_SATISFIED'
+                        ? `<strong>Αυτόματη επίλυση ως ${escapeHtml(automaticLabel(
+                            item.automatic_classification))}</strong><br><span class="text-muted">` +
+                            `Δεν θα λάβει τον επιλεγμένο χαρακτηρισμό ${escapeHtml(selectedLabel)}. ` +
+                            'Με βάση τις προηγούμενες αποφάσεις της ίδιας μαζικής ενημέρωσης, ' +
+                            `η ημέρα επιλύεται αυτόματα ως ${escapeHtml(automaticLabel(
+                                item.automatic_classification))}.</span>`
+                        : `Θα χαρακτηριστεί ${escapeHtml(selectedLabel)}`}</li>`).join('')}</ul></div>`).join('');
     const category = preview.leave_category?.label || preview.leave_category?.value || '';
     return `<div class="text-start stage3-bulk-preview">
         <div class="mb-2"><strong>${escapeHtml(preview.selected_count || 0)} επιλεγμένες εγγραφές</strong><br>
@@ -10643,6 +10655,10 @@ function weeklyHrStage3BulkPreviewHtml(preview = {}) {
         <div class="mb-2"><strong>Τελικός χαρακτηρισμός:</strong> ${escapeHtml(
             weeklyHrStage3BulkClassificationLabel(preview.classification))}${category
                 ? `<br><strong>Κατηγορία:</strong> ${escapeHtml(category)}` : ''}</div>
+        <div class="mb-2"><strong>${escapeHtml(preview.will_apply_count || 0)} θα χαρακτηριστούν ${
+            escapeHtml(selectedLabel)}</strong>${Number(preview.auto_satisfied_count || 0)
+                ? `<br><strong>${escapeHtml(preview.auto_satisfied_count)} θα επιλυθούν αυτόματα</strong>`
+                : ''}</div>
         <div class="stage3-bulk-preview-entries border rounded p-2">${entries}</div></div>`;
 }
 

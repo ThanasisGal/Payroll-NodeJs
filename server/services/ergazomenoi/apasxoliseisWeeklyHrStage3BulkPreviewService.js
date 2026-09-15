@@ -12,6 +12,8 @@ const { findStage1PeriodSlice } = require('./apasxoliseisStage1PeriodSliceServic
 const { assertHrSelectableLeaveCategory } = require(
     './apasxoliseisHrLeaveCategoryPolicyService'
 );
+const { makeSimulation } = require(
+    './apasxoliseisWeeklyHrStage3BulkPreviewSimulationService');
 
 const MAX_STAGE3_BULK_PREVIEW_ITEMS = 100;
 const PREVIEW_LOAD_CONCURRENCY = 8;
@@ -212,7 +214,7 @@ function canonicalFingerprintCommand({ command, requestScope, readyItems }) {
                 .localeCompare(`${b.employee_id}|${b.week_start}|${b.decision_date}|${b.row_id}`)) };
 }
 async function buildWeeklyHrStage3BulkPreview({ command: rawCommand, requestScope = {},
-    loadAuthoritativeContext, leaveCategoryLabel = '' } = {}) {
+    loadAuthoritativeContext, leaveCategoryLabel = '', simulateSequential = false } = {}) {
     if (typeof loadAuthoritativeContext !== 'function') fail(
         'STAGE3_BULK_CONTEXT_LOADER_REQUIRED',
         'Δεν είναι διαθέσιμη η ασφαλής προεπισκόπηση Stage 3.', 503);
@@ -222,15 +224,42 @@ async function buildWeeklyHrStage3BulkPreview({ command: rawCommand, requestScop
             if (item.input_error) throw item.input_error;
             const context = await loadAuthoritativeContext(item, command);
             assertAuthoritativePreviewItem({ context, item, command });
-            return { valid: true, item: { ...item,
+            return { valid: true, context, item: { ...item,
                 employee_kodikos: text(context.scope?.employee_kodikos) || item.employee_kodikos,
                 employee_name: text(context.employee_name), status: 'READY',
                 before: positiveClassification(context.row) || 'UNCLASSIFIED',
-                after: command.final_classification } };
+                after: command.final_classification, outcome: 'APPLY' } };
         } catch (error) {
             return { valid: false, failure: publicFailure(item, error) };
         }
     });
+    if (simulateSequential && results.every((result) => result.valid)) {
+        const simulations = new Map();
+        const ordered = results.map((result, index) => ({ result, index })).sort((a, b) =>
+            `${a.result.item.employee_id}|${a.result.item.week_start}|${a.result.item.decision_date}|${a.result.item.row_id}`
+                .localeCompare(`${b.result.item.employee_id}|${b.result.item.week_start}|${b.result.item.decision_date}|${b.result.item.row_id}`));
+        for (const { result } of ordered) {
+            const item = result.item;
+            const weekKey = `${item.employee_id}|${item.week_start}|${item.week_end}`;
+            try {
+                if (!simulations.has(weekKey)) simulations.set(weekKey,
+                    makeSimulation(result.context));
+                const simulation = simulations.get(weekKey);
+                const outcome = simulation.inspect(item);
+                Object.assign(item, outcome);
+                if (outcome.outcome === 'APPLY') simulation.apply(item, command);
+                else {
+                    item.after = outcome.automatic_classification;
+                    item.explanation = 'Η ημέρα επιλύεται αυτόματα από προηγούμενες ' +
+                        'αποφάσεις της ίδιας μαζικής ενημέρωσης και δεν θα λάβει ' +
+                        'τον επιλεγμένο χαρακτηρισμό.';
+                }
+            } catch (error) {
+                result.valid = false;
+                result.failure = publicFailure(item, error);
+            }
+        }
+    }
     const items = results.filter((result) => result.valid).map((result) => result.item);
     const invalidItems = results.filter((result) => !result.valid).map((result) => result.failure);
     const canApply = invalidItems.length === 0;
@@ -238,6 +267,9 @@ async function buildWeeklyHrStage3BulkPreview({ command: rawCommand, requestScop
         canonicalFingerprintCommand({ command, requestScope, readyItems: items })
     )).digest('hex') : '';
     return { can_apply: canApply, selected_count: command.items.length,
+        will_apply_count: items.filter((item) => item.outcome === 'APPLY').length,
+        auto_satisfied_count: items.filter((item) =>
+            item.outcome === 'AUTO_SATISFIED').length,
         employee_count: new Set(items.map((item) => item.employee_id)).size,
         classification: command.final_classification,
         leave_category: command.final_classification === 'LEAVE'

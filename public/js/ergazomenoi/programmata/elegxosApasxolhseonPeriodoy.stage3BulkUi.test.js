@@ -60,9 +60,28 @@ function sandboxFor(items = [item()]) {
         allowed: weeklyHrStage3BulkAllowedClassifications,
         previewCommand: weeklyHrStage3BulkPreviewCommand,
         preview: previewWeeklyHrStage3Bulk,
+        previewHtml: weeklyHrStage3BulkPreviewHtml,
         reset: resetWeeklyHrStage3BulkState
     };`, sandbox);
     return { sandbox, alerts, fetchCalls, loads: () => loads };
+}
+
+{
+    const { sandbox } = sandboxFor();
+    const html = sandbox.bulk.previewHtml({ selected_count: 3,
+        employee_count: 1, classification: 'ABSENCE',
+        will_apply_count: 2, auto_satisfied_count: 1,
+        items: [
+            { ...item(), decision_date: '2026-05-26', outcome: 'APPLY' },
+            { ...item(), decision_date: '2026-05-27', outcome: 'APPLY' },
+            { ...item(), decision_date: '2026-05-28', outcome: 'AUTO_SATISFIED',
+                automatic_classification: 'REST_REPO' }
+        ] });
+    assert.match(html, /3 επιλεγμένες εγγραφές/);
+    assert.match(html, /2 θα χαρακτηριστούν ΑΠΟΥΣΙΑ/);
+    assert.match(html, /1 θα επιλυθούν αυτόματα/);
+    assert.match(html, /28\/05\/2026: <strong>Αυτόματη επίλυση ως ΑΝΑΠΑΥΣΗ \/ ΡΕΠΟ/);
+    assert.match(html, /Δεν θα λάβει τον επιλεγμένο χαρακτηρισμό ΑΠΟΥΣΙΑ/);
 }
 
 {
