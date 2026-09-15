@@ -5,6 +5,7 @@ const { buildHrSelectableLeaveCategoryQuery } = require('../../services/ergazome
 const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { getOrarioTermsForDate: resolveTemporalWorkTerms } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('../../utils/ergazomenoi/employmentProfileHistory');
+const { appendStage4BlockedDeviationRows } = require('../../services/ergazomenoi/apasxoliseisStage4BlockedDeviationPresentationService');
 // module.exports = erganhController;
 
 const mongoose = require('mongoose');
@@ -8166,7 +8167,8 @@ class erganhController {
                 total,
                 totalPages: Math.ceil(total / limitNum),
                 rows: reviewRows,
-                deviations: enrichedDeviations,
+                deviations: appendStage4BlockedDeviationRows({ deviations: enrichedDeviations,
+                    canonicalLifecycleProjections, reviewRows }),
                 pendingDeviationWeeks,
                 legacyDeviations,
                 canonicalLifecycleProjections,

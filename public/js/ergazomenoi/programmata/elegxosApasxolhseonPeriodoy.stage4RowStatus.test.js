@@ -14,6 +14,7 @@ const end = source.indexOf('function hasAdeiaSuggestion', start);
 const payloads = [];
 const sandbox = {
     weeklyHrStage1Payloads: new Map(),
+    currentCanonicalLifecyclePayloads: [],
     stage1DateKey: (value) => String(value || '').slice(0, 10),
     reviewHrReasonLabel: (reason) => ({
         ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION:

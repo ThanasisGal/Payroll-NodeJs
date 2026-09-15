@@ -2410,7 +2410,8 @@ function hasAdeiaSuggestionInRows(rows = []) {
 
 function weeklyLifecyclePayloadForDeviation(
     dev = {},
-    lifecyclePayloads = [...weeklyHrStage1Payloads.values()]
+    lifecyclePayloads = currentCanonicalLifecyclePayloads.length
+        ? currentCanonicalLifecyclePayloads : [...weeklyHrStage1Payloads.values()]
 ) {
     const employeeKodikos = String(dev.kodikos || dev.employee_kodikos || '').trim();
     const weekStart = stage1DateKey(dev.week_apo || dev.weekStart);
@@ -11735,6 +11736,7 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         currentCanonicalLifecyclePayloads = Array.isArray(
             payload.canonicalLifecycleProjections
         ) ? payload.canonicalLifecycleProjections : [];
+        currentReviewLifecycleProjectionReady = Array.isArray(payload.canonicalLifecycleProjections);
         await loadWeeklyHrLeaveCategories().catch((error) =>
             console.warn('[weeklyHrLeaveCategories]', error));
         currentWeeklyHrStage2BulkPreview = payload.stage2BulkPreview || null;
