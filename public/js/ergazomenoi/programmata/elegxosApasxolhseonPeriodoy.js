@@ -13247,6 +13247,37 @@ document.getElementById('reviewPdfDownloadBtn')?.addEventListener('click', async
     }
 });
 
+function initEmploymentReviewScrollToTop() {
+    const workspace = document.getElementById('employmentReviewWorkspace');
+    const button = document.getElementById('employmentReviewScrollToTop');
+    if (!workspace || !button) return;
+    let activeScrollTarget = null;
+    const isVerticalScrollTarget = (target) => {
+        if (!(target instanceof HTMLElement) || !workspace.contains(target) ||
+            target.closest('.modal, .swal2-container')) return false;
+        const overflowY = getComputedStyle(target).overflowY;
+        return ['auto', 'scroll'].includes(overflowY) &&
+            target.scrollHeight > target.clientHeight;
+    };
+    const refresh = () => {
+        if (!isVerticalScrollTarget(activeScrollTarget)) activeScrollTarget = null;
+        button.hidden = !activeScrollTarget || activeScrollTarget.scrollTop <= 120;
+    };
+    workspace.addEventListener('scroll', (event) => {
+        if (!isVerticalScrollTarget(event.target)) return;
+        activeScrollTarget = event.target;
+        refresh();
+    }, true);
+    button.addEventListener('click', () => {
+        if (isVerticalScrollTarget(activeScrollTarget)) {
+            activeScrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
+        } else refresh();
+    });
+    new MutationObserver(refresh).observe(workspace, { childList: true, subtree: true });
+    refresh();
+}
+
+document.addEventListener('DOMContentLoaded', initEmploymentReviewScrollToTop);
 document.addEventListener('DOMContentLoaded', initReviewMoveByEnter);
 document.addEventListener('DOMContentLoaded', ensureReviewCardElevation);
 document.addEventListener('DOMContentLoaded', bindHrReviewEvents);
