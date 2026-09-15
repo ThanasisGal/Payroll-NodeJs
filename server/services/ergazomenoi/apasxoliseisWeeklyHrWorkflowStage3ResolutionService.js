@@ -202,8 +202,15 @@ async function resolveWeeklyHrStage3Day({
             'Δεν υπολογίστηκε το νέο authoritative Stage-1 fingerprint.', 409);
         let rebasedStage1;
         if (sliceAttestation) {
+            const newStage1Context = text(post.upstream?.stage1_context_fingerprint);
+            if (!/^[a-f0-9]{64}$/.test(newStage1Context)) fail(
+                'STAGE3_POST_WRITE_CONTEXT_FINGERPRINT_MISSING',
+                'Δεν υπολογίστηκε έγκυρο νέο authoritative Stage-1 context fingerprint.', 409);
             const nextSlice = { ...currentSlice,
+                // Preserve the original HR attestation; trusted downstream writes rebase
+                // the natural-week context and actionable-slice effective fingerprints.
                 completion_fingerprint: text(currentSlice.completion_fingerprint),
+                context_fingerprint: newStage1Context,
                 effective_fingerprint: newStage1Effective,
                 version: previousStage1Version + 1 };
             rebasedStage1 = { ...current.stage1,

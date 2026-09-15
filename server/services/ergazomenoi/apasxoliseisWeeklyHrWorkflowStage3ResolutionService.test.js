@@ -237,10 +237,12 @@ function command(initial, h, overrides = {}) {
             context_fingerprint: 'a'.repeat(64), completion_fingerprint: '',
             effective_fingerprint: '', version: 1 }] };
     sliceHarness.loadPostWriteContext = async () => ({ ...sliceContext, remaining_dates: [],
-        upstream: { ...sliceContext.upstream, stage1_current_fingerprint: 'f'.repeat(64) } });
+        upstream: { ...sliceContext.upstream, stage1_current_fingerprint: 'f'.repeat(64),
+            stage1_context_fingerprint: 'b'.repeat(64) } });
     await command(sliceContext, sliceHarness, { request_id: 'stage3:slice-0001' });
     const nextJuneSlice = sliceHarness.store.state.stage1.period_slices[0];
     assert.equal(nextJuneSlice.completion_fingerprint, 'd'.repeat(64));
+    assert.equal(nextJuneSlice.context_fingerprint, 'b'.repeat(64));
     assert.equal(nextJuneSlice.effective_fingerprint, 'f'.repeat(64));
     assert.equal(nextJuneSlice.version, 3);
     assert.equal(sliceHarness.store.state.stage1.period_slices[1].status, 'OPEN');
@@ -251,6 +253,28 @@ function command(initial, h, overrides = {}) {
         'f'.repeat(64));
     assert.equal(sliceHarness.store.audits[0].previous_stage1_version, 2);
     assert.equal(sliceHarness.store.audits[0].new_stage1_version, 3);
+
+    for (const invalidContext of [undefined, 'invalid', 'F'.repeat(64)]) {
+        const missingHarness = harness(sliceContext, []);
+        missingHarness.store.state.stage1 = structuredClone(sliceHarness.store.state.stage1);
+        missingHarness.store.state.stage1.period_slices[0] = {
+            ...sliceHarness.store.state.stage1.period_slices[0],
+            context_fingerprint: 'a'.repeat(64), effective_fingerprint: 'e'.repeat(64),
+            version: 2
+        };
+        missingHarness.store.state.stage1.version = 7;
+        missingHarness.loadPostWriteContext = async () => ({ ...sliceContext,
+            remaining_dates: [], upstream: { ...sliceContext.upstream,
+                stage1_current_fingerprint: 'f'.repeat(64),
+                stage1_context_fingerprint: invalidContext } });
+        await assert.rejects(() => command(sliceContext, missingHarness,
+            { request_id: `stage3:invalid-context-${String(invalidContext)}` }),
+        { code: 'STAGE3_POST_WRITE_CONTEXT_FINGERPRINT_MISSING' });
+        assert.equal(missingHarness.store.state.stage1.version, 7);
+        assert.equal(missingHarness.store.state.stage3, undefined);
+        assert.equal(missingHarness.store.audits.length, 0);
+        assert.equal(missingHarness.store.daily.length, 0);
+    }
 
     const raceContext = context(); const raceHarness = harness(raceContext, []);
     raceHarness.auditModel.create = async () => {
