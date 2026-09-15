@@ -4491,13 +4491,55 @@ async function loadWeeklyHrContext({ req, input, session = null,
         getDailyRepoProfileInfo({ row, istorikoRows: histories, ergazomenos: employee,
             resolveProfileForDate }).profile
     ]));
-    return { base, employee, rows, week, employmentDateScope, periodScope,
+    return { base, employee, rows, week, histories, resolveProfileForDate,
+        employmentDateScope, periodScope,
         effectiveProfile: profile.effectiveProfile,
         effectiveProfilesByDate };
 }
 
+function prepareWeeklyHrStage3LifecycleInputs({ weekly, phaseContextByKodikos }) {
+    const preparedRows = weekly.rows.map((row) => {
+        const effectiveProfile = resolveWeeklyHrSearchDailyProfile({ row,
+            employee: weekly.employee, istorikoRows: weekly.histories,
+            resolveProfileForDate: weekly.resolveProfileForDate });
+        return prepareWeeklyHrStage2LifecycleRow({ row, effectiveProfile,
+            reviewPhaseCode: getReviewPhaseCodeForRow(row, phaseContextByKodikos) });
+    });
+    const preparedProfilesByDate = Object.fromEntries(preparedRows.map((row) => [
+        dateKeyUtc(row.hmeromhnia), weeklyHrStage2LifecycleProfileFromRow(row) ]));
+    return { preparedRows, preparedProfilesByDate,
+        effectiveProfile: preparedProfilesByDate[dateKeyUtc(preparedRows.at(-1)?.hmeromhnia)] || {} };
+}
+
 async function loadWeeklyHrStage3DecisionContext({ req, input, session = null }) {
     const weekly = await loadWeeklyHrContext({ req, input, session });
+    // A transactional Stage-3 reload must derive operational phases from the
+    // same session snapshot as its rows and workflow state.
+    let phasePreparedContext = null;
+    if (session) {
+        const phaseRows = await ProdhlomenaOrariaModel.find({ ...weekly.base,
+            kodikos: weekly.employee.kodikos,
+            hmeromhnia: mongoose.trusted({
+                $gte: startOfWeekMondayUtc(weekly.periodScope.period_start),
+                $lte: endOfWeekSundayUtc(weekly.periodScope.period_end) })
+        }).sort({ hmeromhnia: 1 }).session(session).lean();
+        const employeeByCode = new Map([[String(weekly.employee.kodikos), weekly.employee]]);
+        const historyByEmployee = new Map([[String(weekly.employee.kodikos), weekly.histories]]);
+        phasePreparedContext = { employeeByCode,
+            ...buildPreparedPhaseHistoryMaps({ historyByEmployee, employeeByCode,
+                periodStart: weekly.periodScope.period_start,
+                periodEnd: weekly.periodScope.period_end }),
+            rowsByEmployee: new Map([[String(weekly.employee.kodikos), phaseRows]]) };
+    }
+    const phaseContextByKodikos = await buildReviewPhaseContextByKodikos({
+        team: weekly.base.team, company_kod: weekly.base.company_kod,
+        kodikoi: [String(weekly.employee.kodikos)],
+        ypokatasthma: weekly.base.ypokatasthma,
+        periodStart: weekly.periodScope.period_start,
+        periodEnd: weekly.periodScope.period_end,
+        ...(phasePreparedContext || {}) });
+    const { preparedRows, preparedProfilesByDate, effectiveProfile } =
+        prepareWeeklyHrStage3LifecycleInputs({ weekly, phaseContextByKodikos });
     const applySession = (query) => session ? query.session(session) : query;
     const state = await applySession(ApasxoliseisWeeklyHrWorkflowStateModel.findOne({
         ...weekly.base, employee_id: weekly.employee._id,
@@ -4506,10 +4548,10 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
     const periodScope = weekly.employmentDateScope?.context_only_dates?.length
         ? weekly.periodScope : null;
     const lifecycle = buildWeeklyHrLifecycleProjection({
-        weekRows: weekly.rows.map((row) => ({ ...row, team: weekly.base.team,
+        weekRows: preparedRows.map((row) => ({ ...row, team: weekly.base.team,
             company_kod: weekly.base.company_kod, employee_id: weekly.employee._id })),
-        effectiveProfile: weekly.effectiveProfile,
-        effectiveProfilesByDate: weekly.effectiveProfilesByDate,
+        effectiveProfile,
+        effectiveProfilesByDate: preparedProfilesByDate,
         persistedStage1State: state?.stage1 || null,
         persistedStage2State: state?.stage2 || null,
         persistedStage3State: state?.stage3 || null,
@@ -4521,7 +4563,7 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
     });
     const rowId = String(input.row_id || '').trim();
     const decisionDate = dateKeyUtc(input.decision_date);
-    const row = weekly.rows.find((candidate) => String(candidate._id) === rowId &&
+    const row = preparedRows.find((candidate) => String(candidate._id) === rowId &&
         dateKeyUtc(candidate.hmeromhnia) === decisionDate);
     if (!row) throw weeklyHrApiError('STAGE3_ROW_SCOPE_MISMATCH', 409,
         'Η ημερήσια εγγραφή δεν ανήκει στο επιλεγμένο εβδομαδιαίο πλαίσιο.');
@@ -4534,8 +4576,8 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
         `${weekly.employee.eponymo || ''} ${weekly.employee.onoma || ''}`.trim(),
         row: { ...row, team: weekly.base.team,
         company_kod: weekly.base.company_kod },
-        weekRows: weekly.rows,
-        dailyProfile: weekly.effectiveProfilesByDate[decisionDate] || weekly.effectiveProfile,
+        weekRows: preparedRows,
+        dailyProfile: preparedProfilesByDate[decisionDate] || {},
         actualFacts: resolveStage3DailyActualWorkFacts(row),
         isResidual: (stage3.pending_dates || []).includes(decisionDate),
         remaining_dates: [...(stage3.pending_dates || [])],
@@ -18831,7 +18873,8 @@ Object.defineProperty(erganhController, '__stage3DailyEmploymentProfileTestHooks
     value: Object.freeze({
         prepareWeeklyHrStage2LifecycleRow,
         weeklyHrStage2LifecycleProfileFromRow,
-        resolveWeeklyHrSearchDailyProfile
+        resolveWeeklyHrSearchDailyProfile,
+        prepareWeeklyHrStage3LifecycleInputs
     }),
     enumerable: false
 });
