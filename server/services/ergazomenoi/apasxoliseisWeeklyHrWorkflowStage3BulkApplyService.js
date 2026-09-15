@@ -3,7 +3,8 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const AuditModel = require('../../models/apasxoliseisWeeklyHrWorkflowAudit');
-const { stableStringify, buildStage3InputFingerprint } = require(
+const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
+const { stableStringify, buildStage3InputFingerprint, positiveClassification } = require(
     './apasxoliseisStage3FingerprintService'
 );
 const { assertCriticalEmploymentDecisionRole } = require(
@@ -127,16 +128,112 @@ function idempotentResult(expectedChildren, prior) {
             'Το bulk_request_id έχει χρησιμοποιηθεί για διαφορετική εντολή.', 409,
             { applied_count: 0 });
     }
-    return { applied_count: expectedChildren.length,
+    if (prior.some((audit) => !['STAGE3_DAILY_RESOLVED',
+        'STAGE3_BULK_ITEM_AUTO_SATISFIED'].includes(audit.action))) {
+        fail('STAGE3_BULK_REQUEST_ID_CONFLICT',
+            'Το bulk_request_id έχει χρησιμοποιηθεί για διαφορετική εντολή.', 409,
+            { applied_count: 0 });
+    }
+    const applied = prior.filter((audit) => audit.action === 'STAGE3_DAILY_RESOLVED');
+    const autoSatisfied = prior.filter((audit) =>
+        audit.action === 'STAGE3_BULK_ITEM_AUTO_SATISFIED');
+    return { applied_count: applied.length,
+        auto_satisfied_count: autoSatisfied.length,
         employee_count: new Set(expectedChildren.map(({ item }) => item.employee_id)).size,
-        completed_week_count: prior.filter((audit) =>
-            audit.after_stage?.status === 'COMPLETED').length,
+        completed_week_count: new Set(prior.filter((audit) =>
+            audit.after_stage?.status === 'COMPLETED').map((audit) =>
+            `${audit.employee_id}|${dateKeyUtc(audit.week_start)}|${dateKeyUtc(audit.week_end)}`)).size,
         remaining_stage3_count: 0, idempotent: true,
         results: expectedChildren.map(({ item, request_id }) => {
             const audit = byRequest.get(request_id);
             return { row_id: item.row_id, decision_date: item.decision_date,
-                status: 'ALREADY_APPLIED', stage3_version: audit.stage_version };
+                status: audit.action === 'STAGE3_BULK_ITEM_AUTO_SATISFIED'
+                    ? 'ALREADY_AUTO_SATISFIED' : 'ALREADY_APPLIED',
+                ...(audit.action === 'STAGE3_BULK_ITEM_AUTO_SATISFIED'
+                    ? { automatic_classification: audit.automatic_resolution_classification }
+                    : {}), stage3_version: audit.stage_version };
         }) };
+}
+
+function unchangedDayMaterial(context) {
+    const material = buildStage3InputFingerprint(context).material;
+    return stableStringify({ identity: material.identity,
+        daily_employment: material.daily_employment, declared: material.declared,
+        actual: material.actual, current_classification: material.current_classification });
+}
+function daySnapshot(context) {
+    return { row_updated_at: new Date(context.row?.updatedAt || 0).getTime(),
+        row_locked: context.row?.is_locked === true,
+        day_material: unchangedDayMaterial(context),
+        week_rows: new Map((context.weekRows || []).map((row) => [String(row._id),
+            new Date(row.updatedAt || 0).getTime()])),
+        initially_automatic: (context.lifecycle?.stages?.stage3
+            ?.stage2_automatic_resolution_items || []).some((entry) =>
+            dateKeyUtc(entry.date) === dateKeyUtc(context.row?.hmeromhnia)) };
+}
+function sameBatchAutomaticResolution({ entry, current, initial, appliedInWeek }) {
+    if (!initial || !appliedInWeek.length || current.isResidual !== false ||
+        initial.initially_automatic || positiveClassification(current.row) ||
+        current.row?.is_locked === true || initial.row_locked ||
+        new Date(current.row?.updatedAt || 0).getTime() !== initial.row_updated_at ||
+        unchangedDayMaterial(current) !== initial.day_material ||
+        current.lifecycle?.stages?.stage1?.business_status !== 'COMPLETED' ||
+        current.lifecycle?.stages?.stage2?.business_status !== 'COMPLETED' ||
+        Number(current.upstream?.stage3_version || 0) !==
+            Number(appliedInWeek.at(-1).result.stage3_version)) return null;
+    const writtenIds = new Set(appliedInWeek.map((applied) => applied.item.row_id));
+    if ((current.weekRows || []).length !== initial.week_rows.size ||
+        (current.weekRows || []).some((row) => !initial.week_rows.has(String(row._id)) ||
+            (!writtenIds.has(String(row._id)) &&
+                new Date(row.updatedAt || 0).getTime() !==
+                    initial.week_rows.get(String(row._id))))) return null;
+    const resolution = (current.lifecycle?.stages?.stage3
+        ?.stage2_automatic_resolution_items || []).find((candidate) =>
+        dateKeyUtc(candidate.date) === entry.item.decision_date &&
+        ['REST_REPO', 'NON_WORK'].includes(candidate.classification) &&
+        ['DETERMINISTIC_STAGE2_REPO_RESOLUTION',
+            'STAGE1_REVIEWED_NON_FULL_WITHOUT_ACTUAL_WORK'].includes(candidate.reason));
+    return resolution && !(current.lifecycle?.stages?.stage3?.pending_dates || [])
+        .includes(entry.item.decision_date) ? resolution : null;
+}
+async function auditSameBatchAutomaticResolution({ entry, command, current, resolution,
+    appliedInWeek, actor, envelope, auditModel }) {
+    const stage = current.workflowState?.stage3;
+    const version = Number(stage?.version || 0);
+    if (!stage || version < 1) fail('STAGE3_DATE_NOT_RESIDUAL',
+        'Η ημέρα δεν αποτελεί πλέον εκκρεμότητα του Stage 3.', 409);
+    const snapshot = { status: stage.status,
+        completion_fingerprint: text(stage.completion_fingerprint), version };
+    try {
+        await auditModel.create([{ ...current.scope,
+            workflow_version: 'weekly-hr-workflow:v1', stage: 'STAGE3',
+            action: 'STAGE3_BULK_ITEM_AUTO_SATISFIED', stage_version: version,
+            input_fingerprint: entry.item.expected_input_fingerprint,
+            previous_completion_fingerprint: snapshot.completion_fingerprint,
+            new_completion_fingerprint: snapshot.completion_fingerprint,
+            before_stage: snapshot, after_stage: snapshot,
+            performed_at: new Date(), performed_by_user_id: actor.user_id,
+            performed_by_user_name: actor.user_name,
+            performed_by_user_role: actor.role,
+            reason_or_notes: command.reason_or_notes,
+            request_id: entry.request_id, command_identity: entry.command_identity,
+            decision_date: current.row.hmeromhnia,
+            prodhlomena_oraria_id: current.row._id,
+            previous_classification: 'UNCLASSIFIED',
+            requested_classification: command.final_classification,
+            automatic_resolution_classification: resolution.classification,
+            satisfaction_reason: 'SAME_BATCH_DETERMINISTIC_STAGE2_RESOLUTION',
+            caused_by_request_ids: appliedInWeek.map((applied) => applied.request_id),
+            period_control_version: Number(envelope.period_control_version || 0),
+            period_write_fence_version: Number(envelope.period_write_fence_version || 0)
+        }], { session: envelope.session });
+    } catch (error) {
+        if (error?.code === 11000) fail('STAGE3_REQUEST_RACE_CONFLICT',
+            'Το request_id καταχωρίστηκε ταυτόχρονα. Επαναλάβετε την ανάγνωση.', 409);
+        throw error;
+    }
+    return { stage3_status: stage.status, stage3_version: version,
+        remaining_count: (current.lifecycle?.stages?.stage3?.pending_dates || []).length };
 }
 async function inspectStage3BulkIdempotency({ command: rawCommand, requestScope = {},
     actor: rawActor, auditModel = AuditModel, session = null } = {}) {
@@ -162,9 +259,13 @@ async function applyWeeklyHrStage3Bulk({ command: rawCommand, requestScope = {},
         const priorResult = await inspectStage3BulkIdempotency({ command, requestScope,
             actor, auditModel, session });
         if (priorResult) return priorResult;
+        const initialByRow = new Map();
         const preview = await buildWeeklyHrStage3BulkPreview({ command: previewCommand(command),
-            requestScope, loadAuthoritativeContext: (item) =>
-                loadAuthoritativeContext(item, command, { session }) });
+            requestScope, loadAuthoritativeContext: async (item) => {
+                const context = await loadAuthoritativeContext(item, command, { session });
+                initialByRow.set(item.row_id, daySnapshot(context));
+                return context;
+            } });
         if (!preview.can_apply) invalidBatch(preview);
         if (preview.preview_fingerprint !== command.expected_preview_fingerprint) {
             fail('STAGE3_BULK_PREVIEW_STALE',
@@ -173,19 +274,40 @@ async function applyWeeklyHrStage3Bulk({ command: rawCommand, requestScope = {},
         }
 
         const results = []; const finalWeeks = new Map();
+        const appliedByWeek = new Map();
         for (const entry of expectedChildren) {
             const current = await loadAuthoritativeContext(entry.item, command, { session });
-            const result = await resolveOne({ item: entry.item, command, current, actor,
-                request_id: entry.request_id, command_identity: entry.command_identity,
-                expected_input_fingerprint: buildStage3InputFingerprint(current).fingerprint,
-                expected_stage3_version: Number(current.upstream?.stage3_version || 0),
-                envelope });
             const weekKey = `${entry.item.employee_id}|${entry.item.week_start}|${entry.item.week_end}`;
+            const appliedInWeek = appliedByWeek.get(weekKey) || [];
+            const automatic = sameBatchAutomaticResolution({ entry, current,
+                initial: initialByRow.get(entry.item.row_id), appliedInWeek });
+            let result;
+            if (automatic) {
+                result = await auditSameBatchAutomaticResolution({ entry, command,
+                    current, resolution: automatic, appliedInWeek, actor,
+                    envelope, auditModel });
+                results.push({ row_id: entry.item.row_id,
+                    decision_date: entry.item.decision_date,
+                    status: 'AUTO_SATISFIED',
+                    automatic_classification: automatic.classification,
+                    stage3_version: result.stage3_version });
+            } else {
+                result = await resolveOne({ item: entry.item, command, current, actor,
+                    request_id: entry.request_id, command_identity: entry.command_identity,
+                    expected_input_fingerprint: buildStage3InputFingerprint(current).fingerprint,
+                    expected_stage3_version: Number(current.upstream?.stage3_version || 0),
+                    envelope });
+                appliedInWeek.push({ item: entry.item, request_id: entry.request_id, result });
+                appliedByWeek.set(weekKey, appliedInWeek);
+                results.push({ row_id: entry.item.row_id,
+                    decision_date: entry.item.decision_date,
+                    status: 'APPLIED', stage3_version: result.stage3_version });
+            }
             finalWeeks.set(weekKey, result);
-            results.push({ row_id: entry.item.row_id, decision_date: entry.item.decision_date,
-                status: 'APPLIED', stage3_version: result.stage3_version });
         }
-        return { applied_count: results.length,
+        return { applied_count: results.filter((item) => item.status === 'APPLIED').length,
+            auto_satisfied_count: results.filter((item) =>
+                item.status === 'AUTO_SATISFIED').length,
             employee_count: new Set(ordered.map((item) => item.employee_id)).size,
             completed_week_count: [...finalWeeks.values()].filter((result) =>
                 result.stage3_status === 'COMPLETED').length,

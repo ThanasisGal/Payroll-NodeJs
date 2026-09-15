@@ -10754,11 +10754,15 @@ async function applyFrozenWeeklyHrStage3Bulk() {
         }
         const idempotent = result.idempotent === true;
         const appliedCount = Number(result.applied_count || 0);
+        const autoSatisfiedCount = Number(result.auto_satisfied_count || 0);
         resetWeeklyHrStage3BulkState();
         await loadResults();
         await employmentReviewSwal({ icon: 'success', title: idempotent
             ? 'Η μαζική ενημέρωση είχε ήδη ολοκληρωθεί.'
-            : `Εφαρμόστηκαν ${appliedCount} χαρακτηρισμοί.` });
+            : `Εφαρμόστηκαν ${appliedCount} χαρακτηρισμοί.`,
+        ...(autoSatisfiedCount ? { text: `${autoSatisfiedCount} επιλεγμένες ημέρες ` +
+            'επιλύθηκαν αυτόματα από προηγούμενες αποφάσεις της ίδιας μαζικής εντολής ' +
+            'και δεν έλαβαν τον επιλεγμένο χαρακτηρισμό.' } : {}) });
     } finally {
         weeklyHrStage3BulkSubmitting = false;
         updateWeeklyHrStage3BulkToolbar();

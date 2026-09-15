@@ -48,10 +48,17 @@ function makeWeek({ employeeIndex = 1, week = '2026-06-01', dates = ['2026-06-03
         lifecycle: { employment_date_scope: {
             authoritative_date_set: contextOnly.includes(date) ? [] : [date],
             context_only_dates: contextOnly.includes(date) ? [date] : [] },
-        stages: { stage3: { pending_items: isResidual ? [{ row_id: rowId, date,
-            allowed_classifications: full ? ['LEAVE', 'SICKNESS', 'ABSENCE']
+        stages: { stage1: { business_status: 'COMPLETED' },
+            stage2: { business_status: 'COMPLETED' },
+            stage3: { pending_dates: dates.filter((candidate) =>
+                !resolved.includes(candidate)),
+            stage2_automatic_resolution_items: [],
+            pending_items: isResidual ? [{ row_id: rowId, date,
+                allowed_classifications: full ? ['LEAVE', 'SICKNESS', 'ABSENCE']
                 : ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'] }] : [] } } } };
     });
+    contexts.forEach((context) => { context.weekRows = contexts.map((candidate) =>
+        candidate.row); });
     return contexts;
 }
 function item(context) {
@@ -79,7 +86,8 @@ async function commandWithPreview(contexts, items, overrides = {}) {
         expected_preview_fingerprint: preview.preview_fingerprint,
         reason_or_notes: reason || 'Κοινή αιτιολογία' };
 }
-function harness(initialContexts, { failAt = 0, failureCode = 'WRITER_FAILED' } = {}) {
+function harness(initialContexts, { failAt = 0, failureCode = 'WRITER_FAILED',
+    autoResolveAfter = 0, externalChangeAfter = 0 } = {}) {
     let store = { contexts: structuredClone(initialContexts), workflowAudits: [],
         canonicalWrites: [], prodhlomenaAudits: [], workflowStateWrites: 0,
         resolveCalls: 0, loadsBeforeFirstWrite: 0, order: [] };
@@ -89,7 +97,10 @@ function harness(initialContexts, { failAt = 0, failureCode = 'WRITER_FAILED' } 
     const auditModel = { find: (filter) => ({ session() { return this; }, lean: async () => {
         const expression = new RegExp(filter.request_id.$regex);
         return store.workflowAudits.filter((audit) => expression.test(audit.request_id));
-    } }) };
+    } }), create: async ([document]) => {
+        store.workflowAudits.push(document);
+        return [document];
+    } };
     const runAtomic = async (work) => {
         const snapshot = structuredClone(store);
         try { return await work({ session: {}, period_control_version: 4,
@@ -107,6 +118,9 @@ function harness(initialContexts, { failAt = 0, failureCode = 'WRITER_FAILED' } 
         assert.equal(expected_input_fingerprint,
             buildStage3InputFingerprint(current).fingerprint);
         assert.equal(expected_stage3_version, current.upstream.stage3_version);
+        if (!current.isResidual) throw Object.assign(new Error(
+            'Η ημέρα δεν αποτελεί πλέον εκκρεμότητα του Stage 3.'),
+        { code: 'STAGE3_DATE_NOT_RESIDUAL', statusCode: 409 });
         store.canonicalWrites.push(selected.row_id);
         store.prodhlomenaAudits.push({ row_id: selected.row_id,
             leave_category: command.leave_category });
@@ -119,6 +133,20 @@ function harness(initialContexts, { failAt = 0, failureCode = 'WRITER_FAILED' } 
         target.row.kathgoria_adeias_apologistika = command.leave_category;
         target.row.adeia_apologistika = command.final_classification === 'LEAVE';
         target.isResidual = false;
+        if (autoResolveAfter === store.resolveCalls) {
+            const automaticallyResolved = sameWeek.find((context) => context.isResidual);
+            automaticallyResolved.isResidual = false;
+            sameWeek.forEach((context) => {
+                context.lifecycle.stages.stage3.stage2_automatic_resolution_items = [{
+                    date: automaticallyResolved.row.hmeromhnia,
+                    classification: 'REST_REPO',
+                    reason: 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }];
+            });
+            if (externalChangeAfter === store.resolveCalls) {
+                automaticallyResolved.row.ores_ergasias = 7;
+                automaticallyResolved.row.updatedAt = new Date('2026-06-11Z');
+            }
+        }
         const remaining = sameWeek.filter((context) => context.isResidual)
             .map((context) => context.row.hmeromhnia.toISOString().slice(0, 10));
         const nextVersion = current.upstream.stage3_version + 1;
@@ -134,11 +162,14 @@ function harness(initialContexts, { failAt = 0, failureCode = 'WRITER_FAILED' } 
             context.upstream.stage1_effective_fingerprint = nextFingerprint;
             context.upstream.stage1_version = nextStage1Version;
             context.upstream.stage3_version = nextVersion;
+            context.lifecycle.stages.stage3.pending_dates = remaining;
             context.lifecycle.stages.stage3.pending_items = context.isResidual
                 ? context.lifecycle.stages.stage3.pending_items : [];
         });
         store.workflowStateWrites++;
         store.workflowAudits.push({ request_id, command_identity,
+            action: 'STAGE3_DAILY_RESOLVED', employee_id: selected.employee_id,
+            week_start: current.scope.week_start, week_end: current.scope.week_end,
             stage_version: nextVersion,
             after_stage: { status: remaining.length ? 'OPEN' : 'COMPLETED' } });
         return { stage3_status: remaining.length ? 'OPEN' : 'COMPLETED',
@@ -208,6 +239,51 @@ async function apply(command, h) {
     assert.equal(sameWeekHarness.store.prodhlomenaAudits.length, 2);
     assert.equal(sameWeekHarness.store.workflowAudits.length, 2);
     assert.equal(sameWeekHarness.store.prodhlomenaAudits[0].leave_category, 'ΑΔΚΑΝ');
+
+    const autoContexts = makeWeek({ employeeIndex: 12,
+        dates: ['2026-06-02', '2026-06-03', '2026-06-04'] });
+    const autoCommand = await commandWithPreview(autoContexts, autoContexts.map(item),
+        { bulk_request_id: 'stage3-bulk:test-auto-satisfied' });
+    const autoHarness = harness(autoContexts, { autoResolveAfter: 2 });
+    const autoResult = await apply(autoCommand, autoHarness);
+    assert.equal(autoResult.applied_count, 2);
+    assert.equal(autoResult.auto_satisfied_count, 1);
+    assert.equal(autoResult.completed_week_count, 1);
+    assert.deepEqual(autoResult.results.map((result) => result.status),
+        ['APPLIED', 'APPLIED', 'AUTO_SATISFIED']);
+    assert.deepEqual(autoResult.results.map((result) => result.stage3_version),
+        [3, 4, 4]);
+    assert.equal(autoHarness.store.canonicalWrites.length, 2);
+    assert.equal(autoHarness.store.prodhlomenaAudits.length, 2);
+    assert.equal(autoHarness.store.workflowStateWrites, 2);
+    assert.equal(autoHarness.store.contexts[2].row.adeia_apologistika, undefined);
+    assert.equal(autoHarness.store.workflowAudits.length, 3);
+    assert.deepEqual(autoHarness.store.workflowAudits.map((audit) => audit.action),
+        ['STAGE3_DAILY_RESOLVED', 'STAGE3_DAILY_RESOLVED',
+            'STAGE3_BULK_ITEM_AUTO_SATISFIED']);
+    const autoAudit = autoHarness.store.workflowAudits[2];
+    assert.equal(autoAudit.requested_classification, 'LEAVE');
+    assert.equal(autoAudit.automatic_resolution_classification, 'REST_REPO');
+    assert.deepEqual(autoAudit.caused_by_request_ids,
+        autoHarness.store.workflowAudits.slice(0, 2).map((audit) => audit.request_id));
+    assert.equal(new Set(autoHarness.store.workflowAudits.map((audit) =>
+        audit.request_id)).size, 3);
+    const autoRetry = await apply(autoCommand, autoHarness);
+    assert.equal(autoRetry.idempotent, true);
+    assert.equal(autoRetry.applied_count, 2);
+    assert.equal(autoRetry.auto_satisfied_count, 1);
+    assert.equal(autoRetry.completed_week_count, 1);
+    assert.equal(autoRetry.results[2].status, 'ALREADY_AUTO_SATISFIED');
+    assert.equal(autoHarness.store.workflowAudits.length, 3);
+    assert.equal(autoHarness.store.canonicalWrites.length, 2);
+    const autoExternalHarness = harness(autoContexts,
+        { autoResolveAfter: 2, externalChangeAfter: 2 });
+    await assert.rejects(() => apply(autoCommand, autoExternalHarness),
+        { code: 'STAGE3_DATE_NOT_RESIDUAL' });
+    assert.equal(autoExternalHarness.store.canonicalWrites.length, 0);
+    assert.equal(autoExternalHarness.store.prodhlomenaAudits.length, 0);
+    assert.equal(autoExternalHarness.store.workflowAudits.length, 0);
+    assert.equal(autoExternalHarness.store.workflowStateWrites, 0);
 
     const openContexts = makeWeek({ employeeIndex: 9,
         dates: ['2026-06-02', '2026-06-03', '2026-06-04'] });
