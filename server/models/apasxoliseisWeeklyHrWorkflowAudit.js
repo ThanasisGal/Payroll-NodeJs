@@ -37,7 +37,7 @@ const schema = new Schema({
     stage: immutableRequired(String, { enum: ['STAGE1', 'STAGE2', 'STAGE3'] }),
     action: immutableRequired(String, {
         enum: ['STAGE1_COMPLETED', 'STAGE1_PERIOD_SLICE_COMPLETED', 'STAGE2_COMPLETED',
-            'STAGE3_DAILY_RESOLVED']
+            'STAGE3_DAILY_RESOLVED', 'STAGE3_BULK_ITEM_AUTO_SATISFIED']
     }),
     stage_version: immutableRequired(Number, { min: 1 }),
     input_fingerprint: fingerprint(true),
@@ -111,6 +111,38 @@ const schema = new Schema({
         immutable: true,
         required: function stage3FinalClassificationRequired() {
             return this.action === 'STAGE3_DAILY_RESOLVED';
+        }
+    },
+    requested_classification: {
+        type: String,
+        enum: ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'],
+        immutable: true,
+        required: function autoSatisfiedRequestedClassificationRequired() {
+            return this.action === 'STAGE3_BULK_ITEM_AUTO_SATISFIED';
+        }
+    },
+    automatic_resolution_classification: {
+        type: String, enum: ['REST_REPO', 'NON_WORK'], immutable: true,
+        required: function autoSatisfiedResolutionRequired() {
+            return this.action === 'STAGE3_BULK_ITEM_AUTO_SATISFIED';
+        }
+    },
+    satisfaction_reason: {
+        type: String, enum: ['SAME_BATCH_DETERMINISTIC_STAGE2_RESOLUTION'],
+        immutable: true,
+        required: function autoSatisfiedReasonRequired() {
+            return this.action === 'STAGE3_BULK_ITEM_AUTO_SATISFIED';
+        }
+    },
+    caused_by_request_ids: {
+        type: [String], immutable: true, default: undefined,
+        required: function autoSatisfiedCauseRequired() {
+            return this.action === 'STAGE3_BULK_ITEM_AUTO_SATISFIED';
+        },
+        validate: {
+            validator: (values) => !values || (values.length > 0 &&
+                values.every((value) => /^[A-Za-z0-9][A-Za-z0-9:._-]{7,99}$/.test(value))),
+            message: 'Automatic satisfaction requires valid same-batch child requests.'
         }
     },
     period_control_version: {

@@ -14,10 +14,12 @@ const end = source.indexOf('function hasAdeiaSuggestion', start);
 const payloads = [];
 const sandbox = {
     weeklyHrStage1Payloads: new Map(),
+    currentCanonicalLifecyclePayloads: [],
     stage1DateKey: (value) => String(value || '').slice(0, 10),
     reviewHrReasonLabel: (reason) => ({
         ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION:
-            'Υπάρχει ορφανό χτύπημα κάρτας που πρέπει να επιλυθεί πριν συνεχιστεί ο έλεγχος.'
+            'Υπάρχει ορφανό χτύπημα κάρτας που πρέπει να επιλυθεί πριν συνεχιστεί ο έλεγχος.',
+        CARD_VERIFICATION_PENDING: 'Εκκρεμεί επιβεβαίωση των στοιχείων της κάρτας εργασίας.'
     }[reason] || 'Απαιτείται έλεγχος της περίπτωσης.'),
     escapeHtml: (value) => String(value ?? '')
 };
@@ -43,6 +45,7 @@ addStage4('0012', '2026-04-20', { business_status: 'BLOCKED', pending_count: 1,
 const blockedHtml = sandbox.renderStatus(blocked);
 assert.match(blockedHtml, /text-bg-danger[^>]*>ΜΠΛΟΚΑΡΙΣΜΕΝΟ</);
 assert.match(blockedHtml, /ορφανό χτύπημα κάρτας/);
+assert.match(blockedHtml, /Ελέγξτε την αιτία και διορθώστε τα στοιχεία πριν συνεχίσετε/);
 
 const completed = { kodikos: '0013', week_apo: '2026-04-20', week_eos: '2026-04-26' };
 addStage4('0013', '2026-04-20', { business_status: 'COMPLETED', pending_count: 0 });
@@ -54,6 +57,9 @@ addStage4('0014', '2026-04-20', { business_status: 'BLOCKED', pending_count: 1,
     blockers: ['CARD_VERIFICATION_PENDING'] });
 assert.match(sandbox.renderStatus(blocked), /ΜΠΛΟΚΑΡΙΣΜΕΝΟ/);
 assert.match(sandbox.renderStatus(secondBlocked), /ΜΠΛΟΚΑΡΙΣΜΕΝΟ/);
+assert.match(sandbox.renderStatus(secondBlocked), /επιβεβαίωση των στοιχείων της κάρτας εργασίας/);
+assert.match(sandbox.renderStatus(secondBlocked),
+    /Ελέγξτε την αιτία και διορθώστε τα στοιχεία πριν συνεχίσετε/);
 
 const zeroPending = { kodikos: '0015', week_apo: '2026-04-20',
     week_eos: '2026-04-26', status: 'OPEN_WEEK_PENDING_COMPLETION' };
@@ -80,6 +86,15 @@ const workflowPresentation = source.slice(source.indexOf('function updateEmploym
     source.indexOf('function renderWeeklyHrStage1BulkToolbar'));
 assert.match(workflowPresentation, /presentationStatus === 'LOCKED' && stage\.stage !== 'STAGE4'/);
 assert.match(workflowPresentation, /employmentReviewStage4PreviewNotice/);
-assert.match(view, /Προσωρινή προεπισκόπηση — το Στάδιο 4 μπορεί να ελεγχθεί, αλλά δεν μπορεί ακόμη να ολοκληρωθεί\./);
+assert.match(workflowPresentation,
+    /stage\.presentation_status === 'LOCKED'[\s\S]*?stage\.stage === 'STAGE4' \? 'ΑΝΑΜΟΝΗ'/);
+assert.match(workflowPresentation,
+    /previewNotice\?\.classList\.toggle\('d-none', presentationStatus !== 'LOCKED'\)/);
+assert.match(view, /Προεπισκόπηση — μόνο για ενημέρωση\./);
+assert.match(view,
+    /Ο Τελικός Έλεγχος θα είναι διαθέσιμος μόλις ολοκληρωθεί το προηγούμενο στάδιο\./);
+assert.doesNotMatch(view, /Προσωρινή προεπισκόπηση/);
+assert.doesNotMatch(view.match(
+    /id="employmentReviewStage4PreviewNotice"[\s\S]*?<\/div>/)?.[0] || '', /LOCKED|STAGE4/);
 
 console.log('Stage 4 per-row blocked status presentation tests passed');

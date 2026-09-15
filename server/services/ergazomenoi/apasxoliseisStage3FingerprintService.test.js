@@ -29,9 +29,14 @@ for (const changed of [
     { row: { ...base.row, cards_ores_ergasias: 2,
         cards_apo_ora_01: '15:00', cards_eos_ora_01: '17:00' } },
     { dailyProfile: { ...base.dailyProfile, kathestos_apasxolhshs: '0' } },
+    { dailyProfile: { ...base.dailyProfile, source: 'ERGANI_SNAPSHOT' } },
+    { dailyProfile: { ...base.dailyProfile,
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-26' } },
     { isResidual: false },
     { upstream: { ...base.upstream, stage1_effective_fingerprint: 'c'.repeat(64) } },
-    { upstream: { ...base.upstream, stage1_version: 2 } }
+    { upstream: { ...base.upstream, stage1_version: 2 } },
+    { upstream: { ...base.upstream, stage2_version: 1 } },
+    { stage2: { ...base.stage2, resolved_dates: ['2026-06-02'] } }
 ]) {
     assert.notEqual(buildStage3InputFingerprint({ ...base, ...changed }).fingerprint, first);
 }

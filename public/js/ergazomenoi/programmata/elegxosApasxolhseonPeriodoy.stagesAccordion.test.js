@@ -43,6 +43,9 @@ assert.equal((view.match(/data-bs-parent="#employmentReviewStagesAccordion"/g) |
 assert.equal((view.match(/class="accordion-item" data-workflow-stage="STAGE[1-4]"/g) || []).length, 4);
 assert.equal(getDirectStageItems(view).length, 4);
 assert.match(view, /employmentReviewWorkflowSummary/);
+assert.match(view, /id="employmentReviewWorkflowProgress"/);
+assert.match(view, /aria-label="Πρόοδος Ελέγχου Απασχολήσεων"/);
+assert.match(view, /id="employmentReviewAttentionSummary"/);
 assert.match(view, /STAGE1[\s\S]*weeklyHrStage1Container/);
 assert.match(view, /STAGE2[\s\S]*policyPreviewGroupsContainer/);
 assert.match(view, /STAGE3[\s\S]*weeklyHrStage3Container/);
@@ -111,6 +114,10 @@ const stage3AfterStage2 = sandbox.derive([{ scope: { employee_kodikos: '0004' },
         stage3: stage('OPEN', 26), stage4: stage('COMPLETED')
     } } }], null, { safe_bulk_count: 0, manual_exception_count: 0 });
 assert.equal(stage3AfterStage2.current_stage, 'STAGE3');
+assert.equal(stage3AfterStage2.stages.STAGE1.open_by_default, false);
+assert.equal(stage3AfterStage2.stages.STAGE2.open_by_default, false);
+assert.equal(stage3AfterStage2.stages.STAGE3.open_by_default, true);
+assert.equal(stage3AfterStage2.stages.STAGE4.open_by_default, false);
 const manualStage2 = sandbox.derive([{ scope: { employee_kodikos: '0004' },
     lifecycle_projection: { stages: {
         stage1: stage('COMPLETED'), stage2: stage('COMPLETED'),
@@ -150,6 +157,190 @@ const completedLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' }
 assert.equal(completedLifecycle.current_stage, null);
 assert.equal(completedLifecycle.requires_hr_action, false);
 assert.equal(completedLifecycle.total_pending_count, 0);
+
+const guideStart = source.indexOf('function employmentReviewWaitingReason');
+const guideEnd = source.indexOf('function updateEmploymentReviewWorkflowPresentation');
+assert.notEqual(guideStart, -1);
+assert.notEqual(guideEnd, -1);
+assert.ok(guideEnd > guideStart);
+const classList = () => ({ values: new Set(['d-none']),
+    remove(value) { this.values.delete(value); }, add(value) { this.values.add(value); },
+    contains(value) { return this.values.has(value); } });
+const progressElement = { innerHTML: '', classList: classList() };
+const attentionElement = { innerHTML: '', classList: classList() };
+const guideSandbox = {
+    currentWeeklyHrStage2BulkPreview: null,
+    employmentReviewStageAutoOpenPending: false,
+    workflowStageShortNames: { STAGE1: 'Άδειες', STAGE2: 'Μεταφορά Ρεπό',
+        STAGE3: 'Υπόλοιπες Άδειες', STAGE4: 'Τελικός Έλεγχος' },
+    escapeHtml: (value) => String(value ?? '').replaceAll('<', '&lt;'),
+    getStage2LifecycleReasonLabel: () => 'Διορθώστε τα στοιχεία του τρέχοντος σταδίου.',
+    document: { getElementById: (id) => id === 'employmentReviewWorkflowProgress'
+        ? progressElement : id === 'employmentReviewAttentionSummary' ? attentionElement : null },
+    CSS: { escape: (value) => value }, bootstrap: { Collapse: { getOrCreateInstance: () => ({ show() {} }) } }
+};
+vm.runInNewContext(`${source.slice(guideStart, guideEnd)}
+this.renderGuide = renderEmploymentReviewWorkflowGuide;
+this.attention = employmentReviewAttentionPresentation;
+this.focusStage = focusEmploymentReviewStage;
+this.syncAccordion = syncEmploymentReviewStageAccordionState;
+this.requestAutoOpen = requestEmploymentReviewCurrentStageAutoOpen;
+this.cancelAutoOpen = cancelEmploymentReviewCurrentStageAutoOpen;`, guideSandbox);
+guideSandbox.renderGuide(stage3AfterStage2);
+assert.match(progressElement.innerHTML, /1\. Άδειες/);
+assert.match(progressElement.innerHTML, /2\. Μεταφορά Ρεπό/);
+assert.match(progressElement.innerHTML, /3\. Υπόλοιπες Άδειες/);
+assert.match(progressElement.innerHTML, /4\. Τελικός Έλεγχος/);
+assert.equal((progressElement.innerHTML.match(/is-completed/g) || []).length, 2);
+assert.match(progressElement.innerHTML, /is-current[^>]*aria-current="step"/);
+assert.match(progressElement.innerHTML, /Χρειάζεται η προσοχή σας/);
+assert.doesNotMatch(progressElement.innerHTML, /Χρειάζεται ενέργεια τώρα/);
+assert.match(progressElement.innerHTML, /is-waiting/);
+assert.doesNotMatch(progressElement.innerHTML, /ΚΛΕΙΔΩΜΕΝΟ/);
+assert.match(progressElement.innerHTML,
+    /Αναμονή ολοκλήρωσης του Σταδίου 3 — Υπόλοιπες Άδειες/);
+assert.match(attentionElement.innerHTML, /Τι χρειάζεται την προσοχή σας/);
+assert.match(attentionElement.innerHTML, /26 ημέρες χρειάζονται τελικό χαρακτηρισμό/);
+assert.match(attentionElement.innerHTML, /Τα προηγούμενα στάδια έχουν ολοκληρωθεί/);
+assert.match(attentionElement.innerHTML, /Προβολή 26 εκκρεμοτήτων/);
+assert.equal(progressElement.classList.contains('d-none'), false);
+assert.equal(attentionElement.classList.contains('d-none'), false);
+
+guideSandbox.renderGuide(staleLifecycle);
+assert.match(attentionElement.innerHTML, /Τα στοιχεία άλλαξαν/);
+assert.match(attentionElement.innerHTML,
+    /Τα στοιχεία της εβδομάδας άλλαξαν από την τελευταία αναζήτηση/);
+assert.match(attentionElement.innerHTML,
+    /Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα/);
+assert.doesNotMatch(attentionElement.innerHTML, /STALE|Παρωχημέν|ΜΗ ΕΓΚΥΡΟ/);
+
+const mayStage3Lifecycle = { current_stage: 'STAGE3', stages: {
+    STAGE1: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },
+    STAGE2: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },
+    STAGE3: { presentation_status: 'ACTIVE', business_status: 'OPEN', open_by_default: true,
+        pending_count: 26 },
+    STAGE4: { presentation_status: 'LOCKED', business_status: 'BLOCKED',
+        open_by_default: false }
+} };
+guideSandbox.renderGuide(mayStage3Lifecycle);
+const stage4Progress = progressElement.innerHTML.match(
+    /<li class="employment-review-progress-step[^>]*>[^]*?4\. Τελικός Έλεγχος[^]*?<\/li>/
+)?.[0] || '';
+assert.match(stage4Progress, /is-waiting/);
+assert.doesNotMatch(stage4Progress, /is-blocked|Χρειάζεται διόρθωση/);
+assert.match(stage4Progress,
+    /Αναμονή ολοκλήρωσης του Σταδίου 3 — Υπόλοιπες Άδειες/);
+const workflowPresentationSource = source.slice(
+    source.indexOf('function updateEmploymentReviewWorkflowPresentation'),
+    source.indexOf('function renderWeeklyHrStage1BulkToolbar')
+);
+assert.match(workflowPresentationSource,
+    /stage\.stage === 'STAGE4' \? 'ΑΝΑΜΟΝΗ'/);
+assert.match(workflowPresentationSource,
+    /previewNotice\?\.classList\.toggle\('d-none', presentationStatus !== 'LOCKED'\)/);
+assert.doesNotMatch(workflowPresentationSource,
+    /presentationStatus === 'ACTIVE'[\s\S]{0,120}employmentReviewStage4PreviewNotice/);
+assert.equal(mayStage3Lifecycle.stages.STAGE4.presentation_status, 'LOCKED');
+assert.equal(completedLifecycle.stages.STAGE4.presentation_status, 'COMPLETED');
+
+guideSandbox.currentWeeklyHrStage2BulkPreview = {
+    safe_bulk_count: 19, manual_exception_count: 0, already_resolved_count: 66
+};
+guideSandbox.renderGuide(readyAutomaticLifecycle);
+assert.match(attentionElement.innerHTML, /19 περιπτώσεις είναι έτοιμες για ασφαλή ενημέρωση/);
+assert.match(attentionElement.innerHTML, /0 χρειάζονται χειροκίνητο έλεγχο/);
+assert.match(attentionElement.innerHTML, /66 έχουν ήδη τακτοποιηθεί/);
+assert.match(attentionElement.innerHTML, /Προεπισκόπηση 19 ενημερώσεων/);
+
+guideSandbox.renderGuide(completedLifecycle);
+assert.match(attentionElement.innerHTML, /Ο έλεγχος ολοκληρώθηκε/);
+assert.doesNotMatch(attentionElement.innerHTML, /data-employment-review-attention-stage/);
+const blockedLifecycle = { current_stage: 'STAGE2', stages: {
+    STAGE1: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },
+    STAGE2: { presentation_status: 'ACTIVE', business_status: 'BLOCKED', open_by_default: true,
+        pending_reasons: ['BLOCKER'] },
+    STAGE3: { presentation_status: 'LOCKED', business_status: 'OPEN' },
+    STAGE4: { presentation_status: 'LOCKED', business_status: 'OPEN' }
+} };
+guideSandbox.renderGuide(blockedLifecycle);
+assert.match(progressElement.innerHTML, /is-blocked/);
+assert.match(progressElement.innerHTML, /Χρειάζεται διόρθωση/);
+assert.match(attentionElement.innerHTML, /Διορθώστε τα στοιχεία του τρέχοντος σταδίου/);
+
+const accordionCalls = Object.fromEntries(['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4']
+    .map((stageKey) => [stageKey, { show: 0, hide: 0 }]));
+const collapseByStage = Object.fromEntries(Object.keys(accordionCalls)
+    .map((stageKey) => [stageKey, { stageKey }]));
+guideSandbox.document.querySelector = (selector) => collapseByStage[
+    Object.keys(collapseByStage).find((stageKey) => selector.includes(stageKey))
+] || null;
+guideSandbox.bootstrap.Collapse.getOrCreateInstance = (collapse, options) => {
+    assert.equal(options.toggle, false);
+    return { show() { accordionCalls[collapse.stageKey].show += 1; },
+        hide() { accordionCalls[collapse.stageKey].hide += 1; } };
+};
+const syncLifecycle = { stages: {
+    STAGE1: { stage: 'STAGE1', business_status: 'COMPLETED', open_by_default: false },
+    STAGE2: { stage: 'STAGE2', business_status: 'COMPLETED', open_by_default: false },
+    STAGE3: { stage: 'STAGE3', business_status: 'OPEN', presentation_status: 'ACTIVE',
+        open_by_default: true },
+    STAGE4: { stage: 'STAGE4', business_status: 'BLOCKED', presentation_status: 'LOCKED',
+        open_by_default: false }
+} };
+guideSandbox.requestAutoOpen();
+assert.equal(guideSandbox.syncAccordion(syncLifecycle), true);
+assert.deepEqual(accordionCalls.STAGE1, { show: 0, hide: 1 });
+assert.deepEqual(accordionCalls.STAGE2, { show: 0, hide: 1 });
+assert.deepEqual(accordionCalls.STAGE3, { show: 1, hide: 0 });
+assert.deepEqual(accordionCalls.STAGE4, { show: 0, hide: 1 });
+
+Object.values(accordionCalls).forEach((calls) => { calls.show = 0; calls.hide = 0; });
+assert.equal(guideSandbox.syncAccordion(syncLifecycle), false,
+    'η ασύγχρονη ανανέωση δεν επαναφέρει το τρέχον στάδιο');
+assert.equal(Object.values(accordionCalls).reduce((sum, calls) =>
+    sum + calls.show + calls.hide, 0), 0);
+
+guideSandbox.requestAutoOpen();
+syncLifecycle.stages.STAGE2 = { stage: 'STAGE2', business_status: 'BLOCKED',
+    presentation_status: 'ACTIVE', open_by_default: true };
+syncLifecycle.stages.STAGE3.open_by_default = false;
+guideSandbox.syncAccordion(syncLifecycle);
+assert.equal(accordionCalls.STAGE2.show, 1, 'το τρέχον blocker ανοίγει');
+assert.equal(accordionCalls.STAGE3.hide, 1);
+
+Object.values(accordionCalls).forEach((calls) => { calls.show = 0; calls.hide = 0; });
+guideSandbox.requestAutoOpen();
+guideSandbox.syncAccordion(completedLifecycle);
+assert.equal(Object.values(accordionCalls).reduce((sum, calls) => sum + calls.show, 0), 0,
+    'ολοκληρωμένο lifecycle δεν ανοίγει αυθαίρετο στάδιο');
+assert.equal(Object.values(accordionCalls).reduce((sum, calls) => sum + calls.hide, 0), 4);
+const syncSource = source.slice(source.indexOf('function syncEmploymentReviewStageAccordionState'),
+    source.indexOf('function renderEmploymentReviewWorkflowGuide'));
+assert.doesNotMatch(syncSource, /fetch|submit|scrollIntoView|\.focus\s*\(/);
+assert.match(syncSource, /bootstrap\.Collapse\.getOrCreateInstance/);
+assert.match(syncSource, /if \(!employmentReviewStageAutoOpenPending\) return false/);
+
+Object.values(accordionCalls).forEach((calls) => { calls.show = 0; calls.hide = 0; });
+guideSandbox.requestAutoOpen();
+guideSandbox.cancelAutoOpen();
+assert.equal(guideSandbox.syncAccordion(syncLifecycle), false,
+    'η χειροκίνητη επιλογή ακυρώνει εκκρεμή αυτόματη επιλογή');
+assert.equal(Object.values(accordionCalls).reduce((sum, calls) =>
+    sum + calls.show + calls.hide, 0), 0);
+
+let shown = 0;
+let focused = 0;
+let scrolled = 0;
+const focusItem = { querySelector: (selector) => selector === '.accordion-button'
+    ? { disabled: false, focus() { focused += 1; } } : { },
+scrollIntoView() { scrolled += 1; } };
+guideSandbox.document.querySelector = () => focusItem;
+guideSandbox.bootstrap.Collapse.getOrCreateInstance = () => ({ show() { shown += 1; } });
+assert.equal(guideSandbox.focusStage('STAGE3'), true);
+assert.equal(shown, 1);
+assert.equal(focused, 1);
+assert.equal(scrolled, 1);
+assert.doesNotMatch(source.slice(guideStart, guideEnd), /fetch\s*\(/);
 const progressedLifecycle = sandbox.derive([{ scope: { employee_kodikos: '0004' },
     lifecycle_projection: { stages: {
         stage1: stage('COMPLETED'), stage2: stage('OPEN', 1),
@@ -175,8 +366,55 @@ assert.deepEqual(Array.from(unsortedStage3.stages.STAGE3.pending_items, (item) =
     ['2026-06-03', '2026-06-09', '2026-06-10', '2026-06-22']);
 assert.match(source, /button\.disabled = stageViewLocked/);
 assert.match(source, /aria-disabled[\s\S]{0,100}stageViewLocked/);
-assert.match(source, /ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ/);
-assert.match(source, /ΑΝΑΜΟΝΗ ΟΛΟΚΛΗΡΩΣΗΣ ΠΡΟΗΓΟΥΜΕΝΟΥ ΣΤΑΔΙΟΥ/);
+assert.match(source, /ΧΡΕΙΑΖΕΤΑΙ Η ΠΡΟΣΟΧΗ ΣΑΣ/);
+assert.match(source, /ΟΛΟΚΛΗΡΩΘΗΚΕ/);
+assert.doesNotMatch(source, /ΔΕΝ ΑΠΑΙΤΕΙΤΑΙ ΕΝΕΡΓΕΙΑ ΑΠΟ ΤΟ HR/);
+assert.doesNotMatch(source, /Χρειάζεται ενέργεια τώρα/);
+assert.match(source, /employmentReviewWaitingReason\(stage\.stage\)/);
+const firstSearchStart = source.indexOf('async function loadResults(');
+const firstSearchEnd = source.indexOf('function pairNo(', firstSearchStart);
+assert.notEqual(firstSearchStart, -1);
+assert.notEqual(firstSearchEnd, -1);
+assert.ok(firstSearchEnd > firstSearchStart);
+const firstSearchSource = source.slice(firstSearchStart, firstSearchEnd);
+const canonicalReadyAt = firstSearchSource.indexOf('currentCanonicalLifecyclePayloads =');
+const stage2PreviewReadyAt = firstSearchSource.indexOf('currentWeeklyHrStage2BulkPreview =');
+const finalPresentationAt = firstSearchSource.lastIndexOf(
+    'updateEmploymentReviewWorkflowPresentation();');
+const successfulReturnAt = firstSearchSource.lastIndexOf('return true;');
+const loaderBeginAt = firstSearchSource.indexOf('window.AppLoader?.begin(');
+const loaderEndAt = firstSearchSource.lastIndexOf('window.AppLoader?.end();');
+assert.ok(canonicalReadyAt >= 0 && stage2PreviewReadyAt > canonicalReadyAt);
+assert.ok(loaderBeginAt >= 0 && loaderBeginAt < canonicalReadyAt);
+assert.ok(finalPresentationAt > stage2PreviewReadyAt);
+assert.ok(successfulReturnAt > finalPresentationAt,
+    'η πρώτη Αναζήτηση ολοκληρώνει την παρουσίαση πριν επιλυθεί το promise της');
+assert.ok(loaderEndAt > successfulReturnAt,
+    'ο loader κλείνει στο finally μετά την τελική παρουσίαση');
+assert.doesNotMatch(firstSearchSource, /loadPreparedWeeklyHrStage1|focusEmploymentReviewStage|\.click\s*\(/);
+assert.equal((firstSearchSource.match(/\bloadResults\s*\(/g) || []).length, 1,
+    'η πρώτη Αναζήτηση δεν εξαρτάται από δεύτερη loadResults');
+assert.equal((firstSearchSource.match(/fetch\(`\/api\/prodhlomena-oraria\/review\?/g) || []).length, 1,
+    'η διόρθωση δεν επαναλαμβάνει το κύριο αίτημα Αναζήτησης');
+assert.match(source, /renderWeeklyHrStage3\(lifecycle\);\s*syncEmploymentReviewStageAccordionState\(lifecycle\)/);
+const accordionClickSource = source.slice(source.indexOf("document.addEventListener('click', (event) =>"),
+    source.indexOf("document.addEventListener('change',", source.indexOf("document.addEventListener('click', (event) =>")));
+assert.match(accordionClickSource,
+    /\[data-workflow-stage\] \.accordion-button[\s\S]{0,120}cancelEmploymentReviewCurrentStageAutoOpen\(\)/);
+assert.match(accordionClickSource,
+    /STAGE1[\s\S]{0,160}loadPreparedWeeklyHrStage1\(\)/);
+const searchBindingSource = source.slice(source.indexOf("document.getElementById('searchBtn')"),
+    source.indexOf('window.EmploymentReviewHrTest'));
+assert.match(searchBindingSource,
+    /requestEmploymentReviewCurrentStageAutoOpen\(\)[\s\S]*await loadResults\(\)[\s\S]*finally[\s\S]*cancelEmploymentReviewCurrentStageAutoOpen\(\)/);
+const workflowUpdateSource = source.match(
+    /function updateEmploymentReviewWorkflowPresentation\(\) \{[\s\S]*?\n}/
+)?.[0] || '';
+assert.match(workflowUpdateSource, /summary\.replaceChildren\(\)/);
+assert.match(workflowUpdateSource, /summary\.classList\.add\('d-none'\)/);
+assert.doesNotMatch(workflowUpdateSource, /summary\.innerHTML|Τρέχον Στάδιο:|Απαιτείται HR ενέργεια:/);
+assert.match(source, /ACTIVE:\s*'text-bg-warning'/);
+assert.match(source, /weekly-hr-stage3-resolve[^>]*[\s\S]{0,180}Προεπισκόπηση απόφασης/);
 
 const rendered = sandbox.renderWeeklyHrStage2LifecycleFallback(lifecycle);
 assert.equal(rendered, true);
@@ -284,5 +522,14 @@ assert.match(buttonRule, /white-space\s*:\s*normal/);
 assert.match(buttonRule, /margin\s*:\s*0\s*!important/);
 assert.match(headerContentRule, /flex-wrap\s*:\s*wrap/);
 assert.doesNotMatch(buttonRule, /(?:^|\n)\s*height\s*:\s*[0-9.]+(?:px|rem|vh|vw)\s*;/);
+assert.match(getCssRule('.employment-review-progress-step.is-completed'), /--bs-success/);
+assert.match(getCssRule('.employment-review-progress-step.is-current'), /--bs-warning/);
+assert.match(getCssRule('.employment-review-progress-step.is-blocked'), /--bs-danger/);
+assert.match(getCssRule('.employment-review-progress-step'), /--bs-secondary/);
+assert.match(getCssRule('#employmentReviewStagesAccordion > .workflow-stage-current > .accordion-header > .accordion-button'),
+    /--bs-warning/);
+assert.match(getCssRule('#employmentReviewStagesAccordion > .workflow-stage-blocked > .accordion-header > .accordion-button'),
+    /--bs-danger/);
+assert.match(getCssRule('.employment-review-action-primary'), /--bs-primary/);
 
 console.log('employment review four-stage accordion projection tests passed');

@@ -81,7 +81,8 @@ assert.strictEqual(helpers.boundaryCoverageStatusLabel('NO_CARD_DATA_FOUND'),
 assert.strictEqual(helpers.boundaryCoverageStatusLabel('NOT_REQUIRED'), 'Δεν απαιτείται');
 
 assert.match(source, /let currentEmploymentReviewBoundaryContextPreflight = null;/);
-assert.match(source, /async function loadResults\(\)[\s\S]*?currentEmploymentReviewBoundaryContextPreflight = null;/);
+assert.match(source,
+    /async function loadResults\([^)]*\)[\s\S]*?currentEmploymentReviewBoundaryContextPreflight = null;/);
 assert.match(source,
     /currentEmploymentReviewBoundaryContextPreflight = payload\.finalized === true[\s\S]*?payload\.boundaryContextPreflight \|\| null;/);
 
@@ -111,6 +112,10 @@ assert.match(source,
 assert.match(view, /<button type="button" id="employmentReviewBoundaryContextButton"/);
 assert.match(view, /Πληροφορίες οριακών εβδομάδων/);
 assert.doesNotMatch(view, /<button[^>]*id="employmentReviewBoundaryContextButton"[^>]*type="submit"/);
+assert.match(view,
+    /<div class="d-none" aria-hidden="true">\s*<button type="button" id="employmentReviewBoundaryContextButton"/);
+assert.match(source, /Η εβδομάδα περιλαμβάνει ημέρες από άλλη περίοδο\./);
+assert.match(source, /Οι ημέρες αυτές εμφανίζονται μόνο για πλαίσιο και δεν αλλάζουν από εδώ\./);
 
 assert.match(css, /\.employment-review-boundary-context-button\s*\{/);
 assert.match(css, /\.employment-review-boundary-sides\s*\{[\s\S]*?display: grid;/);
@@ -246,5 +251,18 @@ assert.strictEqual(button.onclick, null);
 assert.strictEqual(deferredEntry.deferred_week_id, 'unchanged-E');
 assert.doesNotMatch(view, /id="employmentReviewDeferredWeeks"/);
 assert.doesNotMatch(source, /deferredContainer\.innerHTML/);
+assert.match(source, /employment_date_scope \|\| \{\}/);
+assert.match(source, /authoritative_date_set \|\| \[\]/);
+assert.match(source, /Τρέχουσα περίοδος — επιτρέπεται απόφαση/);
+assert.match(source, /context_only_dates \|\| \[\]/);
+assert.match(source, /Άλλη περίοδος — μόνο πλαίσιο/);
+assert.match(source, /Η εβδομάδα περιλαμβάνει ημέρες από άλλη περίοδο\./);
+assert.match(source, /Οι ημέρες αυτές εμφανίζονται μόνο για πλαίσιο και δεν αλλάζουν από εδώ\./);
+assert.match(source,
+    /function stage3BoundaryWeekGuidance[\s\S]*?context_only_dates \|\| \[\][\s\S]*?if \(!contextDates\.length\) return '';/);
+const stage3DecisionSection = source.slice(source.indexOf('function renderStage3DecisionItem('),
+    source.indexOf('function stage3BoundaryWeekGuidance('));
+assert.doesNotMatch(stage3DecisionSection, /context_only_dates|period_start|period_end/,
+    'οι πληροφοριακές ημέρες δεν αποκτούν ξεχωριστή διαδρομή απόφασης');
 
 console.log('Boundary UI regression tests: PASS');

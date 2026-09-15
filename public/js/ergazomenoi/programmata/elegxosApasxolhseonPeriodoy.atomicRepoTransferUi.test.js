@@ -338,7 +338,23 @@ function testStage1DailyClassificationPresentationPriority() {
     assert.strictEqual(storedAbsence.text, 'ΑΠΟΥΣΙΑ');
     assert.ok(storedAbsence.className.includes('cell-stage1-absence'));
     assert.ok(!storedLeave.className.includes('cell-stage1-absence'));
-    assert.match(source, /\.cell-stage1-absence\s*\{[^}]*color:\s*#dc3545\s*!important/s);
+    const stage1AbsenceStyle = source.match(
+        /#employmentReviewWorkspace\s+#employmentReviewStage4Collapse\s+#resultsTable\s+\.employee-detail-row\s*>\s*td\.cell-stage1-absence\s*\{([^}]*)\}/)?.[1];
+    assert.ok(stage1AbsenceStyle, 'Stage1 absence must retain its scoped cell style');
+    assert.match(stage1AbsenceStyle,
+        /background-color:\s*var\(--stage4-absence-bg\)\s*!important/);
+    assert.match(stage1AbsenceStyle,
+        /color:\s*var\(--stage4-absence-text\)\s*!important/);
+    const normalAbsenceStyle = source.match(
+        /#employmentReviewWorkspace\s+#employmentReviewStage4Collapse\s+#resultsTable\s+\.employee-detail-row\s*>\s*td\.cell-apoysia\s*\{([^}]*)\}/)?.[1];
+    assert.ok(normalAbsenceStyle, 'Normal absence must retain its scoped cell style');
+    assert.match(normalAbsenceStyle,
+        /background-color:\s*var\(--stage4-absence-bg\)\s*!important/);
+    assert.match(normalAbsenceStyle,
+        /color:\s*var\(--stage4-absence-text\)\s*!important/);
+    assert.match(normalAbsenceStyle,
+        /box-shadow:\s*inset 3px 0 0 var\(--stage4-absence-border\)/);
+    assert.doesNotMatch(stage1AbsenceStyle + normalAbsenceStyle, /#dc3545/i);
     assert.strictEqual(sandbox.resolveReviewApologistikoPresentation(possible, {}).text,
         'ΠΙΘΑΝΗ ΑΔΕΙΑ');
     assert.notStrictEqual(sandbox.resolveReviewApologistikoPresentation(possible, {}).text,
@@ -2427,7 +2443,8 @@ function testSharedLifecyclePanelAndActiveWorkspaceScopeContract() {
     const simpleIndex = viewSource.indexOf('id="hrReviewWorkspace"');
     const advancedIndex = viewSource.indexOf('id="advancedReviewWorkspace"');
     assert.ok(panelIndex >= 0 && panelIndex < simpleIndex && panelIndex < advancedIndex);
-    assert.ok(source.includes('await loadEmploymentPeriodControl(advancedBranch)'));
+    assert.ok(source.includes(
+        'loadEmploymentPeriodControl(advancedBranch, { render: false })'));
     assert.ok(source.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ BASELINE'"));
     assert.ok(source.includes("state?.past_deadline ? 'ΕΚΠΡΟΘΕΣΜΗ' : 'ΕΝΤΟΣ ΠΡΟΘΕΣΜΙΑΣ'"));
     assert.ok(source.includes("actions.historical_reconstruct === true || actions.historical_reassess === true"));
@@ -2840,8 +2857,10 @@ function testPreAndPostCalculationWorkflowGating() {
     assert.ok(loadResultsSource.includes(
         'if (payload.finalized !== true && hasAuthoritativeResult)'
     ));
-    assert.ok(loadResultsSource.indexOf('renderPreCalculationDataIssues(rows);') <
-        loadResultsSource.indexOf('fetchPolicyPreviewGrouping(params)'));
+    assert.match(loadResultsSource,
+        /const shouldLoadWritableHelpers\s*=\s*payload\.finalized !== true && hasAuthoritativeResult;/);
+    assert.match(loadResultsSource,
+        /const policyHelperPromises = shouldLoadWritableHelpers\s*\?\s*\{/);
 
     const provisionalState = {
         effective_mode: 'NORMAL',
@@ -3387,8 +3406,12 @@ function testMinimalWorkspaceEjsContract() {
 }
 
 function testEmploymentReviewScrollContainerContract() {
-    assert.ok(/\.employment-review-page-shell\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)[^}]*overflow:\s*hidden/s.test(cssSource));
-    assert.ok(/\.employment-review-card\s*\{[^}]*display:\s*flex[^}]*height:\s*100%[^}]*min-height:\s*0[^}]*overflow:\s*hidden/s.test(cssSource));
+    assert.ok(/\.employment-review-page-shell\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)[^}]*grid-template-areas:[^}]*"period-status"[^}]*"workspace"[^}]*overflow:\s*hidden/s.test(cssSource));
+    assert.ok(/\.employment-review-page-shell\s*\{[^}]*--employment-review-footer-gap:\s*5px[^}]*padding-bottom:\s*var\(--employment-review-shadow-clearance\)/s.test(cssSource));
+    assert.ok(/#employmentPeriodControlPanel\s*\{[^}]*grid-area:\s*period-status/s.test(cssSource));
+    assert.ok(/\.employment-review-workspace\s*\{[^}]*grid-area:\s*workspace[^}]*overflow:\s*visible/s.test(cssSource));
+    assert.ok(/\.employment-review-card\s*\{[^}]*display:\s*flex[^}]*height:\s*100%[^}]*min-height:\s*0[^}]*overflow:\s*hidden[^}]*border-radius:/s.test(cssSource));
+    assert.ok(/\.employment-review-card\.z-depth-5\s*\{[^}]*box-shadow:/s.test(cssSource));
     assert.ok(/\.review-card-body\s*\{[^}]*display:\s*flex[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*hidden/s.test(cssSource));
     assert.ok(/\.employment-review-scroll-container\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*auto/s.test(cssSource));
     assert.ok(!cssSource.includes('--employment-review-viewport-offset'));

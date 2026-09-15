@@ -89,6 +89,7 @@ function sessionEnvelope(value) {
 async function resolveWeeklyHrStage3Day({
     initialContext, expected_input_fingerprint, expected_stage3_version, final_classification,
     leave_category = '', reason_or_notes, request_id, actor: rawActor,
+    command_identity = '',
     loadFreshContext, loadPostWriteContext, transactionRunner,
     writeDaily = writeCanonicalDailyClassification,
     stateModel = StateModel, auditModel = AuditModel, now = () => new Date()
@@ -108,15 +109,17 @@ async function resolveWeeklyHrStage3Day({
     assertDecisionAllowed(initialContext, finalClassification);
     const initialFingerprint = buildStage3InputFingerprint(initialContext).fingerprint;
     if (text(expected_input_fingerprint) !== initialFingerprint) fail('STAGE3_INPUT_CHANGED',
-        'Τα δεδομένα της ημέρας άλλαξαν. Επαναλάβετε τον έλεγχο.', 409);
+        'Χρειάζεται ανανέωση πριν συνεχίσετε. Πατήστε «Αναζήτηση» και δοκιμάστε ξανά.', 409);
     const expectedStage3Version = Number(expected_stage3_version);
     if (!Number.isInteger(expectedStage3Version) || expectedStage3Version < 0 ||
         expectedStage3Version !== Number(initialContext.upstream?.stage3_version || 0)) {
         fail('STAGE3_VERSION_CONFLICT',
             'Η έκδοση του Stage 3 άλλαξε πριν από την αποθήκευση.', 409);
     }
-    const identity = stage3CommandIdentity({ context: initialContext,
+    const identity = text(command_identity) || stage3CommandIdentity({ context: initialContext,
         fingerprint: initialFingerprint, finalClassification, actor, reason });
+    if (!/^[a-f0-9]{64}$/.test(identity)) fail('INVALID_STAGE3_COMMAND_IDENTITY',
+        'Μη έγκυρη ταυτότητα εντολής Stage 3.');
 
     return transactionRunner(async (transactionValue) => {
         const envelope = sessionEnvelope(transactionValue);
@@ -136,7 +139,7 @@ async function resolveWeeklyHrStage3Day({
         assertDecisionAllowed(fresh, finalClassification);
         const freshFingerprint = buildStage3InputFingerprint(fresh).fingerprint;
         if (freshFingerprint !== initialFingerprint) fail('STAGE3_INPUT_CHANGED',
-            'Τα authoritative δεδομένα άλλαξαν πριν από την αποθήκευση.', 409);
+            'Χρειάζεται ανανέωση πριν συνεχίσετε. Πατήστε «Αναζήτηση» και δοκιμάστε ξανά.', 409);
         if (Number(fresh.upstream?.stage3_version || 0) !== expectedStage3Version) {
             fail('STAGE3_VERSION_CONFLICT',
                 'Η έκδοση του Stage 3 άλλαξε πριν από την αποθήκευση.', 409);
@@ -199,8 +202,15 @@ async function resolveWeeklyHrStage3Day({
             'Δεν υπολογίστηκε το νέο authoritative Stage-1 fingerprint.', 409);
         let rebasedStage1;
         if (sliceAttestation) {
+            const newStage1Context = text(post.upstream?.stage1_context_fingerprint);
+            if (!/^[a-f0-9]{64}$/.test(newStage1Context)) fail(
+                'STAGE3_POST_WRITE_CONTEXT_FINGERPRINT_MISSING',
+                'Δεν υπολογίστηκε έγκυρο νέο authoritative Stage-1 context fingerprint.', 409);
             const nextSlice = { ...currentSlice,
+                // Preserve the original HR attestation; trusted downstream writes rebase
+                // the natural-week context and actionable-slice effective fingerprints.
                 completion_fingerprint: text(currentSlice.completion_fingerprint),
+                context_fingerprint: newStage1Context,
                 effective_fingerprint: newStage1Effective,
                 version: previousStage1Version + 1 };
             rebasedStage1 = { ...current.stage1,

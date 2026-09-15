@@ -5,6 +5,7 @@ const { buildHrSelectableLeaveCategoryQuery } = require('../../services/ergazome
 const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { getOrarioTermsForDate: resolveTemporalWorkTerms } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('../../utils/ergazomenoi/employmentProfileHistory');
+const { appendStage4BlockedDeviationRows } = require('../../services/ergazomenoi/apasxoliseisStage4BlockedDeviationPresentationService');
 // module.exports = erganhController;
 
 const mongoose = require('mongoose');
@@ -455,7 +456,8 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowProjectionService');
 const {
     buildWeeklyHrLifecycleProjection,
-    buildFinalizedWeeklyHrLifecyclePresentation
+    buildFinalizedWeeklyHrLifecyclePresentation,
+    stage3FingerprintResolvedDates
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildWeeklyLifecycleWithStage2State } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleStage2StateService'
@@ -534,6 +536,14 @@ function createWeeklyHrStage2BulkResponseStream(req, res) {
 const {
     resolveWeeklyHrStage3Day: executeWeeklyHrStage3Day
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3ResolutionService');
+const {
+    buildWeeklyHrStage3BulkPreview
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewService');
+const {
+    normalizeStage3BulkApplyCommand,
+    inspectStage3BulkIdempotency,
+    applyWeeklyHrStage3Bulk
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3BulkApplyService');
 const {
     resolveDailyActualWorkFacts: resolveStage3DailyActualWorkFacts
 } = require('../../services/ergazomenoi/apasxoliseisDailyActualWorkFactsService');
@@ -1253,30 +1263,32 @@ function assertReviewDecisionMutualExclusion(row = {}) {
     }
 }
 
-async function activeEmploymentReviewPeriodDates(req) {
-    const period = await PeriodsModel.findOne({
+async function activeEmploymentReviewPeriodDates(req, session = null) {
+    const query = PeriodsModel.findOne({
         xrhsh: req.session.yearInUse,
         kodikos: req.session.periodInUse
-    }).select('apo eos').lean();
+    }).select('apo eos');
+    const period = await (session ? query.session(session) : query).lean();
     if (!period?.apo || !period?.eos) {
         throw weeklyHrApiError('INVALID_PERIOD_SCOPE', 400, 'Δεν βρέθηκε η ενεργή περίοδος.');
     }
     return { period_start: period.apo, period_end: period.eos };
 }
 
-async function activeEmploymentReviewPeriodScope(req, branchOverride = '') {
-    const dates = await activeEmploymentReviewPeriodDates(req);
+async function activeEmploymentReviewPeriodScope(req, branchOverride = '', session = null) {
+    const dates = await activeEmploymentReviewPeriodDates(req, session);
     const branch = String(branchOverride || req.body?.ypokatasthma || req.query?.ypokatasthma || '').trim();
     if (!branch || branch.toUpperCase() === 'ALL' || branch.includes(',')) {
         const error = new Error('Δεν ήταν δυνατό να προσδιοριστεί η περίοδος και το παράρτημα.');
         error.code = 'INVALID_PERIOD_SCOPE'; error.statusCode = 400; throw error;
     }
     const normalizedBranch = branch.padStart(4, '0');
-    const branchRecord = await YpokatasthmataModel.findOne({
+    const branchQuery = YpokatasthmataModel.findOne({
         team: req.session.userTeam,
         companykod_object: String(req.session.companyInUse || ''),
         kodikos: normalizedBranch
-    }).select('_id').lean();
+    }).select('_id');
+    const branchRecord = await (session ? branchQuery.session(session) : branchQuery).lean();
     if (!branchRecord) {
         const error = new Error('Το παράρτημα δεν ανήκει στην ενεργή εταιρεία.');
         error.code = 'PERIOD_CONTROL_SCOPE_FORBIDDEN'; error.statusCode = 403; throw error;
@@ -3724,6 +3736,11 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
         effective_hourly_rate: effectiveProfile.pragmatikoOromisthio ?? null,
         effective_profile_source: reviewPhaseCode ? 'SCHEDULE_PHASE' :
             effectiveProfile.resolution_source || effectiveProfile.source || '',
+        effective_daily_employment_source:
+            effectiveProfile.daily_employment_snapshot_source || '',
+        effective_daily_employment_effective_from:
+            effectiveProfile.hmeromhnia_isxyos_oron_ergasias_apo ||
+            effectiveProfile.hmeromhnia_allaghs_orarioy_apo || null,
         effective_profile_resolution_blocked: effectiveProfile.resolution_blocked === true,
         effective_profile_resolution_reason: effectiveProfile.resolution_reason || '',
         effective_profile_company_id: effectiveProfile.profile_company_id || null,
@@ -3746,10 +3763,19 @@ function weeklyHrStage2LifecycleProfileFromRow(row = {}) {
         eidikh_periptosh: row.effective_special_case,
         source: row.effective_profile_source,
         resolution_source: row.effective_profile_source,
+        daily_employment_snapshot_source: row.effective_daily_employment_source || '',
+        hmeromhnia_isxyos_oron_ergasias_apo:
+            row.effective_daily_employment_effective_from || null,
         resolution_blocked: row.effective_profile_resolution_blocked === true,
         resolution_reason: row.effective_profile_resolution_reason || '',
         profile_company_id: row.effective_profile_company_id || null,
         profile_employee_id: row.effective_profile_employee_id || null };
+}
+
+function resolveWeeklyHrSearchDailyProfile({ row = {}, employee = {}, istorikoRows = [],
+    resolveProfileForDate = null } = {}) {
+    return getDailyRepoProfileInfo({ row, istorikoRows, ergazomenos: employee,
+        resolveProfileForDate }).profile;
 }
 
 function findReviewOperationalPhaseForDate(phases = [], dateKey = '') {
@@ -4385,7 +4411,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
     const branch = String(input.ypokatasthma || '').trim().padStart(4, '0');
     const employeeId = String(input.employee_id || '').trim();
     const week = normalizeNaturalWeek(input.week_start, input.week_end);
-    const periodScope = await activeEmploymentReviewPeriodScope(req, branch);
+    const periodScope = await activeEmploymentReviewPeriodScope(req, branch, session);
     if (!mongoose.isValidObjectId(employeeId)) {
         throw weeklyHrApiError('INVALID_WEEK_SCOPE', 400, 'Μη έγκυρη ταυτότητα εργαζομένου.');
     }
@@ -4422,7 +4448,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
         }).select(CANONICAL_HISTORY_SELECT_FIELDS)
             .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 })).lean();
     const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
-        team: base.team, employees: [employee]
+        team: base.team, employees: [employee], session
     });
     const resolveProfileForDate = (reviewDate) =>
         resolveEffectiveEmploymentProfileForReviewDate({
@@ -4466,13 +4492,55 @@ async function loadWeeklyHrContext({ req, input, session = null,
         getDailyRepoProfileInfo({ row, istorikoRows: histories, ergazomenos: employee,
             resolveProfileForDate }).profile
     ]));
-    return { base, employee, rows, week, employmentDateScope, periodScope,
+    return { base, employee, rows, week, histories, resolveProfileForDate,
+        employmentDateScope, periodScope,
         effectiveProfile: profile.effectiveProfile,
         effectiveProfilesByDate };
 }
 
+function prepareWeeklyHrStage3LifecycleInputs({ weekly, phaseContextByKodikos }) {
+    const preparedRows = weekly.rows.map((row) => {
+        const effectiveProfile = resolveWeeklyHrSearchDailyProfile({ row,
+            employee: weekly.employee, istorikoRows: weekly.histories,
+            resolveProfileForDate: weekly.resolveProfileForDate });
+        return prepareWeeklyHrStage2LifecycleRow({ row, effectiveProfile,
+            reviewPhaseCode: getReviewPhaseCodeForRow(row, phaseContextByKodikos) });
+    });
+    const preparedProfilesByDate = Object.fromEntries(preparedRows.map((row) => [
+        dateKeyUtc(row.hmeromhnia), weeklyHrStage2LifecycleProfileFromRow(row) ]));
+    return { preparedRows, preparedProfilesByDate,
+        effectiveProfile: preparedProfilesByDate[dateKeyUtc(preparedRows.at(-1)?.hmeromhnia)] || {} };
+}
+
 async function loadWeeklyHrStage3DecisionContext({ req, input, session = null }) {
     const weekly = await loadWeeklyHrContext({ req, input, session });
+    // A transactional Stage-3 reload must derive operational phases from the
+    // same session snapshot as its rows and workflow state.
+    let phasePreparedContext = null;
+    if (session) {
+        const phaseRows = await ProdhlomenaOrariaModel.find({ ...weekly.base,
+            kodikos: weekly.employee.kodikos,
+            hmeromhnia: mongoose.trusted({
+                $gte: startOfWeekMondayUtc(weekly.periodScope.period_start),
+                $lte: endOfWeekSundayUtc(weekly.periodScope.period_end) })
+        }).sort({ hmeromhnia: 1 }).session(session).lean();
+        const employeeByCode = new Map([[String(weekly.employee.kodikos), weekly.employee]]);
+        const historyByEmployee = new Map([[String(weekly.employee.kodikos), weekly.histories]]);
+        phasePreparedContext = { employeeByCode,
+            ...buildPreparedPhaseHistoryMaps({ historyByEmployee, employeeByCode,
+                periodStart: weekly.periodScope.period_start,
+                periodEnd: weekly.periodScope.period_end }),
+            rowsByEmployee: new Map([[String(weekly.employee.kodikos), phaseRows]]) };
+    }
+    const phaseContextByKodikos = await buildReviewPhaseContextByKodikos({
+        team: weekly.base.team, company_kod: weekly.base.company_kod,
+        kodikoi: [String(weekly.employee.kodikos)],
+        ypokatasthma: weekly.base.ypokatasthma,
+        periodStart: weekly.periodScope.period_start,
+        periodEnd: weekly.periodScope.period_end,
+        ...(phasePreparedContext || {}) });
+    const { preparedRows, preparedProfilesByDate, effectiveProfile } =
+        prepareWeeklyHrStage3LifecycleInputs({ weekly, phaseContextByKodikos });
     const applySession = (query) => session ? query.session(session) : query;
     const state = await applySession(ApasxoliseisWeeklyHrWorkflowStateModel.findOne({
         ...weekly.base, employee_id: weekly.employee._id,
@@ -4481,11 +4549,12 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
     const periodScope = weekly.employmentDateScope?.context_only_dates?.length
         ? weekly.periodScope : null;
     const lifecycle = buildWeeklyHrLifecycleProjection({
-        weekRows: weekly.rows.map((row) => ({ ...row, team: weekly.base.team,
+        weekRows: preparedRows.map((row) => ({ ...row, team: weekly.base.team,
             company_kod: weekly.base.company_kod, employee_id: weekly.employee._id })),
-        effectiveProfile: weekly.effectiveProfile,
-        effectiveProfilesByDate: weekly.effectiveProfilesByDate,
+        effectiveProfile,
+        effectiveProfilesByDate: preparedProfilesByDate,
         persistedStage1State: state?.stage1 || null,
+        persistedStage2State: state?.stage2 || null,
         persistedStage3State: state?.stage3 || null,
         scope: { ...weekly.base, employee_id: weekly.employee._id,
             employee_kodikos: weekly.employee.kodikos,
@@ -4495,7 +4564,7 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
     });
     const rowId = String(input.row_id || '').trim();
     const decisionDate = dateKeyUtc(input.decision_date);
-    const row = weekly.rows.find((candidate) => String(candidate._id) === rowId &&
+    const row = preparedRows.find((candidate) => String(candidate._id) === rowId &&
         dateKeyUtc(candidate.hmeromhnia) === decisionDate);
     if (!row) throw weeklyHrApiError('STAGE3_ROW_SCOPE_MISMATCH', 409,
         'Η ημερήσια εγγραφή δεν ανήκει στο επιλεγμένο εβδομαδιαίο πλαίσιο.');
@@ -4504,16 +4573,18 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
         employee_kodikos: weekly.employee.kodikos,
         week_start: weekly.week.start, week_end: weekly.week.end,
         ...(periodScope || {}) };
-    return { scope, row: { ...row, team: weekly.base.team,
+    return { scope, employee_name:
+        `${weekly.employee.eponymo || ''} ${weekly.employee.onoma || ''}`.trim(),
+        row: { ...row, team: weekly.base.team,
         company_kod: weekly.base.company_kod },
-        weekRows: weekly.rows,
-        dailyProfile: weekly.effectiveProfilesByDate[decisionDate] || weekly.effectiveProfile,
+        weekRows: preparedRows,
+        dailyProfile: preparedProfilesByDate[decisionDate] || {},
         actualFacts: resolveStage3DailyActualWorkFacts(row),
         isResidual: (stage3.pending_dates || []).includes(decisionDate),
         remaining_dates: [...(stage3.pending_dates || [])],
         stage2: { fingerprint: stage3.stage2_fingerprint,
             status: stage3.stage2_status, resolution: stage3.stage2_resolution,
-            resolved_dates: stage3.stage2_resolved_dates || [] },
+            resolved_dates: stage3FingerprintResolvedDates(stage3) },
         upstream: { stage1_attestation_scope: lifecycle.stages.stage1.attestation_scope,
             stage1_period_start: lifecycle.stages.stage1.period_slice?.period_start || '',
             stage1_period_end: lifecycle.stages.stage1.period_slice?.period_end || '',
@@ -4530,7 +4601,10 @@ async function loadWeeklyHrStage3DecisionContext({ req, input, session = null })
             stage2_fingerprint: stage3.stage2_fingerprint,
             stage2_version: Number(state?.stage2?.version || 0),
             stage3_version: Number(state?.stage3?.version || 0) },
-        lifecycle, workflowState: state };
+        lifecycle, workflowState: state,
+        simulation_inputs: { effectiveProfile,
+            effectiveProfilesByDate: preparedProfilesByDate,
+            periodScope, employmentDateScope: weekly.employmentDateScope } };
 }
 
 async function assertActiveEmploymentReviewStage3DayWritable(req, initial, input) {
@@ -4585,6 +4659,7 @@ async function loadWeeklyHrStage2CompletionContext({ req, input, session = null 
         effectiveProfile: weekly.effectiveProfile,
         effectiveProfilesByDate: weekly.effectiveProfilesByDate,
         persistedStage1State: state?.stage1 || null,
+        persistedStage2State: state?.stage2 || null,
         persistedStage3State: state?.stage3 || null, scope, periodScope,
         employmentDateScope: weekly.employmentDateScope
     });
@@ -4810,12 +4885,15 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             rows, workflowState: state,
             stage2StateDiagnostic: 'STAGE2_INPUT_CHANGED' };
         const employeeHistory = historyByCode.get(employeeCode) || [];
-        const resolvedProfilesByDate = Object.fromEntries(rows.map((row) => [
-            dateKeyUtc(row.hmeromhnia), resolveEffectiveEmploymentProfileForReviewDate({
-                reviewDate: row.hmeromhnia, normalEmployee: employee,
-                normalHistory: employeeHistory,
+        const resolveProfileForDate = (reviewDate) =>
+            resolveEffectiveEmploymentProfileForReviewDate({
+                reviewDate, normalEmployee: employee, normalHistory: employeeHistory,
                 borrowedContext: borrowedContexts.get(
-                    borrowedProfileEmployeeKey(employee)) || null }) ]));
+                    borrowedProfileEmployeeKey(employee)) || null });
+        const resolvedProfilesByDate = Object.fromEntries(rows.map((row) => [
+            dateKeyUtc(row.hmeromhnia), getDailyRepoProfileInfo({ row,
+                istorikoRows: employeeHistory, ergazomenos: employee,
+                resolveProfileForDate }).profile ]));
         rows = rows.map((row) => {
             const profile = resolvedProfilesByDate[dateKeyUtc(row.hmeromhnia)] || {};
             const preparedRow = prepareWeeklyHrStage2LifecycleRow({ row, effectiveProfile: profile,
@@ -4840,6 +4918,7 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
         const lifecycle = buildWeeklyHrLifecycleProjection({ weekRows: rows,
             effectiveProfile, effectiveProfilesByDate,
             persistedStage1State: state.stage1 || null,
+            persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null, scope,
             periodScope, employmentDateScope, companyPolicyRules });
         return { scope, rows, lifecycle, workflowState: state, employee,
@@ -5065,6 +5144,18 @@ function correctiveDeltaPresentation(delta = {}) {
     return output;
 }
 
+function stage3AuditDecisionDatesByEmployeeWeek(audits = []) {
+    const byWeek = new Map();
+    for (const audit of audits) {
+        if (audit.action !== 'STAGE3_DAILY_RESOLVED') continue;
+        const key = `${String(audit.employee_id || '')}|${dateKeyUtc(audit.week_start)}`;
+        const dates = byWeek.get(key) || [];
+        dates.push(audit.decision_date);
+        byWeek.set(key, dates);
+    }
+    return byWeek;
+}
+
 async function buildPreparedReviewLifecycleContext({ req, policyContextRows, ownershipPeriod,
     lifecycleByKodikos, employeeByCode, periodStart, periodEnd }) {
     const rowsByEmployeeWeek = new Map();
@@ -5094,6 +5185,8 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
     const workflowByEmployeeWeek = new Map(workflowStates.map((state) => [
         `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`, state
     ]));
+    const stage3AuditDatesByEmployeeWeek =
+        stage3AuditDecisionDatesByEmployeeWeek(workflowAudits);
     const lifecycleByWeek = new Map();
     for (const [key, weekRows] of rowsByEmployeeWeek) {
         const firstRow = weekRows[0];
@@ -5115,7 +5208,10 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
                 company_kod: String(req.session.companyInUse || '') })),
             effectiveProfile: effectiveProfilesByDate[dateKeyUtc(weekRows.at(-1)?.hmeromhnia)] || {},
             effectiveProfilesByDate, persistedStage1State: state.stage1 || null,
+            persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null,
+            stage3AuditDecisionDates: stage3AuditDatesByEmployeeWeek.get(
+                `${String(state.employee_id || employee._id || '')}|${dateKeyUtc(weekStart)}`) || [],
             scope: { team: req.session.userTeam,
                 company_kod: String(req.session.companyInUse || ''),
                 ypokatasthma: String(firstRow.ypokatasthma || '').padStart(4, '0'),
@@ -5675,6 +5771,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
         `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`,
         state
     ]));
+    const stage3AuditDatesByEmployeeWeek =
+        stage3AuditDecisionDatesByEmployeeWeek(workflowAudits);
     const lifecycleByWeek = new Map();
     for (const [key, weekRows] of reviewWeekRows) {
         const firstRow = weekRows[0];
@@ -5719,7 +5817,10 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             effectiveProfile,
             effectiveProfilesByDate,
             persistedStage1State: state.stage1 || null,
+            persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null,
+            stage3AuditDecisionDates: stage3AuditDatesByEmployeeWeek.get(
+                `${String(state.employee_id || employee._id || '')}|${dateKeyUtc(naturalWeekStart)}`) || [],
             scope: {
                 team: req.session.userTeam,
                 company_kod: String(req.session.companyInUse || ''),
@@ -7228,7 +7329,7 @@ class erganhController {
             const [rows, total, deviationContextRows] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
-                        'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                        'ypokatasthma kodikos hmeromhnia kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_adeias_pistomenes_apologistika kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
@@ -7257,7 +7358,7 @@ class erganhController {
                 requestedPeriodStart && requestedPeriodEnd
                     ? ProdhlomenaOrariaModel.find(deviationContextFilter)
                           .select(
-                              'team company_kod ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                              'team company_kod ypokatasthma kodikos hmeromhnia kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_adeias_pistomenes_apologistika kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                                   'egkekrimenh_anaplhrosh_apologistika repo repo_apologistika adeia kathgoria_adeias ores_apoysias explicit_hourly_leave_hours egkekrimenh_oroadeia_apologistika hr_declared_leave adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika argia argia_apologistika ' +
                                   'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                                   'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
@@ -7559,9 +7660,11 @@ class erganhController {
                 const erg = ergByKodikos.get(r.kodikos);
                 const istorikoRowsForEmployee =
                     istorikoRowsByKodikos.get(String(r.kodikos || '').trim()) || [];
-                const effectiveProfile = resolveReviewProfile(
-                    r.hmeromhnia, erg || {}, istorikoRowsForEmployee
-                );
+                const resolveProfileForDate = (date) => resolveReviewProfile(
+                    date, erg || {}, istorikoRowsForEmployee);
+                const effectiveProfile = resolveWeeklyHrSearchDailyProfile({ row: r,
+                    employee: erg || {}, istorikoRows: istorikoRowsForEmployee,
+                    resolveProfileForDate });
                 const breakConfiguration = resolveBreakConfigurationForDate(
                     r.hmeromhnia, istorikoRowsForEmployee, erg || {}
                 );
@@ -8064,7 +8167,8 @@ class erganhController {
                 total,
                 totalPages: Math.ceil(total / limitNum),
                 rows: reviewRows,
-                deviations: enrichedDeviations,
+                deviations: appendStage4BlockedDeviationRows({ deviations: enrichedDeviations,
+                    canonicalLifecycleProjections, reviewRows }),
                 pendingDeviationWeeks,
                 legacyDeviations,
                 canonicalLifecycleProjections,
@@ -11716,6 +11820,12 @@ class erganhController {
                     context.employmentDateScope?.employment_owned_dates || null });
             const periodScope = context.employmentDateScope?.context_only_dates?.length
                 ? context.periodScope : null;
+            const stage3Audits = state?.stage3 ? await
+                ApasxoliseisWeeklyHrWorkflowAuditModel.find({ ...context.base,
+                    employee_id: context.employee._id,
+                    week_start: context.week.start, week_end: context.week.end,
+                    action: 'STAGE3_DAILY_RESOLVED' })
+                    .select('decision_date').lean() : [];
             const lifecycleInput = {
                 weekRows: context.rows.map((row) => ({ ...row,
                     team: context.base.team,
@@ -11723,7 +11833,9 @@ class erganhController {
                 effectiveProfile: context.effectiveProfile,
                 effectiveProfilesByDate: context.effectiveProfilesByDate,
                 persistedStage1State: state?.stage1 || null,
+                persistedStage2State: state?.stage2 || null,
                 persistedStage3State: state?.stage3 || null,
+                stage3AuditDecisionDates: stage3Audits.map((audit) => audit.decision_date),
                 scope: { ...context.base, employee_id: context.employee._id,
                     employee_kodikos: context.employee.kodikos,
                     week_start: context.week.start, week_end: context.week.end },
@@ -11836,6 +11948,8 @@ class erganhController {
                 `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`,
                 state
             ]));
+            const stage3AuditDatesByEmployeeWeek =
+                stage3AuditDecisionDatesByEmployeeWeek(rows.__workflowAudits || []);
             const rowsByWeek = new Map();
             const preparedRows = rows.__preparedPolicyContextRows || rows;
             for (const row of preparedRows) {
@@ -11992,10 +12106,13 @@ class erganhController {
                 try { lifecycleWithStage2 = buildWeeklyHrLifecycleProjection({ weekRows,
                     effectiveProfile, effectiveProfilesByDate,
                     persistedStage1State: state.stage1 || null,
+                    persistedStage2State: state.stage2 || null,
                     persistedStage2DecisionState: preparedStage2ByWeek.get(key) || null,
                     stage2StateDiagnostic:
                         preparedStage2ErrorsByWeek.get(key)?.reason || null,
                     persistedStage3State: state.stage3 || null,
+                    stage3AuditDecisionDates: stage3AuditDatesByEmployeeWeek.get(
+                        `${String(state.employee_id || requested.employee_id || '')}|${dateKeyUtc(requested.week_start)}`) || [],
                     scope: lifecycleProjection.scope || requested,
                     periodScope: employmentDateScope.context_only_dates?.length
                         ? { period_start: periodStart, period_end: periodEnd } : null,
@@ -12307,6 +12424,7 @@ class erganhController {
                                 weekRows: mutableRows, effectiveProfile: context.effectiveProfile,
                                 effectiveProfilesByDate: context.effectiveProfilesByDate,
                                 persistedStage1State: context.workflowState.stage1 || null,
+                                persistedStage2State: context.workflowState.stage2 || null,
                                 persistedStage3State: context.workflowState.stage3 || null,
                                 scope: context.scope, periodScope: context.periodScope,
                                 employmentDateScope: context.employmentDateScope });
@@ -12439,6 +12557,99 @@ class erganhController {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'STAGE1_DAILY_CLASSIFICATION_BULK_FAILED',
                 message: error.statusCode ? error.message : 'Αποτυχία μαζικής αποθήκευσης χαρακτηρισμών.' });
+        }
+    };
+
+    static previewWeeklyHrStage3Bulk = async (req, res) => {
+        try {
+            await assertWeeklyHrWorkflowIndexesReady();
+            let leaveCategoryLabel = '';
+            if (String(req.body?.final_classification || '').trim().toUpperCase() === 'LEAVE') {
+                const category = await Models_A.KathgoriesAdeiasModel.findOne({
+                    kodikos: String(req.body?.leave_category || '').trim(),
+                    ...buildHrSelectableLeaveCategoryQuery()
+                }).select('kodikos perigrafh').lean();
+                leaveCategoryLabel = category
+                    ? `${category.kodikos} - ${category.perigrafh}` : '';
+            }
+            const preview = await buildWeeklyHrStage3BulkPreview({ command: req.body,
+                simulateSequential: true,
+                requestScope: { team: req.session.userTeam,
+                    company_kod: req.session.companyInUse }, leaveCategoryLabel,
+                loadAuthoritativeContext: async (item, command) => {
+                    const input = { ...item, ypokatasthma: command.ypokatasthma,
+                        period_start: command.period_start, period_end: command.period_end };
+                    const initial = await loadWeeklyHrStage3DecisionContext({ req, input });
+                    await assertActiveEmploymentReviewStage3DayWritable(req, initial, input);
+                    return initial;
+                } });
+            return res.json({ success: true, ...preview });
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ success: false,
+                code: error.code || 'STAGE3_BULK_PREVIEW_FAILED',
+                message: error.statusCode ? error.message :
+                    'Αποτυχία προεπισκόπησης μαζικών αποφάσεων Stage 3.' });
+        }
+    };
+
+    static applyWeeklyHrStage3Bulk = async (req, res) => {
+        try {
+            await assertWeeklyHrWorkflowIndexesReady();
+            const command = normalizeStage3BulkApplyCommand(req.body);
+            const actor = { user_id: req.session.userId,
+                user_name: req.session.userName || req.session.username ||
+                    String(req.session.userId || ''), role: req.session.userRole };
+            const requestScope = { team: req.session.userTeam,
+                company_kod: req.session.companyInUse };
+            const prior = await inspectStage3BulkIdempotency({ command: req.body,
+                requestScope, actor });
+            if (prior) return res.json({ success: true, ...prior });
+            const firstInput = { ...command.items[0], ypokatasthma: command.ypokatasthma,
+                period_start: command.period_start, period_end: command.period_end };
+            const initial = await loadWeeklyHrStage3DecisionContext({ req, input: firstInput });
+            const periodAccess = await assertActiveEmploymentReviewStage3DayWritable(
+                req, initial, firstInput
+            );
+            const runFence = periodAccess.state.effective_mode ===
+                'HISTORICAL_RECONSTRUCTION_STALE'
+                ? runWithStaleStage3ResolutionWriteFence : runWithPeriodWriteFence;
+            const loadContext = (item, bulkCommand, { session } = {}) =>
+                loadWeeklyHrStage3DecisionContext({ req, session, input: { ...item,
+                    ypokatasthma: bulkCommand.ypokatasthma,
+                    period_start: bulkCommand.period_start,
+                    period_end: bulkCommand.period_end } });
+            const result = await applyWeeklyHrStage3Bulk({ command: req.body,
+                requestScope, actor,
+                loadAuthoritativeContext: loadContext,
+                runAtomic: (work) => runFence({ scope: periodAccess.scope,
+                    expectedToken: { ...periodAccess.token,
+                        write_fence_version: Number(periodAccess.state.write_fence_version || 0) },
+                    work: ({ session, state }) => work({ session,
+                        period_control_version: Number(state?.version || 0),
+                        period_write_fence_version: Number(state?.write_fence_version || 0) })
+                }).then((fenced) => fenced.result),
+                resolveOne: ({ item, command: bulkCommand, current, actor,
+                    request_id, command_identity, expected_input_fingerprint,
+                    expected_stage3_version, envelope }) => executeWeeklyHrStage3Day({
+                    initialContext: current,
+                    expected_input_fingerprint, expected_stage3_version,
+                    final_classification: bulkCommand.final_classification,
+                    leave_category: bulkCommand.leave_category,
+                    reason_or_notes: bulkCommand.reason_or_notes, request_id,
+                    command_identity, actor,
+                    loadFreshContext: ({ session }) => loadContext(item, bulkCommand, { session }),
+                    loadPostWriteContext: ({ session }) => loadContext(item, bulkCommand, { session }),
+                    transactionRunner: (work) => work(envelope)
+                }) });
+            return res.json({ success: true, ...result });
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ success: false,
+                code: error.code || 'STAGE3_BULK_APPLY_FAILED',
+                message: error.statusCode ? error.message :
+                    'Αποτυχία μαζικής εφαρμογής αποφάσεων Stage 3.',
+                applied_count: 0,
+                ...(Array.isArray(error.invalid_items)
+                    ? { invalid_items: error.invalid_items } : {}) });
         }
     };
 
@@ -18661,6 +18872,16 @@ Object.defineProperty(erganhController, '__employmentReviewReportTestHooks', {
 
 Object.defineProperty(erganhController, '__weeklyHrStage2BulkStreamTestHooks', {
     value: Object.freeze({ createWeeklyHrStage2BulkResponseStream }),
+    enumerable: false
+});
+
+Object.defineProperty(erganhController, '__stage3DailyEmploymentProfileTestHooks', {
+    value: Object.freeze({
+        prepareWeeklyHrStage2LifecycleRow,
+        weeklyHrStage2LifecycleProfileFromRow,
+        resolveWeeklyHrSearchDailyProfile,
+        prepareWeeklyHrStage3LifecycleInputs
+    }),
     enumerable: false
 });
 

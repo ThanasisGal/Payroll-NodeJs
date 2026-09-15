@@ -43,16 +43,24 @@
                     <span id="employmentPeriodProtocol"></span>
                 </span>
             </div>
-            <div id="employmentPeriodControlActions" class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-danger" id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-warning" id="historicalReconstructionBtn">Ανακατασκευή Εκπρόθεσμης Περιόδου</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-warning" id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="finalizeEmploymentPeriodBtn">Οριστικοποίηση περιόδου</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="submitFinalWTODayilyABtn">Τελική υποβολή Απολογιστικού Πίνακα στο ΕΡΓΑΝΗ</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-primary" id="openCorrectivePayrollBtn">Άνοιγμα διορθωτικής μισθοδοσίας</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-primary" id="calculateCorrectivePayrollBtn">Καταχώρηση διορθωτικών στοιχείων και υπολογισμός</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-secondary" id="closeCorrectivePayrollBtn">Κλείσιμο διορθωτικής μισθοδοσίας</button>
-                <button type="button" class="btn btn-sm d-none employment-review-action-btn employment-review-action-success" id="postCorrectivePayrollBtn">Καταχώριση διορθωτικής μισθοδοσίας</button>
+            <div id="employmentPeriodControlActions" class="dropdown d-flex flex-wrap gap-2 d-none">
+                <button type="button" id="employmentPeriodActionsDropdown"
+                    class="btn btn-sm dropdown-toggle employment-review-action-btn employment-review-action-secondary"
+                    data-bs-toggle="dropdown" aria-expanded="false">
+                    Ενέργειες περιόδου
+                </button>
+                <div class="dropdown-menu dropdown-menu-end employment-period-actions-menu"
+                    aria-labelledby="employmentPeriodActionsDropdown">
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-danger" data-employment-period-action id="lockEmploymentPeriodBtn">Κλείδωμα περιόδου</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-warning" data-employment-period-action id="historicalReconstructionBtn">Ανακατασκευή Εκπρόθεσμης Περιόδου</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-warning" data-employment-period-action id="unlockEmploymentPeriodBtn">Ξεκλείδωμα περιόδου</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-success" data-employment-period-action id="finalizeEmploymentPeriodBtn">Οριστικοποίηση περιόδου</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-success" data-employment-period-action id="submitFinalWTODayilyABtn">Τελική υποβολή Απολογιστικού Πίνακα στο ΕΡΓΑΝΗ</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-primary" data-employment-period-action id="openCorrectivePayrollBtn">Άνοιγμα διορθωτικής μισθοδοσίας</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-primary" data-employment-period-action id="calculateCorrectivePayrollBtn">Καταχώρηση διορθωτικών στοιχείων και υπολογισμός</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-secondary" data-employment-period-action id="closeCorrectivePayrollBtn">Κλείσιμο διορθωτικής μισθοδοσίας</button>
+                    <button type="button" class="dropdown-item d-none employment-review-action-btn employment-review-action-success" data-employment-period-action id="postCorrectivePayrollBtn">Καταχώριση διορθωτικής μισθοδοσίας</button>
+                </div>
             </div>
         </div>
         <div id="employmentPeriodControlMessage" class="small text-muted mt-1"></div>
@@ -176,8 +184,12 @@
                 </div>
             </div>
 
-            <div id="employmentReviewWorkflowSummary" class="alert alert-light border py-2 d-none" aria-live="polite"></div>
-            <div class="d-flex justify-content-end mb-1">
+            <nav id="employmentReviewWorkflowProgress" class="employment-review-workflow-progress d-none"
+                aria-label="Πρόοδος Ελέγχου Απασχολήσεων"></nav>
+            <section id="employmentReviewAttentionSummary"
+                class="employment-review-attention-summary d-none" aria-live="polite"></section>
+            <div id="employmentReviewWorkflowSummary" class="d-none" aria-hidden="true"></div>
+            <div class="d-none" aria-hidden="true">
                 <button type="button" id="employmentReviewBoundaryContextButton"
                     class="btn btn-sm employment-review-action-btn employment-review-action-secondary employment-review-boundary-context-button d-none">
                     ⓘ Πληροφορίες οριακών εβδομάδων
@@ -242,8 +254,9 @@
                         <div id="employmentReviewStage4Collapse" class="accordion-collapse collapse"
                             data-bs-parent="#employmentReviewStagesAccordion">
                             <div class="accordion-body p-0">
+                <div id="employmentReviewStage4Summary" class="stage4-summary-strip d-none" role="status" aria-live="polite"></div>
                 <div id="employmentReviewStage4PreviewNotice" class="alert alert-info small py-2 mx-2 mt-2 mb-0 d-none">
-                    Προσωρινή προεπισκόπηση — το Στάδιο 4 μπορεί να ελεγχθεί, αλλά δεν μπορεί ακόμη να ολοκληρωθεί.
+                    Προεπισκόπηση — μόνο για ενημέρωση. Ο Τελικός Έλεγχος θα είναι διαθέσιμος μόλις ολοκληρωθεί το προηγούμενο στάδιο.
                 </div>
                 <div class="table-responsive results-table-wrapper">
                     <table class="table table-bordered table-hover align-middle" id="resultsTable">
@@ -296,6 +309,11 @@
                 <i class="bi bi-chevron-double-left"></i>
                 Επιστροφή
             </a>
+            <button type="button" id="employmentReviewScrollToTop"
+                class="btn btn-toTop employment-review-scroll-to-top"
+                aria-label="Επιστροφή στην κορυφή" hidden>
+                <i class="bi bi-chevron-double-up" aria-hidden="true"></i>
+            </button>
         </div>
     </div>
 

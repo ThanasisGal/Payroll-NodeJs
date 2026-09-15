@@ -14374,17 +14374,25 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-page-shell {
+    --employment-review-footer-gap: 5px;
+    --employment-review-top-gap: 1rem;
+    --employment-review-shadow-clearance: 0.75rem;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+        "period-status"
+        "workspace";
     gap: 0.5rem;
     width: 100% !important;
     max-width: 100%;
     min-width: 0;
-    height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) - 1.5rem);
-    max-height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) - 1.5rem);
+    height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) -
+        var(--employment-review-top-gap) - var(--employment-review-footer-gap));
+    max-height: calc(100dvh - var(--app-header-h) - var(--app-footer-h) -
+        var(--employment-review-top-gap) - var(--employment-review-footer-gap));
     margin-left: 0;
     margin-right: 0;
-    padding-bottom: 0;
+    padding-bottom: var(--employment-review-shadow-clearance);
     overflow: hidden;
     box-sizing: border-box;
 }
@@ -14402,6 +14410,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 #employmentPeriodControlPanel {
+    grid-area: period-status;
     margin: 0;
     padding: 0.55rem 0.75rem;
     overflow-wrap: anywhere;
@@ -14428,11 +14437,19 @@ body.loader-active > *:not(.app-loader) {
     height: 100%;
     min-height: 0;
     overflow: hidden;
+    border-radius: var(--bs-border-radius-xl) !important;
+}
+
+.employment-review-card.z-depth-5 {
+    box-shadow:
+        0 0.35rem 0.7rem rgba(33, 37, 41, 0.2),
+        0 0.15rem 0.3rem rgba(33, 37, 41, 0.14) !important;
 }
 
 .employment-review-workspace {
+    grid-area: workspace;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .employment-review-card > .card-header,
@@ -14450,6 +14467,7 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-card > .card-footer {
     padding-block: 0.45rem;
+    border-radius: 0 0 var(--bs-border-radius-xl) var(--bs-border-radius-xl);
 }
 
 .review-card-body {
@@ -14459,6 +14477,25 @@ body.loader-active > *:not(.app-loader) {
     min-height: 0;
     overflow: hidden;
     padding: 0.55rem 0.75rem;
+}
+
+#employmentReviewWorkspace .employment-review-card > .card-footer {
+    display: flex;
+    align-items: center;
+}
+
+#employmentReviewWorkspace .employment-review-scroll-to-top {
+    width: 2.65rem;
+    height: 2.65rem;
+    margin-top: 0 !important;
+    margin-left: auto;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.25);
+}
+
+#employmentReviewWorkspace .employment-review-scroll-to-top:not([hidden]) {
+    display: flex;
 }
 
 .review-filters-sticky {
@@ -14782,6 +14819,18 @@ body.loader-active > *:not(.app-loader) {
     background: var(--bs-primary-bg-subtle, #cfe2ff);
 }
 
+.employment-period-actions-menu {
+    min-width: 17rem;
+    padding: 0.35rem;
+}
+
+.employment-period-actions-menu .dropdown-item {
+    width: 100%;
+    margin: 0.15rem 0;
+    text-align: left;
+    white-space: normal;
+}
+
 .employment-review-action-secondary:disabled {
     background: var(--bs-secondary-bg-subtle, #e9ecef);
 }
@@ -15071,6 +15120,184 @@ body.loader-active > *:not(.app-loader) {
     overflow: auto;
     overscroll-behavior-y: contain;
     scrollbar-gutter: stable;
+}
+
+#employmentReviewWorkspace {
+    --stage4-absence-bg: #f7e8e8;
+    --stage4-absence-text: #7a3434;
+    --stage4-absence-border: #d7a4a4;
+    --stage4-leave-bg: #e8f1e9;
+    --stage4-leave-text: #355c42;
+    --stage4-sickness-bg: #e9edf6;
+    --stage4-sickness-text: #43577a;
+    --stage4-repo-bg: #e7f1ee;
+    --stage4-repo-text: #326357;
+    --stage4-sixth-bg: #fbf3df;
+    --stage4-sixth-text: #725518;
+}
+
+#employmentReviewStage4Collapse .stage4-summary-strip {
+    margin: 0.55rem 0.7rem 0.2rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid #d9e3dc;
+    border-left: 3px solid #72967a;
+    border-radius: 0.35rem;
+    background: #f6faf7;
+    color: #355c42;
+    font-size: 0.84rem;
+    font-weight: 650;
+}
+
+#employmentReviewStage4Collapse .stage4-summary-strip.stage4-summary-attention {
+    border-color: #e4b6b6;
+    border-left-color: #b35d5d;
+    background: #fff8f8;
+    color: #7a3434;
+}
+
+#employmentReviewStage4Collapse .stage4-classification-pill,
+#employmentReviewStage4Collapse .stage4-sixth-day-pill {
+    display: inline-block;
+    padding: 0.18rem 0.48rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+#employmentReviewStage4Collapse .stage4-classification-absence {
+    background: var(--stage4-absence-bg);
+    color: var(--stage4-absence-text);
+    border-color: var(--stage4-absence-border);
+}
+
+#employmentReviewStage4Collapse .stage4-classification-leave {
+    background: var(--stage4-leave-bg);
+    color: var(--stage4-leave-text);
+    border-color: #aac8b1;
+}
+
+#employmentReviewStage4Collapse .stage4-classification-sickness {
+    background: var(--stage4-sickness-bg);
+    color: var(--stage4-sickness-text);
+    border-color: #bcc8dc;
+}
+
+#employmentReviewStage4Collapse .stage4-classification-repo {
+    background: var(--stage4-repo-bg);
+    color: var(--stage4-repo-text);
+    border-color: #a9ccc1;
+}
+
+#employmentReviewStage4Collapse .stage4-sixth-day-pill,
+#employmentReviewStage4Collapse .review-sixth-day-badge {
+    background: var(--stage4-sixth-bg) !important;
+    color: var(--stage4-sixth-text) !important;
+    border: 1px solid #d9c58c;
+}
+
+#employmentReviewStage4Collapse .stage4-sixth-day-badge {
+    display: inline-flex !important;
+    align-items: center;
+    width: auto;
+    max-width: max-content;
+    padding: 0.12rem 0.35rem;
+    font-size: 0.68rem;
+    line-height: 1.1;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+#employmentReviewStage4Collapse .stage4-sixth-day-badge:is(
+    .review-sixth-day-rate-missing, .stage4-sixth-day-rate-missing) {
+    flex-direction: column;
+    width: fit-content;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.05;
+    overflow-wrap: normal;
+}
+
+#employmentReviewStage4Collapse .stage4-sixth-day-badge:is(
+    .review-sixth-day-rate-missing, .stage4-sixth-day-rate-missing) > span {
+    white-space: nowrap;
+}
+
+#employmentReviewStage4Collapse #resultsTable .employee-detail-row > td.cell-no-card-adeia {
+    background: #f8faf8 !important;
+    color: #355c42 !important;
+}
+
+#employmentReviewStage4Collapse #resultsTable .employee-detail-row > td.cell-repo-day,
+#employmentReviewStage4Collapse #resultsTable .employee-detail-row > td.cell-repo-day-applied {
+    background: var(--stage4-repo-bg) !important;
+    color: var(--stage4-repo-text) !important;
+    border-color: #a9ccc1 !important;
+    box-shadow: none;
+}
+
+#employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td {
+    padding-block: 0.52rem;
+    border-color: #e6e9ec;
+}
+
+#employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td:nth-child(n + 7),
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table td.text-end {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+#employmentReviewStage4Collapse #resultsTable > tbody > .employee-group-row > td {
+    font-size: 0.94rem;
+    letter-spacing: 0.01em;
+    border-bottom-color: #d7dee2;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table td,
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table th {
+    border-color: #e3e7ea;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table td {
+    padding-block: 0.48rem;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table .stage4-week-code {
+    display: block;
+    color: #52616b;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table .stage4-week-start {
+    font-weight: 700;
+}
+
+#employmentReviewStage4Collapse #resultsTable .employee-deviation-row > td {
+    background: #f7f9fa !important;
+    border-left: 3px solid #b8c7c0;
+}
+
+#employmentReviewStage4Collapse #resultsTable .employee-deviation-row.stage4-weekly-blocked > td {
+    background: #fff8f8 !important;
+    border-left-color: #b35d5d;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-section-title {
+    background: #eef2f3;
+    box-shadow: inset 0 -1px 0 #d7dee2;
+}
+
+#employmentReviewStage4Collapse #resultsTable .stage4-weekly-blocked .weekly-deviation-section-title {
+    background: #f8eaea;
+    box-shadow: inset 0 -1px 0 #e4b6b6;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-comment .badge.text-bg-danger {
+    margin-bottom: 0.2rem;
 }
 
 .employment-review-scroll-container #resultsTable .employee-subtotal-row:not(.d-none) > td {
@@ -15560,4 +15787,332 @@ body.loader-active > *:not(.app-loader) {
     flex-wrap: wrap;
     align-items: center;
     gap: 0.35rem;
+}
+
+#employmentReviewStagesAccordion > .workflow-stage-current > .accordion-header > .accordion-button {
+    color: var(--bs-warning-text-emphasis, #664d03);
+    background-color: var(--bs-warning-bg-subtle, #fff3cd);
+    box-shadow: inset 0 calc(-1 * var(--bs-border-width, 1px)) 0
+        var(--bs-warning-border-subtle, #ffe69c);
+}
+
+#employmentReviewStagesAccordion > .workflow-stage-blocked > .accordion-header > .accordion-button {
+    color: var(--bs-danger-text-emphasis, #58151c);
+    background-color: var(--bs-danger-bg-subtle, #f8d7da);
+    box-shadow: inset 0 calc(-1 * var(--bs-border-width, 1px)) 0
+        var(--bs-danger-border-subtle, #f1aeb5);
+}
+
+.stage3-employee-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.stage3-employee-identity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+}
+
+.stage3-employee-name {
+    font-size: 0.95rem;
+}
+
+.stage3-employee-code {
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: 0.8rem;
+}
+
+.stage3-week-summary {
+    font-size: 0.8rem;
+}
+
+.stage3-decisions-table-wrapper {
+    max-width: 100%;
+}
+
+.weekly-hr-stage3-decisions-table {
+    width: 100%;
+    min-width: 82rem;
+    table-layout: fixed;
+}
+.weekly-hr-stage3-decisions-table .stage3-col-select { width: 2.25rem; }
+
+.weekly-hr-stage3-decisions-table .stage3-col-date { width: 9%; }
+.weekly-hr-stage3-decisions-table .stage3-col-day { width: 6%; }
+.weekly-hr-stage3-decisions-table .stage3-col-day-status { width: 9%; }
+.weekly-hr-stage3-decisions-table .stage3-col-declared { width: 11%; }
+.weekly-hr-stage3-decisions-table .stage3-col-actual { width: 11%; }
+.weekly-hr-stage3-decisions-table .stage3-col-reason { width: 23%; }
+.weekly-hr-stage3-decisions-table .stage3-col-classification { width: 17%; }
+.weekly-hr-stage3-decisions-table .stage3-col-action { width: 14%; }
+
+.weekly-hr-stage3-decisions-table th,
+.weekly-hr-stage3-decisions-table td {
+    overflow-wrap: anywhere;
+}
+
+.weekly-hr-stage3-decisions-table .stage3-decision-reason {
+    line-height: 1.35;
+}
+
+.weekly-hr-stage3-decisions-table .stage3-decision-classification .form-select,
+.weekly-hr-stage3-decisions-table .stage3-decision-action .weekly-hr-stage3-resolve {
+    width: 100%;
+    min-width: 0;
+}
+
+.weekly-hr-stage3-decisions-table .stage3-decision-action {
+    text-align: center;
+}
+.weekly-hr-stage3-decisions-table .stage3-decision-select {
+    text-align: center;
+    vertical-align: middle;
+}
+.weekly-hr-stage3-bulk-toolbar .weekly-hr-stage3-bulk-field { min-width: 12rem; }
+.weekly-hr-stage3-bulk-toolbar .weekly-hr-stage3-selected-count { min-width: 7rem; }
+
+.swal2-popup.employment-review-stage3-bulk-preview-popup {
+    width: min(46rem, calc(100vw - 2rem)) !important;
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100dvh - 2rem) !important;
+    padding: 0.65rem 0.9rem 0.75rem !important;
+    overflow: hidden !important;
+}
+.swal2-popup.employment-review-stage3-bulk-preview-popup .swal2-html-container {
+    min-height: 0;
+    max-height: calc(100dvh - 19rem) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+}
+.swal2-popup.employment-review-stage3-bulk-preview-popup .swal2-actions {
+    flex-shrink: 0;
+}
+.stage3-bulk-preview-entries { max-height: 15rem; overflow-y: auto; }
+.stage3-bulk-preview-employee + .stage3-bulk-preview-employee { margin-top: .65rem; }
+
+.stage3-decision-explanation {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.4rem;
+    background: var(--bs-body-bg, #fff);
+    line-height: 1.35;
+}
+
+.stage3-decision-explanation-line {
+    padding-left: 0.55rem;
+    border-left: 0.2rem solid var(--bs-info-border-subtle, #9eeaf9);
+}
+
+.stage3-decision-explanation-resolved {
+    border-left-color: var(--bs-success, #198754);
+}
+
+.stage3-decision-explanation-decision {
+    border-left-color: var(--bs-warning, #ffc107);
+    font-weight: 600;
+}
+
+.stage3-decision-explanation-blocker {
+    border-left-color: var(--bs-danger, #dc3545);
+}
+
+.stage3-decision-preview {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.swal2-popup.employment-review-stage3-preview-popup {
+    width: min(42rem, calc(100vw - 2rem)) !important;
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100dvh - 2rem) !important;
+    left: auto !important;
+    padding: 0.55rem 0.85rem 0.65rem !important;
+    border-radius: 0.75rem !important;
+    overflow: hidden !important;
+}
+
+.swal2-popup.employment-review-stage3-preview-popup .swal2-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: 0.3rem auto 0.1rem;
+    font-size: 0.75rem;
+}
+
+.swal2-popup.employment-review-stage3-preview-popup .swal2-title {
+    margin: 0;
+    padding: 0.15rem 0.5rem 0;
+    font-size: 1.3rem;
+}
+
+.swal2-popup.employment-review-stage3-preview-popup .swal2-html-container {
+    min-height: 0;
+    max-height: calc(100dvh - 18rem) !important;
+    margin: 0.35rem 0.1rem 0;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+.swal2-popup.employment-review-stage3-preview-popup .swal2-input-label {
+    margin: 0.35rem 0 0;
+}
+
+.swal2-popup.employment-review-stage3-preview-popup .swal2-textarea {
+    width: calc(100% - 1rem);
+    min-height: 3.75rem;
+    height: 4.25rem;
+    max-height: 8rem;
+    margin: 0.3rem auto 0;
+    resize: vertical;
+}
+
+.swal2-popup.employment-review-stage3-preview-popup .swal2-actions {
+    margin: 0.45rem auto 0;
+}
+
+.employment-review-workflow-progress {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.45rem;
+    background: var(--bs-body-bg, #fff);
+}
+
+.employment-review-workflow-progress ol {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.employment-review-progress-step {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+.employment-review-progress-step > span:last-child {
+    display: grid;
+    min-width: 0;
+}
+
+.employment-review-progress-step small {
+    line-height: 1.2;
+}
+
+.employment-review-progress-marker {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.employment-review-progress-step.is-completed {
+    color: var(--bs-success, #198754);
+}
+
+.employment-review-progress-step.is-current {
+    color: var(--bs-warning-text-emphasis, #664d03);
+}
+
+.employment-review-progress-step.is-blocked {
+    color: var(--bs-danger, #dc3545);
+}
+
+.employment-review-progress-arrow {
+    flex: 0 0 auto;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+.employment-review-attention-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--bs-warning-border-subtle, #ffe69c);
+    border-left: 0.25rem solid var(--bs-warning, #ffc107);
+    border-radius: 0.4rem;
+    background: var(--bs-warning-bg-subtle, #fff3cd);
+}
+
+.employment-review-attention-summary h4 {
+    margin: 0 0 0.15rem;
+    font-size: 0.9rem;
+}
+
+.employment-review-attention-summary p {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+@media (max-width: 767.98px) {
+    .employment-review-workflow-progress ol {
+        display: grid;
+        align-items: start;
+    }
+
+    .employment-review-progress-arrow {
+        display: none;
+    }
+
+    .employment-review-attention-summary {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
+.stage3-decision-preview-identity,
+.stage3-decision-preview-section {
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.45rem;
+    background: var(--bs-body-bg, #fff);
+}
+
+.stage3-decision-before-after {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+.stage3-decision-before-after > div:not(.stage3-decision-arrow) {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.35rem 0.45rem;
+    border-radius: 0.35rem;
+    background: var(--bs-secondary-bg, #e9ecef);
+}
+
+.stage3-decision-before-after > div:last-child {
+    background: var(--bs-success-bg-subtle, #d1e7dd);
+}
+
+.stage3-decision-arrow {
+    align-self: center;
+    color: var(--bs-primary, #0d6efd);
+    font-size: 1.25rem;
+}
+
+@media (max-width: 575.98px) {
+    .stage3-decision-before-after {
+        grid-template-columns: 1fr;
+    }
+
+    .stage3-decision-arrow {
+        justify-self: center;
+        transform: rotate(90deg);
+    }
 }

@@ -52,6 +52,11 @@ function unique(values = []) {
     return [...new Set(values.filter(Boolean))];
 }
 
+function stage3FingerprintResolvedDates(stage3 = {}) {
+    return unique(stage3.stage2_automatic_resolved_dates || []).map(dateKeyUtc)
+        .filter(Boolean).sort();
+}
+
 function stage2ProposalForScope(state = null, scope = {}) {
     const proposal = state?.current_proposal;
     const sameEmployee = String(proposal?.employee_kodikos || '') ===
@@ -234,9 +239,11 @@ function buildWeeklyHrLifecycleProjection({
     effectiveProfile = {},
     effectiveProfilesByDate = {},
     persistedStage1State = null,
+    persistedStage2State = null,
     persistedStage2DecisionState = null,
     stage2StateDiagnostic = null,
     persistedStage3State = null,
+    stage3AuditDecisionDates = null,
     scope = {},
     periodScope = null,
     employmentDateScope = null,
@@ -279,9 +286,19 @@ function buildWeeklyHrLifecycleProjection({
         const configurationBlockers = (diagnostics.reasons || []).filter(reason =>
             ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE',
                 'ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'].includes(reason));
+        const currentPeriodDates = new Set(boundary.current_period_writable_dates || []);
+        const auditedStage3Dates = Array.isArray(stage3AuditDecisionDates)
+            ? stage3AuditDecisionDates.map((value) => dateKeyUtc(value)) : null;
+        const completeStage3AuditEvidence = auditedStage3Dates?.length > 0 &&
+            auditedStage3Dates.length === Number(persistedStage3State?.version || 0) &&
+            auditedStage3Dates.every(Boolean);
+        const stage3DecisionInThisPeriod = persistedStage3State &&
+            (!completeStage3AuditEvidence || auditedStage3Dates.some((date) =>
+                currentPeriodDates.has(date)));
         const blockers = unique([...(workflow.blocking_reasons || []), ...configurationBlockers,
-            // Existing decisions must be revalidated through their normal full-week path.
-            ...(persistedStage2DecisionState || persistedStage3State
+            // An audited Stage-3 decision in the next period cannot block this
+            // period's deferred slice. Missing audit evidence still fails closed.
+            ...(persistedStage2DecisionState || stage3DecisionInThisPeriod
                 ? ['EXISTING_WEEKLY_DECISION_REQUIRES_FULL_WEEK_VALIDATION'] : [])]);
         const stale = persistedStatus === BUSINESS_STATUS.STALE;
         const hasBlocker = stale || blockers.length > 0;
@@ -538,6 +555,13 @@ function buildWeeklyHrLifecycleProjection({
             reason: nonFullResolvedDates.includes(date)
                 ? 'STAGE1_REVIEWED_NON_FULL_WITHOUT_ACTUAL_WORK'
                 : 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }));
+    const authoritativeWeeklyRestDates = unique(stage1ResolvedRows.filter((row) =>
+        row.repo_apologistika === true ||
+        String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΑΝ')
+        .map((row) => dateKeyUtc(row.hmeromhnia))).sort();
+    const unresolvedRepoCount = Number(afterStage1.unresolved_repo_count);
+    const weeklyRestAlreadySatisfied = Number.isFinite(unresolvedRepoCount) &&
+        unresolvedRepoCount === 0 && authoritativeWeeklyRestDates.length > 0;
     const stage3Dates = resolveStage3ActionableDates({
         rawRemainingDates: unique([
             ...(afterStage1.remaining_possible_leave_days || []),
@@ -562,6 +586,8 @@ function buildWeeklyHrLifecycleProjection({
         employee_kodikos: scope.employee_kodikos || rows[0]?.kodikos,
         week_start: scope.week_start || afterStage1.week_start,
         week_end: scope.week_end || afterStage1.week_end };
+    const authoritativeDates = new Set(employmentDateScope?.authoritative_date_set || []);
+    const contextOnlyDates = new Set(employmentDateScope?.context_only_dates || []);
     const stage3PendingItems = remainingDates.map((date) => {
         const row = rows.find((candidate) => dateKeyUtc(candidate?.hmeromhnia) === date) || {};
         const dailyProfile = effectiveProfilesByDate?.[date] || effectiveProfile;
@@ -573,7 +599,8 @@ function buildWeeklyHrLifecycleProjection({
             isResidual: true, remaining_dates: remainingDates,
             stage2: { fingerprint: stage2Fingerprint, status: stage2.business_status,
                 resolution: stage2.stage2_applicability,
-                resolved_dates: stage2AutomaticResolvedDates },
+                resolved_dates: stage3FingerprintResolvedDates({
+                    stage2_automatic_resolved_dates: stage2AutomaticResolvedDates }) },
             upstream: { stage1_attestation_scope: periodSlice ? 'PERIOD_SLICE' : 'WEEKLY',
                 stage1_period_start: periodSlice?.period_start || '',
                 stage1_period_end: periodSlice?.period_end || '',
@@ -591,7 +618,7 @@ function buildWeeklyHrLifecycleProjection({
                 stage1_version: Number(periodSlice
                     ? persistedSlice?.version || 0 : persistedStage1State?.version || 0),
                 stage2_fingerprint: stage2Fingerprint,
-                stage2_version: 0 } };
+                stage2_version: Number(persistedStage2State?.version || 0) } };
         return Object.freeze({ row_id: String(row?._id || ''), date,
             employment_type: employmentType,
             employment_label: employmentType === '0' ? 'Πλήρης' : employmentType === '1'
@@ -603,6 +630,18 @@ function buildWeeklyHrLifecycleProjection({
             })).filter((interval) => interval.start || interval.end)),
             actual_work_hours: Number(actualFacts.actualWorkHours || 0),
             actual_work_status: actualFacts.cardVerificationStatus,
+            presentation_facts: Object.freeze({
+                declared_work_present: Number(actualFacts.declaredWorkHours || 0) > 0,
+                declared_hours: Number(actualFacts.declaredWorkHours || 0),
+                actual_work_hours: Number(actualFacts.actualWorkHours || 0),
+                actual_work_missing: Number(actualFacts.actualWorkHours || 0) === 0,
+                weekly_rest_already_satisfied: weeklyRestAlreadySatisfied,
+                weekly_rest_satisfied_by_dates: Object.freeze(
+                    weeklyRestAlreadySatisfied ? authoritativeWeeklyRestDates : []),
+                current_period_writable: authoritativeDates.has(date),
+                context_only: contextOnlyDates.has(date),
+                final_human_decision_required: true
+            }),
             allowed_classifications: Object.freeze(employmentType === '0'
                 ? ['LEAVE', 'SICKNESS', 'ABSENCE']
                 : ['1', '2'].includes(employmentType)
@@ -716,6 +755,7 @@ module.exports = {
     BUSINESS_STATUS,
     PRESENTATION_STATUS,
     applySequentialPresentation,
+    stage3FingerprintResolvedDates,
     resolveStage3ActionableDates,
     resolveSafeNonFullNonWorkDates,
     buildStage1NoClassificationPreviewItems,

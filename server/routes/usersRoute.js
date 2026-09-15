@@ -1663,6 +1663,22 @@ router.post(
 );
 
 router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/bulk-preview',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.previewWeeklyHrStage3Bulk
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/bulk-apply',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.applyWeeklyHrStage3Bulk
+);
+
+router.post(
     '/api/prodhlomena-oraria/review/weekly-hr-workflow/stage3/resolve-day',
     checkAuth,
     requireEmploymentReviewAccess,
