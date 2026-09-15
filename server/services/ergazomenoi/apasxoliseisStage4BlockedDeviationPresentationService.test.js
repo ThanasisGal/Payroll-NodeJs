@@ -40,6 +40,24 @@ assert.equal(deviations[0].requires_new_hr_decision, false);
 assert.equal(appendStage4BlockedDeviationRows({ deviations,
     canonicalLifecycleProjections: [projection], reviewRows }).length, 1);
 
+const completedProjection = JSON.parse(JSON.stringify(projection));
+const completedStage4 = completedProjection.lifecycle_projection.stages.stage4;
+completedStage4.business_status = 'COMPLETED';
+completedStage4.pending_count = 0;
+completedStage4.blockers = [];
+completedStage4.pending_reasons = [];
+completedStage4.final_weekly_analysis.status = 'READY';
+completedStage4.final_weekly_analysis.reasons = [];
+completedStage4.final_weekly_analysis.sixthDay = {
+    hmeromhnia: '2026-05-31', premiumRate: 40, sixthDayHours: 6.87 };
+const completedRows = appendStage4BlockedDeviationRows({ deviations: [],
+    canonicalLifecycleProjections: [completedProjection], reviewRows });
+assert.equal(completedRows.length, 1, 'resolved sixth-day row must remain visible');
+assert.equal(completedRows[0].week_apo, '2026-05-25');
+assert.equal(completedRows[0].sixth_day_date, '2026-05-31');
+assert.equal(completedRows[0].sixth_day_premium_rate, 40);
+assert.equal(completedRows[0].status, 'READY');
+
 const source = fs.readFileSync(path.join(__dirname,
     '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8');
 const lifecycleStart = source.indexOf('function weeklyLifecyclePayloadForDeviation');

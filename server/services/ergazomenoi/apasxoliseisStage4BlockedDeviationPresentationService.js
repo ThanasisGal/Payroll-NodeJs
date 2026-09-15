@@ -10,7 +10,9 @@ function appendStage4BlockedDeviationRows({ deviations = [], canonicalLifecycleP
 
     for (const entry of canonicalLifecycleProjections) {
         const stage4 = entry.lifecycle_projection?.stages?.stage4;
-        if (stage4?.business_status !== 'BLOCKED') continue;
+        const analysis = stage4?.final_weekly_analysis || {};
+        const blocked = stage4?.business_status === 'BLOCKED';
+        if (!blocked && !(stage4?.business_status === 'COMPLETED' && analysis.sixthDayIdentity)) continue;
         const { employee_kodikos: kodikos, week_start: weekStart, week_end: weekEnd } = entry.scope || {};
         const key = identity(kodikos, weekStart);
         if (!kodikos || !dateKeyUtc(weekStart) || existing.has(key)) continue;
@@ -19,7 +21,6 @@ function appendStage4BlockedDeviationRows({ deviations = [], canonicalLifecycleP
             String(row.kodikos || '').trim() === String(kodikos).trim() &&
             dateKeyUtc(row.hmeromhnia) >= dateKeyUtc(weekStart) &&
             dateKeyUtc(row.hmeromhnia) <= dateKeyUtc(weekEnd));
-        const analysis = stage4.final_weekly_analysis || {};
         const sixthDay = analysis.sixthDayIdentity || '';
         const seventhDay = analysis.seventhDayIdentity || '';
         const profileRow = weekRows.find((row) => dateKeyUtc(row.hmeromhnia) === dateKeyUtc(sixthDay)) ||
@@ -33,7 +34,7 @@ function appendStage4BlockedDeviationRows({ deviations = [], canonicalLifecycleP
             ypokatasthma: profileRow.ypokatasthma || entry.scope?.ypokatasthma || '',
             week_apo: dateKeyUtc(weekStart),
             week_eos: dateKeyUtc(weekEnd),
-            status: 'NEEDS_HR_DECISION',
+            status: blocked ? 'NEEDS_HR_DECISION' : (analysis.status || 'READY'),
             requires_new_hr_decision: false,
             effective_typos_apasxolhshs: profileRow.effective_typos_apasxolhshs,
             effective_weekly_workdays: weeklyWorkdays,
@@ -42,6 +43,7 @@ function appendStage4BlockedDeviationRows({ deviations = [], canonicalLifecycleP
             actual_workdays: actualWorkdays,
             sixth_day_count: sixthDay ? 1 : 0,
             sixth_day_date: dateKeyUtc(sixthDay),
+            sixth_day_premium_rate: analysis.sixthDay?.premiumRate ?? null,
             seventh_day_count: seventhDay ? 1 : 0,
             seventh_day_date: dateKeyUtc(seventhDay),
             sixth_seventh_day_status: analysis.status,
@@ -49,7 +51,7 @@ function appendStage4BlockedDeviationRows({ deviations = [], canonicalLifecycleP
                 ...(stage4.blockers || []), ...(stage4.pending_reasons || []),
                 ...(analysis.reasons || [])
             ])],
-            stage4_blocked_presentation: true
+            stage4_blocked_presentation: blocked
         });
         existing.add(key);
     }
