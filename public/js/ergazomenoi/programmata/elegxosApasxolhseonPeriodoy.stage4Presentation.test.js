@@ -49,6 +49,10 @@ this.sixth = renderStage4SixthDayValue;
 this.seventh = renderStage4SeventhDayValue;
 this.status = renderStage4StatusCell;
 this.summary = renderStage4Summary;`, sandbox);
+const cardsStart = source.indexOf('function renderSixthDayCardsBadge');
+const cardsEnd = source.indexOf('function resolveSeventhDayRowPresentation', cardsStart);
+sandbox.resolveSixthDayRowPresentation = (row) => row;
+vm.runInContext(`${source.slice(cardsStart, cardsEnd)}\nthis.cardsSixth = renderSixthDayCardsBadge;`, sandbox);
 const absenceHtml = sandbox.classification('ΑΠΟΥΣΙΑ');
 assert.match(absenceHtml, /stage4-classification-absence/);
 assert.doesNotMatch(absenceHtml, /text-bg-danger/);
@@ -59,6 +63,22 @@ const sixthHtml = sandbox.sixth({ kodikos: '0013', week_apo: '2026-05-25',
     week_eos: '2026-05-31', sixth_day_count: 1 });
 assert.match(sixthHtml, /stage4-sixth-day-pill[^>]*>6η ημέρα · 40%/);
 assert.doesNotMatch(sixthHtml, /text-bg-danger/);
+const validCardsHtml = sandbox.cardsSixth({ is_sixth_day: true, sixth_day_premium_rate: 40 });
+const missingCardsHtml = sandbox.cardsSixth({ is_sixth_day: true, sixth_day_premium_rate: null });
+assert.match(validCardsHtml, /stage4-sixth-day-badge[^>]*review-sixth-day-badge/);
+assert.match(missingCardsHtml, /text-bg-danger[^>]*review-sixth-day-rate-missing/);
+const missingPayload = JSON.parse(JSON.stringify(blocked));
+missingPayload.lifecycle_projection.stages.stage4.final_weekly_analysis.sixthDayIdentity = '2026-04-26';
+missingPayload.lifecycle_projection.stages.stage4.final_weekly_analysis.sixthDay = {
+    hmeromhnia: '2026-04-26', premiumRate: null };
+sandbox.currentCanonicalLifecyclePayloads.push(missingPayload);
+const missingWeeklyHtml = sandbox.sixth({ kodikos: '0012', week_apo: '2026-04-20',
+    week_eos: '2026-04-26', sixth_day_count: 1 });
+assert.match(missingWeeklyHtml, /text-bg-danger[^>]*stage4-sixth-day-badge/);
+for (const html of [sixthHtml, validCardsHtml, missingCardsHtml, missingWeeklyHtml]) {
+    assert.doesNotMatch(html, /\bd-block\b/);
+    assert.match(html, /stage4-sixth-day-badge/);
+}
 const blockedHtml = sandbox.status({ kodikos: '0012', week_apo: '2026-04-20',
     week_eos: '2026-04-26' });
 assert.match(blockedHtml, /badge text-bg-danger[^>]*>ΜΠΛΟΚΑΡΙΣΜΕΝΟ/);
@@ -104,7 +124,13 @@ assert.match(row, /stage4-week-code/);
                     <td class="cell-apoysia cell-stage1-absence">${absenceHtml}</td></tr>
                     <tr class="employee-deviation-row"><td><table class="weekly-deviation-table">
                     <thead><tr><th>6η ημέρα</th></tr></thead><tbody><tr><td>${sixthHtml}</td></tr>
-                    </tbody></table></td></tr></tbody></table></div></div></section>`);
+                    </tbody></table></td></tr></tbody></table>
+                <table style="table-layout:fixed;width:300px"><tbody>
+                    <tr><td class="badge-check-cell" style="width:300px">${validCardsHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:300px">${missingCardsHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:300px">${sixthHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:300px">${missingWeeklyHtml}</td></tr>
+                </tbody></table></div></div></section>`);
         const styles = await page.evaluate(() => {
             const absence = document.querySelector('.cell-apoysia');
             const pill = document.querySelector('.stage4-classification-absence');
@@ -122,6 +148,29 @@ assert.match(row, /stage4-week-code/);
         assert.equal(styles.sixthBg, 'rgb(251, 243, 223)', JSON.stringify(styles));
         assert.equal(styles.headerPosition, 'sticky');
         assert.equal(styles.weeklyHeaderPosition, 'sticky');
+        const sizes = await page.evaluate(() => [...document.querySelectorAll(
+            '.badge-check-cell')].map((cell) => {
+            const badge = cell.querySelector('.stage4-sixth-day-badge');
+            const badgeRect = badge.getBoundingClientRect();
+            const cellRect = cell.getBoundingClientRect();
+            const computed = getComputedStyle(badge);
+            return { width: badgeRect.width, cellWidth: cellRect.width,
+                height: badgeRect.height, display: computed.display,
+                maxWidth: computed.maxWidth, paddingTop: computed.paddingTop,
+                fontSize: computed.fontSize };
+        }));
+        assert.equal(sizes.length, 4);
+        for (const size of sizes) {
+            assert.equal(size.display, 'inline-flex');
+            assert.equal(size.maxWidth, 'max-content');
+            assert.ok(size.width < size.cellWidth * 0.75, JSON.stringify(size));
+            assert.equal(size.paddingTop, '1.92px');
+            assert.equal(size.fontSize, '10.88px');
+        }
+        assert.ok(Math.abs(sizes[0].height - sizes[2].height) < 1);
+        assert.ok(Math.abs(sizes[1].height - sizes[3].height) < 1);
+        assert.ok(Math.abs(sizes[0].width - sizes[2].width) < 1);
+        assert.ok(Math.abs(sizes[1].width - sizes[3].width) < 1);
         console.log('Stage4 presentation UI tests passed');
     } finally {
         await browser.close();

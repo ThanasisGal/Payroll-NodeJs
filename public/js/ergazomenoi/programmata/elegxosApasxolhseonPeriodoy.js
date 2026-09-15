@@ -1395,7 +1395,7 @@ function renderSixthDayCardsBadge(row = {}) {
 
     const badgeClass = Number.isFinite(parsedRate)
         ? 'review-sixth-day-badge' : 'text-bg-danger review-sixth-day-rate-missing';
-    return `<span class="badge d-block mt-1 ${badgeClass}">6η ημέρα · ${escapeHtml(rateLabel)}</span>`;
+    return `<span class="badge mt-1 stage4-sixth-day-badge ${badgeClass}">6η ημέρα · ${escapeHtml(rateLabel)}</span>`;
 }
 
 function resolveSeventhDayRowPresentation(
@@ -2520,8 +2520,8 @@ function renderStage4SixthDayValue(dev = {}) {
         Number.isFinite(Number(rate));
     const label = validRate ? `${String(Number(rate)).replace('.', ',')}%` : 'ποσοστό εκκρεμεί';
     return validRate
-        ? `<span class="stage4-sixth-day-pill">6η ημέρα · ${escapeHtml(label)}</span>`
-        : `<span class="badge text-bg-danger">6η ημέρα · ${escapeHtml(label)}</span>`;
+        ? `<span class="stage4-sixth-day-pill stage4-sixth-day-badge">6η ημέρα · ${escapeHtml(label)}</span>`
+        : `<span class="badge text-bg-danger stage4-sixth-day-badge">6η ημέρα · ${escapeHtml(label)}</span>`;
 }
 
 function renderStage4SeventhDayValue(dev = {}) {

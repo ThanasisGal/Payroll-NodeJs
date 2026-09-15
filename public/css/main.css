@@ -15198,6 +15198,18 @@ body.loader-active > *:not(.app-loader) {
     border: 1px solid #d9c58c;
 }
 
+#employmentReviewStage4Collapse .stage4-sixth-day-badge {
+    display: inline-flex !important;
+    align-items: center;
+    width: auto;
+    max-width: max-content;
+    padding: 0.12rem 0.35rem;
+    font-size: 0.68rem;
+    line-height: 1.1;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 #employmentReviewStage4Collapse #resultsTable .employee-detail-row > td.cell-no-card-adeia {
     background: #f8faf8 !important;
     color: #355c42 !important;
