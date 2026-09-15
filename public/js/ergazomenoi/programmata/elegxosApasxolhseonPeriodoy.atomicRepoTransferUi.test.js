@@ -338,7 +338,23 @@ function testStage1DailyClassificationPresentationPriority() {
     assert.strictEqual(storedAbsence.text, 'ΑΠΟΥΣΙΑ');
     assert.ok(storedAbsence.className.includes('cell-stage1-absence'));
     assert.ok(!storedLeave.className.includes('cell-stage1-absence'));
-    assert.match(source, /\.cell-stage1-absence\s*\{[^}]*color:\s*#dc3545\s*!important/s);
+    const stage1AbsenceStyle = source.match(
+        /#employmentReviewWorkspace\s+#employmentReviewStage4Collapse\s+#resultsTable\s+\.employee-detail-row\s*>\s*td\.cell-stage1-absence\s*\{([^}]*)\}/)?.[1];
+    assert.ok(stage1AbsenceStyle, 'Stage1 absence must retain its scoped cell style');
+    assert.match(stage1AbsenceStyle,
+        /background-color:\s*var\(--stage4-absence-bg\)\s*!important/);
+    assert.match(stage1AbsenceStyle,
+        /color:\s*var\(--stage4-absence-text\)\s*!important/);
+    const normalAbsenceStyle = source.match(
+        /#employmentReviewWorkspace\s+#employmentReviewStage4Collapse\s+#resultsTable\s+\.employee-detail-row\s*>\s*td\.cell-apoysia\s*\{([^}]*)\}/)?.[1];
+    assert.ok(normalAbsenceStyle, 'Normal absence must retain its scoped cell style');
+    assert.match(normalAbsenceStyle,
+        /background-color:\s*var\(--stage4-absence-bg\)\s*!important/);
+    assert.match(normalAbsenceStyle,
+        /color:\s*var\(--stage4-absence-text\)\s*!important/);
+    assert.match(normalAbsenceStyle,
+        /box-shadow:\s*inset 3px 0 0 var\(--stage4-absence-border\)/);
+    assert.doesNotMatch(stage1AbsenceStyle + normalAbsenceStyle, /#dc3545/i);
     assert.strictEqual(sandbox.resolveReviewApologistikoPresentation(possible, {}).text,
         'ΠΙΘΑΝΗ ΑΔΕΙΑ');
     assert.notStrictEqual(sandbox.resolveReviewApologistikoPresentation(possible, {}).text,
