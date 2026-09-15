@@ -12,26 +12,36 @@ const controller = source.slice(source.indexOf('function initEmploymentReviewScr
     source.indexOf("document.addEventListener('DOMContentLoaded', initEmploymentReviewScrollToTop)"));
 const view = fs.readFileSync(path.join(root, 'views/ergazomenoi/programmata',
     'elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'public/css/main.css'), 'utf8');
 assert.equal((view.match(/id="employmentReviewScrollToTop"/g) || []).length, 1);
 assert.match(view, /aria-label="Επιστροφή στην κορυφή"/);
+assert.match(view, /<div class="card-footer">[\s\S]*?id="employmentReviewScrollToTop"/);
+assert.doesNotMatch(css.slice(css.indexOf('#employmentReviewWorkspace .employment-review-scroll-to-top {'),
+    css.indexOf('#employmentReviewWorkspace .employment-review-scroll-to-top:not([hidden])')),
+/(?:position:\s*absolute|right:|bottom:)/);
 
 (async () => {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage();
-        await page.setContent(`<!doctype html><style>
+        await page.setContent(`<!doctype html><style>${css}</style><style>
             .area { width: 250px; height: 100px; overflow-y: auto; }
             .area > div { height: 500px; }
             .horizontal { width: 250px; height: 100px; overflow-x: auto; overflow-y: hidden; }
             .horizontal > div { width: 500px; height: 50px; }
-        </style><section id="employmentReviewWorkspace">
+        </style><section id="employmentReviewWorkspace"><div class="employment-review-card">
+            <div class="review-card-body">
             <div id="stage1" class="area"><div></div></div>
             <div id="stage3" class="area"><div></div></div>
             <div id="horizontal" class="horizontal"><div></div></div>
             <div class="modal"><div id="modal-area" class="area"><div></div></div></div>
-            <button type="button" id="employmentReviewScrollToTop" hidden></button>
-        </section><div id="outside" class="area"><div></div></div>`);
+            </div><div class="card-footer">
+                <a id="returnButton" href="/mainapp">Επιστροφή</a>
+                <button type="button" class="btn btn-toTop employment-review-scroll-to-top"
+                    id="employmentReviewScrollToTop" hidden></button>
+            </div></div></section><div id="outside" class="area"><div></div></div>`);
         await page.addScriptTag({ content: `${controller}\ninitEmploymentReviewScrollToTop();` });
+        assert.equal(await page.locator('.card-footer #employmentReviewScrollToTop').count(), 1);
         assert.equal(await page.locator('#employmentReviewScrollToTop').isVisible(), false);
         await page.evaluate(() => {
             for (const id of ['horizontal', 'modal-area']) {
@@ -47,6 +57,21 @@ assert.match(view, /aria-label="Επιστροφή στην κορυφή"/);
             first.dispatchEvent(new Event('scroll'));
         });
         assert.equal(await page.locator('#employmentReviewScrollToTop').isVisible(), true);
+        const footerPlacement = await page.evaluate(() => {
+            const footer = document.querySelector('.card-footer').getBoundingClientRect();
+            const button = document.getElementById('employmentReviewScrollToTop')
+                .getBoundingClientRect();
+            const back = document.getElementById('returnButton').getBoundingClientRect();
+            return { inside: button.top >= footer.top && button.bottom <= footer.bottom &&
+                button.left >= footer.left && button.right <= footer.right,
+            onRight: button.left > back.right,
+            flex: getComputedStyle(document.querySelector('.card-footer')).display,
+            marginLeft: getComputedStyle(document.getElementById(
+                'employmentReviewScrollToTop')).marginLeft };
+        });
+        assert.equal(footerPlacement.inside, true, JSON.stringify(footerPlacement));
+        assert.equal(footerPlacement.onRight, true, JSON.stringify(footerPlacement));
+        assert.equal(footerPlacement.flex, 'flex');
         await page.evaluate(() => {
             const first = document.getElementById('stage1');
             first.scrollTo = (options) => { window.lastScroll = { id: first.id, options }; };
@@ -80,6 +105,7 @@ assert.match(view, /aria-label="Επιστροφή στην κορυφή"/);
             next.dispatchEvent(new Event('scroll'));
         });
         assert.equal(await page.locator('#employmentReviewScrollToTop').count(), 1);
+        assert.equal(await page.locator('.card-footer #employmentReviewScrollToTop').count(), 1);
         assert.equal(await page.locator('#employmentReviewScrollToTop').isVisible(), true);
         await page.evaluate(() => {
             const next = document.getElementById('stage1-new');
