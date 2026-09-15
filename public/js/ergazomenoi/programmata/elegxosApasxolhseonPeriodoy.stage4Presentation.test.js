@@ -65,6 +65,8 @@ assert.match(sixthHtml, /stage4-sixth-day-pill[^>]*>6η ημέρα · 40%/);
 assert.doesNotMatch(sixthHtml, /text-bg-danger/);
 const validCardsHtml = sandbox.cardsSixth({ is_sixth_day: true, sixth_day_premium_rate: 40 });
 const missingCardsHtml = sandbox.cardsSixth({ is_sixth_day: true, sixth_day_premium_rate: null });
+assert.match(sandbox.cardsSixth({ is_sixth_day: true,
+    sixth_day_premium_rate: 'invalid' }), /review-sixth-day-rate-missing/);
 assert.match(validCardsHtml, /stage4-sixth-day-badge[^>]*review-sixth-day-badge/);
 assert.match(missingCardsHtml, /text-bg-danger[^>]*review-sixth-day-rate-missing/);
 const missingPayload = JSON.parse(JSON.stringify(blocked));
@@ -75,6 +77,7 @@ sandbox.currentCanonicalLifecyclePayloads.push(missingPayload);
 const missingWeeklyHtml = sandbox.sixth({ kodikos: '0012', week_apo: '2026-04-20',
     week_eos: '2026-04-26', sixth_day_count: 1 });
 assert.match(missingWeeklyHtml, /text-bg-danger[^>]*stage4-sixth-day-badge/);
+assert.match(missingWeeklyHtml, /stage4-sixth-day-rate-missing/);
 for (const html of [sixthHtml, validCardsHtml, missingCardsHtml, missingWeeklyHtml]) {
     assert.doesNotMatch(html, /\bd-block\b/);
     assert.match(html, /stage4-sixth-day-badge/);
@@ -125,11 +128,11 @@ assert.match(row, /stage4-week-code/);
                     <tr class="employee-deviation-row"><td><table class="weekly-deviation-table">
                     <thead><tr><th>6η ημέρα</th></tr></thead><tbody><tr><td>${sixthHtml}</td></tr>
                     </tbody></table></td></tr></tbody></table>
-                <table style="table-layout:fixed;width:300px"><tbody>
-                    <tr><td class="badge-check-cell" style="width:300px">${validCardsHtml}</td></tr>
-                    <tr><td class="badge-check-cell" style="width:300px">${missingCardsHtml}</td></tr>
-                    <tr><td class="badge-check-cell" style="width:300px">${sixthHtml}</td></tr>
-                    <tr><td class="badge-check-cell" style="width:300px">${missingWeeklyHtml}</td></tr>
+                <table style="table-layout:fixed;width:120px"><tbody>
+                    <tr><td class="badge-check-cell" style="width:120px">${validCardsHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:120px">${missingCardsHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:120px">${sixthHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:120px">${missingWeeklyHtml}</td></tr>
                 </tbody></table></div></div></section>`);
         const styles = await page.evaluate(() => {
             const absence = document.querySelector('.cell-apoysia');
@@ -157,15 +160,36 @@ assert.match(row, /stage4-week-code/);
             return { width: badgeRect.width, cellWidth: cellRect.width,
                 height: badgeRect.height, display: computed.display,
                 maxWidth: computed.maxWidth, paddingTop: computed.paddingTop,
-                fontSize: computed.fontSize };
+                fontSize: computed.fontSize, whiteSpace: computed.whiteSpace,
+                badgeRight: badgeRect.right, cellRight: cellRect.right,
+                badgeScrollWidth: badge.scrollWidth, badgeClientWidth: badge.clientWidth,
+                cellScrollWidth: cell.scrollWidth, cellClientWidth: cell.clientWidth,
+                flexDirection: computed.flexDirection,
+                childLines: badge.children.length,
+                text: badge.textContent.replace(/\s+/g, ' ').trim() };
         }));
         assert.equal(sizes.length, 4);
         for (const size of sizes) {
             assert.equal(size.display, 'inline-flex');
-            assert.equal(size.maxWidth, 'max-content');
-            assert.ok(size.width < size.cellWidth * 0.75, JSON.stringify(size));
             assert.equal(size.paddingTop, '1.92px');
             assert.equal(size.fontSize, '10.88px');
+            assert.ok(size.badgeRight <= size.cellRight + 0.5, JSON.stringify(size));
+            assert.ok(size.badgeScrollWidth <= size.badgeClientWidth + 1, JSON.stringify(size));
+            assert.ok(size.cellScrollWidth <= size.cellClientWidth + 1, JSON.stringify(size));
+        }
+        for (const index of [0, 2]) {
+            assert.equal(sizes[index].whiteSpace, 'nowrap');
+            assert.equal(sizes[index].maxWidth, 'max-content');
+            assert.equal(sizes[index].childLines, 0);
+        }
+        for (const index of [1, 3]) {
+            assert.equal(sizes[index].whiteSpace, 'normal');
+            assert.equal(sizes[index].maxWidth, '100%');
+            assert.equal(sizes[index].flexDirection, 'column');
+            assert.equal(sizes[index].childLines, 2);
+            assert.equal(sizes[index].text, '6η ημέρα · ποσοστό εκκρεμεί');
+            assert.ok(sizes[index].height > sizes[0].height * 1.4, JSON.stringify(sizes));
+            assert.ok(sizes[index].width < sizes[index].cellWidth * 0.95, JSON.stringify(sizes[index]));
         }
         assert.ok(Math.abs(sizes[0].height - sizes[2].height) < 1);
         assert.ok(Math.abs(sizes[1].height - sizes[3].height) < 1);

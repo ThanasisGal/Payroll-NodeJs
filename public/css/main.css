@@ -15210,6 +15210,22 @@ body.loader-active > *:not(.app-loader) {
     white-space: nowrap;
 }
 
+#employmentReviewStage4Collapse .stage4-sixth-day-badge:is(
+    .review-sixth-day-rate-missing, .stage4-sixth-day-rate-missing) {
+    flex-direction: column;
+    width: fit-content;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.05;
+    overflow-wrap: normal;
+}
+
+#employmentReviewStage4Collapse .stage4-sixth-day-badge:is(
+    .review-sixth-day-rate-missing, .stage4-sixth-day-rate-missing) > span {
+    white-space: nowrap;
+}
+
 #employmentReviewStage4Collapse #resultsTable .employee-detail-row > td.cell-no-card-adeia {
     background: #f8faf8 !important;
     color: #355c42 !important;
