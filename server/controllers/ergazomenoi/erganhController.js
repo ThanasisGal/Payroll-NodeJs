@@ -5098,6 +5098,18 @@ function correctiveDeltaPresentation(delta = {}) {
     return output;
 }
 
+function stage3AuditDecisionDatesByEmployeeWeek(audits = []) {
+    const byWeek = new Map();
+    for (const audit of audits) {
+        if (audit.action !== 'STAGE3_DAILY_RESOLVED') continue;
+        const key = `${String(audit.employee_id || '')}|${dateKeyUtc(audit.week_start)}`;
+        const dates = byWeek.get(key) || [];
+        dates.push(audit.decision_date);
+        byWeek.set(key, dates);
+    }
+    return byWeek;
+}
+
 async function buildPreparedReviewLifecycleContext({ req, policyContextRows, ownershipPeriod,
     lifecycleByKodikos, employeeByCode, periodStart, periodEnd }) {
     const rowsByEmployeeWeek = new Map();
@@ -5127,6 +5139,8 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
     const workflowByEmployeeWeek = new Map(workflowStates.map((state) => [
         `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`, state
     ]));
+    const stage3AuditDatesByEmployeeWeek =
+        stage3AuditDecisionDatesByEmployeeWeek(workflowAudits);
     const lifecycleByWeek = new Map();
     for (const [key, weekRows] of rowsByEmployeeWeek) {
         const firstRow = weekRows[0];
@@ -5150,6 +5164,8 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
             effectiveProfilesByDate, persistedStage1State: state.stage1 || null,
             persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null,
+            stage3AuditDecisionDates: stage3AuditDatesByEmployeeWeek.get(
+                `${String(state.employee_id || employee._id || '')}|${dateKeyUtc(weekStart)}`) || [],
             scope: { team: req.session.userTeam,
                 company_kod: String(req.session.companyInUse || ''),
                 ypokatasthma: String(firstRow.ypokatasthma || '').padStart(4, '0'),
@@ -5709,6 +5725,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
         `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`,
         state
     ]));
+    const stage3AuditDatesByEmployeeWeek =
+        stage3AuditDecisionDatesByEmployeeWeek(workflowAudits);
     const lifecycleByWeek = new Map();
     for (const [key, weekRows] of reviewWeekRows) {
         const firstRow = weekRows[0];
@@ -5755,6 +5773,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             persistedStage1State: state.stage1 || null,
             persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null,
+            stage3AuditDecisionDates: stage3AuditDatesByEmployeeWeek.get(
+                `${String(state.employee_id || employee._id || '')}|${dateKeyUtc(naturalWeekStart)}`) || [],
             scope: {
                 team: req.session.userTeam,
                 company_kod: String(req.session.companyInUse || ''),
@@ -7263,7 +7283,7 @@ class erganhController {
             const [rows, total, deviationContextRows] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
-                        'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                        'ypokatasthma kodikos hmeromhnia kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_adeias_pistomenes_apologistika kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
@@ -7292,7 +7312,7 @@ class erganhController {
                 requestedPeriodStart && requestedPeriodEnd
                     ? ProdhlomenaOrariaModel.find(deviationContextFilter)
                           .select(
-                              'team company_kod ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                              'team company_kod ypokatasthma kodikos hmeromhnia kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_adeias_pistomenes_apologistika kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                                   'egkekrimenh_anaplhrosh_apologistika repo repo_apologistika adeia kathgoria_adeias ores_apoysias explicit_hourly_leave_hours egkekrimenh_oroadeia_apologistika hr_declared_leave adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika argia argia_apologistika ' +
                                   'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                                   'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
@@ -11753,6 +11773,12 @@ class erganhController {
                     context.employmentDateScope?.employment_owned_dates || null });
             const periodScope = context.employmentDateScope?.context_only_dates?.length
                 ? context.periodScope : null;
+            const stage3Audits = state?.stage3 ? await
+                ApasxoliseisWeeklyHrWorkflowAuditModel.find({ ...context.base,
+                    employee_id: context.employee._id,
+                    week_start: context.week.start, week_end: context.week.end,
+                    action: 'STAGE3_DAILY_RESOLVED' })
+                    .select('decision_date').lean() : [];
             const lifecycleInput = {
                 weekRows: context.rows.map((row) => ({ ...row,
                     team: context.base.team,
@@ -11762,6 +11788,7 @@ class erganhController {
                 persistedStage1State: state?.stage1 || null,
                 persistedStage2State: state?.stage2 || null,
                 persistedStage3State: state?.stage3 || null,
+                stage3AuditDecisionDates: stage3Audits.map((audit) => audit.decision_date),
                 scope: { ...context.base, employee_id: context.employee._id,
                     employee_kodikos: context.employee.kodikos,
                     week_start: context.week.start, week_end: context.week.end },
@@ -11874,6 +11901,8 @@ class erganhController {
                 `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`,
                 state
             ]));
+            const stage3AuditDatesByEmployeeWeek =
+                stage3AuditDecisionDatesByEmployeeWeek(rows.__workflowAudits || []);
             const rowsByWeek = new Map();
             const preparedRows = rows.__preparedPolicyContextRows || rows;
             for (const row of preparedRows) {
@@ -12035,6 +12064,8 @@ class erganhController {
                     stage2StateDiagnostic:
                         preparedStage2ErrorsByWeek.get(key)?.reason || null,
                     persistedStage3State: state.stage3 || null,
+                    stage3AuditDecisionDates: stage3AuditDatesByEmployeeWeek.get(
+                        `${String(state.employee_id || requested.employee_id || '')}|${dateKeyUtc(requested.week_start)}`) || [],
                     scope: lifecycleProjection.scope || requested,
                     periodScope: employmentDateScope.context_only_dates?.length
                         ? { period_start: periodStart, period_end: periodEnd } : null,

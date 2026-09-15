@@ -243,6 +243,7 @@ function buildWeeklyHrLifecycleProjection({
     persistedStage2DecisionState = null,
     stage2StateDiagnostic = null,
     persistedStage3State = null,
+    stage3AuditDecisionDates = null,
     scope = {},
     periodScope = null,
     employmentDateScope = null,
@@ -285,9 +286,19 @@ function buildWeeklyHrLifecycleProjection({
         const configurationBlockers = (diagnostics.reasons || []).filter(reason =>
             ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE',
                 'ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'].includes(reason));
+        const currentPeriodDates = new Set(boundary.current_period_writable_dates || []);
+        const auditedStage3Dates = Array.isArray(stage3AuditDecisionDates)
+            ? stage3AuditDecisionDates.map((value) => dateKeyUtc(value)) : null;
+        const completeStage3AuditEvidence = auditedStage3Dates?.length > 0 &&
+            auditedStage3Dates.length === Number(persistedStage3State?.version || 0) &&
+            auditedStage3Dates.every(Boolean);
+        const stage3DecisionInThisPeriod = persistedStage3State &&
+            (!completeStage3AuditEvidence || auditedStage3Dates.some((date) =>
+                currentPeriodDates.has(date)));
         const blockers = unique([...(workflow.blocking_reasons || []), ...configurationBlockers,
-            // Existing decisions must be revalidated through their normal full-week path.
-            ...(persistedStage2DecisionState || persistedStage3State
+            // An audited Stage-3 decision in the next period cannot block this
+            // period's deferred slice. Missing audit evidence still fails closed.
+            ...(persistedStage2DecisionState || stage3DecisionInThisPeriod
                 ? ['EXISTING_WEEKLY_DECISION_REQUIRES_FULL_WEEK_VALIDATION'] : [])]);
         const stale = persistedStatus === BUSINESS_STATUS.STALE;
         const hasBlocker = stale || blockers.length > 0;
