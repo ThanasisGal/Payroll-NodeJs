@@ -15122,6 +15122,156 @@ body.loader-active > *:not(.app-loader) {
     scrollbar-gutter: stable;
 }
 
+#employmentReviewWorkspace {
+    --stage4-absence-bg: #f7e8e8;
+    --stage4-absence-text: #7a3434;
+    --stage4-absence-border: #d7a4a4;
+    --stage4-leave-bg: #e8f1e9;
+    --stage4-leave-text: #355c42;
+    --stage4-sickness-bg: #e9edf6;
+    --stage4-sickness-text: #43577a;
+    --stage4-repo-bg: #e7f1ee;
+    --stage4-repo-text: #326357;
+    --stage4-sixth-bg: #fbf3df;
+    --stage4-sixth-text: #725518;
+}
+
+#employmentReviewStage4Collapse .stage4-summary-strip {
+    margin: 0.55rem 0.7rem 0.2rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid #d9e3dc;
+    border-left: 3px solid #72967a;
+    border-radius: 0.35rem;
+    background: #f6faf7;
+    color: #355c42;
+    font-size: 0.84rem;
+    font-weight: 650;
+}
+
+#employmentReviewStage4Collapse .stage4-summary-strip.stage4-summary-attention {
+    border-color: #e4b6b6;
+    border-left-color: #b35d5d;
+    background: #fff8f8;
+    color: #7a3434;
+}
+
+#employmentReviewStage4Collapse .stage4-classification-pill,
+#employmentReviewStage4Collapse .stage4-sixth-day-pill {
+    display: inline-block;
+    padding: 0.18rem 0.48rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+#employmentReviewStage4Collapse .stage4-classification-absence {
+    background: var(--stage4-absence-bg);
+    color: var(--stage4-absence-text);
+    border-color: var(--stage4-absence-border);
+}
+
+#employmentReviewStage4Collapse .stage4-classification-leave {
+    background: var(--stage4-leave-bg);
+    color: var(--stage4-leave-text);
+    border-color: #aac8b1;
+}
+
+#employmentReviewStage4Collapse .stage4-classification-sickness {
+    background: var(--stage4-sickness-bg);
+    color: var(--stage4-sickness-text);
+    border-color: #bcc8dc;
+}
+
+#employmentReviewStage4Collapse .stage4-classification-repo {
+    background: var(--stage4-repo-bg);
+    color: var(--stage4-repo-text);
+    border-color: #a9ccc1;
+}
+
+#employmentReviewStage4Collapse .stage4-sixth-day-pill,
+#employmentReviewStage4Collapse .review-sixth-day-badge {
+    background: var(--stage4-sixth-bg) !important;
+    color: var(--stage4-sixth-text) !important;
+    border: 1px solid #d9c58c;
+}
+
+#employmentReviewStage4Collapse #resultsTable .employee-detail-row > td.cell-no-card-adeia {
+    background: #f8faf8 !important;
+    color: #355c42 !important;
+}
+
+#employmentReviewStage4Collapse #resultsTable .employee-detail-row > td.cell-repo-day,
+#employmentReviewStage4Collapse #resultsTable .employee-detail-row > td.cell-repo-day-applied {
+    background: var(--stage4-repo-bg) !important;
+    color: var(--stage4-repo-text) !important;
+    border-color: #a9ccc1 !important;
+    box-shadow: none;
+}
+
+#employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td {
+    padding-block: 0.52rem;
+    border-color: #e6e9ec;
+}
+
+#employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td:nth-child(n + 7),
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table td.text-end {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+#employmentReviewStage4Collapse #resultsTable > tbody > .employee-group-row > td {
+    font-size: 0.94rem;
+    letter-spacing: 0.01em;
+    border-bottom-color: #d7dee2;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table td,
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table th {
+    border-color: #e3e7ea;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table td {
+    padding-block: 0.48rem;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table .stage4-week-code {
+    display: block;
+    color: #52616b;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-table .stage4-week-start {
+    font-weight: 700;
+}
+
+#employmentReviewStage4Collapse #resultsTable .employee-deviation-row > td {
+    background: #f7f9fa !important;
+    border-left: 3px solid #b8c7c0;
+}
+
+#employmentReviewStage4Collapse #resultsTable .employee-deviation-row.stage4-weekly-blocked > td {
+    background: #fff8f8 !important;
+    border-left-color: #b35d5d;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-section-title {
+    background: #eef2f3;
+    box-shadow: inset 0 -1px 0 #d7dee2;
+}
+
+#employmentReviewStage4Collapse #resultsTable .stage4-weekly-blocked .weekly-deviation-section-title {
+    background: #f8eaea;
+    box-shadow: inset 0 -1px 0 #e4b6b6;
+}
+
+#employmentReviewStage4Collapse #resultsTable .weekly-deviation-comment .badge.text-bg-danger {
+    margin-bottom: 0.2rem;
+}
+
 .employment-review-scroll-container #resultsTable .employee-subtotal-row:not(.d-none) > td {
     position: sticky;
     top: var(--employment-review-subtotal-sticky-top);

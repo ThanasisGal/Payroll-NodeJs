@@ -97,9 +97,9 @@ assert.match(dailyRowsRenderer,
 assert.match(dailyRowsRenderer,
     /tdClass\(`\$\{rowPresentation\.apologistiko\.className\} text-center`\)/);
 const apologistikoCell = dailyRowsRenderer.slice(
-    dailyRowsRenderer.indexOf('${rowPresentation.apologistiko.text}'),
+    dailyRowsRenderer.indexOf('${renderStage4ClassificationPill(rowPresentation.apologistiko.text)}'),
     dailyRowsRenderer.indexOf('</td>',
-        dailyRowsRenderer.indexOf('${rowPresentation.apologistiko.text}'))
+        dailyRowsRenderer.indexOf('${renderStage4ClassificationPill(rowPresentation.apologistiko.text)}'))
 );
 assert.ok(apologistikoCell.indexOf('renderDeclaredRepoWithCardsBadge(row)') <
     apologistikoCell.indexOf('renderSeventhDayBadges(row)'));

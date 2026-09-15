@@ -1393,7 +1393,9 @@ function renderSixthDayCardsBadge(row = {}) {
         ? `${String(parsedRate).replace('.', ',')}%`
         : 'ποσοστό εκκρεμεί';
 
-    return `<span class="badge text-bg-warning d-block mt-1 review-sixth-day-badge">6η ημέρα · ${escapeHtml(rateLabel)}</span>`;
+    const badgeClass = Number.isFinite(parsedRate)
+        ? 'review-sixth-day-badge' : 'text-bg-danger review-sixth-day-rate-missing';
+    return `<span class="badge d-block mt-1 ${badgeClass}">6η ημέρα · ${escapeHtml(rateLabel)}</span>`;
 }
 
 function resolveSeventhDayRowPresentation(
@@ -1513,15 +1515,18 @@ function ensureReviewTableStructure() {
         const style = document.createElement('style');
         style.id = 'reviewDynamicCellStyles';
         style.textContent = `
-            .cell-apoysia {
-                background-color: #dc3545 !important;
-                color: #ffffff !important;
-                font-weight: 700;
+            #employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable
+            .employee-detail-row > td.cell-apoysia {
+                background-color: var(--stage4-absence-bg) !important;
+                color: var(--stage4-absence-text) !important;
+                box-shadow: inset 3px 0 0 var(--stage4-absence-border);
+                font-weight: 600;
             }
 
-            .cell-stage1-absence {
-                background-color: #f8d7da !important;
-                color: #dc3545 !important;
+            #employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable
+            .employee-detail-row > td.cell-stage1-absence {
+                background-color: var(--stage4-absence-bg) !important;
+                color: var(--stage4-absence-text) !important;
             }
 
             .cell-break-subtracted {
@@ -2493,6 +2498,45 @@ function renderStage4StatusCell(dev = {}) {
         '<div>Ελέγξτε την αιτία και διορθώστε τα στοιχεία πριν συνεχίσετε.</div></div>';
 }
 
+function renderStage4ClassificationPill(text = '') {
+    const palette = {
+        'ΑΠΟΥΣΙΑ': 'absence', 'ΑΔΕΙΑ': 'leave', 'ΑΣΘΕΝΕΙΑ': 'sickness',
+        'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ': 'repo'
+    };
+    const kind = palette[String(text).trim()];
+    return kind
+        ? `<span class="stage4-classification-pill stage4-classification-${kind}">${escapeHtml(text)}</span>`
+        : text;
+}
+
+function renderStage4SixthDayValue(dev = {}) {
+    const analysis = weeklyLifecyclePayloadForDeviation(dev)
+        ?.lifecycle_projection?.stages?.stage4?.final_weekly_analysis;
+    if (!analysis?.sixthDayIdentity && Number(dev.sixth_day_count || 0) === 0) {
+        return escapeHtml(dev.sixth_day_count ?? 0);
+    }
+    const rate = analysis?.sixthDay?.premiumRate ?? dev.sixth_day_premium_rate;
+    const validRate = rate !== null && rate !== undefined && String(rate).trim() !== '' &&
+        Number.isFinite(Number(rate));
+    const label = validRate ? `${String(Number(rate)).replace('.', ',')}%` : 'ποσοστό εκκρεμεί';
+    return validRate
+        ? `<span class="stage4-sixth-day-pill">6η ημέρα · ${escapeHtml(label)}</span>`
+        : `<span class="badge text-bg-danger">6η ημέρα · ${escapeHtml(label)}</span>`;
+}
+
+function renderStage4SeventhDayValue(dev = {}) {
+    const value = renderWeeklySeventhDayValue(dev);
+    if (!Number(value)) return escapeHtml(value);
+    const seventh = weeklyLifecyclePayloadForDeviation(dev)
+        ?.lifecycle_projection?.stages?.stage4?.final_weekly_analysis?.seventhDay;
+    const illegal = seventh?.severity === 'SERIOUS_VIOLATION' ||
+        seventh?.classification === 'SEVENTH_DAY_ILLEGAL_OVERTIME' ||
+        dev.seventh_day_severity === 'SERIOUS_VIOLATION';
+    return illegal
+        ? '<span class="badge text-bg-danger">7η ημέρα · ΠΑΡΑΝΟΜΗ</span>'
+        : '<span class="stage4-sixth-day-pill">7η ημέρα</span>';
+}
+
 function hasAdeiaSuggestion(row) {
     return [
         possibleLeavePresentationStates.DERIVED,
@@ -2510,6 +2554,10 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
 
     const wrapperTr = document.createElement('tr');
     wrapperTr.classList.add('employee-deviation-row');
+    if (visibleDeviations.some((dev) => weeklyLifecyclePayloadForDeviation(dev)
+        ?.lifecycle_projection?.stages?.stage4?.business_status === 'BLOCKED')) {
+        wrapperTr.classList.add('stage4-weekly-blocked');
+    }
     wrapperTr.classList.add('d-none');
     wrapperTr.dataset.groupId = groupId;
 
@@ -2531,15 +2579,15 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     data-week-start="${escapeHtml(String(dev.week_apo || dev.weekStart || '').slice(0, 10))}"
                     data-week-end="${escapeHtml(String(dev.week_eos || dev.weekEnd || '').slice(0, 10))}"
                 >
-                    <td>${formatDate(dev.week_apo || dev.weekStart)}</td>
+                    <td class="stage4-week-start"><span class="stage4-week-code">${escapeHtml(dev.kodikos || '')}</span>${formatDate(dev.week_apo || dev.weekStart)}</td>
                     <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
                     <td>${escapeHtml(renderWeeklyEmploymentStatus(dev))}</td>
                     <td class="text-end">${escapeHtml(dev.effective_weekly_workdays ?? '-')}</td>
                     <td class="text-end">${escapeHtml(dev.effective_expected_repo ?? dev.expected_repo ?? '-')}</td>
                     <td class="text-end">${escapeHtml(dev.actual_workdays ?? '-')}</td>
                     <td class="text-end fw-bold">${escapeHtml(resolveFinalWeeklyNonWorkDays(dev))}</td>
-                    <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
-                    <td class="text-end">${escapeHtml(renderWeeklySeventhDayValue(dev))}</td>
+                    <td class="text-end">${renderStage4SixthDayValue(dev)}</td>
+                    <td class="text-end">${renderStage4SeventhDayValue(dev)}</td>
                     <td class="weekly-deviation-comment">${renderStage4StatusCell(dev)}${renderDeviationNoteCell(dev)}${dev.status === 'NEEDS_HR_DECISION' && dev.requires_new_hr_decision !== false && canRecordCanonicalEmploymentDecision()
                         ? `<div class="mt-2">${Number(dev.canonical_identical_group_count || 0) > 1
                             ? `<div class="small fw-semibold mb-1">${escapeHtml(dev.canonical_identical_group_count)} όμοιες περιπτώσεις</div>` : ''}<button type="button" class="btn btn-sm canonical-decision-open employment-review-action-btn employment-review-action-primary"
@@ -2555,7 +2603,7 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
         .join('');
 
     wrapperTr.innerHTML = `
-        <td colspan="13" class="p-2 bg-warning-subtle">
+        <td colspan="13" class="p-2">
             <div class="fw-bold weekly-deviation-section-title">
                 Εβδομαδιαίος έλεγχος εργασίας και ανάπαυσης
                 <span class="badge text-bg-light border ms-1">Εβδομάδα Δευτέρα–Κυριακή</span>
@@ -3644,7 +3692,7 @@ function renderReviewRows(rows = [], deviations = []) {
                 ${renderSixthDayCardsBadge(row)}
             </td>
             <td${tdClass(`${rowPresentation.apologistiko.className} text-center`)}>
-                ${rowPresentation.apologistiko.text}
+                ${renderStage4ClassificationPill(rowPresentation.apologistiko.text)}
                 ${renderDeclaredRepoWithCardsBadge(row)}
                 ${renderApprovedOrphanAuditBadge(row)}
                 ${renderScenarioBadge(row, rowPresentation.badgeState)}
@@ -10926,6 +10974,23 @@ function renderEmploymentReviewWorkflowGuide(lifecycle = {}) {
     attention.classList.remove('d-none');
 }
 
+function renderStage4Summary(payloads = []) {
+    const strip = document.getElementById('employmentReviewStage4Summary');
+    if (!strip) return;
+    const stage4Rows = (Array.isArray(payloads) ? payloads : [])
+        .map((payload) => payload?.lifecycle_projection?.stages?.stage4)
+        .filter(Boolean);
+    const attentionWeeks = stage4Rows.filter((stage4) =>
+        stage4.business_status === 'BLOCKED' || Number(stage4.pending_count || 0) > 0).length;
+    const allCompleted = stage4Rows.length > 0 && stage4Rows.every((stage4) =>
+        stage4.business_status === 'COMPLETED');
+    strip.classList.toggle('d-none', !attentionWeeks && !allCompleted);
+    strip.classList.toggle('stage4-summary-attention', attentionWeeks > 0);
+    strip.textContent = attentionWeeks
+        ? `Χρειάζονται έλεγχο: ${attentionWeeks} ${attentionWeeks === 1 ? 'εβδομάδα' : 'εβδομάδες'}`
+        : allCompleted ? '✓ Τελικός εβδομαδιαίος έλεγχος ολοκληρώθηκε' : '';
+}
+
 function updateEmploymentReviewWorkflowPresentation() {
     const allPayloads = [...currentCanonicalLifecyclePayloads]
         .sort(compareWeeklyHrStage1Payloads);
@@ -10934,6 +10999,7 @@ function updateEmploymentReviewWorkflowPresentation() {
     const lifecycle = derivePeriodLifecyclePresentation(allPayloads, currentEmploymentPeriodControl,
         currentWeeklyHrStage2BulkPreview);
     currentEmploymentReviewLifecyclePresentation = lifecycle;
+    renderStage4Summary(allPayloads);
     renderEmploymentReviewBoundaryContextSummary();
     currentStage2DailyResolutionByKey = buildStage2DailyResolutionByKey(allPayloads);
     currentCanonicalDailyEmploymentTypeByKey = buildCanonicalDailyEmploymentTypeByKey(allPayloads);
