@@ -10595,8 +10595,11 @@ function weeklyHrStage3BulkPreviewCommand() {
     const items = weeklyHrStage3BulkSelectedItems();
     if (!items.length) return null;
     const first = items[0];
-    return { ypokatasthma: first.ypokatasthma, period_start: first.period_start,
-        period_end: first.period_end, final_classification: weeklyHrStage3BulkClassification,
+    const periodStart = stage1DateKey(currentPolicyPreviewBaseParams?.get('apo_hmeromhnia'));
+    const periodEnd = stage1DateKey(currentPolicyPreviewBaseParams?.get('eos_hmeromhnia'));
+    if (!periodStart || !periodEnd) return null;
+    return { ypokatasthma: first.ypokatasthma, period_start: periodStart,
+        period_end: periodEnd, final_classification: weeklyHrStage3BulkClassification,
         leave_category: weeklyHrStage3BulkClassification === 'LEAVE'
             ? weeklyHrStage3BulkLeaveCategory : '',
         items: items.map((item) => ({ employee_id: item.employee_id,

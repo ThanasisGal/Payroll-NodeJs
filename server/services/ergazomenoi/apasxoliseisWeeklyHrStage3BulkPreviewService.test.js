@@ -5,7 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
 const { buildStage3InputFingerprint } = require('./apasxoliseisStage3FingerprintService');
-const { MAX_STAGE3_BULK_PREVIEW_ITEMS, buildWeeklyHrStage3BulkPreview } = require(
+const { MAX_STAGE3_BULK_PREVIEW_ITEMS, normalizeStage3BulkPreviewCommand,
+    buildWeeklyHrStage3BulkPreview } = require(
     './apasxoliseisWeeklyHrStage3BulkPreviewService'
 );
 
@@ -65,6 +66,13 @@ async function preview(contexts, input, options = {}) {
 (async () => {
     const first = makeContext(); const second = makeContext({ index: 1 });
     const valid = await preview([first, second], command([itemFor(first), itemFor(second)]));
+    const authoritativeDates = normalizeStage3BulkPreviewCommand(command([itemFor(first)], {
+        period_start: new Date('2026-06-01T00:00:00.000Z'),
+        period_end: new Date('2026-06-30T00:00:00.000Z') }));
+    assert.equal(authoritativeDates.period_start, '2026-06-01');
+    assert.equal(authoritativeDates.period_end, '2026-06-30');
+    assert.throws(() => normalizeStage3BulkPreviewCommand(command([itemFor(first)], {
+        period_start: 'malformed' })), { code: 'INVALID_STAGE3_BULK_DATE' });
     assert.equal(valid.result.can_apply, true);
     assert.equal(valid.result.selected_count, 2);
     assert.equal(valid.result.employee_count, 2);

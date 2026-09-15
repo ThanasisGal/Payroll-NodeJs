@@ -31,6 +31,8 @@ function sandboxFor(items = [item()]) {
         weeklyHrStage3FrozenApplyCommand: null, weeklyHrStage3BulkRetryPending: false,
         weeklyHrStage3BulkSubmitting: false,
         currentEmploymentReviewLifecyclePresentation: { stages: { STAGE3: { pending_items: items } } },
+        currentPolicyPreviewBaseParams: new URLSearchParams({
+            apo_hmeromhnia: '2026-06-01', eos_hmeromhnia: '2026-06-30' }),
         currentCanonicalLifecyclePayloads: [],
         currentReviewRows: [{ employee_kodikos: '0007', employee_name: 'ΣΠΥΡΙΔΩΝΟΣ ΑΡΕΤΗ' }],
         weeklyHrLeaveCategories: [{ value: 'ΑΔΚΑΝ', label: 'ΑΔΚΑΝ - Κανονική άδεια' }],
@@ -45,6 +47,8 @@ function sandboxFor(items = [item()]) {
             [row.employee_kodikos, row.employee_name])),
         escapeHtml: (value) => String(value ?? ''),
         formatStage1DateKey: (value) => String(value || '').split('-').reverse().join('/'),
+        stage1DateKey: (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
+            ? String(value) : '',
         csrfToken: 'csrf-test',
         crypto: { randomUUID: () => '00000000-0000-4000-8000-000000000001' },
         employmentReviewSwal: async (options) => { alerts.push(options); return { isConfirmed: false }; },
@@ -99,6 +103,22 @@ function sandboxFor(items = [item()]) {
     assert.equal(command.items[0].expected_stage3_version, 2);
     assert.equal(command.final_classification, 'LEAVE');
     assert.equal(command.leave_category, 'ΑΔΚΑΝ');
+    assert.equal(command.period_start, '2026-06-01');
+    assert.equal(command.period_end, '2026-06-30');
+}
+
+{
+    const fullWeek = item({ period_start: '', period_end: '' });
+    const boundaryWeek = item({ row_id: 'row-2', period_start: '2026-06-01',
+        period_end: '2026-06-30' });
+    const { sandbox } = sandboxFor([fullWeek, boundaryWeek]);
+    const command = sandbox.bulk.previewCommand();
+    assert.equal(command.period_start, '2026-06-01');
+    assert.equal(command.period_end, '2026-06-30');
+    assert.equal(command.items.length, 2);
+    sandbox.currentPolicyPreviewBaseParams = new URLSearchParams({
+        apo_hmeromhnia: 'malformed', eos_hmeromhnia: '2026-06-30' });
+    assert.equal(sandbox.bulk.previewCommand(), null);
 }
 
 async function validApplyAndSingleRefresh() {
