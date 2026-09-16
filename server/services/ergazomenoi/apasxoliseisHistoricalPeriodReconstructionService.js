@@ -43,6 +43,7 @@ const RESULT_FIELDS = Object.freeze([...DEPENDENCY_FIELDS,
     'ores_paranomhs_yperorias_apologistika', 'ores_nyxtas_apologistika',
     'ores_argion_prosayxhsh_apologistika', 'kyriakes_apologistika'
 ]);
+const FINGERPRINT_SUPERSET_FIELDS = Object.freeze(['_id', ...RESULT_FIELDS]);
 
 function reconstructionError(code, statusCode, message) {
     const error = new Error(message || code); error.code = code; error.statusCode = statusCode; return error;
@@ -237,19 +238,22 @@ async function calculateHistoricalFingerprints({ scope, prodhlomenaModel = Prodh
     session = null, models = {}, holidayDependencyResolver = calculateHolidayDependencies }) {
     const periodStart = dateOnly(scope.period_start), periodEnd = dateOnly(scope.period_end);
     const window = dependencyWindow(periodStart);
-    const rowLoads = [
-        () => loadRows({ scope, start: periodStart, end: periodEnd, fields: SOURCE_FIELDS, prodhlomenaModel, session }),
-        () => loadRows({ scope, start: window.start, end: window.end, fields: DEPENDENCY_FIELDS, prodhlomenaModel, session }),
-        () => loadRows({ scope, start: periodStart, end: periodEnd, fields: RESULT_FIELDS, prodhlomenaModel, session })
-    ];
-    const loaded = [];
-    if (session) {
-        for (const load of rowLoads) loaded.push(await load());
-    } else loaded.push(...await Promise.all(rowLoads.map((load) => load())));
-    const [sourceRows, dependencyRows, resultRows] = loaded;
     const dependencyStart = window.start || periodStart;
-    const holidayRows = await loadRows({ scope, start: dependencyStart, end: periodEnd,
-        fields: ['_id', 'kodikos', 'hmeromhnia'], prodhlomenaModel, session });
+    const supersetRows = await loadRows({ scope, start: dependencyStart, end: periodEnd,
+        fields: FINGERPRINT_SUPERSET_FIELDS, prodhlomenaModel, session });
+    const inRange = (row, start, end) => {
+        const value = new Date(row.hmeromhnia).getTime();
+        return value >= start.getTime() && value <= end.getTime();
+    };
+    const projectedRows = (rows, fields) => rows.map(row => selectFields(row, fields));
+    const periodRows = supersetRows.filter(row => inRange(row, periodStart, periodEnd));
+    const sourceRows = projectedRows(periodRows, ['_id', ...SOURCE_FIELDS]);
+    const dependencyRows = window.start && window.end
+        ? projectedRows(supersetRows.filter(row => inRange(row, window.start, window.end)),
+            ['_id', ...DEPENDENCY_FIELDS])
+        : [];
+    const resultRows = projectedRows(periodRows, ['_id', ...RESULT_FIELDS]);
+    const holidayRows = projectedRows(supersetRows, ['_id', 'kodikos', 'hmeromhnia']);
     const holiday = await holidayDependencyResolver({ scope, start: dependencyStart,
         end: periodEnd, rows: holidayRows, models, session });
     const legacyDependencyFingerprint = fingerprintRows(dependencyRows, DEPENDENCY_FIELDS, {
@@ -466,7 +470,7 @@ async function failHistoricalReconstruction({ scope, requestId, calculationId = 
 }
 
 module.exports = { FINGERPRINT_VERSION, EMPLOYMENT_CALCULATION_SEMANTICS_VERSION,
-    SOURCE_FIELDS, DEPENDENCY_FIELDS, RESULT_FIELDS,
+    SOURCE_FIELDS, DEPENDENCY_FIELDS, RESULT_FIELDS, FINGERPRINT_SUPERSET_FIELDS,
     dependencyWindow, fingerprintRows, projectionForHistoricalState, isPastDeadline,
     calculateHistoricalFingerprints, calculateHolidayDependencies,
     isHistoricalDependencyCurrent,

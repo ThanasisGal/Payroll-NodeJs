@@ -184,7 +184,7 @@ function castFingerprintDateSelector(dateSelector) {
         const fingerprints = await calculateHistoricalFingerprints({ scope: juneScope,
             prodhlomenaModel: castingProdhlomenaModel,
             holidayDependencyResolver: noHolidayDependencies });
-        assert.strictEqual(castFilters.length, 3);
+        assert.strictEqual(castFilters.length, 1);
         for (const filter of castFilters) {
             assert.strictEqual(filter.hmeromhnia.$gte.getTime(), periodStart.getTime());
             assert.strictEqual(filter.hmeromhnia.$lte.getTime(), periodEnd.getTime());
@@ -281,12 +281,26 @@ function castFingerprintDateSelector(dateSelector) {
             cards_apo_ora_01: '08:00', cards_eos_ora_01: '16:00',
             kathgoria_ergasias_apologistika: 'ΕΡΓ' }
     ];
-    const prodhlomenaModel = { find(filter) { let selected = factRows.filter(row =>
+    let prodhlomenaFindCalls = 0;
+    const prodhlomenaModel = { find(filter) { prodhlomenaFindCalls += 1; const selected = factRows.filter(row =>
         row.hmeromhnia >= filter.hmeromhnia.$gte && row.hmeromhnia <= filter.hmeromhnia.$lte);
         return { select() { return this; }, sort() { return this; }, session() { return this; },
             async lean() { return selected.map(row => ({ ...row })); } }; } };
+    let holidayRows;
     const mayFingerprints = await calculateHistoricalFingerprints({ scope: mayScope, prodhlomenaModel,
-        holidayDependencyResolver: noHolidayDependencies });
+        holidayDependencyResolver: async options => {
+            holidayRows = options.rows;
+            return noHolidayDependencies();
+        } });
+    assert.strictEqual(prodhlomenaFindCalls, 1);
+    assert.deepStrictEqual(holidayRows, factRows.map(row => ({ _id: row._id,
+        kodikos: row.kodikos, hmeromhnia: row.hmeromhnia })));
+    assert.strictEqual(mayFingerprints.source_fingerprint,
+        '3d9ef353c3d83cec12d1fd328348c1f3003e2f104ededd9266eabf8a1c5198f3');
+    assert.strictEqual(mayFingerprints.dependency_fingerprint,
+        'aac50608b77fa7f338bd05217dd82acb12645fe434a375da7e131b4c0646aab3');
+    assert.strictEqual(mayFingerprints.result_fingerprint,
+        'eb4b626f5bc90678fb1fd3d3978897e6ef650ff286f0bab17a42634592a198cc');
     assert.strictEqual(mayFingerprints.dependency_window_start.toISOString().slice(0, 10), '2026-04-27');
     assert.strictEqual(mayFingerprints.dependency_window_end.toISOString().slice(0, 10), '2026-04-30');
     const originalMayDependency = mayFingerprints.dependency_fingerprint;
