@@ -381,4 +381,60 @@ assert.strictEqual(singleMasterSeptemberPreflight.previous.affected_employee_cou
 assert.strictEqual(singleMasterSeptemberPreflight.next.affected_employee_count, 1);
 assert.strictEqual(singleMasterSeptemberPreflight.next.complete_card_pairs, 1);
 
+
+// Phase 2B: canonical gap descriptors and weekly ownership use one master record.
+const singleMasterGapDescriptors =
+    buildPostDepartureExclusionDescriptors([singleMasterRehire]);
+assert.strictEqual(singleMasterGapDescriptors.length, 1);
+assert.strictEqual(
+    singleMasterGapDescriptors[0].departureEnd.toISOString(),
+    '2026-07-31T23:59:59.999Z'
+);
+assert.strictEqual(
+    singleMasterGapDescriptors[0].nextHireStart.toISOString(),
+    '2026-09-17T00:00:00.000Z'
+);
+
+const rehireJulyWeek = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-07-27',
+    natural_week_end: '2026-08-02',
+    period_start: '2026-07-01',
+    period_end: '2026-07-31',
+    hire_date: singleMasterRehire.hmeromhnia_proslhpshs,
+    departure_date: singleMasterRehire.hmeromhnia_apoxorhshs,
+    employee: singleMasterRehire
+});
+assert.deepStrictEqual(rehireJulyWeek.employment_owned_dates, [
+    '2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31'
+]);
+assert.deepStrictEqual(rehireJulyWeek.context_only_dates, []);
+assert.strictEqual(rehireJulyWeek.is_full_natural_week, false);
+
+const rehireGapWeek = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-08-03',
+    natural_week_end: '2026-08-09',
+    period_start: '2026-08-01',
+    period_end: '2026-08-31',
+    hire_date: singleMasterRehire.hmeromhnia_proslhpshs,
+    departure_date: singleMasterRehire.hmeromhnia_apoxorhshs,
+    employee: singleMasterRehire
+});
+assert.deepStrictEqual(rehireGapWeek.employment_owned_dates, []);
+assert.strictEqual(rehireGapWeek.employment_start, null);
+assert.strictEqual(rehireGapWeek.employment_end, null);
+
+const rehireSeptemberWeek = deriveEmploymentOwnedDateScope({
+    natural_week_start: '2026-09-14',
+    natural_week_end: '2026-09-20',
+    period_start: '2026-09-01',
+    period_end: '2026-09-30',
+    hire_date: singleMasterRehire.hmeromhnia_proslhpshs,
+    departure_date: singleMasterRehire.hmeromhnia_apoxorhshs,
+    employee: singleMasterRehire
+});
+assert.deepStrictEqual(rehireSeptemberWeek.employment_owned_dates, [
+    '2026-09-17', '2026-09-18', '2026-09-19', '2026-09-20'
+]);
+assert.strictEqual(rehireSeptemberWeek.is_full_natural_week, false);
+
 console.log('PASS employment-period scope');
