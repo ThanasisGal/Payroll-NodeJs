@@ -269,4 +269,116 @@ assert.strictEqual(buildFullMonthBoundaryContextPreflight({
     period_start: '2026-07-02', period_end: '2026-07-31', employees: []
 }), null);
 
+
+// -----------------------------------------------------------------------------
+// Canonical single-master rehire lifecycle regressions.
+// Existing legacy tests above remain unchanged; lifecycle behavior is opt-in
+// through employee.employment_history until controller preload integration.
+// -----------------------------------------------------------------------------
+const singleMasterRehire = {
+    kodikos: '0901',
+    ypokatasthma: '0001',
+    hmeromhnia_proslhpshs: '2026-09-17',
+    hmeromhnia_apoxorhshs: null,
+    employment_history: [
+        {
+            _id: 'old-start',
+            hmeromhnia_proslhpshs: '2025-01-01',
+            hmeromhnia_apoxorhshs: null,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2025-01-01',
+            aa_eggrafhs: '0001'
+        },
+        {
+            _id: 'old-close',
+            hmeromhnia_proslhpshs: '2025-01-01',
+            hmeromhnia_apoxorhshs: '2026-07-31',
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-01',
+            aa_eggrafhs: '0002'
+        },
+        {
+            _id: 'rehire',
+            hmeromhnia_proslhpshs: '2026-09-17',
+            hmeromhnia_apoxorhshs: null,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-17',
+            aa_eggrafhs: '0003'
+        }
+    ]
+};
+
+assert.strictEqual(
+    isDateWithinEmploymentPeriod('2026-07-20', singleMasterRehire),
+    true
+);
+assert.strictEqual(
+    isDateWithinEmploymentPeriod('2026-07-31', singleMasterRehire),
+    true
+);
+assert.strictEqual(
+    isDateWithinEmploymentPeriod('2026-08-01', singleMasterRehire),
+    false
+);
+assert.strictEqual(
+    isDateWithinEmploymentPeriod('2026-09-16', singleMasterRehire),
+    false
+);
+assert.strictEqual(
+    isDateWithinEmploymentPeriod('2026-09-17', singleMasterRehire),
+    true
+);
+assert.strictEqual(
+    isDateWithinEmploymentPeriod('2026-09-20', singleMasterRehire),
+    true
+);
+
+// A natural week containing the inactive gap or a mid-week rehire is not a full
+// employment week. A later fully employed week is.
+assert.strictEqual(
+    isWeekFullyWithinEmploymentPeriod('2026-07-27', singleMasterRehire),
+    false
+);
+assert.strictEqual(
+    isWeekFullyWithinEmploymentPeriod('2026-09-14', singleMasterRehire),
+    false
+);
+assert.strictEqual(
+    isWeekFullyWithinEmploymentPeriod('2026-09-21', singleMasterRehire),
+    true
+);
+
+// Boundary preflight must use the old cycle for July even though the master
+// employee currently contains the September rehire dates.
+const singleMasterJulyPreflight = buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-07-01',
+    period_end: '2026-07-31',
+    employees: [singleMasterRehire],
+    previous_rows: [
+        completeCardRow('0901', '2026-06-29')
+    ],
+    next_rows: [
+        completeCardRow('0901', '2026-08-01')
+    ]
+});
+assert.strictEqual(singleMasterJulyPreflight.previous.affected_employee_count, 1);
+assert.strictEqual(singleMasterJulyPreflight.previous.complete_card_pairs, 1);
+assert.strictEqual(singleMasterJulyPreflight.next.status, 'NOT_REQUIRED');
+assert.strictEqual(singleMasterJulyPreflight.next.affected_employee_count, 0);
+
+// September's leading boundary is inside the inactive gap, while the trailing
+// boundary belongs to the new employment cycle.
+const singleMasterSeptemberPreflight = buildFullMonthBoundaryContextPreflight({
+    period_start: '2026-09-01',
+    period_end: '2026-09-30',
+    employees: [singleMasterRehire],
+    previous_rows: [
+        completeCardRow('0901', '2026-08-31')
+    ],
+    next_rows: [
+        completeCardRow('0901', '2026-10-01')
+    ]
+});
+assert.strictEqual(singleMasterSeptemberPreflight.previous.status, 'NOT_REQUIRED');
+assert.strictEqual(singleMasterSeptemberPreflight.previous.affected_employee_count, 0);
+assert.strictEqual(singleMasterSeptemberPreflight.next.affected_employee_count, 1);
+assert.strictEqual(singleMasterSeptemberPreflight.next.complete_card_pairs, 1);
+
 console.log('PASS employment-period scope');

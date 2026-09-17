@@ -7,6 +7,9 @@ const {
 const {
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
+const {
+    isDateWithinEmploymentCycles
+} = require('./employeeEmploymentCycleResolverService');
 
 const DEFERRED_WEEK_STATUS = 'DEFERRED_TO_NEXT_PERIOD';
 const DEFERRED_WEEK_MESSAGE = 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ';
@@ -113,6 +116,16 @@ function buildPostDepartureExclusionDescriptors(employees = []) {
 function isDateWithinEmploymentPeriod(value, employee = {}) {
     const rowKey = dateKeyUtc(value);
     if (!rowKey) return false;
+
+    // Opt-in lifecycle context: callers that preload canonical history attach it
+    // as employment_history. Existing callers without it keep exact legacy behavior.
+    if (Array.isArray(employee.employment_history)) {
+        return isDateWithinEmploymentCycles(rowKey, {
+            currentEmployee: employee,
+            history: employee.employment_history
+        });
+    }
+
     const hireKey = dateKeyUtc(employee.hmeromhnia_proslhpshs);
     const departureKey = dateKeyUtc(employee.hmeromhnia_apoxorhshs);
     if (hireKey && rowKey < hireKey) return false;
@@ -124,6 +137,12 @@ function isWeekFullyWithinEmploymentPeriod(value, employee = {}) {
     const weekStart = dateKeyUtc(startOfWeekMondayUtc(value));
     const weekEnd = dateKeyUtc(endOfWeekSundayUtc(value));
     if (!weekStart || !weekEnd) return false;
+
+    if (Array.isArray(employee.employment_history)) {
+        return enumerateDateKeys(weekStart, weekEnd)
+            .every((date) => isDateWithinEmploymentPeriod(date, employee));
+    }
+
     const hireKey = dateKeyUtc(employee.hmeromhnia_proslhpshs);
     const departureKey = dateKeyUtc(employee.hmeromhnia_apoxorhshs);
     if (hireKey && weekStart < hireKey) return false;
