@@ -1,1 +1,1 @@
-function updateLabelsFromHidden(V,p){const E=document['getElementById'](V)['value'];p['forEach'](i=>{document['getElementById'](i)['textContent']=E;});}
+function updateLabelsFromHidden(q,Q){const d=document['getElementById'](q)['value'];Q['forEach'](r=>{document['getElementById'](r)['textContent']=d;});}
