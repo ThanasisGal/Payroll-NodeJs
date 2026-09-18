@@ -2537,7 +2537,7 @@ function renderStage4SeventhDayValue(dev = {}) {
         seventh?.classification === 'SEVENTH_DAY_ILLEGAL_OVERTIME' ||
         dev.seventh_day_severity === 'SERIOUS_VIOLATION';
     return illegal
-        ? '<span class="badge text-bg-danger">7η ημέρα · ΠΑΡΑΝΟΜΗ</span>'
+        ? '<span class="badge text-bg-danger stage4-seventh-day-badge">7η ημέρα · ΠΑΡΑΝΟΜΗ</span>'
         : '<span class="stage4-sixth-day-pill">7η ημέρα</span>';
 }
 
@@ -11135,7 +11135,8 @@ function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const stale = businessStatus === 'STALE';
     const statusText = weeklyHrHasOnlyOrphanBlockers(payload)
         ? 'Απαιτείται επίλυση ορφανού χτυπήματος' : ({ OPEN: 'Ανοιχτό', COMPLETED: 'Ολοκληρωμένο',
-        BLOCKED: 'Μπλοκαρισμένο', STALE: 'Τα στοιχεία άλλαξαν' }[businessStatus] || businessStatus);
+        BLOCKED: 'Μπλοκαρισμένο', STALE: 'Τα στοιχεία άλλαξαν',
+        DEFERRED_TO_NEXT_PERIOD: 'Θα μεταφερθεί στην επόμενη περίοδο' }[businessStatus] || businessStatus);
     const blockedExplanation = weeklyHrBlockedExplanation(payload);
     const eligible = isWeeklyHrStage1Eligible(payload);
     const selected = eligible && weeklyHrStage1Selected.has(key);

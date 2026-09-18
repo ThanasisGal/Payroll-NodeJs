@@ -15210,6 +15210,18 @@ body.loader-active > *:not(.app-loader) {
     white-space: nowrap;
 }
 
+#employmentReviewStage4Collapse .stage4-seventh-day-badge {
+    display: inline-block;
+    box-sizing: border-box;
+    max-width: 100%;
+    padding: 0.12rem 0.35rem;
+    font-size: 0.68rem;
+    line-height: 1.1;
+    font-weight: 700;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 #employmentReviewStage4Collapse .stage4-sixth-day-badge:is(
     .review-sixth-day-rate-missing, .stage4-sixth-day-rate-missing) {
     flex-direction: column;

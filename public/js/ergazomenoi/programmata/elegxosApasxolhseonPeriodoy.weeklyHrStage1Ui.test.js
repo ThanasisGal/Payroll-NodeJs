@@ -383,6 +383,34 @@ const filterHelpersStart = source.indexOf('function stage1ClassificationForRow')
 const filterHelpersEnd = source.indexOf('function stage1RelevantDates', filterHelpersStart);
 const businessStatusFunction = source.match(
     /function weeklyHrStage1BusinessStatus\([\s\S]*?\n}/)?.[0] || '';
+const cardRendererSource = source.match(
+    /function renderWeeklyHrStage1Card\([\s\S]*?\n}/)?.[0];
+assert.ok(cardRendererSource);
+const cardSandbox = {
+    weeklyHrStage1Key: () => 'deferred-week',
+    weeklyHrHasOnlyOrphanBlockers: () => false,
+    weeklyHrBlockedExplanation: () => '',
+    isWeeklyHrStage1Eligible: () => false,
+    weeklyHrStage1Selected: new Set(),
+    weeklyHrStage1IndexWarning: () => '',
+    stage1RelevantDates: () => [],
+    weeklyHrOrphanRows: () => [],
+    renderWeeklyHrOrphanItem: () => '',
+    formatStage1DateKey: scopeSandbox.helpers.formatStage1DateKey,
+    escapeHtml: String
+};
+vm.runInNewContext(`${businessStatusFunction}\n${cardRendererSource}\n` +
+    'this.render = renderWeeklyHrStage1Card;', cardSandbox);
+const deferredCard = cardSandbox.render({
+    scope: { employee_kodikos: '0001', week_start: '2026-06-29', week_end: '2026-07-05' },
+    lifecycle_projection: { stages: { stage1: {
+        business_status: 'DEFERRED_TO_NEXT_PERIOD'
+    } } }
+});
+assert.match(deferredCard,
+    /<span class="badge bg-secondary">Θα μεταφερθεί στην επόμενη περίοδο<\/span>/);
+assert.doesNotMatch(deferredCard, /DEFERRED_TO_NEXT_PERIOD/);
+
 const filterSandbox = {};
 vm.runInNewContext(`${source.match(/function stage1DateKey[\s\S]*?\n}/)?.[0]}\n` +
     `${businessStatusFunction}\n${source.slice(filterHelpersStart, filterHelpersEnd)}\n` +
