@@ -238,6 +238,9 @@ const {
     DEFERRED_WEEK_MESSAGE
 } = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
 const {
+    preloadEmployeeEmploymentCycleContexts
+} = require('../../services/ergazomenoi/employeeEmploymentCycleContextLoaderService');
+const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
     SOURCE_VERSION: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
     buildWeeklyRepoDeviationPreview,
@@ -4315,7 +4318,10 @@ function applyPostDepartureExclusionsToFilter(filter, descriptors = []) {
     const exclusions = descriptors.map((descriptor) => {
         const exclusion = {
             kodikos: descriptor.kodikos,
-            hmeromhnia: mongoose.trusted({ $gt: descriptor.departureEnd })
+            hmeromhnia: mongoose.trusted({
+                $gt: descriptor.departureEnd,
+                ...(descriptor.nextHireStart ? { $lt: descriptor.nextHireStart } : {})
+            })
         };
         if (descriptor.ypokatasthma) {
             exclusion.ypokatasthma = descriptor.ypokatasthma;
@@ -4343,9 +4349,15 @@ async function applyEmploymentDepartureScopeToFilters({
     const employees = await ErgazomenoiModel.find(employeeFilter)
         .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
         .lean();
-    const descriptors = buildPostDepartureExclusionDescriptors(employees);
+    const lifecycleEmployees = await preloadEmployeeEmploymentCycleContexts({
+        team,
+        company_kod: companyId,
+        employees,
+        historyModel: IstorikoProslhpseonAllagonModel
+    });
+    const descriptors = buildPostDepartureExclusionDescriptors(lifecycleEmployees);
     filters.forEach((filter) => applyPostDepartureExclusionsToFilter(filter, descriptors));
-    return { employees, descriptors };
+    return { employees: lifecycleEmployees, descriptors };
 }
 
 const REVIEW_SELECT_FIELDS =
@@ -4463,7 +4475,8 @@ async function loadWeeklyHrContext({ req, input, session = null,
         period_start: periodScope.period_start,
         period_end: periodScope.period_end,
         hire_date: employee.hmeromhnia_proslhpshs,
-        departure_date: employee.hmeromhnia_apoxorhshs
+        departure_date: employee.hmeromhnia_apoxorhshs,
+        employee
     });
     const expectedDates = employmentDateScope?.employment_owned_dates || [];
     const expectedDateSet = new Set(expectedDates);
@@ -4912,7 +4925,7 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             natural_week_start: seed.week_start, natural_week_end: seed.week_end,
             period_start: periodStart, period_end: periodEnd,
             hire_date: employee.hmeromhnia_proslhpshs,
-            departure_date: employee.hmeromhnia_apoxorhshs });
+            departure_date: employee.hmeromhnia_apoxorhshs, employee });
         const periodScope = employmentDateScope?.context_only_dates?.length
             ? periodAccess.scope : null;
         const lifecycle = buildWeeklyHrLifecycleProjection({ weekRows: rows,
@@ -5198,7 +5211,7 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
             natural_week_start: weekStart, natural_week_end: weekEnd,
             period_start: ownershipPeriod.period_start, period_end: ownershipPeriod.period_end,
             hire_date: employee.hmeromhnia_proslhpshs,
-            departure_date: employee.hmeromhnia_apoxorhshs });
+            departure_date: employee.hmeromhnia_apoxorhshs, employee });
         const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
             dateKeyUtc(row.hmeromhnia), weeklyHrStage2LifecycleProfileFromRow(row)
         ]));
@@ -5616,7 +5629,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             period_start: ownershipPeriod.period_start,
             period_end: ownershipPeriod.period_end,
             hire_date: employee.hmeromhnia_proslhpshs,
-            departure_date: employee.hmeromhnia_apoxorhshs
+            departure_date: employee.hmeromhnia_apoxorhshs,
+            employee
         });
         const employmentOwnedDateSet = new Set(
             employmentDateScope?.employment_owned_dates || weekRows.map((row) => dateKeyUtc(row.hmeromhnia))
@@ -5786,7 +5800,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             period_start: ownershipPeriod.period_start,
             period_end: ownershipPeriod.period_end,
             hire_date: employee.hmeromhnia_proslhpshs,
-            departure_date: employee.hmeromhnia_apoxorhshs
+            departure_date: employee.hmeromhnia_apoxorhshs,
+            employee
         });
         const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
             dateKeyUtc(row.hmeromhnia), {

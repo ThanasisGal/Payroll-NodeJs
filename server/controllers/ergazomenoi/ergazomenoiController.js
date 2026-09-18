@@ -1,5 +1,5 @@
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { writeEmployeeEmploymentProfile, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -3310,7 +3310,8 @@ class ergazomenoiController {
 
     static postErgazomenoiUpdate = async (req, res) => {
         const ergazomenoiId = req.params.ergazomenoiId;
-        const { formData = {}, filesToUpdate } = req.body || {};
+        const { formData = {}, filesToUpdate, rehireIntent = false, rehireDate = null } =
+            req.body || {};
         const aforaDaneismoErgazomenoy = formData.afora_daneismo_ergazomenoy === true;
 
         const omadaErgasias = req.session?.userTeam;
@@ -3762,17 +3763,46 @@ class ergazomenoiController {
                 }
             });
 
-            const result = await writeEmployeeEmploymentProfile({
-                scope: { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy },
-                input: profileInput(formData, 'edit'), employeeId: ergazomenoiId,
-                effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
-                    formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
-                maintenance: { employeeChanges: filteredDataErgazomenoi,
-                    historyChanges: updateFieldsIstoriko,
-                    identity: formData.istorikoId ? undefined : getIstorikoDateIdentity(formData),
-                    originalHistoryId: formData.istorikoId || null,
-                    correctableIdentityFields: formData.istorikoId ? ['hmeromhnia_apoxorhshs'] : [] }
-            });
+            const result = rehireIntent === true
+                ? await writeEmployeeRehire({
+                    scope: {
+                        team: omadaErgasias,
+                        company_kod: kodikosEtaireias,
+                        kodikos: kodikosErgazomenoy
+                    },
+                    employeeId: ergazomenoiId,
+                    rehireDate: rehireDate || formData.hmeromhnia_proslhpshs,
+                    input: profileInput(formData, 'edit'),
+                    employeeChanges: filteredDataErgazomenoi,
+                    historyChanges: {
+                        ...updateFieldsIstoriko,
+                        afora_proslhpsh: true
+                    }
+                })
+                : await writeEmployeeEmploymentProfile({
+                    scope: {
+                        team: omadaErgasias,
+                        company_kod: kodikosEtaireias,
+                        kodikos: kodikosErgazomenoy
+                    },
+                    input: profileInput(formData, 'edit'),
+                    employeeId: ergazomenoiId,
+                    effectiveFrom:
+                        formData.hmeromhnia_isxyos_oron_ergasias_apo ||
+                        formData.hmeromhnia_allaghs_orarioy_apo ||
+                        formData.hmeromhnia_proslhpshs,
+                    maintenance: {
+                        employeeChanges: filteredDataErgazomenoi,
+                        historyChanges: updateFieldsIstoriko,
+                        identity: formData.istorikoId
+                            ? undefined
+                            : getIstorikoDateIdentity(formData),
+                        originalHistoryId: formData.istorikoId || null,
+                        correctableIdentityFields: formData.istorikoId
+                            ? ['hmeromhnia_apoxorhshs']
+                            : []
+                    }
+                });
             updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);
 
             if (!updatedErgazomenos) {
@@ -3784,6 +3814,14 @@ class ergazomenoiController {
         } catch (error) {
             console.error('❌ Σφάλμα κατά την ενημέρωση εργαζόμενου:', error);
             if (isEmploymentProfileError(error)) return profileError(res, error);
+            if (String(error?.code || '').startsWith('EMPLOYEE_REHIRE_')) {
+                return res.status(error.statusCode || 409).json({
+                    success: false,
+                    reason: error.code,
+                    errorMessage:
+                        'Η επαναπρόσληψη δεν ολοκληρώθηκε. Ελέγξτε τα στοιχεία της νέας πρόσληψης και δοκιμάστε ξανά.'
+                });
+            }
             return res.status(500).json({
                 success: false,
                 errorMessage: 'Σφάλμα κατά την ενημέρωση εργαζόμενου'

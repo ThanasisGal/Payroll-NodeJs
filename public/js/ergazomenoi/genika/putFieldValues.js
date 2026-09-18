@@ -51,6 +51,119 @@ document.addEventListener('DOMContentLoaded', () => {
             return typeof value === 'function' ? value.bind(target) : value;
         }
     });
+    const rehireQuery = new URLSearchParams(window.location.search);
+    const isRehireDraftMode = rehireQuery.get('rehire') === '1';
+    const rehireDraftDate = rehireQuery.get('rehireDate') || '';
+
+    const isCalendarDate = value =>
+        /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+
+    const displayRehireDate = (dateKey) => {
+        const match = String(dateKey || '').match(
+            /^(\d{4})-(\d{2})-(\d{2})$/
+        );
+        return match
+            ? `${match[3]}/${match[2]}/${match[1]}`
+            : String(dateKey || '');
+    };
+
+    const addUtcDays = (dateKey, days) => {
+        if (!isCalendarDate(dateKey)) return '';
+        const date = new Date(`${dateKey}T00:00:00.000Z`);
+        if (Number.isNaN(date.getTime())) return '';
+        date.setUTCDate(date.getUTCDate() + days);
+        return date.toISOString().slice(0, 10);
+    };
+
+    const setRehireField = (id, value) => {
+        const field = document.getElementById(id);
+        if (field) field.value = value;
+    };
+
+    const initializeRehireDraft = () => {
+        if (!isRehireDraftMode) return;
+
+        if (!isCalendarDate(rehireDraftDate)) {
+            Swal.fire({
+                backdrop: false,
+                allowOutsideClick: false,
+                icon: 'error',
+                title: 'Μη έγκυρη ημερομηνία',
+                text: 'Δεν είναι δυνατό να προετοιμαστούν τα στοιχεία της νέας πρόσληψης.',
+                confirmButtonText: 'Κλείσιμο'
+            });
+            return;
+        }
+
+        setRehireField('hmeromhnia_proslhpshs', rehireDraftDate);
+        setRehireField('hmeromhnia_allaghs_symbashs', rehireDraftDate);
+        setRehireField('hmeromhnia_allaghs_orarioy_apo', rehireDraftDate);
+        setRehireField('hmeromhnia_allaghs_orarioy_eos', addUtcDays(rehireDraftDate, 6));
+        setRehireField('hmeromhnia_isxyos_oron_ergasias_apo', rehireDraftDate);
+        setRehireField('hmeromhnia_isxyos_oron_ergasias_eos', '');
+        setRehireField('hmeromhnia_lhxhs_symbashs', '');
+        setRehireField('hmeromhnia_apoxorhshs', '');
+
+        const scheduleEndField =
+            document.getElementById('hmeromhnia_allaghs_orarioy_eos');
+        if (scheduleEndField) {
+            scheduleEndField.dispatchEvent(
+                new Event('input', { bubbles: true })
+            );
+        }
+        setRehireField('istorikoId', '');
+
+        const terminationCheckbox =
+            document.getElementById('kataggelia_me_proeidopoihsh');
+        if (terminationCheckbox) terminationCheckbox.checked = false;
+
+        setRehireField('hmnia_koinopoihshs_kataggelias', '');
+        setRehireField('mhnes_proeidopoihshs', '0');
+        setRehireField('logos_peratoshs_stathera', '');
+        setRehireField('parathrhseis_peratoshs', '');
+
+        const activeCheckbox = document.getElementById('energos');
+        if (activeCheckbox) activeCheckbox.checked = true;
+
+        const activeLabel = document.getElementById('label-energos');
+        if (activeLabel) {
+            activeLabel.textContent = 'ΕΝΕΡΓΟΣ';
+            activeLabel.classList.remove('red-text');
+        }
+
+        document.querySelectorAll('.submitButton').forEach(button => {
+            button.innerHTML =
+                '<i class="bi bi-floppy"></i> Καταχώριση επαναπρόσληψης';
+            button.style.width = 'auto';
+            button.style.minWidth = '16rem';
+            button.style.whiteSpace = 'nowrap';
+        });
+
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            width: '21rem',
+            icon: 'info',
+            title: 'Νέα πρόσληψη',
+            html: 'Ελέγξτε και συμπληρώστε τα στοιχεία της νέας απασχόλησης.<br><strong>Δεν έχει γίνει ακόμη καμία καταχώριση.</strong>',
+            showConfirmButton: false,
+            showCloseButton: true,
+            timer: 5500,
+            timerProgressBar: true,
+            didOpen: () => {
+                const htmlContainer = Swal.getHtmlContainer();
+                if (htmlContainer) {
+                    htmlContainer.style.whiteSpace = 'normal';
+                    htmlContainer.style.overflowWrap = 'anywhere';
+                    htmlContainer.style.lineHeight = '1.35';
+                    htmlContainer.style.textAlign = 'left';
+                }
+            }
+        });
+    };
+
+    initializeRehireDraft();
+
     const isEmpty = (v) => !String(v ?? '').trim();
     const isEmptyArray = (v) => !Array.isArray(v) || v.length === 0;
     let message = '';
@@ -59,6 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
+
         if (!window.validateEmploymentProfileBreak(document)) return;
 
         const formData = {};
@@ -515,7 +629,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) {
                 typosMetabolhsData = [];
             }
-            const hasMetaboles = typosMetabolhsData.length > 0;
+            const hasMetaboles =
+                isRehireDraftMode ? false : typosMetabolhsData.length > 0;
 
             // -------------------------------------------------------------------------
             // Radio group: Μεταβολές (εμφανίζεται μόνο αν hasMetaboles)
@@ -919,10 +1034,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const v = {
                 formData: formData,
-                filesToUpdate: result.value
+                filesToUpdate: result.value,
+                ...(isRehireDraftMode
+                    ? {
+                        rehireIntent: true,
+                        rehireDate:
+                            formData.hmeromhnia_proslhpshs || rehireDraftDate
+                    }
+                    : {})
             };
 
             const createContract = result.value?.create_contract === true;
+
+            if (isRehireDraftMode) {
+                const finalRehireConfirmation = await Swal.fire({
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    icon: 'warning',
+                    title: 'Καταχώριση επαναπρόσληψης',
+                    html: `
+                        <p>
+                            Θα καταχωριστεί νέα πρόσληψη από
+                            <strong>${displayRehireDate(
+                                formData.hmeromhnia_proslhpshs ||
+                                    rehireDraftDate
+                            )}</strong>.
+                        </p>
+                        <p>
+                            Ελέγξατε τα στοιχεία απασχόλησης, σύμβασης,
+                            αποδοχών και ωραρίου;
+                        </p>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: 'Καταχώριση',
+                    cancelButtonText: 'Ακύρωση',
+                    focusCancel: true,
+                    customClass: {
+                        title: 'custom-title',
+                        popup: 'custom-swal-popup',
+                        htmlContainer: 'custom-html-container',
+                        confirmButton:
+                            'class-success custom-confirm-button custom-swal-button',
+                        cancelButton:
+                            'custom-cancel-button custom-swal-button'
+                    }
+                });
+
+                if (!finalRehireConfirmation.isConfirmed) return;
+            }
+
 
             // -------------------------------------------------------------------------
             // ✅ SAFETY NET για E6N: σε ορισμένες ροές ο /api/ergazomenoi/update

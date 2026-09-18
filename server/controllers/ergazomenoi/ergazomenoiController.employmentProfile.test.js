@@ -672,7 +672,7 @@ test('semantic controller audit: allocation and Add/Edit field maps retain basel
     const noDivider = text => text.replace(/\n\s*\/\/ =+$/, '').trim();
     assert.equal(part(source, '        const filteredDataErgazomenoi =', '        const updateFieldsIstoriko =', editOffset(source)),
         noDivider(part(baseline, '        const filteredDataErgazomenoi =', '        // ✅ 5)', editOffset(baseline))));
-    assert.equal(part(source, '            const toNumber =', '            const result = await writeEmployeeEmploymentProfile', editOffset(source)),
+    assert.equal(part(source, '            const toNumber =', '            const result = rehireIntent === true', editOffset(source)),
         part(baseline, '            const toNumber =', '            updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate', editOffset(baseline)));
     const beforeHistory = part(baseline, '        const newIstoriko =', '        try {\n            await IstorikoProslhpseonAllagonModel.create', addOffset(baseline))
         .replace("            aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),\n", '');

@@ -7,6 +7,10 @@ const {
 const {
     resolveCardPairVerification
 } = require('./apasxoliseisCardPairResolverService');
+const {
+    buildEmploymentCycles,
+    isDateWithinEmploymentCycles
+} = require('./employeeEmploymentCycleResolverService');
 
 const DEFERRED_WEEK_STATUS = 'DEFERRED_TO_NEXT_PERIOD';
 const DEFERRED_WEEK_MESSAGE = 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ';
@@ -87,19 +91,47 @@ function buildPostDepartureExclusionDescriptors(employees = []) {
 
     const descriptors = [];
     for (const employeesForIdentity of grouped.values()) {
-        // Αν υπάρχει ενεργή εγγραφή χωρίς αποχώρηση, δεν αποκλείουμε γραμμές
-        // με βάση κάποιο παλιό/διπλό employee record.
-        if (employeesForIdentity.some((employee) => !endOfDepartureDay(employee.hmeromhnia_apoxorhshs))) {
+        const employee = employeesForIdentity[0];
+
+        // Canonical single-master lifecycle: each closed cycle excludes only the
+        // inactive range until the next hire. An open current cycle has no tail
+        // exclusion, so rehire dates remain visible.
+        if (employeesForIdentity.length === 1 && Array.isArray(employee.employment_history)) {
+            const cycles = buildEmploymentCycles({
+                currentEmployee: employee,
+                history: employee.employment_history
+            });
+
+            cycles.forEach((cycle, index) => {
+                const departureEnd = endOfDepartureDay(cycle.departure_date);
+                if (!departureEnd) return;
+
+                const nextCycle = cycles[index + 1] || null;
+                const nextHireStart = nextCycle
+                    ? startOfHireDay(nextCycle.hire_date)
+                    : null;
+
+                descriptors.push({
+                    kodikos: String(employee.kodikos || '').trim(),
+                    ypokatasthma: normalizeBranch(employee.ypokatasthma),
+                    departureEnd,
+                    ...(nextHireStart ? { nextHireStart } : {})
+                });
+            });
+            continue;
+        }
+
+        // Exact legacy fallback for old duplicate physical employee records.
+        if (employeesForIdentity.some((item) => !endOfDepartureDay(item.hmeromhnia_apoxorhshs))) {
             continue;
         }
 
         const departureEnds = employeesForIdentity
-            .map((employee) => endOfDepartureDay(employee.hmeromhnia_apoxorhshs))
+            .map((item) => endOfDepartureDay(item.hmeromhnia_apoxorhshs))
             .filter(Boolean)
             .sort((a, b) => b.getTime() - a.getTime());
         if (departureEnds.length === 0) continue;
 
-        const employee = employeesForIdentity[0];
         descriptors.push({
             kodikos: String(employee.kodikos || '').trim(),
             ypokatasthma: normalizeBranch(employee.ypokatasthma),
@@ -113,6 +145,16 @@ function buildPostDepartureExclusionDescriptors(employees = []) {
 function isDateWithinEmploymentPeriod(value, employee = {}) {
     const rowKey = dateKeyUtc(value);
     if (!rowKey) return false;
+
+    // Opt-in lifecycle context: callers that preload canonical history attach it
+    // as employment_history. Existing callers without it keep exact legacy behavior.
+    if (Array.isArray(employee.employment_history)) {
+        return isDateWithinEmploymentCycles(rowKey, {
+            currentEmployee: employee,
+            history: employee.employment_history
+        });
+    }
+
     const hireKey = dateKeyUtc(employee.hmeromhnia_proslhpshs);
     const departureKey = dateKeyUtc(employee.hmeromhnia_apoxorhshs);
     if (hireKey && rowKey < hireKey) return false;
@@ -124,6 +166,12 @@ function isWeekFullyWithinEmploymentPeriod(value, employee = {}) {
     const weekStart = dateKeyUtc(startOfWeekMondayUtc(value));
     const weekEnd = dateKeyUtc(endOfWeekSundayUtc(value));
     if (!weekStart || !weekEnd) return false;
+
+    if (Array.isArray(employee.employment_history)) {
+        return enumerateDateKeys(weekStart, weekEnd)
+            .every((date) => isDateWithinEmploymentPeriod(date, employee));
+    }
+
     const hireKey = dateKeyUtc(employee.hmeromhnia_proslhpshs);
     const departureKey = dateKeyUtc(employee.hmeromhnia_apoxorhshs);
     if (hireKey && weekStart < hireKey) return false;
@@ -145,7 +193,7 @@ function enumerateDateKeys(startValue, endValue) {
 
 function deriveEmploymentOwnedDateScope({ natural_week_start, natural_week_end,
     period_start = natural_week_start, period_end = natural_week_end,
-    hire_date = null, departure_date = null } = {}) {
+    hire_date = null, departure_date = null, employee = null } = {}) {
     const naturalStart = dateKeyUtc(natural_week_start);
     const naturalEnd = dateKeyUtc(natural_week_end);
     const periodStart = dateKeyUtc(period_start);
@@ -154,10 +202,23 @@ function deriveEmploymentOwnedDateScope({ natural_week_start, natural_week_end,
     const departure = dateKeyUtc(departure_date);
     if (!naturalStart || !naturalEnd || !periodStart || !periodEnd ||
         naturalStart > naturalEnd || periodStart > periodEnd) return null;
-    const employmentStart = hire && hire > naturalStart ? hire : naturalStart;
-    const employmentEnd = departure && departure < naturalEnd ? departure : naturalEnd;
-    const employmentDates = employmentStart <= employmentEnd
-        ? enumerateDateKeys(employmentStart, employmentEnd) : [];
+
+    let employmentStart;
+    let employmentEnd;
+    let employmentDates;
+
+    if (employee && Array.isArray(employee.employment_history)) {
+        employmentDates = enumerateDateKeys(naturalStart, naturalEnd)
+            .filter((date) => isDateWithinEmploymentPeriod(date, employee));
+        employmentStart = employmentDates[0] || null;
+        employmentEnd = employmentDates.at(-1) || null;
+    } else {
+        employmentStart = hire && hire > naturalStart ? hire : naturalStart;
+        employmentEnd = departure && departure < naturalEnd ? departure : naturalEnd;
+        employmentDates = employmentStart <= employmentEnd
+            ? enumerateDateKeys(employmentStart, employmentEnd) : [];
+    }
+
     const ownedDates = employmentDates.filter((key) =>
         key >= periodStart && key <= periodEnd);
     return Object.freeze({
