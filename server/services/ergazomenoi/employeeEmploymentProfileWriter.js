@@ -6,6 +6,7 @@ const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { IDENTITY_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged } = require('../../utils/ergazomenoi/employmentProfileTransition');
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
+const { buildEmployeeRehireTransition } = require('./employeeRehireLifecycleTransitionService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -392,4 +393,97 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
         return result;
     }, activeSession);
 }
-module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE, transactionCapability, writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileCorrections, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode };
+
+// Dedicated rehire command. The old relationship is closed at its actual
+// departure date before appending the new profile version. All changes share
+// the same transaction/session as the existing employment-profile writer.
+async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
+    employeeChanges = {}, historyChanges = {},
+    connection = mongoose.connection, employeeModel = ErgazomenoiModel,
+    historyModel = IstorikoProslhpseonAllagonModel, capabilityProbe = transactionCapability }) {
+    if (!scope || !['team', 'company_kod', 'kodikos'].every(key =>
+        typeof scope[key] === 'string' && scope[key].trim())) {
+        C.invalid('scope', 'complete scope required');
+    }
+    if (typeof employeeId !== 'string' || !employeeId.trim()) {
+        C.invalid('employeeId', 'required');
+    }
+
+    const filter = Object.fromEntries(
+        ['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]])
+    );
+
+    return inProfileTransaction(connection, capabilityProbe, async session => {
+        const current = await employeeModel
+            .findOne({ ...filter, _id: employeeId })
+            .session(session)
+            .lean();
+        if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
+
+        const rows = await historyModel.find(filter).session(session).lean();
+        const transition = buildEmployeeRehireTransition({
+            currentEmployee: current,
+            history: rows,
+            rehireDate,
+            employeeChanges,
+            historyChanges
+        });
+
+        const previousHistoryId = transition.previous_cycle.history_ids.at(-1);
+        if (!previousHistoryId) throw failure('EMPLOYEE_REHIRE_HISTORY_REQUIRED');
+        const previousRow = rows.find(row => String(row._id) === String(previousHistoryId));
+        if (!previousRow) throw failure('EMPLOYEE_REHIRE_HISTORY_REQUIRED');
+
+        const departure = C.calendarDate(transition.previous_cycle.departure_date);
+        const previousStart = effectiveStart(previousRow);
+        const previousEnd = effectiveEnd(previousRow);
+        if (!departure || !previousStart || previousStart > departure) {
+            throw failure('EMPLOYEE_REHIRE_HISTORY_INVALID');
+        }
+        if (previousEnd && previousEnd < departure) {
+            throw failure('EMPLOYEE_REHIRE_HISTORY_END_BEFORE_DEPARTURE');
+        }
+
+        const closed = await historyModel.updateOne({
+            ...filter,
+            _id: previousRow._id,
+            hmeromhnia_isxyos_oron_ergasias_eos:
+                previousRow.hmeromhnia_isxyos_oron_ergasias_eos ?? null,
+            hmeromhnia_apoxorhshs: previousRow.hmeromhnia_apoxorhshs ?? null
+        }, {
+            $set: {
+                hmeromhnia_apoxorhshs: departure,
+                hmeromhnia_isxyos_oron_ergasias_eos: departure
+            }
+        }, { session });
+        if (closed.matchedCount !== 1) {
+            throw failure('EMPLOYEE_REHIRE_HISTORY_STALE');
+        }
+
+        const result = await writeEmployeeEmploymentProfile({
+            scope,
+            employeeId,
+            effectiveFrom: transition.effective_from,
+            mode: MODE_NEW_VERSION,
+            input,
+            maintenance: {
+                employeeChanges: transition.employee_changes,
+                historyChanges: transition.history_changes,
+                identity: transition.history_changes
+            },
+            connection,
+            employeeModel,
+            historyModel,
+            capabilityProbe,
+            [ACTIVE_SESSION]: session
+        });
+
+        return {
+            ...result,
+            cycle_no: transition.cycle_no,
+            rehire_date: transition.effective_from,
+            previous_cycle: transition.previous_cycle
+        };
+    });
+}
+module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE, transactionCapability, writeEmployeeEmploymentProfile, writeEmployeeRehire, writeEmployeeEmploymentProfileCorrections, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode };

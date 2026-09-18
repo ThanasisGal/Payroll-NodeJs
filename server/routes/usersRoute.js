@@ -20,6 +20,7 @@ const antistoixiseisController = require('../controllers/companies/antistoixisei
 const krathseisController = require('../controllers/krathseisController.js');
 const genikaAPIsController = require('../controllers/genikaAPIsController.js');
 const ergazomenoiController = require('../controllers/ergazomenoi/ergazomenoiController.js');
+const employeeRehireController = require('../controllers/ergazomenoi/employeeRehireController.js');
 const symbaseisController = require('../controllers/symbaseisController.js');
 const programmataController = require('../controllers/ergazomenoi/programmataController.js');
 const erganhController = require('../controllers/ergazomenoi/erganhController.js');
@@ -1229,6 +1230,13 @@ router.post(
     checkAuth,
     requireUserPrivilegeAction('Ergazomenoi', 'update'),
     ergazomenoiController.postErgazomenoiUpdate
+);
+
+router.post(
+    '/api/ergazomenoi/rehire/:ergazomenoiId',
+    checkAuth,
+    requireUserPrivilegeAction('Ergazomenoi', 'update'),
+    employeeRehireController.postEmployeeRehire
 );
 
 router.post('/api/forologikes-klimakes/lookup', ergazomenoiController.forologikesKlimakes);
