@@ -149,6 +149,43 @@ test('new relationship can explicitly supply new contract and schedule boundarie
     );
 });
 
+test('new history cannot keep stale lifecycle dates when reviewed employee dates changed', () => {
+    const transition = buildEmployeeRehireTransition({
+        currentEmployee: oldClosedEmployee(),
+        history: oldClosedHistory(),
+        rehireDate: '2026-09-16',
+        employeeChanges: {
+            hmeromhnia_allaghs_symbashs: '2026-09-16',
+            hmeromhnia_allaghs_orarioy_apo: '2026-09-16',
+            hmeromhnia_allaghs_orarioy_eos: '2026-09-22',
+            hmeromhnia_lhxhs_symbashs: '2027-07-30'
+        },
+        historyChanges: {
+            hmeromhnia_allaghs_symbashs: '2026-09-17',
+            hmeromhnia_allaghs_orarioy_apo: '2026-09-17',
+            hmeromhnia_allaghs_orarioy_eos: '2026-09-20',
+            hmeromhnia_lhxhs_symbashs: '2026-07-30'
+        }
+    });
+
+    assert.equal(
+        transition.history_changes.hmeromhnia_allaghs_symbashs,
+        transition.employee_changes.hmeromhnia_allaghs_symbashs
+    );
+    assert.equal(
+        transition.history_changes.hmeromhnia_allaghs_orarioy_apo,
+        transition.employee_changes.hmeromhnia_allaghs_orarioy_apo
+    );
+    assert.equal(
+        transition.history_changes.hmeromhnia_allaghs_orarioy_eos,
+        '2026-09-22'
+    );
+    assert.equal(
+        transition.history_changes.hmeromhnia_lhxhs_symbashs,
+        '2027-07-30'
+    );
+});
+
 test('rehire requires a closed current employment relationship', () => {
     assert.throws(
         () => buildEmployeeRehireTransition({

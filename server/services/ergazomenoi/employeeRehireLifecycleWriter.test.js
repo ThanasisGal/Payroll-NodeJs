@@ -196,6 +196,47 @@ test('rehire atomically closes old relationship at departure and appends new cyc
     assert.equal(db.ended(), true);
 });
 
+test('writer stores the same reviewed contract end in employee and new history', async () => {
+    const db = database(initialClosed());
+
+    await writeEmployeeRehire({
+        ...db.deps,
+        scope,
+        employeeId: 'employee-1',
+        rehireDate: '2026-09-16',
+        employeeChanges: {
+            hmeromhnia_allaghs_symbashs: '2026-09-16',
+            hmeromhnia_allaghs_orarioy_apo: '2026-09-16',
+            hmeromhnia_allaghs_orarioy_eos: '2026-09-22',
+            hmeromhnia_lhxhs_symbashs: '2027-07-30'
+        },
+        historyChanges: {
+            hmeromhnia_allaghs_orarioy_eos: '2026-09-20',
+            hmeromhnia_lhxhs_symbashs: '2026-07-30'
+        }
+    });
+
+    const stored = db.state();
+    const newest = stored.history.at(-1);
+
+    assert.equal(
+        dateKey(stored.employee.hmeromhnia_lhxhs_symbashs),
+        '2027-07-30'
+    );
+    assert.equal(
+        dateKey(newest.hmeromhnia_lhxhs_symbashs),
+        '2027-07-30'
+    );
+    assert.equal(
+        dateKey(stored.employee.hmeromhnia_allaghs_orarioy_eos),
+        '2026-09-22'
+    );
+    assert.equal(
+        dateKey(newest.hmeromhnia_allaghs_orarioy_eos),
+        '2026-09-22'
+    );
+});
+
 test('new-history failure rolls back both old-history closure and master update', async () => {
     const initial = initialClosed();
     const db = database(initial, 'new-history');

@@ -1,5 +1,6 @@
 // Επιλεγμένη γραμμή (id από data-id)
 let selectedRowId = null;
+let selectedRowDeparture = '';
 
 function employeeTableScrollContainer() {
     return document.getElementById('myTable')?.closest('.overflow-auto') || null;
@@ -12,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const table = document.getElementById('myTable');
     const header = document.getElementById('myTableHeader');
     const btnEdit = document.getElementById('edit-btn');
+    const btnRehire = document.getElementById('rehire-btn');
     const btnDelete = document.getElementById('delete-btn');
 
     // Βάσεις URLs
@@ -31,6 +33,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (btnEdit) {
             btnEdit.href =
                 selectedRowId && isAllowed(btnEdit) ? `${baseEdit}/${selectedRowId}` : '#';
+        }
+        if (btnRehire) {
+            const closedRelationship = selectedRowId && Boolean(selectedRowDeparture);
+            btnRehire.disabled = !isAllowed(btnRehire);
+            btnRehire.classList.toggle('opacity-50', Boolean(selectedRowId && !closedRelationship));
+            btnRehire.dataset.relationshipClosed = closedRelationship ? '1' : '0';
         }
         if (btnDelete) {
             btnDelete.href =
@@ -88,13 +96,112 @@ document.addEventListener('DOMContentLoaded', function () {
             rows.forEach((r) => r.classList.remove('selected-row'));
             if (wasSelected) {
                 selectedRowId = null;
+                selectedRowDeparture = '';
             } else {
                 this.classList.add('selected-row');
                 selectedRowId = this.getAttribute('data-id') || null;
+                selectedRowDeparture = this.getAttribute('data-departure') || '';
             }
             updateButtons();
         });
     });
+
+    const nextDateKey = (dateKey) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return '';
+        const date = new Date(`${dateKey}T00:00:00.000Z`);
+        if (Number.isNaN(date.getTime())) return '';
+        date.setUTCDate(date.getUTCDate() + 1);
+        return date.toISOString().slice(0, 10);
+    };
+
+    const displayDateKey = (dateKey) => {
+        const match = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        return match ? `${match[3]}/${match[2]}/${match[1]}` : String(dateKey || '');
+    };
+
+    if (btnRehire) {
+        btnRehire.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (!isAllowed(btnRehire)) return;
+
+            if (!selectedRowId) {
+                await Swal.fire({
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    title: 'Καμία επιλογή',
+                    text: 'Παρακαλώ επιλέξτε πρώτα έναν εργαζόμενο από τον πίνακα.',
+                    icon: 'info',
+                    confirmButtonText: 'Κλείσιμο'
+                });
+                return;
+            }
+
+            const minRehireDate = nextDateKey(selectedRowDeparture);
+            if (!minRehireDate) {
+                await Swal.fire({
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    title: 'Δεν υπάρχει ημερομηνία αποχώρησης',
+                    text: 'Για να γίνει επαναπρόσληψη πρέπει να υπάρχει καταχωρημένη ημερομηνία αποχώρησης από την προηγούμενη απασχόληση.',
+                    icon: 'warning',
+                    confirmButtonText: 'Κλείσιμο'
+                });
+                return;
+            }
+
+            const prompt = await Swal.fire({
+                backdrop: false,
+                allowOutsideClick: false,
+                title: 'Επαναπρόσληψη εργαζομένου',
+                text: `Η προηγούμενη απασχόληση έληξε στις ${displayDateKey(selectedRowDeparture)}. Επιλέξτε την ημερομηνία της νέας πρόσληψης. Στο επόμενο βήμα θα ελέγξετε και θα συμπληρώσετε τα στοιχεία της νέας πρόσληψης. Δεν θα αποθηκευτεί κάτι σε αυτό το βήμα.`,
+                icon: 'info',
+                input: 'date',
+                inputAttributes: { min: minRehireDate },
+                didOpen: () => {
+                    const dateInput = Swal.getInput();
+                    if (dateInput) {
+                        dateInput.style.width = '17rem';
+                        dateInput.style.maxWidth = 'calc(100% - 2rem)';
+                        dateInput.style.marginLeft = 'auto';
+                        dateInput.style.marginRight = 'auto';
+                    }
+
+                    const confirmButton = Swal.getConfirmButton();
+                    if (confirmButton) {
+                        confirmButton.style.width = 'auto';
+                        confirmButton.style.minWidth = '8rem';
+                        confirmButton.style.whiteSpace = 'nowrap';
+                    }
+                },
+                inputValidator: (value) => {
+                    if (!value) return 'Η ημερομηνία επαναπρόσληψης είναι υποχρεωτική.';
+                    if (value < minRehireDate) {
+                        return `Η ημερομηνία πρέπει να είναι από ${displayDateKey(minRehireDate)} και μετά.`;
+                    }
+                    return undefined;
+                },
+                showCancelButton: true,
+                confirmButtonText: 'Συνέχεια',
+                cancelButtonText: 'Ακύρωση',
+                focusCancel: true,
+                customClass: {
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup',
+                    htmlContainer: 'custom-html-container',
+                    confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                    cancelButton: 'custom-cancel-button custom-swal-button'
+                }
+            });
+
+            if (!prompt.isConfirmed) return;
+
+            const target =
+                `${baseEdit}/${selectedRowId}?rehire=1&rehireDate=${encodeURIComponent(prompt.value)}`;
+            location.href = departureUrl(target);
+        });
+    }
 
     // Ένας και μόνο handler για DELETE (CSP/CSRF-safe)
     if (btnDelete) {
@@ -306,6 +413,7 @@ document.addEventListener('DOMContentLoaded', function () {
         rows.forEach(row => row.classList.remove('selected-row'));
         const selected = [...rows].find(row => state.employeeId && row.getAttribute('data-id') === state.employeeId);
         selectedRowId = selected ? state.employeeId : null;
+        selectedRowDeparture = selected ? selected.getAttribute('data-departure') || '' : '';
         selected?.classList.add('selected-row');
         updateButtons();
         // Let layout and browser history scroll restoration finish before our scroll.

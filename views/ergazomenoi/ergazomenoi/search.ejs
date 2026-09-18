@@ -22,6 +22,22 @@
 
         return `${day}/${month}/${year}`;
     };
+    const employmentDateKey = (value) => {
+        if (!value) return '';
+
+        if (typeof value === 'string') {
+            const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+        }
+
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '';
+
+        const year = d.getUTCFullYear();
+        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
 %>
 
 <style nonce="<%= nonce %>">
@@ -152,7 +168,11 @@
                 <% if (ergazomenoiFilteredRecs && ergazomenoiFilteredRecs.length > 0) { %>
                     <% ergazomenoiFilteredRecs.forEach(element => { %>
                         <% const isInactive = element.energos !== true; %>
-                        <tr class="input-content-regular <%= isInactive ? 'ergazomenos-anenergos table-danger' : '' %>" data-id="<%- element._id %>" id="myTableRow">
+                        <tr class="input-content-regular <%= isInactive ? 'ergazomenos-anenergos table-danger' : '' %>"
+                            data-id="<%- element._id %>"
+                            data-active="<%= element.energos === true ? '1' : '0' %>"
+                            data-departure="<%= employmentDateKey(element.hmeromhnia_apoxorhshs) %>"
+                            id="myTableRow">
                             <td class="col-1 padding-left-rem-0_5"><%- element.kodikos %></td>
                             <td class="col-2-5">
                                 <%- element.eponymo %>
@@ -199,6 +219,19 @@
                     data-allowed="<%= (userPrivileges.privileges?.admin || userPrivileges.privileges?.update) ? '1' : '0' %>">
                     <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
                 </a>
+
+                <button
+                    id="rehire-btn"
+                    type="button"
+                    data-bs-toggle="tooltip"
+                    data-bs-title="Δημιουργία νέας εργασιακής σχέσης για ανενεργό εργαζόμενο"
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="18vw"
+                    class="btn btn-success rounded-4 buttons-content"
+                    data-allowed="<%= (userPrivileges.privileges?.admin || userPrivileges.privileges?.update) ? '1' : '0' %>"
+                    <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.update) ? 'disabled' : '' %>>
+                    <i class="buttons-content bi bi-person-plus"></i> Επαναπρόσληψη
+                </button>
 
                 <a
                     id="delete-btn"

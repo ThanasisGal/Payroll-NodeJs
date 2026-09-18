@@ -119,16 +119,17 @@ function buildEmployeeRehireTransition({
 
         hmeromhnia_proslhpshs: rehire,
         hmeromhnia_apoxorhshs: null,
-        hmeromhnia_allaghs_symbashs: dateKeyUtc(
-            explicitOr(historyChanges.hmeromhnia_allaghs_symbashs, contractStart)
-        ),
-        hmeromhnia_allaghs_orarioy_apo: dateKeyUtc(
-            explicitOr(historyChanges.hmeromhnia_allaghs_orarioy_apo, scheduleStart)
-        ),
+        // Lifecycle dates in the new history row are a projection of the
+        // reviewed employee relationship. They must never have an independent
+        // stale value from an older history/form snapshot.
+        hmeromhnia_allaghs_symbashs:
+            employeePatch.hmeromhnia_allaghs_symbashs,
+        hmeromhnia_allaghs_orarioy_apo:
+            employeePatch.hmeromhnia_allaghs_orarioy_apo,
         hmeromhnia_allaghs_orarioy_eos:
-            explicitOr(historyChanges.hmeromhnia_allaghs_orarioy_eos, null),
+            employeePatch.hmeromhnia_allaghs_orarioy_eos,
         hmeromhnia_lhxhs_symbashs:
-            explicitOr(historyChanges.hmeromhnia_lhxhs_symbashs, null),
+            employeePatch.hmeromhnia_lhxhs_symbashs,
         hmeromhnia_isxyos_oron_ergasias_apo: rehire,
         hmeromhnia_isxyos_oron_ergasias_eos: null,
 
