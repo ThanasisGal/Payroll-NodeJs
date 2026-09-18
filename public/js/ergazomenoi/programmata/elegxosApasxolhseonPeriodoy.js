@@ -11633,7 +11633,7 @@ document.addEventListener('click', (event) => {
     const orphanButton = event.target.closest('.weekly-hr-open-orphan');
     if (orphanButton) { const row = currentReviewRows.find((item) => String(item._id) === orphanButton.dataset.rowId) ||
         weeklyHrStage1RowsById.get(orphanButton.dataset.rowId);
-        if (row) showDetailsModal(row); return; }
+        if (row) showDetailsModal(row, { orphanResolution: true }); return; }
     const dayButton = event.target.closest('.weekly-hr-open-day');
     if (dayButton) { const row = currentReviewRows.find((item) => String(item._id) === dayButton.dataset.rowId) ||
         weeklyHrStage1RowsById.get(dayButton.dataset.rowId);
@@ -12666,7 +12666,7 @@ function validateReviewSave(updates) {
     return errors;
 }
 
-function showDetailsModal(row) {
+function showDetailsModal(row, { orphanResolution = false } = {}) {
     if (!isCurrentPeriodReviewDate(row)) {
         return employmentReviewSwal({ icon: 'info', title: 'Πληροφοριακή ημέρα άλλης περιόδου',
             text: 'Η ημέρα ανήκει μόνο στο εβδομαδιαίο πλαίσιο ανάγνωσης. Δεν επιτρέπεται μεταβολή από την ενεργή περίοδο.' });
@@ -12674,6 +12674,9 @@ function showDetailsModal(row) {
     const reusableOrphanReason = row?.orphan_card_resolution_preview
         ?.automaticReusableApplied === true
         ? String(row.orphan_card_resolution_preview.reusableDecisionReason || '') : '';
+    const initialReason = reusableOrphanReason || (orphanResolution === true
+        ? 'Η προτεινόμενη από την εφαρμογή επίλυση του ορφανού χτυπήματος ελέγχθηκε και εγκρίθηκε από τον HR.'
+        : '');
     const html = `
     <div class="container-fluid">
 
@@ -12731,7 +12734,7 @@ function showDetailsModal(row) {
             <div class="review-modal-section-title">Αιτιολογία Αλλαγής</div>
 
             <textarea id="edit_reason" class="form-control" rows="3"
-                ${reusableOrphanReason ? 'readonly' : ''}>${escapeHtml(reusableOrphanReason)}</textarea>
+                ${reusableOrphanReason ? 'readonly' : ''}>${escapeHtml(initialReason)}</textarea>
 
             <div class="d-flex gap-2 mt-3">
                 ${
