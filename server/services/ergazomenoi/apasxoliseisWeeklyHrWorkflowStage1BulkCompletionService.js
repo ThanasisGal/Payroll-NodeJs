@@ -32,6 +32,57 @@ function resultStatus(error) {
     return 'FAILED';
 }
 
+function periodAccessDateKey(value) {
+    if (!value) return '';
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value.toISOString().slice(0, 10);
+    }
+    return String(value).slice(0, 10);
+}
+
+function stage1PeriodAccessCacheKey(scope = {}) {
+    const branch = String(scope.ypokatasthma || '').trim();
+    return JSON.stringify([
+        String(scope.team || '').trim(),
+        String(scope.company_kod || '').trim(),
+        branch ? branch.padStart(4, '0') : '',
+        periodAccessDateKey(scope.period_start),
+        periodAccessDateKey(scope.period_end)
+    ]);
+}
+
+function createStage1BulkPeriodAccessResolver(resolvePeriodAccess) {
+    if (typeof resolvePeriodAccess !== 'function') {
+        throw new TypeError('resolvePeriodAccess dependency is required.');
+    }
+    const reusableByPeriod = new Map();
+    return async function resolveStage1BulkPeriodAccess(scope) {
+        const key = stage1PeriodAccessCacheKey(scope);
+        const reusable = reusableByPeriod.get(key);
+        if (reusable) {
+            try {
+                const result = await reusable;
+                if (result?.token?.exists === true) return result;
+            } catch (_error) {
+                // A failed resolution is never reusable; retry authoritatively below.
+            }
+        }
+
+        const pending = Promise.resolve().then(() => resolvePeriodAccess(scope));
+        reusableByPeriod.set(key, pending);
+        try {
+            const result = await pending;
+            if (result?.token?.exists !== true && reusableByPeriod.get(key) === pending) {
+                reusableByPeriod.delete(key);
+            }
+            return result;
+        } catch (error) {
+            if (reusableByPeriod.get(key) === pending) reusableByPeriod.delete(key);
+            throw error;
+        }
+    };
+}
+
 async function mapWithConcurrency(items, limit, worker) {
     const results = new Array(items.length);
     let nextIndex = 0;
@@ -94,4 +145,5 @@ async function completeWeeklyHrWorkflowStage1Bulk({
 }
 
 module.exports = { BULK_STAGE1_CONCURRENCY, childRequestId, mapWithConcurrency,
+    stage1PeriodAccessCacheKey, createStage1BulkPeriodAccessResolver,
     completeWeeklyHrWorkflowStage1Bulk };
