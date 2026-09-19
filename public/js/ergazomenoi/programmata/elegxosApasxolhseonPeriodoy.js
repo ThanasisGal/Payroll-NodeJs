@@ -11512,14 +11512,22 @@ async function completeWeeklyHrStage1BulkFromUi() {
                 weeklyHrStage1Selected.delete(weeklyHrStage1Key(item.scope));
             }
         });
-        await Promise.all(scopes.map((scope) => refreshWeeklyHrStage1Scope(scope)
-            .catch((error) => console.warn('[weeklyHrStage1BulkRefresh]', error))));
+        let refreshSucceeded = false;
+        try {
+            refreshSucceeded = await loadResults() !== false;
+        } catch (error) {
+            console.warn('[weeklyHrStage1BulkRefresh]', error);
+        }
         const presentation = renderWeeklyHrStage1BulkResult(result);
         await employmentReviewSwal({ icon: presentation.needsReview ? 'warning' : 'success',
             title: 'Μαζική ολοκλήρωση Σταδίου 1',
             ...(presentation.html
                 ? { html: presentation.html }
                 : { text: presentation.text }) });
+        if (!refreshSucceeded) {
+            await employmentReviewSwal({ icon: 'warning', title: 'Η προβολή δεν ανανεώθηκε',
+                text: 'Η μαζική ολοκλήρωση ολοκληρώθηκε, αλλά η προβολή δεν ανανεώθηκε. Πατήστε νέα «Αναζήτηση».' });
+        }
     } catch (error) {
         await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία', text: error.message });
     } finally {

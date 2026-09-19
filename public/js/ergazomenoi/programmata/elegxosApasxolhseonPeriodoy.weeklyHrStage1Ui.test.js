@@ -630,7 +630,14 @@ const bulkFunctionSource = source.slice(
 );
 const submittedReasons = [];
 const submittedScopes = [];
+const bulkEvents = [];
 let editedReason = null;
+let bulkResponse = { ok: true, body: { success: true, requested_count: 1,
+    completed_count: 1, already_completed_count: 0, failed_count: 0,
+    blocked_count: 0, results: [] } };
+let loadResultsCalls = 0;
+let scopeRefreshCalls = 0;
+let loadResultsOutcome = true;
 const bulkSandbox = {
     weeklyHrStage1BulkSubmitting: false,
     weeklyHrStage1Selected: new Set(['week-1']),
@@ -642,15 +649,17 @@ const bulkSandbox = {
     updateWeeklyHrStage1BulkToolbar: () => {},
     employmentReviewSwal: async (options) => options.input === 'textarea'
         ? { isConfirmed: true, value: editedReason ?? options.inputValue }
-        : { isConfirmed: true },
+        : (bulkEvents.push(`alert:${options.title}`), { isConfirmed: true }),
     fetch: async (_url, options) => { const body = JSON.parse(options.body);
         submittedReasons.push(body.reason_or_notes);
         submittedScopes.push(body.scopes[0]);
-        return { ok: true, json: async () => ({ success: true, requested_count: 1,
-            completed_count: 1, already_completed_count: 0, failed_count: 0,
-            blocked_count: 0, results: [] }) }; },
+        bulkEvents.push('bulk-response');
+        return { ok: bulkResponse.ok, json: async () => bulkResponse.body }; },
     csrfToken: 'csrf', crypto: { randomUUID: () => 'request-id' },
-    refreshWeeklyHrStage1Scope: async () => {}, weeklyHrStage1Key: () => 'week-1',
+    loadResults: async () => { loadResultsCalls++; bulkEvents.push('load-results');
+        return loadResultsOutcome; },
+    refreshWeeklyHrStage1Scope: async () => { scopeRefreshCalls++; },
+    weeklyHrStage1Key: () => 'week-1',
     renderWeeklyHrStage1BulkResult: () => ({ needsReview: 0, text: 'ok', html: '' }),
     console
 };
@@ -663,6 +672,9 @@ vm.runInNewContext(`${bulkFunctionSource}\nthis.runBulk = completeWeeklyHrStage1
         employee_id: 'employee-14', week_start: '2026-06-29', week_end: '2026-07-05',
         period_start: '2026-06-01', period_end: '2026-06-30' });
     await bulkSandbox.runBulk();
+    assert.equal(loadResultsCalls, 3);
+    assert.equal(scopeRefreshCalls, 0);
+    assert.ok(bulkEvents.indexOf('bulk-response') < bulkEvents.indexOf('load-results'));
     assert.deepEqual(submittedReasons,
         [expectedDefaultReason, 'Νέα αιτιολογία HR', 'Νέα αιτιολογία HR']);
     assert.deepEqual(submittedScopes[0], { ypokatasthma: '0000',
@@ -670,10 +682,41 @@ vm.runInNewContext(`${bulkFunctionSource}\nthis.runBulk = completeWeeklyHrStage1
     assert.deepEqual(submittedScopes[2], { ypokatasthma: '0000',
         employee_id: 'employee-14', week_start: '2026-06-29', week_end: '2026-07-05',
         period_start: '2026-06-01', period_end: '2026-06-30' });
+
+    bulkResponse = { ok: true, body: { success: true, requested_count: 2,
+        completed_count: 1, already_completed_count: 0, failed_count: 1,
+        blocked_count: 0, results: [{ status: 'COMPLETED', scope: {} },
+            { status: 'FAILED', scope: {}, message: 'Χρειάζεται επανέλεγχο.' }] } };
+    bulkSandbox.weeklyHrStage1Selected.add('week-1');
+    await bulkSandbox.runBulk();
+    assert.equal(loadResultsCalls, 4);
+    assert.equal(scopeRefreshCalls, 0);
+
+    loadResultsOutcome = false;
+    bulkSandbox.weeklyHrStage1Selected.add('week-1');
+    await bulkSandbox.runBulk();
+    assert.equal(loadResultsCalls, 5);
+    assert.ok(bulkEvents.includes('alert:Μαζική ολοκλήρωση Σταδίου 1'));
+    assert.ok(bulkEvents.includes('alert:Η προβολή δεν ανανεώθηκε'));
+
+    bulkResponse = { ok: false, body: { success: false,
+        message: 'Αποτυχία μαζικής ολοκλήρωσης.' } };
+    loadResultsOutcome = true;
+    bulkSandbox.weeklyHrStage1Selected.add('week-1');
+    await bulkSandbox.runBulk();
+    assert.equal(loadResultsCalls, 5);
+    assert.equal(scopeRefreshCalls, 0);
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 assert.match(bulkFunctionSource, new RegExp(`inputValue: '${expectedDefaultReason}'`));
 assert.match(bulkFunctionSource,
     /customClass:\s*\{ confirmButton: 'weekly-hr-stage1-bulk-confirm' \}/);
+assert.equal((bulkFunctionSource.match(/await loadResults\(\)/g) || []).length, 1);
+assert.doesNotMatch(bulkFunctionSource, /refreshWeeklyHrStage1Scope\(/);
+const singleCompletionSource = source.slice(
+    source.indexOf('async function completeWeeklyHrStage1FromUi'),
+    source.indexOf('function renderWeeklyHrStage1BulkResult')
+);
+assert.match(singleCompletionSource, /await refreshWeeklyHrStage1Scope\(scope\)/);
 assert.match(css,
     /\.employment-review-swal-popup \.swal2-confirm\.weekly-hr-stage1-bulk-confirm\s*\{[\s\S]*?white-space:\s*nowrap/);
 assert.doesNotMatch(css, /\.swal2-confirm\s*\{[^}]*white-space:\s*nowrap/);
