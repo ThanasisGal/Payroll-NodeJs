@@ -141,5 +141,10 @@ test('conflict page exposes only the friendly escaped message contract', () => {
         'utf8'
     );
     assert.match(view, /<%= message %>/);
+    assert.match(
+        view,
+        /href="\/ergazomenoi\/ergazomenoi" class="btn btn-brown rounded-4 buttons-content"/
+    );
+    assert.doesNotMatch(view, /btn-outline-secondary/);
     assert.doesNotMatch(view, /error\.(?:stack|message)|reason|code/);
 });
