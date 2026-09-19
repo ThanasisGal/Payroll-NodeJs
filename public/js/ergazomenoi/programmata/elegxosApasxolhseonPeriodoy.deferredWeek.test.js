@@ -29,6 +29,28 @@ assert.equal(result.deferred_weeks[0].deferred_action_required, true);
 assert.equal(result.deferred_weeks[0].possible_leave_dates.length, 2);
 assert.ok(Object.values(result.stages).every(stage =>
     stage.presentation_status === 'DEFERRED_TO_NEXT_PERIOD' && stage.enabled === false));
+assert.ok(Object.values(result.stages).every(stage => stage.pending_count === 0));
+
+const deferredPresentationLabel = 'ΕΞΕΤΑΣΗ ΣΤΗΝ ΕΠΟΜΕΝΗ ΠΕΡΙΟΔΟ';
+const deferredStage2Message =
+    'Η εβδομάδα θα εξεταστεί στην επόμενη περίοδο, όταν θα υπάρχουν πλήρη εβδομαδιαία στοιχεία.';
+assert.equal((source.match(new RegExp(deferredPresentationLabel, 'g')) || []).length, 3);
+assert.ok(source.includes(`DEFERRED_TO_NEXT_PERIOD: '${deferredPresentationLabel}'`));
+assert.ok(source.includes(deferredStage2Message));
+assert.ok(!source.includes('ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ'));
+
+const fallbackStart = source.indexOf('function renderWeeklyHrStage2LifecycleFallback(');
+const fallbackEnd = source.indexOf('\nfunction ', fallbackStart + 1);
+const fallbackContainer = { innerHTML: '' };
+const renderFallback = vm.runInNewContext(
+    `${source.slice(fallbackStart, fallbackEnd)}; renderWeeklyHrStage2LifecycleFallback;`,
+    { document: { getElementById: () => fallbackContainer } }
+);
+assert.equal(renderFallback({ stages: { STAGE2: {
+    business_status: 'DEFERRED_TO_NEXT_PERIOD', pending_count: 0
+} } }), true);
+assert.match(fallbackContainer.innerHTML, new RegExp(deferredStage2Message));
+assert.ok(!fallbackContainer.innerHTML.includes('ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ'));
 
 for (const status of ['OPEN', 'BLOCKED', 'STALE']) {
     const pending = { scope: { ...scope, employee_id: 'OTHER', employee_kodikos: '0002' },

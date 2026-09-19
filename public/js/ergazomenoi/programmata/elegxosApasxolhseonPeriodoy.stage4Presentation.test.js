@@ -90,9 +90,17 @@ const seventhPayload = JSON.parse(JSON.stringify(completed));
 seventhPayload.lifecycle_projection.stages.stage4.final_weekly_analysis.seventhDay = {
     severity: 'SERIOUS_VIOLATION', classification: 'SEVENTH_DAY_ILLEGAL_OVERTIME' };
 sandbox.currentCanonicalLifecyclePayloads.push(seventhPayload);
-assert.match(sandbox.seventh({ kodikos: '0013', week_apo: '2026-05-25',
+const seventhHtml = sandbox.seventh({ kodikos: '0013', week_apo: '2026-05-25',
     week_eos: '2026-05-31', seventh_day_count: 1,
-    seventh_day_severity: 'SERIOUS_VIOLATION' }), /text-bg-danger[^>]*>7η ημέρα · ΠΑΡΑΝΟΜΗ/);
+    seventh_day_severity: 'SERIOUS_VIOLATION' });
+assert.match(seventhHtml, /badge text-bg-danger stage4-seventh-day-badge[^>]*>7η ημέρα · ΠΑΡΑΝΟΜΗ/);
+const seventhCss = css.match(
+    /#employmentReviewStage4Collapse \.stage4-seventh-day-badge\s*\{[^}]*\}/)?.[0] || '';
+assert.ok(seventhCss);
+assert.match(seventhCss, /padding:\s*0\.12rem 0\.35rem/);
+assert.match(seventhCss, /font-size:\s*0\.68rem/);
+assert.match(seventhCss, /max-width:\s*100%/);
+assert.match(seventhCss, /white-space:\s*normal/);
 
 const strip = { classList: { names: new Set(), toggle(name, on) {
     if (on) this.names.add(name); else this.names.delete(name);
@@ -133,7 +141,10 @@ assert.match(row, /stage4-week-code/);
                     <tr><td class="badge-check-cell" style="width:120px">${missingCardsHtml}</td></tr>
                     <tr><td class="badge-check-cell" style="width:120px">${sixthHtml}</td></tr>
                     <tr><td class="badge-check-cell" style="width:120px">${missingWeeklyHtml}</td></tr>
-                </tbody></table></div></div></section>`);
+                </tbody></table>
+                <table style="table-layout:fixed;width:90px"><tbody><tr>
+                    <td class="seventh-check-cell">${seventhHtml}</td>
+                </tr></tbody></table></div></div></section>`);
         const styles = await page.evaluate(() => {
             const absence = document.querySelector('.cell-apoysia');
             const pill = document.querySelector('.stage4-classification-absence');
@@ -195,6 +206,20 @@ assert.match(row, /stage4-week-code/);
         assert.ok(Math.abs(sizes[1].height - sizes[3].height) < 1);
         assert.ok(Math.abs(sizes[0].width - sizes[2].width) < 1);
         assert.ok(Math.abs(sizes[1].width - sizes[3].width) < 1);
+        const seventhSize = await page.evaluate(() => {
+            const cell = document.querySelector('.seventh-check-cell');
+            const badge = cell.querySelector('.stage4-seventh-day-badge');
+            const style = getComputedStyle(badge);
+            return { fontSize: style.fontSize, paddingTop: style.paddingTop,
+                whiteSpace: style.whiteSpace, cellWidth: cell.clientWidth,
+                cellScroll: cell.scrollWidth, badgeWidth: badge.clientWidth,
+                badgeScroll: badge.scrollWidth };
+        });
+        assert.equal(seventhSize.fontSize, '10.88px');
+        assert.equal(seventhSize.paddingTop, '1.92px');
+        assert.equal(seventhSize.whiteSpace, 'normal');
+        assert.ok(seventhSize.cellScroll <= seventhSize.cellWidth + 1);
+        assert.ok(seventhSize.badgeScroll <= seventhSize.badgeWidth + 1);
         console.log('Stage4 presentation UI tests passed');
     } finally {
         await browser.close();

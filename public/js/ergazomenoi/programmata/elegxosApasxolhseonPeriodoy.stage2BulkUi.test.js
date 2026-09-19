@@ -8,6 +8,8 @@ const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy
 const viewSource = fs.readFileSync(path.join(__dirname,
     '../../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
 const cssSource = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
+const defaultStage2Reason =
+    'Εφαρμογή των ασφαλών αυτόματων τακτοποιήσεων του Σταδίου 2, όπως προτάθηκαν από τον Έλεγχο Απασχολήσεων.';
 const start = source.indexOf('function stage2BulkChangeUnavailableReason');
 const end = source.indexOf('async function completeWeeklyHrStage2BulkFromUi');
 assert.ok(start >= 0 && end > start);
@@ -25,8 +27,10 @@ let fetchResult = { ok: true, body: { success: true, page: 1, page_count: 1,
 const fetchCalls = [];
 function fakeElement(id) {
     return { id, innerHTML: '', textContent: '', value: '', disabled: false, onclick: null,
-        listeners: {}, classList: { add() {}, remove() {}, toggle() {} },
-        setCustomValidity() {}, reportValidity() {}, focus() {},
+        listeners: {}, validityMessage: '', validityReports: 0, focused: false,
+        classList: { add() {}, remove() {}, toggle() {} },
+        setCustomValidity(value) { this.validityMessage = value; },
+        reportValidity() { this.validityReports++; }, focus() { this.focused = true; },
         addEventListener(type, listener, options) {
             this.listeners[type] = { listener, once: options?.once === true };
         },
@@ -51,8 +55,13 @@ const modalInstance = { show() {
             elements.weeklyHrStage2PreviewReason.value = 'Ελεγμένη προεπισκόπηση';
             elements.weeklyHrStage2PreviewApply.onclick();
         } else if (modalAction === 'paginate') {
+            elements.weeklyHrStage2PreviewReason.value = 'Χειροκίνητη αιτιολογία HR';
             Promise.resolve(elements.weeklyHrStage2PreviewNext.onclick()).then(() =>
                 elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal'));
+        } else if (modalAction === 'validate-empty') {
+            elements.weeklyHrStage2PreviewReason.value = '';
+            elements.weeklyHrStage2PreviewApply.onclick();
+            elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal');
         } else elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal');
     });
 }, hide() { elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal'); } };
@@ -161,6 +170,7 @@ assert.doesNotMatch(container.innerHTML, /checkbox|Τακτοποίηση επι
     assert.doesNotMatch(fetchCalls[0].url, /bulk-complete/);
     assert.equal(fetchCalls[0].options.method || 'GET', 'GET');
     assert.equal(completionCalls, 0);
+    assert.equal(elements.weeklyHrStage2PreviewReason.value, defaultStage2Reason);
     assert.match(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
         /weekly-hr-stage2-preview-case/);
     assert.match(elements.weeklyHrStage2BulkPreviewBody.innerHTML,
@@ -197,6 +207,16 @@ assert.doesNotMatch(container.innerHTML, /checkbox|Τακτοποίηση επι
     assert.ok(paginationCalls.every((call) => (call.options.method || 'GET') === 'GET'));
     assert.ok(paginationCalls.every((call) => !call.url.includes('bulk-complete')));
     assert.match(paginationCalls[1].url, /page=2/);
+    assert.equal(elements.weeklyHrStage2PreviewReason.value, 'Χειροκίνητη αιτιολογία HR');
+
+    modalAction = 'validate-empty';
+    const completionCallsBeforeValidation = completionCalls;
+    await sandbox.previewBulk();
+    assert.equal(completionCalls, completionCallsBeforeValidation);
+    assert.equal(elements.weeklyHrStage2PreviewReason.validityMessage,
+        'Η αιτιολογία είναι υποχρεωτική.');
+    assert.ok(elements.weeklyHrStage2PreviewReason.validityReports > 0);
+    assert.equal(elements.weeklyHrStage2PreviewReason.focused, true);
     modalAction = 'cancel';
     fetchResult.body.page_count = 1;
 
@@ -286,6 +306,11 @@ assert.match(viewSource, /data-bs-dismiss="modal">Ακύρωση/);
 assert.match(viewSource, /Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά/);
 assert.match(viewSource, /weekly-hr-stage2-preview-footer[\s\S]*weekly-hr-stage2-preview-safety[\s\S]*weekly-hr-stage2-preview-controls/);
 assert.match(viewSource, /weekly-hr-stage2-preview-controls[\s\S]*weekly-hr-stage2-preview-pagination[\s\S]*weekly-hr-stage2-preview-reason[\s\S]*weekly-hr-stage2-preview-actions/);
+const reasonTextarea = viewSource.match(/<textarea id="weeklyHrStage2PreviewReason"[\s\S]*?<\/textarea>/)?.[0] || '';
+assert.match(reasonTextarea, /employment-review-reason-textarea/);
+assert.match(reasonTextarea, /\brequired\b/);
+assert.doesNotMatch(reasonTextarea, /\b(?:readonly|disabled)\b/);
+assert.match(renderSource, new RegExp(`reason\\.value = '${defaultStage2Reason}'`));
 assert.doesNotMatch(previewSource, /employmentReviewSwal\(\{ icon: 'info'/);
 assert.match(cssSource, /max-width: min\(1200px, 94vw\)/);
 assert.match(cssSource, /\.employment-review-stage2-bulk-preview-modal \.modal-body \{[\s\S]*overflow-y: auto/);
@@ -294,6 +319,10 @@ assert.match(cssSource, /font-size: 0\.95rem/);
 assert.match(cssSource, /\.weekly-hr-stage2-preview-footer \{[\s\S]*flex-direction: column/);
 assert.match(cssSource, /\.weekly-hr-stage2-preview-safety \{[\s\S]*width: 100%/);
 assert.match(cssSource, /\.weekly-hr-stage2-preview-controls \{[\s\S]*grid-template-columns: auto minmax\(16rem, 1fr\) auto/);
+const reasonTextareaCss = cssSource.match(/\.employment-review-reason-textarea \{[\s\S]*?\n\}/)?.[0] || '';
+assert.match(reasonTextareaCss, /min-height:\s*7rem/);
+assert.match(reasonTextareaCss, /line-height:\s*1\.45/);
+assert.match(reasonTextareaCss, /resize:\s*vertical/);
 assert.match(source, /details\.slice\(0, 50\)/);
 assert.match(completionSource, /while \(hasMore\)/);
 assert.match(completionSource, /continuation_token: continuationToken/);

@@ -14986,6 +14986,13 @@ body.loader-active > *:not(.app-loader) {
     min-width: 0;
 }
 
+.employment-review-reason-textarea {
+    width: 100%;
+    min-height: 7rem;
+    line-height: 1.45;
+    resize: vertical;
+}
+
 @media (max-width: 991.98px) {
     .weekly-hr-stage2-preview-controls {
         grid-template-columns: 1fr auto;
@@ -15208,6 +15215,18 @@ body.loader-active > *:not(.app-loader) {
     line-height: 1.1;
     font-weight: 700;
     white-space: nowrap;
+}
+
+#employmentReviewStage4Collapse .stage4-seventh-day-badge {
+    display: inline-block;
+    box-sizing: border-box;
+    max-width: 100%;
+    padding: 0.12rem 0.35rem;
+    font-size: 0.68rem;
+    line-height: 1.1;
+    font-weight: 700;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 #employmentReviewStage4Collapse .stage4-sixth-day-badge:is(

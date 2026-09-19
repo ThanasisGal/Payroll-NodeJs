@@ -2537,7 +2537,7 @@ function renderStage4SeventhDayValue(dev = {}) {
         seventh?.classification === 'SEVENTH_DAY_ILLEGAL_OVERTIME' ||
         dev.seventh_day_severity === 'SERIOUS_VIOLATION';
     return illegal
-        ? '<span class="badge text-bg-danger">7η ημέρα · ΠΑΡΑΝΟΜΗ</span>'
+        ? '<span class="badge text-bg-danger stage4-seventh-day-badge">7η ημέρα · ΠΑΡΑΝΟΜΗ</span>'
         : '<span class="stage4-sixth-day-pill">7η ημέρα</span>';
 }
 
@@ -3296,7 +3296,7 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
                     String(payload.scope?.employee_kodikos || '') === String(row.kodikos || '') &&
                     String(payload.scope?.ypokatasthma || '').padStart(4, '0') === String(row.ypokatasthma || '').padStart(4, '0') &&
                     payload.lifecycle_projection.deferred_possible_leave_dates?.includes(stage1DateKey(row.hmeromhnia)))
-                ? 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ' : 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
+                ? 'ΕΞΕΤΑΣΗ ΣΤΗΝ ΕΠΟΜΕΝΗ ΠΕΡΙΟΔΟ' : 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
             className: 'cell-adeia-suggestion',
             source: 'derived'
         };
@@ -5814,7 +5814,7 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.',
     OPEN_WEEK_PENDING_COMPLETION:
         'Η τελευταία εβδομάδα δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.',
-    DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
+    DEFERRED_TO_NEXT_PERIOD: 'ΕΞΕΤΑΣΗ ΣΤΗΝ ΕΠΟΜΕΝΗ ΠΕΡΙΟΔΟ',
     CROSS_MONTH_REPO_TRANSFER_NOT_ALLOWED:
         'Η μεταφορά ρεπό δεν επιτρέπεται ανάμεσα σε ημέρες διαφορετικών μηνών.',
     NO_SOURCE_CANDIDATE:
@@ -9120,7 +9120,7 @@ const workflowStageShortNames = Object.freeze({
     STAGE3: 'Υπόλοιπες Άδειες', STAGE4: 'Τελικός Έλεγχος'
 });
 const workflowStageStatusLabels = Object.freeze({
-    DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
+    DEFERRED_TO_NEXT_PERIOD: 'ΕΞΕΤΑΣΗ ΣΤΗΝ ΕΠΟΜΕΝΗ ΠΕΡΙΟΔΟ',
     COMPLETED: 'ΟΛΟΚΛΗΡΩΘΗΚΕ', ACTIVE: 'ΧΡΕΙΑΖΕΤΑΙ Η ΠΡΟΣΟΧΗ ΣΑΣ', OPEN: 'ΑΝΟΙΧΤΟ',
     BLOCKED: 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ', STALE: 'ΤΑ ΣΤΟΙΧΕΙΑ ΑΛΛΑΞΑΝ', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
 });
@@ -9661,7 +9661,7 @@ async function showWeeklyHrStage2BulkPreviewModal(preview, firstPageResult) {
     let pageResult = firstPageResult;
     let outcome = { isConfirmed: false, value: '' };
     let paginationError = null;
-    reason.value = '';
+    reason.value = 'Εφαρμογή των ασφαλών αυτόματων τακτοποιήσεων του Σταδίου 2, όπως προτάθηκαν από τον Έλεγχο Απασχολήσεων.';
     reason.classList.remove('is-invalid');
     reason.setCustomValidity('');
     const loadPage = async (page) => {
@@ -9904,7 +9904,7 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     if (!container || !stage) return false;
     if (stage.business_status === 'DEFERRED_TO_NEXT_PERIOD') {
         container.innerHTML = '<div class="text-info-emphasis small">' +
-            'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ — Η απόφαση ρεπό θα εξεταστεί στην επόμενη περίοδο.</div>';
+            'Η εβδομάδα θα εξεταστεί στην επόμενη περίοδο, όταν θα υπάρχουν πλήρη εβδομαδιαία στοιχεία.</div>';
         return true;
     }
     if (!currentWeeklyHrStage2BulkPreview) {
@@ -11135,7 +11135,8 @@ function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const stale = businessStatus === 'STALE';
     const statusText = weeklyHrHasOnlyOrphanBlockers(payload)
         ? 'Απαιτείται επίλυση ορφανού χτυπήματος' : ({ OPEN: 'Ανοιχτό', COMPLETED: 'Ολοκληρωμένο',
-        BLOCKED: 'Μπλοκαρισμένο', STALE: 'Τα στοιχεία άλλαξαν' }[businessStatus] || businessStatus);
+        BLOCKED: 'Μπλοκαρισμένο', STALE: 'Τα στοιχεία άλλαξαν',
+        DEFERRED_TO_NEXT_PERIOD: 'Θα μεταφερθεί στην επόμενη περίοδο' }[businessStatus] || businessStatus);
     const blockedExplanation = weeklyHrBlockedExplanation(payload);
     const eligible = isWeeklyHrStage1Eligible(payload);
     const selected = eligible && weeklyHrStage1Selected.has(key);
@@ -11511,14 +11512,22 @@ async function completeWeeklyHrStage1BulkFromUi() {
                 weeklyHrStage1Selected.delete(weeklyHrStage1Key(item.scope));
             }
         });
-        await Promise.all(scopes.map((scope) => refreshWeeklyHrStage1Scope(scope)
-            .catch((error) => console.warn('[weeklyHrStage1BulkRefresh]', error))));
+        let refreshSucceeded = false;
+        try {
+            refreshSucceeded = await loadResults() !== false;
+        } catch (error) {
+            console.warn('[weeklyHrStage1BulkRefresh]', error);
+        }
         const presentation = renderWeeklyHrStage1BulkResult(result);
         await employmentReviewSwal({ icon: presentation.needsReview ? 'warning' : 'success',
             title: 'Μαζική ολοκλήρωση Σταδίου 1',
             ...(presentation.html
                 ? { html: presentation.html }
                 : { text: presentation.text }) });
+        if (!refreshSucceeded) {
+            await employmentReviewSwal({ icon: 'warning', title: 'Η προβολή δεν ανανεώθηκε',
+                text: 'Η μαζική ολοκλήρωση ολοκληρώθηκε, αλλά η προβολή δεν ανανεώθηκε. Πατήστε νέα «Αναζήτηση».' });
+        }
     } catch (error) {
         await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία', text: error.message });
     } finally {
@@ -11632,7 +11641,7 @@ document.addEventListener('click', (event) => {
     const orphanButton = event.target.closest('.weekly-hr-open-orphan');
     if (orphanButton) { const row = currentReviewRows.find((item) => String(item._id) === orphanButton.dataset.rowId) ||
         weeklyHrStage1RowsById.get(orphanButton.dataset.rowId);
-        if (row) showDetailsModal(row); return; }
+        if (row) showDetailsModal(row, { orphanResolution: true }); return; }
     const dayButton = event.target.closest('.weekly-hr-open-day');
     if (dayButton) { const row = currentReviewRows.find((item) => String(item._id) === dayButton.dataset.rowId) ||
         weeklyHrStage1RowsById.get(dayButton.dataset.rowId);
@@ -12665,7 +12674,7 @@ function validateReviewSave(updates) {
     return errors;
 }
 
-function showDetailsModal(row) {
+function showDetailsModal(row, { orphanResolution = false } = {}) {
     if (!isCurrentPeriodReviewDate(row)) {
         return employmentReviewSwal({ icon: 'info', title: 'Πληροφοριακή ημέρα άλλης περιόδου',
             text: 'Η ημέρα ανήκει μόνο στο εβδομαδιαίο πλαίσιο ανάγνωσης. Δεν επιτρέπεται μεταβολή από την ενεργή περίοδο.' });
@@ -12673,6 +12682,9 @@ function showDetailsModal(row) {
     const reusableOrphanReason = row?.orphan_card_resolution_preview
         ?.automaticReusableApplied === true
         ? String(row.orphan_card_resolution_preview.reusableDecisionReason || '') : '';
+    const initialReason = reusableOrphanReason || (orphanResolution === true
+        ? 'Η προτεινόμενη από την εφαρμογή επίλυση του ορφανού χτυπήματος ελέγχθηκε και εγκρίθηκε από τον HR.'
+        : '');
     const html = `
     <div class="container-fluid">
 
@@ -12729,8 +12741,8 @@ function showDetailsModal(row) {
         <div class="review-modal-section">
             <div class="review-modal-section-title">Αιτιολογία Αλλαγής</div>
 
-            <textarea id="edit_reason" class="form-control" rows="3"
-                ${reusableOrphanReason ? 'readonly' : ''}>${escapeHtml(reusableOrphanReason)}</textarea>
+            <textarea id="edit_reason" class="form-control employment-review-reason-textarea" rows="4"
+                ${reusableOrphanReason ? 'readonly' : ''}>${escapeHtml(initialReason)}</textarea>
 
             <div class="d-flex gap-2 mt-3">
                 ${

@@ -477,7 +477,7 @@ const {
     completeWeeklyHrWorkflowStage1
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage1CompletionService');
 const {
-    completeWeeklyHrWorkflowStage1Bulk
+    completeWeeklyHrWorkflowStage1Bulk, createStage1BulkPeriodAccessResolver
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage1BulkCompletionService');
 const {
     completeWeeklyHrStage1PeriodSlice
@@ -5040,22 +5040,30 @@ async function loadWeeklyHrStage2BulkPreparedContexts({ req, input }) {
     return { contexts, periodAccess };
 }
 
-async function assertActiveEmploymentReviewStage1CompletionReadable(req, initial, input) {
+function validateActiveEmploymentReviewStage1CompletionScope(req, initial, input, periodAccess) {
     if (!input.period_start || !input.period_end) {
-        return assertActiveEmploymentReviewPeriodReadable(
-            req, initial.base.ypokatasthma,
-            { kind: 'WEEKLY_CONTEXT', start: initial.week.start, end: initial.week.end,
-                authoritativeRowDates: initial.rows.filter((row) =>
-                    initial.employmentDateScope?.authoritative_date_set?.includes(
-                        dateKeyUtc(row.hmeromhnia)
-                    )).map((row) => row.hmeromhnia),
-                requiredAuthoritativeDates:
-                    initial.employmentDateScope?.authoritative_date_set || null }
-        );
+        const authoritativeDates = initial.employmentDateScope?.authoritative_date_set || null;
+        const insideScope = isWeekAllowedForEmploymentPeriod({
+            period_start: periodAccess.scope.period_start,
+            period_end: periodAccess.scope.period_end,
+            week_start: initial.week.start,
+            week_end: initial.week.end,
+            period_control: periodAccess.state,
+            historical_as_of: resolveWeeklyRepoPreviewAsOfDate({
+                sessionAppDate: req.session.appDate,
+                periodEnd: periodAccess.scope.period_end,
+                periodControl: periodAccess.state
+            }),
+            authoritative_row_dates: initial.rows.filter((row) =>
+                authoritativeDates?.includes(dateKeyUtc(row.hmeromhnia)))
+                .map((row) => row.hmeromhnia),
+            required_authoritative_dates: authoritativeDates,
+            allow_stale_completed_context: true
+        });
+        if (!insideScope) throw weeklyHrApiError('PERIOD_CONTROL_SCOPE_MISMATCH', 409,
+            'Η ανάγνωση δεν ανήκει στην ενεργή περίοδο.');
+        return periodAccess;
     }
-    const periodAccess = await assertActiveEmploymentReviewPeriodReadable(
-        req, initial.base.ypokatasthma
-    );
     const exactActivePeriod = dateKeyUtc(input.period_start) ===
             dateKeyUtc(periodAccess.scope.period_start) &&
         dateKeyUtc(input.period_end) === dateKeyUtc(periodAccess.scope.period_end);
@@ -5077,8 +5085,17 @@ async function assertActiveEmploymentReviewStage1CompletionReadable(req, initial
     return periodAccess;
 }
 
+async function assertActiveEmploymentReviewStage1CompletionReadable(
+    req, initial, input, periodAccessResolver = null
+) {
+    const periodAccess = periodAccessResolver
+        ? await periodAccessResolver(initial.periodScope)
+        : await assertActiveEmploymentReviewPeriodReadable(req, initial.base.ypokatasthma);
+    return validateActiveEmploymentReviewStage1CompletionScope(req, initial, input, periodAccess);
+}
+
 async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
-    indexesAlreadyChecked = false }) {
+    indexesAlreadyChecked = false, periodAccessResolver = null }) {
     const allowedInputFields = new Set(['ypokatasthma', 'employee_id', 'week_start', 'week_end',
         'period_start', 'period_end', 'period_control_token', 'request_id', 'reason_or_notes']);
     const forbiddenInputFields = Object.keys(input || {}).filter((field) =>
@@ -5089,7 +5106,7 @@ async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
     if (!indexesAlreadyChecked) await assertWeeklyHrWorkflowIndexesReady();
     const initial = await loadWeeklyHrContext({ req, input });
     const periodAccess = await assertActiveEmploymentReviewStage1CompletionReadable(
-        req, initial, input
+        req, initial, input, periodAccessResolver
     );
     const staleHistoricalCompletion =
         periodAccess.state.effective_mode === 'HISTORICAL_RECONSTRUCTION_STALE';
@@ -12247,12 +12264,16 @@ class erganhController {
             const actor = { user_id: req.session.userId, user_name:
                 req.session.userName || req.session.username || String(req.session.userId || ''),
                 role: req.session.userRole };
+            const periodAccessResolver = createStage1BulkPeriodAccessResolver(
+                (scope) => assertActiveEmploymentReviewPeriodReadable(req, scope.ypokatasthma)
+            );
             const result = await completeWeeklyHrWorkflowStage1Bulk({
                 scopes: req.body.scopes, reason_or_notes: req.body.reason_or_notes,
                 bulk_request_id: req.body.bulk_request_id, actor,
                 completeOne: ({ scope, reason_or_notes, request_id }) =>
                     completeWeeklyHrStage1ForScope({ req, input: scope, requestId: request_id,
-                        reason: reason_or_notes, indexesAlreadyChecked: true })
+                        reason: reason_or_notes, indexesAlreadyChecked: true,
+                        periodAccessResolver })
             });
             return res.json({ success: true, ...result });
         } catch (error) {
