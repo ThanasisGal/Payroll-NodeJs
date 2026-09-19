@@ -799,7 +799,7 @@ class ergazomenoiController {
         }
     };
 
-    static editErgazomenoiForm = async (req, res) => {
+    static editErgazomenoiForm = async (req, res, next) => {
         const locals = {
             title: 'Συντήρηση Στοιχείων Εργαζομένων',
             description: 'Web Payroll Solutions'
@@ -818,8 +818,6 @@ class ergazomenoiController {
             // const ergazomenoiKod = req.params.kod;
             const ergazomenoiKod = ergazomenoiData.kodikos;
 
-            console.time('ISTORIKO_FIND');
-
             const rawIstorikoData = await IstorikoProslhpseonAllagonModel.find({
                 team: userTeam,
                 company_kod: companyId,
@@ -828,18 +826,11 @@ class ergazomenoiController {
                 .sort({ aa_eggrafhs: 1 })
                 .lean();
 
-            console.timeEnd('ISTORIKO_FIND');
-
-            console.time('ENRICH');
-
             const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
             const originalEmploymentHistoryId = selectMaintenanceMode(
                 rawIstorikoData,
                 getIstorikoDateIdentity(ergazomenoiData)
             ).historyId || '';
-
-            console.timeEnd('ENRICH');
-
             const perifereies = await PerifereiesModel.find().sort('perigrafh');
             const genikesParametroi = await GenikesParametroiModel.find()
                 .sort({ kodikos: 1 })
@@ -887,7 +878,23 @@ class ergazomenoiController {
                 rec: ergazomenoiData
             });
         } catch (error) {
-            console.log('Σφάλμα :', error);
+            console.error('Σφάλμα κατά τη φόρτωση της Συντήρησης εργαζομένου:', error);
+            if (isEmploymentProfileError(error)) {
+                const message = error.code === 'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY'
+                    ? 'Δεν είναι δυνατή η ασφαλής επιλογή της ιστορικής εγγραφής του εργαζομένου. Εντοπίστηκαν περισσότερες από μία αντίστοιχες εγγραφές ιστορικού. Απαιτείται έλεγχος από διαχειριστή.'
+                    : 'Η Συντήρηση του εργαζομένου δεν μπορεί να ανοίξει με ασφάλεια. Απαιτείται έλεγχος από διαχειριστή.';
+                return res.status(error.statusCode || 409).render(
+                    'ergazomenoi/ergazomenoi/employment-profile-conflict',
+                    {
+                        locals: {
+                            title: 'Αδυναμία φόρτωσης Συντήρησης εργαζομένου',
+                            description: 'Web Payroll Solutions'
+                        },
+                        message
+                    }
+                );
+            }
+            return next(error);
         }
     };
 
