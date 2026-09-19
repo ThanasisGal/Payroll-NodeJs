@@ -165,7 +165,8 @@ function legacyMaintenancePatch(patch = {}, stored, history = false) {
 function selectMaintenanceMode(rows, identity) {
     if (!identity || !IDENTITY_FIELDS.every(field => Object.hasOwn(identity, field))) C.invalid('historyIdentity', 'complete identity required');
     const date = (row, field) => field === 'hmeromhnia_isxyos_oron_ergasias_apo' ? effectiveStart(row) :
-        C.calendarDate(row[field], field);
+        field === 'hmeromhnia_isxyos_oron_ergasias_eos' ? effectiveEnd(row) :
+            C.calendarDate(row[field], field);
     const matches = rows.filter(row => IDENTITY_FIELDS.every(field =>
         (date(row, field)?.getTime() ?? null) === (date(identity, field)?.getTime() ?? null)));
     if (matches.length > 1) throw failure('EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY');

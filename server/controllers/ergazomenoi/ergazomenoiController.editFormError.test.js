@@ -62,7 +62,13 @@ function editHandler(historyRows) {
         CompaniesModel: { findById: () => query({ _id: employee.company_kod }) },
         ErgazomenoiModel: { findById: () => query(employee) },
         IstorikoProslhpseonAllagonModel: { find: () => query(historyRows) },
+        PerifereiesModel: { find: () => query([]) },
+        GenikesParametroiModel: { find: () => query([]) },
+        ProdhlomenaOrariaModel: { find: () => query([]) },
+        ProgrammataDypaModel: { findOne: () => query(null) },
+        mongoose: { trusted: (value) => value },
         enrichIstorikoRowsForDetails: async (rows) => rows,
+        getEmploymentProfileUiContext: async () => ({}),
         selectMaintenanceMode,
         isEmploymentProfileError
     };
@@ -105,6 +111,37 @@ test('edit page returns a completed friendly 409 response for normalized legacy/
     assert.equal(res.view, 'ergazomenoi/ergazomenoi/employment-profile-conflict');
     assert.match(res.locals.message, /περισσότερες από μία/);
     assert.doesNotMatch(res.locals.message, /EMPLOYEE_PROFILE|Error|stack/i);
+    assert.equal(forwarded, null);
+});
+
+test('edit page selects the open modern row and reaches the normal render path', async () => {
+    const shared = {
+        team: 'BLG', company_kod: '69e7812a74cb535fd4d1a6e1', kodikos: '0005',
+        hmeromhnia_proslhpshs: new Date('2026-04-23'),
+        hmeromhnia_allaghs_symbashs: new Date('2026-04-23'),
+        hmeromhnia_allaghs_orarioy_apo: new Date('2026-04-23'),
+        hmeromhnia_allaghs_orarioy_eos: new Date('2026-04-29'),
+        hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-04-23'),
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_lhxhs_symbashs: new Date('2026-10-31'),
+        hmeromhnia_apoxorhshs: new Date('2026-04-24')
+    };
+    const legacy = { ...shared, _id: '69e8ca00b198b803164b7731', aa_eggrafhs: '0001' };
+    delete legacy.hmeromhnia_isxyos_oron_ergasias_apo;
+    delete legacy.hmeromhnia_isxyos_oron_ergasias_eos;
+    const modern = { ...shared, _id: '6a65e737a2ce245e430d4d70', aa_eggrafhs: '0002',
+        employment_profile_source: 'ERGOMENOI_CONTROLLER', afora_allagh_oron_ergasias: true };
+    const req = { params: { id: '69e8ca00b198b803164b7718' }, session: {
+        userTeam: 'BLG', companyInUse: '69e7812a74cb535fd4d1a6e1', yearInUse: '2026'
+    } };
+    const res = { render(view, locals) { this.view = view; this.locals = locals; this.finished = true; } };
+    let forwarded = null;
+
+    await editHandler([legacy, modern])(req, res, (error) => { forwarded = error; });
+
+    assert.equal(res.finished, true);
+    assert.equal(res.view, 'ergazomenoi/ergazomenoi/edit');
+    assert.equal(res.locals.originalEmploymentHistoryId, '6a65e737a2ce245e430d4d70');
     assert.equal(forwarded, null);
 });
 
