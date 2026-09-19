@@ -14986,6 +14986,13 @@ body.loader-active > *:not(.app-loader) {
     min-width: 0;
 }
 
+.employment-review-reason-textarea {
+    width: 100%;
+    min-height: 7rem;
+    line-height: 1.45;
+    resize: vertical;
+}
+
 @media (max-width: 991.98px) {
     .weekly-hr-stage2-preview-controls {
         grid-template-columns: 1fr auto;

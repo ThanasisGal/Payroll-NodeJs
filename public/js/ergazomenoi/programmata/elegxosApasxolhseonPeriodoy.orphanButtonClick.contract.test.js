@@ -60,6 +60,7 @@ vm.runInNewContext(`${modalSource}\nthis.open = showDetailsModal;`, sandbox);
 function reasonField() {
     const match = container.innerHTML.match(/<textarea id="edit_reason"([^>]*)>([\s\S]*?)<\/textarea>/);
     assert.ok(match);
+    assert.match(match[1], /\bemployment-review-reason-textarea\b/);
     return { value: match[2], readonly: /\breadonly\b/.test(match[1]) };
 }
 sandbox.open(...opened[0]);

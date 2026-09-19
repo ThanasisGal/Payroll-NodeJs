@@ -9661,7 +9661,7 @@ async function showWeeklyHrStage2BulkPreviewModal(preview, firstPageResult) {
     let pageResult = firstPageResult;
     let outcome = { isConfirmed: false, value: '' };
     let paginationError = null;
-    reason.value = '';
+    reason.value = 'Εφαρμογή των ασφαλών αυτόματων τακτοποιήσεων του Σταδίου 2, όπως προτάθηκαν από τον Έλεγχο Απασχολήσεων.';
     reason.classList.remove('is-invalid');
     reason.setCustomValidity('');
     const loadPage = async (page) => {
@@ -12733,7 +12733,7 @@ function showDetailsModal(row, { orphanResolution = false } = {}) {
         <div class="review-modal-section">
             <div class="review-modal-section-title">Αιτιολογία Αλλαγής</div>
 
-            <textarea id="edit_reason" class="form-control" rows="3"
+            <textarea id="edit_reason" class="form-control employment-review-reason-textarea" rows="4"
                 ${reusableOrphanReason ? 'readonly' : ''}>${escapeHtml(initialReason)}</textarea>
 
             <div class="d-flex gap-2 mt-3">
