@@ -1,7 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { writeEmployeeEmploymentProfile, MODE_CORRECT_EXISTING } = require('./employeeEmploymentProfileWriter');
+const { writeEmployeeEmploymentProfile, selectMaintenanceMode, MODE_CORRECT_EXISTING } = require('./employeeEmploymentProfileWriter');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { buildCompleteProfileSnapshot } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
@@ -235,6 +235,36 @@ test('normal latest legacy Maintenance correction keeps its identity and creates
     assert.equal(C.readEmploymentProfile(db.state().history[0]).recorded, true);
 });
 
+test('legacy and modern rows with the same normalized identity are rejected without creating a duplicate', async () => {
+    const identity = {
+        hmeromhnia_proslhpshs: new Date('2026-04-23'),
+        hmeromhnia_allaghs_symbashs: new Date('2026-04-23'),
+        hmeromhnia_allaghs_orarioy_apo: new Date('2026-04-23'),
+        hmeromhnia_allaghs_orarioy_eos: new Date('2026-04-29'),
+        hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-04-23'),
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_lhxhs_symbashs: new Date('2026-10-31'),
+        hmeromhnia_apoxorhshs: new Date('2026-04-24')
+    };
+    const legacy = { ...scope, ...identity, _id: 'legacy', aa_eggrafhs: '0001', afora_proslhpsh: true };
+    delete legacy.hmeromhnia_isxyos_oron_ergasias_apo;
+    const modern = { ...scope, ...identity, _id: 'modern', aa_eggrafhs: '0002',
+        employment_profile_source: 'ERGOMENOI_CONTROLLER', afora_proslhpsh: true,
+        afora_allagh_oron_ergasias: true };
+    const current = { ...modern, _id: 'employee' };
+
+    assert.throws(() => selectMaintenanceMode([legacy, modern], identity), (error) =>
+        error.code === 'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY' && error.statusCode === 409);
+
+    const db = database({ employee: current, history: [legacy, modern] });
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-04-23', maintenance: {
+            identity, employeeChanges: {}, historyChanges: {}
+        } }), (error) => error.code === 'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY');
+    assert.equal(db.state().history.length, 2);
+    assert.equal(db.writes(), 0);
+});
+
 for (const terminationType of ['ma_217', 'ma_222', 'ma_227']) test(
     `exact Maintenance termination ${terminationType} corrects departure on the same history row`,
     async () => {
@@ -278,7 +308,7 @@ test('exact older termination correction targets only its historyId with a later
 
 test('no-change Maintenance selects real May version and preserves non-terms history noise', async () => {
     const { IDENTITY_FIELDS } = require('../../utils/ergazomenoi/employmentProfileTransition');
-    const { selectMaintenanceMode, MODE_LEGACY_MAINTENANCE } = require('./employeeEmploymentProfileWriter');
+    const { MODE_LEGACY_MAINTENANCE } = require('./employeeEmploymentProfileWriter');
     const identity = Object.fromEntries(IDENTITY_FIELDS.map(field => [field, null]));
     Object.assign(identity, { hmeromhnia_allaghs_orarioy_apo: new Date('2026-05-25'),
         hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-05-25'),
