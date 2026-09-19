@@ -3296,7 +3296,7 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
                     String(payload.scope?.employee_kodikos || '') === String(row.kodikos || '') &&
                     String(payload.scope?.ypokatasthma || '').padStart(4, '0') === String(row.ypokatasthma || '').padStart(4, '0') &&
                     payload.lifecycle_projection.deferred_possible_leave_dates?.includes(stage1DateKey(row.hmeromhnia)))
-                ? 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ' : 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
+                ? 'ΕΞΕΤΑΣΗ ΣΤΗΝ ΕΠΟΜΕΝΗ ΠΕΡΙΟΔΟ' : 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
             className: 'cell-adeia-suggestion',
             source: 'derived'
         };
@@ -5814,7 +5814,7 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.',
     OPEN_WEEK_PENDING_COMPLETION:
         'Η τελευταία εβδομάδα δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.',
-    DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
+    DEFERRED_TO_NEXT_PERIOD: 'ΕΞΕΤΑΣΗ ΣΤΗΝ ΕΠΟΜΕΝΗ ΠΕΡΙΟΔΟ',
     CROSS_MONTH_REPO_TRANSFER_NOT_ALLOWED:
         'Η μεταφορά ρεπό δεν επιτρέπεται ανάμεσα σε ημέρες διαφορετικών μηνών.',
     NO_SOURCE_CANDIDATE:
@@ -9120,7 +9120,7 @@ const workflowStageShortNames = Object.freeze({
     STAGE3: 'Υπόλοιπες Άδειες', STAGE4: 'Τελικός Έλεγχος'
 });
 const workflowStageStatusLabels = Object.freeze({
-    DEFERRED_TO_NEXT_PERIOD: 'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ',
+    DEFERRED_TO_NEXT_PERIOD: 'ΕΞΕΤΑΣΗ ΣΤΗΝ ΕΠΟΜΕΝΗ ΠΕΡΙΟΔΟ',
     COMPLETED: 'ΟΛΟΚΛΗΡΩΘΗΚΕ', ACTIVE: 'ΧΡΕΙΑΖΕΤΑΙ Η ΠΡΟΣΟΧΗ ΣΑΣ', OPEN: 'ΑΝΟΙΧΤΟ',
     BLOCKED: 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ', STALE: 'ΤΑ ΣΤΟΙΧΕΙΑ ΑΛΛΑΞΑΝ', LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'
 });
@@ -9904,7 +9904,7 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     if (!container || !stage) return false;
     if (stage.business_status === 'DEFERRED_TO_NEXT_PERIOD') {
         container.innerHTML = '<div class="text-info-emphasis small">' +
-            'ΑΝΑΜΟΝΗ ΠΛΗΡΟΥΣ ΕΒΔΟΜΑΔΙΑΙΟΥ ΕΛΕΓΧΟΥ — Η απόφαση ρεπό θα εξεταστεί στην επόμενη περίοδο.</div>';
+            'Η εβδομάδα θα εξεταστεί στην επόμενη περίοδο, όταν θα υπάρχουν πλήρη εβδομαδιαία στοιχεία.</div>';
         return true;
     }
     if (!currentWeeklyHrStage2BulkPreview) {
