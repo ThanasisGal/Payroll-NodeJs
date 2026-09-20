@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!table) return;
 
+    const canManageHistory = table.dataset.canManageHistory === 'true';
+
     const fields = [
         'hmeromhnia_proslhpshs',
         'hmeromhnia_allaghs_symbashs',
@@ -219,16 +221,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function createActionButtons() {
         return `
             <div class="istoriko-actions">
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" title="Προσθήκη">
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" title="Προσθήκη" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-plus-lg"></i>
                 </button>
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" title="Τροποποίηση">
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" title="Τροποποίηση" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-pencil-square"></i>
                 </button>
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" title="Διαγραφή">
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" title="Διαγραφή" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-trash3"></i>
                 </button>
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-undo" data-action="undo" title="Αναίρεση">
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-undo" data-action="undo" title="Αναίρεση" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-arrow-counterclockwise"></i>
                 </button>
             </div>
@@ -273,7 +275,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!cell) return;
 
             const value = cell.dataset.iso || '';
-            cell.innerHTML = `<input type="date" class="date-control istoriko-date-input" data-field-input="${field}" value="${value}">`;
+            const lifecycleLocked = field === 'hmeromhnia_proslhpshs';
+            const lifecycleAttributes = lifecycleLocked
+                ? 'readonly disabled aria-disabled="true" title="Η ημερομηνία πρόσληψης αλλάζει μόνο μέσω ελεγχόμενης διόρθωσης lifecycle/επαναπρόσληψης."'
+                : '';
+            cell.innerHTML = `<input type="date" class="date-control istoriko-date-input" data-field-input="${field}" value="${value}" ${lifecycleAttributes}>`;
         });
 
         row.dataset.editing = '1';
@@ -673,6 +679,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!row) return;
 
         const action = button.dataset.action;
+
+        if (['add', 'edit', 'delete', 'undo'].includes(action) && !canManageHistory) {
+            event.preventDefault();
+            return;
+        }
 
         if (action === 'add') {
             const newRow = createEmptyRow();

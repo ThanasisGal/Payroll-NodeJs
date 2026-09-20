@@ -22,6 +22,7 @@ function failure(code) { const error = new Error(code); error.code = code; error
 // Private session sharing keeps all accepted history operations in one transaction.
 const ACTIVE_SESSION = Symbol('employeeProfileTransaction');
 const EDITOR_OPERATION = Symbol('historyEditorOperation');
+const REHIRE_OPERATION = Symbol('employeeRehireOperation');
 async function inProfileTransaction(connection, capabilityProbe, work, activeSession = null) {
     if (activeSession) return work(activeSession);
     let capable = false;
@@ -183,7 +184,8 @@ function selectMaintenanceMode(rows, identity) {
 // the repository has no unique employee business-key index. This writer guarantees
 // current/history atomicity, not cross-route concurrent code allocation.
 async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom, newEmployee = null, employeeId = null,
-    mode = MODE_NEW_VERSION, historyId = null, maintenance = null, [ACTIVE_SESSION]: activeSession = null, [EDITOR_OPERATION]: editorOperation = false,
+    mode = MODE_NEW_VERSION, historyId = null, maintenance = null, [ACTIVE_SESSION]: activeSession = null,
+    [EDITOR_OPERATION]: editorOperation = false, [REHIRE_OPERATION]: rehireOperation = false,
     connection = mongoose.connection, employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel, capabilityProbe = transactionCapability }) {
     if (!scope || !['team', 'company_kod', 'kodikos'].every((key) => typeof scope[key] === 'string' && scope[key].trim())) {
@@ -202,6 +204,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
         const submittedInput = input, submittedMaintenance = maintenance;
         const write = async () => {
             let input = submittedInput, maintenance = submittedMaintenance;
+            if (!rehireOperation && newEmployee &&
+                C.calendarDate(newEmployee.hmeromhnia_apoxorhshs)) {
+                newEmployee = { ...newEmployee, energos: false };
+            }
             const current = await employeeModel.findOne(employeeId ? { ...filter, _id: employeeId } : filter).session(session).lean();
             if (employeeId && String(current?._id) !== String(employeeId)) throw failure('EMPLOYEE_PROFILE_STALE');
             if (newEmployee && current) throw failure('EMPLOYEE_PROFILE_ALREADY_EXISTS');
@@ -237,10 +243,31 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 !semanticEmploymentProfileChanged(current, maintenance, input);
             const patch = legacyMaintenance ? legacyMaintenancePatch(maintenance.employeeChanges, current) : cleanMaintenancePatch(maintenance?.employeeChanges);
             let historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
+
             const correctableIdentityFields = new Set(maintenance?.correctableIdentityFields || []);
             if ([...correctableIdentityFields].some(field => field !== 'hmeromhnia_apoxorhshs')) {
                 C.invalid('correctableIdentityFields', 'unsupported maintenance identity correction');
             }
+
+            // Hire date is employment-cycle identity. Normal Maintenance may send
+            // the unchanged hire date back from the form, but it may not create a
+            // different hire identity. Only the dedicated rehire command may do so.
+            if (!editorOperation && !rehireOperation && current && !newEmployee && rows.length > 0) {
+                const requestedHires = [
+                    patch.hmeromhnia_proslhpshs,
+                    historyPatch.hmeromhnia_proslhpshs
+                ]
+                    .filter(value => value !== undefined && value !== null && value !== '')
+                    .map(value => C.calendarDate(value));
+                if (requestedHires.length) {
+                    const currentHire = C.calendarDate(current.hmeromhnia_proslhpshs);
+                    if (!currentHire || requestedHires.some(value =>
+                        !value || value.getTime() !== currentHire.getTime())) {
+                        throw failure('EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_REHIRE');
+                    }
+                }
+            }
+
             let selection = { mode, historyId };
             if (!editorOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION) {
                 const originalHistoryId = maintenance.originalHistoryId;
@@ -265,6 +292,13 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 }
                 if (!editorOperation && maintenance?.identity && selectMaintenanceMode([target], maintenance.identity).historyId !== selectedHistoryId) {
                     throw failure('EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH');
+                }
+                if (editorOperation && Object.hasOwn(historyPatch, 'hmeromhnia_proslhpshs')) {
+                    const requestedHire = C.calendarDate(historyPatch.hmeromhnia_proslhpshs);
+                    const storedHire = C.calendarDate(target.hmeromhnia_proslhpshs);
+                    if ((requestedHire?.getTime() ?? null) !== (storedHire?.getTime() ?? null)) {
+                        throw failure('EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_LIFECYCLE_REPAIR');
+                    }
                 }
                 const originalFrom = effectiveStart(target);
                 const latest = !datedRows.some(row => effectiveStart(row) > originalFrom);
@@ -306,6 +340,12 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 const facts = legacyMaintenance ? {} : Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
                 const currentChanges = latest ? { ...patch, ...facts, ...(capturedBaseline ? { [T.ANCHOR]: capturedBaseline } : {}) } :
                     Object.fromEntries(Object.entries(patch).filter(([field]) => !HISTORY_CURRENT_FIELDS.has(field)));
+                if (latest && !rehireOperation) {
+                    const proposedDeparture = Object.hasOwn(currentChanges, 'hmeromhnia_apoxorhshs')
+                        ? currentChanges.hmeromhnia_apoxorhshs
+                        : current.hmeromhnia_apoxorhshs;
+                    if (C.calendarDate(proposedDeparture)) currentChanges.energos = false;
+                }
                 if (Object.keys(currentChanges).length) {
                     const update = await employeeModel.updateOne({ ...filter, _id: current._id },
                         { $set: currentChanges }, { session });
@@ -342,11 +382,27 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             }
             if (datedRows.some((row) => effectiveStart(row) >= from)) throw failure('EMPLOYEE_PROFILE_NON_APPEND_CHANGE');
             const openRows = datedRows.filter((row) => !effectiveEnd(row) || effectiveEnd(row) >= from);
-            if (openRows.length > 1) throw failure('EMPLOYEE_PROFILE_HISTORY_OVERLAP');
+            const currentHireKey = C.calendarDate(current?.hmeromhnia_proslhpshs)?.getTime() ?? null;
+            const rowsToClose = rehireOperation
+                ? openRows.filter(row =>
+                    (C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() ?? null) === currentHireKey)
+                : openRows;
+            if (rowsToClose.length > 1) throw failure('EMPLOYEE_PROFILE_HISTORY_OVERLAP');
             if (legacyMaintenance) historyPatch = legacyMaintenancePatch(maintenance.historyChanges, null, true);
             if (maintenance && rows.length === 0 &&
                 !C.calendarDate(historyPatch.hmeromhnia_isxyos_oron_ergasias_apo)) {
                 historyPatch.hmeromhnia_isxyos_oron_ergasias_apo = from;
+            }
+            if (current && !newEmployee && !rehireOperation && rows.length > 0) {
+                const currentHire = C.calendarDate(current.hmeromhnia_proslhpshs);
+                if (currentHire) {
+                    patch.hmeromhnia_proslhpshs = current.hmeromhnia_proslhpshs;
+                    historyPatch.hmeromhnia_proslhpshs = current.hmeromhnia_proslhpshs;
+                    patch.hmeromhnia_apoxorhshs = current.hmeromhnia_apoxorhshs ?? null;
+                    historyPatch.hmeromhnia_apoxorhshs =
+                        current.hmeromhnia_apoxorhshs ?? null;
+                    historyPatch.afora_proslhpsh = false;
+                }
             }
             const snapshot = legacyMaintenance ? {} : buildCompleteProfileSnapshot({ input,
                 current: { ...(current || newEmployee), ...patch, ...historyPatch }, effectiveFrom: from });
@@ -358,6 +414,12 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             const currentUpdate = legacyMaintenance ? patch : { ...patch, ...facts, ...(baseline ? { [T.ANCHOR]: baseline } : {}),
                 hmeromhnia_isxyos_oron_ergasias_apo: snapshot.hmeromhnia_isxyos_oron_ergasias_apo,
                 hmeromhnia_isxyos_oron_ergasias_eos: until };
+            if (current && !rehireOperation) {
+                const proposedDeparture = Object.hasOwn(currentUpdate, 'hmeromhnia_apoxorhshs')
+                    ? currentUpdate.hmeromhnia_apoxorhshs
+                    : current.hmeromhnia_apoxorhshs;
+                if (C.calendarDate(proposedDeparture)) currentUpdate.energos = false;
+            }
             let employee;
             if (current) {
                 employee = { ...current, ...currentUpdate };
@@ -368,9 +430,9 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             } else {
                 [employee] = await employeeModel.create([{ ...newEmployee, ...filter, ...currentUpdate }], { session });
             }
-            if (openRows[0]) {
+            if (rowsToClose[0]) {
                 const until = new Date(from); until.setUTCDate(until.getUTCDate() - 1);
-                const closed = await historyModel.updateOne({ ...filter, _id: openRows[0]._id },
+                const closed = await historyModel.updateOne({ ...filter, _id: rowsToClose[0]._id },
                     { $set: { hmeromhnia_isxyos_oron_ergasias_eos: until } }, { session });
                 if (closed.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_HISTORY_STALE');
             }
@@ -476,7 +538,8 @@ async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
             employeeModel,
             historyModel,
             capabilityProbe,
-            [ACTIVE_SESSION]: session
+            [ACTIVE_SESSION]: session,
+            [REHIRE_OPERATION]: true
         });
 
         return {

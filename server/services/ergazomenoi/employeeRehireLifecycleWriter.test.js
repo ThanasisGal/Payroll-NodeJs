@@ -371,3 +371,38 @@ test('a third relationship appends cycle 3 without changing cycle 1', async () =
     );
     assert.equal(dateKey(db.state().history[2].hmeromhnia_proslhpshs), '2027-02-01');
 });
+
+test('rehire leaves malformed older legacy rows untouched when current cycle is safely anchored', async () => {
+    const initial = {
+        employee: {
+            _id: 'employee-1', ...scope, archived: false, energos: false,
+            hmeromhnia_proslhpshs: '2026-06-30', hmeromhnia_apoxorhshs: '2026-07-20',
+            hmeromhnia_allaghs_symbashs: '2026-06-30', hmeromhnia_allaghs_orarioy_apo: '2026-06-30',
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-30'
+        },
+        history: [
+            { _id: 'legacy-1', ...scope, aa_eggrafhs: '0001', hmeromhnia_proslhpshs: '2025-09-22',
+                hmeromhnia_apoxorhshs: null, hmeromhnia_isxyos_oron_ergasias_apo: '2025-09-22',
+                hmeromhnia_isxyos_oron_ergasias_eos: '2025-09-28', afora_proslhpsh: true },
+            { _id: 'legacy-2', ...scope, aa_eggrafhs: '0002', hmeromhnia_proslhpshs: '2026-06-22',
+                hmeromhnia_apoxorhshs: null, hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-22',
+                hmeromhnia_isxyos_oron_ergasias_eos: '2026-06-28', afora_proslhpsh: true },
+            { _id: 'current-cycle', ...scope, aa_eggrafhs: '0003', hmeromhnia_proslhpshs: '2026-06-30',
+                hmeromhnia_apoxorhshs: '2026-07-20', hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-30',
+                hmeromhnia_isxyos_oron_ergasias_eos: null, afora_proslhpsh: true }
+        ]
+    };
+    const legacyBefore = initial.history.slice(0, 2).map(clone);
+    const db = database(initial);
+
+    const result = await writeEmployeeRehire({
+        ...db.deps, scope, employeeId: 'employee-1', rehireDate: '2026-08-21'
+    });
+
+    const stored = db.state();
+    assert.deepEqual(stored.history.slice(0, 2), legacyBefore);
+    assert.equal(dateKey(stored.history[2].hmeromhnia_apoxorhshs), '2026-07-20');
+    assert.equal(dateKey(stored.history[2].hmeromhnia_isxyos_oron_ergasias_eos), '2026-07-20');
+    assert.equal(dateKey(stored.history.at(-1).hmeromhnia_proslhpshs), '2026-08-21');
+    assert.equal(result.previous_cycle.hire_date, '2026-06-30');
+});

@@ -17,6 +17,83 @@ function explicitOr(value, fallback) {
     return value === undefined || value === '' ? fallback : value;
 }
 
+function currentCycleHistoryOrder(row = {}, fallbackIndex = 0) {
+    const effective = dateKeyUtc(
+        row.hmeromhnia_isxyos_oron_ergasias_apo ||
+        row.hmeromhnia_allaghs_orarioy_apo ||
+        row.hmeromhnia_allaghs_symbashs ||
+        row.createdAt ||
+        row.hmeromhnia_proslhpshs
+    ) || '';
+    const createdAt = row.createdAt ? new Date(row.createdAt).getTime() : 0;
+    return {
+        effective,
+        createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+        sequence: Number(row.aa_eggrafhs) || 0,
+        fallbackIndex
+    };
+}
+
+function compareCurrentCycleHistory(left, right) {
+    for (const field of ['effective', 'createdAt', 'sequence', 'fallbackIndex']) {
+        if (left.order[field] < right.order[field]) return -1;
+        if (left.order[field] > right.order[field]) return 1;
+    }
+    return 0;
+}
+
+function resolveCurrentCycleFromMaster({ currentEmployee, history = [], conflictCode = null }) {
+    const currentHire = dateKeyUtc(currentEmployee?.hmeromhnia_proslhpshs);
+    const currentDeparture = dateKeyUtc(currentEmployee?.hmeromhnia_apoxorhshs);
+    if (!currentHire) {
+        throw rehireError('EMPLOYEE_REHIRE_CURRENT_CYCLE_MISMATCH', {
+            current_hire_date: currentHire,
+            legacy_history_conflict: conflictCode
+        });
+    }
+
+    const evidence = (Array.isArray(history) ? history : []).map((row, index) => ({
+        row,
+        hire_date: dateKeyUtc(row?.hmeromhnia_proslhpshs),
+        source_id: row?._id == null ? null : String(row._id),
+        order: currentCycleHistoryOrder(row, index)
+    }));
+
+    const newer = evidence.filter(item => item.hire_date && item.hire_date > currentHire);
+    if (newer.length) {
+        throw rehireError('EMPLOYEE_REHIRE_CURRENT_CYCLE_MISMATCH', {
+            current_hire_date: currentHire,
+            newer_history_hires: newer.map(item => item.hire_date),
+            legacy_history_conflict: conflictCode
+        });
+    }
+
+    const matching = evidence
+        .filter(item => item.hire_date === currentHire && item.source_id)
+        .sort(compareCurrentCycleHistory);
+    if (!matching.length) {
+        throw rehireError('EMPLOYEE_REHIRE_HISTORY_REQUIRED', {
+            current_hire_date: currentHire,
+            legacy_history_conflict: conflictCode
+        });
+    }
+
+    const distinctHireDates = [...new Set(evidence
+        .map(item => item.hire_date)
+        .filter(value => value && value <= currentHire))].sort();
+
+    return Object.freeze({
+        cycle_no: Math.max(1, distinctHireDates.indexOf(currentHire) + 1),
+        hire_date: currentHire,
+        departure_date: currentDeparture,
+        is_current_cycle: true,
+        source: 'CURRENT',
+        source_id: currentEmployee?._id == null ? null : String(currentEmployee._id),
+        history_ids: Object.freeze(matching.map(item => item.source_id)),
+        recovered_from_legacy_history_conflict: conflictCode
+    });
+}
+
 function buildEmployeeRehireTransition({
     currentEmployee = null,
     history = [],
@@ -37,16 +114,29 @@ function buildEmployeeRehireTransition({
         throw rehireError('EMPLOYEE_REHIRE_INVALID_DATE', { rehireDate });
     }
 
-    const cycles = buildEmploymentCycles({
-        currentEmployee,
-        history: Array.isArray(history) ? history : []
-    });
-
-    if (!cycles.length) {
-        throw rehireError('EMPLOYEE_REHIRE_NO_EMPLOYMENT_CYCLE');
+    let cycles;
+    let latest;
+    let legacyHistoryConflict = null;
+    try {
+        cycles = buildEmploymentCycles({
+            currentEmployee,
+            history: Array.isArray(history) ? history : []
+        });
+        if (!cycles.length) {
+            throw rehireError('EMPLOYEE_REHIRE_NO_EMPLOYMENT_CYCLE');
+        }
+        latest = cycles.at(-1);
+    } catch (error) {
+        if (!String(error?.code || '').startsWith('EMPLOYMENT_CYCLE_')) throw error;
+        legacyHistoryConflict = error.code;
+        latest = resolveCurrentCycleFromMaster({
+            currentEmployee,
+            history,
+            conflictCode: error.code
+        });
+        cycles = Object.freeze([latest]);
     }
 
-    const latest = cycles.at(-1);
     const currentHire = dateKeyUtc(currentEmployee.hmeromhnia_proslhpshs);
 
     if (
@@ -156,7 +246,8 @@ function buildEmployeeRehireTransition({
         previous_cycle: latest,
         employee_changes: employeePatch,
         history_changes: historyPatch,
-        cycles_before_rehire: cycles
+        cycles_before_rehire: cycles,
+        legacy_history_conflict: legacyHistoryConflict
     });
 }
 

@@ -69,6 +69,7 @@ function editHandler(historyRows) {
         mongoose: { trusted: (value) => value },
         enrichIstorikoRowsForDetails: async (rows) => rows,
         getEmploymentProfileUiContext: async () => ({}),
+        canManageEmployeeHistory: async () => false,
         selectMaintenanceMode,
         isEmploymentProfileError
     };

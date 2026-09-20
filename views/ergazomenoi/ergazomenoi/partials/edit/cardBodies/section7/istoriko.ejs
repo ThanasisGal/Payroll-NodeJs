@@ -44,7 +44,8 @@
 
     <div class="istoriko-table-wrapper">
 
-        <table class="table table-striped table-bordered table-sm table-hover mb-0 istoriko-table" id="istorikoTable">
+        <table class="table table-striped table-bordered table-sm table-hover mb-0 istoriko-table" id="istorikoTable"
+            data-can-manage-history="<%= canManageEmployeeHistory ? 'true' : 'false' %>">
 
             <colgroup>
                 <col class="istoriko-col-aa">
@@ -105,16 +106,16 @@
 
                             <td class="istoriko-actions-col text-center">
                                 <div class="istoriko-actions">
-                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" data-id="<%= row._id %>" title="Προσθήκη">
+                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" data-id="<%= row._id %>" title="Προσθήκη" <%- canManageEmployeeHistory ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-plus-lg"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" data-id="<%= row._id %>" title="Τροποποίηση">
+                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" data-id="<%= row._id %>" title="Τροποποίηση" <%- canManageEmployeeHistory ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" data-id="<%= row._id %>" title="Διαγραφή">
+                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" data-id="<%= row._id %>" title="Διαγραφή" <%- canManageEmployeeHistory ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-trash3"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-undo" data-action="undo" data-id="<%= row._id %>" title="Αναίρεση">
+                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-undo" data-action="undo" data-id="<%= row._id %>" title="Αναίρεση" <%- canManageEmployeeHistory ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-arrow-counterclockwise"></i>
                                     </button>
                                 </div>
