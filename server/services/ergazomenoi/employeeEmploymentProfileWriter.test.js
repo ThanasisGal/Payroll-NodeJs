@@ -426,3 +426,138 @@ test('no-history baseline without any safe effective date fails before writes', 
     error => error.code === 'INVALID_EMPLOYMENT_PROFILE' && error.field === 'effectiveFrom');
     assert.equal(db.writes(), 0); assert.deepEqual(db.state(), initial);
 });
+
+test('ordinary profile version cannot create a new employment cycle by changing hire date', async () => {
+    const baseline = buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' });
+    const initial = {
+        employee: { _id: 'employee', ...scope, ...baseline,
+            hmeromhnia_proslhpshs: '2025-01-01', hmeromhnia_apoxorhshs: null },
+        history: [{ _id: 'old', ...scope, ...baseline, aa_eggrafhs: '0001',
+            hmeromhnia_proslhpshs: '2025-01-01', hmeromhnia_apoxorhshs: null }]
+    };
+    const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({
+        ...db.dependencies,
+        scope,
+        employeeId: 'employee',
+        input: arrangement,
+        effectiveFrom: '2026-09-15',
+        maintenance: {
+            employeeChanges: { hmeromhnia_proslhpshs: '2026-09-15' },
+            historyChanges: { hmeromhnia_proslhpshs: '2026-09-15' }
+        }
+    }), error => error.code === 'EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_REHIRE');
+    assert.deepEqual(db.state(), initial);
+    assert.equal(db.writes(), 0);
+});
+
+
+test('ordinary appended profile inherits the existing employment-cycle hire identity', async () => {
+    const baseline = buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' });
+    const initial = {
+        employee: {
+            _id: 'employee',
+            ...scope,
+            ...baseline,
+            hmeromhnia_proslhpshs: '2025-01-01',
+            hmeromhnia_apoxorhshs: null
+        },
+        history: [{
+            _id: 'old',
+            ...scope,
+            ...baseline,
+            aa_eggrafhs: '0001',
+            hmeromhnia_proslhpshs: '2025-01-01',
+            hmeromhnia_apoxorhshs: null,
+            afora_proslhpsh: true
+        }]
+    };
+    const db = database(initial);
+
+    await writeEmployeeEmploymentProfile({
+        ...db.dependencies,
+        scope,
+        employeeId: 'employee',
+        input: arrangement,
+        effectiveFrom: '2026-09-15'
+    });
+
+    const stored = db.state();
+    assert.equal(
+        new Date(stored.employee.hmeromhnia_proslhpshs).toISOString().slice(0, 10),
+        '2025-01-01'
+    );
+    assert.equal(
+        new Date(stored.history[1].hmeromhnia_proslhpshs).toISOString().slice(0, 10),
+        '2025-01-01'
+    );
+    assert.equal(stored.history[1].afora_proslhpsh, false);
+});
+
+test('closed relationship is stored inactive even when submitted active', async () => {
+    const db = database();
+    await writeEmployeeEmploymentProfile({
+        ...db.dependencies,
+        scope,
+        newEmployee: {
+            eponymo: 'Closed',
+            energos: true,
+            hmeromhnia_proslhpshs: '2026-01-01',
+            hmeromhnia_apoxorhshs: '2026-07-31'
+        },
+        effectiveFrom: '2026-01-01'
+    });
+    assert.equal(db.state().employee.energos, false);
+});
+
+test('maintenance departure forces current master inactive', async () => {
+    const initial = {
+        employee: {
+            _id: 'employee',
+            ...scope,
+            energos: true,
+            hmeromhnia_proslhpshs: '2026-01-01',
+            hmeromhnia_apoxorhshs: null,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-01-01'
+        },
+        history: [{
+            _id: 'old',
+            ...scope,
+            aa_eggrafhs: '0001',
+            hmeromhnia_proslhpshs: '2026-01-01',
+            hmeromhnia_apoxorhshs: null,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-01-01',
+            hmeromhnia_isxyos_oron_ergasias_eos: null,
+            afora_proslhpsh: true
+        }]
+    };
+    const db = database(initial);
+    await writeEmployeeEmploymentProfile({
+        ...db.dependencies,
+        scope,
+        employeeId: 'employee',
+        effectiveFrom: '2026-01-01',
+        maintenance: {
+            employeeChanges: {
+                energos: true,
+                hmeromhnia_apoxorhshs: new Date('2026-07-31')
+            },
+            historyChanges: {
+                hmeromhnia_apoxorhshs: new Date('2026-07-31')
+            },
+            identity: {
+                hmeromhnia_proslhpshs: new Date('2026-01-01'),
+                hmeromhnia_allaghs_symbashs: null,
+                hmeromhnia_allaghs_orarioy_apo: null,
+                hmeromhnia_allaghs_orarioy_eos: null,
+                hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-01-01'),
+                hmeromhnia_isxyos_oron_ergasias_eos: null,
+                hmeromhnia_lhxhs_symbashs: null,
+                hmeromhnia_apoxorhshs: null
+            },
+            originalHistoryId: 'old',
+            correctableIdentityFields: ['hmeromhnia_apoxorhshs']
+        }
+    });
+    assert.equal(db.state().employee.energos, false);
+});

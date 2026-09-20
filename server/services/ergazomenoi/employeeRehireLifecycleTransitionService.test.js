@@ -318,3 +318,27 @@ test('contract and schedule starts cannot precede the rehire date', () => {
         (error) => error.code === 'EMPLOYEE_REHIRE_INVALID_SCHEDULE_START'
     );
 });
+
+test('legacy malformed earlier cycles do not block a safely anchored current rehire', () => {
+    const transition = buildEmployeeRehireTransition({
+        currentEmployee: oldClosedEmployee({
+            hmeromhnia_proslhpshs: '2026-06-30',
+            hmeromhnia_apoxorhshs: '2026-07-20'
+        }),
+        history: [
+            { _id: 'legacy-1', aa_eggrafhs: '0001', hmeromhnia_proslhpshs: '2025-09-22',
+                hmeromhnia_apoxorhshs: null, hmeromhnia_isxyos_oron_ergasias_apo: '2025-09-22' },
+            { _id: 'legacy-2', aa_eggrafhs: '0002', hmeromhnia_proslhpshs: '2026-06-22',
+                hmeromhnia_apoxorhshs: null, hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-22' },
+            { _id: 'current-cycle', aa_eggrafhs: '0003', hmeromhnia_proslhpshs: '2026-06-30',
+                hmeromhnia_apoxorhshs: '2026-07-20', hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-30' }
+        ],
+        rehireDate: '2026-08-21'
+    });
+
+    assert.equal(transition.effective_from, '2026-08-21');
+    assert.equal(transition.previous_cycle.hire_date, '2026-06-30');
+    assert.equal(transition.previous_cycle.departure_date, '2026-07-20');
+    assert.deepEqual([...transition.previous_cycle.history_ids], ['current-cycle']);
+    assert.equal(transition.legacy_history_conflict, 'EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE');
+});

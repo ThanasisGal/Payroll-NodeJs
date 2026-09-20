@@ -423,10 +423,11 @@ function historyHandler(db) {
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     return vm.runInNewContext(`${helpers}\n(${method})`, { Date, console: { error() {} }, ...Terms, ...M,
         ErgazomenoiModel: db.employeeModel,
+        canManageEmployeeHistory: async () => true,
         writeEmployeeEmploymentHistoryOperations: args => W.writeEmployeeEmploymentHistoryOperations({ ...args, ...db.deps }) });
 }
 async function editHistory(db, updates) {
-    const req = { session: { userTeam: scope.team, companyInUse: scope.company_kod },
+    const req = { session: { userId: 'authorized-user', userTeam: scope.team, companyInUse: scope.company_kod },
         body: { employeeId: db.state().employee._id, updates } };
     const res = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
     await historyHandler(db)(req, res); return res;

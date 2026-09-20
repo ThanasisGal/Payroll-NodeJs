@@ -1,5 +1,6 @@
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
 const { writeEmployeeEmploymentProfile, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
 const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -861,6 +862,7 @@ class ergazomenoiController {
 
             res.render('ergazomenoi/ergazomenoi/edit', {
                 employmentProfileUi: await getEmploymentProfileUiContext(),
+                canManageEmployeeHistory: await canManageEmployeeHistory(req.session.userId),
                 locals,
                 perifereies,
                 companyData,
@@ -939,6 +941,17 @@ class ergazomenoiController {
                 });
             }
 
+            if (!Array.isArray(updates) || updates.some(update => !['modified', 'inserted', 'deleted'].includes(update.state))) {
+                return res.status(400).json({ success: false, message: 'Μη έγκυρη μεταβολή ιστορικού.' });
+            }
+
+            if (updates.length > 0 && !await canManageEmployeeHistory(req.session.userId)) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Δεν έχετε δικαίωμα διαχείρισης ιστορικού.'
+                });
+            }
+
             const ergazomenos = await ErgazomenoiModel.findOne({
                 _id: employeeId,
                 team: userTeam,
@@ -989,9 +1002,6 @@ class ergazomenoiController {
                     )
             });
 
-            if (!Array.isArray(updates) || updates.some(update => !['modified', 'inserted', 'deleted'].includes(update.state))) {
-                return res.status(400).json({ success: false, message: 'Μη έγκυρη μεταβολή ιστορικού.' });
-            }
             const operations = updates.map(({ _id, state, data = {} }) => {
                 if (state === 'deleted') return { state, historyId: _id };
                 const rate = parseSixthDayPremiumRate(data.pososto_prosayxhshs_6hs_hmeras);
