@@ -47,7 +47,9 @@
 			min="0"
 		/>
     </div>
-    
+
+    <div class="col-3"></div>
+
     <div class="col-3 left-align">
       	<label for="symfonhtheis_misthos_apasxolhseis" class="col-form-label label-font-size">
         	Καθαρός Συμφ/θείς Μισθός (Απασχολήσεις) 
@@ -91,13 +93,13 @@
 </div>
 
 <div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
-    <div class="col-9 left-align">
+    <div class="col-3 left-align">
         <label for="corrective_payroll_withholding_rate_percent" class="col-form-label label-font-size">
-            Ποσοστό παρακράτησης διορθωτικής μισθοδοσίας
+            Ποσοστό Παρακράτησης εις Χείρας Τρίτων
         </label>
     </div>
     <div class="col-1-5 left-align">
-        <input type="number" id="corrective_payroll_withholding_rate_percent" name="corrective_payroll_withholding_rate_percent" class="form-control input-contents right-align" min="0" max="100" step="0.01" value="<%= safeFloat('corrective_payroll_withholding_rate_percent') %>" />
+        <input type="number" id="corrective_payroll_withholding_rate_percent" name="corrective_payroll_withholding_rate_percent" class="form-control input-contents right-align" min="0" max="100" step="0.01" value="<%= safeFloat('corrective_payroll_withholding_rate_percent') || '0.00' %>" />
     </div>
 </div>
 
