@@ -30,7 +30,7 @@ async function requireScopedEmployeeForUpdate({
     const employeeScope = buildEmployeeScope({ employeeId, sessionTeam, companyId });
     let employee;
     try {
-        employee = await model.findOne(employeeScope).select('_id kodikos').lean();
+        employee = await model.findOne(employeeScope).select('_id kodikos hmeromhnia_apoxorhshs').lean();
     } catch (error) {
         logger.error('Employee scope lookup failed', {
             category: error?.name || 'EMPLOYEE_SCOPE_LOOKUP_FAILED'

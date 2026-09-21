@@ -27,6 +27,34 @@ const form = () => ({ hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_sy
     kathestos_apasxolhshs: '0', kathestos_apasxolhshs_stathera: '0',
     symbash: 'contract', symbash_stathera: 'contract', nomimosMisthos: 1200,
     poso_symbashs_01: 1200, symbatikes_ores_ergasias: 40 });
+test('Maintenance submitted-field detection recognizes every KPK contract source', () => {
+    for (const key of ['kpk_efka_basei_symbashs_stathera', 'kpk_efka_basei_symbashs',
+        'tmp_kpk_efka_stathera']) {
+        const submitted = M.submittedEmployeeMaintenanceFields(
+            { kpk_efka_basei_symbashs: '0115' }, { [key]: '0115' });
+        assert.deepEqual(submitted, ['kpk_efka_basei_symbashs'], key);
+    }
+});
+test('Maintenance submitted-field detection recognizes work-terms start fallback', () => {
+    const data = { hmeromhnia_allaghs_orarioy_apo: '2026-07-06' };
+    assert.equal(Object.hasOwn(data, 'hmeromhnia_isxyos_oron_ergasias_apo'), false);
+    assert.deepEqual(M.submittedEmployeeMaintenanceFields(
+        { hmeromhnia_isxyos_oron_ergasias_apo: data.hmeromhnia_allaghs_orarioy_apo }, data),
+    ['hmeromhnia_isxyos_oron_ergasias_apo']);
+});
+test('Maintenance submitted-field detection uses presence for every falsy value', () => {
+    for (const value of [false, 0, '', null, []]) {
+        assert.deepEqual(M.submittedEmployeeMaintenanceFields(
+            { afora_kataggelia_me_proeidopoihsh: value,
+                kpk_efka_basei_symbashs: value,
+                hmeromhnia_isxyos_oron_ergasias_apo: value },
+            { kataggelia_me_proeidopoihsh: value,
+                tmp_kpk_efka_stathera: value,
+                hmeromhnia_allaghs_orarioy_apo: value }),
+        ['afora_kataggelia_me_proeidopoihsh', 'kpk_efka_basei_symbashs',
+            'hmeromhnia_isxyos_oron_ergasias_apo']);
+    }
+});
 function memory(initial = { employee: null, history: [] }, fail = '') {
     let committed = plain(initial), draft, ended = false, writes = 0;
     let committedEmployeeCreates = 0, draftEmployeeCreates = 0;
@@ -108,7 +136,9 @@ function handler(mode, db) {
             ? { action: 'CORRECT_EXISTING', employee: db.state().employee,
                 history: db.state().history[0], afm: '123456789' }
             : { action: 'CREATE_NEW', afm: '' },
-        writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps })
+        writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
+        writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }),
+        dateKeyUtc: require('../../utils/date/mondaySundayWeek').dateKeyUtc
     });
 }
 async function submit(mode, input, db = memory()) {
@@ -231,6 +261,105 @@ test('imported legacy employee with no history saves departure in one baseline t
     assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2025-05-01');
     assert.equal(db.state().history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
     assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
+});
+test('Maintenance first departure with empty history ID closes a schedule-only terminal row', async () => {
+    const stored = await initial();
+    stored.employee.hmeromhnia_proslhpshs = '2026-04-25';
+    stored.employee.hmeromhnia_apoxorhshs = null;
+    stored.employee.energos = true;
+    stored.employee.hmeromhnia_isxyos_oron_ergasias_apo = '2026-05-25';
+    stored.employee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-15';
+    stored.employee.hmeromhnia_lhxhs_symbashs = '2026-10-31';
+    stored.employee.hmeromhnia_allaghs_orarioy_apo = '2026-07-06';
+    stored.employee.hmeromhnia_allaghs_orarioy_eos = '2026-07-12';
+    stored.history = [
+        ['0001', '2026-04-25', '2026-05-24'], ['0002', '2026-05-25', '2026-05-31'],
+        ['0003', '2026-06-01', '2026-06-07'], ['0004', '2026-06-08', '2026-06-14'],
+        ['0005', '2026-06-15', null], ['0006', null, null]
+    ].map(([number, start, end]) => ({ ...plain(stored.history[0]),
+        _id: `maintenance-${number}`, aa_eggrafhs: number,
+        hmeromhnia_proslhpshs: '2026-04-25', hmeromhnia_apoxorhshs: null,
+        hmeromhnia_isxyos_oron_ergasias_apo: start,
+        hmeromhnia_isxyos_oron_ergasias_eos: end,
+        hmeromhnia_allaghs_orarioy_apo: number === '0006' ? '2026-07-06' : null,
+        hmeromhnia_allaghs_orarioy_eos: number === '0006' ? '2026-07-12' : null,
+        afora_allagh_oron_ergasias: number !== '0006',
+        createdAt: `2026-07-${number === '0006' ? '06' : '01'}T00:00:00.000Z`
+    }));
+    const before = plain(stored.history);
+    const { db, res } = await submit('edit', { ...form(), istorikoId: '',
+        hmeromhnia_proslhpshs: '2026-04-25',
+        hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
+        hmeromhnia_allaghs_orarioy_eos: '2026-07-12',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-25',
+        hmeromhnia_isxyos_oron_ergasias_eos: '2026-10-15', energos: true,
+        hmeromhnia_apoxorhshs: '2026-09-20',
+        logos_peratoshs_stathera: 'Καταγγελία σύμβασης',
+        parathrhseis_peratoshs: 'departure note',
+        kataggelia_me_proeidopoihsh: true,
+        hmnia_koinopoihshs_kataggelias: '2026-09-01',
+        mhnes_proeidopoihshs: 1,
+        email: 'departure@example.invalid', nomimosMisthos: 1300 }, memory(stored));
+    assert.equal(res.code, 200, `${res.body?.reason}: ${res.body?.errorMessage}`);
+    const after = db.state();
+    assert.equal(after.history.length, 6);
+    assert.deepEqual(after.history.slice(0, 4), before.slice(0, 4));
+    assert.deepEqual(after.history.map(row => row._id), before.map(row => row._id));
+    assert.equal(after.employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-20');
+    assert.equal(after.employee.energos, false);
+    assert.equal(after.employee.hmeromhnia_isxyos_oron_ergasias_eos.slice(0, 10), '2026-09-20');
+    assert.equal(after.employee.hmeromhnia_lhxhs_symbashs, '2026-10-31');
+    assert.equal(after.employee.logos_peratosis, 'Καταγγελία σύμβασης');
+    assert.equal(after.employee.parathrhseis_peratosis, 'departure note');
+    assert.equal(after.employee.afora_kataggelia_me_proeidopoihsh, true);
+    assert.equal(after.employee.hmeromhnia_koinopoihshs_kataggelias.slice(0, 10), '2026-09-01');
+    assert.equal(after.employee.mhnes_proeidopoihshs, 1);
+    assert.equal(after.employee.email, 'departure@example.invalid');
+    assert.equal(after.employee.nomimosMisthos, 1300);
+    assert.equal(after.history[4].hmeromhnia_isxyos_oron_ergasias_eos.slice(0, 10), '2026-09-20');
+    assert.equal(after.history[4].nomimosMisthos, 1300);
+    assert.equal(after.history[5].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-20');
+    assert.equal(after.history[5].hmeromhnia_isxyos_oron_ergasias_apo, null);
+    assert.deepEqual({ ...after.history[5], hmeromhnia_apoxorhshs: null }, before[5]);
+    const repeated = await submit('edit', { ...form(), istorikoId: '',
+        hmeromhnia_proslhpshs: '2026-04-25',
+        hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
+        hmeromhnia_allaghs_orarioy_eos: '2026-07-12',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-25',
+        hmeromhnia_isxyos_oron_ergasias_eos: '2026-10-15', energos: true,
+        hmeromhnia_apoxorhshs: '2026-09-20',
+        email: 'repeated@example.invalid', nomimosMisthos: 1400 }, memory(after));
+    assert.equal(repeated.res.code, 200, repeated.res.body?.errorMessage);
+    assert.equal(repeated.db.state().history.length, 6);
+    assert.equal(repeated.db.state().employee.email, 'repeated@example.invalid');
+    assert.equal(repeated.db.state().employee.nomimosMisthos, 1400);
+    assert.equal(repeated.db.state().employee.logos_peratosis, 'Καταγγελία σύμβασης');
+    assert.equal(repeated.db.state().employee.parathrhseis_peratosis, 'departure note');
+    assert.equal(repeated.db.state().employee.afora_kataggelia_me_proeidopoihsh, true);
+    assert.equal(repeated.db.state().history[4].nomimosMisthos, 1400);
+    assert.equal(repeated.db.state().history[5].hmeromhnia_isxyos_oron_ergasias_apo, null);
+    const clear = await submit('edit', { ...form(), istorikoId: '',
+        hmeromhnia_proslhpshs: '2026-04-25',
+        hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
+        hmeromhnia_allaghs_orarioy_eos: '2026-07-12',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-25',
+        hmeromhnia_apoxorhshs: '2026-09-20',
+        kataggelia_me_proeidopoihsh: false, mhnes_proeidopoihshs: 0,
+        parathrhseis_peratoshs: '' }, memory(repeated.db.state()));
+    assert.equal(clear.res.code, 200, clear.res.body?.errorMessage);
+    assert.equal(clear.db.state().employee.afora_kataggelia_me_proeidopoihsh, false);
+    assert.equal(clear.db.state().employee.mhnes_proeidopoihshs, 0);
+    assert.equal(clear.db.state().employee.parathrhseis_peratosis, '');
+    assert.equal(clear.db.state().history.length, 6);
+});
+test('Maintenance invalid departure returns a lifecycle error without writes', async () => {
+    const stored = await initial();
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '2026-02-30' }, db);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_INVALID_DATE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), stored);
 });
 test('LEGACY maintenance preserves sparse history and baseline ordinary contract updates', async () => {
     const stored = await legacyInitial();
@@ -678,7 +807,7 @@ test('semantic controller audit: allocation and Add/Edit field maps retain basel
     const noDivider = text => text.replace(/\n\s*\/\/ =+$/, '').trim();
     assert.equal(part(source, '        const filteredDataErgazomenoi =', '        const updateFieldsIstoriko =', editOffset(source)),
         noDivider(part(baseline, '        const filteredDataErgazomenoi =', '        // ✅ 5)', editOffset(baseline))));
-    assert.equal(part(source, '            const toNumber =', '            const result = rehireIntent === true', editOffset(source)),
+    assert.equal(part(source, '            const toNumber =', '            const submittedDeparture =', editOffset(source)),
         part(baseline, '            const toNumber =', '            updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate', editOffset(baseline)));
     assert.match(source, /const addHistoryValues = \{/);
     assert.match(source, /submittedAddPatch\(newIstoriko, submittedFormKeys, addHistoryOwnedFields\)/);
