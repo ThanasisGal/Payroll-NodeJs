@@ -138,6 +138,7 @@ function handler(mode, db) {
             : { action: 'CREATE_NEW', afm: '' },
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
         writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }),
+        writeEmployeeDepartureCancellation: args => W.writeEmployeeDepartureCancellation({ ...args, ...db.deps }),
         dateKeyUtc: require('../../utils/date/mondaySundayWeek').dateKeyUtc
     });
 }
@@ -351,6 +352,56 @@ test('Maintenance first departure with empty history ID closes a schedule-only t
     assert.equal(clear.db.state().employee.mhnes_proeidopoihshs, 0);
     assert.equal(clear.db.state().employee.parathrhseis_peratosis, '');
     assert.equal(clear.db.state().history.length, 6);
+});
+test('same-departure Maintenance ignores a submitted active flag without a new cycle', async () => {
+    const stored = await initial();
+    stored.employee.hmeromhnia_apoxorhshs = '2026-09-20';
+    stored.employee.energos = false;
+    stored.history[0].hmeromhnia_apoxorhshs = '2026-09-20';
+    const beforeIds = stored.history.map(row => row._id);
+    const { db, res } = await submit('edit', { ...form(),
+        hmeromhnia_apoxorhshs: '2026-09-20', energos: true }, memory(stored));
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    const after = db.state();
+    assert.equal(after.employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-20');
+    assert.equal(after.employee.energos, false);
+    assert.equal(after.history.length, stored.history.length);
+    assert.deepEqual(after.history.map(row => row._id), beforeIds);
+    assert.equal(after.history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-20');
+    assert.equal(after.employee.hmeromhnia_proslhpshs.slice(0, 10), stored.employee.hmeromhnia_proslhpshs.slice(0, 10));
+});
+test('explicit departure cancellation reopens the same cycle through the controller', async () => {
+    const initialState = await initial();
+    const departed = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '2026-09-20',
+        energos: true }, memory(initialState));
+    assert.equal(departed.res.code, 200, departed.res.body?.errorMessage);
+    const closed = departed.db.state();
+    assert.equal(closed.employee.energos, false);
+    const reopened = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '',
+        energos: true }, memory(closed));
+    assert.equal(reopened.res.code, 200, reopened.res.body?.errorMessage);
+    const after = reopened.db.state();
+    assert.equal(after.employee.hmeromhnia_apoxorhshs, null);
+    assert.equal(after.employee.energos, true);
+    assert.equal(after.history.length, closed.history.length);
+    assert.deepEqual(after.history.map(row => row._id), closed.history.map(row => row._id));
+    assert.equal(after.history.at(-1).hmeromhnia_apoxorhshs, null);
+    assert.equal(after.employee.hmeromhnia_proslhpshs, initialState.employee.hmeromhnia_proslhpshs);
+    assert.equal(W.writeEmployeeDepartureCancellation !== undefined, true);
+});
+test('departure cancellation never acknowledges an unrelated email change without saving it', async () => {
+    const initialState = await initial();
+    initialState.employee.email = 'old@example.test';
+    const departed = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '2026-09-20',
+        energos: true, email: 'old@example.test' }, memory(initialState));
+    assert.equal(departed.res.code, 200, departed.res.body?.errorMessage);
+    const closed = departed.db.state();
+    const attempt = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '',
+        energos: true, email: 'new@example.test' }, memory(closed));
+    assert.equal(attempt.res.code, 409);
+    assert.equal(attempt.res.body.reason, 'EMPLOYEE_DEPARTURE_CANCELLATION_SEPARATE_SAVE_REQUIRED');
+    assert.match(attempt.res.body.errorMessage, /ακύρωση αποχώρησης πρέπει να αποθηκευτεί χωριστά/);
+    assert.deepEqual(attempt.db.state(), closed);
 });
 test('Maintenance invalid departure returns a lifecycle error without writes', async () => {
     const stored = await initial();

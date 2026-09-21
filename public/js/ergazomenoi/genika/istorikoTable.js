@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
         'createdAt',
         'updatedAt',
         '__lookups',
+        'employment_profile_source',
+        'employment_profile_schema_version',
+        'ekdosh_typoy_egkekrimenhs_rythmishs',
         'symbash',
         'kathgoria_symbashs',
         'eidikothta_symbashs'
@@ -93,7 +96,32 @@ document.addEventListener('DOMContentLoaded', () => {
         nomimoOromisthio: 'Νόμιμο Ωρομίσθιο',
         pragmatikosMisthos: 'Πραγματικός Μισθός',
         pragmatikoHmeromisthio: 'Πραγματικό Ημερομίσθιο',
-        pragmatikoOromisthio: 'Πραγματικό Ωρομίσθιο'
+        pragmatikoOromisthio: 'Πραγματικό Ωρομίσθιο',
+        eidikh_kathgoria_ergazomenoy: 'Ειδική Κατηγορία Εργαζόμενου',
+        eidikh_periptosh: 'Ειδική Περίπτωση',
+        typos_ergazomenon: 'Τύπος Εργαζόμενου',
+        afora_egkekrimenh_rythmish_ergasias: 'Αφορά Εγκεκριμένη Ρύθμιση Εργασίας',
+        hmnia_enarxhs_egkekrimenhs_rythmishs: 'Ημ/νία Έναρξης Εγκεκριμένης Ρύθμισης',
+        hmnia_lhxhs_egkekrimenhs_rythmishs: 'Ημ/νία Λήξης Εγκεκριμένης Ρύθμισης',
+        hmeres_efarmoghs_egkekrimenhs_rythmishs: 'Ημέρες Εφαρμογής Εγκεκριμένης Ρύθμισης',
+        typos_egkekrimenhs_rythmishs: 'Τύπος Εγκεκριμένης Ρύθμισης',
+        diakoph_apo_ora_egkekrimenhs_rythmishs: 'Διακοπή Εγκεκριμένης Ρύθμισης Από Ώρα',
+        diakoph_eos_ora_egkekrimenhs_rythmishs: 'Διακοπή Εγκεκριμένης Ρύθμισης Έως Ώρα',
+        kathgoria_adeias_egkekrimenhs_rythmishs: 'Κατηγορία Άδειας Εγκεκριμένης Ρύθμισης',
+        dialleima_apo_ora_01: 'Διάλειμμα 1 Από Ώρα',
+        dialleima_eos_ora_01: 'Διάλειμμα 1 Έως Ώρα',
+        dialleima_apo_ora_02: 'Διάλειμμα 2 Από Ώρα',
+        dialleima_eos_ora_02: 'Διάλειμμα 2 Έως Ώρα',
+        dialleima_apo_ora_03: 'Διάλειμμα 3 Από Ώρα',
+        dialleima_eos_ora_03: 'Διάλειμμα 3 Έως Ώρα',
+        afora_allagh_dialleimatos: 'Αφορά Αλλαγή Διαλείμματος',
+        hmeromhnia_isxyos_dialleimatos_apo: 'Ημ/νία Ισχύος Διαλείμματος Από',
+        dialleima_se_lepta: 'Διάρκεια Διαλείμματος (Λεπτά)',
+        dialleima_entos_ektos_orarioy: 'Διάλειμμα Εντός / Εκτός Ωραρίου',
+        synexes_diakekomeno: 'Συνεχές / Διακεκομμένο Ωράριο',
+        typos_orarioy: 'Τύπος Ωραρίου',
+        evelikth_proselefsh: 'Ευέλικτη Προσέλευση',
+        symbatikes_ores_ergasias: 'Συμβατικές Ώρες Εργασίας'
     };
 
     function getCsrfToken() {
@@ -185,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getFieldLabel(field) {
-        return fieldLabels[field] || field.replaceAll('_', ' ');
+        return fieldLabels[field] || null;
     }
 
     function setRowState(row, state) {
@@ -611,7 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildOtherFieldsRows(record) {
         const rows = Object.entries(record)
-            .filter(([key, value]) => !excludedModalFields.has(key) && !isEmptyValue(value))
+            .filter(([key, value]) => !excludedModalFields.has(key) && getFieldLabel(key) && !isEmptyValue(value))
             .map(([key, value]) => {
                 const displayValue =
                     key === 'kathestos_apasxolhshs'

@@ -21,7 +21,7 @@ async function fixture(t, category, edit = true, pending = false) {
     }
     const html = ejs.render(fs.readFileSync(template, 'utf8'), { rec }, { filename: template });
     await page.setContent(`<div class="card-body"><select id="${categoryId}" name="${categoryId}" data-selected="${category || ''}">` +
-        (pending ? '' : ['', '0004', '0005', '0009'].map(value => `<option value="${value}" ${value === (category || '') ? 'selected' : ''}>${value}</option>`).join('')) + '</select>' + html + '</div>');
+        (pending ? '' : ['', '0001', '0004', '0005', '0009'].map(value => `<option value="${value}" ${value === (category || '') ? 'selected' : ''}>${value}</option>`).join('')) + '</select>' + html + '</div>');
     return page;
 }
 async function states(page) {
@@ -135,7 +135,7 @@ for (const mode of ['add', 'edit']) test(`${mode}: actual break controls enforce
     const file = path.resolve(`views/ergazomenoi/ergazomenoi/partials/${mode}/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs`);
     const rec = { eidikh_kathgoria_ergazomenoy: '0004', dialleima_se_lepta: 45, dialleima_entos_ektos_orarioy: false };
     await page.setContent('<div class="card-body"><select id="eidikh_kathgoria_ergazomenoy" name="eidikh_kathgoria_ergazomenoy">' +
-        ['0004', '0005', '0009'].map(value => `<option>${value}</option>`).join('') + '</select>' +
+        ['0001', '0004', '0005', '0009'].map(value => `<option>${value}</option>`).join('') + '</select>' +
         ejs.render(fs.readFileSync(file, 'utf8'), { rec, companyInUse: '', userTeam: '' }, { filename: file }) + '</div>');
     await page.addScriptTag({ content: ui });
     const duration = page.locator('#dialleima_se_lepta');
@@ -145,10 +145,14 @@ for (const mode of ['add', 'edit']) test(`${mode}: actual break controls enforce
     const collect = code.slice(start, code.indexOf('// ✅ CONVERT PDFs TO BASE64', start));
     const submitStart = code.indexOf('        event.preventDefault();');
     const submitGuard = code.slice(submitStart, start);
-    for (const category of ['0004', '0005', '0009']) {
+    for (const category of ['0001', '0004', '0005', '0009']) {
         await page.selectOption('#eidikh_kathgoria_ergazomenoy', category);
-        const special = category !== '0009';
+        const special = ['0004', '0005'].includes(category);
+        const nonZeroMin = category === '0001' ? 10 : 15;
+        assert.equal(await duration.getAttribute('min'), '0');
         assert.equal(await duration.getAttribute('max'), special ? '45' : '30');
+        assert.equal(await duration.getAttribute('step'), '1');
+        assert.equal(await duration.getAttribute('data-non-zero-min'), String(nonZeroMin));
         assert.equal(await inside.isDisabled(), special);
         if (special) {
             assert.equal(await inside.isChecked(), true);
@@ -157,9 +161,9 @@ for (const mode of ['add', 'edit']) test(`${mode}: actual break controls enforce
             await inside.uncheck(); assert.equal(await inside.isChecked(), false);
             await inside.check(); assert.equal(await inside.isChecked(), true);
         }
-        for (const minutes of [0, 1, 14, 15, 30, 31, 45, 46]) {
+        for (const minutes of [0, 1, 9, 10, 14, 15, 30, 31, 45, 46]) {
             await duration.fill(String(minutes));
-            const valid = minutes === 0 || (minutes >= 15 && minutes <= (special ? 45 : 30));
+            const valid = minutes === 0 || (minutes >= nonZeroMin && minutes <= (special ? 45 : 30));
             assert.equal(await duration.evaluate(el => el.checkValidity()), valid);
             // Execute the real pre-collection guard: invalid input never reaches collection.
             assert.equal(await page.evaluate(body => new Function('event', body + '\nreturn true;')({

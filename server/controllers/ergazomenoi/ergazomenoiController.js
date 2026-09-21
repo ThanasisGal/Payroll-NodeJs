@@ -1,7 +1,7 @@
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
 const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
@@ -3846,6 +3846,17 @@ class ergazomenoiController {
                         afora_proslhpsh: true
                     }
                 })
+                : storedDeparture && Object.hasOwn(formData, 'hmeromhnia_apoxorhshs') &&
+                    (formData.hmeromhnia_apoxorhshs === '' || formData.hmeromhnia_apoxorhshs === null)
+                    ? await writeEmployeeDepartureCancellation({
+                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
+                            kodikos: kodikosErgazomenoy }, employeeId: ergazomenoiId,
+                        input: profileInput(formData, 'edit'),
+                        maintenance: { employeeChanges: filteredDataErgazomenoi,
+                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
+                            historyChanges: updateFieldsIstoriko,
+                            submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData) }
+                    })
                 : submittedDeparture && (!storedDeparture || storedDeparture === submittedDeparture)
                     ? await writeEmployeeDeparture({
                         scope: { team: omadaErgasias, company_kod: kodikosEtaireias,

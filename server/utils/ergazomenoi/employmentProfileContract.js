@@ -95,16 +95,18 @@ function readEmploymentProfile(source = {}) {
 function normalizeEmploymentBreakSubmission(input = {}, current = {}, { allowLegacyDuration = true } = {}) {
     const category = input.eidikh_kathgoria_ergazomenoy !== undefined
         ? input.eidikh_kathgoria_ergazomenoy : current.eidikh_kathgoria_ergazomenoy;
-    const alwaysInside = ['0004', '0005'].includes(String(category ?? '').trim());
+    const categoryCode = String(category ?? '').trim();
+    const alwaysInside = ['0004', '0005'].includes(categoryCode);
+    const min = categoryCode === '0001' ? 10 : 15;
     const max = alwaysInside ? 45 : 30;
     const value = field => input[field] !== undefined ? input[field] : current[field];
     const minutes = number(value('dialleima_se_lepta') ?? 0, 'dialleima_se_lepta');
     const inside = boolean(value('dialleima_entos_ektos_orarioy') ?? false, 'dialleima_entos_ektos_orarioy');
     const preservedLegacyDuration = allowLegacyDuration && input.dialleima_se_lepta === undefined &&
-        category === current.eidikh_kathgoria_ergazomenoy &&
+        categoryCode === String(current.eidikh_kathgoria_ergazomenoy ?? '').trim() &&
         Number(current.dialleima_se_lepta) === minutes && Number.isInteger(minutes) && minutes > max;
-    if (!preservedLegacyDuration && (!Number.isInteger(minutes) || (minutes !== 0 && (minutes < 15 || minutes > max)))) {
-        invalid('dialleima_se_lepta', `expected 0 or 15..${max} minutes`);
+    if (!preservedLegacyDuration && (!Number.isInteger(minutes) || (minutes !== 0 && (minutes < min || minutes > max)))) {
+        invalid('dialleima_se_lepta', `expected 0 or ${min}..${max} minutes`);
     }
     return { dialleima_se_lepta: minutes, dialleima_entos_ektos_orarioy: alwaysInside || inside };
 }

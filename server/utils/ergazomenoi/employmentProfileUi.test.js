@@ -7,7 +7,7 @@ const { execFileSync } = require('node:child_process');
 const ejs = require('ejs');
 const C = require('./employmentProfileContract');
 const { getEmploymentProfileUiContext } = require('./employmentProfileUiContext');
-const { initEmploymentProfileUi } = require('../../../public/js/ergazomenoi/genika/employmentProfileUi');
+const { initEmploymentProfileUi, validateEmploymentProfileBreak } = require('../../../public/js/ergazomenoi/genika/employmentProfileUi');
 const checkpoint = '3b44e851f30b0ff01f60455638e224cd3d4c616c';
 const base = 'views/ergazomenoi/ergazomenoi/';
 const partial = mode => `${base}partials/${mode}/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs`;
@@ -100,7 +100,7 @@ test('common handler toggles controls and category without clearing any values o
     ids.dialleima_se_lepta.value = '45';
     initEmploymentProfileUi({ getElementById: id => ids[id], querySelectorAll: () => controls });
     assert(controls.every(c => c.disabled)); assert.equal(ids.dialleima_se_lepta.value, '45');
-    assert.equal(ids.dialleima_se_lepta.validation, undefined);
+    assert.equal(ids.dialleima_se_lepta.validation, 'Το διάλειμμα πρέπει να είναι 0 ή 15–30 λεπτά.');
     ids[C.ENABLED].checked = true; ids[C.ENABLED].listeners.change(); assert(controls.every(c => !c.disabled));
     ids[C.TYPE].selectedOptions[0].dataset.leaveCategory = 'false'; ids[C.TYPE].listeners.change(); assert(ids[C.CATEGORY].disabled);
     ids[C.ENABLED].checked = false; ids[C.ENABLED].listeners.change();
@@ -110,6 +110,54 @@ test('common handler toggles controls and category without clearing any values o
     for (const n of ['0', '15', '30', '14', '45']) {
         ids.dialleima_se_lepta.value = n; ids.dialleima_se_lepta.listeners.input();
         assert.equal(Boolean(ids.dialleima_se_lepta.validation), ['14', '45'].includes(n));
+    }
+});
+test('browser break limits, inside policy and third controls match server categories', () => {
+    const category = element();
+    const categoryListeners = [];
+    category.addEventListener = (event, callback) => { if (event === 'change') categoryListeners.push(callback); };
+    const duration = element('0');
+    duration.reportValidity = () => !duration.validation;
+    const inside = element();
+    const insideLabel = element();
+    const third = [element(), element()];
+    const ids = { eidikh_kathgoria_ergazomenoy: category, dialleima_se_lepta: duration,
+        dialleima_entos_ektos_orarioy: inside, 'label-dialleima_entos_ektos_orarioy': insideLabel };
+    initEmploymentProfileUi({ getElementById: id => ids[id], querySelectorAll: () => third });
+    for (const [code, accepted, rejected, forced, max, min] of [
+        ['0001', [0, 10, 30], [...Array.from({ length: 9 }, (_, n) => n + 1), 31], false, '30', '10'],
+        ['ordinary', [0, 15, 30], [...Array.from({ length: 14 }, (_, n) => n + 1), 31], false, '30', '15'],
+        ['0004', [0, 15, 45], [...Array.from({ length: 14 }, (_, n) => n + 1), 46], true, '45', '15'],
+        ['0005', [0, 15, 45], [...Array.from({ length: 14 }, (_, n) => n + 1), 46], true, '45', '15']
+    ]) {
+        category.value = ` ${code} `; inside.checked = false; categoryListeners.forEach(callback => callback());
+        assert.equal(inside.disabled, forced, code);
+        assert.equal(inside.checked, forced, code);
+        assert.equal(third.every(control => control.disabled === !forced), true, code);
+        assert.equal(duration.min, '0');
+        assert.equal(duration.dataset.nonZeroMin, min);
+        assert.equal(duration.max, max);
+        assert.equal(duration.step, '1');
+        duration.value = '0';
+        assert.equal(validateEmploymentProfileBreak({ getElementById: id => ids[id] }), true, `${code}: zero`);
+        for (const minutes of accepted) {
+            duration.value = String(minutes); duration.listeners.input();
+            assert.equal(duration.reportValidity(), true, `${code}: ${minutes}`);
+        }
+        for (const minutes of rejected) {
+            duration.value = String(minutes); duration.listeners.input();
+            assert.equal(duration.reportValidity(), false, `${code}: ${minutes}`);
+            assert.equal(duration.validation, `Το διάλειμμα πρέπει να είναι 0 ή ${min}–${max} λεπτά.`);
+        }
+    }
+    category.value = '0001'; duration.value = '9';
+    const root = { getElementById: id => ids[id] };
+    assert.equal(validateEmploymentProfileBreak(root), false);
+    duration.value = '10';
+    assert.equal(validateEmploymentProfileBreak(root), true);
+    for (const file of ['getFieldValues.js', 'putFieldValues.js']) {
+        assert.match(fs.readFileSync(`public/js/ergazomenoi/genika/${file}`, 'utf8'),
+            /if \(!window\.validateEmploymentProfileBreak\(document\)\) return;/);
     }
 });
 test('controller changes are limited to import and two GET render context properties', () => {

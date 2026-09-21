@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { writeEmployeeDeparture, writeEmployeeRehire } = require('./employeeEmploymentProfileWriter');
+const { writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire } = require('./employeeEmploymentProfileWriter');
 const { buildEmploymentCycles, resolveEmploymentCycleForDate } = require('./employeeEmploymentCycleResolverService');
 const { buildEmployeeDepartureTransition } = require('./employeeDepartureLifecycleTransitionService');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
@@ -128,6 +128,45 @@ test('same departure repeats safely; different departure and archived employee r
     const other = database(archived);
     await assert.rejects(depart(other), { code: 'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH' });
     assert.equal(other.writes(), 0);
+});
+
+test('controlled cancellation restores only departure-clamped boundaries in one cycle', async () => {
+    const before = auditedFixture(), db = database(before);
+    await depart(db);
+    const closed = db.state();
+    assert.equal(closed.employee.employment_departure_restore.departure, '2026-09-20');
+    const result = await writeEmployeeDepartureCancellation({ ...db.deps, scope, employeeId: 'employee-0014' });
+    assert.equal(result.mode, 'MODE_DEPARTURE_CANCELLATION');
+    const after = db.state();
+    assert.equal(after.history.length, before.history.length);
+    assert.deepEqual(after.history.map(row => row._id), before.history.map(row => row._id));
+    assert.deepEqual(after.history, before.history);
+    assert.equal(after.employee.hmeromhnia_apoxorhshs, null);
+    assert.equal(after.employee.energos, true);
+    assert.equal(date(after.employee.hmeromhnia_isxyos_oron_ergasias_eos), '2026-10-15');
+    assert.equal(after.employee.employment_departure_restore, null);
+    assert.equal(buildEmploymentCycles({ currentEmployee: after.employee, history: after.history }).length, 1);
+});
+
+test('cancellation without recorded boundary provenance rejects before writes', async () => {
+    const db = database(auditedFixture());
+    await depart(db);
+    const closed = db.state();
+    delete closed.employee.employment_departure_restore;
+    const unknown = database(closed);
+    await assert.rejects(writeEmployeeDepartureCancellation({ ...unknown.deps, scope,
+        employeeId: 'employee-0014' }), { code: 'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED' });
+    assert.equal(unknown.writes(), 0);
+});
+
+test('cancellation history failure rolls back the employee reopening', async () => {
+    const departed = database(auditedFixture());
+    await depart(departed);
+    const closed = departed.state();
+    const db = database(closed, 'history');
+    await assert.rejects(writeEmployeeDepartureCancellation({ ...db.deps, scope,
+        employeeId: 'employee-0014' }), /history failed/);
+    assert.deepEqual(db.state(), closed);
 });
 
 test('same-day departure allowed; before-hire and future history event reject without writes', async () => {

@@ -16,7 +16,8 @@
     }
     function updateEmploymentProfileBreak(root) {
         const category = root.getElementById('eidikh_kathgoria_ergazomenoy');
-        const alwaysInside = THIRD_BREAK_CATEGORIES.has(category?.value);
+        const categoryCode = String(category?.value ?? '').trim();
+        const alwaysInside = THIRD_BREAK_CATEGORIES.has(categoryCode);
         const duration = root.getElementById('dialleima_se_lepta');
         const inside = root.getElementById('dialleima_entos_ektos_orarioy');
         if (inside) {
@@ -26,11 +27,15 @@
             if (label) label.textContent = inside.checked ? 'ΕΝΤΟΣ' : 'ΕΚΤΟΣ';
         }
         if (duration) {
+            const min = categoryCode === '0001' ? 10 : 15;
             const max = alwaysInside ? 45 : 30;
+            duration.min = '0'; // Zero is valid; custom validity enforces the non-zero minimum.
+            duration.dataset.nonZeroMin = String(min);
             duration.max = String(max);
+            duration.step = '1';
             const n = Number(duration.value);
-            duration.setCustomValidity(duration.value === '' || (Number.isInteger(n) && (n === 0 || (n >= 15 && n <= max)))
-                ? '' : `Το διάλειμμα πρέπει να είναι 0 ή 15–${max} λεπτά.`);
+            duration.setCustomValidity(duration.value === '' || (Number.isInteger(n) && (n === 0 || (n >= min && n <= max)))
+                ? '' : `Το διάλειμμα πρέπει να είναι 0 ή ${min}–${max} λεπτά.`);
         }
         return duration;
     }
@@ -43,7 +48,7 @@
         if (specialCategory) {
             const thirdBreakInputs = root.querySelectorAll('[data-third-profile-break]');
             function updateBreakIntervalAvailability() {
-                thirdBreakInputs.forEach(input => { input.disabled = !THIRD_BREAK_CATEGORIES.has(specialCategory.value); });
+                thirdBreakInputs.forEach(input => { input.disabled = !THIRD_BREAK_CATEGORIES.has(String(specialCategory.value).trim()); });
             }
             specialCategory.addEventListener('change', updateBreakIntervalAvailability);
             updateBreakIntervalAvailability(); // Also reused by the existing async dropdown change event.
