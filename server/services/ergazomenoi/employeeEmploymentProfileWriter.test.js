@@ -4,13 +4,17 @@ const { test } = require('node:test');
 const { writeEmployeeEmploymentProfile, selectMaintenanceMode, MODE_CORRECT_EXISTING } = require('./employeeEmploymentProfileWriter');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { buildCompleteProfileSnapshot } = require('../../utils/ergazomenoi/employmentProfileHistory');
+const { resolveEmploymentProfileFactsForDate } = require('../../utils/ergazomenoi/employmentProfileHistory');
+const { resolveEmploymentTypeFromFormData } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const { profileError } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
+const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 
 function database(initial = { employee: null, history: [] }, fail = '') {
     let committed = structuredClone(initial); let draft; let ended = false; let writes = 0;
     const session = { async withTransaction(work) {
         draft = structuredClone(committed);
-        try { await work(); committed = draft; } finally { draft = null; }
+        try { await work(); if (fail === 'commit') throw new Error('commit failed'); committed = draft; } finally { draft = null; }
     }, async endSession() { ended = true; } };
     const query = (read) => ({ session(value) { assert.equal(value, session); return this; }, async lean() { return structuredClone(read()); } });
     const matches = (row, filter) => row && Object.entries(filter).every(([key, value]) =>
@@ -19,6 +23,7 @@ function database(initial = { employee: null, history: [] }, fail = '') {
         findOne: () => query(() => draft.employee),
         async updateOne(filter, update, options) {
             assert.equal(options.session, session); writes++;
+            if (fail === 'employee') throw new Error('employee failed');
             if (!matches(draft.employee, filter)) return { matchedCount: 0 };
             Object.assign(draft.employee, update.$set); return { matchedCount: 1 };
         },
@@ -32,6 +37,7 @@ function database(initial = { employee: null, history: [] }, fail = '') {
         async updateOne(filter, update, options) {
             assert.equal(options.session, session); writes++;
             if (fail === 'close') throw new Error('close failed');
+            if (fail === `close:${filter._id}`) throw new Error('close failed');
             const row = draft.history.find((row) => matches(row, filter));
             if (!row || fail === 'stale') return { matchedCount: 0 };
             Object.assign(row, update.$set);
@@ -69,6 +75,127 @@ test('a new arrangement appends complete history and closes previous version', a
     assert.equal(db.state().history[1][C.ENABLED], true);
     assert.equal(db.state().employee.localNote, 'preserve');
     assert.equal(db.state().history[1].aa_eggrafhs, '0002');
+});
+
+function legacyShadowState() {
+    const end = new Date('2026-10-15');
+    const base = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-05-28' }),
+        hmeromhnia_proslhpshs: '2026-05-28', hmeromhnia_isxyos_oron_ergasias_eos: end,
+        kathestos_apasxolhshs: '0', typos_apasxolhshs: '0',
+        hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
+        mo_oron_hmerhsias_ergasias: 8, nomimosMisthos: 1000,
+        pragmatikosMisthos: 1100, poso_symbashs_01: 1100 };
+    const legacy = { ...base, _id: 'legacy-0001', ...scope, aa_eggrafhs: '0001',
+        createdAt: new Date('2026-05-28') };
+    for (const field of C.FACT_FIELDS) delete legacy[field];
+    delete legacy.employment_profile_source;
+    const recorded = { ...base, _id: 'recorded-0002', ...scope, aa_eggrafhs: '0002',
+        createdAt: new Date('2026-05-29') };
+    return { employee: { ...base, _id: 'employee', ...scope, energos: true,
+        archived: false, hmeromhnia_apoxorhshs: null }, history: [legacy, recorded] };
+}
+function rotatingAppend(db) {
+    const type = resolveEmploymentTypeFromFormData({ kathestos_apasxolhshs_stathera: 'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ' });
+    assert.equal(type, '2');
+    const changes = { hmeromhnia_proslhpshs: '2026-05-28',
+        hmeromhnia_allaghs_symbashs: '2026-09-22',
+        hmeromhnia_allaghs_orarioy_apo: '2026-09-22',
+        hmeromhnia_allaghs_orarioy_eos: '2026-09-28',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-22',
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        kathestos_apasxolhshs: type, typos_apasxolhshs: type,
+        hmeres_ergasias_ebdomadas: 1, ores_ergasias_ebdomadas: 8,
+        mo_oron_hmerhsias_ergasias: 8, nomimosMisthos: 300,
+        pragmatikosMisthos: 350, poso_symbashs_01: 350 };
+    return writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
+        effectiveFrom: '2026-09-22', maintenance: { originalHistoryId: 'recorded-0002',
+            employeeChanges: changes, historyChanges: changes } });
+}
+
+test('legacy shadow and recorded V1 close together before one rotating profile append', async () => {
+    const initial = legacyShadowState();
+    const db = database(initial);
+    const saved = await rotatingAppend(db);
+    const state = db.state();
+    assert.equal(saved.mode, 'MODE_NEW_VERSION');
+    assert.equal(state.history.length, 3);
+    assert.deepEqual(state.history.slice(0, 2).map(row => row._id), initial.history.map(row => row._id));
+    for (const row of state.history.slice(0, 2)) {
+        assert.equal(new Date(row.hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0, 10), '2026-09-21');
+        assert.equal(new Date(row.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0, 10), '2026-05-28');
+    }
+    for (let index = 0; index < 2; index++) assert.deepEqual(state.history[index], {
+        ...initial.history[index],
+        hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-21')
+    });
+    assert.equal(C.readEmploymentProfile(state.history[0]).recorded, false);
+    assert.equal(Object.hasOwn(state.history[0], C.SCHEMA_VERSION), false);
+    assert.equal(C.readEmploymentProfile(state.history[1]).recorded, true);
+    assert.equal(state.history[0].nomimosMisthos, initial.history[0].nomimosMisthos);
+    const next = state.history[2];
+    assert.equal(C.readEmploymentProfile(next).recorded, true);
+    assert.equal(next.aa_eggrafhs, '0003');
+    assert.equal(new Date(next.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0, 10), '2026-09-22');
+    assert.equal(next.hmeromhnia_isxyos_oron_ergasias_eos, null);
+    assert.equal(new Date(next.hmeromhnia_allaghs_orarioy_eos).toISOString().slice(0, 10), '2026-09-28');
+    for (const record of [next, state.employee]) {
+        assert.equal(record.kathestos_apasxolhshs, '2');
+        assert.equal(record.hmeres_ergasias_ebdomadas, 1);
+        assert.equal(record.ores_ergasias_ebdomadas, 8);
+        assert.equal(record.mo_oron_hmerhsias_ergasias, 8);
+        assert.equal(record.nomimosMisthos, 300);
+        assert.equal(record.pragmatikosMisthos, 350);
+        assert.equal(record.poso_symbashs_01, 350);
+        assert.equal(record.hmeromhnia_proslhpshs, '2026-05-28');
+    }
+    assert.equal(state.employee.hmeromhnia_apoxorhshs, null);
+    assert.equal(state.employee.energos, true);
+    const cycles = buildEmploymentCycles({ currentEmployee: state.employee, history: state.history });
+    assert.equal(cycles.length, 1);
+    assert.equal(cycles[0].hire_date, '2026-05-28');
+    assert.equal(resolveEmploymentProfileFactsForDate('2026-09-21', state.history).historyId, 'recorded-0002');
+    assert.equal(resolveEmploymentProfileFactsForDate('2026-09-22', state.history).historyId, next._id);
+});
+
+test('other overlapping predecessor shapes fail closed before writes', async () => {
+    const cases = {
+        'two recorded profiles': state => Object.assign(state.history[0],
+            Object.fromEntries(C.FACT_FIELDS.map(field => [field, state.history[1][field]]))),
+        'different starts': state => { state.history[0].hmeromhnia_isxyos_oron_ergasias_apo = '2026-06-01'; },
+        'different hires': state => { state.history[0].hmeromhnia_proslhpshs = '2026-06-01'; },
+        'different ends': state => { state.history[0].hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-16'; },
+        'legacy row created later': state => { state.history[0].createdAt = new Date('2026-05-30'); },
+        'newer cycle': state => { state.history.push({ ...scope, _id: 'newer-cycle',
+            hmeromhnia_proslhpshs: '2026-07-01', aa_eggrafhs: '0003' }); }
+    };
+    for (const [name, mutate] of Object.entries(cases)) {
+        const initial = legacyShadowState(); mutate(initial);
+        const db = database(initial);
+        await assert.rejects(rotatingAppend(db), error => error.code === 'EMPLOYEE_PROFILE_HISTORY_OVERLAP', name);
+        assert.equal(db.writes(), 0, name);
+        assert.deepEqual(db.state(), initial, name);
+    }
+});
+
+test('all legacy-shadow writes roll back on each failure point', async () => {
+    for (const fail of ['close:legacy-0001', 'close:recorded-0002', 'stale', 'employee', 'history', 'commit']) {
+        const initial = legacyShadowState();
+        const db = database(initial, fail);
+        await assert.rejects(rotatingAppend(db), undefined, fail);
+        assert.deepEqual(db.state(), initial, fail);
+        assert.equal(db.ended(), true, fail);
+    }
+});
+
+test('ambiguous overlap has a dedicated Greek response', () => {
+    let status;
+    const response = { status(value) { status = value; return this; }, json(value) { return value; } };
+    const error = Object.assign(new Error('overlap'), { code: 'EMPLOYEE_PROFILE_HISTORY_OVERLAP', statusCode: 409 });
+    const result = profileError(response, error);
+    assert.equal(status, 409);
+    assert.equal(result.reason, error.code);
+    assert.match(result.message, /επικαλυπτόμενες ενεργές περιόδους/);
+    assert.match(result.message, /δεν αποθηκεύτηκε/);
 });
 test('history failure rolls back an initial employee insert', async () => {
     const db = database(undefined, 'history');
