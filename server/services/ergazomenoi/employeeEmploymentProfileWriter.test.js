@@ -699,6 +699,20 @@ test('closed relationship is stored inactive even when submitted active', async 
     assert.equal(db.state().employee.energos, false);
 });
 
+test('generic profile correction cannot clear a stored departure', async () => {
+    const initial = correctionState();
+    initial.employee.hmeromhnia_apoxorhshs = new Date('2026-09-20');
+    initial.employee.energos = false;
+    initial.history[1].hmeromhnia_apoxorhshs = new Date('2026-09-20');
+    const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'latest',
+        effectiveFrom: '2026-09-01', maintenance: {
+            employeeChanges: { hmeromhnia_apoxorhshs: null, energos: true },
+            historyChanges: { hmeromhnia_apoxorhshs: null }
+        } }), { code: 'EMPLOYEE_DEPARTURE_CANCELLATION_REQUIRES_CONTROLLED_FLOW' });
+    assert.equal(db.writes(), 0);
+});
 test('maintenance departure forces current master inactive', async () => {
     const initial = {
         employee: {

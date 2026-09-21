@@ -8,6 +8,7 @@ const { IDENTITY_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged } 
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { buildEmployeeRehireTransition } = require('./employeeRehireLifecycleTransitionService');
 const { buildEmployeeDepartureTransition } = require('./employeeDepartureLifecycleTransitionService');
+const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -155,7 +156,7 @@ const HISTORY_CURRENT_FIELDS = new Set([...BASE_HISTORY_FIELDS, ...IDENTITY_FIEL
 function cleanMaintenancePatch(patch = {}) {
     return Object.fromEntries(Object.entries(patch).filter(([field, value]) => value !== undefined &&
         !C.FACT_FIELDS.includes(field) && !['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
-            'createdAt', T.ANCHOR, 'employment_profile_source'].includes(field)));
+            'createdAt', T.ANCHOR, 'employment_profile_source', 'employment_departure_restore'].includes(field)));
 }
 function legacyMaintenancePatch(patch = {}, stored, history = false) {
     const changes = cleanMaintenancePatch(patch);
@@ -285,6 +286,11 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 !semanticEmploymentProfileChanged(current, maintenance, input);
             const patch = legacyMaintenance ? legacyMaintenancePatch(maintenance.employeeChanges, current) : cleanMaintenancePatch(maintenance?.employeeChanges);
             let historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
+            if (!rehireOperation && C.calendarDate(current?.hmeromhnia_apoxorhshs) &&
+                Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') &&
+                !C.calendarDate(patch.hmeromhnia_apoxorhshs)) {
+                throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_REQUIRES_CONTROLLED_FLOW');
+            }
 
             const correctableIdentityFields = new Set(maintenance?.correctableIdentityFields || []);
             if ([...correctableIdentityFields].some(field => field !== 'hmeromhnia_apoxorhshs')) {
@@ -459,6 +465,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 ...currentProfileProjection(snapshot), ...(baseline ? { [T.ANCHOR]: baseline } : {}),
                 hmeromhnia_isxyos_oron_ergasias_apo: snapshot.hmeromhnia_isxyos_oron_ergasias_apo,
                 hmeromhnia_isxyos_oron_ergasias_eos: until };
+            if (rehireOperation) currentUpdate.employment_departure_restore = null;
             if (current && !rehireOperation) {
                 const proposedDeparture = Object.hasOwn(currentUpdate, 'hmeromhnia_apoxorhshs')
                     ? currentUpdate.hmeromhnia_apoxorhshs
@@ -557,6 +564,17 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         }
         const employeePatch = { ...mappedEmployee, ...factChanges,
             hmeromhnia_apoxorhshs: departure, energos: false };
+        if (!C.calendarDate(current.hmeromhnia_apoxorhshs)) {
+            employeePatch.employment_departure_restore = {
+                departure: transition.departure,
+                terminal_id: String(transition.terminalHistoryRow._id),
+                profile_id: String(transition.latestProfileRow._id),
+                employee_end_clamped: Boolean(transition.clampEmployeeEnd),
+                profile_end_clamped: Boolean(transition.clampProfileEnd),
+                employee_end_before: current.hmeromhnia_isxyos_oron_ergasias_eos ?? null,
+                profile_end_before: transition.latestProfileRow.hmeromhnia_isxyos_oron_ergasias_eos ?? null
+            };
+        }
         if (transition.clampEmployeeEnd) employeePatch.hmeromhnia_isxyos_oron_ergasias_eos = departure;
         else delete employeePatch.hmeromhnia_isxyos_oron_ergasias_eos;
         const mappedHistory = cleanMaintenancePatch(
@@ -599,6 +617,86 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         }
         return { employee: { ...current, ...employeePatch }, mode: 'MODE_DEPARTURE',
             history: { ...terminal, ...historyPatches.get(String(terminal._id)) } };
+    });
+}
+
+// A mistaken departure is reversed only with the before-image recorded by the
+// departure writer. Older clamped records without provenance fail closed.
+async function writeEmployeeDepartureCancellation({ scope, employeeId, input = {}, maintenance = {},
+    connection = mongoose.connection, employeeModel = ErgazomenoiModel,
+    historyModel = IstorikoProslhpseonAllagonModel, capabilityProbe = transactionCapability }) {
+    if (!scope || !['team', 'company_kod', 'kodikos'].every(key =>
+        typeof scope[key] === 'string' && scope[key].trim()) ||
+        typeof employeeId !== 'string' || !employeeId.trim()) C.invalid('scope', 'complete employee scope required');
+    const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]]));
+    return inProfileTransaction(connection, capabilityProbe, async session => {
+        const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
+        if (!current || current.archived === true || current.energos !== false) {
+            throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
+        }
+        const rows = await historyModel.find(filter).session(session).lean();
+        const departure = C.calendarDate(current.hmeromhnia_apoxorhshs);
+        const marker = current.employment_departure_restore;
+        if (!departure || !marker || marker.departure !== departure.toISOString().slice(0, 10)) {
+            throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED');
+        }
+        const comparable = (field, value) => {
+            if (value == null || value === '') return null;
+            const path = ErgazomenoiModel.schema.path(field);
+            const cast = path ? path.cast(value) : value;
+            if (cast == null || cast === '') return null;
+            return cast instanceof Date ? cast.toISOString() : JSON.stringify(cast);
+        };
+        const submitted = new Set(maintenance.submittedEmployeeFields || []);
+        const mapped = cleanMaintenancePatch(maintenance.employeeChanges);
+        const restoredEnd = marker.employee_end_clamped
+            ? marker.employee_end_before : current.hmeromhnia_isxyos_oron_ergasias_eos;
+        const hasOtherEmployeeChange = [...submitted].some(field => {
+            if (!Object.hasOwn(mapped, field) ||
+                ['energos', 'hmeromhnia_apoxorhshs', 'updatedAt'].includes(field)) return false;
+            const submittedValue = comparable(field, mapped[field]);
+            return submittedValue !== comparable(field, current[field]) &&
+                !(field === 'hmeromhnia_isxyos_oron_ergasias_eos' &&
+                    submittedValue === comparable(field, restoredEnd));
+        });
+        const hasOtherHistoryChange = Object.entries(maintenance.submittedHistoryChanges || {})
+            .some(([field, value]) => !['hmeromhnia_apoxorhshs', 'updatedAt'].includes(field) &&
+                comparable(field, value) !== comparable(field, current[field]));
+        if (hasOtherEmployeeChange || hasOtherHistoryChange ||
+            semanticEmploymentProfileChanged(current, {}, input)) {
+            throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_SEPARATE_SAVE_REQUIRED');
+        }
+        const cycles = buildEmploymentCycles({ currentEmployee: current, history: rows });
+        const cycle = cycles.at(-1);
+        if (!cycle?.is_current_cycle || cycle.departure_date !== marker.departure) {
+            throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
+        }
+        const terminal = rows.find(row => String(row._id) === marker.terminal_id);
+        const profile = rows.find(row => String(row._id) === marker.profile_id);
+        if (!terminal || !profile || !cycle.history_ids.includes(marker.terminal_id) ||
+            !cycle.history_ids.includes(marker.profile_id) ||
+            C.calendarDate(terminal.hmeromhnia_apoxorhshs)?.getTime() !== departure.getTime() ||
+            (marker.employee_end_clamped && C.calendarDate(current.hmeromhnia_isxyos_oron_ergasias_eos)?.getTime() !== departure.getTime()) ||
+            (marker.profile_end_clamped && C.calendarDate(profile.hmeromhnia_isxyos_oron_ergasias_eos)?.getTime() !== departure.getTime())) {
+            throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
+        }
+        const employeePatch = { hmeromhnia_apoxorhshs: null, energos: true,
+            employment_departure_restore: null };
+        if (marker.employee_end_clamped) employeePatch.hmeromhnia_isxyos_oron_ergasias_eos = marker.employee_end_before;
+        const updated = await employeeModel.updateOne({ ...filter, _id: current._id },
+            { $set: employeePatch }, { session });
+        if (updated.matchedCount !== 1) throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
+        const historyPatches = new Map([[marker.terminal_id, { hmeromhnia_apoxorhshs: null }]]);
+        if (marker.profile_end_clamped) historyPatches.set(marker.profile_id,
+            { ...(historyPatches.get(marker.profile_id) || {}),
+                hmeromhnia_isxyos_oron_ergasias_eos: marker.profile_end_before });
+        for (const [id, patch] of historyPatches) {
+            const row = rows.find(item => String(item._id) === id);
+            const changed = await historyModel.updateOne({ ...filter, _id: row._id }, { $set: patch }, { session });
+            if (changed.matchedCount !== 1) throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
+        }
+        return { employee: { ...current, ...employeePatch }, mode: 'MODE_DEPARTURE_CANCELLATION',
+            history: { ...terminal, ...historyPatches.get(marker.terminal_id) } };
     });
 }
 
@@ -687,4 +785,4 @@ async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
         };
     });
 }
-module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE, transactionCapability, writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeRehire, writeEmployeeEmploymentProfileCorrections, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode };
+module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE, transactionCapability, writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentProfileCorrections, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode };

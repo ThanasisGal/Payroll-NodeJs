@@ -104,6 +104,28 @@ test('new break submissions allow 0 and 15..30; reads preserve legacy >30', () =
     assert.equal(normalize({}, { dialleima_se_lepta: 45 }).dialleima_se_lepta, 45);
     assert.throws(() => normalize({ dialleima_se_lepta: 45 }, { dialleima_se_lepta: 45 }));
 });
+test('break duration boundaries and inside policy follow trimmed special category', () => {
+    for (const [category, accepted, rejected, alwaysInside] of [
+        ['0001', [0, ...Array.from({ length: 21 }, (_, n) => n + 10)],
+            [...Array.from({ length: 9 }, (_, n) => n + 1), 31], false],
+        ['other', [0, ...Array.from({ length: 16 }, (_, n) => n + 15)],
+            [...Array.from({ length: 14 }, (_, n) => n + 1), 31], false],
+        ['0004', [0, ...Array.from({ length: 31 }, (_, n) => n + 15)],
+            [...Array.from({ length: 14 }, (_, n) => n + 1), 46], true],
+        ['0005', [0, ...Array.from({ length: 31 }, (_, n) => n + 15)],
+            [...Array.from({ length: 14 }, (_, n) => n + 1), 46], true]
+    ]) {
+        for (const minutes of accepted) {
+            const result = C.normalizeEmploymentBreakSubmission({ eidikh_kathgoria_ergazomenoy: ` ${category} `,
+                dialleima_se_lepta: minutes, dialleima_entos_ektos_orarioy: false });
+            assert.equal(result.dialleima_se_lepta, minutes);
+            assert.equal(result.dialleima_entos_ektos_orarioy, alwaysInside);
+        }
+        for (const minutes of rejected) assert.throws(() => C.normalizeEmploymentBreakSubmission({
+            eidikh_kathgoria_ergazomenoy: category, dialleima_se_lepta: minutes
+        }), error => error.field === 'dialleima_se_lepta');
+    }
+});
 test('Mongoose document validation uses the common server contract', async () => {
     await assert.rejects(new ErgazomenoiModel({ [C.ENABLED]: true }).validate());
     await assert.rejects(new ErgazomenoiModel({ dialleima_se_lepta: 45 }).validate());

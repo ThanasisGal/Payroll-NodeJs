@@ -63,6 +63,7 @@ const ErgazomenoiSchema = new Schema(
 
         hmeromhnia_lhxhs_symbashs: { type: Date },
         hmeromhnia_apoxorhshs: { type: Date },
+        employment_departure_restore: { type: Schema.Types.Mixed },
         afora_kataggelia_me_proeidopoihsh: { type: Boolean, default: false },
         hmeromhnia_koinopoihshs_kataggelias: { type: Date },
         mhnes_proeidopoihshs: { type: Number, default: 0 },
