@@ -1,3 +1,5 @@
+const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
+const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
 const { writeEmployeeEmploymentProfile, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
@@ -1312,6 +1314,7 @@ class ergazomenoiController {
             kodikosValue = 0;
 
         const { formData = {} } = req.body || {};
+        const submittedFormKeys = new Set(Object.keys(formData));
         const filesToUpdate = req.body?.filesToUpdate || {};
         const aforaDaneismoErgazomenoy = formData.afora_daneismo_ergazomenoy === true;
         const sixthDayPremiumRate = parseSixthDayPremiumRate(
@@ -1357,7 +1360,23 @@ class ergazomenoiController {
             filesToUpdate.ma_222 = true;
         }
 
+        let persistenceTarget;
         try {
+            persistenceTarget = await resolveEmployeeAddPersistenceTarget({
+                employeeModel: ErgazomenoiModel,
+                historyModel: IstorikoProslhpseonAllagonModel,
+                scope: { team: sessionUserTeam, company_kod: sessionCompanyInUse },
+                formData, existingEmployeeId: req.body?.existingEmployeeId
+            });
+        } catch (error) {
+            if (error.statusCode === 409) return res.status(409).json({
+                success: false, reason: error.code, message: error.message
+            });
+            return res.status(500).json({ success: false, errorMessage: 'Σφάλμα ελέγχου εργαζομένου' });
+        }
+        formData.afm_ergazomenoyHidden = persistenceTarget.afm;
+
+        if (persistenceTarget.action === 'CREATE_NEW') try {
             const lastRecord = await ErgazomenoiModel.find({
                 team: sessionUserTeam,
                 company_kod: sessionCompanyInUse
@@ -1380,10 +1399,10 @@ class ergazomenoiController {
         const days = 7;
         const sessions = 3;
 
-        const newErgazomenos = ErgazomenoiModel({
+        const addEmployeeValues = {
             team: sessionUserTeam,
             company_kod: sessionCompanyInUse,
-            kodikos: aa_kod.toString().padStart(4, '0'),
+            kodikos: persistenceTarget.employee?.kodikos || aa_kod.toString().padStart(4, '0'),
             eponymo: formData.eponymoHidden,
             onoma: formData.onomaHidden,
             afm: formData.afm_ergazomenoyHidden,
@@ -1570,7 +1589,13 @@ class ergazomenoiController {
             symbash: formData.symbash_stathera,
             kathgoria_symbashs: formData.kathgoria_symbashs_stathera,
             eidikothta_symbashs: formData.eidikothta_symbashs_stathera
-        });
+        };
+        const newErgazomenos = ErgazomenoiModel(addEmployeeValues);
+        const addEmployeeOwnedFields = new Set(Object.keys(addEmployeeValues));
+        const setAddEmployeeField = (field, value) => {
+            addEmployeeOwnedFields.add(field);
+            newErgazomenos[field] = value;
+        };
 
         const fieldsWithHidden = new Set(['stoixeio_symbashs']);
         const numberFields = new Set(['poso_symbashs', 'poso_symbashs_basei_oron_ergasias']);
@@ -1590,28 +1615,27 @@ class ergazomenoiController {
 
                 // Assign main field
                 if (numberFields.has(fieldStoixeio)) {
-                    newErgazomenos[fieldName] = formData[fieldName] || 0;
+                    setAddEmployeeField(fieldName, formData[fieldName] || 0);
                 } else {
-                    newErgazomenos[fieldName] = formData[fieldName] || null;
+                    setAddEmployeeField(fieldName, formData[fieldName] || null);
                 }
 
                 // Assign hidden field (μόνο για stoixeio_symbashs)
                 if (fieldsWithHidden.has(fieldStoixeio)) {
                     const hiddenFieldName = `${fieldName}_hidden`;
-                    newErgazomenos[hiddenFieldName] = formData[hiddenFieldName] || null;
+                    setAddEmployeeField(hiddenFieldName, formData[hiddenFieldName] || null);
                 }
             });
         }
 
-        newErgazomenos.synolo_symbashs = formData.synolo_symbashs;
-        newErgazomenos.synolo_symbashs_basei_oron_ergasias =
-            formData.synolo_symbashs_basei_oron_ergasias;
-        newErgazomenos.nomimosMisthos = formData.nomimosMisthos;
-        newErgazomenos.nomimoHmeromisthio = formData.nomimoHmeromisthio;
-        newErgazomenos.nomimoOromisthio = formData.nomimoOromisthio;
-        newErgazomenos.pragmatikosMisthos = formData.pragmatikosMisthos;
-        newErgazomenos.pragmatikoHmeromisthio = formData.pragmatikoHmeromisthio;
-        newErgazomenos.pragmatikoOromisthio = formData.pragmatikoOromisthio;
+        setAddEmployeeField("synolo_symbashs", formData.synolo_symbashs);
+        setAddEmployeeField("synolo_symbashs_basei_oron_ergasias", formData.synolo_symbashs_basei_oron_ergasias);
+        setAddEmployeeField("nomimosMisthos", formData.nomimosMisthos);
+        setAddEmployeeField("nomimoHmeromisthio", formData.nomimoHmeromisthio);
+        setAddEmployeeField("nomimoOromisthio", formData.nomimoOromisthio);
+        setAddEmployeeField("pragmatikosMisthos", formData.pragmatikosMisthos);
+        setAddEmployeeField("pragmatikoHmeromisthio", formData.pragmatikoHmeromisthio);
+        setAddEmployeeField("pragmatikoOromisthio", formData.pragmatikoOromisthio);
 
         // Ορισμός σειράς fields
         const fieldsKrathseonInOrder = ['krathsh', 'ama_krathshs'];
@@ -1621,86 +1645,66 @@ class ergazomenoiController {
 
             fieldsKrathseonInOrder.forEach((fieldKrathsh) => {
                 const fieldNameKrathshs = `${fieldKrathsh}_${idNum}`;
-                newErgazomenos[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
+                setAddEmployeeField(fieldNameKrathshs, formData[fieldNameKrathshs] || null);
             });
         }
 
-        newErgazomenos.epikoyrikh_xoris_efka = formData.epikoyrikh_xoris_efka || null;
-        newErgazomenos.astheneia_xoris_efka = formData.astheneia_xoris_efka || null;
-        newErgazomenos.idiothta_sto_ergo_39 = formData.idiothta_sto_ergo_39 || null;
+        setAddEmployeeField("epikoyrikh_xoris_efka", formData.epikoyrikh_xoris_efka || null);
+        setAddEmployeeField("astheneia_xoris_efka", formData.astheneia_xoris_efka || null);
+        setAddEmployeeField("idiothta_sto_ergo_39", formData.idiothta_sto_ergo_39 || null);
 
-        newErgazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia =
-            formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia;
-        newErgazomenos.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
-            formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera;
-        newErgazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
-            formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia;
-        newErgazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
-            formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || null;
-        newErgazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia =
-            formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia;
-        newErgazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia =
-            formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera;
-        newErgazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia =
-            formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia;
-        newErgazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia =
-            formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || null;
-        newErgazomenos.adeia_eisodoy_gia_epoxikh_apasxolhsh =
-            formData.adeia_eisodoy_gia_epoxikh_apasxolhsh;
-        newErgazomenos.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh =
-            formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh;
-        newErgazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh =
-            formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null;
-        newErgazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh =
-            formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null;
+        setAddEmployeeField("adeia_diamonhs_me_amesh_prosbash_gia_ergasia", formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia);
+        setAddEmployeeField("eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia", formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera);
+        setAddEmployeeField("arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia", formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia);
+        setAddEmployeeField("hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia", formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || null);
+        setAddEmployeeField("adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia", formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia);
+        setAddEmployeeField("eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia", formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera);
+        setAddEmployeeField("arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia", formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia);
+        setAddEmployeeField("hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia", formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || null);
+        setAddEmployeeField("adeia_eisodoy_gia_epoxikh_apasxolhsh", formData.adeia_eisodoy_gia_epoxikh_apasxolhsh);
+        setAddEmployeeField("arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh", formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh);
+        setAddEmployeeField("apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh", formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null);
+        setAddEmployeeField("eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh", formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null);
 
-        newErgazomenos.epaggelmatikh_katartish = formData.epaggelmatikh_katartish;
-        newErgazomenos.antikeimeno_katartishs = formData.antikeimeno_katartishs;
-        newErgazomenos.thematiko_pedio = formData.thematiko_pedio_stathera;
-        newErgazomenos.thematikh_enothta = formData.thematikh_enothta_stathera;
-        newErgazomenos.foreas_katartishs = formData.foreas_katartishs_stathera;
-        newErgazomenos.katartish_apo = formData.katartish_apo;
-        newErgazomenos.katartish_eos = formData.katartish_eos;
-        newErgazomenos.diarkeia_se_ores = formData.diarkeia_se_ores;
-        newErgazomenos.etos_apokthshs = formData.etos_apokthshs;
-        newErgazomenos.allh_glossa_01 = formData.allh_glossa_01;
-        newErgazomenos.allh_glossa_02 = formData.allh_glossa_02;
-        newErgazomenos.allh_glossa_03 = formData.allh_glossa_03;
-        newErgazomenos.allh_glossa_04 = formData.allh_glossa_04;
-        newErgazomenos.gnosh_ypologiston = formData.gnosh_ypologiston;
-        newErgazomenos.allo_proson = formData.allo_proson;
+        setAddEmployeeField("epaggelmatikh_katartish", formData.epaggelmatikh_katartish);
+        setAddEmployeeField("antikeimeno_katartishs", formData.antikeimeno_katartishs);
+        setAddEmployeeField("thematiko_pedio", formData.thematiko_pedio_stathera);
+        setAddEmployeeField("thematikh_enothta", formData.thematikh_enothta_stathera);
+        setAddEmployeeField("foreas_katartishs", formData.foreas_katartishs_stathera);
+        setAddEmployeeField("katartish_apo", formData.katartish_apo);
+        setAddEmployeeField("katartish_eos", formData.katartish_eos);
+        setAddEmployeeField("diarkeia_se_ores", formData.diarkeia_se_ores);
+        setAddEmployeeField("etos_apokthshs", formData.etos_apokthshs);
+        setAddEmployeeField("allh_glossa_01", formData.allh_glossa_01);
+        setAddEmployeeField("allh_glossa_02", formData.allh_glossa_02);
+        setAddEmployeeField("allh_glossa_03", formData.allh_glossa_03);
+        setAddEmployeeField("allh_glossa_04", formData.allh_glossa_04);
+        setAddEmployeeField("gnosh_ypologiston", formData.gnosh_ypologiston);
+        setAddEmployeeField("allo_proson", formData.allo_proson);
 
-        newErgazomenos.symfonhtheis_misthos_genikos = formData.symfonhtheis_misthos_genikos;
-        newErgazomenos.symfonhtheis_misthos_apasxolhseis =
-            formData.symfonhtheis_misthos_apasxolhseis;
-        newErgazomenos.paketo_apodoxon = formData.paketo_apodoxon;
-        newErgazomenos.pososto_prosayxhshs_6hs_hmeras =
-            toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras);
-        newErgazomenos.corrective_payroll_withholding_rate_percent =
-            formData.corrective_payroll_withholding_rate_percent;
-        newErgazomenos.ypologismos_foroy = formData.ypologismos_foroy;
-        newErgazomenos.oysiodeis_oroi = formData.oysiodeis_oroi_stathera || '0';
-        newErgazomenos.oros_sth_symbash_n_3986_2011 = formData.oros_sth_symbash_n_3986_2011;
-        newErgazomenos.kataggelia_katopin_eggrafhs_proeidopoihshs =
-            formData.kataggelia_katopin_eggrafhs_proeidopoihshs;
-        newErgazomenos.hmeromhnia_eggrafhs_proeidopoihshs =
-            formData.hmeromhnia_eggrafhs_proeidopoihshs || null;
-        newErgazomenos.omadikh_apolysh = formData.omadikh_apolysh;
-        newErgazomenos.arithmos_apofashs_gia_omadikh_apolysh =
-            formData.arithmos_apofashs_gia_omadikh_apolysh;
-        newErgazomenos.hmeromhnia_apofashs_gia_omadikh_apolysh =
-            formData.hmeromhnia_apofashs_gia_omadikh_apolysh || null;
-        newErgazomenos.epidosh_me_dikastiko_epimelhth = formData.epidosh_me_dikastiko_epimelhth;
-        newErgazomenos.hmeromhnia_epidoshs = formData.hmeromhnia_epidoshs || null;
-        newErgazomenos.hmeromhnia_katabolhs_ths_apozhmioshs =
-            formData.hmeromhnia_katabolhs_ths_apozhmioshs || null;
-        newErgazomenos.shmeioseis_apozhmioshs = formData.shmeioseis_apozhmioshs;
-        newErgazomenos.parathrhseis = formData.parathrhseis;
+        setAddEmployeeField("symfonhtheis_misthos_genikos", formData.symfonhtheis_misthos_genikos);
+        setAddEmployeeField("symfonhtheis_misthos_apasxolhseis", formData.symfonhtheis_misthos_apasxolhseis);
+        setAddEmployeeField("paketo_apodoxon", formData.paketo_apodoxon);
+        setAddEmployeeField("pososto_prosayxhshs_6hs_hmeras", toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras));
+        setAddEmployeeField("corrective_payroll_withholding_rate_percent", formData.corrective_payroll_withholding_rate_percent);
+        setAddEmployeeField("ypologismos_foroy", formData.ypologismos_foroy);
+        setAddEmployeeField("oysiodeis_oroi", formData.oysiodeis_oroi_stathera || '0');
+        setAddEmployeeField("oros_sth_symbash_n_3986_2011", formData.oros_sth_symbash_n_3986_2011);
+        setAddEmployeeField("kataggelia_katopin_eggrafhs_proeidopoihshs", formData.kataggelia_katopin_eggrafhs_proeidopoihshs);
+        setAddEmployeeField("hmeromhnia_eggrafhs_proeidopoihshs", formData.hmeromhnia_eggrafhs_proeidopoihshs || null);
+        setAddEmployeeField("omadikh_apolysh", formData.omadikh_apolysh);
+        setAddEmployeeField("arithmos_apofashs_gia_omadikh_apolysh", formData.arithmos_apofashs_gia_omadikh_apolysh);
+        setAddEmployeeField("hmeromhnia_apofashs_gia_omadikh_apolysh", formData.hmeromhnia_apofashs_gia_omadikh_apolysh || null);
+        setAddEmployeeField("epidosh_me_dikastiko_epimelhth", formData.epidosh_me_dikastiko_epimelhth);
+        setAddEmployeeField("hmeromhnia_epidoshs", formData.hmeromhnia_epidoshs || null);
+        setAddEmployeeField("hmeromhnia_katabolhs_ths_apozhmioshs", formData.hmeromhnia_katabolhs_ths_apozhmioshs || null);
+        setAddEmployeeField("shmeioseis_apozhmioshs", formData.shmeioseis_apozhmioshs);
+        setAddEmployeeField("parathrhseis", formData.parathrhseis);
 
-        const newIstoriko = IstorikoProslhpseonAllagonModel({
+        const addHistoryValues = {
             team: sessionUserTeam,
             company_kod: sessionCompanyInUse,
-            kodikos: aa_kod.toString().padStart(4, '0'),
+            kodikos: persistenceTarget.employee?.kodikos || aa_kod.toString().padStart(4, '0'),
             hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
             hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
             hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
@@ -1719,7 +1723,13 @@ class ergazomenoiController {
             symbash: formData.symbash_stathera,
             kathgoria_symbashs: formData.kathgoria_symbashs_stathera,
             eidikothta_symbashs: formData.eidikothta_symbashs_stathera
-        });
+        };
+        const newIstoriko = IstorikoProslhpseonAllagonModel(addHistoryValues);
+        const addHistoryOwnedFields = new Set(Object.keys(addHistoryValues));
+        const setAddHistoryField = (field, value) => {
+            addHistoryOwnedFields.add(field);
+            newIstoriko[field] = value;
+        };
 
         for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
             const idNum = i.toString().padStart(2, '0');
@@ -1736,49 +1746,61 @@ class ergazomenoiController {
 
                 // Assign main field
                 if (numberFields.has(fieldStoixeio)) {
-                    newIstoriko[fieldName] = formData[fieldName] || 0;
+                    setAddHistoryField(fieldName, formData[fieldName] || 0);
                 } else {
-                    newIstoriko[fieldName] = formData[fieldName] || null;
+                    setAddHistoryField(fieldName, formData[fieldName] || null);
                 }
 
                 // Assign hidden field (μόνο για stoixeio_symbashs)
                 if (fieldsWithHidden.has(fieldStoixeio)) {
                     const hiddenFieldName = `${fieldName}_hidden`;
-                    newIstoriko[hiddenFieldName] = formData[hiddenFieldName] || null;
+                    setAddHistoryField(hiddenFieldName, formData[hiddenFieldName] || null);
                 }
             });
         }
 
-        newIstoriko.synolo_symbashs = formData.synolo_symbashs;
-        newIstoriko.synolo_symbashs_basei_oron_ergasias =
-            formData.synolo_symbashs_basei_oron_ergasias;
-        newIstoriko.nomimosMisthos = formData.nomimosMisthos;
-        newIstoriko.nomimoHmeromisthio = formData.nomimoHmeromisthio;
-        newIstoriko.nomimoOromisthio = formData.nomimoOromisthio;
-        newIstoriko.pragmatikosMisthos = formData.pragmatikosMisthos;
-        newIstoriko.pragmatikoHmeromisthio = formData.pragmatikoHmeromisthio;
-        newIstoriko.pragmatikoOromisthio = formData.pragmatikoOromisthio;
+        setAddHistoryField("synolo_symbashs", formData.synolo_symbashs);
+        setAddHistoryField("synolo_symbashs_basei_oron_ergasias", formData.synolo_symbashs_basei_oron_ergasias);
+        setAddHistoryField("nomimosMisthos", formData.nomimosMisthos);
+        setAddHistoryField("nomimoHmeromisthio", formData.nomimoHmeromisthio);
+        setAddHistoryField("nomimoOromisthio", formData.nomimoOromisthio);
+        setAddHistoryField("pragmatikosMisthos", formData.pragmatikosMisthos);
+        setAddHistoryField("pragmatikoHmeromisthio", formData.pragmatikoHmeromisthio);
+        setAddHistoryField("pragmatikoOromisthio", formData.pragmatikoOromisthio);
 
         fieldsKrathseon.forEach((fieldKrathsh) => {
             for (let i = 1; i <= arithmosKrathseon; i++) {
                 const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
-                newIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
+                setAddHistoryField(fieldNameKrathshs, formData[fieldNameKrathshs] || null);
             }
         });
 
-        newIstoriko.createdAt = Date.now();
-        newIstoriko.updatedAt = Date.now();
+        setAddHistoryField("createdAt", Date.now());
+        setAddHistoryField("updatedAt", Date.now());
 
         let savedErgazomenos = null; // ✅ Δήλωση
 
         try {
+            const correcting = persistenceTarget.action === 'CORRECT_EXISTING';
             const result = await writeEmployeeEmploymentProfile({
                 scope: { team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: newErgazomenos.kodikos },
-                input: profileInput(formData, 'add'), newEmployee: newErgazomenos.toObject(),
+                input: profileInput(correcting
+                    ? submittedProfileForm(formData, submittedFormKeys) : formData, 'add'),
+                ...(correcting ? {
+                    employeeId: String(persistenceTarget.employee._id),
+                    mode: 'MODE_CORRECT_EXISTING',
+                    historyId: String(persistenceTarget.history._id)
+                } : { newEmployee: newErgazomenos.toObject() }),
                 effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo || formData.hmeromhnia_allaghs_orarioy_apo,
-                maintenance: { historyChanges: newIstoriko.toObject() }
+                maintenance: correcting ? {
+                    employeeChanges: submittedAddPatch(newErgazomenos, submittedFormKeys, addEmployeeOwnedFields),
+                    historyChanges: submittedAddPatch(newIstoriko, submittedFormKeys, addHistoryOwnedFields)
+                } : { historyChanges: newIstoriko.toObject() }
             });
-            savedErgazomenos = result.employee;
+            savedErgazomenos = correcting
+                ? await ErgazomenoiModel.findOne({ team: sessionUserTeam,
+                    company_kod: sessionCompanyInUse, _id: persistenceTarget.employee._id })
+                : result.employee;
         } catch (error) {
             if (isEmploymentProfileError(error)) return profileError(res, error);
             return res.status(500).json({
@@ -1976,7 +1998,7 @@ class ergazomenoiController {
                 return {
                     team: sessionUserTeam,
                     company_kod: sessionCompanyInUse,
-                    kodikos: aa_kod.toString().padStart(4, '0'),
+                    kodikos: persistenceTarget.employee?.kodikos || aa_kod.toString().padStart(4, '0'),
                     hmeromhnia: formData[`hmeromhnia_${i1}`],
                     kathgoria_ergasias: kathgoriaErgasias,
                     apo_ora_01: getTimeValue(`apo_ora_01_${i1}`),
@@ -2013,8 +2035,15 @@ class ergazomenoiController {
 
             while (currentDate <= toDate) {
                 let i1 = i < 10 ? '0' + i : i;
-                const newOrario = new ProdhlomenaOrariaModel(createOrarioData(i1));
-                promises.push(ProdhlomenaOrariaModel.create(newOrario));
+                const orarioData = createOrarioData(i1);
+                const { team, company_kod, kodikos, hmeromhnia, adeia, astheneia,
+                    kathgoria_adeias, ...addOwnedFields } = orarioData;
+                promises.push(ProdhlomenaOrariaModel.findOneAndUpdate(
+                    { team, company_kod, kodikos, hmeromhnia },
+                    { $set: addOwnedFields,
+                        $setOnInsert: { team, company_kod, kodikos, hmeromhnia } },
+                    { returnDocument: 'after', upsert: true }
+                ));
 
                 currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
                 i++;
@@ -2309,9 +2338,12 @@ class ergazomenoiController {
             // ✅ FINAL RESPONSE (with E3 data if generated)
             // =====================================================================
 
-            return res.status(201).json({
+            return res.status(persistenceTarget.action === 'CREATE_NEW' ? 201 : 200).json({
                 success: true,
-                message: 'Εργαζόμενος δημιουργήθηκε επιτυχώς',
+                persistenceAction: persistenceTarget.action === 'CREATE_NEW' ? 'created' : 'corrected',
+                message: persistenceTarget.action === 'CREATE_NEW'
+                    ? 'Εργαζόμενος δημιουργήθηκε επιτυχώς'
+                    : 'Τα στοιχεία του ήδη καταχωρημένου εργαζομένου διορθώθηκαν επιτυχώς',
                 data: {
                     _id: savedErgazomenos._id,
                     kodikos: savedErgazomenos.kodikos,

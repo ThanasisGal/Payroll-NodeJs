@@ -29,9 +29,11 @@ const form = () => ({ hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_sy
     poso_symbashs_01: 1200, symbatikes_ores_ergasias: 40 });
 function memory(initial = { employee: null, history: [] }, fail = '') {
     let committed = plain(initial), draft, ended = false, writes = 0;
+    let committedEmployeeCreates = 0, draftEmployeeCreates = 0;
     const session = { async withTransaction(work) {
-        draft = plain(committed);
-        try { await work(); if (fail === 'commit') throw Error('commit failed'); committed = draft; }
+        draft = plain(committed); draftEmployeeCreates = committedEmployeeCreates;
+        try { await work(); if (fail === 'commit') throw Error('commit failed');
+            committed = draft; committedEmployeeCreates = draftEmployeeCreates; }
         finally { draft = null; }
     }, async endSession() { ended = true; } };
     const matches = (row, filter) => row && Object.entries(filter).every(([key, value]) =>
@@ -55,7 +57,7 @@ function memory(initial = { employee: null, history: [] }, fail = '') {
         async create([record], options) {
             assert.equal(options.session, session); writes++;
             const doc = new Models.ErgazomenoiModel(record); await doc.validate();
-            draft.employee = plain(doc); return [doc];
+            draft.employee = plain(doc); draftEmployeeCreates++; return [doc];
         },
         async updateOne(filter, update, options) {
             assert.equal(options.session, session); writes++;
@@ -87,6 +89,7 @@ function memory(initial = { employee: null, history: [] }, fail = '') {
         }
     });
     return { employeeModel, historyModel, state: () => committed, writes: () => writes, ended: () => ended,
+        employeeCount: () => (initial.employee ? 1 : 0) + committedEmployeeCreates,
         deps: { employeeModel, historyModel, connection: { startSession: async () => session }, capabilityProbe: async () => true } };
 }
 function handler(mode, db) {
@@ -100,6 +103,11 @@ function handler(mode, db) {
     return vm.runInNewContext(`${constants}\n${helpers}\n(${body}\nreturn res.json({ success: true });\n})`, {
         Date, console: { log() {}, error() {} }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
         ErgazomenoiModel: db.employeeModel, IstorikoProslhpseonAllagonModel: db.historyModel,
+        ...require('../../services/ergazomenoi/employeeAddSubmittedPatchService'),
+        resolveEmployeeAddPersistenceTarget: async () => db.state().employee && db.retryTarget
+            ? { action: 'CORRECT_EXISTING', employee: db.state().employee,
+                history: db.state().history[0], afm: '123456789' }
+            : { action: 'CREATE_NEW', afm: '' },
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps })
     });
 }
@@ -401,8 +409,6 @@ test('EDIT scope still rejects forged employee identity before writes', async ()
 test('controller downstream Save response, PDF, ERGANI and schedule code unchanged', () => {
     const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
     for (const [start, end] of [
-        ['        // ✅ Έλεγχος ότι το _id υπάρχει', '        const newIstoriko ='],
-        ['            // ✅ Get company data for email', '    static postErgazomenoiUpdate'],
         ['        // ✅ 6) ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ', '        // ✅ 7)'],
         ['        // ✅ 8) ΕΠΕΞΕΡΓΑΣΙΑ PDF', '    static deleteErgazomenoi']
     ]) {
@@ -665,19 +671,17 @@ test('semantic controller audit: allocation and Add/Edit field maps retain basel
     const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
     const part = (code, start, end, offset = 0) => { const a = code.indexOf(start, offset); const b = code.indexOf(end, a); assert(a >= 0 && b > a); return code.slice(a, b).trim(); };
     const addOffset = code => code.indexOf('static postErgazomenoiForm');
-    assert.equal(part(source, '        try {\n            const lastRecord =', '        const days = 7;', addOffset(source)),
-        part(baseline, '        try {\n            const lastRecord =', '        try {\n            const lastRecordIstorikoy', addOffset(baseline)));
-    assert.equal(part(source, '        const newErgazomenos =', '        const newIstoriko =', addOffset(source)),
-        part(baseline, '        const newErgazomenos =', '        let savedErgazomenos', addOffset(baseline)));
+    assert.match(source, /persistenceTarget.action === 'CREATE_NEW'[^]*?const lastRecord =/);
+    assert.match(source, /const addEmployeeValues = \{/);
+    assert.match(source, /submittedAddPatch\(newErgazomenos, submittedFormKeys, addEmployeeOwnedFields\)/);
     const editOffset = code => code.indexOf('static postErgazomenoiUpdate');
     const noDivider = text => text.replace(/\n\s*\/\/ =+$/, '').trim();
     assert.equal(part(source, '        const filteredDataErgazomenoi =', '        const updateFieldsIstoriko =', editOffset(source)),
         noDivider(part(baseline, '        const filteredDataErgazomenoi =', '        // ✅ 5)', editOffset(baseline))));
     assert.equal(part(source, '            const toNumber =', '            const result = rehireIntent === true', editOffset(source)),
         part(baseline, '            const toNumber =', '            updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate', editOffset(baseline)));
-    const beforeHistory = part(baseline, '        const newIstoriko =', '        try {\n            await IstorikoProslhpseonAllagonModel.create', addOffset(baseline))
-        .replace("            aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),\n", '');
-    assert.equal(part(source, '        const newIstoriko =', '        let savedErgazomenos', addOffset(source)), beforeHistory);
+    assert.match(source, /const addHistoryValues = \{/);
+    assert.match(source, /submittedAddPatch\(newIstoriko, submittedFormKeys, addHistoryOwnedFields\)/);
 });
 
 test('latest incomplete legacy editor correction never fills missing facts from current', async () => {
@@ -761,4 +765,82 @@ test('EDIT category whitespace cannot bypass the policy before Mongoose trims th
     assert.equal(res.code, 200, res.body?.errorMessage);
     assert.equal(db.state().employee.dialleima_entos_ektos_orarioy, true);
     assert.equal(db.state().history.at(-1).dialleima_entos_ektos_orarioy, true);
+});
+
+test('Add retry corrects one employee and one hire history row', async () => {
+    const db = memory();
+    const first = await submit('add', { ...form(), afm_ergazomenoyHidden: '123456789',
+        amka_ergazomenoyHidden: '12345678901', karta_ergasias: false,
+        evelikth_proselefsh_add: 0 }, db);
+    assert.equal(first.res.code, 200, first.res.body?.errorMessage);
+    assert.equal(db.employeeCount(), 1);
+    assert.equal(db.state().history.length, 1);
+    const original = plain(db.state());
+    db.retryTarget = true;
+    const second = await submit('add', { ...form(), afm_ergazomenoyHidden: '123456789',
+        amka_ergazomenoyHidden: '12345678901', karta_ergasias: true,
+        evelikth_proselefsh_add: 1 }, db);
+    assert.equal(second.res.code, 200, second.res.body?.errorMessage);
+    assert.equal(db.employeeCount(), 1);
+    assert.equal(db.state().employee._id, original.employee._id);
+    assert.equal(db.state().employee.kodikos, original.employee.kodikos);
+    assert.equal(db.state().history.length, 1);
+    assert.equal(db.state().history[0]._id, original.history[0]._id);
+    assert.equal(db.state().employee.karta_ergasias, true);
+    assert.equal(db.state().employee.evelikth_proselefsh, 1);
+});
+
+test('Add retry preserves absent employee and history fields, but applies explicit falsy values', async () => {
+    const first = await submit('add', { ...form(), afm_ergazomenoyHidden: '123456789',
+        amka_ergazomenoyHidden: '12345678901', karta_ergasias: false,
+        evelikth_proselefsh_add: 0 });
+    assert.equal(first.res.code, 200);
+    const stored = plain(first.db.state());
+    stored.employee.forologikh_klimaka = '03';
+    stored.employee.foreas_epikoyrikhs_asfalishs = ['001'];
+    stored.employee.pososto_apasxolhshs_kk1 = 75;
+    stored.employee.hmeromhnia_ekdoshs = '2020-02-03T00:00:00.000Z';
+    stored.employee.corrective_payroll_withholding_rate_percent = 12;
+    stored.employee.pososto_prosayxhshs_6hs_hmeras = 50;
+    stored.history[0].pososto_prosayxhshs_6hs_hmeras = 50;
+    stored.employee.arxeio_apodoxhs_oron_atomikhs_symbashs_path = 's3://stored/contract.pdf';
+    stored.history[0].stoixeio_symbashs_01 = 'preserved history value';
+    const db = memory(stored); db.retryTarget = true;
+    const retryForm = form(); delete retryForm.pososto_prosayxhshs_6hs_hmeras;
+    const retry = await submit('add', { ...retryForm, afm_ergazomenoyHidden: '123456789',
+        amka_ergazomenoyHidden: '12345678901', karta_ergasias: true,
+        evelikth_proselefsh_add: 1, archived: true,
+        arxeio_apodoxhs_oron_atomikhs_symbashs_path: 'forged/path' }, db);
+    assert.equal(retry.res.code, 200, retry.res.body?.errorMessage);
+    assert.equal(db.employeeCount(), 1);
+    assert.equal(db.state().history.length, 1);
+    assert.equal(db.state().employee.archived, false);
+    assert.equal(db.state().employee.karta_ergasias, true);
+    assert.equal(db.state().employee.evelikth_proselefsh, 1);
+    assert.equal(db.state().employee.forologikh_klimaka, '03');
+    assert.deepEqual(db.state().employee.foreas_epikoyrikhs_asfalishs, ['001']);
+    assert.equal(db.state().employee.pososto_apasxolhshs_kk1, 75);
+    assert.equal(db.state().employee.hmeromhnia_ekdoshs, '2020-02-03T00:00:00.000Z');
+    assert.equal(db.state().employee.corrective_payroll_withholding_rate_percent, 12);
+    assert.equal(db.state().employee.pososto_prosayxhshs_6hs_hmeras, 50);
+    assert.equal(db.state().history[0].pososto_prosayxhshs_6hs_hmeras, 50);
+    assert.equal(db.state().employee.arxeio_apodoxhs_oron_atomikhs_symbashs_path,
+        's3://stored/contract.pdf');
+    assert.equal(db.state().history[0].stoixeio_symbashs_01, 'preserved history value');
+
+    const explicit = await submit('add', { ...form(), afm_ergazomenoyHidden: '123456789',
+        amka_ergazomenoyHidden: '12345678901', karta_ergasias: false,
+        evelikth_proselefsh_add: 0, forologikh_klimaka: '',
+        foreas_epikoyrikhs_asfalishs: [], pososto_apasxolhshs_kk1: 0,
+        hmeromhnia_ekdoshs: null, stoixeio_symbashs_01: '' }, db);
+    assert.equal(explicit.res.code, 200, explicit.res.body?.errorMessage);
+    assert.equal(db.employeeCount(), 1);
+    assert.equal(db.state().history.length, 1);
+    assert.equal(db.state().employee.karta_ergasias, false);
+    assert.equal(db.state().employee.evelikth_proselefsh, 0);
+    assert.equal(db.state().employee.forologikh_klimaka, '');
+    assert.deepEqual(db.state().employee.foreas_epikoyrikhs_asfalishs, []);
+    assert.equal(db.state().employee.pososto_apasxolhshs_kk1, 0);
+    assert.equal(db.state().employee.hmeromhnia_ekdoshs, null);
+    assert.equal(db.state().history[0].stoixeio_symbashs_01, null);
 });
