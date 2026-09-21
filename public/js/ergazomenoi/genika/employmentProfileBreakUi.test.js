@@ -185,3 +185,82 @@ for (const mode of ['add', 'edit']) test(`${mode}: actual break controls enforce
     const ordinary = await page.evaluate(body => new Function(body + '\nreturn formData;')(), collect);
     assert.equal(ordinary.dialleima_entos_ektos_orarioy, false);
 });
+
+test('committed break duration rejects invalid values without blocking temporary typing', async t => {
+    const page = await browser.newPage(); t.after(() => page.close());
+    const file = path.resolve('views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs');
+    const rec = { eidikh_kathgoria_ergazomenoy: '0001', dialleima_se_lepta: 0 };
+    await page.setContent('<div class="card-body"><select id="eidikh_kathgoria_ergazomenoy" name="eidikh_kathgoria_ergazomenoy">' +
+        ['0001', '0004', '0005', '0009'].map(value => `<option>${value}</option>`).join('') + '</select>' +
+        ejs.render(fs.readFileSync(file, 'utf8'), { rec, companyInUse: '', userTeam: '' }, { filename: file }) + '</div>');
+    await page.addScriptTag({ content: ui });
+    const duration = page.locator('#dialleima_se_lepta');
+    const submitGuardCode = fs.readFileSync(__dirname + '/getFieldValues.js', 'utf8');
+    const submitGuard = submitGuardCode.slice(submitGuardCode.indexOf('        event.preventDefault();'),
+        submitGuardCode.indexOf('        const formData = {}'));
+    const canSubmit = () => page.evaluate(body => new Function('event', body + '\nreturn true;')({
+        preventDefault() {}, stopPropagation() {}
+    }) === true, submitGuard);
+    for (const [category, min, max, invalid, valid] of [
+        ['0001', 10, 30, [5, 9, 31], [10, 30]],
+        ['0009', 15, 30, [14, 31], [15, 30]],
+        ['0004', 15, 45, [14, 46], [15, 45]],
+        ['0005', 15, 45, [14, 46], [15, 45]]
+    ]) {
+        await page.selectOption('#eidikh_kathgoria_ergazomenoy', category);
+        assert.equal(await duration.getAttribute('min'), '0');
+        assert.equal(await duration.getAttribute('max'), String(max));
+        assert.equal(await duration.getAttribute('step'), '1');
+        assert.equal(await duration.getAttribute('data-non-zero-min'), String(min));
+        if (category === '0001') {
+            await duration.fill('1');
+            assert.equal(await duration.inputValue(), '1'); // Still editable while focused.
+            await duration.fill('10');
+            await duration.blur();
+            assert.equal(await duration.inputValue(), '10');
+        }
+        for (const minutes of [0, ...valid]) {
+            await duration.fill(String(minutes));
+            await duration.blur();
+            assert.equal(await duration.inputValue(), String(minutes));
+            assert.equal(await canSubmit(), true);
+        }
+        await duration.fill('0');
+        await duration.blur();
+        for (const minutes of invalid) {
+            await duration.fill(String(minutes));
+            await duration.blur();
+            assert.equal(await duration.inputValue(), '0');
+            assert.equal(await duration.evaluate(el => el.validationMessage),
+                `Η διάρκεια διαλείμματος πρέπει να είναι 0 ή από ${min} έως ${max} λεπτά.`);
+            assert.equal(await canSubmit(), false); // Restored value cannot silently pass Save.
+            await duration.fill('0');
+            await duration.blur();
+            assert.equal(await canSubmit(), true);
+        }
+        await duration.fill(String(min - 1));
+        await duration.dispatchEvent('change');
+        assert.equal(await duration.inputValue(), '0');
+        assert.equal(await canSubmit(), false);
+        await duration.fill('0');
+        await duration.blur();
+    }
+});
+
+test('invalid committed break clears when no prior valid value exists', async t => {
+    const page = await browser.newPage(); t.after(() => page.close());
+    const file = path.resolve('views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs');
+    const rec = { eidikh_kathgoria_ergazomenoy: '0001', dialleima_se_lepta: 45 };
+    await page.setContent('<div class="card-body"><select id="eidikh_kathgoria_ergazomenoy"><option>0001</option></select>' +
+        ejs.render(fs.readFileSync(file, 'utf8'), { rec, companyInUse: '', userTeam: '' }, { filename: file }) + '</div>');
+    await page.addScriptTag({ content: ui });
+    const duration = page.locator('#dialleima_se_lepta');
+    await duration.fill('5');
+    await duration.blur();
+    assert.equal(await duration.inputValue(), '');
+    assert.equal(await duration.evaluate(el => el.checkValidity()), false);
+    await duration.fill('10');
+    await duration.blur();
+    assert.equal(await duration.inputValue(), '10');
+    assert.equal(await duration.evaluate(el => el.checkValidity()), true);
+});

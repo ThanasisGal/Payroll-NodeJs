@@ -2,6 +2,7 @@
 (function () {
     'use strict';
     const THIRD_BREAK_CATEGORIES = new Set(['0004', '0005']);
+    const breakInputState = new WeakMap();
     // Serialization only. Disabled dependent controls are omitted, never cleared by a visual toggle.
     function serializeEmploymentProfileField(input, payload) {
         if (input.hasAttribute('data-approved-arrangement-control') && input.disabled) return true;
@@ -29,19 +30,41 @@
         if (duration) {
             const min = categoryCode === '0001' ? 10 : 15;
             const max = alwaysInside ? 45 : 30;
+            const message = `Η διάρκεια διαλείμματος πρέπει να είναι 0 ή από ${min} έως ${max} λεπτά.`;
             duration.min = '0'; // Zero is valid; custom validity enforces the non-zero minimum.
             duration.dataset.nonZeroMin = String(min);
             duration.max = String(max);
             duration.step = '1';
             const n = Number(duration.value);
-            duration.setCustomValidity(duration.value === '' || (Number.isInteger(n) && (n === 0 || (n >= min && n <= max)))
-                ? '' : `Το διάλειμμα πρέπει να είναι 0 ή ${min}–${max} λεπτά.`);
+            const valid = duration.value === '' || (Number.isInteger(n) && (n === 0 || (n >= min && n <= max)));
+            const state = breakInputState.get(duration);
+            duration.setCustomValidity(valid && !state?.rejected ? '' : message);
         }
         return duration;
     }
-    function validateEmploymentProfileBreak(root) {
+    function commitEmploymentProfileBreak(root) {
         const duration = updateEmploymentProfileBreak(root);
-        return !duration || duration.reportValidity();
+        if (!duration) return true;
+        const state = breakInputState.get(duration) || { lastValid: null, rejected: false };
+        if (duration.value !== '' && duration.checkValidity() && !state.rejected) {
+            state.lastValid = duration.value;
+            breakInputState.set(duration, state);
+            return true;
+        }
+        if (duration.value === '' && !state.rejected) return true;
+        const min = Number(duration.dataset.nonZeroMin);
+        const max = Number(duration.max);
+        const previous = Number(state.lastValid);
+        state.rejected = true;
+        duration.value = state.lastValid !== null && Number.isInteger(previous) &&
+            (previous === 0 || (previous >= min && previous <= max)) ? state.lastValid : '';
+        breakInputState.set(duration, state);
+        duration.setCustomValidity(`Η διάρκεια διαλείμματος πρέπει να είναι 0 ή από ${min} έως ${max} λεπτά.`);
+        duration.reportValidity();
+        return false;
+    }
+    function validateEmploymentProfileBreak(root) {
+        return commitEmploymentProfileBreak(root);
     }
     function initEmploymentProfileUi(root) {
         const specialCategory = root.getElementById('eidikh_kathgoria_ergazomenoy');
@@ -57,7 +80,19 @@
         const inside = root.getElementById('dialleima_entos_ektos_orarioy');
         const updateBreak = () => updateEmploymentProfileBreak(root);
         specialCategory?.addEventListener('change', updateBreak);
-        duration?.addEventListener('input', updateBreak);
+        if (duration) {
+            updateBreak();
+            if (duration.value !== '' && duration.checkValidity()) {
+                breakInputState.set(duration, { lastValid: duration.value, rejected: false });
+            }
+            duration.addEventListener('input', () => {
+                const state = breakInputState.get(duration);
+                if (state && duration.value !== '') state.rejected = false;
+                updateBreak();
+            });
+            duration.addEventListener('change', () => commitEmploymentProfileBreak(root));
+            duration.addEventListener('blur', () => commitEmploymentProfileBreak(root));
+        }
         inside?.addEventListener('change', updateBreak);
         updateBreak();
         const master = root.getElementById('afora_egkekrimenh_rythmish_ergasias');

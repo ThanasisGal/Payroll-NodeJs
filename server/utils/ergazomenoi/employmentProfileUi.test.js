@@ -91,7 +91,8 @@ for (const mode of ['add', 'edit']) test(`${mode}: only OTHER is disabled; store
 });
 function element(value = '') {
     return { value, checked: false, disabled: false, dataset: {}, listeners: {}, textContent: '',
-        addEventListener(event, callback) { this.listeners[event] = callback; }, setCustomValidity(message) { this.validation = message; } };
+        addEventListener(event, callback) { this.listeners[event] = callback; }, setCustomValidity(message) { this.validation = message; },
+        checkValidity() { return !this.validation; }, reportValidity() { return !this.validation; } };
 }
 test('common handler toggles controls and category without clearing any values or day choices', () => {
     const ids = Object.fromEntries([C.ENABLED, C.TYPE, C.CATEGORY, C.FROM, 'day', 'dialleima_se_lepta', `label-${C.ENABLED}`].map(k => [k, element(k)]));
@@ -100,7 +101,7 @@ test('common handler toggles controls and category without clearing any values o
     ids.dialleima_se_lepta.value = '45';
     initEmploymentProfileUi({ getElementById: id => ids[id], querySelectorAll: () => controls });
     assert(controls.every(c => c.disabled)); assert.equal(ids.dialleima_se_lepta.value, '45');
-    assert.equal(ids.dialleima_se_lepta.validation, 'Το διάλειμμα πρέπει να είναι 0 ή 15–30 λεπτά.');
+    assert.equal(ids.dialleima_se_lepta.validation, 'Η διάρκεια διαλείμματος πρέπει να είναι 0 ή από 15 έως 30 λεπτά.');
     ids[C.ENABLED].checked = true; ids[C.ENABLED].listeners.change(); assert(controls.every(c => !c.disabled));
     ids[C.TYPE].selectedOptions[0].dataset.leaveCategory = 'false'; ids[C.TYPE].listeners.change(); assert(ids[C.CATEGORY].disabled);
     ids[C.ENABLED].checked = false; ids[C.ENABLED].listeners.change();
@@ -147,13 +148,13 @@ test('browser break limits, inside policy and third controls match server catego
         for (const minutes of rejected) {
             duration.value = String(minutes); duration.listeners.input();
             assert.equal(duration.reportValidity(), false, `${code}: ${minutes}`);
-            assert.equal(duration.validation, `Το διάλειμμα πρέπει να είναι 0 ή ${min}–${max} λεπτά.`);
+            assert.equal(duration.validation, `Η διάρκεια διαλείμματος πρέπει να είναι 0 ή από ${min} έως ${max} λεπτά.`);
         }
     }
     category.value = '0001'; duration.value = '9';
     const root = { getElementById: id => ids[id] };
     assert.equal(validateEmploymentProfileBreak(root), false);
-    duration.value = '10';
+    duration.value = '10'; duration.listeners.input();
     assert.equal(validateEmploymentProfileBreak(root), true);
     for (const file of ['getFieldValues.js', 'putFieldValues.js']) {
         assert.match(fs.readFileSync(`public/js/ergazomenoi/genika/${file}`, 'utf8'),
