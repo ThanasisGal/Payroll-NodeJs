@@ -8,10 +8,11 @@ const { resolveEmploymentProfileFactsForDate } = require('../../utils/ergazomeno
 const { resolveEmploymentTypeFromFormData } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { profileError } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
+const { ErgazomenoiModel } = require('../../models/ergazomenoi');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
-    'apasxolhsh_basei_symbashs', 'pososto_prosayxhshs_6hs_hmeras'];
+    'pososto_prosayxhshs_6hs_hmeras'];
 function assertCanonicalWorkTermsMatch(current, history) {
     for (const field of canonicalWorkTerms) {
         assert.equal(Object.hasOwn(current, field), Object.hasOwn(history, field), field);
@@ -19,7 +20,18 @@ function assertCanonicalWorkTermsMatch(current, history) {
     }
 }
 
-function database(initial = { employee: null, history: [] }, fail = '') {
+test('current employee schema accepts explicit rotating type and empty week type without defaults', () => {
+    for (const field of ['typos_apasxolhshs', 'typos_ebdomadas']) {
+        assert.ok(ErgazomenoiModel.schema.path(field), field);
+        assert.equal(Object.hasOwn(new ErgazomenoiModel({}).toObject(), field), false, field);
+    }
+    const cast = new ErgazomenoiModel({ typos_apasxolhshs: '2', typos_ebdomadas: '' }).toObject();
+    assert.equal(cast.typos_apasxolhshs, '2');
+    assert.equal(cast.typos_ebdomadas, '');
+    assert.equal(Object.hasOwn(cast, 'typos_ebdomadas'), true);
+});
+
+function database(initial = { employee: null, history: [] }, fail = '', castCurrentThroughSchema = false) {
     let committed = structuredClone(initial); let draft; let ended = false; let writes = 0;
     const session = { async withTransaction(work) {
         draft = structuredClone(committed);
@@ -34,7 +46,11 @@ function database(initial = { employee: null, history: [] }, fail = '') {
             assert.equal(options.session, session); writes++;
             if (fail === 'employee') throw new Error('employee failed');
             if (!matches(draft.employee, filter)) return { matchedCount: 0 };
-            Object.assign(draft.employee, update.$set); return { matchedCount: 1 };
+            const changes = castCurrentThroughSchema
+                ? Object.fromEntries(Object.entries(new ErgazomenoiModel(update.$set)
+                    .toObject({ minimize: false })).filter(([field]) => Object.hasOwn(update.$set, field)))
+                : update.$set;
+            Object.assign(draft.employee, changes); return { matchedCount: 1 };
         },
         async create([record], options) {
             assert.equal(options.session, session); writes++;
@@ -291,17 +307,30 @@ test('latest complete correction restores absent canonical current fields withou
     const saved = structuredClone(appended.state());
     delete saved.employee.typos_apasxolhshs;
     delete saved.employee.typos_ebdomadas;
-    const db = database(saved);
+    saved.employee.hmeromhnia_isxyos_oron_ergasias_eos = new Date('2026-10-15');
+    saved.history[2].hmeromhnia_isxyos_oron_ergasias_eos = new Date('2026-10-15');
+    const db = database(saved, '', true);
     const latest = saved.history[2];
     const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
         employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: latest._id,
         effectiveFrom: '2026-09-22', input: {} });
     assert.equal(result.currentUpdated, true);
+    assert.equal(result.mode, MODE_CORRECT_EXISTING);
     assert.equal(db.state().history.length, 3);
+    assert.deepEqual(db.state().history.map(row => row.aa_eggrafhs), ['0001', '0002', '0003']);
     assert.deepEqual(db.state().history.slice(0, 2), saved.history.slice(0, 2));
+    for (const field of ['_id', 'aa_eggrafhs', 'hmeromhnia_isxyos_oron_ergasias_apo',
+        'hmeromhnia_isxyos_oron_ergasias_eos', 'hmeromhnia_allaghs_orarioy_apo',
+        'hmeromhnia_allaghs_orarioy_eos']) {
+        assert.deepEqual(db.state().history[2][field], saved.history[2][field], field);
+    }
+    assert.deepEqual(db.state().history[2], saved.history[2]);
     assertCanonicalWorkTermsMatch(db.state().employee, db.state().history[2]);
     assert.equal(db.state().employee.typos_apasxolhshs, '2');
     assert.equal(db.state().employee.typos_ebdomadas, '');
+    assert.equal(db.state().employee.energos, true);
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs, null);
+    assert.deepEqual(db.state().employee.hmeromhnia_proslhpshs, saved.employee.hmeromhnia_proslhpshs);
 });
 test('older complete correction preserves surrounding boundaries and never copies current arrangement', async () => {
     const initial = correctionState(); const db = database(initial);
@@ -521,12 +550,14 @@ test('no-change Maintenance selects real May version and preserves non-terms his
         hmeromhnia_isxyos_oron_ergasias_apo: null, hmeromhnia_isxyos_oron_ergasias_eos: null };
     const initial = { employee: { ...real, _id: 'employee' }, history: [noise, real] };
     assert.deepEqual(selectMaintenanceMode(initial.history, identity), { mode: MODE_CORRECT_EXISTING, historyId: 'real' });
-    const db = database(initial);
+    const db = database(initial, '', true);
     const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
         effectiveFrom: '2026-05-25', maintenance: { identity, employeeChanges: {}, historyChanges: {} } });
     assert.equal(result.mode, MODE_LEGACY_MAINTENANCE);
     assert.equal(result.history._id, 'real');
     assert.deepEqual(db.state(), initial);
+    assert.equal(Object.hasOwn(db.state().employee, 'typos_apasxolhshs'), false);
+    assert.equal(Object.hasOwn(db.state().employee, 'typos_ebdomadas'), false);
     // A pre-existing overlap is not newly introduced by this non-boundary correction.
     const overlap = { ...noise, afora_allagh_oron_ergasias: true };
     const conflicting = database({ ...initial, history: [real, overlap] });

@@ -79,6 +79,8 @@ const ErgazomenoiSchema = new Schema(
         afora_dokimastikh_periodo: { type: Boolean, default: false },
         hmnia_lhxhs_dokimastikhs_periodoy: { type: Date },
         kathestos_apasxolhshs: { type: String, trim: true },
+        typos_apasxolhshs: { type: String, trim: true },
+        typos_ebdomadas: { type: String, trim: true },
         sxesh_ergasias: { type: String, trim: true },
         proyphresia_se_eth: { type: Number, default: 0 },
         proyphresia_apozhmioshs_se_eth: { type: Number, default: 0 },
