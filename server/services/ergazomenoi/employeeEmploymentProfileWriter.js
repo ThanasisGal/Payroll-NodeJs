@@ -14,6 +14,12 @@ const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
 // Selected internally from fresh transactional reads; callers cannot force it.
 const MODE_LEGACY_MAINTENANCE = 'MODE_LEGACY_MAINTENANCE';
 
+function currentProfileProjection(snapshot) {
+    return Object.fromEntries(T.STANDARD_FIELDS.filter(field =>
+        Object.hasOwn(snapshot, field) && snapshot[field] !== undefined)
+        .map(field => [field, snapshot[field]]));
+}
+
 async function transactionCapability(connection) {
     const hello = await connection.db.admin().command({ hello: 1 });
     return Boolean((hello.setName || hello.msg === 'isdbgrid') && hello.logicalSessionTimeoutMinutes > 0);
@@ -374,7 +380,9 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 const snapshot = legacyMaintenance ? {} : buildCompleteProfileSnapshot({ input, current: source, effectiveFrom: from });
                 const capturedBaseline = latest && !legacyMaintenance ? T.capture(current, rows, from) : null;
                 const facts = legacyMaintenance ? {} : Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
-                const currentChanges = latest ? { ...patch, ...facts, ...(capturedBaseline ? { [T.ANCHOR]: capturedBaseline } : {}) } :
+                const currentChanges = latest ? { ...patch, ...facts,
+                    ...(!legacyMaintenance ? currentProfileProjection(snapshot) : {}),
+                    ...(capturedBaseline ? { [T.ANCHOR]: capturedBaseline } : {}) } :
                     Object.fromEntries(Object.entries(patch).filter(([field]) => !HISTORY_CURRENT_FIELDS.has(field)));
                 if (latest && !rehireOperation) {
                     const proposedDeparture = Object.hasOwn(currentChanges, 'hmeromhnia_apoxorhshs')
@@ -447,7 +455,8 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             if (until && until < from) C.invalid('hmeromhnia_isxyos_oron_ergasias_eos', 'end precedes start');
             if (!legacyMaintenance) snapshot.hmeromhnia_isxyos_oron_ergasias_eos = until;
             const baseline = legacyMaintenance ? null : T.capture(current, rows, from);
-            const currentUpdate = legacyMaintenance ? patch : { ...patch, ...facts, ...(baseline ? { [T.ANCHOR]: baseline } : {}),
+            const currentUpdate = legacyMaintenance ? patch : { ...patch, ...facts,
+                ...currentProfileProjection(snapshot), ...(baseline ? { [T.ANCHOR]: baseline } : {}),
                 hmeromhnia_isxyos_oron_ergasias_apo: snapshot.hmeromhnia_isxyos_oron_ergasias_apo,
                 hmeromhnia_isxyos_oron_ergasias_eos: until };
             if (current && !rehireOperation) {

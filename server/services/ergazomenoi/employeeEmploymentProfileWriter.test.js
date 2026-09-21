@@ -9,6 +9,15 @@ const { resolveEmploymentTypeFromFormData } = require('../../utils/ergazomenoi/g
 const { profileError } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
+const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
+    'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
+    'apasxolhsh_basei_symbashs', 'pososto_prosayxhshs_6hs_hmeras'];
+function assertCanonicalWorkTermsMatch(current, history) {
+    for (const field of canonicalWorkTerms) {
+        assert.equal(Object.hasOwn(current, field), Object.hasOwn(history, field), field);
+        assert.deepEqual(current[field], history[field], field);
+    }
+}
 
 function database(initial = { employee: null, history: [] }, fail = '') {
     let committed = structuredClone(initial); let draft; let ended = false; let writes = 0;
@@ -133,6 +142,9 @@ test('legacy shadow and recorded V1 close together before one rotating profile a
     assert.equal(C.readEmploymentProfile(state.history[1]).recorded, true);
     assert.equal(state.history[0].nomimosMisthos, initial.history[0].nomimosMisthos);
     const next = state.history[2];
+    assertCanonicalWorkTermsMatch(state.employee, next);
+    assert.equal(state.employee.typos_apasxolhshs, '2');
+    assert.equal(state.employee.typos_ebdomadas, '');
     assert.equal(C.readEmploymentProfile(next).recorded, true);
     assert.equal(next.aa_eggrafhs, '0003');
     assert.equal(new Date(next.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0, 10), '2026-09-22');
@@ -271,6 +283,25 @@ test('same-date exact latest correction changes current and the same history row
     for (const field of ['_id', 'aa_eggrafhs', 'hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos']) {
         assert.deepEqual(db.state().history[1][field], initial.history[1][field]);
     }
+});
+test('latest complete correction restores absent canonical current fields without appending history', async () => {
+    const initial = legacyShadowState();
+    const appended = database(initial);
+    await rotatingAppend(appended);
+    const saved = structuredClone(appended.state());
+    delete saved.employee.typos_apasxolhshs;
+    delete saved.employee.typos_ebdomadas;
+    const db = database(saved);
+    const latest = saved.history[2];
+    const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: latest._id,
+        effectiveFrom: '2026-09-22', input: {} });
+    assert.equal(result.currentUpdated, true);
+    assert.equal(db.state().history.length, 3);
+    assert.deepEqual(db.state().history.slice(0, 2), saved.history.slice(0, 2));
+    assertCanonicalWorkTermsMatch(db.state().employee, db.state().history[2]);
+    assert.equal(db.state().employee.typos_apasxolhshs, '2');
+    assert.equal(db.state().employee.typos_ebdomadas, '');
 });
 test('older complete correction preserves surrounding boundaries and never copies current arrangement', async () => {
     const initial = correctionState(); const db = database(initial);
