@@ -1,9 +1,10 @@
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
-const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
+const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
 
@@ -3812,6 +3813,23 @@ class ergazomenoiController {
                 }
             });
 
+            const submittedDeparture = typeof formData.hmeromhnia_apoxorhshs === 'string' &&
+                /^\d{4}-\d{2}-\d{2}$/.test(formData.hmeromhnia_apoxorhshs) &&
+                dateKeyUtc(formData.hmeromhnia_apoxorhshs);
+            const storedDeparture = dateKeyUtc(scopedAccess.employee.hmeromhnia_apoxorhshs);
+            if (rehireIntent !== true && formData.hmeromhnia_apoxorhshs && !submittedDeparture) {
+                const error = new Error('EMPLOYEE_DEPARTURE_INVALID_DATE');
+                error.code = 'EMPLOYEE_DEPARTURE_INVALID_DATE';
+                error.statusCode = 409;
+                throw error;
+            }
+            if (rehireIntent !== true && submittedDeparture && storedDeparture &&
+                storedDeparture !== submittedDeparture) {
+                const error = new Error('EMPLOYEE_DEPARTURE_CONFLICT');
+                error.code = 'EMPLOYEE_DEPARTURE_CONFLICT';
+                error.statusCode = 409;
+                throw error;
+            }
             const result = rehireIntent === true
                 ? await writeEmployeeRehire({
                     scope: {
@@ -3828,7 +3846,25 @@ class ergazomenoiController {
                         afora_proslhpsh: true
                     }
                 })
-                : await writeEmployeeEmploymentProfile({
+                : submittedDeparture && (!storedDeparture || storedDeparture === submittedDeparture)
+                    ? await writeEmployeeDeparture({
+                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
+                            kodikos: kodikosErgazomenoy },
+                        employeeId: ergazomenoiId,
+                        departureDate: submittedDeparture,
+                        input: profileInput(formData, 'edit'),
+                        effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
+                            formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
+                        maintenance: { employeeChanges: filteredDataErgazomenoi,
+                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
+                            historyChanges: updateFieldsIstoriko,
+                            submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
+                            submittedFormFields: Object.keys(formData),
+                            identity: formData.istorikoId ? undefined : getIstorikoDateIdentity(formData),
+                            originalHistoryId: formData.istorikoId || null,
+                            correctableIdentityFields: formData.istorikoId ? ['hmeromhnia_apoxorhshs'] : [] }
+                    })
+                    : await writeEmployeeEmploymentProfile({
                     scope: {
                         team: omadaErgasias,
                         company_kod: kodikosEtaireias,
@@ -3863,6 +3899,7 @@ class ergazomenoiController {
         } catch (error) {
             console.error('❌ Σφάλμα κατά την ενημέρωση εργαζόμενου:', error);
             if (isEmploymentProfileError(error)) return profileError(res, error);
+            if (String(error?.code || '').startsWith('EMPLOYEE_DEPARTURE_')) return profileError(res, error);
             if (String(error?.code || '').startsWith('EMPLOYEE_REHIRE_')) {
                 return res.status(error.statusCode || 409).json({
                     success: false,

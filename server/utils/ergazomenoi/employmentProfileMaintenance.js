@@ -20,6 +20,23 @@ function historyEditorChanges(mapped, data) {
     if (fields.has('hmeres_ergasias_ebdomadas')) fields.add('typos_ebdomadas');
     return Object.fromEntries(Object.entries(mapped).filter(([field]) => fields.has(field)));
 }
+function submittedEmployeeMaintenanceFields(mapped, data) {
+    const aliases = {
+        eponymo: ['eponymoHidden'], onoma: ['onomaHidden'],
+        afm: ['afm_ergazomenoyHidden'], amka: ['amka_ergazomenoyHidden'],
+        afora_kataggelia_me_proeidopoihsh: ['kataggelia_me_proeidopoihsh'],
+        hmeromhnia_koinopoihshs_kataggelias: ['hmnia_koinopoihshs_kataggelias'],
+        logos_peratosis: ['logos_peratoshs_stathera'],
+        parathrhseis_peratosis: ['parathrhseis_peratoshs'],
+        efarmostea_sse_parathrhseis: ['parathrhseis_efarmosteas_sse'],
+        kpk_efka_basei_symbashs: ['tmp_kpk_efka_stathera'],
+        hmeromhnia_isxyos_oron_ergasias_apo: ['hmeromhnia_allaghs_orarioy_apo'],
+        typos_ebdomadas: ['hmeres_ergasias_ebdomadas']
+    };
+    return Object.keys(mapped).filter(field => field === 'updatedAt' ||
+        [field, `${field}Hidden`, `${field}_stathera`, `${field}_edit`,
+            ...(aliases[field] || [])].some(source => Object.hasOwn(data, source)));
+}
 function isEmploymentProfileError(error) {
     const code = String(error?.code || '');
     return error?.code === 'INVALID_EMPLOYMENT_PROFILE' ||
@@ -28,6 +45,12 @@ function isEmploymentProfileError(error) {
 }
 function profileError(res, error) {
     const messages = {
+        EMPLOYEE_DEPARTURE_INVALID_DATE: 'Η ημερομηνία αποχώρησης δεν είναι έγκυρη. Δεν αποθηκεύτηκε καμία αλλαγή.',
+        EMPLOYEE_DEPARTURE_BEFORE_HIRE: 'Η αποχώρηση δεν μπορεί να προηγείται της πρόσληψης. Δεν αποθηκεύτηκε καμία αλλαγή.',
+        EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH: 'Η τρέχουσα εργασιακή σχέση δεν συμφωνεί με το ιστορικό. Απαιτείται έλεγχος πριν από την αποχώρηση.',
+        EMPLOYEE_DEPARTURE_HISTORY_REQUIRED: 'Δεν βρέθηκε ασφαλής εγγραφή του τρέχοντος ιστορικού για την αποχώρηση.',
+        EMPLOYEE_DEPARTURE_CONFLICT: 'Η ημερομηνία αποχώρησης συγκρούεται με την υπάρχουσα σχέση ή μεταγενέστερη μεταβολή. Δεν αποθηκεύτηκε καμία αλλαγή.',
+        EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE: 'Η ίδια υποβολή αλλάζει χρονικά όρια ή στοιχεία προφίλ που απαιτούν χωριστή μεταβολή. Αποθηκεύστε πρώτα αυτή τη μεταβολή και έπειτα την αποχώρηση.',
         EMPLOYEE_PROFILE_DELETE_IDENTITY_MISMATCH: 'Η συγκεκριμένη εγγραφή ιστορικού προς διαγραφή δεν βρέθηκε. Δεν αποθηκεύτηκε καμία αλλαγή.',
         EMPLOYEE_PROFILE_DELETE_CURRENT_VERSION_UNSUPPORTED: 'Η διαγραφή αφαιρεί το ισχύον πλήρες ιστορικό του εργαζομένου χωρίς ασφαλή αντικατάσταση. Δεν γίνεται αυτόματη επαναφορά σε προηγούμενη περίοδο. Δεν αποθηκεύτηκε καμία αλλαγή.',
         EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED: 'Δεν υποστηρίζεται αναδρομική αλλαγή ορίων περιόδου ή μετακίνηση ορίων ελλιπούς ιστορικού. Δεν αποθηκεύτηκε καμία αλλαγή.',
@@ -49,4 +72,5 @@ function profileError(res, error) {
     return res.status(error.statusCode || 500).json({ success: false, reason: error.code || 'EMPLOYEE_PROFILE_SAVE_FAILED',
         field: error.field, message, errorMessage: message });
 }
-module.exports = { profileInput, profileError, isEmploymentProfileError, historyEditorChanges };
+module.exports = { profileInput, profileError, isEmploymentProfileError, historyEditorChanges,
+    submittedEmployeeMaintenanceFields };

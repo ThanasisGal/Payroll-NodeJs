@@ -7,6 +7,7 @@ const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { IDENTITY_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged } = require('../../utils/ergazomenoi/employmentProfileTransition');
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { buildEmployeeRehireTransition } = require('./employeeRehireLifecycleTransitionService');
+const { buildEmployeeDepartureTransition } = require('./employeeDepartureLifecycleTransitionService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -457,9 +458,107 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
     }, activeSession);
 }
 
-// Dedicated rehire command. The old relationship is closed at its actual
-// departure date before appending the new profile version. All changes share
-// the same transaction/session as the existing employment-profile writer.
+// First departure closes the current cycle's terminal evidence and latest
+// work-terms profile without inserting another history version.
+async function writeEmployeeDeparture({ scope, employeeId, departureDate, input = {}, effectiveFrom,
+    maintenance = {}, connection = mongoose.connection, employeeModel = ErgazomenoiModel,
+    historyModel = IstorikoProslhpseonAllagonModel, capabilityProbe = transactionCapability }) {
+    if (!scope || !['team', 'company_kod', 'kodikos'].every(key =>
+        typeof scope[key] === 'string' && scope[key].trim()) ||
+        typeof employeeId !== 'string' || !employeeId.trim()) C.invalid('scope', 'complete employee scope required');
+    const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]]));
+    return inProfileTransaction(connection, capabilityProbe, async session => {
+        const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
+        if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
+        const rows = await historyModel.find(filter).session(session).lean();
+        const transition = buildEmployeeDepartureTransition({ currentEmployee: current, history: rows, departureDate });
+        if (!rows.length) {
+            // Imported employees retain the established one-row baseline transaction.
+            return writeEmployeeEmploymentProfile({ scope, employeeId, input, effectiveFrom,
+                maintenance, connection, employeeModel, historyModel, capabilityProbe,
+                [ACTIVE_SESSION]: session });
+        }
+        const departure = C.calendarDate(transition.departure);
+        const submitted = new Set(maintenance.submittedFormFields || []);
+        const mappedEmployee = cleanMaintenancePatch(maintenance.employeeChanges);
+        if (maintenance.submittedEmployeeFields) {
+            const owned = new Set(maintenance.submittedEmployeeFields);
+            for (const field of Object.keys(mappedEmployee)) if (!owned.has(field)) delete mappedEmployee[field];
+        }
+        for (const field of [...IDENTITY_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo']) {
+            if (field === 'hmeromhnia_apoxorhshs' || field === 'hmeromhnia_isxyos_oron_ergasias_eos') continue;
+            if (submitted.has(field) && Object.hasOwn(mappedEmployee, field) &&
+                (C.calendarDate(mappedEmployee[field])?.getTime() ?? null) !==
+                (C.calendarDate(current[field])?.getTime() ?? null)) {
+                throw failure(field === 'hmeromhnia_proslhpshs'
+                    ? 'EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_REHIRE'
+                    : 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+            }
+            delete mappedEmployee[field];
+        }
+        delete mappedEmployee.energos;
+        const profileFactsChanged = semanticEmploymentProfileChanged(current, {}, input);
+        let factChanges = {};
+        if (profileFactsChanged) {
+            if (!C.readEmploymentProfile(current).recorded ||
+                !C.readEmploymentProfile(transition.latestProfileRow).recorded ||
+                effectiveStart(current)?.getTime() !== effectiveStart(transition.latestProfileRow)?.getTime()) {
+                throw failure('EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+            }
+            const before = C.normalizeEmploymentProfileSubmission({}, current);
+            const after = C.normalizeEmploymentProfileSubmission(input, current);
+            factChanges = Object.fromEntries(C.FACT_FIELDS.filter(field =>
+                JSON.stringify(before[field]) !== JSON.stringify(after[field])).map(field => [field, after[field]]));
+        }
+        const employeePatch = { ...mappedEmployee, ...factChanges,
+            hmeromhnia_apoxorhshs: departure, energos: false };
+        if (transition.clampEmployeeEnd) employeePatch.hmeromhnia_isxyos_oron_ergasias_eos = departure;
+        else delete employeePatch.hmeromhnia_isxyos_oron_ergasias_eos;
+        const mappedHistory = cleanMaintenancePatch(
+            maintenance.submittedHistoryChanges || maintenance.historyChanges);
+        const profilePatch = { ...factChanges };
+        for (const [field, value] of Object.entries(mappedHistory)) {
+            if (field === 'hmeromhnia_isxyos_dialleimatos_apo') {
+                if ((C.calendarDate(value)?.getTime() ?? null) !==
+                    (C.calendarDate(current[field])?.getTime() ?? null)) {
+                    throw failure('EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+                }
+                continue;
+            }
+            if (!HISTORY_CURRENT_FIELDS.has(field) || IDENTITY_FIELDS.includes(field) ||
+                ['afora_proslhpsh', 'afora_allagh_oron_ergasias', 'afora_allagh_dialleimatos'].includes(field)) continue;
+            if (JSON.stringify(value) !== JSON.stringify(current[field])) profilePatch[field] = value;
+        }
+        const updated = await employeeModel.updateOne({ ...filter, _id: current._id },
+            { $set: employeePatch }, { session });
+        if (updated.matchedCount !== 1) throw failure('EMPLOYEE_DEPARTURE_CONFLICT');
+
+        const historyPatches = new Map();
+        const terminal = transition.terminalHistoryRow;
+        const profile = transition.latestProfileRow;
+        historyPatches.set(String(terminal._id), { hmeromhnia_apoxorhshs: departure });
+        if (transition.clampProfileEnd) {
+            const id = String(profile._id);
+            historyPatches.set(id, { ...(historyPatches.get(id) || {}),
+                hmeromhnia_isxyos_oron_ergasias_eos: departure });
+        }
+        if (Object.keys(profilePatch).length) {
+            const id = String(profile._id);
+            historyPatches.set(id, { ...(historyPatches.get(id) || {}), ...profilePatch });
+        }
+        for (const [id, patch] of historyPatches) {
+            const row = rows.find(item => String(item._id) === id);
+            const changed = await historyModel.updateOne({ ...filter, _id: row._id },
+                { $set: patch }, { session });
+            if (changed.matchedCount !== 1) throw failure('EMPLOYEE_DEPARTURE_CONFLICT');
+        }
+        return { employee: { ...current, ...employeePatch }, mode: 'MODE_DEPARTURE',
+            history: { ...terminal, ...historyPatches.get(String(terminal._id)) } };
+    });
+}
+
+// Rehire appends a new profile only after the prior lifecycle evidence and
+// latest work-terms profile are closed in the same transaction.
 async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
     employeeChanges = {}, historyChanges = {},
     connection = mongoose.connection, employeeModel = ErgazomenoiModel,
@@ -492,10 +591,11 @@ async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
             historyChanges
         });
 
-        const previousHistoryId = transition.previous_cycle.history_ids.at(-1);
-        if (!previousHistoryId) throw failure('EMPLOYEE_REHIRE_HISTORY_REQUIRED');
-        const previousRow = rows.find(row => String(row._id) === String(previousHistoryId));
-        if (!previousRow) throw failure('EMPLOYEE_REHIRE_HISTORY_REQUIRED');
+        const previousRows = transition.previous_cycle.history_ids.map(id =>
+            rows.find(row => String(row._id) === String(id)));
+        const terminalRow = previousRows.at(-1);
+        const previousRow = [...previousRows].reverse().find(row => row && effectiveStart(row));
+        if (!terminalRow || !previousRow) throw failure('EMPLOYEE_REHIRE_HISTORY_REQUIRED');
 
         const departure = C.calendarDate(transition.previous_cycle.departure_date);
         const previousStart = effectiveStart(previousRow);
@@ -503,24 +603,16 @@ async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
         if (!departure || !previousStart || previousStart > departure) {
             throw failure('EMPLOYEE_REHIRE_HISTORY_INVALID');
         }
-        if (previousEnd && previousEnd < departure) {
-            throw failure('EMPLOYEE_REHIRE_HISTORY_END_BEFORE_DEPARTURE');
-        }
-
-        const closed = await historyModel.updateOne({
-            ...filter,
-            _id: previousRow._id,
-            hmeromhnia_isxyos_oron_ergasias_eos:
-                previousRow.hmeromhnia_isxyos_oron_ergasias_eos ?? null,
-            hmeromhnia_apoxorhshs: previousRow.hmeromhnia_apoxorhshs ?? null
-        }, {
-            $set: {
-                hmeromhnia_apoxorhshs: departure,
-                hmeromhnia_isxyos_oron_ergasias_eos: departure
-            }
-        }, { session });
-        if (closed.matchedCount !== 1) {
-            throw failure('EMPLOYEE_REHIRE_HISTORY_STALE');
+        const profilePatch = {};
+        if (!previousEnd || previousEnd > departure) profilePatch.hmeromhnia_isxyos_oron_ergasias_eos = departure;
+        if (String(previousRow._id) === String(terminalRow._id)) profilePatch.hmeromhnia_apoxorhshs = departure;
+        const closed = await historyModel.updateOne({ ...filter, _id: previousRow._id },
+            { $set: profilePatch }, { session });
+        if (closed.matchedCount !== 1) throw failure('EMPLOYEE_REHIRE_HISTORY_STALE');
+        if (String(previousRow._id) !== String(terminalRow._id)) {
+            const terminalClosed = await historyModel.updateOne({ ...filter, _id: terminalRow._id },
+                { $set: { hmeromhnia_apoxorhshs: departure } }, { session });
+            if (terminalClosed.matchedCount !== 1) throw failure('EMPLOYEE_REHIRE_HISTORY_STALE');
         }
 
         const result = await writeEmployeeEmploymentProfile({
@@ -550,4 +642,4 @@ async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
         };
     });
 }
-module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE, transactionCapability, writeEmployeeEmploymentProfile, writeEmployeeRehire, writeEmployeeEmploymentProfileCorrections, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode };
+module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE, transactionCapability, writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeRehire, writeEmployeeEmploymentProfileCorrections, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode };
