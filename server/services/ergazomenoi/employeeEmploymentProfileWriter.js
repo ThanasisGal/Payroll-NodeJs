@@ -176,6 +176,41 @@ function selectMaintenanceMode(rows, identity) {
         { mode: MODE_NEW_VERSION, historyId: null };
 }
 
+function appendPredecessors({ openRows, datedRows, rows, current, from, rehireOperation }) {
+    if (openRows.length <= 1) return openRows;
+    const overlap = () => { throw failure('EMPLOYEE_PROFILE_HISTORY_OVERLAP'); };
+    if (rehireOperation) overlap();
+    const day = value => C.calendarDate(value)?.getTime() ?? null;
+    const hire = day(current?.hmeromhnia_proslhpshs);
+    const start = effectiveStart(openRows[0])?.getTime() ?? null;
+    const end = effectiveEnd(openRows[0])?.getTime() ?? null;
+    const complete = openRows.filter(row => C.readEmploymentProfile(row).recorded);
+    // Creation order and sequence must identify the complete snapshot as the
+    // latest predecessor, independently of Mongo's result order.
+    const sequence = row => Number(row.aa_eggrafhs);
+    const created = row => row.createdAt ? new Date(row.createdAt).getTime() : null;
+    const authoritative = complete[0];
+    if (!hire || !start || from.getTime() <= start || !authoritative || complete.length !== 1 ||
+        current.archived === true || current.energos === false || day(current.hmeromhnia_apoxorhshs) ||
+        !C.readEmploymentProfile(current).recorded || effectiveStart(current)?.getTime() !== start ||
+        (effectiveEnd(current)?.getTime() ?? null) !== end ||
+        !Number.isSafeInteger(sequence(authoritative)) || !Number.isFinite(created(authoritative)) ||
+        datedRows.some(row => effectiveStart(row)?.getTime() >= from.getTime()) ||
+        rows.some(row => day(row.hmeromhnia_proslhpshs) > hire ||
+            (day(row.hmeromhnia_proslhpshs) === hire && day(row.hmeromhnia_apoxorhshs))) ||
+        openRows.some(row => day(row.hmeromhnia_proslhpshs) !== hire ||
+            effectiveStart(row)?.getTime() !== start || (effectiveEnd(row)?.getTime() ?? null) !== end ||
+            day(row.hmeromhnia_apoxorhshs) || !Number.isSafeInteger(sequence(row)) ||
+            !Number.isFinite(created(row)) ||
+            (row !== authoritative && (created(row) > created(authoritative) ||
+                (created(row) === created(authoritative) && sequence(row) >= sequence(authoritative)))))) overlap();
+    // A newer recorded profile outside the overlapping group would make the
+    // supposedly authoritative predecessor stale.
+    if (datedRows.some(row => row !== authoritative && C.readEmploymentProfile(row).recorded &&
+        (effectiveStart(row)?.getTime() ?? 0) > start)) overlap();
+    return openRows;
+}
+
 // Shared Add/Edit/profile writer. Never falls
 // back to two independent writes on standalone MongoDB. Same transaction pattern
 // as the existing weekly repo-transfer writer, without coupling its payroll code.
@@ -388,7 +423,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 ? openRows.filter(row =>
                     (C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() ?? null) === currentHireKey)
                 : openRows;
-            if (rowsToClose.length > 1) throw failure('EMPLOYEE_PROFILE_HISTORY_OVERLAP');
+            appendPredecessors({ openRows: rowsToClose, datedRows, rows, current, from, rehireOperation });
             if (legacyMaintenance) historyPatch = legacyMaintenancePatch(maintenance.historyChanges, null, true);
             if (maintenance && rows.length === 0 &&
                 !C.calendarDate(historyPatch.hmeromhnia_isxyos_oron_ergasias_apo)) {
@@ -431,9 +466,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             } else {
                 [employee] = await employeeModel.create([{ ...newEmployee, ...filter, ...currentUpdate }], { session });
             }
-            if (rowsToClose[0]) {
+            for (const predecessor of rowsToClose) {
                 const until = new Date(from); until.setUTCDate(until.getUTCDate() - 1);
-                const closed = await historyModel.updateOne({ ...filter, _id: rowsToClose[0]._id },
+                const closed = await historyModel.updateOne({ ...filter, _id: predecessor._id,
+                    hmeromhnia_isxyos_oron_ergasias_eos: predecessor.hmeromhnia_isxyos_oron_ergasias_eos ?? null },
                     { $set: { hmeromhnia_isxyos_oron_ergasias_eos: until } }, { session });
                 if (closed.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_HISTORY_STALE');
             }
