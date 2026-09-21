@@ -1,10 +1,26 @@
 // public\js\ergazomenoi\genika\getFieldValues.js
 
+function createEmployeeAddRetryState() {
+    let persistedEmployeeId = null;
+    return {
+        createPayload(formData, filesToUpdate, skipContract) {
+            return { formData, existingEmployeeId: persistedEmployeeId,
+                filesToUpdate, skipContract };
+        },
+        rememberLocalSave(response) {
+            if (response?.success && response.data?._id) {
+                persistedEmployeeId = response.data._id;
+            }
+        }
+    };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const isEmpty = (v) => !String(v ?? '').trim();
     const isEmptyArray = (v) => !Array.isArray(v) || v.length === 0;
     let message = '';
     let erganiUploadInProgress = false;
+    const employeeAddRetryState = createEmployeeAddRetryState();
 
     // ============================================================================
     // ✅ PROGRESS ANIMATION FUNCTION
@@ -659,11 +675,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // POST REQUEST
             // =========================================================================
 
-            const payload = {
-                formData: formData,
-                filesToUpdate: result.value,
-                skipContract: skipScheduleValidation && !forceContractPdfBeforeE3NRest // ✅ ΝΕΟ: αν "Συνέχεια", δεν φτιάχνουμε σύμβαση
-            };
+            const payload = employeeAddRetryState.createPayload(
+                formData, result.value,
+                skipScheduleValidation && !forceContractPdfBeforeE3NRest
+            );
 
             if (!skipScheduleValidation) {
                 Swal.fire({
@@ -829,6 +844,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok || !data?.success) {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
+
+                employeeAddRetryState.rememberLocalSave(data);
 
                 // =====================================================================
                 // ✅ DECLARE XML DATA (ONCE - AT THE TOP)
