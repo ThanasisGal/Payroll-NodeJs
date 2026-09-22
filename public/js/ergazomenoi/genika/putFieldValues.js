@@ -1404,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ct = response.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
                 const data = await response.json();
-                message = data?.errorMessage || '';
+                message = data?.message || data?.errorMessage || '';
 
                 console.group('[CONTRACT-DEBUG] RESPONSE JSON');
                 console.log('success:', data?.success);

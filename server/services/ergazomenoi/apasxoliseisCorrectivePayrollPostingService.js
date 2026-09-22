@@ -94,7 +94,11 @@ async function postCorrectivePayroll({ session: userSession, scope: input, caseI
         if (!frozenPayroll.length) throw periodError('CORRECTIVE_ORIGINAL_PAYROLL_NOT_FOUND', 409,
             'Δεν βρέθηκε αρχική μισθοδοτική εγγραφή για τον εργαζόμενο και τον τύπο αποδοχών.');
         const originalIds = frozenPayroll.map((row) => row._id).filter(Boolean);
-        const originals = await payrollModel.find({ _id: { $in: originalIds }, team: scope.team,
+        if (originalIds.length !== frozenPayroll.length || !originalIds.every((id) => mongoose.isValidObjectId(id))) {
+            throw periodError('CORRECTIVE_ORIGINAL_PAYROLL_MISMATCH', 409,
+                'Οι αρχικές μισθοδοτικές εγγραφές δεν συμφωνούν με το παγωμένο αποτέλεσμα.');
+        }
+        const originals = await payrollModel.find({ _id: mongoose.trusted({ $in: originalIds }), team: scope.team,
             company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma, kodikos: employee,
             typos_apodoxon: earningsType }).session(dbSession).lean();
         if (originals.length !== originalIds.length) throw periodError('CORRECTIVE_ORIGINAL_PAYROLL_MISMATCH', 409,

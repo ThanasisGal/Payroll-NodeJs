@@ -119,7 +119,7 @@ async function assertEmployees(scope, codes, ypokatasthma = '') {
     const query = {
         team: scope.effectiveTeam,
         company_kod: scope.companyId,
-        kodikos: { $in: codes }
+        kodikos: mongoose.trusted({ $in: codes })
     };
     if (ypokatasthma) query.ypokatasthma = ypokatasthma;
     const rows = await ErgazomenoiModel.find(query).select('kodikos').lean();
