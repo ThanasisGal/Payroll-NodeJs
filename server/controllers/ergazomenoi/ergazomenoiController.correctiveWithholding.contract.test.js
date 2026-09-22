@@ -7,7 +7,7 @@ const editView = fs.readFileSync(path.join(__dirname,
     '../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section6/diafora.ejs'), 'utf8');
 assert.match(controller, /function parseCorrectivePayrollWithholdingRate/);
 assert.ok((controller.match(/formData\.corrective_payroll_withholding_rate_percent/g) || []).length >= 6);
-assert.match(controller, /newErgazomenos\.corrective_payroll_withholding_rate_percent\s*=/);
+assert.match(controller, /setAddEmployeeField\("corrective_payroll_withholding_rate_percent", formData\.corrective_payroll_withholding_rate_percent\)/);
 assert.match(controller, /corrective_payroll_withholding_rate_percent:\s*formData\.corrective_payroll_withholding_rate_percent/);
 for (const view of [addView, editView]) {
     assert.ok(view.includes('Ποσοστό Παρακράτησης εις Χείρας Τρίτων'));

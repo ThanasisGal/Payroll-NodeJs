@@ -11,7 +11,7 @@ const source = fs.readFileSync(
 
 assert.match(
     source,
-    /writeEmployeeEmploymentProfile, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations/
+    /writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations/
 );
 
 const start = source.indexOf('static postErgazomenoiUpdate');
