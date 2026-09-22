@@ -67,7 +67,7 @@
                                 <li id="li111" data-value="li111">
                                     <a
                                         id="admin_users"
-                                        data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
+                                        data-sidebar-special data-sidebar-authorized="<%= isAdminOrSupervisorRole(userRole) %>"
                                         class="disabled childmenu-li menu-item"
                                         href="/admin"
                                         data-bs-toggle="tooltip"
@@ -78,7 +78,7 @@
                                         <span class="sidebar-menu-label">Διαχείριση Χρηστών</span>
                                     </a>
                                 </li>
-                                <% if (isUserPrivilegesManagerRole(userRole)) { %>
+                                <% if (isAdminOrSupervisorRole(userRole)) { %>
                                     <li id="li112" data-value="li112">
                                         <a
                                             id="admin_user_privileges"
@@ -94,6 +94,22 @@
                                         </a>
                                     </li>
                                 <% } %>
+                                <% if (isAdminOrSupervisorRole(userRole)) { %>
+                                    <li id="li113" data-value="li113">
+                                        <a
+                                            id="admin_disconnect_users"
+                                            data-sidebar-special data-sidebar-authorized="true"
+                                            class="disabled childmenu-li menu-item"
+                                            href="/admin/disconnect-users"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="right"
+                                            data-tooltip-max-width="15vw"
+                                            data-bs-title="Αναγκαστική αποσύνδεση ενεργού χρήστη"
+                                        >
+                                            <span class="sidebar-menu-label">Αποσύνδεση Χρηστών</span>
+                                        </a>
+                                    </li>
+                                <% } %>
                             </ul>
                         </li>
 
@@ -106,7 +122,7 @@
                                 data-tooltip-max-width="15vw"
                                 data-bs-title="Αποστολή αρχείων txt στο Cloud"
                                 href="/api/admin/aws_s3"
-                                data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
+                                data-sidebar-special data-sidebar-authorized="<%= isAdminOrSupervisorRole(userRole) %>"
                             >
                                 <i
                                     class="bi bi-chevron-down chevron-icon margin-right-0_5rem display-none"
@@ -119,7 +135,7 @@
                         <li id="li13" data-value="li13" class="margin-top--0_5rem">
                             <a
                                 id="btn-anoigma-neas-xrhshs"
-                                data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
+                                data-sidebar-special data-sidebar-authorized="<%= isAdminOrSupervisorRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="right"
@@ -137,7 +153,7 @@
                         <li id="li14" data-value="li14">
                             <a
                                 id="admin_active_sessions"
-                                data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
+                                data-sidebar-special data-sidebar-authorized="<%= isAdminOrSupervisorRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
                                 href="/admin/active-sessions"
                                 data-bs-toggle="tooltip"
@@ -155,7 +171,7 @@
                         <li id="li15" data-value="li15">
                             <a
                                 id="admin_usage_report"
-                                data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
+                                data-sidebar-special data-sidebar-authorized="<%= isAdminOrSupervisorRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
                                 href="/admin/usage-report"
                                 data-bs-toggle="tooltip"

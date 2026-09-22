@@ -10,12 +10,15 @@ const {
     normalizeUserRole,
     isAllowedUserRole,
     isAdminUserRole,
+    isAdminOrSupervisorRole,
+    isUserPrivilegesManagerRole,
     getUserRoleLabel,
     getSelectableAdminUserRoles,
     getUserRoleOptionsForCurrentValue,
     getUserRoleBadgeClass
 } = require('../constants/userRoles');
 const UserModel = require('../models/userModel');
+const UsageLogModel = require('../models/usageLog');
 const { UserPrivilegesModel, SidebarStatusModel } = require('../models/privileges');
 
 const sideEffectModuleStubs = [
@@ -32,6 +35,7 @@ for (const [modulePath, exports] of sideEffectModuleStubs) {
 
 const userController = require('./userController');
 const requireAdminRole = require('../middlewares/requireAdminRole');
+const { requireAdminOrSupervisorRole, requireUserPrivilegesManagerRole } = require('../middlewares/requireAdminRole');
 
 const tests = [];
 function test(name, fn) {
@@ -86,6 +90,9 @@ test('role constants and normalization', () => {
     assert.strictEqual(getUserRoleLabel('S'), 'Supervisor');
     assert.strictEqual(getUserRoleLabel('HR'), 'HR');
     USER_ROLE_CODES.forEach((role) => assert.strictEqual(isAdminUserRole(role), role === 'A'));
+    USER_ROLE_CODES.forEach((role) => assert.strictEqual(isAdminOrSupervisorRole(role), ['A', 'S'].includes(role)));
+    assert.strictEqual(isUserPrivilegesManagerRole, isAdminOrSupervisorRole);
+    assert.strictEqual(requireUserPrivilegesManagerRole, requireAdminOrSupervisorRole);
 });
 
 test('non-string role input shapes are rejected', () => {
@@ -109,6 +116,23 @@ test('selectable and legacy edit options', () => {
     assert.deepStrictEqual(getSelectableAdminUserRoles().map((option) => option.value), ['A', 'S', 'HR', 'C', 'V']);
     assert.ok(getUserRoleOptionsForCurrentValue('U').some((option) => option.value === 'U'));
     assert.ok(!getSelectableAdminUserRoles().some((option) => option.value === 'U'));
+});
+
+test('Supervisor add/edit role controls show only lower roles and preserve legacy U on edit', () => {
+    const { getAssignableRolesForActor } = require('../services/adminUserManagementScopeService');
+    const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
+    const add = renderView('users/add.ejs', { userRoleOptions: getAssignableRolesForActor(actor),
+        managedTeam: 'TEAM1', canManageAllTeams: false, csrfToken: 'csrf-test' });
+    assert.doesNotMatch(add, /id="role-(?:A|S)"/);
+    for (const role of ['HR', 'C', 'V']) assert.match(add, new RegExp(`id="role-${role}"`));
+    const target = { _id: '65809f8f971f6f52a8408e7b', firstName: 'Test', lastName: 'User',
+        email: 'test@example.invalid', password: 'x', tel: '', team: 'TEAM1',
+        privileges: 'U', situation: 'A', details: '', updatedAt: new Date(0) };
+    const edit = renderView('users/edit.ejs', { users: target, normalizedUserRole: 'U',
+        userRoleOptions: getAssignableRolesForActor(actor, 'U'), managedTeam: 'TEAM1',
+        canManageAllTeams: false, csrfToken: 'csrf-test' });
+    assert.doesNotMatch(edit, /id="role-(?:A|S)"/);
+    assert.match(edit, /id="role-U"/);
 });
 
 test('UserModel validates and normalizes privileges without a database', async () => {
@@ -146,7 +170,7 @@ test('controller create synchronizes privileges and isAdmin', async () => {
             const res = responseStub();
             const writesBefore = writes.length;
             await userController.postUser({
-                session: { userTeam: 'THA' },
+                adminActor: { userId: 'actor', role: 'A', team: 'THA' },
                 body: userBody(` ${role.toLowerCase()} `)
             }, res);
             const write = writes.at(-1);
@@ -175,12 +199,12 @@ test('controller create and edit reject invalid shapes before model access', asy
         const invalidValues = [undefined, '', '   ', ['A'], ['A', 'HR'], { role: 'A' }, { toString() { return 'A'; } }];
         for (const value of invalidValues) {
             const createRes = responseStub();
-            await userController.postUser({ body: userBody(value) }, createRes);
+            await userController.postUser({ adminActor: { userId: 'actor', role: 'A', team: 'THA' }, body: userBody(value) }, createRes);
             assert.strictEqual(createRes.statusCode, 400);
             assert.deepStrictEqual(createRes.redirects, ['/admin/add']);
 
             const editRes = responseStub();
-            await userController.editPostUser({ params: { id: 'user-id' }, body: userBody(value) }, editRes);
+            await userController.editPostUser({ adminActor: { userId: 'actor', role: 'A', team: 'THA' }, params: { id: 'user-id' }, body: userBody(value) }, editRes);
             assert.strictEqual(editRes.statusCode, 400);
             assert.deepStrictEqual(editRes.redirects, ['/admin/edit/user-id']);
         }
@@ -209,12 +233,13 @@ test('controller edit synchronizes role/admin and enables validators', async () 
             const res = responseStub();
             const targetId = new mongoose.Types.ObjectId(`0000000000000000000000${String(sequence++).padStart(2, '0')}`);
             await userController.editPostUser({
-                session: { userTeam: 'TEAM1' },
+                adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' },
                 params: { id: String(targetId) },
                 body: { ...userBody(to), team: 'TEAM2' }
             }, res);
             const write = updates.at(-1);
             assert.strictEqual(write.update.privileges, to);
+            assert.ok(!Object.hasOwn(write.update, 'password'));
             assert.strictEqual(write.update.isAdmin, expectedAdmin);
             assert.strictEqual(write.update.team, 'TEAM1');
             assert.strictEqual(write.options.runValidators, true);
@@ -235,16 +260,109 @@ test('controller edit handles null update and thrown errors safely', async () =>
         UserModel.findOne = () => ({ select: () => ({ lean: async () => ({ _id: targetId, team: 'TEAM1' }) }) });
         UserModel.findOneAndUpdate = async () => null;
         const missingRes = responseStub();
-        await userController.editPostUser({ session: { userTeam: 'TEAM1' }, params: { id: targetId }, body: userBody('HR') }, missingRes);
+        await userController.editPostUser({ adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' }, params: { id: targetId }, body: userBody('HR') }, missingRes);
         assert.strictEqual(missingRes.statusCode, 404);
         assert.ok(!missingRes.flashes.some((flash) => flash.message === 'Επιτυχής Ενημέρωση'));
 
         UserModel.findOneAndUpdate = async () => { throw new Error('raw database detail'); };
         const errorRes = responseStub();
-        await userController.editPostUser({ session: { userTeam: 'TEAM1' }, params: { id: targetId }, body: userBody('S') }, errorRes);
+        await userController.editPostUser({ adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' }, params: { id: targetId }, body: userBody('S') }, errorRes);
         assert.deepStrictEqual(errorRes.redirects, ['/admin']);
         assert.ok(errorRes.flashes.some((flash) => flash.message === 'Δεν ήταν δυνατή η ενημέρωση του χρήστη'));
         assert.ok(!errorRes.flashes.some((flash) => flash.message.includes('raw database detail')));
+    } finally {
+        UserModel.findOne = originalFindOne;
+        UserModel.findOneAndUpdate = originalUpdate;
+    }
+});
+
+test('crafted edit password is ignored while another field changes', async () => {
+    const originalFindOne = UserModel.findOne;
+    const originalUpdate = UserModel.findOneAndUpdate;
+    const targetId = '65809f8f971f6f52a8408e7b';
+    const stored = { _id: targetId, team: 'TEAM1', privileges: 'HR',
+        firstName: 'Before', password: 'stored-password-hash' };
+    try {
+        UserModel.findOne = () => ({ select() { return this; }, lean: async () => stored });
+        UserModel.findOneAndUpdate = async (filter, update) => {
+            assert.ok(!Object.hasOwn(update, 'password'));
+            Object.assign(stored, update);
+            return stored;
+        };
+        const res = responseStub();
+        await userController.editPostUser({ adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' },
+            params: { id: targetId },
+            body: { ...userBody('HR'), firstName: 'After', password: 'attacker-supplied-value' } }, res);
+        assert.deepStrictEqual(res.redirects, ['/admin']);
+        assert.strictEqual(stored.firstName, 'After');
+        assert.strictEqual(stored.password, 'stored-password-hash');
+    } finally {
+        UserModel.findOne = originalFindOne;
+        UserModel.findOneAndUpdate = originalUpdate;
+    }
+});
+
+test('Supervisor create stores its database-backed team and rejects A/S/U assignments', async () => {
+    const originalFindOne = UserModel.findOne;
+    const originalCreate = UserModel.create;
+    const created = [];
+    const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
+    try {
+        UserModel.findOne = () => ({ sort() { return this; }, lean: async () => null });
+        UserModel.create = async (user) => { created.push(user.toObject()); };
+        for (const role of ['HR', 'C', 'V']) {
+            const res = responseStub();
+            await userController.postUser({ adminActor: actor,
+                body: { ...userBody(role), team: 'TEAM2' } }, res);
+            assert.strictEqual(res.statusCode, 200);
+            assert.strictEqual(created.at(-1).team, 'TEAM1');
+            assert.strictEqual(created.at(-1).privileges, role);
+        }
+        for (const role of ['A', 'S', 'U']) {
+            const before = created.length;
+            const res = responseStub();
+            await userController.postUser({ adminActor: actor,
+                body: { ...userBody(role), team: 'TEAM2' } }, res);
+            assert.strictEqual(res.statusCode, 400);
+            assert.strictEqual(created.length, before);
+        }
+    } finally {
+        UserModel.findOne = originalFindOne;
+        UserModel.create = originalCreate;
+    }
+});
+
+test('Supervisor edit cannot escalate role or change target team', async () => {
+    const originalFindOne = UserModel.findOne;
+    const originalUpdate = UserModel.findOneAndUpdate;
+    const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
+    const targetId = '65809f8f971f6f52a8408e7b';
+    const updates = [];
+    try {
+        UserModel.findOne = (filter) => ({ select() { return this; }, lean: async () =>
+            filter.privileges?.$in.includes('HR') && filter.team.test('TEAM1')
+                ? { _id: targetId, team: 'TEAM1', privileges: 'HR' } : null });
+        UserModel.findOneAndUpdate = async (filter, update) => {
+            updates.push({ filter, update });
+            return { _id: targetId };
+        };
+        const allowed = responseStub();
+        await userController.editPostUser({ adminActor: actor, params: { id: targetId },
+            body: { ...userBody('C'), team: 'TEAM2' } }, allowed);
+        assert.strictEqual(updates.length, 1);
+        assert.strictEqual(updates[0].update.team, 'TEAM1');
+        for (const role of ['A', 'S']) {
+            const denied = responseStub();
+            await userController.editPostUser({ adminActor: actor, params: { id: targetId },
+                body: userBody(role) }, denied);
+            assert.strictEqual(denied.statusCode, 400);
+            assert.strictEqual(updates.length, 1);
+        }
+        const self = responseStub();
+        await userController.editPostUser({ adminActor: actor, params: { id: actor.userId },
+            body: userBody('HR') }, self);
+        assert.strictEqual(updates.length, 1);
+        assert.strictEqual(self.statusCode, 404);
     } finally {
         UserModel.findOne = originalFindOne;
         UserModel.findOneAndUpdate = originalUpdate;
@@ -349,7 +467,7 @@ test('requireAdminRole authorizes only active database-backed A users', async ()
                 res,
                 () => { nextCalls++; }
             );
-            assert.strictEqual(selectedFields, 'privileges situation', scenario.name);
+            assert.strictEqual(selectedFields, '_id privileges situation team', scenario.name);
             assert.strictEqual(nextCalls, scenario.next || 0, scenario.name);
             if (scenario.status) assert.strictEqual(res.statusCode, scenario.status, scenario.name);
         }
@@ -366,7 +484,40 @@ test('requireAdminRole authorizes only active database-backed A users', async ()
     }
 });
 
-test('user-management routes require the admin middleware', () => {
+test('requireAdminOrSupervisorRole authorizes only active database-backed A and S users', async () => {
+    const originalFindById = UserModel.findById;
+    try {
+        const withoutSession = responseStub();
+        await requireAdminOrSupervisorRole({}, withoutSession, () => assert.fail('unexpected authorization'));
+        assert.deepStrictEqual(withoutSession.redirects, ['/login']);
+        for (const [role, situation, allowed] of [
+            ['A', 'A', true], ['S', 'A', true], ['HR', 'A', false], ['C', 'A', false],
+            ['U', 'A', false], ['V', 'A', false], ['A', 'I', false], ['S', 'I', false]
+        ]) {
+            UserModel.findById = () => ({ select() { return this; }, lean: async () => ({ _id: 'actor', privileges: role, situation, team: 'THA' }) });
+            const res = responseStub();
+            let nextCalls = 0;
+            const req = { session: { userId: 'actor', userRole: 'A', userTeam: 'WRONG', isAdmin: true } };
+            await requireAdminOrSupervisorRole(req,
+                res, () => { nextCalls++; });
+            assert.strictEqual(nextCalls, allowed ? 1 : 0, role + situation);
+            if (!allowed) assert.strictEqual(res.statusCode, 403, role + situation);
+            if (allowed) {
+                assert.deepStrictEqual(req.adminActor, { userId: 'actor', role, team: 'THA' });
+                assert.ok(Object.isFrozen(req.adminActor));
+            }
+        }
+        UserModel.findById = () => ({ select() { return this; }, lean: async () => null });
+        const missing = responseStub();
+        await requireAdminOrSupervisorRole({ session: { userId: 'actor' } }, missing,
+            () => assert.fail('missing user authorized'));
+        assert.strictEqual(missing.statusCode, 403);
+    } finally {
+        UserModel.findById = originalFindById;
+    }
+});
+
+test('user-management routes require the A/S middleware', () => {
     const routeSource = fs.readFileSync(path.join(repositoryRoot, 'server', 'routes', 'usersRoute.js'), 'utf8');
     const contracts = [
         ["router.get('/admin'", 'adminHomepage'],
@@ -386,8 +537,8 @@ test('user-management routes require the admin middleware', () => {
     ];
     for (const [prefix, handler] of contracts) {
         assert.ok(
-            routeSource.includes(`${prefix}, requireAdminRole, userController.${handler});`),
-            `${prefix} must use requireAdminRole`
+            routeSource.includes(`${prefix}, requireAdminOrSupervisorRole, userController.${handler});`),
+            `${prefix} must use requireAdminOrSupervisorRole`
         );
     }
 });
@@ -433,6 +584,26 @@ test('edit EJS renders S, HR, and legacy U correctly', () => {
         assert.ok(html.includes('&lt;note&gt;'));
         assert.deepStrictEqual(duplicateIds(html), []);
     }
+});
+
+test('edit EJS renders only a readonly masked password without submitting it', () => {
+    const filename = path.join(repositoryRoot, 'views/users/edit.ejs');
+    const source = fs.readFileSync(filename, 'utf8');
+    assert.ok(!source.includes('users.password'));
+    assert.doesNotMatch(source, /name=["']password["']/);
+    const users = { id: 'id', _id: 'id', firstName: 'Test', lastName: 'User',
+        email: 'test@example.invalid', password: 'SECRET_HASH_MUST_NOT_RENDER', tel: '',
+        team: 'TEAM1', privileges: 'HR', situation: 'A', details: '', updatedAt: new Date(0) };
+    const html = renderView('users/edit.ejs', { users, normalizedUserRole: 'HR',
+        userRoleOptions: getUserRoleOptionsForCurrentValue('HR'), managedTeam: 'TEAM1',
+        canManageAllTeams: false, csrfToken: 'csrf-test' });
+    assert.doesNotMatch(html, /SECRET_HASH_MUST_NOT_RENDER/);
+    const passwordInput = html.match(/<input\s+[^>]*id="password"[^>]*>/)?.[0];
+    assert.ok(passwordInput);
+    assert.match(passwordInput, /value="••••••••"/);
+    assert.match(passwordInput, /\breadonly\b/);
+    assert.match(passwordInput, /aria-readonly="true"/);
+    assert.doesNotMatch(passwordInput, /\bname=/);
 });
 
 test('view EJS uses human role labels and direct escaped details', () => {
@@ -609,6 +780,225 @@ test('user-management card footers own vertical sizing and center actions', () =
     assert.ok(formStart >= 0 && bodyStart > formStart && footerStart > bodyStart && formEnd > footerStart);
     assert.ok(addHtml.slice(formStart, bodyStart).includes('name="_csrf"'));
     assert.match(addHtml.slice(bodyStart, footerStart), /<\/div>\s*$/);
+});
+
+test('Supervisor list and search pass the role, team, and self scope to Mongo', async () => {
+    const originalCount = UserModel.countDocuments;
+    const originalAggregate = UserModel.aggregate;
+    const originalFind = UserModel.find;
+    const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
+    const filters = [];
+    try {
+        UserModel.countDocuments = async (filter) => { filters.push(filter); return 0; };
+        UserModel.aggregate = (pipeline) => {
+            filters.push(pipeline[0].$match);
+            return { skip() { return this; }, limit() { return this; }, exec: async () => [] };
+        };
+        UserModel.find = (filter) => {
+            filters.push(filter);
+            return { select() { return this; }, skip() { return this; }, limit: async () => [] };
+        };
+        const res = responseStub();
+        await userController.adminHomepage({ adminActor: actor, query: {} }, res);
+        await userController.searchPostUser({ adminActor: actor, body: { searchTerm: 'test' },
+            query: {}, session: {} }, res);
+        assert.strictEqual(filters.length, 4);
+        for (const filter of filters) {
+            assert.ok(filter.team.test(' team1 '));
+            assert.deepStrictEqual(filter.privileges.$in, ['HR', 'C', 'U', 'V']);
+            assert.strictEqual(String(filter._id.$ne), actor.userId);
+        }
+    } finally {
+        UserModel.countDocuments = originalCount;
+        UserModel.aggregate = originalAggregate;
+        UserModel.find = originalFind;
+    }
+});
+
+test('Supervisor active-session page queries each user through canonical target scope', async () => {
+    const originalDb = mongoose.connection.db;
+    const originalFindOne = UserModel.findOne;
+    const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
+    const ids = ['65809f8f971f6f52a8408e7b', '65809f8f971f6f52a8408e7c'];
+    const queried = [];
+    try {
+        mongoose.connection.db = { collection() { return { find() { return { toArray: async () =>
+            ids.map((userId) => ({ session: JSON.stringify({ userId }) })) }; } }; } };
+        UserModel.findOne = (filter) => {
+            queried.push(filter);
+            return { select() { return this; }, lean: async () =>
+                String(filter._id) === ids[0] ? { _id: ids[0], team: 'TEAM1', privileges: 'HR' } :
+                    !filter.privileges ? { _id: ids[1], team: 'OTHER', privileges: 'A' } : null };
+        };
+        const res = responseStub();
+        await userController.activeSessionsPage({ adminActor: actor }, res);
+        assert.strictEqual(res.renders[0].locals.activeUsers.length, 1);
+        assert.strictEqual(queried.length, 2);
+        assert.ok(queried.every((filter) => filter.team.test('TEAM1') &&
+            filter.privileges.$in.includes('HR')));
+        const adminRes = responseStub();
+        await userController.activeSessionsPage({ adminActor: { ...actor, role: 'A', team: 'THA' } }, adminRes);
+        assert.strictEqual(adminRes.renders[0].locals.activeUsers.length, 2);
+    } finally {
+        mongoose.connection.db = originalDb;
+        UserModel.findOne = originalFindOne;
+    }
+});
+
+test('Supervisor usage report and export restrict logs by managed user IDs', async () => {
+    const originalFind = UserModel.find;
+    const originalAggregate = UsageLogModel.aggregate;
+    const originalUsageFind = UsageLogModel.find;
+    const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
+    const targetId = new mongoose.Types.ObjectId('65809f8f971f6f52a8408e7b');
+    const matches = [];
+    try {
+        UserModel.find = (filter) => {
+            assert.ok(filter.team.test('TEAM1'));
+            assert.deepStrictEqual(filter.privileges.$in, ['HR', 'C', 'U', 'V']);
+            return { select() { return this; }, lean: async () => [{ _id: targetId }] };
+        };
+        UsageLogModel.aggregate = async (pipeline) => { matches.push(pipeline[0].$match); return []; };
+        UsageLogModel.find = (filter) => {
+            matches.push(filter);
+            return { sort() { return this; }, lean: async () => [] };
+        };
+        const res = responseStub();
+        res.setHeader = () => {};
+        await userController.usageReportPage({ adminActor: actor, query: { month: '2026-09' } }, res);
+        await userController.exportUsageReport({ adminActor: actor, query: { month: '2026-09' } }, res);
+        assert.strictEqual(matches.length, 6);
+        assert.ok(matches.every((filter) => filter.userId.$in.length === 1 &&
+            String(filter.userId.$in[0]) === String(targetId)));
+    } finally {
+        UserModel.find = originalFind;
+        UsageLogModel.aggregate = originalAggregate;
+        UsageLogModel.find = originalUsageFind;
+    }
+});
+
+test('THA Admin usage report and export retain all-team query scope', async () => {
+    const originalFind = UserModel.find;
+    const originalAggregate = UsageLogModel.aggregate;
+    const originalUsageFind = UsageLogModel.find;
+    const matches = [];
+    try {
+        UserModel.find = () => assert.fail('THA Admin must not enumerate user IDs');
+        UsageLogModel.aggregate = async (pipeline) => { matches.push(pipeline[0].$match); return []; };
+        UsageLogModel.find = (filter) => {
+            matches.push(filter);
+            return { sort() { return this; }, lean: async () => [] };
+        };
+        const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'A', team: 'THA' };
+        const res = responseStub();
+        res.setHeader = () => {};
+        await userController.usageReportPage({ adminActor: actor, query: { month: '2026-09' } }, res);
+        await userController.exportUsageReport({ adminActor: actor, query: { month: '2026-09' } }, res);
+        assert.strictEqual(matches.length, 6);
+        assert.ok(matches.every((filter) => filter.date === '2026-09' && !filter.userId));
+    } finally {
+        UserModel.find = originalFind;
+        UsageLogModel.aggregate = originalAggregate;
+        UsageLogModel.find = originalUsageFind;
+    }
+});
+
+test('Supervisor delete uses scoped Mongo filter and rejects self before deletion', async () => {
+    const originalDelete = UserModel.deleteOne;
+    const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
+    const targetId = '65809f8f971f6f52a8408e7b';
+    const filters = [];
+    try {
+        UserModel.deleteOne = async (filter) => { filters.push(filter); return { deletedCount: 1 }; };
+        const allowed = responseStub();
+        await userController.deletePostUser({ adminActor: actor, params: { id: targetId } }, allowed);
+        assert.strictEqual(filters.length, 1);
+        assert.strictEqual(filters[0]._id, targetId);
+        assert.ok(filters[0].team.test('TEAM1'));
+        assert.deepStrictEqual(filters[0].privileges.$in, ['HR', 'C', 'U', 'V']);
+        const self = responseStub();
+        await userController.deletePostUser({ adminActor: actor, params: { id: actor.userId } }, self);
+        assert.strictEqual(self.statusCode, 404);
+        assert.strictEqual(filters.length, 1);
+    } finally {
+        UserModel.deleteOne = originalDelete;
+    }
+});
+
+test('Supervisor view, edit, and delete pages use the same target identity filter', async () => {
+    const originalFindOne = UserModel.findOne;
+    const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
+    const targetId = '65809f8f971f6f52a8408e7b';
+    const filters = [];
+    const projections = [];
+    try {
+        UserModel.findOne = (filter) => {
+            filters.push(filter);
+            const query = { select(fields) { projections.push(fields); return this; },
+                then(resolve, reject) { return Promise.resolve(
+                    { _id: targetId, team: 'TEAM1', privileges: 'HR' }).then(resolve, reject); } };
+            return query;
+        };
+        for (const method of ['viewUser', 'editUser', 'checkAndDeletePostUser']) {
+            const res = responseStub();
+            await userController[method]({ adminActor: actor, params: { id: targetId } }, res);
+            assert.strictEqual(res.statusCode, 200);
+            assert.strictEqual(res.renders.length, 1);
+            assert.strictEqual(filters.at(-1)._id, targetId);
+            assert.ok(filters.at(-1).team.test('TEAM1'));
+            assert.deepStrictEqual(filters.at(-1).privileges.$in, ['HR', 'C', 'U', 'V']);
+            if (method === 'editUser') {
+                assert.strictEqual(projections.at(-1), '-password');
+                assert.deepStrictEqual(res.renders[0].locals.userRoleOptions.map((option) => option.value),
+                    ['HR', 'C', 'V']);
+            }
+        }
+        const before = filters.length;
+        const self = responseStub();
+        await userController.viewUser({ adminActor: actor, params: { id: actor.userId } }, self);
+        assert.strictEqual(self.statusCode, 404);
+        assert.strictEqual(filters.length, before);
+    } finally {
+        UserModel.findOne = originalFindOne;
+    }
+});
+
+test('Admin message checks canonical target scope before Socket.IO emit', async () => {
+    const socket = require('../socket');
+    const originalGetIO = socket.getIO;
+    const originalFindById = UserModel.findById;
+    const originalFindOne = UserModel.findOne;
+    const actorId = '65809f8f971f6f52a8408e7a';
+    const targetId = '65809f8f971f6f52a8408e7b';
+    const emitted = [];
+    try {
+        socket.getIO = () => ({ to(room) { return { emit(event) { emitted.push([room, event]); } }; } });
+        UserModel.findById = () => ({ lean: async () => ({ firstName: 'Actor', lastName: 'Test' }) });
+        UserModel.findOne = (filter) => ({ select() { return this; }, lean: async () =>
+            filter.privileges && !filter.team.test('OTHER') ? null :
+                { _id: targetId, team: 'OTHER', privileges: 'HR' } });
+        const supervisor = { userId: actorId, role: 'S', team: 'TEAM1' };
+        const denied = responseStub();
+        await userController.sendMessageToUser({ adminActor: supervisor,
+            body: { toUserId: targetId, message: 'Test' } }, denied);
+        assert.strictEqual(denied.statusCode, 404);
+        assert.deepStrictEqual(emitted, []);
+        const self = responseStub();
+        await userController.sendMessageToUser({ adminActor: supervisor,
+            body: { toUserId: actorId, message: 'Test' } }, self);
+        assert.strictEqual(self.statusCode, 404);
+        assert.deepStrictEqual(emitted, []);
+        const admin = { userId: actorId, role: 'A', team: 'THA' };
+        const allowed = responseStub();
+        await userController.sendMessageToUser({ adminActor: admin,
+            body: { toUserId: targetId, message: 'Test' } }, allowed);
+        assert.strictEqual(allowed.payload.success, true);
+        assert.deepStrictEqual(emitted, [[`user_${targetId}`, 'admin:message']]);
+    } finally {
+        socket.getIO = originalGetIO;
+        UserModel.findById = originalFindById;
+        UserModel.findOne = originalFindOne;
+    }
 });
 
 (async () => {

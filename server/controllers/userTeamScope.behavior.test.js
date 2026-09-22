@@ -36,8 +36,8 @@ function matches(filter, user) {
     if (filter.team instanceof RegExp && !filter.team.test(user.team)) return false;
     if (Array.isArray(filter.$or)) {
         const matchesSearch = filter.$or.some((condition) => Object.entries(condition).some(([field, rule]) => {
-            if (!(rule?.$regex instanceof RegExp)) return false;
-            return rule.$regex.test(String(user[field] || ''));
+            if (!(rule instanceof RegExp)) return false;
+            return rule.test(String(user[field] || ''));
         }));
         if (!matchesSearch) return false;
     }
@@ -103,21 +103,21 @@ async function testAdminListScope() {
             }
         }, async () => {
             const tha = response();
-            await userController.adminHomepage({ session: { userTeam: ' tha ' }, query: {} }, tha);
+            await userController.adminHomepage({ adminActor: { userId: IDS.THA, role: 'A', team: 'THA' }, query: {} }, tha);
             assert.deepStrictEqual(countFilter, {});
             assert.deepStrictEqual(aggregateStages[0], { $match: {} });
             assert.deepStrictEqual(tha.rendered.locals.users.map((user) => user.team), ['THA', 'team1', ' TEAM2 ']);
             assert.strictEqual(tha.rendered.locals.pages, 2);
 
             const team1 = response();
-            await userController.adminHomepage({ session: { userTeam: 'team1' }, query: {} }, team1);
+            await userController.adminHomepage({ adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' }, query: {} }, team1);
             assert.ok(countFilter.team instanceof RegExp);
             assert.ok(aggregateStages[0].$match.team instanceof RegExp);
             assert.deepStrictEqual(team1.rendered.locals.users.map((user) => user.team), ['team1']);
             assert.strictEqual(team1.rendered.locals.pages, 1);
 
             const invalid = response();
-            await userController.adminHomepage({ session: {}, query: {} }, invalid);
+            await userController.adminHomepage({ adminActor: undefined, query: {} }, invalid);
             assert.strictEqual(invalid.statusCode, 403);
         });
     } finally {
@@ -138,7 +138,8 @@ async function testSearchScope() {
             },
             find: (filter) => findQuery(users.filter((user) => matches(filter, user)))
         }, async () => {
-            const req = { session: { userTeam: 'TEAM1' }, body: { searchTerm: 'Match' }, query: {} };
+            const req = { adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' },
+                session: {}, body: { searchTerm: 'Match' }, query: {} };
             const res = response();
             await userController.searchPostUser(req, res);
             assert.ok(countFilter.team instanceof RegExp);
@@ -166,21 +167,21 @@ async function testDirectObjectScope() {
         for (const method of ['viewUser', 'editUser', 'checkAndDeletePostUser']) {
             const denied = response();
             await userController[method](
-                { session: { userTeam: 'TEAM1' }, params: { id: IDS.TEAM2 } },
+                { adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' }, params: { id: IDS.TEAM2 } },
                 denied
             );
             assert.strictEqual(denied.statusCode, 404, method);
         }
         const deniedDelete = response();
         await userController.deletePostUser(
-            { session: { userTeam: 'TEAM1' }, params: { id: IDS.TEAM2 } },
+            { adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' }, params: { id: IDS.TEAM2 } },
             deniedDelete
         );
         assert.strictEqual(deniedDelete.statusCode, 404);
 
         const allowed = response();
         await userController.viewUser(
-            { session: { userTeam: 'THA' }, params: { id: IDS.TEAM2 } },
+            { adminActor: { userId: IDS.THA, role: 'A', team: 'THA' }, params: { id: IDS.TEAM2 } },
             allowed
         );
         assert.strictEqual(allowed.rendered.locals.users.team, ' TEAM2 ');
@@ -208,22 +209,22 @@ async function testCreateAndEditTeamTampering() {
             firstName: 'New', lastName: 'User', email: 'new@example.invalid', password: 'secret',
             tel: '', team: 'TEAM2', radioRoles: 'S', radioStatus: 'A', details: ''
         };
-        await userController.postUser({ session: { userTeam: 'TEAM1' }, body }, response());
+        await userController.postUser({ adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' }, body }, response());
         assert.strictEqual(created[0].team, 'TEAM1');
 
-        await userController.postUser({ session: { userTeam: 'THA' }, body }, response());
+        await userController.postUser({ adminActor: { userId: IDS.THA, role: 'A', team: 'THA' }, body }, response());
         assert.strictEqual(created[1].team, 'TEAM2');
 
         const editRes = response();
         await userController.editPostUser(
-            { session: { userTeam: 'TEAM1' }, params: { id: IDS.TEAM1 }, body },
+            { adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' }, params: { id: IDS.TEAM1 }, body },
             editRes
         );
         assert.strictEqual(updates[0].update.team, 'TEAM1');
 
         const foreignEdit = response();
         await userController.editPostUser(
-            { session: { userTeam: 'TEAM1' }, params: { id: IDS.TEAM2 }, body },
+            { adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' }, params: { id: IDS.TEAM2 }, body },
             foreignEdit
         );
         assert.strictEqual(foreignEdit.statusCode, 404);
@@ -239,17 +240,17 @@ async function testPrivilegesDropdownScope() {
         find: (filter) => findQuery(users.filter((user) => matches(filter, user)))
     }, async () => {
         const tha = response();
-        await userPrivilegesController.listUsers({ session: { userTeam: 'THA' } }, tha);
+        await userPrivilegesController.listUsers({ adminActor: { userId: IDS.THA, role: 'A', team: 'THA' } }, tha);
         assert.strictEqual(tha.payload.items.length, 3);
         assert.deepStrictEqual(Object.keys(tha.payload.items[0]).sort(), ['active', 'label', 'role', 'roleLabel', 'value']);
 
         const team1 = response();
-        await userPrivilegesController.listUsers({ session: { userTeam: 'team1' } }, team1);
+        await userPrivilegesController.listUsers({ adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' } }, team1);
         assert.strictEqual(team1.payload.items.length, 1);
         assert.ok(!JSON.stringify(team1.payload).includes('match2@example.invalid'));
 
         const invalid = response();
-        await userPrivilegesController.listUsers({ session: {} }, invalid);
+        await userPrivilegesController.listUsers({ adminActor: undefined }, invalid);
         assert.strictEqual(invalid.statusCode, 403);
         assert.strictEqual(invalid.payload.code, 'INVALID_TEAM_SCOPE');
     });
@@ -285,7 +286,7 @@ async function testPrivilegesDirectScope() {
 
         const deniedGet = response();
         await userPrivilegesController.getPrivileges(
-            { session: { userTeam: 'TEAM1' }, params: { userId: IDS.TEAM2 } },
+            { adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' }, params: { userId: IDS.TEAM2 } },
             deniedGet
         );
         assert.strictEqual(deniedGet.statusCode, 404);
@@ -293,7 +294,7 @@ async function testPrivilegesDirectScope() {
 
         const allowedGet = response();
         await userPrivilegesController.getPrivileges(
-            { session: { userTeam: 'THA' }, params: { userId: IDS.TEAM2 } },
+            { adminActor: { userId: IDS.THA, role: 'A', team: 'THA' }, params: { userId: IDS.TEAM2 } },
             allowedGet
         );
         assert.strictEqual(allowedGet.statusCode, 200);
@@ -306,7 +307,7 @@ async function testPrivilegesDirectScope() {
         const deniedPut = response();
         await userPrivilegesController.updatePrivileges(
             {
-                session: { userTeam: 'TEAM1' },
+                adminActor: { userId: IDS.THA, role: 'A', team: 'TEAM1' },
                 params: { userId: IDS.TEAM2 },
                 body: { rows: [] }
             },

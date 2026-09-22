@@ -4,10 +4,10 @@ const { UserPrivilegesModel } = require('../models/privileges');
 const UserPrivilegeFormCatalogModel = require('../models/userPrivilegeFormCatalog');
 const { getUserRoleLabel } = require('../constants/userRoles');
 const {
-    normalizeRequiredUserTeam,
-    buildManagedUserFilter,
-    buildManagedUserIdentityFilter
-} = require('../services/userTeamScopeService');
+    buildAdminManagedUserFilter,
+    buildAdminManagedUserIdentityFilter,
+    assertAdminCanManageTarget
+} = require('../services/adminUserManagementScopeService');
 const {
     getSchemaPrivilegeKeys,
     serializePrivilegeDocuments,
@@ -20,21 +20,21 @@ function sendError(res, error) {
     return res.status(status).json({ success: false, code: error?.code || 'INTERNAL_ERROR', message });
 }
 
-async function requireExistingUser(userId, sessionTeam, dbSession = null) {
+async function requireExistingUser(userId, actor, dbSession = null) {
     if (!mongoose.isValidObjectId(userId)) {
         throw Object.assign(new Error('Μη έγκυρο αναγνωριστικό χρήστη'), { status: 400, code: 'INVALID_USER_ID' });
     }
-    let query = UserModel.findOne(buildManagedUserIdentityFilter(sessionTeam, userId))
+    let query = UserModel.findOne(buildAdminManagedUserIdentityFilter(actor, userId))
         .select('_id kod firstName lastName email team privileges situation');
     if (dbSession) query = query.session(dbSession);
     const user = await query.lean();
     if (!user) throw Object.assign(new Error('Ο χρήστης δεν βρέθηκε'), { status: 404, code: 'USER_NOT_FOUND' });
-    return user;
+    return assertAdminCanManageTarget(actor, user);
 }
 
 exports.renderPage = (req, res) => {
     try {
-        normalizeRequiredUserTeam(req.session?.userTeam);
+        buildAdminManagedUserFilter(req.adminActor);
         return res.render('users/dikaiomataXrhston', {
             title: 'Δικαιώματα Χρηστών',
             description: 'Διαχείριση δικαιωμάτων χρηστών',
@@ -47,7 +47,7 @@ exports.renderPage = (req, res) => {
 
 exports.listUsers = async (req, res) => {
     try {
-        const users = await UserModel.find(buildManagedUserFilter(req.session?.userTeam))
+        const users = await UserModel.find(buildAdminManagedUserFilter(req.adminActor))
             .select('_id kod firstName lastName email team privileges situation')
             .sort({ lastName: 1, firstName: 1, email: 1 })
             .lean();
@@ -70,7 +70,7 @@ exports.listUsers = async (req, res) => {
 
 exports.getPrivileges = async (req, res) => {
     try {
-        const user = await requireExistingUser(req.params.userId, req.session?.userTeam);
+        const user = await requireExistingUser(req.params.userId, req.adminActor);
         const [catalog, documents] = await Promise.all([
             UserPrivilegeFormCatalogModel.find({ active: true, showInPrivileges: true })
                 .select('_id form formLabel sidebarOrder')
@@ -103,7 +103,7 @@ exports.updatePrivileges = async (req, res) => {
         await updateAllPrivilegesAtomically({
             userId,
             payload: req.body,
-            authorizeTarget: (session) => requireExistingUser(userId, req.session?.userTeam, session)
+            authorizeTarget: (session) => requireExistingUser(userId, req.adminActor, session)
         });
         return res.json({ success: true, message: 'Τα δικαιώματα ενημερώθηκαν επιτυχώς' });
     } catch (error) {

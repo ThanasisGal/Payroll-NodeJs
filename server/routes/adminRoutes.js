@@ -6,12 +6,12 @@ const textCacheManager = require('../utils/textCacheManager');
 const { UserPrivilegesModel } = require('../models/privileges');
 const { CompaniesModel } = require('../models/companies');
 const uploadTextTemplateController = require('../controllers/uploadTextTemplateController');
-const requireAdminRole = require('../middlewares/requireAdminRole');
+const { requireAdminOrSupervisorRole } = require('../middlewares/requireAdminRole');
 
 // ============================================================================
 // GET /admin/aws_s3 - Render Upload Page
 // ============================================================================
-router.get('/aws_s3', requireAdminRole, async (req, res) => {
+router.get('/aws_s3', requireAdminOrSupervisorRole, async (req, res) => {
     const sessionUserTeam = req.session.userTeam;
     const companyId = req.session.companyInUse;
     const sessionUserId = req.session.userId;
@@ -61,7 +61,7 @@ router.get('/aws_s3', requireAdminRole, async (req, res) => {
 // ============================================================================
 router.post(
     '/templates/upload',
-    requireAdminRole,
+    requireAdminOrSupervisorRole,
     uploadTextTemplate.array('files', 20),
     uploadTextTemplateController.uploadTemplates
 );

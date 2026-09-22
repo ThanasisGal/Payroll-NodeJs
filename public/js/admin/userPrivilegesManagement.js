@@ -367,8 +367,8 @@
             renderTable(data);
         } catch (error) {
             if (requestId !== state.requestId) return;
+            console.error('[user-privileges] Failed to load privileges:', error);
             clearTable('Δεν ήταν δυνατή η φόρτωση των δικαιωμάτων.');
-            await window.Swal?.fire('Σφάλμα', error.message, 'error');
         } finally {
             if (requestId === state.requestId) setBusy(false);
         }

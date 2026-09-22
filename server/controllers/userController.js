@@ -22,16 +22,15 @@ const {
     isAllowedUserRole,
     isAdminUserRole,
     getUserRoleLabel,
-    getSelectableAdminUserRoles,
-    getUserRoleOptionsForCurrentValue,
     getUserRoleBadgeClass
 } = require('../constants/userRoles');
 const {
     normalizeRequiredUserTeam,
-    canManageAllUserTeams,
-    buildManagedUserFilter,
-    buildManagedUserIdentityFilter
+    canManageAllUserTeams
 } = require('../services/userTeamScopeService');
+const { buildAdminManagedUserFilter, buildAdminManagedUserIdentityFilter,
+    assertAdminCanManageTarget, getAssignableRolesForActor, isSupervisorManageableRole } =
+    require('../services/adminUserManagementScopeService');
 
 const { PeriodsModel } = Models;
 const { ParamModel } = Models_A;
@@ -152,7 +151,7 @@ class userController {
         const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
 
         try {
-            const managedUserFilter = buildManagedUserFilter(req.session?.userTeam);
+            const managedUserFilter = buildAdminManagedUserFilter(req.adminActor);
             const totalRecords = await UserModel.countDocuments(managedUserFilter);
             let totalPages = perPage > totalRecords ? 1 : Math.ceil(totalRecords / perPage);
             let limPerPage = perPage > totalRecords ? totalRecords : perPage;
@@ -188,13 +187,13 @@ class userController {
 
     static addUser = (req, res) => {
         try {
-            const managedTeam = normalizeRequiredUserTeam(req.session?.userTeam);
+            const managedTeam = req.adminActor.team;
             res.render('users/add', {
                 title: 'Προσθήκη Νέου Χρήστη',
                 description: 'Web Payroll Solutions by Admin',
-                userRoleOptions: getSelectableAdminUserRoles(),
+                userRoleOptions: getAssignableRolesForActor(req.adminActor),
                 managedTeam,
-                canManageAllTeams: canManageAllUserTeams(managedTeam)
+                canManageAllTeams: req.adminActor.role === 'A' && canManageAllUserTeams(managedTeam)
             });
         } catch (error) {
             return res.status(Number(error?.status) || 500).send('Δεν έχετε έγκυρο team scope');
@@ -203,15 +202,17 @@ class userController {
 
     static postUser = async (req, res) => {
         const normalizedRole = normalizeUserRole(req.body.radioRoles);
-        if (!isAllowedUserRole(normalizedRole)) {
+        if (!isAllowedUserRole(normalizedRole) ||
+            (req.adminActor.role === 'S' &&
+                !getAssignableRolesForActor(req.adminActor).some((option) => option.value === normalizedRole))) {
             await res.flash('warning', 'Μη έγκυρος ρόλος χρήστη');
             return res.status(400).redirect('/admin/add');
         }
 
         let team;
         try {
-            const sessionTeam = normalizeRequiredUserTeam(req.session?.userTeam);
-            team = canManageAllUserTeams(sessionTeam)
+            const sessionTeam = req.adminActor.team;
+            team = req.adminActor.role === 'A' && canManageAllUserTeams(sessionTeam)
                 ? normalizeRequiredUserTeam(req.body.team)
                 : sessionTeam;
         } catch (error) {
@@ -262,7 +263,7 @@ class userController {
                 return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             }
             const users = await UserModel.findOne(
-                buildManagedUserIdentityFilter(req.session?.userTeam, req.params.id)
+                buildAdminManagedUserIdentityFilter(req.adminActor, req.params.id)
             );
             if (!users) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
 
@@ -285,10 +286,10 @@ class userController {
             if (!mongoose.isValidObjectId(req.params.id)) {
                 return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             }
-            const sessionTeam = normalizeRequiredUserTeam(req.session?.userTeam);
+            const sessionTeam = req.adminActor.team;
             const users = await UserModel.findOne(
-                buildManagedUserIdentityFilter(sessionTeam, req.params.id)
-            );
+                buildAdminManagedUserIdentityFilter(req.adminActor, req.params.id)
+            ).select('-password');
             if (!users) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
 
             res.render('users/edit', {
@@ -296,9 +297,9 @@ class userController {
                 description: 'Web Payroll Solutions by Admin',
                 users,
                 normalizedUserRole: normalizeUserRole(users?.privileges),
-                userRoleOptions: getUserRoleOptionsForCurrentValue(users?.privileges),
+                userRoleOptions: getAssignableRolesForActor(req.adminActor, users?.privileges),
                 managedTeam: sessionTeam,
-                canManageAllTeams: canManageAllUserTeams(sessionTeam)
+                canManageAllTeams: req.adminActor.role === 'A' && canManageAllUserTeams(sessionTeam)
             });
         } catch (error) {
             logger.error(error);
@@ -310,7 +311,8 @@ class userController {
 
     static editPostUser = async (req, res) => {
         const normalizedRole = normalizeUserRole(req.body.radioRoles);
-        if (!isAllowedUserRole(normalizedRole)) {
+        if (!isAllowedUserRole(normalizedRole) ||
+            (req.adminActor.role === 'S' && !isSupervisorManageableRole(normalizedRole))) {
             await res.flash('warning', 'Μη έγκυρος ρόλος χρήστη');
             return res.status(400).redirect(`/admin/edit/${req.params.id}`);
         }
@@ -319,19 +321,19 @@ class userController {
             if (!mongoose.isValidObjectId(req.params.id)) {
                 return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             }
-            const sessionTeam = normalizeRequiredUserTeam(req.session?.userTeam);
-            const managedUserFilter = buildManagedUserIdentityFilter(sessionTeam, req.params.id);
-            const targetUser = await UserModel.findOne(managedUserFilter).select('_id team').lean();
+            const sessionTeam = req.adminActor.team;
+            const managedUserFilter = buildAdminManagedUserIdentityFilter(req.adminActor, req.params.id);
+            const targetUser = await UserModel.findOne(managedUserFilter).select('_id team privileges').lean();
             if (!targetUser) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
+            assertAdminCanManageTarget(req.adminActor, targetUser);
 
-            const team = canManageAllUserTeams(sessionTeam)
+            const team = req.adminActor.role === 'A' && canManageAllUserTeams(sessionTeam)
                 ? normalizeRequiredUserTeam(req.body.team)
                 : sessionTeam;
             const update = {
                 firstName: req.body.firstName,
                 lastName: req.body.lastName,
                 email: req.body.email,
-                password: req.body.password,
                 tel: req.body.tel,
                 team,
                 privileges: normalizedRole,
@@ -357,6 +359,9 @@ class userController {
             if (Number(error?.status) === 403) {
                 return res.status(403).send('Δεν έχετε έγκυρο team scope');
             }
+            if (Number(error?.status) === 404) {
+                return res.status(404).send('Ο χρήστης δεν βρέθηκε');
+            }
             await res.flash('warning', 'Δεν ήταν δυνατή η ενημέρωση του χρήστη');
             return res.redirect('/admin');
         }
@@ -368,7 +373,7 @@ class userController {
                 return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             }
             const result = await UserModel.deleteOne(
-                buildManagedUserIdentityFilter(req.session?.userTeam, req.params.id)
+                buildAdminManagedUserIdentityFilter(req.adminActor, req.params.id)
             );
             if (result.deletedCount !== 1) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             await res.flash('info', 'Επιτυχής Διαγραφή');
@@ -387,7 +392,7 @@ class userController {
                 return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             }
             const users = await UserModel.findOne(
-                buildManagedUserIdentityFilter(req.session?.userTeam, req.params.id)
+                buildAdminManagedUserIdentityFilter(req.adminActor, req.params.id)
             );
             if (!users) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
 
@@ -412,14 +417,14 @@ class userController {
             const perPage = Number(process.env.EGGRAFES);
             const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
             const searchFilter = {
-                ...buildManagedUserFilter(req.session?.userTeam),
+                ...buildAdminManagedUserFilter(req.adminActor),
                 $or: [
-                    { kod: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { firstName: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { lastName: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { email: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { tel: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { team: { $regex: new RegExp(searchNoSpecialChar, 'i') } }
+                    { kod: new RegExp(searchNoSpecialChar, 'i') },
+                    { firstName: new RegExp(searchNoSpecialChar, 'i') },
+                    { lastName: new RegExp(searchNoSpecialChar, 'i') },
+                    { email: new RegExp(searchNoSpecialChar, 'i') },
+                    { tel: new RegExp(searchNoSpecialChar, 'i') },
+                    { team: new RegExp(searchNoSpecialChar, 'i') }
                 ]
             };
             const totalRecords = await UserModel.countDocuments(searchFilter);
@@ -456,13 +461,13 @@ class userController {
             const perPage = Number(process.env.EGGRAFES);
             const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
             const searchFilter = {
-                ...buildManagedUserFilter(req.session?.userTeam),
+                ...buildAdminManagedUserFilter(req.adminActor),
                 $or: [
-                    { firstName: { $regex: new RegExp(searchTerm, 'i') } },
-                    { lastName: { $regex: new RegExp(searchTerm, 'i') } },
-                    { email: { $regex: new RegExp(searchTerm, 'i') } },
-                    { tel: { $regex: new RegExp(searchTerm, 'i') } },
-                    { team: { $regex: new RegExp(searchTerm, 'i') } }
+                    { firstName: new RegExp(searchTerm, 'i') },
+                    { lastName: new RegExp(searchTerm, 'i') },
+                    { email: new RegExp(searchTerm, 'i') },
+                    { tel: new RegExp(searchTerm, 'i') },
+                    { team: new RegExp(searchTerm, 'i') }
                 ]
             };
             const totalRecords = await UserModel.countDocuments(searchFilter);
@@ -502,9 +507,12 @@ class userController {
                     const data = JSON.parse(s.session);
                     if (!data.userId) continue;
 
-                    const user = await UserModel.findById(data.userId)
+                    if (!mongoose.isValidObjectId(data.userId)) continue;
+                    const user = await UserModel.findOne(
+                        buildAdminManagedUserIdentityFilter(req.adminActor, data.userId))
                         .select('firstName lastName email tel team privileges')
                         .lean();
+                    if (!user) continue;
 
                     activeUsers.push({
                         userId: data.userId,
@@ -531,7 +539,7 @@ class userController {
                 title: 'Ενεργοί Χρήστες',
                 description: 'Web Payroll Solutions',
                 activeUsers,
-                currentUserId: String(req.session.userId)
+                currentUserId: req.adminActor.userId
             });
         } catch (error) {
             logger.error(error);
@@ -541,13 +549,21 @@ class userController {
 
     static sendMessageToUser = async (req, res) => {
         try {
-            const currentUser = await UserModel.findById(req.session.userId).lean();
+            const currentUser = await UserModel.findById(req.adminActor.userId).lean();
 
             const { toUserId, message } = req.body;
 
             if (!toUserId || !message?.trim()) {
                 return res.status(400).json({ success: false, message: 'Missing data' });
             }
+            if (!mongoose.isValidObjectId(toUserId)) {
+                return res.status(400).json({ success: false, message: 'Μη έγκυρος χρήστης' });
+            }
+            const target = await UserModel.findOne(
+                buildAdminManagedUserIdentityFilter(req.adminActor, toUserId))
+                .select('_id team privileges').lean();
+            if (!target) return res.status(404).json({ success: false, message: 'Ο χρήστης δεν βρέθηκε' });
+            assertAdminCanManageTarget(req.adminActor, target);
 
             // ✅ Στείλε το μήνυμα μέσω Socket.io
             const { getIO } = require('../socket');
@@ -556,7 +572,7 @@ class userController {
 
             io.to(roomName).emit('admin:message', {
                 from: `${currentUser.firstName} ${currentUser.lastName}`,
-                fromUserId: String(req.session.userId), // ✅ Προσθήκη
+                fromUserId: req.adminActor.userId,
                 message: message.trim(),
                 sentAt: new Date().toISOString()
             });
@@ -564,7 +580,8 @@ class userController {
             return res.json({ success: true });
         } catch (error) {
             logger.error(error);
-            return res.status(500).json({ success: false, message: 'Server error' });
+            return res.status(Number(error?.status) || 500).json({ success: false,
+                message: Number(error?.status) === 404 ? 'Ο χρήστης δεν βρέθηκε' : 'Server error' });
         }
     };
 
@@ -608,6 +625,10 @@ class userController {
 
     static usageReportPage = async (req, res) => {
         try {
+            const unrestricted = req.adminActor.role === 'A' && req.adminActor.team === 'THA';
+            const managedUsers = unrestricted ? [] : await UserModel.find(
+                buildAdminManagedUserFilter(req.adminActor)).select('_id').lean();
+            const usageMatch = unrestricted ? {} : { userId: { $in: managedUsers.map((user) => user._id) } };
             const greekMonths = [
                 'ΙΑΝΟΥΑΡΙΟΣ',
                 'ΦΕΒΡΟΥΑΡΙΟΣ',
@@ -631,7 +652,7 @@ class userController {
             const athensTimezone = 'Europe/Athens';
 
             const logs = await UsageLogModel.aggregate([
-                { $match: { date: month } },
+                { $match: { date: month, ...usageMatch } },
                 {
                     $group: {
                         _id: { userId: '$userId', team: '$team' },
@@ -646,7 +667,7 @@ class userController {
 
             const [dailyRaw, hourlyRaw, weekdayRaw, dailyUserRaw] = await Promise.all([
                 UsageLogModel.aggregate([
-                    { $match: { date: month } },
+                    { $match: { date: month, ...usageMatch } },
                     {
                         $group: {
                             _id: {
@@ -665,7 +686,7 @@ class userController {
                     { $sort: { '_id.day': 1 } }
                 ]),
                 UsageLogModel.aggregate([
-                    { $match: { date: month } },
+                    { $match: { date: month, ...usageMatch } },
                     {
                         $group: {
                             _id: {
@@ -683,7 +704,7 @@ class userController {
                     { $sort: { '_id.hour': 1 } }
                 ]),
                 UsageLogModel.aggregate([
-                    { $match: { date: month } },
+                    { $match: { date: month, ...usageMatch } },
                     {
                         $group: {
                             _id: {
@@ -701,7 +722,7 @@ class userController {
                     { $sort: { '_id.weekday': 1 } }
                 ]),
                 UsageLogModel.aggregate([
-                    { $match: { date: month } },
+                    { $match: { date: month, ...usageMatch } },
                     {
                         $group: {
                             _id: {
@@ -892,7 +913,13 @@ class userController {
     static exportUsageReport = async (req, res) => {
         try {
             const month = req.query.month || new Date().toISOString().slice(0, 7);
-            const logs = await UsageLogModel.find({ date: month }).sort({ loginAt: 1 }).lean();
+            const unrestricted = req.adminActor.role === 'A' && req.adminActor.team === 'THA';
+            const managedUsers = unrestricted ? [] : await UserModel.find(
+                buildAdminManagedUserFilter(req.adminActor)).select('_id').lean();
+            const usageFilter = unrestricted ? {} :
+                { userId: mongoose.trusted({ $in: managedUsers.map((user) => user._id) }) };
+            const logs = await UsageLogModel.find({ date: month, ...usageFilter })
+                .sort({ loginAt: 1 }).lean();
 
             const rows = [
                 'Team,Χρήστης,Ημ/νία Login,Ημ/νία Logout,Διάρκεια (λεπτά),Τρόπος Κλεισίματος'

@@ -30,6 +30,7 @@ const ektyposhSymbaseonController = require('../controllers/ektyposeis/symbaseis
 const ektyposhApasxolhseonController = require('../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js');
 const E3NJsonSubmitController = require('../controllers/ergazomenoi/e3nJsonSubmitController');
 const userPrivilegesController = require('../controllers/userPrivilegesController');
+const disconnectUsersController = require('../controllers/disconnectUsersController');
 
 // const { savePdfFromBase64, deletePdf } = require('../utils/pdfHandler');
 
@@ -70,8 +71,7 @@ const requireEmploymentReviewAccess = requireUserPrivilegeForm('ElegxosApasxolhs
 const {
     requireCriticalEmploymentDecisionRole
 } = require('../services/ergazomenoi/apasxoliseisCriticalActionAuthorizationService');
-const requireAdminRole = require('../middlewares/requireAdminRole.js');
-const { requireUserPrivilegesManagerRole } = require('../middlewares/requireAdminRole.js');
+const { requireAdminOrSupervisorRole } = require('../middlewares/requireAdminRole.js');
 const sanitizeNumberFields = require('../middlewares/sanitizeNumbers');
 
 // ============================================================================
@@ -140,39 +140,43 @@ router.get('/logout/end_Session', userController.logout);
 // ============================================================================
 // ADMIN ROUTES
 // ============================================================================
-router.get('/admin', requireAdminRole, userController.adminHomepage);
+router.get('/admin', requireAdminOrSupervisorRole, userController.adminHomepage);
 
-router.get('/admin/add', requireAdminRole, userController.addUser);
+router.get('/admin/add', requireAdminOrSupervisorRole, userController.addUser);
 
-router.post('/admin/add', requireAdminRole, userController.postUser);
+router.post('/admin/add', requireAdminOrSupervisorRole, userController.postUser);
 
-router.get('/admin/view/:id', requireAdminRole, userController.viewUser);
+router.get('/admin/view/:id', requireAdminOrSupervisorRole, userController.viewUser);
 
-router.get('/admin/edit/:id', requireAdminRole, userController.editUser);
+router.get('/admin/edit/:id', requireAdminOrSupervisorRole, userController.editUser);
 
-router.put('/admin/edit/:id', requireAdminRole, userController.editPostUser);
+router.put('/admin/edit/:id', requireAdminOrSupervisorRole, userController.editPostUser);
 
-router.delete('/admin/edit/:id', requireAdminRole, userController.deletePostUser);
+router.delete('/admin/edit/:id', requireAdminOrSupervisorRole, userController.deletePostUser);
 
-router.get('/admin/delete/:id', requireAdminRole, userController.checkAndDeletePostUser);
+router.get('/admin/delete/:id', requireAdminOrSupervisorRole, userController.checkAndDeletePostUser);
 
-router.post('/admin/search', requireAdminRole, userController.searchPostUser);
+router.post('/admin/search', requireAdminOrSupervisorRole, userController.searchPostUser);
 
-router.get('/admin/search', requireAdminRole, userController.searchGetUser);
+router.get('/admin/search', requireAdminOrSupervisorRole, userController.searchGetUser);
 
-router.get('/admin/user-privileges', requireUserPrivilegesManagerRole, userPrivilegesController.renderPage);
+router.get('/admin/user-privileges', requireAdminOrSupervisorRole, userPrivilegesController.renderPage);
 
-router.get('/admin/user-privileges/users', requireUserPrivilegesManagerRole, userPrivilegesController.listUsers);
+router.get('/admin/user-privileges/users', requireAdminOrSupervisorRole, userPrivilegesController.listUsers);
 
-router.get('/admin/user-privileges/:userId', requireUserPrivilegesManagerRole, userPrivilegesController.getPrivileges);
+router.get('/admin/user-privileges/:userId', requireAdminOrSupervisorRole, userPrivilegesController.getPrivileges);
 
-router.put('/admin/user-privileges/:userId', requireUserPrivilegesManagerRole, userPrivilegesController.updatePrivileges);
+router.put('/admin/user-privileges/:userId', requireAdminOrSupervisorRole, userPrivilegesController.updatePrivileges);
 
-router.post('/admin/dhmioyrgia-arxeion-neas-xrhshs', checkAuth, adminController.anoigmaNeasXrhshs);
+router.get('/admin/disconnect-users', requireAdminOrSupervisorRole, disconnectUsersController.renderPage);
 
-router.get('/admin/active-sessions', requireAdminRole, userController.activeSessionsPage);
+router.post('/admin/disconnect-users', requireAdminOrSupervisorRole, disconnectUsersController.disconnectUser);
 
-router.post('/admin/send-message', requireAdminRole, userController.sendMessageToUser);
+router.post('/admin/dhmioyrgia-arxeion-neas-xrhshs', requireAdminOrSupervisorRole, adminController.anoigmaNeasXrhshs);
+
+router.get('/admin/active-sessions', requireAdminOrSupervisorRole, userController.activeSessionsPage);
+
+router.post('/admin/send-message', requireAdminOrSupervisorRole, userController.sendMessageToUser);
 
 // ============================================================================
 // MAIN APP ROUTES
@@ -1778,9 +1782,9 @@ router.post('/api/update_session_periodos', kinhseisController.update_session_pe
 
 router.post('/api/usage/heartbeat', checkAuth, userController.heartbeat);
 
-router.get('/admin/usage-report', requireAdminRole, userController.usageReportPage);
+router.get('/admin/usage-report', requireAdminOrSupervisorRole, userController.usageReportPage);
 
-router.get('/admin/usage-report/export', requireAdminRole, userController.exportUsageReport);
+router.get('/admin/usage-report/export', requireAdminOrSupervisorRole, userController.exportUsageReport);
 // ============================================================================
 // ✅ ERROR HANDLING - Multer & PDF Errors
 // ============================================================================
