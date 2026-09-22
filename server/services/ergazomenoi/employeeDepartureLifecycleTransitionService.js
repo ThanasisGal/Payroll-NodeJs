@@ -1,7 +1,8 @@
 'use strict';
 
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
-const { effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
+const { effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
+const { complete } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
 
 function departureError(code) {
@@ -13,6 +14,30 @@ function departureError(code) {
 
 function latestCycleRows(cycle, history) {
     return cycle.history_ids.map(id => history.find(row => String(row._id) === id));
+}
+
+// Schedule dates describe a predeclared plan. The legacy effectiveStart helper
+// falls back to them, so it cannot prove that work terms changed after departure.
+function explicitWorkTermsStart(row = {}) {
+    if (row.afora_allagh_oron_ergasias === false && !complete(row)) return null;
+    return dateKeyUtc(row.hmeromhnia_isxyos_oron_ergasias_apo);
+}
+
+function hasFutureWorkTermsEvent(row, departure) {
+    return [explicitWorkTermsStart(row), dateKeyUtc(row.hmeromhnia_allaghs_symbashs),
+        row.afora_allagh_dialleimatos === true
+            ? dateKeyUtc(row.hmeromhnia_isxyos_dialleimatos_apo) : null]
+        .some(date => date && date > departure);
+}
+
+function departureProfileStart(row) {
+    const explicit = explicitWorkTermsStart(row);
+    if (explicit) return explicit;
+    // Pure legacy rows may only have a schedule date. They can serve as the
+    // existing profile baseline, but never as a future work-terms event.
+    if (row.afora_allagh_oron_ergasias === false ||
+        Object.hasOwn(row, 'hmeromhnia_isxyos_oron_ergasias_apo')) return null;
+    return dateKeyUtc(row.hmeromhnia_allaghs_orarioy_apo);
 }
 
 function buildEmployeeDepartureTransition({ currentEmployee, history = [], departureDate }) {
@@ -28,8 +53,7 @@ function buildEmployeeDepartureTransition({ currentEmployee, history = [], depar
     const hire = dateKeyUtc(currentEmployee.hmeromhnia_proslhpshs);
     if (!hire) throw departureError('EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH');
     if (departure < hire) throw departureError('EMPLOYEE_DEPARTURE_BEFORE_HIRE');
-    if ([effectiveStart(currentEmployee), currentEmployee.hmeromhnia_allaghs_orarioy_apo,
-        currentEmployee.hmeromhnia_allaghs_symbashs].some(value => dateKeyUtc(value) > departure)) {
+    if (hasFutureWorkTermsEvent(currentEmployee, departure)) {
         throw departureError('EMPLOYEE_DEPARTURE_CONFLICT');
     }
     const storedDeparture = dateKeyUtc(currentEmployee.hmeromhnia_apoxorhshs);
@@ -51,19 +75,17 @@ function buildEmployeeDepartureTransition({ currentEmployee, history = [], depar
     if (rows.some(row => !row)) throw departureError('EMPLOYEE_DEPARTURE_HISTORY_REQUIRED');
     if (rows.some(row => {
         const priorDeparture = dateKeyUtc(row.hmeromhnia_apoxorhshs);
-        const eventDates = [effectiveStart(row), row.hmeromhnia_allaghs_orarioy_apo,
-            row.hmeromhnia_allaghs_symbashs, row.hmeromhnia_isxyos_dialleimatos_apo];
         return (priorDeparture && priorDeparture !== departure) ||
-            eventDates.some(value => dateKeyUtc(value) > departure);
+            hasFutureWorkTermsEvent(row, departure);
     })) throw departureError('EMPLOYEE_DEPARTURE_CONFLICT');
 
     const terminalHistoryRow = rows.at(-1) || null;
-    const latestProfileRow = [...rows].reverse().find(row => effectiveStart(row)) || null;
+    const latestProfileRow = [...rows].reverse().find(row => {
+        const start = departureProfileStart(row);
+        return start && start <= departure;
+    }) || null;
     if (rows.length && (!terminalHistoryRow || !latestProfileRow)) {
         throw departureError('EMPLOYEE_DEPARTURE_HISTORY_REQUIRED');
-    }
-    if (latestProfileRow && dateKeyUtc(effectiveStart(latestProfileRow)) > departure) {
-        throw departureError('EMPLOYEE_DEPARTURE_CONFLICT');
     }
     return { departure, cycle, terminalHistoryRow, latestProfileRow,
         clampEmployeeEnd: !dateKeyUtc(currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos) ||

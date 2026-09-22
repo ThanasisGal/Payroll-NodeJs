@@ -169,7 +169,7 @@ test('cancellation history failure rolls back the employee reopening', async () 
     assert.deepEqual(db.state(), closed);
 });
 
-test('same-day departure allowed; before-hire and future history event reject without writes', async () => {
+test('same-day departure and later schedule allowed; before-hire rejects without writes', async () => {
     const initial = auditedFixture(); initial.history = [initial.history[0]];
     initial.employee.hmeromhnia_isxyos_oron_ergasias_apo = '2026-04-25';
     initial.employee.hmeromhnia_allaghs_orarioy_apo = '2026-04-25';
@@ -181,8 +181,137 @@ test('same-day departure allowed; before-hire and future history event reject wi
     await assert.rejects(depart(earlier, '2026-04-24'), { code: 'EMPLOYEE_DEPARTURE_BEFORE_HIRE' });
     assert.equal(earlier.writes(), 0);
     const future = database(auditedFixture());
-    await assert.rejects(depart(future, '2026-06-20'), { code: 'EMPLOYEE_DEPARTURE_CONFLICT' });
-    assert.equal(future.writes(), 0);
+    await depart(future, '2026-06-20');
+    assert.equal(future.state().employee.hmeromhnia_allaghs_orarioy_apo, '2026-07-06');
+    assert.equal(future.state().employee.energos, false);
+});
+
+function firstDayNoShow(scheduleEnd = '2026-06-08') {
+    const hire = '2026-06-01';
+    return { employee: { _id: 'employee-0014', ...scope, archived: false, energos: true,
+        hmeromhnia_proslhpshs: hire, hmeromhnia_apoxorhshs: null,
+        hmeromhnia_allaghs_symbashs: hire,
+        hmeromhnia_isxyos_oron_ergasias_apo: hire,
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        ora_enarxhs_proths_foras: '11:00', ora_apoxorhshs_proths_foras: '17:00',
+        hmeromhnia_allaghs_orarioy_apo: '2026-06-02',
+        hmeromhnia_allaghs_orarioy_eos: scheduleEnd }, history: [
+        { _id: 'history-initial', ...scope, aa_eggrafhs: '0001',
+            hmeromhnia_proslhpshs: hire, hmeromhnia_allaghs_symbashs: hire,
+            hmeromhnia_isxyos_oron_ergasias_apo: hire,
+            hmeromhnia_isxyos_oron_ergasias_eos: null,
+            hmeromhnia_allaghs_orarioy_apo: '2026-06-02',
+            hmeromhnia_allaghs_orarioy_eos: scheduleEnd },
+        { _id: 'history-schedule', ...scope, aa_eggrafhs: '0002',
+            hmeromhnia_proslhpshs: hire, hmeromhnia_allaghs_symbashs: hire,
+            hmeromhnia_allaghs_orarioy_apo: '2026-06-02',
+            hmeromhnia_allaghs_orarioy_eos: scheduleEnd,
+            afora_allagh_oron_ergasias: false,
+            hmeromhnia_isxyos_oron_ergasias_apo: null }
+    ] };
+}
+
+for (const scheduleEnd of ['2026-06-08', '2026-07-01']) {
+    test(`first-day no-show preserves predeclared schedule through ${scheduleEnd}`, async () => {
+        const initial = firstDayNoShow(scheduleEnd), db = database(initial);
+        const selection = buildEmployeeDepartureTransition({ currentEmployee: initial.employee,
+            history: initial.history, departureDate: '2026-06-01' });
+        assert.equal(selection.latestProfileRow._id, 'history-initial');
+        assert.equal(selection.terminalHistoryRow._id, 'history-schedule');
+        const result = await depart(db, '2026-06-01');
+        const after = db.state();
+        assert.equal(result.mode, 'MODE_DEPARTURE');
+        assert.equal(after.employee.hmeromhnia_proslhpshs, '2026-06-01');
+        assert.equal(date(after.employee.hmeromhnia_apoxorhshs), '2026-06-01');
+        assert.equal(after.employee.energos, false);
+        assert.equal(after.employee.ora_enarxhs_proths_foras, '11:00');
+        assert.equal(after.employee.ora_apoxorhshs_proths_foras, '17:00');
+        assert.equal(after.employee.hmeromhnia_allaghs_orarioy_apo, '2026-06-02');
+        assert.equal(after.employee.hmeromhnia_allaghs_orarioy_eos, scheduleEnd);
+        assert.equal(after.history[1].hmeromhnia_allaghs_orarioy_apo, '2026-06-02');
+        assert.equal(after.history[1].hmeromhnia_allaghs_orarioy_eos, scheduleEnd);
+        assert.equal(date(after.history[1].hmeromhnia_apoxorhshs), '2026-06-01');
+        assert.equal(date(after.history[0].hmeromhnia_isxyos_oron_ergasias_eos), '2026-06-01');
+        assert.equal(after.history[1].hmeromhnia_isxyos_oron_ergasias_apo, null);
+        assert.equal(after.history.length, 2);
+        assert.equal(buildEmploymentCycles({ currentEmployee: after.employee, history: after.history }).length, 1);
+    });
+}
+
+test('legacy schedule-only fallback after departure does not become a future profile', async () => {
+    const initial = firstDayNoShow();
+    delete initial.history[1].hmeromhnia_isxyos_oron_ergasias_apo;
+    delete initial.history[1].afora_allagh_oron_ergasias;
+    const db = database(initial);
+    await depart(db, '2026-06-01');
+    assert.equal(db.state().history[1].hmeromhnia_allaghs_orarioy_apo, '2026-06-02');
+    assert.equal(db.state().employee.energos, false);
+});
+
+test('first departure without history anchors its baseline at hire, not future schedule', async () => {
+    const initial = firstDayNoShow();
+    initial.history = [];
+    const db = database(initial);
+    await depart(db, '2026-06-01', { effectiveFrom: '2026-06-02', maintenance: {
+        employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-06-01') },
+        historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-06-01') }
+    } });
+    const after = db.state();
+    assert.equal(after.history.length, 1);
+    assert.equal(date(after.history[0].hmeromhnia_isxyos_oron_ergasias_apo), '2026-06-01');
+    assert.equal(date(after.employee.hmeromhnia_apoxorhshs), '2026-06-01');
+    assert.equal(after.employee.energos, false);
+    assert.equal(after.employee.hmeromhnia_allaghs_orarioy_apo, '2026-06-02');
+    assert.equal(after.employee.hmeromhnia_allaghs_orarioy_eos, '2026-06-08');
+});
+
+test('genuine future contract change rejects departure before writes', async () => {
+    const initial = firstDayNoShow();
+    initial.employee.hmeromhnia_allaghs_symbashs = '2026-06-02';
+    const db = database(initial);
+    await assert.rejects(depart(db, '2026-06-01'), { code: 'EMPLOYEE_DEPARTURE_CONFLICT' });
+    assert.equal(db.writes(), 0);
+});
+
+test('future contract change preserved in history rejects even when current is older', async () => {
+    const initial = firstDayNoShow();
+    initial.history[1].hmeromhnia_allaghs_symbashs = '2026-06-02';
+    const db = database(initial);
+    await assert.rejects(depart(db, '2026-06-01'), { code: 'EMPLOYEE_DEPARTURE_CONFLICT' });
+    assert.equal(db.writes(), 0);
+});
+
+test('complete V1 future work-terms profile rejects even with schedule metadata', async () => {
+    const initial = firstDayNoShow();
+    const future = { _id: 'history-future-profile', ...scope, aa_eggrafhs: '0003',
+        hmeromhnia_proslhpshs: '2026-06-01',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-02',
+        hmeromhnia_allaghs_orarioy_apo: '2026-06-02',
+        afora_allagh_oron_ergasias: true,
+        ...C.normalizeEmploymentProfileSubmission({}, {}) };
+    initial.history.push(future);
+    const db = database(initial);
+    await assert.rejects(depart(db, '2026-06-01'), { code: 'EMPLOYEE_DEPARTURE_CONFLICT' });
+    assert.equal(db.writes(), 0);
+});
+
+test('explicit legacy work-terms version after departure rejects without writes', async () => {
+    const initial = firstDayNoShow();
+    initial.history[1].hmeromhnia_isxyos_oron_ergasias_apo = '2026-06-02';
+    initial.history[1].afora_allagh_oron_ergasias = true;
+    const db = database(initial);
+    await assert.rejects(depart(db, '2026-06-01'), { code: 'EMPLOYEE_DEPARTURE_CONFLICT' });
+    assert.equal(db.writes(), 0);
+});
+
+test('copied break date is ignored; explicit break change remains a conflict', async () => {
+    const initial = firstDayNoShow();
+    initial.history[1].hmeromhnia_isxyos_dialleimatos_apo = '2026-06-02';
+    await depart(database(initial), '2026-06-01');
+    initial.history[1].afora_allagh_dialleimatos = true;
+    const db = database(initial);
+    await assert.rejects(depart(db, '2026-06-01'), { code: 'EMPLOYEE_DEPARTURE_CONFLICT' });
+    assert.equal(db.writes(), 0);
 });
 
 test('earlier profile end is preserved and a newer cycle is rejected without writes', async () => {

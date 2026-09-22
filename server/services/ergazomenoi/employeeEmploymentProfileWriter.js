@@ -526,7 +526,11 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         const transition = buildEmployeeDepartureTransition({ currentEmployee: current, history: rows, departureDate });
         if (!rows.length) {
             // Imported employees retain the established one-row baseline transaction.
-            return writeEmployeeEmploymentProfile({ scope, employeeId, input, effectiveFrom,
+            // A future schedule start is not the validity start of a same-day
+            // departure's first work-terms baseline.
+            const baselineFrom = C.calendarDate(effectiveFrom) > C.calendarDate(transition.departure)
+                ? current.hmeromhnia_proslhpshs : effectiveFrom;
+            return writeEmployeeEmploymentProfile({ scope, employeeId, input, effectiveFrom: baselineFrom,
                 maintenance, connection, employeeModel, historyModel, capabilityProbe,
                 [ACTIVE_SESSION]: session });
         }
