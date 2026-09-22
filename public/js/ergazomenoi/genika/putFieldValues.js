@@ -42,6 +42,16 @@ function withCompactOrdinarySwalClasses(options) {
     } };
 }
 
+function createSingleFlight() {
+    let inProgress = false;
+    return async action => {
+        if (inProgress) return { skipped: true };
+        inProgress = true;
+        try { return await action(); }
+        finally { inProgress = false; }
+    };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const Swal = new Proxy(window.Swal, {
         get(target, property) {
@@ -168,13 +178,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const isEmptyArray = (v) => !Array.isArray(v) || v.length === 0;
     let message = '';
     let erganiUploadInProgress = false;
+    const runFormSubmissionOnce = createSingleFlight();
 
     async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
 
         if (!window.validateEmploymentProfileBreak(document)) return;
-
         const formData = {};
         const filePromises = [];
         const sections = document.querySelectorAll('.card-body');
@@ -1822,7 +1832,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                           maUrlToSend,
                                           result.value?.isPermanent === true,
                                           processCode,
-                                          result.value?.erganiUploadMethod || 'xml'
+                                          result.value?.erganiUploadMethod || 'xml',
+                                          formData.hmeromhnia_metabolhs
                                       );
 
                                 if (
@@ -2179,6 +2190,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+    }
+
+    function handleFormSubmitOnce(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        return runFormSubmissionOnce(() => handleFormSubmit(event));
     }
 
     // ============================================================================
@@ -2611,7 +2628,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================================
     // ✅ MA REST JSON UPLOAD
     // ============================================================================
-    async function submitMARestToErganh(ergazomenosId) {
+    async function submitMARestToErganh(ergazomenosId, hmeromhniaMetabolhs) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
         const ypokatasthma =
@@ -2633,6 +2650,7 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({
                 ergazomenosId,
                 ypokatasthma,
+                hmeromhnia_metabolhs: hmeromhniaMetabolhs,
                 erganiUploadMethod: 'rest'
             })
         });
@@ -2989,7 +3007,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const buttons = document.querySelectorAll('.submitButton');
     buttons.forEach((button) => {
-        button.addEventListener('click', handleFormSubmit);
+        button.addEventListener('click', handleFormSubmitOnce);
     });
 
     // ============================================================================
@@ -4225,7 +4243,8 @@ document.addEventListener('DOMContentLoaded', () => {
         s3Url,
         isPermanent = false,
         processCode = null,
-        erganiUploadMethod = 'xml'
+        erganiUploadMethod = 'xml',
+        hmeromhniaMetabolhs = ''
     ) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const normalizedProcessCode = String(processCode || '')
@@ -4364,7 +4383,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showGenericRestProgressSwal('Οριστική υποβολή MA μέσω REST API');
                 }
 
-                const payload = await submitMARestToErganh(ergazomenosId);
+                const payload = await submitMARestToErganh(ergazomenosId, hmeromhniaMetabolhs);
                 return { success: true, ...payload };
             } catch (error) {
                 if (window.hideLoader) window.hideLoader();
