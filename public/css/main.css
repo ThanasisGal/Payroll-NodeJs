@@ -2868,11 +2868,33 @@ a {
     left: 5% !important;
     transform: translateX(0) !important;
     border-radius: 5% !important;
-    width: auto !important;
+    width: auto;
     background-color: rgb(255, 252, 240) !important;
     box-shadow:
         0 27px 24px 0 rgb(0, 0, 0, 0.5),
         0 40px 37px 0 rgba(0, 0, 0, 0.22) !important;
+}
+
+/* Ordinary dialogs with no declared width follow the application's 600px geometry.
+   Preview/review classes and dialogs with an explicit width retain their own layout. */
+.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):has(> .swal2-icon.swal2-error),
+.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):has(> .swal2-icon.swal2-warning),
+.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):has(> .swal2-icon.swal2-success) {
+    width: min(600px, 90vw) !important;
+    max-width: 90vw !important;
+}
+
+.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):has(> .swal2-icon.swal2-error) .swal2-html-container,
+.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):has(> .swal2-icon.swal2-warning) .swal2-html-container,
+.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):has(> .swal2-icon.swal2-success) .swal2-html-container {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+}
+
+.swal2-popup.ergani-submitted-pdf-popup {
+    width: min(1250px, 94vw) !important;
+    max-width: 94vw !important;
 }
 
 .swal2-popup.swal-employee-out-of-period {
@@ -2990,6 +3012,16 @@ a {
 .custom-html-container {
     max-height: none !important;
     overflow: visible !important;
+}
+
+.custom-swal-popup .ergani-rest-message {
+    max-width: 100% !important;
+    max-height: min(48vh, 380px) !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
 }
 
 .custom-confirm-button {

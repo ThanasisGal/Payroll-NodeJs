@@ -136,16 +136,16 @@ async function buildMAData(ergazomenos, companyData, ypokatasthmataData, options
         let epivolhPdfBase64 = ''; // ✅ MA-ONLY: Αρχείο Επιβολής (δεν υπάρχει στο E3N)
 
         if (ergazomenos.oysiodeis_oroi === '0') {
-            if (ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path) {
+            if (ergazomenos.arxeio_apodoxhs_oysiodon_oron_path) {
                 try {
-                    console.log('📥 [MA-GENERATOR-v1] Downloading contract PDF from S3...');
+                    console.log('📥 [MA-GENERATOR-v1] Downloading essential-terms PDF from S3...');
                     const { downloadFileFromS3 } = require('../s3Helper');
                     const pdfBuffer = await downloadFileFromS3(
-                        ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path
+                        ergazomenos.arxeio_apodoxhs_oysiodon_oron_path
                     );
                     contractPdfBase64 = pdfBuffer.toString('base64');
                     console.log(
-                        `✅ [MA-GENERATOR-v1] Contract PDF: ${contractPdfBase64.length} chars`
+                        `✅ [MA-GENERATOR-v1] Essential-terms PDF: ${contractPdfBase64.length} chars`
                     );
                 } catch (pdfError) {
                     console.error(
@@ -529,16 +529,16 @@ async function generateMAXML(ergazomenos, companyData, ypokatasthmataData, optio
         let epivolhPdfBase64 = ''; // ✅ MA-ONLY: Αρχείο Επιβολής (δεν υπάρχει στο E3N)
 
         if (ergazomenos.oysiodeis_oroi === '0') {
-            if (ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path) {
+            if (ergazomenos.arxeio_apodoxhs_oysiodon_oron_path) {
                 try {
-                    console.log('📥 [MA-GENERATOR-v1] Downloading contract PDF from S3...');
+                    console.log('📥 [MA-GENERATOR-v1] Downloading essential-terms PDF from S3...');
                     const { downloadFileFromS3 } = require('../s3Helper');
                     const pdfBuffer = await downloadFileFromS3(
-                        ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path
+                        ergazomenos.arxeio_apodoxhs_oysiodon_oron_path
                     );
                     contractPdfBase64 = pdfBuffer.toString('base64');
                     console.log(
-                        `✅ [MA-GENERATOR-v1] Contract PDF: ${contractPdfBase64.length} chars`
+                        `✅ [MA-GENERATOR-v1] Essential-terms PDF: ${contractPdfBase64.length} chars`
                     );
                 } catch (pdfError) {
                     console.error(
@@ -1223,4 +1223,4 @@ async function generateMAJSON(ergazomenos, companyData, ypokatasthmataData, opti
     }
 }
 
-module.exports = { generateMAXML, generateMAJSON, buildMAData, buildMAJSON, MA_JSON_FIELDS };
+module.exports = { generateMAXML, generateMAJSON, buildMAData, buildMAXML, buildMAJSON, MA_JSON_FIELDS };

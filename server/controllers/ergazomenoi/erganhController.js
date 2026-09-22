@@ -61,6 +61,7 @@ const {
     buildDigitalCardsUpdateFromPairs
 } = require('../../services/ergazomenoi/prodhlomenaOrariaCardsPolicy');
 const { generateMAJSON } = require('../../utils/xmlGenerators/e3_MA_v1Generator');
+const { validateMaMutationDate } = require('../../utils/erganh/validateMaMutationDate');
 const { generateE5NJSON } = require('../../utils/xmlGenerators/e5N_v1Generator');
 const {
     generateE6NMPXML,
@@ -15103,6 +15104,11 @@ class erganhController {
             }
 
             const body = req.body || {};
+            const mutationDate = validateMaMutationDate(body.hmeromhnia_metabolhs);
+            if (!mutationDate) {
+                return res.status(400).json({ success: false,
+                    message: 'Απαιτείται έγκυρη ημερομηνία μεταβολής για την υποβολή MA.' });
+            }
             const ergazomenosId =
                 body.ergazomenosId || body.employeeId || body.id || body.kodikos || '';
 
@@ -15232,12 +15238,7 @@ class erganhController {
             // 5) JSON + REST API -> Οριστική υποβολή WebMA
             // --------------------------------------------------------------------
             const jsonResult = await generateMAJSON(ergazomenos, companyData, ypokatasthmataData, {
-                hmeromhnia_metabolhs:
-                    body.hmeromhnia_metabolhs ||
-                    body.hmeromhniaMetabolhs ||
-                    ergazomenos.hmeromhnia_metabolhs ||
-                    ergazomenos.hmeromhnia_allaghs_orarioy_apo ||
-                    ergazomenos.hmeromhnia_proslhpshs
+                hmeromhnia_metabolhs: mutationDate
             });
 
             const payload = jsonResult.payload || jsonResult.json;

@@ -13,6 +13,20 @@
             .replace(/'/g, '&#39;');
     }
 
+    function formatSwalMessageHtml(value) {
+        return escapeHtml(value).replace(/\\n|\r\n|\r|\n/g, '<br>');
+    }
+
+    function standardClasses(kind = 'error') {
+        return {
+            confirmButton: `class-${kind} custom-confirm-button custom-swal-button`,
+            cancelButton: 'class-secondary custom-cancel-button custom-swal-button',
+            title: 'custom-title',
+            popup: 'custom-swal-popup',
+            htmlContainer: 'custom-html-container ergani-rest-message'
+        };
+    }
+
     function normalizeResult(result = {}) {
         const submission = result.submission || result.erganh?.submission || {};
         const success = result.success === true;
@@ -133,6 +147,7 @@
             `,
             allowOutsideClick: false,
             showConfirmButton: false,
+            customClass: standardClasses('warning'),
             didOpen: () => global.Swal.showLoading()
         });
     }
@@ -148,6 +163,7 @@
             backdrop: false,
             allowOutsideClick: false,
             width: 1250,
+            customClass: { popup: 'ergani-submitted-pdf-popup' },
             title,
             html: `
                 <div class="ergani-submitted-pdf-result">
@@ -189,8 +205,9 @@
         await global.Swal.fire({
             icon: 'error',
             title: `Αποτυχία υποβολής ${result.submissionCode || 'ΕΡΓΑΝΗ'}`,
-            html: `<p>${escapeHtml(result.errorMessage || 'Η υποβολή δεν ολοκληρώθηκε.')}</p>`,
-            confirmButtonText: 'OK'
+            html: `<p>${formatSwalMessageHtml(result.errorMessage || 'Η υποβολή δεν ολοκληρώθηκε.')}</p>`,
+            confirmButtonText: 'Κλείσιμο',
+            customClass: standardClasses('error')
         });
     }
 
@@ -202,11 +219,12 @@
             html: `
                 ${result.protocol ? `<p>Πρωτόκολλο: <strong>${escapeHtml(result.protocol)}</strong></p>` : ''}
                 <p>Η υποβολή παραμένει επιτυχημένη, αλλά δεν ανακτήθηκε το PDF.</p>
-                <p>${escapeHtml(result.pdfWarning || result.message || 'Δοκιμάστε ξανά αργότερα.')}</p>
+                <p>${formatSwalMessageHtml(result.pdfWarning || result.message || 'Δοκιμάστε ξανά αργότερα.')}</p>
             `,
             showCancelButton: allowManualRetry,
             confirmButtonText: allowManualRetry ? 'Νέα προσπάθεια ανάκτησης PDF' : 'OK',
-            cancelButtonText: 'Κλείσιμο'
+            cancelButtonText: 'Κλείσιμο',
+            customClass: standardClasses('warning')
         });
     }
 
@@ -267,8 +285,9 @@
                         : `Αποτυχία υποβολής ${result.submissionCode || 'ΕΡΓΑΝΗ'}`,
                     html: result.success
                         ? '<p>Η υποβολή ολοκληρώθηκε, αλλά δεν ήταν δυνατή η προβολή του αποτελέσματος.</p>'
-                        : '<p>Δεν ήταν δυνατή η προβολή των λεπτομερειών της αποτυχίας.</p>',
-                    confirmButtonText: 'OK'
+                        : `<p>${formatSwalMessageHtml(result.errorMessage || 'Δεν ήταν δυνατή η προβολή των λεπτομερειών της αποτυχίας.')}</p>`,
+                    confirmButtonText: 'Κλείσιμο',
+                    customClass: standardClasses(result.success ? 'warning' : 'error')
                 });
             } catch (_) {
                 // Το submission result παραμένει αμετάβλητο ακόμη και αν αποτύχει το fallback UI.
@@ -279,6 +298,7 @@
 
     const api = {
         escapeHtml,
+        formatSwalMessageHtml,
         normalizeResult,
         getSafeSameOriginPdfUrl,
         closeLoaders,

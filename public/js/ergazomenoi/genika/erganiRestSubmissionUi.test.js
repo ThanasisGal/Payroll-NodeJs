@@ -276,6 +276,22 @@ test('dynamic values are escaped before SweetAlert HTML', () => {
     );
 });
 
+test('MA validation keeps both messages, wraps line breaks and escapes HTML', async () => {
+    let dialog;
+    const ui = loadUi({ swalImpl: (options) => { dialog = options; return { isConfirmed: true }; } });
+    const message = 'Έχει λήξει η περίοδος αποδοχής\\nΥπάρχει ήδη αναγγελία\n' +
+        '<img src=x onerror="alert(1)">';
+    await ui.presentSubmissionResultSafely({ success: false, submissionCode: 'WebMA', message });
+    assert.equal(dialog.icon, 'error');
+    assert.equal(dialog.confirmButtonText, 'Κλείσιμο');
+    assert.equal(dialog.customClass.popup, 'custom-swal-popup');
+    assert.equal(dialog.customClass.title, 'custom-title');
+    assert.match(dialog.customClass.htmlContainer, /custom-html-container/);
+    assert.match(dialog.customClass.confirmButton, /class-error custom-confirm-button custom-swal-button/);
+    assert.match(dialog.html, /αποδοχής<br>Υπάρχει ήδη αναγγελία<br>&lt;img/);
+    assert.doesNotMatch(dialog.html, /<img|\\n/);
+});
+
 test('PDF modal links protect new tabs without escaping plain SweetAlert titles', () => {
     const source = fs.readFileSync(modulePath, 'utf8');
     assert.match(source, /target="_blank" rel="noopener noreferrer"/);
