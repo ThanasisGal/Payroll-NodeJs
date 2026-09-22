@@ -13,6 +13,7 @@ const expectedCoverage = [
     'ergazomenoi/genika/employmentProfileUi',
     'ergazomenoi/genika/employeeTableReturnState',
     'admin/userPrivilegesManagement',
+    'admin/disconnectUsers',
     'kinhseis/apasxolhseis/payrollPhasesPanel',
     'Krathseis/nestingTables',
     'Krathseis/selectRowInTable',
@@ -120,6 +121,20 @@ const references = collectLiteralScriptReferences();
 const productionArrays = parseProductionArrays();
 const processingLoops = parseProcessingLoops();
 const sourceEntries = new Map();
+
+for (const key of ['admin/userPrivilegesManagement', 'admin/disconnectUsers']) {
+    assert.ok(references.has(key), `Required Admin EJS script reference is missing: ${key}`);
+}
+for (const [key, locations] of references) {
+    if (!key.startsWith('admin/')) continue;
+    const sourcePath = `public/js/${key}.js`;
+    assert.ok(fs.existsSync(path.join(repositoryRoot, sourcePath)),
+        `Admin EJS script ${key} has no source; references: ${locations.join(', ')}`);
+    assert.strictEqual((productionArrays.get('admin_files') || []).filter((entry) => entry === sourcePath).length,
+        1, `Admin EJS script ${key} must occur exactly once in admin_files`);
+}
+assert.deepStrictEqual(processingLoops.get('admin_files'), ['false'],
+    'admin_files must use the normal minification and obfuscation phase');
 
 for (const [arrayName, sources] of productionArrays) {
     sources.forEach((sourcePath) => {

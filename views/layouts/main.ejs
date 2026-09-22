@@ -401,6 +401,21 @@
                     console.log('✅ Joined room:', data.room); // ✅ ΠΡΟΣΘΕΣΕ
                 });
 
+                socket.on('admin:force-logout', function () {
+                    // The redirect is scheduled first: notification failures cannot keep
+                    // a client on a page after the server-side session was destroyed.
+                    window.setTimeout(() => window.location.replace('/login'), 900);
+                    try {
+                        window.hideLoader?.();
+                        window.Swal?.close?.();
+                        window.Swal?.fire({ icon: 'info', title: 'Η συνεδρία σας τερματίστηκε από διαχειριστή.',
+                            showConfirmButton: false, allowOutsideClick: false, allowEscapeKey: false,
+                            timer: 900 })?.catch?.(() => {});
+                    } catch (error) {
+                        console.warn('Force logout notification unavailable');
+                    }
+                });
+
                 // EFKA progress events (percent + message + step/totalSteps)
                 socket.on('efka:progress', function (data) {
                     console.log('PROGRESS FROM SERVER:', data);

@@ -33,7 +33,7 @@ const usageLogSchema = new Schema(
         },
         closedBy: {
             type: String,
-            enum: ['logout', 'browser_close', 'session_expired', null],
+            enum: ['logout', 'browser_close', 'session_expired', 'admin_forced_logout', null],
             default: null
         },
         date: {

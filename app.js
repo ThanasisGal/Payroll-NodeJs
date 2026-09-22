@@ -60,7 +60,7 @@ require('./server/config/aws');
 
 const getSessionVars = require('./server/middlewares/session-variables');
 const logger = require('./server/utils/logger');
-const { isAdminUserRole, isUserPrivilegesManagerRole } = require('./server/constants/userRoles');
+const { isAdminUserRole, isAdminOrSupervisorRole, isUserPrivilegesManagerRole } = require('./server/constants/userRoles');
 
 // ============================================================================
 // ✅ TEXT CACHE SYSTEM IMPORTS
@@ -75,6 +75,7 @@ const { startUsageCleanupGuarded } = require('./server/utils/usageCleanupStartup
 const app = express();
 app.disable('x-powered-by');
 app.locals.isUserPrivilegesManagerRole = isUserPrivilegesManagerRole;
+app.locals.isAdminOrSupervisorRole = isAdminOrSupervisorRole;
 app.locals.isAdminUserRole = isAdminUserRole;
 
 const cdnProxy = require('./server/middlewares/cdnProxy');

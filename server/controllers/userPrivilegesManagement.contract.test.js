@@ -82,7 +82,7 @@ test('A/S middleware admits active A and S and rejects HR/C/U/V for page and API
     const originalFindById = UserModel.findById;
     try {
         for (const role of USER_ROLE_CODES) {
-            UserModel.findById = () => ({ select: () => ({ lean: async () => ({ privileges: role, situation: 'A' }) }) });
+            UserModel.findById = () => ({ select: () => ({ lean: async () => ({ _id: 'actor', privileges: role, situation: 'A', team: 'TEAM1' }) }) });
             let nextCalls = 0;
             const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, send() { return this; }, redirect() { return this; } };
             await requireUserPrivilegesManagerRole({ session: { userId: 'actor' } }, res, () => { nextCalls += 1; });
@@ -457,10 +457,10 @@ test('transaction rolls back earlier row when a later version guard does not mat
 test('routes protect page and both APIs with the A/S middleware', () => {
     const routes = fs.readFileSync(path.join(root, 'server/routes/usersRoute.js'), 'utf8');
     for (const signature of [
-        "router.get('/admin/user-privileges', requireUserPrivilegesManagerRole",
-        "router.get('/admin/user-privileges/users', requireUserPrivilegesManagerRole",
-        "router.get('/admin/user-privileges/:userId', requireUserPrivilegesManagerRole",
-        "router.put('/admin/user-privileges/:userId', requireUserPrivilegesManagerRole"
+        "router.get('/admin/user-privileges', requireAdminOrSupervisorRole",
+        "router.get('/admin/user-privileges/users', requireAdminOrSupervisorRole",
+        "router.get('/admin/user-privileges/:userId', requireAdminOrSupervisorRole",
+        "router.put('/admin/user-privileges/:userId', requireAdminOrSupervisorRole"
     ]) assert.ok(routes.includes(signature), signature);
 });
 
@@ -473,11 +473,11 @@ test('user API projection excludes all sensitive fields', () => {
 });
 
 test('selected user validation rejects malformed and missing ObjectIds', async () => {
-    await assert.rejects(() => userPrivilegesController.requireExistingUser('not-an-object-id', 'TEAM1'), (error) => error.code === 'INVALID_USER_ID');
+    await assert.rejects(() => userPrivilegesController.requireExistingUser('not-an-object-id', { userId: 'actor', role: 'A', team: 'TEAM1' }), (error) => error.code === 'INVALID_USER_ID');
     const originalFindOne = UserModel.findOne;
     try {
         UserModel.findOne = () => ({ select: () => ({ lean: async () => null }) });
-        await assert.rejects(() => userPrivilegesController.requireExistingUser(String(id(8)), 'TEAM1'), (error) => error.code === 'USER_NOT_FOUND');
+        await assert.rejects(() => userPrivilegesController.requireExistingUser(String(id(8)), { userId: 'actor', role: 'A', team: 'TEAM1' }), (error) => error.code === 'USER_NOT_FOUND');
     } finally {
         UserModel.findOne = originalFindOne;
     }
@@ -494,7 +494,7 @@ test('controller returns safe 400 and 404 responses for invalid and missing user
     }
 
     const invalid = response();
-    await userPrivilegesController.getPrivileges({ session: { userTeam: 'TEAM1' }, params: { userId: 'not-an-object-id' } }, invalid);
+    await userPrivilegesController.getPrivileges({ adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' }, params: { userId: 'not-an-object-id' } }, invalid);
     assert.strictEqual(invalid.statusCode, 400);
     assert.strictEqual(invalid.payload.code, 'INVALID_USER_ID');
 
@@ -502,7 +502,7 @@ test('controller returns safe 400 and 404 responses for invalid and missing user
     try {
         UserModel.findOne = () => ({ select: () => ({ lean: async () => null }) });
         const missing = response();
-        await userPrivilegesController.getPrivileges({ session: { userTeam: 'TEAM1' }, params: { userId: String(id(8)) } }, missing);
+        await userPrivilegesController.getPrivileges({ adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' }, params: { userId: String(id(8)) } }, missing);
         assert.strictEqual(missing.statusCode, 404);
         assert.strictEqual(missing.payload.code, 'USER_NOT_FOUND');
     } finally {
@@ -521,12 +521,63 @@ test('users dropdown response contains only safe descriptive fields and central 
             })
         });
         const res = { payload: null, json(value) { this.payload = value; return this; }, status() { return this; } };
-        await userPrivilegesController.listUsers({ session: { userTeam: 'TEAM1' } }, res);
+        await userPrivilegesController.listUsers({ adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' } }, res);
         assert.strictEqual(res.payload.items[0].roleLabel, 'Supervisor');
         assert.deepStrictEqual(Object.keys(res.payload.items[0]).sort(), ['active', 'label', 'role', 'roleLabel', 'value']);
         assert.ok(!JSON.stringify(res.payload).includes('must-not-leak'));
     } finally {
         UserModel.find = originalFind;
+    }
+});
+
+test('Supervisor privilege list and target lookup enforce canonical role/team/self scope', async () => {
+    const originalFind = UserModel.find;
+    const originalFindOne = UserModel.findOne;
+    const actor = { userId: String(id(1)), role: 'S', team: 'TEAM1' };
+    const targetId = String(id(2));
+    const filters = [];
+    try {
+        UserModel.find = (filter) => {
+            filters.push(filter);
+            return { select() { return this; }, sort() { return this; }, lean: async () => [] };
+        };
+        const res = { json(payload) { this.payload = payload; return this; } };
+        await userPrivilegesController.listUsers({ adminActor: actor }, res);
+        assert.deepStrictEqual(res.payload.items, []);
+        assert.ok(filters[0].team.test('TEAM1'));
+        assert.deepStrictEqual(filters[0].privileges.$in, ['HR', 'C', 'U', 'V']);
+        assert.strictEqual(String(filters[0]._id.$ne), actor.userId);
+
+        UserModel.findOne = (filter) => {
+            filters.push(filter);
+            return { select() { return this; }, lean: async () => null };
+        };
+        await assert.rejects(() => userPrivilegesController.requireExistingUser(actor.userId, actor),
+            { status: 404 });
+        await assert.rejects(() => userPrivilegesController.requireExistingUser(targetId, actor),
+            { status: 404 });
+        assert.deepStrictEqual(filters.at(-1).privileges.$in, ['HR', 'C', 'U', 'V']);
+        assert.ok(filters.at(-1).team.test('TEAM1'));
+    } finally {
+        UserModel.find = originalFind;
+        UserModel.findOne = originalFindOne;
+    }
+});
+
+test('THA Admin privilege lookup accepts another-team A/S target', async () => {
+    const originalFindOne = UserModel.findOne;
+    const targetId = String(id(9));
+    try {
+        UserModel.findOne = (filter) => {
+            assert.deepStrictEqual(filter, { _id: targetId });
+            return { select() { return this; }, lean: async () =>
+                ({ _id: targetId, team: 'OTHER', privileges: 'S' }) };
+        };
+        const user = await userPrivilegesController.requireExistingUser(targetId,
+            { userId: String(id(1)), role: 'A', team: 'THA' });
+        assert.strictEqual(user.privileges, 'S');
+    } finally {
+        UserModel.findOne = originalFindOne;
     }
 });
 
@@ -606,7 +657,7 @@ test('mutating route remains under the global CSRF contract', () => {
 
 test('sidebar uses the centralized A/S helper', () => {
     const source = fs.readFileSync(path.join(root, 'views/partials/sidebar.ejs'), 'utf8');
-    assert.ok(source.includes('isUserPrivilegesManagerRole(userRole)'));
+    assert.ok(source.includes('isAdminOrSupervisorRole(userRole)'));
     assert.ok(source.includes('/admin/user-privileges'));
     assert.ok(!/userRole\s*===\s*['"](?:A|S)['"]/.test(source));
 });
@@ -622,7 +673,9 @@ test('catalog visible order exactly matches canonical data-privilege-form sideba
     assert.strictEqual(new Set(visibleCatalog.map((entry) => entry.sidebarOrder)).size, visibleCatalog.length);
     assert.deepStrictEqual(
         visibleCatalog.map((entry) => entry.sidebarOrder),
-        sidebarForms.map((_, index) => (index + 1) * 1000)
+        [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 9500,
+            10000, 10500, 11000, 12000, 13000, 14000, 15000, 16000,
+            17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000]
     );
     const employmentReview = visibleCatalog.find((entry) => entry.form === 'ElegxosApasxolhseonPeriodoy');
     assert.strictEqual(employmentReview.sidebarOrder, 12000);

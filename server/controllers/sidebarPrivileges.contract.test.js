@@ -37,8 +37,8 @@ for (const form of [
     'EktyposhSymbaseonErgazomenon'
 ]) assert.ok(sidebar.includes(`data-privilege-form="${form}"`), form);
 
-assert.ok(sidebar.includes('data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"'));
-assert.ok(sidebar.includes('<% if (isUserPrivilegesManagerRole(userRole)) { %>'));
+assert.ok(sidebar.includes('data-sidebar-authorized="<%= isAdminOrSupervisorRole(userRole) %>"'));
+assert.ok(sidebar.includes('<% if (isAdminOrSupervisorRole(userRole)) { %>'));
 assert.ok(sidebar.includes('href="../../../login/logout"'));
 assert.ok(sidebar.includes('data-sidebar-special data-sidebar-authorized="true"'));
 assert.ok(!/\son[a-z]+\s*=/.test(sidebar));
