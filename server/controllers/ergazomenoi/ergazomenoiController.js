@@ -1373,7 +1373,18 @@ class ergazomenoiController {
             if (error.statusCode === 409) return res.status(409).json({
                 success: false, reason: error.code, message: error.message
             });
-            return res.status(500).json({ success: false, errorMessage: 'Σφάλμα ελέγχου εργαζομένου' });
+            console.error('Employee add persistence target check failed', {
+                team: sessionUserTeam,
+                company_kod: sessionCompanyInUse,
+                errorName: error.name,
+                errorCode: error.code,
+                errorPath: error.path,
+                errorKind: error.kind
+            });
+            const safeMessage = 'Δεν ήταν δυνατός ο έλεγχος του εργαζομένου. ' +
+                'Η αποθήκευση δεν πραγματοποιήθηκε. ' +
+                'Παρακαλώ δοκιμάστε ξανά ή επικοινωνήστε με τον διαχειριστή.';
+            return res.status(500).json({ success: false, message: safeMessage, errorMessage: safeMessage });
         }
         formData.afm_ergazomenoyHidden = persistenceTarget.afm;
 
@@ -4404,10 +4415,10 @@ class ergazomenoiController {
                     team: formData.team,
                     company_kod: formData.company_kod,
                     kodikos: formData.kodikosHidden,
-                    hmeromhnia: {
+                    hmeromhnia: mongoose.trusted({
                         $gte: new Date(formData.hmeromhnia_allaghs_orarioy_apo),
                         $lte: new Date(formData.hmeromhnia_allaghs_orarioy_eos)
-                    }
+                    })
                 })
                     .sort({ hmeromhnia: 1 })
                     .lean();

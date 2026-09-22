@@ -18,7 +18,7 @@ async function resolveEmployeeAddPersistenceTarget({ employeeModel, historyModel
     const filter = { team: scope.team, company_kod: scope.company_kod };
     const escapedAfm = afm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const employees = afm ? await employeeModel.find({ ...filter,
-        afm: { $regex: `^\\s*${escapedAfm}\\s*$` } }) : [];
+        afm: mongoose.trusted({ $regex: `^\\s*${escapedAfm}\\s*$` }) }) : [];
     if (existingEmployeeId != null && existingEmployeeId !== '') {
         if (!mongoose.isValidObjectId(existingEmployeeId)) throw conflict(
             'EMPLOYEE_ADD_IDENTITY_CONFLICT', 'Μη έγκυρο αναγνωριστικό επανάληψης.');

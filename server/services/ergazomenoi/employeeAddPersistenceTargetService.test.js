@@ -2,6 +2,10 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const mongoose = require('mongoose');
+const { ErgazomenoiModel } = require('../../models/ergazomenoi');
 const { resolveEmployeeAddPersistenceTarget: resolve } = require('./employeeAddPersistenceTargetService');
 const scope = { team: 'team', company_kod: 'company' };
 const hire = '2026-09-21';
@@ -25,6 +29,25 @@ function fixture(employees = [employee], rows = [history]) {
 const request = (db, extra = {}) => resolve({ ...db, scope,
     formData: { afm_ergazomenoyHidden: ' 123456789 ', amka_ergazomenoyHidden: '12345678901',
         hmeromhnia_proslhpshs: hire, ...extra.formData }, existingEmployeeId: extra.hint });
+test('AFM selector survives real Ergazomenoi sanitize and cast', async () => {
+    const previous = mongoose.get('sanitizeFilter');
+    mongoose.set('sanitizeFilter', true);
+    try {
+        let checked = false;
+        const employeeModel = { find(filter) {
+            const query = ErgazomenoiModel.find(filter);
+            mongoose.sanitizeFilter(query.getFilter());
+            assert.doesNotThrow(() => query.cast(ErgazomenoiModel));
+            assert.equal(query.getFilter().afm.$regex, '^\\s*123456789\\s*$');
+            checked = true;
+            return Promise.resolve([]);
+        } };
+        assert.equal((await request({ employeeModel, historyModel: {} })).action, 'CREATE_NEW');
+        assert.equal(checked, true);
+    } finally {
+        mongoose.set('sanitizeFilter', previous);
+    }
+});
 async function rejected(db, extra, reason) {
     await assert.rejects(request(db, extra), e => e.statusCode === 409 && e.code === reason);
     assert.equal(db.writes(), 0);
@@ -62,4 +85,27 @@ test('foreign, mismatched and invalid retry hints reject', async () => {
     await rejected(fixture([{ ...employee, _id: id, afm: '987654321' }]), { hint: id },
         'EMPLOYEE_ADD_IDENTITY_CONFLICT');
     await rejected(fixture(), { hint: 'invalid' }, 'EMPLOYEE_ADD_IDENTITY_CONFLICT');
+});
+test('safe 409 business messages reach both employee add error dialogs', async () => {
+    const conflicts = [
+        [fixture([{ ...employee, amka: '99999999999' }]), {}, 'Το ΑΜΚΑ διαφέρει'],
+        [fixture([{ ...employee, hmeromhnia_proslhpshs: '2026-09-20' }]), {}, 'Η ημερομηνία πρόσληψης διαφέρει'],
+        [fixture([{ ...employee, energos: false }]), {}, 'Χρησιμοποιήστε την επαναπρόσληψη']
+    ];
+    const sourceRoot = path.resolve(__dirname, '../../../public/js/ergazomenoi/genika');
+    for (const name of ['getFieldValues.js', 'putFieldValues.js']) {
+        const source = fs.readFileSync(path.join(sourceRoot, name), 'utf8');
+        const expression = source.match(/message = (data\?\.message \|\| data\?\.errorMessage \|\| '');/);
+        assert.ok(expression, name);
+        assert.match(source, /text: String\(message \|\| err\)/);
+        const displayed = new Function('data', `return ${expression[1]};`);
+        for (const [db, extra, expected] of conflicts) {
+            await assert.rejects(request(db, extra), error => {
+                assert.equal(error.statusCode, 409);
+                assert.match(displayed({ message: error.message }), new RegExp(expected));
+                assert.doesNotMatch(displayed({ message: error.message }), /HTTP 409/);
+                return true;
+            });
+        }
+    }
 });

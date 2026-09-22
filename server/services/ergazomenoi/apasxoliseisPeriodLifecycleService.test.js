@@ -294,7 +294,8 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
     const submissionModel = { findOne(filter) { assert.strictEqual(filter.ypokatasthma_kodikos, '0001');
         assert.strictEqual(String(filter.companykod_object), scope.company_kod);
         assert.strictEqual(filter.submission_code, 'WTODailyA');
-        assert.deepStrictEqual(filter.submission_id, { $type: 'number', $gt: 0 });
+        assert.strictEqual(filter.submission_id.$type, 'number');
+        assert.strictEqual(filter.submission_id.$gt, 0);
         assert.strictEqual(filter.process_code, undefined);
         assert.strictEqual(filter.employment_period_start.toISOString().slice(0, 10), scope.period_start);
         assert.strictEqual(filter.employment_period_end.toISOString().slice(0, 10), scope.period_end);
@@ -308,7 +309,8 @@ const snapshotInput = { dailyResults: [{ kodikos: '1', hmeromhnia: '2026-06-01',
     const productionSubmission = { ...submission, _id: '507f1f77bcf86cd799439015', submission_id: 207 };
     const productionSubmissionModel = { findOne(filter) {
         assert.strictEqual(filter.submission_code, 'WTODailyA');
-        assert.deepStrictEqual(filter.submission_id, { $type: 'number', $gt: 0 });
+        assert.strictEqual(filter.submission_id.$type, 'number');
+        assert.strictEqual(filter.submission_id.$gt, 0);
         assert.strictEqual(filter.process_code, undefined);
         return query(productionSubmission);
     } };

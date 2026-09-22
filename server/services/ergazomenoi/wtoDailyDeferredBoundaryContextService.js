@@ -1,4 +1,5 @@
 'use strict';
+const mongoose = require('mongoose');
 const WorkflowState = require('../../models/apasxoliseisWeeklyHrWorkflowState');
 const Decision = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
 const { deriveDeferredWeekScope } = require('./apasxoliseisEmploymentPeriodScopeService');
@@ -53,7 +54,7 @@ async function loadWtoDailyDeferredBoundaryContext({ scope, frozenSnapshot, sess
     }));
     const ids = assessed.filter((week) => week.requirement_status === REQUIREMENT_STATUS.REQUIRED).map((week) => week.deferred_week_id);
     const decisions = ids.length ? await decisionModel.find({ team: scope.team, company_kod: scope.company_kod,
-        ypokatasthma: scope.ypokatasthma, deferred_week_id: { $in: ids }, resolution_kind: 'DEFERRED_CROSS_PERIOD_REPO_RESOLUTION' }).lean() : [];
+        ypokatasthma: scope.ypokatasthma, deferred_week_id: mongoose.trusted({ $in: ids }), resolution_kind: 'DEFERRED_CROSS_PERIOD_REPO_RESOLUTION' }).lean() : [];
     return { deferredWeeks: assessed, decisions };
 }
 function workflowBoundaryStart(week, periodStart) { return week.week_start > periodStart ? week.week_start : periodStart; }

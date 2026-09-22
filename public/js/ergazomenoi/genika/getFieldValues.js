@@ -839,7 +839,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ct = response.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
                 const data = await response.json();
-                message = data?.errorMessage || '';
+                message = data?.message || data?.errorMessage || '';
 
                 if (!response.ok || !data?.success) {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);

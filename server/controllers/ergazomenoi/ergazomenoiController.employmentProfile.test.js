@@ -129,13 +129,13 @@ function handler(mode, db) {
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     const constants = source.slice(source.indexOf('const fieldsStoixeionSymbashs'), source.indexOf('function parseS3Uri'));
     return vm.runInNewContext(`${constants}\n${helpers}\n(${body}\nreturn res.json({ success: true });\n})`, {
-        Date, console: { log() {}, error() {} }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
+        Date, console: { log() {}, error(...args) { db.logs?.push(args); } }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
         ErgazomenoiModel: db.employeeModel, IstorikoProslhpseonAllagonModel: db.historyModel,
         ...require('../../services/ergazomenoi/employeeAddSubmittedPatchService'),
-        resolveEmployeeAddPersistenceTarget: async () => db.state().employee && db.retryTarget
+        resolveEmployeeAddPersistenceTarget: db.resolveTarget || (async () => db.state().employee && db.retryTarget
             ? { action: 'CORRECT_EXISTING', employee: db.state().employee,
                 history: db.state().history[0], afm: '123456789' }
-            : { action: 'CREATE_NEW', afm: '' },
+            : { action: 'CREATE_NEW', afm: '' }),
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
         writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }),
         writeEmployeeDepartureCancellation: args => W.writeEmployeeDepartureCancellation({ ...args, ...db.deps }),
@@ -151,6 +151,29 @@ async function submit(mode, input, db = memory()) {
     assert.equal(mongoose.connection.readyState, 0);
     return { db, res };
 }
+test('employee add preserves 409 messages and hides unexpected technical failure', async () => {
+    const conflictDb = memory();
+    conflictDb.resolveTarget = async () => {
+        throw Object.assign(new Error('Η ημερομηνία πρόσληψης διαφέρει.'),
+            { statusCode: 409, code: 'EMPLOYEE_ADD_HIRE_DATE_CONFLICT' });
+    };
+    const conflict = await submit('add', form(), conflictDb);
+    assert.equal(conflict.res.code, 409);
+    assert.equal(conflict.res.body.message, 'Η ημερομηνία πρόσληψης διαφέρει.');
+
+    const failureDb = memory();
+    failureDb.logs = [];
+    failureDb.resolveTarget = async () => {
+        throw Object.assign(new Error('Cast failed for synthetic 123456789'),
+            { name: 'CastError', path: 'afm', kind: 'string' });
+    };
+    const failure = await submit('add', form(), failureDb);
+    assert.equal(failure.res.code, 500);
+    assert.equal(failure.res.body.message, failure.res.body.errorMessage);
+    assert.match(failure.res.body.message, /Η αποθήκευση δεν πραγματοποιήθηκε/);
+    assert.doesNotMatch(JSON.stringify(failureDb.logs), /123456789|Cast failed/);
+    assert.equal(failureDb.logs[0][1].errorPath, 'afm');
+});
 async function initial(input = {}) {
     const { db, res } = await submit('add', { ...form(), ...input });
     assert.equal(res.code, 200, res.body?.errorMessage); return db.state();
@@ -599,6 +622,9 @@ test('controller downstream Save response, PDF, ERGANI and schedule code unchang
         let chunk = baseline.slice(oldStart, oldEnd).trimEnd();
         // Section separators immediately before the moved history are not executable.
         chunk = chunk.replace(/\n\s*\/\/ =+$/, '');
+        if (start.includes('ΕΠΕΞΕΡΓΑΣΙΑ PDF')) chunk = chunk.replace(
+            /hmeromhnia: \{\n\s*\$gte: new Date\(formData\.hmeromhnia_allaghs_orarioy_apo\),\n\s*\$lte: new Date\(formData\.hmeromhnia_allaghs_orarioy_eos\)\n\s*\}/,
+            match => match.replace('hmeromhnia: {', 'hmeromhnia: mongoose.trusted({').replace(/\n(\s*)\}$/, '\n$1})'));
         assert(source.slice(newStart).startsWith(chunk), start);
     }
 });

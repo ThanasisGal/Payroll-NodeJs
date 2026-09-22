@@ -33,7 +33,7 @@ const { ErgazomenoiModel, OrariaModel, ProdhlomenaOrariaModel } = Models_D;
 
 // Το ApoysiesModel δεν χρησιμοποιείται πλέον στις Απασχολήσεις.
 // Οι ώρες απουσίας διαβάζονται από ProdhlomenaOrariaModel.ores_apoysias_apologistika.
-const { ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
+const { ApasxolhseisModel, AstheneiesModel } = Models_E;
 const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
 const {
     generateAndSaveWorkFactsForEmployeePeriod,
@@ -2294,16 +2294,21 @@ class kinhseisController {
     static getSynoloArgion = async (req, res) => {
         try {
             const { team, company_kod, etos, startDate, endDate } = req.body;
+            const rangeStart = new Date(startDate);
+            const rangeEnd = new Date(endDate);
+            if (!Number.isFinite(rangeStart.getTime()) || !Number.isFinite(rangeEnd.getTime())) {
+                return res.status(400).json({ error: 'Μη έγκυρο διάστημα ημερομηνιών.' });
+            }
 
             // Δημιουργούμε το φίλτρο για το ArgiesModel
             const filter = {
                 team: team,
                 company_kod: company_kod,
                 etos: etos,
-                hmeromhnia: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate)
-                }
+                hmeromhnia: mongoose.trusted({
+                    $gte: rangeStart,
+                    $lte: rangeEnd
+                })
             };
 
             // Ανακτούμε τις εγγραφές που ταιριάζουν
@@ -2418,6 +2423,11 @@ class kinhseisController {
     static getSynoloProhgoymenonAstheneion = async (req, res) => {
         try {
             const { team, company_kod, xrhsh, kodikos, startDate, endDate } = req.body;
+            const rangeStart = new Date(startDate);
+            const rangeEnd = new Date(endDate);
+            if (!Number.isFinite(rangeStart.getTime()) || !Number.isFinite(rangeEnd.getTime())) {
+                return res.status(400).json({ error: 'Μη έγκυρο διάστημα ημερομηνιών.' });
+            }
 
             // Δημιουργούμε το φίλτρο για το AstheneiesModel
             const filter = {
@@ -2425,10 +2435,10 @@ class kinhseisController {
                 company_kod: company_kod,
                 xrhsh: xrhsh,
                 kodikos: kodikos,
-                apo_hmeromhnia_01: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate)
-                }
+                apo_hmeromhnia_01: mongoose.trusted({
+                    $gte: rangeStart,
+                    $lte: rangeEnd
+                })
             };
 
             const prohgoymenesAstheneies = await AstheneiesModel.find(filter);
@@ -2461,14 +2471,19 @@ class kinhseisController {
     static get_Asfalistikes_Klaseis_Gia_Epidothsh_Efka = async (req, res) => {
         try {
             const { etos, pragmatikoHmeromisthioParsed } = req.body;
+            const dailyWage = Number(pragmatikoHmeromisthioParsed);
+            if (pragmatikoHmeromisthioParsed === null || pragmatikoHmeromisthioParsed === '' ||
+                !Number.isFinite(dailyWage)) {
+                return res.status(400).json({ error: 'Μη έγκυρο ημερομίσθιο.' });
+            }
 
             const query = {
                 $or: [
-                    { kodikos: { $in: ['03', '08'] }, etos: etos },
+                    { kodikos: mongoose.trusted({ $in: ['03', '08'] }), etos: etos },
                     {
                         etos: etos,
-                        apo_orio: { $lte: pragmatikoHmeromisthioParsed },
-                        eos_orio: { $gte: pragmatikoHmeromisthioParsed }
+                        apo_orio: mongoose.trusted({ $lte: dailyWage }),
+                        eos_orio: mongoose.trusted({ $gte: dailyWage })
                     }
                 ]
             };
@@ -2609,25 +2624,34 @@ class kinhseisController {
         try {
             const { team, company_kod, xrhsh, kodikos, startDate, endDate } = req.body;
 
-            // Δημιουργούμε το φίλτρο για το AstheneiesModel
+            const rangeStart = new Date(startDate);
+            const rangeEnd = new Date(endDate);
+            if (!Number.isFinite(rangeStart.getTime()) || !Number.isFinite(rangeEnd.getTime()) || rangeStart > rangeEnd) {
+                return res.status(400).json({ error: 'Μη έγκυρο διάστημα ημερομηνιών.' });
+            }
+
+            // Οι θέσεις άδειας αποθηκεύονται στην εγγραφή απασχόλησης της περιόδου.
             const filter = {
-                team: team,
-                company_kod: company_kod,
-                xrhsh: xrhsh,
-                kodikos: kodikos,
-                apo_hmeromhnia_01: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate)
-                }
+                team, company_kod, xrhsh, kodikos,
+                $or: [
+                    { apo_hmeromhnia_adeias_01: mongoose.trusted({ $gte: rangeStart, $lte: rangeEnd }) },
+                    { apo_hmeromhnia_adeias_02: mongoose.trusted({ $gte: rangeStart, $lte: rangeEnd }) },
+                    { apo_hmeromhnia_adeias_03: mongoose.trusted({ $gte: rangeStart, $lte: rangeEnd }) },
+                    { apo_hmeromhnia_adeias_04: mongoose.trusted({ $gte: rangeStart, $lte: rangeEnd }) },
+                    { apo_hmeromhnia_adeias_05: mongoose.trusted({ $gte: rangeStart, $lte: rangeEnd }) }
+                ]
             };
 
-            const prohgoymenesAdeies = await AdeiesModel.find(filter);
+            const prohgoymenesAdeies = await ApasxolhseisModel.find(filter);
 
             // Υπολογισμός συνόλων
             const synola = prohgoymenesAdeies.reduce(
                 (acc, record) => {
                     for (let i = 1; i <= 5; i++) {
-                        acc.synolo_hmeron_adeias += record[`hmeres_adeias_0${i}`] || 0;
+                        const leaveStart = record[`apo_hmeromhnia_adeias_0${i}`];
+                        if (leaveStart && leaveStart >= rangeStart && leaveStart <= rangeEnd) {
+                            acc.synolo_hmeron_adeias += record[`hmeres_adeias_0${i}`] || 0;
+                        }
                     }
                     return acc;
                 },
@@ -2646,6 +2670,9 @@ class kinhseisController {
     static getSynoloApodoxonProhgoymenonPeriodon = async (req, res) => {
         try {
             const { team, company_kod, xrhsh, kodikos, periodos, typos_apodoxon } = req.body;
+            if (typeof periodos !== 'string' && typeof periodos !== 'number') {
+                return res.status(400).json({ error: 'Μη έγκυρη περίοδος.' });
+            }
 
             // 🔹 Βρίσκουμε όλες τις εγγραφές με periodos < periodos
             const apodoxes = await ApasxolhseisModel.find({
@@ -2654,7 +2681,7 @@ class kinhseisController {
                 xrhsh: xrhsh,
                 kodikos: kodikos,
                 typos_apodoxon: typos_apodoxon,
-                periodos: { $lt: periodos } // ✅ MongoDB τρόπος για periodos < periodos
+                periodos: mongoose.trusted({ $lt: periodos }) // ✅ MongoDB τρόπος για periodos < periodos
             });
 
             // ✅ Αν δεν βρεθούν εγγραφές, επιστρέφουμε 0 (για αποφυγή undefined errors)

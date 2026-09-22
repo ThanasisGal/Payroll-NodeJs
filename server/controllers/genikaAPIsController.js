@@ -821,12 +821,12 @@ class genikaAPIsController {
             if (searchTerm) {
                 const safeSearchTerm = String(searchTerm).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-                query = mongoose.trusted({
+                query = {
                     $or: [
-                        { kodikos: { $regex: safeSearchTerm, $options: 'i' } },
-                        { perigrafh: { $regex: safeSearchTerm, $options: 'i' } }
+                        { kodikos: mongoose.trusted({ $regex: safeSearchTerm, $options: 'i' }) },
+                        { perigrafh: mongoose.trusted({ $regex: safeSearchTerm, $options: 'i' }) }
                     ]
-                });
+                };
             }
 
             const eidikothtes = await EidikothtesErganhModel.find(query); // Χρήση του query object για την αναζήτηση
