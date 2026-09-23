@@ -56,6 +56,7 @@ function canonicalOrphanResolutionMetadata(value = {}) {
         risk_acknowledged: riskAcknowledged === true,
         rest_conflicts: Array.isArray(value.rest_conflicts) ? value.rest_conflicts : [],
         raw_cards_preserved: value.raw_cards_preserved === true,
+        apologistiko_biblio: value.apologistiko_biblio === true,
         approved_by: value.approved_by || '',
         approved_at: value.approved_at || null
     };

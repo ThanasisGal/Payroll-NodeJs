@@ -13059,6 +13059,7 @@ class erganhController {
                         orphanResolutionCommand.risk_acknowledged === true,
                     rest_conflicts: approvedOrphanResolution.rest?.conflicts || [],
                     raw_cards_preserved: true,
+                    apologistiko_biblio: true,
                     approved_by: changedBy,
                     approved_at: null
                 };

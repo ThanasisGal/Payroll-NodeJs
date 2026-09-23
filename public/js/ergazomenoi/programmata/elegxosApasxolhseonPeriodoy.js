@@ -1359,25 +1359,28 @@ function renderReviewDateCell(row = {}) {
 
 function resolveSixthDayRowPresentation(
     row = {},
-    lifecyclePayloads = [...weeklyHrStage1Payloads.values()]
+    lifecyclePayloads = [
+        ...currentCanonicalLifecyclePayloads,
+        ...weeklyHrStage1Payloads.values()
+    ]
 ) {
-    if (row.is_sixth_day === true) return row;
     const rowDate = stage1DateKey(row.hmeromhnia);
     const employeeKodikos = String(row.kodikos || row.employee_kodikos || '').trim();
     const branch = String(row.ypokatasthma || '').trim();
     const payload = lifecyclePayloads.find((item) => {
         const scope = item?.scope || {};
-        const sixthDay = item?.lifecycle_projection?.stages?.stage4
-            ?.final_weekly_analysis?.sixthDay;
+        const weekStart = stage1DateKey(scope.week_start);
+        const weekEnd = stage1DateKey(scope.week_end);
         return String(scope.employee_kodikos || '').trim() === employeeKodikos &&
             String(scope.ypokatasthma || '').trim() === branch &&
-            stage1DateKey(sixthDay?.hmeromhnia) === rowDate;
+            (!weekStart || rowDate >= weekStart) && (!weekEnd || rowDate <= weekEnd);
     });
     const sixthDay = payload?.lifecycle_projection?.stages?.stage4
         ?.final_weekly_analysis?.sixthDay;
-    if (!sixthDay) return row;
-    return { ...row, is_sixth_day: true,
-        sixth_day_premium_rate: sixthDay.premiumRate };
+    if (!payload) return row;
+    const selected = stage1DateKey(sixthDay?.hmeromhnia) === rowDate;
+    return { ...row, is_sixth_day: selected,
+        sixth_day_premium_rate: selected ? sixthDay.premiumRate : null };
 }
 
 function renderSixthDayCardsBadge(row = {}) {
@@ -2612,6 +2615,12 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                 Εβδομαδιαίος έλεγχος εργασίας και ανάπαυσης
                 <span class="badge text-bg-light border ms-1">Εβδομάδα Δευτέρα–Κυριακή</span>
             </div>
+            ${visibleDeviations.some((dev) => weeklyLifecyclePayloadForDeviation(dev)
+                ?.lifecycle_projection?.stages?.stage4?.analysis_presentation_status === 'PROVISIONAL')
+                ? `<div class="alert alert-warning py-2 mb-2 weekly-analysis-provisional">
+                    <strong>ΠΡΟΕΠΙΣΚΟΠΗΣΗ</strong><br>
+                    Το εβδομαδιαίο αποτέλεσμα μπορεί να αλλάξει μέχρι να ολοκληρωθούν τα προηγούμενα στάδια ελέγχου.
+                </div>` : ''}
             <div class="weekly-deviation-table-shell">
                 <table class="table table-sm table-bordered mb-0 bg-white weekly-deviation-table">
                     <colgroup>
@@ -12174,6 +12183,8 @@ function renderOrphanCardResolutionSection(row = {}) {
     const proposal = preview.proposal || {};
     const rest = preview.rest || {};
     const approved = row.orphan_card_resolution?.status === 'HR_APPROVED';
+    const approvedDecision = row.orphan_card_resolution || {};
+    const approvedInterval = approvedDecision.approved_interval || {};
     const orphanLabel = preview.orphanType === 'START_ONLY' ? 'Μόνο είσοδος'
         : preview.orphanType === 'END_ONLY' ? 'Μόνο έξοδος' : 'Άγνωστος τύπος';
     const knownPunch = preview.orphanType === 'START_ONLY'
@@ -12222,11 +12233,25 @@ function renderOrphanCardResolutionSection(row = {}) {
                     ? '<div class="small mt-1">Η πρόσθετη εργασία, η υπερεργασία και οι υπερωρίες διατηρούν τις υπάρχουσες τιμές τους και οριστικοποιούνται στον εβδομαδιαίο υπολογισμό.</div>'
                     : ''}
             </div>` : ''}
-            <div class="small mb-2">
+            ${approved ? `<div class="alert alert-info py-2 approved-orphan-decision">
+                <div><strong>Εγκεκριμένη επίλυση:</strong>
+                    ${escapeHtml(approvedInterval.start || approvedDecision.approved_start || '-')}–${escapeHtml(approvedInterval.end || approvedDecision.approved_end || '-')}</div>
+                <div><strong>Εγκεκριμένες ώρες:</strong> ${escapeHtml(Number(
+                    approvedInterval.workDurationHours ?? approvedInterval.durationHours ??
+                    approvedDecision.approved_hours ?? row.ores_ergasias_apologistika ?? 0
+                ).toFixed(2))}</div>
+                <div><strong>Απολογιστικό Βιβλίο:</strong> ${row.apologistiko_biblio === true ? 'ΝΑΙ' : 'ΟΧΙ'}</div>
+                <div><strong>Εγκρίθηκε από:</strong> ${escapeHtml(approvedDecision.approved_by || '-')}</div>
+                <div><strong>Εγκρίθηκε στις:</strong> ${escapeHtml(approvedDecision.approved_at || '-')}</div>
+            </div>
+            ${proposal.start || proposal.end ? `<div class="small mb-2 orphan-current-preview">
+                <strong>Τρέχουσα προεπισκόπηση / επανεκτίμηση:</strong>
+                ${escapeHtml(proposal.start || '-')}–${escapeHtml(proposal.end || '-')}
+            </div>` : ''}` : `<div class="small mb-2">
                 <strong>Πρόταση:</strong> ${escapeHtml(proposal.start || '-')}–${escapeHtml(proposal.end || '-')}
                 · <strong>Απολογιστικό Βιβλίο:</strong>
                 ${preview.apologistikoBookUpdate === true ? 'ΝΑΙ' : 'ΟΧΙ'}
-            </div>
+            </div>`}
             <div class="small mb-2">
                 <div><strong>Προηγούμενη εργασία:</strong> ${escapeHtml(intervalLabel(rest.previous))}</div>
                 <div><strong>Ανάπαυση προς τα πίσω:</strong> ${escapeHtml(minutesLabel(rest.backwardMinutes))}</div>
@@ -12347,6 +12372,7 @@ async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = 
 }
 
 async function initializeOrphanResolutionPreview(row) {
+    if (row?.orphan_card_resolution?.status === 'HR_APPROVED') return;
     if (!prefillOrphanResolutionProposal(row)) {
         bindOrphanResolutionManualPreview(row);
         return;

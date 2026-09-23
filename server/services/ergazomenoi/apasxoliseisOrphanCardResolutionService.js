@@ -304,7 +304,9 @@ function resolveOrphanCardResolution({ row = {}, contextRows = [], manualInterva
             schedule_kind: proposal.scheduleKind,
             rule: proposal.rule
         } : null,
-        apologistikoBookUpdate: proposal.orphanType === CARD_PAIR_STATE.END_ONLY,
+        // Κάθε ρητά εγκεκριμένη ανακατασκευή ορφανού χτυπήματος ανήκει
+        // υποχρεωτικά στη ροή του Απολογιστικού Βιβλίου.
+        apologistikoBookUpdate: true,
         approvedUpdates: canApprove ? {
             kathgoria_ergasias_apologistika: 'ΕΡΓ',
             apo_ora_01_apologistika: proposal.start,
@@ -313,7 +315,7 @@ function resolveOrphanCardResolution({ row = {}, contextRows = [], manualInterva
             apo_ora_03_apologistika: '', eos_ora_03_apologistika: '',
             ores_ergasias_apologistika: proposal.netWorkMinutes / 60,
             ores_pragmatikhs_ergasias_apologistika: proposal.netWorkMinutes / 60,
-            apologistiko_biblio: proposal.orphanType === CARD_PAIR_STATE.END_ONLY
+            apologistiko_biblio: true
         } : null
     };
 }

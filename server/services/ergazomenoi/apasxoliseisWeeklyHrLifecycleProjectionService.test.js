@@ -115,6 +115,8 @@ assert.deepEqual(lifecycle0001WithIncompleteStage2.stages.stage2.pending_reasons
     ['INCOMPLETE_EMPLOYEE_WEEK']);
 assert.deepEqual(lifecycle0001WithIncompleteStage2.stages.stage2.blockers,
     ['INCOMPLETE_EMPLOYEE_WEEK']);
+assert.equal(lifecycle0001WithIncompleteStage2.stages.stage4.analysis_presentation_status,
+    'PROVISIONAL');
 
 const employee0009 = week('0009');
 employee0009[1] = possibleLeave(employee0009[1]);
@@ -124,6 +126,8 @@ const lifecycle0009 = buildWeeklyHrLifecycleProjection({ weekRows: employee0009,
     effectiveProfile: profile });
 assert.equal(lifecycle0009.stages.stage1.business_status, 'BLOCKED');
 assert.equal(lifecycle0009.stages.stage1.presentation_status, 'BLOCKED');
+assert.equal(lifecycle0009.stages.stage4.analysis_presentation_status, 'PROVISIONAL');
+assert.equal(lifecycle0009.stages.stage4.upstream_stages_completed, false);
 assert.ok(lifecycle0009.stages.stage1.pending_reasons.includes(
     'POSSIBLE_LEAVE_REQUIRES_HR_CLASSIFICATION'));
 assert.ok(lifecycle0009.stages.stage1.blockers.includes(
@@ -152,6 +156,12 @@ assert.equal(genuineStage4Blocked.stages.stage4.pending_count, 1);
 assert.equal(lifecycle0004.stages.stage4.business_status, 'COMPLETED');
 assert.equal(lifecycle0004.stages.stage4.pending_count, 0);
 assert.equal(lifecycle0004.stages.stage4.final_weekly_analysis.status, 'READY');
+assert.equal(lifecycle0004.stages.stage4.analysis_presentation_status,
+    'ELIGIBLE_FOR_FINALIZATION');
+assert.equal(lifecycle0004.stages.stage4.upstream_stages_completed, true);
+const finalized0004 = buildFinalizedWeeklyHrLifecyclePresentation(lifecycle0004);
+assert.equal(finalized0004.stages.stage4.analysis_presentation_status, 'FINAL');
+assert.equal(finalized0004.stages.stage4.upstream_stages_completed, true);
 assert.ok(lifecycle0004.stages.stage4.final_weekly_analysis.seventhDay);
 
 const employee0014 = week('0014');
@@ -183,6 +193,7 @@ assert.deepEqual(completed0014.stages.stage3.resolved_before_stage3_dates, []);
 assert.deepEqual(completed0014.stages.stage3.pending_dates, ['2026-06-17']);
 assert.equal(completed0014.stages.stage3.remaining_possible_leave_count, 1);
 assert.equal(completed0014.stages.stage3.business_status, 'OPEN');
+assert.equal(completed0014.stages.stage4.analysis_presentation_status, 'PROVISIONAL');
 
 function authoritativeStage3FingerprintContext({ projection, rows, selectedDate,
     scope, stage2Version = 0 }) {

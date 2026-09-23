@@ -695,7 +695,12 @@ function buildWeeklyHrLifecycleProjection({
     });
 
     const stages = applySequentialPresentation({ stage1, stage2, stage3, stage4 });
+    const upstreamStagesCompleted = [stages.stage1, stages.stage2, stages.stage3]
+        .every((stage) => stage.business_status === BUSINESS_STATUS.COMPLETED);
     stages.stage4 = Object.freeze({ ...stages.stage4,
+        analysis_presentation_status: upstreamStagesCompleted
+            ? 'ELIGIBLE_FOR_FINALIZATION' : 'PROVISIONAL',
+        upstream_stages_completed: upstreamStagesCompleted,
         diagnostic_pending_count: finalBlockers.length,
         pending_count: stages.stage4.presentation_status === PRESENTATION_STATUS.LOCKED
             ? 0 : stages.stage4.pending_count,
@@ -744,6 +749,8 @@ function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
                 blockers: Object.freeze([]) })];
         })
     );
+    completedStages.stage4 = Object.freeze({ ...completedStages.stage4,
+        analysis_presentation_status: 'FINAL', upstream_stages_completed: true });
     return Object.freeze({ ...projection, finalized_authoritative: true,
         persisted_stage1_status: BUSINESS_STATUS.COMPLETED,
         current_stage: null, total_pending_count: 0, requires_hr_action: false,

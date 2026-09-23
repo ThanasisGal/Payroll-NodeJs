@@ -97,6 +97,22 @@ assert.match(startModalHtml, /<strong>Τύπος:<\/strong> Μόνο είσοδ�
 assert.doesNotMatch(startModalHtml, />START_ONLY<|>END_ONLY|PREVIOUS|NEXT/);
 assert.match(startModalHtml, /ανεπαρκής ανάπαυση από την προηγούμενη εργασία/);
 assert.match(startModalHtml, /ανεπαρκής ανάπαυση μέχρι την επόμενη εργασία/);
+const approvedModalHtml = sandbox.renderOrphanCardResolutionSection({
+    hmeromhnia: '2026-08-07', cards_apo_ora_01: '09:00', cards_eos_ora_01: '',
+    ores_ergasias_apologistika: 7.5, apologistiko_biblio: true,
+    orphan_card_resolution: { status: 'HR_APPROVED', approved_by: 'hr-user',
+        approved_at: '2026-08-10T10:00:00.000Z', approved_interval: {
+            start: '09:00', end: '17:00', workDurationHours: 7.5 } },
+    orphan_card_resolution_preview: { orphanVisible: true, eligible: true,
+        orphanType: 'START_ONLY', apologistikoBookUpdate: true,
+        proposal: { start: '09:00', end: '17:30', workDurationHours: 8 },
+        rest: { hasViolation: false, conflicts: [] } }
+});
+assert.match(approvedModalHtml, /Εγκεκριμένη επίλυση:<\/strong>\s*09:00–17:00/);
+assert.match(approvedModalHtml, /Απολογιστικό Βιβλίο:<\/strong> ΝΑΙ/);
+assert.match(approvedModalHtml, /Εγκρίθηκε από:<\/strong> hr-user/);
+assert.match(approvedModalHtml, /Τρέχουσα προεπισκόπηση \/ επανεκτίμηση:<\/strong>\s*09:00–17:30/);
+assert.ok(approvedModalHtml.indexOf('09:00–17:00') < approvedModalHtml.indexOf('09:00–17:30'));
 assert.doesNotMatch(source, />Flags</);
 assert.match(source, /<div class="review-modal-section-title">Ενδείξεις<\/div>/);
 assert.match(source, /preview\.orphanType === 'START_ONLY'/);
@@ -170,4 +186,3 @@ assert.doesNotMatch(sandbox.applyOrphanDerivedPreview.toString(),
     /end\s*-\s*start|timeToMinutes|convertTime/);
 
 console.log('orphan weekly workflow presentation tests passed');
-

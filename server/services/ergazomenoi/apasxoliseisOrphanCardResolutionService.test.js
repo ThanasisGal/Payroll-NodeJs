@@ -33,7 +33,7 @@ assert.strictEqual(startResult.proposal.start, '14:51');
 assert.strictEqual(startResult.proposal.end, '22:51');
 assert.strictEqual(startResult.proposal.workDurationMinutes, 480);
 assert.strictEqual(startResult.proposal.durationSource, 'DECLARED_CONTINUOUS_DURATION');
-assert.strictEqual(startResult.apologistikoBookUpdate, false);
+assert.strictEqual(startResult.apologistikoBookUpdate, true);
 assert.strictEqual(startResult.canApprove, true);
 
 const reusableCriteria = {
@@ -56,7 +56,7 @@ const legacyReason = attachOrphanResolutionPreviews({ rows: [startOnly],
     reusableApprovals: [reusableBase] })[0];
 assert.strictEqual(legacyReason.orphan_card_resolution_preview.reusableDecisionReason,
     LEGACY_REUSABLE_ORPHAN_REASON);
-assert.strictEqual(startResult.approvedUpdates.apologistiko_biblio, false);
+assert.strictEqual(startResult.approvedUpdates.apologistiko_biblio, true);
 assert.strictEqual(startOnly.cards_eos_ora_01, '');
 
 const endOnly = row('2026-06-14', {
@@ -114,6 +114,7 @@ const reusableRule = safe.reusableDecisionRule;
 const safeReuse = resolveOrphanCardResolution({ row: startOnly,
     contextRows: [previousSafe, startOnly, nextSafe], reusableRule });
 assert.strictEqual(safeReuse.canAutomaticReuse, true);
+assert.strictEqual(safeReuse.approvedUpdates.apologistiko_biblio, true);
 const differentBreakReuse = resolveOrphanCardResolution({
     row: row('2026-06-16', { cards_apo_ora_01: '14:51', cards_eos_ora_01: '',
         dialleima_entos_ektos_orarioy: false, dialleima_se_lepta: 45 }),
