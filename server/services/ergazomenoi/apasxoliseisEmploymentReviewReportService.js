@@ -1459,6 +1459,6 @@ module.exports = { REPORT_SCHEMA_VERSION, DAILY_NUMBER_FIELDS, TOTAL_NUMBER_FIEL
     buildEmploymentReviewReportProjection, buildEmploymentReviewWorkbook,
     buildEmploymentReviewPdf, dailyAnalysis, dateLabel, orphanLabel,
     employmentStatusLabel, presentationLeaveCategory, SIMPLE_PDF_SUMMARY_COLUMNS,
-    buildSimplePdfSummaryRows, simplePdfFooterLayout, DAILY_DETAIL_FONT_SIZE,
+    buildSimplePdfSummaryRows, simplePdfFooterLayout, addSimplePdfFooters, DAILY_DETAIL_FONT_SIZE,
     SUMMARY_FONT_SIZE, buildSimplePdfFileName, SIMPLE_PDF_GRAND_TOTAL_FILL,
     simplePdfSummaryFill, buildDossierWeekNarrative, buildDossierPdfFileName };

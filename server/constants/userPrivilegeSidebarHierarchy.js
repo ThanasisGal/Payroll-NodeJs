@@ -133,6 +133,7 @@ const userPrivilegeSidebarHierarchy = [
     entry('ElegxosApasxolhseonPeriodoy', 'li236', 'Έλεγχος Απασχολήσεων', 500, [files, ergani]),
     entry('ApologistikosPinakasOrarion', 'li2371', 'Απολογιστικός Πίνακας Ωραρίων', 100, [files, ergani, submissions]),
     entry('ApologistikosPinakasYperorion', 'li2372', 'Απολογιστικός Πίνακας Υπερωριών', 200, [files, ergani, submissions]),
+    entry('KatastashElegxouApologistikouPinaka', 'li2374', 'Κατάσταση Ελέγχου Απολογιστικού Πίνακα', 300, [files, ergani, submissions]),
     entry('Krathseis', 'li24', 'Κρατήσεις', 400, [files]),
     entry('Symbaseis', 'li251', 'Συμβάσεις', 100, [files, contracts]),
     entry('KathgoriesSymbaseon', 'li252', 'Κατηγορίες Συμβάσεων', 200, [files, contracts]),
