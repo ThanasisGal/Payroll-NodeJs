@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const {
     removeClientRawCardUpdates,
     canonicalOrphanResolutionMetadata,
+    orphanResolutionSemanticView,
     buildReviewCompareAndSetFilter,
     buildEmploymentReviewUpdateErrorResponse,
     persistOrphanResolutionWrite
@@ -24,10 +25,10 @@ const baseRow = Object.freeze({
     is_locked: false, orphan_card_resolution: null
 });
 
-function metadata(scope = 'ONE_TIME') {
+function metadata(scope = 'ONE_TIME', orphanType = 'START_ONLY') {
     return {
         status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1',
-        orphan_type: 'START_ONLY', reuse_scope: scope,
+        orphan_type: orphanType, reuse_scope: scope,
         approved_interval: { start: '14:51', end: '23:21' },
         rest_violation: false, risk_acknowledged: false,
         rest_conflicts: [], raw_cards_preserved: true, approved_by: 'HR', approved_at: null
@@ -58,12 +59,14 @@ function harness(initial = baseRow) {
     return { state, rowModel, auditModel, transaction };
 }
 
-async function save(h, scope = 'ONE_TIME', oldRecord = structuredClone(h.state.row)) {
+async function save(h, scope = 'ONE_TIME', oldRecord = structuredClone(h.state.row),
+    orphanType = 'START_ONLY') {
     return h.transaction(() => persistOrphanResolutionWrite({
         oldRecord,
         semanticUpdates: {
             apo_ora_01_apologistika: '14:51', eos_ora_01_apologistika: '23:21',
-            ores_ergasias_apologistika: 8, orphan_card_resolution: metadata(scope)
+            ores_ergasias_apologistika: 8, apologistiko_biblio: false,
+            orphan_card_resolution: metadata(scope, orphanType)
         },
         changedBy: 'HR', reason: 'orphan approval', now: new Date('2026-08-24T18:04:50Z'),
         schemaPaths: Object.keys(baseRow), rowModel: h.rowModel, auditModel: h.auditModel,
@@ -89,6 +92,10 @@ async function run() {
     assert(oneTime.state.audits[0].newValues.locked_at instanceof Date ||
         typeof oneTime.state.audits[0].newValues.locked_at === 'string');
     assert.strictEqual(oneTime.state.row.orphan_card_resolution.status, 'HR_APPROVED');
+    assert.strictEqual(oneTime.state.row.orphan_card_resolution.orphan_type, 'START_ONLY');
+    assert.strictEqual(oneTime.state.row.orphan_card_resolution.apologistiko_biblio, true);
+    assert.strictEqual(oneTime.state.row.apologistiko_biblio, true);
+    assert.strictEqual(oneTime.state.row.is_locked, true);
     const facts = resolveDailyActualWorkFacts(oneTime.state.row,
         { calculatedWorkHoursAuthoritative: true });
     assert.strictEqual(facts.warnings.includes(WARNING.INCOMPLETE_CARD_INTERVAL), true);
@@ -105,6 +112,30 @@ async function run() {
     await save(future, 'FUTURE_IDENTICAL');
     assert.strictEqual(future.state.reusable.length, 1);
     assert.strictEqual(future.state.audits.length, 1);
+
+    const endOnly = harness();
+    await save(endOnly, 'ONE_TIME', structuredClone(endOnly.state.row), 'END_ONLY');
+    assert.strictEqual(endOnly.state.row.orphan_card_resolution.orphan_type, 'END_ONLY');
+    assert.strictEqual(endOnly.state.row.apologistiko_biblio, true);
+    assert.strictEqual(endOnly.state.row.is_locked, true);
+
+    const changedLocked = harness({ ...baseRow, is_locked: true,
+        apologistiko_biblio: true, apo_ora_01_apologistika: '14:51',
+        eos_ora_01_apologistika: '23:21', ores_ergasias_apologistika: 8,
+        orphan_card_resolution: { ...metadata(), apologistiko_biblio: true,
+            approved_at: new Date('2026-08-24T18:04:50Z') },
+        locked_by: 'HR', locked_at: new Date('2026-08-24T18:04:50Z') });
+    await assert.rejects(() => persistOrphanResolutionWrite({
+        oldRecord: structuredClone(changedLocked.state.row),
+        semanticUpdates: { apo_ora_01_apologistika: '14:51',
+            eos_ora_01_apologistika: '23:30', ores_ergasias_apologistika: 8,
+            apologistiko_biblio: true, orphan_card_resolution: {
+                ...metadata(), approved_interval: { start: '14:51', end: '23:30' }
+            } },
+        changedBy: 'HR', reason: 'changed retry', schemaPaths: Object.keys(baseRow),
+        rowModel: changedLocked.rowModel, auditModel: changedLocked.auditModel, session: {}
+    }), (error) => error.code === 'EMPLOYMENT_REVIEW_RECORD_LOCKED' && error.statusCode === 409);
+    assert.strictEqual(changedLocked.state.audits.length, 0);
 
     const rollback = harness();
     rollback.state.failAudit = true;
@@ -177,6 +208,16 @@ async function run() {
     assert.strictEqual(canonicalOrphanResolutionMetadata({
         rest_risk_acknowledged: true
     }).risk_acknowledged, true);
+    const pairAware = canonicalOrphanResolutionMetadata({ resolved_pairs: [
+        { pairNumber: 2, orphanType: 'START_ONLY', start: '18:04', end: '21:04' },
+        { pairNumber: 1, orphanType: 'END_ONLY', start: '09:00', end: '12:00' }
+    ] });
+    assert.deepStrictEqual(pairAware.resolved_pairs.map((item) => item.pairNumber), [1, 2]);
+    assert.notDeepStrictEqual(orphanResolutionSemanticView(pairAware),
+        orphanResolutionSemanticView({ ...pairAware, resolved_pairs: [
+            ...pairAware.resolved_pairs.slice(0, 1),
+            { ...pairAware.resolved_pairs[1], end: '21:05' }
+        ] }));
 
     assert.deepStrictEqual(buildEmploymentReviewUpdateErrorResponse(Object.assign(
         new Error('safe conflict'), { code: 'SAFE_CONFLICT', statusCode: 409 }

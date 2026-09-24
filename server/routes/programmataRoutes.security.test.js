@@ -31,6 +31,8 @@ const contracts = [
     ['GET', '/ergazomenoi/programmata/exagoghOrarionSeErganh', "requireUserPrivilegeAction('ExagoghOrarionSeErganh', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/apologistikosPinakasOrarion', "requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/apologistikosPinakasYperorion', "requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/katastashElegxouApologistikouPinaka', "requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/katastashElegxouApologistikouPinaka/pdf', "requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'export')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/calcApasxolhseisPeriodoy', "requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'read')", 'authorizeProgrammataSessionCompany'],
     ['POST', '/ergazomenoi/programmata/calcApasxolhseisPeriodoy', "requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'update')", 'authorizeProgrammataCalculation'],
     ['GET', '/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy', "requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'read')", 'authorizeProgrammataSessionCompany']

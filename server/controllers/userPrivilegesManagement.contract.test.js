@@ -674,7 +674,7 @@ test('catalog visible order exactly matches canonical data-privilege-form sideba
     assert.deepStrictEqual(
         visibleCatalog.map((entry) => entry.sidebarOrder),
         [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 9500,
-            10000, 10500, 11000, 12000, 13000, 14000, 15000, 16000,
+            10000, 10500, 11000, 12000, 13000, 14000, 14500, 15000, 16000,
             17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000]
     );
     const employmentReview = visibleCatalog.find((entry) => entry.form === 'ElegxosApasxolhseonPeriodoy');

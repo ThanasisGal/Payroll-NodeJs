@@ -6,7 +6,7 @@ const { buildStage3InputFingerprint } = require('./apasxoliseisStage3Fingerprint
 const { resolveWeeklyHrStage3Day } = require('./apasxoliseisWeeklyHrWorkflowStage3ResolutionService');
 
 const actor = { user_id: new mongoose.Types.ObjectId(), user_name: 'HR User', role: 'HR' };
-function context({ full = false, residual = true, actual = false,
+function context({ full = false, unknown = false, residual = true, actual = false,
     remaining = ['2026-06-03'], stage1Current = 'b'.repeat(64),
     stage1Completion = 'b'.repeat(64), stage1Effective = stage1Completion,
     date = '2026-06-03', rowId = new mongoose.Types.ObjectId() } = {}) {
@@ -22,7 +22,8 @@ function context({ full = false, residual = true, actual = false,
         ...(actual ? { cards_apo_ora_01: '15:00', cards_eos_ora_01: '17:00' } : {}),
         kathgoria_ergasias_apologistika: '',
         kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' },
-    dailyProfile: { kathestos_apasxolhshs: full ? '0' : '1', source: 'ISTORIKO' },
+    dailyProfile: unknown ? {} : {
+        kathestos_apasxolhshs: full ? '0' : '1', source: 'ISTORIKO' },
     actualFacts: { countsAsActualWorkDay: actual }, isResidual: residual,
     remaining_dates: remaining, stage2: { fingerprint: 'a'.repeat(64),
         status: 'COMPLETED', resolution: 'NOT_APPLICABLE', resolved_dates: [] },
@@ -189,6 +190,8 @@ function command(initial, h, overrides = {}) {
 
     await assert.rejects(() => command(context({ full: true }), harness(context({ full: true }))),
         { code: 'STAGE3_NON_WORK_NOT_ALLOWED_FOR_FULL_TIME' });
+    await assert.rejects(() => command(context({ unknown: true }),
+        harness(context({ unknown: true }))), { code: 'STAGE3_DAILY_REGIME_UNKNOWN' });
     await assert.rejects(() => command(context({ residual: false }),
         harness(context({ residual: false }))), { code: 'STAGE3_DATE_NOT_RESIDUAL' });
     await assert.rejects(() => command(context({ actual: true }), harness(context({ actual: true }))),

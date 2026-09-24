@@ -24,16 +24,22 @@ function employeeModel(employees) {
         filter.afm.$in.includes(employee.afm)
     ) }) };
 }
-function dependencies(employees) {
+function dependencies(employees, existingRows = [], bulkWriteOverride = null) {
     const writes = [];
     return {
         writes,
         value: {
             ergazomenoiModel: employeeModel(employees),
             argiesModel: { find: () => ({ lean: async () => [] }) },
+            loadAppliedProtectionForRows: async () => ({ entriesByRowId: {}, diagnostics: [],
+                hasConflicts: false }),
             prodhlomenaModel: {
-                find: () => query([]),
-                bulkWrite: async (ops) => { writes.push(...ops); return { upsertedCount: ops.length, modifiedCount: 0 }; }
+                find: () => query(existingRows),
+                bulkWrite: async (ops) => {
+                    writes.push(...ops);
+                    if (bulkWriteOverride) return bulkWriteOverride(ops);
+                    return { upsertedCount: ops.length, modifiedCount: 0 };
+                }
             }
         }
     };
@@ -99,6 +105,57 @@ test('schedule import rejects a row from another branch', async () => {
     const result = await saveTelikoToProdhlomena(scheduleSheet('123456789', '0001'), '2026', scope, harness.value);
     assert.equal(result.bulkOps.length, 0);
     assert.equal(harness.writes.length, 0);
+});
+
+test('schedule import skips a locked HR-approved orphan row', async () => {
+    const existing = {
+        _id: '6a92babe5de956f225bd485c', ...scope, kodikos: targetEmployee.kodikos,
+        hmeromhnia: new Date('2026-06-01T00:00:00.000Z'), is_locked: true,
+        apologistiko_biblio: true,
+        orphan_card_resolution: { status: 'HR_APPROVED', orphan_type: 'START_ONLY' }
+    };
+    const harness = dependencies([targetEmployee], [existing]);
+    const result = await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
+    assert.equal(result.bulkOps.length, 0);
+    assert.equal(harness.writes.length, 0);
+});
+
+test('schedule import uses a database lock predicate for an existing unlocked row', async () => {
+    const existing = {
+        _id: '6a92babe5de956f225bd485d', ...scope, kodikos: targetEmployee.kodikos,
+        hmeromhnia: new Date('2026-06-01T00:00:00.000Z'), is_locked: false
+    };
+    const harness = dependencies([targetEmployee], [existing]);
+    await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
+    assert.deepEqual(harness.writes[0].updateOne.filter,
+        { _id: existing._id, is_locked: { $ne: true } });
+    assert.equal(harness.writes[0].updateOne.upsert, false);
+});
+
+test('schedule import race with a concurrently inserted locked row cannot overwrite it', async () => {
+    const concurrentRow = { ...scope, kodikos: targetEmployee.kodikos,
+        hmeromhnia: new Date('2026-06-01T00:00:00.000Z'), is_locked: true,
+        apologistiko_biblio: true };
+    const harness = dependencies([targetEmployee], [], async ([{ updateOne }]) => {
+        const matches = Object.entries(updateOne.filter).every(([key, value]) =>
+            String(concurrentRow[key]) === String(value));
+        assert.equal(matches, true);
+        assert.equal(updateOne.update.$set, undefined);
+        assert.equal(concurrentRow.is_locked, true);
+        assert.equal(concurrentRow.apologistiko_biblio, true);
+        return { upsertedCount: 0, modifiedCount: 0 };
+    });
+    await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
+    const operation = harness.writes[0].updateOne;
+    assert.deepEqual(operation.filter, {
+        ...scope,
+        kodikos: targetEmployee.kodikos,
+        hmeromhnia: new Date('2026-06-01T00:00:00.000Z')
+    });
+    assert.equal(operation.filter.is_locked, undefined);
+    assert.equal(operation.update.$set, undefined);
+    assert.ok(operation.update.$setOnInsert);
+    assert.equal(operation.upsert, true);
 });
 
 function cardRows(branch = '0000') {

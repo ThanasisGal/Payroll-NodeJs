@@ -52,13 +52,17 @@ function harness({ targetRows = [] } = {}) {
 }
 
 test('borrowed cards copy only the normal digital-card policy fields with upsert false', async () => {
-    const h = harness({ targetRows: [{ team: scope.team, company_kod: scope.company_kod,
+    const existingTarget = { _id: '64b000000000000000000099',
+        team: scope.team, company_kod: scope.company_kod,
         ypokatasthma: scope.target_ypokatasthma, kodikos: '0031',
-        hmeromhnia: new Date('2026-06-05T00:00:00.000Z') }] });
+        hmeromhnia: new Date('2026-06-05T00:00:00.000Z'), is_locked: false };
+    const h = harness({ targetRows: [existingTarget] });
     const summary = await updateBorrowedEmployeeDigitalCards({ scope, models: h.models });
     const operation = h.calls.writes[0].ops[0].updateOne;
     assert.equal(summary.targetRowsUpdated, 1);
     assert.equal(operation.upsert, false);
+    assert.equal(operation.filter._id, existingTarget._id);
+    assert.deepStrictEqual(operation.filter.is_locked, { $ne: true });
     assert.deepStrictEqual(Object.keys(operation.update.$set).sort(), [
         'cards_apo_ora_01', 'cards_apo_ora_02', 'cards_apo_ora_03',
         'cards_eos_ora_01', 'cards_eos_ora_02', 'cards_eos_ora_03',
@@ -67,7 +71,16 @@ test('borrowed cards copy only the normal digital-card policy fields with upsert
     assert.equal(operation.update.$set.cards_apo_ora_01, '08:00');
     assert.equal(operation.update.$set.check_ergasia, true);
     assert.equal(operation.update.$setOnInsert, undefined);
-    assert.equal(operation.filter.ypokatasthma, scope.target_ypokatasthma);
+    for (const unrelatedField of [
+        'kathgoria_ergasias', 'apo_ora_01', 'ores_ergasias_apologistika',
+        'orphan_card_resolution', 'is_locked', 'apologistiko_biblio'
+    ]) assert.equal(Object.hasOwn(operation.update.$set, unrelatedField), false,
+        unrelatedField);
+    const concurrentlyLockedTarget = { ...existingTarget, is_locked: true };
+    const lockedTargetMatches =
+        concurrentlyLockedTarget._id === operation.filter._id &&
+        concurrentlyLockedTarget.is_locked !== true;
+    assert.equal(lockedTargetMatches, false);
     assert.equal(h.calls.finds[0].ypokatasthma, scope.source_ypokatasthma);
 });
 

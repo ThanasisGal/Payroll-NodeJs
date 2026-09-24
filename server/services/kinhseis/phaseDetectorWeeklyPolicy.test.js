@@ -42,28 +42,34 @@ function buildWeek({
     return { dailyRows, orariaByDate };
 }
 
-test('work-facts weekly path classifies sixth and seventh days without losing actual hours', () => {
+test('work-facts weekly path requires HR classification when both declared repo days were worked', () => {
     const { dailyRows, orariaByDate } = buildWeek();
+    const analyses = [];
     const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
-        asOfDate: '2026-06-15'
+        asOfDate: '2026-06-15',
+        weeklyAnalyses: analyses
     });
+    const analysis = analyses[0];
 
-    assert.equal(result[6].isSixthDay, true);
-    assert.equal(result[6].sixthDayHours, 7);
-    assert.equal(result[5].isSeventhDay, true);
-    assert.equal(result[5].weeklyComplianceStatus, 'READY');
-    assert.ok(
-        result[5].weeklyComplianceWarnings.includes(
-            'SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'
-        )
+    assert.equal(analysis.status, 'NEEDS_HR_DECISION');
+    assert.deepEqual(analysis.reasons, [
+        'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'
+    ]);
+    assert.equal(analysis.sixthDay, null);
+    assert.equal(analysis.seventhDay, null);
+    assert.deepEqual(
+        [...orariaByDate.values()].map((day) => day.cards_ores_ergasias),
+        [7, 7, 7, 7, 7, 7, 7]
     );
+    assert.ok(result.every((day) =>
+        day.weeklyComplianceStatus === 'NEEDS_HR_DECISION' &&
+        day.isSixthDay === false &&
+        day.isSeventhDay === false
+    ));
 });
 
-test('work-facts propagates canonical sixth-day hours and preserves excess and identities', () => {
-    for (const { actualHours, expectedSixthHours, expectedSixthIndex } of [
-        { actualHours: 7.42, expectedSixthHours: 7.42, expectedSixthIndex: 6 },
-        { actualHours: 8, expectedSixthHours: 8, expectedSixthIndex: 6 }
-    ]) {
+test('work-facts preserves card hours while requiring HR classification of both worked repo days', () => {
+    for (const actualHours of [7.42, 8]) {
         const remainingRepoHours = actualHours > 8 ? 10 : 6;
         const { dailyRows, orariaByDate } = buildWeek({
             hours: [7, 7, 7, 7, 7, remainingRepoHours, actualHours]
@@ -75,15 +81,20 @@ test('work-facts propagates canonical sixth-day hours and preserves excess and i
         });
         const analysis = analyses[0];
 
-        assert.equal(result[expectedSixthIndex].isSixthDay, true);
-        assert.equal(result[expectedSixthIndex].sixthDayHours, expectedSixthHours);
-        assert.equal(analysis.sixthDay.sixthDayHours, expectedSixthHours);
-        assert.equal(analysis.sixthDay.illegalOvertimeHours, 0);
-        assert.equal(analysis.sixthDay.hmeromhnia,
-            expectedSixthIndex === 6 ? '2026-06-14' : '2026-06-12');
-        assert.equal(analysis.seventhDay.hmeromhnia, '2026-06-13');
-        assert.equal(result[5].isSeventhDay, true);
-        assert.equal(analysis.seventhDay.illegalOvertimeHours, remainingRepoHours);
+        assert.equal(analysis.status, 'NEEDS_HR_DECISION');
+        assert.deepEqual(analysis.reasons, [
+            'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'
+        ]);
+        assert.equal(analysis.sixthDay, null);
+        assert.equal(analysis.seventhDay, null);
+        assert.equal(orariaByDate.get('2026-06-13').cards_ores_ergasias,
+            remainingRepoHours);
+        assert.equal(orariaByDate.get('2026-06-14').cards_ores_ergasias, actualHours);
+        assert.ok(result.every((day) =>
+            day.weeklyComplianceStatus === 'NEEDS_HR_DECISION' &&
+            day.isSixthDay === false &&
+            day.isSeventhDay === false
+        ));
     }
 });
 
@@ -106,8 +117,23 @@ test('first cross-month week uses previous-month context but presents requested 
     );
 
     assert.equal(analyses[0].complete, true);
-    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-07-05');
-    assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-04');
+    assert.equal(analyses[0].asOfDate, '2026-07-06');
+    assert.equal(analyses[0].status, 'NEEDS_HR_DECISION');
+    assert.deepEqual(analyses[0].reasons, [
+        'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'
+    ]);
+    assert.equal(analyses[0].sixthDay, null);
+    assert.equal(analyses[0].seventhDay, null);
+    assert.deepEqual(analyses[0].dailyFacts.map((day) => day.date), [
+        '2026-06-29',
+        '2026-06-30',
+        '2026-07-01',
+        '2026-07-02',
+        '2026-07-03',
+        '2026-07-04',
+        '2026-07-05'
+    ]);
+    assert.ok(result.every((day) => !day.isSixthDay && !day.isSeventhDay));
     assert.deepEqual(requested.map((day) => day.date), [
         '2026-07-01',
         '2026-07-02',
@@ -117,7 +143,7 @@ test('first cross-month week uses previous-month context but presents requested 
     ]);
 });
 
-test('completed trailing cross-month week classifies next-month seventh day', () => {
+test('completed trailing cross-month week requires HR classification with next-month context', () => {
     const { dailyRows, orariaByDate } = buildWeek({
         start: '2026-06-29',
         hours: [4, 4, 4, 4, 4, 4, 8]
@@ -135,9 +161,24 @@ test('completed trailing cross-month week classifies next-month seventh day', ()
         '2026-06-30'
     );
 
-    assert.equal(analyses[0].status, 'READY');
-    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-07-05');
-    assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-04');
+    assert.equal(analyses[0].complete, true);
+    assert.equal(analyses[0].asOfDate, '2026-07-06');
+    assert.equal(analyses[0].status, 'NEEDS_HR_DECISION');
+    assert.deepEqual(analyses[0].reasons, [
+        'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'
+    ]);
+    assert.equal(analyses[0].sixthDay, null);
+    assert.equal(analyses[0].seventhDay, null);
+    assert.deepEqual(analyses[0].dailyFacts.map((day) => day.date), [
+        '2026-06-29',
+        '2026-06-30',
+        '2026-07-01',
+        '2026-07-02',
+        '2026-07-03',
+        '2026-07-04',
+        '2026-07-05'
+    ]);
+    assert.ok(result.every((day) => !day.isSixthDay && !day.isSeventhDay));
     assert.deepEqual(requested.map((day) => day.date), ['2026-06-29', '2026-06-30']);
 });
 
@@ -191,8 +232,23 @@ test('completed trailing week is analyzed normally after its authoritative as-of
     });
 
     assert.equal(analyses[0].complete, true);
-    assert.equal(analyses[0].status, 'READY');
     assert.equal(analyses[0].asOfDate, '2026-07-06');
+    assert.equal(analyses[0].status, 'NEEDS_HR_DECISION');
+    assert.deepEqual(analyses[0].reasons, [
+        'WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'
+    ]);
+    assert.equal(analyses[0].sixthDay, null);
+    assert.equal(analyses[0].seventhDay, null);
+    assert.deepEqual(analyses[0].dailyFacts.map((day) => day.date), [
+        '2026-06-29',
+        '2026-06-30',
+        '2026-07-01',
+        '2026-07-02',
+        '2026-07-03',
+        '2026-07-04',
+        '2026-07-05'
+    ]);
+    assert.ok(dailyRows.every((day) => !day.isSixthDay && !day.isSeventhDay));
 });
 
 test('missing rows after week completion require HR decision instead of remaining open', () => {

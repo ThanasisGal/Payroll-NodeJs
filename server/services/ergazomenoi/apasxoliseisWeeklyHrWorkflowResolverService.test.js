@@ -3,6 +3,7 @@
 const assert = require('assert');
 const {
     NEXT_STAGE,
+    resolveNoWorkCandidateForDate,
     resolveWeeklyHrWorkflow
 } = require('./apasxoliseisWeeklyHrWorkflowResolverService');
 
@@ -237,13 +238,46 @@ assert.deepStrictEqual(mixed.unclassified_stage2_candidates, [
     { date: DATES[1], candidate_kind: 'REST_REPO',
         label: 'Προς εξέταση ως ΑΝΑΠΑΥΣΗ / ΡΕΠΟ' },
     { date: DATES[3], candidate_kind: 'POSSIBLE_LEAVE_RESIDUAL',
-        label: 'Προς τελική εξέταση ως ΠΙΘΑΝΗ ΑΔΕΙΑ' }
+        label: 'Προς επίλυση ως ΜΗ ΕΡΓΑΣΙΑ' }
 ]);
 const rotational = resolve(directRows, { effectiveProfilesByDate: {
     [DATES[1]]: profile(5, { typos_apasxolhshs: '2' }) } });
 assert.strictEqual(rotational.unclassified_stage2_candidates[0].candidate_kind,
     'POSSIBLE_LEAVE_RESIDUAL');
 assert.deepStrictEqual(rotational.direct_repo_candidates, []);
+
+for (const declaredHours of [8, 5, 2, 0]) {
+    const fullTimeCandidate = resolveNoWorkCandidateForDate({ date: DATES[1], declaredHours,
+        effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '0' } }
+    });
+    assert.strictEqual(fullTimeCandidate.candidate_kind, 'REST_REPO',
+        `full-time declared ${declaredHours}h`);
+    const nonFullCandidate = resolveNoWorkCandidateForDate({ date: DATES[1], declaredHours,
+        effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '1' } }
+    });
+    assert.strictEqual(nonFullCandidate.candidate_kind, 'POSSIBLE_LEAVE_RESIDUAL',
+        `non-full declared ${declaredHours}h`);
+    assert.strictEqual(nonFullCandidate.label, 'Προς επίλυση ως ΜΗ ΕΡΓΑΣΙΑ');
+}
+
+const historicalFullOverridesCurrentNonFull = resolve(directRows, {
+    effectiveProfile: { typos_apasxolhshs: '1' },
+    effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '0' } }
+}).unclassified_stage2_candidates[0];
+assert.strictEqual(historicalFullOverridesCurrentNonFull.candidate_kind, 'REST_REPO');
+const historicalNonFullOverridesCurrentFull = resolve(directRows, {
+    effectiveProfile: { typos_apasxolhshs: '0' },
+    effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '1' } }
+}).unclassified_stage2_candidates[0];
+assert.strictEqual(historicalNonFullOverridesCurrentFull.candidate_kind,
+    'POSSIBLE_LEAVE_RESIDUAL');
+const unknownDateRegime = resolve(directRows, {
+    effectiveProfile: { typos_apasxolhshs: '0' },
+    effectiveProfilesByDate: { [DATES[1]]: {} }
+});
+assert.strictEqual(unknownDateRegime.unclassified_stage2_candidates[0].candidate_kind,
+    'UNRESOLVED_REGIME');
+assert.ok(unknownDateRegime.blocking_reasons.includes('DAILY_EMPLOYMENT_REGIME_UNKNOWN'));
 
 // Non-full daily semantics are driven by the effective profile of that date.
 // No declared obligation and no work is ordinary non-work, never possible leave.

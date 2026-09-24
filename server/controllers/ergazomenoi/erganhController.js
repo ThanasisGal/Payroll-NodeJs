@@ -201,7 +201,9 @@ const {
     classifyLeaveProvenance
 } = require('../../services/ergazomenoi/apasxoliseisLeaveProvenanceService');
 const {
+    EMPLOYMENT_REGIME,
     resolveFullTimeFromWorkTerms,
+    resolveEmploymentRegimeFromWorkTerms,
     resolveReviewIsFullTimeProfile,
     normalizeEmploymentType: normalizeReviewEmploymentType
 } = require('../../services/ergazomenoi/apasxoliseisReviewEmploymentProfileService');
@@ -461,6 +463,7 @@ const {
 const {
     buildWeeklyHrLifecycleProjection,
     buildFinalizedWeeklyHrLifecyclePresentation,
+    withWeeklyAnalysisPresentationStatus,
     stage3FingerprintResolvedDates
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildWeeklyLifecycleWithStage2State } = require(
@@ -3652,10 +3655,8 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     const reviewPhaseCode = String(phaseCode || '').trim();
     const hasCards = reviewHasCardEvidence(row);
     const hasNoCards = !hasCards;
-    const isNonFullPhase = !resolveReviewIsFullTimeProfile(
-        effectiveProfile,
-        reviewPhaseCode
-    );
+    const isNonFullPhase = resolveEmploymentRegimeFromWorkTerms(effectiveProfile) ===
+        EMPLOYMENT_REGIME.NON_FULL;
 
     // Δηλωμένη εργασία + κάρτες αποκλείουν το «ΜΕ» σε κάθε ημερήσια φάση.
     // Καθαρίζεται και στην απόκριση ώστε παλιά δεδομένα να μη φαίνονται λάθος
@@ -3718,16 +3719,20 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
     const normalizedRow = normalizeReviewNonFullNonWorkRow(
         row, effectiveProfile, reviewPhaseCode);
     const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
+    const effectiveRegime = resolveEmploymentRegimeFromWorkTerms(effectiveProfile);
+    const explicitEmploymentCode = normalizeReviewEmploymentType(
+        effectiveProfile.kathestos_apasxolhshs
+    ) || normalizeReviewEmploymentType(effectiveProfile.typos_apasxolhshs);
+    const authoritativeEmploymentCode = explicitEmploymentCode ||
+        (effectiveRegime === EMPLOYMENT_REGIME.FULL_TIME ? '0'
+            : effectiveRegime === EMPLOYMENT_REGIME.NON_FULL ? '1' : '');
     return { ...normalizedRow,
         kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
         kathgoria_ergasias: effectiveKathgoria,
         kathgoria_ergasias_effective: effectiveKathgoria,
-        effective_is_full_time: resolveReviewIsFullTimeProfile(
-            effectiveProfile, reviewPhaseCode),
-        effective_kathestos_apasxolhshs:
-            reviewPhaseCode || effectiveProfile.kathestos_apasxolhshs || '',
-        effective_typos_apasxolhshs:
-            reviewPhaseCode || effectiveProfile.typos_apasxolhshs || '',
+        effective_is_full_time: resolveReviewIsFullTimeProfile(effectiveProfile),
+        effective_kathestos_apasxolhshs: authoritativeEmploymentCode,
+        effective_typos_apasxolhshs: authoritativeEmploymentCode,
         effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
         effective_weekly_workdays:
             Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
@@ -3738,7 +3743,7 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
         effective_special_category: effectiveProfile.eidikh_kathgoria_ergazomenoy || '',
         effective_special_case: effectiveProfile.eidikh_periptosh || '',
         effective_hourly_rate: effectiveProfile.pragmatikoOromisthio ?? null,
-        effective_profile_source: reviewPhaseCode ? 'SCHEDULE_PHASE' :
+        effective_profile_source:
             effectiveProfile.resolution_source || effectiveProfile.source || '',
         effective_daily_employment_source:
             effectiveProfile.daily_employment_snapshot_source || '',
@@ -8076,7 +8081,8 @@ class erganhController {
                     scope: buildWeeklyHrStage2BulkContextScope({ key: scopeKey,
                         lifecycle: lifecycleProjection, weekRows,
                         preparedEmployee: ergByKodikos.get(employeeKodikos) || null }),
-                    lifecycle_projection: lifecycleProjection
+                    lifecycle_projection:
+                        withWeeklyAnalysisPresentationStatus(lifecycleProjection)
                 };
             });
             const deferredIds = canonicalLifecycleProjections.map((entry) =>
@@ -12791,7 +12797,8 @@ class erganhController {
                 row, contextRows, effectiveEmployee, breakConfiguration,
                 manualInterval: {
                     start: req.body?.apologistiko_start,
-                    end: req.body?.apologistiko_end
+                    end: req.body?.apologistiko_end,
+                    pairs: req.body?.pairs
                 },
                 reuseScope: req.body?.reuse_scope === ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
                     ? ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
@@ -12955,6 +12962,15 @@ class erganhController {
                     message: 'Δεν βρέθηκε η εγγραφή.'
                 });
             }
+            const lockedOrphanApprovalReplayCandidate = oldRecord.is_locked === true &&
+                orphanResolutionCommand?.approve === true;
+            if (oldRecord.is_locked === true && !lockedOrphanApprovalReplayCandidate) {
+                return res.status(409).json({
+                    success: false,
+                    code: 'EMPLOYMENT_REVIEW_RECORD_LOCKED',
+                    message: 'Η εγγραφή είναι κλειδωμένη. Ξεκλειδώστε την πριν από νέα επεξεργασία.'
+                });
+            }
 
             if (cleanUpdates.argia === true) {
                 const holidayContext = await buildNoCardsDisplayContext({
@@ -13017,7 +13033,8 @@ class erganhController {
                     approvedOrphanResolution = resolveOrphanCardResolution({
                         row: oldRecord, contextRows, effectiveEmployee, breakConfiguration,
                         manualInterval: { start: orphanResolutionCommand.apologistiko_start,
-                            end: orphanResolutionCommand.apologistiko_end },
+                            end: orphanResolutionCommand.apologistiko_end,
+                            pairs: orphanResolutionCommand.pairs },
                         riskAcknowledged: orphanResolutionCommand.risk_acknowledged === true,
                         reuseScope: orphanResolutionCommand.reuse_scope ===
                             ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
@@ -13027,6 +13044,24 @@ class erganhController {
                     if (approvedOrphanResolution.requiresRiskAcknowledgement === true ||
                         approvedOrphanResolution.canApprove !== true ||
                         !approvedOrphanResolution.approvedUpdates) {
+                        if (approvedOrphanResolution.reason === 'ORPHAN_PAIR_SET_MISMATCH') {
+                            throw Object.assign(new Error(
+                                'Τα ζεύγη επίλυσης δεν συμφωνούν πλέον με τα πραγματικά ορφανά χτυπήματα.'),
+                            { code: 'ORPHAN_PAIR_SET_MISMATCH', statusCode: 409 });
+                        }
+                        if (approvedOrphanResolution.reason ===
+                            'INCOMPLETE_OR_INVALID_ORPHAN_PAIR_INTERVAL') {
+                            throw Object.assign(new Error(
+                                'Απαιτείται πλήρες έγκυρο διάστημα Από–Έως για κάθε ορφανό ζεύγος.'),
+                            { code: 'ORPHAN_PAIR_INTERVAL_REQUIRED', statusCode: 409 });
+                        }
+                        if (['SPLIT_REST_BELOW_MINIMUM',
+                            'SPLIT_INTERVALS_OVERLAP'].includes(
+                            approvedOrphanResolution.reason)) {
+                            throw Object.assign(new Error(
+                                'Το χειροκίνητο σπαστό διάστημα παραβιάζει τον κανόνα ελάχιστης τρίωρης διακοπής.'),
+                            { code: approvedOrphanResolution.reason, statusCode: 409 });
+                        }
                         throw Object.assign(new Error(
                             'Απαιτείται ρητή επιβεβαίωση της παραβίασης 11ωρης ανάπαυσης.'),
                         { code: 'ORPHAN_REST_RISK_ACKNOWLEDGEMENT_REQUIRED', statusCode: 409 });
@@ -13050,6 +13085,7 @@ class erganhController {
                 orphanMetadata = {
                     status: 'HR_APPROVED', policy_version: ORPHAN_CARD_POLICY_VERSION,
                     orphan_type: approvedOrphanResolution.orphanType,
+                    resolved_pairs: approvedOrphanResolution.resolvedPairs || [],
                     reuse_scope: approvedOrphanResolution.reuseScope,
                     approved_interval: approvedOrphanResolution.proposal,
                     reusable_decision_rule:
@@ -13059,6 +13095,7 @@ class erganhController {
                         orphanResolutionCommand.risk_acknowledged === true,
                     rest_conflicts: approvedOrphanResolution.rest?.conflicts || [],
                     raw_cards_preserved: true,
+                    apologistiko_biblio: true,
                     approved_by: changedBy,
                     approved_at: null
                 };
@@ -13156,10 +13193,16 @@ class erganhController {
                     }
                     const finalUpdates = { ...permittedUpdates, is_locked: true,
                         locked_by: changedBy, locked_at: new Date() };
-                    await ProdhlomenaOrariaModel.updateOne(
-                        { _id: id, team: sessionTeam, company_kod: companyId },
+                    const updateResult = await ProdhlomenaOrariaModel.updateOne(
+                        { _id: id, team: sessionTeam, company_kod: companyId,
+                            is_locked: { $ne: true } },
                         { $set: finalUpdates }, { session }
                     );
+                    if (updateResult.matchedCount !== 1) {
+                        throw Object.assign(new Error(
+                            'Η εγγραφή κλειδώθηκε ή άλλαξε πριν από την αποθήκευση.'
+                        ), { code: 'EMPLOYMENT_REVIEW_RECORD_LOCKED', statusCode: 409 });
+                    }
                     await ProdhlomenaOrariaAuditModel.create([{
                         team: sessionTeam, company_kod: companyId,
                         prodhlomena_oraria_id: oldRecord._id, kodikos: oldRecord.kodikos,
@@ -17751,6 +17794,8 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
     const employeeModel = dependencies.ergazomenoiModel || ErgazomenoiModel;
     const prodhlomenaModel = dependencies.prodhlomenaModel || ProdhlomenaOrariaModel;
     const argiesModel = dependencies.argiesModel || ArgiesModel;
+    const loadProtection = dependencies.loadAppliedProtectionForRows ||
+        loadAppliedProtectionForRows;
     const {
         AMBIGUOUS_SCOPE_CODE,
         OUTSIDE_SCOPE_CODE,
@@ -17918,17 +17963,18 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         $or: mongoose.trusted(preparedRecords.map(({ filter }) => filter))
     })
         .select(
-            '_id team company_kod ypokatasthma kodikos hmeromhnia ' +
+            '_id team company_kod ypokatasthma kodikos hmeromhnia is_locked ' +
                 'kathgoria_ergasias_apologistika repo_apologistika'
         )
         .lean();
     const recordKey = ({ team, company_kod, ypokatasthma, kodikos, hmeromhnia }) =>
         [team, company_kod, ypokatasthma, kodikos, new Date(hmeromhnia).toISOString()].join('|');
     const existingRowsByKey = new Map(existingRows.map((row) => [recordKey(row), row]));
-    const appliedProtectionContext = await loadAppliedProtectionForRows(existingRows);
+    const appliedProtectionContext = await loadProtection(existingRows);
     let protectedIdentityAttempts = 0;
-    const bulkOps = preparedRecords.map(({ filter, record }) => {
+    const bulkOps = preparedRecords.flatMap(({ filter, record }) => {
         const existingRow = existingRowsByKey.get(recordKey(record));
+        if (existingRow?.is_locked === true) return [];
         let protectedRecordUpdate = record;
         if (existingRow) {
             const sanitized = sanitizeAppliedRepoTransferUpdate({
@@ -17942,13 +17988,20 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
                 protectedIdentityAttempts++;
             }
         }
-        return {
+        if (!existingRow) return [{
             updateOne: {
                 filter,
-                update: { $set: protectedRecordUpdate },
+                update: { $setOnInsert: record },
                 upsert: true
             }
-        };
+        }];
+        return [{
+            updateOne: {
+                filter: { _id: existingRow._id, is_locked: { $ne: true } },
+                update: { $set: protectedRecordUpdate },
+                upsert: false
+            }
+        }];
     });
     if (protectedIdentityAttempts > 0) {
         console.warn(

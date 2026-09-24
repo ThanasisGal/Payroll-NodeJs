@@ -80,6 +80,55 @@ assert.strictEqual(splitManual.result.derivedUpdate.ores_ergasias_apologistika, 
 assert.strictEqual(splitManual.result.derivedUpdate.ores_nyxtas_apologistika, 0);
 assert.strictEqual(splitManual.result.derivedUpdate.ores_argion_prosayxhsh_apologistika, 9.5);
 
+const realPairAwareRow = row({
+    kodikos: '0031', hmeromhnia: new Date('2026-08-07T00:00:00.000Z'),
+    apo_ora_01: '09:30', eos_ora_01: '14:30',
+    apo_ora_02: '17:30', eos_ora_02: '20:30',
+    cards_apo_ora_01: '09:32', cards_eos_ora_01: '14:31',
+    cards_apo_ora_02: '18:04', cards_eos_ora_02: '',
+    apo_ora_01_apologistika: '09:32', eos_ora_01_apologistika: '14:31',
+    apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
+    apo_ora_03_apologistika: '', eos_ora_03_apologistika: ''
+});
+const realPairAware = calculate(realPairAwareRow, { pairs: [
+    { pairNumber: 2, start: '18:04', end: '21:04' }
+] }, { dialleima_entos_ektos_orarioy: true, dialleima_se_lepta: 30 });
+assert.strictEqual(realPairAware.approval.proposal.workDurationMinutes, 479);
+assert.strictEqual(realPairAware.approval.proposal.workDurationHours, 479 / 60);
+assert.strictEqual(realPairAware.approval.approvedUpdates.apo_ora_01_apologistika, '09:32');
+assert.strictEqual(realPairAware.approval.approvedUpdates.eos_ora_01_apologistika, '14:31');
+assert.strictEqual(realPairAware.approval.approvedUpdates.apo_ora_02_apologistika, '18:04');
+assert.strictEqual(realPairAware.approval.approvedUpdates.eos_ora_02_apologistika, '21:04');
+assert.deepStrictEqual(getPayrollCalculationIntervals(realPairAware.result.workingRow), [
+    { index: 1, apo: '09:32', eos: '14:31', start: 572, end: 871,
+        source: 'APOLOGISTIKA' },
+    { index: 2, apo: '18:04', eos: '21:04', start: 1084, end: 1264,
+        source: 'APOLOGISTIKA' }
+]);
+assert.strictEqual(getPayrollDailyWorkMinutes(realPairAware.result.workingRow), 479);
+assert.strictEqual(realPairAware.result.derivedUpdate.ores_ergasias_apologistika, 7.98);
+assert.strictEqual(realPairAware.result.derivedUpdate.ores_apoysias_apologistika, 0.02);
+assert.notStrictEqual(realPairAware.result.derivedUpdate.ores_apoysias_apologistika, 5.07);
+const realPairAwarePreview = buildApprovedOrphanDerivedPreview({
+    row: realPairAwareRow,
+    effectiveEmployee: { hmeres_ergasias_ebdomadas: 5,
+        ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8,
+        dialleima_entos_ektos_orarioy: true, dialleima_se_lepta: 30 },
+    argiesDateSet: new Set(), approvedOrphanResolution: realPairAware.approval,
+    proorhApoxorhshMinutes: 0
+});
+assert.strictEqual(realPairAwarePreview.fields.ores_ergasias_apologistika, 7.98);
+assert.strictEqual(realPairAwarePreview.fields.ores_apoysias_apologistika, 0.02);
+assert.strictEqual(realPairAwarePreview.workingRow.apo_ora_01_apologistika, '09:32');
+assert.strictEqual(realPairAwarePreview.workingRow.apo_ora_02_apologistika, '18:04');
+for (const field of ORPHAN_DERIVED_PREVIEW_FIELDS) {
+    assert.deepStrictEqual(realPairAwarePreview.fields[field],
+        Object.prototype.hasOwnProperty.call(realPairAware.result.derivedUpdate, field)
+            ? realPairAware.result.derivedUpdate[field]
+            : Object.prototype.hasOwnProperty.call(realPairAware.approval.approvedUpdates, field)
+                ? realPairAware.approval.approvedUpdates[field] : realPairAwareRow[field], field);
+}
+
 const riskRow = row();
 const riskContextRows = [{ _id: 'previous', hmeromhnia: new Date('2026-06-13T00:00:00Z'),
     cards_apo_ora_01: '23:00', cards_eos_ora_01: '08:00' }, riskRow];
@@ -194,4 +243,3 @@ assert.strictEqual(staleWriteSet.cards_eos_ora_01, undefined);
 assert.strictEqual(staleWriteSet.orphan_card_resolution.status, 'HR_APPROVED');
 
 console.log('approved orphan daily derived calculation contract: PASS');
-

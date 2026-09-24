@@ -161,8 +161,8 @@ vm.runInNewContext(`${source.slice(factsStart, factsEnd)}\nthis.helpers = {
     renderStage1DayFacts, stage1IntervalsText, stage1CurrentClassificationLabel
 };`, factsSandbox);
 const juneCrossPayload = { stage1_daily_presentation: [{ date: '2026-06-29',
-    employment_label: 'Πλήρης', declared_intervals: [{ start: '11:00', end: '19:00' }],
-    declared_hours: 8, actual_work_hours: 0, card_intervals: [], card_hours: 0,
+    employment_label: 'Πλήρης', declared_intervals: [{ start: '10:00', end: '15:00' }],
+    declared_hours: 5, actual_work_hours: 0, card_intervals: [], card_hours: 0,
     current_apologistiko_classification: 'POSSIBLE_LEAVE' }, { date: '2026-06-30',
     employment_label: 'Πλήρης', declared_intervals: [], declared_hours: 0,
     actual_work_hours: 8.62,
@@ -170,7 +170,7 @@ const juneCrossPayload = { stage1_daily_presentation: [{ date: '2026-06-29',
     current_apologistiko_classification: 'ΕΡΓ' }] };
 const pendingFacts = factsSandbox.helpers.renderStage1DayFacts(juneCrossPayload, '2026-06-29');
 assert.match(pendingFacts, /Καθεστώς:<\/strong> Πλήρης/);
-assert.match(pendingFacts, /Προδηλωμένο:<\/strong> 11:00–19:00\s*\/ 8,00 ώρες/);
+assert.match(pendingFacts, /Προδηλωμένο:<\/strong> 10:00–15:00\s*\/ 5,00 ώρες/);
 assert.match(pendingFacts, /Πραγματική εργασία:<\/strong>\s*0,00 ώρες/);
 assert.match(pendingFacts, /Κάρτες:<\/strong> Δεν υπάρχουν/);
 assert.match(pendingFacts, /Ώρες βάσει καρτών:<\/strong>\s*0,00 ώρες/);

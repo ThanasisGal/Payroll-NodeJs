@@ -8,9 +8,28 @@ const { buildWeeklyHrLifecycleProjection } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildStage3InputFingerprint } = require(
     '../../services/ergazomenoi/apasxoliseisStage3FingerprintService');
+const { resolveNoWorkCandidateForDate } = require(
+    '../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowResolverService');
 
 const { prepareWeeklyHrStage2LifecycleRow, weeklyHrStage2LifecycleProfileFromRow,
     resolveWeeklyHrSearchDailyProfile } = Controller.__stage3DailyEmploymentProfileTestHooks;
+
+const acceptance0031 = prepareWeeklyHrStage2LifecycleRow({
+    row: { hmeromhnia: '2026-08-05', kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 5, apo_ora_01: '10:00', eos_ora_01: '15:00' },
+    effectiveProfile: { kathestos_apasxolhshs: '0', typos_apasxolhshs: '0',
+        hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 40,
+        mo_oron_hmerhsias_ergasias: 40 / 6, source: 'DATE_EFFECTIVE_HISTORY' },
+    reviewPhaseCode: '1'
+});
+assert.equal(acceptance0031.effective_is_full_time, true);
+assert.equal(acceptance0031.effective_kathestos_apasxolhshs, '0');
+assert.equal(acceptance0031.effective_typos_apasxolhshs, '0');
+assert.equal(acceptance0031.effective_schedule_phase_code, '1');
+assert.equal(acceptance0031.effective_profile_source, 'DATE_EFFECTIVE_HISTORY');
+assert.equal(resolveNoWorkCandidateForDate({ date: '2026-08-05',
+    effectiveProfilesByDate: { '2026-08-05':
+        weeklyHrStage2LifecycleProfileFromRow(acceptance0031) } }).candidate_kind, 'REST_REPO');
 
 function dateAt(start, offset) {
     const value = new Date(`${start}T00:00:00.000Z`);
@@ -49,7 +68,8 @@ function resolvedDailyProfiles(rows, employee, history) {
         const prepared = prepareWeeklyHrStage2LifecycleRow({
             row, effectiveProfile: searchResolved, reviewPhaseCode: '0'
         });
-        assert.equal(prepared.effective_profile_source, 'SCHEDULE_PHASE');
+        assert.equal(prepared.effective_profile_source,
+            searchResolved.resolution_source || searchResolved.source || '');
         assert.equal(prepared.effective_daily_employment_source,
             authoritative.daily_employment_snapshot_source);
         return [row.hmeromhnia, {

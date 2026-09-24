@@ -16,6 +16,7 @@ const {
     SIMPLE_PDF_SUMMARY_COLUMNS,
     buildSimplePdfSummaryRows,
     simplePdfFooterLayout,
+    addSimplePdfFooters,
     DAILY_DETAIL_FONT_SIZE,
     SUMMARY_FONT_SIZE,
     buildSimplePdfFileName,
@@ -721,6 +722,7 @@ test('ο Φάκελος Ελέγχου αρχίζει με εξώφυλλο κα
 });
 
 test('απλό PDF και Φάκελος χρησιμοποιούν κοινές υλοποιήσεις σελίδας, σύνοψης και footer', () => {
+    assert.equal(typeof addSimplePdfFooters, 'function');
     const source = require('node:fs').readFileSync(require('node:path').join(__dirname,
         'apasxoliseisEmploymentReviewReportService.js'), 'utf8');
     const renderer = source.slice(source.indexOf('function buildEmploymentReviewPdf'),

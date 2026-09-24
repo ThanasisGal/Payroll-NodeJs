@@ -24,6 +24,7 @@ const employeeRehireController = require('../controllers/ergazomenoi/employeeReh
 const symbaseisController = require('../controllers/symbaseisController.js');
 const programmataController = require('../controllers/ergazomenoi/programmataController.js');
 const erganhController = require('../controllers/ergazomenoi/erganhController.js');
+const apologistikosPinakasControlReportController = require('../controllers/ergazomenoi/apologistikosPinakasControlReportController.js');
 const kinhseisController = require('../controllers/Kinhseis/kinhseisController.js');
 const forosController = require('../controllers/Kinhseis/forosContoller.js');
 const ektyposhSymbaseonController = require('../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js');
@@ -762,6 +763,20 @@ router.get(
     requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'read'),
     authorizeProgrammataSessionCompany,
     erganhController.mainApologistikosPinakasYperorionForm
+);
+
+router.get(
+    '/ergazomenoi/programmata/katastashElegxouApologistikouPinaka',
+    requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'read'),
+    authorizeProgrammataSessionCompany,
+    apologistikosPinakasControlReportController.page
+);
+
+router.get(
+    '/ergazomenoi/programmata/katastashElegxouApologistikouPinaka/pdf',
+    requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'export'),
+    authorizeProgrammataSessionCompany,
+    apologistikosPinakasControlReportController.pdf
 );
 
 // ============================================================================

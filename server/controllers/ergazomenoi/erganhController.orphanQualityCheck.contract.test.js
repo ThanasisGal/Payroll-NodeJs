@@ -23,11 +23,15 @@ assert.match(handler, /countOrphanHitsByEmployee\(rows\)/);
 assert.doesNotMatch(handler, /updateOne|bulkWrite|create\(|save\(/);
 assert.match(routes, /review\/orphan-quality-check[\s\S]*requireEmploymentReviewAccess/);
 
-const successfulLoad = frontend.slice(
-    frontend.indexOf('const payload = await response.json();', frontend.indexOf('async function loadResults')),
-    frontend.indexOf('const correctiveSummary', frontend.indexOf('async function loadResults'))
-);
-assert.match(successfulLoad, /if \(!payload\.success\)[\s\S]*return;/);
-assert.match(successfulLoad, /EmploymentReviewOrphanQualityCheck\?\.run/);
+const loadResultsStart = frontend.indexOf('async function loadResults');
+const successfulLoad = frontend.slice(loadResultsStart,
+    frontend.indexOf('const correctiveSummary', loadResultsStart));
+assert.notStrictEqual(loadResultsStart, -1);
+assert.match(successfulLoad, /payload:\s*await response\.json\(\)/);
+assert.match(successfulLoad, /const \{ response, payload \} = reviewResult/);
+assert.match(successfulLoad,
+    /if \(!payload\.success\)[\s\S]*return false;[\s\S]*ensureReviewTableStructure\(\)/);
+assert.match(successfulLoad,
+    /currentReviewRows = rows;[\s\S]*EmploymentReviewOrphanQualityCheck\?\.run/);
 
 console.log('orphan quality check controller contracts passed');

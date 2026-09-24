@@ -31,7 +31,7 @@ for (const form of [
     'Companies', 'Ypokatasthmata', 'NomimoiEkprosopoi', 'Passwords', 'Antistoixiseis', 'Trapezes',
     'Ergazomenoi', 'AntigrafhProgrammatonErgasias', 'LhpshOrarionApoErganh', 'LhpshOrarionApoKartes',
     'CalcApasxolhseisPeriodoy', 'ElegxosApasxolhseonPeriodoy', 'ApologistikosPinakasOrarion',
-    'ApologistikosPinakasYperorion', 'Krathseis', 'Symbaseis', 'KathgoriesSymbaseon',
+    'ApologistikosPinakasYperorion', 'KatastashElegxouApologistikouPinaka', 'Krathseis', 'Symbaseis', 'KathgoriesSymbaseon',
     'EidikothtesSymbaseon', 'StoixeiaSymbaseon', 'KlimakiaSymbaseon',
     'YpologismoiKlimakionSymbaseon', 'Apasxolhseis', 'EktyposhAtomikonEkkathariseon',
     'EktyposhSymbaseonErgazomenon'

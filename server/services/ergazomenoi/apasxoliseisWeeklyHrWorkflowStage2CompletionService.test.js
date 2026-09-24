@@ -142,6 +142,21 @@ function harness(classification, failure = '') {
         { code: 'STAGE2_INPUT_CHANGED' });
     }
     {
+        const fullDateWins = context('REST_REPO');
+        fullDateWins.effectiveProfile = { typos_apasxolhshs: '1' };
+        assert.equal(inspectAutomaticMaterialization(fullDateWins).status,
+            'READY_TO_MATERIALIZE');
+        const nonFullDateWins = context('NON_WORK');
+        nonFullDateWins.effectiveProfile = { typos_apasxolhshs: '0' };
+        assert.equal(inspectAutomaticMaterialization(nonFullDateWins).status,
+            'READY_TO_MATERIALIZE');
+        const unknown = context('REST_REPO');
+        unknown.effectiveProfile = { typos_apasxolhshs: '0' };
+        unknown.effectiveProfilesByDate['2026-06-09'] = {};
+        assert.equal(inspectAutomaticMaterialization(unknown).code,
+            'STAGE2_DAILY_PROFILE_CHANGED');
+    }
+    {
         const h = harness('NON_WORK');
         h.initial.lifecycle.stages.stage3.pending_dates = ['2026-06-16'];
         await assert.rejects(() => completeWeeklyHrWorkflowStage2(h.args),
