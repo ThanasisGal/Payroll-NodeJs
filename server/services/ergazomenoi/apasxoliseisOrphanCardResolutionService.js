@@ -13,7 +13,8 @@ const {
     timeToMinutes
 } = require('./apasxoliseisScenarioFactsService');
 const {
-    MINIMUM_INTERDAY_REST_MINUTES
+    MINIMUM_INTERDAY_REST_MINUTES,
+    evaluateSplitShiftRest
 } = require('./apasxoliseisRestPeriodPolicyService');
 
 const POLICY_VERSION = 'orphan-card-continuous:v1';
@@ -134,6 +135,92 @@ function resolveEffectiveBreakContext(row = {}, effectiveEmployee = {}, breakCon
 function buildProposal(row = {}, override = {}, effectiveEmployee = {}, breakConfiguration = null) {
     const declared = resolveContinuousDeclaredSchedule(row);
     const verification = resolveCardPairVerification(row);
+    const occupiedDeclared = buildDeclaredIntervals(row).filter((item) => item.start || item.end);
+    const splitSchedule = occupiedDeclared.length >= 2;
+    if (splitSchedule && verification.unresolvedPairs.length > 0) {
+        const requestedPairs = Array.isArray(override.pairs) ? override.pairs :
+            (verification.unresolvedPairs.length === 1 && override.start && override.end
+                ? [{ pairNumber: verification.unresolvedPairs[0].pairNumber,
+                    start: override.start, end: override.end }] : []);
+        const unresolvedPairs = verification.unresolvedPairs.map((item) => ({
+            pairNumber: Number(item.pairNumber),
+            orphanType: item.state,
+            knownStart: normalizeTimeValue(item.start),
+            knownEnd: normalizeTimeValue(item.end),
+            missingPunch: item.state === CARD_PAIR_STATE.START_ONLY ? 'END' : 'START'
+        }));
+        const actualNumbers = unresolvedPairs.map((item) => item.pairNumber).sort();
+        const suppliedNumbers = requestedPairs.map((item) => Number(item.pairNumber)).sort();
+        const pairSetMatches = actualNumbers.length === suppliedNumbers.length &&
+            actualNumbers.every((value, index) => value === suppliedNumbers[index]) &&
+            new Set(suppliedNumbers).size === suppliedNumbers.length;
+        if (!pairSetMatches) return { eligible: false, reason: 'ORPHAN_PAIR_SET_MISMATCH',
+            scheduleKind: SCHEDULE_KIND.SPLIT, unresolvedPairs };
+        const resolvedPairs = unresolvedPairs.map((orphan) => {
+            const input = requestedPairs.find((item) => Number(item.pairNumber) === orphan.pairNumber);
+            const start = normalizeTimeValue(input?.start);
+            const end = normalizeTimeValue(input?.end);
+            const bounds = intervalBounds(row.hmeromhnia, start, end);
+            return bounds ? { ...orphan, start, end, ...bounds } : null;
+        });
+        if (resolvedPairs.some((item) => !item)) return { eligible: false,
+            reason: 'INCOMPLETE_OR_INVALID_ORPHAN_PAIR_INTERVAL',
+            scheduleKind: SCHEDULE_KIND.SPLIT, unresolvedPairs };
+        const approvedUpdates = { kathgoria_ergasias_apologistika: 'ΕΡΓ',
+            apologistiko_biblio: true };
+        resolvedPairs.forEach((item) => {
+            const pair = String(item.pairNumber).padStart(2, '0');
+            approvedUpdates[`apo_ora_${pair}_apologistika`] = item.start;
+            approvedUpdates[`eos_ora_${pair}_apologistika`] = item.end;
+        });
+        const proposedRow = { ...row, ...approvedUpdates };
+        // Η ζευγοκεντρική επίλυση είναι μερική ως προς την εντολή του HR,
+        // αλλά η κανονική ημερήσια μηχανή χρειάζεται πάντοτε ολόκληρη την
+        // προτεινόμενη απολογιστική γραμμή. Έτσι ο κοινός μηδενισμός δεν
+        // μπορεί να εξαφανίσει ένα ήδη έγκυρο, ανεξάρτητο ζεύγος.
+        [1, 2, 3].forEach((number) => {
+            const pair = String(number).padStart(2, '0');
+            approvedUpdates[`apo_ora_${pair}_apologistika`] =
+                normalizeTimeValue(proposedRow[`apo_ora_${pair}_apologistika`]) || '';
+            approvedUpdates[`eos_ora_${pair}_apologistika`] =
+                normalizeTimeValue(proposedRow[`eos_ora_${pair}_apologistika`]) || '';
+        });
+        const proposedIntervals = buildApologistikaIntervals(proposedRow)
+            .filter((item) => item.isComplete && !item.isZeroLength);
+        const splitValidationRow = { ...proposedRow };
+        [1, 2, 3].forEach((number) => {
+            const pair = String(number).padStart(2, '0');
+            splitValidationRow[`cards_apo_ora_${pair}`] =
+                proposedRow[`apo_ora_${pair}_apologistika`] || '';
+            splitValidationRow[`cards_eos_ora_${pair}`] =
+                proposedRow[`eos_ora_${pair}_apologistika`] || '';
+        });
+        const splitValidation = evaluateSplitShiftRest(splitValidationRow);
+        if (splitValidation.status === 'VIOLATION') return { eligible: false,
+            reason: splitValidation.reasons[0] || 'SPLIT_REST_POLICY_VIOLATION',
+            scheduleKind: SCHEDULE_KIND.SPLIT, unresolvedPairs, splitValidation };
+        const netWorkMinutes = proposedIntervals.reduce(
+            (sum, item) => sum + Number(item.durationMinutes || 0), 0);
+        approvedUpdates.ores_ergasias_apologistika = netWorkMinutes / 60;
+        approvedUpdates.ores_pragmatikhs_ergasias_apologistika = netWorkMinutes / 60;
+        const bounds = resolvedPairs.reduce((result, item) => ({
+            startAt: Math.min(result.startAt, item.startAt),
+            endAt: Math.max(result.endAt, item.endAt)
+        }), { startAt: Infinity, endAt: -Infinity });
+        return { eligible: true, orphanType: unresolvedPairs.length === 1
+            ? unresolvedPairs[0].orphanType : 'MULTIPLE',
+        pairNumber: unresolvedPairs.length === 1 ? unresolvedPairs[0].pairNumber : null,
+        unresolvedPairs, resolvedPairs, approvedUpdates, proposedRow,
+        start: resolvedPairs[0].start, end: resolvedPairs[resolvedPairs.length - 1].end,
+        startAt: bounds.startAt, endAt: bounds.endAt,
+        durationMinutes: netWorkMinutes, netWorkMinutes,
+        durationSource: resolvedPairs.length === 1 ? 'HR_MANUAL_SPLIT_INTERVAL'
+            : 'HR_MANUAL_SPLIT_PAIRS', scheduleKind: SCHEDULE_KIND.SPLIT,
+        rule: null, automaticStart: null, automaticEnd: null,
+        manualIntervalMatchesRule: false, declaredDurationMinutes: null,
+        effectiveDailyAverageHours: null, insideSchedule: false,
+        declaredBreakMinutes: 0, externalBreakMinutes: 0 };
+    }
     if (verification.completePairs.length !== 0 || verification.unresolvedPairs.length !== 1) {
         return { eligible: false, reason: 'NOT_SINGLE_ORPHAN_CARD_PUNCH' };
     }
@@ -244,6 +331,13 @@ function resolveOrphanCardResolution({ row = {}, contextRows = [], manualInterva
     if (!proposal.eligible) return { eligible: false, category: hasRawPunch ? 'ΕΡΓ' : '',
         orphanVisible: hasRawPunch, blocking: hasRawPunch,
         orphanType: verification.unresolvedPairs[0]?.state || null,
+        unresolvedPairs: verification.unresolvedPairs.map((item) => ({
+            pairNumber: Number(item.pairNumber), orphanType: item.state,
+            knownStart: normalizeTimeValue(item.start), knownEnd: normalizeTimeValue(item.end),
+            missingPunch: item.state === CARD_PAIR_STATE.START_ONLY ? 'END' : 'START'
+        })),
+        scheduleKind: proposal.scheduleKind || null,
+        splitValidation: proposal.splitValidation || null,
         reason: proposal.reason };
     const rest = evaluateRestRisk({ row, proposal, contextRows });
     const reusableRuleMatches = Boolean(reusableRule &&
@@ -259,6 +353,13 @@ function resolveOrphanCardResolution({ row = {}, contextRows = [], manualInterva
         policyVersion: POLICY_VERSION,
         category: 'ΕΡΓ',
         orphanType: proposal.orphanType,
+        pairNumber: proposal.pairNumber,
+        unresolvedPairs: proposal.unresolvedPairs || [{ pairNumber: proposal.pairNumber,
+            orphanType: proposal.orphanType,
+            knownStart: verification.unresolvedPairs[0]?.start || '',
+            knownEnd: verification.unresolvedPairs[0]?.end || '',
+            missingPunch: proposal.orphanType === CARD_PAIR_STATE.START_ONLY ? 'END' : 'START' }],
+        resolvedPairs: proposal.resolvedPairs || null,
         orphanVisible: true,
         blocking: !canApprove,
         proposal: { start: proposal.start, end: proposal.end,
@@ -307,16 +408,14 @@ function resolveOrphanCardResolution({ row = {}, contextRows = [], manualInterva
         // Κάθε ρητά εγκεκριμένη ανακατασκευή ορφανού χτυπήματος ανήκει
         // υποχρεωτικά στη ροή του Απολογιστικού Βιβλίου.
         apologistikoBookUpdate: true,
-        approvedUpdates: canApprove ? {
+        approvedUpdates: canApprove ? (proposal.approvedUpdates || {
             kathgoria_ergasias_apologistika: 'ΕΡΓ',
-            apo_ora_01_apologistika: proposal.start,
-            eos_ora_01_apologistika: proposal.end,
-            apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
-            apo_ora_03_apologistika: '', eos_ora_03_apologistika: '',
+            [`apo_ora_${String(proposal.pairNumber).padStart(2, '0')}_apologistika`]: proposal.start,
+            [`eos_ora_${String(proposal.pairNumber).padStart(2, '0')}_apologistika`]: proposal.end,
             ores_ergasias_apologistika: proposal.netWorkMinutes / 60,
             ores_pragmatikhs_ergasias_apologistika: proposal.netWorkMinutes / 60,
             apologistiko_biblio: true
-        } : null
+        }) : null
     };
 }
 

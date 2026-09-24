@@ -45,12 +45,18 @@ function canonicalOrphanResolutionMetadata(value = {}) {
         value.risk_acknowledgement ?? false;
     const restViolation = value.rest_violation ??
         (Array.isArray(value.rest_conflicts) && value.rest_conflicts.length > 0);
+    const resolvedPairs = Array.isArray(value.resolved_pairs) ? value.resolved_pairs
+        .map((item) => ({ pairNumber: Number(item.pairNumber),
+            orphanType: String(item.orphanType || ''),
+            start: String(item.start || ''), end: String(item.end || '') }))
+        .sort((left, right) => left.pairNumber - right.pairNumber) : [];
     return {
         status: value.status || '',
         policy_version: value.policy_version || '',
         orphan_type: value.orphan_type || '',
         reuse_scope: reuseScope,
         approved_interval: interval,
+        resolved_pairs: resolvedPairs,
         reusable_decision_rule: value.reusable_decision_rule || null,
         rest_violation: restViolation === true,
         risk_acknowledged: riskAcknowledged === true,
@@ -129,15 +135,30 @@ async function persistOrphanResolutionWrite({
     oldRecord, semanticUpdates, changedBy, reason, now = new Date(), schemaPaths,
     rowModel, auditModel, createReusableApproval, session
 }) {
-    if (isIdenticalOrphanResolution(oldRecord, semanticUpdates)) {
+    const approvedOrphanType = semanticUpdates?.orphan_card_resolution?.orphan_type;
+    const approvedOrphan = semanticUpdates?.orphan_card_resolution?.status === 'HR_APPROVED' &&
+        ['START_ONLY', 'END_ONLY'].includes(approvedOrphanType);
+    const invariantUpdates = approvedOrphan
+        ? { ...semanticUpdates, apologistiko_biblio: true,
+            orphan_card_resolution: {
+                ...semanticUpdates.orphan_card_resolution,
+                apologistiko_biblio: true
+            } }
+        : semanticUpdates;
+    if (isIdenticalOrphanResolution(oldRecord, invariantUpdates)) {
         return { idempotent: true, updated: false };
     }
+    if (oldRecord.is_locked === true) {
+        throw Object.assign(new Error(
+            'Η εγγραφή είναι κλειδωμένη και η ζητούμενη επίλυση δεν είναι ισοδύναμη.'
+        ), { code: 'EMPLOYMENT_REVIEW_RECORD_LOCKED', statusCode: 409 });
+    }
     const finalUpdates = {
-        ...semanticUpdates,
-        orphan_card_resolution: semanticUpdates.orphan_card_resolution
-            ? { ...canonicalOrphanResolutionMetadata(semanticUpdates.orphan_card_resolution),
+        ...invariantUpdates,
+        orphan_card_resolution: invariantUpdates.orphan_card_resolution
+            ? { ...canonicalOrphanResolutionMetadata(invariantUpdates.orphan_card_resolution),
                 approved_at: now }
-            : semanticUpdates.orphan_card_resolution,
+            : invariantUpdates.orphan_card_resolution,
         is_locked: true,
         locked_by: changedBy,
         locked_at: now

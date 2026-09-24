@@ -142,6 +142,25 @@ const splitManualHtml = sandbox.renderOrphanCardResolutionSection({
 });
 assert.match(splitManualHtml, /Χειροκίνητο πραγματικό διάστημα σπαστού ωραρίου/);
 assert.match(splitManualHtml, /value="FUTURE_IDENTICAL"[^>]*disabled/);
+const realPairAwareHtml = sandbox.renderOrphanCardResolutionSection({
+    cards_apo_ora_01: '09:32', cards_eos_ora_01: '14:31',
+    cards_apo_ora_02: '18:04', cards_eos_ora_02: '',
+    apo_ora_02: '17:30', eos_ora_02: '20:30',
+    orphan_card_resolution_preview: {
+        orphanVisible: true, eligible: true, orphanType: 'START_ONLY',
+        unresolvedPairs: [{ pairNumber: 2, orphanType: 'START_ONLY',
+            knownStart: '18:04', knownEnd: null, missingPunch: 'END' }],
+        proposal: { start: '18:04', end: '21:04', durationHours: 479 / 60,
+            workDurationHours: 479 / 60, durationSource: 'HR_MANUAL_SPLIT_INTERVAL',
+            scheduleKind: 'SPLIT', manualIntervalMatchesRule: false },
+        rest: { hasViolation: false, conflicts: [] }
+    }
+});
+assert.match(realPairAwareHtml, /Ζεύγος 2/);
+assert.match(realPairAwareHtml, /Υπάρχει είσοδος: 18:04/);
+assert.match(realPairAwareHtml, /Λείπει έξοδος/);
+assert.match(realPairAwareHtml, /Καθαρή διάρκεια:<\/strong>\s*7\.98 ώρες/);
+assert.doesNotMatch(realPairAwareHtml, /Πραγματικό χτύπημα:<\/strong>\s*09:32/);
 const rowBeforeDerivedPreview = structuredClone(endRow);
 sandbox.applyOrphanDerivedPreview(endRow, { fields: {
     ores_ergasias_apologistika: 8,
@@ -157,6 +176,12 @@ assert.strictEqual(modalInputs.get('edit_ores_apoysias_apologistika').value, '0.
 assert.strictEqual(modalInputs.get('edit_ores_nyxtas_apologistika').value, '1.78');
 assert.strictEqual(modalInputs.get('edit_repo_apologistika').checked, false);
 assert.strictEqual(modalInputs.get('edit_kyriakes_apologistika').checked, false);
+ sandbox.applyOrphanDerivedPreview(realPairAwareHtml, { fields: {
+    ores_ergasias_apologistika: 7.98,
+    ores_apoysias_apologistika: 0.02
+} });
+assert.strictEqual(modalInputs.get('edit_ores_ergasias_apologistika').value, '7.98');
+assert.strictEqual(modalInputs.get('edit_ores_apoysias_apologistika').value, '0.02');
 assert.deepStrictEqual(endRow, rowBeforeDerivedPreview);
 assert.strictEqual(sandbox.requiresExplicitOrphanResolutionApproval(
     { ...endRow, orphan_card_resolution_preview: {

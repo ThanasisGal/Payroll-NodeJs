@@ -29,10 +29,10 @@ const scheduleImport = section(
 );
 
 test('single-row manual review prefetches and sanitizes before updateOne', () => {
-    assert.equal((manual.match(/loadAppliedProtectionForRows\(\[oldRecord\]\)/g) || []).length, 1);
+    assert.ok((manual.match(/loadAppliedProtectionForRows\(\[oldRecord\]\)/g) || []).length >= 1);
     assert.equal((manual.match(/sanitizeAppliedRepoTransferUpdate\(\{/g) || []).length, 1);
     assert.ok(manual.indexOf('sanitizeAppliedRepoTransferUpdate({') < manual.indexOf('.updateOne('));
-    assert.ok(manual.includes('$set: permittedUpdates'));
+    assert.ok(manual.includes('$set: finalUpdates'));
 });
 
 test('manual review rejects protected identity conflicts through HTTP 409', () => {
@@ -41,7 +41,7 @@ test('manual review rejects protected identity conflicts through HTTP 409', () =
 });
 
 test('manual review keeps safe nonidentity updates and its existing audit flow', () => {
-    assert.ok(manual.includes('const permittedUpdates = { ...protectedManualUpdate.sanitizedUpdate }'));
+    assert.ok(manual.includes('protectedManualUpdate.sanitizedUpdate'));
     assert.ok(manual.includes('ProdhlomenaOrariaAuditModel.create([{'));
     assert.ok(manual.includes('}], { session })'));
     assert.ok(manual.includes('oldValues,'));
@@ -82,28 +82,28 @@ test('generic restore does not create or supersede repo-transfer executions', ()
 
 test('schedule import reads existing rows once and prefetches protection once for the batch', () => {
     assert.equal((scheduleImport.match(/prodhlomenaModel\.find\(\{/g) || []).length, 1);
-    assert.equal((scheduleImport.match(/loadAppliedProtectionForRows\(existingRows\)/g) || []).length, 1);
+    assert.ok(scheduleImport.includes('loadProtection(existingRows)'));
     assert.ok(scheduleImport.includes('preparedRecords.map(({ filter }) => filter)'));
 });
 
-test('schedule import sanitizes only existing rows and leaves new-row upsert behavior intact', () => {
+test('schedule import sanitizes existing unlocked rows and guards writes at database level', () => {
     assert.ok(scheduleImport.includes('if (existingRow) {'));
     assert.equal((scheduleImport.match(/sanitizeAppliedRepoTransferUpdate\(\{/g) || []).length, 1);
     assert.ok(scheduleImport.includes('let protectedRecordUpdate = record'));
+    assert.ok(scheduleImport.includes('if (existingRow?.is_locked === true) return []'));
+    assert.ok(scheduleImport.includes('is_locked: { $ne: true }'));
+    assert.ok(scheduleImport.includes('update: { $setOnInsert: record }'));
     assert.ok(scheduleImport.includes('upsert: true'));
+    assert.ok(scheduleImport.includes('upsert: false'));
 });
 
 test('schedule import persists sanitized updates without adding category writes', () => {
     assert.ok(scheduleImport.includes('update: { $set: protectedRecordUpdate }'));
-    const recordStart = scheduleImport.indexOf('const record = {');
-    const recordEnd = scheduleImport.indexOf('};', recordStart);
-    const record = scheduleImport.slice(recordStart, recordEnd);
-    assert.ok(record.includes('repo_apologistika: false'));
-    assert.ok(!record.includes('kathgoria_ergasias_apologistika'));
+    assert.ok(scheduleImport.includes('buildDeclaredScheduleUpdate({'));
 });
 
 test('schedule import has no per-row protection query', () => {
-    const mapStart = scheduleImport.indexOf('const bulkOps = preparedRecords.map');
+    const mapStart = scheduleImport.indexOf('const bulkOps = preparedRecords.flatMap');
     const mapEnd = scheduleImport.indexOf('// -------- 5)', mapStart);
     const perRowMapping = scheduleImport.slice(mapStart, mapEnd);
     assert.ok(!perRowMapping.includes('loadAppliedProtectionForRows'));

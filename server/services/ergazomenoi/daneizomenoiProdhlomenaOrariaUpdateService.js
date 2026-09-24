@@ -129,6 +129,7 @@ async function updateBorrowedEmployeeRows({
         sourceRowsFound: 0,
         targetRowsInserted: 0,
         targetRowsUpdated: 0,
+        targetRowsSkippedLocked: 0,
         skippedMappings: 0,
         employeesWithoutSourceRows: 0,
         conflicts: 0,
@@ -254,7 +255,7 @@ async function updateBorrowedEmployeeRows({
 
     const targetCodes = [...new Set(validMappings.map((mapping) => mapping.targetCode))];
     const existingTargetRows = await prodhlomenaModel.find(targetSchedulesFilter({ scope, targetCodes }))
-        .select('team company_kod ypokatasthma kodikos hmeromhnia')
+        .select('_id team company_kod ypokatasthma kodikos hmeromhnia is_locked')
         .lean();
     const existingTargetRowsByKey = new Map();
     for (const row of existingTargetRows) {
@@ -265,13 +266,27 @@ async function updateBorrowedEmployeeRows({
 
     const bulkOps = [];
     for (const { identity, sourceRow } of pendingTargetRows) {
-        if ((existingTargetRowsByKey.get(targetRowKey(identity)) || []).length > 1) {
+        const existingRows = existingTargetRowsByKey.get(targetRowKey(identity)) || [];
+        if (existingRows.length > 1) {
             summary.targetAmbiguities++;
             continue;
         }
-        const update = { $set: buildUpdate(sourceRow) };
-        if (upsert) update.$setOnInsert = identity;
-        bulkOps.push({ updateOne: { filter: identity, update, upsert } });
+        const existingRow = existingRows[0];
+        if (existingRow?.is_locked === true) {
+            summary.targetRowsSkippedLocked++;
+            continue;
+        }
+        if (!existingRow && upsert) {
+            bulkOps.push({ updateOne: { filter: identity,
+                update: { $setOnInsert: { ...identity, ...buildUpdate(sourceRow) } },
+                upsert: true } });
+            continue;
+        }
+        const filter = existingRow
+            ? { _id: existingRow._id, is_locked: { $ne: true } }
+            : identity;
+        bulkOps.push({ updateOne: { filter,
+            update: { $set: buildUpdate(sourceRow) }, upsert: false } });
     }
     if (bulkOps.length === 0) return summary;
 

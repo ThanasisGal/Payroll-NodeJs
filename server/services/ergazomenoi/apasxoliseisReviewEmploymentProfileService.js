@@ -55,22 +55,41 @@ function resolveFullTimeFromWorkTerms(workTerms = {}) {
     return null;
 }
 
+const EMPLOYMENT_REGIME = Object.freeze({
+    FULL_TIME: 'FULL_TIME',
+    NON_FULL: 'NON_FULL',
+    UNKNOWN: 'UNKNOWN'
+});
+
+function resolveEmploymentRegimeFromWorkTerms(workTerms = {}) {
+    const fullTime = resolveFullTimeFromWorkTerms(workTerms);
+    return fullTime === true ? EMPLOYMENT_REGIME.FULL_TIME
+        : fullTime === false ? EMPLOYMENT_REGIME.NON_FULL
+            : EMPLOYMENT_REGIME.UNKNOWN;
+}
+
+function resolveEmploymentRegimeForDate({ date, effectiveProfilesByDate = {},
+    effectiveProfile = {} } = {}) {
+    const hasDateSpecificProfile = Boolean(date &&
+        Object.prototype.hasOwnProperty.call(effectiveProfilesByDate || {}, date));
+    const workTerms = hasDateSpecificProfile
+        ? effectiveProfilesByDate[date] : effectiveProfile;
+    return Object.freeze({
+        regime: resolveEmploymentRegimeFromWorkTerms(workTerms),
+        workTerms: workTerms && typeof workTerms === 'object' ? workTerms : {},
+        source: hasDateSpecificProfile ? 'DATE_EFFECTIVE' : 'BASE_FALLBACK'
+    });
+}
+
 function resolveReviewIsFullTimeProfile(workTerms = {}, phaseCode = '') {
-    const normalizedPhaseCode = String(phaseCode || '').trim();
-    if (normalizedPhaseCode === '0') return true;
-    if (normalizedPhaseCode === '1' || normalizedPhaseCode === '2') return false;
-
-    const contractualResolution = resolveFullTimeFromWorkTerms(workTerms);
-    if (contractualResolution !== null) return contractualResolution;
-
-    // «ΜΗ ΕΡΓΑΣΙΑ» επιτρέπεται μόνο όταν έχει τεκμηριωθεί μη πλήρης απασχόληση
-    // από την ημερήσια schedule phase ή, αν αυτή λείπει, από τους όρους εργασίας.
-    // Σε άγνωστο/παλιό profile δεν υποβαθμίζουμε ένα ρεπό σε «ΜΗ ΕΡΓΑΣΙΑ».
-    return true;
+    return resolveFullTimeFromWorkTerms(workTerms);
 }
 
 module.exports = {
+    EMPLOYMENT_REGIME,
     normalizeEmploymentType,
     resolveFullTimeFromWorkTerms,
+    resolveEmploymentRegimeFromWorkTerms,
+    resolveEmploymentRegimeForDate,
     resolveReviewIsFullTimeProfile
 };

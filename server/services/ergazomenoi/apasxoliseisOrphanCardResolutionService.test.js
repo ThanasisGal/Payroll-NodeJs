@@ -202,6 +202,63 @@ assert.strictEqual(splitManual.reuseScope, 'ONE_TIME');
 assert.strictEqual(splitManual.reusableEligible, false);
 assert.strictEqual(splitManual.reusableDecisionRule, null);
 
+const realSplitCase = row('2026-08-07', {
+    apo_ora_01: '09:30', eos_ora_01: '14:30',
+    apo_ora_02: '17:30', eos_ora_02: '20:30',
+    cards_apo_ora_01: '09:32', cards_eos_ora_01: '14:31',
+    cards_apo_ora_02: '18:04', cards_eos_ora_02: '',
+    apo_ora_01_apologistika: '09:32', eos_ora_01_apologistika: '14:31',
+    apo_ora_02_apologistika: '', eos_ora_02_apologistika: '',
+    apo_ora_03_apologistika: '', eos_ora_03_apologistika: ''
+});
+const realSplitResolution = resolveOrphanCardResolution({ row: realSplitCase,
+    contextRows: [realSplitCase], manualInterval: { pairs: [
+        { pairNumber: 2, start: '18:04', end: '21:04' }
+    ] }, reuseScope: RESOLUTION_SCOPE.FUTURE_IDENTICAL });
+assert.strictEqual(realSplitResolution.eligible, true);
+assert.deepStrictEqual(realSplitResolution.unresolvedPairs, [{ pairNumber: 2,
+    orphanType: 'START_ONLY', knownStart: '18:04', knownEnd: null,
+    missingPunch: 'END' }]);
+assert.strictEqual(realSplitResolution.approvedUpdates.apo_ora_02_apologistika, '18:04');
+assert.strictEqual(realSplitResolution.approvedUpdates.eos_ora_02_apologistika, '21:04');
+assert.strictEqual(realSplitResolution.approvedUpdates.apo_ora_01_apologistika, '09:32');
+assert.strictEqual(realSplitResolution.approvedUpdates.eos_ora_01_apologistika, '14:31');
+assert.strictEqual(realSplitResolution.approvedUpdates.apo_ora_03_apologistika, '');
+assert.strictEqual(realSplitResolution.approvedUpdates.eos_ora_03_apologistika, '');
+assert.strictEqual(realSplitResolution.proposal.workDurationMinutes, 479);
+assert.strictEqual(realSplitResolution.approvedUpdates.ores_ergasias_apologistika,
+    7.983333333333333);
+assert.strictEqual(realSplitResolution.reuseScope, 'ONE_TIME');
+assert.strictEqual(realSplitResolution.approvedUpdates.apologistiko_biblio, true);
+const invalidSplitGap = resolveOrphanCardResolution({ row: realSplitCase,
+    manualInterval: { pairs: [{ pairNumber: 2, start: '16:00', end: '19:00' }] } });
+assert.strictEqual(invalidSplitGap.eligible, false);
+assert.strictEqual(invalidSplitGap.reason, 'SPLIT_REST_BELOW_MINIMUM');
+assert.strictEqual(invalidSplitGap.splitValidation.measuredRestMinutes, 89);
+
+const multipleSplit = row('2026-08-08', {
+    apo_ora_01: '08:00', eos_ora_01: '11:00',
+    apo_ora_02: '15:00', eos_ora_02: '18:00',
+    cards_apo_ora_01: '08:05', cards_eos_ora_01: '',
+    cards_apo_ora_02: '', cards_eos_ora_02: '18:10'
+});
+const omittedPair = resolveOrphanCardResolution({ row: multipleSplit,
+    manualInterval: { pairs: [{ pairNumber: 1, start: '08:05', end: '11:05' }] } });
+assert.strictEqual(omittedPair.reason, 'ORPHAN_PAIR_SET_MISMATCH');
+const extraPair = resolveOrphanCardResolution({ row: realSplitCase,
+    manualInterval: { pairs: [{ pairNumber: 2, start: '18:04', end: '21:04' },
+        { pairNumber: 3, start: '22:00', end: '23:00' }] } });
+assert.strictEqual(extraPair.reason, 'ORPHAN_PAIR_SET_MISMATCH');
+const allPairs = resolveOrphanCardResolution({ row: multipleSplit,
+    manualInterval: { pairs: [
+        { pairNumber: 1, start: '08:05', end: '11:05' },
+        { pairNumber: 2, start: '15:10', end: '18:10' }
+    ] } });
+assert.strictEqual(allPairs.eligible, true);
+assert.strictEqual(allPairs.resolvedPairs.length, 2);
+assert.strictEqual(allPairs.approvedUpdates.apo_ora_01_apologistika, '08:05');
+assert.strictEqual(allPairs.approvedUpdates.apo_ora_02_apologistika, '15:10');
+
 const averageEnd = row('2026-06-15', { kathgoria_ergasias: 'ΑΝ', repo: true,
     apo_ora_01: '', eos_ora_01: '', cards_apo_ora_01: '', cards_eos_ora_01: '23:47' });
 const averageNoBreak = resolveOrphanCardResolution({ row: averageEnd,

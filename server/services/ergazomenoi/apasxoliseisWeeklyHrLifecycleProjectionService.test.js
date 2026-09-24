@@ -189,18 +189,23 @@ assert.deepEqual(completed0014.stages.stage1.reviewed_possible_leave_dates,
     ['2026-06-17']);
 assert.deepEqual(completed0014.stages.stage3.raw_remaining_possible_leave_dates,
     ['2026-06-17']);
-assert.deepEqual(completed0014.stages.stage3.resolved_before_stage3_dates, []);
-assert.deepEqual(completed0014.stages.stage3.pending_dates, ['2026-06-17']);
-assert.equal(completed0014.stages.stage3.remaining_possible_leave_count, 1);
-assert.equal(completed0014.stages.stage3.business_status, 'OPEN');
-assert.equal(completed0014.stages.stage4.analysis_presentation_status, 'PROVISIONAL');
+assert.deepEqual(completed0014.stages.stage3.resolved_before_stage3_dates,
+    ['2026-06-17']);
+assert.deepEqual(completed0014.stages.stage3.pending_dates, []);
+assert.equal(completed0014.stages.stage3.remaining_possible_leave_count, 0);
+assert.equal(completed0014.stages.stage3.business_status, 'COMPLETED');
+assert.deepEqual(completed0014.stages.stage3.stage2_automatic_resolution_items,
+    [{ date: '2026-06-17', classification: 'REST_REPO',
+        reason: 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }]);
+assert.equal(completed0014.stages.stage4.analysis_presentation_status,
+    'ELIGIBLE_FOR_FINALIZATION');
 
 function authoritativeStage3FingerprintContext({ projection, rows, selectedDate,
-    scope, stage2Version = 0 }) {
+    scope, stage2Version = 0, dailyProfile = profile }) {
     const stage1 = projection.stages.stage1;
     const stage3 = projection.stages.stage3;
     const row = rows.find((candidate) => candidate.hmeromhnia === selectedDate);
-    return { scope, row, dailyProfile: profile, isResidual: true,
+    return { scope, row, dailyProfile, isResidual: true,
         stage2: { fingerprint: stage3.stage2_fingerprint, status: stage3.stage2_status,
             resolution: stage3.stage2_resolution,
             resolved_dates: stage3.stage2_automatic_resolved_dates || [] },
@@ -219,16 +224,20 @@ function authoritativeStage3FingerprintContext({ projection, rows, selectedDate,
 
 const equivalentFingerprintsByStage2Version = new Map();
 for (const stage2Version of [0, 6]) {
+    const unknownDailyProfile = {};
     const scope = { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
         employee_id: 'employee-0014', employee_kodikos: '0014',
         week_start: '2026-06-15', week_end: '2026-06-21' };
     const projection = buildWeeklyHrLifecycleProjection({ weekRows: employee0014,
-        effectiveProfile: profile, persistedStage1State: { status: 'COMPLETED',
+        effectiveProfile: profile,
+        effectiveProfilesByDate: { '2026-06-17': unknownDailyProfile },
+        persistedStage1State: { status: 'COMPLETED',
             completion_fingerprint: employee0014Fingerprint },
         persistedStage2State: { version: stage2Version }, scope });
     const pending = projection.stages.stage3.pending_items[0];
     const authoritative = authoritativeStage3FingerprintContext({ projection,
-        rows: employee0014, selectedDate: pending.date, scope, stage2Version });
+        rows: employee0014, selectedDate: pending.date, scope, stage2Version,
+        dailyProfile: unknownDailyProfile });
     assert.equal(pending.input_fingerprint,
         buildStage3InputFingerprint(authoritative).fingerprint,
         `Search και authoritative πλαίσιο συμφωνούν για Stage 2 version ${stage2Version}`);
@@ -279,16 +288,18 @@ assert.deepEqual(partialResidualProjection.stage1_no_classification_preview_item
     date: '2026-06-16', safe: true, classification: 'NON_WORK',
     source_date: null, reasons: []
 }]);
-assert.ok(!completed0014.stages.stage3.pending_items[0]
-    .allowed_classifications.includes('NON_WORK'));
-assert.equal(completed0014.stages.stage3.pending_items[0].expected_stage3_version, 0);
-const completed0014AtStage3Version = buildWeeklyHrLifecycleProjection({
+assert.deepEqual(completed0014.stages.stage3.pending_items, []);
+const unknown0014AtStage3Version = buildWeeklyHrLifecycleProjection({
     weekRows: employee0014, effectiveProfile: profile,
+    effectiveProfilesByDate: { '2026-06-17': {} },
     persistedStage1State: { status: 'COMPLETED',
         completion_fingerprint: employee0014Fingerprint },
     persistedStage3State: { status: 'OPEN', version: 4 }
 });
-assert.equal(completed0014AtStage3Version.stages.stage3.pending_items[0]
+assert.deepEqual(unknown0014AtStage3Version.stages.stage3.pending_items[0]
+    .allowed_classifications, []);
+assert.equal(unknown0014AtStage3Version.stages.stage3.business_status, 'BLOCKED');
+assert.equal(unknown0014AtStage3Version.stages.stage3.pending_items[0]
     .expected_stage3_version, 4);
 
 // After the last residual receives a canonical classification, the immutable
@@ -340,10 +351,10 @@ const reviewed0014Weeks = [
             completion_fingerprint: buildStage1Fingerprint(fixture).fingerprint } });
 });
 assert.equal(reviewed0014Weeks.reduce((sum, projection) =>
-    sum + projection.stages.stage3.pending_count, 0), 1);
+    sum + projection.stages.stage3.pending_count, 0), 0);
 assert.deepEqual(reviewed0014Weeks.flatMap((projection) =>
     projection.stages.stage3.pending_dates),
-['2026-06-22']);
+[]);
 
 const rotationalResidual = week('rotational');
 rotationalResidual[1] = possibleLeave(rotationalResidual[1]);
@@ -643,9 +654,8 @@ const ambiguousPreview = buildStage1NoClassificationPreviewItems({
     repoTransfer: { reasons: ['MULTIPLE_SOURCE_CANDIDATES'] },
     stage2Actionability: { has_transferable_pair: false, has_bounded_selection: true }
 });
-assert.deepEqual(ambiguousPreview, [{ date: '2026-06-19', safe: false,
-    classification: null, source_date: null, requires_further_review: true,
-    reasons: ['MULTIPLE_SOURCE_CANDIDATES'] }]);
+assert.deepEqual(ambiguousPreview, [{ date: '2026-06-19', safe: true,
+    classification: 'REST_REPO', source_date: null, reasons: [] }]);
 
 const crossMonth = week('0014', '2026-06-29');
 crossMonth[0] = possibleLeave(crossMonth[0]);
@@ -964,18 +974,13 @@ const mayBoundaryLifecycle = buildWeeklyHrLifecycleProjection({
 });
 assert.equal(mayBoundaryLifecycle.stages.stage1.business_status, 'COMPLETED');
 assert.equal(mayBoundaryLifecycle.stages.stage2.business_status, 'COMPLETED');
-assert.equal(mayBoundaryLifecycle.stages.stage3.business_status, 'OPEN');
-assert.equal(mayBoundaryLifecycle.stages.stage3.pending_count, 2);
+assert.equal(mayBoundaryLifecycle.stages.stage3.business_status, 'COMPLETED');
+assert.equal(mayBoundaryLifecycle.stages.stage3.pending_count, 0);
 assert.deepEqual(mayBoundaryLifecycle.stages.stage3.pending_dates,
-    ['2026-05-02', '2026-05-03']);
-for (const item of mayBoundaryLifecycle.stages.stage3.pending_items) {
-    assert.deepEqual(item.allowed_classifications, ['LEAVE', 'SICKNESS', 'ABSENCE']);
-    assert.equal(item.presentation_facts.weekly_rest_already_satisfied, true);
-    assert.equal(item.presentation_facts.current_period_writable, true);
-    assert.equal(item.presentation_facts.context_only, false);
-    assert.equal(item.presentation_facts.final_human_decision_required, true);
-    assert.ok(item.input_fingerprint);
-}
+    []);
+assert.deepEqual(mayBoundaryLifecycle.stages.stage3.stage2_automatic_resolution_items
+    .map((item) => [item.date, item.classification]),
+[['2026-05-02', 'REST_REPO'], ['2026-05-03', 'REST_REPO']]);
 assert.deepEqual(mayBoundaryLifecycle.employment_date_scope.context_only_dates,
     ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30']);
 assert.deepEqual(mayBoundaryLifecycle.employment_date_scope.authoritative_date_set,

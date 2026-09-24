@@ -26,8 +26,12 @@ assert.match(clickHandler, /if \(row\) showDetailsModal\(row\); return;/);
 
 console.log('Employment Review orphan button click contract: PASS');
 
-const expectedReason = 'Η προτεινόμενη από την εφαρμογή επίλυση του ορφανού χτυπήματος ελέγχθηκε και εγκρίθηκε από τον HR.';
-const row = { _id: 'orphan-row', orphan_card_resolution_preview: { orphanVisible: true } };
+const startOnlyReason = 'Τακτοποίηση ορφανού χτυπήματος εξόδου';
+const endOnlyReason = 'Τακτοποίηση ορφανού χτυπήματος εισόδου';
+const row = { _id: 'orphan-row', orphan_card_resolution_preview: {
+    orphanVisible: true,
+    unresolvedPairs: [{ pairNumber: 1, orphanType: 'START_ONLY', missingPunch: 'END' }]
+} };
 const opened = [];
 vm.runInNewContext(`(() => { ${orphanBranch} })()`, {
     event: { target: { closest: () => ({ dataset: { rowId: row._id } }) } },
@@ -39,7 +43,6 @@ assert.equal(opened[0][0], row);
 assert.equal(opened[0][1].orphanResolution, true);
 // Only the orphan button supplies an opening context; all other callers stay unchanged.
 assert.equal((source.match(/showDetailsModal\(row, \{ orphanResolution: true \}\)/g) || []).length, 1);
-assert.equal(source.split(expectedReason).length - 1, 1);
 
 const container = { innerHTML: '' };
 const sandbox = {
@@ -54,9 +57,29 @@ const sandbox = {
     setTimeout: () => {}, initModalMoveByEnter: () => {},
     initializeOrphanResolutionPreview: () => {}
 };
+const reasonHelperSource = source.slice(source.indexOf('function defaultOrphanResolutionReason'),
+    source.indexOf('async function loadAuditHistory'));
 const modalSource = source.slice(source.indexOf('function showDetailsModal'),
     source.indexOf('function buildReviewExportParams'));
-vm.runInNewContext(`${modalSource}\nthis.open = showDetailsModal;`, sandbox);
+vm.runInNewContext(`${reasonHelperSource}\n${modalSource}\n` +
+    'this.open = showDetailsModal; this.defaultReason = defaultOrphanResolutionReason;', sandbox);
+assert.equal(sandbox.defaultReason(row.orphan_card_resolution_preview.unresolvedPairs),
+    startOnlyReason);
+assert.equal(sandbox.defaultReason([
+    { pairNumber: 1, orphanType: 'END_ONLY', missingPunch: 'START' }
+]), endOnlyReason);
+assert.equal(sandbox.defaultReason([
+    { pairNumber: 1, orphanType: 'START_ONLY', missingPunch: 'END' },
+    { pairNumber: 2, orphanType: 'START_ONLY', missingPunch: 'END' }
+]), 'Τακτοποίηση ορφανών χτυπημάτων εξόδου');
+assert.equal(sandbox.defaultReason([
+    { pairNumber: 1, orphanType: 'END_ONLY', missingPunch: 'START' },
+    { pairNumber: 2, orphanType: 'END_ONLY', missingPunch: 'START' }
+]), 'Τακτοποίηση ορφανών χτυπημάτων εισόδου');
+assert.equal(sandbox.defaultReason([
+    { pairNumber: 1, orphanType: 'START_ONLY', missingPunch: 'END' },
+    { pairNumber: 2, orphanType: 'END_ONLY', missingPunch: 'START' }
+]), 'Τακτοποίηση ορφανών χτυπημάτων εισόδου και εξόδου');
 function reasonField() {
     const match = container.innerHTML.match(/<textarea id="edit_reason"([^>]*)>([\s\S]*?)<\/textarea>/);
     assert.ok(match);
@@ -64,7 +87,7 @@ function reasonField() {
     return { value: match[2], readonly: /\breadonly\b/.test(match[1]) };
 }
 sandbox.open(...opened[0]);
-assert.deepEqual(reasonField(), { value: expectedReason, readonly: false });
+assert.deepEqual(reasonField(), { value: startOnlyReason, readonly: false });
 sandbox.open(row);
 assert.deepEqual(reasonField(), { value: '', readonly: false });
 sandbox.open(row, { orphanResolution: false });
@@ -75,10 +98,11 @@ const reusableRow = { ...row, orphan_card_resolution_preview: {
 for (const context of [undefined, { orphanResolution: true }]) {
     sandbox.open(reusableRow, context);
     assert.deepEqual(reasonField(), { value: 'Υφιστάμενη έγκριση HR.', readonly: true });
-    assert.doesNotMatch(container.innerHTML, new RegExp(expectedReason));
+    assert.doesNotMatch(container.innerHTML, new RegExp(startOnlyReason));
 }
 sandbox.open({ ...row, orphan_card_resolution_preview: {
-    automaticReusableApplied: false, reusableDecisionReason: 'Δεν εφαρμόστηκε.'
+    automaticReusableApplied: false, reusableDecisionReason: 'Δεν εφαρμόστηκε.',
+    unresolvedPairs: [{ pairNumber: 1, orphanType: 'END_ONLY', missingPunch: 'START' }]
 } }, { orphanResolution: true });
-assert.deepEqual(reasonField(), { value: expectedReason, readonly: false });
+assert.deepEqual(reasonField(), { value: endOnlyReason, readonly: false });
 console.log('Employment Review orphan reason prefill regression: PASS');

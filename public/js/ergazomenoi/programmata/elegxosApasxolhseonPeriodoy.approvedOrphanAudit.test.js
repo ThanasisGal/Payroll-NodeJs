@@ -70,6 +70,6 @@ assert.match(badge, /ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ/);
 assert.strictEqual(sandbox.renderApprovedOrphanAuditBadge(orphanRow(null)), '');
 
 assert.match(source,
-    /\$\{rowPresentation\.apologistiko\.text\}[\s\S]*\$\{renderApprovedOrphanAuditBadge\(row\)\}/);
+    /\$\{renderStage4ClassificationPill\(rowPresentation\.apologistiko\.text\)\}[\s\S]*\$\{renderApprovedOrphanAuditBadge\(row\)\}/);
 
 console.log('approved orphan pending/audit renderer regression: PASS');

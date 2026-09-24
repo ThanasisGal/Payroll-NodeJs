@@ -32,7 +32,8 @@ function query(rows) {
     };
 }
 
-function harness({ employees = [], companies = [], sourceRows = [], targetRows = [], bulkResults = [] } = {}) {
+function harness({ employees = [], companies = [], sourceRows = [], targetRows = [],
+    bulkResults = [], bulkWriteOverride = null } = {}) {
     const calls = { employeeFind: [], companyFind: [], scheduleFind: [], targetFind: [], bulkWrite: [] };
     let bulkIndex = 0;
     return {
@@ -57,6 +58,7 @@ function harness({ employees = [], companies = [], sourceRows = [], targetRows =
                 },
                 async bulkWrite(ops, options) {
                     calls.bulkWrite.push({ ops, options });
+                    if (bulkWriteOverride) return bulkWriteOverride(ops, options);
                     return bulkResults[bulkIndex++] || { upsertedCount: ops.length, modifiedCount: 0 };
                 },
                 async deleteMany() { throw new Error('deleteMany must never be called'); },
@@ -158,12 +160,13 @@ test('maps target 0031 to source 0003 and bulk-upserts the target identity only'
     });
     assert.notEqual(h.calls.scheduleFind[0].ypokatasthma, operation.filter.ypokatasthma);
     assert.equal(operation.upsert, true);
-    assert.equal(operation.update.$set.apo_ora_01, '08:00');
-    assert.equal(operation.update.$set.cards_apo_ora_01, '');
+    assert.equal(operation.update.$setOnInsert.apo_ora_01, '08:00');
+    assert.equal(operation.update.$setOnInsert.cards_apo_ora_01, '');
+    assert.equal(operation.update.$set, undefined);
     for (const protectedField of [
-        '_id', 'team', 'company_kod', 'kodikos', 'ypokatasthma', 'hmeromhnia',
+        '_id',
         'orphan_card_resolution', 'is_locked', 'compensation_breakdown_apologistika'
-    ]) assert.ok(!Object.hasOwn(operation.update.$set, protectedField), protectedField);
+    ]) assert.ok(!Object.hasOwn(operation.update.$setOnInsert, protectedField), protectedField);
 });
 
 test('repeated identical execution uses the same identity and creates no duplicate', async () => {
@@ -192,6 +195,7 @@ test('an existing target row is reported as updated without creating a new row',
         companies: [{ _id: sourceCompanyId, afm: validAfm }],
         sourceRows: [sourceRow({ apo_ora_01: '09:00', eos_ora_01: '17:00' })],
         targetRows: [{
+            _id: '64b000000000000000000099',
             team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.target_ypokatasthma,
             kodikos: '0031', hmeromhnia: new Date('2026-08-05T00:00:00.000Z')
         }],
@@ -200,19 +204,69 @@ test('an existing target row is reported as updated without creating a new row',
     const summary = await updateBorrowedEmployeeDeclaredSchedules({ scope, models: h.models });
     assert.equal(summary.targetRowsInserted, 0);
     assert.equal(summary.targetRowsUpdated, 1);
-    assert.equal(h.calls.bulkWrite[0].ops[0].updateOne.upsert, true);
+    assert.equal(h.calls.bulkWrite[0].ops[0].updateOne.upsert, false);
 });
 
-test('no existing target row is upserted as an insert', async () => {
+test('a locked HR-approved orphan target is never overwritten', async () => {
     const h = harness({
         employees: [employee()],
         companies: [{ _id: sourceCompanyId, afm: validAfm }],
-        sourceRows: [sourceRow()]
+        sourceRows: [sourceRow()],
+        targetRows: [{
+            _id: '64b000000000000000000098', team: scope.team,
+            company_kod: scope.company_kod, ypokatasthma: scope.target_ypokatasthma,
+            kodikos: '0031', hmeromhnia: new Date('2026-08-05T00:00:00.000Z'),
+            is_locked: true, apologistiko_biblio: true,
+            orphan_card_resolution: { status: 'HR_APPROVED', orphan_type: 'START_ONLY' }
+        }]
     });
     const summary = await updateBorrowedEmployeeDeclaredSchedules({ scope, models: h.models });
-    assert.equal(summary.targetRowsInserted, 1);
+    assert.equal(summary.targetRowsSkippedLocked, 1);
+    assert.equal(h.calls.bulkWrite.length, 0);
+});
+
+test('an existing unlocked borrowed target uses a database lock predicate', async () => {
+    const target = {
+        _id: '64b000000000000000000097', team: scope.team,
+        company_kod: scope.company_kod, ypokatasthma: scope.target_ypokatasthma,
+        kodikos: '0031', hmeromhnia: new Date('2026-08-05T00:00:00.000Z'), is_locked: false
+    };
+    const h = harness({ employees: [employee()],
+        companies: [{ _id: sourceCompanyId, afm: validAfm }],
+        sourceRows: [sourceRow()], targetRows: [target] });
+    await updateBorrowedEmployeeDeclaredSchedules({ scope, models: h.models });
+    assert.deepStrictEqual(h.calls.bulkWrite[0].ops[0].updateOne.filter,
+        { _id: target._id, is_locked: { $ne: true } });
+    assert.equal(h.calls.bulkWrite[0].ops[0].updateOne.upsert, false);
+});
+
+test('missing-row race with a concurrently inserted locked target cannot overwrite it', async () => {
+    const concurrentRow = { team: scope.team, company_kod: scope.company_kod,
+        ypokatasthma: scope.target_ypokatasthma, kodikos: '0031',
+        hmeromhnia: new Date('2026-08-05T00:00:00.000Z'), is_locked: true,
+        apologistiko_biblio: true };
+    const h = harness({
+        employees: [employee()],
+        companies: [{ _id: sourceCompanyId, afm: validAfm }],
+        sourceRows: [sourceRow()],
+        bulkWriteOverride: async ([{ updateOne }]) => {
+            const matches = Object.entries(updateOne.filter).every(([key, value]) =>
+                String(concurrentRow[key]) === String(value));
+            assert.equal(matches, true);
+            assert.equal(updateOne.update.$set, undefined);
+            assert.equal(concurrentRow.is_locked, true);
+            assert.equal(concurrentRow.apologistiko_biblio, true);
+            return { upsertedCount: 0, modifiedCount: 0 };
+        }
+    });
+    const summary = await updateBorrowedEmployeeDeclaredSchedules({ scope, models: h.models });
+    assert.equal(summary.targetRowsInserted, 0);
     assert.equal(h.calls.targetFind.length, 1);
     assert.equal(h.calls.bulkWrite.length, 1);
+    const operation = h.calls.bulkWrite[0].ops[0].updateOne;
+    assert.equal(operation.filter.is_locked, undefined);
+    assert.equal(operation.update.$set, undefined);
+    assert.ok(operation.update.$setOnInsert);
 });
 
 test('duplicate existing target identity is ambiguous and is never written', async () => {

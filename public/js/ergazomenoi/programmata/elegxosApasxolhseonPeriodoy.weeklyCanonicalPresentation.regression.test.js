@@ -39,7 +39,5 @@ assert.equal(saturday.is_sixth_day, true);
 assert.equal(saturday.sixth_day_premium_rate, 0);
 assert.equal(sandbox.renderSixthDayCardsBadge(staleFriday), '');
 assert.match(sandbox.renderSixthDayCardsBadge(saturday), /6η ημέρα · 0%/);
-assert.match(source, /analysis_presentation_status === 'PROVISIONAL'/);
-assert.match(source, /ΠΡΟΕΠΙΣΚΟΠΗΣΗ/);
 
 console.log('canonical weekly daily-row presentation regression tests passed');

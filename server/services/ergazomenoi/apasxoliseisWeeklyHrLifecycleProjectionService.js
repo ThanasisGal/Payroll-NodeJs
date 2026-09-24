@@ -24,7 +24,9 @@ const {
     analyzeWeeklySixthSeventhDay
 } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
-const { normalizeEmploymentType } = require('./apasxoliseisReviewEmploymentProfileService');
+const { EMPLOYMENT_REGIME, normalizeEmploymentType,
+    resolveEmploymentRegimeForDate } = require(
+    './apasxoliseisReviewEmploymentProfileService');
 const { buildStage2ResolutionFingerprint,
     buildStage3InputFingerprint } = require('./apasxoliseisStage3FingerprintService');
 const { deriveStage1PeriodSlice, buildStage1PeriodSliceFingerprints,
@@ -47,6 +49,34 @@ const PRESENTATION_STATUS = Object.freeze({
     STALE: 'STALE',
     LOCKED: 'LOCKED'
 });
+const WEEKLY_ANALYSIS_PRESENTATION_STATUS = Object.freeze({
+    PROVISIONAL: 'PROVISIONAL',
+    ELIGIBLE_FOR_FINALIZATION: 'ELIGIBLE_FOR_FINALIZATION',
+    FINAL: 'FINAL'
+});
+
+function resolveWeeklyAnalysisPresentationStatus(projection = {}) {
+    if (projection.finalized_authoritative === true) {
+        return WEEKLY_ANALYSIS_PRESENTATION_STATUS.FINAL;
+    }
+    const stages = projection.stages || {};
+    return ['stage1', 'stage2', 'stage3'].every((key) =>
+        stages[key]?.business_status === BUSINESS_STATUS.COMPLETED)
+        ? WEEKLY_ANALYSIS_PRESENTATION_STATUS.ELIGIBLE_FOR_FINALIZATION
+        : WEEKLY_ANALYSIS_PRESENTATION_STATUS.PROVISIONAL;
+}
+
+function withWeeklyAnalysisPresentationStatus(projection = {}) {
+    const status = resolveWeeklyAnalysisPresentationStatus(projection);
+    const stages = projection.stages || {};
+    const stage4 = Object.freeze({ ...(stages.stage4 || {}),
+        analysis_presentation_status: status,
+        upstream_stages_completed:
+            status !== WEEKLY_ANALYSIS_PRESENTATION_STATUS.PROVISIONAL });
+    return Object.freeze({ ...projection,
+        weekly_analysis_presentation_status: status,
+        stages: Object.freeze({ ...stages, stage4 }) });
+}
 
 function unique(values = []) {
     return [...new Set(values.filter(Boolean))];
@@ -152,17 +182,15 @@ function resolveStage2Actionability(repoTransfer = {}) {
         reasons: Object.freeze(reasons) });
 }
 
-function resolveSafeNonFullNonWorkDates({
-    rows = [], candidateDates = [], effectiveProfile = {}, effectiveProfilesByDate = {}
+function resolveSafeNoWorkDatesForRegime({
+    rows = [], candidateDates = [], effectiveProfile = {}, effectiveProfilesByDate = {}, regime
 } = {}) {
     return unique(candidateDates).filter((date) => {
         const row = rows.find((candidate) => dateKeyUtc(candidate?.hmeromhnia) === date);
-        const dailyProfile = effectiveProfilesByDate?.[date] || effectiveProfile;
-        const employmentType = normalizeEmploymentType(
-            dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
-        );
+        const resolvedRegime = resolveEmploymentRegimeForDate({ date,
+            effectiveProfilesByDate, effectiveProfile }).regime;
         const facts = resolveDailyActualWorkFacts(row || {});
-        return ['1', '2'].includes(employmentType) &&
+        return regime === resolvedRegime &&
             facts.countsAsActualWorkDay !== true && Number(facts.cardHours || 0) === 0 &&
             !(facts.completeCardPairNumbers || []).length &&
             !(facts.unresolvedCardPairNumbers || []).length &&
@@ -170,11 +198,21 @@ function resolveSafeNonFullNonWorkDates({
     });
 }
 
+function resolveSafeNonFullNonWorkDates(options = {}) {
+    return resolveSafeNoWorkDatesForRegime({ ...options, regime: EMPLOYMENT_REGIME.NON_FULL });
+}
+
+function resolveSafeFullTimeRestDates(options = {}) {
+    return resolveSafeNoWorkDatesForRegime({ ...options, regime: EMPLOYMENT_REGIME.FULL_TIME });
+}
+
 function buildStage1NoClassificationPreviewItems({
     rows = [], possibleDates = [], effectiveProfile = {}, effectiveProfilesByDate = {},
     repoTransfer = {}, stage2Actionability = {}, stage2ResolvedDates = []
 } = {}) {
     const nonFullDates = new Set(resolveSafeNonFullNonWorkDates({ rows,
+        candidateDates: possibleDates, effectiveProfile, effectiveProfilesByDate }));
+    const fullTimeDates = new Set(resolveSafeFullTimeRestDates({ rows,
         candidateDates: possibleDates, effectiveProfile, effectiveProfilesByDate }));
     const resolvedRepoDates = new Set(stage2ResolvedDates);
     const sourceDate = dateKeyUtc(repoTransfer.source?.hmeromhnia);
@@ -185,7 +223,8 @@ function buildStage1NoClassificationPreviewItems({
     return Object.freeze(unique(possibleDates).sort().map((date) => {
         if (nonFullDates.has(date)) return Object.freeze({ date, safe: true,
             classification: 'NON_WORK', source_date: null, reasons: Object.freeze([]) });
-        if (resolvedRepoDates.has(date) || (hasSafePair && targetDate === date)) {
+        if (fullTimeDates.has(date) || resolvedRepoDates.has(date) ||
+            (hasSafePair && targetDate === date)) {
             return Object.freeze({ date, safe: true, classification: 'REST_REPO',
                 source_date: sourceDate || null, reasons: Object.freeze([]) });
         }
@@ -539,6 +578,10 @@ function buildWeeklyHrLifecycleProjection({
         !(afterStage1.confirmed_sickness_days || []).includes(date) &&
         !(afterStage1.confirmed_absence_days || []).includes(date)));
     const reviewedWithoutPositiveClassification = persistedStatus === BUSINESS_STATUS.COMPLETED;
+    const fullTimeResolvedDates = reviewedWithoutPositiveClassification
+        ? resolveSafeFullTimeRestDates({ rows,
+            candidateDates: afterStage1.remaining_possible_leave_days || [],
+            effectiveProfile, effectiveProfilesByDate }) : [];
     const nonFullResolvedDates = reviewedWithoutPositiveClassification
         ? resolveSafeNonFullNonWorkDates({ rows,
             candidateDates: afterStage1.remaining_possible_leave_days || [],
@@ -547,6 +590,7 @@ function buildWeeklyHrLifecycleProjection({
         ? dateKeyUtc(repoTransfer.target?.hmeromhnia) : null;
     const stage2AutomaticResolvedDates = unique([
         ...stage2ResolvedDates,
+        ...fullTimeResolvedDates,
         ...nonFullResolvedDates
     ]).filter((date) => date !== rejectedTargetDate).sort();
     const stage2AutomaticResolutionItems = stage2AutomaticResolvedDates.map((date) =>
@@ -590,7 +634,9 @@ function buildWeeklyHrLifecycleProjection({
     const contextOnlyDates = new Set(employmentDateScope?.context_only_dates || []);
     const stage3PendingItems = remainingDates.map((date) => {
         const row = rows.find((candidate) => dateKeyUtc(candidate?.hmeromhnia) === date) || {};
-        const dailyProfile = effectiveProfilesByDate?.[date] || effectiveProfile;
+        const regimeResolution = resolveEmploymentRegimeForDate({ date,
+            effectiveProfilesByDate, effectiveProfile });
+        const dailyProfile = regimeResolution.workTerms;
         const actualFacts = resolveDailyActualWorkFacts(row);
         const employmentType = normalizeEmploymentType(
             dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
@@ -642,18 +688,21 @@ function buildWeeklyHrLifecycleProjection({
                 context_only: contextOnlyDates.has(date),
                 final_human_decision_required: true
             }),
-            allowed_classifications: Object.freeze(employmentType === '0'
+            allowed_classifications: Object.freeze(
+                regimeResolution.regime === EMPLOYMENT_REGIME.FULL_TIME
                 ? ['LEAVE', 'SICKNESS', 'ABSENCE']
-                : ['1', '2'].includes(employmentType)
+                : regimeResolution.regime === EMPLOYMENT_REGIME.NON_FULL
                     ? ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'] : []),
             input_fingerprint: buildStage3InputFingerprint(context).fingerprint,
             expected_stage3_version: Number(persistedStage3State?.version || 0),
             stage2_fingerprint: stage2Fingerprint
         });
     });
+    const unknownRegimeDates = stage3PendingItems.filter((item) =>
+        !item.allowed_classifications.length).map((item) => item.date);
     const stage3 = stageResult('STAGE3', {
-        business_status: remainingDates.length
-            ? BUSINESS_STATUS.OPEN : BUSINESS_STATUS.COMPLETED,
+        business_status: unknownRegimeDates.length ? BUSINESS_STATUS.BLOCKED
+            : remainingDates.length ? BUSINESS_STATUS.OPEN : BUSINESS_STATUS.COMPLETED,
         pending_count: remainingDates.length,
         remaining_possible_leave_count: remainingDates.length,
         raw_remaining_possible_leave_count: rawRemainingDates.length,
@@ -669,8 +718,11 @@ function buildWeeklyHrLifecycleProjection({
         stage2_non_full_non_work_dates: Object.freeze(nonFullResolvedDates),
         stage2_status: stage2.business_status,
         stage2_resolution: stage2.stage2_applicability,
-        pending_reasons: Object.freeze(remainingDates.length
-            ? ['REMAINING_POSSIBLE_LEAVE_REVIEW_REQUIRED'] : [])
+        pending_reasons: Object.freeze(unknownRegimeDates.length
+            ? ['DAILY_EMPLOYMENT_REGIME_UNKNOWN']
+            : remainingDates.length ? ['REMAINING_POSSIBLE_LEAVE_REVIEW_REQUIRED'] : []),
+        blockers: Object.freeze(unknownRegimeDates.length
+            ? ['DAILY_EMPLOYMENT_REGIME_UNKNOWN'] : [])
     });
 
     const finalAnalysis = analyzeWeeklySixthSeventhDay({
@@ -699,7 +751,8 @@ function buildWeeklyHrLifecycleProjection({
         .every((stage) => stage.business_status === BUSINESS_STATUS.COMPLETED);
     stages.stage4 = Object.freeze({ ...stages.stage4,
         analysis_presentation_status: upstreamStagesCompleted
-            ? 'ELIGIBLE_FOR_FINALIZATION' : 'PROVISIONAL',
+            ? WEEKLY_ANALYSIS_PRESENTATION_STATUS.ELIGIBLE_FOR_FINALIZATION
+            : WEEKLY_ANALYSIS_PRESENTATION_STATUS.PROVISIONAL,
         upstream_stages_completed: upstreamStagesCompleted,
         diagnostic_pending_count: finalBlockers.length,
         pending_count: stages.stage4.presentation_status === PRESENTATION_STATUS.LOCKED
@@ -719,7 +772,7 @@ function buildWeeklyHrLifecycleProjection({
             ? stage2ResolvedDates.filter((date) => date !== rejectedTargetDate)
             : stage2ResolvedDates
     });
-    return Object.freeze({
+    return withWeeklyAnalysisPresentationStatus({
         projection_version: 'weekly-hr-derived-lifecycle:v1',
         read_only: true,
         persisted_stage1_status: persistedStatus,
@@ -750,8 +803,9 @@ function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
         })
     );
     completedStages.stage4 = Object.freeze({ ...completedStages.stage4,
-        analysis_presentation_status: 'FINAL', upstream_stages_completed: true });
-    return Object.freeze({ ...projection, finalized_authoritative: true,
+        analysis_presentation_status: WEEKLY_ANALYSIS_PRESENTATION_STATUS.FINAL,
+        upstream_stages_completed: true });
+    return withWeeklyAnalysisPresentationStatus({ ...projection, finalized_authoritative: true,
         persisted_stage1_status: BUSINESS_STATUS.COMPLETED,
         current_stage: null, total_pending_count: 0, requires_hr_action: false,
         stage1_no_classification_preview_items: Object.freeze([]),
@@ -761,6 +815,9 @@ function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
 module.exports = {
     BUSINESS_STATUS,
     PRESENTATION_STATUS,
+    WEEKLY_ANALYSIS_PRESENTATION_STATUS,
+    resolveWeeklyAnalysisPresentationStatus,
+    withWeeklyAnalysisPresentationStatus,
     applySequentialPresentation,
     stage3FingerprintResolvedDates,
     resolveStage3ActionableDates,
