@@ -37,7 +37,11 @@ function makeWeek({ employeeIndex = 1, week = '2026-06-01', dates = ['2026-06-03
             kodikos: String(employeeIndex).padStart(4, '0'), hmeromhnia: new Date(`${date}Z`),
             updatedAt: new Date('2026-06-10Z'), kathgoria_ergasias: 'ΕΡΓ',
             ores_ergasias: 8, kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' },
-        dailyProfile: unknown.includes(date) ? {} : { kathestos_apasxolhshs: full ? '0' : '1' },
+        dailyProfile: unknown.includes(date) ? {} : {
+            kathestos_apasxolhshs: full ? '0' : '1',
+            typos_ebdomadas: '5ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: full ? 5 : 4
+        },
         actualFacts: { countsAsActualWorkDay: actual.includes(date) }, isResidual,
         remaining_dates: dates.filter((candidate) => !resolved.includes(candidate)),
         upstream: { stage1_current_fingerprint: state.stage1.effective_fingerprint,

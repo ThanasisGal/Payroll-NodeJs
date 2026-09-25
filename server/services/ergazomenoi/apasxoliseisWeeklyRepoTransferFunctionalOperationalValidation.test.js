@@ -189,6 +189,7 @@ async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
     const rows = weekRows(employment);
     const employmentProfile = {
         typos_apasxolhshs: employment.typos_apasxolhshs,
+        typos_ebdomadas: employment.targetCategory === 'ΑΝ' ? '5ΗΜΕΡΗ' : '6ΗΜΕΡΗ',
         hmeres_ergasias_ebdomadas: employment.workdays,
         ores_ergasias_ebdomadas: employment.workdays * employment.dailyHours,
         mo_oron_hmerhsias_ergasias: employment.dailyHours

@@ -23,7 +23,8 @@ function context({ full = false, unknown = false, residual = true, actual = fals
         kathgoria_ergasias_apologistika: '',
         kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' },
     dailyProfile: unknown ? {} : {
-        kathestos_apasxolhshs: full ? '0' : '1', source: 'ISTORIKO' },
+        kathestos_apasxolhshs: full ? '0' : '1', typos_ebdomadas: '5ΗΜΕΡΗ',
+        hmeres_ergasias_ebdomadas: full ? 5 : 4, source: 'ISTORIKO' },
     actualFacts: { countsAsActualWorkDay: actual }, isResidual: residual,
     remaining_dates: remaining, stage2: { fingerprint: 'a'.repeat(64),
         status: 'COMPLETED', resolution: 'NOT_APPLICABLE', resolved_dates: [] },
@@ -190,8 +191,21 @@ function command(initial, h, overrides = {}) {
 
     await assert.rejects(() => command(context({ full: true }), harness(context({ full: true }))),
         { code: 'STAGE3_NON_WORK_NOT_ALLOWED_FOR_FULL_TIME' });
+    const thresholdPartTime = context();
+    thresholdPartTime.dailyProfile.hmeres_ergasias_ebdomadas = 5;
+    await assert.rejects(() => command(thresholdPartTime, harness(thresholdPartTime)),
+        { code: 'STAGE3_NON_WORK_NOT_ALLOWED_FOR_FULL_TIME' });
+    const rotationalContext = context();
+    rotationalContext.dailyProfile.kathestos_apasxolhshs = '2';
+    rotationalContext.dailyProfile.hmeres_ergasias_ebdomadas = 6;
+    assert.equal((await command(rotationalContext, harness(rotationalContext))).resolved, true);
     await assert.rejects(() => command(context({ unknown: true }),
         harness(context({ unknown: true }))), { code: 'STAGE3_DAILY_REGIME_UNKNOWN' });
+    const missingWeeklySystem = context();
+    delete missingWeeklySystem.dailyProfile.typos_ebdomadas;
+    missingWeeklySystem.dailyProfile.hmeres_ergasias_ebdomadas = 5;
+    await assert.rejects(() => command(missingWeeklySystem, harness(missingWeeklySystem)),
+        { code: 'STAGE3_DAILY_REGIME_UNKNOWN' });
     await assert.rejects(() => command(context({ residual: false }),
         harness(context({ residual: false }))), { code: 'STAGE3_DATE_NOT_RESIDUAL' });
     await assert.rejects(() => command(context({ actual: true }), harness(context({ actual: true }))),

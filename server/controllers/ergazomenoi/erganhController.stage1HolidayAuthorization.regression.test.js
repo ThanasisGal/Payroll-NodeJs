@@ -73,15 +73,17 @@ const stage1Save = section(
     'static saveWeeklyHrStage1DailyClassificationsBulk',
     'static resolveWeeklyHrStage3Day'
 );
-assert.match(stage1Save, /applyOne: async \(\{ row_id, classification, updates, reason }\)/);
+assert.match(stage1Save,
+    /applyOne: async \(\{ row_id, classification, leave_category, updates, reason }\)/);
 assert.match(stage1Save, /if \(classification === 'HOLIDAY'\)/);
 assert.match(stage1Save, /ProdhlomenaOrariaModel\.findOne\(\{ _id: row_id,[\s\S]*\.select\(REVIEW_SELECT_FIELDS\)\.lean\(\)/);
 assert.match(stage1Save, /buildNoCardsDisplayContext\(\{[\s\S]*authoritativeTarget\.hmeromhnia/);
 assert.match(stage1Save, /resolveAuthoritativeHolidayClassification\(\{[\s\S]*stage1HolidayEligibilityContext\(holidayRecord,/);
 assert.match(stage1Save, /STAGE1_HOLIDAY_NOT_AUTHORITATIVE/);
 assert.match(stage1Save, /updates = buildStage1ClassificationUpdates\([\s\S]*classification: 'HOLIDAY'/);
-assert.ok(stage1Save.indexOf('resolveAuthoritativeHolidayClassification({') <
-    stage1Save.indexOf("updates = buildStage1ClassificationUpdates("));
+const holidayEligibilityIndex = stage1Save.indexOf('resolveAuthoritativeHolidayClassification({');
+assert.ok(holidayEligibilityIndex < stage1Save.indexOf(
+    'updates = buildStage1ClassificationUpdates(', holidayEligibilityIndex));
 
 const manualUpdate = section(
     'static updateProdhlomenaOrariaReviewRecord',

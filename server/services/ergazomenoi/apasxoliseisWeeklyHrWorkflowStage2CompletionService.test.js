@@ -22,7 +22,8 @@ function context(classification = 'REST_REPO') {
     adeia_apologistika: false, astheneia_apologistika: false,
     apousia_apologistika: null, ores_ergasias_apologistika: 0 }],
     effectiveProfilesByDate: { [date]: { typos_apasxolhshs:
-        classification === 'REST_REPO' ? '0' : '1' } },
+        classification === 'REST_REPO' ? '0' : '1', typos_ebdomadas: '5ΗΜΕΡΗ',
+        hmeres_ergasias_ebdomadas: classification === 'REST_REPO' ? 5 : 4 } },
     lifecycle: { stages: { stage3: { stage2_automatic_resolution_items: [
         { date, classification }
     ] } } }, upstream: { stage1_current_fingerprint: FP1 } };
@@ -68,7 +69,8 @@ function harness(classification, failure = '') {
         const minimal = context('REST_REPO');
         const expanded = structuredClone(minimal);
         expanded.effectiveProfilesByDate['2026-06-09'] = {
-            typos_apasxolhshs: '0', loader_metadata: 'representation only' };
+            typos_apasxolhshs: '0', typos_ebdomadas: '5ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 5, loader_metadata: 'representation only' };
         const minimalItems = inspectAutomaticMaterialization(minimal).items;
         const expandedItems = inspectAutomaticMaterialization(expanded).items;
         assert.deepEqual(buildWeeklyHrStage2FingerprintInput(minimal, minimalItems),
@@ -90,6 +92,17 @@ function harness(classification, failure = '') {
         assert.equal(h.committed.audits[0].stage2_resolution_items[0].classification,
             classification);
         assert.deepEqual(expected, classification === 'REST_REPO' ? ['ΑΝ', true] : ['ΜΕ', false]);
+    }
+    for (const [system, days, classification] of [
+        ['5ΗΜΕΡΗ', 5, 'REST_REPO'], ['5ΗΜΕΡΗ', 4, 'NON_WORK'],
+        ['6ΗΜΕΡΗ', 6, 'REST_REPO'], ['6ΗΜΕΡΗ', 5, 'NON_WORK']
+    ]) {
+        const candidate = context(classification);
+        const date = candidate.lifecycle.stages.stage3.stage2_automatic_resolution_items[0].date;
+        candidate.effectiveProfilesByDate[date] = { typos_apasxolhshs: '1',
+            typos_ebdomadas: system, hmeres_ergasias_ebdomadas: days };
+        assert.equal(inspectAutomaticMaterialization(candidate).status,
+            'READY_TO_MATERIALIZE', `${system}/${days}/${classification}`);
     }
     const noAction = context(); noAction.lifecycle.stages.stage3
         .stage2_automatic_resolution_items = [];

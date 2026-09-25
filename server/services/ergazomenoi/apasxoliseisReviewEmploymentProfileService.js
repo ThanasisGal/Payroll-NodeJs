@@ -19,6 +19,8 @@ function normalizeEmploymentType(value) {
             'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ',
             'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ_ΑΠΑΣΧΟΛΗΣΗ',
             'EK_PERITROPHS',
+            'EK_PERITROPIS',
+            'EK_PERITROPH',
             'EK_PERITROPHIS',
             'ROTATIONAL'
         ].includes(raw)
@@ -61,6 +63,73 @@ const EMPLOYMENT_REGIME = Object.freeze({
     UNKNOWN: 'UNKNOWN'
 });
 
+const NO_WORK_EMPLOYMENT_TYPE = Object.freeze({
+    FULL_TIME: 'FULL_TIME', PART_TIME: 'PART_TIME', ROTATIONAL: 'ROTATIONAL', UNKNOWN: 'UNKNOWN'
+});
+const NO_WORK_CLASSIFICATION = Object.freeze({
+    REST_REPO: 'REST_REPO', NON_WORK: 'NON_WORK'
+});
+
+function normalizeWeeklySystemDays(value) {
+    if (value === 5 || value === 6) return value;
+    if (typeof value !== 'string') return null;
+    const raw = value.trim().toUpperCase().replace(/\s+/g, '');
+    if (['5', '5HMERH', '5ΗΜΕΡΗ', '5ΗΜΕΡΟ'].includes(raw)) return 5;
+    if (['6', '6HMERH', '6ΗΜΕΡΗ', '6ΗΜΕΡΟ'].includes(raw)) return 6;
+    return null;
+}
+
+function contractualWeeklyDays(value) {
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    const parsed = Number(String(value).replace(',', '.'));
+    return Number.isFinite(parsed) && parsed > 0 && parsed <= 7 ? parsed : null;
+}
+
+function resolveNoWorkDaySemanticFromWorkTerms(workTerms = {}) {
+    const contractType = normalizeEmploymentType(workTerms.kathestos_apasxolhshs);
+    const employmentTypeValue = normalizeEmploymentType(workTerms.typos_apasxolhshs);
+    const normalizedType = contractType && employmentTypeValue &&
+        contractType !== employmentTypeValue ? '' : contractType || employmentTypeValue;
+    const employmentType = normalizedType === '0' ? NO_WORK_EMPLOYMENT_TYPE.FULL_TIME
+        : normalizedType === '1' ? NO_WORK_EMPLOYMENT_TYPE.PART_TIME
+            : normalizedType === '2' ? NO_WORK_EMPLOYMENT_TYPE.ROTATIONAL
+                : NO_WORK_EMPLOYMENT_TYPE.UNKNOWN;
+    const weeklySystemDays = normalizeWeeklySystemDays(workTerms.typos_ebdomadas);
+    const contractualDays = contractualWeeklyDays(workTerms.hmeres_ergasias_ebdomadas);
+    const resolved = (classification, erganiCode, reason) => Object.freeze({ status: 'RESOLVED',
+        classification, ergani_code: erganiCode, employment_type: employmentType,
+        weekly_system_days: weeklySystemDays, contractual_weekly_days: contractualDays, reason });
+    if (employmentType === NO_WORK_EMPLOYMENT_TYPE.FULL_TIME) {
+        return resolved(NO_WORK_CLASSIFICATION.REST_REPO, 'ΑΝ', 'FULL_TIME_REST_REPO');
+    }
+    if (employmentType === NO_WORK_EMPLOYMENT_TYPE.ROTATIONAL) {
+        return resolved(NO_WORK_CLASSIFICATION.NON_WORK, 'ΜΕ', 'ROTATIONAL_NON_WORK');
+    }
+    if (employmentType === NO_WORK_EMPLOYMENT_TYPE.PART_TIME &&
+        weeklySystemDays !== null && contractualDays !== null) {
+        const restRepo = contractualDays >= weeklySystemDays;
+        return resolved(restRepo ? NO_WORK_CLASSIFICATION.REST_REPO : NO_WORK_CLASSIFICATION.NON_WORK,
+            restRepo ? 'ΑΝ' : 'ΜΕ', restRepo
+                ? 'PART_TIME_MEETS_WEEKLY_SYSTEM_THRESHOLD'
+                : 'PART_TIME_BELOW_WEEKLY_SYSTEM_THRESHOLD');
+    }
+    return Object.freeze({ status: 'UNKNOWN', classification: null, ergani_code: null,
+        employment_type: employmentType, weekly_system_days: weeklySystemDays,
+        contractual_weekly_days: contractualDays,
+        reason: employmentType === NO_WORK_EMPLOYMENT_TYPE.UNKNOWN ? 'UNKNOWN_EMPLOYMENT_TYPE'
+            : weeklySystemDays === null ? 'WEEKLY_SYSTEM_UNKNOWN' : 'CONTRACTUAL_WEEKLY_DAYS_UNKNOWN' });
+}
+
+function resolveNoWorkDaySemanticForDate({ date, effectiveProfilesByDate = {},
+    effectiveProfile = {} } = {}) {
+    const hasDateSpecificProfile = Boolean(date &&
+        Object.prototype.hasOwnProperty.call(effectiveProfilesByDate || {}, date));
+    const workTerms = hasDateSpecificProfile ? effectiveProfilesByDate[date] : effectiveProfile;
+    return Object.freeze({ ...resolveNoWorkDaySemanticFromWorkTerms(workTerms),
+        workTerms: workTerms && typeof workTerms === 'object' ? workTerms : {},
+        source: hasDateSpecificProfile ? 'DATE_EFFECTIVE' : 'BASE_FALLBACK' });
+}
+
 function resolveEmploymentRegimeFromWorkTerms(workTerms = {}) {
     const fullTime = resolveFullTimeFromWorkTerms(workTerms);
     return fullTime === true ? EMPLOYMENT_REGIME.FULL_TIME
@@ -87,7 +156,12 @@ function resolveReviewIsFullTimeProfile(workTerms = {}, phaseCode = '') {
 
 module.exports = {
     EMPLOYMENT_REGIME,
+    NO_WORK_EMPLOYMENT_TYPE,
+    NO_WORK_CLASSIFICATION,
     normalizeEmploymentType,
+    normalizeWeeklySystemDays,
+    resolveNoWorkDaySemanticFromWorkTerms,
+    resolveNoWorkDaySemanticForDate,
     resolveFullTimeFromWorkTerms,
     resolveEmploymentRegimeFromWorkTerms,
     resolveEmploymentRegimeForDate,

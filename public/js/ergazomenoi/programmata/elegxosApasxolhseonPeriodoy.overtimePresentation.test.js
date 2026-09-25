@@ -11,13 +11,19 @@ const start = source.indexOf('function createEmptyTotals');
 const end = source.indexOf('function buildDeviationsByKodikos', start);
 const sandbox = {
     num: (value) => Number(value || 0),
-    effectiveWorkHoursValue: (row) => Number(row.ores_ergasias_apologistika || 0)
+    hours: (value) => Number(value || 0).toFixed(2),
+    breakSubtractedHoursValue: () => 0
 };
 vm.createContext(sandbox);
-vm.runInContext(`${source.slice(start, end)}
+const effectiveHoursSource = source.slice(source.indexOf('function effectiveWorkHoursValue'),
+    source.indexOf('// function breakSubtractedHoursValue'));
+const renderHoursSource = source.match(/function renderHoursCell\([\s\S]*?\n}/)?.[0] || '';
+vm.runInContext(`${effectiveHoursSource}\n${renderHoursSource}\n${source.slice(start, end)}
 this.emptyTotals = createEmptyTotals;
 this.add = addRowToTotals;
-this.uiOvertime = sumUiYperoria;`, sandbox);
+this.uiOvertime = sumUiYperoria;
+this.effectiveHours = effectiveWorkHoursValue;
+this.renderHours = renderHoursCell;`, sandbox);
 
 const row = {
     ores_nominhs_yperorias_apologistika: 5,
@@ -36,6 +42,19 @@ sandbox.add(totals, row);
 assert.equal(totals.nomimiYperoria, 13.19);
 assert.equal(totals.paranomiYperoria, 4.98);
 assert.equal(totals.uiYperoria, 18.17);
+
+const fullDayLeave = { adeia_apologistika: true,
+    kathgoria_adeias_apologistika: 'ΑΔΚΑΝ', ores_ergasias: 2,
+    ores_ergasias_apologistika: 2,
+    ores_pragmatikhs_ergasias_apologistika: 0 };
+assert.equal(sandbox.effectiveHours(fullDayLeave), 2);
+assert.match(sandbox.renderHours(fullDayLeave), /2\.00/);
+const leaveTotals = sandbox.emptyTotals();
+leaveTotals.ores_ergasias_apologistika = 34;
+sandbox.add(leaveTotals, fullDayLeave);
+assert.equal(leaveTotals.ores_ergasias_apologistika, 36);
+assert.equal(sandbox.effectiveHours({ ...fullDayLeave,
+    ores_pragmatikhs_ergasias_apologistika: 0 }), 2);
 
 const employeeTotalsRenderer = source.slice(
     source.indexOf('function appendEmployeeTotalsRow'),

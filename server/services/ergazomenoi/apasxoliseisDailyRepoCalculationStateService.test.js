@@ -77,7 +77,11 @@ test('FULL profile preserves material apologistika target repo', () => {
 test('MERIKH profile interprets ΜΕ through explicit daily context', () => {
     const resolved = resolveDailyRepoCalculationState({
         row: { kathgoria_ergasias: 'ΜΕ', repo: false },
-        dailyProfile: { typos_apasxolhshs: 'MERIKH' }
+        dailyProfile: {
+            typos_apasxolhshs: 'MERIKH',
+            typos_ebdomadas: '5ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 4
+        }
     });
 
     assert.deepEqual(resolved, expected({
@@ -96,7 +100,11 @@ test('MERIKH profile preserves material apologistika negative override', () => {
             kathgoria_ergasias_apologistika: 'ΕΡΓ',
             repo_apologistika: false
         },
-        dailyProfile: { kathestos_apasxolhshs: '1' }
+        dailyProfile: {
+            kathestos_apasxolhshs: '1',
+            typos_ebdomadas: '5ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 4
+        }
     });
 
     assert.deepEqual(resolved, expected({
@@ -128,7 +136,7 @@ test('EK_PERITROPHS profile uses ΜΕ and resolves a material target repo', () =
     }
 });
 
-test('existing numeric work-terms fallback remains in parity with profile helper', () => {
+test('numeric work terms without an explicit employment type fail closed', () => {
     const full = resolveDailyRepoCalculationState({
         row: { kathgoria_ergasias: 'ΑΝ', repo: false },
         dailyProfile: { ores_ergasias_ebdomadas: 40 }
@@ -141,10 +149,12 @@ test('existing numeric work-terms fallback remains in parity with profile helper
         }
     });
 
-    assert.equal(full.expectedRepoCategory, 'ΑΝ');
-    assert.equal(full.effectiveRepo, true);
-    assert.equal(partial.expectedRepoCategory, 'ΜΕ');
-    assert.equal(partial.effectiveRepo, true);
+    for (const value of [full, partial]) {
+        assert.equal(value.expectedRepoCategory, null);
+        assert.equal(value.effectiveRepo, null);
+        assert.deepEqual(value.diagnostics,
+            [DIAGNOSTIC.DAILY_EMPLOYMENT_PROFILE_UNRESOLVED]);
+    }
 });
 
 test('missing, unknown, incomplete and conflicting profiles fail closed', () => {

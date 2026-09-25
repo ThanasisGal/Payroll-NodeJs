@@ -1,6 +1,6 @@
 const {
     normalizeEmploymentType,
-    resolveFullTimeFromWorkTerms
+    resolveNoWorkDaySemanticFromWorkTerms
 } = require('./apasxoliseisReviewEmploymentProfileService');
 const {
     MODE: EFFECTIVE_REPO_MODE,
@@ -55,10 +55,10 @@ function resolveDailyRepoCalculationState({ row, dailyProfile } = {}) {
         return unresolvedProfileResult();
     }
 
-    const isFullTime = resolveFullTimeFromWorkTerms(dailyProfile);
-    if (isFullTime === null) return unresolvedProfileResult();
+    const semantic = resolveNoWorkDaySemanticFromWorkTerms(dailyProfile);
+    if (semantic.status !== 'RESOLVED') return unresolvedProfileResult();
 
-    const expectedRepoCategory = isFullTime ? 'ΑΝ' : 'ΜΕ';
+    const expectedRepoCategory = semantic.ergani_code;
     const effectiveState = resolveEffectiveRepoState({
         row,
         mode: EFFECTIVE_REPO_MODE.CURRENT,

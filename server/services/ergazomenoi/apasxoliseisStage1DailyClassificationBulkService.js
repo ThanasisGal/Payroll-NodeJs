@@ -60,7 +60,11 @@ function classificationUpdates(change, row = {}) {
             ? ERGANI_II_SICKNESS_LEAVE_CATEGORY
             : (change.classification === 'LEAVE' ? change.kathgoria_adeias_apologistika : ''),
         astheneia_apologistika: change.classification === 'SICKNESS',
-        apousia_apologistika: change.classification === 'ABSENCE'
+        apousia_apologistika: change.classification === 'ABSENCE',
+        ...(change.classification === 'LEAVE' ? {
+            ores_ergasias_apologistika: nonNegativeNumber(row.ores_ergasias),
+            ores_pragmatikhs_ergasias_apologistika: 0
+        } : {})
     };
 }
 
@@ -188,6 +192,7 @@ async function saveStage1DailyClassificationsBulk({ changes, reason, applyOne,
         try {
             const outcome = await applyOne({ row_id: change.row_id,
                 classification: change.classification,
+                leave_category: change.kathgoria_adeias_apologistika || '',
                 updates: classificationUpdates(change), reason: normalizedReason });
             return { row_id: change.row_id, status: outcome?.unchanged ? 'UNCHANGED' : 'SAVED',
                 ...(outcome?.record ? { record: outcome.record } : {}) };

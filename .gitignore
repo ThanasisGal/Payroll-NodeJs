@@ -23,6 +23,10 @@ public/txt-cache/
 # Test files
 server/utils/test-*.js
 scripts/**
+!scripts/repair-confirmed-full-day-leave-hours.js
+!scripts/repair-confirmed-full-day-leave-hours.test.js
+!scripts/repair-legacy-no-work-semantics.js
+!scripts/repair-legacy-no-work-semantics.test.js
 
 # ============================================================================
 # Παραγόμενα αρχεία (generated files)

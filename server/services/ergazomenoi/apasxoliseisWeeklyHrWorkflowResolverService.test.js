@@ -59,6 +59,7 @@ function possibleLeaveRow(date) {
 function profile(workdays = 5, extra = {}) {
     return {
         hmeres_ergasias_ebdomadas: workdays,
+        typos_ebdomadas: workdays === 6 ? '6ΗΜΕΡΗ' : '5ΗΜΕΡΗ',
         typos_apasxolhshs: '0',
         pososto_prosayxhshs_6hs_hmeras: 40,
         ...extra
@@ -229,7 +230,7 @@ const mixed = resolve(twoPossibleRows, {
     effectiveProfile: profile(5, { profile_changed_inside_week: true }),
     effectiveProfilesByDate: {
         [DATES[1]]: profile(5, { typos_apasxolhshs: '0' }),
-        [DATES[3]]: profile(5, { typos_apasxolhshs: '1' })
+        [DATES[3]]: profile(4, { typos_apasxolhshs: '1', typos_ebdomadas: '5ΗΜΕΡΗ' })
     }
 });
 assert.strictEqual(mixed.next_required_hr_stage, NEXT_STAGE.REPO_RESOLUTION);
@@ -253,7 +254,8 @@ for (const declaredHours of [8, 5, 2, 0]) {
     assert.strictEqual(fullTimeCandidate.candidate_kind, 'REST_REPO',
         `full-time declared ${declaredHours}h`);
     const nonFullCandidate = resolveNoWorkCandidateForDate({ date: DATES[1], declaredHours,
-        effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '1' } }
+        effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '1',
+            typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4 } }
     });
     assert.strictEqual(nonFullCandidate.candidate_kind, 'POSSIBLE_LEAVE_RESIDUAL',
         `non-full declared ${declaredHours}h`);
@@ -261,13 +263,15 @@ for (const declaredHours of [8, 5, 2, 0]) {
 }
 
 const historicalFullOverridesCurrentNonFull = resolve(directRows, {
-    effectiveProfile: { typos_apasxolhshs: '1' },
+    effectiveProfile: { typos_apasxolhshs: '1', typos_ebdomadas: '5ΗΜΕΡΗ',
+        hmeres_ergasias_ebdomadas: 4 },
     effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '0' } }
 }).unclassified_stage2_candidates[0];
 assert.strictEqual(historicalFullOverridesCurrentNonFull.candidate_kind, 'REST_REPO');
 const historicalNonFullOverridesCurrentFull = resolve(directRows, {
     effectiveProfile: { typos_apasxolhshs: '0' },
-    effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '1' } }
+    effectiveProfilesByDate: { [DATES[1]]: { typos_apasxolhshs: '1',
+        typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4 } }
 }).unclassified_stage2_candidates[0];
 assert.strictEqual(historicalNonFullOverridesCurrentFull.candidate_kind,
     'POSSIBLE_LEAVE_RESIDUAL');
@@ -286,7 +290,8 @@ const partialNoDeclared = { ...workRow(DATES[1]), ores_ergasias: 0,
     cards_apo_ora_01: '', cards_eos_ora_01: '', ores_ergasias_apologistika: 0,
     kathgoria_ergasias_apologistika: 'ΜΕ', kathgoria_adeias_apologistika: '' };
 const partialNoDeclaredResult = resolve(weekWith(partialNoDeclared), {
-    effectiveProfilesByDate: { [DATES[1]]: profile(5, { typos_apasxolhshs: '1' }) }
+    effectiveProfilesByDate: { [DATES[1]]: profile(4, { typos_apasxolhshs: '1',
+        typos_ebdomadas: '5ΗΜΕΡΗ' }) }
 });
 assert.deepStrictEqual(partialNoDeclaredResult.possible_leave_days, []);
 assert.deepStrictEqual(partialNoDeclaredResult.remaining_possible_leave_days, []);
@@ -301,7 +306,8 @@ const partialCanonicalNonWork = { ...workRow(DATES[1]), apologistiko_biblio: tru
     apousia_apologistika: false };
 const partialCanonicalNonWorkResult = resolve(weekWith(partialCanonicalNonWork), {
     leave_classification_completed: true,
-    effectiveProfilesByDate: { [DATES[1]]: profile(5, { typos_apasxolhshs: '1' }) }
+    effectiveProfilesByDate: { [DATES[1]]: profile(4, { typos_apasxolhshs: '1',
+        typos_ebdomadas: '5ΗΜΕΡΗ' }) }
 });
 assert.ok(!partialCanonicalNonWorkResult.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
 assert.notStrictEqual(partialCanonicalNonWorkResult.next_required_hr_stage,
@@ -311,7 +317,8 @@ assert.notStrictEqual(partialCanonicalNonWorkResult.next_required_hr_stage,
 const partialUndeclaredWork = { ...workRow(DATES[1]), ores_ergasias: 0,
     apo_ora_01: '', eos_ora_01: '' };
 const partialUndeclaredWorkResult = resolve(weekWith(partialUndeclaredWork), {
-    effectiveProfilesByDate: { [DATES[1]]: profile(5, { typos_apasxolhshs: '1' }) }
+    effectiveProfilesByDate: { [DATES[1]]: profile(4, { typos_apasxolhshs: '1',
+        typos_ebdomadas: '5ΗΜΕΡΗ' }) }
 });
 assert.deepStrictEqual(partialUndeclaredWorkResult.possible_leave_days, []);
 assert.ok(partialUndeclaredWorkResult.worked_declared_repo_days.length === 0);

@@ -28,6 +28,9 @@ assert.throws(() => buildCanonicalClassificationUpdates({ classification: 'LEAVE
 assert.equal(buildCanonicalClassificationUpdates({ classification: 'LEAVE',
     leave_category: 'ΑΔΚΑΝ', row: { ores_ergasias: 6 } }).ores_ergasias_apologistika, 6);
 assert.equal(buildCanonicalClassificationUpdates({ classification: 'LEAVE',
+    leave_category: 'ΑΔΚΑΝ', row: { ores_ergasias: 6 } })
+    .ores_pragmatikhs_ergasias_apologistika, 0);
+assert.equal(buildCanonicalClassificationUpdates({ classification: 'LEAVE',
     leave_category: 'ΑΔΚΑΝ', row: { ores_ergasias: -1 } }).ores_ergasias_apologistika, 0);
 
 const row = { _id: new mongoose.Types.ObjectId(), team: 'THA', company_kod: 'company',

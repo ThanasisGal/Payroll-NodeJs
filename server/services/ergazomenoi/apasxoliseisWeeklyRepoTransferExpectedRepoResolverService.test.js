@@ -155,7 +155,9 @@ for (const [type, analyzer] of [
     assert.ok(result.reasons.includes(
         type === 'PLHRHS'
             ? 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'
-            : 'REPO_DEFICIT_REMAINS'
+            : type === 'MERIKH'
+                ? 'NO_WORK_DAY_SEMANTIC_UNKNOWN'
+                : 'REPO_DEFICIT_REMAINS'
     ));
     assert.strictEqual(result.eligibility_status, ELIGIBILITY_STATUS.NEEDS_REVIEW);
 }

@@ -21,6 +21,8 @@ const {
 const {
     buildApasxoliseisScenarioFacts
 } = require('./apasxoliseisScenarioFactsService');
+const { resolveNoWorkDaySemanticFromWorkTerms } = require(
+    './apasxoliseisReviewEmploymentProfileService');
 
 const START = '2026-07-06';
 
@@ -84,31 +86,29 @@ function week({ sources = [1], targets = [3], existingRepo = [] } = {}) {
 }
 
 function analyze(rows, type = 'MERIKH', profile = {}, contexts = {}) {
+    const employmentProfile = {
+        typos_apasxolhshs: type, typos_ebdomadas: '5ΗΜΕΡΗ',
+        hmeres_ergasias_ebdomadas: 6, ...profile
+    };
+    const category = resolveNoWorkDaySemanticFromWorkTerms(employmentProfile).ergani_code;
+    const semanticRows = rows.map((item) => ({ ...item,
+        ...(item.kathgoria_ergasias === 'ΜΕ' ? { kathgoria_ergasias: category } : {}) }));
     return analyzeWeeklyRepoTransferSinglePairV2({
-        weekRows: rows,
-        employmentProfile: {
-            typos_apasxolhshs: type, hmeres_ergasias_ebdomadas: 6,
-            ...profile
-        },
+        weekRows: semanticRows,
+        employmentProfile,
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
         existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map()
     });
 }
 
 function assertEquivalentPartialPolicy(rows, profile = {}) {
-    const merikhV1 = analyzeWeeklyRepoTransferSinglePairV1({
-        weekRows: rows,
-        employmentProfile: {
-            typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6,
-            ...profile
-        }
-    });
-    for (const type of ['MERIKH', 'EK_PERITROPHS', '2', '02', 'EK_PERITROPIS', 'ROTATIONAL']) {
+    const rotational = analyze(rows, 'EK_PERITROPHS', profile);
+    for (const type of ['EK_PERITROPHS', '2', '02', 'EK_PERITROPIS', 'ROTATIONAL']) {
         const result = analyze(rows, type, profile);
-        assert.strictEqual(result.eligibility_status, merikhV1.eligibility_status, type);
-        assert.deepStrictEqual(result.reasons, merikhV1.reasons, type);
-        assert.strictEqual(result.counts.existing_actual_repo, merikhV1.counts.existing_actual_repo);
-        assert.strictEqual(result.counts.predicted_final_repo, merikhV1.counts.predicted_final_repo);
+        assert.strictEqual(result.eligibility_status, rotational.eligibility_status, type);
+        assert.deepStrictEqual(result.reasons, rotational.reasons, type);
+        assert.strictEqual(result.counts.existing_actual_repo, rotational.counts.existing_actual_repo);
+        assert.strictEqual(result.counts.predicted_final_repo, rotational.counts.predicted_final_repo);
     }
 }
 
@@ -137,6 +137,20 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
     assert.strictEqual(result.employee.repo_resolution_source, 'CONTRACTUAL_WEEKLY_WORKDAYS');
 }
 
+for (const [name, type, system, days, existingRepo, expectedCategory] of [
+    ['PART_TIME_5_OF_5', 'MERIKH', '5ΗΜΕΡΗ', 5, [6], 'ΑΝ'],
+    ['PART_TIME_5_OF_4', 'MERIKH', '5ΗΜΕΡΗ', 4, [0, 6], 'ΜΕ'],
+    ['PART_TIME_6_OF_6', 'MERIKH', '6ΗΜΕΡΗ', 6, [], 'ΑΝ'],
+    ['PART_TIME_6_OF_5', 'MERIKH', '6ΗΜΕΡΗ', 5, [6], 'ΜΕ'],
+    ['ROTATIONAL', 'EK_PERITROPHS', '6ΗΜΕΡΗ', 6, [], 'ΜΕ']
+]) {
+    const result = analyze(week({ existingRepo }), type, {
+        typos_ebdomadas: system, hmeres_ergasias_ebdomadas: days
+    });
+    assert.strictEqual(result.eligibility_status, 'ELIGIBLE', name);
+    assert.strictEqual(result.target.semantic_target_category, expectedCategory, name);
+}
+
 {
     const fourDayWeek = week({ sources: [1], targets: [3], existingRepo: [0, 6] });
     for (const type of ['MERIKH', 'EK_PERITROPHS']) {
@@ -155,7 +169,8 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             weekRows: fourDayWeek,
             employmentProfile: {
                 typos_apasxolhshs: type,
-                hmeres_ergasias_ebdomadas: 4, mo_oron_hmerhsias_ergasias: 4
+                typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4,
+                mo_oron_hmerhsias_ergasias: 4
             },
             contractVersion: 'v2'
         });
@@ -166,7 +181,8 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             weekRows: fourDayWeek,
             employmentProfile: {
                 typos_apasxolhshs: type,
-                hmeres_ergasias_ebdomadas: 4, mo_oron_hmerhsias_ergasias: 4
+                typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4,
+                mo_oron_hmerhsias_ergasias: 4
             },
             contractVersion: 'v2'
         });
@@ -180,6 +196,7 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
         weekRows: week({ existingRepo: [0, 6] }),
         employmentProfile: {
             typos_apasxolhshs: 'MERIKH',
+            typos_ebdomadas: '5ΗΜΕΡΗ',
             hmeres_ergasias_ebdomadas: 4
         }
     });
@@ -438,9 +455,11 @@ for (const invalidTimes of [
     const rows = week({ targets: [2, 4] });
     rows[4].cards_apo_ora_01 = '10:00';
     rows[4].cards_eos_ora_01 = '10:00';
+    rows.forEach((item) => { if (item.kathgoria_ergasias === 'ΜΕ') item.kathgoria_ergasias = 'ΑΝ'; });
     const v1 = analyzeWeeklyRepoTransferSinglePairV1({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
     assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
@@ -451,9 +470,11 @@ for (const invalidTimes of [
 {
     const rows = week({ targets: [2, 4] });
     rows[4].cards_ores_ergasias = 'invalid';
+    rows.forEach((item) => { if (item.kathgoria_ergasias === 'ΜΕ') item.kathgoria_ergasias = 'ΑΝ'; });
     const v1 = analyzeWeeklyRepoTransferSinglePairV1({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
     assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
@@ -465,9 +486,11 @@ for (const invalidTimes of [
     const rows = week({ targets: [2, 4] });
     rows[4].cards_apo_ora_01 = '10:00';
     rows[4].cards_eos_ora_01 = '14:00';
+    rows.forEach((item) => { if (item.kathgoria_ergasias === 'ΜΕ') item.kathgoria_ergasias = 'ΑΝ'; });
     const v1 = analyzeWeeklyRepoTransferSinglePairV1({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
     assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');

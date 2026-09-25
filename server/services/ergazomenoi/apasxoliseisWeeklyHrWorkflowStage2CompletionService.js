@@ -9,8 +9,7 @@ const { assertCriticalEmploymentDecisionRole } = require(
 );
 const { stableStringify } = require('./apasxoliseisStage3FingerprintService');
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
-const { EMPLOYMENT_REGIME, normalizeEmploymentType,
-    resolveEmploymentRegimeForDate } = require(
+const { normalizeEmploymentType, resolveNoWorkDaySemanticForDate } = require(
     './apasxoliseisReviewEmploymentProfileService');
 const { writeCanonicalDailyClassification, planCanonicalDailyClassification } = require(
     './apasxoliseisCanonicalDailyClassificationWriterService'
@@ -62,7 +61,8 @@ function rowMatchesUpdates(row = {}, updates = {}) {
 function effectiveProfileSignature(dailyProfile = {}) {
     return stableStringify({ employment_type: normalizeEmploymentType(
         dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
-    ) });
+    ), weekly_system: dailyProfile?.typos_ebdomadas ?? null,
+    contractual_weekly_days: dailyProfile?.hmeres_ergasias_ebdomadas ?? null });
 }
 function inspectAutomaticMaterialization(context = {}) {
     const rows = new Map((context.rows || []).map((row) => [dateKeyUtc(row.hmeromhnia), row]));
@@ -81,17 +81,14 @@ function inspectAutomaticMaterialization(context = {}) {
             }
             if (stage3Pending.has(date)) fail('STAGE2_DATE_MOVED_TO_STAGE3',
                 'Η ημέρα αποτελεί πλέον εκκρεμότητα του Stage 3.', 409);
-            const regimeResolution = resolveEmploymentRegimeForDate({ date,
+            const semantic = resolveNoWorkDaySemanticForDate({ date,
                 effectiveProfilesByDate: context.effectiveProfilesByDate,
                 effectiveProfile: context.effectiveProfile });
-            const dailyProfile = regimeResolution.workTerms;
+            const dailyProfile = semantic.workTerms;
             const employmentType = normalizeEmploymentType(
                 dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
             );
-            if ((classification === 'REST_REPO' &&
-                    regimeResolution.regime !== EMPLOYMENT_REGIME.FULL_TIME) ||
-                (classification === 'NON_WORK' &&
-                    regimeResolution.regime !== EMPLOYMENT_REGIME.NON_FULL)) {
+            if (semantic.status !== 'RESOLVED' || classification !== semantic.classification) {
                 fail('STAGE2_DAILY_PROFILE_CHANGED',
                     'Το ημερομηνιακά ισχύον καθεστώς απασχόλησης άλλαξε.', 409);
             }

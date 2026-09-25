@@ -18,10 +18,31 @@ const { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY
         kathgoria_adeias_apologistika: 'ΑΔΑΣ', astheneia_apologistika: true,
         apousia_apologistika: false });
     assert.equal(ERGANI_II_SICKNESS_LEAVE_CATEGORY, 'ΑΔΑΣ');
+    for (const [scheduled, expected] of [[2, 2], [3.5, 3.5], [0, 0], [-2, 0],
+        [Number.NaN, 0]]) {
+        const leave = classificationUpdates({ classification: 'LEAVE',
+            kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' }, {
+            ores_ergasias: scheduled,
+            ores_ergasias_apologistika: 0,
+            ores_pragmatikhs_ergasias_apologistika: 0,
+            kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE'
+        });
+        assert.equal(leave.adeia_apologistika, true);
+        assert.equal(leave.kathgoria_adeias_apologistika, 'ΑΔΚΑΝ');
+        assert.equal(leave.ores_ergasias_apologistika, expected);
+        assert.equal(leave.ores_pragmatikhs_ergasias_apologistika, 0);
+        assert.equal(Object.hasOwn(leave, 'cards_ores_ergasias'), false);
+        assert.equal(Object.keys(leave).some((field) =>
+            /yper|prostheth|ekth|evdom/.test(field)), false);
+    }
     assert.deepEqual(classificationUpdates({ classification: 'ABSENCE' }), {
         repo_apologistika: false, adeia_apologistika: false,
         kathgoria_adeias_apologistika: '', astheneia_apologistika: false,
         apousia_apologistika: true });
+    assert.deepEqual(classificationUpdates({ classification: 'UNCLASSIFIED' }), {
+        repo_apologistika: false, adeia_apologistika: false,
+        kathgoria_adeias_apologistika: '', astheneia_apologistika: false,
+        apousia_apologistika: false });
     assert.deepEqual(classificationUpdates({ classification: 'HOLIDAY' }, {
         ores_ergasias: 8
     }), {
@@ -80,6 +101,12 @@ const { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY
         changes: [{ row_id: 'holiday', classification: 'HOLIDAY' }],
         applyOne: async (command) => { holidayCommand = command; } });
     assert.equal(holidayCommand.classification, 'HOLIDAY');
+    let leaveCommand;
+    await saveStage1DailyClassificationsBulk({ reason: 'x',
+        changes: [{ row_id: 'leave', classification: 'LEAVE',
+            kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' }],
+        applyOne: async (command) => { leaveCommand = command; } });
+    assert.equal(leaveCommand.leave_category, 'ΑΔΚΑΝ');
     assert.deepEqual(applyCanonicalAbsenceMetrics({ ores_ergasias: 7.5,
         ores_apoysias_apologistika: 1.25, apousia_apologistika: false },
     classificationUpdates({ classification: 'ABSENCE' })), {

@@ -205,6 +205,7 @@ const {
     resolveFullTimeFromWorkTerms,
     resolveEmploymentRegimeFromWorkTerms,
     resolveReviewIsFullTimeProfile,
+    resolveNoWorkDaySemanticFromWorkTerms,
     normalizeEmploymentType: normalizeReviewEmploymentType
 } = require('../../services/ergazomenoi/apasxoliseisReviewEmploymentProfileService');
 const {
@@ -3655,8 +3656,9 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     const reviewPhaseCode = String(phaseCode || '').trim();
     const hasCards = reviewHasCardEvidence(row);
     const hasNoCards = !hasCards;
-    const isNonFullPhase = resolveEmploymentRegimeFromWorkTerms(effectiveProfile) ===
-        EMPLOYMENT_REGIME.NON_FULL;
+    const noWorkSemantic = resolveNoWorkDaySemanticFromWorkTerms(effectiveProfile);
+    const isNonWorkPhase = noWorkSemantic.status === 'RESOLVED' &&
+        noWorkSemantic.classification === 'NON_WORK';
 
     // Δηλωμένη εργασία + κάρτες αποκλείουν το «ΜΕ» σε κάθε ημερήσια φάση.
     // Καθαρίζεται και στην απόκριση ώστε παλιά δεδομένα να μη φαίνονται λάθος
@@ -3679,7 +3681,7 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     // κάρτες είναι ήδη η ορθή κατάσταση «ΜΗ ΕΡΓΑΣΙΑ». Δεν αποτελεί
     // απολογιστική μεταβολή, επομένως η απολογιστική στήλη μένει ουδέτερη.
     if (
-        isNonFullPhase &&
+        isNonWorkPhase &&
         declaredKathgoria === 'ΜΕ' &&
         hasNoCards &&
         (apologistikiKathgoria === 'ΑΝ' || apologistikiKathgoria === 'ΜΕ')
@@ -3694,7 +3696,7 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     }
 
     if (
-        isNonFullPhase &&
+        isNonWorkPhase &&
         declaredKathgoria === 'ΕΡΓ' &&
         hasNoCards &&
         apologistikiKathgoria === 'ΑΝ'
@@ -3719,13 +3721,10 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
     const normalizedRow = normalizeReviewNonFullNonWorkRow(
         row, effectiveProfile, reviewPhaseCode);
     const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
-    const effectiveRegime = resolveEmploymentRegimeFromWorkTerms(effectiveProfile);
     const explicitEmploymentCode = normalizeReviewEmploymentType(
         effectiveProfile.kathestos_apasxolhshs
     ) || normalizeReviewEmploymentType(effectiveProfile.typos_apasxolhshs);
-    const authoritativeEmploymentCode = explicitEmploymentCode ||
-        (effectiveRegime === EMPLOYMENT_REGIME.FULL_TIME ? '0'
-            : effectiveRegime === EMPLOYMENT_REGIME.NON_FULL ? '1' : '');
+    const authoritativeEmploymentCode = explicitEmploymentCode;
     return { ...normalizedRow,
         kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
         kathgoria_ergasias: effectiveKathgoria,
@@ -12528,7 +12527,7 @@ class erganhController {
             const result = await saveStage1DailyClassificationsBulk({
                 changes: req.body.changes,
                 reason: req.body.reason,
-                applyOne: async ({ row_id, classification, updates, reason }) => {
+                applyOne: async ({ row_id, classification, leave_category, updates, reason }) => {
                     let authoritativeTarget = await ProdhlomenaOrariaModel.findOne({ _id: row_id,
                         team: req.session.userTeam,
                         company_kod: String(req.session.companyInUse || ''),
@@ -12539,6 +12538,11 @@ class erganhController {
                         targetDate > classificationPeriodEnd) {
                         throw weeklyHrApiError('STAGE1_DATE_OUTSIDE_ACTIONABLE_PERIOD', 409,
                             'Η ημερομηνία δεν αποτελεί στόχο εγγραφής της περιόδου.');
+                    }
+                    if (classification === 'LEAVE') {
+                        updates = buildStage1ClassificationUpdates({ classification,
+                            kathgoria_adeias_apologistika: leave_category },
+                        authoritativeTarget);
                     }
                     if (classification === 'HOLIDAY') {
                         authoritativeTarget = authoritativeTarget ||
@@ -12926,8 +12930,10 @@ class erganhController {
 
             for (const field of allowedFields) {
                 if (Object.prototype.hasOwnProperty.call(updates, field)) {
-                    if (['argia', 'ores_pragmatikhs_ergasias_apologistika'].includes(field) &&
-                        updates.argia !== true) continue;
+                    if (field === 'argia' && updates.argia !== true) continue;
+                    if (field === 'ores_pragmatikhs_ergasias_apologistika' &&
+                        updates.argia !== true &&
+                        !(updates.adeia_apologistika === true && updates[field] === 0)) continue;
                     cleanUpdates[field] = updates[field];
                 }
             }
@@ -13195,7 +13201,7 @@ class erganhController {
                         locked_by: changedBy, locked_at: new Date() };
                     const updateResult = await ProdhlomenaOrariaModel.updateOne(
                         { _id: id, team: sessionTeam, company_kod: companyId,
-                            is_locked: { $ne: true } },
+                            is_locked: mongoose.trusted({ $ne: true }) },
                         { $set: finalUpdates }, { session }
                     );
                     if (updateResult.matchedCount !== 1) {

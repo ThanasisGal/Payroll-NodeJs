@@ -119,7 +119,8 @@ function autoLeavePriorityWeek() {
 function analyze(rows, profile = { typos_apasxolhshs: 'PLHRHS'}, contexts = {}) {
     return analyzeWeeklyRepoTransferSinglePair({
         weekRows: rows,
-        employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
+        employmentProfile: { hmeres_ergasias_ebdomadas: 5,
+            typos_ebdomadas: '5ΗΜΕΡΗ', ...profile },
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
         existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map(),
         sameRunDailyCalculatedRowIds: contexts.sameRunDailyCalculatedRowIds || new Set()
@@ -174,7 +175,7 @@ function testValidFullTimeTargetBeforeSource() {
 
 function testValidPartTimeAndCountsMeAndAnAsRepo() {
     const rows = partTimeWeek();
-    const result = analyze(rows, { typos_apasxolhshs: 'MERIKH'});
+    const result = analyze(rows, { typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ' });
     assertEligible(result, dateKey(2), dateKey(4), 'ΜΕ');
     assert.strictEqual(result.counts.existing_actual_repo, 1);
 
@@ -185,12 +186,13 @@ function testValidPartTimeAndCountsMeAndAnAsRepo() {
         cards_apo_ora_01: '',
         cards_eos_ora_01: ''
     });
-    const withAn = analyze(rows, { typos_apasxolhshs: 'MERIKH'});
+    const withAn = analyze(rows, { typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ' });
     assertEligible(withAn, dateKey(2), dateKey(4), 'ΜΕ');
     assert.strictEqual(withAn.counts.existing_actual_repo, 1);
 
     rows[0].repo = true;
-    const withExplicitAnRepo = analyze(rows, { typos_apasxolhshs: 'MERIKH'});
+    const withExplicitAnRepo = analyze(rows, { typos_apasxolhshs: 'MERIKH',
+        typos_ebdomadas: '6ΗΜΕΡΗ' });
     assertReason(withExplicitAnRepo, 'REPO_LIMIT_EXCEEDED');
     assert.strictEqual(withExplicitAnRepo.counts.existing_actual_repo, 2);
 }
@@ -225,7 +227,8 @@ function testCanonicalCurrentProposedRepoStateAndIsolation() {
         kathgoria_ergasias_apologistika: 'ΜΕ',
         repo_apologistika: true
     });
-    const partial = analyze(partialRows, { typos_apasxolhshs: 'MERIKH' });
+    const partial = analyze(partialRows, { typos_apasxolhshs: 'MERIKH',
+        typos_ebdomadas: '6ΗΜΕΡΗ' });
     assert.strictEqual(partial.counts.existing_actual_repo, 1);
     assert.strictEqual(partial.counts.predicted_final_repo, 2);
 

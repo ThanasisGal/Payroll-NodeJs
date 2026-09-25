@@ -295,13 +295,14 @@ function testPersistedRepoCategoryOverridesDerivedLeave() {
         kathgoria_ergasias: 'ΕΡΓ',
         cards_ores_ergasias: 0,
         noCardsDisplayStatus: 'ΑΔΕΙΑ',
+        apologistiko_biblio: true,
         kathgoria_ergasias_apologistika: 'ΑΝ',
         repo_apologistika: true,
         adeia_apologistika: false
     }, { apologistikoText: '' });
     assert.strictEqual(applied.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
     assert.strictEqual(applied.className, 'cell-repo-day');
-    assert.strictEqual(applied.source, 'persisted');
+    assert.strictEqual(applied.source, 'persisted_canonical');
 
     const derived = sandbox.resolveReviewApologistikoPresentation({
         kathgoria_ergasias: 'ΕΡΓ',
@@ -669,8 +670,8 @@ function testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow() {
     assert.strictEqual(sandbox.renderScenarioBadge(pendingScenario, null), '');
 }
 
-function testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates() {
-    const neutral = sandbox.resolveReviewRowPresentation({
+function testDeclaredRepoPresentationDistinguishesNoncanonicalWorkAndAppliedStates() {
+    const noncanonical = sandbox.resolveReviewRowPresentation({
         kathgoria_ergasias_original: 'ΑΝ',
         kathgoria_ergasias_apologistika: 'ΑΝ',
         repo_apologistika: true,
@@ -682,17 +683,17 @@ function testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates() 
         isApologistikoRepoRow: false,
         isApologistikoNonWorkRow: false
     }, null);
-    assert.strictEqual(neutral.declared.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
-    assert.strictEqual(neutral.apologistiko.text, '-');
-    assert.strictEqual(neutral.apologistiko.className, '');
-    assert.strictEqual(neutral.isOriginalDeclaredRepo, true);
+    assert.strictEqual(noncanonical.declared.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.match(noncanonical.apologistiko.text, /ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ/);
+    assert.strictEqual(noncanonical.apologistiko.source, 'persisted_noncanonical');
+    assert.strictEqual(noncanonical.isOriginalDeclaredRepo, true);
     assert.strictEqual(
         sandbox.renderScenarioBadge({
             scenarioDecision: {
                 scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW',
                 requires_review: true
             }
-        }, neutral.badgeState),
+        }, noncanonical.badgeState),
         ''
     );
 
@@ -718,6 +719,7 @@ function testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates() 
 
     const applied = sandbox.resolveReviewRowPresentation({
         kathgoria_ergasias_original: 'ΕΡΓ',
+        apologistiko_biblio: true,
         kathgoria_ergasias_apologistika: 'ΑΝ',
         repo_apologistika: true,
         cards_ores_ergasias: 0
@@ -733,8 +735,8 @@ function testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates() 
     assert.strictEqual(applied.isAppliedRepoTarget, true);
 }
 
-function testDeclaredNonWorkStaysOnlyInDeclaredColumn() {
-    const neutral = sandbox.resolveReviewRowPresentation({
+function testDeclaredNonWorkDoesNotHideNoncanonicalApologistikoState() {
+    const noncanonical = sandbox.resolveReviewRowPresentation({
         kathgoria_ergasias_original: 'ΜΕ',
         kathgoria_ergasias_apologistika: 'ΑΝ',
         repo_apologistika: true,
@@ -748,12 +750,106 @@ function testDeclaredNonWorkStaysOnlyInDeclaredColumn() {
         isApologistikoNonWorkRow: true
     }, null);
 
-    assert.strictEqual(neutral.declared.text, 'ΜΗ ΕΡΓΑΣΙΑ');
-    assert.strictEqual(neutral.apologistiko.text, '-');
-    assert.strictEqual(neutral.apologistiko.className, '');
-    assert.strictEqual(neutral.apologistiko.source, 'declared_non_work_neutral');
-    assert.strictEqual(neutral.isOriginalDeclaredNonWork, true);
-    assert.strictEqual(neutral.isOriginalDeclaredNeutral, true);
+    assert.strictEqual(noncanonical.declared.text, 'ΜΗ ΕΡΓΑΣΙΑ');
+    assert.match(noncanonical.apologistiko.text, /ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ/);
+    assert.strictEqual(noncanonical.apologistiko.source, 'persisted_noncanonical');
+    assert.strictEqual(noncanonical.isOriginalDeclaredNonWork, true);
+    assert.strictEqual(noncanonical.isOriginalDeclaredNeutral, true);
+}
+
+function testDeclaredNeutralIsOnlyTheFinalApologistikoFallback() {
+    const presentation = (row, stage2AutomaticResolution = null) =>
+        sandbox.resolveReviewRowPresentation(row, {
+            declaredText: row.kathgoria_ergasias_original === 'ΑΝ'
+                ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ' : 'ΜΗ ΕΡΓΑΣΙΑ',
+            declaredClass: '',
+            apologistikoText: '',
+            isApologistikoRepoRow: false,
+            isApologistikoNonWorkRow: false,
+            stage2AutomaticResolution
+        }, null).apologistiko;
+
+    const canonicalRepo = presentation({
+        kathgoria_ergasias_original: 'ΜΕ', cards_ores_ergasias: 0,
+        apologistiko_biblio: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true
+    });
+    assert.strictEqual(canonicalRepo.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.strictEqual(canonicalRepo.source, 'persisted_canonical');
+
+    const canonicalNonWork = presentation({
+        kathgoria_ergasias_original: 'ΑΝ', cards_ores_ergasias: 0,
+        apologistiko_biblio: true,
+        kathgoria_ergasias_apologistika: 'ΜΕ', repo_apologistika: false
+    });
+    assert.strictEqual(canonicalNonWork.text, 'ΜΗ ΕΡΓΑΣΙΑ');
+    assert.strictEqual(canonicalNonWork.source, 'persisted_canonical');
+
+    const canonicalWork = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΜΕ', cards_ores_ergasias: 0,
+        apologistiko_biblio: true,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: false,
+        apo_ora_01_apologistika: '08:00', eos_ora_01_apologistika: '12:00'
+    }, {
+        declaredText: 'ΜΗ ΕΡΓΑΣΙΑ', declaredClass: '',
+        apologistikoText: '08:00–12:00',
+        stage2AutomaticResolution: { classification: 'REST_REPO' }
+    }, null).apologistiko;
+    assert.strictEqual(canonicalWork.text, '08:00–12:00');
+    assert.strictEqual(canonicalWork.source, 'persisted_canonical');
+
+    assert.strictEqual(presentation({
+        kathgoria_ergasias_original: 'ΜΕ', cards_ores_ergasias: 0,
+        apologistiko_biblio: false, repo_apologistika: false
+    }, { classification: 'REST_REPO' }).text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.strictEqual(presentation({
+        kathgoria_ergasias_original: 'ΑΝ', cards_ores_ergasias: 0,
+        apologistiko_biblio: false, repo_apologistika: false
+    }, { classification: 'NON_WORK' }).text, 'ΜΗ ΕΡΓΑΣΙΑ');
+
+    ['ΑΝ', 'ΜΕ'].forEach((declaredCategory) => {
+        const neutral = presentation({
+            kathgoria_ergasias_original: declaredCategory,
+            cards_ores_ergasias: 0,
+            apologistiko_biblio: false,
+            kathgoria_ergasias_apologistika: '',
+            repo_apologistika: false
+        });
+        assert.strictEqual(neutral.text, '-');
+        assert.match(neutral.source, /^declared_(repo|non_work)_neutral$/);
+    });
+
+    const staleRepo = presentation({
+        kathgoria_ergasias_original: 'ΜΕ', cards_ores_ergasias: 0,
+        apologistiko_biblio: false,
+        kathgoria_ergasias_apologistika: '', repo_apologistika: true
+    });
+    assert.match(staleRepo.text, /^ΡΕΠΟ — ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ$/);
+    assert.notStrictEqual(staleRepo.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+
+    const inconsistentRepo = presentation({
+        kathgoria_ergasias_original: 'ΜΕ', cards_ores_ergasias: 0,
+        apologistiko_biblio: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: false
+    });
+    assert.match(inconsistentRepo.text, /ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ/);
+    assert.notStrictEqual(inconsistentRepo.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+}
+
+function testModalDistinguishesDeclaredAndApologistikoRepoFields() {
+    const modalSource = source.slice(
+        source.indexOf('function showDetailsModal'),
+        source.indexOf('function initModalMoveByEnter')
+    );
+    assert.match(modalSource,
+        /Προδηλωμένο Ρεπό: \$\{row\.repo \? 'ΝΑΙ' : 'ΟΧΙ'\}/);
+
+    const fields = sandbox.renderApologistikaFields({
+        repo: false,
+        repo_apologistika: true
+    });
+    assert.match(fields,
+        /for="edit_repo_apologistika"[\s\S]*?Ρεπό[\s\S]*?id="edit_repo_apologistika"[\s\S]*?checked/);
 }
 
 function mockClassList(initial = []) {
@@ -3610,8 +3706,10 @@ const tests = [
     testPersistedAnWithCardsIsNotBlanketRepoPresentation,
     testFullTimeDeclaredWorkWithCardsNeverDisplaysPersistedNonWork,
     testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow,
-    testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates,
-    testDeclaredNonWorkStaysOnlyInDeclaredColumn,
+    testDeclaredRepoPresentationDistinguishesNoncanonicalWorkAndAppliedStates,
+    testDeclaredNonWorkDoesNotHideNoncanonicalApologistikoState,
+    testDeclaredNeutralIsOnlyTheFinalApologistikoFallback,
+    testModalDistinguishesDeclaredAndApologistikoRepoFields,
     testEmployeeGroupsUseAccessibleSingleOpenAccordion,
     testAppliedHistoryRendersWithoutCurrentProjectionGroup,
     testReadyFullTimeAndSplitShift,

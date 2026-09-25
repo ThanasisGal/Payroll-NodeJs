@@ -220,7 +220,8 @@ for (const marker of [
         effectiveProfile: { ...profile, hmeres_ergasias_ebdomadas: 6 }
     });
     assert.strictEqual(analysis.status, 'NOT_APPLICABLE');
-    assert.strictEqual(analysis.sixthDay, undefined);
+    assert.strictEqual(analysis.sixthDay, null);
+    assert.strictEqual(analysis.seventhDay, null);
 }
 
 console.log('PASS auto-leave provenance and sixth-day repo-transfer integration');

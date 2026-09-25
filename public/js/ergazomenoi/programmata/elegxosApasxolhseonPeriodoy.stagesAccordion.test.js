@@ -167,7 +167,8 @@ const classList = () => ({ values: new Set(['d-none']),
     remove(value) { this.values.delete(value); }, add(value) { this.values.add(value); },
     contains(value) { return this.values.has(value); } });
 const progressElement = { innerHTML: '', classList: classList() };
-const attentionElement = { innerHTML: '', classList: classList() };
+const attentionElement = { innerHTML: '', classList: classList(),
+    setAttribute(name, value) { this[name] = value; } };
 const guideSandbox = {
     currentWeeklyHrStage2BulkPreview: null,
     employmentReviewStageAutoOpenPending: false,
@@ -175,6 +176,7 @@ const guideSandbox = {
         STAGE3: 'Υπόλοιπες Άδειες', STAGE4: 'Τελικός Έλεγχος' },
     escapeHtml: (value) => String(value ?? '').replaceAll('<', '&lt;'),
     getStage2LifecycleReasonLabel: () => 'Διορθώστε τα στοιχεία του τρέχοντος σταδίου.',
+    updateWeeklyHrStage1BulkToolbar: () => {},
     document: { getElementById: (id) => id === 'employmentReviewWorkflowProgress'
         ? progressElement : id === 'employmentReviewAttentionSummary' ? attentionElement : null },
     CSS: { escape: (value) => value }, bootstrap: { Collapse: { getOrCreateInstance: () => ({ show() {} }) } }
@@ -204,7 +206,8 @@ assert.match(attentionElement.innerHTML, /26 ημέρες χρειάζονται
 assert.match(attentionElement.innerHTML, /Τα προηγούμενα στάδια έχουν ολοκληρωθεί/);
 assert.match(attentionElement.innerHTML, /Προβολή 26 εκκρεμοτήτων/);
 assert.equal(progressElement.classList.contains('d-none'), false);
-assert.equal(attentionElement.classList.contains('d-none'), false);
+assert.equal(attentionElement.classList.contains('d-none'), true);
+assert.equal(attentionElement['aria-hidden'], 'true');
 
 guideSandbox.renderGuide(staleLifecycle);
 assert.match(attentionElement.innerHTML, /Τα στοιχεία άλλαξαν/);
@@ -213,6 +216,23 @@ assert.match(attentionElement.innerHTML,
 assert.match(attentionElement.innerHTML,
     /Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα/);
 assert.doesNotMatch(attentionElement.innerHTML, /STALE|Παρωχημέν|ΜΗ ΕΓΚΥΡΟ/);
+
+const deferredLifecycle = { current_stage: null, stages: Object.fromEntries(
+    ['STAGE1', 'STAGE2', 'STAGE3', 'STAGE4'].map((stageKey) => [stageKey, {
+        stage: stageKey, business_status: 'DEFERRED_TO_NEXT_PERIOD',
+        presentation_status: 'DEFERRED_TO_NEXT_PERIOD', pending_count: 0,
+        open_by_default: false
+    }])) };
+guideSandbox.renderGuide(deferredLifecycle);
+const deferredSteps = [...progressElement.innerHTML.matchAll(
+    /<li class="employment-review-progress-step[^>]*>[^]*?<\/li>/g)].map((match) => match[0]);
+assert.equal(deferredSteps.length, 4);
+for (const [index, deferredStep] of deferredSteps.entries()) {
+    assert.match(deferredStep, /is-deferred/);
+    assert.match(deferredStep, /Εξέταση στην επόμενη περίοδο/);
+    assert.doesNotMatch(deferredStep, /Αναμονή προηγούμενου βήματος/);
+    if (index > 0) assert.doesNotMatch(deferredStep, /Αναμονή ολοκλήρωσης του Σταδίου/);
+}
 
 const mayStage3Lifecycle = { current_stage: 'STAGE3', stages: {
     STAGE1: { presentation_status: 'COMPLETED', business_status: 'COMPLETED' },
@@ -230,6 +250,7 @@ assert.match(stage4Progress, /is-waiting/);
 assert.doesNotMatch(stage4Progress, /is-blocked|Χρειάζεται διόρθωση/);
 assert.match(stage4Progress,
     /Αναμονή ολοκλήρωσης του Σταδίου 3 — Υπόλοιπες Άδειες/);
+assert.doesNotMatch(stage4Progress, /Εξέταση στην επόμενη περίοδο/);
 const workflowPresentationSource = source.slice(
     source.indexOf('function updateEmploymentReviewWorkflowPresentation'),
     source.indexOf('function renderWeeklyHrStage1BulkToolbar')

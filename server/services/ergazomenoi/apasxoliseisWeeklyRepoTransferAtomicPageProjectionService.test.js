@@ -313,7 +313,8 @@ function testValidFullTimeAndPartTimeWeeks() {
     const partTime = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [
             weeklyInput(partTimeWeek(), {
-                typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5
+                typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6HMERH',
+                hmeres_ergasias_ebdomadas: 5
             })
         ]
     });

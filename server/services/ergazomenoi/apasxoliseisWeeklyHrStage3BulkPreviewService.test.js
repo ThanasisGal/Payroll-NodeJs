@@ -24,7 +24,11 @@ function makeContext({ index = 0, date = '2026-06-03', full = false, actual = fa
         String(index + 1).padStart(4, '0'), hmeromhnia: new Date(`${date}Z`),
     updatedAt: new Date('2026-06-10Z'), kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8,
     kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE', ...rowPatch },
-    dailyProfile: unknown ? {} : { kathestos_apasxolhshs: full ? '0' : '1' },
+    dailyProfile: unknown ? {} : {
+        kathestos_apasxolhshs: full ? '0' : '1',
+        typos_ebdomadas: '5ΗΜΕΡΗ',
+        hmeres_ergasias_ebdomadas: full ? 5 : 4
+    },
     actualFacts: { countsAsActualWorkDay: actual }, isResidual: residual,
     upstream: { stage1_current_fingerprint: stage1Fingerprint,
         stage1_effective_fingerprint: stage1Fingerprint, stage3_version: stage3Version },

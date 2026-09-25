@@ -25,9 +25,7 @@ const {
     resolveEffectiveRepoState
 } = require('./apasxoliseisEffectiveRepoStateService');
 const {
-    EMPLOYMENT_REGIME,
-    resolveFullTimeFromWorkTerms,
-    resolveEmploymentRegimeForDate
+    resolveNoWorkDaySemanticForDate
 } = require('./apasxoliseisReviewEmploymentProfileService');
 const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
 
@@ -63,17 +61,17 @@ function isCanonicalStage2NonWork(row = {}) {
 
 function resolveNoWorkCandidateForDate({ date, effectiveProfilesByDate = {},
     effectiveProfile = {} } = {}) {
-    const { regime } = resolveEmploymentRegimeForDate({ date,
+    const semantic = resolveNoWorkDaySemanticForDate({ date,
         effectiveProfilesByDate, effectiveProfile });
-    return Object.freeze({ date, regime,
-        candidate_kind: regime === EMPLOYMENT_REGIME.FULL_TIME
-            ? 'REST_REPO' : regime === EMPLOYMENT_REGIME.NON_FULL
+    return Object.freeze({ date, semantic_status: semantic.status,
+        candidate_kind: semantic.classification === 'REST_REPO'
+            ? 'REST_REPO' : semantic.classification === 'NON_WORK'
                 ? 'POSSIBLE_LEAVE_RESIDUAL' : 'UNRESOLVED_REGIME',
-        label: regime === EMPLOYMENT_REGIME.FULL_TIME
+        label: semantic.classification === 'REST_REPO'
             ? 'Προς εξέταση ως ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
-            : regime === EMPLOYMENT_REGIME.NON_FULL
+            : semantic.classification === 'NON_WORK'
                 ? 'Προς επίλυση ως ΜΗ ΕΡΓΑΣΙΑ'
-                : 'Δεν προσδιορίστηκε το ημερομηνιακά ισχύον καθεστώς απασχόλησης' });
+                : 'Δεν προσδιορίστηκαν με ασφάλεια οι ημερομηνιακά ισχύοντες όροι απασχόλησης' });
 }
 
 function resolveWeeklyHrWorkflow({
@@ -176,11 +174,10 @@ function resolveWeeklyHrWorkflow({
     const unclassifiedStage2Candidates = unclassifiedPossibleLeaveDays.map((date) => {
         const candidate = resolveNoWorkCandidateForDate({ date,
             effectiveProfilesByDate, effectiveProfile: profile });
-        const { regime } = candidate;
-        if (regime === EMPLOYMENT_REGIME.UNKNOWN) {
+        if (candidate.semantic_status === 'UNKNOWN') {
             blockingReasons.push('DAILY_EMPLOYMENT_REGIME_UNKNOWN');
         }
-        const { regime: _regime, ...presentation } = candidate;
+        const { semantic_status: _semanticStatus, ...presentation } = candidate;
         return Object.freeze(presentation);
     });
 
@@ -205,17 +202,14 @@ function resolveWeeklyHrWorkflow({
     });
 
     const expectedRepoCount = expectedRepoResolution.effectiveExpectedWeeklyRepo;
-    const fullTime = resolveFullTimeFromWorkTerms(profile);
-    const expectedRepoCategory = fullTime === null ? null : (fullTime ? 'ΑΝ' : 'ΜΕ');
     const restingRepoDays = orderedRows.filter((row) => {
         const date = dateKeyUtc(row.hmeromhnia);
         if (classifiedDateSet.has(date)) return false;
         // Το canonical NON_WORK του Stage 2 είναι ρητά μη εργασία, όχι repo identity.
         if (isCanonicalStage2NonWork(row)) return false;
-        const { regime } = resolveEmploymentRegimeForDate({ date,
+        const semantic = resolveNoWorkDaySemanticForDate({ date,
             effectiveProfilesByDate, effectiveProfile: profile });
-        const dailyExpectedRepoCategory = regime === EMPLOYMENT_REGIME.UNKNOWN
-            ? null : regime === EMPLOYMENT_REGIME.FULL_TIME ? 'ΑΝ' : 'ΜΕ';
+        const dailyExpectedRepoCategory = semantic.ergani_code;
         const state = resolveEffectiveRepoState({
             row,
             mode: EFFECTIVE_REPO_MODE.CURRENT,
@@ -240,9 +234,9 @@ function resolveWeeklyHrWorkflow({
     const targetRows = leave_classification_completed === true
         ? orderedRows.filter((row) =>
               !classifiedDateSet.has(dateKeyUtc(row.hmeromhnia)) &&
-              resolveEmploymentRegimeForDate({ date: dateKeyUtc(row.hmeromhnia),
-                  effectiveProfilesByDate, effectiveProfile: profile }).regime ===
-                  EMPLOYMENT_REGIME.FULL_TIME &&
+              resolveNoWorkDaySemanticForDate({ date: dateKeyUtc(row.hmeromhnia),
+                  effectiveProfilesByDate, effectiveProfile: profile }).classification ===
+                  'REST_REPO' &&
               targetEligible(row))
         : [];
     // Δηλωμένο ρεπό με πραγματική εργασία είναι πιθανή πηγή μεταφοράς,

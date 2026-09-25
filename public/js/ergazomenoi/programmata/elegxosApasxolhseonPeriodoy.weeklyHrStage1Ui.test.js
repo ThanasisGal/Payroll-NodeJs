@@ -26,19 +26,19 @@ assert.match(indexWarningSandbox.warning({ write_enabled: false,
 assert.equal(indexWarningSandbox.warning({ write_enabled: false,
     write_disabled_code: 'OTHER_FAILURE' }), '');
 assert.match(source, /<tr class="weekly-hr-stage1-card"/);
-assert.match(source, /Πιθανές άδειες/);
+assert.match(source, /<th>Δευ<\/th>.*<th>Κυρ<\/th>/s);
 assert.match(source, /weekly-hr-stage1-day-classification/);
 assert.match(source, /UNCLASSIFIED.*LEAVE.*SICKNESS.*ABSENCE/s);
 assert.doesNotMatch(source.match(/function renderStage1DayEditor[\s\S]*?\n}/)?.[0] || '',
     /<option value="REPO"/);
 assert.match(source, /weekly-hr-select-all-days/);
 assert.match(source, /weekly-hr-clear-all-days/);
-assert.match(source, /Επιλεγμένες → Άδεια/);
-assert.match(source, /Επιλεγμένες → Ασθένεια/);
-assert.match(source, /Επιλεγμένες → Απουσία/);
+assert.match(source, /data-classification="LEAVE">Άδεια/);
+assert.match(source, /data-classification="SICKNESS">Ασθένεια/);
+assert.match(source, /data-classification="ABSENCE">Απουσία/);
 assert.doesNotMatch(source, /Επιλεγμένες → ΡΕΠΟ/);
-assert.match(source, /Καθαρισμός χαρακτηρισμού/);
-assert.match(source, /Αποθήκευση Χαρακτηρισμών/);
+assert.match(source, /data-classification="UNCLASSIFIED">Καθαρισμός/);
+assert.match(source, /Αποθήκευση \$\{counts\.drafts\}/);
 assert.match(source, /\/api\/dropdown\/ergazomenoi\/kathgoria_adeias/);
 assert.match(source, /Κάθε επιλεγμένη Άδεια πρέπει να έχει πραγματική κατηγορία άδειας/);
 assert.match(source, /isHrSelectableLeaveCategoryOption/);
@@ -46,15 +46,47 @@ assert.match(source, /value !== 'POSSIBLE_LEAVE'/);
 assert.doesNotMatch(source, /<option value="POSSIBLE_LEAVE" selected>ΠΙΘΑΝΗ ΑΔΕΙΑ<\/option>/);
 assert.match(source, /bulk-classify-days/);
 assert.match(source, /function updateAuthoritativeReviewDailyRow/);
-assert.match(source, /if \(item\.record\) updateAuthoritativeReviewDailyRow\(item\.record\)/);
-assert.match(source, /data-review-cell="apologistiko"/);
+assert.match(source, /if \(item\.record\) \{[\s\S]*updateAuthoritativeReviewDailyRow\(item\.record\)/);
+assert.match(source, /if \(reviewRowsUpdated\) renderCurrentReviewRows\(\)/);
+assert.match(source, /\$\{renderHoursCell\(row\)\}/);
 assert.match(source, /await Promise\.all\(\[\.\.\.affectedKeys\]/);
 assert.match(source, /showDetailsModal\(row\)/);
 assert.match(source, /weekly-hr-bulk-complete/);
-assert.match(source, /Μαζική Ολοκλήρωση Ελέγχου Αδειών \/ Ασθενειών \/ Απουσιών/);
+assert.match(source, /weekly-hr-bulk-complete[^>]*>Μαζική ολοκλήρωση/);
 assert.doesNotMatch(source, /weekly-hr-complete[^\s]*[\s\S]*data-row-id/);
 const dailySaveFunction = source.match(/async function saveStage1DailyClassificationDrafts\([\s\S]*?\n}/)?.[0] || '';
 assert.doesNotMatch(dailySaveFunction, /loadResults\(|location\.reload/);
+assert.match(dailySaveFunction, /html: renderStage1DailyClassificationSaveResult\(result\)/);
+const dailySaveResultHelper = source.match(
+    /function renderStage1DailyClassificationSaveResult\([\s\S]*?\n}/)?.[0] || '';
+const dailySaveResultSandbox = { Map, escapeHtml: (value) => String(value)
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') };
+vm.runInNewContext(`${dailySaveResultHelper}\nthis.render = renderStage1DailyClassificationSaveResult;`,
+    dailySaveResultSandbox);
+const groupedFailureHtml = dailySaveResultSandbox.render({ requested_count: 4, saved_count: 1,
+    unchanged_count: 1, failed_count: 2, results: [
+        { status: 'SAVED' },
+        { status: 'UNCHANGED' },
+        { status: 'FAILED', code: 'EMPLOYMENT_REVIEW_UPDATE_FAILED',
+            message: 'Η ημερήσια αλλαγή δεν αποθηκεύτηκε.' },
+        { status: 'FAILED', code: 'EMPLOYMENT_REVIEW_UPDATE_FAILED',
+            message: 'Η ημερήσια αλλαγή δεν αποθηκεύτηκε.' }
+    ] });
+assert.match(groupedFailureHtml, /Αποθηκεύτηκαν 1 από 4 ημέρες/);
+assert.match(groupedFailureHtml, /1 ήταν ήδη ίδια/);
+assert.match(groupedFailureHtml, /2 ημέρες απέτυχαν/);
+assert.equal((groupedFailureHtml.match(/EMPLOYMENT_REVIEW_UPDATE_FAILED/g) || []).length, 1);
+assert.equal((groupedFailureHtml.match(/Η ημερήσια αλλαγή δεν αποθηκεύτηκε\./g) || []).length, 1);
+const distinctFailureHtml = dailySaveResultSandbox.render({ requested_count: 3,
+    saved_count: 0, unchanged_count: 0, failed_count: 3, results: [
+        { status: 'FAILED', code: 'ONE', message: 'Πρώτη αιτία' },
+        { status: 'FAILED', code: 'ONE', message: 'Πρώτη αιτία' },
+        { status: 'REVIEW_REQUIRED', code: 'TWO', message: '<Δεύτερη αιτία>' }
+    ] });
+assert.match(distinctFailureHtml, /2 ημέρες:[\s\S]*Κωδικός: ONE/);
+assert.match(distinctFailureHtml, /1 ημέρα:[\s\S]*Κωδικός: TWO/);
+assert.match(distinctFailureHtml, /&lt;Δεύτερη αιτία&gt;/);
+assert.doesNotMatch(distinctFailureHtml, /row_id/);
 
 const scopeHelpers = source.slice(source.indexOf('function stage1DateKey'),
     source.indexOf('async function fetchWeeklyHrStage1'));
@@ -213,9 +245,9 @@ assert.equal(previewSandbox.helpers.renderStage1NoClassificationPreview(previewP
     date: '2026-06-02', safe: true, classification: 'REST_REPO' }, {
         adeia_apologistika: true, kathgoria_adeias_apologistika: 'ΑΔΚΑΝ'
     }), '2026-06-02'), '');
-assert.match(source, /displayDates = Array\.isArray\(filteredDates\) \? filteredDates :[\s\S]*?payload\.period_slice\?\.actionable_dates/);
-assert.match(source, /renderStage1ReviewDay\(payload, date, relevantDates\)/);
-assert.match(source, /pending \? renderStage1DayEditor\(payload, date\) : ''/);
+assert.match(source, /const weekDates = stage1NaturalWeekDates\(scope\.week_start\)/);
+assert.match(source, /renderStage1MatrixDayCell\([\s\S]*payload, date, relevantDates/);
+assert.match(source, /const editable = actionable && relevantDates\.includes\(date\) && Boolean\(row\)/);
 assert.doesNotMatch(source.match(/function renderStage1DayFacts[\s\S]*?\n}/)?.[0] || '',
     /context_only_dates/);
 
@@ -264,11 +296,12 @@ assert.equal(labelHelper('ΑΔΚΑΝ - Κανονική άδεια'), 'ΑΔΚΑ�
 assert.match(editors, /value="ΑΔΚΑΝ" selected>Κνονική άδεια|value="ΑΔΚΑΝ" selected>Κανονική άδεια/);
 assert.match(css, /weekly-hr-stage1-leave-category[\s\S]*width:\s*30rem/);
 
-const eligibilityStart = source.indexOf('function isWeeklyHrStage1Eligible');
+const eligibilityStart = source.indexOf('function isWeeklyHrStage1Selectable');
 const eligibilityEnd = source.indexOf('const workflowStageNames');
 const eligibilitySandbox = { weeklyHrStage1DayDrafts: new Map() };
 vm.runInNewContext(`${source.slice(eligibilityStart, eligibilityEnd)}\nthis.helpers = {
-    isWeeklyHrStage1Eligible, weeklyHrStage1BusinessStatus };`, eligibilitySandbox);
+    isWeeklyHrStage1Selectable, isWeeklyHrStage1Completable,
+    weeklyHrStage1BusinessStatus };`, eligibilitySandbox);
 const completedDerived = { stage1_status: 'OPEN', write_enabled: true, rows: [{ _id: 'r1' }],
     workflow: { next_required_hr_stage: 'REPO_RESOLUTION' },
     lifecycle_projection: { stages: { stage1: {
@@ -276,18 +309,20 @@ const completedDerived = { stage1_status: 'OPEN', write_enabled: true, rows: [{ 
     } } } };
 assert.equal(eligibilitySandbox.helpers.weeklyHrStage1BusinessStatus(completedDerived),
     'COMPLETED');
-assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Eligible(completedDerived), false);
+assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Selectable(completedDerived), false);
 const activeDerived = { ...completedDerived,
     lifecycle_projection: { stages: { stage1: { business_status: 'OPEN' } } } };
-assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Eligible(activeDerived), true);
+assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Selectable(activeDerived), true);
+assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Completable(activeDerived), true);
 eligibilitySandbox.weeklyHrStage1DayDrafts.set('r1', { classification: 'LEAVE' });
-assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Eligible(activeDerived), false);
+assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Selectable(activeDerived), true);
+assert.equal(eligibilitySandbox.helpers.isWeeklyHrStage1Completable(activeDerived), false);
 assert.match(source, /Αποθηκεύστε πρώτα τους χαρακτηρισμούς και μετά ολοκληρώστε το Στάδιο 1/);
 
 // 0014-shaped integration: three OPEN scopes are eligible and selected, while
 // the already completed week remains ineligible. Positive daily classification
 // is deliberately not part of completion eligibility.
-const toolbarStart = source.indexOf('function isWeeklyHrStage1Eligible');
+const toolbarStart = source.indexOf('function isWeeklyHrStage1Selectable');
 const toolbarEnd = source.indexOf('function updateWeeklyHrStage1BulkToolbar');
 const weeklyPayloads = new Map();
 const weeklySelected = new Set();
@@ -298,6 +333,7 @@ const toolbarSandbox = {
     weeklyHrStage1DaySelected: new Set(),
     weeklyHrStage1BulkSubmitting: false,
     weeklyHrStage1DaySaving: false,
+    weeklyHrStage1AttentionTooltip: 'Πληροφορίες Σταδίου 1',
     stage1DisplayFilters: { employeeQuery: '', status: 'ALL',
         leave: false, sickness: false, absence: false },
     stage1PayloadsForDisplay: () => [...weeklyPayloads.values()],
@@ -312,7 +348,8 @@ const toolbarSandbox = {
     escapeHtml: String
 };
 vm.runInNewContext(`${source.slice(toolbarStart, toolbarEnd)}\nthis.helpers = {
-    isWeeklyHrStage1Eligible, weeklyHrStage1Counts, renderWeeklyHrStage1BulkToolbar,
+    isWeeklyHrStage1Selectable, isWeeklyHrStage1Completable,
+    weeklyHrStage1Counts, renderWeeklyHrStage1BulkToolbar,
     visibleWeeklyHrStage1Payloads, pruneHiddenWeeklyHrStage1Selections
 };`, toolbarSandbox);
 const openPayload = (id) => ({ scope: { key: id }, stage1_status: 'OPEN', write_enabled: true,
@@ -329,15 +366,31 @@ const enabledToolbar = toolbarSandbox.helpers.renderWeeklyHrStage1BulkToolbar();
 assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().selected, 3);
 const enabledButton = enabledToolbar.match(
     /<button[^>]*weekly-hr-bulk-complete[\s\S]*?<\/button>/)?.[0] || '';
-assert.match(enabledButton, /Μαζική Ολοκλήρωση/);
+assert.match(enabledButton, /Μαζική ολοκλήρωση/);
 assert.doesNotMatch(enabledButton, /disabled/);
-assert.equal(toolbarSandbox.helpers.isWeeklyHrStage1Eligible(completedDerived), false);
+toolbarSandbox.weeklyHrStage1DayDrafts.set('03', { classification: 'LEAVE',
+    kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' });
+assert.equal(toolbarSandbox.helpers.isWeeklyHrStage1Selectable(weeklyPayloads.get('w1')), true);
+toolbarSandbox.helpers.pruneHiddenWeeklyHrStage1Selections();
+assert.equal(weeklySelected.has('w1'), true);
+const toolbarWithDraft = toolbarSandbox.helpers.renderWeeklyHrStage1BulkToolbar();
+assert.match(toolbarWithDraft.match(
+    /<button[^>]*weekly-hr-bulk-complete[\s\S]*?<\/button>/)?.[0] || '', /disabled/);
+assert.doesNotMatch(toolbarWithDraft.match(
+    /<button[^>]*weekly-hr-save-day-classifications[\s\S]*?<\/button>/)?.[0] || '',
+    /disabled/);
+assert.match(toolbarWithDraft, /⚠ 1 μη αποθηκευμένη αλλαγή/);
+toolbarSandbox.weeklyHrStage1DayDrafts.clear();
+assert.equal(weeklySelected.has('w1'), true);
+assert.doesNotMatch(toolbarSandbox.helpers.renderWeeklyHrStage1BulkToolbar().match(
+    /<button[^>]*weekly-hr-bulk-complete[\s\S]*?<\/button>/)?.[0] || '', /disabled/);
+assert.equal(toolbarSandbox.helpers.isWeeklyHrStage1Selectable(completedDerived), false);
 weeklySelected.clear();
 assert.match(toolbarSandbox.helpers.renderWeeklyHrStage1BulkToolbar()
     .match(/<button[^>]*weekly-hr-bulk-complete[\s\S]*?<\/button>/)?.[0] || '', /disabled/);
 const blockedPayload = { ...openPayload('blocked'),
     workflow: { next_required_hr_stage: 'BLOCKED' } };
-assert.equal(toolbarSandbox.helpers.isWeeklyHrStage1Eligible(blockedPayload), false);
+assert.equal(toolbarSandbox.helpers.isWeeklyHrStage1Selectable(blockedPayload), false);
 weeklyPayloads.clear();
 const hiddenCompletedPayload = { ...completedDerived,
     scope: { key: 'hidden-completed', employee_kodikos: '0001' } };
@@ -347,7 +400,7 @@ weeklyPayloads.set('hidden-completed', hiddenCompletedPayload);
 weeklyPayloads.set('visible-active', visibleActivePayload);
 assert.equal(JSON.stringify(toolbarSandbox.helpers.weeklyHrStage1Counts()), JSON.stringify({
     total: 2, needsAction: 1, open: 1, stale: 0, completed: 1, blocked: 0,
-    visible: 2, selected: 0
+    visible: 2, selected: 0, selectedDays: 0, drafts: 0, selectedDrafts: 0
 }));
 weeklySelected.add('hidden-completed');
 weeklySelected.add('visible-active');
@@ -361,11 +414,11 @@ weeklyPayloads.set('visible-blocked', { ...blockedPayload,
     lifecycle_projection: { stages: { stage1: { business_status: 'BLOCKED' } } } });
 toolbarSandbox.helpers.pruneHiddenWeeklyHrStage1Selections();
 assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().visible, 1);
-assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().selected, 0);
-assert.deepEqual([...weeklySelected], []);
+assert.equal(toolbarSandbox.helpers.weeklyHrStage1Counts().selected, 1);
+assert.deepEqual([...weeklySelected], ['visible-active']);
 assert.match(source, /visibleWeeklyHrStage1Payloads\(\)\.forEach\(\(payload\)/);
 assert.match(source, /const visibleEligibleKeys = pruneHiddenWeeklyHrStage1Selections\(\)/);
-assert.doesNotMatch(source.match(/function isWeeklyHrStage1Eligible[\s\S]*?\n}/)?.[0] || '',
+assert.doesNotMatch(source.match(/function isWeeklyHrStage1Selectable[\s\S]*?\n}/)?.[0] || '',
     /classificationForRow|LEAVE|SICKNESS|ABSENCE/);
 assert.match(source, /id="stage1EmployeeSearch"/);
 assert.match(source, /placeholder="Όνομα ή κωδικός εργαζομένου"/);
@@ -390,10 +443,12 @@ const cardSandbox = {
     weeklyHrStage1Key: () => 'deferred-week',
     weeklyHrHasOnlyOrphanBlockers: () => false,
     weeklyHrBlockedExplanation: () => '',
-    isWeeklyHrStage1Eligible: () => false,
+    isWeeklyHrStage1Selectable: () => false,
     weeklyHrStage1Selected: new Set(),
     weeklyHrStage1IndexWarning: () => '',
     stage1RelevantDates: () => [],
+    stage1NaturalWeekDates: () => [],
+    renderStage1MatrixDayCell: () => '',
     weeklyHrOrphanRows: () => [],
     renderWeeklyHrOrphanItem: () => '',
     formatStage1DateKey: scopeSandbox.helpers.formatStage1DateKey,
@@ -537,7 +592,10 @@ const countsSandbox = {
     weeklyHrStage1Payloads: new Map(statusPayloads.map((payload, index) =>
         [String(index), payload])),
     weeklyHrStage1Selected: new Set(),
-    isWeeklyHrStage1Eligible: () => false,
+    isWeeklyHrStage1Selectable: () => false,
+    weeklyHrStage1DraftCount: () => 0,
+    weeklyHrStage1DaySelected: new Set(),
+    weeklyHrStage1DayDrafts: new Map(),
     stage1PayloadsForDisplay: () => statusPayloads,
     visibleWeeklyHrStage1Payloads: () => statusPayloads,
     weeklyHrStage1Key: (scope) => scope.employee_kodikos
@@ -562,14 +620,13 @@ assert.match(legacyBulkControls, /class="d-flex/);
 assert.doesNotMatch(legacyBulkControls, /\bd-none\b/);
 assert.match(legacyBulkControls, /Επιλογή όλων/);
 assert.match(legacyBulkControls, /Αποεπιλογή όλων/);
-assert.match(legacyBulkControls,
-    /Μαζική Ολοκλήρωση Ελέγχου Αδειών \/ Ασθενειών \/ Απουσιών/);
-assert.match(toolbarSource, /d-none border-top[\s\S]*weekly-hr-day-bulk-toolbar/);
+assert.match(toolbarSource, /Μαζική ολοκλήρωση/);
+assert.doesNotMatch(toolbarSource, /d-none border-top[\s\S]*weekly-hr-day-bulk-toolbar/);
 assert.match(toolbarSource, /Αναζήτηση εργαζομένου/);
 assert.match(toolbarSource, /Όνομα ή κωδικός εργαζομένου/);
 assert.match(toolbarSource, /Κατάσταση/);
 assert.match(source, /renderWeeklyHrStage1Card\(payload, filteredDates = null\)/);
-assert.match(source, /renderStage1ReviewDay\(payload, date, relevantDates\)/);
+assert.match(source, /renderStage1MatrixDayCell\([\s\S]*payload, date, relevantDates/);
 assert.match(source, /function stage1PayloadsForDisplay\(\) \{\s*return \[\.\.\.weeklyHrStage1Payloads\.values\(\)\];\s*}/);
 assert.match(source.match(/function weeklyHrStage1Counts[\s\S]*?\n}/)?.[0] || '',
     /stage1PayloadsForDisplay\(\)/);
@@ -577,7 +634,7 @@ assert.match(source.match(/function renderWeeklyHrStage1Presentation[\s\S]*?\n}/
     /stage1PayloadsForDisplay\(\)/);
 assert.match(source.match(/function updateEmploymentReviewWorkflowPresentation[\s\S]*?\n}/)?.[0] || '',
     /visibleWeeklyHrPayloads\(allPayloads\)/);
-assert.match(source, /weekly-hr-select-all-days'[\s\S]*?visibleWeeklyHrPayloads\(\)/);
+assert.match(source, /weekly-hr-select-all-days'[\s\S]*?visibleWeeklyHrStage1Payloads\(\)/);
 const stage1PresentationSource = source.match(
     /function renderWeeklyHrStage1Presentation\(\)[\s\S]*?\n}/)?.[0] || '';
 assert.match(stage1PresentationSource, /Δεν βρέθηκαν εγγραφές με τα επιλεγμένα φίλτρα/);
@@ -594,7 +651,7 @@ for (const internalStatus of ['OPEN', 'BLOCKED', 'STALE', 'COMPLETED']) {
 }
 const stage1ToolbarCss = css.match(/\.weekly-hr-stage1-bulk-toolbar\s*\{[^}]*\}/)?.[0] || '';
 assert.ok(stage1ToolbarCss, 'Stage 1 toolbar CSS contract must exist');
-assert.doesNotMatch(stage1ToolbarCss, /position:\s*sticky/);
+assert.match(stage1ToolbarCss, /position:\s*sticky/);
 const stage1TableHeaderCss = css.match(
     /\.weekly-hr-stage1-table\s*>\s*thead\s*>\s*tr\s*>\s*th\s*\{[^}]*\}/
 )?.[0] || '';
@@ -640,11 +697,13 @@ let scopeRefreshCalls = 0;
 let loadResultsOutcome = true;
 const bulkSandbox = {
     weeklyHrStage1BulkSubmitting: false,
+    weeklyHrStage1DaySaving: false,
     weeklyHrStage1Selected: new Set(['week-1']),
     weeklyHrStage1Payloads: new Map([['week-1', {}]]),
     weeklyHrStage1Scopes: new Map([['week-1', { ypokatasthma: '0000',
         employee_id: 'employee-14', week_start: '2026-06-01', week_end: '2026-06-07' }]]),
     isWeeklyHrStage1Eligible: () => true,
+    weeklyHrStage1DraftCount: () => 0,
     pruneHiddenWeeklyHrStage1Selections: () => new Set(['week-1']),
     updateWeeklyHrStage1BulkToolbar: () => {},
     employmentReviewSwal: async (options) => options.input === 'textarea'
