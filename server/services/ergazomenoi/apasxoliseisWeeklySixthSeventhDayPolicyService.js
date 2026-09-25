@@ -11,7 +11,7 @@ const {
 } = require('./apasxoliseisEffectiveRepoStateService');
 const {
     normalizeEmploymentType,
-    resolveFullTimeFromWorkTerms
+    resolveNoWorkDaySemanticFromWorkTerms
 } = require('./apasxoliseisReviewEmploymentProfileService');
 
 const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v3';
@@ -81,19 +81,8 @@ function resolveCanonicalRepoDayIdentities({
     effectiveProfile = {},
     allowedRepoIdentityCounts = [2]
 } = {}) {
-    const fullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
-    const explicitRepoCategories = [...new Set(
-        weekRows
-            .flatMap((row) => [
-                row?.kathgoria_ergasias_apologistika,
-                row?.kathgoria_ergasias
-            ])
-            .map((value) => String(value || '').trim())
-            .filter((value) => value === 'ΑΝ' || value === 'ΜΕ')
-    )];
-    const expectedRepoCategory = fullTime === null
-        ? (explicitRepoCategories.length === 1 ? explicitRepoCategories[0] : null)
-        : (fullTime ? 'ΑΝ' : 'ΜΕ');
+    const expectedRepoCategory = resolveNoWorkDaySemanticFromWorkTerms(
+        effectiveProfile).ergani_code;
     const states = weekRows.map((row) => ({
         identity: dateKeyUtc(row?.hmeromhnia),
         state: resolveEffectiveRepoState({
@@ -127,16 +116,16 @@ function resolveCanonicalRepoDayIdentities({
 }
 
 function resolveCurrentRepoCandidateIdentities({ weekRows = [], effectiveProfile = {} } = {}) {
-    const fullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
-    const expectedRepoCategory = fullTime === null ? null : (fullTime ? 'ΑΝ' : 'ΜΕ');
+    const expectedRepoCategory = resolveNoWorkDaySemanticFromWorkTerms(
+        effectiveProfile).ergani_code;
     return weekRows.filter((row) => resolveEffectiveRepoState({
         row, mode: EFFECTIVE_REPO_MODE.CURRENT, expectedRepoCategory
     }).effectiveRepo === true).map((row) => dateKeyUtc(row.hmeromhnia)).filter(Boolean).sort();
 }
 
 function resolveSafeHumanRepoCandidateIdentities({ weekRows = [], effectiveProfile = {} } = {}) {
-    const fullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
-    const expectedRepoCategory = fullTime === null ? null : (fullTime ? 'ΑΝ' : 'ΜΕ');
+    const expectedRepoCategory = resolveNoWorkDaySemanticFromWorkTerms(
+        effectiveProfile).ergani_code;
     return weekRows.filter((row) => {
         if (row?.is_locked === true) return false;
         const effectiveRepo = resolveEffectiveRepoState({
@@ -152,8 +141,8 @@ function resolveSafeHumanRepoCandidateIdentities({ weekRows = [], effectiveProfi
 }
 
 function resolveWorkedDeclaredRepoDays({ weekRows = [], dailyFacts = [], effectiveProfile = {} } = {}) {
-    const fullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
-    const expectedRepoCategory = fullTime === null ? null : (fullTime ? 'ΑΝ' : 'ΜΕ');
+    const expectedRepoCategory = resolveNoWorkDaySemanticFromWorkTerms(
+        effectiveProfile).ergani_code;
     const factsByDate = new Map(dailyFacts.map((day) => [day.hmeromhnia, day]));
     return weekRows.map((row) => ({
         row,
@@ -238,6 +227,7 @@ function analyzeWeeklySixthSeventhDay({
             signature: [
                 normalizeEmploymentType(profile.kathestos_apasxolhshs) ||
                     normalizeEmploymentType(profile.typos_apasxolhshs),
+                String(profile.typos_ebdomadas ?? '').trim(),
                 String(profile.hmeres_ergasias_ebdomadas ?? '').trim()
             ].join('|'),
             weeklyWorkdays: Number(profile.hmeres_ergasias_ebdomadas)
@@ -370,10 +360,8 @@ function analyzeWeeklySixthSeventhDay({
     });
     let canonicalRepoDayIdentities;
     if (canonicalRepoDayIdentitiesOverride !== null) {
-        const overrideFullTime = resolveFullTimeFromWorkTerms(effectiveProfile);
-        const overrideExpectedRepoCategory = overrideFullTime === null
-            ? null
-            : (overrideFullTime ? 'ΑΝ' : 'ΜΕ');
+        const overrideExpectedRepoCategory = resolveNoWorkDaySemanticFromWorkTerms(
+            effectiveProfile).ergani_code;
         const override = [...new Set((Array.isArray(canonicalRepoDayIdentitiesOverride)
             ? canonicalRepoDayIdentitiesOverride : []).map(dateKeyUtc).filter(Boolean))].sort();
         const candidates = allowDeclaredRepoIdentityOverride

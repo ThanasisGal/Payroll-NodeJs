@@ -43,6 +43,8 @@ const detailsSandbox = {
     renderOrphanCardResolutionSection: () => '', renderScenarioDetailsSection: () => '',
     renderApologistikaFields: () => '', userCanReviewEdit: () => false,
     hasAdeiaSuggestion: presentationSandbox.helpers.hasAdeiaSuggestion,
+    isCurrentPeriodReviewDate: () => true,
+    escapeHtml: String,
     initModalMoveByEnter: () => {}, initializeOrphanResolutionPreview: () => {}
 };
 vm.runInNewContext(`${modalMarkup}\nthis.show = showDetailsModal;`, detailsSandbox);
@@ -96,6 +98,7 @@ assert.equal(elements.edit_ores_ergasias_apologistika.value, '3.00');
 
 assert.equal((modalMarkup.match(/Προτείνεται έλεγχος άδειας/g) || []).length, 2);
 assert.match(source, /CONFIRMED[\s\S]*text: 'ΑΔΕΙΑ'/);
-assert.match(source, /DERIVED[\s\S]*PERSISTED[\s\S]*LEGACY[\s\S]*text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ'/);
+assert.match(source, /DERIVED[\s\S]*PERSISTED[\s\S]*LEGACY/);
+assert.match(source, /'ΠΙΘΑΝΗ ΑΔΕΙΑ'/);
 
 console.log('confirmed leave modal regression tests passed');

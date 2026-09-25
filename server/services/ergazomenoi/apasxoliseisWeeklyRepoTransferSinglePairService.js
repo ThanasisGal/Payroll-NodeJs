@@ -28,6 +28,8 @@ const {
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
 const { CARD_PAIR_STATE, resolveCardPairVerification } =
     require('./apasxoliseisCardPairResolverService');
+const { resolveNoWorkDaySemanticFromWorkTerms } = require(
+    './apasxoliseisReviewEmploymentProfileService');
 
 const SCENARIO_CODE = 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR';
 const SCENARIO_VERSION = 'repo-transfer-single-pair:v5';
@@ -862,7 +864,6 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
     if (![EMPLOYMENT_TYPE.FULL, EMPLOYMENT_TYPE.PARTIAL].includes(employmentType)) {
         return buildResult({ ...base, reasons: ['UNSUPPORTED_EMPLOYMENT_TYPE'] });
     }
-
     const repoResolution = resolveEffectiveExpectedWeeklyRepo({
         weekRows: rows,
         effectiveProfile: profile
@@ -892,6 +893,13 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
     base.employee.scheduled_work_days = repoResolution.scheduledWorkDays;
     base.employee.effective_weekly_workdays = repoResolution.effectiveWeeklyWorkdays;
 
+    const noWorkSemantic = resolveNoWorkDaySemanticFromWorkTerms(
+        isPlainObject(input.noWorkSemanticProfile) ? input.noWorkSemanticProfile : profile);
+    if (noWorkSemantic.status !== 'RESOLVED') {
+        return buildResult({ ...base, status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['NO_WORK_DAY_SEMANTIC_UNKNOWN'] });
+    }
+
     const rowInfos = rows.map((row) =>
         buildRowInfo(row, {
             holidayByDateKey,
@@ -918,8 +926,8 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
             reasons: ['SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'],
             counts: { actual_workdays_before_repo_transfer: 7 } });
     }
-    const sourceCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
-    const targetCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
+    const sourceCategory = noWorkSemantic.ergani_code;
+    const targetCategory = noWorkSemantic.ergani_code;
     const potentialSources = rowInfos.filter((info) => {
         const category = toTrimmedString(info.row.kathgoria_ergasias);
         const isFullTimeBlankUnscheduledSource =
@@ -1260,7 +1268,7 @@ function withScenarioVersion(result, scenarioVersion) {
 function partialSourceFacts(info) {
     const declared = info.facts.declared;
     return (
-        declared.isDeclaredNonWork &&
+        (declared.isDeclaredNonWork || declared.isDeclaredRepo) &&
         declared.hasDeclaredHours === false &&
         declared.hasDeclaredIntervals === false &&
         info.cardHours !== null &&
@@ -1327,6 +1335,7 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
     // established MERIKH pair analysis. Only the normalized identity changes here.
     const equivalentInput = {
         ...input,
+        noWorkSemanticProfile: profile,
         employmentProfile: {
             ...profile,
             typos_apasxolhshs: EMPLOYMENT_TYPE.PARTIAL
@@ -1339,6 +1348,7 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
                 Number.isSafeInteger(value) && value >= 1 && value <= 6
         }
     );
+    const noWorkSemantic = resolveNoWorkDaySemanticFromWorkTerms(profile);
     if (rows.length !== 7 || rows.some((row) => !isPlainObject(row))) {
         return withScenarioVersion(establishedResult, SCENARIO_VERSION_V2);
     }
@@ -1397,7 +1407,8 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
             target: null,
             semantic_proposal: input.allowCrossPeriod === true ? {
                 selectable_source_candidates: selectableSources.map((info) => rowReference(info, 'ΕΡΓ')),
-                selectable_target_candidates: selectableTargets.map((info) => rowReference(info, 'ΜΕ'))
+                selectable_target_candidates: selectableTargets.map((info) => rowReference(info,
+                    noWorkSemantic.ergani_code || ''))
             } : null
         });
     }
@@ -1490,7 +1501,7 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
     return deepFreeze({
         ...common,
         source: rowReference(cleanSources[0], 'ΕΡΓ'),
-        target: rowReference(cleanTargets[0], 'ΜΕ'),
+        target: rowReference(cleanTargets[0], noWorkSemantic.ergani_code),
         semantic_proposal: {
             ...establishedResult.semantic_proposal,
             source_role: 'SOURCE_BECOMES_WORK',

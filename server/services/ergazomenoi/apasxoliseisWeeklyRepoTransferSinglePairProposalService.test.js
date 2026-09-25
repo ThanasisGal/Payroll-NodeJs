@@ -85,7 +85,8 @@ function partTimeWeek() {
 function build(rows, profile = { typos_apasxolhshs: 'PLHRHS'}, contexts = {}) {
     return buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
+        employmentProfile: { hmeres_ergasias_ebdomadas: 5,
+            typos_ebdomadas: '5ΗΜΕΡΗ', ...profile },
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
         existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map()
     });
@@ -95,7 +96,8 @@ function buildV2(rows, dependencies = {}) {
     return buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
         employmentProfile: {
-            typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5
+            typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 5
         },
         contractVersion: 'v2'
     }, dependencies);
@@ -222,7 +224,7 @@ function testValidFullTimeProposal() {
 
 function testValidPartTimeProposal() {
     const result = build(partTimeWeek(), {
-        typos_apasxolhshs: 'MERIKH'
+        typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ'
     });
     assertReadyContract(result, dateKey(2), dateKey(4), 'ΜΕ');
     assert.strictEqual(result.items[0].proposed_values.ores_ergasias_apologistika, 4);
@@ -457,7 +459,7 @@ function testPartialProposalClearsProvisionalAutoLeaveFields() {
         ores_apoysias_apologistika: 0
     });
     const result = build(rows, {
-        typos_apasxolhshs: 'MERIKH'
+        typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ'
     });
 
     assertReadyContract(result, dateKey(2), dateKey(4), 'ΜΕ');
@@ -520,7 +522,8 @@ function testV2InvalidResultsPreserveVersions() {
         './apasxoliseisWeeklyRepoTransferSinglePairService'
     ).analyzeWeeklyRepoTransferSinglePairV2({
         weekRows: validRows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 5 }
     });
 
     const invalidHours = partTimeWeek();
@@ -540,7 +543,8 @@ function testV2InvalidResultsPreserveVersions() {
         './apasxoliseisWeeklyRepoTransferSinglePairService'
     ).analyzeWeeklyRepoTransferSinglePairV2({
         weekRows: fallbackRows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 5 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 5 }
     });
     fallbackRows[2].cards_ores_ergasias = 'not-a-number';
     assertV2Invalid(

@@ -26,7 +26,22 @@ assert.match(controller, /createWeeklyRepoTransferDecision\([\s\S]*mutationRunne
 assert.match(controller, /applyWeeklyRepoTransferDecision[\s\S]*assertActiveEmploymentReviewPeriodNormal/);
 assert.match(controller, /periodWriteGuard:[\s\S]*start: plan\.source\.date[\s\S]*start: plan\.target\.date/);
 assert.match(controller, /periodFence: \(\{ session \}\) => fencePeriodForWrite/);
-assert.strictEqual((controller.match(/assertActiveEmploymentReviewPeriodNormal\(req, oldRecord\.ypokatasthma/g) || []).length, 3);
+const updateReviewPath = controller.slice(
+    controller.indexOf('static updateProdhlomenaOrariaReviewRecord = async'),
+    controller.indexOf('static unlockProdhlomenaOrariaReviewRecord = async'));
+const unlockReviewPath = controller.slice(
+    controller.indexOf('static unlockProdhlomenaOrariaReviewRecord = async'),
+    controller.indexOf('static restoreProdhlomenaOrariaReviewRecord = async'));
+const restoreReviewPath = controller.slice(
+    controller.indexOf('static restoreProdhlomenaOrariaReviewRecord = async'),
+    controller.indexOf('static getProdhlomenaOrariaAuditHistory = async'));
+assert.match(updateReviewPath, /assertActiveEmploymentReviewOrphanResolutionPeriod\(/);
+assert.match(updateReviewPath, /assertActiveEmploymentReviewPeriodNormal\(/);
+assert.match(updateReviewPath, /periodFence\(\{[\s\S]*expectedToken: periodAccess\.token/);
+for (const path of [unlockReviewPath, restoreReviewPath]) {
+    assert.match(path, /assertActiveEmploymentReviewPeriodNormal\(/);
+    assert.match(path, /runWithPeriodWriteFence\(\{[\s\S]*expectedToken: periodAccess\.token/);
+}
 assert.ok((controller.match(/scope: periodAccess\.scope,[\s\S]{0,120}expectedToken: periodAccess\.token/g) || []).length >= 3);
 assert.match(controller, /runProdhlomenaOrariaPolicyPreviewApplyExecutionLocked[\s\S]*assertActiveEmploymentReviewPeriodNormal/);
 assert.match(policyExecution, /runPolicyPreviewApplyExecutionLocked[\s\S]*return buildLockedApplyExecutionResult\(applyPlan\)/);
@@ -41,8 +56,9 @@ assert.ok(browser.includes("LOCKED: 'ΚΛΕΙΔΩΜΕΝΟ'"));
 assert.ok(browser.includes("CORRECTIVE_ONLY: 'Μόνο διορθωτική μισθοδοσία'"));
 assert.ok(browser.includes("HISTORICAL_RECONSTRUCTION_REQUIRED: 'ΕΚΠΡΟΘΕΣΜΗ — ΧΩΡΙΣ ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ'"));
 assert.ok(browser.includes('δεν ξεκλειδώνει χειροκίνητα κλειδωμένες ημερήσιες εγγραφές'));
-assert.ok(browser.includes("inputValue: unlocking ? '' : 'Ολοκλήρωση ελέγχου και κλείδωμα ανακατασκευασμένης εκπρόθεσμης περιόδου '"));
-assert.ok(browser.includes("confirmButton: 'employment-period-lock-confirm-button'"));
+assert.match(browser, /const historicalLock = !unlocking[\s\S]*effective_mode === 'HISTORICAL_RECONSTRUCTED'/);
+assert.match(browser, /inputValue: unlocking[\s\S]*historicalLock[\s\S]*Ολοκλήρωση ελέγχου και κλείδωμα ανακατασκευασμένης εκπρόθεσμης περιόδου[\s\S]*Ολοκλήρωση ελέγχου και κλείδωμα περιόδου/);
+assert.match(browser, /customClass:\s*\{[\s\S]*confirmButton: unlocking[\s\S]*employment-period-unlock-confirm-button[\s\S]*employment-period-lock-confirm-button/);
 assert.match(css, /\.employment-review-swal-popup \.swal2-confirm\.employment-period-lock-confirm-button\s*\{[^}]*min-width:\s*11rem;[^}]*white-space:\s*nowrap;/s);
 assert.ok(browser.includes("transitionEmploymentPeriod('unlock')"));
 assert.ok(browser.includes("/period-control/${action}"));

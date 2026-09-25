@@ -89,7 +89,9 @@ function partTimeWeek() {
 function build(rows, profile = { typos_apasxolhshs: 'PLHRHS'}, contexts = {}) {
     return buildWeeklyRepoTransferSinglePairGroupProjection({
         weekRows: rows,
-        employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
+        employmentProfile: {
+            typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 5, ...profile
+        },
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
         existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map()
     });
@@ -196,7 +198,7 @@ function testValidFullTimeProjection() {
     assert.strictEqual(
         group.description,
         'Μεταφορά ρεπό για τον εργαζόμενο 001: η 07/07/2026 γίνεται εργασία και η ' +
-            '10/07/2026 γίνεται ρεπό (ΑΝ, πλήρης απασχόληση). Οι δύο αλλαγές απαιτούν ' +
+            '10/07/2026 γίνεται ρεπό (ΑΝ, ανάπαυση). Οι δύο αλλαγές απαιτούν ' +
             'μία ενιαία απόφαση HR. Η προεπισκόπηση δεν αλλάζει δεδομένα· η εφαρμογή ' +
             'επιτρέπεται μόνο μετά από έγκριση και επιτυχή έλεγχο ασφαλείας του server.'
     );
@@ -215,7 +217,8 @@ function testValidFullTimeProjection() {
 
 function testValidPartTimeProjection() {
     const result = build(partTimeWeek(), {
-        typos_apasxolhshs: 'MERIKH'
+        typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ',
+        hmeres_ergasias_ebdomadas: 5
     });
     assertReady(result);
     const group = result.groups[0];
@@ -224,7 +227,7 @@ function testValidPartTimeProjection() {
     assertSafetyContract(group);
     assert.strictEqual(target.kathgoria_ergasias_apologistika, 'ΜΕ');
     assert.strictEqual(target.proposed_values.repo_apologistika, true);
-    assert.ok(group.description.includes('ΜΕ, μερική απασχόληση'));
+    assert.ok(group.description.includes('ΜΕ, μη εργασία'));
     assert.strictEqual(group.pair_contract.approval_supported, false);
 }
 

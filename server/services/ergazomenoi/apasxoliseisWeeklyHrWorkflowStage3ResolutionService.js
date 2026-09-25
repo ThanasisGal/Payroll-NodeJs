@@ -6,8 +6,7 @@ const StateModel = require('../../models/apasxoliseisWeeklyHrWorkflowState');
 const AuditModel = require('../../models/apasxoliseisWeeklyHrWorkflowAudit');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
-const { EMPLOYMENT_REGIME, normalizeEmploymentType,
-    resolveEmploymentRegimeFromWorkTerms } = require(
+const { normalizeEmploymentType, resolveNoWorkDaySemanticFromWorkTerms } = require(
     './apasxoliseisReviewEmploymentProfileService');
 const { stableStringify, buildStage3InputFingerprint,
     positiveClassification } = require('./apasxoliseisStage3FingerprintService');
@@ -75,12 +74,12 @@ function assertDecisionAllowed(context, finalClassification) {
         context.dailyProfile?.kathestos_apasxolhshs ??
         context.dailyProfile?.typos_apasxolhshs
     );
-    const regime = resolveEmploymentRegimeFromWorkTerms(context.dailyProfile);
-    if (regime === EMPLOYMENT_REGIME.UNKNOWN) fail('STAGE3_DAILY_REGIME_UNKNOWN',
-        'Δεν προσδιορίστηκε με ασφάλεια το ημερήσιο καθεστώς απασχόλησης.', 409);
-    if (finalClassification === 'NON_WORK' && regime === EMPLOYMENT_REGIME.FULL_TIME) {
+    const semantic = resolveNoWorkDaySemanticFromWorkTerms(context.dailyProfile);
+    if (semantic.status === 'UNKNOWN') fail('STAGE3_DAILY_REGIME_UNKNOWN',
+        'Δεν προσδιορίστηκαν με ασφάλεια οι ημερήσιοι όροι απασχόλησης.', 409);
+    if (finalClassification === 'NON_WORK' && semantic.classification === 'REST_REPO') {
         fail('STAGE3_NON_WORK_NOT_ALLOWED_FOR_FULL_TIME',
-            'Η ΜΗ ΕΡΓΑΣΙΑ δεν επιτρέπεται σε ημέρα πλήρους απασχόλησης.', 409);
+            'Η ΜΗ ΕΡΓΑΣΙΑ δεν επιτρέπεται όταν οι ισχύοντες όροι απαιτούν ΑΝΑΠΑΥΣΗ / ΡΕΠΟ.', 409);
     }
     return employmentType;
 }

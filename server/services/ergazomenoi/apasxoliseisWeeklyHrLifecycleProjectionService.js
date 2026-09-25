@@ -24,8 +24,7 @@ const {
     analyzeWeeklySixthSeventhDay
 } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
-const { EMPLOYMENT_REGIME, normalizeEmploymentType,
-    resolveEmploymentRegimeForDate } = require(
+const { normalizeEmploymentType, resolveNoWorkDaySemanticForDate } = require(
     './apasxoliseisReviewEmploymentProfileService');
 const { buildStage2ResolutionFingerprint,
     buildStage3InputFingerprint } = require('./apasxoliseisStage3FingerprintService');
@@ -182,15 +181,15 @@ function resolveStage2Actionability(repoTransfer = {}) {
         reasons: Object.freeze(reasons) });
 }
 
-function resolveSafeNoWorkDatesForRegime({
-    rows = [], candidateDates = [], effectiveProfile = {}, effectiveProfilesByDate = {}, regime
+function resolveSafeNoWorkDatesForClassification({
+    rows = [], candidateDates = [], effectiveProfile = {}, effectiveProfilesByDate = {}, classification
 } = {}) {
     return unique(candidateDates).filter((date) => {
         const row = rows.find((candidate) => dateKeyUtc(candidate?.hmeromhnia) === date);
-        const resolvedRegime = resolveEmploymentRegimeForDate({ date,
-            effectiveProfilesByDate, effectiveProfile }).regime;
+        const semantic = resolveNoWorkDaySemanticForDate({ date,
+            effectiveProfilesByDate, effectiveProfile });
         const facts = resolveDailyActualWorkFacts(row || {});
-        return regime === resolvedRegime &&
+        return semantic.status === 'RESOLVED' && semantic.classification === classification &&
             facts.countsAsActualWorkDay !== true && Number(facts.cardHours || 0) === 0 &&
             !(facts.completeCardPairNumbers || []).length &&
             !(facts.unresolvedCardPairNumbers || []).length &&
@@ -199,11 +198,11 @@ function resolveSafeNoWorkDatesForRegime({
 }
 
 function resolveSafeNonFullNonWorkDates(options = {}) {
-    return resolveSafeNoWorkDatesForRegime({ ...options, regime: EMPLOYMENT_REGIME.NON_FULL });
+    return resolveSafeNoWorkDatesForClassification({ ...options, classification: 'NON_WORK' });
 }
 
 function resolveSafeFullTimeRestDates(options = {}) {
-    return resolveSafeNoWorkDatesForRegime({ ...options, regime: EMPLOYMENT_REGIME.FULL_TIME });
+    return resolveSafeNoWorkDatesForClassification({ ...options, classification: 'REST_REPO' });
 }
 
 function buildStage1NoClassificationPreviewItems({
@@ -634,9 +633,9 @@ function buildWeeklyHrLifecycleProjection({
     const contextOnlyDates = new Set(employmentDateScope?.context_only_dates || []);
     const stage3PendingItems = remainingDates.map((date) => {
         const row = rows.find((candidate) => dateKeyUtc(candidate?.hmeromhnia) === date) || {};
-        const regimeResolution = resolveEmploymentRegimeForDate({ date,
+        const semantic = resolveNoWorkDaySemanticForDate({ date,
             effectiveProfilesByDate, effectiveProfile });
-        const dailyProfile = regimeResolution.workTerms;
+        const dailyProfile = semantic.workTerms;
         const actualFacts = resolveDailyActualWorkFacts(row);
         const employmentType = normalizeEmploymentType(
             dailyProfile?.kathestos_apasxolhshs ?? dailyProfile?.typos_apasxolhshs
@@ -689,9 +688,9 @@ function buildWeeklyHrLifecycleProjection({
                 final_human_decision_required: true
             }),
             allowed_classifications: Object.freeze(
-                regimeResolution.regime === EMPLOYMENT_REGIME.FULL_TIME
+                semantic.classification === 'REST_REPO'
                 ? ['LEAVE', 'SICKNESS', 'ABSENCE']
-                : regimeResolution.regime === EMPLOYMENT_REGIME.NON_FULL
+                : semantic.classification === 'NON_WORK'
                     ? ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'] : []),
             input_fingerprint: buildStage3InputFingerprint(context).fingerprint,
             expected_stage3_version: Number(persistedStage3State?.version || 0),

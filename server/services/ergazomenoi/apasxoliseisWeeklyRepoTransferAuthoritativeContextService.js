@@ -4,6 +4,9 @@ const { CompaniesModel } = require('../../models/companies');
 const { ArgiesModel } = require('../../models/stathera_arxeia');
 const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const {
+    resolveNoWorkDaySemanticFromWorkTerms
+} = require('./apasxoliseisReviewEmploymentProfileService');
+const {
     buildApasxoliseisScenarioFacts
 } = require('./apasxoliseisScenarioFactsService');
 const {
@@ -163,14 +166,15 @@ function getDailyRepoProfileInfo({ row = {}, istorikoRows = [], ergazomenos = {}
         kathestos_apasxolhshs: employmentType,
         daily_employment_snapshot_source: ['0', '1', '2'].includes(snapshot)
             ? 'PRODHLomena_ORARIA' : 'ORARIO_TERMS_FOR_DATE' };
+    const noWorkSemantic = resolveNoWorkDaySemanticFromWorkTerms(profile);
     return { profile, employmentType,
-        expectedRepoCategory: employmentType === '0'
-            ? 'ΑΝ'
-            : (employmentType === '1' || employmentType === '2' ? 'ΜΕ' : null) };
+        expectedRepoCategory: noWorkSemantic.status === 'RESOLVED'
+            ? noWorkSemantic.ergani_code : null };
 }
 function profileSignature(profile = {}) {
     return [
         String(profile.typos_apasxolhshs ?? ''),
+        String(profile.typos_ebdomadas ?? ''),
         String(profile.hmeres_ergasias_ebdomadas ?? ''),
         String(profile.ores_ergasias_ebdomadas ?? ''),
         String(profile.mo_oron_hmerhsias_ergasias ?? ''),

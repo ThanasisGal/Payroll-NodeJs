@@ -35,10 +35,8 @@ function buildCanonicalClassificationUpdates({ classification, leave_category = 
             astheneia_apologistika: false, apousia_apologistika: false,
             ores_ergasias_apologistika: 0 };
     }
-    return { ...classificationUpdates({ classification: normalized,
-        kathgoria_adeias_apologistika: String(leave_category || '').trim() }),
-        ...(normalized === 'LEAVE' ? { ores_ergasias_apologistika: Math.max(0,
-            Number.isFinite(Number(row.ores_ergasias)) ? Number(row.ores_ergasias) : 0) } : {}) };
+    return classificationUpdates({ classification: normalized,
+        kathgoria_adeias_apologistika: String(leave_category || '').trim() }, row);
 }
 
 function planCanonicalDailyClassification({ row = {}, classification,

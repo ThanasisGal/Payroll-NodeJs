@@ -188,7 +188,8 @@ function testDailyEmploymentProfileForMixedJune0014() {
         { _id: 'partial', afora_allagh_oron_ergasias: true,
             hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-01',
             hmeromhnia_isxyos_oron_ergasias_eos: '2026-06-14',
-            kathestos_apasxolhshs: '1' },
+            kathestos_apasxolhshs: '1', typos_ebdomadas: '5ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: 4 },
         { _id: 'full', afora_allagh_oron_ergasias: true,
             hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-15',
             kathestos_apasxolhshs: '0' }

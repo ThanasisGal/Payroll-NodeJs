@@ -11,7 +11,8 @@ const scope = { team: 'THA', company_kod: 'company', ypokatasthma: '0000',
     employee_id: new mongoose.Types.ObjectId(), employee_kodikos: '0007',
     week_start: new Date('2026-04-27T00:00:00.000Z'),
     week_end: new Date('2026-05-03T00:00:00.000Z') };
-const profile = { hmeres_ergasias_ebdomadas: 5, typos_apasxolhshs: '1',
+const profile = { hmeres_ergasias_ebdomadas: 5, kathestos_apasxolhshs: '1',
+    typos_apasxolhshs: '1', typos_ebdomadas: '5HMERH',
     pososto_prosayxhshs_6hs_hmeras: 40, pragmatikoOromisthio: 10 };
 const dates = ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30',
     '2026-05-01', '2026-05-02', '2026-05-03'];
@@ -56,7 +57,7 @@ function decisionContext(day) {
         item.hmeromhnia.toISOString().slice(0, 10)) &&
         item.kathgoria_adeias_apologistika === 'POSSIBLE_LEAVE')
         .map((item) => item.hmeromhnia.toISOString().slice(0, 10));
-    return { scope, row, dailyProfile: { kathestos_apasxolhshs: '1' },
+    return { scope, row, dailyProfile: profile,
         actualFacts: { countsAsActualWorkDay: false }, isResidual: remaining.includes(day),
         remaining_dates: remaining, stage2: { status: 'COMPLETED',
             resolution: 'NOT_APPLICABLE', resolved_dates: [], fingerprint: 'a'.repeat(64) },

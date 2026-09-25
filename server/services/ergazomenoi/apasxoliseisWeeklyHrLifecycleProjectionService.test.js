@@ -21,7 +21,7 @@ const {
 } = require('./apasxoliseisStage1FingerprintService');
 const { buildStage3InputFingerprint } = require('./apasxoliseisStage3FingerprintService');
 
-const profile = { hmeres_ergasias_ebdomadas: 5, typos_apasxolhshs: '0',
+const profile = { hmeres_ergasias_ebdomadas: 5, typos_ebdomadas: '5ΗΜΕΡΗ', typos_apasxolhshs: '0',
     pososto_prosayxhshs_6hs_hmeras: 40, pragmatikoOromisthio: 10 };
 
 function week(kodikos = '0004', start = '2026-06-15') {
@@ -272,11 +272,13 @@ assert.equal(fullRepoResolvedProjection.stages.stage3.pending_count, 0);
 const partialResidual = week('partial-residual');
 partialResidual[1] = possibleLeave(partialResidual[1]);
 const partialProfiles = Object.fromEntries(partialResidual.map((row) => [
-    row.hmeromhnia, { ...profile, typos_apasxolhshs: '1', kathestos_apasxolhshs: '1' }
+    row.hmeromhnia, { ...profile, hmeres_ergasias_ebdomadas: 4,
+        typos_apasxolhshs: '1', kathestos_apasxolhshs: '1' }
 ]));
 const partialResidualProjection = buildWeeklyHrLifecycleProjection({
     weekRows: partialResidual,
-    effectiveProfile: { ...profile, typos_apasxolhshs: '1' },
+    effectiveProfile: { ...profile, hmeres_ergasias_ebdomadas: 4,
+        typos_apasxolhshs: '1' },
     effectiveProfilesByDate: partialProfiles,
     persistedStage1State: { status: 'COMPLETED',
         completion_fingerprint: buildStage1Fingerprint(partialResidual).fingerprint }
@@ -288,6 +290,20 @@ assert.deepEqual(partialResidualProjection.stage1_no_classification_preview_item
     date: '2026-06-16', safe: true, classification: 'NON_WORK',
     source_date: null, reasons: []
 }]);
+for (const [system, days, expected] of [
+    ['5ΗΜΕΡΗ', 5, 'REST_REPO'], ['5ΗΜΕΡΗ', 4, 'NON_WORK'],
+    ['6ΗΜΕΡΗ', 6, 'REST_REPO'], ['6ΗΜΕΡΗ', 5, 'NON_WORK']
+]) {
+    const date = '2026-06-16';
+    const items = buildStage1NoClassificationPreviewItems({
+        rows: [possibleLeave({ ...week('semantic-matrix')[1], hmeromhnia: date })],
+        possibleDates: [date], effectiveProfilesByDate: { [date]: {
+            typos_apasxolhshs: '1', typos_ebdomadas: system,
+            hmeres_ergasias_ebdomadas: days
+        } }
+    });
+    assert.equal(items[0].classification, expected, `${system}/${days}`);
+}
 assert.deepEqual(completed0014.stages.stage3.pending_items, []);
 const unknown0014AtStage3Version = buildWeeklyHrLifecycleProjection({
     weekRows: employee0014, effectiveProfile: profile,
@@ -507,9 +523,15 @@ for (const [employmentType, targetCategory] of [['1', 'ΜΕ'], ['2', 'ΜΕ']]) {
         cards_ores_ergasias: 8, cards_apo_ora_01: '09:00', cards_eos_ora_01: '17:00' });
     Object.assign(nonFullRows[3], { cards_ores_ergasias: 0,
         cards_apo_ora_01: '', cards_eos_ora_01: '' });
+    if (employmentType === '1') Object.assign(nonFullRows[6], {
+        kathgoria_ergasias: 'ΜΕ', repo: false, ores_ergasias: 0,
+        apo_ora_01: '', eos_ora_01: '', cards_ores_ergasias: 0,
+        cards_apo_ora_01: '', cards_eos_ora_01: ''
+    });
     const nonFullLifecycle = buildWeeklyHrLifecycleProjection({ weekRows: nonFullRows,
         effectiveProfile: { ...profile, typos_apasxolhshs: employmentType,
-            hmeres_ergasias_ebdomadas: 6 } });
+            typos_ebdomadas: employmentType === '1' ? '6ΗΜΕΡΗ' : '5ΗΜΕΡΗ',
+            hmeres_ergasias_ebdomadas: employmentType === '1' ? 5 : 6 } });
     const item = nonFullLifecycle.stages.stage2.pending_items[0];
     assert.ok(item, `missing Stage 2 item for employment type ${employmentType}`);
     assert.equal(item.source.declaration_classification, 'ΜΕ');

@@ -15072,14 +15072,18 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .weekly-hr-stage1-table {
-    font-size: 0.82rem;
+    width: 100%;
+    table-layout: fixed;
+    font-size: 0.78rem;
     margin-bottom: 0;
 }
 
 .weekly-hr-stage1-table-shell {
     width: 100%;
     min-width: 0;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(100vh - 17rem);
 }
 
 .weekly-hr-stage1-table > thead > tr > th {
@@ -15094,6 +15098,155 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage1-table th,
 .weekly-hr-stage1-table td {
     padding: 0.35rem 0.45rem;
+}
+
+.weekly-hr-stage1-table .stage1-col-select { width: 3.5%; }
+.weekly-hr-stage1-table .stage1-col-code { width: 5.5%; }
+.weekly-hr-stage1-table .stage1-col-employee { width: 15%; }
+.weekly-hr-stage1-table .stage1-col-week { width: 9%; }
+.weekly-hr-stage1-table .stage1-col-status { width: 8.5%; }
+.weekly-hr-stage1-table .stage1-col-day { width: 8.35%; }
+
+.weekly-hr-stage1-employee,
+.weekly-hr-stage1-status {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.weekly-hr-stage1-matrix-day-cell {
+    overflow: hidden;
+    vertical-align: top;
+}
+
+.weekly-hr-stage1-day-tile {
+    position: relative;
+    min-height: 3.35rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.3rem;
+    background: var(--bs-body-bg, #fff);
+}
+
+.weekly-hr-stage1-day-tile.is-pending {
+    border-color: var(--bs-warning, #ffc107);
+    background: var(--bs-warning-bg-subtle, #fff3cd);
+}
+
+.weekly-hr-stage1-day-tile.has-draft {
+    border-color: #8eb6e8;
+    background: #eef6ff;
+    box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.06);
+}
+
+.weekly-hr-stage1-day-tile .weekly-hr-stage1-day-select {
+    position: absolute;
+    top: 0.2rem;
+    left: 0.2rem;
+    z-index: 2;
+    margin: 0;
+}
+
+.weekly-hr-stage1-draft-marker {
+    position: absolute;
+    top: 0.12rem;
+    right: 0.22rem;
+    z-index: 2;
+    color: var(--bs-primary, #0d6efd);
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.weekly-hr-stage1-open-editor,
+.weekly-hr-stage1-readonly-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.05rem;
+    width: 100%;
+    min-height: 3.25rem;
+    padding: 0.15rem;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    line-height: 1.15;
+    text-align: center;
+    overflow: hidden;
+}
+
+.weekly-hr-stage1-open-editor strong,
+.weekly-hr-stage1-readonly-tile strong,
+.weekly-hr-stage1-open-editor span,
+.weekly-hr-stage1-readonly-tile span,
+.weekly-hr-stage1-open-editor small,
+.weekly-hr-stage1-readonly-tile small {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.weekly-hr-stage1-open-editor:hover,
+.weekly-hr-stage1-open-editor:focus {
+    outline: 2px solid var(--bs-primary, #0d6efd);
+    outline-offset: -2px;
+}
+
+.weekly-hr-stage1-readonly-tile small {
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: 0.68rem;
+}
+
+.weekly-hr-stage1-day-date {
+    font-variant-numeric: tabular-nums;
+}
+
+.weekly-hr-stage1-day-editor {
+    width: min(30rem, 100vw) !important;
+}
+
+.weekly-hr-stage1-day-editor .weekly-hr-stage1-day-facts {
+    font-size: 0.85rem;
+}
+
+.weekly-hr-stage1-editor-navigation {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.weekly-hr-stage1-editor-prev,
+.weekly-hr-stage1-editor-prev:hover,
+.weekly-hr-stage1-editor-prev:focus {
+    color: #41464b;
+    background: var(--bs-secondary-bg-subtle, #e9ecef);
+    border-color: #ced4da;
+}
+
+.weekly-hr-stage1-editor-next,
+.weekly-hr-stage1-editor-next:hover,
+.weekly-hr-stage1-editor-next:focus {
+    color: #084298;
+    background: var(--bs-primary-bg-subtle, #cfe2ff);
+    border-color: #9ec5fe;
+}
+
+.weekly-hr-stage1-editor-prev:hover,
+.weekly-hr-stage1-editor-prev:focus,
+.weekly-hr-stage1-editor-next:hover,
+.weekly-hr-stage1-editor-next:focus {
+    box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.1);
+}
+
+.weekly-hr-stage1-editor-prev:disabled,
+.weekly-hr-stage1-editor-next:disabled {
+    color: var(--bs-secondary-color, #6c757d);
+    background: var(--bs-secondary-bg, #e9ecef);
+    border-color: var(--bs-border-color, #dee2e6);
+    opacity: 0.6;
 }
 
 .weekly-hr-stage1-day {
@@ -15704,9 +15857,76 @@ body.loader-active > *:not(.app-loader) {
     }
 }
 .weekly-hr-stage1-bulk-toolbar {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 20;
     background: var(--bs-body-bg, #fff);
     margin-bottom: 0.625rem !important;
+    box-shadow: 0 0.15rem 0.35rem rgba(0, 0, 0, 0.08);
+}
+
+.weekly-hr-stage1-bulk-toolbar .weekly-hr-stage1-search {
+    flex: 0 1 19rem;
+    min-width: 17.5rem;
+}
+
+.weekly-hr-stage1-bulk-toolbar .weekly-hr-stage1-status-filter {
+    flex: 0 1 11rem;
+    min-width: 9rem;
+}
+
+.weekly-hr-stage1-bulk-toolbar .form-label {
+    font-size: 0.72rem;
+}
+
+.weekly-hr-stage1-counts {
+    display: flex;
+    flex: 1 1 34rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.15rem 0.65rem;
+    margin-left: auto;
+}
+
+.weekly-hr-stage1-draft-warning {
+    white-space: nowrap;
+}
+
+.weekly-hr-stage1-bulk-action-menu-portal {
+    z-index: 1090;
+}
+
+.weekly-hr-stage1-info-trigger {
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid #d6b85b;
+    border-radius: 50%;
+    color: #664d03;
+    background: #fff8db;
+}
+
+.weekly-hr-stage1-tooltip {
+    --bs-tooltip-bg: #fff4bf;
+    --bs-tooltip-color: #352b08;
+    --bs-tooltip-opacity: 1;
+    --bs-tooltip-max-width: 24rem;
+}
+
+.weekly-hr-stage1-tooltip .tooltip-inner {
+    padding: 0.5rem 0.65rem;
+    border: 1px solid #e3cc73;
+    border-radius: 0.35rem;
+    box-shadow: 0 0.2rem 0.55rem rgba(73, 57, 8, 0.16);
+    text-align: left;
+}
+
+.weekly-hr-stage1-tooltip.bs-tooltip-top .tooltip-arrow::before {
+    border-top-color: #e3cc73;
+}
+
+.weekly-hr-stage1-tooltip.bs-tooltip-bottom .tooltip-arrow::before {
+    border-bottom-color: #e3cc73;
 }
 
 .employment-review-boundary-sides {
@@ -16085,7 +16305,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-attention-summary {
-    display: flex;
+    display: none !important;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;

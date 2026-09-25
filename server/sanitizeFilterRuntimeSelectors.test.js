@@ -9,6 +9,8 @@ const { ErgazomenoiModel, ProdhlomenaOrariaModel, ErgazomenoiErganhModel } = req
 const { ApasxolhseisModel, AstheneiesModel } = require('./models/kinhseis');
 const { ArgiesModel, AsfalistikesKlaseisModel, EidikothtesErganhModel } = require('./models/stathera_arxeia');
 const DecisionModel = require('./models/apasxoliseisWeeklyRepoTransferDecision');
+const confirmedLeaveRepair = require(
+    './services/ergazomenoi/apasxoliseisConfirmedFullDayLeaveHoursRepairService');
 const { audit, auditSource } = require('./audits/checkMongooseRawSelectors');
 
 function cast(model, filter) {
@@ -81,6 +83,81 @@ test('countDocuments and findOneAndUpdate cast filter operators through the same
     }
 });
 
+test('Stage-1 review write keeps the unlocked-row guard castable with narrow trust', () => {
+    const previous = mongoose.get('sanitizeFilter');
+    mongoose.set('sanitizeFilter', true);
+    try {
+        const scope = { _id: objectId, team: 'SYNTHETIC_TEAM',
+            company_kod: 'SYNTHETIC_COMPANY' };
+        const rawFilter = { ...scope, is_locked: { $ne: true } };
+        const rawQuery = ProdhlomenaOrariaModel.find(rawFilter);
+        mongoose.sanitizeFilter(rawQuery.getFilter());
+        assert.deepEqual(rawQuery.getFilter().is_locked, { $eq: { $ne: true } });
+        assert.throws(() => rawQuery.cast(ProdhlomenaOrariaModel),
+            error => error.name === 'CastError' && error.path === 'is_locked');
+
+        const trustedFilter = {
+            ...scope,
+            is_locked: mongoose.trusted({ $ne: true })
+        };
+        assert.equal(Object.getOwnPropertySymbols(trustedFilter).length, 0,
+            'the complete selector must not be trusted');
+        assert.ok(Object.getOwnPropertySymbols(trustedFilter.is_locked).length > 0,
+            'only the server-owned operator boundary must be trusted');
+        assert.doesNotThrow(() => cast(ProdhlomenaOrariaModel, trustedFilter));
+        assert.equal(trustedFilter._id, objectId);
+        assert.equal(trustedFilter.team, scope.team);
+        assert.equal(trustedFilter.company_kod, scope.company_kod);
+        assert.equal(trustedFilter.is_locked.$ne, true);
+        assert.deepEqual(Object.keys(trustedFilter.is_locked), ['$ne']);
+    } finally {
+        mongoose.set('sanitizeFilter', previous);
+    }
+});
+
+test('confirmed full-day leave repair keeps its date range narrowly trusted', () => {
+    const previous = mongoose.get('sanitizeFilter');
+    mongoose.set('sanitizeFilter', true);
+    try {
+        const filter = {
+            team: 'SYNTHETIC_TEAM',
+            company_kod: 'SYNTHETIC_COMPANY',
+            ypokatasthma: '0000',
+            hmeromhnia: mongoose.trusted({ $gte: start, $lte: end }),
+            adeia_apologistika: true
+        };
+        assert.equal(Object.getOwnPropertySymbols(filter).length, 0,
+            'the complete repair selector must not be trusted');
+        assert.ok(Object.getOwnPropertySymbols(filter.hmeromhnia).length > 0,
+            'only the server-owned date operator boundary must be trusted');
+        assert.doesNotThrow(() => cast(ProdhlomenaOrariaModel, filter));
+        assert.deepEqual(Object.keys(filter.hmeromhnia), ['$gte', '$lte']);
+    } finally {
+        mongoose.set('sanitizeFilter', previous);
+    }
+});
+
+test('confirmed full-day leave repair CAS keeps missing fields narrowly trusted', () => {
+    const previous = mongoose.get('sanitizeFilter');
+    mongoose.set('sanitizeFilter', true);
+    try {
+        const filter = confirmedLeaveRepair.casFilter({ source: {
+            _id: objectId,
+            team: 'SYNTHETIC_TEAM',
+            company_kod: 'SYNTHETIC_COMPANY',
+            astheneia_apologistika: undefined
+        } });
+        assert.equal(Object.getOwnPropertySymbols(filter).length, 0,
+            'the complete CAS selector must not be trusted');
+        assert.ok(Object.getOwnPropertySymbols(filter.astheneia_apologistika).length > 0,
+            'only the server-owned missing-field operator boundary must be trusted');
+        assert.deepEqual(Object.keys(filter.astheneia_apologistika), ['$exists']);
+        assert.doesNotThrow(() => cast(ProdhlomenaOrariaModel, filter));
+    } finally {
+        mongoose.set('sanitizeFilter', previous);
+    }
+});
+
 test('production selectors retain narrow trust boundaries', () => {
     const root = path.resolve(__dirname, '..');
     const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -93,9 +170,23 @@ test('production selectors retain narrow trust boundaries', () => {
         ['server/services/ergazomenoi/apasxoliseisPeriodLifecycleService.js', /submission_id: mongoose\.trusted\(\{ \$type: 'number', \$gt: 0 \}\)/],
         ['server/services/ergazomenoi/wtoDailyDeferredBoundaryContextService.js', /deferred_week_id: mongoose\.trusted\(\{ \$in: ids \}\)/],
         ['server/middlewares/programmataAccessScope.js', /kodikos: mongoose\.trusted\(\{ \$in: codes \}\)/],
-        ['server/controllers/genikaAPIsController.js', /kodikos: mongoose\.trusted\(\{ \$regex: safeSearchTerm, \$options: 'i' \}\)/]
+        ['server/controllers/genikaAPIsController.js', /kodikos: mongoose\.trusted\(\{ \$regex: safeSearchTerm, \$options: 'i' \}\)/],
+        ['server/controllers/ergazomenoi/erganhController.js',
+            /is_locked: mongoose\.trusted\(\{ \$ne: true \}\)/],
+        ['server/services/ergazomenoi/apasxoliseisConfirmedFullDayLeaveHoursRepairService.js',
+            /hmeromhnia: mongoose\.trusted\(\{\s*\$gte:[\s\S]*\$lte:/],
+        ['server/services/ergazomenoi/apasxoliseisConfirmedFullDayLeaveHoursRepairService.js',
+            /value === undefined\s*\? mongoose\.trusted\(\{ \$exists: false \}\)\s*:\s*value/]
     ];
     for (const [file, pattern] of checks) assert.match(read(file), pattern, file);
+    const controller = read('server/controllers/ergazomenoi/erganhController.js');
+    const writePath = controller.slice(
+        controller.indexOf('static updateProdhlomenaOrariaReviewRecord = async'),
+        controller.indexOf('static unlockProdhlomenaOrariaReviewRecord = async')
+    );
+    assert.match(writePath, /is_locked: mongoose\.trusted\(\{ \$ne: true \}\)/);
+    assert.doesNotMatch(writePath,
+        /ProdhlomenaOrariaModel\.updateOne\(\s*mongoose\.trusted\(/);
 });
 
 test('no new unclassified direct Mongoose field selectors', () => {

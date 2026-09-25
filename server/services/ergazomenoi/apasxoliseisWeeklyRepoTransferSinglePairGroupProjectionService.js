@@ -318,11 +318,11 @@ function buildAtomicReusableContext({ proposal, employmentProfile, targetCategor
 }
 
 function buildDescription({ employeeKodikos, sourceDate, targetDate, targetCategory }) {
-    const employmentLabel = targetCategory === 'ΜΕ' ? 'μερική απασχόληση' : 'πλήρης απασχόληση';
+    const noWorkLabel = targetCategory === 'ΜΕ' ? 'μη εργασία' : 'ανάπαυση';
     return (
         `Μεταφορά ρεπό για τον εργαζόμενο ${employeeKodikos}: ` +
         `η ${displayDate(sourceDate)} γίνεται εργασία και η ${displayDate(targetDate)} ` +
-        `γίνεται ρεπό (${targetCategory}, ${employmentLabel}). ` +
+        `γίνεται ρεπό (${targetCategory}, ${noWorkLabel}). ` +
         'Οι δύο αλλαγές απαιτούν μία ενιαία απόφαση HR. Η προεπισκόπηση δεν αλλάζει δεδομένα· ' +
         'η εφαρμογή επιτρέπεται μόνο μετά από έγκριση και επιτυχή έλεγχο ασφαλείας του server.'
     );

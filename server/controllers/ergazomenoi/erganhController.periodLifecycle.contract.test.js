@@ -11,7 +11,10 @@ assert.match(routes, /period-control\/corrective\/open'[\s\S]*requireCriticalEmp
 assert.match(routes, /period-control\/corrective\/calculate'[\s\S]*requireCriticalEmploymentDecisionRole[\s\S]*calculateEmploymentReviewCorrectiveCase/);
 assert.match(routes, /period-control\/corrective\/close'[\s\S]*requireCriticalEmploymentDecisionRole[\s\S]*closeEmploymentReviewCorrectiveCase/);
 assert.match(controller, /calculateEmploymentReviewCorrectiveCase[\s\S]*normalizeCorrectionCommands\(req\.body\)[\s\S]*saveCorrectiveResult/);
-assert.ok((controller.match(/buildEmploymentDailyCalculationUpdate\(\{/g) || []).length >= 2);
+assert.match(controller, /runFrozenAuthoritativeEmploymentWeek[\s\S]*buildEmploymentDailyCalculationUpdate\(\{/);
+assert.match(controller, /function buildApprovedOrphanDailyDerivedUpdate\([\s\S]*checkNightHours\(context\)[\s\S]*checkSundayHolidayHours\(context\)[\s\S]*checkRepoAdeiaAstheneiaApologistika\(context\)/);
+assert.match(controller, /buildApprovedOrphanDerivedPreview[\s\S]*buildApprovedOrphanDailyDerivedUpdate\(\{/);
+assert.match(controller, /updateProdhlomenaOrariaReviewRecord[\s\S]*buildApprovedOrphanDailyDerivedUpdate\(\{/);
 assert.match(controller, /runFrozenAuthoritativeEmploymentWeek[\s\S]*buildWeeklyRepoPostCheckWritePlan\(/);
 assert.match(controller, /runAuthoritativeWeek:\s*runFrozenAuthoritativeEmploymentWeek/);
 for (const duplicatedRule of ['ordinal < 480', 'ordinal < 540', 'ordinal < 720', '22:00', '06:00',
