@@ -132,7 +132,9 @@ function publicPreview(preview) {
 function casFilter(item) {
     const filter = {};
     for (const [key, value] of Object.entries(item.source)) {
-        filter[key] = value === undefined ? { $exists: false } : value;
+        filter[key] = value === undefined
+            ? mongoose.trusted({ $exists: false })
+            : value;
     }
     return filter;
 }
@@ -184,4 +186,4 @@ async function applyRepairBatch({ scope, previewFingerprint, confirmed, reason, 
 }
 
 module.exports = { AUDIT_CONTEXT, hasHourlyLeaveMarker, identifyRepairCandidate,
-    buildRepairPreview, publicPreview, applyRepairBatch };
+    buildRepairPreview, publicPreview, casFilter, applyRepairBatch };

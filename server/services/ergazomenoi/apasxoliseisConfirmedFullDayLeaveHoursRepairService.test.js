@@ -87,6 +87,16 @@ test('stale row is not overwritten and is reported for review', async () => {
     assert.equal(result.stale[0].status, 'STALE / REVIEW_REQUIRED');
 });
 
+test('CAS missing-field selector narrowly trusts only the server-owned operator', () => {
+    const filter = S.casFilter({ source: { _id: base._id,
+        astheneia_apologistika: undefined, adeia_apologistika: true } });
+    assert.equal(Object.getOwnPropertySymbols(filter).length, 0);
+    assert.ok(Object.getOwnPropertySymbols(filter.astheneia_apologistika).length > 0);
+    assert.deepEqual(Object.keys(filter.astheneia_apologistika), ['$exists']);
+    assert.equal(filter.astheneia_apologistika.$exists, false);
+    assert.equal(filter.adeia_apologistika, true);
+});
+
 test('rerun after apply is idempotent with zero repairable rows and writes', async () => {
     const h = harness(); const first = await S.buildRepairPreview({ scope, ...h });
     await S.applyRepairBatch({ scope, previewFingerprint: first.preview_fingerprint,
