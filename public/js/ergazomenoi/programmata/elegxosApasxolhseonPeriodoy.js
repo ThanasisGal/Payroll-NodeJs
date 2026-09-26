@@ -12111,7 +12111,7 @@ document.addEventListener('shown.bs.collapse', (event) => {
     }
 });
 
-window.addEventListener('resize', refreshEmploymentReviewStickyLayout);
+window.addEventListener?.('resize', refreshEmploymentReviewStickyLayout);
 
 
 async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {

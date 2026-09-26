@@ -177,7 +177,7 @@ assert.match(css, /\.weekly-hr-stage1-status > \.badge\s*\{[\s\S]*?overflow-wrap
 assert.match(source, /#weeklyHrStage1Container \.weekly-hr-stage1-bulk-toolbar[\s\S]*?getBoundingClientRect\(\)\.height \|\| 0/);
 assert.match(source, /--weekly-hr-stage1-toolbar-sticky-height/);
 assert.match(source, /shown\.bs\.collapse[\s\S]*?employmentReviewStage1Collapse[\s\S]*?refreshEmploymentReviewStickyLayout/);
-assert.match(source, /window\.addEventListener\('resize', refreshEmploymentReviewStickyLayout\)/);
+assert.match(source, /window\.addEventListener\?\.\('resize', refreshEmploymentReviewStickyLayout\)/);
 assert.doesNotMatch(css.match(/\.weekly-hr-stage1-table\s*\{[^}]*\}/)?.[0] || '',
     /min-width/);
 assert.doesNotMatch(css, /weekly-hr-stage1-table[^\n]*nth-child[\s\S]*?left:/);
