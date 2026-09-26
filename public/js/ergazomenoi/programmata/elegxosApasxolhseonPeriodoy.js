@@ -759,6 +759,9 @@ function renderCurrentReviewRows() {
 function updateWeeklyDeviationStickyMetrics() {
     const scrollContainer = document.querySelector('.employment-review-scroll-container');
     if (!scrollContainer) return;
+    const stage1ToolbarHeight = document.querySelector(
+        '#weeklyHrStage1Container .weekly-hr-stage1-bulk-toolbar'
+    )?.getBoundingClientRect().height || 0;
     const mainHeaderHeight = document.querySelector(
         '.employment-review-scroll-container #resultsTable > thead'
     )?.getBoundingClientRect().height || 0;
@@ -767,6 +770,9 @@ function updateWeeklyDeviationStickyMetrics() {
     );
     const visibleSectionTitle = document.querySelector(
         '#resultsTable .employee-deviation-row:not(.d-none) .weekly-deviation-section-title'
+    );
+    scrollContainer.style.setProperty(
+        '--weekly-hr-stage1-toolbar-sticky-height', `${stage1ToolbarHeight}px`
     );
     scrollContainer.style.setProperty(
         '--employment-review-subtotal-sticky-top', `${mainHeaderHeight}px`
@@ -1698,11 +1704,6 @@ function ensureReviewTableStructure() {
                 background-color: #f8f9fa;
                 border: 1px solid #dee2e6;
                 font-size: 0.8rem;
-            }
-
-            .review-card-body {
-                max-height: calc(100vh - 12rem);
-                overflow-y: auto;
             }
 
             .policy-preview-card .card-body {
@@ -11497,6 +11498,7 @@ function renderWeeklyHrStage1Presentation() {
         <tbody>${cards.join('')}</tbody></table>${emptyFilteredResult}</div>${pagination}`;
     initializeWeeklyHrStage1Tooltips(container);
     initializeWeeklyHrStage1BulkDropdownPortal(container);
+    updateWeeklyDeviationStickyMetrics();
 }
 
 async function refreshWeeklyHrStage1Scope(scope) {
@@ -12102,6 +12104,14 @@ document.addEventListener('input', (event) => {
     search?.focus({ preventScroll: true });
     search?.setSelectionRange(search.value.length, search.value.length);
 });
+
+document.addEventListener('shown.bs.collapse', (event) => {
+    if (event.target?.id === 'employmentReviewStage1Collapse') {
+        refreshEmploymentReviewStickyLayout();
+    }
+});
+
+window.addEventListener?.('resize', refreshEmploymentReviewStickyLayout);
 
 
 async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
