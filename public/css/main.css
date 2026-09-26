@@ -15081,14 +15081,12 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage1-table-shell {
     width: 100%;
     min-width: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    max-height: calc(100vh - 17rem);
+    overflow: visible;
 }
 
 .weekly-hr-stage1-table > thead > tr > th {
     position: sticky;
-    top: 0;
+    top: var(--weekly-hr-stage1-toolbar-sticky-height, 0px);
     z-index: 13;
     background-color: var(--bs-body-bg, #fff) !important;
     background-clip: padding-box;
@@ -15107,11 +15105,27 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage1-table .stage1-col-status { width: 8.5%; }
 .weekly-hr-stage1-table .stage1-col-day { width: 8.35%; }
 
-.weekly-hr-stage1-employee,
-.weekly-hr-stage1-status {
+.weekly-hr-stage1-employee {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.weekly-hr-stage1-status {
+    overflow: visible;
+    text-align: center;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+.weekly-hr-stage1-status > .badge {
+    display: inline-block;
+    max-width: 100%;
+    height: auto;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+    text-align: center;
+    white-space: normal;
 }
 
 .weekly-hr-stage1-matrix-day-cell {
