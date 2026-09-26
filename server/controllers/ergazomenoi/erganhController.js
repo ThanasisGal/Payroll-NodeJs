@@ -504,7 +504,7 @@ const { loadWeeklyHrStage2BulkSearchPresentation } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkSearchGateService');
 const { buildWeeklyHrStage2BulkDetails } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkDetailsService');
-const { writeCanonicalDailyClassification } = require(
+const { planCanonicalDailyClassification, writeCanonicalDailyClassification } = require(
     '../../services/ergazomenoi/apasxoliseisCanonicalDailyClassificationWriterService');
 const stage2BulkStateCache = new WeeklyHrStage2BulkStateCache();
 function stage2BulkRequestScope(req, input = {}) {
@@ -1187,7 +1187,7 @@ function checkSundayHolidayHours(context) {
 }
 
 function checkRepoAdeiaAstheneiaApologistika(context) {
-    const { rec } = context;
+    const { rec, ergazomenos } = context;
 
     const declaredHours = Number(rec.ores_ergasias || 0);
     const cardsHours = Number(rec.cards_ores_ergasias || 0);
@@ -1232,10 +1232,24 @@ function checkRepoAdeiaAstheneiaApologistika(context) {
 
     // ΡΕΠΟ / ΜΗ ΕΡΓΑΣΙΑ και δεν υπάρχουν κάρτες
     if ((rec.repo === true || declaredHours === 0) && cardsHours === 0) {
-        update.repo_apologistika = true;
-        update.adeia_apologistika = false;
-        update.kathgoria_adeias_apologistika = '';
-        return update;
+        const semantic = resolveNoWorkDaySemanticFromWorkTerms(ergazomenos);
+        if (semantic.status !== 'RESOLVED') {
+            return {
+                ...update,
+                repo_apologistika: false,
+                kathgoria_ergasias_apologistika: '',
+                adeia_apologistika: false,
+                kathgoria_adeias_apologistika: '',
+                apousia_apologistika: false
+            };
+        }
+        return {
+            ...update,
+            ...planCanonicalDailyClassification({
+                row: rec,
+                classification: semantic.classification
+            })
+        };
     }
 
     // Έχει προδηλωμένη εργασία αλλά δεν υπάρχουν κάρτες
