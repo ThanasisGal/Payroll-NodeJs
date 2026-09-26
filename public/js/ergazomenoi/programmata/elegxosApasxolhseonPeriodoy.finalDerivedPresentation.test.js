@@ -162,6 +162,8 @@ assert.equal(sandbox.weeklyEmploymentStatus({ effective_typos_apasxolhshs: '2' }
 assert.equal(sandbox.weeklyEmploymentStatus({ effective_typos_apasxolhshs: '0' }), 'Πλήρης');
 assert.equal(sandbox.finalWeeklyNonWorkDays({ actual_workdays: 2 }), 5);
 assert.equal(sandbox.finalWeeklyNonWorkDays({ actual_workdays: 5 }), 2);
+assert.equal(sandbox.finalWeeklyNonWorkDays({ actual_workdays: 0,
+    effective_weekly_workdays: 5, effective_expected_repo: 2 }), 7);
 assert.equal(sandbox.finalWeeklyNonWorkDays({ kodikos: '0014', week_apo: '2026-06-01',
     week_eos: '2026-06-07', resolved_repo: 4, resolved_repo_identities: [] }, [{
     scope: { employee_kodikos: '0014', week_start: '2026-06-01', week_end: '2026-06-07' },
