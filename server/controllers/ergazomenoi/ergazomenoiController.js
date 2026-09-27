@@ -4,6 +4,10 @@ const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/emplo
 const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
+const {
+    rejectEmployeeScheduleDailyRest,
+    validateEmployeeScheduleDailyRest
+} = require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService');
 const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -1319,6 +1323,10 @@ class ergazomenoiController {
             kodikosValue = 0;
 
         const { formData = {} } = req.body || {};
+        const dailyRestValidation = validateEmployeeScheduleDailyRest(formData);
+        if (!dailyRestValidation.valid) {
+            return rejectEmployeeScheduleDailyRest(res, dailyRestValidation);
+        }
         const submittedFormKeys = new Set(Object.keys(formData));
         const filesToUpdate = req.body?.filesToUpdate || {};
         const aforaDaneismoErgazomenoy = formData.afora_daneismo_ergazomenoy === true;
@@ -3389,6 +3397,10 @@ class ergazomenoiController {
             objectId: mongoose.Types.ObjectId
         });
         if (!scopedAccess) return;
+        const dailyRestValidation = validateEmployeeScheduleDailyRest(formData);
+        if (!dailyRestValidation.valid) {
+            return rejectEmployeeScheduleDailyRest(res, dailyRestValidation);
+        }
         const sixthDayPremiumRate = parseSixthDayPremiumRate(
             formData.pososto_prosayxhshs_6hs_hmeras
         );

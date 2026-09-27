@@ -1282,6 +1282,63 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function renderDailyRestViolations(restViolations) {
+        const warning = document.getElementById('daily-rest-violation-warning');
+        if (!warning) return;
+
+        const violations = Array.isArray(restViolations) ? restViolations : [];
+        if (!violations.length) {
+            if (!warning.hidden || warning.dataset.violationSignature) {
+                warning.hidden = true;
+                warning.replaceChildren();
+                delete warning.dataset.violationSignature;
+            }
+            return;
+        }
+
+        const signature = JSON.stringify(violations);
+        if (!warning.hidden && warning.dataset.violationSignature === signature) return;
+
+        const title = document.createElement('div');
+        title.className = 'employee-daily-rest-warning-title';
+
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-exclamation-triangle-fill';
+        icon.setAttribute('aria-hidden', 'true');
+
+        const titleText = document.createElement('span');
+        titleText.textContent = 'Παραβίαση ημερήσιας ανάπαυσης';
+        title.append(icon, titleText);
+
+        const introduction = document.createElement('p');
+        introduction.textContent =
+            'Οι παρακάτω ημέρες δεν έχουν την απαιτούμενη ανάπαυση 11 ωρών:';
+
+        const list = document.createElement('ul');
+        violations.forEach((violation) => {
+            const item = document.createElement('li');
+            const numericRestHours = Number(violation.restHours);
+            const restHours = (
+                Number.isFinite(numericRestHours)
+                    ? numericRestHours.toFixed(2)
+                    : String(violation.restHours || '')
+            ).replace('.', ',');
+            item.textContent = `${violation.previousLabel} → ${violation.currentLabel}: ${restHours} ώρες ανάπαυσης`;
+            list.append(item);
+        });
+
+        const requirement = document.createElement('p');
+        requirement.className = 'employee-daily-rest-warning-requirement';
+        requirement.textContent =
+            'Απαιτούνται τουλάχιστον 11 ώρες ανάπαυσης μεταξύ εργάσιμων ημερών.';
+
+        warning.replaceChildren(title, introduction, list, requirement);
+        warning.dataset.violationSignature = signature;
+        warning.hidden = false;
+    }
+
+    window.renderEmployeeDailyRestViolations = renderDailyRestViolations;
+
     function calculateWeeklyTotalHours() {
         let totalMinutes = 0;
         const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
@@ -1291,9 +1348,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const dailyHours = {};
         let hasExceeded = false;
         const exceededDays = [];
-        let hasRestViolation = false;
-        const restViolations = [];
-        let previousDayEndTime = null;
+        const scheduleDays = [];
         let allKathgoriesCompleted = true;
 
         for (let i = 1; i <= differenceInDays; i++) {
@@ -1306,13 +1361,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 allKathgoriesCompleted = false;
             }
 
-            let currentDayStartTime = null;
-            let currentDayEndTime = null;
+            const workIntervals = [];
 
             for (let j = 1; j <= 3; j++) {
                 const jj = j < 10 ? '0' + j : String(j);
                 const apoOra = document.getElementById(`apo_ora_${jj}_${i1}`)?.value;
                 const eosOra = document.getElementById(`eos_ora_${jj}_${i1}`)?.value;
+
+                workIntervals.push({ start: apoOra || '', end: eosOra || '' });
 
                 if (!apoOra || !eosOra) continue;
 
@@ -1324,9 +1380,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 dailyMinutes += diffMinutes;
                 totalMinutes += diffMinutes;
 
-                if (currentDayStartTime === null) currentDayStartTime = apoMinutes;
-                currentDayEndTime = eosMinutes;
             }
+
+            scheduleDays.push({
+                date: document.getElementById(`hmeromhnia_${i1}`)?.value || '',
+                label:
+                    document.getElementById(`day_label_${i1}`)?.textContent || `Ημέρα ${i}`,
+                category: kathgoriaVal,
+                intervals: workIntervals
+            });
 
             const dailyHoursValue = dailyMinutes / 60;
             dailyHours[i1] = dailyHoursValue;
@@ -1347,50 +1409,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
 
-            if (i > 1 && previousDayEndTime !== null && currentDayStartTime !== null) {
-                const prevI1 = i - 1 < 10 ? '0' + (i - 1) : String(i - 1);
-
-                let prevDayHadWork = false;
-                for (let j = 1; j <= 3; j++) {
-                    const jj = j < 10 ? '0' + j : String(j);
-                    const prevApoOra = document.getElementById(`apo_ora_${jj}_${prevI1}`)?.value;
-                    const prevEosOra = document.getElementById(`eos_ora_${jj}_${prevI1}`)?.value;
-                    if (prevApoOra && prevEosOra) {
-                        prevDayHadWork = true;
-                        break;
-                    }
-                }
-
-                if (prevDayHadWork && dailyMinutes > 0 && previousDayEndTime > 0) {
-                    let restMinutes = 24 * 60 - previousDayEndTime + currentDayStartTime;
-
-                    if (restMinutes < 0) {
-                        restMinutes += 24 * 60;
-                    }
-
-                    const restHours = restMinutes / 60;
-
-                    if (restHours < 11) {
-                        hasRestViolation = true;
-                        const prevLabel =
-                            document.getElementById(`day_label_${prevI1}`)?.textContent ||
-                            `Ημέρα ${i - 1}`;
-                        const currentLabel =
-                            document.getElementById(`day_label_${i1}`)?.textContent || `Ημέρα ${i}`;
-                        restViolations.push({
-                            prevDay: prevLabel,
-                            currentDay: currentLabel,
-                            restHours: restHours.toFixed(2)
-                        });
-                    }
-                }
-            }
-
-            previousDayEndTime =
-                dailyMinutes > 0 && currentDayEndTime !== null && currentDayEndTime > 0
-                    ? currentDayEndTime
-                    : null;
         }
+
+        const restViolations =
+            window.EmployeeDailyRestValidation.collectDailyRestViolations(scheduleDays);
 
         const totalHours = (totalMinutes / 60).toFixed(2);
         const totalInput = document.getElementById('total_hours_day');
@@ -1401,6 +1423,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (totalInput) {
             totalInput.value = totalHours;
         }
+
+        renderDailyRestViolations(restViolations);
 
         if (parseFloat(totalHours) > 40) {
             return false;
@@ -1435,38 +1459,6 @@ document.addEventListener('DOMContentLoaded', function () {
         //         }
         //     });
         // }
-
-        if (hasRestViolation) {
-            const restMessage = restViolations
-                .map(
-                    (v) =>
-                        `<div style="text-align:left; margin:5px 0;">
-                    <strong>${v.prevDay} → ${v.currentDay}:</strong> ${v.restHours} ώρες ανάπαυσης
-                </div>`
-                )
-                .join('');
-
-            Swal.fire({
-                backdrop: false,
-                allowOutsideClick: false,
-                icon: 'error',
-                title: 'ΠΡΟΣΟΧΗ - ΠΑΡΑΒΙΑΣΗ ΗΜΕΡΗΣΙΑΣ ΑΝΑΠΑΥΣΗΣ!!!',
-                html: `
-                    <div style="text-align:center;">
-                        <p>Οι παρακάτω ημέρες δεν έχουν την απαιτούμενη ανάπαυση 11 ωρών:</p>
-                        ${restMessage}
-                        <br><br>
-                        <p style="color:red; font-weight:bold;">Απαιτούνται τουλάχιστον 11 ώρες ανάπαυσης μεταξύ εργάσιμων ημερών!</p>
-                    </div>`,
-                showConfirmButton: true,
-                confirmButtonText: 'Το κατάλαβα',
-                customClass: {
-                    confirmButton: 'class-error custom-confirm-button custom-swal-button',
-                    title: 'custom-title',
-                    popup: 'custom-swal-popup'
-                }
-            });
-        }
 
         if (allKathgoriesCompleted) {
             const oresErgasiasInput = document.getElementById('ores_ergasias_ebdomadas');

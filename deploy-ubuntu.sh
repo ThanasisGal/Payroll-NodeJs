@@ -829,6 +829,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/toggleDisabledSelectViaCheckbox.js"
     "public/js/ergazomenoi/genika/toggleDisabledInputViaCheckbox.js"
     "public/js/ergazomenoi/genika/fillLabelFromInput.js"
+    "public/js/ergazomenoi/genika/dailyRestValidation.js"
     "public/js/ergazomenoi/genika/date_sync_add.js"
     "public/js/ergazomenoi/genika/date_sync_edit.js"
     "public/js/ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs.js"

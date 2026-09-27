@@ -18,6 +18,7 @@ const { findHistoryIdReferences } =
     require('../../services/ergazomenoi/employeeHistoryReferenceAuditService');
 const { REAL_0069_SCOPE, REAL_0069_IDS, buildReal0069SanitizedHistoryFixture } =
     require('../../services/ergazomenoi/fixtures/real0069SanitizedHistoryFixture');
+const { twoDaySchedule } = require('../../../test/fixtures/employeeDailyRestFixtures');
 const source = fs.readFileSync(__dirname + '/ergazomenoiController.js', 'utf8').replaceAll('\r', '');
 const scope = { team: 'fixture', company_kod: 'company', kodikos: '0001' };
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -180,6 +181,7 @@ function handler(mode, db) {
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
         writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }),
         writeEmployeeDepartureCancellation: args => W.writeEmployeeDepartureCancellation({ ...args, ...db.deps }),
+        ...require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService'),
         dateKeyUtc: require('../../utils/date/mondaySundayWeek').dateKeyUtc
     });
 }
@@ -192,6 +194,38 @@ async function submit(mode, input, db = memory()) {
     await handler(mode, db)(req, res);
     assert.equal(mongoose.connection.readyState, 0);
     return { db, res };
+}
+test('add and update controller paths reject invalid daily rest before any writer', async () => {
+    const invalidSchedule = twoDaySchedule(
+        [{ start: '14:00', end: '22:00' }],
+        [{ start: '08:00', end: '16:00' }]
+    );
+
+    const addDb = memory();
+    const add = await submit('add', { ...form(), ...invalidSchedule }, addDb);
+    assert.equal(add.res.code, 400);
+    assert.equal(add.res.body.reason, 'EMPLOYEE_SCHEDULE_DAILY_REST_VIOLATION');
+    assert.match(add.res.body.message, /11 ωρών/);
+    assert.equal(addDb.writes(), 0);
+
+    const stored = await initial();
+    const editDb = memory(stored);
+    const edit = await submit('edit', { ...form(), ...invalidSchedule }, editDb);
+    assert.equal(edit.res.code, 400);
+    assert.equal(edit.res.body.reason, 'EMPLOYEE_SCHEDULE_DAILY_REST_VIOLATION');
+    assert.equal(editDb.writes(), 0);
+});
+
+for (const [name, nextStart] of [['exactly eleven hours', '09:00'], ['more than eleven hours', '10:00']]) {
+    test(`update controller allows ${name}`, async () => {
+        const stored = await initial();
+        const validSchedule = twoDaySchedule(
+            [{ start: '14:00', end: '22:00' }],
+            [{ start: nextStart, end: '17:00' }]
+        );
+        const result = await submit('edit', { ...form(), ...validSchedule }, memory(stored));
+        assert.equal(result.res.code, 200, result.res.body?.message);
+    });
 }
 test('employee add preserves 409 messages and hides unexpected technical failure', async () => {
     const conflictDb = memory();
