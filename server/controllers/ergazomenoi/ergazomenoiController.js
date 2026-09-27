@@ -11,6 +11,7 @@ const {
     validateEmployeeScheduleDailyRest
 } = require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService');
 const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
+const { generatePersistedEmployeeContract } = require('../../services/ergazomenoi/persistedEmployeeContractService');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
 
@@ -1989,7 +1990,8 @@ class ergazomenoiController {
                 console.error('Stack:', pdfError.stack);
 
                 contractPdfData = {
-                    error: 'PDF generation failed: ' + pdfError.message,
+                    error: pdfError.message,
+                    errorCode: pdfError.code || 'CONTRACT_PDF_GENERATION_FAILED',
                     showPreview: false
                 };
             }
@@ -4234,7 +4236,12 @@ class ergazomenoiController {
             try {
                 const userContext = await getUserContext(req);
 
-                const contractS3Key = await generateContractPDF(updatedErgazomenos, userContext);
+                const contractS3Key = await generatePersistedEmployeeContract({
+                    employeeModel: ErgazomenoiModel,
+                    employeeScope,
+                    generateContractPDF,
+                    userContext
+                });
                 const pdfUrl = await generatePresignedUrl(contractS3Key, 600);
 
                 await ErgazomenoiModel.updateOne(employeeScope, {
@@ -4251,7 +4258,8 @@ class ergazomenoiController {
             } catch (pdfError) {
                 console.error('⚠️ [UPDATE] Σφάλμα δημιουργίας PDF σύμβασης:', pdfError.message);
                 contractPdfData = {
-                    error: 'PDF generation failed: ' + pdfError.message,
+                    error: pdfError.message,
+                    errorCode: pdfError.code || 'CONTRACT_PDF_GENERATION_FAILED',
                     showPreview: false
                 };
             }
