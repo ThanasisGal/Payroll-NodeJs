@@ -434,6 +434,8 @@ test('Maintenance first departure with empty history ID closes a schedule-only t
         createdAt: `2026-07-${number === '0006' ? '06' : '01'}T00:00:00.000Z`
     }));
     const before = plain(stored.history);
+    const departureDb = memory(stored);
+    departureDb.logs = [];
     const { db, res } = await submit('edit', { ...form(), istorikoId: '',
         hmeromhnia_proslhpshs: '2026-04-25',
         hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
@@ -446,8 +448,9 @@ test('Maintenance first departure with empty history ID closes a schedule-only t
         kataggelia_me_proeidopoihsh: true,
         hmnia_koinopoihshs_kataggelias: '2026-09-01',
         mhnes_proeidopoihshs: 1,
-        email: 'departure@example.invalid', nomimosMisthos: 1300 }, memory(stored));
-    assert.equal(res.code, 200, `${res.body?.reason}: ${res.body?.errorMessage}`);
+        email: 'departure@example.invalid', nomimosMisthos: 1300 }, departureDb);
+    assert.equal(res.code, 200, `${res.body?.reason}: ${res.body?.errorMessage}; ` +
+        JSON.stringify(departureDb.logs));
     const after = db.state();
     assert.equal(after.history.length, 6);
     assert.deepEqual(after.history.slice(0, 4), before.slice(0, 4));
@@ -609,7 +612,7 @@ for (const [name, input, invalid] of addCases) test(`ADD controller: ${name}`, a
         assert.equal(res.code, 400); assert.equal(res.body.field, invalid);
         assert.equal(db.writes(), 0); assert.equal(db.state().employee, null); return;
     }
-    assert.equal(res.code, 200, res.body?.errorMessage); assert.equal(db.state().history.length, 1);
+    assert.equal(res.code, 200, `${res.body?.reason}: ${res.body?.errorMessage}`); assert.equal(db.state().history.length, 1);
     const expected = plain(C.normalizeEmploymentProfileSubmission(M.profileInput({ ...form(), ...input }, 'add')));
     for (const field of C.FACT_FIELDS) {
         assert.deepEqual(db.state().employee[field], expected[field], field);
@@ -832,13 +835,13 @@ test('history editor cannot change date identity or correct an unknown ID', asyn
         assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
     }
 });
-test('batch history corrections roll back earlier correction when a later identity fails', async () => {
+test('batch history corrections validate the complete plan before any physical write', async () => {
     const stored = await initial(enabled), db = memory(stored), row = stored.history[0];
     const res = await editHistory(db, [
         { _id: row._id, state: 'modified', data: rowData(row, { [C.ENABLED]: false }) },
         { _id: 'ffffffffffffffffffffffff', state: 'modified', data: rowData(row) }
     ]);
-    assert.equal(res.code, 409); assert(db.writes() > 0, 'earlier draft correction ran');
+    assert.equal(res.code, 409); assert.equal(db.writes(), 0);
     assert.deepEqual(db.state(), stored); assert.equal(db.ended(), true);
 });
 test('older exact correction preserves current profile and surrounding version', async () => {
@@ -861,11 +864,12 @@ test('sparse older legacy history is never filled from the current arrangement',
     assert.equal(res.code, 409); assert.equal(res.body.reason, 'EMPLOYEE_PROFILE_LEGACY_CORRECTION_REQUIRES_FACTS');
     assert.deepEqual(db.state(), stored);
 });
-test('all controller methods outside the three persistence seams are byte-identical to baseline', () => {
+test('all controller methods outside the canonical persistence seams are byte-identical to baseline', () => {
     const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
     const methods = code => new Map(code.split(/(?=^    static )/m).map(part => [part.match(/^    static (\w+)/)?.[1], part]));
     const before = methods(baseline), after = methods(source);
-    for (const [name, code] of before) if (name && !['editErgazomenoiForm', 'postErgazomenoiForm', 'postErgazomenoiUpdate', 'updateIstorikoData'].includes(name)) {
+    for (const [name, code] of before) if (name && !['editErgazomenoiForm', 'postErgazomenoiForm',
+        'postErgazomenoiUpdate', 'updateIstorikoData', 'deleteErgazomenoi'].includes(name)) {
         assert.equal(after.get(name), code, name);
     }
 });
@@ -1019,7 +1023,7 @@ test('later batch failure rolls back deletion, append, closed boundaries and cur
     const stored = await twoVersions(), db = memory(stored);
     const res = await editHistory(db, [{ state: 'deleted', _id: stored.history[0]._id }, insertion('2026-10-01'),
         { state: 'deleted', _id: 'ffffffffffffffffffffffff' }]);
-    assert.equal(res.code, 409); assert(db.writes() >= 3); assert.deepEqual(db.state(), stored);
+    assert.equal(res.code, 409); assert.equal(db.writes(), 0); assert.deepEqual(db.state(), stored);
 });
 test('transaction commit failure rolls back renumbering and accepted deletion/append', async () => {
     const stored = await twoVersions(), db = memory(stored, 'commit');

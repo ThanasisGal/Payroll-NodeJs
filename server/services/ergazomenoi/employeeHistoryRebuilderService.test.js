@@ -12,10 +12,11 @@ const { REAL_0069_IDS, buildReal0069SanitizedHistoryFixture } =
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0069' };
 
 test('period identity boundaries are classified separately from mutable period state', () => {
-    assert.ok(PERIOD_IDENTITY_FIELDS.includes('hmeromhnia_allaghs_symbashs'));
+    assert.ok(PERIOD_IDENTITY_FIELDS.includes('hmeromhnia_proslhpshs'));
     assert.ok(PERIOD_IDENTITY_FIELDS.includes('hmeromhnia_isxyos_oron_ergasias_apo'));
-    assert.ok(PERIOD_IDENTITY_FIELDS.includes('hmeromhnia_apoxorhshs'));
+    assert.ok(PERIOD_IDENTITY_FIELDS.includes('hmeromhnia_isxyos_oron_ergasias_eos'));
     assert.ok(!PERIOD_IDENTITY_FIELDS.includes('hmeromhnia_lhxhs_symbashs'));
+    assert.ok(!PERIOD_IDENTITY_FIELDS.includes('hmeromhnia_apoxorhshs'));
     assert.ok(PERIOD_STATE_FIELDS.includes('hmeromhnia_lhxhs_symbashs'));
     assert.ok(PERIOD_STATE_FIELDS.includes('typos_apasxolhshs'));
     assert.ok(PERIOD_STATE_FIELDS.includes('nomimoHmeromisthio'));

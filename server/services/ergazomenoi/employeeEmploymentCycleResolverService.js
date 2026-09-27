@@ -1,6 +1,7 @@
 'use strict';
 
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
+const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 
 const STATUS = Object.freeze({
     EMPLOYED: 'EMPLOYED',
@@ -71,7 +72,7 @@ function buildEmploymentCycles({
     history = []
 } = {}) {
     const grouped = new Map();
-    const rows = Array.isArray(history) ? history : [];
+    const rows = semanticHistoryRows(history);
 
     rows.forEach((row, index) => {
         const evidence = normalizeEvidence(row, 'HISTORY', index);

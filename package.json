@@ -11,7 +11,9 @@
         "css:verify": "./deploy-css-linux.sh verify",
         "css:deploy": "./deploy-css-linux.sh deploy",
         "setup:employee-history-repair-audit": "node scripts/setupEmployeeHistoryRepairAudit.js",
-        "check:employee-history-repair-audit": "node scripts/checkEmployeeHistoryRepairAudit.js"
+        "check:employee-history-repair-audit": "node scripts/checkEmployeeHistoryRepairAudit.js",
+        "check:employee-history-readiness": "node scripts/checkEmployeeHistoryReadiness.js",
+        "repair:employee-history": "node scripts/repairEmployeeHistoryCanonical.js"
     },
     "keywords": [],
     "author": "",

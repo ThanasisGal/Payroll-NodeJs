@@ -147,6 +147,7 @@ function plan(state, target, employeePatch, historyPatch, options = {}) {
         idempotent: options.idempotent === true,
         responseCode: options.responseCode || state,
         cleanupRequired: options.cleanupRequired === true,
+        replacementByDeletedId: options.replacementByDeletedId || {},
         diagnostics: options.diagnostics || {}
     };
 }
@@ -199,6 +200,7 @@ function resolveEmployeeHistoryMutation({
         canonicalRows,
         rowsToUpdate: rebuild.rowsToUpdate,
         rowsToDelete: rebuild.rowsToDelete,
+        replacementByDeletedId: rebuild.replacementByDeletedId,
         cleanupRequired: rebuild.cleanupRequired,
         diagnostics: rebuild.diagnostics
     };
@@ -226,8 +228,11 @@ function resolveEmployeeHistoryMutation({
     if (!target) {
         const currentHire = comparable(currentEmployee?.hmeromhnia_proslhpshs);
         const cycleRows = canonicalRows.filter(row => comparable(row.hmeromhnia_proslhpshs) === currentHire);
-        const latestStart = Math.max(0, ...cycleRows.map(row => effectiveStart(row)?.getTime() || 0));
-        const candidates = cycleRows.filter(row => (effectiveStart(row)?.getTime() || 0) === latestStart);
+        const profileCycleRows = cycleRows.filter(row => !isSparseHireLifecycleEvidence(row));
+        const selectableCycleRows = profileCycleRows.length ? profileCycleRows : cycleRows;
+        const latestStart = Math.max(0, ...selectableCycleRows.map(row => effectiveStart(row)?.getTime() || 0));
+        const candidates = selectableCycleRows.filter(row =>
+            (effectiveStart(row)?.getTime() || 0) === latestStart);
         const polluted = resolveDeterministicPollutedTarget(candidates, currentEmployee);
         if (polluted.polluted && !polluted.target) return conflict('CONFLICT_INCONSISTENT_HISTORY');
         if (polluted.target) target = polluted.target;

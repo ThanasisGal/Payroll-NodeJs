@@ -4,6 +4,7 @@ const C = require('./employmentProfileContract');
 const T = require('./employmentProfileTemporal');
 const { resolveBreakConfigurationForDate } = require('./resolveBreakConfigurationForDate');
 const { buildCanonicalWorkTermsSnapshotFields } = require('./getOrarioTermsForDate');
+const { semanticHistoryRows } = require('./employmentHistoryCanonicalStatus');
 
 const BASE_HISTORY_FIELDS = [
     'hmeromhnia_proslhpshs', 'hmeromhnia_allaghs_symbashs',
@@ -62,6 +63,7 @@ function effectiveEnd(row) {
 function resolveEmploymentProfileFactsForDate(date, history = [], { scheduledWorkingDay = false, currentEmployee = {} } = {}) {
     const target = C.calendarDate(date);
     if (!target) C.invalid('date', 'required');
+    history = semanticHistoryRows(history);
     let candidates = history.filter((row) => {
         const from = effectiveStart(row); const until = effectiveEnd(row);
         return from && from <= target && (!until || target <= until);

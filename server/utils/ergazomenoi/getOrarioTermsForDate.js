@@ -1,6 +1,7 @@
 const T = require('./employmentProfileTemporal');
 const C = require('./employmentProfileContract');
 const { resolveBreakConfigurationForDate } = require('./resolveBreakConfigurationForDate');
+const { semanticHistoryRows } = require('./employmentHistoryCanonicalStatus');
 // ============================================================================
 // getOrarioTermsForDate.js
 // ============================================================================
@@ -275,6 +276,7 @@ function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}, previousR
 }
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
+    istorikoRows = semanticHistoryRows(istorikoRows);
     const targetDate = normalizeDateOnly(date);
     const temporal = T.fallback(date, ergazomenos, istorikoRows);
     const originalEmployee = ergazomenos;

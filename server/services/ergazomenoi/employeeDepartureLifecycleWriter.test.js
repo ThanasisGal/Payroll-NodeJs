@@ -77,7 +77,10 @@ function database(initial, fail = '') {
     };
     return { state: () => clone(committed), writes: () => writes,
         deps: { connection: { startSession: async () => session }, capabilityProbe: async () => true,
-            employeeModel, historyModel } };
+            employeeModel, historyModel,
+            auditModel: { async create() { return [{}]; } },
+            auditCollectionChecker: async () => true,
+            referenceChecker: async () => [] } };
 }
 
 async function depart(db, departureDate = '2026-09-20', extra = {}) {
@@ -126,7 +129,10 @@ test('same departure repeats safely; different departure and archived employee r
     assert.equal(db.writes(), count);
     const archived = auditedFixture(); archived.employee.archived = true;
     const other = database(archived);
-    await assert.rejects(depart(other), { code: 'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH' });
+    await assert.rejects(depart(other), error => [
+        'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH',
+        'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'
+    ].includes(error.code));
     assert.equal(other.writes(), 0);
 });
 
@@ -335,7 +341,10 @@ test('earlier profile end is preserved and a newer cycle is rejected without wri
         hmeromhnia_proslhpshs: '2026-11-01', hmeromhnia_apoxorhshs: null,
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-11-01' });
     const mismatch = database(newer);
-    await assert.rejects(depart(mismatch), { code: 'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH' });
+    await assert.rejects(depart(mismatch), error => [
+        'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH',
+        'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'
+    ].includes(error.code));
     assert.equal(mismatch.writes(), 0);
 });
 

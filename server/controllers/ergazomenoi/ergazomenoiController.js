@@ -1,7 +1,9 @@
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, deleteEmployeeAndEmploymentHistory, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { buildEmployeeMaintenanceIdentity } =
+    require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
 const {
@@ -525,22 +527,6 @@ function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {})
     };
 }
 
-function getIstorikoDateIdentity(formData = {}) {
-    return {
-        hmeromhnia_proslhpshs: toDateOrNull(formData.hmeromhnia_proslhpshs),
-        hmeromhnia_allaghs_symbashs: toDateOrNull(formData.hmeromhnia_allaghs_symbashs),
-        hmeromhnia_allaghs_orarioy_apo: toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo),
-        hmeromhnia_allaghs_orarioy_eos: toDateOrNull(formData.hmeromhnia_allaghs_orarioy_eos),
-        hmeromhnia_isxyos_oron_ergasias_apo:
-            toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) ||
-            toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo),
-        hmeromhnia_isxyos_oron_ergasias_eos:
-            toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null,
-        hmeromhnia_lhxhs_symbashs: toDateOrNull(formData.hmeromhnia_lhxhs_symbashs),
-        hmeromhnia_apoxorhshs: toDateOrNull(formData.hmeromhnia_apoxorhshs)
-    };
-}
-
 // =========================================================================
 // ✅ HELPERS: Εμπλουτισμός ιστορικού για αναλυτικό modal
 // =========================================================================
@@ -837,7 +823,7 @@ class ergazomenoiController {
             const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
             const originalEmploymentHistoryId = selectMaintenanceMode(
                 rawIstorikoData,
-                getIstorikoDateIdentity(ergazomenoiData),
+                buildEmployeeMaintenanceIdentity(ergazomenoiData),
                 ergazomenoiData
             ).historyId || '';
             const originalEmploymentHistoryRevision = rawIstorikoData.find(row =>
@@ -1024,7 +1010,7 @@ class ergazomenoiController {
                 return { state, historyId: _id, input: profileInput(data, 'edit'),
                     effectiveFrom: data.hmeromhnia_isxyos_oron_ergasias_apo || data.hmeromhnia_allaghs_orarioy_apo,
                     maintenance: { historyChanges, employeeChanges: historyChanges, submittedFields: Object.keys(data),
-                        identity: getIstorikoDateIdentity(data) } };
+                        identity: buildEmployeeMaintenanceIdentity(data) } };
             });
             await writeEmployeeEmploymentHistoryOperations({
                 scope: { team: userTeam, company_kod: companyId, kodikos: String(kodikos) },
@@ -3898,7 +3884,7 @@ class ergazomenoiController {
                             historyChanges: updateFieldsIstoriko,
                             submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
                             submittedFormFields: Object.keys(formData),
-                            identity: formData.istorikoId ? undefined : getIstorikoDateIdentity(formData),
+                            identity: formData.istorikoId ? undefined : buildEmployeeMaintenanceIdentity(formData),
                             originalHistoryId: formData.istorikoId || null,
                             correctableIdentityFields: formData.istorikoId ? ['hmeromhnia_apoxorhshs'] : [] }
                     })
@@ -3924,7 +3910,7 @@ class ergazomenoiController {
                         submittedProfileFields: Object.keys(profileInput(formData, 'edit')),
                         identity: formData.istorikoId
                             ? undefined
-                            : getIstorikoDateIdentity(formData),
+                            : buildEmployeeMaintenanceIdentity(formData),
                         originalHistoryId: formData.istorikoId || null,
                         correctableIdentityFields: formData.istorikoId
                             ? ['hmeromhnia_apoxorhshs']
@@ -4770,12 +4756,9 @@ class ergazomenoiController {
 
             console.log('🗑️  [DELETE-EMPLOYEE] Deleting from database...');
 
-            await ErgazomenoiModel.deleteOne({ _id: req.params.id });
-
-            await IstorikoProslhpseonAllagonModel.deleteMany({
-                team: team,
-                company_kod: company,
-                kodikos: kodikos
+            await deleteEmployeeAndEmploymentHistory({
+                scope: { team, company_kod: company, kodikos },
+                employeeId: String(req.params.id)
             });
 
             await ProdhlomenaOrariaModel.deleteMany({

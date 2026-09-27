@@ -1,4 +1,5 @@
-const { Schema: _Schema, model } = require('mongoose');
+const mongoose = require('mongoose');
+const { Schema: _Schema, model } = mongoose;
 
 const Schema = _Schema;
 const { employmentProfileFields, attachEmploymentProfileValidation } = require('./employeeEmploymentProfileFields');
@@ -931,6 +932,17 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
         krathsh_07: { type: String, trim: true },
         createdAt: { type: Date, default: Date.now() },
         updatedAt: { type: Date, default: Date.now() },
+        // A referenced legacy duplicate may not be deleted. This durable marker
+        // keeps the physical _id valid while excluding the row from canonical
+        // employment semantics on every subsequent read/rebuild.
+        employment_history_canonical_status: {
+            type: String,
+            enum: ['REDUNDANT_REFERENCED']
+        },
+        employment_history_canonical_survivor_id: {
+            type: Schema.Types.ObjectId,
+            ref: 'IstorikoProslhpseonAllagon'
+        },
         history_reference_fence: { type: Number, min: 0, select: false }
     },
     {
@@ -940,6 +952,18 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
 
 IstorikoProslhpseonAllagonSchema.add(employmentProfileFields({ history: true }));
 attachEmploymentProfileValidation(IstorikoProslhpseonAllagonSchema);
+
+// Referenced redundant rows remain physically present only to keep immutable
+// provenance ids valid. Normal application reads must never treat them as
+// employment events. The canonical writer opts into the complete physical set.
+IstorikoProslhpseonAllagonSchema.pre(/^find/, function excludeRedundantHistoryArtifacts() {
+    if (this.mongooseOptions().includeRedundantHistoryArtifacts === true) return;
+    this.where({
+        employment_history_canonical_status: mongoose.trusted({
+            $ne: 'REDUNDANT_REFERENCED'
+        })
+    });
+});
 
 const IstorikoProslhpseonAllagonModel = model(
     'IstorikoProslhpseonAllagon',
