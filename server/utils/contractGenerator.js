@@ -8,8 +8,6 @@
  *
  */
 
-const PizZip = require('pizzip');
-const Docxtemplater = require('docxtemplater');
 const { promisify } = require('util');
 const path = require('path');
 const fs = require('fs-extra');
@@ -17,6 +15,8 @@ const { exec } = require('child_process');
 const { PDFDocument, rgb } = require('pdf-lib');
 
 const { loadTextsByCategory, combineTexts, CATEGORIES } = require('./textLoader');
+const { buildContractDateData } = require('./contractDateData');
+const { renderContractDocxBuffer } = require('./contractDocxRenderer');
 
 const Models_A = require('../models/stathera_arxeia');
 const Models_C = require('../models/companies');
@@ -66,59 +66,6 @@ function formatDate(date) {
 
     return [day, month, year].join('/');
 }
-
-const calculateMonthsDifference = (startDate, endDate) => {
-    if (!endDate) return 0;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const yearsDifference = end.getFullYear() - start.getFullYear();
-    const monthsDifference = end.getMonth() - start.getMonth();
-    return yearsDifference * 12 + monthsDifference;
-};
-
-const calculateDateDifference = (startDate, endDate) => {
-    if (!endDate) return '';
-
-    const [sd, sm, sy] = startDate.split('/').map(Number);
-    const [ed, em, ey] = endDate.split('/').map(Number);
-
-    const daysInEndMonth = new Date(ey, em, 0).getDate();
-    const isStartFirstDay = sd === 1;
-    const isEndLastDay = ed === daysInEndMonth;
-
-    let calcEd = ed,
-        calcEm = em,
-        calcEy = ey;
-
-    if (isStartFirstDay && isEndLastDay) {
-        const nextMonth = new Date(ey, em, 1);
-        calcEd = 1;
-        calcEm = nextMonth.getMonth() + 1;
-        calcEy = nextMonth.getFullYear();
-    }
-
-    let years = calcEy - sy;
-    let months = calcEm - sm;
-    let days = calcEd - sd;
-
-    if (days < 0) {
-        months--;
-        const daysInPrevMonth = new Date(calcEy, calcEm - 1, 0).getDate();
-        days += daysInPrevMonth;
-    }
-
-    if (months < 0) {
-        years--;
-        months += 12;
-    }
-
-    const parts = [];
-    if (years > 0) parts.push(`${years} ${years === 1 ? 'έτους' : 'ετών'}`);
-    if (months > 0) parts.push(`${months} ${months === 1 ? 'μηνός' : 'μηνών'}`);
-    if (days > 0) parts.push(`${days} ${days === 1 ? 'ημέρας' : 'ημερών'}`);
-
-    return parts.join(', ');
-};
 
 const numbersToWords = (n) => {
     const ones = [
@@ -530,6 +477,8 @@ function generateCategoryPlaceholders(categoryParts, ergazomenos) {
 
 async function generateContractPDF(ergazomenos, userContext) {
     try {
+        const contractDateData = buildContractDateData(ergazomenos);
+
         await fs.ensureDir(outputFolder);
 
         if (!(await fs.pathExists(docxTemplatePath))) {
@@ -734,16 +683,6 @@ async function generateContractPDF(ergazomenos, userContext) {
                 break;
         }
 
-        const diarkeia_text = calculateDateDifference(
-            formatDate(ergazomenos.hmeromhnia_allaghs_symbashs),
-            formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)
-        );
-
-        let diarkeia = '.';
-        if (diarkeia_text) {
-            diarkeia = `, διάρκειας ${diarkeia_text} και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
-        }
-
         const hmeres_lektika = daysToText(parseInt(ergazomenos.hmeres_ergasias_ebdomadas || 0), '');
         const ores_lektika = daysToText(parseInt(ergazomenos.ores_ergasias_ebdomadas || 0), '');
         const currentYear = new Date().getFullYear();
@@ -753,8 +692,8 @@ async function generateContractPDF(ergazomenos, userContext) {
             _SXESH_ERGASIAS: sxeshErgasias?.perigrafh || '..........',
             _KATHESTOS_APASXOLHSHS: apasxolhsh,
             _POLH: poleis?.perigrafh || '..........',
-            _HMEROMHNIA_PROSLHPSHS: formatDate(ergazomenos.hmeromhnia_proslhpshs),
-            _HMEROMHNIA_LHXHS_SYMBASHS: formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs),
+            _HMEROMHNIA_PROSLHPSHS: contractDateData._HMEROMHNIA_PROSLHPSHS,
+            _HMEROMHNIA_LHXHS_SYMBASHS: contractDateData._HMEROMHNIA_LHXHS_SYMBASHS,
 
             _ETAIREIA: company.firstname == '' ? 'εταιρεία' : 'επιχείρηση',
             _ERGODOTHS: company.firstname == '' ? 'η εταιρεία' : 'η εργοδότρια',
@@ -827,7 +766,7 @@ async function generateContractPDF(ergazomenos, userContext) {
             _THLEFONO_ERGAZOMENOY: ergazomenos.thlefono || '..........',
             _EMAIL_ERGAZOMENOY: ergazomenos.email || '..........',
             _TYPOS_ERGAZOMENOY: typos,
-            _DIARKEIA: diarkeia,
+            _DIARKEIA: contractDateData._DIARKEIA,
 
             _HMERES_LEKTIKA: hmeres_lektika,
             _HMERES_APASXOLHSHS: ergazomenos.hmeres_ergasias_ebdomadas || '....',
@@ -875,26 +814,14 @@ async function generateContractPDF(ergazomenos, userContext) {
             undefinedKeys.forEach((k) => console.warn(`   - ${k}`));
         }
 
-        const content = await fs.readFile(docxTemplatePath, 'binary');
-        const zip = new PizZip(content);
-        const doc = new Docxtemplater(zip, {
-            paragraphLoop: true,
-            linebreaks: true,
-            nullGetter: function (part) {
-                if (!part.module) return '';
-                if (part.value == null) return '';
-                return '';
-            }
-        });
-
-        doc.render(data);
+        const content = await fs.readFile(docxTemplatePath);
 
         const timestamp = Date.now();
         const tempDocxPath = path.join(
             outputFolder,
             `contract_${ergazomenos.kodikos}_${timestamp}.docx`
         );
-        const updatedDocx = doc.getZip().generate({ type: 'nodebuffer' });
+        const updatedDocx = renderContractDocxBuffer(content, data);
         await fs.writeFile(tempDocxPath, updatedDocx);
 
         const isWindows = process.platform === 'win32';

@@ -755,11 +755,12 @@ test('EDIT matching history revision allows the normal employee-only Save', asyn
     assert.deepEqual(db.state().history, stored.history);
     assert.equal(db.writes(), 1);
 });
-test('controller downstream Save response, PDF, ERGANI and schedule code unchanged', () => {
+test('controller downstream Save response, uploads, ERGANI and schedule code unchanged outside contract generation', () => {
     const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
     for (const [start, end] of [
         ['        // ✅ 6) ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ', '        // ✅ 7)'],
-        ['        // ✅ 8) ΕΠΕΞΕΡΓΑΣΙΑ PDF', '    static deleteErgazomenoi']
+        ['        // ✅ 8) ΕΠΕΞΕΡΓΑΣΙΑ PDF', '        // ✅ 9) ΑΥΤΟΜΑΤΗ ΔΗΜΙΟΥΡΓΙΑ PDF ΣΥΜΒΑΣΗΣ'],
+        ['        // ✅ 10) ΑΝΑΚΤΗΣΗ ΔΕΔΟΜΕΝΩΝ', '    static deleteErgazomenoi']
     ]) {
         const oldStart = baseline.indexOf(start), newStart = source.indexOf(start);
         assert(oldStart >= 0 && newStart >= 0, start);
@@ -768,7 +769,7 @@ test('controller downstream Save response, PDF, ERGANI and schedule code unchang
         let chunk = baseline.slice(oldStart, oldEnd).trimEnd();
         // Section separators immediately before the moved history are not executable.
         chunk = chunk.replace(/\n\s*\/\/ =+$/, '');
-        if (start.includes('ΕΠΕΞΕΡΓΑΣΙΑ PDF')) chunk = chunk.replace(
+        if (start.includes('ΕΠΕΞΕΡΓΑΣΙΑ PDF') || start.includes('ΑΝΑΚΤΗΣΗ ΔΕΔΟΜΕΝΩΝ')) chunk = chunk.replace(
             /hmeromhnia: \{\n\s*\$gte: new Date\(formData\.hmeromhnia_allaghs_orarioy_apo\),\n\s*\$lte: new Date\(formData\.hmeromhnia_allaghs_orarioy_eos\)\n\s*\}/,
             match => match.replace('hmeromhnia: {', 'hmeromhnia: mongoose.trusted({').replace(/\n(\s*)\}$/, '\n$1})'));
         assert(source.slice(newStart).startsWith(chunk), start);

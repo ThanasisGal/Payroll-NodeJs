@@ -9,6 +9,7 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const { getDocument } = require('pdfjs-dist');
 const pdfjsLib = require('pdfjs-dist');
+const { validateContractDateInvariants } = require('../../../utils/contractDateData');
 
 const Models_A = require('../../../models/stathera_arxeia');
 const Models_B = require('../../../models/privileges');
@@ -586,6 +587,7 @@ class ektyposhApasxolhseonController {
                         break;
                 }
 
+                validateContractDateInvariants(symbash);
                 const differenceInMonths = calculateMonthsDifference(symbash.hmeromhnia_allaghs_symbashs, symbash.hmeromhnia_lhxhs_symbashs);
                 if (differenceInMonths !== 0) {
                     diarkeia = `, διάρκειας ${differenceInMonths} μηνών και η οποία λήγει την ${formatDate(symbash.hmeromhnia_lhxhs_symbashs)}.`;
@@ -879,6 +881,13 @@ class ektyposhApasxolhseonController {
 
         } catch (error) {
             console.error('Error fetching contracts:', error);
+            if (String(error?.code || '').startsWith('CONTRACT_')) {
+                return res.status(error.statusCode || 409).json({
+                    success: false,
+                    reason: error.code,
+                    message: error.message
+                });
+            }
             res.status(500).send('Error fetching contracts');
         }
     }

@@ -13,6 +13,7 @@ const pdfjsLib = require('pdfjs-dist');
 // ✅ TEXT CACHE SYSTEM IMPORTS
 const { loadTextsByCategory, combineTexts, CATEGORIES } = require('../../../utils/textLoader');
 const { getCompanyFolder } = require('../../../utils/userContext'); // ✅ Import at top!
+const { validateContractDateInvariants } = require('../../../utils/contractDateData');
 
 const Models_A = require('../../../models/stathera_arxeia');
 const Models_B = require('../../../models/privileges');
@@ -641,6 +642,7 @@ class ektyposhSymbaseonController {
                         break;
                 }
 
+                validateContractDateInvariants(symbash);
                 const differenceInMonths = calculateMonthsDifference(
                     symbash.hmeromhnia_allaghs_symbashs,
                     symbash.hmeromhnia_lhxhs_symbashs
@@ -969,6 +971,13 @@ class ektyposhSymbaseonController {
             });
         } catch (error) {
             console.error('Error fetching contracts:', error);
+            if (String(error?.code || '').startsWith('CONTRACT_')) {
+                return res.status(error.statusCode || 409).json({
+                    success: false,
+                    reason: error.code,
+                    message: error.message
+                });
+            }
             res.status(500).send('Error fetching contracts');
         }
     };
