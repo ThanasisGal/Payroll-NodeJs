@@ -13,6 +13,14 @@ const { XrhseisModel, PeriodsModel } = Models;
 
 const threeSpaces = '\u00A0'.repeat(3);
 
+const toIsoDateOnly = (value) => {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+        throw new Error('Selected period has no valid end date');
+    }
+
+    return value.toISOString().slice(0, 10);
+};
+
 var redir;
 
 class mainAppController {
@@ -425,16 +433,19 @@ class mainAppController {
             }
 
             const newPeriodDescr = periodoi.perigrafh;
+            const newAppDate = toIsoDateOnly(periodoi.eos);
 
             // ✅ Update parameters
             await ParamModel.findByIdAndUpdate(parameter._id, {
                 usedPeriod: newPeriod,
-                usedPeriodDescr: newPeriodDescr
+                usedPeriodDescr: newPeriodDescr,
+                appDate: newAppDate
             });
 
             // ✅ Update session
             req.session.periodInUse = newPeriod;
             req.session.periodInUseDescr = newPeriodDescr;
+            req.session.appDate = newAppDate;
 
             // ✅ Save session before redirect
             await new Promise((resolve, reject) => {
