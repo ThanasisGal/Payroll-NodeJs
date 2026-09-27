@@ -140,7 +140,15 @@ test('controlled cancellation restores only departure-clamped boundaries in one 
     const after = db.state();
     assert.equal(after.history.length, before.history.length);
     assert.deepEqual(after.history.map(row => row._id), before.history.map(row => row._id));
-    assert.deepEqual(after.history, before.history);
+    for (let index = 0; index < after.history.length; index += 1) {
+        const withoutRevision = row => Object.fromEntries(Object.entries(row)
+            .filter(([field]) => field !== 'updatedAt'));
+        assert.deepEqual(withoutRevision(after.history[index]), withoutRevision(before.history[index]));
+    }
+    assert.ok(new Date(after.history[4].updatedAt).getTime() >
+        new Date(closed.history[4].updatedAt).getTime());
+    assert.ok(new Date(after.history[5].updatedAt).getTime() >
+        new Date(closed.history[5].updatedAt).getTime());
     assert.equal(after.employee.hmeromhnia_apoxorhshs, null);
     assert.equal(after.employee.energos, true);
     assert.equal(date(after.employee.hmeromhnia_isxyos_oron_ergasias_eos), '2026-10-15');

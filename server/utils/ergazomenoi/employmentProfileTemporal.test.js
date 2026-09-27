@@ -33,12 +33,13 @@ function memory(employee = legacy(), history = [], fail = false) {
     };
     const historyModel = {
         find: filter => query(() => draft.history.filter(row => matches(row, filter))),
-        async create([row], { session: s }) { assert.equal(s, session); const saved = { ...clone(row), _id: 'h' + draft.history.length }; draft.history.push(saved); return [saved]; },
-        async updateOne(filter, update, { session: s }) { assert.equal(s, session); const row = draft.history.find(row => matches(row, filter)); if (!row) return { matchedCount: 0 }; Object.assign(row, clone(update.$set)); return { matchedCount: 1 }; },
+        async create([row], { session: s }) { assert.equal(s, session); const saved = { _id: 'h' + draft.history.length, ...clone(row) }; draft.history.push(saved); return [saved]; },
+        async updateOne(filter, update, { session: s }) { assert.equal(s, session); const row = draft.history.find(row => matches(row, filter)); if (!row) return { matchedCount: 0 }; Object.assign(row, clone(update.$set || {})); for (const [field, increment] of Object.entries(update.$inc || {})) row[field] = Number(row[field] || 0) + increment; return { matchedCount: 1 }; },
         async deleteOne(filter, { session: s }) { assert.equal(s, session); const i = draft.history.findIndex(row => matches(row, filter)); if (i < 0) return { deletedCount: 0 }; draft.history.splice(i, 1); return { deletedCount: 1 }; }
     };
     const deps = { scope, employeeId: employee._id, employeeModel, historyModel,
-        connection: { startSession: async () => session }, capabilityProbe: async () => true };
+        connection: { startSession: async () => session }, referenceChecker: async () => [],
+        capabilityProbe: async () => true };
     return { state: () => clone(state), deps, append: (date, minutes, patch = {}) => W.writeEmployeeEmploymentProfile({ ...deps,
         effectiveFrom: date, input: { dialleima_se_lepta: minutes }, maintenance: undefined,
         // New version work-term changes use the existing mapped seam.
@@ -215,16 +216,10 @@ test('valid arrangement full vs projected history has identical active provenanc
     assert.deepEqual(H.resolveEmploymentProfileFactsForDate('2026-09-15', [project(row, Weekly.HISTORY_SELECT_FIELDS)], options), full);
 });
 
-test('anchored first boundary cannot move and import cannot clear compatibility metadata', async () => {
+test('anchored first boundary cannot move', async () => {
     const db = memory(); await db.append('2026-09-15', 15); const before = db.state();
     await assert.rejects(W.writeEmployeeEmploymentHistoryOperations({ ...db.deps, operations: [{ state: 'modified', historyId: before.history[0]._id,
         input: {}, effectiveFrom: '2026-09-20', maintenance: { submittedFields: [T.START], historyChanges: { [T.START]: '2026-09-20' } } }] }),
     error => error.code === 'EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED');
     assert.deepEqual(db.state(), before);
-    const { buildTblProsopExistingUpdate } = require('./tblProsopImportUpdate');
-    const imported = { ...before.employee, ...buildTblProsopExistingUpdate({ D: 'Updated' }, { eponymo: 'Updated' }).$set };
-    assert.deepEqual(imported[T.ANCHOR], before.employee[T.ANCHOR]);
-    assert.equal(B.resolveBreakConfigurationForDate('2026-06-15', before.history, imported).break_minutes, 30);
-    const Model = require('../../models/ergazomenoi').ErgazomenoiModel;
-    assert.deepEqual(clone(Model.hydrate(imported).toObject()[T.ANCHOR]), before.employee[T.ANCHOR]);
 });

@@ -48,12 +48,13 @@ test('post-check persistence payloads remain unchanged inside the period fence',
     assert.ok(postCheckSource.includes('await ProdhlomenaOrariaDeviationsModel.insertMany('));
     assert.ok(postCheckSource.includes('work: ({ session }) => replaceDeviations(session)'));
     const persistedDeviation = postCheckSource.slice(
-        postCheckSource.indexOf('await ProdhlomenaOrariaDeviationsModel.insertMany(')
+        postCheckSource.indexOf('const deviationRecords = result.deviations.map')
     );
     assert.ok(persistedDeviation.includes('status: d.status || undefined'));
     assert.ok(persistedDeviation.includes(
         'reasons: Array.isArray(d.reasons) ? d.reasons : undefined'
     ));
+    assert.ok(persistedDeviation.includes('ProdhlomenaOrariaDeviationsModel.insertMany(\n            deviationRecords,'));
 });
 
 test('persisted diagnostic metadata reaches the shared review export projection', () => {

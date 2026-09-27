@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
         setRehireField('istorikoId', '');
+        setRehireField('historyExpectedRevision', '');
 
         const terminationCheckbox =
             document.getElementById('kataggelia_me_proeidopoihsh');
@@ -160,6 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
             showCloseButton: true,
             timer: 5500,
             timerProgressBar: true,
+            customClass: {
+                popup: 'employee-rehire-draft-toast'
+            },
             didOpen: () => {
                 const htmlContainer = Swal.getHtmlContainer();
                 if (htmlContainer) {
@@ -179,6 +183,46 @@ document.addEventListener('DOMContentLoaded', () => {
     let message = '';
     let erganiUploadInProgress = false;
     const runFormSubmissionOnce = createSingleFlight();
+
+    function showWorkScheduleSection() {
+        const scheduleTab = [...document.querySelectorAll('.menu_Links li')].find(
+            (link) => link.textContent.trim() === 'Ωράριο Εργασίας'
+        );
+        if (scheduleTab && !scheduleTab.classList.contains('active')) scheduleTab.click();
+    }
+
+    async function blockSaveForDailyRestViolation(formData) {
+        const validation = window.EmployeeDailyRestValidation;
+        if (!validation?.scheduleDaysFromFormData || !validation?.collectDailyRestViolations) {
+            throw new Error('EMPLOYEE_DAILY_REST_VALIDATION_UNAVAILABLE');
+        }
+
+        const scheduleDays = validation.scheduleDaysFromFormData(formData, {
+            labelForIndex(index, suffix, date) {
+                return document.getElementById(`day_label_${suffix}`)?.textContent?.trim() ||
+                    date || `Ημέρα ${index}`;
+            }
+        });
+        const violations = validation.collectDailyRestViolations(scheduleDays);
+        if (!violations.length) return false;
+
+        showWorkScheduleSection();
+        window.renderEmployeeDailyRestViolations?.(violations);
+
+        const warning = document.getElementById('daily-rest-violation-warning');
+        warning?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        await Swal.fire({
+            backdrop: false,
+            allowOutsideClick: false,
+            returnFocus: false,
+            icon: 'error',
+            title: 'Δεν είναι δυνατή η αποθήκευση',
+            text: 'Υπάρχει παράβαση της ελάχιστης ημερήσιας ανάπαυσης των 11 ωρών. Διορθώστε το ωράριο και προσπαθήστε ξανά.',
+            confirmButtonText: 'Κλείσιμο'
+        });
+        return true;
+    }
 
     async function handleFormSubmit(event) {
         event.preventDefault();
@@ -300,6 +344,8 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('📦 Συλλεγμένα δεδομένα φόρμας:', formData);
 
         try {
+            if (await blockSaveForDailyRestViolation(formData)) return;
+
             await Promise.all(filePromises);
 
             // ============================================================================

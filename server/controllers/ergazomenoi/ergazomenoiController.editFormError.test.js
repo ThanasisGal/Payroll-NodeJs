@@ -94,7 +94,8 @@ test('edit page returns a completed friendly 409 response for normalized legacy/
     const legacy = { ...shared, _id: '69e8ca00b198b803164b7731', aa_eggrafhs: '0001' };
     delete legacy.hmeromhnia_isxyos_oron_ergasias_apo;
     const modern = { ...shared, _id: '6a65e737a2ce245e430d4d70', aa_eggrafhs: '0002',
-        employment_profile_source: 'ERGOMENOI_CONTROLLER', afora_allagh_oron_ergasias: true };
+        employment_profile_source: 'ERGOMENOI_CONTROLLER', afora_allagh_oron_ergasias: true,
+        updatedAt: new Date('2026-09-26T07:30:00.000Z') };
     const req = { params: { id: '69e8ca00b198b803164b7718' }, session: {
         userTeam: 'BLG', companyInUse: '69e7812a74cb535fd4d1a6e1', yearInUse: '2026'
     } };
@@ -131,7 +132,8 @@ test('edit page selects the open modern row and reaches the normal render path',
     delete legacy.hmeromhnia_isxyos_oron_ergasias_apo;
     delete legacy.hmeromhnia_isxyos_oron_ergasias_eos;
     const modern = { ...shared, _id: '6a65e737a2ce245e430d4d70', aa_eggrafhs: '0002',
-        employment_profile_source: 'ERGOMENOI_CONTROLLER', afora_allagh_oron_ergasias: true };
+        employment_profile_source: 'ERGOMENOI_CONTROLLER', afora_allagh_oron_ergasias: true,
+        updatedAt: new Date('2026-09-26T07:30:00.000Z') };
     const req = { params: { id: '69e8ca00b198b803164b7718' }, session: {
         userTeam: 'BLG', companyInUse: '69e7812a74cb535fd4d1a6e1', yearInUse: '2026'
     } };
@@ -143,6 +145,7 @@ test('edit page selects the open modern row and reaches the normal render path',
     assert.equal(res.finished, true);
     assert.equal(res.view, 'ergazomenoi/ergazomenoi/edit');
     assert.equal(res.locals.originalEmploymentHistoryId, '6a65e737a2ce245e430d4d70');
+    assert.equal(res.locals.originalEmploymentHistoryRevision, '2026-09-26T07:30:00.000Z');
     assert.equal(forwarded, null);
 });
 

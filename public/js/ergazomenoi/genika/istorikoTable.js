@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'kodikos',
         'createdAt',
         'updatedAt',
+        'history_reference_fence',
         '__lookups',
         'employment_profile_source',
         'employment_profile_schema_version',

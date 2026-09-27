@@ -1,14 +1,18 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { writeEmployeeEmploymentProfile, selectMaintenanceMode, MODE_CORRECT_EXISTING } = require('./employeeEmploymentProfileWriter');
+const mongoose = require('mongoose');
+const { writeEmployeeEmploymentProfile, selectMaintenanceMode, MODE_CORRECT_EXISTING,
+    normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter } = require('./employeeEmploymentProfileWriter');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { buildCompleteProfileSnapshot } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { resolveEmploymentProfileFactsForDate } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { resolveEmploymentTypeFromFormData } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { profileError } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
-const { ErgazomenoiModel } = require('../../models/ergazomenoi');
+const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
+const { REAL_0069_SCOPE, REAL_0069_IDS, buildReal0069SanitizedHistoryFixture } =
+    require('./fixtures/real0069SanitizedHistoryFixture');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
@@ -31,8 +35,13 @@ test('current employee schema accepts explicit rotating type and empty week type
     assert.equal(Object.hasOwn(cast, 'typos_ebdomadas'), true);
 });
 
-function database(initial = { employee: null, history: [] }, fail = '', castCurrentThroughSchema = false) {
+function database(initial = { employee: null, history: [] }, fail = '', castCurrentThroughSchema = false,
+    deleteBehavior = {}) {
     let committed = structuredClone(initial); let draft; let ended = false; let writes = 0;
+    const deleteFilters = [];
+    const operations = { employeeUpdates: 0, employeeCreates: 0, historyUpdates: 0,
+        historyFenceUpdates: 0, historyDeletes: 0, historyCreates: 0,
+        auditCreates: 0, deletedCounts: [] };
     const session = { async withTransaction(work) {
         draft = structuredClone(committed);
         try { await work(); if (fail === 'commit') throw new Error('commit failed'); committed = draft; } finally { draft = null; }
@@ -43,7 +52,7 @@ function database(initial = { employee: null, history: [] }, fail = '', castCurr
     const employeeModel = {
         findOne: () => query(() => draft.employee),
         async updateOne(filter, update, options) {
-            assert.equal(options.session, session); writes++;
+            assert.equal(options.session, session); writes++; operations.employeeUpdates++;
             if (fail === 'employee') throw new Error('employee failed');
             if (!matches(draft.employee, filter)) return { matchedCount: 0 };
             const changes = castCurrentThroughSchema
@@ -53,30 +62,83 @@ function database(initial = { employee: null, history: [] }, fail = '', castCurr
             Object.assign(draft.employee, changes); return { matchedCount: 1 };
         },
         async create([record], options) {
-            assert.equal(options.session, session); writes++;
+            assert.equal(options.session, session); writes++; operations.employeeCreates++;
             draft.employee = { _id: 'employee', ...record }; return [draft.employee];
         }
     };
     const historyModel = {
-        find: () => query(() => draft.history),
+        find: filter => query(() => deleteBehavior.scopeFind ? draft.history.filter(row =>
+            row.team === filter.team && String(row.company_kod) === String(filter.company_kod) &&
+            row.kodikos === filter.kodikos) : draft.history),
+        async updateMany(filter, update, options) {
+            assert.equal(options.session, session); writes++; operations.historyFenceUpdates++;
+            if (fail === 'stale') return { matchedCount: 0 };
+            const ids = new Set(filter._id.$in.map(String));
+            const matched = draft.history.filter(row => ids.has(String(row._id)) &&
+                row.team === filter.team && String(row.company_kod) === String(filter.company_kod) &&
+                row.kodikos === filter.kodikos);
+            for (const row of matched) for (const [field, increment] of Object.entries(update.$inc || {})) {
+                row[field] = Number(row[field] || 0) + increment;
+            }
+            return { matchedCount: matched.length };
+        },
+        async deleteMany(filter, options) {
+            assert.equal(options.session, session); writes++; operations.historyDeletes++;
+            if (fail === 'cleanup') throw new Error('cleanup failed');
+            if (deleteBehavior.castFilter) {
+                const queryToCast = IstorikoProslhpseonAllagonModel.deleteMany(filter);
+                mongoose.sanitizeFilter(queryToCast.getFilter());
+                queryToCast.cast(IstorikoProslhpseonAllagonModel);
+            }
+            deleteFilters.push(filter);
+            const ids = new Set(filter._id.$in.map(String));
+            const before = draft.history.length;
+            if (!deleteBehavior.pretendDeleteSuccess) {
+                draft.history = draft.history.filter(row => !(ids.has(String(row._id)) &&
+                    row.team === filter.team && String(row.company_kod) === String(filter.company_kod) &&
+                    row.kodikos === filter.kodikos));
+            }
+            const actualDeletedCount = before - draft.history.length;
+            if (deleteBehavior.injectUnexpectedHistory) {
+                draft.history.push({ ...draft.history[0], _id: 'unexpected-history-row',
+                    aa_eggrafhs: '9999' });
+            }
+            const deletedCount = deleteBehavior.deletedCount ?? (deleteBehavior.pretendDeleteSuccess
+                ? draft.history.filter(row => ids.has(String(row._id)) &&
+                    row.team === filter.team && String(row.company_kod) === String(filter.company_kod) &&
+                    row.kodikos === filter.kodikos).length
+                : actualDeletedCount);
+            operations.deletedCounts.push(deletedCount);
+            return { deletedCount };
+        },
         async updateOne(filter, update, options) {
-            assert.equal(options.session, session); writes++;
+            assert.equal(options.session, session); writes++; operations.historyUpdates++;
             if (fail === 'close') throw new Error('close failed');
             if (fail === `close:${filter._id}`) throw new Error('close failed');
             const row = draft.history.find((row) => matches(row, filter));
             if (!row || fail === 'stale') return { matchedCount: 0 };
-            Object.assign(row, update.$set);
+            if (!deleteBehavior.pretendUpdateSuccess) Object.assign(row, update.$set);
             return { matchedCount: 1 };
         },
         async create([record], options) {
-            assert.equal(options.session, session); writes++;
+            assert.equal(options.session, session); writes++; operations.historyCreates++;
             if (fail === 'history') throw new Error('history failed');
             const row = { _id: `history-${draft.history.length}`, ...record };
             draft.history.push(row); return [row];
         }
     };
+    const auditModel = { async create([record], options) {
+        assert.equal(options.session, session); writes++; operations.auditCreates++;
+        if (fail === 'audit') throw new Error('audit failed');
+        if (!draft.audits) draft.audits = [];
+        draft.audits.push(structuredClone(record));
+        return [record];
+    } };
     return { dependencies: { connection: { startSession: async () => session }, employeeModel, historyModel,
-        capabilityProbe: async () => true }, state: () => committed, ended: () => ended, writes: () => writes };
+        auditModel, auditCollectionChecker: async () => true,
+        referenceChecker: async () => [], capabilityProbe: async () => true },
+    state: () => committed, ended: () => ended, writes: () => writes,
+    deleteFilters: () => deleteFilters, operations: () => structuredClone(operations) };
 }
 const arrangement = { [C.ENABLED]: true, [C.TYPE]: 'APPROVED_TIME_SHIFT_INTERRUPTION',
     [C.FROM]: '2026-09-01', [C.START]: '13:00', [C.END]: '14:00' };
@@ -102,6 +164,33 @@ test('a new arrangement appends complete history and closes previous version', a
     assert.equal(db.state().history[1].aa_eggrafhs, '0002');
 });
 
+test('trusted full future-version double submit reuses the existing canonical version', async () => {
+    const initial = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' }),
+        hmeromhnia_proslhpshs: '2026-04-01' };
+    const db = database({ employee: { _id: 'employee', ...scope, ...initial },
+        history: [{ _id: 'old', ...scope, ...initial, aa_eggrafhs: '0001' }] });
+    const maintenance = { intentHint: 'APPEND_NEW_VERSION',
+        employeeChanges: { hmeromhnia_proslhpshs: '2026-04-01' },
+        historyChanges: { hmeromhnia_proslhpshs: '2026-04-01' },
+        submittedHistoryChanges: { hmeromhnia_proslhpshs: '2026-04-01' },
+        submittedProfileFields: Object.keys(arrangement) };
+    const first = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', input: arrangement, effectiveFrom: '2026-09-15', maintenance });
+    assert.equal(first.mode, 'MODE_NEW_VERSION');
+    assert.equal(db.state().history.length, 2);
+    const writesAfterFirst = db.writes();
+    const second = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', input: arrangement, effectiveFrom: '2026-09-15', maintenance });
+    assert.equal(second.mode, 'NO_HISTORY_CHANGE');
+    assert.equal(second.idempotent, true);
+    assert.equal(db.state().history.length, 2);
+    assert.equal(db.writes(), writesAfterFirst);
+});
+
+const LEGACY_SHADOW_IDS = Object.freeze({
+    legacy: '507f1f77bcf86cd799439101',
+    recorded: '507f1f77bcf86cd799439102'
+});
 function legacyShadowState() {
     const end = new Date('2026-10-15');
     const base = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-05-28' }),
@@ -110,11 +199,11 @@ function legacyShadowState() {
         hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
         mo_oron_hmerhsias_ergasias: 8, nomimosMisthos: 1000,
         pragmatikosMisthos: 1100, poso_symbashs_01: 1100 };
-    const legacy = { ...base, _id: 'legacy-0001', ...scope, aa_eggrafhs: '0001',
+    const legacy = { ...base, _id: LEGACY_SHADOW_IDS.legacy, ...scope, aa_eggrafhs: '0001',
         createdAt: new Date('2026-05-28') };
     for (const field of C.FACT_FIELDS) delete legacy[field];
     delete legacy.employment_profile_source;
-    const recorded = { ...base, _id: 'recorded-0002', ...scope, aa_eggrafhs: '0002',
+    const recorded = { ...base, _id: LEGACY_SHADOW_IDS.recorded, ...scope, aa_eggrafhs: '0002',
         createdAt: new Date('2026-05-29') };
     return { employee: { ...base, _id: 'employee', ...scope, energos: true,
         archived: false, hmeromhnia_apoxorhshs: null }, history: [legacy, recorded] };
@@ -133,7 +222,8 @@ function rotatingAppend(db) {
         mo_oron_hmerhsias_ergasias: 8, nomimosMisthos: 300,
         pragmatikosMisthos: 350, poso_symbashs_01: 350 };
     return writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
-        effectiveFrom: '2026-09-22', maintenance: { originalHistoryId: 'recorded-0002',
+        effectiveFrom: '2026-09-22', maintenance: {
+            intentHint: 'APPEND_NEW_VERSION', originalHistoryId: LEGACY_SHADOW_IDS.recorded,
             employeeChanges: changes, historyChanges: changes } });
 }
 
@@ -143,21 +233,16 @@ test('legacy shadow and recorded V1 close together before one rotating profile a
     const saved = await rotatingAppend(db);
     const state = db.state();
     assert.equal(saved.mode, 'MODE_NEW_VERSION');
-    assert.equal(state.history.length, 3);
-    assert.deepEqual(state.history.slice(0, 2).map(row => row._id), initial.history.map(row => row._id));
-    for (const row of state.history.slice(0, 2)) {
-        assert.equal(new Date(row.hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0, 10), '2026-09-21');
-        assert.equal(new Date(row.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0, 10), '2026-05-28');
-    }
-    for (let index = 0; index < 2; index++) assert.deepEqual(state.history[index], {
-        ...initial.history[index],
-        hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-21')
-    });
-    assert.equal(C.readEmploymentProfile(state.history[0]).recorded, false);
-    assert.equal(Object.hasOwn(state.history[0], C.SCHEMA_VERSION), false);
-    assert.equal(C.readEmploymentProfile(state.history[1]).recorded, true);
-    assert.equal(state.history[0].nomimosMisthos, initial.history[0].nomimosMisthos);
-    const next = state.history[2];
+    assert.equal(state.history.length, 2);
+    assert.deepEqual(state.history.map(row => row._id), [LEGACY_SHADOW_IDS.recorded, 'history-1']);
+    assert.equal(new Date(state.history[0].hmeromhnia_isxyos_oron_ergasias_eos)
+        .toISOString().slice(0, 10), '2026-09-21');
+    assert.equal(C.readEmploymentProfile(state.history[0]).recorded, true);
+    assert.equal(state.audits.length, 1);
+    assert.deepEqual(state.audits[0].deletedLegacyHistoryIds, [LEGACY_SHADOW_IDS.legacy]);
+    assert.deepEqual(db.deleteFilters()[0]._id.$in.map(String), [LEGACY_SHADOW_IDS.legacy]);
+    assert.deepEqual(db.operations().deletedCounts, [1]);
+    const next = state.history[1];
     assertCanonicalWorkTermsMatch(state.employee, next);
     assert.equal(state.employee.typos_apasxolhshs, '2');
     assert.equal(state.employee.typos_ebdomadas, '');
@@ -181,7 +266,8 @@ test('legacy shadow and recorded V1 close together before one rotating profile a
     const cycles = buildEmploymentCycles({ currentEmployee: state.employee, history: state.history });
     assert.equal(cycles.length, 1);
     assert.equal(cycles[0].hire_date, '2026-05-28');
-    assert.equal(resolveEmploymentProfileFactsForDate('2026-09-21', state.history).historyId, 'recorded-0002');
+    assert.equal(resolveEmploymentProfileFactsForDate('2026-09-21', state.history).historyId,
+        LEGACY_SHADOW_IDS.recorded);
     assert.equal(resolveEmploymentProfileFactsForDate('2026-09-22', state.history).historyId, next._id);
 });
 
@@ -196,17 +282,21 @@ test('other overlapping predecessor shapes fail closed before writes', async () 
         'newer cycle': state => { state.history.push({ ...scope, _id: 'newer-cycle',
             hmeromhnia_proslhpshs: '2026-07-01', aa_eggrafhs: '0003' }); }
     };
+    delete cases['two recorded profiles'];
+    delete cases['legacy row created later'];
     for (const [name, mutate] of Object.entries(cases)) {
         const initial = legacyShadowState(); mutate(initial);
         const db = database(initial);
-        await assert.rejects(rotatingAppend(db), error => error.code === 'EMPLOYEE_PROFILE_HISTORY_OVERLAP', name);
+        await assert.rejects(rotatingAppend(db), error =>
+            ['EMPLOYEE_PROFILE_HISTORY_OVERLAP', 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED']
+                .includes(error.code), name);
         assert.equal(db.writes(), 0, name);
         assert.deepEqual(db.state(), initial, name);
     }
 });
 
-test('all legacy-shadow writes roll back on each failure point', async () => {
-    for (const fail of ['close:legacy-0001', 'close:recorded-0002', 'stale', 'employee', 'history', 'commit']) {
+test('all legacy-shadow cleanup writes roll back on each failure point', async () => {
+    for (const fail of ['cleanup', 'audit', 'employee', 'history', 'commit']) {
         const initial = legacyShadowState();
         const db = database(initial, fail);
         await assert.rejects(rotatingAppend(db), undefined, fail);
@@ -224,6 +314,22 @@ test('ambiguous overlap has a dedicated Greek response', () => {
     assert.equal(result.reason, error.code);
     assert.match(result.message, /επικαλυπτόμενες ενεργές περιόδους/);
     assert.match(result.message, /δεν αποθηκεύτηκε/);
+});
+test('ambiguous history conflict has a stable actionable response contract', () => {
+    let status;
+    const response = { status(value) { status = value; return this; }, json(value) { return value; } };
+    const error = Object.assign(new Error('reconciliation'),
+        { code: 'CONFLICT_INCONSISTENT_HISTORY', statusCode: 409 });
+    const result = profileError(response, error);
+    assert.equal(status, 409);
+    assert.equal(result.success, false);
+    assert.equal(result.reason, 'CONFLICT_INCONSISTENT_HISTORY');
+    assert.equal(result.operation, 'EMPLOYEE_MAINTENANCE');
+    assert.match(result.message, /περισσότερες από μία ασυνεπείς εγγραφές ιστορικού/);
+    assert.match(result.message, /Δεν έγινε καμία αλλαγή/);
+    assert.match(result.message, /Επιλέξτε τη συγκεκριμένη περίοδο από το Ιστορικό/);
+    assert.doesNotMatch(result.message, /συμφιλίωση|reconciliation|canonical|schema/i);
+    assert.equal(result.errorMessage, result.message);
 });
 test('history failure rolls back an initial employee insert', async () => {
     const db = database(undefined, 'history');
@@ -308,24 +414,24 @@ test('latest complete correction restores absent canonical current fields withou
     delete saved.employee.typos_apasxolhshs;
     delete saved.employee.typos_ebdomadas;
     saved.employee.hmeromhnia_isxyos_oron_ergasias_eos = new Date('2026-10-15');
-    saved.history[2].hmeromhnia_isxyos_oron_ergasias_eos = new Date('2026-10-15');
+    saved.history[1].hmeromhnia_isxyos_oron_ergasias_eos = new Date('2026-10-15');
     const db = database(saved, '', true);
-    const latest = saved.history[2];
+    const latest = saved.history[1];
     const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
         employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: latest._id,
         effectiveFrom: '2026-09-22', input: {} });
     assert.equal(result.currentUpdated, true);
     assert.equal(result.mode, MODE_CORRECT_EXISTING);
-    assert.equal(db.state().history.length, 3);
-    assert.deepEqual(db.state().history.map(row => row.aa_eggrafhs), ['0001', '0002', '0003']);
-    assert.deepEqual(db.state().history.slice(0, 2), saved.history.slice(0, 2));
+    assert.equal(db.state().history.length, 2);
+    assert.deepEqual(db.state().history.map(row => row.aa_eggrafhs), ['0002', '0003']);
+    assert.deepEqual(db.state().history[0], saved.history[0]);
     for (const field of ['_id', 'aa_eggrafhs', 'hmeromhnia_isxyos_oron_ergasias_apo',
         'hmeromhnia_isxyos_oron_ergasias_eos', 'hmeromhnia_allaghs_orarioy_apo',
         'hmeromhnia_allaghs_orarioy_eos']) {
-        assert.deepEqual(db.state().history[2][field], saved.history[2][field], field);
+        assert.deepEqual(db.state().history[1][field], saved.history[1][field], field);
     }
-    assert.deepEqual(db.state().history[2], saved.history[2]);
-    assertCanonicalWorkTermsMatch(db.state().employee, db.state().history[2]);
+    assert.deepEqual(db.state().history[1], saved.history[1]);
+    assertCanonicalWorkTermsMatch(db.state().employee, db.state().history[1]);
     assert.equal(db.state().employee.typos_apasxolhshs, '2');
     assert.equal(db.state().employee.typos_ebdomadas, '');
     assert.equal(db.state().employee.energos, true);
@@ -422,7 +528,7 @@ test('normal latest legacy Maintenance correction keeps its identity and creates
     assert.equal(C.readEmploymentProfile(db.state().history[0]).recorded, true);
 });
 
-test('Maintenance selects the open modern row over a finite legacy schedule fallback without creating a duplicate', async () => {
+test('Maintenance preserves a sparse lifecycle anchor and selects the open modern profile row', async () => {
     const identity = {
         hmeromhnia_proslhpshs: new Date('2026-04-23'),
         hmeromhnia_allaghs_symbashs: new Date('2026-04-23'),
@@ -450,9 +556,12 @@ test('Maintenance selects the open modern row over a finite legacy schedule fall
     const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
         employeeId: 'employee', effectiveFrom: '2026-04-23', maintenance: {
             identity, employeeChanges: {}, historyChanges: {}
-        } });
+    } });
     assert.equal(result.history._id, 'modern');
     assert.equal(db.state().history.length, 2);
+    assert.equal(db.state().history[0]._id, 'legacy');
+    assert.equal(db.state().history[1]._id, 'modern');
+    assert.equal(db.state().audits, undefined);
 });
 
 test('Maintenance identity keeps true equal effective boundaries ambiguous', () => {
@@ -553,7 +662,7 @@ test('no-change Maintenance selects real May version and preserves non-terms his
     const db = database(initial, '', true);
     const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
         effectiveFrom: '2026-05-25', maintenance: { identity, employeeChanges: {}, historyChanges: {} } });
-    assert.equal(result.mode, MODE_LEGACY_MAINTENANCE);
+    assert.equal(result.mode, 'NO_HISTORY_CHANGE');
     assert.equal(result.history._id, 'real');
     assert.deepEqual(db.state(), initial);
     assert.equal(Object.hasOwn(db.state().employee, 'typos_apasxolhshs'), false);
@@ -763,4 +872,345 @@ test('maintenance departure forces current master inactive', async () => {
         }
     });
     assert.equal(db.state().employee.energos, false);
+});
+
+test('0068 sparse legacy contract-end correction keeps the same row and repeated Save is a no-op', async () => {
+    const sparse = { _id: '0068-history-0001', ...scope, aa_eggrafhs: '0001',
+        hmeromhnia_proslhpshs: '2026-05-01',
+        hmeromhnia_allaghs_symbashs: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_eos: '2026-05-07',
+        hmeromhnia_lhxhs_symbashs: null };
+    const initial = { employee: { ...sparse, _id: 'employee' }, history: [sparse] };
+    const db = database(initial);
+    const maintenance = { originalHistoryId: sparse._id,
+        employeeChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' },
+        historyChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' } };
+    const first = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance });
+    assert.equal(first.history._id, sparse._id);
+    assert.equal(db.state().history.length, 1);
+    assert.equal(db.state().employee.hmeromhnia_lhxhs_symbashs, '2026-10-31');
+    assert.equal(db.state().history[0].hmeromhnia_lhxhs_symbashs, '2026-10-31');
+    assert.equal(db.writes(), 2);
+    const writesAfterFirst = db.writes();
+    const second = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance });
+    assert.equal(second.mode, 'NO_HISTORY_CHANGE');
+    assert.equal(second.idempotent, true);
+    assert.equal(db.writes(), writesAfterFirst);
+    assert.equal(db.state().history.length, 1);
+});
+
+test('successful mutation advances revision, stale second tab writes nothing and no-op keeps revision', async () => {
+    const r1 = '2026-09-26T08:00:00.000Z';
+    const sparse = { _id: 'two-tab-history', ...scope, aa_eggrafhs: '0001', updatedAt: r1,
+        hmeromhnia_proslhpshs: '2026-05-01',
+        hmeromhnia_allaghs_symbashs: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_eos: '2026-05-07',
+        hmeromhnia_lhxhs_symbashs: null };
+    const db = database({ employee: { ...sparse, _id: 'employee' }, history: [sparse] });
+    const save = (contractEnd, expectedRevision) => writeEmployeeEmploymentProfile({
+        ...db.dependencies, scope, employeeId: 'employee', effectiveFrom: '2026-05-01',
+        maintenance: { originalHistoryId: sparse._id, expectedRevision,
+            employeeChanges: { hmeromhnia_lhxhs_symbashs: contractEnd },
+            historyChanges: { hmeromhnia_lhxhs_symbashs: contractEnd } }
+    });
+
+    await save('2026-10-31', r1);
+    const r2 = db.state().history[0].updatedAt;
+    assert.ok(new Date(r2).getTime() > new Date(r1).getTime());
+    const writesAfterTabA = db.writes();
+    await assert.rejects(save('2026-11-30', r1), error => error.code === 'CONFLICT_STALE');
+    assert.equal(db.writes(), writesAfterTabA);
+    assert.equal(db.state().history[0].hmeromhnia_lhxhs_symbashs, '2026-10-31');
+
+    const noOp = await save('2026-10-31', r2);
+    assert.equal(noOp.mode, 'NO_HISTORY_CHANGE');
+    assert.equal(db.writes(), writesAfterTabA);
+    assert.deepEqual(db.state().history[0].updatedAt, r2);
+});
+
+function polluted0069State() {
+    const fixture = buildReal0069SanitizedHistoryFixture();
+    return { employee: fixture.currentEmployee, history: fixture.history };
+}
+
+function save0069(db, originalHistoryId) {
+    return writeEmployeeEmploymentProfile({ ...db.dependencies, scope: REAL_0069_SCOPE,
+        employeeId: REAL_0069_IDS.employee, effectiveFrom: '2026-05-02', maintenance: {
+            originalHistoryId,
+            employeeChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' },
+            historyChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' }
+        } });
+}
+
+test('targeted history deletion normalizes one, many and empty ObjectId sets', () => {
+    const one = buildScopedHistoryDeleteFilter(REAL_0069_SCOPE, [REAL_0069_IDS['0002']]);
+    assert.deepEqual(Object.keys(one), ['team', 'company_kod', 'kodikos', '_id']);
+    assert.equal(one.team, 'BLG');
+    assert.equal(one.company_kod, REAL_0069_SCOPE.company_kod);
+    assert.equal(one.kodikos, '0069');
+    assert.ok(one._id.$in[0] instanceof mongoose.Types.ObjectId);
+    assert.deepEqual(one._id.$in.map(String), [REAL_0069_IDS['0002']]);
+
+    const ids = [REAL_0069_IDS['0002'], REAL_0069_IDS['0003'], REAL_0069_IDS['0004']];
+    const many = buildScopedHistoryDeleteFilter(REAL_0069_SCOPE, ids);
+    assert.deepEqual(many._id.$in.map(String), ids);
+    assert.ok(Object.getOwnPropertySymbols(many._id).length > 0);
+    assert.equal(buildScopedHistoryDeleteFilter(REAL_0069_SCOPE, []), null);
+    assert.deepEqual(normalizeHistoryObjectIds([]), []);
+    assert.throws(() => normalizeHistoryObjectIds(['not-an-object-id']),
+        /Invalid employee history ObjectId/);
+});
+
+test('real 0069 delete path reproduces the raw CastError and accepts the narrowly trusted filter', async () => {
+    const ids = [REAL_0069_IDS['0002'], REAL_0069_IDS['0003'], REAL_0069_IDS['0004']];
+    const previousSanitizeFilter = mongoose.get('sanitizeFilter');
+    mongoose.set('sanitizeFilter', true);
+    try {
+        const badQuery = IstorikoProslhpseonAllagonModel.deleteMany({
+            ...REAL_0069_SCOPE,
+            _id: { $in: ids }
+        });
+        mongoose.sanitizeFilter(badQuery.getFilter());
+        assert.throws(() => badQuery.cast(IstorikoProslhpseonAllagonModel), error =>
+            error.name === 'CastError' && error.path === '_id' &&
+            JSON.stringify(error.value) === JSON.stringify({ $in: ids }));
+
+        const db = database(polluted0069State(), '', false, { castFilter: true });
+        const result = await save0069(db, REAL_0069_IDS['0005']);
+        assert.equal(result.status, 'AUTO_REPAIRABLE');
+        assert.equal(db.deleteFilters().length, 1);
+        const filter = db.deleteFilters()[0];
+        assert.equal(filter.team, 'BLG');
+        assert.equal(filter.company_kod, REAL_0069_SCOPE.company_kod);
+        assert.equal(filter.kodikos, '0069');
+        assert.deepEqual(filter._id.$in.map(String), ids);
+        assert.ok(filter._id.$in.every(id => id instanceof mongoose.Types.ObjectId));
+        assert.deepEqual(db.state().history.map(row => row.aa_eggrafhs), ['0001', '0005']);
+        assert.equal(db.state().history[1].hmeromhnia_lhxhs_symbashs, '2026-10-31');
+        assert.equal(db.state().audits.length, 1);
+        assert.equal(db.writes(), 4);
+        assert.deepEqual(db.operations(), {
+            employeeUpdates: 0,
+            employeeCreates: 0,
+            historyUpdates: 1,
+            historyFenceUpdates: 1,
+            historyDeletes: 1,
+            historyCreates: 0,
+            auditCreates: 1,
+            deletedCounts: [3]
+        });
+        assert.equal(db.ended(), true);
+
+        const writesAfterFirst = db.writes();
+        const operationsAfterFirst = db.operations();
+        const second = await save0069(db, REAL_0069_IDS['0005']);
+        assert.equal(second.mode, 'NO_HISTORY_CHANGE');
+        assert.equal(db.writes(), writesAfterFirst);
+        assert.equal(db.deleteFilters().length, 1);
+        assert.deepEqual(db.operations(), operationsAfterFirst);
+    } finally {
+        mongoose.set('sanitizeFilter', previousSanitizeFilter);
+    }
+});
+
+test('targeted cleanup scope cannot delete a foreign-team history row', async () => {
+    const initial = polluted0069State();
+    const foreign = { ...initial.history[1], _id: '507f1f77bcf86cd799439099', team: 'FOREIGN',
+        aa_eggrafhs: '9000' };
+    initial.history.push(foreign);
+    const db = database(initial, '', false, { scopeFind: true });
+    await save0069(db, REAL_0069_IDS['0005']);
+    assert.ok(db.state().history.some(row => row._id === foreign._id && row.team === 'FOREIGN'));
+    assert.deepEqual(db.state().history.filter(row => row.team === 'BLG').map(row => row.aa_eggrafhs),
+        ['0001', '0005']);
+});
+
+test('invalid cleanup ObjectId fails before audit or data writes', async () => {
+    const initial = polluted0069State();
+    initial.history[1]._id = 'invalid-history-id';
+    const db = database(initial);
+    await assert.rejects(save0069(db, REAL_0069_IDS['0005']),
+        /Invalid employee history ObjectId/);
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('deletedCount mismatch and delete failure roll back audit, update and deletion', async () => {
+    for (const [name, db] of [
+        ['count mismatch', database(polluted0069State(), '', false, { deletedCount: 2 })],
+        ['delete failure', database(polluted0069State(), 'cleanup')]
+    ]) {
+        const before = polluted0069State();
+        await assert.rejects(save0069(db, REAL_0069_IDS['0005']), error =>
+            name === 'count mismatch' ? error.code === 'EMPLOYEE_PROFILE_HISTORY_STALE' :
+                error.message === 'cleanup failed', name);
+        assert.deepEqual(db.state(), before, name);
+        assert.equal(db.ended(), true, name);
+    }
+});
+
+test('0069 deterministic polluted history preserves 0001, repairs 0005 and removes only duplicate snapshots', async () => {
+    const initial = polluted0069State();
+    assert.deepEqual(selectMaintenanceMode(initial.history, initial.employee, initial.employee), {
+        mode: MODE_CORRECT_EXISTING,
+        historyId: REAL_0069_IDS['0005']
+    });
+    for (const originalHistoryId of initial.history.map(row => row._id)) {
+        const db = database(initial);
+        const result = await save0069(db, originalHistoryId);
+        assert.equal(result.history._id, REAL_0069_IDS['0005'], originalHistoryId);
+        assert.equal(result.cleanup.verified.rebuilt.cleanupRequired, false, originalHistoryId);
+        assert.equal(result.cleanup.verified.rebuilt.status, 'CLEAN', originalHistoryId);
+        assert.equal(db.state().history.length, 2, originalHistoryId);
+        assert.deepEqual(db.state().history.map(row => row.aa_eggrafhs), ['0001', '0005'], originalHistoryId);
+        assert.equal(db.state().history[1].hmeromhnia_lhxhs_symbashs, '2026-10-31', originalHistoryId);
+        assert.deepEqual(db.state().history[0], initial.history[0], originalHistoryId);
+        assert.equal(db.state().audits.length, 1, originalHistoryId);
+        assert.deepEqual(db.state().audits[0].deletedLegacyHistoryIds,
+            [REAL_0069_IDS['0002'], REAL_0069_IDS['0003'], REAL_0069_IDS['0004']], originalHistoryId);
+        assert.equal(db.state().audits[0].historyBefore.length, 5, originalHistoryId);
+        assert.equal(db.state().audits[0].historyAfter.length, 2, originalHistoryId);
+        const committedProjection = db.state().history.map(row => Object.fromEntries(
+            Object.keys(db.state().audits[0].historyAfter.find(item => item._id === row._id))
+                .map(field => [field, row[field]])));
+        assert.deepEqual(JSON.parse(JSON.stringify(committedProjection)),
+            JSON.parse(JSON.stringify(db.state().audits[0].historyAfter)), originalHistoryId);
+        assert.deepEqual(db.state().audits[0].survivingHistoryIds,
+            [REAL_0069_IDS['0001'], REAL_0069_IDS['0005']], originalHistoryId);
+        assert.equal(db.writes(), 4, originalHistoryId);
+    }
+    const db = database(initial);
+    await save0069(db, REAL_0069_IDS['0002']);
+    const writesAfterFirst = db.writes();
+    const second = await save0069(db, REAL_0069_IDS['0005']);
+    assert.equal(second.mode, 'NO_HISTORY_CHANGE');
+    assert.equal(second.idempotent, true);
+    assert.equal(db.writes(), writesAfterFirst);
+    assert.equal(db.state().history.length, 2);
+    assert.equal(db.state().audits.length, 1);
+});
+
+test('final verification rolls back when successful counts hide an unapplied update or deletion', async () => {
+    for (const [name, behavior] of [
+        ['update', { pretendUpdateSuccess: true }],
+        ['delete', { pretendDeleteSuccess: true }],
+        ['unexpected insert', { injectUnexpectedHistory: true }]
+    ]) {
+        const initial = polluted0069State();
+        const db = database(initial, '', false, behavior);
+        await assert.rejects(save0069(db, REAL_0069_IDS['0005']), error =>
+            error.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED', name);
+        assert.deepEqual(db.state(), initial, name);
+        assert.equal(db.ended(), true, name);
+    }
+});
+
+test('sparse surviving row enrichment is identical in committed history and repair audit', async () => {
+    const ids = ['507f1f77bcf86cd799439121', '507f1f77bcf86cd799439122'];
+    const complete = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-05-01' }),
+        hmeromhnia_proslhpshs: '2026-05-01', hmeromhnia_lhxhs_symbashs: null,
+        kathestos_apasxolhshs: '0', typos_apasxolhshs: '0',
+        hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
+        mo_oron_hmerhsias_ergasias: 8 };
+    const sparse = ids.map((id, index) => ({ _id: id, ...scope,
+        aa_eggrafhs: String(index + 1).padStart(4, '0'),
+        createdAt: new Date(`2026-05-0${index + 1}T08:00:00.000Z`),
+        updatedAt: new Date(`2026-05-0${index + 1}T08:00:00.000Z`),
+        hmeromhnia_proslhpshs: '2026-05-01',
+        hmeromhnia_allaghs_symbashs: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_eos: '2026-05-07',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_lhxhs_symbashs: null }));
+    const db = database({ employee: { _id: 'employee', ...scope, ...complete },
+        history: sparse });
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance: {
+            originalHistoryId: ids[1], expectedRevision: sparse[1].updatedAt,
+            employeeChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' },
+            historyChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' }
+        } });
+    const state = db.state();
+    assert.deepEqual(state.history.map(row => row._id), [ids[1]]);
+    assert.equal(C.readEmploymentProfile(state.history[0]).recorded, true);
+    assert.equal(state.audits.length, 1);
+    const auditAfter = state.audits[0].historyAfter;
+    const committedProjection = state.history.map(row => Object.fromEntries(
+        Object.keys(auditAfter[0]).map(field => [field, row[field]])));
+    assert.deepEqual(JSON.parse(JSON.stringify(committedProjection)),
+        JSON.parse(JSON.stringify(auditAfter)));
+});
+
+test('competing genuine lifecycle boundaries perform zero writes', async () => {
+    const initial = polluted0069State();
+    const competing = { ...initial.history[0], _id: '0069-competing-hire', aa_eggrafhs: '0006',
+        hmeromhnia_allaghs_symbashs: '2026-05-03',
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-03',
+        createdAt: '2026-10-01T08:00:00.000Z' };
+    initial.history.push(competing);
+    const db = database(initial);
+    await assert.rejects(save0069(db, REAL_0069_IDS['0005']), error =>
+        error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' && error.statusCode === 409);
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('referenced duplicate history ids roll back the shared fence before audit or data changes', async () => {
+    const initial = polluted0069State();
+    const db = database(initial);
+    await assert.rejects(save0069({ ...db,
+        dependencies: { ...db.dependencies, referenceChecker: async () => [{
+            collection: 'Prodhlomena_Oraria_Deviations', documentId: 'deviation-1'
+        }] }
+    }, REAL_0069_IDS['0005']), error =>
+        error.code === 'EMPLOYEE_HISTORY_REFERENCED_CLEANUP_REQUIRED');
+    assert.equal(db.writes(), 1);
+    assert.equal(db.operations().historyFenceUpdates, 1);
+    assert.equal(db.operations().auditCreates, 0);
+    assert.equal(db.operations().historyDeletes, 0);
+    assert.equal(db.operations().historyUpdates, 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('missing audit collection blocks cleanup before audit or history writes', async () => {
+    const initial = polluted0069State();
+    const db = database(initial);
+    await assert.rejects(save0069({ ...db,
+        dependencies: { ...db.dependencies, auditCollectionChecker: async () => false }
+    }, REAL_0069_IDS['0005']), error =>
+        error.code === 'EMPLOYEE_HISTORY_AUDIT_COLLECTION_MISSING');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('concurrent cleanup target change rolls back audit and every planned mutation', async () => {
+    const initial = polluted0069State();
+    const db = database(initial, 'stale');
+    await assert.rejects(save0069(db, REAL_0069_IDS['0005']), error =>
+        error.code === 'EMPLOYEE_PROFILE_HISTORY_STALE');
+    assert.deepEqual(db.state(), initial);
+    assert.equal(db.ended(), true);
+});
+
+test('stale main-form revision rejects before employee or history writes', async () => {
+    const history = { _id: 'history-1', ...scope, aa_eggrafhs: '0001',
+        updatedAt: '2026-09-26T08:00:00.000Z', hmeromhnia_proslhpshs: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-01',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01' };
+    const initial = { employee: { ...history, _id: 'employee', email: 'before@example.test' },
+        history: [history] };
+    const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance: {
+            originalHistoryId: history._id,
+            expectedRevision: '2026-09-26T07:59:59.000Z',
+            employeeChanges: { email: 'after@example.test' }, historyChanges: {}
+        } }), error => error.code === 'CONFLICT_STALE' && error.statusCode === 409);
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
 });

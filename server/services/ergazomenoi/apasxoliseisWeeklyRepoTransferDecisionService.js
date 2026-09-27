@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const DecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
+const { fenceEmployeeHistoryReferences } =
+    require('./employeeHistoryReferenceWriteFenceService');
 const PolicyApprovalModel = require('../../models/apasxoliseisPolicyPreviewApproval');
 const { validateSessionScope } = require('./apasxoliseisPolicyPreviewApprovalService');
 const { reconstructWeeklyRepoTransferDecision } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
@@ -80,6 +82,7 @@ function presentation(record, currentFingerprint = null) { return { id: String(r
 
 async function createWeeklyRepoTransferDecision({ session, payload, decisionModel = DecisionModel, approvalModel = PolicyApprovalModel,
     reconstruct = reconstructWeeklyRepoTransferDecision, periodGuard, mutationRunner,
+    referenceFence = fenceEmployeeHistoryReferences,
     preloadedDecisionByRequestId = null, preloadedDecisionByProposalIdentity = null }) {
     const scope = scopeFromSession(session); const command = validateCommand(payload);
     const normalizedCommandIdentity = commandIdentity(command);
@@ -160,6 +163,8 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
     };
     try {
         const createRecord = async (dbSession = null) => {
+            await referenceFence({ collectionName: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions',
+                documents: [record], session: dbSession });
             if (!dbSession) return decisionModel.create(record);
             const created = await decisionModel.create([record], { session: dbSession });
             return Array.isArray(created) ? created[0] : created;

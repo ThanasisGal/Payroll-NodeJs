@@ -16,6 +16,10 @@ const {
 const {
     writeEmployeeRehire
 } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const {
+    rejectEmployeeScheduleDailyRest,
+    validateEmployeeScheduleDailyRest
+} = require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService');
 
 const REHIRE_WORK_TERM_FIELDS = Object.freeze([
     'eidikh_kathgoria_ergazomenoy',
@@ -125,6 +129,15 @@ async function postEmployeeRehire(req, res) {
     const profileSource = Object.keys(objectOrEmpty(payload.profile)).length
         ? objectOrEmpty(payload.profile)
         : employmentSource;
+
+    const dailyRestValidation = validateEmployeeScheduleDailyRest({
+        ...payload,
+        ...employmentSource,
+        ...profileSource
+    });
+    if (!dailyRestValidation.valid) {
+        return rejectEmployeeScheduleDailyRest(res, dailyRestValidation);
+    }
 
     const rehireDate =
         payload.rehireDate ||

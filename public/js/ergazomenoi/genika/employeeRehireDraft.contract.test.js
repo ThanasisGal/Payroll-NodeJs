@@ -8,6 +8,7 @@ const source = fs.readFileSync(
     path.join(__dirname, 'putFieldValues.js'),
     'utf8'
 );
+const css = fs.readFileSync(path.resolve(__dirname, '../../../css/main.css'), 'utf8');
 
 assert.match(source, /const isRehireDraftMode = rehireQuery\.get\('rehire'\) === '1'/);
 assert.match(source, /setRehireField\('hmeromhnia_proslhpshs', rehireDraftDate\)/);
@@ -25,9 +26,14 @@ assert.match(source, /timerProgressBar: true/);
 assert.match(source, /width: '21rem'/);
 assert.match(source, /showCloseButton: true/);
 assert.match(source, /timer: 5500/);
+assert.match(source, /popup: 'employee-rehire-draft-toast'/);
 assert.match(source, /htmlContainer\.style\.whiteSpace = 'normal'/);
 assert.match(source, /htmlContainer\.style\.overflowWrap = 'anywhere'/);
-assert.doesNotMatch(source, /rehire-draft-notice/);
+assert.match(css, /\.swal2-popup\.employee-rehire-draft-toast\s*\{[\s\S]*?width:\s*min\(24rem, calc\(100vw - 2rem\)\) !important;[\s\S]*?max-width:\s*min\(24rem, calc\(100vw - 2rem\)\) !important;[\s\S]*?left:\s*auto !important;/);
+const globalPopupRule = css.slice(css.indexOf('.swal2-popup {'),
+    css.indexOf('/* Compact Employee Maintenance notice'));
+assert.match(globalPopupRule, /width:\s*auto;/);
+assert.doesNotMatch(globalPopupRule, /24rem/);
 assert.match(source, /if \(isRehireDraftMode\) \{/);
 
 assert.match(source, /rehireIntent: true/);

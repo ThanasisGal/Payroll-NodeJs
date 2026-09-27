@@ -829,6 +829,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/toggleDisabledSelectViaCheckbox.js"
     "public/js/ergazomenoi/genika/toggleDisabledInputViaCheckbox.js"
     "public/js/ergazomenoi/genika/fillLabelFromInput.js"
+    "public/js/ergazomenoi/genika/dailyRestValidation.js"
     "public/js/ergazomenoi/genika/date_sync_add.js"
     "public/js/ergazomenoi/genika/date_sync_edit.js"
     "public/js/ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs.js"
@@ -1854,6 +1855,12 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     
     if ! "$NODE24_BIN/node" -e "require('libxmljs2')" >/dev/null 2>&1; then
         echo "[EC2] LIBXMLJS2_NODE24_GUARD_FAILED: deployment stopped before PM2 reload" >&2
+        exit 1
+    fi
+
+    echo "[EC2] Verifying Employee_History_Repair_Audit release prerequisite..."
+    if ! "$NODE24_BIN/node" scripts/checkEmployeeHistoryRepairAudit.js; then
+        echo "[EC2] EMPLOYEE_HISTORY_REPAIR_AUDIT_PREFLIGHT_FAILED: run the explicit setup command, verify it, then retry deployment" >&2
         exit 1
     fi
     export PATH="$DEPENDENCY_ORIGINAL_PATH"

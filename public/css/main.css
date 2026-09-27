@@ -2875,6 +2875,67 @@ a {
         0 40px 37px 0 rgba(0, 0, 0, 0.22) !important;
 }
 
+/* Compact Employee Maintenance notice; the top-end container owns positioning. */
+.swal2-popup.employee-rehire-draft-toast {
+    width: min(24rem, calc(100vw - 2rem)) !important;
+    max-width: min(24rem, calc(100vw - 2rem)) !important;
+    min-width: 0 !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    box-sizing: border-box !important;
+    padding: 0.75rem 1rem !important;
+    border-radius: 0.5rem !important;
+}
+
+.swal2-popup.employee-rehire-draft-toast .swal2-title,
+.swal2-popup.employee-rehire-draft-toast .swal2-html-container {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+}
+
+.employee-daily-rest-warning {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    margin: 0.5rem 0 0.75rem;
+    padding: 0.7rem 0.85rem;
+    overflow-wrap: anywhere;
+    color: var(--bs-danger-text-emphasis, #842029);
+    background: var(--bs-danger-bg-subtle, #f8d7da);
+    border: 1px solid var(--bs-danger-border-subtle, #f1aeb5);
+    border-left: 0.25rem solid var(--bs-danger, #dc3545);
+    border-radius: 0.375rem;
+    font-size: 0.9rem;
+}
+
+.employee-daily-rest-warning[hidden] {
+    display: none !important;
+}
+
+.employee-daily-rest-warning-title {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.35rem;
+    font-weight: 700;
+}
+
+.employee-daily-rest-warning p {
+    margin: 0 0 0.35rem;
+}
+
+.employee-daily-rest-warning ul {
+    margin: 0 0 0.35rem;
+    padding-left: 1.25rem;
+}
+
+.employee-daily-rest-warning-requirement {
+    margin-bottom: 0 !important;
+    font-weight: 600;
+}
+
 /* Ordinary dialogs with no declared width follow the application's 600px geometry.
    Preview/review classes and dialogs with an explicit width retain their own layout. */
 .swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):has(> .swal2-icon.swal2-error),

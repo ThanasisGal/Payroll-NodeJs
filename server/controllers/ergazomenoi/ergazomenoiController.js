@@ -4,6 +4,10 @@ const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/emplo
 const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
+const {
+    rejectEmployeeScheduleDailyRest,
+    validateEmployeeScheduleDailyRest
+} = require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService');
 const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -833,8 +837,11 @@ class ergazomenoiController {
             const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
             const originalEmploymentHistoryId = selectMaintenanceMode(
                 rawIstorikoData,
-                getIstorikoDateIdentity(ergazomenoiData)
+                getIstorikoDateIdentity(ergazomenoiData),
+                ergazomenoiData
             ).historyId || '';
+            const originalEmploymentHistoryRevision = rawIstorikoData.find(row =>
+                String(row._id) === String(originalEmploymentHistoryId))?.updatedAt?.toISOString?.() || '';
             const perifereies = await PerifereiesModel.find().sort('perigrafh');
             const genikesParametroi = await GenikesParametroiModel.find()
                 .sort({ kodikos: 1 })
@@ -872,6 +879,7 @@ class ergazomenoiController {
                 genikesParametroi,
                 istorikoData,
                 originalEmploymentHistoryId,
+                originalEmploymentHistoryRevision,
                 orariaData,
                 ergazomenoiData: {
                     ...ergazomenoiData,
@@ -1315,6 +1323,10 @@ class ergazomenoiController {
             kodikosValue = 0;
 
         const { formData = {} } = req.body || {};
+        const dailyRestValidation = validateEmployeeScheduleDailyRest(formData);
+        if (!dailyRestValidation.valid) {
+            return rejectEmployeeScheduleDailyRest(res, dailyRestValidation);
+        }
         const submittedFormKeys = new Set(Object.keys(formData));
         const filesToUpdate = req.body?.filesToUpdate || {};
         const aforaDaneismoErgazomenoy = formData.afora_daneismo_ergazomenoy === true;
@@ -3385,6 +3397,10 @@ class ergazomenoiController {
             objectId: mongoose.Types.ObjectId
         });
         if (!scopedAccess) return;
+        const dailyRestValidation = validateEmployeeScheduleDailyRest(formData);
+        if (!dailyRestValidation.valid) {
+            return rejectEmployeeScheduleDailyRest(res, dailyRestValidation);
+        }
         const sixthDayPremiumRate = parseSixthDayPremiumRate(
             formData.pososto_prosayxhshs_6hs_hmeras
         );
@@ -3899,8 +3915,13 @@ class ergazomenoiController {
                         formData.hmeromhnia_allaghs_orarioy_apo ||
                         formData.hmeromhnia_proslhpshs,
                     maintenance: {
+                        expectedRevision: formData.historyExpectedRevision || null,
                         employeeChanges: filteredDataErgazomenoi,
+                        submittedEmployeeFields: submittedEmployeeMaintenanceFields(
+                            filteredDataErgazomenoi, formData),
                         historyChanges: updateFieldsIstoriko,
+                        submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
+                        submittedProfileFields: Object.keys(profileInput(formData, 'edit')),
                         identity: formData.istorikoId
                             ? undefined
                             : getIstorikoDateIdentity(formData),
@@ -3919,19 +3940,32 @@ class ergazomenoiController {
                 });
             }
         } catch (error) {
-            console.error('❌ Σφάλμα κατά την ενημέρωση εργαζόμενου:', error);
             if (isEmploymentProfileError(error)) return profileError(res, error);
             if (String(error?.code || '').startsWith('EMPLOYEE_DEPARTURE_')) return profileError(res, error);
             if (String(error?.code || '').startsWith('EMPLOYEE_REHIRE_')) {
+                const message = 'Η επαναπρόσληψη δεν ολοκληρώθηκε. Ελέγξτε τα στοιχεία της νέας πρόσληψης και δοκιμάστε ξανά.';
                 return res.status(error.statusCode || 409).json({
                     success: false,
                     reason: error.code,
-                    errorMessage:
-                        'Η επαναπρόσληψη δεν ολοκληρώθηκε. Ελέγξτε τα στοιχεία της νέας πρόσληψης και δοκιμάστε ξανά.'
+                    operation: 'REHIRE',
+                    message,
+                    errorMessage: message
                 });
             }
+            console.error('❌ Απρόβλεπτο σφάλμα ενημέρωσης εργαζομένου', {
+                correlationId: req.id || req.headers?.['x-request-id'] || null,
+                team: omadaErgasias,
+                company_kod: kodikosEtaireias,
+                kodikos: kodikosErgazomenoy,
+                operation: rehireIntent === true ? 'REHIRE' : 'EMPLOYEE_MAINTENANCE',
+                errorCode: error?.code || null,
+                errorMessage: error?.message || String(error)
+            });
             return res.status(500).json({
                 success: false,
+                reason: 'EMPLOYEE_PROFILE_SAVE_FAILED',
+                operation: rehireIntent === true ? 'REHIRE' : 'EMPLOYEE_MAINTENANCE',
+                message: 'Σφάλμα κατά την ενημέρωση εργαζόμενου',
                 errorMessage: 'Σφάλμα κατά την ενημέρωση εργαζόμενου'
             });
         }

@@ -930,7 +930,8 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
         krathsh_06: { type: String, trim: true },
         krathsh_07: { type: String, trim: true },
         createdAt: { type: Date, default: Date.now() },
-        updatedAt: { type: Date, default: Date.now() }
+        updatedAt: { type: Date, default: Date.now() },
+        history_reference_fence: { type: Number, min: 0, select: false }
     },
     {
         collection: 'Istoriko_Proslhpseon_Allagon'
