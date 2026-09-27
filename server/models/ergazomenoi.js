@@ -1,4 +1,5 @@
-const { Schema: _Schema, model } = require('mongoose');
+const mongoose = require('mongoose');
+const { Schema: _Schema, model } = mongoose;
 
 const Schema = _Schema;
 const { employmentProfileFields, attachEmploymentProfileValidation } = require('./employeeEmploymentProfileFields');
@@ -957,7 +958,11 @@ attachEmploymentProfileValidation(IstorikoProslhpseonAllagonSchema);
 // employment events. The canonical writer opts into the complete physical set.
 IstorikoProslhpseonAllagonSchema.pre(/^find/, function excludeRedundantHistoryArtifacts() {
     if (this.mongooseOptions().includeRedundantHistoryArtifacts === true) return;
-    this.where({ employment_history_canonical_status: { $ne: 'REDUNDANT_REFERENCED' } });
+    this.where({
+        employment_history_canonical_status: mongoose.trusted({
+            $ne: 'REDUNDANT_REFERENCED'
+        })
+    });
 });
 
 const IstorikoProslhpseonAllagonModel = model(

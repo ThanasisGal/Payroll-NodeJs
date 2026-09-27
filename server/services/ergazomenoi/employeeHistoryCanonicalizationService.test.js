@@ -2,6 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const mongoose = require('mongoose');
 const { EVENT_TYPES, ROW_DISPOSITIONS, CANONICAL_STATUSES,
     REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
     canonicalizeEmployeeHistory } = require('./employeeHistoryCanonicalizationService');
@@ -71,7 +72,7 @@ test('normal model reads exclude referenced artifacts while canonical reads can 
     const normal = IstorikoProslhpseonAllagonModel.find({ team: 'TEST' });
     await runPreFind(normal);
     assert.deepEqual(normal.getFilter().employment_history_canonical_status,
-        { $ne: 'REDUNDANT_REFERENCED' });
+        mongoose.trusted({ $ne: 'REDUNDANT_REFERENCED' }));
     const complete = IstorikoProslhpseonAllagonModel.find({ team: 'TEST' });
     complete.mongooseOptions({ includeRedundantHistoryArtifacts: true });
     await runPreFind(complete);
