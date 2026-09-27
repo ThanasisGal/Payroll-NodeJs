@@ -41,7 +41,11 @@ function isEmploymentProfileError(error) {
     const code = String(error?.code || '');
     return error?.code === 'INVALID_EMPLOYMENT_PROFILE' ||
         code.startsWith('EMPLOYEE_PROFILE_') ||
-        code.startsWith('EMPLOYMENT_CYCLE_');
+        code.startsWith('EMPLOYEE_HISTORY_') ||
+        code.startsWith('EMPLOYMENT_CYCLE_') ||
+        code.startsWith('CONFLICT_') ||
+        ['HIRE_DATE_REQUIRES_CONTROLLED_LIFECYCLE', 'LEGACY_FACTS_REQUIRED',
+            'NEW_VERSION_NOT_FUTURE'].includes(code);
 }
 function profileError(res, error) {
     const messages = {
@@ -63,17 +67,30 @@ function profileError(res, error) {
         EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH: 'Η διόρθωση απαιτεί την ακριβή υπάρχουσα εγγραφή και αμετάβλητες ημερομηνίες περιόδου. Δεν αποθηκεύτηκε η μεταβολή.',
         EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_REHIRE: 'Η ημερομηνία πρόσληψης δεν αλλάζει από απλή μεταβολή ιστορικού. Νέα εργασιακή σχέση καταχωρίζεται μόνο μέσω της επαναπρόσληψης.',
         EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_LIFECYCLE_REPAIR: 'Η ημερομηνία πρόσληψης υπάρχουσας ιστορικής εγγραφής δεν αλλάζει από τον απλό editor. Απαιτείται ελεγχόμενη διόρθωση του ιστορικού.',
+        EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED: 'Βρέθηκαν ασυνεπείς παλαιότερες εγγραφές ιστορικού και η αλλαγή δεν μπορεί να αποθηκευτεί με ασφάλεια. Δεν έγινε καμία αλλαγή. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ιστορικού.',
+        EMPLOYEE_HISTORY_REFERENCED_CLEANUP_REQUIRED: 'Βρέθηκαν παλαιότερες εγγραφές ιστορικού που χρησιμοποιούνται από άλλες καταχωρίσεις και δεν μπορούν να αφαιρεθούν αυτόματα. Δεν έγινε καμία αλλαγή. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ιστορικού.',
+        EMPLOYEE_HISTORY_REFERENCED_DELETE_FORBIDDEN: 'Η εγγραφή ιστορικού χρησιμοποιείται ήδη από υπολογισμούς ή αποθηκευμένα στοιχεία και δεν μπορεί να διαγραφεί. Δεν έγινε καμία αλλαγή.',
+        EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED: 'Δεν ήταν δυνατό να επιβεβαιωθεί με ασφάλεια ότι οι παλαιότερες εγγραφές ιστορικού μπορούν να αφαιρεθούν. Δεν έγινε καμία αλλαγή.',
+        EMPLOYEE_HISTORY_AUDIT_COLLECTION_MISSING: 'Η ασφαλής καταγραφή της διόρθωσης ιστορικού δεν έχει εγκατασταθεί. Δεν έγινε καμία αλλαγή. Επικοινωνήστε με τον διαχειριστή.',
+        EMPLOYEE_HISTORY_AUDIT_COLLECTION_CHECK_FAILED: 'Δεν ήταν δυνατό να επιβεβαιωθεί η ασφαλής καταγραφή της διόρθωσης ιστορικού. Δεν έγινε καμία αλλαγή.',
         EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE: 'Το ιστορικό περιέχει παλαιότερη ανοικτή εργασιακή σχέση πριν από νεότερη πρόσληψη. Απαιτείται έλεγχος του ιστορικού.',
         EMPLOYMENT_CYCLE_OVERLAP: 'Το ιστορικό περιέχει επικαλυπτόμενες εργασιακές σχέσεις. Απαιτείται έλεγχος του ιστορικού.',
         EMPLOYMENT_CYCLE_DEPARTURE_BEFORE_HIRE: 'Το ιστορικό περιέχει αποχώρηση πριν από την αντίστοιχη πρόσληψη. Απαιτείται έλεγχος του ιστορικού.',
         MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE: 'Η προσαύξηση 6ης ημέρας του ιστορικού πρέπει να είναι μη αρνητικός αριθμός.',
-        EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY: 'Βρέθηκαν πολλαπλές εγγραφές με την ίδια ιστορική ταυτότητα. Δεν αποθηκεύτηκε η μεταβολή.'
+        EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY: 'Βρέθηκαν πολλαπλές εγγραφές με την ίδια ιστορική ταυτότητα. Δεν αποθηκεύτηκε η μεταβολή.',
+        CONFLICT_OVERLAP: 'Η αλλαγή ορίων επικαλύπτεται με άλλη περίοδο ιστορικού. Διορθώστε τις ημερομηνίες και δοκιμάστε ξανά.',
+        CONFLICT_AMBIGUOUS_TARGET: 'Βρέθηκαν περισσότερες από μία ασυνεπείς εγγραφές ιστορικού και δεν ήταν δυνατό να προσδιοριστεί με ασφάλεια η σωστή περίοδος. Δεν έγινε καμία αλλαγή. Επιλέξτε τη συγκεκριμένη περίοδο από το Ιστορικό.',
+        CONFLICT_INCONSISTENT_HISTORY: 'Βρέθηκαν περισσότερες από μία ασυνεπείς εγγραφές ιστορικού και δεν ήταν δυνατό να προσδιοριστεί με ασφάλεια η σωστή περίοδος. Δεν έγινε καμία αλλαγή. Επιλέξτε τη συγκεκριμένη περίοδο από το Ιστορικό.',
+        CONFLICT_STALE: 'Τα δεδομένα άλλαξαν από άλλο χρήστη. Ανανεώστε τη φόρμα και δοκιμάστε ξανά.',
+        HIRE_DATE_REQUIRES_CONTROLLED_LIFECYCLE: 'Η αλλαγή ημερομηνίας πρόσληψης απαιτεί ελεγχόμενη ενέργεια κύκλου απασχόλησης και δεν εκτελείται από την απλή συντήρηση.',
+        LEGACY_FACTS_REQUIRED: 'Η παλαιά εγγραφή δεν περιέχει αρκετά στοιχεία για ασφαλή διόρθωση. Συμπληρώστε ρητά τα στοιχεία της περιόδου.',
+        NEW_VERSION_NOT_FUTURE: 'Η νέα μεταβολή πρέπει να αρχίζει μετά την τελευταία περίοδο του ίδιου κύκλου απασχόλησης.'
     };
     const message = error.code === 'INVALID_EMPLOYMENT_PROFILE'
         ? `Μη έγκυρα στοιχεία εργασίας (${error.field}): ${error.message}`
         : messages[error.code] || 'Η αποθήκευση εργαζομένου και ιστορικού απέτυχε. Δεν αποθηκεύτηκε η μεταβολή.';
     return res.status(error.statusCode || 500).json({ success: false, reason: error.code || 'EMPLOYEE_PROFILE_SAVE_FAILED',
-        field: error.field, message, errorMessage: message });
+        field: error.field, operation: error.operation || 'EMPLOYEE_MAINTENANCE', message, errorMessage: message });
 }
 module.exports = { profileInput, profileError, isEmploymentProfileError, historyEditorChanges,
     submittedEmployeeMaintenanceFields };

@@ -104,18 +104,23 @@ test('employee update is covered by CSRF and uses session-scoped filter', () => 
         /return \{\s*_id: employeeId,\s*team: sessionTeam,\s*company_kod: companyId/
     );
     assert.match(employeeController, /requireScopedEmployeeForUpdate\(/);
-    assert.match(employeeController, /input: profileInput\(formData, 'edit'\), employeeId: ergazomenoiId/);
+    assert.match(employeeController, /input: profileInput\(formData, 'edit'\)/);
+    assert.match(employeeController, /employeeId: ergazomenoiId/);
+    assert.match(employeeController,
+        /expectedRevision: formData\.historyExpectedRevision \|\| null/);
     const writer = read('server/services/ergazomenoi/employeeEmploymentProfileWriter.js');
-    assert.match(writer, /employeeModel\.findOne\(employeeId \? \{ \.\.\.filter, _id: employeeId \} : filter\)\.session\(session\)/);
+    assert.match(writer,
+        /requestScopedLean\(\s*employeeModel\.findOne\(employeeId \? \{ \.\.\.filter, _id: employeeId \} : filter\),\s*session/);
     assert.match(writer, /updateOne\(\{ \.\.\.filter, _id: current\._id \}/);
 });
 
-test('employee history identity comes from the scoped database employee', () => {
+test('employee history identity and departure state come from the scoped database employee', () => {
     const updateHandler = employeeController.slice(
         employeeController.indexOf('static postErgazomenoiUpdate'),
         employeeController.indexOf('static getErgazomenosById')
     );
-    assert.match(employeeScope, /\.select\('_id kodikos'\)/);
+    assert.match(employeeScope,
+        /\.select\('_id kodikos hmeromhnia_apoxorhshs'\)/);
     assert.match(employeeScope, /employeeCode = String\(employee\.kodikos \?\? ''\)\.trim\(\)/);
     assert.doesNotMatch(
         updateHandler,

@@ -23,6 +23,9 @@ public/txt-cache/
 # Test files
 server/utils/test-*.js
 scripts/**
+!scripts/setupEmployeeHistoryRepairAudit.js
+!scripts/setupEmployeeHistoryRepairAudit.test.js
+!scripts/checkEmployeeHistoryRepairAudit.js
 !scripts/repair-confirmed-full-day-leave-hours.js
 !scripts/repair-confirmed-full-day-leave-hours.test.js
 !scripts/repair-legacy-no-work-semantics.js

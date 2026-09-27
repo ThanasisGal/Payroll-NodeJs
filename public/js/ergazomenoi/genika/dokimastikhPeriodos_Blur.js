@@ -125,17 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const suggestedDateISO = formatDateToISO(suggestedDate);
                     this.value = suggestedDateISO;
                     
-                    // ✅ Ενημερώνουμε το hmeromhnia_lhxhs_symbashs
-                    if (hmeromhniaLhxhsSymbashs) {
-                        hmeromhniaLhxhsSymbashs.value = suggestedDateISO;
-                    }   
-                    
                     return;
-                }
-                
-                // Αν όλα ΟΚ, ενημέρωση του hmeromhnia_lhxhs_symbashs
-                if (isValid && hmeromhniaLhxhsSymbashs) {
-                    hmeromhniaLhxhsSymbashs.value = dokimastikiPeridoosDate;
                 }
             }
         });

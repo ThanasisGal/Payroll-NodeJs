@@ -228,7 +228,7 @@ test('valid employee lookup returns exact team/company update scope', async () =
     });
     assert.deepEqual(result.employeeScope, lookupFilter);
     assert.equal(result.employeeCode, '0001');
-    assert.equal(projection, '_id kodikos');
+    assert.equal(projection, '_id kodikos hmeromhnia_apoxorhshs');
 });
 
 test('employee scope query rejection returns sanitized 500 without updates', async () => {

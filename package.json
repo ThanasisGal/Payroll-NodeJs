@@ -10,8 +10,8 @@
         "css:minify": "cleancss --inline none -o public/css/main.min.css public/css/main.css",
         "css:verify": "./deploy-css-linux.sh verify",
         "css:deploy": "./deploy-css-linux.sh deploy",
-        "import:prosop": "PHASE=2 EXCEL_PATH=./tblProsop.xlsx node importTblProsop.js",
-        "import:prosop:phase1": "PHASE=1 EXCEL_PATH=./tblProsop.xlsx node importTblProsop.js"
+        "setup:employee-history-repair-audit": "node scripts/setupEmployeeHistoryRepairAudit.js",
+        "check:employee-history-repair-audit": "node scripts/checkEmployeeHistoryRepairAudit.js"
     },
     "keywords": [],
     "author": "",

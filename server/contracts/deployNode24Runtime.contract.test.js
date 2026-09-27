@@ -10,7 +10,8 @@ const { spawnSync } = require('node:child_process');
 const script = fs.readFileSync(path.resolve(__dirname, '../../deploy-ubuntu.sh'), 'utf8');
 const remote = script.slice(script.indexOf('# REMOTE DEPLOYMENT')).split("bash <<'ENDSSH'\n")[1].split('\nENDSSH')[0];
 const preflight = remote.slice(remote.indexOf('    NODE24_BIN='), remote.indexOf('    echo "[EC2] Configuring npm'));
-const nativeGuard = remote.slice(remote.indexOf('    if ! "$NODE24_BIN/node"'), remote.indexOf('    export PATH="$DEPENDENCY_ORIGINAL_PATH"'));
+const nativeGuard = remote.slice(remote.indexOf('    if ! "$NODE24_BIN/node"'),
+    remote.indexOf('    echo "[EC2] Verifying Employee_History_Repair_Audit'));
 
 function fixture(t, { version = 'v24.12.0', abi = '137', nativeExit = 0, missing = '' } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-node24-'));

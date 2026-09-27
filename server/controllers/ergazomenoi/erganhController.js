@@ -404,6 +404,8 @@ const ApasxoliseisCompanyPolicyRuleModel = require('../../models/apasxoliseisCom
 const ApasxoliseisPeriodFrozenSnapshotModel = require('../../models/apasxoliseisPeriodFrozenSnapshot');
 const ApasxoliseisPeriodCorrectiveCaseModel = require('../../models/apasxoliseisPeriodCorrectiveCase');
 const ApasxoliseisCorrectivePayrollPostingModel = require('../../models/apasxoliseisCorrectivePayrollPosting');
+const { fenceEmployeeHistoryReferences } =
+    require('../../services/ergazomenoi/employeeHistoryReferenceWriteFenceService');
 const { ApasxolhseisModel, ApasxolhseisPeriodFactsModel } = require('../../models/kinhseis');
 const {
     getPeriodControl,
@@ -2496,43 +2498,46 @@ async function runWeeklyRepoPostCheck({
         deviationsCleanupFilter.ypokatasthma = selectedYpokatasthma;
     }
 
-    const replaceDeviations = async (session = null) => {
+    const deviationRecords = result.deviations.map((d) => ({
+        team: d.team,
+        company_kod: d.company_kod,
+        period_apo: d.period_apo,
+        period_eos: d.period_eos,
+        ypokatasthma: d.ypokatasthma,
+        kodikos: d.kodikos,
+        eponymo: d.eponymo,
+        onoma: d.onoma,
+        week_apo: d.week_apo,
+        week_eos: d.week_eos,
+        policyVersion: d.policyVersion,
+        sourceVersion: d.sourceVersion,
+        expected_repo: d.expected_repo,
+        actual_repo: d.actual_repo,
+        missing_repo: d.missing_repo,
+        status: d.status || undefined,
+        reasons: Array.isArray(d.reasons) ? d.reasons : undefined,
+        profile_changed_inside_week: d.profile_changed_inside_week,
+        excess_repo: d.excess_repo,
+        effective_expected_repo: d.effective_expected_repo,
+        effective_weekly_workdays: d.effective_weekly_workdays,
+        expected_repo_source: d.expected_repo_source,
+        effective_typos_apasxolhshs: d.effective_typos_apasxolhshs,
+        effective_profile_source: d.effective_profile_source,
+        effective_profile_date: d.effective_profile_date,
+        effective_profile_istoriko_id: d.effective_profile_istoriko_id,
+        previous_typos_apasxolhshs: d.previous_typos_apasxolhshs,
+        previous_profile_source: d.previous_profile_source,
+        previous_profile_date: d.previous_profile_date,
+        previous_profile_istoriko_id: d.previous_profile_istoriko_id,
+        deviation_type: d.deviation_type,
+        note: d.note
+    }));
+    const replaceDeviations = async (session) => {
+        await fenceEmployeeHistoryReferences({ collectionName: 'Prodhlomena_Oraria_Deviations',
+            documents: deviationRecords, session });
         await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter, session ? { session } : undefined);
-        if (result.deviations.length > 0) await ProdhlomenaOrariaDeviationsModel.insertMany(
-            result.deviations.map((d) => ({
-                team: d.team,
-                company_kod: d.company_kod,
-                period_apo: d.period_apo,
-                period_eos: d.period_eos,
-                ypokatasthma: d.ypokatasthma,
-                kodikos: d.kodikos,
-                eponymo: d.eponymo,
-                onoma: d.onoma,
-                week_apo: d.week_apo,
-                week_eos: d.week_eos,
-                policyVersion: d.policyVersion,
-                sourceVersion: d.sourceVersion,
-                expected_repo: d.expected_repo,
-                actual_repo: d.actual_repo,
-                missing_repo: d.missing_repo,
-                status: d.status || undefined,
-                reasons: Array.isArray(d.reasons) ? d.reasons : undefined,
-                profile_changed_inside_week: d.profile_changed_inside_week,
-                excess_repo: d.excess_repo,
-                effective_expected_repo: d.effective_expected_repo,
-                effective_weekly_workdays: d.effective_weekly_workdays,
-                expected_repo_source: d.expected_repo_source,
-                effective_typos_apasxolhshs: d.effective_typos_apasxolhshs,
-                effective_profile_source: d.effective_profile_source,
-                effective_profile_date: d.effective_profile_date,
-                effective_profile_istoriko_id: d.effective_profile_istoriko_id,
-                previous_typos_apasxolhshs: d.previous_typos_apasxolhshs,
-                previous_profile_source: d.previous_profile_source,
-                previous_profile_date: d.previous_profile_date,
-                previous_profile_istoriko_id: d.previous_profile_istoriko_id,
-                deviation_type: d.deviation_type,
-                note: d.note
-            })),
+        if (deviationRecords.length > 0) await ProdhlomenaOrariaDeviationsModel.insertMany(
+            deviationRecords,
             session ? { session, ordered: false } : { ordered: false }
         );
     };
@@ -2542,7 +2547,14 @@ async function runWeeklyRepoPostCheck({
             calculationId,
             work: ({ session }) => replaceDeviations(session)
         });
-    } else await replaceDeviations();
+    } else {
+        const referenceSession = await mongoose.startSession();
+        try {
+            await referenceSession.withTransaction(() => replaceDeviations(referenceSession));
+        } finally {
+            await referenceSession.endSession();
+        }
+    }
 
     result.deviationsSaved = result.deviations.length;
 
@@ -9030,7 +9042,23 @@ class erganhController {
                     team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
                     deferred_week_id: deferredWeekId, resolution_kind: 'DEFERRED_CROSS_PERIOD_REPO_RESOLUTION',
                     resolution_status: 'RESOLVED' }).sort({ resolution_revision: 1 }).lean(),
-                create: (record) => ApasxoliseisWeeklyRepoTransferDecisionModel.create(record)
+                create: async (record) => {
+                    const referenceSession = await mongoose.startSession();
+                    try {
+                        let created;
+                        await referenceSession.withTransaction(async () => {
+                            await fenceEmployeeHistoryReferences({
+                                collectionName: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions',
+                                documents: [record], session: referenceSession
+                            });
+                            [created] = await ApasxoliseisWeeklyRepoTransferDecisionModel
+                                .create([record], { session: referenceSession });
+                        });
+                        return created;
+                    } finally {
+                        await referenceSession.endSession();
+                    }
+                }
             };
             const result = await resolveDeferredCrossPeriodRepo({ body: req.body, session: req.session,
                 decisionStore: store, indexGuard: assertDeferredCrossPeriodResolutionIndexReady,
@@ -12427,6 +12455,18 @@ class erganhController {
                                     decision_code: 'APPROVE_PROPOSAL', notes: reason_or_notes,
                                     request_id }, reconstruct: async () => preparedPair,
                                 periodGuard: async () => {},
+                                mutationRunner: async (write) => {
+                                    const referenceSession = await mongoose.startSession();
+                                    try {
+                                        let result;
+                                        await referenceSession.withTransaction(async () => {
+                                            result = await write(referenceSession);
+                                        });
+                                        return result;
+                                    } finally {
+                                        await referenceSession.endSession();
+                                    }
+                                },
                                 preloadedDecisionByRequestId: prepared.decisionByRequestId,
                                 preloadedDecisionByProposalIdentity:
                                     prepared.decisionByProposalIdentity });

@@ -3,6 +3,8 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const DecisionModel = require('../../models/apasxoliseisWeeklyCanonicalDecision');
+const { fenceEmployeeHistoryReferences } =
+    require('./employeeHistoryReferenceWriteFenceService');
 const {
     assertCriticalEmploymentDecisionRole
 } = require('./apasxoliseisCriticalActionAuthorizationService');
@@ -365,6 +367,7 @@ async function recordWeeklyCanonicalDecision({
     decisionModel = DecisionModel,
     indexReadinessGuard = assertWeeklyCanonicalDecisionIndexesReady,
     mutationRunner = null,
+    referenceFence = fenceEmployeeHistoryReferences,
     now = new Date()
 }) {
     const validated = validateDecisionCommand({ session, command, currentInput });
@@ -415,6 +418,8 @@ async function recordWeeklyCanonicalDecision({
     };
     try {
         const createRecord = async (dbSession = null) => {
+            await referenceFence({ collectionName: 'Apasxoliseis_Weekly_Canonical_Decisions',
+                documents: [record], session: dbSession });
             if (!dbSession) return decisionModel.create(record);
             const created = await decisionModel.create([record], { session: dbSession });
             return Array.isArray(created) ? created[0] : created;

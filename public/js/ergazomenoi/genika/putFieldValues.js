@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
         setRehireField('istorikoId', '');
+        setRehireField('historyExpectedRevision', '');
 
         const terminationCheckbox =
             document.getElementById('kataggelia_me_proeidopoihsh');

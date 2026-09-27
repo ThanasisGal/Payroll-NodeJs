@@ -69,4 +69,16 @@ function semanticEmploymentProfileChanged(current, { employeeChanges = {}, histo
         JSON.stringify(semanticValue(current, field)) !== JSON.stringify(semanticValue(proposed, field)));
 }
 
-module.exports = { IDENTITY_FIELDS, TRANSITION_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged };
+function semanticEmploymentProfilePatch(current, maintenance = {}, input = {}) {
+    const submitted = Object.fromEntries(Object.entries({
+        ...(maintenance.historyChanges || {}), ...(maintenance.employeeChanges || {}),
+        ...(maintenance.identity || {}), ...input
+    }).filter(([, value]) => value !== undefined));
+    const proposed = { ...current, ...submitted };
+    return Object.fromEntries(TRANSITION_FIELDS.filter(field => Object.hasOwn(submitted, field) &&
+        JSON.stringify(semanticValue(current, field)) !== JSON.stringify(semanticValue(proposed, field)))
+        .map(field => [field, submitted[field]]));
+}
+
+module.exports = { IDENTITY_FIELDS, TRANSITION_FIELDS, NEW_CURRENT_FIELDS,
+    semanticEmploymentProfileChanged, semanticEmploymentProfilePatch };

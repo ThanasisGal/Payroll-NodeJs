@@ -14,6 +14,8 @@ const { buildCorrectiveDelta, correctionSubmissionCapability,
 const { assertPeriodLifecycleIndexesReady } = require('./apasxoliseisPeriodLifecycleIndexGuardService');
 const { isHistoricalDependencyCurrent } =
     require('./apasxoliseisHistoricalPeriodReconstructionService');
+const { fenceEmployeeHistoryReferences } =
+    require('./employeeHistoryReferenceWriteFenceService');
 
 function actor(session = {}) {
     const role = assertCriticalEmploymentDecisionRole(session); const id = String(session.userId || '').trim();
@@ -42,6 +44,7 @@ function authoritativeSubmissionPeriod(submission = {}) {
 async function finalizeEmploymentPeriod({ session: userSession, scope: input, reason, requestId, snapshotInput, now = new Date(),
     periodControlModel = PeriodControlModel, frozenModel = FrozenModel, auditModel = LifecycleAuditModel,
     indexGuard = assertPeriodLifecycleIndexesReady, transactionRunner = transaction,
+    referenceFence = fenceEmployeeHistoryReferences,
     historicalFingerprintResolver = (options) => require('./apasxoliseisHistoricalPeriodReconstructionService')
         .calculateHistoricalFingerprints(options) }) {
     const scope = normalizeScope(input); const by = actor(userSession); const cleanReason = requiredText(reason,
@@ -72,12 +75,15 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
             ? 'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE' : 'NORMAL';
         let documents;
         try {
-            documents = await frozenModel.create([{ ...scope, ...built, frozen_snapshot: built.snapshot,
+            const frozenRecord = { ...scope, ...built, frozen_snapshot: built.snapshot,
                 finalized_at: now, finalized_by_user_id: by.user_id, finalized_by_user_name: by.user_name,
                 finalized_by_user_role: by.role, finalize_reason: cleanReason, request_id: cleanRequestId,
                 baseline_origin: baselineOrigin,
                 historical_reconstruction_version: historicalReconstructionVersion,
-                created_at: now }], { session: dbSession });
+                created_at: now };
+            await referenceFence({ collectionName: 'Apasxoliseis_Period_Frozen_Snapshots',
+                documents: [frozenRecord], session: dbSession });
+            documents = await frozenModel.create([frozenRecord], { session: dbSession });
         } catch (error) {
             const scopeVersionConflict = error?.code === 11000 && (
                 error?.keyPattern?.historical_reconstruction_version === 1 ||
