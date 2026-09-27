@@ -31,14 +31,17 @@ function memory(employee = legacy(), history = [], fail = false) {
         findOne: filter => query(() => matches(draft.employee, filter) ? draft.employee : null),
         async updateOne(filter, update, { session: s }) { assert.equal(s, session); assert(matches(draft.employee, filter)); Object.assign(draft.employee, clone(update.$set)); return { matchedCount: 1 }; }
     };
-    const historyModel = {
+    const historyModel = Object.assign(function HistoryDocument(row) { return clone(row); }, {
         find: filter => query(() => draft.history.filter(row => matches(row, filter))),
         async create([row], { session: s }) { assert.equal(s, session); const saved = { _id: 'h' + draft.history.length, ...clone(row) }; draft.history.push(saved); return [saved]; },
         async updateOne(filter, update, { session: s }) { assert.equal(s, session); const row = draft.history.find(row => matches(row, filter)); if (!row) return { matchedCount: 0 }; Object.assign(row, clone(update.$set || {})); for (const [field, increment] of Object.entries(update.$inc || {})) row[field] = Number(row[field] || 0) + increment; return { matchedCount: 1 }; },
-        async deleteOne(filter, { session: s }) { assert.equal(s, session); const i = draft.history.findIndex(row => matches(row, filter)); if (i < 0) return { deletedCount: 0 }; draft.history.splice(i, 1); return { deletedCount: 1 }; }
-    };
+        async updateMany(filter, update, { session: s }) { assert.equal(s, session); const ids = new Set(filter._id.$in.map(String)); const found = draft.history.filter(row => ids.has(String(row._id))); for (const row of found) for (const [field, increment] of Object.entries(update.$inc || {})) row[field] = Number(row[field] || 0) + increment; return { matchedCount: found.length }; },
+        async deleteMany(filter, { session: s }) { assert.equal(s, session); const ids = new Set(filter._id.$in.map(String)); const before = draft.history.length; draft.history = draft.history.filter(row => !ids.has(String(row._id))); return { deletedCount: before - draft.history.length }; }
+    });
     const deps = { scope, employeeId: employee._id, employeeModel, historyModel,
         connection: { startSession: async () => session }, referenceChecker: async () => [],
+        auditModel: { async create() { return [{}]; } },
+        auditCollectionChecker: async () => true,
         capabilityProbe: async () => true };
     return { state: () => clone(state), deps, append: (date, minutes, patch = {}) => W.writeEmployeeEmploymentProfile({ ...deps,
         effectiveFrom: date, input: { dialleima_se_lepta: minutes }, maintenance: undefined,

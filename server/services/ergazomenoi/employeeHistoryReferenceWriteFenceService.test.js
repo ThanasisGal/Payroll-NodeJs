@@ -201,16 +201,17 @@ test('every repository writer and cleanup deletion use the shared history write 
         'server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionService.js'
     ]) assert.match(read(file), /fenceEmployeeHistoryReferences/);
     const writer = read('server/services/ergazomenoi/employeeEmploymentProfileWriter.js');
-    assert.match(writer, /historyModel\.updateMany\(deleteFilter[\s\S]*HISTORY_REFERENCE_FENCE_FIELD/);
-    assert.ok(writer.indexOf('historyModel.updateMany(deleteFilter') <
-        writer.indexOf('referenceChecker({ connection, historyIds: deletedIds, session })'));
-    const editorDelete = writer.slice(writer.indexOf("if (op.state === 'deleted')"),
-        writer.indexOf("} else {", writer.indexOf("if (op.state === 'deleted')")));
-    assert.match(editorDelete, /historyModel\.updateOne\([\s\S]*HISTORY_REFERENCE_FENCE_FIELD/);
-    assert.ok(editorDelete.indexOf('HISTORY_REFERENCE_FENCE_FIELD') <
-        editorDelete.indexOf('referenceChecker({ connection'));
-    assert.ok(editorDelete.indexOf('referenceChecker({ connection') <
-        editorDelete.indexOf('historyModel.deleteOne'));
+    const executor = writer.slice(writer.indexOf('async function executeFinalMutationPlan'),
+        writer.indexOf('// Private session sharing'));
+    assert.match(executor, /historyModel\.updateMany\(deleteFilter[\s\S]*HISTORY_REFERENCE_FENCE_FIELD/);
+    assert.ok(executor.indexOf('historyModel.updateMany(deleteFilter') <
+        executor.indexOf('checkedHistoryReferences({ referenceChecker, connection'));
+    const editorStart = writer.indexOf('async function writeEmployeeEmploymentHistoryOperations');
+    const editorEnd = writer.indexOf('\n\nconst HISTORY_CURRENT_FIELDS', editorStart);
+    const editor = writer.slice(editorStart, editorEnd);
+    assert.doesNotMatch(editor,
+        /historyModel\.(?:updateOne|updateMany|deleteOne|deleteMany|create)\(/);
+    assert.match(editor, /executeFinalMutationPlan\(/);
     const controller = read('server/controllers/ergazomenoi/erganhController.js');
     const bulkStart = controller.indexOf('static completeWeeklyHrWorkflowStage2Bulk');
     const bulkEnd = controller.indexOf('\n    static ', bulkStart + 1);

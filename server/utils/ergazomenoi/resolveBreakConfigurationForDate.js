@@ -2,6 +2,7 @@
 
 const C = require('./employmentProfileContract');
 const T = require('./employmentProfileTemporal');
+const { semanticHistoryRows } = require('./employmentHistoryCanonicalStatus');
 
 function dateOnlyUtc(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -44,6 +45,7 @@ function stableIdentity(row = {}) {
 }
 
 function resolveBreakConfigurationForDate(date, historyRows = [], employee = {}) {
+    historyRows = semanticHistoryRows(historyRows);
     const intervals = source => T.versioned(employee, historyRows)
         ? Object.fromEntries(C.BREAK_PAIRS.flat().map(field => [field, source[field] ?? null])) : {};
     const targetDate = dateOnlyUtc(date);

@@ -80,7 +80,9 @@ function database(initial, fail = '') {
         async updateOne(filter, update, options) {
             assert.equal(options.session, session);
             writes += 1;
-            if (fail === 'prior-close' && update.$set?.hmeromhnia_apoxorhshs) {
+            if (fail === 'prior-close' &&
+                (update.$set?.hmeromhnia_apoxorhshs ||
+                    update.$set?.hmeromhnia_isxyos_oron_ergasias_eos)) {
                 throw new Error('prior close failed');
             }
             const row = draft.history.find(item => matches(item, filter));
@@ -110,7 +112,10 @@ function database(initial, fail = '') {
             },
             capabilityProbe: async () => true,
             employeeModel,
-            historyModel
+            historyModel,
+            auditModel: { async create() { return [{}]; } },
+            auditCollectionChecker: async () => true,
+            referenceChecker: async () => []
         },
         state: () => clone(committed),
         writes: () => writes,
@@ -372,7 +377,7 @@ test('a third relationship appends cycle 3 without changing cycle 1', async () =
     assert.equal(dateKey(db.state().history[2].hmeromhnia_proslhpshs), '2027-02-01');
 });
 
-test('rehire leaves malformed older legacy rows untouched when current cycle is safely anchored', async () => {
+test('rehire remains full-history strict when an older lifecycle is malformed', async () => {
     const initial = {
         employee: {
             _id: 'employee-1', ...scope, archived: false, energos: false,
@@ -392,17 +397,13 @@ test('rehire leaves malformed older legacy rows untouched when current cycle is 
                 hmeromhnia_isxyos_oron_ergasias_eos: null, afora_proslhpsh: true }
         ]
     };
-    const legacyBefore = initial.history.slice(0, 2).map(clone);
+    const before = clone(initial);
     const db = database(initial);
 
-    const result = await writeEmployeeRehire({
+    await assert.rejects(writeEmployeeRehire({
         ...db.deps, scope, employeeId: 'employee-1', rehireDate: '2026-08-21'
-    });
-
-    const stored = db.state();
-    assert.deepEqual(stored.history.slice(0, 2), legacyBefore);
-    assert.equal(dateKey(stored.history[2].hmeromhnia_apoxorhshs), '2026-07-20');
-    assert.equal(dateKey(stored.history[2].hmeromhnia_isxyos_oron_ergasias_eos), '2026-07-20');
-    assert.equal(dateKey(stored.history.at(-1).hmeromhnia_proslhpshs), '2026-08-21');
-    assert.equal(result.previous_cycle.hire_date, '2026-06-30');
+    }), error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), before);
 });

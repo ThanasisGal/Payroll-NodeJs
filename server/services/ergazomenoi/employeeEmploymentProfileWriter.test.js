@@ -2,7 +2,9 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const mongoose = require('mongoose');
-const { writeEmployeeEmploymentProfile, selectMaintenanceMode, MODE_CORRECT_EXISTING,
+const { writeEmployeeEmploymentProfile, repairEmployeeHistoryCanonical,
+    deleteEmployeeAndEmploymentHistory,
+    selectMaintenanceMode, MODE_CORRECT_EXISTING,
     normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter } = require('./employeeEmploymentProfileWriter');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { buildCompleteProfileSnapshot } = require('../../utils/ergazomenoi/employmentProfileHistory');
@@ -13,6 +15,10 @@ const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverServ
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { REAL_0069_SCOPE, REAL_0069_IDS, buildReal0069SanitizedHistoryFixture } =
     require('./fixtures/real0069SanitizedHistoryFixture');
+const { REAL_0002_IDS, buildReal0002SanitizedHistoryFixture } =
+    require('./fixtures/real0002SanitizedHistoryFixture');
+const { SUPPORTED_COLLECTIONS } =
+    require('./employeeHistoryReferenceDefinitionsService');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
@@ -39,7 +45,7 @@ function database(initial = { employee: null, history: [] }, fail = '', castCurr
     deleteBehavior = {}) {
     let committed = structuredClone(initial); let draft; let ended = false; let writes = 0;
     const deleteFilters = [];
-    const operations = { employeeUpdates: 0, employeeCreates: 0, historyUpdates: 0,
+    const operations = { employeeUpdates: 0, employeeCreates: 0, employeeDeletes: 0, historyUpdates: 0,
         historyFenceUpdates: 0, historyDeletes: 0, historyCreates: 0,
         auditCreates: 0, deletedCounts: [] };
     const session = { async withTransaction(work) {
@@ -64,6 +70,12 @@ function database(initial = { employee: null, history: [] }, fail = '', castCurr
         async create([record], options) {
             assert.equal(options.session, session); writes++; operations.employeeCreates++;
             draft.employee = { _id: 'employee', ...record }; return [draft.employee];
+        },
+        async deleteOne(filter, options) {
+            assert.equal(options.session, session); writes++; operations.employeeDeletes++;
+            if (!matches(draft.employee, filter)) return { deletedCount: 0 };
+            draft.employee = null;
+            return { deletedCount: 1 };
         }
     };
     const historyModel = {
@@ -150,6 +162,22 @@ test('initial employee and complete history commit together', async () => {
     const history = db.state().history[0];
     for (const field of C.FACT_FIELDS) assert.deepEqual(history[field], db.state().employee[field], field);
     assert.equal(history.afora_proslhpsh, true); assert.equal(db.ended(), true);
+});
+
+test('whole-employee deletion uses the canonical plan, reference fence and final empty verification', async () => {
+    const initial = buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' });
+    const db = database({ employee: { _id: 'employee', ...scope, ...initial },
+        history: [{ _id: '507f1f77bcf86cd799439199', ...scope, ...initial,
+            aa_eggrafhs: '0001' }] });
+    const result = await deleteEmployeeAndEmploymentHistory({ ...db.dependencies,
+        scope, employeeId: 'employee' });
+    assert.deepEqual(result, { deletedEmployee: 1, deletedHistory: 1 });
+    assert.equal(db.state().employee, null);
+    assert.deepEqual(db.state().history, []);
+    assert.equal(db.operations().employeeDeletes, 1);
+    assert.equal(db.operations().historyFenceUpdates, 1);
+    assert.equal(db.operations().historyDeletes, 1);
+    assert.equal(db.operations().auditCreates, 1);
 });
 test('a new arrangement appends complete history and closes previous version', async () => {
     const initial = buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' });
@@ -364,7 +392,8 @@ test('same-date or retroactive changes cannot overwrite a later profile', async 
     for (const effectiveFrom of ['2026-09-01', '2026-09-15']) {
         const db = database(initial);
         await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope, input: arrangement, effectiveFrom }),
-            (error) => error.code === 'EMPLOYEE_PROFILE_NON_APPEND_CHANGE');
+            (error) => ['EMPLOYEE_PROFILE_NON_APPEND_CHANGE',
+                'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'].includes(error.code));
         assert.deepEqual(db.state(), initial); assert.equal(db.writes(), 0);
     }
 });
@@ -561,7 +590,7 @@ test('Maintenance preserves a sparse lifecycle anchor and selects the open moder
     assert.equal(db.state().history.length, 2);
     assert.equal(db.state().history[0]._id, 'legacy');
     assert.equal(db.state().history[1]._id, 'modern');
-    assert.equal(db.state().audits, undefined);
+    assert.equal(db.state().audits.length, 1);
 });
 
 test('Maintenance identity keeps true equal effective boundaries ambiguous', () => {
@@ -996,6 +1025,7 @@ test('real 0069 delete path reproduces the raw CastError and accepts the narrowl
         assert.deepEqual(db.operations(), {
             employeeUpdates: 0,
             employeeCreates: 0,
+            employeeDeletes: 0,
             historyUpdates: 1,
             historyFenceUpdates: 1,
             historyDeletes: 1,
@@ -1094,6 +1124,20 @@ test('0069 deterministic polluted history preserves 0001, repairs 0005 and remov
     assert.equal(db.state().audits.length, 1);
 });
 
+test('controlled legacy normalization uses the canonical writer and is idempotent', async () => {
+    const db = database(polluted0069State());
+    const first = await repairEmployeeHistoryCanonical({ ...db.dependencies,
+        scope: REAL_0069_SCOPE, employeeId: REAL_0069_IDS.employee });
+    assert.equal(first.changed, true);
+    assert.deepEqual(db.state().history.map(row => String(row._id)),
+        [REAL_0069_IDS['0001'], REAL_0069_IDS['0005']]);
+    const writesAfterFirst = db.writes();
+    const second = await repairEmployeeHistoryCanonical({ ...db.dependencies,
+        scope: REAL_0069_SCOPE, employeeId: REAL_0069_IDS.employee });
+    assert.equal(second.changed, false);
+    assert.equal(db.writes(), writesAfterFirst);
+});
+
 test('final verification rolls back when successful counts hide an unapplied update or deletion', async () => {
     for (const [name, behavior] of [
         ['update', { pretendUpdateSuccess: true }],
@@ -1160,22 +1204,82 @@ test('competing genuine lifecycle boundaries perform zero writes', async () => {
     assert.deepEqual(db.state(), initial);
 });
 
-test('referenced duplicate history ids roll back the shared fence before audit or data changes', async () => {
+test('referenced duplicate history ids remain physical and become semantically inert', async () => {
     const initial = polluted0069State();
     const db = database(initial);
-    await assert.rejects(save0069({ ...db,
+    const result = await save0069({ ...db,
         dependencies: { ...db.dependencies, referenceChecker: async () => [{
             collection: 'Prodhlomena_Oraria_Deviations', documentId: 'deviation-1'
         }] }
-    }, REAL_0069_IDS['0005']), error =>
-        error.code === 'EMPLOYEE_HISTORY_REFERENCED_CLEANUP_REQUIRED');
-    assert.equal(db.writes(), 1);
+    }, REAL_0069_IDS['0005']);
+    assert.equal(result.cleanup.referencedRedundant.length, 3);
     assert.equal(db.operations().historyFenceUpdates, 1);
-    assert.equal(db.operations().auditCreates, 0);
+    assert.equal(db.operations().auditCreates, 1);
     assert.equal(db.operations().historyDeletes, 0);
-    assert.equal(db.operations().historyUpdates, 0);
-    assert.deepEqual(db.state(), initial);
+    assert.equal(db.operations().historyUpdates, 4);
+    const retained = db.state().history.filter(row =>
+        [REAL_0069_IDS['0002'], REAL_0069_IDS['0003'], REAL_0069_IDS['0004']]
+            .includes(String(row._id)));
+    assert.equal(retained.length, 3);
+    assert.ok(retained.every(row => row.employment_history_canonical_status ===
+        'REDUNDANT_REFERENCED'));
+    assert.ok(retained.every(row => String(row.employment_history_canonical_survivor_id) ===
+        REAL_0069_IDS['0005']));
 });
+
+test('real 0006/0002 unchanged Save keeps all three semantic ids and normalizes once', async () => {
+    const fixture = buildReal0002SanitizedHistoryFixture();
+    const db = database({ employee: fixture.currentEmployee, history: fixture.history });
+    const dependencies = db.dependencies;
+    const save = () => writeEmployeeEmploymentProfile({ ...dependencies,
+        scope: fixture.scope, employeeId: String(fixture.currentEmployee._id),
+        effectiveFrom: '2026-09-16', input: C.readEmploymentProfile(fixture.currentEmployee).facts,
+        maintenance: { originalHistoryId: REAL_0002_IDS.CURRENT_PROFILE,
+            employeeChanges: {}, historyChanges: {}, submittedEmployeeFields: [],
+            submittedProfileFields: [], submittedHistoryChanges: {} } });
+
+    const first = await save();
+    assert.deepEqual(db.state().history.map(row => String(row._id)), [
+        REAL_0002_IDS.OLD_PROFILE, REAL_0002_IDS.DEPARTURE, REAL_0002_IDS.CURRENT_PROFILE
+    ]);
+    assert.equal(new Date(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_eos)
+        .toISOString().slice(0, 10), '2026-07-31');
+    assert.equal(db.operations().employeeUpdates, 0);
+    assert.equal(db.operations().historyUpdates, 1);
+    assert.equal(db.operations().historyDeletes, 0);
+    assert.equal(db.operations().historyCreates, 0);
+    assert.equal(db.operations().auditCreates, 1);
+    assert.deepEqual(first.cleanup.referencedUpdates, []);
+    const afterFirst = structuredClone(db.state());
+    const writesAfterFirst = db.writes();
+
+    const second = await save();
+    assert.equal(second.mode, 'NO_HISTORY_CHANGE');
+    assert.equal(db.writes(), writesAfterFirst);
+    assert.deepEqual(db.state(), afterFirst);
+    assert.equal(db.state().audits.length, 1);
+});
+
+for (const collection of SUPPORTED_COLLECTIONS) test(
+    `referenced canonical UPDATE preserves the stable id for frozen consumer ${collection}`,
+    async () => {
+        const fixture = buildReal0002SanitizedHistoryFixture();
+        const db = database({ employee: fixture.currentEmployee, history: fixture.history });
+        const result = await repairEmployeeHistoryCanonical({ ...db.dependencies,
+            scope: fixture.scope, employeeId: String(fixture.currentEmployee._id),
+            referenceChecker: async ({ historyIds }) => historyIds.map(String)
+                .includes(REAL_0002_IDS.OLD_PROFILE)
+                ? [{ collection, documentId: `${collection}-document` }] : [] });
+        assert.equal(result.changed, true);
+        assert.deepEqual(db.state().history.map(row => String(row._id)), [
+            REAL_0002_IDS.OLD_PROFILE, REAL_0002_IDS.DEPARTURE,
+            REAL_0002_IDS.CURRENT_PROFILE
+        ]);
+        assert.equal(db.operations().historyUpdates, 1);
+        assert.equal(db.operations().historyDeletes, 0);
+        assert.deepEqual(result.applied.referencedUpdates.map(item => item.historyId),
+            [REAL_0002_IDS.OLD_PROFILE]);
+    });
 
 test('missing audit collection blocks cleanup before audit or history writes', async () => {
     const initial = polluted0069State();

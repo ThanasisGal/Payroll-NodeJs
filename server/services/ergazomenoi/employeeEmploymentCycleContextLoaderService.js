@@ -5,6 +5,8 @@ const {
     IstorikoProslhpseonAllagonModel
 } = require('../../models/ergazomenoi');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
+const { REDUNDANT_STATUS_FIELD, semanticHistoryRows } =
+    require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 
 const LIFECYCLE_HISTORY_FIELDS = Object.freeze([
     '_id',
@@ -15,6 +17,7 @@ const LIFECYCLE_HISTORY_FIELDS = Object.freeze([
     'hmeromhnia_allaghs_symbashs',
     'hmeromhnia_allaghs_orarioy_apo',
     'hmeromhnia_isxyos_oron_ergasias_apo',
+    REDUNDANT_STATUS_FIELD,
     'createdAt'
 ]);
 
@@ -27,7 +30,7 @@ function distinctHireDates(employee = {}, history = []) {
     const currentHire = dateKeyUtc(employee.hmeromhnia_proslhpshs);
     if (currentHire) dates.add(currentHire);
 
-    for (const row of history) {
+    for (const row of semanticHistoryRows(history)) {
         const hire = dateKeyUtc(row?.hmeromhnia_proslhpshs);
         if (hire) dates.add(hire);
     }
@@ -93,7 +96,7 @@ async function preloadEmployeeEmploymentCycleContexts({
             return { ...employee };
         }
 
-        const history = historyByCode.get(code) || [];
+        const history = semanticHistoryRows(historyByCode.get(code) || []);
 
         // Ordinary employees with only one distinct hire date stay on the exact
         // legacy interval logic. Only actual multi-hire evidence opts into cycles.

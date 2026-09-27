@@ -1,5 +1,7 @@
 'use strict';
 const C = require('./employmentProfileContract');
+const { REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
+    semanticHistoryRows } = require('./employmentHistoryCanonicalStatus');
 const ANCHOR = 'employment_profile_pre_v1';
 const START = 'hmeromhnia_isxyos_oron_ergasias_apo';
 const END = 'hmeromhnia_isxyos_oron_ergasias_eos';
@@ -15,7 +17,8 @@ const HISTORY_SELECT = [...new Set(['_id', 'team', 'company_kod', 'kodikos', 'aa
     START, END, 'hmeromhnia_proslhpshs', 'hmeromhnia_allaghs_symbashs',
     'hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos',
     'employment_profile_source', 'afora_allagh_oron_ergasias', 'afora_allagh_dialleimatos',
-    'hmeromhnia_isxyos_dialleimatos_apo', 'createdAt', ...PROFILE_FIELDS])].join(' ');
+    'hmeromhnia_isxyos_dialleimatos_apo', REDUNDANT_STATUS_FIELD,
+    REDUNDANT_SURVIVOR_FIELD, 'createdAt', ...PROFILE_FIELDS])].join(' ');
 function profileSelect(extra = '') {
     return [...new Set(`${HISTORY_SELECT} ${ANCHOR} ${extra}`.split(/\s+/).filter(Boolean))].join(' ');
 }
@@ -35,7 +38,8 @@ function anchor(employee = {}) {
         ? value : null;
 }
 function versioned(employee = {}, rows = []) {
-    return Boolean(anchor(employee) || employee[C.SCHEMA_VERSION] === 1 || (Array.isArray(rows) ? rows : []).some(row => row?.[C.SCHEMA_VERSION] === 1));
+    return Boolean(anchor(employee) || employee[C.SCHEMA_VERSION] === 1 ||
+        semanticHistoryRows(rows).some(row => row?.[C.SCHEMA_VERSION] === 1));
 }
 function capture(employee, rows, from) {
     if (!employee || versioned(employee, rows)) return null;
@@ -46,6 +50,7 @@ function capture(employee, rows, from) {
 // No historical effective-start date is invented for an observed compatibility baseline.
 // Missing V1 provenance/facts fail closed. Pure legacy fallback retains its old semantics.
 function fallback(date, employee = {}, rows = []) {
+    rows = semanticHistoryRows(rows);
     if (!versioned(employee, rows)) return { facts: employee, source: 'LEGACY_EMPLOYEE_FALLBACK' };
     const target = day(date), baseline = anchor(employee);
     if (target && baseline && target < day(baseline.before)) {

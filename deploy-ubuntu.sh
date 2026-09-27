@@ -1863,6 +1863,13 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
         echo "[EC2] EMPLOYEE_HISTORY_REPAIR_AUDIT_PREFLIGHT_FAILED: run the explicit setup command, verify it, then retry deployment" >&2
         exit 1
     fi
+    echo "[EC2] Running read-only Employee History population readiness gate..."
+    if ! EMPLOYEE_HISTORY_READINESS_PRODUCTION_ACK=READ_ONLY \
+        "$NODE24_BIN/node" scripts/checkEmployeeHistoryReadiness.js \
+        --expected-database="${EMPLOYEE_HISTORY_EXPECTED_DATABASE:-}"; then
+        echo "[EC2] EMPLOYEE_HISTORY_POPULATION_READINESS_FAILED: deployment stopped before PM2 reload" >&2
+        exit 1
+    fi
     export PATH="$DEPENDENCY_ORIGINAL_PATH"
     hash -r
 
