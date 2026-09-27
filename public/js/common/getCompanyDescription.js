@@ -62,14 +62,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // Ενημέρωση του DOM
             if (data && data.newCompanyDescription) {
                 const newCompanyDescription = "Εταιρεία : " + data.newCompanyDescription;
-                
+
                 if (selectedCompanyElement) {
-                    // Αφαίρεση quotes αν υπάρχουν
-                    const cleanDescription = newCompanyDescription.length > 2
-                        ? newCompanyDescription. substring(0, newCompanyDescription.length - 1)
-                        : newCompanyDescription;
-                    
-                    selectedCompanyElement.innerHTML = cleanDescription;
+                    selectedCompanyElement.textContent = newCompanyDescription;
                 } else {
                     console.warn("Element #selectedCompany not found");
                 }
