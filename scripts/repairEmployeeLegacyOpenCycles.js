@@ -31,6 +31,7 @@ const OUTCOMES = Object.freeze({
     APPLYABLE_DELETE_AND_CANONICAL_UPDATE: 'APPLYABLE_DELETE_AND_CANONICAL_UPDATE',
     APPLYABLE_WITH_CURRENT_HIRE_FOUNDATION: 'APPLYABLE_WITH_CURRENT_HIRE_FOUNDATION',
     BLOCKED_REFERENCED_CORRUPTED_CYCLE: 'BLOCKED_REFERENCED_CORRUPTED_CYCLE',
+    BLOCKED_LATER_CLOSED_CYCLE: 'BLOCKED_LATER_CLOSED_CYCLE',
     BLOCKED_REMAINING_AMBIGUITY: 'BLOCKED_REMAINING_AMBIGUITY',
     BLOCKED_CURRENT_CHANGE_REQUIRED: 'BLOCKED_CURRENT_CHANGE_REQUIRED',
     BLOCKED_OTHER: 'BLOCKED_OTHER'
@@ -51,6 +52,7 @@ function validateArguments({ argv = [], env = process.env, knownProductionUri,
     const apply = argv.includes('--apply');
     if (dryRun === apply) throw new Error('LEGACY_CLEANUP_EXACTLY_ONE_MODE_REQUIRED');
     const scopeFile = argument(argv, 'scope-file');
+    const outputPrefixOption = argument(argv, 'output-prefix');
     const expectedCount = Number(argument(argv, 'expected-count'));
     if (!scopeFile) throw new Error('LEGACY_CLEANUP_SCOPE_FILE_REQUIRED');
     if (!Number.isSafeInteger(expectedCount) || expectedCount < 1) {
@@ -59,6 +61,11 @@ function validateArguments({ argv = [], env = process.env, knownProductionUri,
     const target = identifyReadOnlyTarget({ argv, env, knownProductionUri,
         knownDevelopmentUri, readFile });
     const expectedPlanSha256 = argument(argv, 'expected-plan-sha256');
+    const outputPrefix = outputPrefixOption ? path.resolve(outputPrefixOption) : null;
+    if (outputPrefix && (!outputPrefix.startsWith('/tmp/') ||
+        ['.json', '.csv', '.sha256'].some(extension => outputPrefix.endsWith(extension)))) {
+        throw new Error('LEGACY_CLEANUP_OUTPUT_PREFIX_MUST_BE_TMP_BASENAME');
+    }
     if (apply) {
         if (!/^[0-9a-f]{64}$/i.test(String(expectedPlanSha256 || ''))) {
             throw new Error('LEGACY_CLEANUP_APPLY_PLAN_SHA256_REQUIRED');
@@ -71,7 +78,7 @@ function validateArguments({ argv = [], env = process.env, knownProductionUri,
             throw new Error('LEGACY_CLEANUP_PRODUCTION_CONFIRMATION_REQUIRED');
         }
     }
-    return { dryRun, apply, scopeFile: path.resolve(scopeFile), expectedCount,
+    return { dryRun, apply, scopeFile: path.resolve(scopeFile), expectedCount, outputPrefix,
         expectedPlanSha256: expectedPlanSha256?.toLowerCase() || null, ...target };
 }
 
@@ -117,6 +124,9 @@ function referenceMapFor(ids, referenceRows) {
 }
 
 function blockedOutcome(plan) {
+    if (plan.status === PLAN_STATUSES.BLOCKED_LATER_CLOSED_CYCLE) {
+        return OUTCOMES.BLOCKED_LATER_CLOSED_CYCLE;
+    }
     if (plan.status === PLAN_STATUSES.BLOCKED_REMAINING_AMBIGUITY) {
         return OUTCOMES.BLOCKED_REMAINING_AMBIGUITY;
     }
@@ -186,6 +196,8 @@ function csvValue(value) {
 
 function recordsCsv(records) {
     const fields = ['team', 'company_display_code', 'company_kod', 'kodikos', 'employee_id',
+        'current_hire_date', 'preserved_closed_hire_dates',
+        'corrupted_earlier_open_hire_dates', 'corrupted_later_stray_hire_dates',
         'original_history_ids', 'corrupted_cycle_hire_dates', 'policy_removed_ids',
         'canonical_removed_ids', 'updated_ids', 'inserted_row_count', 'surviving_ids',
         'referenced_removed_ids', 'final_canonical_status', 'final_cleanup_required',
@@ -264,6 +276,13 @@ async function buildDryRunPlan({ db, scopes, target, expectedCount,
             company_kod: scope.company_kod,
             kodikos: scope.kodikos,
             employee_id: String(employee._id),
+            current_hire_date: plan.diagnostics.currentHireDate,
+            preserved_closed_hire_dates: plan.diagnostics.preservedClosedHireDates,
+            corrupted_earlier_open_hire_dates:
+                plan.diagnostics.corruptedEarlierOpenHireDates,
+            corrupted_later_stray_hire_dates:
+                plan.diagnostics.corruptedLaterStrayHireDates,
+            later_closed_hire_dates: plan.diagnostics.laterClosedHireDates,
             original_history_ids: plan.diagnostics.originalHistoryIds,
             corrupted_cycle_hire_dates: plan.diagnostics.corruptedCycleHireDates,
             policy_removed_ids: plan.policyRemovedHistoryIds,
@@ -404,6 +423,9 @@ async function run({ argv = process.argv.slice(2), env = process.env,
     }
     if (observedWriteCommands.length) throw new Error('LEGACY_CLEANUP_DRY_RUN_WRITE_DETECTED');
     const fingerprint = sha256(plan);
+    const outputJson = request.outputPrefix ? `${request.outputPrefix}.json` : OUTPUT_JSON;
+    const outputCsv = request.outputPrefix ? `${request.outputPrefix}.csv` : OUTPUT_CSV;
+    const outputSha = request.outputPrefix ? `${request.outputPrefix}.sha256` : OUTPUT_SHA;
     const machine = { ...plan, plan_sha256: fingerprint,
         safety: { mongodb_write_commands: 0, production_access: request.environment === 'PRODUCTION' } };
     if (request.apply) {
@@ -460,16 +482,16 @@ async function run({ argv = process.argv.slice(2), env = process.env,
         }
         machine.apply_result = applySummary;
     } else {
-        writeFile(OUTPUT_JSON, `${JSON.stringify(machine, null, 2)}\n`);
-        writeFile(OUTPUT_CSV, recordsCsv(machine.records));
-        writeFile(OUTPUT_SHA, `${fingerprint}\n`);
+        writeFile(outputJson, `${JSON.stringify(machine, null, 2)}\n`);
+        writeFile(outputCsv, recordsCsv(machine.records));
+        writeFile(outputSha, `${fingerprint}\n`);
     }
     output(JSON.stringify({ environment: request.environment, database: request.database,
         mode: request.dryRun ? 'DRY_RUN' : 'APPLY', ...plan.summary,
         plan_sha256: fingerprint, mongodb_write_commands: observedWriteCommands.length,
-        output_json: request.dryRun ? OUTPUT_JSON : null,
-        output_csv: request.dryRun ? OUTPUT_CSV : null,
-        output_sha256: request.dryRun ? OUTPUT_SHA : null,
+        output_json: request.dryRun ? outputJson : null,
+        output_csv: request.dryRun ? outputCsv : null,
+        output_sha256: request.dryRun ? outputSha : null,
         apply_result: machine.apply_result || null }, null, 2));
     return machine;
 }

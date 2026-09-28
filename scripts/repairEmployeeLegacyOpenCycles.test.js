@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { PLAN_STATUSES } =
+const { PLAN_STATUSES, planEmployeeLegacyOpenCycleCleanup } =
     require('../server/services/ergazomenoi/employeeLegacyOpenCycleCleanupService');
 const { OUTCOMES, validateArguments, readExactScopes, buildScopedEmployeeQuery,
     assertExactScopePopulation, classifyDryRunPlan, applyableRecordsFor,
@@ -25,6 +25,37 @@ test('dry-run blocks referenced corrupted cycle without a real canonical survivo
         documentId: 'frozen-1' }] } });
     assert.equal(classified.outcome, OUTCOMES.BLOCKED_REFERENCED_CORRUPTED_CYCLE);
     assert.deepEqual(classified.physicalDeleteIds, []);
+});
+
+test('dry-run blocks a referenced later stray row without a canonical survivor', () => {
+    const scope = { team: 'BLG', company_kod: 'company', kodikos: '0319' };
+    const laterId = '507f1f77bcf86cd799439181';
+    const currentEmployee = { _id: '507f1f77bcf86cd799439182', ...scope,
+        hmeromhnia_proslhpshs: '2026-05-30', hmeromhnia_apoxorhshs: null };
+    const history = [
+        { _id: '507f1f77bcf86cd799439183', ...scope, aa_eggrafhs: '0001',
+            hmeromhnia_proslhpshs: '2026-05-30', afora_proslhpsh: true,
+            afora_allagh_oron_ergasias: false },
+        { _id: laterId, ...scope, aa_eggrafhs: '0002',
+            hmeromhnia_proslhpshs: '2026-06-01', afora_proslhpsh: true,
+            afora_allagh_oron_ergasias: false }
+    ];
+    const plan = planEmployeeLegacyOpenCycleCleanup({ scope, currentEmployee,
+        completeHistoryRows: history });
+    assert.deepEqual(plan.diagnostics.corruptedLaterStrayHireDates, ['2026-06-01']);
+    const classified = classifyDryRunPlan({ plan,
+        referenceById: { [laterId]: [{ collection: 'Oraria_Apologistika',
+            documentId: 'frozen-1' }] } });
+    assert.equal(classified.outcome, OUTCOMES.BLOCKED_REFERENCED_CORRUPTED_CYCLE);
+    assert.deepEqual(classified.physicalDeleteIds, []);
+});
+
+test('later closed cycle maps to its dedicated dry-run outcome', () => {
+    const classified = classifyDryRunPlan({ plan: {
+        status: PLAN_STATUSES.BLOCKED_LATER_CLOSED_CYCLE,
+        reason: 'LATER_NON_CURRENT_CYCLE_HAS_EXPLICIT_DEPARTURE'
+    } });
+    assert.equal(classified.outcome, OUTCOMES.BLOCKED_LATER_CLOSED_CYCLE);
 });
 
 test('exact scope query and population assertion reject any out-of-scope employee', () => {
@@ -61,6 +92,17 @@ test('apply requires the expected fingerprint and explicit cleanup confirmation'
         argv: [...withSha, '--confirm-legacy-open-cycle-cleanup'] });
     assert.equal(validated.apply, true);
     assert.equal(validated.environment, 'DEVELOPMENT');
+});
+
+test('dry-run accepts a distinct tmp output prefix and rejects repository paths', () => {
+    const common = { env: { MONGODB_URL: developmentUri },
+        knownDevelopmentUri: developmentUri, knownProductionUri: productionUri };
+    const validated = validateArguments({ ...common, argv: ['--dry-run', ...baseArgs,
+        '--output-prefix=/tmp/later-stray-plan'] });
+    assert.equal(validated.outputPrefix, '/tmp/later-stray-plan');
+    assert.throws(() => validateArguments({ ...common, argv: ['--dry-run', ...baseArgs,
+        '--output-prefix=/home/example/later-stray-plan'] }),
+    /LEGACY_CLEANUP_OUTPUT_PREFIX_MUST_BE_TMP_BASENAME/);
 });
 
 test('dry-run plan reads only the exact scope and emits a delete-only plan', async () => {

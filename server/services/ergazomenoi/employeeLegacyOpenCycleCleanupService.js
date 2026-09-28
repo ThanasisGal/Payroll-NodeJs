@@ -12,6 +12,7 @@ const {
 
 const PLAN_STATUSES = Object.freeze({
     APPLYABLE: 'APPLYABLE',
+    BLOCKED_LATER_CLOSED_CYCLE: 'BLOCKED_LATER_CLOSED_CYCLE',
     BLOCKED_REMAINING_AMBIGUITY: 'BLOCKED_REMAINING_AMBIGUITY',
     BLOCKED_CURRENT_CHANGE_REQUIRED: 'BLOCKED_CURRENT_CHANGE_REQUIRED',
     BLOCKED_OTHER: 'BLOCKED_OTHER'
@@ -100,6 +101,10 @@ function basePlan({ scope, currentEmployee, completeHistoryRows }) {
         finalCanonicalResult: null,
         diagnostics: {
             corruptedCycleHireDates: [],
+            corruptedEarlierOpenHireDates: [],
+            corruptedLaterStrayHireDates: [],
+            preservedClosedHireDates: [],
+            laterClosedHireDates: [],
             closedCycleHireDates: [],
             currentHireDate: null,
             originalHistoryIds: (completeHistoryRows || []).map(historyId).filter(Boolean),
@@ -165,29 +170,45 @@ function planEmployeeLegacyOpenCycleCleanup({ scope: rawScope, currentEmployee,
             rowsByHire.get(hire).push(row);
         }
         const hireDates = [...new Set([...rowsByHire.keys(), currentHireDate])].sort();
-        const corruptedHireDates = [];
-        const closedHireDates = [];
+        const corruptedEarlierOpenHireDates = [];
+        const corruptedLaterStrayHireDates = [];
+        const preservedClosedHireDates = [];
+        const laterClosedHireDates = [];
         const policyRemoved = new Set();
         const closedDepartureByHire = new Map();
         for (const hire of hireDates) {
             const rows = rowsByHire.get(hire) || [];
             const departures = [...new Set(rows.map(row => day(row.hmeromhnia_apoxorhshs))
                 .filter(Boolean))];
+            if (hire === currentHireDate) continue;
             if (departures.length) {
-                closedHireDates.push(hire);
-                closedDepartureByHire.set(hire, departures);
+                if (hire > currentHireDate) {
+                    laterClosedHireDates.push(hire);
+                } else {
+                    preservedClosedHireDates.push(hire);
+                    closedDepartureByHire.set(hire, departures);
+                }
                 continue;
             }
-            const isCurrent = hire === currentHireDate;
-            const followedByLaterHire = hireDates.some(candidate => candidate > hire);
-            if (!isCurrent && followedByLaterHire) {
-                corruptedHireDates.push(hire);
-                for (const row of rows) if (historyId(row)) policyRemoved.add(historyId(row));
-            }
+            (hire < currentHireDate
+                ? corruptedEarlierOpenHireDates : corruptedLaterStrayHireDates).push(hire);
+            for (const row of rows) if (historyId(row)) policyRemoved.add(historyId(row));
         }
+        const corruptedHireDates = [...corruptedEarlierOpenHireDates,
+            ...corruptedLaterStrayHireDates].sort();
         plan.diagnostics.corruptedCycleHireDates = corruptedHireDates;
-        plan.diagnostics.closedCycleHireDates = closedHireDates;
+        plan.diagnostics.corruptedEarlierOpenHireDates = corruptedEarlierOpenHireDates;
+        plan.diagnostics.corruptedLaterStrayHireDates = corruptedLaterStrayHireDates;
+        plan.diagnostics.preservedClosedHireDates = preservedClosedHireDates;
+        plan.diagnostics.laterClosedHireDates = laterClosedHireDates;
+        plan.diagnostics.closedCycleHireDates = preservedClosedHireDates;
         plan.policyRemovedHistoryIds = [...policyRemoved].sort();
+        if (laterClosedHireDates.length) {
+            return blocked(plan, PLAN_STATUSES.BLOCKED_LATER_CLOSED_CYCLE,
+                'LATER_NON_CURRENT_CYCLE_HAS_EXPLICIT_DEPARTURE', {
+                    desiredHistoryRows: completeHistoryRows.map(row => ({ ...row }))
+                });
+        }
 
         const policySurvivors = activeRows.filter(row => !policyRemoved.has(historyId(row)))
             .map(row => ({ ...row }));

@@ -30,6 +30,68 @@ test('legacy cleanup removes previous open corrupted cycle and preserves current
     assert.deepEqual(plan.policyRemovedHistoryIds, ['old-open']);
     assert.deepEqual(plan.preservedHistoryIds, ['current-row']);
     assert.deepEqual(plan.desiredHistoryRows.map(item => item._id), ['current-row']);
+    assert.deepEqual(plan.diagnostics.corruptedEarlierOpenHireDates, ['2024-01-01']);
+    assert.deepEqual(plan.diagnostics.corruptedLaterStrayHireDates, []);
+});
+
+test('legacy cleanup removes a stray later open hire and never removes current hire', () => {
+    const plan = planEmployeeLegacyOpenCycleCleanup({ scope, currentEmployee: current(),
+        completeHistoryRows: [row('current-row', '2024-03-01'),
+            row('later-stray', '2024-04-01')] });
+    assert.equal(plan.status, PLAN_STATUSES.APPLYABLE);
+    assert.deepEqual(plan.policyRemovedHistoryIds, ['later-stray']);
+    assert.deepEqual(plan.preservedHistoryIds, ['current-row']);
+    assert.deepEqual(plan.diagnostics.corruptedEarlierOpenHireDates, []);
+    assert.deepEqual(plan.diagnostics.corruptedLaterStrayHireDates, ['2024-04-01']);
+});
+
+test('legacy cleanup preserves earlier closed cycle and current while removing later stray', () => {
+    const rows = [
+        row('closed-row', '2024-01-01', { hmeromhnia_apoxorhshs: '2024-02-01' }),
+        row('current-row', '2024-03-01'), row('later-stray', '2024-04-01')
+    ];
+    const plan = planEmployeeLegacyOpenCycleCleanup({ scope, currentEmployee: current(),
+        completeHistoryRows: rows });
+    assert.equal(plan.status, PLAN_STATUSES.APPLYABLE);
+    assert.deepEqual(plan.policyRemovedHistoryIds, ['later-stray']);
+    assert.deepEqual(plan.preservedHistoryIds, ['closed-row', 'current-row']);
+    assert.deepEqual(plan.diagnostics.preservedClosedHireDates, ['2024-01-01']);
+    assert.equal(plan.desiredHistoryRows.find(item => item._id === 'closed-row')
+        .hmeromhnia_apoxorhshs, '2024-02-01');
+});
+
+test('sanitized BLG 0002/0319 shape removes only the later stray cycle', () => {
+    const fixtureScope = { team: 'BLG', company_kod: 'company-0002', kodikos: '0319' };
+    const employee = { _id: 'employee-0319', ...fixtureScope,
+        hmeromhnia_proslhpshs: '2026-05-30', hmeromhnia_apoxorhshs: null };
+    const fixtureRow = (id, hire, extra = {}) => ({ _id: id, ...fixtureScope,
+        aa_eggrafhs: id.slice(-4), hmeromhnia_proslhpshs: hire,
+        afora_proslhpsh: true, afora_allagh_oron_ergasias: false, ...extra });
+    const rows = [
+        fixtureRow('closed-0319', '2026-04-07', { hmeromhnia_apoxorhshs: '2026-04-30' }),
+        fixtureRow('current-0319', '2026-05-30'),
+        fixtureRow('stray-0319', '2026-06-01')
+    ];
+    const plan = planEmployeeLegacyOpenCycleCleanup({ scope: fixtureScope,
+        currentEmployee: employee, completeHistoryRows: rows });
+    assert.equal(plan.status, PLAN_STATUSES.APPLYABLE);
+    assert.deepEqual(plan.policyRemovedHistoryIds, ['stray-0319']);
+    assert.deepEqual(plan.desiredHistoryRows.map(item => item._id),
+        ['closed-0319', 'current-0319']);
+    assert.deepEqual(plan.diagnostics.preservedClosedHireDates, ['2026-04-07']);
+    assert.deepEqual(plan.diagnostics.corruptedLaterStrayHireDates, ['2026-06-01']);
+    assert.equal(plan.finalCanonicalResult.status, 'CLEAN');
+    assert.equal(plan.diagnostics.secondPassIdempotent, true);
+});
+
+test('later non-current hire with explicit departure is blocked for review', () => {
+    const plan = planEmployeeLegacyOpenCycleCleanup({ scope, currentEmployee: current(),
+        completeHistoryRows: [row('current-row', '2024-03-01'),
+            row('later-closed', '2024-04-01', { hmeromhnia_apoxorhshs: '2024-04-30' })] });
+    assert.equal(plan.status, PLAN_STATUSES.BLOCKED_LATER_CLOSED_CYCLE);
+    assert.equal(plan.reason, 'LATER_NON_CURRENT_CYCLE_HAS_EXPLICIT_DEPARTURE');
+    assert.deepEqual(plan.diagnostics.laterClosedHireDates, ['2024-04-01']);
+    assert.deepEqual(plan.policyRemovedHistoryIds, []);
 });
 
 test('legacy cleanup preserves a previous explicitly closed cycle unchanged', () => {
