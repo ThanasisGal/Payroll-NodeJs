@@ -42,6 +42,7 @@ function isEmploymentProfileError(error) {
     return error?.code === 'INVALID_EMPLOYMENT_PROFILE' ||
         code.startsWith('EMPLOYEE_PROFILE_') ||
         code.startsWith('EMPLOYEE_HISTORY_') ||
+        code.startsWith('EMPLOYEE_OPEN_CYCLE_') ||
         code.startsWith('EMPLOYMENT_CYCLE_') ||
         code.startsWith('CONFLICT_') ||
         ['HIRE_DATE_REQUIRES_CONTROLLED_LIFECYCLE', 'LEGACY_FACTS_REQUIRED',
@@ -66,6 +67,7 @@ function profileError(res, error) {
         EMPLOYEE_PROFILE_LEGACY_CORRECTION_REQUIRES_FACTS: 'Η διόρθωση παλαιού ελλιπούς ιστορικού απαιτεί ρητά όλα τα στοιχεία της περιόδου.',
         EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH: 'Η διόρθωση απαιτεί την ακριβή υπάρχουσα εγγραφή και αμετάβλητες ημερομηνίες περιόδου. Δεν αποθηκεύτηκε η μεταβολή.',
         EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_REHIRE: 'Η ημερομηνία πρόσληψης δεν αλλάζει από απλή μεταβολή ιστορικού. Νέα εργασιακή σχέση καταχωρίζεται μόνο μέσω της επαναπρόσληψης.',
+        EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE: 'Δεν επιτρέπεται αλλαγή ή νέα καταχώριση πρόσληψης όσο η τρέχουσα εργασιακή σχέση δεν έχει ημερομηνία αποχώρησης. Καταχωρήστε πρώτα την αποχώρηση και στη συνέχεια χρησιμοποιήστε τη διαδικασία Επαναπρόσληψης.',
         EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_LIFECYCLE_REPAIR: 'Η ημερομηνία πρόσληψης υπάρχουσας ιστορικής εγγραφής δεν αλλάζει από τον απλό editor. Απαιτείται ελεγχόμενη διόρθωση του ιστορικού.',
         EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED: 'Βρέθηκαν ασυνεπείς παλαιότερες εγγραφές ιστορικού και η αλλαγή δεν μπορεί να αποθηκευτεί με ασφάλεια. Δεν έγινε καμία αλλαγή. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ιστορικού.',
         EMPLOYEE_HISTORY_REFERENCED_CLEANUP_REQUIRED: 'Βρέθηκαν παλαιότερες εγγραφές ιστορικού που χρησιμοποιούνται από άλλες καταχωρίσεις και δεν μπορούν να αφαιρεθούν αυτόματα. Δεν έγινε καμία αλλαγή. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ιστορικού.',

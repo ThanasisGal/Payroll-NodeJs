@@ -2,6 +2,10 @@
 
 <%
     const rows = Array.isArray(istorikoData) ? istorikoData : [];
+    const currentRelationshipOpen = Boolean(ergazomenoiData?.hmeromhnia_proslhpshs) &&
+        !ergazomenoiData?.hmeromhnia_apoxorhshs;
+    const currentHireDate = ergazomenoiData?.hmeromhnia_proslhpshs
+        ? new Date(ergazomenoiData.hmeromhnia_proslhpshs).toISOString().split('T')[0] : '';
 
     const fmtDate = (v) => {
         if (!v) return '';
@@ -45,7 +49,9 @@
     <div class="istoriko-table-wrapper">
 
         <table class="table table-striped table-bordered table-sm table-hover mb-0 istoriko-table" id="istorikoTable"
-            data-can-manage-history="<%= canManageEmployeeHistory ? 'true' : 'false' %>">
+            data-can-manage-history="<%= canManageEmployeeHistory ? 'true' : 'false' %>"
+            data-current-relationship-open="<%= currentRelationshipOpen ? 'true' : 'false' %>"
+            data-current-hire-date="<%= currentHireDate %>">
 
             <colgroup>
                 <col class="istoriko-col-aa">
@@ -136,6 +142,12 @@
     </div>
 
     <div class="card-footer mt-auto istoriko-card-footer">
+        <% if (currentRelationshipOpen) { %>
+            <div class="text-muted small mb-2">
+                Η πρόσληψη εμφανίζεται μόνο για ανάγνωση. Για νέα εργασιακή σχέση καταχωρήστε πρώτα
+                Αποχώρηση και μετά χρησιμοποιήστε την Επαναπρόσληψη.
+            </div>
+        <% } %>
         <div class="d-flex istoriko-footer-actions">
             <button
                 type="button"

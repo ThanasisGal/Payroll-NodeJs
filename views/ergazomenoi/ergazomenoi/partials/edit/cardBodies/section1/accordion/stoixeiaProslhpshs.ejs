@@ -29,6 +29,8 @@
     const ergazomenosId = ergazomenoiData?._id || ergazomenoiData?.id || '';
     const symbashDaneismoyPdfPath = safe('arxeio_symbashs_daneismoy_path');
     const hasSymbashDaneismoyPdf = !isEmpty(symbashDaneismoyPdfPath);
+    const currentRelationshipOpen = Boolean(safe('hmeromhnia_proslhpshs')) &&
+        !safe('hmeromhnia_apoxorhshs');
 
     const symbashDaneismoyPdfViewUrl = hasSymbashDaneismoyPdf && ergazomenosId
         ? `/api/ergazomenoi/${ergazomenosId}/documents/symbash-daneismoy/view`
@@ -53,7 +55,7 @@
                     </label>
                 </div>
                 <div class="col-1-5">
-                    <input type="date" name="hmeromhnia_proslhpshs" id="hmeromhnia_proslhpshs" class="date-control" value="<%= safe('hmeromhnia_proslhpshs') ? new Date(safe('hmeromhnia_proslhpshs')).toISOString().split('T')[0] : '' %>" />
+                    <input type="date" name="hmeromhnia_proslhpshs" id="hmeromhnia_proslhpshs" class="date-control" value="<%= safe('hmeromhnia_proslhpshs') ? new Date(safe('hmeromhnia_proslhpshs')).toISOString().split('T')[0] : '' %>" <%- currentRelationshipOpen ? 'readonly aria-readonly="true" title="Καταχωρήστε πρώτα την Αποχώρηση και έπειτα χρησιμοποιήστε την Επαναπρόσληψη."' : '' %> />
                 </div>
                 
                 <div class="col-2-5"></div>
@@ -143,6 +145,15 @@
                     <input type="date" name="hmeromhnia_apoxorhshs" id="hmeromhnia_apoxorhshs" class="date-control" value="<%= safe('hmeromhnia_apoxorhshs') ? new Date(safe('hmeromhnia_apoxorhshs')).toISOString().split('T')[0] : '' %>" />  
                 </div>
             </div>
+
+            <% if (currentRelationshipOpen) { %>
+                <div class="row margin-left--1rem margin-right--1rem mb-2">
+                    <div class="col-12 text-muted small">
+                        Η ημερομηνία πρόσληψης δεν αλλάζει όσο η τρέχουσα εργασιακή σχέση είναι ανοικτή.
+                        Καταχωρήστε πρώτα την Αποχώρηση και στη συνέχεια χρησιμοποιήστε την Επαναπρόσληψη.
+                    </div>
+                </div>
+            <% } %>
 
             <div class="height-vh-0_2"></div>
 

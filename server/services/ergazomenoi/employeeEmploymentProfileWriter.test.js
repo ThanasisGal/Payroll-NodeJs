@@ -2,7 +2,8 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const mongoose = require('mongoose');
-const { writeEmployeeEmploymentProfile, repairEmployeeHistoryCanonical,
+const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentHistoryOperations,
+    writeEmployeeDeparture, repairEmployeeHistoryCanonical,
     deleteEmployeeAndEmploymentHistory,
     selectMaintenanceMode, MODE_CORRECT_EXISTING,
     normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter } = require('./employeeEmploymentProfileWriter');
@@ -776,6 +777,104 @@ test('ordinary profile version cannot create a new employment cycle by changing 
     }), error => error.code === 'EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_REHIRE');
     assert.deepEqual(db.state(), initial);
     assert.equal(db.writes(), 0);
+});
+
+function openCycleHireGuardState() {
+    const baseline = buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' });
+    const lifecycle = { hmeromhnia_proslhpshs: '2026-04-01',
+        hmeromhnia_apoxorhshs: null, energos: true, archived: false };
+    return {
+        employee: { _id: 'employee', ...scope, ...baseline, ...lifecycle },
+        history: [{ _id: '507f1f77bcf86cd799439188', ...scope, ...baseline,
+            ...lifecycle, aa_eggrafhs: '0001', afora_proslhpsh: true,
+            createdAt: new Date('2026-04-01T00:00:00.000Z') }]
+    };
+}
+
+function historyGuardOperation(state, historyId, historyChanges, effectiveFrom = '2026-04-01') {
+    return { state, historyId, effectiveFrom,
+        maintenance: { historyChanges, employeeChanges: historyChanges,
+            submittedFields: Object.keys(historyChanges) } };
+}
+
+test('open-cycle hire guard allows unchanged active-employee Save', async () => {
+    const initial = openCycleHireGuardState();
+    const db = database(initial);
+    const hire = initial.employee.hmeromhnia_proslhpshs;
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-04-01',
+        maintenance: { employeeChanges: { hmeromhnia_proslhpshs: hire },
+            historyChanges: { hmeromhnia_proslhpshs: hire } } });
+    assert.equal(new Date(db.state().employee.hmeromhnia_proslhpshs)
+        .toISOString().slice(0, 10), '2026-04-01');
+});
+
+test('open-cycle hire guard allows ordinary profile change in the active cycle', async () => {
+    const db = database(openCycleHireGuardState());
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', input: arrangement, effectiveFrom: '2026-09-15' });
+    assert.equal(db.state().history.length, 2);
+    assert.equal(new Set(db.state().history.map(row => new Date(row.hmeromhnia_proslhpshs)
+        .toISOString().slice(0, 10))).size, 1);
+});
+
+test('open-cycle hire guard keeps normal Maintenance hire protection and zero writes', async () => {
+    const initial = openCycleHireGuardState();
+    const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-09-15',
+        maintenance: { employeeChanges: { hmeromhnia_proslhpshs: '2026-09-15' },
+            historyChanges: { hmeromhnia_proslhpshs: '2026-09-15' } } }),
+    error => error.code === 'EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_REHIRE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('open-cycle hire guard rejects History editor hire identity modification with zero writes', async () => {
+    const initial = openCycleHireGuardState();
+    const db = database(initial);
+    const row = initial.history[0];
+    await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies, scope,
+        employeeId: 'employee', operations: [historyGuardOperation('modified', row._id,
+            { hmeromhnia_proslhpshs: '2026-09-15' })] }),
+    error => error.code === 'EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('open-cycle hire guard rejects History editor second-cycle insertion with zero writes', async () => {
+    const initial = openCycleHireGuardState();
+    const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies, scope,
+        employeeId: 'employee', operations: [historyGuardOperation('inserted', null,
+            { hmeromhnia_proslhpshs: '2026-09-15', afora_proslhpsh: true }, '2026-09-15')] }),
+    error => error.code === 'EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('open-cycle hire guard rejects conflicting crafted History request with zero writes', async () => {
+    const initial = openCycleHireGuardState();
+    const db = database(initial);
+    const row = initial.history[0];
+    const operation = historyGuardOperation('modified', row._id,
+        { hmeromhnia_proslhpshs: '2026-09-15', afora_proslhpsh: true });
+    operation.maintenance.employeeChanges = { hmeromhnia_proslhpshs: '2026-09-16' };
+    await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies, scope,
+        employeeId: 'employee', operations: [operation] }),
+    error => error.code === 'EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('open-cycle hire guard still allows explicit Departure', async () => {
+    const db = database(openCycleHireGuardState());
+    await writeEmployeeDeparture({ ...db.dependencies, scope, employeeId: 'employee',
+        departureDate: '2026-08-31', effectiveFrom: '2026-04-01' });
+    assert.equal(new Date(db.state().employee.hmeromhnia_apoxorhshs)
+        .toISOString().slice(0, 10), '2026-08-31');
+    assert.equal(new Date(db.state().history[0].hmeromhnia_apoxorhshs)
+        .toISOString().slice(0, 10), '2026-08-31');
 });
 
 

@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!table) return;
 
     const canManageHistory = table.dataset.canManageHistory === 'true';
+    const currentRelationshipOpen = table.dataset.currentRelationshipOpen === 'true';
+    const currentHireDate = table.dataset.currentHireDate || '';
 
     const fields = [
         'hmeromhnia_proslhpshs',
@@ -248,9 +250,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createActionButtons() {
+        const addTitle = currentRelationshipOpen
+            ? 'Προσθήκη μεταβολής στην ίδια εργασιακή σχέση'
+            : 'Προσθήκη';
         return `
             <div class="istoriko-actions">
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" title="Προσθήκη" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" title="${addTitle}" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-plus-lg"></i>
                 </button>
                 <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" title="Τροποποίηση" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
@@ -291,6 +296,12 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
         `;
 
+        if (currentRelationshipOpen && currentHireDate) {
+            const hireCell = tr.querySelector('[data-field="hmeromhnia_proslhpshs"]');
+            hireCell.dataset.iso = currentHireDate;
+            hireCell.textContent = formatDateForDisplay(currentHireDate);
+        }
+
         setRowState(tr, 'inserted');
         return tr;
     }
@@ -306,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const value = cell.dataset.iso || '';
             const lifecycleLocked = field === 'hmeromhnia_proslhpshs';
             const lifecycleAttributes = lifecycleLocked
-                ? 'readonly disabled aria-disabled="true" title="Η ημερομηνία πρόσληψης αλλάζει μόνο μέσω ελεγχόμενης διόρθωσης lifecycle/επαναπρόσληψης."'
+                ? 'readonly disabled aria-disabled="true" title="Καταχωρήστε πρώτα την Αποχώρηση και έπειτα χρησιμοποιήστε την Επαναπρόσληψη."'
                 : '';
             cell.innerHTML = `<input type="date" class="date-control istoriko-date-input" data-field-input="${field}" value="${value}" ${lifecycleAttributes}>`;
         });
