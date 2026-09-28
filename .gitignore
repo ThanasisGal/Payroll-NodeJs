@@ -28,6 +28,8 @@ scripts/**
 !scripts/checkEmployeeHistoryRepairAudit.js
 !scripts/checkEmployeeHistoryReadiness.js
 !scripts/repairEmployeeHistoryCanonical.js
+!scripts/repairEmployeeLegacyOpenCycles.js
+!scripts/repairEmployeeLegacyOpenCycles.test.js
 !scripts/repair-confirmed-full-day-leave-hours.js
 !scripts/repair-confirmed-full-day-leave-hours.test.js
 !scripts/repair-legacy-no-work-semantics.js
