@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const mongoose = require('mongoose');
 const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentHistoryOperations,
-    writeEmployeeDeparture, repairEmployeeHistoryCanonical,
+    writeEmployeeDeparture, repairEmployeeHistoryCanonical, repairEmployeeLegacyOpenCycles,
     deleteEmployeeAndEmploymentHistory,
     selectMaintenanceMode, MODE_CORRECT_EXISTING,
     normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter } = require('./employeeEmploymentProfileWriter');
@@ -1235,6 +1235,73 @@ test('controlled legacy normalization uses the canonical writer and is idempoten
         scope: REAL_0069_SCOPE, employeeId: REAL_0069_IDS.employee });
     assert.equal(second.changed, false);
     assert.equal(db.writes(), writesAfterFirst);
+});
+
+test('controlled legacy open-cycle cleanup uses the shared transactional mutation boundary', async () => {
+    const oldId = '507f1f77bcf86cd799439131';
+    const currentId = '507f1f77bcf86cd799439132';
+    const employee = { _id: 'employee', ...scope,
+        hmeromhnia_proslhpshs: '2026-05-01', hmeromhnia_apoxorhshs: null };
+    const db = database({ employee, history: [
+        { _id: oldId, ...scope, aa_eggrafhs: '0001',
+            hmeromhnia_proslhpshs: '2025-05-01', afora_proslhpsh: true,
+            afora_allagh_oron_ergasias: false },
+        { _id: currentId, ...scope, aa_eggrafhs: '0002',
+            hmeromhnia_proslhpshs: '2026-05-01', afora_proslhpsh: true,
+            afora_allagh_oron_ergasias: false }
+    ] });
+    const result = await repairEmployeeLegacyOpenCycles({ ...db.dependencies,
+        scope, employeeId: 'employee' });
+    assert.deepEqual(db.state().employee, employee);
+    assert.deepEqual(db.state().history.map(row => String(row._id)), [currentId]);
+    assert.equal(db.operations().employeeUpdates, 0);
+    assert.equal(db.operations().historyFenceUpdates, 1);
+    assert.equal(db.operations().historyDeletes, 1);
+    assert.equal(db.operations().auditCreates, 1);
+    assert.equal(result.canonical.status, 'CLEAN');
+    assert.equal(result.canonical.cleanupRequired, false);
+});
+
+test('referenced corrupted legacy open cycle is blocked before any write', async () => {
+    const oldId = '507f1f77bcf86cd799439141';
+    const currentId = '507f1f77bcf86cd799439142';
+    const initial = { employee: { _id: 'employee', ...scope,
+        hmeromhnia_proslhpshs: '2026-05-01', hmeromhnia_apoxorhshs: null }, history: [
+        { _id: oldId, ...scope, aa_eggrafhs: '0001',
+            hmeromhnia_proslhpshs: '2025-05-01', afora_proslhpsh: true,
+            afora_allagh_oron_ergasias: false },
+        { _id: currentId, ...scope, aa_eggrafhs: '0002',
+            hmeromhnia_proslhpshs: '2026-05-01', afora_proslhpsh: true,
+            afora_allagh_oron_ergasias: false }
+    ] };
+    const db = database(initial);
+    await assert.rejects(repairEmployeeLegacyOpenCycles({ ...db.dependencies,
+        scope, employeeId: 'employee', referenceChecker: async ({ historyIds }) =>
+            historyIds.map(String).includes(oldId)
+                ? [{ collection: 'Prodhlomena_Oraria_Deviations', documentId: 'frozen-1' }]
+                : [] }), error => error.code === 'BLOCKED_REFERENCED_CORRUPTED_CYCLE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('legacy open-cycle cleanup rejects a stale dry-run fingerprint before writes', async () => {
+    const oldId = '507f1f77bcf86cd799439143';
+    const currentId = '507f1f77bcf86cd799439144';
+    const initial = { employee: { _id: 'employee', ...scope,
+        hmeromhnia_proslhpshs: '2026-05-01', hmeromhnia_apoxorhshs: null }, history: [
+        { _id: oldId, ...scope, aa_eggrafhs: '0001',
+            hmeromhnia_proslhpshs: '2025-05-01', afora_proslhpsh: true,
+            afora_allagh_oron_ergasias: false },
+        { _id: currentId, ...scope, aa_eggrafhs: '0002',
+            hmeromhnia_proslhpshs: '2026-05-01', afora_proslhpsh: true,
+            afora_allagh_oron_ergasias: false }
+    ] };
+    const db = database(initial);
+    await assert.rejects(repairEmployeeLegacyOpenCycles({ ...db.dependencies,
+        scope, employeeId: 'employee', expectedPlanFingerprint: 'a'.repeat(64) }),
+    error => error.code === 'EMPLOYEE_LEGACY_OPEN_CYCLE_CLEANUP_FINGERPRINT_MISMATCH');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
 });
 
 test('final verification rolls back when successful counts hide an unapplied update or deletion', async () => {

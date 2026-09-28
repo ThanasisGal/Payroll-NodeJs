@@ -30,6 +30,9 @@ const { STATES: MUTATION_STATES, INTENTS: MUTATION_INTENTS,
 const { planEmployeeMaintenanceHistory } =
     require('./employeeMaintenanceHistoryPlannerService');
 const { assertOpenCycleHireGuard } = require('./employeeOpenCycleHireGuardService');
+const { PLAN_STATUSES: LEGACY_CLEANUP_PLAN_STATUSES, FOUNDATION_SOURCE, stableStringify,
+    planEmployeeLegacyOpenCycleCleanup } =
+    require('./employeeLegacyOpenCycleCleanupService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -264,16 +267,24 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     employeeId, session, employeeModel, historyModel, auditModel,
     auditCollectionChecker, referenceChecker, connection, diagnostics,
     targetedHistoryId = null, targetedPatch = {}, historyDocumentFactory = null,
-    canonicalRepairRequired = false, deleteCurrent = false }) {
+    canonicalRepairRequired = false, deleteCurrent = false,
+    controlledLegacyOpenCycleCleanup = false }) {
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
         ? { ...currentPatch } : { ...currentBefore, ...currentPatch };
-    if (!deleteCurrent) assertOpenCycleHireGuard({
-        currentBefore,
-        historyBefore: physicalPlan.beforeRows,
-        currentAfter: expectedCurrentBeforeWrite,
-        historyAfter: physicalPlan.finalRows
-    });
+    if (controlledLegacyOpenCycleCleanup) {
+        if (deleteCurrent || diagnostics?.operation !== 'LEGACY_OPEN_CYCLE_CLEANUP' ||
+            Object.keys(currentPatch || {}).length) {
+            throw failure('EMPLOYEE_LEGACY_OPEN_CYCLE_CLEANUP_INVALID_BOUNDARY');
+        }
+    } else if (!deleteCurrent) {
+        assertOpenCycleHireGuard({
+            currentBefore,
+            historyBefore: physicalPlan.beforeRows,
+            currentAfter: expectedCurrentBeforeWrite,
+            historyAfter: physicalPlan.finalRows
+        });
+    }
     const postMutationCanonical = canonicalizeEmployeeHistory({ scope: filter,
         currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows });
     if (postMutationCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
@@ -1620,9 +1631,102 @@ async function repairEmployeeHistoryCanonical({ scope, employeeId,
             changed: true, canonical, applied };
     });
 }
+
+// One-time legacy policy entry point. The pure plan is deliberately recomputed
+// from fresh transactional state and all physical mutations still flow through
+// the same canonical mutation boundary used by ordinary history maintenance.
+async function repairEmployeeLegacyOpenCycles({ scope, employeeId,
+    expectedPlanFingerprint = null,
+    connection = mongoose.connection, employeeModel = ErgazomenoiModel,
+    historyModel = IstorikoProslhpseonAllagonModel,
+    auditModel = EmployeeHistoryRepairAuditModel,
+    auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
+    referenceChecker = findHistoryIdReferences,
+    capabilityProbe = transactionCapability }) {
+    const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(field => {
+        const value = String(scope?.[field] ?? '').trim();
+        if (!value) C.invalid('scope', 'complete employee scope required');
+        return [field, value];
+    }));
+    if (typeof employeeId !== 'string' || !employeeId.trim()) {
+        C.invalid('employeeId', 'exact employee id required');
+    }
+    if (expectedPlanFingerprint != null &&
+        !/^[0-9a-f]{64}$/i.test(String(expectedPlanFingerprint))) {
+        C.invalid('expectedPlanFingerprint', 'valid SHA-256 required');
+    }
+    return inProfileTransaction(connection, capabilityProbe, async session => {
+        const current = await requestScopedLean(
+            employeeModel.findOne({ ...filter, _id: employeeId }), session,
+            LARGE_EMPLOYEE_FIELDS_EXCLUSION);
+        if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
+        const rows = await completeHistoryLean(historyModel, filter, session);
+        const cleanupPlan = planEmployeeLegacyOpenCycleCleanup({ scope: filter,
+            currentEmployee: current, completeHistoryRows: rows });
+        if (cleanupPlan.status !== LEGACY_CLEANUP_PLAN_STATUSES.APPLYABLE) {
+            const error = failure(cleanupPlan.status);
+            error.cleanupReason = cleanupPlan.reason;
+            throw error;
+        }
+        if (expectedPlanFingerprint &&
+            cleanupPlan.planFingerprint !== String(expectedPlanFingerprint).toLowerCase()) {
+            throw failure('EMPLOYEE_LEGACY_OPEN_CYCLE_CLEANUP_FINGERPRINT_MISMATCH');
+        }
+        if (!cleanupPlan.diagnostics.currentEmployeeUnchanged) {
+            throw failure('BLOCKED_CURRENT_CHANGE_REQUIRED');
+        }
+        const referencedPolicyRows = [];
+        for (const historyId of cleanupPlan.policyRemovedHistoryIds) {
+            let references;
+            try {
+                references = await checkedHistoryReferences({ referenceChecker, connection,
+                    historyIds: [historyId], session });
+            } catch {
+                throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
+            }
+            if (references.length && !cleanupPlan.replacementByDeletedId[historyId]) {
+                referencedPolicyRows.push({ historyId, references });
+            }
+        }
+        if (referencedPolicyRows.length) {
+            const error = failure('BLOCKED_REFERENCED_CORRUPTED_CYCLE');
+            error.references = referencedPolicyRows;
+            throw error;
+        }
+        const historyDocumentFactory = source => typeof historyModel === 'function'
+            ? new historyModel(source, null, source.employment_profile_source === FOUNDATION_SOURCE
+                ? { defaults: false } : undefined)
+            : source;
+        const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: rows,
+            desiredRows: cleanupPlan.desiredHistoryRows, historyModel,
+            historyDocumentFactory,
+            replacementByDeletedId: cleanupPlan.replacementByDeletedId });
+        const applied = await executeFinalMutationPlan({ physicalPlan,
+            currentBefore: current, currentPatch: {}, filter, employeeId: current._id,
+            session, employeeModel, historyModel, auditModel, auditCollectionChecker,
+            referenceChecker, connection,
+            diagnostics: { ...cleanupPlan.diagnostics,
+                operation: 'LEGACY_OPEN_CYCLE_CLEANUP',
+                planFingerprint: cleanupPlan.planFingerprint },
+            historyDocumentFactory,
+            canonicalRepairRequired: true,
+            controlledLegacyOpenCycleCleanup: true });
+        const verifiedCanonical = canonicalizeEmployeeHistory({ scope: filter,
+            currentEmployee: applied.verified.current,
+            historyRows: applied.verified.history });
+        if (verifiedCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY ||
+            verifiedCanonical.cleanupRequired || !verifiedCanonical.idempotent ||
+            Object.keys(verifiedCanonical.employeePatch || {}).length ||
+            stableStringify(applied.verified.current) !== stableStringify(current)) {
+            throw failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+        }
+        return { employee: applied.verified.current, history: applied.verified.history,
+            changed: true, cleanupPlan, canonical: verifiedCanonical, applied };
+    });
+}
 module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE,
     transactionCapability, normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter,
     writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation,
     writeEmployeeRehire,
     writeEmployeeEmploymentHistoryOperations, deleteEmployeeAndEmploymentHistory,
-    repairEmployeeHistoryCanonical, selectMaintenanceMode };
+    repairEmployeeHistoryCanonical, repairEmployeeLegacyOpenCycles, selectMaintenanceMode };

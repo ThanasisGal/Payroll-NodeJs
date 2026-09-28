@@ -13,7 +13,8 @@
         "setup:employee-history-repair-audit": "node scripts/setupEmployeeHistoryRepairAudit.js",
         "check:employee-history-repair-audit": "node scripts/checkEmployeeHistoryRepairAudit.js",
         "check:employee-history-readiness": "node scripts/checkEmployeeHistoryReadiness.js",
-        "repair:employee-history": "node scripts/repairEmployeeHistoryCanonical.js"
+        "repair:employee-history": "node scripts/repairEmployeeHistoryCanonical.js",
+        "repair:employee-history-open-cycles": "node scripts/repairEmployeeLegacyOpenCycles.js"
     },
     "keywords": [],
     "author": "",
