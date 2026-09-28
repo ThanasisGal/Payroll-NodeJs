@@ -29,6 +29,7 @@ const { STATES: MUTATION_STATES, INTENTS: MUTATION_INTENTS,
     resolveEmployeeHistoryMutation } = require('./employeeEmploymentProfileMutationResolverService');
 const { planEmployeeMaintenanceHistory } =
     require('./employeeMaintenanceHistoryPlannerService');
+const { assertOpenCycleHireGuard } = require('./employeeOpenCycleHireGuardService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -267,6 +268,12 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
         ? { ...currentPatch } : { ...currentBefore, ...currentPatch };
+    if (!deleteCurrent) assertOpenCycleHireGuard({
+        currentBefore,
+        historyBefore: physicalPlan.beforeRows,
+        currentAfter: expectedCurrentBeforeWrite,
+        historyAfter: physicalPlan.finalRows
+    });
     const postMutationCanonical = canonicalizeEmployeeHistory({ scope: filter,
         currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows });
     if (postMutationCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
@@ -500,6 +507,8 @@ async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, ope
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         const originalRows = await completeHistoryLean(historyModel, filter, session);
+        assertOpenCycleHireGuard({ currentEmployee: current,
+            historyRows: originalRows, operations });
         const canonicalBefore = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: current, historyRows: originalRows });
         if (canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
@@ -585,6 +594,12 @@ async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, ope
         }
         const finalCurrent = planningState.current;
         const finalRows = rows;
+        assertOpenCycleHireGuard({
+            currentBefore: current,
+            historyBefore: originalRows,
+            currentAfter: finalCurrent,
+            historyAfter: finalRows
+        });
         const canonicalAfter = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: finalCurrent, historyRows: finalRows });
         if (canonicalAfter.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {

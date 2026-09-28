@@ -14,6 +14,8 @@ const M = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const Models = require('../../models/ergazomenoi');
 const Terms = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { requireScopedEmployeeForUpdate } = require('./employeeUpdateScope');
+const { buildEmployeeMaintenanceIdentity } =
+    require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 const { findHistoryIdReferences } =
     require('../../services/ergazomenoi/employeeHistoryReferenceAuditService');
 const { REAL_0069_SCOPE, REAL_0069_IDS, buildReal0069SanitizedHistoryFixture } =
@@ -781,6 +783,7 @@ function historyHandler(db) {
     const method = source.slice(start, end).trim().replace('static updateIstorikoData = ', '').replace(/;$/, '');
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     return vm.runInNewContext(`${helpers}\n(${method})`, { Date, console: { error() {} }, ...Terms, ...M,
+        buildEmployeeMaintenanceIdentity,
         ErgazomenoiModel: db.employeeModel,
         canManageEmployeeHistory: async () => true,
         writeEmployeeEmploymentHistoryOperations: args => W.writeEmployeeEmploymentHistoryOperations({ ...args, ...db.deps }) });
@@ -835,6 +838,19 @@ test('history editor cannot change date identity or correct an unknown ID', asyn
         assert.equal(res.code, 409); assert.equal(res.body.reason, update._id === row._id ? 'EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED' : 'EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH');
         assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
     }
+});
+test('open-cycle hire guard controller rejects crafted History hire request without writes', async () => {
+    const stored = await initial();
+    const row = stored.history[0];
+    const db = memory(stored);
+    const res = await editHistory(db, [{ _id: row._id, state: 'modified',
+        data: rowData(row, { hmeromhnia_proslhpshs: '2026-09-15' }) }]);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason,
+        'EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE');
+    assert.match(res.body.message, /Καταχωρήστε πρώτα την αποχώρηση/);
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), stored);
 });
 test('batch history corrections validate the complete plan before any physical write', async () => {
     const stored = await initial(enabled), db = memory(stored), row = stored.history[0];

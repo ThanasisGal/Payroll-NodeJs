@@ -12428,11 +12428,14 @@ body.loader-active > *:not(.app-loader) {
 
 .istoriko-card-footer {
     background-color: #eef1e7;
-    padding: 0.6rem 1rem;
+    height: auto !important;
+    min-height: 4rem;
+    padding: 0.85rem 1rem;
 }
 
 .istoriko-footer-actions {
     width: 100%;
+    min-height: 2.3rem;
     justify-content: space-around;
     align-items: center;
 }
@@ -12440,6 +12443,7 @@ body.loader-active > *:not(.app-loader) {
 .istoriko-footer-btn {
     width: 22%;
     font-size: 0.8vw;
+    white-space: nowrap;
 }
 
 .istoriko-footer-btn-save {
