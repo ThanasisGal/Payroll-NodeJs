@@ -3,6 +3,7 @@
 (() => {
     const app = document.getElementById('wtoLeaveApp');
     if (!app) return;
+    const card = document.getElementById('wtoLeaveCard');
     const branch = document.getElementById('wtoLeaveBranch');
     const from = document.getElementById('wtoLeaveFrom');
     const to = document.getElementById('wtoLeaveTo');
@@ -16,11 +17,51 @@
     const canExport = app.dataset.canExport === 'true';
     let validPreview = null;
     let inputRevision = 0;
+    let layoutFrame = null;
+
+    function syncWtoLeaveCardHeight() {
+        if (!card) return;
+        const minimumHeight = 320;
+        const footerClearance = 25;
+        const cardTop = card.getBoundingClientRect().top;
+        const footer = document.querySelector('.footer');
+        const footerTop = footer
+            ? Math.min(footer.getBoundingClientRect().top, window.innerHeight)
+            : window.innerHeight;
+        const availableHeight = footerTop - cardTop - footerClearance;
+        const cardHeight = Math.max(minimumHeight, Math.floor(availableHeight));
+        card.style.height = `${cardHeight}px`;
+        card.style.maxHeight = `${cardHeight}px`;
+    }
+
+    function scheduleWtoLeaveCardHeightSync() {
+        if (layoutFrame !== null) window.cancelAnimationFrame(layoutFrame);
+        layoutFrame = window.requestAnimationFrame(() => {
+            layoutFrame = null;
+            syncWtoLeaveCardHeight();
+        });
+    }
+
+    function initWtoLeaveLayout() {
+        syncWtoLeaveCardHeight();
+        window.addEventListener('resize', scheduleWtoLeaveCardHeightSync);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWtoLeaveLayout, { once: true });
+    } else {
+        initWtoLeaveLayout();
+    }
 
     function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
         })[char]);
+    }
+    function formatGreekDate(value) {
+        const normalized = String(value ?? '').trim();
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+        return match ? `${match[3]}/${match[2]}/${match[1]}` : normalized;
     }
     function csrfHeaders() {
         const token = document.getElementById('wtoLeaveCsrf')?.value || '';
@@ -48,22 +89,23 @@
         document.getElementById('wtoLeaveDayCount').textContent = data.employee_day_count;
         document.getElementById('wtoLeaveAnalyticsCount').textContent = data.analytics_count;
         rowsBody.innerHTML = data.rows.length ? data.rows.map((row) => `<tr>
-            <td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.employee_code)}</td>
+            <td>${escapeHtml(formatGreekDate(row.date))}</td><td>${escapeHtml(row.employee_code)}</td>
             <td>${escapeHtml(row.afm)}</td><td>${escapeHtml(`${row.eponymo} ${row.onoma}`)}</td>
             <td>${escapeHtml(row.leave_type)}</td><td>${row.full_day ? 'Ολοήμερη' : 'Ωριαία'}</td>
             <td>${escapeHtml(row.full_day ? '—' : row.intervals.map((item) => `${item.from}–${item.to}`).join(', '))}</td>
             <td>${escapeHtml(row.reference_year || '—')}</td><td>${escapeHtml(row.required_days || '—')}</td>
         </tr>`).join('') : '<tr><td colspan="9" class="text-center text-muted">Δεν βρέθηκαν υποβλητέες άδειες.</td></tr>';
         blockers.hidden = data.blockers.length === 0;
-        blockers.innerHTML = data.blockers.length ? `<strong>Blockers</strong><ul class="mb-0">${data.blockers
+        blockers.innerHTML = data.blockers.length ? `<strong>Προβλήματα που εμποδίζουν την υποβολή</strong><ul class="mb-0">${data.blockers
             .map((item) => `<li>${escapeHtml(item.code)}: ${escapeHtml(item.message)} (${escapeHtml(item.employee_code || '—')} ${escapeHtml(item.date || '')})</li>`).join('')}</ul>` : '';
-        json.textContent = data.payload ? JSON.stringify(data.payload, null, 2) : 'Δεν υπάρχει επιλέξιμο payload.';
+        json.textContent = data.payload ? JSON.stringify(data.payload, null, 2) :
+            'Δεν υπάρχουν επιλέξιμα δεδομένα προς υποβολή.';
         validPreview = data.submission_eligible && data.parity?.exact ? data : null;
         submitButton.disabled = !validPreview || !canExport;
         status.className = validPreview ? 'alert alert-success mt-3 mb-0' :
             data.blockers.length ? 'alert alert-danger mt-3 mb-0' : 'alert alert-info mt-3 mb-0';
         status.textContent = validPreview
-            ? 'Η προεπισκόπηση είναι έγκυρη και συμφωνεί ακριβώς με το payload.'
+            ? 'Η προεπισκόπηση είναι έγκυρη και συμφωνεί ακριβώς με τα δεδομένα προς υποβολή.'
             : data.blockers.length ? 'Η προεπισκόπηση έχει blockers και δεν μπορεί να υποβληθεί.'
                 : 'Δεν υπάρχουν υποβλητέες άδειες στο επιλεγμένο φίλτρο.';
     }
@@ -80,7 +122,7 @@
                 'Συμπληρώστε υποκατάστημα και έγκυρο διάστημα ημερομηνιών.', 'warning');
             return;
         }
-        invalidatePreview('Φόρτωση authoritative προεπισκόπησης…');
+        invalidatePreview('Φόρτωση προεπισκόπησης από τα επίσημα δεδομένα…');
         const requestedInput = input();
         const requestedRevision = inputRevision;
         setBusy(true);
@@ -102,13 +144,13 @@
             <p><strong>Υποκατάστημα:</strong> ${escapeHtml(selectedBranch)}</p>
             <p><strong>Πραγματικό διάστημα:</strong> ${escapeHtml(validPreview.actual_from)} – ${escapeHtml(validPreview.actual_to)}</p>
             <p><strong>Εργαζόμενοι:</strong> ${validPreview.employee_count}<br>
-            <strong>Ημέρες εργαζομένων:</strong> ${validPreview.employee_day_count}<br>
-            <strong>Analytics records:</strong> ${validPreview.analytics_count}</p>
-            <p class="text-danger"><strong>Η ενέργεια θα πραγματοποιήσει οριστική REST υποβολή WTOLeave στο ΕΡΓΑΝΗ.</strong></p></div>`;
-        const result = window.Swal ? await window.Swal.fire({ title: 'Οριστική υποβολή WTOLeave',
+            <strong>Ημέρες αδειών:</strong> ${validPreview.employee_day_count}<br>
+            <strong>Αναλυτικές εγγραφές:</strong> ${validPreview.analytics_count}</p>
+            <p class="text-danger"><strong>Η ενέργεια θα πραγματοποιήσει οριστική υποβολή αδειών στο ΕΡΓΑΝΗ.</strong></p></div>`;
+        const result = window.Swal ? await window.Swal.fire({ title: 'Οριστική υποβολή αδειών',
             html: confirmationHtml, icon: 'warning', showCancelButton: true,
             confirmButtonText: 'Οριστική υποβολή', cancelButtonText: 'Ακύρωση', focusCancel: true }) :
-            { isConfirmed: window.confirm('Η ενέργεια θα πραγματοποιήσει οριστική REST υποβολή WTOLeave στο ΕΡΓΑΝΗ.') };
+            { isConfirmed: window.confirm('Η ενέργεια θα πραγματοποιήσει οριστική υποβολή αδειών στο ΕΡΓΑΝΗ.') };
         if (!result.isConfirmed) return;
         setBusy(true);
         try {
@@ -120,7 +162,7 @@
             submitButton.disabled = true;
             if (window.Swal) await window.Swal.fire('Επιτυχία', data.idempotent
                 ? `Η ίδια υποβολή υπάρχει ήδη. Πρωτόκολλο: ${data.protocol || '—'}`
-                : `Η WTOLeave υποβλήθηκε. Πρωτόκολλο: ${data.protocol || '—'}`, 'success');
+                : `Η υποβολή αδειών ολοκληρώθηκε. Πρωτόκολλο: ${data.protocol || '—'}`, 'success');
         } catch (error) {
             if (window.Swal) await window.Swal.fire('Αποτυχία υποβολής', error.message, 'error');
         } finally { setBusy(false); }
