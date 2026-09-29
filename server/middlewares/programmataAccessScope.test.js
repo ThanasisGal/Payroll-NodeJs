@@ -138,6 +138,22 @@ function employeeResult(rows) {
             foreignSourceBranch, foreignSourceResponse, () => assert.fail('next called')
         );
         assert.strictEqual(foreignSourceResponse.statusCode, 404);
+
+        YpokatasthmataModel.findOne = () => companyResult({ _id: '507f1f77bcf86cd799439012' });
+        const wtoLeaveSubmit = {
+            path: '/api/ergazomenoi/programmata/wto-leave/submit',
+            session: { companyInUse: '507f1f77bcf86cd799439011', userId: '7' },
+            authenticatedUserTeam: 'TEAM1',
+            body: { ypokatasthma: '1', from_date: '2026-08-01', to_date: '2026-08-31' }
+        };
+        let wtoLeaveNext = 0;
+        await scope.authorizeExternalAction(wtoLeaveSubmit, response(), () => wtoLeaveNext++);
+        assert.strictEqual(wtoLeaveNext, 1);
+        assert.strictEqual(wtoLeaveSubmit.programmataAccessScope.ypokatasthma, '0001');
+        assert.strictEqual(wtoLeaveSubmit.programmataAccessScope.externalDateRange.startValue,
+            '2026-08-01');
+        assert.strictEqual(wtoLeaveSubmit.programmataAccessScope.externalDateRange.endValue,
+            '2026-08-31');
     } finally {
         CompaniesModel.findById = originalCompanyFindById;
         CompaniesModel.find = originalCompanyFind;

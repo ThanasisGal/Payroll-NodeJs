@@ -30,6 +30,9 @@ const contracts = [
     ['POST', '/ergazomenoi/programmata/delete-pdf', "requireUserPrivilegeAction('LhpshOrarionApoKartes', 'delete')", 'validatePdfDelete'],
     ['GET', '/ergazomenoi/programmata/exagoghOrarionSeErganh', "requireUserPrivilegeAction('ExagoghOrarionSeErganh', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/apologistikosPinakasOrarion', "requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/ypovoliAdeion', "requireUserPrivilegeAction('YpobolhAdeion', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['POST', '/api/ergazomenoi/programmata/wto-leave/preview', "requireUserPrivilegeAction('YpobolhAdeion', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['POST', '/api/ergazomenoi/programmata/wto-leave/submit', "requireUserPrivilegeAction('YpobolhAdeion', 'export')", 'authorizeProgrammataExternalAction'],
     ['GET', '/ergazomenoi/programmata/apologistikosPinakasYperorion', "requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/katastashElegxouApologistikouPinaka', "requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/katastashElegxouApologistikouPinaka/pdf', "requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'export')", 'authorizeProgrammataSessionCompany'],
@@ -48,6 +51,20 @@ for (const [method, route, privilege, scope] of contracts) {
     assert.ok(block.includes(privilege), `${method} ${route}: action privilege middleware missing`);
     assert.ok(block.includes(scope), `${method} ${route}: scope middleware missing`);
 }
+
+for (const route of [
+    '/ergazomenoi/programmata/ypovoliAdeion',
+    '/api/ergazomenoi/programmata/wto-leave/preview',
+    '/api/ergazomenoi/programmata/wto-leave/submit'
+]) {
+    const start = routes.indexOf(`'${route}'`);
+    const block = routes.slice(start, start + 500);
+    assert.ok(block.includes('checkAuth'), `${route}: checkAuth missing`);
+}
+const wtoLeaveSubmitStart = routes.indexOf("'/api/ergazomenoi/programmata/wto-leave/submit'");
+const wtoLeaveSubmitBlock = routes.slice(wtoLeaveSubmitStart, wtoLeaveSubmitStart + 500);
+assert.ok(wtoLeaveSubmitBlock.indexOf("requireUserPrivilegeAction('YpobolhAdeion', 'export')") <
+    wtoLeaveSubmitBlock.indexOf('authorizeProgrammataExternalAction'));
 
 const borrowedGetStart = routes.indexOf("'/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon'");
 const borrowedGetBlock = routes.slice(borrowedGetStart, routes.indexOf('router.', borrowedGetStart + 10));

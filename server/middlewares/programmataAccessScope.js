@@ -375,18 +375,25 @@ async function authorizeExternalAction(req, res, next) {
         try {
             const isSchedule = req.path === '/ergazomenoi/programmata/downloadSchedule';
             const isCards = req.path === '/ergazomenoi/programmata/downloadCards';
-            const startValue = isSchedule
+            const isWtoLeave = req.path === '/api/ergazomenoi/programmata/wto-leave/submit';
+            const startValue = isWtoLeave
+                ? req.body?.from_date
+                : isSchedule
                 ? req.body?.fromDate
                 : isCards
                   ? req.body?.apoHmeromhnia
                   : req.body?.apo_hmeromhnia;
-            const endValue = isSchedule
+            const endValue = isWtoLeave
+                ? req.body?.to_date
+                : isSchedule
                 ? req.body?.toDate
                 : isCards
                   ? req.body?.eosHmeromhnia
                   : req.body?.eos_hmeromhnia;
             const rawYpokatasthma =
-                (isSchedule || isCards
+                (isWtoLeave
+                    ? req.body?.ypokatasthma
+                    : isSchedule || isCards
                     ? req.body?.selectedPararthma
                     : req.body?.ypokatasthmata_stathera ?? req.body?.ypokatasthmata);
             const range = externalDateRange(startValue, endValue);

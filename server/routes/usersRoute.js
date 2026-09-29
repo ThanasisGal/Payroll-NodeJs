@@ -25,6 +25,7 @@ const symbaseisController = require('../controllers/symbaseisController.js');
 const programmataController = require('../controllers/ergazomenoi/programmataController.js');
 const erganhController = require('../controllers/ergazomenoi/erganhController.js');
 const apologistikosPinakasControlReportController = require('../controllers/ergazomenoi/apologistikosPinakasControlReportController.js');
+const wtoLeaveController = require('../controllers/ergazomenoi/wtoLeaveController.js');
 const kinhseisController = require('../controllers/Kinhseis/kinhseisController.js');
 const forosController = require('../controllers/Kinhseis/forosContoller.js');
 const ektyposhSymbaseonController = require('../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js');
@@ -756,6 +757,30 @@ router.get(
     requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'read'),
     authorizeProgrammataSessionCompany,
     erganhController.mainApologistikosPinakasForm
+);
+
+router.get(
+    '/ergazomenoi/programmata/ypovoliAdeion',
+    checkAuth,
+    requireUserPrivilegeAction('YpobolhAdeion', 'read'),
+    authorizeProgrammataSessionCompany,
+    wtoLeaveController.page
+);
+
+router.post(
+    '/api/ergazomenoi/programmata/wto-leave/preview',
+    checkAuth,
+    requireUserPrivilegeAction('YpobolhAdeion', 'read'),
+    authorizeProgrammataSessionCompany,
+    wtoLeaveController.preview
+);
+
+router.post(
+    '/api/ergazomenoi/programmata/wto-leave/submit',
+    checkAuth,
+    requireUserPrivilegeAction('YpobolhAdeion', 'export'),
+    authorizeProgrammataExternalAction,
+    wtoLeaveController.submit
 );
 
 router.get(

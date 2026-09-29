@@ -69,7 +69,7 @@ const visibleCatalog = seedData
     .sort((left, right) => left.sidebarOrder - right.sidebarOrder);
 const sortedHierarchy = [...userPrivilegeSidebarHierarchy].sort(compareHierarchyEntries);
 
-assert.strictEqual(sidebarForms.length, 27);
+assert.strictEqual(sidebarForms.length, 28);
 assert.deepStrictEqual(sidebarForms.map((entry) => entry.form), visibleCatalog.map((entry) => entry.form));
 assert.deepStrictEqual(sidebarForms.map((entry) => entry.itemLabel), visibleCatalog.map((entry) => entry.formLabel));
 assert.deepStrictEqual(sortedHierarchy.map((entry) => entry.form), sidebarForms.map((entry) => entry.form));
@@ -92,7 +92,15 @@ assert.ok(visibleCatalog.every((entry) => entry.sidebarOrder >= 1000));
 const hiddenCatalog = seedData.filter((entry) => entry.showInPrivileges === false);
 assert.ok(hiddenCatalog.every((entry) => !userPrivilegeSidebarHierarchy.some((item) => item.form === entry.form)));
 assert.ok(!userPrivilegeSidebarHierarchy.some((entry) =>
-    ['Μικτές από Καθαρές Αποδοχές', 'Ετήσιες Μονάδες Εργασίας (EME)', 'Υποβολή Αδειών']
+    ['Μικτές από Καθαρές Αποδοχές', 'Ετήσιες Μονάδες Εργασίας (EME)']
         .includes(entry.itemLabel)));
+assert.deepStrictEqual(userPrivilegeSidebarHierarchy.find((entry) => entry.form === 'YpobolhAdeion'), {
+    form: 'YpobolhAdeion', sidebarNodeId: 'li2373', itemLabel: 'Υποβολή Αδειών', itemOrder: 400,
+    ancestors: [
+        { key: 'files', label: 'Αρχεία', order: 100 },
+        { key: 'ergani-ii', label: 'ΕΡΓΑΝΗ ΙΙ', order: 300 },
+        { key: 'file-submissions', label: 'Αποστολή Αρχείων', order: 600 }
+    ]
+});
 
 console.log(`PASS sidebar/catalog/hierarchy contract (${sidebarForms.length} visible forms, exact labels/nesting/order)`);

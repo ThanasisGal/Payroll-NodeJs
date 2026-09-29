@@ -1,0 +1,70 @@
+<br><br>
+<section class="container-fluid px-4" id="wtoLeaveApp"
+    data-company-name="<%= companyName %>"
+    data-can-export="<%= userPrivileges.admin === true || userPrivileges.export === true %>">
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h1 class="h5 mb-0">Υποβολή Αδειών ΕΡΓΑΝΗ ΙΙ — WTOLeave</h1>
+        </div>
+        <div class="card-body">
+            <input type="hidden" id="wtoLeaveCsrf" value="<%= csrfToken %>">
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-4">
+                    <label class="form-label field-required" for="wtoLeaveBranch">Υποκατάστημα</label>
+                    <select class="form-select" id="wtoLeaveBranch" required>
+                        <option value="">Επιλέξτε υποκατάστημα</option>
+                        <% for (const branch of branches || []) { %>
+                            <option value="<%= branch.kodikos %>"><%= branch.kodikos %> — <%= branch.perigrafh || '' %></option>
+                        <% } %>
+                    </select>
+                </div>
+                <div class="col-lg-3">
+                    <label class="form-label field-required" for="wtoLeaveFrom">Από ημερομηνία</label>
+                    <input class="form-control" type="date" id="wtoLeaveFrom" required>
+                </div>
+                <div class="col-lg-3">
+                    <label class="form-label field-required" for="wtoLeaveTo">Έως ημερομηνία</label>
+                    <input class="form-control" type="date" id="wtoLeaveTo" required>
+                </div>
+                <div class="col-lg-2">
+                    <button class="btn btn-brown w-100" type="button" id="wtoLeavePreviewButton">
+                        <i class="bi bi-search"></i> Προεπισκόπηση
+                    </button>
+                </div>
+            </div>
+
+            <div class="alert alert-secondary mt-3 mb-0" id="wtoLeaveStatus" role="status">
+                Επιλέξτε υποκατάστημα και ημερομηνίες για προεπισκόπηση.
+            </div>
+
+            <div class="row g-2 mt-2" id="wtoLeaveSummary" hidden>
+                <div class="col-md"><div class="border rounded p-2">Πραγματικό διάστημα: <strong id="wtoLeaveActualRange">—</strong></div></div>
+                <div class="col-md"><div class="border rounded p-2">Εργαζόμενοι: <strong id="wtoLeaveEmployeeCount">0</strong></div></div>
+                <div class="col-md"><div class="border rounded p-2">Ημέρες εργαζομένων: <strong id="wtoLeaveDayCount">0</strong></div></div>
+                <div class="col-md"><div class="border rounded p-2">Analytics: <strong id="wtoLeaveAnalyticsCount">0</strong></div></div>
+            </div>
+
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-striped table-bordered align-middle">
+                    <thead>
+                        <tr><th>Ημερομηνία</th><th>Κωδικός</th><th>ΑΦΜ</th><th>Εργαζόμενος</th>
+                            <th>Τύπος</th><th>Μορφή</th><th>Διαστήματα</th><th>Έτος</th><th>Δικαιούμενες</th></tr>
+                    </thead>
+                    <tbody id="wtoLeaveRows"><tr><td colspan="9" class="text-center text-muted">Δεν υπάρχει προεπισκόπηση.</td></tr></tbody>
+                </table>
+            </div>
+
+            <div id="wtoLeaveBlockers" class="alert alert-danger" hidden></div>
+            <label class="form-label" for="wtoLeaveJson">JSON preview</label>
+            <pre class="border rounded bg-light p-3 overflow-auto" id="wtoLeaveJson" style="max-height: 28rem;">Δεν υπάρχει επιλέξιμο payload.</pre>
+        </div>
+        <div class="card-footer d-flex gap-2 flex-wrap">
+            <button class="btn btn-danger" type="button" id="wtoLeaveSubmitButton" disabled>
+                <i class="bi bi-send-check"></i> Τελική Υποβολή Αδειών στο ΕΡΓΑΝΗ
+            </button>
+            <a class="btn btn-brown" href="/mainapp"><i class="bi bi-chevron-double-left"></i> Επιστροφή</a>
+        </div>
+    </div>
+</section>
+
+<script nonce="<%= nonce %>" src="<%= script('ergazomenoi/programmata/wtoLeave.js') %>"></script>
