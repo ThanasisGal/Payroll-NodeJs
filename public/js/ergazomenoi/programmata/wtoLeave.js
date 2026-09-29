@@ -160,9 +160,19 @@
                 { ...input(), request_id: requestId });
             validPreview = null;
             submitButton.disabled = true;
-            if (window.Swal) await window.Swal.fire('Επιτυχία', data.idempotent
-                ? `Η ίδια υποβολή υπάρχει ήδη. Πρωτόκολλο: ${data.protocol || '—'}`
-                : `Η υποβολή αδειών ολοκληρώθηκε. Πρωτόκολλο: ${data.protocol || '—'}`, 'success');
+            if (window.Swal) {
+                const protocol = escapeHtml(data.protocol || '—');
+                if (data.idempotent === true) {
+                    await window.Swal.fire({ title: 'Ήδη υποβλημένο', icon: 'success',
+                        html: `<p>Η συγκεκριμένη υποβολή αδειών έχει ήδη ολοκληρωθεί στο ΕΡΓΑΝΗ.</p>
+                            <p>Πρωτόκολλο: <strong>${protocol}</strong></p>
+                            <p>Δεν πραγματοποιήθηκε νέα υποβολή.</p>` });
+                } else {
+                    await window.Swal.fire({ title: 'Επιτυχία', icon: 'success',
+                        html: `<p>Η υποβολή αδειών ολοκληρώθηκε.</p>
+                            <p>Πρωτόκολλο: <strong>${protocol}</strong></p>` });
+                }
+            }
         } catch (error) {
             if (window.Swal) await window.Swal.fire('Αποτυχία υποβολής', error.message, 'error');
         } finally { setBusy(false); }

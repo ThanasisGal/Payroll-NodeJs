@@ -50,6 +50,7 @@ const response = { statusCode: 200, body: null,
     await controller.submit(req, response);
     assert.equal(response.statusCode, 201);
     assert.equal(response.body.success, true);
+    assert.equal(response.body.idempotent, false);
     assert.equal(uploads.length, 1, 'ο uploader καλείται μόνο μία φορά');
     assert.equal(uploads[0].submissionCode, 'WTOLeave');
     assert.deepStrictEqual(uploads[0].payload, payload);
@@ -60,5 +61,31 @@ const response = { statusCode: 200, body: null,
     assert.equal(records[0].request_id, 'wtoleave-test-0001');
     assert.match(records[0].payload_fingerprint, /^[a-f0-9]{64}$/);
     assert.deepStrictEqual(records[0].request_payload, payload);
-    console.log('PASS WTOLeave submit uses mocked generic uploader and persists canonical audit fields');
+
+    let reusedUploaderCalls = 0;
+    const existing = { _id: 'existing-log-1', protocol: 'PROTO-EXISTING',
+        submit_date_text: '10/08/2026 12:30', erganh_submission_id: 'document-existing',
+        pdf_s3_url: '', payload_fingerprint: records[0].payload_fingerprint,
+        submission_status: 'SUCCESS', document_status: 'ACTIVE' };
+    const reusedController = createWtoLeaveController({
+        loadWtoLeaveDataset: async () => dataset,
+        uploadJsonDocumentToErgani: async () => { reusedUploaderCalls += 1; },
+        CompaniesModel: { findOne: () => { throw new Error('company lookup must not run'); } },
+        PasswordsModel: { findOne: () => { throw new Error('password lookup must not run'); } },
+        YpokatasthmataModel: {}, UserPrivilegesModel: {},
+        ErgazomenoiErganhModel: {
+            findOne: () => lean(existing),
+            create: async () => { throw new Error('create must not run for idempotent reuse'); }
+        }
+    });
+    const reusedResponse = { statusCode: 200, body: null,
+        status(code) { this.statusCode = code; return this; },
+        json(body) { this.body = body; return this; } };
+    await reusedController.submit(req, reusedResponse);
+    assert.equal(reusedResponse.statusCode, 200);
+    assert.equal(reusedResponse.body.success, true);
+    assert.equal(reusedResponse.body.idempotent, true);
+    assert.equal(reusedResponse.body.protocol, 'PROTO-EXISTING');
+    assert.equal(reusedUploaderCalls, 0, 'η reused διαδρομή δεν καλεί τον ERGANI uploader');
+    console.log('PASS WTOLeave new submit and idempotent reuse keep uploader behavior distinct');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
