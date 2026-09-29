@@ -79,6 +79,70 @@ test('history pdfSaved uses the same storage condition as pdfUrl', () => {
     );
 });
 
+test('successful submitted PDF retry clears deferred state and stale PDF errors', () => {
+    const retryHandler = erganhController.slice(
+        erganhController.indexOf('static retrySubmittedErganiPdf'),
+        erganhController.indexOf('static getCompanyErganhDashboard')
+    );
+    const savedPdfPath = retryHandler.slice(
+        retryHandler.indexOf('erganhLog.pdf_s3_key = pdfStorage.pdfS3Key'),
+        retryHandler.indexOf('} catch (error)')
+    );
+
+    assert.match(savedPdfPath, /erganhLog\.pdf_s3_key = pdfStorage\.pdfS3Key/);
+    assert.match(savedPdfPath, /erganhLog\.pdf_size_bytes = pdfStorage\.pdfSizeBytes/);
+    assert.match(savedPdfPath, /erganhLog\.pdf_deferred = false/);
+    assert.match(savedPdfPath, /erganhLog\.error_message = null/);
+    assert.ok(savedPdfPath.indexOf('erganhLog.pdf_deferred = false') < savedPdfPath.indexOf('await erganhLog.save()'));
+    assert.match(
+        savedPdfPath,
+        /success: true,[\s\S]*pdfSaved: true,[\s\S]*pdfDeferred: false,[\s\S]*pdfUrl:/
+    );
+});
+
+test('existing submitted PDF self-heals stale metadata without contacting ERGANI', () => {
+    const retryHandler = erganhController.slice(
+        erganhController.indexOf('static retrySubmittedErganiPdf'),
+        erganhController.indexOf('static getCompanyErganhDashboard')
+    );
+    const existingPdfPath = retryHandler.slice(
+        retryHandler.indexOf('if (existingPdfUrl)'),
+        retryHandler.indexOf("const submissionCode = erganhLog.submission_code || ''")
+    );
+
+    assert.match(existingPdfPath, /erganhLog\.pdf_deferred !== false \|\| erganhLog\.error_message/);
+    assert.match(existingPdfPath, /erganhLog\.pdf_deferred = false/);
+    assert.match(existingPdfPath, /erganhLog\.error_message = null/);
+    assert.match(existingPdfPath, /await erganhLog\.save\(\)/);
+    assert.match(
+        existingPdfPath,
+        /success: true,[\s\S]*pdfSaved: true,[\s\S]*pdfDeferred: false,[\s\S]*pdfUrl: existingPdfUrl/
+    );
+    assert.doesNotMatch(existingPdfPath, /PasswordsModel|authenticateErgani|getSubmissionDocument|downloadSubmittedErganiPdfWithPlaywright/);
+    assert.ok(retryHandler.indexOf('if (existingPdfUrl)') < retryHandler.indexOf('PasswordsModel.findOne'));
+});
+
+test('unavailable submitted PDF stays deferred without changing submission state', () => {
+    const retryHandler = erganhController.slice(
+        erganhController.indexOf('static retrySubmittedErganiPdf'),
+        erganhController.indexOf('static getCompanyErganhDashboard')
+    );
+
+    assert.match(
+        retryHandler,
+        /if \(!documentResult\?\.success \|\| !Buffer\.isBuffer\(documentResult\.buffer\)\)[\s\S]*success: false,[\s\S]*pdfDeferred: true/
+    );
+    assert.match(
+        retryHandler,
+        /if \(!pdfStorage\.pdfSaved\)[\s\S]*success: false,[\s\S]*pdfDeferred: true/
+    );
+    assert.doesNotMatch(
+        retryHandler,
+        /erganhLog\.(submission_status|document_status|protocol|submission_code)\s*=/
+    );
+    assert.doesNotMatch(retryHandler, /ErgazomenoiErganhModel\.create|uploadJsonDocumentToErgani|submitDocument/);
+});
+
 test('employee read and update routes require auth and canonical privileges', () => {
     assert.match(
         routes,
