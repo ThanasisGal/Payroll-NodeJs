@@ -8,6 +8,8 @@ const libxmljs = require('libxmljs2');
 const {
     buildWtoDailySubmissionProjection
 } = require('../../services/ergazomenoi/wtoDailySubmissionProjectionService');
+const { filterEligibleApologistikosSource, buildCanonicalApologistikosRows } =
+    require('../../services/ergazomenoi/apologistikosPinakasControlReportService');
 
 async function generateWTOXML(companyData, ypokatasthmataData, prodhlomenaRows, options = {}) {
     try {
@@ -32,15 +34,20 @@ async function generateWTOXML(companyData, ypokatasthmataData, prodhlomenaRows, 
             throw new Error('[WTO-v1] Δεν βρέθηκαν εγγραφές με apologistiko_biblio=true.');
         }
 
-        const employeesByCode = new Map();
-        validRows.forEach((row) => employeesByCode.set(String(row.kodikos || '').trim(), {
-            kodikos: row.kodikos, afm: row.afm_ergazomenoy || row.afm,
-            eponymo: row.eponymo_ergazomenoy || row.eponymo,
-            onoma: row.onoma_ergazomenoy || row.onoma
-        }));
+        let canonicalRows = options.canonicalRows;
+        if (!options.projection && !Array.isArray(canonicalRows)) {
+            if (!Array.isArray(options.employees)) {
+                const error = new Error(
+                    '[WTO-v1] Απαιτούνται canonicalRows ή authoritative employee records.');
+                error.code = 'WTODAILY_EMPLOYEE_ELIGIBILITY_SOURCE_REQUIRED';
+                throw error;
+            }
+            const eligibleSource = filterEligibleApologistikosSource({ rows: validRows,
+                employees: options.employees });
+            canonicalRows = buildCanonicalApologistikosRows(eligibleSource);
+        }
         const xmlData = options.projection || buildWtoDailySubmissionProjection({
-            rows: validRows,
-            employees: [...employeesByCode.values()],
+            canonicalRows,
             branch: options.ypokatasthma || ypokatasthmataData?.kodikos,
             periodStart: options.apo_hmeromhnia,
             periodEnd: options.eos_hmeromhnia,

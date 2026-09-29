@@ -53,7 +53,7 @@ const EMPLOYEE_FIELDS = Object.freeze(['kodikos', 'afm', 'eponymo', 'onoma', 'hm
     'hmeromhnia_proslhpshs', 'hmeromhnia_apoxorhshs', 'aa_eggrafhs', 'typos_ergazomenon',
     'eidikh_kathgoria_ergazomenoy', 'eidikh_periptosh', 'dialleima_entos_ektos_orarioy',
     'dialleima_se_lepta', 'evelikth_proselefsh', 'plhrhs_apasxolhsh', 'pliris_apasxolhsh',
-    'merikh_apasxolhsh']);
+    'merikh_apasxolhsh', 'afora_daneismo_ergazomenoy', 'typos_ergodoth_daneismoy']);
 const HISTORY_FIELDS = Object.freeze(['_id', 'kodikos', 'aa_eggrafhs', 'hmeromhnia_allaghs_orarioy_apo',
     'hmeromhnia_allaghs_orarioy_eos', 'hmeromhnia_isxyos_oron_ergasias_apo',
     'hmeromhnia_isxyos_oron_ergasias_eos', 'hmeromhnia_allaghs_symbashs',

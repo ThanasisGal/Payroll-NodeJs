@@ -16712,7 +16712,7 @@ class erganhController {
                 company_kod: companyKodikos,
                 kodikos: mongoose.trusted({ $in: employeeCodes })
             })
-                .select('kodikos afm eponymo onoma')
+                .select('kodikos afm eponymo onoma afora_daneismo_ergazomenoy typos_ergodoth_daneismoy')
                 .lean();
 
             const employeeByKodikos = new Map(
@@ -16736,7 +16736,8 @@ class erganhController {
                 companyDescription: req.session?.companyDescription || '',
                 ypokatasthma: selectedYpokatasthma,
                 apo_hmeromhnia,
-                eos_hmeromhnia
+                eos_hmeromhnia,
+                employees
             });
 
             const tmpXmlDir = path.join(process.cwd(), 'tmp', 'erganh-xml');

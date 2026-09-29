@@ -16,6 +16,7 @@ const {
     resolveWtoDailyDeferredBoundaryReadiness
 } = require('./wtoDailyDeferredBoundaryReadinessService');
 const { buildWtoDailySubmissionProjection } = require('./wtoDailySubmissionProjectionService');
+const { buildCanonicalApologistikosRows } = require('./apologistikosPinakasControlReportService');
 const DecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
 
 const dates = ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30',
@@ -335,12 +336,13 @@ assert.equal(resolveWtoDailyDeferredBoundaryReadiness({ deferredWeeks: [required
     periodEnd: sourcePeriod.period_end }).status, REQUIRED);
 
 const employees = [{ kodikos: '1', afm: '123456789', eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΕΡΓΑΖΟΜΕΝΟΣ' }];
-assert.doesNotThrow(() => buildWtoDailySubmissionProjection({ rows: mayOverlay,
-    employees, branch: '0001', periodStart: targetPeriod.period_start, periodEnd: targetPeriod.period_end }));
-assert.throws(() => buildWtoDailySubmissionProjection({ rows: [frozenRows[4]], employees,
+const canonical = (rows) => buildCanonicalApologistikosRows({ rows, employees });
+assert.doesNotThrow(() => buildWtoDailySubmissionProjection({ canonicalRows: canonical(mayOverlay),
+    branch: '0001', periodStart: targetPeriod.period_start, periodEnd: targetPeriod.period_end }));
+assert.throws(() => buildWtoDailySubmissionProjection({ canonicalRows: canonical([frozenRows[4]]),
     branch: '0001', periodStart: sourcePeriod.period_start, periodEnd: sourcePeriod.period_end }),
 (error) => error.code === 'WTODAILY_ROW_OUTSIDE_PERIOD');
-assert.throws(() => buildWtoDailySubmissionProjection({ rows: [frozenRows[0]], employees,
+assert.throws(() => buildWtoDailySubmissionProjection({ canonicalRows: canonical([frozenRows[0]]),
     branch: '0001', periodStart: sourcePeriod.period_start, periodEnd: sourcePeriod.period_end,
     relatedProtocol: 'protocol-1' }),
 (error) => error.code === 'UNSUPPORTED_WTODAILY_CORRECTIVE_SUBMISSION');
