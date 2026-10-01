@@ -1,0 +1,77 @@
+<br><br>
+<section class="container-fluid px-4" id="wtoLeaveApp"
+    data-company-name="<%= companyName %>"
+    data-can-export="<%= userPrivileges.admin === true || userPrivileges.export === true %>">
+    <form id="wtoLeaveForm">
+    <div id="wtoLeaveCard" class="card d-flex flex-column shadow-sm z-depth-5 overflow-hidden">
+        <div class="card-header p-0 height-rem-3_5">
+            <label class="headers-content">Υποβολή Αδειών</label>
+        </div>
+        <div id="wtoLeaveCardBody" class="card-body d-flex flex-column flex-grow-1" style="min-height: 0; overflow: hidden;">
+            <input type="hidden" id="wtoLeaveCsrf" value="<%= csrfToken %>">
+            <div class="row g-3 align-items-end flex-shrink-0">
+                <div class="col-lg-4">
+                    <label class="form-label field-required" for="wtoLeaveBranch">Υποκατάστημα</label>
+                    <select class="form-select" id="wtoLeaveBranch" required>
+                        <option value="">Επιλέξτε υποκατάστημα</option>
+                        <% for (const branch of branches || []) { %>
+                            <option value="<%= branch.kodikos %>"><%= branch.kodikos %> — <%= branch.perigrafh || '' %></option>
+                        <% } %>
+                    </select>
+                </div>
+                <div class="col-lg-3">
+                    <label class="form-label field-required" for="wtoLeaveFrom">Από ημερομηνία</label>
+                    <input class="date-control" type="date" id="wtoLeaveFrom"
+                        value="<%= periodRec && periodRec.apo ? new Date(periodRec.apo).toISOString().slice(0, 10) : '' %>" required>
+                </div>
+                <div class="col-lg-3">
+                    <label class="form-label field-required" for="wtoLeaveTo">Έως ημερομηνία</label>
+                    <input class="date-control" type="date" id="wtoLeaveTo"
+                        value="<%= periodRec && periodRec.eos ? new Date(periodRec.eos).toISOString().slice(0, 10) : '' %>" required>
+                </div>
+                <div class="col-lg-2">
+                    <button class="btn btn-brown w-100" type="button" id="wtoLeavePreviewButton">
+                        <i class="bi bi-search"></i> Προεπισκόπηση
+                    </button>
+                </div>
+            </div>
+
+            <div class="alert alert-secondary mt-3 mb-0 flex-shrink-0" id="wtoLeaveStatus" role="status">
+                Επιλέξτε υποκατάστημα και ημερομηνίες για προεπισκόπηση.
+            </div>
+
+            <div class="row g-2 mt-2 flex-shrink-0" id="wtoLeaveSummary" hidden>
+                <div class="col-4"><div class="border rounded p-2">Πραγματικό διάστημα: <strong id="wtoLeaveActualRange" style="white-space: nowrap;">—</strong></div></div>
+                <div class="col-2"><div class="border rounded p-2">Εργαζόμενοι: <strong id="wtoLeaveEmployeeCount">0</strong></div></div>
+                <div class="col-3"><div class="border rounded p-2">Ημέρες αδειών: <strong id="wtoLeaveDayCount">0</strong></div></div>
+                <div class="col-3"><div class="border rounded p-2">Αναλυτικές εγγραφές: <strong id="wtoLeaveAnalyticsCount">0</strong></div></div>
+            </div>
+
+            <div id="wtoLeaveResultsScroll" class="table-responsive mt-3"
+                style="flex: 1 1 12rem; min-height: 4rem; max-height: 18rem; overflow-y: auto; overflow-x: auto;">
+                <table class="table table-sm table-striped table-bordered align-middle">
+                    <thead class="position-sticky top-0 bg-white">
+                        <tr><th>Ημερομηνία</th><th>Κωδικός</th><th>ΑΦΜ</th><th>Εργαζόμενος</th>
+                            <th>Τύπος</th><th>Μορφή</th><th>Διαστήματα</th><th>Έτος</th><th>Δικαιούμενες</th></tr>
+                    </thead>
+                    <tbody id="wtoLeaveRows"><tr><td colspan="9" class="text-center text-muted">Δεν υπάρχει προεπισκόπηση.</td></tr></tbody>
+                </table>
+            </div>
+
+            <div id="wtoLeaveBlockers" class="alert alert-danger flex-shrink-0" hidden></div>
+            <label class="form-label flex-shrink-0 mt-2" for="wtoLeaveJson">Δεδομένα προς υποβολή</label>
+            <pre class="border rounded bg-light p-3 overflow-auto mb-0" id="wtoLeaveJson"
+                style="flex: 1 1 8rem; min-height: 4rem; max-height: 12rem;">Δεν υπάρχουν επιλέξιμα δεδομένα προς υποβολή.</pre>
+        </div>
+        <div class="card-footer mt-auto d-flex gap-2 flex-wrap">
+            <button class="btn btn-danger" type="button" id="wtoLeaveSubmitButton" disabled>
+                <i class="bi bi-send-check"></i> Τελική Υποβολή Αδειών στο ΕΡΓΑΝΗ
+            </button>
+            <a class="btn btn-brown" href="/mainapp"><i class="bi bi-chevron-double-left"></i> Επιστροφή</a>
+        </div>
+    </div>
+    </form>
+</section>
+
+<script src="<%= script('ergazomenoi/genika/erganiRestSubmissionUi') %>"></script>
+<script nonce="<%= nonce %>" src="<%= script('ergazomenoi/programmata/wtoLeave.js') %>"></script>

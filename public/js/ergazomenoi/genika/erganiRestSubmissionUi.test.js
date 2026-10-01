@@ -7,18 +7,19 @@ const path = require('node:path');
 
 const modulePath = path.resolve(__dirname, 'erganiRestSubmissionUi.js');
 
-function loadUi({ fetchImpl, swalImpl, events = [], loaderElements = [] } = {}) {
+function loadUi({ fetchImpl, swalImpl, events = [], loaderElements = [],
+    documentElements = {}, openImpl } = {}) {
     delete require.cache[modulePath];
 
     global.location = { origin: 'https://payroll.test' };
     global.document = {
         querySelector: () => ({ content: 'csrf-test' }),
         querySelectorAll: () => loaderElements,
-        getElementById: () => null
+        getElementById: (id) => documentElements[id] || null
     };
     global.hideLoader = () => events.push('loader-close');
     global.AppLoader = { hide: () => events.push('app-loader-close') };
-    global.open = () => {};
+    global.open = openImpl || (() => {});
     global.fetch =
         fetchImpl ||
         (async () => ({
@@ -113,6 +114,59 @@ test('direct PDF result closes loader before rendering iframe', async () => {
     assert.ok(events.includes('pdf-modal'));
     assert.ok(events.indexOf('loader-close') < events.indexOf('pdf-modal'));
     assert.ok(events.indexOf('app-loader-close') < events.indexOf('pdf-modal'));
+});
+
+test('PDF viewer collapses navigation only after validation and preserves canonical download', async () => {
+    let dialog;
+    let openHandler;
+    const opened = [];
+    const openButton = { addEventListener: (event, handler) => {
+        assert.equal(event, 'click');
+        openHandler = handler;
+    } };
+    const ui = loadUi({
+        documentElements: { erganiSubmittedPdfOpen: openButton },
+        openImpl: (...args) => opened.push(args),
+        swalImpl: (options) => { dialog = options; return { isConfirmed: false }; }
+    });
+    const canonicalUrl =
+        '/ergazomenoi/ergazomenoi/ergani/pdf/507f1f77bcf86cd799439011';
+    const result = await ui.presentSubmissionResult({
+        success: true,
+        submissionCode: 'WTOLeave',
+        pdfUrl: canonicalUrl
+    });
+
+    assert.equal(result.pdfUrl, canonicalUrl);
+    assert.match(dialog.html, new RegExp(`src="${canonicalUrl}#navpanes=0"`));
+    assert.match(dialog.html, new RegExp(`href="${canonicalUrl}"[^>]*download`));
+    assert.doesNotMatch(dialog.html, /toolbar=0/);
+    assert.equal(typeof openHandler, 'function');
+    openHandler();
+    assert.deepStrictEqual(opened[0], [
+        `${canonicalUrl}#navpanes=0`, '_blank', 'noopener,noreferrer'
+    ]);
+});
+
+test('compact portrait PDF variant scopes width, fit and single-row actions to opted-in flows', async () => {
+    let dialog;
+    const ui = loadUi({ swalImpl: (options) => { dialog = options; return { isConfirmed: false }; } });
+    await ui.presentSubmissionResult({
+        success: true,
+        submissionCode: 'WTOLeave',
+        pdfViewerVariant: 'compact-portrait',
+        pdfUrl: '/ergazomenoi/ergazomenoi/ergani/pdf/507f1f77bcf86cd799439011'
+    });
+    assert.match(dialog.customClass.popup,
+        /ergani-submitted-pdf-popup--compact-portrait/);
+    assert.match(dialog.html,
+        /pdf\/507f1f77bcf86cd799439011#view=FitH&amp;navpanes=0/);
+    assert.doesNotMatch(dialog.html, /toolbar=0/);
+
+    const css = fs.readFileSync(path.resolve(__dirname, '../../../css/main.css'), 'utf8');
+    assert.match(css, /ergani-submitted-pdf-popup--compact-portrait[\s\S]*?width:\s*min\(46rem/);
+    assert.match(css, /ergani-submitted-pdf-popup--compact-portrait[\s\S]*?height:\s*min\(78dvh, 50rem\)/);
+    assert.match(css, /ergani-submitted-pdf-popup--compact-portrait \.pdf-preview-actions[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?gap:\s*0\.75rem;/);
 });
 
 test('deferred result calls scoped retry endpoint with CSRF and credentials', async () => {

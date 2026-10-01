@@ -15792,9 +15792,16 @@ class erganhController {
             });
 
             if (existingPdfUrl) {
+                if (erganhLog.pdf_deferred !== false || erganhLog.error_message) {
+                    erganhLog.pdf_deferred = false;
+                    erganhLog.error_message = null;
+                    await erganhLog.save();
+                }
+
                 return res.json({
                     success: true,
                     pdfSaved: true,
+                    pdfDeferred: false,
                     pdfUrl: existingPdfUrl,
                     protocol: erganhLog.protocol || null,
                     submitDate: erganhLog.submit_date_text || erganhLog.submit_date || null
@@ -15995,12 +16002,14 @@ class erganhController {
             erganhLog.pdf_filename = pdfStorage.pdfFilename;
             erganhLog.pdf_content_type = pdfStorage.pdfContentType;
             erganhLog.pdf_size_bytes = pdfStorage.pdfSizeBytes;
+            erganhLog.pdf_deferred = false;
             erganhLog.error_message = null;
             await erganhLog.save();
 
             return res.json({
                 success: true,
                 pdfSaved: true,
+                pdfDeferred: false,
                 pdfUrl: getErganiPdfRoute(erganhLog._id),
                 protocol,
                 submitDate,
@@ -16712,7 +16721,7 @@ class erganhController {
                 company_kod: companyKodikos,
                 kodikos: mongoose.trusted({ $in: employeeCodes })
             })
-                .select('kodikos afm eponymo onoma')
+                .select('kodikos afm eponymo onoma afora_daneismo_ergazomenoy typos_ergodoth_daneismoy')
                 .lean();
 
             const employeeByKodikos = new Map(
@@ -16736,7 +16745,8 @@ class erganhController {
                 companyDescription: req.session?.companyDescription || '',
                 ypokatasthma: selectedYpokatasthma,
                 apo_hmeromhnia,
-                eos_hmeromhnia
+                eos_hmeromhnia,
+                employees
             });
 
             const tmpXmlDir = path.join(process.cwd(), 'tmp', 'erganh-xml');

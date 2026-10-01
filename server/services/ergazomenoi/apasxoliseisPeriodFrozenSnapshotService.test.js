@@ -32,7 +32,8 @@ daily[0].effective_profile_resolved = weeklyRows[0].effective_profile_resolved;
 const input = { scope, dailyResults: daily, weeklyDailyResults: weeklyRows,
     calendarFacts: weeklyRows.map((row) => ({ hmeromhnia: row.hmeromhnia, is_holiday: false })),
     employees: [{ kodikos: '001', afm: '123456789', eponymo: 'ΕΠ', onoma: 'ΟΝ', hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40,
-        pragmatikoOromisthio: 10, password: 'excluded' }],
+        pragmatikoOromisthio: 10, afora_daneismo_ergazomenoy: false,
+        typos_ergodoth_daneismoy: false, password: 'excluded' }],
     payrollResults: [{ kodikos: '001', aa_misthodosias: '1', typos_apodoxon: '01', synolo_mikton_apodoxon: 1000 }],
     deviations: [{ kodikos: '001', week_apo: '2026-06-01', status: 'NEEDS_HR', reasons: ['X'] }],
     canonicalDecisions: [{ employee_kodikos: '001', week_start: '2026-06-01', request_id: 'e2', decision_payload: { classification: 'SIXTH' } }],
@@ -50,6 +51,8 @@ assert.strictEqual(one.frozen_snapshot_fingerprint, auditNoise.frozen_snapshot_f
 assert.strictEqual(one.frozen_snapshot_fingerprint.length, 64);
 assert.strictEqual(one.snapshot.snapshot_schema_version, 'employment-period-frozen:v3');
 assert.strictEqual(one.snapshot.employees[0].afm, '123456789');
+assert.strictEqual(one.snapshot.employees[0].afora_daneismo_ergazomenoy, false);
+assert.strictEqual(one.snapshot.employees[0].typos_ergodoth_daneismoy, false);
 assert.strictEqual(one.snapshot.daily_results[0].apologistiko_biblio, true);
 assert.strictEqual(one.snapshot.daily_results[0].cards_apo_ora_01, '09:00');
 assert.strictEqual(one.snapshot.daily_results[0].cards_eos_ora_01, '17:00');
@@ -68,6 +71,10 @@ const changedPolicy = buildEmploymentPeriodFrozenSnapshot({ ...input, policyCont
 assert.notStrictEqual(one.frozen_snapshot_fingerprint, changedPolicy.frozen_snapshot_fingerprint);
 const changedProfile = buildEmploymentPeriodFrozenSnapshot({ ...input, employees: [{ ...input.employees[0], pragmatikoOromisthio: 11 }] });
 assert.notStrictEqual(one.frozen_snapshot_fingerprint, changedProfile.frozen_snapshot_fingerprint);
+const changedEligibility = buildEmploymentPeriodFrozenSnapshot({ ...input, employees: [{
+    ...input.employees[0], afora_daneismo_ergazomenoy: true
+}] });
+assert.notStrictEqual(one.frozen_snapshot_fingerprint, changedEligibility.frozen_snapshot_fingerprint);
 const reviewBefore = projectFrozenReview(one.snapshot);
 input.dailyResults[0].ores_ergasias_apologistika = 99;
 input.policyContext.policy_version = 'current-v99';

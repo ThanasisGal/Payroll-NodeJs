@@ -16,6 +16,7 @@ const USER_PRIVILEGE_FORM_CATALOG_SEED = Object.freeze([
     { form: 'ApologistikosPinakasOrarion', formLabel: 'Απολογιστικός Πίνακας Ωραρίων', sidebarOrder: 13000, active: true, showInPrivileges: true },
     { form: 'ApologistikosPinakasYperorion', formLabel: 'Απολογιστικός Πίνακας Υπερωριών', sidebarOrder: 14000, active: true, showInPrivileges: true },
     { form: 'KatastashElegxouApologistikouPinaka', formLabel: 'Κατάσταση Ελέγχου Απολογιστικού Πίνακα', sidebarOrder: 14500, active: true, showInPrivileges: true },
+    { form: 'YpobolhAdeion', formLabel: 'Υποβολή Αδειών', sidebarOrder: 14750, active: true, showInPrivileges: true },
     { form: 'Krathseis', formLabel: 'Κρατήσεις', sidebarOrder: 15000, active: true, showInPrivileges: true },
     { form: 'Symbaseis', formLabel: 'Συμβάσεις', sidebarOrder: 16000, active: true, showInPrivileges: true },
     { form: 'KathgoriesSymbaseon', formLabel: 'Κατηγορίες Συμβάσεων', sidebarOrder: 17000, active: true, showInPrivileges: true },

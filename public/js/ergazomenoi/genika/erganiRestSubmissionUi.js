@@ -55,6 +55,9 @@
             pdfDeferred: result.pdfDeferred === true,
             pdfWarning: result.pdfWarning || '',
             pdfFilename: result.pdfFilename || '',
+            pdfViewerVariant: result.pdfViewerVariant === 'compact-portrait'
+                ? 'compact-portrait'
+                : '',
             message: result.message || '',
             errorMessage:
                 result.errorMessage || result.error || result.userMessage || result.message || ''
@@ -158,12 +161,19 @@
         const title = result.submissionCode
             ? `ΕΡΓΑΝΗ - ${result.submissionCode}`
             : 'ΕΡΓΑΝΗ - Υποβληθέν PDF';
+        const compactPortrait = result.pdfViewerVariant === 'compact-portrait';
+        const popupClass = compactPortrait
+            ? 'ergani-submitted-pdf-popup ergani-submitted-pdf-popup--compact-portrait'
+            : 'ergani-submitted-pdf-popup';
+        const previewPdfUrl = compactPortrait
+            ? `${safePdfUrl}#view=FitH&navpanes=0`
+            : `${safePdfUrl}#navpanes=0`;
 
         await global.Swal.fire({
             backdrop: false,
             allowOutsideClick: false,
             width: 1250,
-            customClass: { popup: 'ergani-submitted-pdf-popup' },
+            customClass: { popup: popupClass },
             title,
             html: `
                 <div class="ergani-submitted-pdf-result">
@@ -175,7 +185,7 @@
                         ${result.pdfFilename ? `<br>Αρχείο: ${escapeHtml(result.pdfFilename)}` : ''}
                     </p>
                     <iframe
-                        src="${escapeHtml(safePdfUrl)}"
+                        src="${escapeHtml(previewPdfUrl)}"
                         class="pdf-preview-iframe"
                         title="PDF υποβολής ΕΡΓΑΝΗ">
                     </iframe>
@@ -191,7 +201,7 @@
                 global.document
                     ?.getElementById?.('erganiSubmittedPdfOpen')
                     ?.addEventListener('click', () =>
-                        global.open(safePdfUrl, '_blank', 'noopener,noreferrer')
+                        global.open(previewPdfUrl, '_blank', 'noopener,noreferrer')
                     );
                 global.document
                     ?.getElementById?.('erganiSubmittedPdfClose')
