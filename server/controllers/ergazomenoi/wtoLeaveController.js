@@ -36,6 +36,12 @@ function safeFilenamePart(value, fallback = 'UNKNOWN') {
         .replace(/\s+/g, '_').substring(0, 80);
     return cleaned || fallback;
 }
+function getWtoLeavePdfRoute(id) {
+    return id ? `/ergazomenoi/ergazomenoi/ergani/pdf/${id}` : '';
+}
+function hasWtoLeavePdf(record = {}) {
+    return !!(record.pdf_s3_key || record.pdf_relative_path || record.pdf_s3_url);
+}
 async function saveWtoLeavePdf({ pdfBuffer, contentType, team, company, restResult }) {
     if (!Buffer.isBuffer(pdfBuffer) || pdfBuffer.subarray(0, 5).toString() !== '%PDF-') {
         return { pdfSaved: false, pdfS3Key: null, pdfS3Url: null, pdfRelativePath: null,
@@ -160,11 +166,16 @@ function createWtoLeaveController(dependencies = {}) {
                     companykod_object: scope.company, ypokatasthma_kodikos: branchCode,
                     submission_code: 'WTOLeave', payload_fingerprint: fingerprint,
                     submission_status: 'SUCCESS', is_final: true, document_status: 'ACTIVE' }).lean();
-                if (existing) return res.json({ success: true, idempotent: true,
-                    submissionCode: 'WTOLeave', protocol: existing.protocol,
-                    submitDate: existing.submit_date_text,
-                    erganhSubmissionId: existing.erganh_submission_id,
-                    erganhLogId: existing._id, pdfUrl: existing.pdf_s3_url || '' });
+                if (existing) {
+                    const pdfSaved = hasWtoLeavePdf(existing);
+                    return res.json({ success: true, idempotent: true,
+                        submissionCode: 'WTOLeave', protocol: existing.protocol,
+                        submitDate: existing.submit_date_text,
+                        erganhSubmissionId: existing.erganh_submission_id,
+                        erganhLogId: existing._id, pdfSaved,
+                        pdfDeferred: existing.pdf_deferred === true,
+                        pdfUrl: pdfSaved ? getWtoLeavePdfRoute(existing._id) : '' });
+                }
 
                 const [company, password] = await Promise.all([
                     Company.findOne({ _id: scope.company, team: scope.team }).lean(),
@@ -235,7 +246,8 @@ function createWtoLeaveController(dependencies = {}) {
                 return res.status(201).json({ success: true, idempotent: false,
                     submissionCode: 'WTOLeave', protocol: record.protocol,
                     submitDate: record.submit_date_text, erganhSubmissionId: record.erganh_submission_id,
-                    erganhLogId: record._id, pdfUrl: record.pdf_s3_url || '',
+                    erganhLogId: record._id, pdfSaved: hasWtoLeavePdf(record),
+                    pdfUrl: hasWtoLeavePdf(record) ? getWtoLeavePdfRoute(record._id) : '',
                     pdfDeferred: record.pdf_deferred === true });
             } catch (error) {
                 if (externalSuccess && !error.statusCode) {
@@ -252,6 +264,7 @@ function createWtoLeaveController(dependencies = {}) {
 
 const controller = createWtoLeaveController();
 Object.defineProperty(controller, '__testHooks', { value: Object.freeze({ createWtoLeaveController,
-    assertBrowserInput, assertRequestId, resolvedSubmissionIdentity, parseSubmitDate }), enumerable: false });
+    assertBrowserInput, assertRequestId, resolvedSubmissionIdentity, parseSubmitDate,
+    getWtoLeavePdfRoute, hasWtoLeavePdf }), enumerable: false });
 
 module.exports = controller;
