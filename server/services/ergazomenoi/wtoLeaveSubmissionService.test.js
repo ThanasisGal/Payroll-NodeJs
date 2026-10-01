@@ -3,6 +3,7 @@
 const assert = require('assert');
 const {
     employeeEligibleForWtoLeave,
+    candidateKind,
     buildWtoLeaveCanonicalDataset,
     buildWtoLeavePayload,
     validateWtoLeaveParity
@@ -21,14 +22,45 @@ const row = (date, overrides = {}) => ({ _id: `row-${date}`, kodikos: '0001',
     egkekrimena_diastimata_oroadeias_apologistika: [], ...overrides });
 
 assert.equal(employeeEligibleForWtoLeave(employee()), true, 'κάρτα true');
-assert.equal(employeeEligibleForWtoLeave(employee({ karta_ergasias: false })), false, 'κάρτα false');
+assert.equal(employeeEligibleForWtoLeave(employee({ karta_ergasias: false })), true,
+    'η ψηφιακή κάρτα δεν είναι προϋπόθεση WTOLeave');
 assert.equal(employeeEligibleForWtoLeave(employee({ afora_daneismo_ergazomenoy: true,
     typos_ergodoth_daneismoy: false })), false, 'πλευρά δανειζόμενου αποκλείεται');
 assert.equal(employeeEligibleForWtoLeave(employee({ afora_daneismo_ergazomenoy: true,
     typos_ergodoth_daneismoy: true })), true, 'δανείζων εργοδότης περιλαμβάνεται');
 assert.equal(buildWtoLeaveCanonicalDataset({ sourceRows: [row('2026-08-10')],
-    employees: [employee({ karta_ergasias: false })] }).rows.length, 0,
-'εργαζόμενος χωρίς κάρτα αποκλείεται από το canonical σύνολο');
+    employees: [employee({ karta_ergasias: false })] }).rows.length, 1,
+'εργαζόμενος χωρίς κάρτα αλλά με lending eligibility περιλαμβάνεται');
+assert.equal(buildWtoLeaveCanonicalDataset({ sourceRows: [row('2026-08-10')],
+    employees: [employee({ karta_ergasias: true })] }).rows.length, 1,
+'εργαζόμενος με κάρτα και lending eligibility περιλαμβάνεται');
+assert.equal(buildWtoLeaveCanonicalDataset({ sourceRows: [row('2026-08-10')],
+    employees: [employee({ karta_ergasias: false, afora_daneismo_ergazomenoy: true,
+        typos_ergodoth_daneismoy: false })] }).rows.length, 0,
+'η υπάρχουσα lending-side εξαίρεση διατηρείται ανεξάρτητα από την κάρτα');
+
+const sicknessRow = row('2026-08-11', { adeia_apologistika: false,
+    astheneia_apologistika: true, kathgoria_adeias_apologistika: 'ΑΔΑΣ' });
+assert.deepStrictEqual(candidateKind(sicknessRow), {
+    kind: 'full_day', type: 'ΑΔΑΣ', intervals: []
+}, 'η canonical ασθένεια είναι ολοήμερο WTOLeave candidate');
+const sicknessResult = buildWtoLeaveCanonicalDataset({ sourceRows: [sicknessRow],
+    employees: [employee()] });
+assert.equal(sicknessResult.rows.length, 1);
+const sicknessAnalytics = buildWtoLeavePayload({ canonicalRows: sicknessResult.rows,
+    branch: '0001' }).WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0]
+    .ErgazomenosAnalytics.ErgazomenosWTOAnalytics[0];
+assert.deepStrictEqual(sicknessAnalytics, {
+    f_type: 'ΑΔΑΣ', f_from: '', f_to: '', f_year: '', f_req_days: ''
+}, 'η ασθένεια διατηρεί τον ακριβή τύπο χωρίς ώρες ή στοιχεία entitlement ΑΔΚΑΝ');
+
+const weekendAn = row('2026-08-09', { adeia_apologistika: false,
+    astheneia_apologistika: false, kathgoria_adeias_apologistika: '',
+    kathgoria_ergasias_apologistika: 'ΑΝ', apologistiko_biblio: true });
+assert.deepStrictEqual(candidateKind(weekendAn), { kind: 'excluded' },
+    'το Σαββατοκύριακο ΑΝ χωρίς leave/sickness flags αποκλείεται');
+assert.equal(buildWtoLeaveCanonicalDataset({ sourceRows: [weekendAn],
+    employees: [employee()] }).rows.length, 0);
 
 for (const [label, profile, expected] of [
     ['canonical full-time', { kathestos_apasxolhshs: '0', typos_apasxolhshs: '' }, '0'],

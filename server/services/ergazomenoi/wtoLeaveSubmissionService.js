@@ -30,13 +30,12 @@ function blocker(code, message, row = {}, details = {}) {
         ...details });
 }
 function employeeEligibleForWtoLeave(employee) {
-    return Boolean(employee?.karta_ergasias === true &&
-        employeeIsEligibleForProdhlomenaOraria(employee));
+    return employeeIsEligibleForProdhlomenaOraria(employee);
 }
 function candidateKind(row) {
     const type = String(row.kathgoria_adeias_apologistika ?? '');
     if (type === 'POSSIBLE_LEAVE') return Object.freeze({ kind: 'excluded' });
-    const fullDay = row.adeia_apologistika === true;
+    const fullDay = row.adeia_apologistika === true || row.astheneia_apologistika === true;
     const hourly = row.egkekrimenh_oroadeia_apologistika === true;
     if (!fullDay && !hourly) return Object.freeze({ kind: 'excluded' });
     if (!type.trim()) return Object.freeze({ kind: 'blocked', code: 'WTOLEAVE_EMPTY_TYPE',
