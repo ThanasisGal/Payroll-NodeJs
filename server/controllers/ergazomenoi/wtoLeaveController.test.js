@@ -60,6 +60,25 @@ const response = { statusCode: 200, body: null,
     assert.equal(hasWtoLeavePdf({ pdf_s3_url: 'stored-url' }), true);
     assert.equal(hasWtoLeavePdf({}), false);
 
+    let renderedPage;
+    const pageController = createWtoLeaveController({
+        CompaniesModel: { findOne: () => lean({ _id: 'company-id', eponymia: 'ΕΤΑΙΡΕΙΑ' }) },
+        YpokatasthmataModel: { find: () => ({ sort: () => lean([{ kodikos: '0000' }]) }) },
+        UserPrivilegesModel: { findOne: () => lean({ privileges: { export: true } }) },
+        PeriodsModel: { findOne: (filter) => {
+            assert.deepStrictEqual(filter, { xrhsh: 2026, kodikos: '08' });
+            return lean({ apo: new Date('2026-08-01T00:00:00.000Z'),
+                eos: new Date('2026-08-31T00:00:00.000Z') });
+        } },
+        ErgazomenoiErganhModel: {}, PasswordsModel: {}
+    });
+    await pageController.page({ programmataAccessScope: { companyId: 'company-id',
+        effectiveTeam: 'TEAM1' }, session: { userId: 'user-1', yearInUse: 2026,
+        periodInUse: '08' } }, { render(view, data) { renderedPage = { view, data }; } });
+    assert.equal(renderedPage.view, 'ergazomenoi/programmata/ypovoliAdeion');
+    assert.equal(renderedPage.data.periodRec.apo.toISOString(), '2026-08-01T00:00:00.000Z');
+    assert.equal(renderedPage.data.periodRec.eos.toISOString(), '2026-08-31T00:00:00.000Z');
+
     await controller.submit(req, response);
     assert.equal(response.statusCode, 201);
     assert.equal(response.body.success, true);

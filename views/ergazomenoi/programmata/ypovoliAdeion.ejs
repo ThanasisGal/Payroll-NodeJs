@@ -21,11 +21,13 @@
                 </div>
                 <div class="col-lg-3">
                     <label class="form-label field-required" for="wtoLeaveFrom">Από ημερομηνία</label>
-                    <input class="date-control" type="date" id="wtoLeaveFrom" required>
+                    <input class="date-control" type="date" id="wtoLeaveFrom"
+                        value="<%= periodRec && periodRec.apo ? new Date(periodRec.apo).toISOString().slice(0, 10) : '' %>" required>
                 </div>
                 <div class="col-lg-3">
                     <label class="form-label field-required" for="wtoLeaveTo">Έως ημερομηνία</label>
-                    <input class="date-control" type="date" id="wtoLeaveTo" required>
+                    <input class="date-control" type="date" id="wtoLeaveTo"
+                        value="<%= periodRec && periodRec.eos ? new Date(periodRec.eos).toISOString().slice(0, 10) : '' %>" required>
                 </div>
                 <div class="col-lg-2">
                     <button class="btn btn-brown w-100" type="button" id="wtoLeavePreviewButton">

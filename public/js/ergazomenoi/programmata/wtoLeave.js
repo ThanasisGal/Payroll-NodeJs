@@ -168,7 +168,8 @@
             }
             await window.ErganiRestSubmissionUi.presentSubmissionResultSafely({
                 ...data,
-                processDescription: 'Οργάνωση Χρόνου Εργασίας - Άδειες'
+                processDescription: 'Οργάνωση Χρόνου Εργασίας - Άδειες',
+                pdfViewerVariant: 'compact-portrait'
             });
         } catch (error) {
             if (window.Swal) await window.Swal.fire('Αποτυχία υποβολής', error.message, 'error');

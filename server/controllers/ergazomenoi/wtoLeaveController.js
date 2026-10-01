@@ -3,6 +3,7 @@
 const { CompaniesModel, PasswordsModel, YpokatasthmataModel } = require('../../models/companies');
 const { ErgazomenoiErganhModel } = require('../../models/ergazomenoi');
 const { UserPrivilegesModel } = require('../../models/privileges');
+const { PeriodsModel } = require('../../models/stathera_arxeia');
 const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentUploader');
 const { loadWtoLeaveDataset } =
     require('../../services/ergazomenoi/wtoLeaveDatasetService');
@@ -104,6 +105,7 @@ function createWtoLeaveController(dependencies = {}) {
     const Branch = dependencies.YpokatasthmataModel || YpokatasthmataModel;
     const Log = dependencies.ErgazomenoiErganhModel || ErgazomenoiErganhModel;
     const Privilege = dependencies.UserPrivilegesModel || UserPrivilegesModel;
+    const Period = dependencies.PeriodsModel || PeriodsModel;
     const loadDataset = dependencies.loadWtoLeaveDataset || loadWtoLeaveDataset;
     const upload = dependencies.uploadJsonDocumentToErgani || uploadJsonDocumentToErgani;
     const savePdf = dependencies.saveWtoLeavePdf || saveWtoLeavePdf;
@@ -112,16 +114,18 @@ function createWtoLeaveController(dependencies = {}) {
         page: async (req, res) => {
             try {
                 const scope = req.programmataAccessScope;
-                const [company, branches, privilege] = await Promise.all([
+                const [company, branches, privilege, periodRec] = await Promise.all([
                     Company.findOne({ _id: scope.companyId, team: scope.effectiveTeam }).lean(),
                     Branch.find({ companykod_object: scope.companyId, team: scope.effectiveTeam })
                         .sort({ kodikos: 1 }).lean(),
-                    Privilege.findOne({ userId: req.session.userId, form: 'YpobolhAdeion' }).lean()
+                    Privilege.findOne({ userId: req.session.userId, form: 'YpobolhAdeion' }).lean(),
+                    Period.findOne({ xrhsh: req.session.yearInUse,
+                        kodikos: req.session.periodInUse }).lean()
                 ]);
                 return res.render('ergazomenoi/programmata/ypovoliAdeion', {
                     locals: { title: 'Υποβολή Αδειών ΕΡΓΑΝΗ ΙΙ', description: 'WTOLeave' },
                     companyName: company?.eponymia || company?.perigrafh || company?.kod || '',
-                    branches, userPrivileges: privilege?.privileges || {}, rec: {}
+                    branches, userPrivileges: privilege?.privileges || {}, periodRec, rec: {}
                 });
             } catch (error) {
                 return sendControllerError(res, error, 'Δεν ήταν δυνατή η φόρτωση της σελίδας WTOLeave.');
