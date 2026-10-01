@@ -26,6 +26,7 @@ const programmataController = require('../controllers/ergazomenoi/programmataCon
 const erganhController = require('../controllers/ergazomenoi/erganhController.js');
 const apologistikosPinakasControlReportController = require('../controllers/ergazomenoi/apologistikosPinakasControlReportController.js');
 const wtoLeaveController = require('../controllers/ergazomenoi/wtoLeaveController.js');
+const wtoOvertimeController = require('../controllers/ergazomenoi/wtoOvertimeController.js');
 const kinhseisController = require('../controllers/Kinhseis/kinhseisController.js');
 const forosController = require('../controllers/Kinhseis/forosContoller.js');
 const ektyposhSymbaseonController = require('../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js');
@@ -719,8 +720,8 @@ router.post(
 router.post(
     '/ergazomenoi/programmata/wtoApologistikoYperorion',
     requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'export'),
-    authorizeProgrammataExternalAction,
-    erganhController.generateWTOApologistikoYperorion
+    authorizeProgrammataSessionCompany,
+    wtoOvertimeController.deprecatedLegacy
 );
 
 router.post(
@@ -785,9 +786,26 @@ router.post(
 
 router.get(
     '/ergazomenoi/programmata/apologistikosPinakasYperorion',
+    checkAuth,
     requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'read'),
     authorizeProgrammataSessionCompany,
-    erganhController.mainApologistikosPinakasYperorionForm
+    wtoOvertimeController.page
+);
+
+router.post(
+    '/api/ergazomenoi/programmata/wto-overtime/preview',
+    checkAuth,
+    requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'read'),
+    authorizeProgrammataSessionCompany,
+    wtoOvertimeController.preview
+);
+
+router.post(
+    '/api/ergazomenoi/programmata/wto-overtime/submit',
+    checkAuth,
+    requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'export'),
+    authorizeProgrammataExternalAction,
+    wtoOvertimeController.submit
 );
 
 router.get(

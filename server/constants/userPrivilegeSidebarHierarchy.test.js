@@ -37,6 +37,17 @@ assert.ok(Object.isFrozen(userPrivilegeSidebarHierarchy));
 assert.ok(Object.isFrozen(userPrivilegeSidebarHierarchy[0]));
 assert.ok(Object.isFrozen(userPrivilegeSidebarHierarchy[0].ancestors));
 assert.ok(userPrivilegeSidebarHierarchy.every((entry) => /^li[0-9]+$/.test(entry.sidebarNodeId)));
+const byForm = new Map(userPrivilegeSidebarHierarchy.map((entry) => [entry.form, entry]));
+assert.equal(byForm.has('ApologistikosPinakasOrarion'), false,
+    'ο canonical κατάλογος παραμένει ανεξάρτητος, αλλά η φόρμα δεν αποδίδεται στο sidebar');
+assert.deepStrictEqual(byForm.get('KatastashElegxouApologistikouPinaka').ancestors.map((item) => item.key),
+    ['files', 'ergani-ii']);
+assert.ok(byForm.get('ElegxosApasxolhseonPeriodoy').itemOrder <
+    byForm.get('KatastashElegxouApologistikouPinaka').itemOrder);
+assert.deepStrictEqual(byForm.get('ApologistikosPinakasYperorion').ancestors.map((item) => item.key),
+    ['files', 'ergani-ii', 'file-submissions']);
+assert.deepStrictEqual(byForm.get('YpobolhAdeion').ancestors.map((item) => item.key),
+    ['files', 'ergani-ii', 'file-submissions']);
 
 const insertionSafe = [100, 200, 150].map((itemOrder, index) => ({
     form: `Inserted${index}`,

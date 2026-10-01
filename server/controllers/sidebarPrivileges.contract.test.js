@@ -30,12 +30,21 @@ assert.ok(!/situation_(?:A|S|HR|C|U|V)/.test(frontend));
 for (const form of [
     'Companies', 'Ypokatasthmata', 'NomimoiEkprosopoi', 'Passwords', 'Antistoixiseis', 'Trapezes',
     'Ergazomenoi', 'AntigrafhProgrammatonErgasias', 'LhpshOrarionApoErganh', 'LhpshOrarionApoKartes',
-    'CalcApasxolhseisPeriodoy', 'ElegxosApasxolhseonPeriodoy', 'ApologistikosPinakasOrarion',
+    'CalcApasxolhseisPeriodoy', 'ElegxosApasxolhseonPeriodoy',
     'ApologistikosPinakasYperorion', 'KatastashElegxouApologistikouPinaka', 'YpobolhAdeion', 'Krathseis', 'Symbaseis', 'KathgoriesSymbaseon',
     'EidikothtesSymbaseon', 'StoixeiaSymbaseon', 'KlimakiaSymbaseon',
     'YpologismoiKlimakionSymbaseon', 'Apasxolhseis', 'EktyposhAtomikonEkkathariseon',
     'EktyposhSymbaseonErgazomenon'
 ]) assert.ok(sidebar.includes(`data-privilege-form="${form}"`), form);
+
+assert.ok(!sidebar.includes('data-privilege-form="ApologistikosPinakasOrarion"'));
+const employmentReviewIndex = sidebar.indexOf('data-privilege-form="ElegxosApasxolhseonPeriodoy"');
+const controlReportIndex = sidebar.indexOf('data-privilege-form="KatastashElegxouApologistikouPinaka"');
+const submissionsIndex = sidebar.indexOf('Αποστολή Αρχείων', controlReportIndex);
+const overtimeIndex = sidebar.indexOf('data-privilege-form="ApologistikosPinakasYperorion"');
+const leaveIndex = sidebar.indexOf('data-privilege-form="YpobolhAdeion"');
+assert.ok(employmentReviewIndex < controlReportIndex && controlReportIndex < submissionsIndex);
+assert.ok(submissionsIndex < overtimeIndex && overtimeIndex < leaveIndex);
 
 assert.ok(sidebar.includes('data-sidebar-authorized="<%= isAdminOrSupervisorRole(userRole) %>"'));
 assert.ok(sidebar.includes('<% if (isAdminOrSupervisorRole(userRole)) { %>'));

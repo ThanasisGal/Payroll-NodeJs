@@ -154,6 +154,27 @@ function employeeResult(rows) {
             '2026-08-01');
         assert.strictEqual(wtoLeaveSubmit.programmataAccessScope.externalDateRange.endValue,
             '2026-08-31');
+
+        const wtoOvertimeSubmit = {
+            path: '/api/ergazomenoi/programmata/wto-overtime/submit',
+            session: { companyInUse: '507f1f77bcf86cd799439011', userId: '7' },
+            authenticatedUserTeam: 'TEAM1',
+            body: { ypokatasthma: '2', from_date: '2026-09-01', to_date: '2026-09-30' }
+        };
+        let wtoOvertimeNext = 0;
+        await scope.authorizeExternalAction(
+            wtoOvertimeSubmit, response(), () => wtoOvertimeNext++
+        );
+        assert.strictEqual(wtoOvertimeNext, 1);
+        assert.strictEqual(wtoOvertimeSubmit.programmataAccessScope.ypokatasthma, '0002');
+        assert.strictEqual(
+            wtoOvertimeSubmit.programmataAccessScope.externalDateRange.startValue,
+            '2026-09-01'
+        );
+        assert.strictEqual(
+            wtoOvertimeSubmit.programmataAccessScope.externalDateRange.endValue,
+            '2026-09-30'
+        );
     } finally {
         CompaniesModel.findById = originalCompanyFindById;
         CompaniesModel.find = originalCompanyFind;

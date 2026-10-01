@@ -376,14 +376,16 @@ async function authorizeExternalAction(req, res, next) {
             const isSchedule = req.path === '/ergazomenoi/programmata/downloadSchedule';
             const isCards = req.path === '/ergazomenoi/programmata/downloadCards';
             const isWtoLeave = req.path === '/api/ergazomenoi/programmata/wto-leave/submit';
-            const startValue = isWtoLeave
+            const isWtoOvertime = req.path === '/api/ergazomenoi/programmata/wto-overtime/submit';
+            const isWtoRest = isWtoLeave || isWtoOvertime;
+            const startValue = isWtoRest
                 ? req.body?.from_date
                 : isSchedule
                 ? req.body?.fromDate
                 : isCards
                   ? req.body?.apoHmeromhnia
                   : req.body?.apo_hmeromhnia;
-            const endValue = isWtoLeave
+            const endValue = isWtoRest
                 ? req.body?.to_date
                 : isSchedule
                 ? req.body?.toDate
@@ -391,7 +393,7 @@ async function authorizeExternalAction(req, res, next) {
                   ? req.body?.eosHmeromhnia
                   : req.body?.eos_hmeromhnia;
             const rawYpokatasthma =
-                (isWtoLeave
+                (isWtoRest
                     ? req.body?.ypokatasthma
                     : isSchedule || isCards
                     ? req.body?.selectedPararthma
