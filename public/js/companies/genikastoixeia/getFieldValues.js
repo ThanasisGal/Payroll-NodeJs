@@ -1,6 +1,60 @@
 // public\js\companies\genikastoixeia\getFieldValues.js
 
-document.addEventListener('DOMContentLoaded', () => {
+function getCompanyAddCsrfToken() {
+    let appToken = '';
+    try {
+        appToken = typeof window !== 'undefined' && typeof window.getCSRFToken === 'function'
+            ? window.getCSRFToken() : '';
+    } catch {}
+    const metaToken = typeof document !== 'undefined'
+        ? document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') : '';
+    const inputToken = typeof document !== 'undefined'
+        ? document.querySelector('input[name="_csrf"]')?.value : '';
+    return String(appToken || metaToken || inputToken || '').trim();
+}
+
+function safeCompanyAddResponseText(value) {
+    const text = String(value || '').trim();
+    if (!text || /<(?:!doctype|html|body|pre|script)\b/i.test(text)) return '';
+    return text.slice(0, 500);
+}
+
+function isCompanyAddCsrfFailure(status, data, responseText = '') {
+    if (status !== 403) return false;
+    const contractText = [data?.error, data?.message, responseText]
+        .map((value) => String(value || ''))
+        .join(' ');
+    return ['CSRF validation failed', 'Invalid or missing CSRF token', 'CSRF token invalid']
+        .some((marker) => contractText.includes(marker));
+}
+
+function companyAddErrorMessage(status, data, responseText = '') {
+    if (isCompanyAddCsrfFailure(status, data, responseText)) {
+        return 'Η συνεδρία έληξε ή το CSRF token δεν είναι έγκυρο. Ανανεώστε τη σελίδα και δοκιμάστε ξανά.';
+    }
+    const serverMessage = [data?.message, data?.error, data?.code, responseText]
+        .map(safeCompanyAddResponseText)
+        .find(Boolean);
+    if (serverMessage) return serverMessage;
+    if (status === 403) return 'Δεν έχετε δικαίωμα πρόσβασης';
+    if (status === 400) return 'Μη έγκυρα δεδομένα';
+    if (data?.success === false) return 'Η αποθήκευση δεν ολοκληρώθηκε';
+    return `HTTP error ${status}`;
+}
+
+async function readCompanyAddResponse(response) {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+        const data = await response.json().catch(() => null);
+        return { data, responseText: '', isJson: true };
+    }
+    const responseText = safeCompanyAddResponseText(
+        await response.text().catch(() => '')
+    );
+    return { data: null, responseText, isJson: false };
+}
+
+if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
     const isEmpty = (v) => !String(v ?? '').trim();
     const isEmptyArray = (v) => !Array.isArray(v) || v.length === 0;
 
@@ -58,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await Promise.all(filePromises);
 
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const csrfToken = getCompanyAddCsrfToken();
 
             const errors = [];
             if (isEmpty(formData.eponymia)) errors.push('Επώνυμο/μία');
@@ -96,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'CSRF-Token': csrfToken // ✅ για csurf
+                    ...(csrfToken ? { 'CSRF-Token': csrfToken } : {})
                 },
                 credentials: 'include', // ✅ στείλε session cookies
                 body: JSON.stringify(formData)
@@ -121,12 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Redirect ${response.status} χωρίς Location header`);
             }
 
-            // 3) CSRF/Forbidden
-            if (response.status === 403) {
-                throw new Error('CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.');
-            }
-
-            // 4) 204 No Content → δικό μας redirect (προσαρμόσ’ το όπου θέλεις)
+            // 3) 204 No Content → δικό μας redirect (προσαρμόσ’ το όπου θέλεις)
             if (response.status === 204) {
                 await Swal.fire({
                     backdrop: false, // overlay
@@ -144,12 +193,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const { data, responseText, isJson } = await readCompanyAddResponse(response);
+
+            // 4) Διάκριση πραγματικού CSRF από privilege/scope 403
+            if (response.status === 403) {
+                throw new Error(companyAddErrorMessage(response.status, data, responseText));
+            }
+
             // 5) JSON απάντηση
-            const ct = response.headers.get('content-type') || '';
-            if (ct.includes('application/json')) {
-                const data = await response.json();
+            if (isJson) {
                 if (!response.ok || !data?.success) {
-                    throw new Error(`HTTP ${response.status} / success=${data?.success}`);
+                    throw new Error(companyAddErrorMessage(response.status, data, responseText));
                 }
                 await Swal.fire({
                     backdrop: false, // overlay
@@ -188,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 7) Σφάλμα HTTP
-            throw new Error(`HTTP error ${response.status}`);
+            throw new Error(companyAddErrorMessage(response.status, data, responseText));
         } catch (err) {
             await Swal.fire({
                 backdrop: false, // overlay
@@ -215,3 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', handleFormSubmit);
     });
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { getCompanyAddCsrfToken, safeCompanyAddResponseText,
+        isCompanyAddCsrfFailure, companyAddErrorMessage, readCompanyAddResponse };
+}
