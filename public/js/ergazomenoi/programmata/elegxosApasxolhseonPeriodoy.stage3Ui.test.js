@@ -14,6 +14,8 @@ assert.match(source, /inputValue:\s*selection === 'NON_WORK'\s*\? STAGE3_NON_WOR
 assert.match(source, /inputValidator:[\s\S]*String\(value \|\| ''\)\.trim\(\)/);
 assert.match(source, /weekly-hr-stage3-classification/);
 assert.match(source, /weekly-hr-stage3-leave-category/);
+assert.match(source,
+    /\['LEAVE', 'SICKNESS'\]\.includes\(selection\) && !leaveCategory/);
 assert.match(source, /weekly-hr-stage3-resolve/);
 assert.match(source, /Προεπισκόπηση απόφασης/);
 assert.match(source, /Εφαρμογή χαρακτηρισμού/);

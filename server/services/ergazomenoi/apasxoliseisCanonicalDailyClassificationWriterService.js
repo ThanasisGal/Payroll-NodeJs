@@ -17,9 +17,16 @@ function buildCanonicalClassificationUpdates({ classification, leave_category = 
     const normalized = String(classification || '').trim().toUpperCase();
     if (!ALLOWED.has(normalized)) throw error('INVALID_STAGE3_CLASSIFICATION',
         'Μη έγκυρος τελικός χαρακτηρισμός Stage 3.');
-    if (normalized === 'LEAVE' && (!String(leave_category || '').trim() ||
-        String(leave_category).trim() === 'POSSIBLE_LEAVE')) {
-        throw error('LEAVE_CATEGORY_REQUIRED', 'Η κατηγορία άδειας είναι υποχρεωτική.');
+    if (['LEAVE', 'SICKNESS'].includes(normalized) &&
+        !String(leave_category || '').trim()) {
+        throw error(normalized === 'SICKNESS'
+            ? 'SICKNESS_CATEGORY_REQUIRED' : 'LEAVE_CATEGORY_REQUIRED',
+        'Η κατηγορία άδειας/ασθένειας είναι υποχρεωτική.');
+    }
+    if (['LEAVE', 'SICKNESS'].includes(normalized) &&
+        String(leave_category).trim() === 'POSSIBLE_LEAVE') {
+        throw error('POSSIBLE_LEAVE_NOT_HR_SELECTABLE',
+            'Η ένδειξη POSSIBLE_LEAVE δεν είναι τελική κατηγορία επιλογής HR.');
     }
     if (normalized === 'NON_WORK') {
         return { apologistiko_biblio: true,

@@ -8,7 +8,7 @@ const PeriodControlAuditModel = require('../../models/apasxoliseisPeriodControlA
 const {
     calculatePeriodDeadline, normalizeScope, resolveEffectiveMode, projectPeriodControl,
     assertNormalPeriod, assertReviewReadablePeriod, runWithPeriodWriteFence,
-    runWithStaleOrphanResolutionWriteFence,
+    runWithStaleOrphanResolutionWriteFence, runWithStaleZeroLengthResolutionWriteFence,
     transitionPeriodControl, isDateInsideEmploymentPeriod,
     isWeekAllowedForEmploymentPeriod, acquirePeriodCalculationOwnership,
     runWithPeriodCalculationWriteFence, releasePeriodCalculationOwnership
@@ -238,6 +238,25 @@ const session = { userRole: 'HR', userId: '507f1f77bcf86cd799439011', userName: 
     assert.strictEqual(staleOrphanResult.result, 'orphan-only');
     assert.strictEqual(staleOrphanResult.state.historical_reconstruction_status, 'COMPLETED');
     assert.strictEqual(staleOrphanWrites, 1);
+
+    let staleZeroLengthWrites = 0;
+    const staleZeroLengthStore = fake({ ...reconstructedRecord, version: 11,
+        write_fence_version: 5, active_calculation_id: '' });
+    const staleZeroLengthResult = await runWithStaleZeroLengthResolutionWriteFence({
+        scope, expectedToken: { exists: true, stored_status: 'OPEN', version: 11 },
+        now: new Date('2026-08-14'), periodControlModel: staleZeroLengthStore.model,
+        indexGuard: async () => ({ ready: true }),
+        fingerprintResolver: async () => ({ dependency_fingerprint: 'b'.repeat(64) }),
+        transactionRunner: async (work) => work({ id: 'stale-zero-length-session' }),
+        work: ({ session, state }) => {
+            assert.strictEqual(session.id, 'stale-zero-length-session');
+            assert.strictEqual(state.effective_mode, 'HISTORICAL_RECONSTRUCTION_STALE');
+            staleZeroLengthWrites += 1;
+            return 'zero-length-only';
+        }
+    });
+    assert.strictEqual(staleZeroLengthResult.result, 'zero-length-only');
+    assert.strictEqual(staleZeroLengthWrites, 1);
 
     const store = fake();
     const locked = await transitionPeriodControl({ session, scope, action: 'LOCK', reason: 'Οριστικοποίηση ελέγχου', requestId: 'period-lock-001', now: new Date('2026-07-01'), expectedVersion: 0, periodControlModel: store.model, auditModel: store.audit, indexGuard: async () => ({ ready: true }) });

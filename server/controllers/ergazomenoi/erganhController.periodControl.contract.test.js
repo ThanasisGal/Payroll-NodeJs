@@ -36,6 +36,20 @@ const restoreReviewPath = controller.slice(
     controller.indexOf('static restoreProdhlomenaOrariaReviewRecord = async'),
     controller.indexOf('static getProdhlomenaOrariaAuditHistory = async'));
 assert.match(updateReviewPath, /assertActiveEmploymentReviewOrphanResolutionPeriod\(/);
+assert.match(updateReviewPath,
+    /assertActiveEmploymentReviewCardEvidenceResolutionPeriod\([\s\S]*?μηδενικού διαστήματος κάρτας/);
+assert.match(updateReviewPath,
+    /staleZeroLengthResolution[\s\S]*?runWithStaleZeroLengthResolutionWriteFence/);
+assert.match(updateReviewPath,
+    /staleZeroLengthResolution[\s\S]*?buildStaleZeroLengthResolutionWriteSet/);
+const cardEvidencePeriodGuard = controller.slice(
+    controller.indexOf('async function assertActiveEmploymentReviewCardEvidenceResolutionPeriod'),
+    controller.indexOf('function assertActiveEmploymentReviewOrphanResolutionPeriod'));
+assert.match(cardEvidencePeriodGuard, /assertReviewReadablePeriod\(\{ scope \}\)/);
+assert.match(cardEvidencePeriodGuard,
+    /\['NORMAL', 'HISTORICAL_RECONSTRUCTED',[\s\S]*?'HISTORICAL_RECONSTRUCTION_STALE'\]\.includes\(mode\)/);
+assert.doesNotMatch(cardEvidencePeriodGuard,
+    /HISTORICAL_RECONSTRUCTION_REQUIRED'\]\.includes|FINALIZED'\]\.includes/);
 assert.match(updateReviewPath, /assertActiveEmploymentReviewPeriodNormal\(/);
 assert.match(updateReviewPath, /periodFence\(\{[\s\S]*expectedToken: periodAccess\.token/);
 for (const path of [unlockReviewPath, restoreReviewPath]) {

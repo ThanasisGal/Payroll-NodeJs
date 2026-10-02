@@ -57,8 +57,10 @@ function normalizeClassification(value) {
 }
 function normalizeLeaveCategory(classification, value) {
     const normalized = text(value);
-    if (classification !== 'LEAVE') return '';
-    if (!normalized) fail('LEAVE_CATEGORY_REQUIRED', 'Η κατηγορία άδειας είναι υποχρεωτική.');
+    if (!['LEAVE', 'SICKNESS'].includes(classification)) return '';
+    if (!normalized) fail(classification === 'SICKNESS'
+        ? 'SICKNESS_CATEGORY_REQUIRED' : 'LEAVE_CATEGORY_REQUIRED',
+    'Η κατηγορία άδειας/ασθένειας είναι υποχρεωτική.');
     assertHrSelectableLeaveCategory(normalized);
     return normalized;
 }
@@ -272,7 +274,7 @@ async function buildWeeklyHrStage3BulkPreview({ command: rawCommand, requestScop
             item.outcome === 'AUTO_SATISFIED').length,
         employee_count: new Set(items.map((item) => item.employee_id)).size,
         classification: command.final_classification,
-        leave_category: command.final_classification === 'LEAVE'
+        leave_category: ['LEAVE', 'SICKNESS'].includes(command.final_classification)
             ? { value: command.leave_category,
                 label: text(leaveCategoryLabel) || command.leave_category } : null,
         preview_fingerprint: previewFingerprint, items, invalid_items: invalidItems };

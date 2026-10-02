@@ -1,8 +1,9 @@
 'use strict';
 
 async function loadWeeklyHrStage2BulkSearchPresentation({ finalizedReadOnly = false,
+    reconstructionRequiredReadOnly = false,
     loadWritablePresentation } = {}) {
-    if (finalizedReadOnly) return null;
+    if (finalizedReadOnly || reconstructionRequiredReadOnly) return null;
     if (typeof loadWritablePresentation !== 'function') {
         throw new TypeError('loadWritablePresentation must be a function.');
     }

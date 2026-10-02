@@ -11,11 +11,6 @@ const {
 const ALLOWED_CLASSIFICATIONS = new Set([
     'UNCLASSIFIED', 'LEAVE', 'SICKNESS', 'ABSENCE', 'HOLIDAY'
 ]);
-const ERGANI_II_SICKNESS_LEAVE_CATEGORY = 'ΑΔΑΣ';
-
-// Locked future ERGANI II contract: a daily sickness remains sickness internally,
-// but a future leave submission must project it as leave category ΑΔΑΣ.
-
 function serviceError(code, message, statusCode = 400) {
     const error = new Error(message);
     error.code = code;
@@ -30,13 +25,19 @@ function normalizeChange(change = {}) {
         throw serviceError('INVALID_DAILY_CLASSIFICATION', 'Μη έγκυρη ημερήσια αλλαγή.');
     }
     const leaveCategory = String(change.kathgoria_adeias_apologistika || '').trim();
-    if (classification === 'LEAVE' && (!leaveCategory || leaveCategory === 'POSSIBLE_LEAVE')) {
-        throw serviceError('LEAVE_CATEGORY_REQUIRED', 'Η κατηγορία άδειας είναι υποχρεωτική.');
+    if (['LEAVE', 'SICKNESS'].includes(classification) && !leaveCategory) {
+        throw serviceError(classification === 'SICKNESS'
+            ? 'SICKNESS_CATEGORY_REQUIRED' : 'LEAVE_CATEGORY_REQUIRED',
+        'Η κατηγορία άδειας/ασθένειας είναι υποχρεωτική.');
+    }
+    if (['LEAVE', 'SICKNESS'].includes(classification) &&
+        leaveCategory === 'POSSIBLE_LEAVE') {
+        throw serviceError('POSSIBLE_LEAVE_NOT_HR_SELECTABLE',
+            'Η ένδειξη POSSIBLE_LEAVE δεν είναι τελική κατηγορία επιλογής HR.');
     }
     return { row_id: rowId, classification,
-        ...(classification === 'LEAVE' ? { kathgoria_adeias_apologistika: leaveCategory } : {}),
-        ...(classification === 'SICKNESS'
-            ? { kathgoria_adeias_apologistika: ERGANI_II_SICKNESS_LEAVE_CATEGORY } : {}) };
+        ...(['LEAVE', 'SICKNESS'].includes(classification)
+            ? { kathgoria_adeias_apologistika: leaveCategory } : {}) };
 }
 
 function classificationUpdates(change, row = {}) {
@@ -56,9 +57,8 @@ function classificationUpdates(change, row = {}) {
     return {
         repo_apologistika: false,
         adeia_apologistika: change.classification === 'LEAVE',
-        kathgoria_adeias_apologistika: change.classification === 'SICKNESS'
-            ? ERGANI_II_SICKNESS_LEAVE_CATEGORY
-            : (change.classification === 'LEAVE' ? change.kathgoria_adeias_apologistika : ''),
+        kathgoria_adeias_apologistika: ['LEAVE', 'SICKNESS'].includes(change.classification)
+            ? change.kathgoria_adeias_apologistika : '',
         astheneia_apologistika: change.classification === 'SICKNESS',
         apousia_apologistika: change.classification === 'ABSENCE',
         ...(change.classification === 'LEAVE' ? {
@@ -212,7 +212,7 @@ async function saveStage1DailyClassificationsBulk({ changes, reason, applyOne,
         results };
 }
 
-module.exports = { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY,
+module.exports = { BULK_DAILY_CLASSIFICATION_CONCURRENCY,
     classificationUpdates, resolveAuthoritativeHolidayClassification,
     loadAuthoritativeStage1HolidayContext,
     applyCanonicalAbsenceMetrics, applyCardDerivedAbsenceMetrics,

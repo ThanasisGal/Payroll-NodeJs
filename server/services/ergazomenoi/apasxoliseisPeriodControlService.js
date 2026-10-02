@@ -255,12 +255,15 @@ async function assertReviewReadablePeriod({ scope, now = new Date(), expectedTok
     }
     return { state, token: stateToken(state) };
 }
-async function fenceStaleOrphanResolutionWrite({ scope, expectedToken, now = new Date(), session,
+async function fenceStaleCardEvidenceResolutionWrite({ scope, expectedToken, now = new Date(), session,
     periodControlModel = PeriodControlModel,
     fingerprintResolver = require('./apasxoliseisHistoricalPeriodReconstructionService')
-        .calculateHistoricalFingerprints }) {
+        .calculateHistoricalFingerprints,
+    unavailableCode = 'PERIOD_CONTROL_STALE_CARD_EVIDENCE_RESOLUTION_NOT_ALLOWED',
+    unavailableMessage = 'Η περίοδος δεν επιτρέπει επίλυση στοιχείων κάρτας.',
+    transactionRequiredMessage = 'Δεν είναι διαθέσιμη η ασφαλής επίλυση στοιχείων κάρτας.' }) {
     if (!session) throw periodError('PERIOD_CONTROL_TRANSACTION_REQUIRED', 503,
-        'Δεν είναι διαθέσιμη η ασφαλής επίλυση ορφανού χτυπήματος.');
+        transactionRequiredMessage);
     const normalized = normalizeScope(scope);
     if (expectedToken?.exists !== true) throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409,
         'Η κατάσταση της περιόδου άλλαξε. Η ενέργεια ακυρώθηκε.');
@@ -281,22 +284,49 @@ async function fenceStaleOrphanResolutionWrite({ scope, expectedToken, now = new
         record: record?.toObject ? record.toObject() : record, now, dependencyFingerprint });
     if (state.effective_mode !== MODES.HISTORICAL_RECONSTRUCTION_STALE ||
         state.historical_reconstruction_status !== 'COMPLETED') {
-        throw periodError('PERIOD_CONTROL_STALE_ORPHAN_RESOLUTION_NOT_ALLOWED', 409,
-            'Η περίοδος δεν επιτρέπει επίλυση ορφανού χτυπήματος.');
+        throw periodError(unavailableCode, 409, unavailableMessage);
     }
     return { state, token: stateToken(state) };
 }
-async function runWithStaleOrphanResolutionWriteFence({ scope, expectedToken, now = new Date(), work,
+async function runWithStaleCardEvidenceResolutionWriteFence({ scope, expectedToken,
+    now = new Date(), work,
     periodControlModel = PeriodControlModel, indexGuard = assertPeriodControlIndexesReady,
-    transactionRunner = runTransaction, fingerprintResolver }) {
-    if (typeof work !== 'function') throw new TypeError('Orphan-resolution write callback is required.');
+    transactionRunner = runTransaction, fingerprintResolver,
+    unavailableCode, unavailableMessage, transactionRequiredMessage }) {
+    if (typeof work !== 'function') throw new TypeError('Card-evidence resolution callback is required.');
     if (typeof indexGuard === 'function') await indexGuard();
     return transactionRunner(async (session) => {
-        const fenced = await fenceStaleOrphanResolutionWrite({
-            scope, expectedToken, now, session, periodControlModel, fingerprintResolver
+        const fenced = await fenceStaleCardEvidenceResolutionWrite({
+            scope, expectedToken, now, session, periodControlModel, fingerprintResolver,
+            unavailableCode, unavailableMessage, transactionRequiredMessage
         });
         return { result: await work({ session, state: fenced.state, token: fenced.token }), ...fenced };
     });
+}
+
+function fenceStaleOrphanResolutionWrite(options = {}) {
+    return fenceStaleCardEvidenceResolutionWrite({ ...options,
+        unavailableCode: 'PERIOD_CONTROL_STALE_ORPHAN_RESOLUTION_NOT_ALLOWED',
+        unavailableMessage: 'Η περίοδος δεν επιτρέπει επίλυση ορφανού χτυπήματος.',
+        transactionRequiredMessage:
+            'Δεν είναι διαθέσιμη η ασφαλής επίλυση ορφανού χτυπήματος.' });
+}
+
+function runWithStaleOrphanResolutionWriteFence(options = {}) {
+    if (typeof options.work !== 'function') {
+        throw new TypeError('Orphan-resolution write callback is required.');
+    }
+    return runWithStaleCardEvidenceResolutionWriteFence({ ...options,
+        unavailableCode: 'PERIOD_CONTROL_STALE_ORPHAN_RESOLUTION_NOT_ALLOWED',
+        unavailableMessage: 'Η περίοδος δεν επιτρέπει επίλυση ορφανού χτυπήματος.',
+        transactionRequiredMessage:
+            'Δεν είναι διαθέσιμη η ασφαλής επίλυση ορφανού χτυπήματος.' });
+}
+
+function runWithStaleZeroLengthResolutionWriteFence(options = {}) {
+    return runWithStaleCardEvidenceResolutionWriteFence({ ...options,
+        unavailableCode: 'PERIOD_CONTROL_STALE_ZERO_LENGTH_RESOLUTION_NOT_ALLOWED',
+        unavailableMessage: 'Η περίοδος δεν επιτρέπει επίλυση μηδενικού διαστήματος κάρτας.' });
 }
 async function fenceStaleStage1CompletionWrite({ scope: input, expectedToken, now = new Date(), session,
     periodControlModel = PeriodControlModel,
@@ -787,7 +817,9 @@ module.exports = { MODES, periodError, dateOnly, calculatePeriodDeadline, normal
     isDateInsideEmploymentPeriod, isWeekAllowedForEmploymentPeriod,
     isPastDeadline, resolveEffectiveMode, projectPeriodControl, getPeriodControl, stateToken,
     assertNormalPeriod, assertReviewReadablePeriod, fencePeriodForWrite, runWithPeriodWriteFence,
+    fenceStaleCardEvidenceResolutionWrite, runWithStaleCardEvidenceResolutionWriteFence,
     fenceStaleOrphanResolutionWrite, runWithStaleOrphanResolutionWriteFence,
+    runWithStaleZeroLengthResolutionWriteFence,
     fenceStaleStage1CompletionWrite, runWithStaleStage1CompletionWriteFence,
     fenceStaleStage3ResolutionWrite, runWithStaleStage3ResolutionWriteFence,
     fenceStaleStage2MaterializationWrite,

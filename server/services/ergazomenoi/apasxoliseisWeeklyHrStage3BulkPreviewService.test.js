@@ -150,9 +150,13 @@ async function preview(contexts, input, options = {}) {
     const normalFingerprint = (await preview([first, second], normal)).result.preview_fingerprint;
     assert.equal((await preview([first, second], reverse)).result.preview_fingerprint,
         normalFingerprint);
-    assert.notEqual((await preview([first, second], { ...normal,
-        final_classification: 'SICKNESS', leave_category: '' })).result.preview_fingerprint,
-    normalFingerprint);
+    await assert.rejects(() => preview([first, second], { ...normal,
+        final_classification: 'SICKNESS', leave_category: '' }),
+    { code: 'SICKNESS_CATEGORY_REQUIRED' });
+    const sicknessPreview = (await preview([first, second], { ...normal,
+        final_classification: 'SICKNESS', leave_category: 'ΑΔΑΝΕΥΑΠ' })).result;
+    assert.equal(sicknessPreview.leave_category.value, 'ΑΔΑΝΕΥΑΠ');
+    assert.notEqual(sicknessPreview.preview_fingerprint, normalFingerprint);
     assert.notEqual((await preview([first, second], { ...normal,
         leave_category: 'ΑΔΑΝΕΥΑΠ' })).result.preview_fingerprint, normalFingerprint);
 

@@ -19,7 +19,15 @@ assert.match(mainSearch,
     /frozenState\.stored_status === 'FINALIZED'[\s\S]*?finalizedReadOnly = true/);
 assert.match(mainSearch,
     /loadWeeklyHrStage2BulkSearchPresentation\(\{[\s\S]*?finalizedReadOnly,[\s\S]*?loadWritablePresentation/);
+assert.match(mainSearch,
+    /reconstructionRequiredReadOnly,[\s\S]*?loadWritablePresentation/);
 assert.match(mainSearch, /const stage2BulkPreview = stage2BulkPresentation\?\.preview \|\| null/);
+assert.match(mainSearch,
+    /historical_reconstruction_required: reconstructionRequiredReadOnly/);
+assert.match(mainSearch,
+    /Η περίοδος είναι εκπρόθεσμη και πρέπει πρώτα να γίνει Ανακατασκευή Εκπρόθεσμης Περιόδου/);
+assert.match(mainSearch,
+    /const controlled = Number\.isInteger\(error\?\.statusCode\)[\s\S]*?controlled \? error\.statusCode : 500/);
 assert.match(mainSearch, /finalized: finalizedReadOnly/);
 assert.match(mainSearch, /snapshot_schema_version !== 'employment-period-frozen:v3'/);
 assert.match(mainSearch, /projectFrozenReview/);

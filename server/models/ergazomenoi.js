@@ -416,6 +416,7 @@ const ProdhlomenaOrariaSchema = new Schema(
         check_ergasia: { type: Boolean, default: false },
         cards_ores_ergasias: { type: Number, default: 0 },
         orphan_card_resolution: { type: Schema.Types.Mixed, default: null },
+        zero_length_card_resolution: { type: Schema.Types.Mixed, default: null },
         apo_ora_01_apologistika: { type: String },
         eos_ora_01_apologistika: { type: String },
         apo_ora_02_apologistika: { type: String },

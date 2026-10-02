@@ -40,7 +40,8 @@ assert.doesNotMatch(source, /Επιλεγμένες → ΡΕΠΟ/);
 assert.match(source, /data-classification="UNCLASSIFIED">Καθαρισμός/);
 assert.match(source, /Αποθήκευση \$\{counts\.drafts\}/);
 assert.match(source, /\/api\/dropdown\/ergazomenoi\/kathgoria_adeias/);
-assert.match(source, /Κάθε επιλεγμένη Άδεια πρέπει να έχει πραγματική κατηγορία άδειας/);
+assert.match(source,
+    /Κάθε επιλεγμένη Άδεια ή Ασθένεια πρέπει να έχει πραγματική κατηγορία/);
 assert.match(source, /isHrSelectableLeaveCategoryOption/);
 assert.match(source, /value !== 'POSSIBLE_LEAVE'/);
 assert.doesNotMatch(source, /<option value="POSSIBLE_LEAVE" selected>ΠΙΘΑΝΗ ΑΔΕΙΑ<\/option>/);
@@ -253,7 +254,10 @@ assert.doesNotMatch(source.match(/function renderStage1DayFacts[\s\S]*?\n}/)?.[0
 
 const editorStart = source.indexOf('function stage1ClassificationForRow');
 const editorEnd = source.indexOf('async function loadWeeklyHrLeaveCategories');
-const sandbox = { weeklyHrLeaveCategories: [{ value: 'ΑΔΚΑΝ', label: 'Κανονική άδεια' }],
+const sandbox = { weeklyHrLeaveCategories: [
+    { value: 'ΑΔΚΑΝ', label: 'Κανονική άδεια' },
+    { value: 'ΑΔΑΝΕΥΑΠ', label: 'Ασθένεια χωρίς αποδοχές' }
+],
     weeklyHrStage1DayDrafts: new Map(), weeklyHrStage1DaySelected: new Set(),
     escapeHtml: String, formatStage1DateKey: scopeSandbox.helpers.formatStage1DateKey,
     stage1DateKey: (value) => String(value).slice(0, 10) };
@@ -263,7 +267,8 @@ const payload = { workflow: { unclassified_stage2_candidates: [
 ] }, rows: [
     { _id: 'u', hmeromhnia: '2026-06-02', kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' },
     { _id: 'l', hmeromhnia: '2026-06-04', adeia_apologistika: true, kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' },
-    { _id: 's', hmeromhnia: '2026-06-05', astheneia_apologistika: true },
+    { _id: 's', hmeromhnia: '2026-06-05', astheneia_apologistika: true,
+        kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' },
     { _id: 'a', hmeromhnia: '2026-06-06', apousia_apologistika: true }
 ] };
 assert.equal(sandbox.helpers.stage1ClassificationForRow(payload.rows[0]), 'UNCLASSIFIED');
@@ -287,8 +292,8 @@ assert.match(nonWorkEditor, /Προς εξέταση ως ΜΗ ΕΡΓΑΣΙΑ/);
 assert.doesNotMatch(source, /Οι αχαρακτήριστες ημέρες θα εξεταστούν στο επόμενο στάδιο ως πιθανό ΡΕΠΟ/);
 const sicknessEditor = sandbox.helpers.renderStage1DayEditor(payload, '2026-06-05');
 assert.match(sicknessEditor, /weekly-hr-stage1-leave-category/);
-assert.match(sicknessEditor, /disabled aria-disabled="true"/);
-assert.match(sicknessEditor, /value="ΑΔΑΣ" selected/);
+assert.doesNotMatch(sicknessEditor, /disabled aria-disabled="true"/);
+assert.match(sicknessEditor, /value="ΑΔΑΝΕΥΑΠ" selected/);
 assert.match(source, /function formatStage1LeaveCategoryLabel/);
 const labelHelper = vm.runInNewContext(`(() => { ${source.match(/function formatStage1LeaveCategoryLabel[\s\S]*?\n}/)?.[0]} return formatStage1LeaveCategoryLabel; })()`);
 assert.equal(labelHelper('ΑΔΑΠΕΜ..... - Περιγραφή'), 'ΑΔΑΠΕΜ. - Περιγραφή');
@@ -451,6 +456,8 @@ const cardSandbox = {
     renderStage1MatrixDayCell: () => '',
     weeklyHrOrphanRows: () => [],
     renderWeeklyHrOrphanItem: () => '',
+    weeklyHrZeroLengthRows: () => [],
+    renderWeeklyHrZeroLengthItem: () => '',
     formatStage1DateKey: scopeSandbox.helpers.formatStage1DateKey,
     escapeHtml: String
 };

@@ -184,6 +184,36 @@ assert.strictEqual(approvedOrphanFacts.cardVerificationStatus, 'HR_APPROVED_ORPH
 assert.strictEqual(approvedOrphanFacts.actualWorkHours, 8);
 assert.strictEqual(approvedOrphanFacts.countsAsActualWorkDay, true);
 
+const unresolvedZeroLengthFacts = resolveDailyActualWorkFacts({
+    kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8, cards_ores_ergasias: 0,
+    cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04'
+});
+assert.deepStrictEqual(unresolvedZeroLengthFacts.reasons,
+    ['ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION']);
+assert.equal(unresolvedZeroLengthFacts.countsAsActualWorkDay, false);
+assert.equal(unresolvedZeroLengthFacts.actualWorkHours, 0);
+assert.ok(!unresolvedZeroLengthFacts.reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+
+const approvedZeroLengthFacts = resolveDailyActualWorkFacts({
+    kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 8, cards_ores_ergasias: 0,
+    cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04',
+    apo_ora_01_apologistika: '14:04', eos_ora_01_apologistika: '22:04',
+    ores_ergasias_apologistika: 7.5,
+    zero_length_card_resolution: {
+        status: 'HR_APPROVED', policy_version: 'zero-length-card-work:v1',
+        resolution_kind: 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE',
+        raw_cards_preserved: true
+    }
+});
+assert.equal(approvedZeroLengthFacts.cardVerificationStatus,
+    'HR_APPROVED_ZERO_LENGTH');
+assert.equal(approvedZeroLengthFacts.actualWorkHours, 7.5);
+assert.equal(approvedZeroLengthFacts.countsAsActualWorkDay, true);
+assert.deepStrictEqual(approvedZeroLengthFacts.reasons, []);
+assert.ok(approvedZeroLengthFacts.warnings.includes(
+    'HR_APPROVED_ZERO_LENGTH_CARD_RESOLUTION'));
+
 const partiallyVerifiedFacts = facts('ΕΡΓ', 8, 8, {
     cards_apo_ora_01: '09:00',
     cards_eos_ora_01: '13:00',
