@@ -10,7 +10,7 @@ const payload = { WTOS: { WTO: [{ f_aa_pararthmatos: '0001', f_rel_protocol: '',
     f_rel_date: '', f_comments: '', f_from_date: '10/08/2026', f_to_date: '10/08/2026',
     Ergazomenoi: { ErgazomenoiWTO: [{ f_afm: '123456789', f_eponymo: 'ΔΟΚΙΜΗ',
         f_onoma: 'ΜΑΡΙΑ', f_date: '10/08/2026', ErgazomenosAnalytics: {
-            ErgazomenosWTOAnalytics: [{ f_type: 'ΥΠ', f_from: '17:01', f_to: '18:31' }]
+            ErgazomenosWTOAnalytics: [{ f_type: 'ΥΠ', f_from: '17:15', f_to: '18:45' }]
         } }] } }] } };
 const dataset = { response: { success: true, submission_eligible: true }, payload,
     parity: { exact: true }, authorized: { team: 'TEAM1', company: '507f1f77bcf86cd799439011' },

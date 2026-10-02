@@ -17,6 +17,7 @@ function query(value) {
     const sourceRows = [{ _id: 'row-1', kodikos: '0001',
         hmeromhnia: new Date('2026-08-10T00:00:00.000Z'),
         cards_apo_ora_01: '08:00', cards_eos_ora_01: '16:00',
+        apo_ora_yperories: '17:15', eos_ora_yperories: '18:45',
         ores_nominhs_yperorias_apologistika: 1.5 }];
     const employees = [{ kodikos: '0001', afm: '123456789', eponymo: 'ΔΟΚΙΜΗ',
         onoma: 'ΜΑΡΙΑ', karta_ergasias: true, afora_daneismo_ergazomenoy: false }];
@@ -39,6 +40,8 @@ function query(value) {
     assert.equal(dataset.response.total_legal_overtime_minutes, 90);
     assert.equal(dataset.response.actual_from, '10/08/2026');
     assert.equal(dataset.response.actual_to, '10/08/2026');
+    assert.equal(dataset.response.rows[0].f_from, '17:15');
+    assert.equal(dataset.response.rows[0].f_to, '18:45');
     assert.equal(dataset.response.parity.exact, true);
     assert.ok(!JSON.stringify(scheduleFilters).includes('FINALIZED'),
         'η OPEN περίοδος δεν αποκλείεται ούτε απαιτείται FINALIZED');

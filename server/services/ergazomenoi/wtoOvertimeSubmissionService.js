@@ -4,8 +4,6 @@ const crypto = require('crypto');
 const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 const { employeeIsEligibleForProdhlomenaOraria } =
     require('./erganiImportedEmployeeScopeService');
-const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
-const { isApprovedOrphanResolution } = require('./apasxoliseisOrphanCardResolutionService');
 const { dateKey } = require('./wtoLeaveEntitlementService');
 
 const LEGAL_OVERTIME_FIELDS = Object.freeze([
@@ -20,8 +18,10 @@ const LEGAL_OVERWORK_FIELDS = Object.freeze([
     'ores_yperergasias_argion_apologistika',
     'ores_yperergasias_argion_nyxtas_apologistika'
 ]);
-const APOLOGISTIKO_PAIR_NUMBERS = Object.freeze(['01', '02', '03']);
 const MAX_AUTOMATIC_OVERTIME_MINUTES = 180;
+const CANONICAL_INTERVAL_MISSING_MESSAGE =
+    'Δεν υπάρχει έγκυρο απολογιστικό διάστημα νόμιμης υπερωρίας.\n' +
+    'Εκτελέστε ξανά τον Υπολογισμό / Έλεγχο Απασχολήσεων για τη συγκεκριμένη ημέρα.';
 const CAP_WARNING = 'Η απολογιστική νόμιμη υπερωρία της ημέρας υπερβαίνει τις 3 ώρες. ' +
     'Στην αυτόματη υποβολή θα συμπεριληθούν έως 3 ώρες. ' +
     'Ο επιπλέον χρόνος δεν περιλαμβάνεται στην αυτόματη υποβολή και ' +
@@ -77,45 +77,6 @@ function validateIdentity(employee, row) {
     return null;
 }
 
-function apologistikoAsCardPairs(row = {}) {
-    return Object.fromEntries(APOLOGISTIKO_PAIR_NUMBERS.flatMap((pair) => [
-        [`cards_apo_ora_${pair}`, row[`apo_ora_${pair}_apologistika`]],
-        [`cards_eos_ora_${pair}`, row[`eos_ora_${pair}_apologistika`]]
-    ]));
-}
-
-function resolveBaseEndTime(row, employee) {
-    const usesCard = employee?.karta_ergasias === true;
-    let verification = resolveCardPairVerification(
-        usesCard ? row : apologistikoAsCardPairs(row),
-        { pairNumbers: APOLOGISTIKO_PAIR_NUMBERS }
-    );
-    if (usesCard && verification.hasUnresolvedCardEvidence &&
-        isApprovedOrphanResolution(row)) {
-        const approvedVerification = resolveCardPairVerification(apologistikoAsCardPairs(row),
-            { pairNumbers: APOLOGISTIKO_PAIR_NUMBERS });
-        if (!approvedVerification.hasUnresolvedCardEvidence &&
-            approvedVerification.completePairs.length > 0) verification = approvedVerification;
-    }
-    if (verification.hasUnresolvedCardEvidence) {
-        return { blocker: blocker(usesCard ? 'WTOOVA_UNRESOLVED_CARD_EVIDENCE' :
-            'WTOOVA_INVALID_APOLOGISTIKO_INTERVAL', usesCard
-            ? 'Υπάρχει ορφανό ή ελλιπές ζεύγος κάρτας. Ολοκληρώστε πρώτα τον Έλεγχο Απασχολήσεων και τον επανυπολογισμό της ημέρας.'
-            : 'Το απολογιστικό ωράριο της ημέρας έχει ελλιπές ή μη έγκυρο διάστημα.', row,
-        { unresolved_pair_numbers: verification.unresolvedPairNumbers }) };
-    }
-    if (verification.completePairs.length === 0) {
-        return { blocker: blocker(usesCard ? 'WTOOVA_CARD_EXIT_NOT_FOUND' :
-            'WTOOVA_APOLOGISTIKO_END_NOT_FOUND', usesCard
-            ? 'Δεν βρέθηκε έγκυρη canonical έξοδος κάρτας για την ημέρα.'
-            : 'Δεν βρέθηκε έγκυρο canonical απολογιστικό τέλος για την ημέρα.', row) };
-    }
-    const lastPair = verification.completePairs[verification.completePairs.length - 1];
-    return Object.freeze({ baseEndTime: lastPair.end, baseEndMinutes: lastPair.endMinutes,
-        baseEndSource: usesCard ? 'CARD' : 'APOLOGISTIKO_INTERVAL',
-        pairNumber: lastPair.pairNumber });
-}
-
 function buildWtoOvertimeCanonicalDataset({ sourceRows = [], employees = [] } = {}) {
     const employeeByCode = new Map(employees.map((employee) => [clean(employee.kodikos), employee]));
     const rows = [];
@@ -148,15 +109,22 @@ function buildWtoOvertimeCanonicalDataset({ sourceRows = [], employees = [] } = 
         }
         employeeDateKeys.add(employeeDateKey);
         afmDateKeys.add(afmDateKey);
-        const base = resolveBaseEndTime(source, employee);
-        if (base.blocker) { blockers.push(base.blocker); continue; }
+        const canonicalFrom = clean(source.apo_ora_yperories);
+        const canonicalTo = clean(source.eos_ora_yperories);
+        const canonicalFromMinutes = timeToMinutes(canonicalFrom);
+        if (canonicalFromMinutes === null || timeToMinutes(canonicalTo) === null) {
+            blockers.push(blocker('WTOOVA_CANONICAL_OVERTIME_INTERVAL_MISSING',
+                CANONICAL_INTERVAL_MISSING_MESSAGE, source));
+            continue;
+        }
 
         const legalOverworkMinutes = totalFieldMinutes(source, LEGAL_OVERWORK_FIELDS);
         const submittedOvertimeMinutes = Math.min(legalOvertimeMinutes,
             MAX_AUTOMATIC_OVERTIME_MINUTES);
         const excessMinutes = legalOvertimeMinutes - submittedOvertimeMinutes;
-        const fromMinutes = base.baseEndMinutes + legalOverworkMinutes + 1;
-        const toMinutes = fromMinutes + submittedOvertimeMinutes;
+        const fTo = excessMinutes > 0
+            ? minutesToTime(canonicalFromMinutes + MAX_AUTOMATIC_OVERTIME_MINUTES)
+            : canonicalTo;
         const rowWarnings = [];
         if (excessMinutes > 0) {
             const capWarning = warning('WTOOVA_LEGAL_OVERTIME_CAP', CAP_WARNING, source,
@@ -168,11 +136,10 @@ function buildWtoOvertimeCanonicalDataset({ sourceRows = [], employees = [] } = 
         rows.push(Object.freeze({
             source_record_id: clean(source._id), employee_code: clean(employee.kodikos),
             afm: clean(employee.afm), eponymo: clean(employee.eponymo), onoma: clean(employee.onoma),
-            date: dateKey(source.hmeromhnia), base_end_time: base.baseEndTime,
-            base_end_source: base.baseEndSource, legal_overwork_minutes: legalOverworkMinutes,
+            date: dateKey(source.hmeromhnia), legal_overwork_minutes: legalOverworkMinutes,
             legal_overtime_minutes: legalOvertimeMinutes,
             submitted_overtime_minutes: submittedOvertimeMinutes, excess_minutes: excessMinutes,
-            f_type: 'ΥΠ', f_from: minutesToTime(fromMinutes), f_to: minutesToTime(toMinutes),
+            f_type: 'ΥΠ', f_from: canonicalFrom, f_to: fTo,
             warnings: Object.freeze(rowWarnings)
         }));
     }
@@ -274,8 +241,8 @@ function buildWtoOvertimePayloadFingerprint({ team, company, branch, payload }) 
 
 module.exports = {
     LEGAL_OVERTIME_FIELDS, LEGAL_OVERWORK_FIELDS, MAX_AUTOMATIC_OVERTIME_MINUTES,
-    CAP_WARNING, hoursToMinutes, totalFieldMinutes, minutesToTime, timeToMinutes,
-    resolveBaseEndTime, buildWtoOvertimeCanonicalDataset, buildWtoOvertimePayload,
+    CAP_WARNING, CANONICAL_INTERVAL_MISSING_MESSAGE, hoursToMinutes, totalFieldMinutes,
+    minutesToTime, timeToMinutes, buildWtoOvertimeCanonicalDataset, buildWtoOvertimePayload,
     flattenCanonicalFacts, flattenPayloadFacts, validatePayloadSchema,
     validateWtoOvertimeParity, buildWtoOvertimePayloadFingerprint, formatDate
 };

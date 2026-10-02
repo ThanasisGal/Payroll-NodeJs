@@ -18,6 +18,7 @@ const employee = (overrides = {}) => ({ kodikos: '0001', afm: '123456789',
 const row = (date = '2026-08-10', overrides = {}) => ({ _id: `row-${date}`, kodikos: '0001',
     hmeromhnia: new Date(`${date}T00:00:00.000Z`),
     cards_apo_ora_01: '08:00', cards_eos_ora_01: '16:00',
+    apo_ora_yperories: '17:01', eos_ora_yperories: '18:01',
     ores_nominhs_yperorias_apologistika: 1, ...overrides });
 
 assert.deepStrictEqual(LEGAL_OVERTIME_FIELDS, [
@@ -55,47 +56,51 @@ assert.equal(result.rows[0].legal_overtime_minutes, 90, 'η παράνομη υ�
 assert.equal(result.rows[0].legal_overwork_minutes, 60);
 assert.equal(result.rows[0].f_type, 'ΥΠ');
 assert.equal(result.rows[0].f_from, '17:01');
-assert.equal(result.rows[0].f_to, '18:31');
-assert.equal(result.rows[0].base_end_source, 'CARD');
+assert.equal(result.rows[0].f_to, '18:01');
 
 result = buildWtoOvertimeCanonicalDataset({ sourceRows: [row('2026-08-11', {
     ores_nominhs_yperorias_apologistika: 0, ores_yperergasias_apologistika: 2
 })], employees: [employee()] });
 assert.equal(result.rows.length, 0, 'η υπερεργασία μόνη της δεν δημιουργεί WTOOvA row');
 
-result = buildWtoOvertimeCanonicalDataset({ sourceRows: [row('2026-08-12', {
-    cards_apo_ora_01: '08:00', cards_eos_ora_01: '12:00',
-    cards_apo_ora_02: '16:00', cards_eos_ora_02: '20:00'
-})], employees: [employee()] });
-assert.equal(result.rows[0].base_end_time, '20:00', 'χρησιμοποιείται η τελευταία έγκυρη έξοδος κάρτας');
-
-result = buildWtoOvertimeCanonicalDataset({ sourceRows: [row('2026-08-13', {
-    cards_eos_ora_01: '', ores_nominhs_yperorias_apologistika: 1
-})], employees: [employee()] });
-assert.equal(result.rows.length, 0);
-assert.equal(result.blockers[0].code, 'WTOOVA_UNRESOLVED_CARD_EVIDENCE');
-
-result = buildWtoOvertimeCanonicalDataset({ sourceRows: [row('2026-08-13', {
-    cards_eos_ora_01: '', orphan_card_resolution: {
-        status: 'HR_APPROVED', policy_version: 'orphan-card-continuous:v1'
-    },
-    apo_ora_01_apologistika: '08:00', eos_ora_01_apologistika: '17:00'
-})], employees: [employee()] });
-assert.equal(result.blockers.length, 0,
-    'η εγκεκριμένη canonical επίλυση καταναλώνεται χωρίς μεταβολή του πρωτογενούς χτυπήματος');
-assert.equal(result.rows[0].base_end_time, '17:00');
-assert.equal(result.rows[0].base_end_source, 'CARD');
-
-const nonCardRow = row('2026-08-14', {
-    cards_apo_ora_01: '', cards_eos_ora_01: '',
-    apo_ora_01_apologistika: '08:00', eos_ora_01_apologistika: '12:00',
-    apo_ora_02_apologistika: '16:00', eos_ora_02_apologistika: '20:00'
+const authoritativeRow = row('2026-08-12', {
+    cards_eos_ora_01: '22:00', eos_ora_03_apologistika: '21:30',
+    ores_yperergasias_apologistika: 1.5,
+    apo_ora_yperories: '20:13', eos_ora_yperories: '21:43'
 });
-result = buildWtoOvertimeCanonicalDataset({ sourceRows: [nonCardRow],
-    employees: [employee({ karta_ergasias: false })] });
-assert.equal(result.rows.length, 1, 'εργαζόμενος χωρίς κάρτα μπορεί να συμμετέχει');
-assert.equal(result.rows[0].base_end_time, '20:00');
-assert.equal(result.rows[0].base_end_source, 'APOLOGISTIKO_INTERVAL');
+result = buildWtoOvertimeCanonicalDataset({ sourceRows: [authoritativeRow], employees: [employee()] });
+assert.equal(result.rows[0].f_from, '20:13', 'η canonical αρχή υπερωρίας είναι authoritative');
+assert.equal(result.rows[0].f_to, '21:43', 'η canonical λήξη διατηρείται έως 180 λεπτά');
+assert.notEqual(result.rows[0].f_from, '23:31',
+    'δεν εφαρμόζεται έξοδος κάρτας + υπερεργασία + 1 λεπτό');
+
+const changedOverworkRow = { ...authoritativeRow, ores_yperergasias_apologistika: 0 };
+const unchangedInterval = buildWtoOvertimeCanonicalDataset({ sourceRows: [changedOverworkRow],
+    employees: [employee()] }).rows[0];
+assert.deepStrictEqual([unchangedInterval.f_from, unchangedInterval.f_to], ['20:13', '21:43'],
+    'η μεταβολή της υπερεργασίας δεν μεταβάλλει το WTOOvA διάστημα');
+
+for (const karta_ergasias of [true, false]) {
+    const sameRule = buildWtoOvertimeCanonicalDataset({ sourceRows: [authoritativeRow],
+        employees: [employee({ karta_ergasias })] }).rows[0];
+    assert.deepStrictEqual([sameRule.f_from, sameRule.f_to], ['20:13', '21:43'],
+        'εργαζόμενοι με και χωρίς κάρτα χρησιμοποιούν το ίδιο canonical διάστημα');
+}
+
+for (const invalidInterval of [
+    { apo_ora_yperories: '' },
+    { eos_ora_yperories: '' },
+    { apo_ora_yperories: '24:00' },
+    { eos_ora_yperories: '18:60' }
+]) {
+    result = buildWtoOvertimeCanonicalDataset({ sourceRows: [row('2026-08-13', invalidInterval)],
+        employees: [employee()] });
+    assert.equal(result.rows.length, 0);
+    assert.equal(result.blockers[0].code, 'WTOOVA_CANONICAL_OVERTIME_INTERVAL_MISSING');
+    assert.equal(result.blockers[0].message,
+        'Δεν υπάρχει έγκυρο απολογιστικό διάστημα νόμιμης υπερωρίας.\n' +
+        'Εκτελέστε ξανά τον Υπολογισμό / Έλεγχο Απασχολήσεων για τη συγκεκριμένη ημέρα.');
+}
 
 result = buildWtoOvertimeCanonicalDataset({ sourceRows: [row('2026-08-15')], employees: [employee({
     karta_ergasias: false, afora_daneismo_ergazomenoy: true,
@@ -104,12 +109,11 @@ assert.equal(result.rows.length, 0, 'η ακριβής lending-side εξαίρε
 assert.equal(result.blockers.length, 0);
 
 result = buildWtoOvertimeCanonicalDataset({ sourceRows: [row('2026-08-16', {
-    cards_apo_ora_01: '14:00', cards_eos_ora_01: '22:00',
-    ores_yperergasias_apologistika: 1,
+    apo_ora_yperories: '23:15', eos_ora_yperories: '01:15',
     ores_nominhs_yperorias_apologistika: 2
 })], employees: [employee()] });
-assert.equal(result.rows[0].f_from, '23:01');
-assert.equal(result.rows[0].f_to, '01:01');
+assert.equal(result.rows[0].f_from, '23:15');
+assert.equal(result.rows[0].f_to, '01:15');
 let payload = buildWtoOvertimePayload({ canonicalRows: result.rows, branch: '0001' });
 const midnightEmployee = payload.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0];
 assert.equal(midnightEmployee.f_date, '16/08/2026');
@@ -117,11 +121,15 @@ assert.equal(midnightEmployee.ErgazomenosAnalytics.ErgazomenosWTOAnalytics.lengt
     'η υπερωρία μετά τα μεσάνυχτα δεν σπάει');
 
 result = buildWtoOvertimeCanonicalDataset({ sourceRows: [row('2026-08-17', {
-    ores_nominhs_yperorias_apologistika: 200 / 60
+    apo_ora_yperories: '20:13', eos_ora_yperories: '23:23',
+    ores_nominhs_yperorias_apologistika: 1.78,
+    ores_nominhs_yperorias_argion_nyxtas_apologistika: 1.38
 })], employees: [employee()] });
-assert.equal(result.rows[0].legal_overtime_minutes, 200);
+assert.equal(result.rows[0].legal_overtime_minutes, 190);
 assert.equal(result.rows[0].submitted_overtime_minutes, 180);
-assert.equal(result.rows[0].excess_minutes, 20);
+assert.equal(result.rows[0].excess_minutes, 10);
+assert.equal(result.rows[0].f_from, '20:13');
+assert.equal(result.rows[0].f_to, '23:13');
 assert.equal(result.warnings.length, 1);
 assert.equal(result.blockers.length, 0, 'η υπέρβαση 180 λεπτών είναι warning και όχι blocker');
 assert.match(result.warnings[0].message, /έως 3 ώρες/);
@@ -130,9 +138,11 @@ const mayKnownRows = buildWtoOvertimeCanonicalDataset({
     sourceRows: [
         row('2026-05-01', { _id: 'may-0004', kodikos: '0004',
             cards_apo_ora_01: '14:00', cards_eos_ora_01: '22:17',
+            apo_ora_yperories: '22:18', eos_ora_yperories: '22:19',
             ores_nominhs_yperorias_apologistika: 1 / 60 }),
         row('2026-05-09', { _id: 'may-0017', kodikos: '0017',
             cards_apo_ora_01: '14:00', cards_eos_ora_01: '22:07',
+            apo_ora_yperories: '22:08', eos_ora_yperories: '01:44',
             ores_nominhs_yperorias_apologistika: 3.6 })
     ],
     employees: [
@@ -145,16 +155,14 @@ const mayKnownRows = buildWtoOvertimeCanonicalDataset({
 assert.deepStrictEqual({ ...mayKnownRows.rows[0], warnings: undefined }, {
     source_record_id: 'may-0004', employee_code: '0004', afm: '111111111',
     eponymo: 'ΤΣΙΤΟΓΛΟΥ', onoma: 'ΧΡΗΣΤΟΣ', date: '2026-05-01',
-    base_end_time: '22:17', base_end_source: 'CARD', legal_overwork_minutes: 0,
-    legal_overtime_minutes: 1, submitted_overtime_minutes: 1, excess_minutes: 0,
+    legal_overwork_minutes: 0, legal_overtime_minutes: 1, submitted_overtime_minutes: 1, excess_minutes: 0,
     f_type: 'ΥΠ', f_from: '22:18', f_to: '22:19', warnings: undefined
 });
 assert.deepStrictEqual({ ...mayKnownRows.rows[1], warnings: undefined }, {
     source_record_id: 'may-0017', employee_code: '0017', afm: '222222222',
     eponymo: 'ΜΕΛΑΧΡΟΙΝΑΚΗΣ', onoma: 'ΑΝΑΡΓΥΡΟΣ', date: '2026-05-09',
-    base_end_time: '22:07', base_end_source: 'CARD', legal_overwork_minutes: 0,
-    legal_overtime_minutes: 216, submitted_overtime_minutes: 180, excess_minutes: 36,
-    f_type: 'ΥΠ', f_from: '22:08', f_to: '01:08', warnings: undefined
+    legal_overwork_minutes: 0, legal_overtime_minutes: 216, submitted_overtime_minutes: 180,
+    excess_minutes: 36, f_type: 'ΥΠ', f_from: '22:08', f_to: '01:08', warnings: undefined
 });
 assert.equal(mayKnownRows.warnings.length, 1);
 assert.equal(mayKnownRows.blockers.length, 0);
@@ -178,8 +186,12 @@ const altered = JSON.parse(JSON.stringify(payload));
 altered.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0]
     .ErgazomenosAnalytics.ErgazomenosWTOAnalytics[0].f_to = '23:59';
 assert.equal(validateWtoOvertimeParity(result.rows, altered).exact, false);
-assert.equal(buildWtoOvertimePayloadFingerprint({ team: 'TEAM1',
-    company: '507f1f77bcf86cd799439011', branch: '0001', payload }),
-'62dcd6999bbb7bc6a512d2aec06a7dfd03b37d0bfd2cf64aa1898d2cb105b872');
+const correctedFingerprint = buildWtoOvertimePayloadFingerprint({ team: 'TEAM1',
+    company: '507f1f77bcf86cd799439011', branch: '0001', payload });
+assert.equal(correctedFingerprint,
+    'ba053655ade28efaba13d88e096d26d0331e4d325403aa9571cb7b32064504b6');
+assert.notEqual(correctedFingerprint,
+    '62dcd6999bbb7bc6a512d2aec06a7dfd03b37d0bfd2cf64aa1898d2cb105b872',
+    'το αποτύπωμα αλλάζει όταν διορθώνεται το canonical διάστημα');
 
 console.log('PASS WTOOvA legal-only canonical projection, time rules, cap, identity, dates and parity');

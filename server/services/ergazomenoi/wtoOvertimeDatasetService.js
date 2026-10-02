@@ -57,7 +57,6 @@ function assertScope(scope = {}) {
 function publicRow(row) {
     return { source_record_id: row.source_record_id, employee_code: row.employee_code,
         afm: row.afm, eponymo: row.eponymo, onoma: row.onoma, date: row.date,
-        base_end_time: row.base_end_time, base_end_source: row.base_end_source,
         legal_overwork_minutes: row.legal_overwork_minutes,
         legal_overtime_minutes: row.legal_overtime_minutes,
         submitted_overtime_minutes: row.submitted_overtime_minutes,

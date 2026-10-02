@@ -105,7 +105,8 @@
             <td>${escapeHtml(item.employee_code || '—')}</td><td>—</td><td>—</td>
             <td>${escapeHtml(formatGreekDate(item.date || ''))}</td>
             <td>—</td><td>—</td><td>—</td><td>—</td>
-            <td class="text-danger fw-semibold">ΑΠΑΙΤΕΙ ΕΛΕΓΧΟ</td>
+            <td class="text-danger fw-semibold" tabindex="0" data-bs-toggle="tooltip"
+                data-wto-overtime-tooltip="${escapeHtml(item.message || '')}">ΑΠΑΙΤΕΙ ΕΛΕΓΧΟ</td>
         </tr>`;
     }
     function render(data) {

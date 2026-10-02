@@ -50,6 +50,7 @@ assert.match(script, /Number\(row\.excess_minutes\) > 0/);
 assert.match(script, />ΠΡΟΣΟΧΗ<\/td>/);
 assert.match(script, />ΕΤΟΙΜΟ<\/td>/);
 assert.match(script, />ΑΠΑΙΤΕΙ ΕΛΕΓΧΟ<\/td>/);
+assert.match(script, /data-wto-overtime-tooltip="\$\{escapeHtml\(item\.message \|\| ''\)\}"/);
 assert.match(script, /<td class="wto-overtime-status-attention fw-semibold" tabindex="0"/);
 assert.ok(!script.includes('<tr class="wto-overtime-status-attention'));
 assert.match(view, /\.wto-overtime-status-attention\s*\{[\s\S]*?background-color:\s*#fff8db/);
@@ -94,5 +95,9 @@ assert.ok(deploy.includes('"public/js/ergazomenoi/programmata/wtoOvertime.js"'))
 assert.ok(!deploy.includes('"public/js/ergazomenoi/programmata/sendApologistikoYperorionButton.js"'));
 assert.ok(!controller.includes('wtoOv_v1Generator'));
 assert.ok(!submissionService.includes('splitOvertimeRow'));
+assert.ok(!submissionService.includes('resolveBaseEndTime'));
+assert.ok(!submissionService.includes('apasxoliseisCardPairResolverService'));
+assert.ok(submissionService.includes('source.apo_ora_yperories'));
+assert.ok(submissionService.includes('source.eos_ora_yperories'));
 
 console.log('PASS WTOOvA UI, common PDF viewer, clean download URL and deployment artifact contract');
