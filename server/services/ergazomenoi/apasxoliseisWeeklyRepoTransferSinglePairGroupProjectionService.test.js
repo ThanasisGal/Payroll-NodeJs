@@ -341,11 +341,12 @@ function testSplitShiftIntervalsArePreservedInProjection() {
         cards_apo_ora_02: '12:00',
         cards_eos_ora_02: '16:00'
     });
-    const zeroLengthSource = build(zeroLengthRows).groups[0].items[0].proposed_values;
-    assert.strictEqual(zeroLengthSource.apo_ora_01_apologistika, '');
-    assert.strictEqual(zeroLengthSource.eos_ora_01_apologistika, '');
-    assert.strictEqual(zeroLengthSource.apo_ora_02_apologistika, '12:00');
-    assert.strictEqual(zeroLengthSource.eos_ora_02_apologistika, '16:00');
+    const unresolvedZeroLength = build(zeroLengthRows);
+    assertNotAvailable(
+        unresolvedZeroLength,
+        'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'
+    );
+    assert.strictEqual(unresolvedZeroLength.eligibility_status, 'NEEDS_REVIEW');
 
     const threeIntervalRows = fullTimeWeek();
     Object.assign(threeIntervalRows[1], {

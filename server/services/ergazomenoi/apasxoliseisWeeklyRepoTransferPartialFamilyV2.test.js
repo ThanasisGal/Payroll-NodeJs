@@ -462,9 +462,10 @@ for (const invalidTimes of [
             hmeres_ergasias_ebdomadas: 6 }
     });
     const v2 = analyze(rows);
-    assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(v1.eligibility_status, 'NEEDS_REVIEW');
     assert.strictEqual(v2.eligibility_status, v1.eligibility_status);
-    assert.strictEqual(v2.target.hmeromhnia, date(2));
+    assert.ok(v1.reasons.includes('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+    assert.ok(v2.reasons.includes('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'));
 }
 
 {

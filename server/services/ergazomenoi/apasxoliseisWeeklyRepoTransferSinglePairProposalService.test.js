@@ -237,7 +237,7 @@ function testSemanticOrderWhenTargetComesFirst() {
     assert.ok(result.items[0].hmeromhnia > result.items[1].hmeromhnia);
 }
 
-function testSourceIntervalPositionsAndZeroLengthClearing() {
+function testSourceIntervalPositionsAndZeroLengthBlocking() {
     const rows = fullTimeWeek();
     Object.assign(rows[1], {
         cards_ores_ergasias: '7,5',
@@ -279,16 +279,9 @@ function testSourceIntervalPositionsAndZeroLengthClearing() {
         cards_eos_ora_02: '16:00'
     });
     const zeroLength = build(zeroLengthRows);
-    assertReadyContract(zeroLength, dateKey(1), dateKey(4), 'ΑΝ');
-    assert.strictEqual(zeroLength.items[0].proposed_values.apo_ora_01_apologistika, '');
-    assert.strictEqual(zeroLength.items[0].proposed_values.eos_ora_01_apologistika, '');
-    assert.strictEqual(
-        zeroLength.items[0].proposed_values.apo_ora_02_apologistika,
-        '12:00'
-    );
-    assert.strictEqual(
-        zeroLength.items[0].proposed_values.eos_ora_02_apologistika,
-        '16:00'
+    assertNotAvailable(
+        zeroLength,
+        'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'
     );
 
     const invalidExtraPairRows = fullTimeWeek();
@@ -717,7 +710,7 @@ function run() {
     testValidFullTimeProposal();
     testValidPartTimeProposal();
     testSemanticOrderWhenTargetComesFirst();
-    testSourceIntervalPositionsAndZeroLengthClearing();
+    testSourceIntervalPositionsAndZeroLengthBlocking();
     testSourceCardHourNormalizationAndAuthority();
     testTargetCardAnomaliesAreNotAvailable();
     testProposalClearsProvisionalAutoLeaveFieldsWithoutMutatingRows();
