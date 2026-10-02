@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('assert/strict');
-const { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY,
+const { BULK_DAILY_CLASSIFICATION_CONCURRENCY,
     classificationUpdates,
     resolveAuthoritativeHolidayClassification,
     loadAuthoritativeStage1HolidayContext,
@@ -13,11 +13,20 @@ const { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY
     saveStage1DailyClassificationsBulk } = require('./apasxoliseisStage1DailyClassificationBulkService');
 
 (async () => {
-    assert.deepEqual(classificationUpdates({ classification: 'SICKNESS' }), {
+    assert.deepEqual(classificationUpdates({ classification: 'SICKNESS',
+        kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' }), {
         repo_apologistika: false, adeia_apologistika: false,
-        kathgoria_adeias_apologistika: 'ΑΔΑΣ', astheneia_apologistika: true,
+        kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ', astheneia_apologistika: true,
         apousia_apologistika: false });
-    assert.equal(ERGANI_II_SICKNESS_LEAVE_CATEGORY, 'ΑΔΑΣ');
+    for (const classification of ['LEAVE', 'SICKNESS', 'ABSENCE']) {
+        for (const current of [false, true]) {
+            const updates = classificationUpdates({ classification,
+                ...(classification !== 'ABSENCE'
+                    ? { kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' } : {}) });
+            assert.equal(Object.hasOwn(updates, 'apologistiko_biblio'), false,
+                `${classification} must preserve apologistiko_biblio=${current}`);
+        }
+    }
     for (const [scheduled, expected] of [[2, 2], [3.5, 3.5], [0, 0], [-2, 0],
         [Number.NaN, 0]]) {
         const leave = classificationUpdates({ classification: 'LEAVE',
@@ -116,7 +125,8 @@ const { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY
         ores_apoysias_apologistika: 7.5, hmeres_apoysias_apologistika: 1 });
     const restored = applyCanonicalAbsenceMetrics({ apousia_apologistika: true,
         ores_apoysias_base_apologistika: 1.25, ores_apoysias_apologistika: 7.5 },
-    classificationUpdates({ classification: 'SICKNESS' }));
+    classificationUpdates({ classification: 'SICKNESS',
+        kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' }));
     assert.equal(restored.hmeres_apoysias_apologistika, 0);
     assert.equal(restored.ores_apoysias_apologistika, 1.25);
     assert.deepEqual(applyCardDerivedAbsenceMetrics({ apousia_apologistika: false },
@@ -147,26 +157,36 @@ const { BULK_DAILY_CLASSIFICATION_CONCURRENCY, ERGANI_II_SICKNESS_LEAVE_CATEGORY
     await assert.rejects(() => saveStage1DailyClassificationsBulk({ reason: 'x',
         changes: [{ row_id: '1', classification: 'LEAVE' }], applyOne: async () => ({}) }),
     (error) => error.code === 'LEAVE_CATEGORY_REQUIRED');
+    await assert.rejects(() => saveStage1DailyClassificationsBulk({ reason: 'x',
+        changes: [{ row_id: '1', classification: 'SICKNESS' }], applyOne: async () => ({}) }),
+    (error) => error.code === 'SICKNESS_CATEGORY_REQUIRED');
+    await assert.rejects(() => saveStage1DailyClassificationsBulk({ reason: 'x',
+        changes: [{ row_id: '1', classification: 'SICKNESS',
+            kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' }], applyOne: async () => ({}) }),
+    (error) => error.code === 'POSSIBLE_LEAVE_NOT_HR_SELECTABLE');
 
     let sicknessCommand;
     await saveStage1DailyClassificationsBulk({ reason: 'x',
         changes: [{ row_id: 'sickness', classification: 'SICKNESS',
-            kathgoria_adeias_apologistika: 'UNTRUSTED' }],
+            kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' }],
         applyOne: async (command) => { sicknessCommand = command; } });
     assert.deepEqual(sicknessCommand.updates, { repo_apologistika: false,
-        adeia_apologistika: false, kathgoria_adeias_apologistika: 'ΑΔΑΣ',
+        adeia_apologistika: false, kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ',
         astheneia_apologistika: true, apousia_apologistika: false });
     const authoritative = { _id: 'authoritative', astheneia_apologistika: true };
     const authoritativeResult = await saveStage1DailyClassificationsBulk({ reason: 'x',
-        changes: [{ row_id: 'authoritative', classification: 'SICKNESS' }],
+        changes: [{ row_id: 'authoritative', classification: 'SICKNESS',
+            kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' }],
         applyOne: async () => ({ record: authoritative }) });
     assert.strictEqual(authoritativeResult.results[0].record, authoritative);
 
     const calls = [];
     const result = await saveStage1DailyClassificationsBulk({ reason: 'Κοινή αιτιολογία', changes: [
         { row_id: '11', classification: 'ABSENCE' },
-        { row_id: '16', classification: 'SICKNESS' },
-        { row_id: '18', classification: 'SICKNESS' }
+        { row_id: '16', classification: 'SICKNESS',
+            kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' },
+        { row_id: '18', classification: 'SICKNESS',
+            kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' }
     ], applyOne: async (command) => { calls.push(command); if (command.row_id === '16') {
         const error = new Error('conflict'); error.code = 'PERIOD_CONTROL_STATE_CONFLICT';
         error.statusCode = 409; throw error; } return command.row_id === '18' ? { unchanged: true } : {}; } });

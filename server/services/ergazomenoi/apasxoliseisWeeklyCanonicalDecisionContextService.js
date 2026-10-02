@@ -189,7 +189,8 @@ function supportedActions(reasons = [], context = {}) {
     return {
         profile: values.has('PROFILE_CHANGED_INSIDE_WEEK'),
         card_documentary: values.has('CARD_VERIFICATION_PENDING') ||
-            values.has('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'),
+            values.has('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION') ||
+            values.has('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'),
         repo_identities: values.has('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC') &&
             context.appliedExecutions.length === 0 &&
             (context.currentRepoCandidateDates || []).length >= 2,

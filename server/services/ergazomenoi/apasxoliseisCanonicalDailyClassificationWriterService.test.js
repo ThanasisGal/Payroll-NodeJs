@@ -21,10 +21,21 @@ assert.deepEqual(buildCanonicalClassificationUpdates({ classification: 'REST_REP
 });
 assert.deepEqual(planCanonicalDailyClassification({ classification: 'REST_REPO', row: {} }),
     buildCanonicalClassificationUpdates({ classification: 'REST_REPO' }));
-assert.equal(buildCanonicalClassificationUpdates({ classification: 'SICKNESS' })
-    .astheneia_apologistika, true);
+assert.throws(() => buildCanonicalClassificationUpdates({ classification: 'SICKNESS' }),
+    { code: 'SICKNESS_CATEGORY_REQUIRED' });
+assert.equal(buildCanonicalClassificationUpdates({ classification: 'SICKNESS',
+    leave_category: 'ΑΔΑΝΕΥΑΠ' }).astheneia_apologistika, true);
 assert.throws(() => buildCanonicalClassificationUpdates({ classification: 'LEAVE' }),
     { code: 'LEAVE_CATEGORY_REQUIRED' });
+for (const classification of ['LEAVE', 'SICKNESS', 'ABSENCE']) {
+    for (const current of [false, true]) {
+        const updates = buildCanonicalClassificationUpdates({ classification,
+            ...(classification !== 'ABSENCE' ? { leave_category: 'ΑΔΑΝΕΥΑΠ' } : {}),
+            row: { apologistiko_biblio: current } });
+        assert.equal(Object.hasOwn(updates, 'apologistiko_biblio'), false,
+            `${classification} must preserve apologistiko_biblio=${current}`);
+    }
+}
 assert.equal(buildCanonicalClassificationUpdates({ classification: 'LEAVE',
     leave_category: 'ΑΔΚΑΝ', row: { ores_ergasias: 6 } }).ores_ergasias_apologistika, 6);
 assert.equal(buildCanonicalClassificationUpdates({ classification: 'LEAVE',

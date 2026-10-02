@@ -30,7 +30,9 @@ assert.match(controller, /static completeWeeklyHrWorkflowStage1Bulk/);
 assert.match(controller, /static saveWeeklyHrStage1DailyClassificationsBulk/);
 assert.match(controller, /saveStage1DailyClassificationsBulk\(\{/);
 assert.match(controller, /erganhController\.updateProdhlomenaOrariaReviewRecord\(\{/);
-assert.match(controller, /classification === 'LEAVE'[\s\S]*buildStage1ClassificationUpdates\(\{ classification,[\s\S]*authoritativeTarget\)/);
+assert.match(controller, /\['LEAVE', 'SICKNESS'\]\.includes\(classification\)[\s\S]*buildStage1ClassificationUpdates\(\{ classification,[\s\S]*authoritativeTarget\)/);
+assert.match(controller,
+    /kodikos: String\(leave_category \|\| ''\)\.trim\(\),[\s\S]*buildHrSelectableLeaveCategoryQuery\(\)/);
 assert.match(controller, /updates\.adeia_apologistika === true && updates\[field\] === 0/);
 assert.match(controller, /const record = await ProdhlomenaOrariaModel\.findOne\(\{/);
 assert.match(controller, /return \{ unchanged:[\s\S]*record \}/);

@@ -276,7 +276,8 @@ function getPayrollCalculationIntervals(rec, ergazomenos = null) {
         row: rec, effectiveEmployee: ergazomenos, workIntervals
     }).workIntervals;
 
-    if (rec?.orphan_card_resolution?.status === 'HR_APPROVED' &&
+    if ((rec?.orphan_card_resolution?.status === 'HR_APPROVED' ||
+        rec?.zero_length_card_resolution?.status === 'HR_APPROVED') &&
         apologistikaIntervals.length > 0) {
         return resolve(apologistikaIntervals);
     }

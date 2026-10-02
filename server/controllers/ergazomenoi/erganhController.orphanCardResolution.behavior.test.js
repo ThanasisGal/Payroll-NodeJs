@@ -82,18 +82,21 @@ function preparedResolution(orphanType = 'START_ONLY', command = {}) {
 }
 
 function overrides(persist, { record = oldRecord, loadRecord = null,
-    orphanType = 'START_ONLY', prepareResolution = null } = {}) {
+    orphanType = 'START_ONLY', prepareResolution = null,
+    prepareZeroLengthResolution = null } = {}) {
     return {
         loadOldRecord: async () => structuredClone(loadRecord ? loadRecord() : record),
         prepareOrphanResolution: async (input) => prepareResolution
             ? prepareResolution(input) : preparedResolution(orphanType,
                 input.orphanResolutionCommand),
+        ...(prepareZeroLengthResolution ? { prepareZeroLengthResolution } : {}),
         getPeriodAccess: async () => ({ scope: {}, token: 'token',
             state: { effective_mode: 'NORMAL' } }),
         loadAppliedProtection: async () => ({ entriesByRowId: {}, diagnostics: [],
             hasConflicts: false }),
         periodFence: async ({ work }) => work({ session: { isolated: true } }),
-        persistOrphanResolutionWrite: persist
+        persistOrphanResolutionWrite: persist,
+        persistZeroLengthResolutionWrite: persist
     };
 }
 
@@ -118,6 +121,61 @@ async function run() {
     assert.strictEqual(receivedUpdates.cards_apo_ora_01, undefined);
     assert.strictEqual(receivedUpdates.cards_eos_ora_01, undefined);
     assert.strictEqual(receivedUpdates.orphan_card_resolution.status, 'HR_APPROVED');
+
+    const zeroRecord = { ...oldRecord,
+        cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04',
+        cards_apo_ora_02: '', cards_eos_ora_02: '', cards_ores_ergasias: 0,
+        zero_length_card_resolution: null };
+    let zeroPersistenceInput;
+    const zero = await invoke(async (input) => {
+        zeroPersistenceInput = input;
+        return { idempotent: false, updated: true };
+    }, {
+        record: zeroRecord,
+        requestOverrides: { body: {
+            reason: 'Αποτυχία διαβίβασης χτυπημάτων κάρτας',
+            updates: { cards_apo_ora_01: '00:00', cards_eos_ora_01: '23:59',
+                cards_ores_ergasias: 23.98 },
+            orphan_resolution: null,
+            zero_length_resolution: { approve: true,
+                transmission_failure_confirmed: true,
+                intervals: [{ pairNumber: 1, start: '14:04', end: '22:04' }] }
+        } },
+        prepareZeroLengthResolution: async () => ({ approvedZeroLength: {
+            approvedUpdates: { kathgoria_ergasias_apologistika: 'ΕΡΓ',
+                apologistiko_biblio: true,
+                apo_ora_01_apologistika: '14:04', eos_ora_01_apologistika: '22:04',
+                ores_ergasias_apologistika: 8,
+                ores_pragmatikhs_ergasias_apologistika: 8 },
+            metadata: { status: 'HR_APPROVED',
+                policy_version: 'zero-length-card-work:v1',
+                resolution_kind: 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE',
+                raw_cards_preserved: true, apologistiko_biblio: true }
+        }, dailyDerived: { derivedUpdate: {
+            kathgoria_ergasias_apologistika: 'ΕΡΓ',
+            ores_ergasias_apologistika: 8 } } })
+    });
+    assert.strictEqual(zero.res.statusCode, 200);
+    assert.strictEqual(zero.res.payload.success, true);
+    assert.strictEqual(zeroPersistenceInput.semanticUpdates.cards_apo_ora_01, undefined);
+    assert.strictEqual(zeroPersistenceInput.semanticUpdates.cards_eos_ora_01, undefined);
+    assert.strictEqual(zeroPersistenceInput.semanticUpdates.cards_ores_ergasias, undefined);
+    assert.strictEqual(zeroPersistenceInput.semanticUpdates.apo_ora_01_apologistika, '14:04');
+    assert.strictEqual(zeroPersistenceInput.semanticUpdates.eos_ora_01_apologistika, '22:04');
+    assert.strictEqual(zeroPersistenceInput.semanticUpdates.apologistiko_biblio, true);
+    assert.strictEqual(zeroPersistenceInput.semanticUpdates
+        .zero_length_card_resolution.status, 'HR_APPROVED');
+    let noReasonPersisted = false;
+    const zeroWithoutReason = await invoke(async () => { noReasonPersisted = true; }, {
+        record: zeroRecord,
+        requestOverrides: { body: { reason: '', updates: {}, orphan_resolution: null,
+            zero_length_resolution: { approve: true,
+                transmission_failure_confirmed: true,
+                intervals: [{ pairNumber: 1, start: '14:04', end: '22:04' }] } } },
+        prepareZeroLengthResolution: async () => { throw new Error('must not prepare'); }
+    });
+    assert.strictEqual(zeroWithoutReason.res.statusCode, 400);
+    assert.strictEqual(noReasonPersisted, false);
 
     for (const orphanType of ['START_ONLY', 'END_ONLY']) {
         const state = { row: structuredClone(oldRecord), audits: [] };

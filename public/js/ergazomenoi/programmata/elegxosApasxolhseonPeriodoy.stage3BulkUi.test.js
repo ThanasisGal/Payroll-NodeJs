@@ -105,6 +105,11 @@ function sandboxFor(items = [item()]) {
     assert.equal(command.leave_category, 'ΑΔΚΑΝ');
     assert.equal(command.period_start, '2026-06-01');
     assert.equal(command.period_end, '2026-06-30');
+    sandbox.weeklyHrStage3BulkClassification = 'SICKNESS';
+    sandbox.weeklyHrStage3BulkLeaveCategory = 'ΑΔΑΝΕΥΑΠ';
+    const sicknessCommand = sandbox.bulk.previewCommand();
+    assert.equal(sicknessCommand.final_classification, 'SICKNESS');
+    assert.equal(sicknessCommand.leave_category, 'ΑΔΑΝΕΥΑΠ');
 }
 
 {

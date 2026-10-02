@@ -1,28 +1,25 @@
 'use strict';
 
-const assert = require('assert/strict');
-const { loadWeeklyHrStage2BulkSearchPresentation } = require(
-    './apasxoliseisWeeklyHrStage2BulkSearchGateService');
+const assert = require('node:assert/strict');
+const {
+    loadWeeklyHrStage2BulkSearchPresentation
+} = require('./apasxoliseisWeeklyHrStage2BulkSearchGateService');
 
 (async () => {
-    let writableGuardCalls = 0;
-    const finalizedWritablePresentation = async () => {
-        writableGuardCalls++;
-        throw Object.assign(new Error('Finalized periods are read-only.'),
-            { code: 'EMPLOYMENT_REVIEW_PERIOD_FINALIZED' });
-    };
-    await assert.rejects(finalizedWritablePresentation,
-        (error) => error.code === 'EMPLOYMENT_REVIEW_PERIOD_FINALIZED');
-    writableGuardCalls = 0;
-    const april = await loadWeeklyHrStage2BulkSearchPresentation({ finalizedReadOnly: true,
-        loadWritablePresentation: finalizedWritablePresentation });
-    assert.equal(april, null);
-    assert.equal(writableGuardCalls, 0);
-
-    const may = await loadWeeklyHrStage2BulkSearchPresentation({ finalizedReadOnly: false,
-        loadWritablePresentation: async () => { writableGuardCalls++;
-            return { preview: { total_scopes: 85 } }; } });
-    assert.deepEqual(may.preview, { total_scopes: 85 });
-    assert.equal(writableGuardCalls, 1);
-    console.log('weekly HR Stage-2 finalized search gate tests passed');
+    let loads = 0;
+    const loader = async () => { loads += 1; return { preview: { can_apply: true } }; };
+    assert.equal(await loadWeeklyHrStage2BulkSearchPresentation({
+        reconstructionRequiredReadOnly: true, loadWritablePresentation: loader
+    }), null);
+    assert.equal(loads, 0,
+        'reconstruction-required Search must not invoke the writable Stage-2 loader');
+    assert.equal(await loadWeeklyHrStage2BulkSearchPresentation({
+        finalizedReadOnly: true, loadWritablePresentation: loader
+    }), null);
+    assert.equal(loads, 0);
+    assert.deepEqual(await loadWeeklyHrStage2BulkSearchPresentation({
+        loadWritablePresentation: loader
+    }), { preview: { can_apply: true } });
+    assert.equal(loads, 1);
+    console.log('Stage-2 bulk Search read-only gate tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

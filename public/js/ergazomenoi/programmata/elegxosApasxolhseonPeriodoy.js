@@ -1184,9 +1184,9 @@ function resolveCardEvidenceIssue(row = {}) {
     if (zeroLength) {
         return {
             code: 'ZERO_LENGTH_CARD_EVIDENCE',
-            status: 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ',
+            status: 'ΜΗ ΕΓΚΥΡΟ ΜΗΔΕΝΙΚΟ ΔΙΑΣΤΗΜΑ ΚΑΡΤΑΣ',
             finding: `Η είσοδος και η έξοδος της κάρτας έχουν την ίδια ώρα (${zeroLength.rawStart}).`,
-            guidance: 'Ελέγξτε και διορθώστε τα στοιχεία της κάρτας εργασίας.'
+            guidance: 'Δηλώστε τις πραγματικές ώρες απασχόλησης. Τα αρχικά χτυπήματα κάρτας θα διατηρηθούν.'
         };
     }
     return null;
@@ -6390,14 +6390,17 @@ function buildPreCalculationDataIssueGroups(rows = []) {
         if (!issue) return;
         if (issue.code === 'ORPHAN_CARD_PUNCH' &&
             row.orphan_card_resolution?.status === 'HR_APPROVED') return;
-        const groupCode = issue.code === 'ORPHAN_CARD_PUNCH'
-            ? issue.code
-            : 'INVALID_CARD_EVIDENCE';
+        if (issue.code === 'ZERO_LENGTH_CARD_EVIDENCE' &&
+            row.zero_length_card_resolution?.status === 'HR_APPROVED') return;
+        const groupCode = ['ORPHAN_CARD_PUNCH', 'ZERO_LENGTH_CARD_EVIDENCE']
+            .includes(issue.code) ? issue.code : 'INVALID_CARD_EVIDENCE';
         if (!groupsByCode.has(groupCode)) {
             groupsByCode.set(groupCode, {
                 issue_code: groupCode,
                 title: issue.code === 'ORPHAN_CARD_PUNCH'
                     ? 'Ορφανό χτύπημα κάρτας'
+                    : issue.code === 'ZERO_LENGTH_CARD_EVIDENCE'
+                        ? 'Μη έγκυρο μηδενικό διάστημα κάρτας'
                     : 'Άκυρα στοιχεία κάρτας',
                 cases: []
             });
@@ -6411,6 +6414,7 @@ function buildPreCalculationDataIssueGroups(rows = []) {
             source_date: String(row.hmeromhnia || '').slice(0, 10),
             finding: issue.finding,
             guidance: issue.guidance
+            , issue_code: issue.code
         });
     });
     return [...groupsByCode.values()]
@@ -6459,7 +6463,9 @@ function renderPreCalculationDataIssues(rows = []) {
                                         <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
                                             <button type="button" class="btn btn-sm actionable-issue-open-case employment-review-action-btn employment-review-action-primary"
                                                 data-issue-source="pre-calculation" data-actionable-group-index="${groupIndex}"
-                                                data-actionable-case-index="${caseIndex}">Άνοιγμα στον πίνακα</button>
+                                                data-actionable-case-index="${caseIndex}">${group.issue_code === 'ZERO_LENGTH_CARD_EVIDENCE'
+                                                    ? 'Επίλυση πραγματικής απασχόλησης'
+                                                    : 'Άνοιγμα στον πίνακα'}</button>
                                             <span class="small text-muted actionable-issue-navigation-feedback" aria-live="polite"></span>
                                         </div>
                                     </article>`).join('')}</div>
@@ -6811,7 +6817,12 @@ function bindActionableIssueEvents(container) {
             const feedback = button.parentElement?.querySelector(
                 '.actionable-issue-navigation-feedback'
             );
-            if (issueCase) openActionableIssueInTable(issueCase, feedback);
+            if (issueCase?.issue_code === 'ZERO_LENGTH_CARD_EVIDENCE') {
+                const row = currentReviewRows.find((item) =>
+                    String(item._id) === String(issueCase.prodhlomena_oraria_id));
+                if (row) showDetailsModal(row, { zeroLengthResolution: true });
+                else openActionableIssueInTable(issueCase, feedback);
+            } else if (issueCase) openActionableIssueInTable(issueCase, feedback);
         });
     });
     container.querySelectorAll('.canonical-decision-open').forEach((button) => {
@@ -9001,9 +9012,9 @@ function renderStage1DayEditor(payload, date) {
     const rowId = String(row._id);
     const draft = weeklyHrStage1DayDrafts.get(rowId) || {
         classification: stage1ClassificationForRow(row),
-        kathgoria_adeias_apologistika: row.astheneia_apologistika === true
-            ? 'ΑΔΑΣ' : (row.adeia_apologistika === true
-                ? String(row.kathgoria_adeias_apologistika || '') : '')
+        kathgoria_adeias_apologistika:
+            (row.astheneia_apologistika === true || row.adeia_apologistika === true)
+                ? String(row.kathgoria_adeias_apologistika || '') : ''
     };
     const stage2Candidate = (payload.workflow?.unclassified_stage2_candidates || [])
         .find((candidate) => candidate.date === date);
@@ -9024,7 +9035,7 @@ function renderStage1DayEditor(payload, date) {
                 `<option value="${value}" ${draft.classification === value ? 'selected' : ''}>${stage1ClassificationLabel(value)}</option>`).join('')}
         </select>
         ${holidayEligible ? `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-success weekly-hr-save-holiday-day" data-row-id="${escapeHtml(rowId)}" ${draft.classification === 'HOLIDAY' && !weeklyHrStage1DaySaving ? '' : 'disabled aria-disabled="true"'}>Αποθήκευση</button>` : ''}
-        <select class="form-select form-select-sm weekly-hr-stage1-leave-category ${['LEAVE', 'SICKNESS'].includes(draft.classification) ? '' : 'd-none'}" data-row-id="${escapeHtml(rowId)}" ${draft.classification === 'SICKNESS' ? 'disabled aria-disabled="true"' : ''}>${stage1LeaveCategoryOptions(draft.kathgoria_adeias_apologistika)}</select>
+        <select class="form-select form-select-sm weekly-hr-stage1-leave-category ${['LEAVE', 'SICKNESS'].includes(draft.classification) ? '' : 'd-none'}" data-row-id="${escapeHtml(rowId)}">${stage1LeaveCategoryOptions(draft.kathgoria_adeias_apologistika)}</select>
         ${draft.classification === 'UNCLASSIFIED' && stage2Candidate
             ? `<small class="weekly-hr-stage2-candidate-label text-muted">${escapeHtml(stage2Candidate.label)}</small>` : ''}
     </span>`;
@@ -9077,6 +9088,9 @@ function weeklyHrBlockedExplanation(payload = {}) {
         reasons.has('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE')) {
         return 'Υπάρχει ορφανό χτύπημα κάρτας που πρέπει να επιλυθεί πριν συνεχιστεί ο έλεγχος.';
     }
+    if (reasons.has('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION')) {
+        return 'Υπάρχει μηδενικό διάστημα κάρτας. Το HR πρέπει να δηλώσει τις πραγματικές ώρες ή να διορθώσει την πηγή.';
+    }
     if (reasons.has('MULTIPLE_SOURCE_CANDIDATES') ||
         reasons.has('MULTIPLE_TARGET_CANDIDATES') ||
         reasons.has('MULTIPLE_EQUIVALENT_REPO_TRANSFER_CANDIDATES')) {
@@ -9099,6 +9113,7 @@ function weeklyHrHasOnlyOrphanBlockers(payload = {}) {
         : payload?.workflow?.blocking_reasons || [])];
     const orphanReasons = new Set([
         'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION',
+        'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION',
         'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'
     ]);
     return reasons.length > 0 && reasons.every((reason) => orphanReasons.has(reason));
@@ -9128,6 +9143,23 @@ function renderWeeklyHrOrphanItem(row = {}) {
         ${proposal.breakMinutes !== undefined ? `<div><strong>Διάλειμμα:</strong> ${escapeHtml(proposal.breakMinutes)} λεπτά · ${proposal.breakInsideSchedule ? 'εντός' : 'εκτός'} ωραρίου</div>` : ''}
         <div><strong>Προτεινόμενο διάστημα:</strong> ${escapeHtml(proposal.start || '-')}–${escapeHtml(proposal.end || '-')}</div>
         <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-orphan mt-1" data-row-id="${escapeHtml(row._id)}">Επίλυση ορφανού χτυπήματος</button>
+    </div>`;
+}
+
+function weeklyHrZeroLengthRows(payload = {}) {
+    return (payload.rows || []).map((row) => currentReviewRows.find((candidate) =>
+        String(candidate._id) === String(row._id)) || row).filter((row) =>
+        isCurrentPeriodReviewDate(row, payload) && zeroLengthCardPairs(row).length > 0 &&
+        row?.zero_length_card_resolution?.status !== 'HR_APPROVED');
+}
+
+function renderWeeklyHrZeroLengthItem(row = {}) {
+    const evidence = zeroLengthCardPairs(row).map((item) =>
+        `${item.rawTime}–${item.rawTime}`).join(', ');
+    return `<div class="border rounded p-2 small weekly-hr-zero-length-item" data-row-id="${escapeHtml(row._id)}">
+        <div><strong>${escapeHtml(formatStage1DateKey(row.hmeromhnia))}</strong> · Μηδενικό διάστημα: ${escapeHtml(evidence)}</div>
+        <div>Τα αρχικά χτυπήματα θα διατηρηθούν.</div>
+        <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-zero-length mt-1" data-row-id="${escapeHtml(row._id)}">Επίλυση πραγματικής απασχόλησης</button>
     </div>`;
 }
 
@@ -10173,7 +10205,8 @@ function updateStage3LeaveCategoryVisibility(classificationSelect) {
     const stage3Row = classificationSelect?.closest('[data-stage3-row-id]');
     const leaveCategorySelect = stage3Row?.querySelector('.weekly-hr-stage3-leave-category');
     if (!leaveCategorySelect) return null;
-    leaveCategorySelect.classList.toggle('d-none', classificationSelect.value !== 'LEAVE');
+    leaveCategorySelect.classList.toggle('d-none',
+        !['LEAVE', 'SICKNESS'].includes(classificationSelect.value));
     return leaveCategorySelect;
 }
 
@@ -10540,7 +10573,7 @@ function renderWeeklyHrStage3BulkToolbar() {
     const options = allowed.map((value) => `<option value="${value}" ${
         weeklyHrStage3BulkClassification === value ? 'selected' : ''}>${escapeHtml(
         weeklyHrStage3BulkClassificationLabel(value))}</option>`).join('');
-    const leaveVisible = weeklyHrStage3BulkClassification === 'LEAVE';
+    const leaveVisible = ['LEAVE', 'SICKNESS'].includes(weeklyHrStage3BulkClassification);
     const ready = selectedCount > 0 && allowed.includes(weeklyHrStage3BulkClassification) &&
         (!leaveVisible || Boolean(weeklyHrStage3BulkLeaveCategory));
     return `<div class="weekly-hr-stage3-bulk-toolbar border rounded bg-light px-2 py-2 mb-2">
@@ -10621,7 +10654,7 @@ function stage3DecisionPreviewHtml(item, decision = {}) {
                 <div class="stage3-decision-arrow" aria-hidden="true">→</div>
                 <div><span class="small text-muted">Μετά</span><strong>${escapeHtml(after)}</strong></div>
             </div>
-            ${decision.selection === 'LEAVE' && leaveCategory
+            ${['LEAVE', 'SICKNESS'].includes(decision.selection) && leaveCategory
                 ? `<div class="small mt-2"><strong>Κατηγορία άδειας:</strong> ${escapeHtml(
                     leaveCategory)}</div>` : ''}
         </div></div>`;
@@ -10633,8 +10666,9 @@ async function previewWeeklyHrStage3Decision(rowId) {
     const selection = row?.querySelector('.weekly-hr-stage3-classification')?.value || '';
     const leaveCategory = row?.querySelector('.weekly-hr-stage3-leave-category')?.value || '';
     if (!item || !selection) return;
-    if (selection === 'LEAVE' && !leaveCategory) {
-        await employmentReviewSwal({ icon: 'warning', title: 'Απαιτείται κατηγορία άδειας' });
+    if (['LEAVE', 'SICKNESS'].includes(selection) && !leaveCategory) {
+        await employmentReviewSwal({ icon: 'warning',
+            title: 'Απαιτείται κατηγορία άδειας/ασθένειας' });
         return;
     }
     const leaveCategorySelect = row?.querySelector('.weekly-hr-stage3-leave-category');
@@ -10661,7 +10695,8 @@ async function submitWeeklyHrStage3Decision(rowId, decision = {}) {
     const selection = String(decision.selection || '');
     const leaveCategory = String(decision.leaveCategory || '');
     const reasonOrNotes = String(decision.reasonOrNotes || '').trim();
-    if (!item || !selection || !reasonOrNotes || (selection === 'LEAVE' && !leaveCategory)) return;
+    if (!item || !selection || !reasonOrNotes ||
+        (['LEAVE', 'SICKNESS'].includes(selection) && !leaveCategory)) return;
     const button = row.querySelector('.weekly-hr-stage3-resolve');
     button.disabled = true;
     try {
@@ -10715,7 +10750,7 @@ function weeklyHrStage3BulkPreviewCommand() {
     if (!periodStart || !periodEnd) return null;
     return { ypokatasthma: first.ypokatasthma, period_start: periodStart,
         period_end: periodEnd, final_classification: weeklyHrStage3BulkClassification,
-        leave_category: weeklyHrStage3BulkClassification === 'LEAVE'
+        leave_category: ['LEAVE', 'SICKNESS'].includes(weeklyHrStage3BulkClassification)
             ? weeklyHrStage3BulkLeaveCategory : '',
         items: items.map((item) => ({ employee_id: item.employee_id,
             employee_kodikos: item.employee_kodikos, week_start: item.week_start,
@@ -11215,7 +11250,47 @@ function resetWeeklyHrStage1TooltipInteraction() {
     hideWeeklyHrStage1Tooltip();
 }
 
-function showWeeklyHrStage1Tooltip(target) {
+function calculateWeeklyHrStage1TooltipPosition({ anchorRect, tooltipRect,
+    pointerY = null, viewportWidth = window.innerWidth,
+    viewportHeight = window.innerHeight, viewportPadding = 10, gap = 8 }) {
+    const maximumLeft = Math.max(viewportPadding,
+        viewportWidth - tooltipRect.width - viewportPadding);
+    const right = anchorRect.right + gap;
+    const left = anchorRect.left - tooltipRect.width - gap;
+    const finalLeft = right + tooltipRect.width <= viewportWidth - viewportPadding
+        ? right
+        : left >= viewportPadding ? left
+            : Math.min(maximumLeft, Math.max(viewportPadding, right));
+    const visibleTop = Math.max(anchorRect.top, viewportPadding);
+    const visibleBottom = Math.min(anchorRect.bottom,
+        viewportHeight - viewportPadding);
+    const anchorCenter = anchorRect.top + anchorRect.height / 2;
+    const fallbackY = visibleBottom >= visibleTop
+        ? (visibleTop + visibleBottom) / 2
+        : Math.min(viewportHeight - viewportPadding,
+            Math.max(viewportPadding, anchorCenter));
+    const verticalAnchor = Number.isFinite(pointerY) ? pointerY : fallbackY;
+    const maximumTop = Math.max(viewportPadding,
+        viewportHeight - tooltipRect.height - viewportPadding);
+    const finalTop = Math.min(maximumTop, Math.max(viewportPadding,
+        verticalAnchor - tooltipRect.height / 2));
+    return Object.freeze({ left: finalLeft, top: finalTop });
+}
+
+function updateWeeklyHrStage1TooltipPointerY(clientY) {
+    const tooltip = document.getElementById('weeklyHrStage1HelpTooltip');
+    if (!tooltip || !weeklyHrStage1ActiveTooltipTarget ||
+        tooltip.style.visibility !== 'visible' || !Number.isFinite(clientY)) return;
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const viewportPadding = 10;
+    const maximumTop = Math.max(viewportPadding,
+        window.innerHeight - tooltipRect.height - viewportPadding);
+    const finalTop = Math.min(maximumTop, Math.max(viewportPadding,
+        clientY - tooltipRect.height / 2));
+    tooltip.style.top = `${Math.round(finalTop)}px`;
+}
+
+function showWeeklyHrStage1Tooltip(target, pointerY = null) {
     const tooltip = document.getElementById('weeklyHrStage1HelpTooltip');
     const text = target?.dataset?.stage1Tooltip || '';
     if (!tooltip || !target || !text) return;
@@ -11227,23 +11302,15 @@ function showWeeklyHrStage1Tooltip(target) {
     tooltip.style.top = '0px';
     tooltip.style.left = '0px';
 
-    const viewportPadding = 10;
-    const gap = 8;
-    const targetRect = target.getBoundingClientRect();
+    const anchor = target.closest('td, th') || target;
+    const anchorRect = anchor.getBoundingClientRect();
     const tooltipRect = tooltip.getBoundingClientRect();
-    const maximumLeft = Math.max(viewportPadding,
-        window.innerWidth - tooltipRect.width - viewportPadding);
-    const finalLeft = Math.min(maximumLeft, Math.max(viewportPadding,
-        targetRect.left + targetRect.width / 2 - tooltipRect.width / 2));
-    const preferredTop = targetRect.top - tooltipRect.height - gap;
-    const bottomTop = targetRect.bottom + gap;
-    const maximumTop = Math.max(viewportPadding,
-        window.innerHeight - tooltipRect.height - viewportPadding);
-    const finalTop = Math.min(maximumTop, Math.max(viewportPadding,
-        preferredTop >= viewportPadding ? preferredTop : bottomTop));
+    const position = calculateWeeklyHrStage1TooltipPosition({
+        anchorRect, tooltipRect, pointerY
+    });
 
-    tooltip.style.top = `${Math.round(finalTop)}px`;
-    tooltip.style.left = `${Math.round(finalLeft)}px`;
+    tooltip.style.top = `${Math.round(position.top)}px`;
+    tooltip.style.left = `${Math.round(position.left)}px`;
     weeklyHrStage1ActiveTooltipTarget = target;
     target.setAttribute('aria-describedby', tooltip.id);
     tooltip.style.visibility = 'visible';
@@ -11259,7 +11326,13 @@ function initializeWeeklyHrStage1Tooltips() {
         const target = stage1TooltipTarget(event.target);
         if (!target || target.contains(event.relatedTarget)) return;
         weeklyHrStage1HoveredTooltipTarget = target;
-        showWeeklyHrStage1Tooltip(target);
+        showWeeklyHrStage1Tooltip(target, event.clientY);
+    });
+    container.addEventListener('mousemove', (event) => {
+        const target = stage1TooltipTarget(event.target);
+        if (!target || target !== weeklyHrStage1HoveredTooltipTarget ||
+            target !== weeklyHrStage1ActiveTooltipTarget) return;
+        updateWeeklyHrStage1TooltipPointerY(event.clientY);
     });
     container.addEventListener('mouseout', (event) => {
         const target = stage1TooltipTarget(event.target);
@@ -11360,7 +11433,7 @@ function stage1DayTileState(payload, date, row) {
             ?.current_apologistiko_classification === 'POSSIBLE_LEAVE'
             ? 'ΠΙΘ. ΑΔΕΙΑ' : stage1ReadOnlyDayLabel(payload, date, row))
         : stage1ClassificationLabel(classification).toLocaleUpperCase('el-GR');
-    const leaveCategory = classification === 'LEAVE'
+    const leaveCategory = ['LEAVE', 'SICKNESS'].includes(classification)
         ? String(draft?.kathgoria_adeias_apologistika ||
             row?.kathgoria_adeias_apologistika || '') : '';
     return { classification, label, leaveCategory, draft: Boolean(draft) };
@@ -11464,7 +11537,8 @@ function renderWeeklyHrStage1DayEditorPanel(rowId) {
     const state = stage1DayTileState(payload, date, row);
     const draft = weeklyHrStage1DayDrafts.get(String(rowId));
     const leaveCategory = draft?.kathgoria_adeias_apologistika ||
-        (state.classification === 'LEAVE' ? row.kathgoria_adeias_apologistika : '') || '';
+        (['LEAVE', 'SICKNESS'].includes(state.classification)
+            ? row.kathgoria_adeias_apologistika : '') || '';
     const pendingIds = weeklyHrStage1PendingRowIds();
     const index = pendingIds.indexOf(String(rowId));
     return `<div class="offcanvas-header"><div><h5 class="offcanvas-title mb-0">Χαρακτηρισμός ημέρας</h5>
@@ -11480,7 +11554,7 @@ function renderWeeklyHrStage1DayEditorPanel(rowId) {
                 </select>
                 <div class="mt-2 ${['LEAVE', 'SICKNESS'].includes(state.classification) ? '' : 'd-none'} weekly-hr-stage1-drawer-leave-wrap">
                     <label class="form-label fw-semibold" for="weeklyHrStage1DrawerLeaveCategory">Κατηγορία άδειας</label>
-                    <select id="weeklyHrStage1DrawerLeaveCategory" class="form-select weekly-hr-stage1-leave-category" data-row-id="${escapeHtml(String(rowId))}" ${state.classification === 'SICKNESS' ? 'disabled aria-disabled="true"' : ''}>${stage1LeaveCategoryOptions(state.classification === 'SICKNESS' ? 'ΑΔΑΣ' : leaveCategory)}</select>
+                    <select id="weeklyHrStage1DrawerLeaveCategory" class="form-select weekly-hr-stage1-leave-category" data-row-id="${escapeHtml(String(rowId))}">${stage1LeaveCategoryOptions(leaveCategory)}</select>
                 </div>
                 ${state.draft ? '<div class="small text-warning-emphasis mt-2">● Μη αποθηκευμένη αλλαγή</div>' : ''}
             </div></div>
@@ -11532,8 +11606,10 @@ function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const weekDates = stage1NaturalWeekDates(scope.week_start);
     const dayCells = weekDates.map((date) => renderStage1MatrixDayCell(
         payload, date, relevantDates)).join('');
-    const orphanItems = Array.isArray(filteredDates) ? '' :
-        weeklyHrOrphanRows(payload).map(renderWeeklyHrOrphanItem).join('');
+    const orphanItems = Array.isArray(filteredDates) ? '' : [
+        ...weeklyHrOrphanRows(payload).map(renderWeeklyHrOrphanItem),
+        ...weeklyHrZeroLengthRows(payload).map(renderWeeklyHrZeroLengthItem)
+    ].join('');
     const statusTitle = [statusText, blockedExplanation,
         stale ? 'Τα στοιχεία της εβδομάδας άλλαξαν. Απαιτείται νέα αναζήτηση.' : '',
         payload.write_enabled === false ? 'Η εγγραφή δεν είναι διαθέσιμη.' : '']
@@ -11693,12 +11769,12 @@ function setStage1DayDraft(rowId, classification, leaveCategory = '') {
         ? actionableDates.includes(date) : stage1RelevantDates(owner).includes(date);
     if (!actionable || !stage1RelevantDates(owner).includes(date)) return;
     const normalizedDraft = { classification,
-        kathgoria_adeias_apologistika: classification === 'SICKNESS'
-            ? 'ΑΔΑΣ' : (classification === 'LEAVE' ? leaveCategory : '') };
+        kathgoria_adeias_apologistika: ['LEAVE', 'SICKNESS'].includes(classification)
+            ? leaveCategory : '' };
     const authoritativeClassification = stage1ClassificationForRow(row);
-    const authoritativeLeaveCategory = authoritativeClassification === 'SICKNESS' ? 'ΑΔΑΣ'
-        : authoritativeClassification === 'LEAVE'
-            ? String(row.kathgoria_adeias_apologistika || '') : '';
+    const authoritativeLeaveCategory = ['LEAVE', 'SICKNESS'].includes(
+        authoritativeClassification)
+        ? String(row.kathgoria_adeias_apologistika || '') : '';
     if (normalizedDraft.classification === authoritativeClassification &&
         normalizedDraft.kathgoria_adeias_apologistika === authoritativeLeaveCategory) {
         weeklyHrStage1DayDrafts.delete(String(rowId));
@@ -11710,7 +11786,7 @@ function setStage1DayDraft(rowId, classification, leaveCategory = '') {
 async function classifySelectedStage1Days(classification) {
     if (!weeklyHrStage1DaySelected.size) return;
     let leaveCategory = '';
-    if (classification === 'LEAVE') {
+    if (['LEAVE', 'SICKNESS'].includes(classification)) {
         const options = stage1LeaveCategoryOptions('').replace('<option value="">Κατηγορία άδειας</option>', '');
         const prompt = await employmentReviewSwal({ title: 'Κατηγορία άδειας',
             html: `<select id="weeklyHrBulkLeaveCategory" class="form-select"><option value="">Επιλέξτε κατηγορία</option>${options}</select>`,
@@ -11760,9 +11836,11 @@ async function saveStage1DailyClassificationDrafts(requestedRowIds = null) {
         .filter(([rowId]) => !requestedSet || requestedSet.has(String(rowId)));
     if (!draftsToSave.length) return;
     for (const [, draft] of draftsToSave) {
-        if (draft.classification === 'LEAVE' && !draft.kathgoria_adeias_apologistika) {
-            await employmentReviewSwal({ icon: 'warning', title: 'Κατηγορία άδειας',
-                text: 'Κάθε επιλεγμένη Άδεια πρέπει να έχει πραγματική κατηγορία άδειας.' }); return;
+        if (['LEAVE', 'SICKNESS'].includes(draft.classification) &&
+            !draft.kathgoria_adeias_apologistika) {
+            await employmentReviewSwal({ icon: 'warning',
+                title: 'Κατηγορία άδειας/ασθένειας',
+                text: 'Κάθε επιλεγμένη Άδεια ή Ασθένεια πρέπει να έχει πραγματική κατηγορία.' }); return;
         }
     }
     const prompt = await employmentReviewSwal({ title: 'Αποθήκευση Χαρακτηρισμών',
@@ -12085,6 +12163,14 @@ document.addEventListener('click', (event) => {
     if (orphanButton) { const row = currentReviewRows.find((item) => String(item._id) === orphanButton.dataset.rowId) ||
         weeklyHrStage1RowsById.get(orphanButton.dataset.rowId);
         if (row) showDetailsModal(row, { orphanResolution: true }); return; }
+    const zeroLengthButton = event.target.closest('.weekly-hr-open-zero-length');
+    if (zeroLengthButton) {
+        const row = currentReviewRows.find((item) =>
+            String(item._id) === zeroLengthButton.dataset.rowId) ||
+            weeklyHrStage1RowsById.get(zeroLengthButton.dataset.rowId);
+        if (row) showDetailsModal(row, { zeroLengthResolution: true });
+        return;
+    }
     const dayButton = event.target.closest('.weekly-hr-open-day');
     if (dayButton) { const row = currentReviewRows.find((item) => String(item._id) === dayButton.dataset.rowId) ||
         weeklyHrStage1RowsById.get(dayButton.dataset.rowId);
@@ -12131,7 +12217,9 @@ document.addEventListener('change', (event) => {
     if (event.target.closest('#weeklyHrStage3BulkClassification')) {
         invalidateWeeklyHrStage3FrozenApply();
         weeklyHrStage3BulkClassification = String(event.target.value || '');
-        if (weeklyHrStage3BulkClassification !== 'LEAVE') weeklyHrStage3BulkLeaveCategory = '';
+        if (!['LEAVE', 'SICKNESS'].includes(weeklyHrStage3BulkClassification)) {
+            weeklyHrStage3BulkLeaveCategory = '';
+        }
         updateWeeklyHrStage3BulkToolbar(); return;
     }
     if (event.target.closest('#weeklyHrStage3BulkLeaveCategory')) {
@@ -12148,9 +12236,13 @@ document.addEventListener('change', (event) => {
     const classification = event.target.closest('.weekly-hr-stage1-day-classification');
     if (classification) {
         const existing = weeklyHrStage1DayDrafts.get(classification.dataset.rowId);
+        const sourceRow = weeklyHrStage1RowsById.get(String(classification.dataset.rowId));
+        const retainedCategory = ['LEAVE', 'SICKNESS'].includes(existing?.classification)
+            ? existing.kathgoria_adeias_apologistika || ''
+            : ['LEAVE', 'SICKNESS'].includes(stage1ClassificationForRow(sourceRow || {}))
+                ? String(sourceRow?.kathgoria_adeias_apologistika || '') : '';
         setStage1DayDraft(classification.dataset.rowId, classification.value,
-            classification.value === 'LEAVE' && existing?.classification === 'LEAVE'
-                ? existing.kathgoria_adeias_apologistika || '' : '');
+            ['LEAVE', 'SICKNESS'].includes(classification.value) ? retainedCategory : '');
         rerenderWeeklyHrStage1Rows();
         if (classification.closest('#weeklyHrStage1DayEditor')) {
             const panel = document.getElementById('weeklyHrStage1DayEditor');
@@ -12161,7 +12253,11 @@ document.addEventListener('change', (event) => {
     }
     const leaveCategory = event.target.closest('.weekly-hr-stage1-leave-category');
     if (leaveCategory) {
-        setStage1DayDraft(leaveCategory.dataset.rowId, 'LEAVE', leaveCategory.value);
+        const classificationValue = leaveCategory.closest('.weekly-hr-stage1-day')
+            ?.querySelector('.weekly-hr-stage1-day-classification')?.value ||
+            document.getElementById('weeklyHrStage1DrawerClassification')?.value || 'LEAVE';
+        setStage1DayDraft(leaveCategory.dataset.rowId, classificationValue,
+            leaveCategory.value);
         rerenderWeeklyHrStage1Rows();
         if (leaveCategory.closest('#weeklyHrStage1DayEditor')) {
             const panel = document.getElementById('weeklyHrStage1DayEditor');
@@ -12259,6 +12355,12 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
                 text: payload.message || 'Αποτυχία ανάκτησης δεδομένων.'
             });
             return false;
+        }
+        if (payload.historical_reconstruction_required === true) {
+            employmentReviewSwal({ icon: 'info',
+                title: 'Απαιτείται ανακατασκευή εκπρόθεσμης περιόδου',
+                text: payload.historical_reconstruction_message ||
+                    'Η περίοδος είναι εκπρόθεσμη και πρέπει πρώτα να γίνει Ανακατασκευή Εκπρόθεσμης Περιόδου.' });
         }
 
         ensureReviewTableStructure();
@@ -12771,6 +12873,53 @@ function renderOrphanCardResolutionSection(row = {}) {
     `;
 }
 
+function zeroLengthCardPairs(row = {}) {
+    return [1, 2, 3].flatMap((pairNumber) => {
+        const pair = pairNo(pairNumber);
+        const start = String(row[`cards_apo_ora_${pair}`] || '').trim();
+        const end = String(row[`cards_eos_ora_${pair}`] || '').trim();
+        return start && end && timeToMinutes(start) !== null &&
+            timeToMinutes(start) === timeToMinutes(end)
+            ? [{ pairNumber, rawTime: start }] : [];
+    });
+}
+
+function renderZeroLengthCardResolutionSection(row = {}) {
+    const pairs = zeroLengthCardPairs(row);
+    if (!pairs.length) return '';
+    const approved = row.zero_length_card_resolution?.status === 'HR_APPROVED';
+    const metadata = row.zero_length_card_resolution || {};
+    const intervals = new Map((metadata.approved_intervals || []).map((item) =>
+        [Number(item.pairNumber), item]));
+    return `<div id="zeroLengthCardResolutionSection" class="review-modal-section zero-length-card-resolution-section">
+        <div class="review-modal-section-title">Επίλυση πραγματικής απασχόλησης</div>
+        <div class="alert alert-warning py-2">
+            Τα χτυπήματα της ψηφιακής κάρτας έχουν ίδια ώρα εισόδου/εξόδου.
+            Τα πρωτογενή χτυπήματα δεν θα αλλάξουν. Δηλώστε το πραγματικό διάστημα
+            μόνο εφόσον υπήρξε εργασία και τα σωστά χτυπήματα δεν διαβιβάστηκαν/καταγράφηκαν σωστά στο ΕΡΓΑΝΗ.
+        </div>
+        ${pairs.map((item) => {
+            const approvedInterval = intervals.get(item.pairNumber) || {};
+            return `<div class="row g-2 mb-2 zero-length-resolution-pair" data-pair-number="${item.pairNumber}">
+                <div class="col-12 small"><strong>Αρχικό ζεύγος ${item.pairNumber}:</strong>
+                    ${escapeHtml(item.rawTime)}–${escapeHtml(item.rawTime)}</div>
+                <div class="col-md-6"><label class="form-label" for="zeroLengthStart${item.pairNumber}">Πραγματικά Από</label>
+                    <input type="time" class="form-control zero-length-resolution-start" id="zeroLengthStart${item.pairNumber}" value="${escapeHtml(approvedInterval.start || '')}" ${approved ? 'disabled' : ''}></div>
+                <div class="col-md-6"><label class="form-label" for="zeroLengthEnd${item.pairNumber}">Πραγματικά Έως</label>
+                    <input type="time" class="form-control zero-length-resolution-end" id="zeroLengthEnd${item.pairNumber}" value="${escapeHtml(approvedInterval.end || '')}" ${approved ? 'disabled' : ''}></div>
+            </div>`;
+        }).join('')}
+        ${approved ? `<div class="alert alert-info py-2">Η επίλυση έχει εγκριθεί από ${escapeHtml(
+            metadata.approved_by || '-')}. Τα χτυπήματα κάρτας διατηρήθηκαν.</div>` : `
+            <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="zeroLengthResolutionConfirm">
+                <label class="form-check-label fw-semibold" for="zeroLengthResolutionConfirm">
+                    Επιβεβαιώνω ότι υπήρξε πραγματική εργασία και τα χτυπήματα της ψηφιακής κάρτας δεν διαβιβάστηκαν/καταγράφηκαν σωστά στο ΕΡΓΑΝΗ.
+                </label>
+            </div>`}
+    </div>`;
+}
+
 const orphanDerivedPreviewEditableFields = new Set([
     'ores_ergasias_apologistika', 'ores_apoysias_apologistika',
     'ores_nyxtas_apologistika', 'ores_argion_prosayxhsh_apologistika',
@@ -13208,7 +13357,8 @@ function validateReviewSave(updates) {
     return errors;
 }
 
-function showDetailsModal(row, { orphanResolution = false } = {}) {
+function showDetailsModal(row, { orphanResolution = false,
+    zeroLengthResolution = false } = {}) {
     if (!isCurrentPeriodReviewDate(row)) {
         return employmentReviewSwal({ icon: 'info', title: 'Πληροφοριακή ημέρα άλλης περιόδου',
             text: 'Η ημέρα ανήκει μόνο στο εβδομαδιαίο πλαίσιο ανάγνωσης. Δεν επιτρέπεται μεταβολή από την ενεργή περίοδο.' });
@@ -13216,7 +13366,9 @@ function showDetailsModal(row, { orphanResolution = false } = {}) {
     const reusableOrphanReason = row?.orphan_card_resolution_preview
         ?.automaticReusableApplied === true
         ? String(row.orphan_card_resolution_preview.reusableDecisionReason || '') : '';
-    const initialReason = reusableOrphanReason || (orphanResolution === true
+    const initialReason = reusableOrphanReason || (zeroLengthResolution === true
+        ? 'Επίλυση πραγματικής απασχόλησης λόγω αποτυχίας διαβίβασης ψηφιακής κάρτας'
+        : orphanResolution === true
         ? defaultOrphanResolutionReason(
             row?.orphan_card_resolution_preview?.unresolvedPairs || [])
         : '');
@@ -13253,6 +13405,7 @@ function showDetailsModal(row, { orphanResolution = false } = {}) {
         </div>
 
         ${renderOrphanCardResolutionSection(row)}
+        ${renderZeroLengthCardResolutionSection(row)}
 
         <div class="review-modal-section">
             <div class="review-modal-section-title">Ενδείξεις</div>
@@ -13432,6 +13585,36 @@ function showDetailsModal(row, { orphanResolution = false } = {}) {
                 return;
             }
 
+            const zeroLengthPairs = zeroLengthCardPairs(row);
+            const zeroLengthApproval = document.getElementById(
+                'zeroLengthResolutionConfirm');
+            let zeroLengthResolution = null;
+            if (zeroLengthPairs.length &&
+                row.zero_length_card_resolution?.status !== 'HR_APPROVED') {
+                if (zeroLengthApproval?.checked !== true) {
+                    employmentReviewSwal({ icon: 'warning',
+                        title: 'Ρητή επιβεβαίωση πραγματικής εργασίας',
+                        text: 'Επιβεβαιώστε ρητά την πραγματική εργασία και την αποτυχία διαβίβασης της κάρτας.' });
+                    return;
+                }
+                const intervals = zeroLengthPairs.map((item) => ({
+                    pairNumber: item.pairNumber,
+                    start: document.getElementById(
+                        `zeroLengthStart${item.pairNumber}`)?.value || '',
+                    end: document.getElementById(
+                        `zeroLengthEnd${item.pairNumber}`)?.value || ''
+                }));
+                if (intervals.some((item) => !item.start || !item.end ||
+                    item.start === item.end)) {
+                    employmentReviewSwal({ icon: 'warning',
+                        title: 'Πραγματικό διάστημα απασχόλησης',
+                        text: 'Συμπληρώστε πλήρες, μη μηδενικό διάστημα Από–Έως.' });
+                    return;
+                }
+                zeroLengthResolution = { approve: true, intervals,
+                    transmission_failure_confirmed: true };
+            }
+
             const response = await fetch(`/api/prodhlomena-oraria/review/${row._id}`, {
                 method: 'PATCH',
 
@@ -13443,7 +13626,8 @@ function showDetailsModal(row, { orphanResolution = false } = {}) {
                 body: JSON.stringify({
                     updates,
                     reason,
-                    orphan_resolution: orphanResolution
+                    orphan_resolution: orphanResolution,
+                    zero_length_resolution: zeroLengthResolution
                 })
             });
 

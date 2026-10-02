@@ -135,3 +135,14 @@ test('διαδοχικές κάρτες μετά τα μεσάνυχτα ανή�
     assert.deepEqual(service.getPayrollCalculationIntervals(rec, {dialleima_se_lepta: 30})
         .map(({start,end}) => [start,end]), [[480,720], [1320,1560], [1680,1800]]);
 });
+
+test('εγκεκριμένο μηδενικό διάστημα χρησιμοποιεί τις κανονικές απολογιστικές ώρες', () => {
+    const rec = {
+        hmeromhnia: '2026-08-12',
+        cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04',
+        apo_ora_01_apologistika: '14:04', eos_ora_01_apologistika: '22:04',
+        zero_length_card_resolution: { status: 'HR_APPROVED' }
+    };
+    assert.deepEqual(service.getPayrollCalculationIntervals(rec, { dialleima_se_lepta: 0 })
+        .map(({ start, end }) => [start, end]), [[844, 1324]]);
+});

@@ -30,6 +30,9 @@ const {
 const {
     isApprovedOrphanResolution
 } = require('./apasxoliseisOrphanCardResolutionService');
+const {
+    isApprovedZeroLengthResolution
+} = require('./apasxoliseisZeroLengthCardResolutionService');
 
 function nonNegativeNumber(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -94,6 +97,11 @@ function resolveDailyActualWorkFacts(row = {}, {
         );
     const approvedOrphan = hasOnlySupportedOrphanEvidence &&
         isApprovedOrphanResolution(row);
+    const hasZeroLengthEvidence = cardVerification.unresolvedPairs.some(
+        (pair) => pair.state === CARD_PAIR_STATE.ZERO_LENGTH
+    );
+    const approvedZeroLength = hasZeroLengthEvidence &&
+        isApprovedZeroLengthResolution(row);
     const hasCompleteCardEvidence = cardVerification.hasCompleteCardEvidence;
     const hasIncompleteCardInterval = cardVerification.hasUnresolvedCardEvidence;
     const verificationFacts = {
@@ -117,6 +125,30 @@ function resolveDailyActualWorkFacts(row = {}, {
             reasons,
             warnings
         });
+    }
+
+    if (hasIncompleteCardInterval && approvedZeroLength) {
+        const actualWorkHours = calculatedWork.ok ? calculatedWork.value : 0;
+        return Object.freeze({ category: 'ΕΡΓ', declaredWorkHours: declared.value,
+            cardHours: cards.value, hasCompleteCardEvidence: false, ...verificationFacts,
+            cardVerificationStatus: 'HR_APPROVED_ZERO_LENGTH', actualWorkHours,
+            leaveHours: 0, holidayCreditedHours: 0, sicknessHours: 0,
+            countsAsActualWorkDay: actualWorkHours > 0, reasons: [],
+            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL,
+                'HR_APPROVED_ZERO_LENGTH_CARD_RESOLUTION'] });
+    }
+    if (hasIncompleteCardInterval && hasZeroLengthEvidence) {
+        const verifiedActualWorkHours = hasCompleteCardEvidence
+            ? calculatedHoursAreAuthoritative && calculatedWork.ok
+                ? calculatedWork.value : cardVerification.verifiedHours
+            : 0;
+        return Object.freeze({ category: 'ΕΡΓ', declaredWorkHours: declared.value,
+            cardHours: cards.value, hasCompleteCardEvidence, ...verificationFacts,
+            actualWorkHours: verifiedActualWorkHours, leaveHours: 0,
+            holidayCreditedHours: 0, sicknessHours: 0,
+            countsAsActualWorkDay: verifiedActualWorkHours > 0,
+            reasons: ['ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'],
+            warnings: [WARNING.INCOMPLETE_CARD_INTERVAL] });
     }
 
     // Τα πλήρη ζεύγη παραμένουν αποδεδειγμένος χρόνος ακόμη κι όταν άλλο

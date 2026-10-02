@@ -18,8 +18,8 @@ const matrixSource = source.slice(source.indexOf('function stage1NaturalWeekDate
 
 const drafts = new Map([
     ['d04', { classification: 'ABSENCE', kathgoria_adeias_apologistika: '' }],
-    ['d05', { classification: 'SICKNESS', kathgoria_adeias_apologistika: 'ΑΔΑΣ' }],
-    ['d06', { classification: 'SICKNESS', kathgoria_adeias_apologistika: 'ΑΔΑΣ' }],
+    ['d05', { classification: 'SICKNESS', kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' }],
+    ['d06', { classification: 'SICKNESS', kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' }],
     ['d07', { classification: 'LEAVE', kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' }],
     ['d08', { classification: 'LEAVE', kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' }],
     ['d09', { classification: 'LEAVE', kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' }]
@@ -28,7 +28,10 @@ const selectedDays = new Set(['d04', 'd05']);
 const sandbox = {
     weeklyHrStage1DayDrafts: drafts,
     weeklyHrStage1DaySelected: selectedDays,
-    weeklyHrLeaveCategories: [{ value: 'ΑΔΚΑΝ', label: 'ΑΔΚΑΝ - Κανονική άδεια' }],
+    weeklyHrLeaveCategories: [
+        { value: 'ΑΔΚΑΝ', label: 'ΑΔΚΑΝ - Κανονική άδεια' },
+        { value: 'ΑΔΑΝΕΥΑΠ', label: 'ΑΔΑΝΕΥΑΠ - Ασθένεια' }
+    ],
     weeklyHrStage1Selected: new Set(['week']),
     weeklyHrStage1RowsById: new Map(),
     weeklyHrStage1Payloads: new Map(),
@@ -44,6 +47,8 @@ const sandbox = {
     weeklyHrStage1IndexWarning: () => '',
     weeklyHrOrphanRows: () => [],
     renderWeeklyHrOrphanItem: () => '',
+    weeklyHrZeroLengthRows: () => [],
+    renderWeeklyHrZeroLengthItem: () => '',
     stage1DateKey: (value) => String(value || '').slice(0, 10),
     formatStage1DateKey: (value) => {
         const [year, month, day] = String(value).split('-');
@@ -93,6 +98,7 @@ assert.equal((html.match(/<strong>ΑΠΟΥΣΙΑ<\/strong>/g) || []).length, 1);
 assert.equal((html.match(/<strong>ΑΣΘΕΝΕΙΑ<\/strong>/g) || []).length, 2);
 assert.equal((html.match(/<strong>ΑΔΕΙΑ<\/strong>/g) || []).length, 3);
 assert.equal((html.match(/<span>ΑΔΚΑΝ<\/span>/g) || []).length, 3);
+assert.equal((html.match(/<span>ΑΔΑΝΕΥΑΠ<\/span>/g) || []).length, 2);
 assert.doesNotMatch(html, /weekly-hr-stage1-day-classification/);
 assert.doesNotMatch(html, /weekly-hr-stage1-leave-category/);
 assert.match(html, /weekly-hr-stage1-open-editor/);
@@ -113,8 +119,8 @@ assert.equal(drafts.get('d07').classification, 'LEAVE',
     'Το άνοιγμα ή κλείσιμο του πλαισίου δεν διαγράφει το πρόχειρο');
 const sicknessDrawer = sandbox.helpers.renderWeeklyHrStage1DayEditorPanel('d05');
 assert.match(sicknessDrawer, /value="SICKNESS" selected/);
-assert.match(sicknessDrawer, /value="ΑΔΑΣ" selected/);
-assert.match(sicknessDrawer, /disabled aria-disabled="true"/);
+assert.match(sicknessDrawer, /value="ΑΔΑΝΕΥΑΠ" selected/);
+assert.doesNotMatch(sicknessDrawer, /disabled aria-disabled="true"/);
 assert.deepEqual(Array.from(sandbox.helpers.weeklyHrStage1PendingRowIds()),
     ['d04', 'd05', 'd06', 'd07', 'd08', 'd09']);
 const panel = { innerHTML: '' };
@@ -207,27 +213,73 @@ const tooltipSource = source.slice(source.indexOf('function stage1TooltipTarget'
     source.indexOf('function cleanupWeeklyHrStage1BulkDropdownPortal'));
 const showTooltipSource = tooltipSource.match(
     /function showWeeklyHrStage1Tooltip\([\s\S]*?\n\}/)?.[0] || '';
-const targetRectIndex = showTooltipSource.indexOf('target.getBoundingClientRect()');
+const targetRectIndex = showTooltipSource.indexOf('anchor.getBoundingClientRect()');
 const tooltipRectIndex = showTooltipSource.indexOf('tooltip.getBoundingClientRect()');
-const finalLeftCalculationIndex = showTooltipSource.indexOf('const finalLeft');
-const finalTopCalculationIndex = showTooltipSource.indexOf('const finalTop');
-const finalTopWriteIndex = showTooltipSource.indexOf('tooltip.style.top = `${Math.round(finalTop)}px`');
-const finalLeftWriteIndex = showTooltipSource.indexOf('tooltip.style.left = `${Math.round(finalLeft)}px`');
+const positionCalculationIndex = showTooltipSource.indexOf(
+    'calculateWeeklyHrStage1TooltipPosition');
+const finalTopWriteIndex = showTooltipSource.indexOf(
+    'tooltip.style.top = `${Math.round(position.top)}px`');
+const finalLeftWriteIndex = showTooltipSource.indexOf(
+    'tooltip.style.left = `${Math.round(position.left)}px`');
 const visibleIndex = showTooltipSource.indexOf("tooltip.style.visibility = 'visible'");
 const opaqueIndex = showTooltipSource.indexOf("tooltip.style.opacity = '1'");
-assert.ok(targetRectIndex >= 0 && targetRectIndex < finalLeftCalculationIndex);
-assert.ok(tooltipRectIndex >= 0 && tooltipRectIndex < finalLeftCalculationIndex);
-assert.ok(finalLeftCalculationIndex < finalLeftWriteIndex);
-assert.ok(finalTopCalculationIndex < finalTopWriteIndex);
+assert.ok(targetRectIndex >= 0 && targetRectIndex < positionCalculationIndex);
+assert.ok(tooltipRectIndex >= 0 && tooltipRectIndex < positionCalculationIndex);
+assert.ok(positionCalculationIndex < finalLeftWriteIndex);
+assert.ok(positionCalculationIndex < finalTopWriteIndex);
 assert.ok(finalTopWriteIndex < visibleIndex);
 assert.ok(finalLeftWriteIndex < visibleIndex);
 assert.ok(finalLeftWriteIndex < opaqueIndex);
-assert.match(showTooltipSource, /Math\.min\(maximumLeft, Math\.max\(viewportPadding/);
-assert.match(showTooltipSource, /Math\.min\(maximumTop, Math\.max\(viewportPadding/);
-assert.match(showTooltipSource, /preferredTop >= viewportPadding \? preferredTop : bottomTop/);
+assert.match(showTooltipSource, /target\.closest\('td, th'\) \|\| target/);
+const positionSource = tooltipSource.match(
+    /function calculateWeeklyHrStage1TooltipPosition\([\s\S]*?\n\}/)?.[0] || '';
+assert.match(positionSource, /anchorRect\.right \+ gap/);
+assert.match(positionSource, /anchorRect\.left - tooltipRect\.width - gap/);
+assert.match(positionSource, /right \+ tooltipRect\.width <= viewportWidth - viewportPadding/);
+assert.match(positionSource, /Math\.min\(maximumLeft, Math\.max\(viewportPadding, right\)\)/);
+assert.match(positionSource, /Number\.isFinite\(pointerY\) \? pointerY : fallbackY/);
+assert.match(positionSource, /visibleTop = Math\.max\(anchorRect\.top, viewportPadding\)/);
+assert.match(positionSource, /visibleBottom = Math\.min\(anchorRect\.bottom/);
+assert.match(positionSource, /Math\.min\(maximumTop, Math\.max\(viewportPadding/);
+const positionSandbox = { window: { innerWidth: 500, innerHeight: 400 }, Object,
+    Math, Number };
+vm.runInNewContext(`${positionSource}\nthis.position = calculateWeeklyHrStage1TooltipPosition;`,
+    positionSandbox);
+const rightPosition = positionSandbox.position({
+    anchorRect: { left: 100, right: 200, top: 100, bottom: 200, height: 100 },
+    tooltipRect: { width: 80, height: 40 }, pointerY: 150,
+    viewportWidth: 500, viewportHeight: 400
+});
+assert.deepEqual(JSON.parse(JSON.stringify(rightPosition)), { left: 208, top: 130 });
+const leftPosition = positionSandbox.position({
+    anchorRect: { left: 220, right: 240, top: 100, bottom: 200, height: 100 },
+    tooltipRect: { width: 50, height: 40 }, pointerY: 150,
+    viewportWidth: 250, viewportHeight: 400
+});
+assert.equal(leftPosition.left, 162);
+const clampedPosition = positionSandbox.position({
+    anchorRect: { left: 0, right: 190, top: 100, bottom: 200, height: 100 },
+    tooltipRect: { width: 220, height: 40 }, pointerY: 150,
+    viewportWidth: 200, viewportHeight: 400
+});
+assert.equal(clampedPosition.left, 10);
+const focusPosition = positionSandbox.position({
+    anchorRect: { left: 100, right: 200, top: -100, bottom: 100, height: 200 },
+    tooltipRect: { width: 80, height: 40 }, pointerY: null,
+    viewportWidth: 500, viewportHeight: 400
+});
+assert.equal(focusPosition.top, 35);
 assert.match(tooltipSource, /container\.addEventListener\('mouseover'/);
+assert.match(tooltipSource, /showWeeklyHrStage1Tooltip\(target, event\.clientY\)/);
+assert.match(tooltipSource, /container\.addEventListener\('mousemove'/);
+assert.match(tooltipSource, /updateWeeklyHrStage1TooltipPointerY\(event\.clientY\)/);
+const pointerMoveSource = tooltipSource.match(
+    /function updateWeeklyHrStage1TooltipPointerY\([\s\S]*?\n\}/)?.[0] || '';
+assert.match(pointerMoveSource, /tooltip\.style\.top/);
+assert.doesNotMatch(pointerMoveSource, /tooltip\.style\.left/);
 assert.match(tooltipSource, /container\.addEventListener\('mouseout'/);
 assert.match(tooltipSource, /container\.addEventListener\('focusin'/);
+assert.match(tooltipSource, /showWeeklyHrStage1Tooltip\(target\);/);
 assert.match(tooltipSource, /container\.addEventListener\('focusout'/);
 assert.match(tooltipSource,
     /window\.addEventListener\('scroll', hideWeeklyHrStage1Tooltip, true\)/);

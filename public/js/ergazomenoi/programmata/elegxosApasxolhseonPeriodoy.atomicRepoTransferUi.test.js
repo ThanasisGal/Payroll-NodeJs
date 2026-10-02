@@ -391,7 +391,8 @@ function testPossibleLeaveResolverAndModalPresentationContract() {
         [{ cards_apo_ora_01: '14:51', cards_eos_ora_01: '' }, 'ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ'],
         [{ cards_apo_ora_01: '', cards_eos_ora_01: '22:51' }, 'ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ'],
         [{ cards_apo_ora_01: 'invalid', cards_eos_ora_01: '' }, 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ'],
-        [{ cards_apo_ora_01: '14:51', cards_eos_ora_01: '14:51' }, 'ΜΗ ΕΓΚΥΡΟ ΣΤΟΙΧΕΙΟ ΚΑΡΤΑΣ']
+        [{ cards_apo_ora_01: '14:51', cards_eos_ora_01: '14:51' },
+            'ΜΗ ΕΓΚΥΡΟ ΜΗΔΕΝΙΚΟ ΔΙΑΣΤΗΜΑ ΚΑΡΤΑΣ']
     ].forEach(([cardEvidence, expectedStatus]) => {
         const unsafeRow = { ...derivedRow, ...cardEvidence };
         assert.strictEqual(

@@ -918,6 +918,15 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
             reasons: ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION',
                 ...rowInfos.flatMap((info) => [...sourceExclusions(info), ...targetExclusions(info)])] });
     }
+    const unresolvedZeroLength = rows.some((row) =>
+        row.zero_length_card_resolution?.status !== 'HR_APPROVED' &&
+        resolveCardPairVerification(row).unresolvedPairs.some((pair) =>
+            pair.state === CARD_PAIR_STATE.ZERO_LENGTH));
+    if (unresolvedZeroLength) {
+        return buildResult({ ...base, status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION',
+                ...rowInfos.flatMap((info) => [...sourceExclusions(info), ...targetExclusions(info)])] });
+    }
     const preTransferActualWorkDays = preTransferFacts.filter(
         (facts) => facts.countsAsActualWorkDay && (facts.reasons || []).length === 0
     ).length;

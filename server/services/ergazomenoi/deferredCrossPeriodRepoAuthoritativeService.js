@@ -45,7 +45,8 @@ function assessAnalysis(analysis) {
     const noValidTargetReason = (analysis.reasons || []).some((reason) =>
         String(reason).startsWith('NO_TARGET') || String(reason).startsWith('TARGET_') ||
         reason === 'SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN' ||
-        reason === 'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION');
+        reason === 'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION' ||
+        reason === 'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION');
     const noValidTarget = candidates.target_candidates.length === 0 && noValidTargetReason &&
         (hasSource || (analysis.reasons || []).includes('SEVEN_ACTUAL_WORK_DAYS_REPO_TRANSFER_FORBIDDEN'));
     return { requirement_status: crossPairs.length ? REQUIREMENT_STATUS.REQUIRED :

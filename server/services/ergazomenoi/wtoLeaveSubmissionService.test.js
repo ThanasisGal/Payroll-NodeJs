@@ -40,10 +40,10 @@ assert.equal(buildWtoLeaveCanonicalDataset({ sourceRows: [row('2026-08-10')],
 'η υπάρχουσα lending-side εξαίρεση διατηρείται ανεξάρτητα από την κάρτα');
 
 const sicknessRow = row('2026-08-11', { adeia_apologistika: false,
-    astheneia_apologistika: true, kathgoria_adeias_apologistika: 'ΑΔΑΣ' });
+    astheneia_apologistika: true, kathgoria_adeias_apologistika: 'ΑΔΑΝΕΥΑΠ' });
 assert.deepStrictEqual(candidateKind(sicknessRow), {
-    kind: 'full_day', type: 'ΑΔΑΣ', intervals: []
-}, 'η canonical ασθένεια είναι ολοήμερο WTOLeave candidate');
+    kind: 'full_day', type: 'ΑΔΑΝΕΥΑΠ', intervals: []
+}, 'η canonical ασθένεια χρησιμοποιεί την επιλεγμένη κατηγορία HR');
 const sicknessResult = buildWtoLeaveCanonicalDataset({ sourceRows: [sicknessRow],
     employees: [employee()] });
 assert.equal(sicknessResult.rows.length, 1);
@@ -51,8 +51,8 @@ const sicknessAnalytics = buildWtoLeavePayload({ canonicalRows: sicknessResult.r
     branch: '0001' }).WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0]
     .ErgazomenosAnalytics.ErgazomenosWTOAnalytics[0];
 assert.deepStrictEqual(sicknessAnalytics, {
-    f_type: 'ΑΔΑΣ', f_from: '', f_to: '', f_year: '', f_req_days: ''
-}, 'η ασθένεια διατηρεί τον ακριβή τύπο χωρίς ώρες ή στοιχεία entitlement ΑΔΚΑΝ');
+    f_type: 'ΑΔΑΝΕΥΑΠ', f_from: '', f_to: '', f_year: '', f_req_days: ''
+}, 'η ασθένεια διατηρεί τον επιλεγμένο τύπο χωρίς hard-coded ΑΔΑΣ');
 
 const weekendAn = row('2026-08-09', { adeia_apologistika: false,
     astheneia_apologistika: false, kathgoria_adeias_apologistika: '',
