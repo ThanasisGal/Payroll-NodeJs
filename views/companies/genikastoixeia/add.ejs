@@ -23,7 +23,7 @@
 
                         <%- include('../../partials/_csrfField') %>
 
-                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
+                        <div id="companyAddFixedDetailsCard" class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
 
                             <%- include('./partials/add/cardHeader') %>
                       
@@ -169,6 +169,7 @@
 
     <script src="<%= script('companies/genikastoixeia/getFieldValues') %>"></script>
     <script src="<%= script('companies/genikastoixeia/loadDropdowns_add') %>"></script>
+    <script src="<%= script('companies/genikastoixeia/addFixedDetailsLayout') %>"></script>
     <script src="<%= script('common/checkAfm') %>"></script>
     
     <script src="<%= script('companies/genikastoixeia/dropdownsValue') %>"></script>
