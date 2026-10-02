@@ -752,6 +752,7 @@ declare -a admin_files=(
 )
 
 declare -a companies=(
+    "public/js/companies/genikastoixeia/addFixedDetailsLayout.js"
     "public/js/companies/genikastoixeia/dropdownsValue.js"
     "public/js/companies/genikastoixeia/getFieldValues.js"
     "public/js/companies/genikastoixeia/loadDropdowns_add.js"
