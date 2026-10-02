@@ -16061,27 +16061,27 @@ body.loader-active > *:not(.app-loader) {
     background: #fff8db;
 }
 
-.weekly-hr-stage1-tooltip {
-    --bs-tooltip-bg: #fff4bf;
-    --bs-tooltip-color: #352b08;
-    --bs-tooltip-opacity: 1;
-    --bs-tooltip-max-width: 24rem;
-}
-
-.weekly-hr-stage1-tooltip .tooltip-inner {
+.weekly-hr-stage1-help-tooltip {
+    position: fixed;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    top: -9999px;
+    left: -9999px;
+    z-index: 1100;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(24rem, calc(100vw - 20px));
     padding: 0.5rem 0.65rem;
+    color: #352b08;
+    background: #fff4bf;
     border: 1px solid #e3cc73;
     border-radius: 0.35rem;
     box-shadow: 0 0.2rem 0.55rem rgba(73, 57, 8, 0.16);
+    font-size: 0.875rem;
+    line-height: 1.35;
+    white-space: normal;
     text-align: left;
-}
-
-.weekly-hr-stage1-tooltip.bs-tooltip-top .tooltip-arrow::before {
-    border-top-color: #e3cc73;
-}
-
-.weekly-hr-stage1-tooltip.bs-tooltip-bottom .tooltip-arrow::before {
-    border-bottom-color: #e3cc73;
 }
 
 .employment-review-boundary-sides {
