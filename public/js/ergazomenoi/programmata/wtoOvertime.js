@@ -12,11 +12,15 @@
     const status = document.getElementById('wtoOvertimeStatus');
     const summary = document.getElementById('wtoOvertimeSummary');
     const rowsBody = document.getElementById('wtoOvertimeRows');
+    const helpTooltip = document.getElementById('wtoOvertimeHelpTooltip');
     const canExport = app.dataset.canExport === 'true';
     const excessTooltipText = 'Η απολογιστική νόμιμη υπερωρία της ημέρας υπερβαίνει τις 3 ώρες. Στην αυτόματη υποβολή θα συμπεριληφθούν έως 3 ώρες. Ο επιπλέον χρόνος δεν περιλαμβάνεται στην αυτόματη υποβολή.';
     let validPreview = null;
     let inputRevision = 0;
     let layoutFrame = null;
+    let hoveredTooltipTarget = null;
+    let focusedTooltipTarget = null;
+    let activeTooltipTarget = null;
 
     function syncCardHeight() {
         if (!card) return;
@@ -70,27 +74,56 @@
         previewButton.disabled = busy;
         submitButton.disabled = busy || !validPreview || !canExport;
     }
-    function initializeStatusTooltips() {
-        if (!window.bootstrap?.Tooltip) return;
-        rowsBody.querySelectorAll('[data-wto-overtime-tooltip]')
-            .forEach((element) => window.bootstrap.Tooltip.getOrCreateInstance(element, {
-                title: () => element.dataset.wtoOvertimeTooltip || '',
-                customClass: 'wto-overtime-tooltip',
-                trigger: 'hover focus',
-                placement: 'top',
-                container: 'body'
-            }));
+    function tooltipTarget(node) {
+        const target = node?.closest?.('[data-wto-overtime-tooltip]');
+        return target && rowsBody.contains(target) ? target : null;
     }
-    function disposeStatusTooltips() {
-        if (!window.bootstrap?.Tooltip) return;
-        rowsBody.querySelectorAll('[data-wto-overtime-tooltip]')
-            .forEach((element) => window.bootstrap.Tooltip.getInstance(element)?.dispose());
+    function hideHelpTooltip() {
+        if (!helpTooltip) return;
+        activeTooltipTarget?.removeAttribute('aria-describedby');
+        activeTooltipTarget = null;
+        helpTooltip.style.visibility = 'hidden';
+        helpTooltip.style.opacity = '0';
+        helpTooltip.style.top = '-9999px';
+        helpTooltip.style.left = '-9999px';
+    }
+    function showHelpTooltip(target) {
+        if (!helpTooltip || !target) return;
+        const text = target.dataset.wtoOvertimeTooltip || '';
+        if (!text) return;
+
+        hideHelpTooltip();
+        helpTooltip.textContent = text;
+        helpTooltip.style.top = '0px';
+        helpTooltip.style.left = '0px';
+
+        const viewportPadding = 10;
+        const gap = 8;
+        const targetRect = target.getBoundingClientRect();
+        const tooltipRect = helpTooltip.getBoundingClientRect();
+        const maximumLeft = Math.max(viewportPadding,
+            window.innerWidth - tooltipRect.width - viewportPadding);
+        const finalLeft = Math.min(maximumLeft, Math.max(viewportPadding,
+            targetRect.left + targetRect.width / 2 - tooltipRect.width / 2));
+        const preferredTop = targetRect.top - tooltipRect.height - gap;
+        const bottomTop = targetRect.bottom + gap;
+        const maximumTop = Math.max(viewportPadding,
+            window.innerHeight - tooltipRect.height - viewportPadding);
+        const finalTop = Math.min(maximumTop, Math.max(viewportPadding,
+            preferredTop >= viewportPadding ? preferredTop : bottomTop));
+
+        helpTooltip.style.top = `${Math.round(finalTop)}px`;
+        helpTooltip.style.left = `${Math.round(finalLeft)}px`;
+        activeTooltipTarget = target;
+        target.setAttribute('aria-describedby', helpTooltip.id);
+        helpTooltip.style.visibility = 'visible';
+        helpTooltip.style.opacity = '1';
     }
     function renderSubmissionRow(row) {
         const requiresAttention = Number(row.excess_minutes) > 0;
         const statusCell = requiresAttention
             ? `<td class="wto-overtime-status-attention fw-semibold" tabindex="0"
-                data-bs-toggle="tooltip" data-wto-overtime-tooltip="${escapeHtml(excessTooltipText)}">ΠΡΟΣΟΧΗ</td>`
+                data-wto-overtime-tooltip="${escapeHtml(excessTooltipText)}">ΠΡΟΣΟΧΗ</td>`
             : '<td class="text-success fw-semibold">ΕΤΟΙΜΟ</td>';
         return `<tr>
             <td>${escapeHtml(row.employee_code)}</td><td>${escapeHtml(row.afm)}</td>
@@ -105,7 +138,7 @@
             <td>${escapeHtml(item.employee_code || '—')}</td><td>—</td><td>—</td>
             <td>${escapeHtml(formatGreekDate(item.date || ''))}</td>
             <td>—</td><td>—</td><td>—</td><td>—</td>
-            <td class="text-danger fw-semibold" tabindex="0" data-bs-toggle="tooltip"
+            <td class="text-danger fw-semibold" tabindex="0"
                 data-wto-overtime-tooltip="${escapeHtml(item.message || '')}">ΑΠΑΙΤΕΙ ΕΛΕΓΧΟ</td>
         </tr>`;
     }
@@ -114,14 +147,15 @@
         document.getElementById('wtoOvertimeEmployeeCount').textContent = data.employee_count;
         document.getElementById('wtoOvertimeDayCount').textContent = data.employee_day_count;
         document.getElementById('wtoOvertimeSubmittedTotal').textContent = formatMinutes(data.total_submitted_overtime_minutes);
-        disposeStatusTooltips();
+        hoveredTooltipTarget = null;
+        focusedTooltipTarget = null;
+        hideHelpTooltip();
         const visibleRows = [
             ...(Array.isArray(data.rows) ? data.rows.map(renderSubmissionRow) : []),
             ...(Array.isArray(data.blockers) ? data.blockers.map(renderBlockingRow) : [])
         ];
         rowsBody.innerHTML = visibleRows.length ? visibleRows.join('') :
             '<tr><td colspan="9" class="text-center text-muted">Δεν βρέθηκαν υποβλητέες νόμιμες υπερωρίες.</td></tr>';
-        initializeStatusTooltips();
         validPreview = data.submission_eligible && data.parity?.exact ? data : null;
         submitButton.disabled = !validPreview || !canExport;
         status.className = validPreview ? (data.warning_count ? 'alert alert-warning mt-3 mb-0' :
@@ -134,6 +168,35 @@
             : data.blocker_count ? 'Η προεπισκόπηση δεν μπορεί να υποβληθεί ακόμη.\nΕλέγξτε τις γραμμές με ένδειξη στη στήλη «Κατάσταση».'
                 : 'Δεν υπάρχουν υποβλητέες νόμιμες υπερωρίες στο επιλεγμένο φίλτρο.';
     }
+    rowsBody.addEventListener('mouseover', (event) => {
+        const target = tooltipTarget(event.target);
+        if (!target || target.contains(event.relatedTarget)) return;
+        hoveredTooltipTarget = target;
+        showHelpTooltip(target);
+    });
+    rowsBody.addEventListener('mouseout', (event) => {
+        const target = tooltipTarget(event.target);
+        if (!target || target.contains(event.relatedTarget)) return;
+        if (hoveredTooltipTarget === target) hoveredTooltipTarget = null;
+        if (focusedTooltipTarget !== target) hideHelpTooltip();
+    });
+    rowsBody.addEventListener('focusin', (event) => {
+        const target = tooltipTarget(event.target);
+        if (!target) return;
+        focusedTooltipTarget = target;
+        showHelpTooltip(target);
+    });
+    rowsBody.addEventListener('focusout', (event) => {
+        const target = tooltipTarget(event.target);
+        if (!target || target.contains(event.relatedTarget)) return;
+        if (focusedTooltipTarget === target) focusedTooltipTarget = null;
+        if (hoveredTooltipTarget !== target) hideHelpTooltip();
+    });
+    window.addEventListener('scroll', hideHelpTooltip, true);
+    window.addEventListener('resize', hideHelpTooltip);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') hideHelpTooltip();
+    });
     async function requestJson(url, body) {
         const response = await fetch(url, { method: 'POST', headers: csrfHeaders(),
             credentials: 'same-origin', body: JSON.stringify(body) });

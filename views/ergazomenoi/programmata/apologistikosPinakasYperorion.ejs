@@ -12,9 +12,25 @@
         border: 1px solid #e5cf78 !important;
         cursor: help;
     }
-    .wto-overtime-tooltip .tooltip-inner {
+    .wto-overtime-help-tooltip {
+        position: fixed;
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+        top: -9999px;
+        left: -9999px;
+        z-index: 1080;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
         max-width: 28rem;
         white-space: normal;
+        color: #212529;
+        background: #fff8db;
+        border: 1px solid #e5cf78;
+        border-radius: 0.25rem;
+        box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.18);
+        font-size: 0.875rem;
+        line-height: 1.4;
     }
 </style>
 <section class="container-fluid px-4" id="wtoOvertimeApp"
@@ -89,6 +105,8 @@
     </div>
     </form>
 </section>
+
+<div id="wtoOvertimeHelpTooltip" class="wto-overtime-help-tooltip" role="tooltip"></div>
 
 <script src="<%= script('ergazomenoi/genika/erganiRestSubmissionUi') %>"></script>
 <script nonce="<%= nonce %>" src="<%= script('ergazomenoi/programmata/wtoOvertime.js') %>"></script>

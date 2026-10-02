@@ -60,11 +60,30 @@ const exactTooltip = 'Η απολογιστική νόμιμη υπερωρία 
     'Στην αυτόματη υποβολή θα συμπεριληφθούν έως 3 ώρες. ' +
     'Ο επιπλέον χρόνος δεν περιλαμβάνεται στην αυτόματη υποβολή.';
 assert.ok(script.includes(exactTooltip));
-assert.match(script, /data-bs-toggle="tooltip" data-wto-overtime-tooltip=/);
-assert.match(script, /bootstrap\.Tooltip\.getOrCreateInstance/);
-assert.match(script, /trigger:\s*'hover focus'/);
-assert.match(script, /customClass:\s*'wto-overtime-tooltip'/);
-assert.match(view, /\.wto-overtime-tooltip \.tooltip-inner\s*\{[\s\S]*?max-width:\s*28rem/);
+assert.doesNotMatch(script, /data-bs-toggle="tooltip"/);
+assert.doesNotMatch(script, /bootstrap\.Tooltip|Popper|getOrCreateInstance|getInstance/);
+assert.equal((view.match(/id="wtoOvertimeHelpTooltip"/g) || []).length, 1);
+assert.match(view, /id="wtoOvertimeHelpTooltip" class="wto-overtime-help-tooltip" role="tooltip"/);
+assert.match(view, /\.wto-overtime-help-tooltip\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?visibility:\s*hidden;[\s\S]*?opacity:\s*0;[\s\S]*?pointer-events:\s*none;[\s\S]*?top:\s*-9999px;[\s\S]*?left:\s*-9999px;[\s\S]*?z-index:\s*1080;/);
+assert.match(view, /\.wto-overtime-help-tooltip\s*\{[\s\S]*?max-width:\s*28rem;[\s\S]*?white-space:\s*normal;[\s\S]*?background:\s*#fff8db;[\s\S]*?border:\s*1px solid #e5cf78;/);
+const showTooltip = script.slice(script.indexOf('function showHelpTooltip'),
+    script.indexOf('function renderSubmissionRow'));
+assert.ok(showTooltip.indexOf('getBoundingClientRect()') < showTooltip.indexOf('const finalLeft'));
+assert.ok(showTooltip.indexOf('const finalLeft') < showTooltip.indexOf('helpTooltip.style.top = `${Math.round(finalTop)}px`'));
+assert.ok(showTooltip.indexOf('helpTooltip.style.top = `${Math.round(finalTop)}px`') <
+    showTooltip.indexOf("helpTooltip.style.visibility = 'visible'"));
+assert.ok(showTooltip.indexOf('helpTooltip.style.left = `${Math.round(finalLeft)}px`') <
+    showTooltip.indexOf("helpTooltip.style.visibility = 'visible'"));
+assert.match(showTooltip, /Math\.min\(maximumLeft, Math\.max\(viewportPadding/);
+assert.match(showTooltip, /preferredTop >= viewportPadding \? preferredTop : bottomTop/);
+assert.match(script, /rowsBody\.addEventListener\('mouseover'/);
+assert.match(script, /rowsBody\.addEventListener\('mouseout'/);
+assert.match(script, /rowsBody\.addEventListener\('focusin'/);
+assert.match(script, /rowsBody\.addEventListener\('focusout'/);
+assert.match(script, /window\.addEventListener\('scroll', hideHelpTooltip, true\)/);
+assert.match(script, /window\.addEventListener\('resize', hideHelpTooltip\)/);
+assert.match(script, /event\.key === 'Escape'/);
+assert.match(script, /data-wto-overtime-tooltip="\$\{escapeHtml\(item\.message \|\| ''\)\}"/);
 assert.ok(!/(?:onclick|onmouseover|onmouseenter|onfocus)\s*=/.test(`${view}\n${script}`));
 
 assert.ok(script.includes('Η προεπισκόπηση είναι έτοιμη για υποβολή στο ΕΡΓΑΝΗ.'));
