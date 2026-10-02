@@ -40,6 +40,26 @@
 
     <div class="row form-group g-3 align-items-center mb-0-5">
         <div class="col-1-5 right-align">
+            <label for="companyTeam" class="col-form-label label-font-size field-required">
+                Ομάδα Εργασίας
+            </label>
+        </div>
+        <div class="col-3">
+            <input
+                type="text"
+                name="companyTeam"
+                id="companyTeam"
+                class="form-control input-contents"
+                value="<%= canManageAllTeams ? '' : managedTeam %>"
+                <%= canManageAllTeams ? '' : 'readonly' %>
+                autocomplete="off"
+                required
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
             <label
                 for="fatherName"
                 class="col-form-label label-font-size">

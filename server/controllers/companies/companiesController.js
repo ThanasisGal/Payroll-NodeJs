@@ -15,6 +15,11 @@ const {
     normalizeCompanyUpdatePayload
 } = require('../../services/companies/companyUpdateNormalization');
 const { presentCompanyForEdit } = require('../../services/companies/companyEditPresentation');
+const {
+    buildManagedUserFilter,
+    canManageAllUserTeams,
+    normalizeRequiredUserTeam
+} = require('../../services/userTeamScopeService');
 
 const { ParamModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
@@ -363,13 +368,16 @@ class companiesController {
     static addCompanyForm = async (req, res) => {
         const locals = { title: 'Προσθήκη Νέας Εταιρείας', description: 'Web Payroll Solutions' };
         try {
+            const managedTeam = normalizeRequiredUserTeam(req.session?.userTeam);
             const data = await PerifereiesModel.find().sort('kodikos');
             res.render('companies/genikastoixeia/add', {
                 locals,
                 data,
                 mode: 'add',
                 context: 'company',
-                rec: {}
+                rec: {},
+                managedTeam,
+                canManageAllTeams: canManageAllUserTeams(managedTeam)
             });
         } catch (error) {
             console.error(error);
@@ -782,11 +790,19 @@ class companiesController {
 
     static getAllUsersByTeam = async (req, res) => {
         try {
-            const companyTeam = req.params.companyTeam;
-            const user = await UserModel.find({ team: companyTeam });
-            res.json(user);
+            const authenticatedTeam = normalizeRequiredUserTeam(req.authenticatedUserTeam);
+            const companyTeam = normalizeRequiredUserTeam(req.params.companyTeam);
+            if (!canManageAllUserTeams(authenticatedTeam) && companyTeam !== authenticatedTeam) {
+                return res.status(404).json([]);
+            }
+            const users = await UserModel.find(buildManagedUserFilter(companyTeam))
+                .select('_id lastName firstName team')
+                .lean();
+            return res.json(users);
         } catch (error) {
-            res.json([]);
+            if (error?.code === 'INVALID_TEAM_SCOPE') return res.status(404).json([]);
+            console.error('Αποτυχία φόρτωσης χρηστών ομάδας:', error);
+            return res.status(500).json([]);
         }
     };
 

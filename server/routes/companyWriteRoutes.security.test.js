@@ -6,6 +6,10 @@ const source = fs.readFileSync(path.join(__dirname, 'usersRoute.js'), 'utf8');
 
 const expectedChains = [
     [
+        'GET /api/allUsersByTeam/:companyTeam',
+        /router\.get\(\s*'\/api\/allUsersByTeam\/:companyTeam',\s*requireUserPrivilegeAction\('Companies', 'create'\),\s*companiesController\.getAllUsersByTeam/s
+    ],
+    [
         'POST /companies/genikastoixeia/add',
         /router\.post\(\s*'\/companies\/genikastoixeia\/add',\s*requireUserPrivilegeAction\('Companies', 'create'\),\s*authorizeCompanyCreate,\s*companiesController\.postCompanyForm/s
     ],
