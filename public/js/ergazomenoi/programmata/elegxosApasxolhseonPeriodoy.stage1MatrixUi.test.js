@@ -8,6 +8,8 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname,
     'elegxosApasxolhseonPeriodoy.js'), 'utf8');
 const css = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
+const view = fs.readFileSync(path.join(__dirname,
+    '../../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
 
 const helpersSource = source.slice(source.indexOf('function stage1ClassificationForRow'),
     source.indexOf('async function loadWeeklyHrLeaveCategories'));
@@ -133,7 +135,7 @@ assert.match(contextCell, /επόμενη περίοδο/);
 assert.match(contextCell, /<strong>ΑΔΕΙΑ<\/strong>/);
 assert.doesNotMatch(contextCell, /weekly-hr-stage1-day-classification/);
 assert.doesNotMatch(contextCell, /Πληροφοριακά|Πλαίσιο/);
-assert.equal((contextCell.match(/data-bs-toggle="tooltip"/g) || []).length, 1);
+assert.doesNotMatch(contextCell, /data-bs-toggle="tooltip"/);
 assert.equal((contextCell.match(/data-stage1-tooltip=/g) || []).length, 1);
 assert.doesNotMatch(contextCell, /data-bs-title=|\stitle=/);
 const previousContext = sandbox.helpers.stage1ContextPeriodPresentation(payload, '2026-07-31');
@@ -181,10 +183,59 @@ assert.match(source, /window\.addEventListener\?\.\('resize', refreshEmploymentR
 assert.doesNotMatch(css.match(/\.weekly-hr-stage1-table\s*\{[^}]*\}/)?.[0] || '',
     /min-width/);
 assert.doesNotMatch(css, /weekly-hr-stage1-table[^\n]*nth-child[\s\S]*?left:/);
-assert.match(source, /bootstrap\.Tooltip\.getOrCreateInstance/);
-assert.match(source, /bootstrap\.Tooltip\.getInstance\(element\)\?\.dispose\(\)/);
-assert.match(source, /\.tooltip\.weekly-hr-stage1-tooltip/);
-assert.match(css, /\.weekly-hr-stage1-tooltip\s*\{[\s\S]*?--bs-tooltip-bg:\s*#fff4bf/);
+assert.doesNotMatch(source, /bootstrap\.Tooltip/);
+assert.doesNotMatch(source, /getOrCreateInstance\([^)]*Tooltip/);
+assert.doesNotMatch(source, /getInstance\(element\)\?\.dispose\(\)/);
+assert.match(source, /data-stage1-tooltip=/);
+assert.doesNotMatch(source, /data-bs-toggle="tooltip"/);
+assert.doesNotMatch(source, /data-bs-custom-class="weekly-hr-stage1-tooltip"/);
+assert.strictEqual((view.match(/id="weeklyHrStage1HelpTooltip"/g) || []).length, 1);
+
+const tooltipCss = css.match(/\.weekly-hr-stage1-help-tooltip\s*\{[\s\S]*?\n\}/)?.[0] || '';
+for (const property of [
+    /position:\s*fixed/,
+    /visibility:\s*hidden/,
+    /opacity:\s*0/,
+    /pointer-events:\s*none/,
+    /top:\s*-9999px/,
+    /left:\s*-9999px/
+]) assert.match(tooltipCss, property);
+assert.doesNotMatch(css, /\.weekly-hr-stage1-tooltip(?:\s|\.|\{)/);
+assert.doesNotMatch(tooltipCss, /--bs-tooltip-/);
+
+const tooltipSource = source.slice(source.indexOf('function stage1TooltipTarget'),
+    source.indexOf('function cleanupWeeklyHrStage1BulkDropdownPortal'));
+const showTooltipSource = tooltipSource.match(
+    /function showWeeklyHrStage1Tooltip\([\s\S]*?\n\}/)?.[0] || '';
+const targetRectIndex = showTooltipSource.indexOf('target.getBoundingClientRect()');
+const tooltipRectIndex = showTooltipSource.indexOf('tooltip.getBoundingClientRect()');
+const finalLeftCalculationIndex = showTooltipSource.indexOf('const finalLeft');
+const finalTopCalculationIndex = showTooltipSource.indexOf('const finalTop');
+const finalTopWriteIndex = showTooltipSource.indexOf('tooltip.style.top = `${Math.round(finalTop)}px`');
+const finalLeftWriteIndex = showTooltipSource.indexOf('tooltip.style.left = `${Math.round(finalLeft)}px`');
+const visibleIndex = showTooltipSource.indexOf("tooltip.style.visibility = 'visible'");
+const opaqueIndex = showTooltipSource.indexOf("tooltip.style.opacity = '1'");
+assert.ok(targetRectIndex >= 0 && targetRectIndex < finalLeftCalculationIndex);
+assert.ok(tooltipRectIndex >= 0 && tooltipRectIndex < finalLeftCalculationIndex);
+assert.ok(finalLeftCalculationIndex < finalLeftWriteIndex);
+assert.ok(finalTopCalculationIndex < finalTopWriteIndex);
+assert.ok(finalTopWriteIndex < visibleIndex);
+assert.ok(finalLeftWriteIndex < visibleIndex);
+assert.ok(finalLeftWriteIndex < opaqueIndex);
+assert.match(showTooltipSource, /Math\.min\(maximumLeft, Math\.max\(viewportPadding/);
+assert.match(showTooltipSource, /Math\.min\(maximumTop, Math\.max\(viewportPadding/);
+assert.match(showTooltipSource, /preferredTop >= viewportPadding \? preferredTop : bottomTop/);
+assert.match(tooltipSource, /container\.addEventListener\('mouseover'/);
+assert.match(tooltipSource, /container\.addEventListener\('mouseout'/);
+assert.match(tooltipSource, /container\.addEventListener\('focusin'/);
+assert.match(tooltipSource, /container\.addEventListener\('focusout'/);
+assert.match(tooltipSource,
+    /window\.addEventListener\('scroll', hideWeeklyHrStage1Tooltip, true\)/);
+assert.match(tooltipSource,
+    /window\.addEventListener\('resize', hideWeeklyHrStage1Tooltip\)/);
+assert.match(tooltipSource, /event\.key === 'Escape'[\s\S]*?hideWeeklyHrStage1Tooltip\(\)/);
+assert.match(tooltipSource,
+    /container\.dataset\.stage1TooltipDelegated === 'true'[\s\S]*?stage1TooltipDelegated = 'true'/);
 assert.match(css, /\.employment-review-attention-summary\s*\{[\s\S]*?display:\s*none !important/);
 assert.match(drawer, /weekly-hr-stage1-editor-prev/);
 assert.match(drawer, /weekly-hr-stage1-editor-next/);

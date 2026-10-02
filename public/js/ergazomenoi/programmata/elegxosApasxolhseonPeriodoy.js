@@ -368,6 +368,9 @@ let weeklyHrStage1DaySaving = false;
 let weeklyHrStage1EditorRowId = '';
 let weeklyHrStage1AttentionTooltip = '';
 let weeklyHrStage1BulkDropdownPortal = null;
+let weeklyHrStage1HoveredTooltipTarget = null;
+let weeklyHrStage1FocusedTooltipTarget = null;
+let weeklyHrStage1ActiveTooltipTarget = null;
 const stage1DisplayFilters = {
     employeeQuery: '',
     status: 'ALL',
@@ -11159,7 +11162,7 @@ function renderWeeklyHrStage1BulkToolbar() {
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterAbsence" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="absence" ${stage1DisplayFilters.absence ? 'checked' : ''}><span class="form-check-label">Απουσίες</span></label>
             </span>
             <span class="weekly-hr-stage1-counts text-muted"><span>Εκκρεμότητες: <strong>${counts.needsAction}</strong></span><span>Εμφανιζόμενες εβδομάδες: <strong id="weeklyHrStage1VisibleCount">${counts.visible}</strong></span><span>Επιλεγμένες εβδομάδες: <strong id="weeklyHrStage1SelectedCount">${counts.selected}</strong></span><span>Επιλεγμένες ημέρες: <strong>${counts.selectedDays}</strong></span><span>Μη αποθηκευμένες αλλαγές: <strong>${counts.drafts}</strong></span></span>
-            ${weeklyHrStage1AttentionTooltip ? `<button type="button" class="btn btn-sm weekly-hr-stage1-info-trigger" aria-label="Πληροφορίες Σταδίου 1" data-bs-toggle="tooltip" data-bs-custom-class="weekly-hr-stage1-tooltip" data-stage1-tooltip="${escapeHtml(weeklyHrStage1AttentionTooltip)}">ⓘ</button>` : ''}
+            ${weeklyHrStage1AttentionTooltip ? `<button type="button" class="btn btn-sm weekly-hr-stage1-info-trigger" aria-label="Πληροφορίες Σταδίου 1" data-stage1-tooltip="${escapeHtml(weeklyHrStage1AttentionTooltip)}">ⓘ</button>` : ''}
         </div>
         <div class="d-flex flex-wrap gap-1 align-items-center mt-1 pt-1 border-top weekly-hr-legacy-bulk-controls weekly-hr-day-bulk-toolbar">
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-select-all">Επιλογή όλων</button>
@@ -11172,7 +11175,7 @@ function renderWeeklyHrStage1BulkToolbar() {
             </div>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-success weekly-hr-save-day-classifications" ${weeklyHrStage1DayDrafts.size && !weeklyHrStage1DaySaving ? '' : 'disabled aria-disabled="true"'}>Αποθήκευση ${counts.drafts} ${counts.drafts === 1 ? 'αλλαγής' : 'αλλαγών'}</button>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-success weekly-hr-bulk-complete" ${disabled ? 'disabled aria-disabled="true"' : ''}>Μαζική ολοκλήρωση</button>
-            ${counts.selectedDrafts ? `<span class="small text-warning-emphasis weekly-hr-stage1-draft-warning" tabindex="0" data-bs-toggle="tooltip" data-bs-custom-class="weekly-hr-stage1-tooltip" data-stage1-tooltip="Αποθηκεύστε τους χαρακτηρισμούς πριν από τη μαζική ολοκλήρωση.">⚠ ${counts.selectedDrafts} μη αποθηκευμέν${counts.selectedDrafts === 1 ? 'η αλλαγή' : 'ες αλλαγές'}</span>` : ''}
+            ${counts.selectedDrafts ? `<span class="small text-warning-emphasis weekly-hr-stage1-draft-warning" tabindex="0" data-stage1-tooltip="Αποθηκεύστε τους χαρακτηρισμούς πριν από τη μαζική ολοκλήρωση.">⚠ ${counts.selectedDrafts} μη αποθηκευμέν${counts.selectedDrafts === 1 ? 'η αλλαγή' : 'ες αλλαγές'}</span>` : ''}
             <span class="small weekly-hr-bulk-progress">${weeklyHrStage1BulkSubmitting ? 'Ολοκλήρωση...' : ''}</span>
             <span class="small weekly-hr-day-save-progress">${weeklyHrStage1DaySaving ? 'Η αποθήκευση βρίσκεται σε εξέλιξη...' : ''}</span>
         </div></div></div>`;
@@ -11182,30 +11185,109 @@ function updateWeeklyHrStage1BulkToolbar() {
     const container = document.getElementById('weeklyHrStage1Container');
     const toolbar = container?.querySelector('.weekly-hr-stage1-bulk-toolbar');
     if (toolbar) {
-        disposeWeeklyHrStage1Tooltips(toolbar);
+        resetWeeklyHrStage1TooltipInteraction();
         cleanupWeeklyHrStage1BulkDropdownPortal();
         toolbar.outerHTML = renderWeeklyHrStage1BulkToolbar();
-        initializeWeeklyHrStage1Tooltips(container);
         initializeWeeklyHrStage1BulkDropdownPortal(container);
     }
 }
 
-function initializeWeeklyHrStage1Tooltips(root = document) {
-    if (!window.bootstrap?.Tooltip) return;
-    root.querySelectorAll('[data-bs-toggle="tooltip"][data-stage1-tooltip]')
-        .forEach((element) => bootstrap.Tooltip.getOrCreateInstance(element, {
-            title: () => element.dataset.stage1Tooltip || '',
-            customClass: 'weekly-hr-stage1-tooltip',
-            trigger: 'hover focus', placement: 'top', container: 'body'
-        }));
+function stage1TooltipTarget(node) {
+    const container = document.getElementById('weeklyHrStage1Container');
+    const target = node?.closest?.('[data-stage1-tooltip]');
+    return target && container?.contains(target) ? target : null;
 }
 
-function disposeWeeklyHrStage1Tooltips(root = document) {
-    if (window.bootstrap?.Tooltip) {
-        root.querySelectorAll('[data-bs-toggle="tooltip"][data-stage1-tooltip]')
-            .forEach((element) => bootstrap.Tooltip.getInstance(element)?.dispose());
-    }
-    document.body.querySelectorAll('.tooltip.weekly-hr-stage1-tooltip').forEach((tip) => tip.remove());
+function hideWeeklyHrStage1Tooltip() {
+    const tooltip = document.getElementById('weeklyHrStage1HelpTooltip');
+    weeklyHrStage1ActiveTooltipTarget?.removeAttribute('aria-describedby');
+    weeklyHrStage1ActiveTooltipTarget = null;
+    if (!tooltip) return;
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.opacity = '0';
+    tooltip.style.top = '-9999px';
+    tooltip.style.left = '-9999px';
+}
+
+function resetWeeklyHrStage1TooltipInteraction() {
+    weeklyHrStage1HoveredTooltipTarget = null;
+    weeklyHrStage1FocusedTooltipTarget = null;
+    hideWeeklyHrStage1Tooltip();
+}
+
+function showWeeklyHrStage1Tooltip(target) {
+    const tooltip = document.getElementById('weeklyHrStage1HelpTooltip');
+    const text = target?.dataset?.stage1Tooltip || '';
+    if (!tooltip || !target || !text) return;
+
+    hideWeeklyHrStage1Tooltip();
+    tooltip.textContent = text;
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.opacity = '0';
+    tooltip.style.top = '0px';
+    tooltip.style.left = '0px';
+
+    const viewportPadding = 10;
+    const gap = 8;
+    const targetRect = target.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const maximumLeft = Math.max(viewportPadding,
+        window.innerWidth - tooltipRect.width - viewportPadding);
+    const finalLeft = Math.min(maximumLeft, Math.max(viewportPadding,
+        targetRect.left + targetRect.width / 2 - tooltipRect.width / 2));
+    const preferredTop = targetRect.top - tooltipRect.height - gap;
+    const bottomTop = targetRect.bottom + gap;
+    const maximumTop = Math.max(viewportPadding,
+        window.innerHeight - tooltipRect.height - viewportPadding);
+    const finalTop = Math.min(maximumTop, Math.max(viewportPadding,
+        preferredTop >= viewportPadding ? preferredTop : bottomTop));
+
+    tooltip.style.top = `${Math.round(finalTop)}px`;
+    tooltip.style.left = `${Math.round(finalLeft)}px`;
+    weeklyHrStage1ActiveTooltipTarget = target;
+    target.setAttribute('aria-describedby', tooltip.id);
+    tooltip.style.visibility = 'visible';
+    tooltip.style.opacity = '1';
+}
+
+function initializeWeeklyHrStage1Tooltips() {
+    const container = document.getElementById('weeklyHrStage1Container');
+    if (!container || container.dataset.stage1TooltipDelegated === 'true') return;
+    container.dataset.stage1TooltipDelegated = 'true';
+
+    container.addEventListener('mouseover', (event) => {
+        const target = stage1TooltipTarget(event.target);
+        if (!target || target.contains(event.relatedTarget)) return;
+        weeklyHrStage1HoveredTooltipTarget = target;
+        showWeeklyHrStage1Tooltip(target);
+    });
+    container.addEventListener('mouseout', (event) => {
+        const target = stage1TooltipTarget(event.target);
+        if (!target || target.contains(event.relatedTarget)) return;
+        if (weeklyHrStage1HoveredTooltipTarget === target) {
+            weeklyHrStage1HoveredTooltipTarget = null;
+        }
+        if (weeklyHrStage1FocusedTooltipTarget !== target) hideWeeklyHrStage1Tooltip();
+    });
+    container.addEventListener('focusin', (event) => {
+        const target = stage1TooltipTarget(event.target);
+        if (!target) return;
+        weeklyHrStage1FocusedTooltipTarget = target;
+        showWeeklyHrStage1Tooltip(target);
+    });
+    container.addEventListener('focusout', (event) => {
+        const target = stage1TooltipTarget(event.target);
+        if (!target || target.contains(event.relatedTarget)) return;
+        if (weeklyHrStage1FocusedTooltipTarget === target) {
+            weeklyHrStage1FocusedTooltipTarget = null;
+        }
+        if (weeklyHrStage1HoveredTooltipTarget !== target) hideWeeklyHrStage1Tooltip();
+    });
+    window.addEventListener('scroll', hideWeeklyHrStage1Tooltip, true);
+    window.addEventListener('resize', hideWeeklyHrStage1Tooltip);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') hideWeeklyHrStage1Tooltip();
+    });
 }
 
 function cleanupWeeklyHrStage1BulkDropdownPortal({ restore = false } = {}) {
@@ -11335,7 +11417,7 @@ function renderStage1MatrixDayCell(payload, date, relevantDates) {
         return `<td class="weekly-hr-stage1-matrix-day-cell">
             <div class="weekly-hr-stage1-day-tile weekly-hr-stage1-day-tile-editable ${state.draft ? 'has-draft' : 'is-pending'}">
                 <input type="checkbox" class="form-check-input weekly-hr-stage1-day-select" data-row-id="${escapeHtml(rowId)}" aria-label="Επιλογή ${escapeHtml(formatStage1DateKey(date))}" ${weeklyHrStage1DaySelected.has(rowId) ? 'checked' : ''}>
-                <button type="button" class="weekly-hr-stage1-open-editor" data-row-id="${escapeHtml(rowId)}" ${state.draft ? 'data-bs-toggle="tooltip" data-bs-custom-class="weekly-hr-stage1-tooltip" data-stage1-tooltip="Μη αποθηκευμένη αλλαγή"' : ''}>
+                <button type="button" class="weekly-hr-stage1-open-editor" data-row-id="${escapeHtml(rowId)}" ${state.draft ? 'data-stage1-tooltip="Μη αποθηκευμένη αλλαγή"' : ''}>
                     <span class="weekly-hr-stage1-day-date">${escapeHtml(formatStage1DateKey(date).slice(0, 5))}</span>
                     <strong>${escapeHtml(state.label)}</strong>
                     ${state.leaveCategory ? `<span>${escapeHtml(state.leaveCategory)}</span>` : ''}
@@ -11345,7 +11427,7 @@ function renderStage1MatrixDayCell(payload, date, relevantDates) {
     }
     const context = actionable ? null : stage1ContextPeriodPresentation(payload, date);
     const tooltipAttributes = context?.title
-        ? `tabindex="0" data-bs-toggle="tooltip" data-bs-custom-class="weekly-hr-stage1-tooltip" data-stage1-tooltip="${escapeHtml(context.title)}"` : '';
+        ? `tabindex="0" data-stage1-tooltip="${escapeHtml(context.title)}"` : '';
     const detailsButton = row
         ? `<button type="button" class="weekly-hr-stage1-readonly-tile weekly-hr-open-day" data-row-id="${escapeHtml(String(row._id))}" ${tooltipAttributes}>`
         : `<span class="weekly-hr-stage1-readonly-tile" ${tooltipAttributes}>`;
@@ -11458,9 +11540,9 @@ function renderWeeklyHrStage1Card(payload, filteredDates = null) {
         .filter(Boolean).join(' ');
     return `<tr class="weekly-hr-stage1-card" data-stage1-key="${escapeHtml(key)}">
         <td>${selection}</td><td>${escapeHtml(scope.employee_kodikos)}</td>
-        <td class="weekly-hr-stage1-employee" tabindex="0" data-bs-toggle="tooltip" data-bs-custom-class="weekly-hr-stage1-tooltip" data-stage1-tooltip="${escapeHtml(payload.employee_name || '')}">${escapeHtml(payload.employee_name || '')}</td>
+        <td class="weekly-hr-stage1-employee" tabindex="0" data-stage1-tooltip="${escapeHtml(payload.employee_name || '')}">${escapeHtml(payload.employee_name || '')}</td>
         <td class="text-nowrap">${escapeHtml(formatStage1DateKey(scope.week_start).slice(0, 5))}–${escapeHtml(formatStage1DateKey(scope.week_end).slice(0, 5))}</td>
-        <td class="weekly-hr-stage1-status" tabindex="0" data-bs-toggle="tooltip" data-bs-custom-class="weekly-hr-stage1-tooltip" data-stage1-tooltip="${escapeHtml(statusTitle)}"><span class="badge bg-${stale ? 'warning text-dark' : businessStatus === 'COMPLETED' ? 'success' : businessStatus === 'BLOCKED' ? 'danger' : 'secondary'}">${escapeHtml(statusText)}</span>${orphanItems}${indexWarning}</td>
+        <td class="weekly-hr-stage1-status" tabindex="0" data-stage1-tooltip="${escapeHtml(statusTitle)}"><span class="badge bg-${stale ? 'warning text-dark' : businessStatus === 'COMPLETED' ? 'success' : businessStatus === 'BLOCKED' ? 'danger' : 'secondary'}">${escapeHtml(statusText)}</span>${orphanItems}${indexWarning}</td>
         ${dayCells}
     </tr>`;
 }
@@ -11490,13 +11572,12 @@ function renderWeeklyHrStage1Presentation() {
         <span class="small text-muted">Σύνολο: ${filtered.length} · Σελίδα ${weeklyHrStage1Page} από ${totalPages}</span>
         <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-secondary weekly-hr-stage1-page-prev" ${weeklyHrStage1Page <= 1 ? 'disabled' : ''}>Προηγούμενη</button>
         <button type="button" class="btn btn-outline-secondary weekly-hr-stage1-page-next" ${weeklyHrStage1Page >= totalPages ? 'disabled' : ''}>Επόμενη</button></div></div>`;
-    disposeWeeklyHrStage1Tooltips(container);
+    resetWeeklyHrStage1TooltipInteraction();
     cleanupWeeklyHrStage1BulkDropdownPortal();
     container.innerHTML = `${renderWeeklyHrStage1BulkToolbar()}<div class="weekly-hr-stage1-table-shell"><table class="table table-sm table-bordered align-middle weekly-hr-stage1-table">
         <colgroup><col class="stage1-col-select"><col class="stage1-col-code"><col class="stage1-col-employee"><col class="stage1-col-week"><col class="stage1-col-status"><col span="7" class="stage1-col-day"></colgroup>
         <thead><tr><th>Επιλογή</th><th>Κωδικός</th><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Κατάσταση</th><th>Δευ</th><th>Τρι</th><th>Τετ</th><th>Πεμ</th><th>Παρ</th><th>Σαβ</th><th>Κυρ</th></tr></thead>
         <tbody>${cards.join('')}</tbody></table>${emptyFilteredResult}</div>${pagination}`;
-    initializeWeeklyHrStage1Tooltips(container);
     initializeWeeklyHrStage1BulkDropdownPortal(container);
     updateWeeklyDeviationStickyMetrics();
 }
@@ -11516,6 +11597,7 @@ async function refreshWeeklyHrStage1Scope(scope) {
 async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' } = {}) {
     const container = document.getElementById('weeklyHrStage1Container');
     if (!container) return;
+    resetWeeklyHrStage1TooltipInteraction();
     const scopes = buildWeeklyHrStage1Scopes(
         rows,
         search_start,
@@ -11558,6 +11640,7 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
 
 function prepareWeeklyHrStage1LazyLoad(rows, options = {}) {
     const container = document.getElementById('weeklyHrStage1Container');
+    resetWeeklyHrStage1TooltipInteraction();
     weeklyHrStage1LazyLoad = {
         rows,
         options,
@@ -11588,10 +11671,10 @@ async function loadPreparedWeeklyHrStage1() {
 }
 
 function rerenderWeeklyHrStage1Rows() {
+    resetWeeklyHrStage1TooltipInteraction();
     weeklyHrStage1Payloads.forEach((payload, key) => {
         const existing = document.querySelector(`.weekly-hr-stage1-card[data-stage1-key="${CSS.escape(key)}"]`);
         if (existing) {
-            disposeWeeklyHrStage1Tooltips(existing);
             existing.outerHTML = renderWeeklyHrStage1Card(payload);
         }
     });
@@ -13822,6 +13905,11 @@ document.addEventListener('DOMContentLoaded', initEmploymentReviewScrollToTop);
 document.addEventListener('DOMContentLoaded', initReviewMoveByEnter);
 document.addEventListener('DOMContentLoaded', ensureReviewCardElevation);
 document.addEventListener('DOMContentLoaded', bindHrReviewEvents);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeWeeklyHrStage1Tooltips, { once: true });
+} else {
+    initializeWeeklyHrStage1Tooltips();
+}
 document.getElementById('lockEmploymentPeriodBtn')?.addEventListener('click', () => {
     transitionEmploymentPeriod('lock').catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
 });
