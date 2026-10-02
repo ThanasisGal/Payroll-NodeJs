@@ -49,7 +49,8 @@ test('normalizes all supported REST codes through one contract', () => {
         'WebE5N',
         'WebE6NMP',
         'WebE6NXP',
-        'WebE7N'
+        'WebE7N',
+        'WTOOvA'
     ]) {
         assert.equal(ui.normalizeResult({ success: true, submissionCode }).submissionCode, submissionCode);
     }
@@ -167,6 +168,17 @@ test('compact portrait PDF variant scopes width, fit and single-row actions to o
     assert.match(css, /ergani-submitted-pdf-popup--compact-portrait[\s\S]*?width:\s*min\(46rem/);
     assert.match(css, /ergani-submitted-pdf-popup--compact-portrait[\s\S]*?height:\s*min\(78dvh, 50rem\)/);
     assert.match(css, /ergani-submitted-pdf-popup--compact-portrait \.pdf-preview-actions[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?gap:\s*0\.75rem;/);
+});
+
+test('WTOOvA uses the common compact PDF viewer with safe preview and clean download URLs', async () => {
+    let dialog;
+    const ui = loadUi({ swalImpl: (options) => { dialog = options; return { isConfirmed: false }; } });
+    const canonicalUrl = '/ergazomenoi/ergazomenoi/ergani/pdf/507f1f77bcf86cd799439011';
+    await ui.presentSubmissionResult({ success: true, submissionCode: 'WTOOvA',
+        pdfViewerVariant: 'compact-portrait', pdfUrl: canonicalUrl });
+    assert.match(dialog.html, new RegExp(`src="${canonicalUrl}#view=FitH&amp;navpanes=0"`));
+    assert.match(dialog.html, new RegExp(`href="${canonicalUrl}"[^>]*download`));
+    assert.doesNotMatch(dialog.html, /private-bucket|s3\.amazonaws/);
 });
 
 test('deferred result calls scoped retry endpoint with CSRF and credentials', async () => {

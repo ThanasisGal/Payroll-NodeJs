@@ -662,14 +662,20 @@ test('sidebar uses the centralized A/S helper', () => {
     assert.ok(!/userRole\s*===\s*['"](?:A|S)['"]/.test(source));
 });
 
-test('catalog visible order exactly matches canonical data-privilege-form sidebar order', () => {
+test('privilege catalog is the canonical superset of the navigation-only sidebar forms', () => {
     const source = fs.readFileSync(path.join(root, 'views/partials/sidebar.ejs'), 'utf8');
     const sidebarForms = [...source.matchAll(/data-privilege-form="([^"]+)"/g)].map((match) => match[1]);
     assert.strictEqual(new Set(sidebarForms).size, sidebarForms.length);
     const visibleCatalog = USER_PRIVILEGE_FORM_CATALOG_SEED
         .filter((entry) => entry.active && entry.showInPrivileges !== false)
         .sort((a, b) => a.sidebarOrder - b.sidebarOrder || a.form.localeCompare(b.form));
-    assert.deepStrictEqual(visibleCatalog.map((entry) => entry.form), sidebarForms);
+    const catalogForms = visibleCatalog.map((entry) => entry.form);
+    assert.strictEqual(sidebarForms.length, 27);
+    assert.strictEqual(visibleCatalog.length, 28);
+    assert.deepStrictEqual(catalogForms.filter((form) => !sidebarForms.includes(form)),
+        ['ApologistikosPinakasOrarion']);
+    assert.ok(sidebarForms.every((form) => catalogForms.includes(form)));
+    assert.ok(!sidebarForms.includes('ApologistikosPinakasOrarion'));
     assert.strictEqual(new Set(visibleCatalog.map((entry) => entry.sidebarOrder)).size, visibleCatalog.length);
     assert.deepStrictEqual(
         visibleCatalog.map((entry) => entry.sidebarOrder),
@@ -680,6 +686,13 @@ test('catalog visible order exactly matches canonical data-privilege-form sideba
     const employmentReview = visibleCatalog.find((entry) => entry.form === 'ElegxosApasxolhseonPeriodoy');
     assert.strictEqual(employmentReview.sidebarOrder, 12000);
     assert.strictEqual(employmentReview.formLabel, 'Έλεγχος Απασχολήσεων');
+    const employmentReviewNavigationIndex = sidebarForms.indexOf('ElegxosApasxolhseonPeriodoy');
+    assert.strictEqual(sidebarForms[employmentReviewNavigationIndex + 1],
+        'KatastashElegxouApologistikouPinaka');
+    assert.ok(sidebarForms.indexOf('ApologistikosPinakasYperorion') >
+        sidebarForms.indexOf('KatastashElegxouApologistikouPinaka'));
+    assert.ok(sidebarForms.indexOf('YpobolhAdeion') >
+        sidebarForms.indexOf('ApologistikosPinakasYperorion'));
 });
 
 (async () => {

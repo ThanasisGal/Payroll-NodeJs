@@ -68,11 +68,24 @@ const visibleCatalog = seedData
     .filter((entry) => entry.active === true && entry.showInPrivileges === true)
     .sort((left, right) => left.sidebarOrder - right.sidebarOrder);
 const sortedHierarchy = [...userPrivilegeSidebarHierarchy].sort(compareHierarchyEntries);
+const catalogByForm = new Map(visibleCatalog.map((entry) => [entry.form, entry]));
+const sidebarFormNames = sidebarForms.map((entry) => entry.form);
+const nonNavigationCatalogForms = visibleCatalog
+    .map((entry) => entry.form)
+    .filter((form) => !sidebarFormNames.includes(form));
 
-assert.strictEqual(sidebarForms.length, 28);
-assert.deepStrictEqual(sidebarForms.map((entry) => entry.form), visibleCatalog.map((entry) => entry.form));
-assert.deepStrictEqual(sidebarForms.map((entry) => entry.itemLabel), visibleCatalog.map((entry) => entry.formLabel));
-assert.deepStrictEqual(sortedHierarchy.map((entry) => entry.form), sidebarForms.map((entry) => entry.form));
+assert.strictEqual(sidebarForms.length, 27);
+assert.strictEqual(sortedHierarchy.length, 27);
+assert.deepStrictEqual(nonNavigationCatalogForms, ['ApologistikosPinakasOrarion']);
+assert.ok(catalogByForm.has('ApologistikosPinakasOrarion'));
+assert.ok(!sidebarFormNames.includes('ApologistikosPinakasOrarion'));
+assert.ok(!sortedHierarchy.some((entry) => entry.form === 'ApologistikosPinakasOrarion'));
+assert.ok(sidebarForms.every((entry) => catalogByForm.has(entry.form)));
+assert.deepStrictEqual(
+    sidebarForms.map((entry) => entry.itemLabel),
+    sidebarForms.map((entry) => catalogByForm.get(entry.form).formLabel)
+);
+assert.deepStrictEqual(sortedHierarchy.map((entry) => entry.form), sidebarFormNames);
 
 sortedHierarchy.forEach((entry, index) => {
     const sidebar = sidebarForms[index];
@@ -88,6 +101,18 @@ sortedHierarchy.forEach((entry, index) => {
 assert.ok(sortedHierarchy.every((entry) => /^li[0-9]+$/.test(entry.sidebarNodeId)));
 assert.strictEqual(new Set(sortedHierarchy.map((entry) => entry.sidebarNodeId)).size, sidebarForms.length);
 assert.ok(visibleCatalog.every((entry) => entry.sidebarOrder >= 1000));
+
+const employmentReviewIndex = sidebarFormNames.indexOf('ElegxosApasxolhseonPeriodoy');
+assert.strictEqual(
+    sidebarFormNames[employmentReviewIndex + 1],
+    'KatastashElegxouApologistikouPinaka'
+);
+for (const form of ['ApologistikosPinakasYperorion', 'YpobolhAdeion']) {
+    assert.deepStrictEqual(
+        sortedHierarchy.find((entry) => entry.form === form).ancestors.map(({ label }) => label),
+        ['Αρχεία', 'ΕΡΓΑΝΗ ΙΙ', 'Αποστολή Αρχείων']
+    );
+}
 
 const hiddenCatalog = seedData.filter((entry) => entry.showInPrivileges === false);
 assert.ok(hiddenCatalog.every((entry) => !userPrivilegeSidebarHierarchy.some((item) => item.form === entry.form)));
