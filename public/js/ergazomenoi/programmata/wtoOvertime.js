@@ -156,7 +156,8 @@
         ];
         rowsBody.innerHTML = visibleRows.length ? visibleRows.join('') :
             '<tr><td colspan="9" class="text-center text-muted">Δεν βρέθηκαν υποβλητέες νόμιμες υπερωρίες.</td></tr>';
-        validPreview = data.submission_eligible && data.parity?.exact ? data : null;
+        validPreview = data.submission_eligible && data.parity?.exact &&
+            /^[a-f0-9]{64}$/.test(String(data.preview_fingerprint || '')) ? data : null;
         submitButton.disabled = !validPreview || !canExport;
         status.className = validPreview ? (data.warning_count ? 'alert alert-warning mt-3 mb-0' :
             'alert alert-success mt-3 mb-0') : data.blocker_count ? 'alert alert-danger mt-3 mb-0' :
@@ -201,7 +202,12 @@
         const response = await fetch(url, { method: 'POST', headers: csrfHeaders(),
             credentials: 'same-origin', body: JSON.stringify(body) });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok || data.success !== true) throw new Error(data.message || 'Αποτυχία αιτήματος.');
+        if (!response.ok || data.success !== true) {
+            const error = new Error(data.message || 'Αποτυχία αιτήματος.');
+            error.code = data.code || '';
+            error.status = response.status;
+            throw error;
+        }
         return data;
     }
     previewButton.addEventListener('click', async () => {
@@ -245,7 +251,8 @@
             const requestId = window.crypto?.randomUUID ? window.crypto.randomUUID() :
                 `wtoova-${Date.now()}-${Math.random().toString(16).slice(2)}`;
             const data = await requestJson('/api/ergazomenoi/programmata/wto-overtime/submit',
-                { ...input(), request_id: requestId });
+                { ...input(), request_id: requestId,
+                    preview_fingerprint: validPreview.preview_fingerprint });
             validPreview = null;
             submitButton.disabled = true;
             if (data.idempotent === true && window.Swal) {
@@ -259,6 +266,10 @@
                 pdfViewerVariant: 'compact-portrait'
             });
         } catch (error) {
+            if (error.code === 'WTOOVA_PREVIEW_STALE' ||
+                error.code === 'WTOOVA_INVALID_PREVIEW_FINGERPRINT') {
+                invalidatePreview('Τα δεδομένα άλλαξαν. Εκτελέστε νέα προεπισκόπηση πριν από την υποβολή.');
+            }
             if (window.Swal) await window.Swal.fire('Αποτυχία υποβολής', error.message, 'error');
         } finally { setBusy(false); }
     });
