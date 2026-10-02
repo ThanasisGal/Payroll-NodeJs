@@ -42,7 +42,7 @@ function response(status, body, contentType = 'application/json') {
     };
 }
 
-function createPage({ token = 'page-token', originalFetch }) {
+function createPage({ token = 'page-token', companyTeam = 'BLG', originalFetch }) {
     let domReady;
     let submit;
     const swalCalls = [];
@@ -55,6 +55,7 @@ function createPage({ token = 'page-token', originalFetch }) {
     const fields = [
         { tagName: 'INPUT', type: 'text', name: 'eponymia', value: 'ΔΟΚΙΜΗ ΑΕ', files: [] },
         { tagName: 'INPUT', type: 'text', name: 'afm', value: '123456789', files: [] },
+        { tagName: 'INPUT', type: 'text', name: 'companyTeam', value: companyTeam, files: [] },
         { tagName: 'SELECT', name: 'selectedUsers', multiple: true,
             selectedOptions: [{ value: '507f1f77bcf86cd799439011' }] }
     ];
@@ -176,6 +177,7 @@ function createPage({ token = 'page-token', originalFetch }) {
     assert.strictEqual(successCalls[0].options.headers.get('csrf-token'), 'valid-token');
     assert.strictEqual(successCalls[0].options.headers.get('x-csrf-token'), 'valid-token');
     assert.strictEqual(successCalls[0].options.credentials, 'include');
+    assert.strictEqual(JSON.parse(successCalls[0].options.body).companyTeam, 'BLG');
     assert.strictEqual(successPage.swalCalls.at(-1).icon, 'success');
     assert.strictEqual(successPage.location.href, '/companies/genikastoixeia');
 
@@ -252,7 +254,19 @@ function createPage({ token = 'page-token', originalFetch }) {
     assert.strictEqual(missingCalls[2].options.headers.get('csrf-token'), 'obtained-token');
     assert.strictEqual(missingPage.swalCalls.at(-1).icon, 'success');
 
-    console.log('PASS company add CSRF token, retry and accurate 403 response handling');
+    const missingTeamCalls = [];
+    const missingTeamPage = createPage({
+        companyTeam: '',
+        originalFetch: async (url, options) => {
+            missingTeamCalls.push({ url, options });
+            return response(200, { success: true });
+        }
+    });
+    await missingTeamPage.submit();
+    assert.strictEqual(missingTeamCalls.length, 0);
+    assert.match(missingTeamPage.swalCalls.at(-1).html, /Ομάδα Εργασίας/);
+
+    console.log('PASS company add team validation, CSRF retry and accurate 403 response handling');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

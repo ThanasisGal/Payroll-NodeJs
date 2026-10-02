@@ -14,6 +14,7 @@ const {
 const COMPANY_ID = '507f1f77bcf86cd799439011';
 const OTHER_ID = '507f191e810c19729de860ea';
 const USER_ID = '507f1f77bcf86cd799439012';
+const BLG_USER_ID = '507f1f77bcf86cd799439013';
 
 function response() {
     return {
@@ -98,6 +99,64 @@ function queryResult(value) {
         body: { ...validCompanyBody, companyTeam: '$ne' }
     });
     assert.strictEqual(result.res.statusCode, 403);
+
+    let createUserQueries = 0;
+    UserModel.find = (filter) => {
+        createUserQueries += 1;
+        const rows = [
+            { _id: USER_ID, team: 'TEAM1' },
+            { _id: OTHER_ID, team: 'OTHER' },
+            { _id: BLG_USER_ID, team: 'BLG' }
+        ].filter((user) =>
+            filter._id.$in.map(String).includes(String(user._id)) &&
+            (!filter.team || filter.team.test(user.team))
+        );
+        return {
+            select() { return this; },
+            lean: async () => rows.map(({ _id }) => ({ _id }))
+        };
+    };
+
+    result = await run(authorizeCompanyCreate, {
+        session: { userId: USER_ID },
+        authenticatedUserTeam: 'THA',
+        body: { ...validCompanyBody, companyTeam: 'BLG', selectedUsers: [BLG_USER_ID] }
+    });
+    assert.strictEqual(result.next, 1);
+    assert.strictEqual(result.res.statusCode, 200);
+
+    const queriesBeforeMissingTeam = createUserQueries;
+    result = await run(authorizeCompanyCreate, {
+        session: { userId: USER_ID },
+        authenticatedUserTeam: 'THA',
+        body: { ...validCompanyBody, companyTeam: undefined, selectedUsers: [BLG_USER_ID] }
+    });
+    assert.strictEqual(result.next, 0);
+    assert.strictEqual(result.res.statusCode, 403);
+    assert.strictEqual(createUserQueries, queriesBeforeMissingTeam);
+
+    result = await run(authorizeCompanyCreate, {
+        session: { userId: USER_ID },
+        authenticatedUserTeam: 'BLG',
+        body: { ...validCompanyBody, companyTeam: 'BLG', selectedUsers: [BLG_USER_ID] }
+    });
+    assert.strictEqual(result.next, 1);
+
+    result = await run(authorizeCompanyCreate, {
+        session: { userId: USER_ID },
+        authenticatedUserTeam: 'BLG',
+        body: { ...validCompanyBody, companyTeam: 'OTHER', selectedUsers: [OTHER_ID] }
+    });
+    assert.strictEqual(result.next, 0);
+    assert.strictEqual(result.res.statusCode, 403);
+
+    result = await run(authorizeCompanyCreate, {
+        session: { userId: USER_ID },
+        authenticatedUserTeam: 'BLG',
+        body: { ...validCompanyBody, companyTeam: 'BLG', selectedUsers: [OTHER_ID] }
+    });
+    assert.strictEqual(result.next, 0);
+    assert.strictEqual(result.res.statusCode, 404);
 
     const scopedCompanyFindById = CompaniesModel.findById;
     const originalAntistoixFindById = AntistoixiseisModel.findById;

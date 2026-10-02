@@ -117,6 +117,7 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
             const errors = [];
             if (isEmpty(formData.eponymia)) errors.push('Επώνυμο/μία');
             if (isEmpty(formData.afm)) errors.push('Α.Φ.Μ.');
+            if (isEmpty(formData.companyTeam)) errors.push('Ομάδα Εργασίας');
             let selectedUsersArr = Array.isArray(formData.selectedUsers)
                 ? formData.selectedUsers
                 : [];

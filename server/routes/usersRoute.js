@@ -1020,7 +1020,11 @@ router.post('/api/afmEtaireias', companiesController.checkAfmEtaireias);
 
 router.get('/api/allUser', mainAppController.getAllUsers);
 
-router.get('/api/allUsersByTeam/:companyTeam', companiesController.getAllUsersByTeam);
+router.get(
+    '/api/allUsersByTeam/:companyTeam',
+    requireUserPrivilegeAction('Companies', 'create'),
+    companiesController.getAllUsersByTeam
+);
 
 router.get('/api/appDateInUse', mainAppController.getAppDateInUse);
 

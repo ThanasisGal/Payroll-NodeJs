@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const dhmosDropdown       = document.getElementById("dhmos");
     const polhDropdown        = document.getElementById("polh");
     const allUsersDropdown    = document.getElementById("selectedUsers");
+    const companyTeamInput    = document.getElementById("companyTeam");
 
     const resetSelect = (el) => { el.innerHTML = '<option value="" selected></option>'; el.disabled = true; };
     const enableSelect = (el) => { el.disabled = false; };
@@ -117,25 +118,41 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    const loadAllUsers = async () => {
+    const clearCompanyUsers = () => {
+        allUsersDropdown.innerHTML = "";
+        allUsersDropdown.disabled = true;
+    };
+
+    const loadCompanyUsers = async () => {
+        clearCompanyUsers();
+        const companyTeam = String(companyTeamInput?.value || "").trim().toUpperCase();
+        if (!companyTeam) return;
+
         try {
             await ensureCsrfToken();
-            const response = await apiFetch("/api/allUser", { signal: newController("users") });
+            const response = await apiFetch(
+                `/api/allUsersByTeam/${encodeURIComponent(companyTeam)}`,
+                { signal: newController("users") }
+            );
             if (!response.ok) throw new Error("Network response was not ok");
             const data = await response.json();
-            // προαιρετικά: καθάρισε πριν γεμίσεις
-            allUsersDropdown.innerHTML = "";
+            if (String(companyTeamInput?.value || "").trim().toUpperCase() !== companyTeam) return;
             data.forEach((u) => {
-                // Χρησιμοποιούμε new Option ώστε να μπει σαν text, όχι HTML
                 const option = new Option(`${u.lastName} ${u.firstName}`, u._id);
                 allUsersDropdown.appendChild(option);
             });
+            enableSelect(allUsersDropdown);
         } catch (err) {
-            if (err.name !== "AbortError") console.error("Αποτυχία φόρτωσης χρηστών:", err);
+            clearCompanyUsers();
+            if (err.name !== "AbortError") {
+                console.error("Αποτυχία φόρτωσης χρηστών ομάδας:", err);
+            }
         }
     };
 
+    companyTeamInput?.addEventListener("change", loadCompanyUsers);
+
     // αρχικές φορτώσεις
     loadPerifereies();
-    loadAllUsers();
+    loadCompanyUsers();
 });
