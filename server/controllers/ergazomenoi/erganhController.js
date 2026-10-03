@@ -9708,7 +9708,7 @@ class erganhController {
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
                             'kathgoria_ergasias_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika compensation_breakdown_apologistika apologistiko_biblio ' +
                             'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika argia kyriakes_apologistika ores_apoysias_apologistika ' +
-                            'is_locked locked_by locked_at'
+                            'zero_length_card_resolution is_locked locked_by locked_at'
                     )
                     .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
                     .skip(skip)
@@ -13420,6 +13420,8 @@ class erganhController {
                         persistenceResult = await persist({
                             oldRecord, semanticUpdates: permittedUpdates, changedBy,
                             reason: String(reason).trim(),
+                            reviseApproved:
+                                zeroLengthResolutionCommand.revise_approved === true,
                             schemaPaths: Object.keys(ProdhlomenaOrariaModel.schema.paths),
                             rowModel: ProdhlomenaOrariaModel,
                             auditModel: ProdhlomenaOrariaAuditModel, session

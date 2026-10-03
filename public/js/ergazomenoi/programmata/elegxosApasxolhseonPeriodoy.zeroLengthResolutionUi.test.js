@@ -19,7 +19,9 @@ const sandbox = {
     escapeHtml: String
 };
 vm.runInNewContext(`${functionSource}\nthis.api = {
-    zeroLengthCardPairs, renderZeroLengthCardResolutionSection
+    zeroLengthCardPairs, buildFrozenZeroLengthResolutionCommand,
+    zeroLengthConfirmationPresentation, formatZeroLengthDuration,
+    renderZeroLengthCardResolutionSection
 };`, sandbox);
 
 const row = { _id: 'row-1404', cards_apo_ora_01: '14:04',
@@ -36,6 +38,38 @@ assert.match(html, /value=""/,
     'no fabricated actual-work end time may be prefilled');
 assert.match(html, /id="zeroLengthResolutionConfirm"/);
 assert.match(html, /δεν διαβιβάστηκαν\/καταγράφηκαν σωστά στο ΕΡΓΑΝΗ/);
+
+const humanErrorCommand = sandbox.api.buildFrozenZeroLengthResolutionCommand(row, {
+    valueForId: (id) => ({ zeroLengthStart1: '10:00', zeroLengthEnd1: '10:04' })[id]
+});
+const humanErrorConfirmation = sandbox.api.zeroLengthConfirmationPresentation(
+    row, humanErrorCommand);
+assert.equal(humanErrorConfirmation.actual, '10:00–10:04');
+assert.equal(humanErrorConfirmation.durationText, '4 λεπτά');
+assert.doesNotMatch(humanErrorConfirmation.durationText, /4 ώρες και 4 λεπτά/);
+assert.equal(humanErrorConfirmation.confirmButtonText, 'Επιβεβαίωση 10:00–10:04');
+
+const intendedCommand = sandbox.api.buildFrozenZeroLengthResolutionCommand(row, {
+    valueForId: (id) => ({ zeroLengthStart1: '10:00', zeroLengthEnd1: '14:04' })[id]
+});
+const intendedConfirmation = sandbox.api.zeroLengthConfirmationPresentation(row, intendedCommand);
+assert.equal(intendedConfirmation.actual, '10:00–14:04');
+assert.equal(intendedConfirmation.durationText, '4 ώρες και 4 λεπτά');
+assert.deepEqual(JSON.parse(JSON.stringify(intendedCommand.intervals[0])),
+    { pairNumber: 1, start: '10:00', end: '14:04' });
+assert.equal(Object.isFrozen(intendedCommand), true);
+assert.equal(Object.isFrozen(intendedCommand.intervals), true);
+assert.equal(Object.isFrozen(intendedCommand.intervals[0]), true);
+
+const approvedHtml = sandbox.api.renderZeroLengthCardResolutionSection({ ...row,
+    zero_length_card_resolution: { status: 'HR_APPROVED', approved_by: 'HR',
+        approved_intervals: [{ pairNumber: 1, start: '10:00', end: '10:04' }] }
+});
+assert.match(approvedHtml, /Διόρθωση εγκεκριμένης επίλυσης/);
+assert.match(approvedHtml, /<strong>Πριν:<\/strong>\s*10:00–10:04/);
+assert.match(approvedHtml, /<strong>Μετά:<\/strong>/);
+assert.match(approvedHtml, /Μετά — Από/);
+assert.match(approvedHtml, /zeroLengthResolutionConfirm[^>]*disabled/);
 
 const orphanFunctionSource = source.slice(
     source.indexOf('function renderOrphanCardResolutionSection'),
@@ -118,6 +152,8 @@ assert.match(source, /Δηλώστε τις πραγματικές ώρες απ
 assert.match(source, /issue_code === 'ZERO_LENGTH_CARD_EVIDENCE'[\s\S]*?Επίλυση πραγματικής απασχόλησης/);
 assert.match(source, /zero_length_resolution: zeroLengthResolution/);
 assert.match(source, /transmission_failure_confirmed: true/);
+assert.match(source, /revise_approved: true/);
+assert.match(source, /confirmFrozenZeroLengthResolution\(row, frozenCommand\)/);
 assert.match(source, /item\.start === item\.end/);
 assert.match(source, /ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION/);
 

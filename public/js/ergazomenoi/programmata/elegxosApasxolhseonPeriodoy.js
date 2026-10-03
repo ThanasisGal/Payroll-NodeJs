@@ -12905,6 +12905,76 @@ function zeroLengthCardPairs(row = {}) {
     });
 }
 
+function buildFrozenZeroLengthResolutionCommand(row = {}, {
+    reviseApproved = false,
+    valueForId = (id) => document.getElementById(id)?.value || ''
+} = {}) {
+    const intervals = zeroLengthCardPairs(row).map((item) => Object.freeze({
+        pairNumber: item.pairNumber,
+        start: String(valueForId(`zeroLengthStart${item.pairNumber}`) || ''),
+        end: String(valueForId(`zeroLengthEnd${item.pairNumber}`) || '')
+    }));
+    return Object.freeze({
+        approve: true,
+        ...(reviseApproved ? { revise_approved: true } : {}),
+        intervals: Object.freeze(intervals),
+        transmission_failure_confirmed: true
+    });
+}
+
+function zeroLengthIntervalDurationMinutes(interval = {}) {
+    const start = timeToMinutes(interval.start);
+    const end = timeToMinutes(interval.end);
+    if (start === null || end === null || start === end) return null;
+    return end > start ? end - start : end + 1440 - start;
+}
+
+function formatZeroLengthDuration(minutes) {
+    const total = Number(minutes);
+    if (!Number.isInteger(total) || total <= 0) return '';
+    const hours = Math.floor(total / 60);
+    const rest = total % 60;
+    const parts = [];
+    if (hours) parts.push(`${hours} ${hours === 1 ? 'ώρα' : 'ώρες'}`);
+    if (rest) parts.push(`${rest} ${rest === 1 ? 'λεπτό' : 'λεπτά'}`);
+    return parts.join(' και ');
+}
+
+function zeroLengthConfirmationPresentation(row = {}, command = {}) {
+    const rawByPair = new Map(zeroLengthCardPairs(row).map((item) =>
+        [item.pairNumber, `${item.rawTime}–${item.rawTime}`]));
+    const intervals = Array.isArray(command.intervals) ? command.intervals : [];
+    const actual = intervals.map((item) => `${item.start}–${item.end}`).join(', ');
+    const raw = intervals.map((item) => rawByPair.get(item.pairNumber) || '—').join(', ');
+    const durationMinutes = intervals.reduce((sum, item) =>
+        sum + (zeroLengthIntervalDurationMinutes(item) || 0), 0);
+    return Object.freeze({ raw, actual, durationMinutes,
+        durationText: formatZeroLengthDuration(durationMinutes),
+        confirmButtonText: intervals.length === 1
+            ? `Επιβεβαίωση ${actual}` : 'Επιβεβαίωση διαστημάτων' });
+}
+
+async function confirmFrozenZeroLengthResolution(row, command) {
+    const presentation = zeroLengthConfirmationPresentation(row, command);
+    const confirmation = await employmentReviewSwal({
+        icon: 'warning',
+        title: command.revise_approved === true
+            ? 'Επιβεβαίωση διόρθωσης εγκεκριμένης επίλυσης'
+            : 'Επιβεβαίωση πραγματικής εργασίας',
+        html: `<div class="text-start">
+            <div><strong>Αρχικά χτυπήματα:</strong><br>${escapeHtml(presentation.raw)}</div>
+            <div class="mt-2"><strong>Πραγματική εργασία:</strong><br>${escapeHtml(
+                presentation.actual)}</div>
+            <div class="mt-2"><strong>Διάρκεια:</strong><br>${escapeHtml(
+                presentation.durationText)}</div>
+        </div>`,
+        showCancelButton: true,
+        confirmButtonText: presentation.confirmButtonText,
+        cancelButtonText: 'Επιστροφή'
+    });
+    return confirmation.isConfirmed === true;
+}
+
 function renderZeroLengthCardResolutionSection(row = {}) {
     const pairs = zeroLengthCardPairs(row);
     if (!pairs.length) return '';
@@ -12924,20 +12994,27 @@ function renderZeroLengthCardResolutionSection(row = {}) {
             return `<div class="row g-2 mb-2 zero-length-resolution-pair" data-pair-number="${item.pairNumber}">
                 <div class="col-12 small"><strong>Αρχικό ζεύγος ${item.pairNumber}:</strong>
                     ${escapeHtml(item.rawTime)}–${escapeHtml(item.rawTime)}</div>
-                <div class="col-md-6"><label class="form-label" for="zeroLengthStart${item.pairNumber}">Πραγματικά Από</label>
+                ${approved ? `<div class="col-12 small zero-length-resolution-before"><strong>Πριν:</strong>
+                    ${escapeHtml(approvedInterval.start || '—')}–${escapeHtml(
+                        approvedInterval.end || '—')}</div>
+                    <div class="col-12 small zero-length-resolution-after"><strong>Μετά:</strong></div>` : ''}
+                <div class="col-md-6"><label class="form-label" for="zeroLengthStart${item.pairNumber}">${approved ? 'Μετά — Από' : 'Πραγματικά Από'}</label>
                     <input type="time" class="form-control zero-length-resolution-start" id="zeroLengthStart${item.pairNumber}" value="${escapeHtml(approvedInterval.start || '')}" ${approved ? 'disabled' : ''}></div>
-                <div class="col-md-6"><label class="form-label" for="zeroLengthEnd${item.pairNumber}">Πραγματικά Έως</label>
+                <div class="col-md-6"><label class="form-label" for="zeroLengthEnd${item.pairNumber}">${approved ? 'Μετά — Έως' : 'Πραγματικά Έως'}</label>
                     <input type="time" class="form-control zero-length-resolution-end" id="zeroLengthEnd${item.pairNumber}" value="${escapeHtml(approvedInterval.end || '')}" ${approved ? 'disabled' : ''}></div>
             </div>`;
         }).join('')}
         ${approved ? `<div class="alert alert-info py-2">Η επίλυση έχει εγκριθεί από ${escapeHtml(
-            metadata.approved_by || '-')}. Τα χτυπήματα κάρτας διατηρήθηκαν.</div>` : `
-            <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" id="zeroLengthResolutionConfirm">
+            metadata.approved_by || '-')}. Τα χτυπήματα κάρτας διατηρήθηκαν.</div>
+            <button type="button" class="btn employment-review-action-btn employment-review-action-warning" id="zeroLengthRevisionBtn">
+                Διόρθωση εγκεκριμένης επίλυσης
+            </button>` : ''}
+            <div class="form-check mt-2 ${approved ? 'd-none' : ''}" id="zeroLengthResolutionConfirmationBlock">
+                <input class="form-check-input" type="checkbox" id="zeroLengthResolutionConfirm" ${approved ? 'disabled' : ''}>
                 <label class="form-check-label fw-semibold" for="zeroLengthResolutionConfirm">
                     Επιβεβαιώνω ότι υπήρξε πραγματική εργασία και τα χτυπήματα της ψηφιακής κάρτας δεν διαβιβάστηκαν/καταγράφηκαν σωστά στο ΕΡΓΑΝΗ.
                 </label>
-            </div>`}
+            </div>
     </div>`;
 }
 
@@ -13387,7 +13464,10 @@ function showDetailsModal(row, { orphanResolution = false,
     const reusableOrphanReason = row?.orphan_card_resolution_preview
         ?.automaticReusableApplied === true
         ? String(row.orphan_card_resolution_preview.reusableDecisionReason || '') : '';
-    const initialReason = reusableOrphanReason || (zeroLengthResolution === true
+    const approvedZeroLength = row?.zero_length_card_resolution?.status === 'HR_APPROVED' &&
+        zeroLengthCardPairs(row).length > 0;
+    let zeroLengthRevisionActive = false;
+    const initialReason = approvedZeroLength ? '' : reusableOrphanReason || (zeroLengthResolution === true
         ? 'Επίλυση πραγματικής απασχόλησης λόγω αποτυχίας διαβίβασης ψηφιακής κάρτας'
         : orphanResolution === true
         ? defaultOrphanResolutionReason(
@@ -13451,13 +13531,13 @@ function showDetailsModal(row, { orphanResolution = false,
             <div class="review-modal-section-title">Αιτιολογία Αλλαγής</div>
 
             <textarea id="edit_reason" class="form-control employment-review-reason-textarea" rows="4"
-                ${reusableOrphanReason ? 'readonly' : ''}>${escapeHtml(initialReason)}</textarea>
+                ${reusableOrphanReason ? 'readonly' : ''} ${approvedZeroLength ? 'disabled' : ''}>${escapeHtml(initialReason)}</textarea>
 
             <div class="d-flex gap-2 mt-3">
                 ${
                     userCanReviewEdit()
                         ? `
-                            <button class="btn employment-review-action-btn employment-review-action-success" id="saveRecordBtn">
+                            <button class="btn employment-review-action-btn employment-review-action-success ${approvedZeroLength ? 'd-none' : ''}" id="saveRecordBtn">
                                 <i class="bi bi-save"></i> Αποθήκευση
                             </button>
                         `
@@ -13465,7 +13545,7 @@ function showDetailsModal(row, { orphanResolution = false,
                 }
 
                 ${
-                    row.is_locked && userCanReviewEdit()
+                    row.is_locked && userCanReviewEdit() && !approvedZeroLength
                         ? `
                             <button class="btn employment-review-action-btn employment-review-action-warning" id="unlockRecordBtn">
                                 <i class="bi bi-unlock"></i> Ξεκλείδωμα
@@ -13509,6 +13589,39 @@ function showDetailsModal(row, { orphanResolution = false,
     }, 100);
     initModalMoveByEnter();
     initializeOrphanResolutionPreview(row);
+
+    if (approvedZeroLength) {
+        document.querySelectorAll('#detailsContainer .modal-edit-field, ' +
+            '#detailsContainer .apologistika-number-field, ' +
+            '#detailsContainer .apologistika-checkbox-field').forEach((input) => {
+            input.disabled = true;
+        });
+        document.getElementById('edit_kathgoria_adeias_apologistika')
+            ?.tomselect?.disable?.();
+    }
+
+    document.getElementById('zeroLengthRevisionBtn')?.addEventListener('click', () => {
+        zeroLengthRevisionActive = true;
+        document.querySelectorAll(
+            '#zeroLengthCardResolutionSection .zero-length-resolution-start, ' +
+            '#zeroLengthCardResolutionSection .zero-length-resolution-end'
+        ).forEach((input) => { input.disabled = false; });
+        const confirmationBlock = document.getElementById(
+            'zeroLengthResolutionConfirmationBlock');
+        confirmationBlock?.classList.remove('d-none');
+        const approval = document.getElementById('zeroLengthResolutionConfirm');
+        if (approval) { approval.disabled = false; approval.checked = false; }
+        const reasonInput = document.getElementById('edit_reason');
+        if (reasonInput) {
+            reasonInput.disabled = false;
+            reasonInput.readOnly = false;
+            reasonInput.value = '';
+            reasonInput.placeholder = 'Υποχρεωτική νέα αιτιολογία διόρθωσης';
+            reasonInput.focus();
+        }
+        document.getElementById('saveRecordBtn')?.classList.remove('d-none');
+        document.getElementById('zeroLengthRevisionBtn').disabled = true;
+    });
 
     document.getElementById('loadAuditBtn')?.addEventListener('click', () => {
         loadAuditHistory(row._id);
@@ -13610,21 +13723,20 @@ function showDetailsModal(row, { orphanResolution = false,
             const zeroLengthApproval = document.getElementById(
                 'zeroLengthResolutionConfirm');
             let zeroLengthResolution = null;
-            if (zeroLengthPairs.length &&
-                row.zero_length_card_resolution?.status !== 'HR_APPROVED') {
+            const shouldSubmitZeroLength = zeroLengthPairs.length &&
+                (row.zero_length_card_resolution?.status !== 'HR_APPROVED' ||
+                    zeroLengthRevisionActive);
+            if (shouldSubmitZeroLength) {
                 if (zeroLengthApproval?.checked !== true) {
                     employmentReviewSwal({ icon: 'warning',
                         title: 'Ρητή επιβεβαίωση πραγματικής εργασίας',
                         text: 'Επιβεβαιώστε ρητά την πραγματική εργασία και την αποτυχία διαβίβασης της κάρτας.' });
                     return;
                 }
-                const intervals = zeroLengthPairs.map((item) => ({
-                    pairNumber: item.pairNumber,
-                    start: document.getElementById(
-                        `zeroLengthStart${item.pairNumber}`)?.value || '',
-                    end: document.getElementById(
-                        `zeroLengthEnd${item.pairNumber}`)?.value || ''
-                }));
+                const frozenCommand = buildFrozenZeroLengthResolutionCommand(row, {
+                    reviseApproved: zeroLengthRevisionActive
+                });
+                const intervals = frozenCommand.intervals;
                 if (intervals.some((item) => !item.start || !item.end ||
                     item.start === item.end)) {
                     employmentReviewSwal({ icon: 'warning',
@@ -13632,8 +13744,8 @@ function showDetailsModal(row, { orphanResolution = false,
                         text: 'Συμπληρώστε πλήρες, μη μηδενικό διάστημα Από–Έως.' });
                     return;
                 }
-                zeroLengthResolution = { approve: true, intervals,
-                    transmission_failure_confirmed: true };
+                zeroLengthResolution = frozenCommand;
+                if (!await confirmFrozenZeroLengthResolution(row, frozenCommand)) return;
             }
 
             const response = await fetch(`/api/prodhlomena-oraria/review/${row._id}`, {

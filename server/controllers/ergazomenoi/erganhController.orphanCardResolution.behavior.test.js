@@ -5,6 +5,10 @@ const Module = require('module');
 const {
     persistOrphanResolutionWrite
 } = require('../../services/ergazomenoi/apasxoliseisOrphanResolutionPersistenceService');
+const {
+    resolveZeroLengthCardResolution,
+    persistZeroLengthCardResolutionWrite
+} = require('../../services/ergazomenoi/apasxoliseisZeroLengthCardResolutionService');
 
 const originalModuleLoad = Module._load;
 let erganhController;
@@ -176,6 +180,95 @@ async function run() {
     });
     assert.strictEqual(zeroWithoutReason.res.statusCode, 400);
     assert.strictEqual(noReasonPersisted, false);
+
+    const approvalTime = new Date('2026-08-03T15:00:00.000Z');
+    const revisionTime = new Date('2026-08-04T09:30:00.000Z');
+    const revisionRow = { ...zeroRecord,
+        apo_ora_01: '10:00', eos_ora_01: '14:00', ores_ergasias: 4,
+        apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '10:04',
+        ores_ergasias_apologistika: 4 / 60,
+        ores_pragmatikhs_ergasias_apologistika: 4 / 60,
+        ores_apoysias_apologistika: 3.933333333333333,
+        is_locked: true, locked_by: 'HR Original', locked_at: approvalTime,
+        zero_length_card_resolution: {
+            status: 'HR_APPROVED', policy_version: 'zero-length-card-work:v1',
+            resolution_kind: 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE',
+            affected_pairs: [1], approved_intervals: [
+                { pairNumber: 1, start: '10:00', end: '10:04' }
+            ], raw_cards_preserved: true, apologistiko_biblio: true,
+            transmission_failure_confirmed: true,
+            approved_by: 'HR Original', approved_at: approvalTime
+        }
+    };
+    const revisionState = { row: structuredClone(revisionRow), audits: [] };
+    let revisionPersistenceInput;
+    const revisionResult = await invoke((input) => {
+        revisionPersistenceInput = input;
+        return persistZeroLengthCardResolutionWrite({ ...input, now: revisionTime,
+            schemaPaths: Object.keys(revisionState.row),
+            rowModel: { async updateOne(_filter, update) {
+                Object.assign(revisionState.row, structuredClone(update.$set));
+                return { matchedCount: 1 };
+            } },
+            auditModel: { async create([audit]) {
+                revisionState.audits.push(structuredClone(audit));
+            } }
+        });
+    }, {
+        loadRecord: () => revisionState.row,
+        requestOverrides: { body: {
+            reason: 'Διόρθωση λανθασμένης εγκεκριμένης ώρας λήξης',
+            updates: { cards_apo_ora_01: '00:00', cards_eos_ora_01: '23:59' },
+            orphan_resolution: null,
+            zero_length_resolution: { approve: true, revise_approved: true,
+                transmission_failure_confirmed: true,
+                intervals: [{ pairNumber: 1, start: '10:00', end: '14:04' }] }
+        } },
+        prepareZeroLengthResolution: async ({ oldRecord: current,
+            zeroLengthResolutionCommand, changedBy }) => {
+            const effectiveEmployee = { dialleima_entos_ektos_orarioy: false,
+                dialleima_se_lepta: 0 };
+            const approvedZeroLength = resolveZeroLengthCardResolution({
+                row: current, command: zeroLengthResolutionCommand,
+                effectiveEmployee, actor: changedBy, now: revisionTime
+            });
+            const dailyDerived = erganhController.__orphanDailyCalculationTestHooks
+                .buildApprovedOrphanDailyDerivedUpdate({
+                    row: current, effectiveEmployee, argiesDateSet: new Set(),
+                    approvedOrphanResolution: {
+                        approvedUpdates: approvedZeroLength.approvedUpdates,
+                        policyVersion: approvedZeroLength.metadata.policy_version,
+                        orphanType: 'ZERO_LENGTH'
+                    }, appliedProtectionContext: { entriesByRowId: {}, diagnostics: [],
+                        hasConflicts: false }
+                });
+            return { approvedZeroLength, dailyDerived };
+        }
+    });
+    assert.strictEqual(revisionResult.res.statusCode, 200);
+    assert.strictEqual(revisionPersistenceInput.reviseApproved, true);
+    assert.strictEqual(revisionState.row.cards_apo_ora_01, '14:04');
+    assert.strictEqual(revisionState.row.cards_eos_ora_01, '14:04');
+    assert.strictEqual(revisionState.row.apo_ora_01_apologistika, '10:00');
+    assert.strictEqual(revisionState.row.eos_ora_01_apologistika, '14:04');
+    assert.strictEqual(revisionState.row.ores_ergasias_apologistika, 4.07);
+    assert.strictEqual(revisionState.row.ores_pragmatikhs_ergasias_apologistika, 244 / 60);
+    assert.strictEqual(revisionState.row.ores_apoysias_apologistika, 0);
+    assert.strictEqual(revisionState.row.zero_length_card_resolution.status, 'HR_APPROVED');
+    assert.strictEqual(revisionState.row.zero_length_card_resolution.revision_number, 1);
+    assert.strictEqual(revisionState.row.is_locked, true);
+    assert.strictEqual(revisionState.row.locked_by, 'HR User');
+    assert.strictEqual(revisionState.audits.length, 1);
+    assert.deepStrictEqual(revisionState.audits[0].oldValues
+        .zero_length_card_resolution.approved_intervals,
+    [{ pairNumber: 1, start: '10:00', end: '10:04' }]);
+    assert.deepStrictEqual(revisionState.audits[0].newValues
+        .zero_length_card_resolution.approved_intervals,
+    [{ pairNumber: 1, start: '10:00', end: '14:04' }]);
+    assert.strictEqual(revisionState.audits[0].oldValues.eos_ora_01_apologistika,
+        '10:04');
+    assert.strictEqual(revisionState.audits[0].newValues.eos_ora_01_apologistika,
+        '14:04');
 
     for (const orphanType of ['START_ONLY', 'END_ONLY']) {
         const state = { row: structuredClone(oldRecord), audits: [] };
