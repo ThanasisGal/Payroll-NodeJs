@@ -1,6 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const {
+    buildApasxoliseisScenarioFacts
+} = require('../../services/ergazomenoi/apasxoliseisScenarioFactsService');
 
 const source = fs.readFileSync(path.join(__dirname, 'erganhController.js'), 'utf8');
 
@@ -67,5 +70,27 @@ assertScenarioProjectionFields(
     scenarioClassificationSource,
     'getProdhlomenaOrariaScenarioClassifications'
 );
+assert.match(
+    scenarioClassificationSource,
+    /has_card_evidence:\s*facts\.cards\.hasAnyCardEvidence/
+);
+assert.doesNotMatch(scenarioClassificationSource, /has_any_card_evidence:/);
+
+const zeroLengthFacts = buildApasxoliseisScenarioFacts({
+    hmeromhnia: '2026-08-03',
+    cards_apo_ora_01: '14:04',
+    cards_eos_ora_01: '14:04',
+    cards_ores_ergasias: 0
+});
+const zeroLengthFactsSummary = {
+    has_card_evidence: zeroLengthFacts.cards.hasAnyCardEvidence,
+    has_cards: zeroLengthFacts.cards.hasCards,
+    has_zero_length_card_interval: zeroLengthFacts.cards.hasZeroLengthCardInterval
+};
+assert.deepStrictEqual(zeroLengthFactsSummary, {
+    has_card_evidence: true,
+    has_cards: false,
+    has_zero_length_card_interval: true
+});
 
 console.log('employment review scenario projection controller contract passed');

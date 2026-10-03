@@ -972,9 +972,12 @@ function fillScenarioProposedUpdates(row) {
 function renderScenarioFactsSummary(factsSummary = {}) {
     if (!factsSummary || Object.keys(factsSummary).length === 0) return '';
 
+    const hasCardEvidence = typeof factsSummary.has_card_evidence === 'boolean'
+        ? factsSummary.has_card_evidence
+        : factsSummary.has_any_card_evidence;
     const cardItems = factsSummary.has_zero_length_card_interval === true
         ? [
-            ['Υπάρχουν χτυπήματα κάρτας', factsSummary.has_card_evidence],
+            ['Υπάρχουν χτυπήματα κάρτας', hasCardEvidence],
             ['Έγκυρο μη μηδενικό διάστημα', factsSummary.has_cards],
             ['Μηδενικό διάστημα κάρτας', true]
         ]
