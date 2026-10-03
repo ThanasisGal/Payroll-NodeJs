@@ -39,7 +39,6 @@
         "express-flash-message": "^3.0.2",
         "express-rate-limit": "^8.1.0",
         "express-session": "^1.18.2",
-        "fast-glob": "^3.3.3",
         "form-data": "^4.0.4",
         "fs-extra": "11.3.0",
         "geoip-lite": "^2.0.2",
@@ -79,6 +78,7 @@
         "@types/node": "^22.5.5",
         "clean-css-cli": "^5.6.3",
         "cross-env": "^10.0.0",
+        "fast-glob": "^3.3.3",
         "nodemon": "^3.0.1",
         "terser": "^5.36.0"
     }

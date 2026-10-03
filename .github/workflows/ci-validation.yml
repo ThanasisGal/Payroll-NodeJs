@@ -738,6 +738,8 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "scripts/ci/audit-production-dependencies.test.js"
+            "server/utils/s3Helper.dependencyBoundary.contract.test.js"
             "server/services/ergazomenoi/apasxoliseisExternalBreakTemporal.test.js"
             "server/controllers/ergazomenoi/erganhController.externalBreakTemporal.test.js"
             "server/services/ergazomenoi/apasxoliseisTargetedCanonicalPostCheckIntegrationService.test.js"
