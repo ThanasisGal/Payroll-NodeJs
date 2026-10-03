@@ -71,6 +71,16 @@ assert.match(factsHtml, /Υπάρχουν χτυπήματα κάρτας:\s*Ν�
 assert.match(factsHtml, /Έγκυρο μη μηδενικό διάστημα:\s*ΟΧΙ/);
 assert.match(factsHtml, /Μηδενικό διάστημα κάρτας:\s*ΝΑΙ/);
 assert.doesNotMatch(factsHtml, /Έχει κάρτες:\s*ΟΧΙ/);
+assert.doesNotMatch(factsHtml, /Υπάρχουν χτυπήματα κάρτας:\s*-/);
+const legacyFactsHtml = factsSandbox.render({ declared_category: 'ΕΡΓ', card_hours: 0,
+    has_any_card_evidence: true, has_cards: false, has_zero_length_card_interval: true,
+    is_holiday: false, is_locked: false });
+assert.match(legacyFactsHtml, /Υπάρχουν χτυπήματα κάρτας:\s*ΝΑΙ/);
+assert.doesNotMatch(legacyFactsHtml, /Υπάρχουν χτυπήματα κάρτας:\s*-/);
+const canonicalPrecedenceHtml = factsSandbox.render({ declared_category: 'ΕΡΓ', card_hours: 0,
+    has_card_evidence: false, has_any_card_evidence: true, has_cards: false,
+    has_zero_length_card_interval: true, is_holiday: false, is_locked: false });
+assert.match(canonicalPrecedenceHtml, /Υπάρχουν χτυπήματα κάρτας:\s*ΟΧΙ/);
 
 const scenarioFunctionSource = source.slice(
     source.indexOf('function renderScenarioDetailsSection'),

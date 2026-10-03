@@ -740,6 +740,8 @@ jobs:
           tests=(
             "scripts/ci/audit-production-dependencies.test.js"
             "server/utils/s3Helper.dependencyBoundary.contract.test.js"
+            "server/controllers/ergazomenoi/erganhController.scenarioProjection.contract.test.js"
+            "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.zeroLengthResolutionUi.test.js"
             "server/services/ergazomenoi/apasxoliseisExternalBreakTemporal.test.js"
             "server/controllers/ergazomenoi/erganhController.externalBreakTemporal.test.js"
             "server/services/ergazomenoi/apasxoliseisTargetedCanonicalPostCheckIntegrationService.test.js"
