@@ -178,6 +178,71 @@ function testAnyCardEvidenceContract() {
     assert.strictEqual(noCards.cards.hasAnyCardEvidence, false);
 }
 
+function zeroLengthRow(overrides = {}) {
+    return {
+        _id: 'zero-length-2026-08-03',
+        hmeromhnia: '2026-08-03',
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        cards_apo_ora_01: '14:04',
+        cards_eos_ora_01: '14:04',
+        cards_ores_ergasias: 0,
+        zero_length_card_resolution: null,
+        ...overrides
+    };
+}
+
+function testZeroLengthRequiresReviewUntilCanonicalApproval() {
+    const unresolvedRow = zeroLengthRow();
+    const unresolvedFacts = buildApasxoliseisScenarioFacts(unresolvedRow);
+    const unresolvedDecision = matchApasxoliseisScenarioFacts(unresolvedFacts);
+    assert.strictEqual(unresolvedFacts.cards.hasZeroLengthCardInterval, true);
+    assert.strictEqual(unresolvedFacts.cards.hasAnyCardEvidence, true);
+    assert.strictEqual(unresolvedFacts.cards.hasCards, false);
+    assert.strictEqual(unresolvedFacts.review.zeroLengthResolutionApproved, false);
+    assert.strictEqual(unresolvedDecision.scenario_code, 'ZERO_LENGTH_CARD_INTERVAL');
+    assert.strictEqual(unresolvedDecision.requires_review, true);
+    assert.strictEqual(unresolvedDecision.decision_status, 'PENDING_REVIEW');
+    assert.deepStrictEqual(unresolvedDecision.proposed_updates, {});
+
+    const [unresolvedPreview] = buildApasxoliseisPolicyPreviewRows({ rows: [unresolvedRow] });
+    assert.strictEqual(unresolvedPreview.scenarioFactsSummary.has_card_evidence, true);
+    assert.strictEqual(unresolvedPreview.scenarioFactsSummary.has_cards, false);
+    assert.strictEqual(unresolvedPreview.scenarioFactsSummary.has_zero_length_card_interval, true);
+    assert.strictEqual(unresolvedPreview.policyResult.policy_code, 'ZERO_LENGTH_CARD_REVIEW');
+    assert.strictEqual(unresolvedPreview.policyResult.result_status, 'NEEDS_REVIEW');
+    assert.deepStrictEqual(unresolvedPreview.policyResult.proposed_updates, {});
+
+    const approvedRow = zeroLengthRow({
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        apo_ora_01_apologistika: '14:04',
+        eos_ora_01_apologistika: '22:04',
+        ores_ergasias_apologistika: 8,
+        ores_pragmatikhs_ergasias_apologistika: 8,
+        apologistiko_biblio: true,
+        zero_length_card_resolution: {
+            status: 'HR_APPROVED',
+            policy_version: 'zero-length-card-work:v1',
+            resolution_kind: 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE',
+            raw_cards_preserved: true
+        }
+    });
+    const approvedFacts = buildApasxoliseisScenarioFacts(approvedRow);
+    const approvedDecision = matchApasxoliseisScenarioFacts(approvedFacts);
+    assert.strictEqual(approvedFacts.review.zeroLengthResolutionApproved, true);
+    assert.strictEqual(approvedDecision.scenario_code, 'ZERO_LENGTH_CARD_INTERVAL');
+    assert.strictEqual(approvedDecision.requires_review, false);
+    assert.strictEqual(approvedDecision.decision_status, 'CLASSIFIED_ONLY');
+    assert.deepStrictEqual(approvedDecision.proposed_updates, {});
+    const approvedBefore = JSON.stringify(approvedRow);
+    const [approvedPreview] = buildApasxoliseisPolicyPreviewRows({ rows: [approvedRow] });
+    assert.strictEqual(approvedPreview.policyResult.result_status, 'RESOLVED_BY_POLICY');
+    assert.deepStrictEqual(approvedPreview.policyResult.proposed_updates, {});
+    assert.strictEqual(JSON.stringify(approvedRow), approvedBefore);
+    assert.strictEqual(approvedRow.apo_ora_01_apologistika, '14:04');
+    assert.strictEqual(approvedRow.eos_ora_01_apologistika, '22:04');
+}
+
 function run() {
     testProductionUnscheduledDayIsResolvedWithoutHrReview();
     testProductionUnscheduledHolidayWorkIsResolvedWithoutHrReview();
@@ -185,6 +250,7 @@ function run() {
     testUnsafeBlankDaysRemainUnknown();
     testScenarioExposesStableRuleBranch();
     testAnyCardEvidenceContract();
+    testZeroLengthRequiresReviewUntilCanonicalApproval();
     console.log('apasxoliseis scenario matcher tests passed');
 }
 

@@ -95,6 +95,7 @@ function buildScenarioFactsSummary(facts = {}) {
         declared_hours: facts?.declared?.declaredHours || 0,
         card_hours: facts?.cards?.cardHours || 0,
         has_cards: facts?.cards?.hasCards === true,
+        has_card_evidence: facts?.cards?.hasAnyCardEvidence === true,
         has_zero_length_card_interval: facts?.cards?.hasZeroLengthCardInterval === true,
         is_holiday: facts?.holiday?.isHoliday === true,
         is_mandatory_holiday: facts?.holiday?.isMandatoryHoliday === true,
@@ -135,6 +136,9 @@ function buildBaselineOkPolicyResult({ policyCode, reason, scenarioDecision, row
 }
 
 function buildBaselinePolicyResult({ row, employee, scenarioDecision, rowContextKey }) {
+    if (scenarioDecision?.scenario_code === 'ZERO_LENGTH_CARD_INTERVAL' &&
+        scenarioDecision?.requires_review === true) return null;
+
     if (employee && employee.karta_ergasias !== true) {
         return buildBaselineOkPolicyResult({
             policyCode: BASELINE_POLICY_CODES.CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK,

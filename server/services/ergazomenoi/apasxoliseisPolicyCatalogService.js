@@ -404,6 +404,35 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         ]
     },
     {
+        policy_code: 'ZERO_LENGTH_CARD_REVIEW',
+        policy_version: 'zero-length-card-work:v1',
+        title: 'Επίλυση μηδενικού διαστήματος κάρτας',
+        description:
+            'Διακρίνει το ανεπίλυτο μηδενικό διάστημα από την εγκεκριμένη επίλυση HR.',
+        category: POLICY_CATEGORIES.CARDS_ON_NON_WORK,
+        default_mode: POLICY_MODE.REVIEW_ONLY,
+        supported_modes: [POLICY_MODE.REVIEW_ONLY],
+        default_priority: 55,
+        safety_level: POLICY_SAFETY_LEVEL.HIGH_RISK,
+        batch_approvable: false,
+        requires_human_approval: false,
+        required_facts: [
+            'cards.hasZeroLengthCardInterval',
+            'review.zeroLengthResolutionApproved'
+        ],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [],
+        result_statuses: [
+            POLICY_RESULT_STATUS.NEEDS_REVIEW,
+            POLICY_RESULT_STATUS.RESOLVED_BY_POLICY
+        ],
+        related_scenario_codes: ['ZERO_LENGTH_CARD_INTERVAL'],
+        notes: [
+            'Δεν προτείνει ούτε εφαρμόζει διάστημα εργασίας από τα πρωτογενή χτυπήματα.',
+            'Η εγκεκριμένη απολογιστική επίλυση παραμένει αυθεντική.'
+        ]
+    },
+    {
         policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
         policy_version: 'foundation:v3',
         title: 'Ρεπό, μη εργασία ή μη προδηλωμένη ημέρα με κάρτες',

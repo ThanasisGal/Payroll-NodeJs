@@ -10,11 +10,18 @@ const EXCEPTIONS_PATH = path.resolve(
     'security',
     'npm-audit-exceptions.json'
 );
-const EXACT_ALLOWED_EXCEPTION = Object.freeze({
-    package: 'brace-expansion',
-    advisoryId: 'GHSA-mh99-v99m-4gvg',
-    severity: 'high'
-});
+const EXACT_ALLOWED_EXCEPTIONS = Object.freeze([
+    Object.freeze({
+        package: 'brace-expansion',
+        advisoryId: 'GHSA-mh99-v99m-4gvg',
+        severity: 'high'
+    }),
+    Object.freeze({
+        package: 'http-cache-semantics',
+        advisoryId: 'GHSA-ch52-4w7c-c8xp',
+        severity: 'high'
+    })
+]);
 const SEVERITIES = new Set(['info', 'low', 'moderate', 'high', 'critical']);
 
 function contractError(message) {
@@ -75,12 +82,13 @@ function validateExceptionConfig(config, now = new Date()) {
         if (!SEVERITIES.has(exception.severity)) {
             throw contractError(`Exception ${index} has an invalid severity`);
         }
-        if (
-            exception.package !== EXACT_ALLOWED_EXCEPTION.package ||
-            exception.advisoryId !== EXACT_ALLOWED_EXCEPTION.advisoryId ||
-            exception.severity !== EXACT_ALLOWED_EXCEPTION.severity
-        ) {
-            throw contractError('Only the exact approved brace-expansion advisory may be excepted');
+        const approvedTuple = EXACT_ALLOWED_EXCEPTIONS.some((candidate) =>
+            exception.package === candidate.package &&
+            exception.advisoryId === candidate.advisoryId &&
+            exception.severity === candidate.severity
+        );
+        if (!approvedTuple) {
+            throw contractError('Only exact code-level approved advisory tuples may be excepted');
         }
         if (!/^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/\d+$/.test(exception.trackingIssue)) {
             throw contractError(`Exception ${index} is missing a valid tracking issue`);
@@ -294,7 +302,7 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
-    EXACT_ALLOWED_EXCEPTION,
+    EXACT_ALLOWED_EXCEPTIONS,
     parseJson,
     validateExceptionConfig,
     validateAuditSchema,

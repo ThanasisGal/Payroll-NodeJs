@@ -1,13 +1,15 @@
 const assert = require('assert');
 const {
+    EXACT_ALLOWED_EXCEPTIONS,
     parseJson,
     validateExceptionConfig,
     evaluateAudit,
     acquireAuditReport
 } = require('./audit-production-dependencies');
 
-const NOW = new Date('2026-07-25T12:00:00.000Z');
-const ISSUE = 'https://github.com/ThanasisGal/Payroll-NodeJs/issues/34';
+const NOW = new Date('2026-10-03T12:00:00.000Z');
+const BRACE_ISSUE = 'https://github.com/ThanasisGal/Payroll-NodeJs/issues/34';
+const HTTP_CACHE_ISSUE = 'https://github.com/ThanasisGal/Payroll-NodeJs/issues/268';
 
 function exception(overrides = {}) {
     return {
@@ -15,8 +17,20 @@ function exception(overrides = {}) {
         advisoryId: 'GHSA-mh99-v99m-4gvg',
         severity: 'high',
         reason: 'No patched compatible release exists.',
-        trackingIssue: ISSUE,
+        trackingIssue: BRACE_ISSUE,
         expiresOn: '2026-10-23',
+        ...overrides
+    };
+}
+
+function httpCacheException(overrides = {}) {
+    return {
+        package: 'http-cache-semantics',
+        advisoryId: 'GHSA-ch52-4w7c-c8xp',
+        severity: 'high',
+        reason: 'No patched release exists in the libxmljs2 native-build dependency path.',
+        trackingIssue: HTTP_CACHE_ISSUE,
+        expiresOn: '2026-10-17',
         ...overrides
     };
 }
@@ -61,6 +75,13 @@ const exact = {
     advisoryId: 'GHSA-mh99-v99m-4gvg',
     severity: 'high'
 };
+const httpCacheExact = {
+    package: 'http-cache-semantics',
+    advisoryId: 'GHSA-ch52-4w7c-c8xp',
+    severity: 'high'
+};
+
+assert.deepStrictEqual(EXACT_ALLOWED_EXCEPTIONS, [exact, httpCacheExact]);
 
 function mustFail(name, fn, pattern) {
     assert.throws(fn, pattern, name);
@@ -113,6 +134,29 @@ const exactResult = evaluateAudit(audit([exact]), config(), NOW);
 assert.strictEqual(exactResult.passed, true);
 assert.strictEqual(exactResult.allowed.length, 1);
 
+const httpCacheResult = evaluateAudit(
+    audit([httpCacheExact]), config([httpCacheException()]), NOW
+);
+assert.strictEqual(httpCacheResult.passed, true);
+assert.strictEqual(httpCacheResult.allowed.length, 1);
+
+const bothExactResult = evaluateAudit(
+    audit([exact, httpCacheExact]), config([exception(), httpCacheException()]), NOW
+);
+assert.strictEqual(bothExactResult.passed, true);
+assert.strictEqual(bothExactResult.allowed.length, 2);
+mustFail(
+    'multiple exact exceptions require both active findings',
+    () => evaluateAudit(audit([httpCacheExact]),
+        config([exception(), httpCacheException()]), NOW),
+    /Stale exception: brace-expansion/
+);
+mustFail(
+    'http-cache exception becomes stale when advisory disappears',
+    () => evaluateAudit(audit([]), config([httpCacheException()]), NOW),
+    /Stale exception: http-cache-semantics/
+);
+
 mustFail(
     'different advisory for same package',
     () => evaluateAudit(audit([{ ...exact, advisoryId: 'GHSA-aaaa-bbbb-cccc' }]), config(), NOW),
@@ -129,6 +173,25 @@ mustFail(
     /Stale exception/
 );
 mustFail(
+    'different http-cache advisory is not approved',
+    () => validateExceptionConfig(config([httpCacheException({
+        advisoryId: 'GHSA-aaaa-bbbb-cccc'
+    })]), NOW),
+    /exact code-level approved/
+);
+mustFail(
+    'http-cache advisory under a different package is not approved',
+    () => validateExceptionConfig(config([httpCacheException({
+        package: 'other-package'
+    })]), NOW),
+    /exact code-level approved/
+);
+mustFail(
+    'critical http-cache advisory cannot use the high exception',
+    () => validateExceptionConfig(config([httpCacheException({ severity: 'critical' })]), NOW),
+    /exact code-level approved/
+);
+mustFail(
     'new high advisory',
     () => evaluateAudit(audit([{ package: 'new-package', advisoryId: 'GHSA-1111-2222-3333', severity: 'high' }]), config(), NOW),
     /Stale exception/
@@ -142,6 +205,13 @@ mustFail(
 mustFail(
     'expired exception',
     () => evaluateAudit(audit([exact]), config([exception({ expiresOn: '2026-07-24' })]), NOW),
+    /expired/
+);
+mustFail(
+    'expired http-cache exception',
+    () => evaluateAudit(audit([httpCacheExact]), config([
+        httpCacheException({ expiresOn: '2026-10-02' })
+    ]), NOW),
     /expired/
 );
 mustFail(
@@ -180,7 +250,7 @@ mustFail(
 mustFail(
     'unapproved exception tuple',
     () => validateExceptionConfig(config([exception({ advisoryId: 'GHSA-aaaa-bbbb-cccc' })]), NOW),
-    /exact approved/
+    /exact code-level approved/
 );
 mustFail(
     'high aggregate without direct advisory',

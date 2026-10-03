@@ -783,6 +783,22 @@ const singleCompletionSource = source.slice(
     source.indexOf('function renderWeeklyHrStage1BulkResult')
 );
 assert.match(singleCompletionSource, /await refreshWeeklyHrStage1Scope\(scope\)/);
+const pendingTextFunction = source.match(
+    /function workflowStagePendingText\([\s\S]*?\n}/)?.[0] || '';
+const pendingTextSandbox = {};
+vm.runInNewContext(`${pendingTextFunction}\nthis.render = workflowStagePendingText;`,
+    pendingTextSandbox);
+const blockedWithoutClassificationItems = pendingTextSandbox.render({
+    business_status: 'BLOCKED', pending_count: 0,
+    pending_reasons: ['ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION']
+}, 'BLOCKED', false);
+assert.match(blockedWithoutClassificationItems, /Απαιτείται επίλυση/);
+assert.doesNotMatch(blockedWithoutClassificationItems, /0 εκκρεμότητες/);
+assert.match(pendingTextSandbox.render({
+    business_status: 'OPEN', pending_count: 2
+}, 'OPEN', false), /2 εκκρεμότητες/);
+assert.match(source, /Εκκρεμότητες χαρακτηρισμού: <strong>\$\{counts\.needsAction}/);
+assert.doesNotMatch(source, />Εκκρεμότητες: <strong>\$\{counts\.needsAction}/);
 assert.match(css,
     /\.employment-review-swal-popup \.swal2-confirm\.weekly-hr-stage1-bulk-confirm\s*\{[\s\S]*?white-space:\s*nowrap/);
 assert.doesNotMatch(css, /\.swal2-confirm\s*\{[^}]*white-space:\s*nowrap/);

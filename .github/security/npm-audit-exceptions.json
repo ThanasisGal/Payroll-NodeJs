@@ -1,3 +1,12 @@
 {
-  "exceptions": []
+  "exceptions": [
+    {
+      "package": "http-cache-semantics",
+      "advisoryId": "GHSA-ch52-4w7c-c8xp",
+      "severity": "high",
+      "reason": "No patched release exists; dependency is present only through the libxmljs2 node-gyp installation toolchain, not direct application HTTP caching.",
+      "trackingIssue": "https://github.com/ThanasisGal/Payroll-NodeJs/issues/268",
+      "expiresOn": "2026-10-17"
+    }
+  ]
 }
