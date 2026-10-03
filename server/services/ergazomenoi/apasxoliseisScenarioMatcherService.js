@@ -358,13 +358,28 @@ function getMvpScenarioTemplates() {
         },
         {
             scenario_code: SCENARIO_CODES.ZERO_LENGTH_CARD_INTERVAL,
-            description: 'Ίδια ώρα εισόδου-εξόδου χωρίς πραγματικές κάρτες.',
+            rule_branch: 'ZERO_LENGTH_CARD_INTERVAL_APPROVED',
+            description: 'Εγκεκριμένη επίλυση μηδενικού διαστήματος κάρτας.',
             confidence: CONFIDENCE.HIGH,
             requires_review: false,
             reasons: [REASON_CODES.ZERO_LENGTH_CARD_INTERVAL_FOUND],
             match: (facts) =>
                 facts?.cards?.hasZeroLengthCardInterval === true &&
-                facts?.cards?.hasCards === false,
+                facts?.cards?.hasCards === false &&
+                facts?.review?.zeroLengthResolutionApproved === true,
+            proposed_updates: {}
+        },
+        {
+            scenario_code: SCENARIO_CODES.ZERO_LENGTH_CARD_INTERVAL,
+            rule_branch: 'ZERO_LENGTH_CARD_INTERVAL_PENDING_REVIEW',
+            description: 'Μηδενικό διάστημα κάρτας που απαιτεί επίλυση από HR.',
+            confidence: CONFIDENCE.HIGH,
+            requires_review: true,
+            reasons: [REASON_CODES.ZERO_LENGTH_CARD_INTERVAL_FOUND],
+            match: (facts) =>
+                facts?.cards?.hasZeroLengthCardInterval === true &&
+                facts?.cards?.hasCards === false &&
+                facts?.review?.zeroLengthResolutionApproved !== true,
             proposed_updates: {}
         },
         {

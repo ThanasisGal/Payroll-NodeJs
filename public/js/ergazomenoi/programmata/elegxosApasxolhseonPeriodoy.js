@@ -972,10 +972,17 @@ function fillScenarioProposedUpdates(row) {
 function renderScenarioFactsSummary(factsSummary = {}) {
     if (!factsSummary || Object.keys(factsSummary).length === 0) return '';
 
+    const cardItems = factsSummary.has_zero_length_card_interval === true
+        ? [
+            ['Υπάρχουν χτυπήματα κάρτας', factsSummary.has_card_evidence],
+            ['Έγκυρο μη μηδενικό διάστημα', factsSummary.has_cards],
+            ['Μηδενικό διάστημα κάρτας', true]
+        ]
+        : [['Έχει κάρτες', factsSummary.has_cards]];
     const items = [
         ['Προδηλωμένο', factsSummary.declared_category],
         ['Ώρες καρτών', factsSummary.card_hours],
-        ['Έχει κάρτες', factsSummary.has_cards],
+        ...cardItems,
         ['Αργία', factsSummary.is_holiday],
         ['Κλειδωμένη', factsSummary.is_locked]
     ];
@@ -11097,6 +11104,17 @@ function renderStage4Summary(payloads = []) {
         : allCompleted ? '✓ Τελικός εβδομαδιαίος έλεγχος ολοκληρώθηκε' : '';
 }
 
+function workflowStagePendingText(stage = {}, presentationStatus = '', noHrAction = false) {
+    if (presentationStatus === 'LOCKED' || noHrAction) return '';
+    const hasBlockers = ['pending_reasons', 'blocking_reasons', 'blocked_reasons', 'blockers']
+        .some((field) => Array.isArray(stage[field]) && stage[field].length > 0);
+    if (stage.business_status === 'BLOCKED' && Number(stage.pending_count || 0) === 0 &&
+        hasBlockers) {
+        return ' <span class="small ms-2">Απαιτείται επίλυση</span>';
+    }
+    return ` <span class="small ms-2">${stage.pending_count} εκκρεμότητες</span>`;
+}
+
 function updateEmploymentReviewWorkflowPresentation() {
     const allPayloads = [...currentCanonicalLifecyclePayloads]
         .sort(compareWeeklyHrStage1Payloads);
@@ -11151,8 +11169,7 @@ function updateEmploymentReviewWorkflowPresentation() {
                 'ΟΛΟΚΛΗΡΩΘΗΚΕ</span>'
             : `<span class="badge ${workflowStageStatusClasses[badgeStatus]} ms-2">${escapeHtml(
                 badgeLabel)}</span>`;
-        const pendingText = presentationStatus === 'LOCKED' || noHrAction ? '' :
-            ` <span class="small ms-2">${stage.pending_count} εκκρεμότητες</span>`;
+        const pendingText = workflowStagePendingText(stage, presentationStatus, noHrAction);
         header.innerHTML = `${escapeHtml(workflowStageNames[stage.stage])}
             ${badge}${pendingText}`;
         const stageViewLocked = presentationStatus === 'LOCKED' && stage.stage !== 'STAGE4';
@@ -11196,7 +11213,7 @@ function renderWeeklyHrStage1BulkToolbar() {
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterSickness" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="sickness" ${stage1DisplayFilters.sickness ? 'checked' : ''}><span class="form-check-label">Ασθένειες</span></label>
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterAbsence" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="absence" ${stage1DisplayFilters.absence ? 'checked' : ''}><span class="form-check-label">Απουσίες</span></label>
             </span>
-            <span class="weekly-hr-stage1-counts text-muted"><span>Εκκρεμότητες: <strong>${counts.needsAction}</strong></span><span>Εμφανιζόμενες εβδομάδες: <strong id="weeklyHrStage1VisibleCount">${counts.visible}</strong></span><span>Επιλεγμένες εβδομάδες: <strong id="weeklyHrStage1SelectedCount">${counts.selected}</strong></span><span>Επιλεγμένες ημέρες: <strong>${counts.selectedDays}</strong></span><span>Μη αποθηκευμένες αλλαγές: <strong>${counts.drafts}</strong></span></span>
+            <span class="weekly-hr-stage1-counts text-muted"><span>Εκκρεμότητες χαρακτηρισμού: <strong>${counts.needsAction}</strong></span><span>Εμφανιζόμενες εβδομάδες: <strong id="weeklyHrStage1VisibleCount">${counts.visible}</strong></span><span>Επιλεγμένες εβδομάδες: <strong id="weeklyHrStage1SelectedCount">${counts.selected}</strong></span><span>Επιλεγμένες ημέρες: <strong>${counts.selectedDays}</strong></span><span>Μη αποθηκευμένες αλλαγές: <strong>${counts.drafts}</strong></span></span>
             ${weeklyHrStage1AttentionTooltip ? `<button type="button" class="btn btn-sm weekly-hr-stage1-info-trigger" aria-label="Πληροφορίες Σταδίου 1" data-stage1-tooltip="${escapeHtml(weeklyHrStage1AttentionTooltip)}">ⓘ</button>` : ''}
         </div>
         <div class="d-flex flex-wrap gap-1 align-items-center mt-1 pt-1 border-top weekly-hr-legacy-bulk-controls weekly-hr-day-bulk-toolbar">
@@ -12712,9 +12729,10 @@ function renderApologistikaFields(row) {
 
 function renderOrphanCardResolutionSection(row = {}) {
     const preview = row.orphan_card_resolution_preview || {};
-    if (preview.orphanVisible !== true) return '';
     const unresolvedPairs = Array.isArray(preview.unresolvedPairs)
-        ? preview.unresolvedPairs : [];
+        ? preview.unresolvedPairs.filter((item) =>
+            ['START_ONLY', 'END_ONLY'].includes(item?.orphanType)) : [];
+    if (preview.orphanVisible !== true || unresolvedPairs.length === 0) return '';
     const splitPairDetails = unresolvedPairs.map((item) => {
         const pair = Number(item.pairNumber);
         const declaredStart = row[`apo_ora_0${pair}`] || '—';
@@ -12733,8 +12751,8 @@ function renderOrphanCardResolutionSection(row = {}) {
         const splitPolicyViolation = ['SPLIT_REST_BELOW_MINIMUM',
             'SPLIT_INTERVALS_OVERLAP'].includes(preview.reason);
         const orphanLabel = preview.orphanType === 'END_ONLY' ? 'Μόνο έξοδος' : 'Μόνο είσοδος';
-        const rawPunches = [1, 2, 3].flatMap((index) => [
-            row[`cards_apo_ora_0${index}`], row[`cards_eos_ora_0${index}`]
+        const rawPunches = unresolvedPairs.flatMap((item) => [
+            item.knownStart, item.knownEnd
         ]).filter(Boolean).join(', ') || '-';
         const declaredIntervals = [1, 2, 3].map((index) => ({
             start: row[`apo_ora_0${index}`], end: row[`eos_ora_0${index}`]

@@ -13,8 +13,11 @@ const {
     normalizeTimeValue,
     timeToMinutes
 } = require('./apasxoliseisScenarioFactsService');
-const POLICY_VERSION = 'zero-length-card-work:v1';
-const RESOLUTION_KIND = 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE';
+const {
+    POLICY_VERSION,
+    RESOLUTION_KIND,
+    isApprovedZeroLengthResolution
+} = require('./apasxoliseisZeroLengthCardResolutionContract');
 
 function fail(code, message, statusCode = 400) {
     throw Object.assign(new Error(message), { code, statusCode });
@@ -125,14 +128,6 @@ function resolveZeroLengthCardResolution({ row = {}, command = {}, effectiveEmpl
     return Object.freeze({ approvedUpdates: Object.freeze(approvedUpdates),
         metadata: Object.freeze(metadata), intervals: Object.freeze(intervals),
         netWorkMinutes: netMinutes });
-}
-
-function isApprovedZeroLengthResolution(row = {}) {
-    const value = row.zero_length_card_resolution;
-    return Boolean(value?.status === 'HR_APPROVED' &&
-        value?.policy_version === POLICY_VERSION &&
-        value?.resolution_kind === RESOLUTION_KIND &&
-        value?.raw_cards_preserved === true);
 }
 
 function replayView(metadata = {}) {

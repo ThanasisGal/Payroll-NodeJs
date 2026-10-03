@@ -69,6 +69,17 @@ assert.strictEqual(endResult.proposal.end, '22:51');
 assert.strictEqual(endResult.apologistikoBookUpdate, true);
 assert.strictEqual(endResult.approvedUpdates.apologistiko_biblio, true);
 assert.strictEqual(endOnly.cards_apo_ora_01, '');
+
+const zeroLengthOnly = row('2026-08-03', {
+    cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04', cards_ores_ergasias: 0
+});
+const zeroLengthOrphanResult = resolveOrphanCardResolution({
+    row: zeroLengthOnly, contextRows: [zeroLengthOnly]
+});
+assert.strictEqual(zeroLengthOrphanResult.orphanVisible, false);
+assert.strictEqual(zeroLengthOrphanResult.blocking, false);
+assert.strictEqual(zeroLengthOrphanResult.orphanType, null);
+assert.deepStrictEqual(zeroLengthOrphanResult.unresolvedPairs, []);
 const externalStart = row('2026-06-14', { dialleima_entos_ektos_orarioy: false });
 const externalStartResult = resolveOrphanCardResolution({
     row: externalStart, contextRows: [externalStart]
@@ -258,6 +269,19 @@ assert.strictEqual(allPairs.eligible, true);
 assert.strictEqual(allPairs.resolvedPairs.length, 2);
 assert.strictEqual(allPairs.approvedUpdates.apo_ora_01_apologistika, '08:05');
 assert.strictEqual(allPairs.approvedUpdates.apo_ora_02_apologistika, '15:10');
+
+const mixedOrphanAndZeroLength = row('2026-08-09', {
+    apo_ora_01: '08:00', eos_ora_01: '12:00',
+    apo_ora_02: '16:00', eos_ora_02: '20:00',
+    cards_apo_ora_01: '08:05', cards_eos_ora_01: '',
+    cards_apo_ora_02: '16:04', cards_eos_ora_02: '16:04'
+});
+const mixedResult = resolveOrphanCardResolution({ row: mixedOrphanAndZeroLength,
+    manualInterval: { pairs: [{ pairNumber: 1, start: '08:05', end: '12:05' }] } });
+assert.strictEqual(mixedResult.orphanVisible, true);
+assert.deepStrictEqual(mixedResult.unresolvedPairs, [{ pairNumber: 1,
+    orphanType: 'START_ONLY', knownStart: '08:05', knownEnd: null,
+    missingPunch: 'END' }]);
 
 const averageEnd = row('2026-06-15', { kathgoria_ergasias: 'ΑΝ', repo: true,
     apo_ora_01: '', eos_ora_01: '', cards_apo_ora_01: '', cards_eos_ora_01: '23:47' });

@@ -1,6 +1,10 @@
 // Pure facts extractor for Apasxoliseis scenario classification.
 // This module must stay free of DB, controller, route, and network dependencies.
 
+const {
+    isApprovedZeroLengthResolution
+} = require('./apasxoliseisZeroLengthCardResolutionContract');
+
 const DECLARED_INTERVAL_FIELDS = [
     ['apo_ora_01', 'eos_ora_01'],
     ['apo_ora_02', 'eos_ora_02'],
@@ -284,7 +288,8 @@ function buildApasxoliseisScenarioFacts(row, context = {}) {
         locked_by: toTrimmedString(sourceRow.locked_by),
         locked_at: sourceRow.locked_at || null,
         existingAuditCount,
-        hasManualOverride: toBoolean(sourceRow.is_locked) || existingAuditCount > 0
+        hasManualOverride: toBoolean(sourceRow.is_locked) || existingAuditCount > 0,
+        zeroLengthResolutionApproved: isApprovedZeroLengthResolution(sourceRow)
     };
 
     const facts = {

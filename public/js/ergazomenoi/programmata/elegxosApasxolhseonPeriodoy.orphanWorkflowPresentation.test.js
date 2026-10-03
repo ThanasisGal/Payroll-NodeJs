@@ -27,14 +27,21 @@ const modalStart = source.indexOf('function renderOrphanCardResolutionSection');
 const modalEnd = source.indexOf('async function refreshOrphanResolutionPreview', modalStart);
 vm.runInContext(source.slice(modalStart, modalEnd), sandbox);
 
+const unresolvedPair = (orphanType, pairNumber = 1) => [{ pairNumber, orphanType,
+    knownStart: orphanType === 'START_ONLY' ? '14:38' : null,
+    knownEnd: orphanType === 'END_ONLY' ? '23:47' : null,
+    missingPunch: orphanType === 'START_ONLY' ? 'END' : 'START' }];
+
 const startRow = { _id: 'start', hmeromhnia: '2026-06-07', cards_apo_ora_01: '14:38',
     cards_eos_ora_01: '', orphan_card_resolution_preview: { orphanVisible: true,
+        unresolvedPairs: unresolvedPair('START_ONLY'),
         orphanType: 'START_ONLY', proposal: { start: '14:38', end: '23:08',
             durationSource: 'DECLARED_CONTINUOUS_DURATION', breakMinutes: 30,
             breakInsideSchedule: false } } };
 const endRow = { _id: 'end', hmeromhnia: '2026-06-15', repo: true,
     cards_apo_ora_01: '', cards_eos_ora_01: '23:47',
     orphan_card_resolution_preview: { orphanVisible: true, orphanType: 'END_ONLY',
+        unresolvedPairs: unresolvedPair('END_ONLY'),
         proposal: { start: '15:17', end: '23:47', durationSource: 'EFFECTIVE_DAILY_AVERAGE',
             effectiveDailyAverageHours: 8, breakMinutes: 30, breakInsideSchedule: false } } };
 const startHtml = sandbox.renderWeeklyHrOrphanItem(startRow);
@@ -61,6 +68,7 @@ assert.match(source,
 const reusableModalHtml = sandbox.renderOrphanCardResolutionSection({
     cards_eos_ora_01: '23:47', orphan_card_resolution_preview: {
         orphanVisible: true, eligible: true, orphanType: 'END_ONLY', reuseScope: 'ONE_TIME',
+        unresolvedPairs: unresolvedPair('END_ONLY'),
         proposal: { start: '15:17', end: '23:47', durationHours: 8.5,
             workDurationHours: 8, manualIntervalMatchesRule: true },
         rest: { hasViolation: false, conflicts: [] }
@@ -78,6 +86,7 @@ assert.doesNotMatch(reusableModalHtml, />START_ONLY<|>END_ONLY</);
 const oneTimeOnlyModalHtml = sandbox.renderOrphanCardResolutionSection({
     cards_eos_ora_01: '23:47', orphan_card_resolution_preview: {
         orphanVisible: true, eligible: true, orphanType: 'END_ONLY', reuseScope: 'ONE_TIME',
+        unresolvedPairs: unresolvedPair('END_ONLY'),
         proposal: { start: '16:00', end: '23:47', durationHours: 7.78,
             workDurationHours: 7.28, manualIntervalMatchesRule: false },
         rest: { hasViolation: false, conflicts: [] }
@@ -88,6 +97,7 @@ assert.doesNotMatch(oneTimeOnlyModalHtml, /orphan-future-identical-scope-help/);
 const startModalHtml = sandbox.renderOrphanCardResolutionSection({
     cards_apo_ora_01: '14:38', orphan_card_resolution_preview: {
         orphanVisible: true, eligible: true, orphanType: 'START_ONLY', reuseScope: 'ONE_TIME',
+        unresolvedPairs: unresolvedPair('START_ONLY'),
         proposal: { start: '14:38', end: '23:08', durationHours: 8.5,
             workDurationHours: 8, manualIntervalMatchesRule: true },
         rest: { hasViolation: true, conflicts: ['PREVIOUS', 'NEXT'] }
@@ -105,6 +115,7 @@ const approvedModalHtml = sandbox.renderOrphanCardResolutionSection({
             start: '09:00', end: '17:00', workDurationHours: 7.5 } },
     orphan_card_resolution_preview: { orphanVisible: true, eligible: true,
         orphanType: 'START_ONLY', apologistikoBookUpdate: true,
+        unresolvedPairs: unresolvedPair('START_ONLY'),
         proposal: { start: '09:00', end: '17:30', workDurationHours: 8 },
         rest: { hasViolation: false, conflicts: [] } }
 });
@@ -124,7 +135,8 @@ const splitUnavailableHtml = sandbox.renderOrphanCardResolutionSection({
     apo_ora_01: '08:00', eos_ora_01: '12:00',
     apo_ora_02: '16:00', eos_ora_02: '20:00',
     orphan_card_resolution_preview: { orphanVisible: true, eligible: false,
-        orphanType: 'START_ONLY', reason: 'SPLIT_OR_INVALID_DECLARED_SCHEDULE' }
+        orphanType: 'START_ONLY', reason: 'SPLIT_OR_INVALID_DECLARED_SCHEDULE',
+        unresolvedPairs: unresolvedPair('START_ONLY') }
 });
 assert.match(splitUnavailableHtml, /Μόνο είσοδος/);
 assert.match(splitUnavailableHtml, /08:00–12:00, 16:00–20:00/);
@@ -134,6 +146,7 @@ assert.match(splitUnavailableHtml, /Συμπληρώστε το πραγματι
 const splitManualHtml = sandbox.renderOrphanCardResolutionSection({
     cards_apo_ora_01: '08:15', orphan_card_resolution_preview: {
         orphanVisible: true, eligible: true, orphanType: 'START_ONLY', reuseScope: 'ONE_TIME',
+        unresolvedPairs: unresolvedPair('START_ONLY'),
         proposal: { start: '08:15', end: '17:45', durationHours: 9.5,
             workDurationHours: 9, durationSource: 'HR_MANUAL_SPLIT_INTERVAL',
             scheduleKind: 'SPLIT', manualIntervalMatchesRule: false },
@@ -161,6 +174,28 @@ assert.match(realPairAwareHtml, /Υπάρχει είσοδος: 18:04/);
 assert.match(realPairAwareHtml, /Λείπει έξοδος/);
 assert.match(realPairAwareHtml, /Καθαρή διάρκεια:<\/strong>\s*7\.98 ώρες/);
 assert.doesNotMatch(realPairAwareHtml, /Πραγματικό χτύπημα:<\/strong>\s*09:32/);
+const malformedZeroLengthPreviewHtml = sandbox.renderOrphanCardResolutionSection({
+    cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04',
+    orphan_card_resolution_preview: { orphanVisible: true, eligible: false,
+        orphanType: 'ZERO_LENGTH', unresolvedPairs: [{ pairNumber: 1,
+            orphanType: 'ZERO_LENGTH', knownStart: '14:04', knownEnd: '14:04',
+            missingPunch: 'START' }] }
+});
+assert.strictEqual(malformedZeroLengthPreviewHtml, '');
+const mixedPreviewHtml = sandbox.renderOrphanCardResolutionSection({
+    hmeromhnia: '2026-08-09', cards_apo_ora_01: '08:05', cards_eos_ora_01: '',
+    cards_apo_ora_02: '16:04', cards_eos_ora_02: '16:04',
+    orphan_card_resolution_preview: { orphanVisible: true, eligible: false,
+        orphanType: 'START_ONLY', reason: 'SPLIT_OR_INVALID_DECLARED_SCHEDULE',
+        unresolvedPairs: [
+            { pairNumber: 1, orphanType: 'START_ONLY', knownStart: '08:05',
+                knownEnd: null, missingPunch: 'END' },
+            { pairNumber: 2, orphanType: 'ZERO_LENGTH', knownStart: '16:04',
+                knownEnd: '16:04', missingPunch: 'START' }
+        ] }
+});
+assert.match(mixedPreviewHtml, /Ζεύγος 1/);
+assert.doesNotMatch(mixedPreviewHtml, /Ζεύγος 2|16:04|Λείπει είσοδος/);
 const rowBeforeDerivedPreview = structuredClone(endRow);
 sandbox.applyOrphanDerivedPreview(endRow, { fields: {
     ores_ergasias_apologistika: 8,

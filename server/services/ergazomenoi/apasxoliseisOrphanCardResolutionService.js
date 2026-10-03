@@ -36,6 +36,16 @@ const RESOLUTION_SCOPE = Object.freeze({
     FUTURE_IDENTICAL: 'FUTURE_IDENTICAL'
 });
 
+function isSupportedOrphanState(state) {
+    return state === CARD_PAIR_STATE.START_ONLY || state === CARD_PAIR_STATE.END_ONLY;
+}
+
+function actualOrphanPairs(verification = {}) {
+    return Array.isArray(verification.unresolvedPairs)
+        ? verification.unresolvedPairs.filter((item) => isSupportedOrphanState(item?.state))
+        : [];
+}
+
 function dateStartUtc(value) {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return null;
@@ -134,7 +144,9 @@ function resolveEffectiveBreakContext(row = {}, effectiveEmployee = {}, breakCon
 
 function buildProposal(row = {}, override = {}, effectiveEmployee = {}, breakConfiguration = null) {
     const declared = resolveContinuousDeclaredSchedule(row);
-    const verification = resolveCardPairVerification(row);
+    const rawVerification = resolveCardPairVerification(row);
+    const verification = { ...rawVerification,
+        unresolvedPairs: actualOrphanPairs(rawVerification) };
     const occupiedDeclared = buildDeclaredIntervals(row).filter((item) => item.start || item.end);
     const splitSchedule = occupiedDeclared.length >= 2;
     if (splitSchedule && verification.unresolvedPairs.length > 0) {
@@ -327,11 +339,12 @@ function resolveOrphanCardResolution({ row = {}, contextRows = [], manualInterva
     const proposal = buildProposal(row, manualInterval || {}, effectiveEmployee || {},
         breakConfiguration);
     const verification = resolveCardPairVerification(row);
-    const hasRawPunch = verification.unresolvedPairs.length > 0;
-    if (!proposal.eligible) return { eligible: false, category: hasRawPunch ? 'ΕΡΓ' : '',
-        orphanVisible: hasRawPunch, blocking: hasRawPunch,
-        orphanType: verification.unresolvedPairs[0]?.state || null,
-        unresolvedPairs: verification.unresolvedPairs.map((item) => ({
+    const orphanPairs = actualOrphanPairs(verification);
+    const hasActualOrphan = orphanPairs.length > 0;
+    if (!proposal.eligible) return { eligible: false, category: hasActualOrphan ? 'ΕΡΓ' : '',
+        orphanVisible: hasActualOrphan, blocking: hasActualOrphan,
+        orphanType: orphanPairs[0]?.state || null,
+        unresolvedPairs: orphanPairs.map((item) => ({
             pairNumber: Number(item.pairNumber), orphanType: item.state,
             knownStart: normalizeTimeValue(item.start), knownEnd: normalizeTimeValue(item.end),
             missingPunch: item.state === CARD_PAIR_STATE.START_ONLY ? 'END' : 'START'
@@ -464,6 +477,7 @@ function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
 
 module.exports = { POLICY_VERSION, ORPHAN_RULE, SCHEDULE_KIND, RESOLUTION_SCOPE,
     LEGACY_REUSABLE_ORPHAN_REASON,
+    isSupportedOrphanState, actualOrphanPairs,
     resolveContinuousDeclaredSchedule, resolveAverageFallback,
     resolveEffectiveBreakContext,
     buildProposal, authoritativeWorkIntervals, evaluateRestRisk,
