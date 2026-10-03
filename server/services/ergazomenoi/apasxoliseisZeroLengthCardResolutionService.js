@@ -16,6 +16,7 @@ const {
 const {
     POLICY_VERSION,
     RESOLUTION_KIND,
+    canonicalApprovedPairSet,
     isApprovedZeroLengthResolution
 } = require('./apasxoliseisZeroLengthCardResolutionContract');
 
@@ -58,7 +59,7 @@ function resolveZeroLengthCardResolution({ row = {}, command = {}, effectiveEmpl
     breakConfiguration = null, actor = '', now = new Date() } = {}) {
     if (!command || typeof command !== 'object' || Array.isArray(command) ||
         Object.keys(command).some((field) => ![
-            'approve', 'intervals', 'transmission_failure_confirmed'
+            'approve', 'revise_approved', 'intervals', 'transmission_failure_confirmed'
         ].includes(field))) fail('ZERO_LENGTH_RESOLUTION_FIELDS_NOT_ALLOWED',
         'Η εντολή επίλυσης περιέχει μη επιτρεπτά πεδία.');
     if (command.approve !== true) fail('ZERO_LENGTH_EXPLICIT_APPROVAL_REQUIRED',
@@ -66,6 +67,10 @@ function resolveZeroLengthCardResolution({ row = {}, command = {}, effectiveEmpl
     if (command.transmission_failure_confirmed !== true) fail(
         'ZERO_LENGTH_TRANSMISSION_FAILURE_CONFIRMATION_REQUIRED',
         'Απαιτείται ρητή επιβεβαίωση αποτυχίας διαβίβασης της ψηφιακής κάρτας.');
+    const revisingApproved = command.revise_approved === true;
+    if (revisingApproved && !isApprovedZeroLengthResolution(row)) fail(
+        'ZERO_LENGTH_APPROVED_REVISION_NOT_ALLOWED',
+        'Η εγγραφή δεν περιέχει έγκυρη εγκεκριμένη επίλυση προς διόρθωση.', 409);
     const verification = resolveCardPairVerification(row);
     const zeroPairs = verification.unresolvedPairs.filter(
         (item) => item.state === CARD_PAIR_STATE.ZERO_LENGTH
@@ -77,10 +82,23 @@ function resolveZeroLengthCardResolution({ row = {}, command = {}, effectiveEmpl
         'Δηλώστε το πραγματικό διάστημα απασχόλησης.');
     const intervals = command.intervals.map(normalizedInterval);
     const expected = zeroPairs.map((item) => Number(item.pairNumber)).sort();
+    if (revisingApproved && !isDeepStrictEqual(
+        canonicalApprovedPairSet(row.zero_length_card_resolution), expected
+    )) fail('ZERO_LENGTH_APPROVED_PAIR_SET_MISMATCH',
+        'Τα αρχικά μηδενικά χτυπήματα δεν συμφωνούν πλέον με την εγκεκριμένη επίλυση.', 409);
     const supplied = intervals.map((item) => item.pairNumber).sort();
     if (new Set(supplied).size !== supplied.length ||
         !isDeepStrictEqual(supplied, expected)) fail('ZERO_LENGTH_PAIR_SET_MISMATCH',
         'Τα ζεύγη επίλυσης δεν συμφωνούν με τα τρέχοντα μηδενικά διαστήματα.', 409);
+    const existingIntervals = revisingApproved
+        ? row.zero_length_card_resolution.approved_intervals.map(normalizedInterval)
+            .sort((left, right) => left.pairNumber - right.pairNumber)
+        : [];
+    const sortedIntervals = [...intervals]
+        .sort((left, right) => left.pairNumber - right.pairNumber);
+    if (revisingApproved && isDeepStrictEqual(existingIntervals, sortedIntervals)) fail(
+        'ZERO_LENGTH_REVISION_NO_CHANGE',
+        'Η διορθωμένη επίλυση πρέπει να διαφέρει από την ήδη εγκεκριμένη.', 409);
 
     const approvedUpdates = {
         kathgoria_ergasias_apologistika: 'ΕΡΓ',
@@ -113,7 +131,7 @@ function resolveZeroLengthCardResolution({ row = {}, command = {}, effectiveEmpl
         'Δεν προκύπτει θετική πραγματική απασχόληση.');
     approvedUpdates.ores_ergasias_apologistika = netMinutes / 60;
     approvedUpdates.ores_pragmatikhs_ergasias_apologistika = netMinutes / 60;
-    const metadata = {
+    const approvalMetadata = {
         status: 'HR_APPROVED',
         policy_version: POLICY_VERSION,
         resolution_kind: RESOLUTION_KIND,
@@ -122,12 +140,23 @@ function resolveZeroLengthCardResolution({ row = {}, command = {}, effectiveEmpl
         raw_cards_preserved: true,
         apologistiko_biblio: true,
         transmission_failure_confirmed: true,
-        approved_by: String(actor || ''),
-        approved_at: now
+        approved_by: revisingApproved
+            ? String(row.zero_length_card_resolution.approved_by || '')
+            : String(actor || ''),
+        approved_at: revisingApproved
+            ? row.zero_length_card_resolution.approved_at || null
+            : now
     };
+    const metadata = revisingApproved ? {
+        ...approvalMetadata,
+        revision_number:
+            Math.max(0, Number(row.zero_length_card_resolution.revision_number) || 0) + 1,
+        revised_by: String(actor || ''),
+        revised_at: now
+    } : approvalMetadata;
     return Object.freeze({ approvedUpdates: Object.freeze(approvedUpdates),
         metadata: Object.freeze(metadata), intervals: Object.freeze(intervals),
-        netWorkMinutes: netMinutes });
+        netWorkMinutes: netMinutes, revisingApproved });
 }
 
 function replayView(metadata = {}) {
@@ -137,20 +166,32 @@ function replayView(metadata = {}) {
 }
 
 async function persistZeroLengthCardResolutionWrite({ oldRecord, semanticUpdates,
-    changedBy, reason, now = new Date(), schemaPaths, rowModel, auditModel, session } = {}) {
+    changedBy, reason, reviseApproved = false, now = new Date(), schemaPaths, rowModel,
+    auditModel, session } = {}) {
     const {
         buildReviewCompareAndSetFilter,
         buildAuditDiff
     } = require('./apasxoliseisOrphanResolutionPersistenceService');
-    const finalMetadata = { ...semanticUpdates.zero_length_card_resolution, approved_at: now };
+    const finalMetadata = reviseApproved
+        ? { ...semanticUpdates.zero_length_card_resolution, revised_at: now }
+        : { ...semanticUpdates.zero_length_card_resolution, approved_at: now };
     const invariantUpdates = { ...semanticUpdates, apologistiko_biblio: true,
         zero_length_card_resolution: finalMetadata };
+    if (reviseApproved) {
+        const previousRevision = Math.max(0,
+            Number(oldRecord.zero_length_card_resolution?.revision_number) || 0);
+        if (oldRecord.is_locked !== true || !isApprovedZeroLengthResolution(oldRecord) ||
+            !isApprovedZeroLengthResolution({ zero_length_card_resolution: finalMetadata }) ||
+            Number(finalMetadata.revision_number) !== previousRevision + 1) fail(
+            'ZERO_LENGTH_APPROVED_REVISION_NOT_ALLOWED',
+            'Η κλειδωμένη εγκεκριμένη επίλυση δεν μπορεί να διορθωθεί με ασφάλεια.', 409);
+    }
     const same = Object.entries(invariantUpdates).every(([field, value]) =>
         field === 'zero_length_card_resolution'
             ? isDeepStrictEqual(replayView(oldRecord[field]), replayView(value))
             : isDeepStrictEqual(oldRecord[field], value));
     if (same) return { idempotent: true, updated: false };
-    if (oldRecord.is_locked === true) fail('EMPLOYMENT_REVIEW_RECORD_LOCKED',
+    if (!reviseApproved && oldRecord.is_locked === true) fail('EMPLOYMENT_REVIEW_RECORD_LOCKED',
         'Η εγγραφή είναι κλειδωμένη και η ζητούμενη επίλυση δεν είναι ισοδύναμη.', 409);
     const finalUpdates = { ...invariantUpdates, is_locked: true,
         locked_by: changedBy, locked_at: now };

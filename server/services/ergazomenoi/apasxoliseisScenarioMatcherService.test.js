@@ -224,7 +224,12 @@ function testZeroLengthRequiresReviewUntilCanonicalApproval() {
             status: 'HR_APPROVED',
             policy_version: 'zero-length-card-work:v1',
             resolution_kind: 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE',
-            raw_cards_preserved: true
+            affected_pairs: [1],
+            approved_intervals: [
+                { pairNumber: 1, start: '14:04', end: '22:04' }
+            ],
+            raw_cards_preserved: true,
+            transmission_failure_confirmed: true
         }
     });
     const approvedFacts = buildApasxoliseisScenarioFacts(approvedRow);
