@@ -990,6 +990,66 @@ assert.equal(approvedZeroLengthLifecycle.stages.stage2.presentation_status, 'COM
 assert.equal(approvedZeroLengthLifecycle.stages.stage3.presentation_status, 'COMPLETED');
 assert.equal(approvedZeroLengthLifecycle.stages.stage4.presentation_status, 'COMPLETED');
 
+const suspiciousPolicy = { elegxos_ypopta_mikron_diastimaton_kartas: true,
+    poly_mikro_diastima_kartas_eos_lepta: 5,
+    mikro_diastima_kartas_eos_lepta: 60,
+    mikro_diastima_kartas_max_pososto_programmatos: 25,
+    mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta: 60 };
+const suspiciousLifecycleRows = week('suspicious-daily', '2026-08-03');
+for (const index of [5, 6]) Object.assign(suspiciousLifecycleRows[index], {
+    kathgoria_ergasias: 'ΑΝ', kathgoria_ergasias_apologistika: 'ΑΝ',
+    ores_ergasias: 0, ores_ergasias_apologistika: 0,
+    cards_ores_ergasias: 0, cards_apo_ora_01: '', cards_eos_ora_01: '',
+    apo_ora_01: '', eos_ora_01: '', repo: true, repo_apologistika: true
+});
+Object.assign(suspiciousLifecycleRows[0], {
+    apo_ora_01: '10:00', eos_ora_01: '14:00', ores_ergasias: 4,
+    cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30', cards_ores_ergasias: 0.5,
+    apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '10:30',
+    ores_ergasias_apologistika: 0.5
+});
+const unresolvedSuspiciousLifecycle = buildWeeklyHrLifecycleProjection({
+    weekRows: suspiciousLifecycleRows, effectiveProfile: profile,
+    companySettings: suspiciousPolicy
+});
+assert.ok(unresolvedSuspiciousLifecycle.stages.stage1.blockers.includes(
+    'SUSPICIOUS_SHORT_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+assert.equal(unresolvedSuspiciousLifecycle.stages.stage1.business_status, 'BLOCKED');
+assert.equal(unresolvedSuspiciousLifecycle.stages.stage4.presentation_status, 'LOCKED');
+
+const approvedSuspiciousRows = suspiciousLifecycleRows.map((row) => ({ ...row }));
+Object.assign(approvedSuspiciousRows[0], {
+    is_locked: true, ores_pragmatikhs_ergasias_apologistika: 0.5,
+    ores_apoysias_apologistika: 3.5,
+    ektakth_oroadeia_apologistika: false,
+    ektakta_diastimata_oroadeias_apologistika: [],
+    ores_ektakths_oroadeias_apologistika: 0,
+    kathgoria_adeias_apologistika: '',
+    hr_daily_actual_work_resolution: {
+        status: 'HR_APPROVED', policy_version: 'hr-daily-actual-work:v1',
+        resolution_kind: 'HR_DAILY_ACTUAL_WORK_AND_EMERGENCY_HOURLY_LEAVE',
+        source_case: 'SUSPICIOUS_SHORT_CARD_INTERVAL', reason: 'Η κάρτα είναι σωστή',
+        approved_work_intervals: [{ pairNumber: 1, start: '10:00', end: '10:30' }],
+        emergency_hourly_leave_intervals: [], leave_category: '', raw_card_snapshot: {
+            cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30',
+            cards_apo_ora_02: '', cards_eos_ora_02: '',
+            cards_apo_ora_03: '', cards_eos_ora_03: ''
+        },
+        raw_cards_preserved: true, approved_by: 'HR', approved_at: new Date(),
+        revision_number: 0
+    }
+});
+const approvedSuspiciousLifecycle = buildWeeklyHrLifecycleProjection({
+    weekRows: approvedSuspiciousRows, effectiveProfile: profile,
+    companySettings: suspiciousPolicy
+});
+assert.ok(!approvedSuspiciousLifecycle.stages.stage1.blockers.includes(
+    'SUSPICIOUS_SHORT_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+assert.ok(!approvedSuspiciousLifecycle.stages.stage4.final_weekly_analysis.reasons.includes(
+    'CARD_VERIFICATION_PENDING'));
+assert.equal(approvedSuspiciousLifecycle.stages.stage1.business_status, 'COMPLETED');
+assert.equal(approvedSuspiciousLifecycle.stages.stage4.presentation_status, 'COMPLETED');
+
 const employee0002Actual = week('0002', '2026-06-01');
 Object.assign(employee0002Actual[0], { kathgoria_ergasias: 'ΑΝ', repo: true,
     apo_ora_01: '', eos_ora_01: '', ores_ergasias: 0,

@@ -40,7 +40,8 @@ const NEXT_STAGE = Object.freeze({
 
 const HR_APPROVED_CARD_EVIDENCE_STATUSES = new Set([
     'HR_APPROVED_ORPHAN',
-    'HR_APPROVED_ZERO_LENGTH'
+    'HR_APPROVED_ZERO_LENGTH',
+    'HR_APPROVED_DAILY_ACTUAL_WORK'
 ]);
 
 function uniqueDateKeys(values = []) {
@@ -95,7 +96,8 @@ function resolveWeeklyHrWorkflow({
     actionable_date_keys = null,
     period_scope = null,
     scope = {},
-    employment_date_scope = null
+    employment_date_scope = null,
+    companySettings = {}
 } = {}) {
     const rows = Array.isArray(weekRows) ? [...weekRows] : [];
     const orderedRows = rows.slice().sort((left, right) =>
@@ -189,7 +191,7 @@ function resolveWeeklyHrWorkflow({
     const actualFactsByDate = new Map();
     orderedRows.forEach((row) => {
         const date = dateKeyUtc(row.hmeromhnia);
-        const facts = resolveDailyActualWorkFacts(row);
+        const facts = resolveDailyActualWorkFacts(row, { companySettings });
         actualFactsByDate.set(date, facts);
         const dateIsActionable = (!actionableDateSet || actionableDateSet.has(date)) &&
             (!deferred || date <= boundary.period_end);

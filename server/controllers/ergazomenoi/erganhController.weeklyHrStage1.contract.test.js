@@ -82,7 +82,8 @@ assert.strictEqual((controller.match(/allow_presentation_boundary_slice:/g) || [
 assert.match(controller, /buildFullMonthBoundaryContextPreflight\(\{/);
 assert.match(controller, /boundaryContextPreflight,/);
 assert.match(stage1Read, /stage1DailyPresentation/);
-assert.match(stage1Read, /resolveStage3DailyActualWorkFacts\(row\)/);
+assert.match(stage1Read,
+    /resolveStage3DailyActualWorkFacts\(row, \{[\s\S]*companySettings: context\.companySettings/);
 assert.match(stage1Read, /declared_intervals/);
 assert.match(stage1Read, /card_intervals/);
 assert.match(stage1Read, /current_apologistiko_classification/);

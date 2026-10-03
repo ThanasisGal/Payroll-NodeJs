@@ -6,6 +6,8 @@ const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverS
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
 const { classifyLeaveProvenance } = require('./apasxoliseisLeaveProvenanceService');
 const { normalizeTimeValue } = require('./apasxoliseisScenarioFactsService');
+const { normalizeSuspiciousShortPolicy } =
+    require('./apasxoliseisSuspiciousShortCardIntervalService');
 
 const FINGERPRINT_VERSION = 'weekly-hr-stage1-fingerprint:v1';
 const STAGE1_DERIVED_STATUS = Object.freeze({
@@ -40,9 +42,9 @@ function normalizedManualAuditProvenance(value) {
     return auditId && changedAt ? { latest_audit_id: auditId, latest_changed_at: changedAt } : null;
 }
 
-function normalizedCardEvidence(row) {
+function normalizedCardEvidence(row, companySettings = {}) {
     const verification = resolveCardPairVerification(row);
-    const actual = resolveDailyActualWorkFacts(row);
+    const actual = resolveDailyActualWorkFacts(row, { companySettings });
     return {
         status: verification.status,
         pairs: verification.pairs.map((pair) => ({
@@ -67,7 +69,7 @@ function normalizedCardEvidence(row) {
     };
 }
 
-function normalizeRow(row = {}) {
+function normalizeRow(row = {}, companySettings = {}) {
     return {
         row_id: text(row._id || row.id),
         date: text(dateKeyUtc(row.hmeromhnia)),
@@ -85,7 +87,7 @@ function normalizeRow(row = {}) {
                 end: normalizeTimeValue(row[`eos_ora_${pair}`]) || ''
             }))
         },
-        cards: normalizedCardEvidence(row),
+        cards: normalizedCardEvidence(row, companySettings),
         apologistika: {
             category: text(row.kathgoria_ergasias_apologistika).toUpperCase(),
             repo: boolean(row.repo_apologistika),
@@ -116,11 +118,15 @@ function stableStringify(value) {
     return JSON.stringify(value);
 }
 
-function buildStage1Fingerprint(weekRows = []) {
-    const rows = (Array.isArray(weekRows) ? weekRows : []).map(normalizeRow)
+function buildStage1Fingerprint(weekRows = [], { companySettings = {} } = {}) {
+    const rows = (Array.isArray(weekRows) ? weekRows : []).map((row) =>
+        normalizeRow(row, companySettings))
         .sort((left, right) => left.date.localeCompare(right.date) ||
             left.row_id.localeCompare(right.row_id));
-    const canonicalInput = { fingerprint_version: FINGERPRINT_VERSION, rows };
+    const suspiciousShortPolicy = normalizeSuspiciousShortPolicy(companySettings);
+    const canonicalInput = { fingerprint_version: FINGERPRINT_VERSION, rows,
+        ...(suspiciousShortPolicy.enabled
+            ? { suspicious_short_card_policy: suspiciousShortPolicy } : {}) };
     return Object.freeze({
         fingerprint_version: FINGERPRINT_VERSION,
         fingerprint: crypto.createHash('sha256').update(stableStringify(canonicalInput)).digest('hex'),

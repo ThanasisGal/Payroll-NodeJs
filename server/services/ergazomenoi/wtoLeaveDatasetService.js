@@ -59,7 +59,8 @@ function assertScope(scope = {}) {
 function publicRow(row) {
     return { source_record_id: row.source_record_id, employee_code: row.employee_code,
         afm: row.afm, eponymo: row.eponymo, onoma: row.onoma, date: row.date,
-        leave_type: row.leave_type, full_day: row.full_day, intervals: row.intervals,
+        leave_type: row.leave_type, candidate_kind: row.candidate_kind,
+        full_day: row.full_day, intervals: row.intervals,
         reference_year: row.reference_year, required_days: row.required_days,
         entitlement_debug: row.entitlement_debug };
 }

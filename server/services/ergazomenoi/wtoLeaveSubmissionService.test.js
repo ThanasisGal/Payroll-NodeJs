@@ -102,6 +102,59 @@ let payload = buildWtoLeavePayload({ canonicalRows: result.rows, branch: '0001' 
 assert.equal(payload.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0]
     .ErgazomenosAnalytics.ErgazomenosWTOAnalytics.length, 2, 'τα διαστήματα δεν συγχωνεύονται');
 
+const emergency = row('2026-08-12', { adeia_apologistika: false,
+    apo_ora_01: '10:00', eos_ora_01: '14:00',
+    apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '10:30',
+    ektakth_oroadeia_apologistika: true,
+    ores_ektakths_oroadeias_apologistika: 2.5,
+    ektakta_diastimata_oroadeias_apologistika: [
+        { apo_lepto: 630, eos_lepto: 780 }
+    ], hr_daily_actual_work_resolution: {
+        status: 'HR_APPROVED', policy_version: 'hr-daily-actual-work:v1',
+        resolution_kind: 'HR_DAILY_ACTUAL_WORK_AND_EMERGENCY_HOURLY_LEAVE',
+        source_case: 'SUSPICIOUS_SHORT_CARD_INTERVAL', reason: 'Έκτακτη ανάγκη',
+        approved_work_intervals: [{ pairNumber: 1, start: '10:00', end: '10:30' }],
+        emergency_hourly_leave_intervals: [{ apo_lepto: 630, eos_lepto: 780 }],
+        leave_category: 'ΑΔΑΛΛΗ', raw_card_snapshot: {
+            cards_apo_ora_01: '', cards_eos_ora_01: '',
+            cards_apo_ora_02: '', cards_eos_ora_02: '',
+            cards_apo_ora_03: '', cards_eos_ora_03: ''
+        }, raw_cards_preserved: true,
+        approved_by: 'HR', approved_at: new Date('2026-08-12T15:00:00Z'), revision_number: 0
+    } });
+result = buildWtoLeaveCanonicalDataset({ sourceRows: [emergency], employees: [employee()] });
+assert.equal(result.rows[0].candidate_kind, 'EMERGENCY_HOURLY');
+payload = buildWtoLeavePayload({ canonicalRows: result.rows, branch: '0001' });
+assert.deepStrictEqual(payload.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0]
+    .ErgazomenosAnalytics.ErgazomenosWTOAnalytics[0], {
+    f_type: 'ΑΔΑΛΛΗ', f_from: '10:30', f_to: '13:00', f_year: '', f_req_days: ''
+});
+const emergencyMultiple = { ...emergency,
+    ores_ektakths_oroadeias_apologistika: 2,
+    ektakta_diastimata_oroadeias_apologistika: [
+        { apo_lepto: 630, eos_lepto: 690 }, { apo_lepto: 750, eos_lepto: 810 }
+    ], hr_daily_actual_work_resolution: {
+        ...emergency.hr_daily_actual_work_resolution,
+        emergency_hourly_leave_intervals: [
+            { apo_lepto: 630, eos_lepto: 690 }, { apo_lepto: 750, eos_lepto: 810 }
+        ]
+    } };
+result = buildWtoLeaveCanonicalDataset({ sourceRows: [emergencyMultiple],
+    employees: [employee()] });
+payload = buildWtoLeavePayload({ canonicalRows: result.rows, branch: '0001' });
+assert.equal(payload.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0]
+    .ErgazomenosAnalytics.ErgazomenosWTOAnalytics.length, 2);
+
+result = buildWtoLeaveCanonicalDataset({ sourceRows: [{ ...emergency,
+    egkekrimenh_oroadeia_apologistika: true }], employees: [employee()] });
+assert.equal(result.blockers[0].code, 'WTOLEAVE_AGREEMENT_EMERGENCY_HOURLY_CONFLICT');
+result = buildWtoLeaveCanonicalDataset({ sourceRows: [{ ...emergency,
+    adeia_apologistika: true }], employees: [employee()] });
+assert.equal(result.blockers[0].code, 'WTOLEAVE_FULL_DAY_EMERGENCY_HOURLY_CONFLICT');
+result = buildWtoLeaveCanonicalDataset({ sourceRows: [{ ...emergency,
+    ores_ektakths_oroadeias_apologistika: 1 }], employees: [employee()] });
+assert.equal(result.blockers[0].code, 'WTOLEAVE_EMERGENCY_HOURLY_APPROVAL_INVALID');
+
 result = buildWtoLeaveCanonicalDataset({ sourceRows: [row('2026-08-10', {
     adeia_apologistika: false, egkekrimenh_oroadeia_apologistika: true,
     egkekrimena_diastimata_oroadeias_apologistika: [{ apo_lepto: 660, eos_lepto: 600 }]

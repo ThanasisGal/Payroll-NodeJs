@@ -9,6 +9,9 @@ const {
     resolveZeroLengthCardResolution,
     persistZeroLengthCardResolutionWrite
 } = require('../../services/ergazomenoi/apasxoliseisZeroLengthCardResolutionService');
+const { resolveHrDailyActualWorkResolution,
+    persistHrDailyActualWorkResolutionWrite } = require(
+    '../../services/ergazomenoi/apasxoliseisHrDailyActualWorkResolutionService');
 
 const originalModuleLoad = Module._load;
 let erganhController;
@@ -87,20 +90,22 @@ function preparedResolution(orphanType = 'START_ONLY', command = {}) {
 
 function overrides(persist, { record = oldRecord, loadRecord = null,
     orphanType = 'START_ONLY', prepareResolution = null,
-    prepareZeroLengthResolution = null } = {}) {
+    prepareZeroLengthResolution = null, prepareDailyActualWorkResolution = null } = {}) {
     return {
         loadOldRecord: async () => structuredClone(loadRecord ? loadRecord() : record),
         prepareOrphanResolution: async (input) => prepareResolution
             ? prepareResolution(input) : preparedResolution(orphanType,
                 input.orphanResolutionCommand),
         ...(prepareZeroLengthResolution ? { prepareZeroLengthResolution } : {}),
+        ...(prepareDailyActualWorkResolution ? { prepareDailyActualWorkResolution } : {}),
         getPeriodAccess: async () => ({ scope: {}, token: 'token',
             state: { effective_mode: 'NORMAL' } }),
         loadAppliedProtection: async () => ({ entriesByRowId: {}, diagnostics: [],
             hasConflicts: false }),
         periodFence: async ({ work }) => work({ session: { isolated: true } }),
         persistOrphanResolutionWrite: persist,
-        persistZeroLengthResolutionWrite: persist
+        persistZeroLengthResolutionWrite: persist,
+        persistHrDailyActualWorkResolutionWrite: persist
     };
 }
 
@@ -269,6 +274,77 @@ async function run() {
         '10:04');
     assert.strictEqual(revisionState.audits[0].newValues.eos_ora_01_apologistika,
         '14:04');
+
+    const dailyRow = { ...oldRecord, kodikos: '0002',
+        hmeromhnia: new Date('2026-08-03T00:00:00.000Z'),
+        apo_ora_01: '10:00', eos_ora_01: '14:00', ores_ergasias: 4,
+        cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:05',
+        cards_apo_ora_02: '', cards_eos_ora_02: '',
+        hr_daily_actual_work_resolution: null, is_locked: false };
+    const dailyState = { row: structuredClone(dailyRow), audits: [] };
+    const dailyResult = await invoke((input) =>
+        persistHrDailyActualWorkResolutionWrite({ ...input,
+            now: new Date('2026-10-03T09:00:00.000Z'),
+            schemaPaths: [...Object.keys(dailyState.row),
+                'hr_daily_actual_work_resolution', 'ektakth_oroadeia_apologistika',
+                'ektakta_diastimata_oroadeias_apologistika',
+                'ores_ektakths_oroadeias_apologistika'],
+            rowModel: { async updateOne(_filter, update) {
+                Object.assign(dailyState.row, structuredClone(update.$set));
+                return { matchedCount: 1 };
+            } },
+            auditModel: { async create([audit]) {
+                dailyState.audits.push(structuredClone(audit));
+            } }
+        }), {
+        record: dailyRow,
+        requestOverrides: { body: {
+            reason: 'Έκτακτη αποχώρηση και επιστροφή', updates: {
+                cards_apo_ora_01: '00:00', cards_eos_ora_01: '23:59' },
+            orphan_resolution: null, zero_length_resolution: null,
+            daily_actual_work_resolution: { approve: true,
+                source_case: 'SUSPICIOUS_SHORT_CARD_INTERVAL',
+                work_intervals: [
+                    { pairNumber: 1, start: '10:00', end: '10:30' },
+                    { pairNumber: 2, start: '13:00', end: '14:04' }
+                ], emergency_hourly_leave_intervals: [
+                    { apo_lepto: 630, eos_lepto: 780 }
+                ], leave_category: 'ΑΔΑΣ' }
+        } },
+        prepareDailyActualWorkResolution: async ({ oldRecord: current,
+            dailyResolutionCommand, changedBy, reason }) => {
+            const approvedDailyResolution = resolveHrDailyActualWorkResolution({
+                row: current, command: dailyResolutionCommand,
+                effectiveEmployee: { dialleima_se_lepta: 0 }, actor: changedBy,
+                reason, now: new Date('2026-10-03T09:00:00.000Z')
+            });
+            return { approvedDailyResolution, dailyCanonicalDerived: {
+                derivedUpdate: { kathgoria_ergasias_apologistika: 'ΕΡΓ',
+                    ores_nyxtas_apologistika: 0,
+                    ores_argion_prosayxhsh_apologistika: 0,
+                    ores_argion_ergasia_apologistika: 0,
+                    ores_prostheths_ergasias_apologistika: 0,
+                    ores_yperergasias_apologistika: 0,
+                    ores_nominhs_yperorias_apologistika: 0,
+                    ores_paranomhs_yperorias_apologistika: 0 }
+            } };
+        }
+    });
+    assert.strictEqual(dailyResult.res.statusCode, 200);
+    assert.strictEqual(dailyState.row.cards_apo_ora_01, '14:04');
+    assert.strictEqual(dailyState.row.cards_eos_ora_01, '14:05');
+    assert.strictEqual(dailyState.row.apo_ora_01_apologistika, '10:00');
+    assert.strictEqual(dailyState.row.eos_ora_01_apologistika, '10:30');
+    assert.strictEqual(dailyState.row.apo_ora_02_apologistika, '13:00');
+    assert.strictEqual(dailyState.row.eos_ora_02_apologistika, '14:04');
+    assert.strictEqual(dailyState.row.ores_pragmatikhs_ergasias_apologistika, 94 / 60);
+    assert.strictEqual(dailyState.row.ores_ektakths_oroadeias_apologistika, 2.5);
+    assert.strictEqual(dailyState.row.ores_apoysias_apologistika, 0);
+    assert.strictEqual(dailyState.row.is_locked, true);
+    assert.strictEqual(dailyState.audits.length, 1);
+    assert.strictEqual(dailyState.audits[0].newValues
+        .hr_daily_actual_work_resolution.status, 'HR_APPROVED');
+    assert.strictEqual(dailyState.audits[0].newValues.cards_apo_ora_01, undefined);
 
     for (const orphanType of ['START_ONLY', 'END_ONLY']) {
         const state = { row: structuredClone(oldRecord), audits: [] };

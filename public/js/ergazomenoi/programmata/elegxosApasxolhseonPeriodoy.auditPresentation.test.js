@@ -23,14 +23,22 @@ this.auditFieldLabels = auditFieldLabels;`, sandbox);
 const oldValues = {
     zero_length_card_resolution: { status: 'HR_APPROVED',
         approved_intervals: [{ pairNumber: 1, start: '10:00', end: '10:04' }] },
+    hr_daily_actual_work_resolution: { status: 'HR_APPROVED' },
     ores_pragmatikhs_ergasias_apologistika: 4 / 60,
     ores_apoysias_base_apologistika: 3.93,
+    ektakta_diastimata_oroadeias_apologistika: [],
     apologistiko_biblio: false,
     is_locked: false
 };
 const newValues = {
     zero_length_card_resolution: { status: 'HR_APPROVED', revision_number: 1,
         approved_intervals: [{ pairNumber: 1, start: '10:00', end: '14:04' }] },
+    hr_daily_actual_work_resolution: { status: 'HR_APPROVED', revision_number: 1 },
+    ektakth_oroadeia_apologistika: true,
+    ektakta_diastimata_oroadeias_apologistika: [
+        { apo_lepto: 630, eos_lepto: 780 }
+    ],
+    ores_ektakths_oroadeias_apologistika: 2.5,
     ores_pragmatikhs_ergasias_apologistika: 244 / 60,
     ores_apoysias_base_apologistika: 0,
     apologistiko_biblio: true,
@@ -40,6 +48,7 @@ const before = JSON.parse(JSON.stringify({ oldValues, newValues }));
 const html = sandbox.renderAuditValues(oldValues, newValues);
 
 assert.doesNotMatch(html, /zero_length_card_resolution/);
+assert.doesNotMatch(html, /hr_daily_actual_work_resolution/);
 assert.doesNotMatch(html, /\[object Object\]/);
 assert.doesNotMatch(html, /ores_pragmatikhs_ergasias_apologistika/);
 assert.match(html, /Πραγματικές ώρες εργασίας/);
@@ -47,14 +56,17 @@ assert.doesNotMatch(html, /ores_apoysias_base_apologistika/);
 assert.match(html, /Βασικές ώρες απουσίας/);
 assert.match(html, /Απολογιστικό βιβλίο/);
 assert.match(html, /Κλειδωμένη εγγραφή/);
+assert.match(html, /Έκτακτη ωροάδεια/);
+assert.match(html, /Ώρες έκτακτης ωροάδειας/);
+assert.match(html, /10:30–13:00/);
 assert.match(html, /ΝΑΙ/);
 assert.match(html, /ΟΧΙ/);
 assert.deepEqual({ oldValues, newValues }, before);
 
 const requiredLabels = {
     kathgoria_ergasias_apologistika: 'Κατηγορία εργασίας απολογιστικά',
-    apo_ora_02_apologistika: 'Απολογιστικό Από 2',
-    eos_ora_03_apologistika: 'Απολογιστικό Έως 3',
+    apo_ora_02_apologistika: 'Πραγματική εργασία 2 — Από',
+    eos_ora_03_apologistika: 'Πραγματική εργασία 3 — Έως',
     ores_apoysias_apologistika: 'Ώρες απουσίας',
     hmeres_apoysias_apologistika: 'Ημέρες απουσίας',
     unlocked_at: 'Ξεκλείδωμα στις'

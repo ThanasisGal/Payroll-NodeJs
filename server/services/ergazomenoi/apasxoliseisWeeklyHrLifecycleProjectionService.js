@@ -285,7 +285,8 @@ function buildWeeklyHrLifecycleProjection({
     scope = {},
     periodScope = null,
     employmentDateScope = null,
-    companyPolicyRules = []
+    companyPolicyRules = [],
+    companySettings = {}
 } = {}) {
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const fingerprintRows = rows.map((row) =>
@@ -293,13 +294,14 @@ function buildWeeklyHrLifecycleProjection({
             ? { ...row, kathgoria_ergasias: row.kathgoria_ergasias_original }
             : row
     );
-    const fingerprint = buildStage1Fingerprint(fingerprintRows).fingerprint;
+    const fingerprint = buildStage1Fingerprint(fingerprintRows, { companySettings }).fingerprint;
     const boundary = deriveDeferredWeekScope({ scope, periodScope, employmentDateScope });
     if (isDeferredWeekPending({ boundary })) {
         const workflow = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile,
             effectiveProfilesByDate, scope, period_scope: periodScope || employmentDateScope,
             employment_date_scope: employmentDateScope,
             expected_date_keys: employmentDateScope?.employment_owned_dates || null,
+            companySettings,
             actionable_date_keys: boundary.current_period_writable_dates });
         const slice = { period_start: boundary.period_start, period_end: boundary.period_end,
             actionable_dates: boundary.current_period_writable_dates,
@@ -308,7 +310,8 @@ function buildWeeklyHrLifecycleProjection({
             boundary.period_start, boundary.period_end);
         const fingerprints = buildStage1PeriodSliceFingerprints({
             weekRows: fingerprintRows,
-            slice
+            slice,
+            companySettings
         });
         const persistedStatus = persistedSlice ? resolveStage1PeriodSliceStatus({
             current_context_fingerprint: fingerprints.context_fingerprint,
@@ -317,7 +320,7 @@ function buildWeeklyHrLifecycleProjection({
             current_fingerprint: fingerprint, persisted_stage1_state: persistedStage1State });
         // Keep known calculation-configuration failures; repo classification itself is deferred.
         const diagnostics = analyzeWeeklySixthSeventhDay({ weekRows: rows, effectiveProfile,
-            effectiveProfilesByDate,
+            effectiveProfilesByDate, companySettings,
             expectedDateKeys: employmentDateScope?.employment_owned_dates || null,
             actionableDateKeys: boundary.current_period_writable_dates,
             companyKod: scope.company_kod || rows[0]?.company_kod || '', companyPolicyRules });
@@ -378,7 +381,8 @@ function buildWeeklyHrLifecycleProjection({
     const sliceFingerprints = periodSlice
         ? buildStage1PeriodSliceFingerprints({
             weekRows: fingerprintRows,
-            slice: periodSlice
+            slice: periodSlice,
+            companySettings
         }) : null;
     const persistedSlice = periodSlice ? findStage1PeriodSlice(persistedStage1State,
         periodSlice.period_start, periodSlice.period_end) : null;
@@ -411,7 +415,8 @@ function buildWeeklyHrLifecycleProjection({
         effectiveProfilesByDate,
         leave_classification_completed: false,
         expected_date_keys: expectedDateKeys,
-        actionable_date_keys: actionableDateSet ? [...actionableDateSet] : null
+        actionable_date_keys: actionableDateSet ? [...actionableDateSet] : null,
+        companySettings
     });
     const stage1PendingDates = possibleLeaveDates(rows)
         .filter((date) => !actionableDateSet || actionableDateSet.has(date));
@@ -462,6 +467,7 @@ function buildWeeklyHrLifecycleProjection({
         leave_classification_completed: true,
         expected_date_keys: expectedDateKeys,
         actionable_date_keys: actionableDateSet ? [...actionableDateSet] : null,
+        companySettings,
         ...decisions
     });
     const repoTransfer = fullNaturalWeek ? analyzeWeeklyRepoTransferForEmploymentContract({
@@ -731,7 +737,8 @@ function buildWeeklyHrLifecycleProjection({
         expectedDateKeys,
         actionableDateKeys: actionableDateSet ? [...actionableDateSet] : null,
         companyKod: scope.company_kod || rows[0]?.company_kod || '',
-        companyPolicyRules
+        companyPolicyRules,
+        companySettings
     });
     const finalBlockers = finalAnalysis.status === 'NEEDS_HR_DECISION'
         ? unique(finalAnalysis.reasons || []) : [];

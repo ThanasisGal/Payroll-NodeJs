@@ -19,7 +19,8 @@ const STATUS = Object.freeze({ READY: 'READY', NOT_APPLICABLE: 'NOT_APPLICABLE',
 const ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES = new Set(['0009']);
 const HR_APPROVED_CARD_EVIDENCE_STATUSES = new Set([
     'HR_APPROVED_ORPHAN',
-    'HR_APPROVED_ZERO_LENGTH'
+    'HR_APPROVED_ZERO_LENGTH',
+    'HR_APPROVED_DAILY_ACTUAL_WORK'
 ]);
 
 function hasResolvedCardEvidenceStatus(status) {
@@ -186,7 +187,8 @@ function analyzeWeeklySixthSeventhDay({
     allowDeclaredRepoIdentityOverride = false,
     classificationByDateOverride = null,
     calculatedWorkHoursAuthoritative = false,
-    isCalculatedWorkHoursAuthoritativeForRow = null
+    isCalculatedWorkHoursAuthoritativeForRow = null,
+    companySettings = {}
 } = {}) {
     const blockedProfile = effectiveProfile?.resolution_blocked === true
         ? effectiveProfile
@@ -271,7 +273,8 @@ function analyzeWeeklySixthSeventhDay({
             hmeromhnia: dateKeyUtc(row.hmeromhnia),
             ...resolveDailyActualWorkFacts(row, {
                 calculatedWorkHoursAuthoritative,
-                isCalculatedWorkHoursAuthoritativeForRow
+                isCalculatedWorkHoursAuthoritativeForRow,
+                companySettings
             })
         }))
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));

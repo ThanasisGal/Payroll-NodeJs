@@ -1,4 +1,5 @@
 const { validApprovedHourlyLeaveSegments } = require('../../utils/ergazomenoi/approvedHourlyLeaveSegments');
+const { validEmergencyHourlyLeaveSegments } = require('../../utils/ergazomenoi/emergencyHourlyLeaveSegments');
 // Pure provenance classifier. Labels alone are never sufficient to convert HR leave.
 
 const LEAVE_PROVENANCE = Object.freeze({
@@ -6,6 +7,7 @@ const LEAVE_PROVENANCE = Object.freeze({
     AUTO_CALCULATED_LEAVE: 'AUTO_CALCULATED_LEAVE',
     HR_DECLARED_LEAVE: 'HR_DECLARED_LEAVE',
     APPROVED_ARRANGEMENT_HOURLY_LEAVE: 'APPROVED_ARRANGEMENT_HOURLY_LEAVE',
+    EMERGENCY_HR_HOURLY_LEAVE: 'EMERGENCY_HR_HOURLY_LEAVE',
     NONE: 'NONE'
 });
 
@@ -30,6 +32,13 @@ function classifyLeaveProvenance(row = {}) {
         truthy(row.hr_declared_leave);
 
     if (hasBaseLeaveMarker) return LEAVE_PROVENANCE.HR_DECLARED_LEAVE;
+
+    if (row.ektakth_oroadeia_apologistika === true &&
+        validEmergencyHourlyLeaveSegments(row.ektakta_diastimata_oroadeias_apologistika) &&
+        row.ektakta_diastimata_oroadeias_apologistika?.length > 0 &&
+        text(row.kathgoria_adeias_apologistika) !== '') {
+        return LEAVE_PROVENANCE.EMERGENCY_HR_HOURLY_LEAVE;
+    }
 
     if (row.egkekrimenh_oroadeia_apologistika === true &&
         validApprovedHourlyLeaveSegments(row.egkekrimena_diastimata_oroadeias_apologistika) &&

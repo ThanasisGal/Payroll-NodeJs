@@ -66,7 +66,7 @@ for (const [name, mutate, code] of [
 test('central break policy invalidates the previous canonical context fingerprint', async () => {
     const h = harness();
     const { snapshot } = await load(h);
-    assert.equal(CALCULATION_SOURCE_VERSION, 'weekly-illegal-overtime:45b046b:v3');
+    assert.equal(CALCULATION_SOURCE_VERSION, 'weekly-illegal-overtime:45b046b:v4');
     assert.equal(snapshot.semantics.illegalOvertimeSourceVersion, CALCULATION_SOURCE_VERSION);
     const previousSnapshot = { ...snapshot, semantics: { ...snapshot.semantics,
         illegalOvertimeSourceVersion: 'weekly-illegal-overtime:45b046b:v2' } };
