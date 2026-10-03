@@ -19,6 +19,16 @@ const sandbox = {
     currentReviewRows: [],
     escapeHtml: (value) => String(value ?? ''),
     formatStage1DateKey: (value) => String(value).slice(0, 10),
+    pairNo: (value) => String(value).padStart(2, '0'),
+    timeToMinutes: (value) => {
+        const [hours, minutes] = String(value || '').split(':').map(Number);
+        return Number.isInteger(hours) && Number.isInteger(minutes)
+            ? hours * 60 + minutes : null;
+    },
+    isCurrentPeriodReviewDate: () => true,
+    zeroLengthCardPairs: (row) => row.cards_apo_ora_01 &&
+        row.cards_apo_ora_01 === row.cards_eos_ora_01
+        ? [{ pairNumber: 1, rawTime: row.cards_apo_ora_01 }] : [],
     document: { getElementById: (id) => modalInputs.get(id) || null }
 };
 vm.createContext(sandbox);
@@ -59,6 +69,16 @@ assert.strictEqual(sandbox.weeklyHrHasOnlyOrphanBlockers({ workflow: {
 assert.strictEqual(sandbox.weeklyHrHasOnlyOrphanBlockers({ workflow: {
     blocking_reasons: ['ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION',
         'INCOMPLETE_NATURAL_WEEK'] } }), false);
+const unresolvedZeroLengthRow = { _id: 'zero-unresolved', hmeromhnia: '2026-08-03',
+    cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04' };
+const approvedZeroLengthRow = { ...unresolvedZeroLengthRow, _id: 'zero-approved',
+    zero_length_card_resolution: { status: 'HR_APPROVED' } };
+assert.deepEqual(sandbox.weeklyHrZeroLengthRows({ rows: [unresolvedZeroLengthRow] })
+    .map((row) => row._id), ['zero-unresolved']);
+assert.deepEqual(sandbox.weeklyHrZeroLengthRows({ rows: [approvedZeroLengthRow] }), []);
+assert.match(sandbox.renderWeeklyHrZeroLengthItem(unresolvedZeroLengthRow),
+    /Επίλυση πραγματικής απασχόλησης/);
+assert.equal(sandbox.weeklyHrOrphanRows({ rows: [approvedZeroLengthRow] }).length, 0);
 assert.match(source,
     /Χρήση και σε μελλοντικές όμοιες περιπτώσεις του ίδιου παραρτήματος/);
 assert.match(source,

@@ -9094,12 +9094,12 @@ function weeklyHrBlockedExplanation(payload = {}) {
     const reasons = new Set(authoritativeStage1
         ? authoritativeStage1.blockers || []
         : payload?.workflow?.blocking_reasons || []);
+    if (reasons.has('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION')) {
+        return 'Υπάρχει μηδενικό διάστημα κάρτας. Το HR πρέπει να δηλώσει τις πραγματικές ώρες ή να διορθώσει την πηγή.';
+    }
     if (reasons.has('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION') ||
         reasons.has('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE')) {
         return 'Υπάρχει ορφανό χτύπημα κάρτας που πρέπει να επιλυθεί πριν συνεχιστεί ο έλεγχος.';
-    }
-    if (reasons.has('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION')) {
-        return 'Υπάρχει μηδενικό διάστημα κάρτας. Το HR πρέπει να δηλώσει τις πραγματικές ώρες ή να διορθώσει την πηγή.';
     }
     if (reasons.has('MULTIPLE_SOURCE_CANDIDATES') ||
         reasons.has('MULTIPLE_TARGET_CANDIDATES') ||
@@ -13264,6 +13264,22 @@ function renderAuditRow(audit) {
 }
 
 const auditFieldLabels = {
+    kathgoria_ergasias: 'Δηλωμένη κατηγορία εργασίας',
+    repo: 'Δηλωμένο ρεπό',
+    apo_ora_01: 'Δηλωμένο Από 1',
+    eos_ora_01: 'Δηλωμένο Έως 1',
+    apo_ora_02: 'Δηλωμένο Από 2',
+    eos_ora_02: 'Δηλωμένο Έως 2',
+    apo_ora_03: 'Δηλωμένο Από 3',
+    eos_ora_03: 'Δηλωμένο Έως 3',
+    ores_ergasias: 'Δηλωμένες ώρες εργασίας',
+    cards_apo_ora_01: 'Χτύπημα κάρτας Από 1',
+    cards_eos_ora_01: 'Χτύπημα κάρτας Έως 1',
+    cards_apo_ora_02: 'Χτύπημα κάρτας Από 2',
+    cards_eos_ora_02: 'Χτύπημα κάρτας Έως 2',
+    cards_apo_ora_03: 'Χτύπημα κάρτας Από 3',
+    cards_eos_ora_03: 'Χτύπημα κάρτας Έως 3',
+    cards_ores_ergasias: 'Ώρες εργασίας κάρτας',
     apo_ora_01_apologistika: 'Απολογιστικό Από 1',
     eos_ora_01_apologistika: 'Απολογιστικό Έως 1',
     apo_ora_02_apologistika: 'Απολογιστικό Από 2',
@@ -13271,33 +13287,78 @@ const auditFieldLabels = {
     apo_ora_03_apologistika: 'Απολογιστικό Από 3',
     eos_ora_03_apologistika: 'Απολογιστικό Έως 3',
 
+    apologistiko_biblio: 'Απολογιστικό βιβλίο',
     ores_ergasias_apologistika: 'Ώρες εργασίας',
+    ores_pragmatikhs_ergasias_apologistika: 'Πραγματικές ώρες εργασίας',
     ores_apoysias_apologistika: 'Ώρες απουσίας',
+    ores_apoysias_base_apologistika: 'Βασικές ώρες απουσίας',
+    hmeres_apoysias_apologistika: 'Ημέρες απουσίας',
     ores_nyxtas_apologistika: 'Ώρες νύχτας',
     ores_argion_prosayxhsh_apologistika: 'Προσαύξηση αργιών',
     ores_argion_ergasia_apologistika: 'Εργασία αργιών',
+    ores_prostheths_ergasias_apologistika: 'Πρόσθετη εργασία',
+    ores_yperergasias_apologistika: 'Υπερεργασία',
+    ores_yperergasias_nyxtas_apologistika: 'Υπερεργασία νύχτας',
+    ores_yperergasias_argion_apologistika: 'Υπερεργασία αργίας',
+    ores_yperergasias_argion_nyxtas_apologistika: 'Υπερεργασία αργίας και νύχτας',
+    ores_nominhs_yperorias_apologistika: 'Νόμιμη υπερωρία',
+    ores_nominhs_yperorias_nyxtas_apologistika: 'Νόμιμη υπερωρία νύχτας',
+    ores_nominhs_yperorias_argion_apologistika: 'Νόμιμη υπερωρία αργίας',
+    ores_nominhs_yperorias_argion_nyxtas_apologistika:
+        'Νόμιμη υπερωρία αργίας και νύχτας',
+    ores_paranomhs_yperorias_apologistika: 'Παράνομη υπερωρία',
+    ores_paranomhs_yperorias_nyxtas_apologistika: 'Παράνομη υπερωρία νύχτας',
+    ores_paranomhs_yperorias_argion_apologistika: 'Παράνομη υπερωρία αργίας',
+    ores_paranomhs_yperorias_argion_nyxtas_apologistika:
+        'Παράνομη υπερωρία αργίας και νύχτας',
+    ores_adeias_pistomenes_apologistika: 'Πιστωμένες ώρες άδειας',
+    ores_argias_pistomenes_apologistika: 'Πιστωμένες ώρες αργίας',
+    compensation_breakdown_apologistika: 'Ανάλυση απολογιστικών προσαυξήσεων',
 
     repo_apologistika: 'Ρεπό',
+    adeia: 'Δηλωμένη άδεια',
     adeia_apologistika: 'Άδεια',
     argia: 'Αργία',
+    argia_apologistika: 'Αργία απολογιστικά',
+    hr_declared_leave: 'Άδεια δηλωμένη από HR',
     kathgoria_ergasias_apologistika: 'Κατηγορία εργασίας απολογιστικά',
+    kathgoria_adeias: 'Δηλωμένη κατηγορία άδειας',
     kathgoria_adeias_apologistika: 'Κατηγορία άδειας',
+    astheneia: 'Δηλωμένη ασθένεια',
     astheneia_apologistika: 'Ασθένεια',
     apousia_apologistika: 'Απουσία',
     kyriakes_apologistika: 'Κυριακή',
+    egkekrimenh_oroadeia_apologistika: 'Εγκεκριμένη ωριαία άδεια',
+    explicit_hourly_leave_hours: 'Ρητές ώρες ωριαίας άδειας',
+    egkekrimena_diastimata_oroadeias_apologistika:
+        'Εγκεκριμένα διαστήματα ωριαίας άδειας',
 
     is_locked: 'Κλειδωμένη εγγραφή',
     locked_by: 'Κλείδωμα από',
     locked_at: 'Κλείδωμα στις',
-    unlocked_by: 'Ξεκλείδωμα από'
+    unlocked_by: 'Ξεκλείδωμα από',
+    unlocked_at: 'Ξεκλείδωμα στις',
+    orphan_card_resolution: 'Επίλυση ορφανού χτυπήματος',
+    automatic_resolution: 'Αυτόματη επίλυση'
 };
+
+const hiddenAuditValueFields = new Set([
+    'zero_length_card_resolution'
+]);
 
 function auditLabel(field) {
     return auditFieldLabels[field] || field;
 }
 
+function auditDisplayValue(value) {
+    if (value === true) return 'ΝΑΙ';
+    if (value === false) return 'ΟΧΙ';
+    return value ?? '';
+}
+
 function renderAuditValues(oldValues = {}, newValues = {}) {
-    const fields = Object.keys(newValues || {});
+    const fields = Object.keys(newValues || {})
+        .filter((field) => !hiddenAuditValueFields.has(field));
 
     if (fields.length === 0) {
         return '<div class="text-muted">Δεν υπάρχουν επιμέρους αλλαγές.</div>';
@@ -13317,9 +13378,9 @@ function renderAuditValues(oldValues = {}, newValues = {}) {
                     .map(
                         (field) => `
                             <tr>
-                                <td>${auditLabel(field)}</td>
-                                <td>${oldValues?.[field] ?? ''}</td>
-                                <td>${newValues?.[field] ?? ''}</td>
+                                <td>${escapeHtml(auditLabel(field))}</td>
+                                <td>${escapeHtml(auditDisplayValue(oldValues?.[field]))}</td>
+                                <td>${escapeHtml(auditDisplayValue(newValues?.[field]))}</td>
                             </tr>
                         `
                     )

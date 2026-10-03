@@ -223,6 +223,50 @@ const approvedOrphan = resolve(weekWith(
 ));
 assert.ok(!approvedOrphan.blocking_reasons.includes('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
 
+// Approved zero-length evidence is resolved for weekly gating while its raw warning remains.
+const unresolvedZeroLength = { ...workRow(DATES[0]),
+    apo_ora_01: '10:00', eos_ora_01: '14:00', ores_ergasias: 4,
+    cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04', cards_ores_ergasias: 0,
+    apo_ora_01_apologistika: '', eos_ora_01_apologistika: '',
+    ores_ergasias_apologistika: 0, zero_length_card_resolution: null };
+const unresolvedZeroLengthWorkflow = resolve(weekWith(unresolvedZeroLength));
+assert.ok(unresolvedZeroLengthWorkflow.blocking_reasons.includes(
+    'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+assert.ok(unresolvedZeroLengthWorkflow.blocking_reasons.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+assert.strictEqual(unresolvedZeroLengthWorkflow.next_required_hr_stage, NEXT_STAGE.BLOCKED);
+
+const approvedZeroLength = { ...unresolvedZeroLength,
+    apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '14:04',
+    ores_ergasias_apologistika: 4, ores_pragmatikhs_ergasias_apologistika: 4,
+    ores_apoysias_apologistika: 0, apologistiko_biblio: true, is_locked: true,
+    zero_length_card_resolution: {
+        status: 'HR_APPROVED', policy_version: 'zero-length-card-work:v1',
+        resolution_kind: 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE',
+        affected_pairs: [1],
+        approved_intervals: [{ pairNumber: 1, start: '10:00', end: '14:04' }],
+        raw_cards_preserved: true, transmission_failure_confirmed: true
+    } };
+const approvedZeroLengthWorkflow = resolve(weekWith(approvedZeroLength));
+assert.ok(approvedZeroLengthWorkflow.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
+assert.ok(approvedZeroLengthWorkflow.warnings.includes(
+    'HR_APPROVED_ZERO_LENGTH_CARD_RESOLUTION'));
+assert.ok(!approvedZeroLengthWorkflow.blocking_reasons.includes(
+    'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+assert.ok(!approvedZeroLengthWorkflow.blocking_reasons.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+assert.notStrictEqual(approvedZeroLengthWorkflow.next_required_hr_stage,
+    NEXT_STAGE.BLOCKED);
+
+const unresolvedEndOnly = { ...workRow(DATES[0]), cards_apo_ora_01: '',
+    cards_eos_ora_01: '17:00', cards_ores_ergasias: 0,
+    ores_ergasias_apologistika: 0 };
+const unresolvedEndOnlyWorkflow = resolve(weekWith(unresolvedEndOnly));
+assert.ok(unresolvedEndOnlyWorkflow.blocking_reasons.includes(
+    'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+assert.ok(unresolvedEndOnlyWorkflow.blocking_reasons.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+
 // Daily Stage-2 handoff semantics use the terms effective on each date.
 const twoPossibleRows = weekWith(possibleLeaveRow(DATES[1]), possibleLeaveRow(DATES[3]));
 const mixed = resolve(twoPossibleRows, {
