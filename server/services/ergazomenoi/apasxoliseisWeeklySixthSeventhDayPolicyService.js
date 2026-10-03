@@ -17,6 +17,19 @@ const {
 const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v3';
 const STATUS = Object.freeze({ READY: 'READY', NOT_APPLICABLE: 'NOT_APPLICABLE', NEEDS_HR_DECISION: 'NEEDS_HR_DECISION' });
 const ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES = new Set(['0009']);
+const HR_APPROVED_CARD_EVIDENCE_STATUSES = new Set([
+    'HR_APPROVED_ORPHAN',
+    'HR_APPROVED_ZERO_LENGTH'
+]);
+
+function hasResolvedCardEvidenceStatus(status) {
+    return status === 'READY' || HR_APPROVED_CARD_EVIDENCE_STATUSES.has(status);
+}
+
+function hasCardProvenWorkStatus(status) {
+    return status === 'SAFE_AUTO_RESOLVED' ||
+        HR_APPROVED_CARD_EVIDENCE_STATUSES.has(status);
+}
 
 function validRate(value) {
     if (value === null || value === undefined || String(value).trim() === '') return null;
@@ -32,8 +45,7 @@ function resolveSeventhDayIllegalOvertimeHours(day) {
 function selectSixthDay(candidates) {
     const cardProvenCandidates = candidates
         .filter((day) => day.cardHours > 0 ||
-            ['SAFE_AUTO_RESOLVED', 'HR_APPROVED_ORPHAN'].includes(
-                day.cardVerificationStatus))
+            hasCardProvenWorkStatus(day.cardVerificationStatus))
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
     const standardCandidates = cardProvenCandidates.filter(
         (day) => day.actualWorkHours > 5 && day.actualWorkHours <= 8
@@ -72,7 +84,7 @@ function selectSixthDay(candidates) {
 
 function isSixthDayEligible(day) {
     return (day.cardHours > 0 ||
-        ['SAFE_AUTO_RESOLVED', 'HR_APPROVED_ORPHAN'].includes(day.cardVerificationStatus)) &&
+        hasCardProvenWorkStatus(day.cardVerificationStatus)) &&
         day.actualWorkHours > 5 && day.actualWorkHours <= 8;
 }
 
@@ -273,7 +285,7 @@ function analyzeWeeklySixthSeventhDay({
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: factReasons, warnings: [], dailyFacts });
     }
     if (actionableDailyFacts.some((day) =>
-        !['READY', 'HR_APPROVED_ORPHAN'].includes(day.cardVerificationStatus))) {
+        !hasResolvedCardEvidenceStatus(day.cardVerificationStatus))) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,
             status: STATUS.NEEDS_HR_DECISION,

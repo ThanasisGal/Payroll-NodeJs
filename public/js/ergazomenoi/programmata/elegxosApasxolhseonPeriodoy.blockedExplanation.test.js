@@ -25,6 +25,13 @@ const orphan = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
 ]));
 assert.match(orphan, /ορφανό χτύπημα κάρτας/);
 
+const zeroLength = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
+    'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION',
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'
+]));
+assert.match(zeroLength, /μηδενικό διάστημα κάρτας/);
+assert.doesNotMatch(zeroLength, /ορφανό χτύπημα κάρτας/);
+
 const repo = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
     'MULTIPLE_SOURCE_CANDIDATES'
 ]));
@@ -36,12 +43,17 @@ const missing = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
 assert.match(missing, /Λείπουν απαραίτητα στοιχεία απασχόλησης/);
 assert.match(missing, /Συμπληρώστε ή διορθώστε τα στοιχεία πριν συνεχίσετε/);
 
-for (const message of [orphan, repo, missing]) {
+for (const message of [orphan, zeroLength, repo, missing]) {
     assert.doesNotMatch(message,
         /ORPHAN_CARD|UNRESOLVED|MULTIPLE_SOURCE|INCOMPLETE_NATURAL_WEEK/);
 }
 assert.strictEqual(sandbox.weeklyHrBlockedExplanation(payload('OPEN')), '');
 assert.strictEqual(sandbox.weeklyHrBlockedExplanation(payload('COMPLETED')), '');
+const approvedZeroLength = payload('COMPLETED');
+approvedZeroLength.rows = [{ cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04',
+    zero_length_card_resolution: { status: 'HR_APPROVED' } }];
+assert.strictEqual(sandbox.weeklyHrBlockedExplanation(approvedZeroLength), '');
+assert.strictEqual(sandbox.weeklyHrHasOnlyOrphanBlockers(approvedZeroLength), false);
 
 const rebasedCompleted = payload('COMPLETED');
 rebasedCompleted.workflow = { next_required_hr_stage: 'BLOCKED',

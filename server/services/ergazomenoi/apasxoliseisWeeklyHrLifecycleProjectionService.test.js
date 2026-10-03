@@ -945,6 +945,51 @@ assert.equal(departureOrphanAfter.stages.stage1.blockers.includes(
 assert.deepEqual(departureOrphanAfter.employment_date_scope.authoritative_date_set,
     ['2026-06-01', '2026-06-02']);
 
+const approvedZeroLengthWeek = week('approved-zero-length', '2026-08-03');
+for (const index of [5, 6]) Object.assign(approvedZeroLengthWeek[index], {
+    kathgoria_ergasias: 'ΑΝ', kathgoria_ergasias_apologistika: 'ΑΝ',
+    ores_ergasias: 0, ores_ergasias_apologistika: 0,
+    cards_ores_ergasias: 0, cards_apo_ora_01: '', cards_eos_ora_01: '',
+    apo_ora_01: '', eos_ora_01: '', repo: true, repo_apologistika: true
+});
+Object.assign(approvedZeroLengthWeek[0], {
+    apo_ora_01: '10:00', eos_ora_01: '14:00', ores_ergasias: 4,
+    cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04', cards_ores_ergasias: 0,
+    apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '14:04',
+    ores_ergasias_apologistika: 4, ores_pragmatikhs_ergasias_apologistika: 4,
+    ores_apoysias_apologistika: 0, apologistiko_biblio: true, is_locked: true,
+    zero_length_card_resolution: {
+        status: 'HR_APPROVED', policy_version: 'zero-length-card-work:v1',
+        resolution_kind: 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE',
+        affected_pairs: [1],
+        approved_intervals: [{ pairNumber: 1, start: '10:00', end: '14:04' }],
+        raw_cards_preserved: true, transmission_failure_confirmed: true
+    }
+});
+const approvedZeroLengthLifecycle = buildWeeklyHrLifecycleProjection({
+    weekRows: approvedZeroLengthWeek, effectiveProfile: profile
+});
+assert.equal(approvedZeroLengthLifecycle.stages.stage1.business_status, 'COMPLETED');
+assert.equal(approvedZeroLengthLifecycle.stages.stage1.presentation_status, 'COMPLETED');
+assert.ok(!approvedZeroLengthLifecycle.stages.stage1.blockers.includes(
+    'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+assert.ok(!approvedZeroLengthLifecycle.stages.stage1.blockers.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+assert.equal(approvedZeroLengthLifecycle.stages.stage4.business_status, 'COMPLETED');
+assert.ok(!approvedZeroLengthLifecycle.stages.stage4.blockers.includes(
+    'CARD_VERIFICATION_PENDING'));
+assert.ok(!approvedZeroLengthLifecycle.stages.stage4.blockers.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+assert.ok(!approvedZeroLengthLifecycle.stages.stage4.final_weekly_analysis.reasons.includes(
+    'CARD_VERIFICATION_PENDING'));
+assert.ok(!approvedZeroLengthLifecycle.stages.stage4.final_weekly_analysis.reasons.includes(
+    'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+assert.ok(!approvedZeroLengthLifecycle.stages.stage4.final_weekly_analysis.reasons.includes(
+    'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+assert.equal(approvedZeroLengthLifecycle.stages.stage2.presentation_status, 'COMPLETED');
+assert.equal(approvedZeroLengthLifecycle.stages.stage3.presentation_status, 'COMPLETED');
+assert.equal(approvedZeroLengthLifecycle.stages.stage4.presentation_status, 'COMPLETED');
+
 const employee0002Actual = week('0002', '2026-06-01');
 Object.assign(employee0002Actual[0], { kathgoria_ergasias: 'ΑΝ', repo: true,
     apo_ora_01: '', eos_ora_01: '', ores_ergasias: 0,

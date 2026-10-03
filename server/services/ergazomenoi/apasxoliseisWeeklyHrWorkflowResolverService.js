@@ -38,6 +38,11 @@ const NEXT_STAGE = Object.freeze({
     DEFERRED_TO_NEXT_PERIOD: DEFERRED_WEEK_STATUS
 });
 
+const HR_APPROVED_CARD_EVIDENCE_STATUSES = new Set([
+    'HR_APPROVED_ORPHAN',
+    'HR_APPROVED_ZERO_LENGTH'
+]);
+
 function uniqueDateKeys(values = []) {
     return [...new Set((Array.isArray(values) ? values : [])
         .map(dateKeyUtc).filter(Boolean))].sort();
@@ -196,7 +201,7 @@ function resolveWeeklyHrWorkflow({
         warnings.push(...(facts.warnings || []));
         if (dateIsActionable &&
             (facts.warnings || []).includes('INCOMPLETE_CARD_INTERVAL') &&
-            facts.cardVerificationStatus !== 'HR_APPROVED_ORPHAN') {
+            !HR_APPROVED_CARD_EVIDENCE_STATUSES.has(facts.cardVerificationStatus)) {
             blockingReasons.push('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE');
         }
     });

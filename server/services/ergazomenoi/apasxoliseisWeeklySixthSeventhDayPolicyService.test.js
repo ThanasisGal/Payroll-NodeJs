@@ -144,6 +144,31 @@ assert.strictEqual(june0004.sixthDay.cardVerificationStatus, 'HR_APPROVED_ORPHAN
 assert.strictEqual(june0004.seventhDay, null);
 assert.ok(!june0004.reasons.includes('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC'));
 
+const approvedZeroLengthWeek = week([0, 8, 8, 8, 8, 0, 0]);
+Object.assign(approvedZeroLengthWeek[0], {
+    ores_ergasias: 4,
+    cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:04', cards_ores_ergasias: 0,
+    apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '14:04',
+    ores_ergasias_apologistika: 4, ores_pragmatikhs_ergasias_apologistika: 4,
+    zero_length_card_resolution: {
+        status: 'HR_APPROVED', policy_version: 'zero-length-card-work:v1',
+        resolution_kind: 'ACTUAL_WORK_ERGANI_TRANSMISSION_FAILURE',
+        affected_pairs: [1],
+        approved_intervals: [{ pairNumber: 1, start: '10:00', end: '14:04' }],
+        raw_cards_preserved: true, transmission_failure_confirmed: true
+    }
+});
+const approvedZeroLengthResult = analyzeWeeklySixthSeventhDay({
+    weekRows: approvedZeroLengthWeek,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: 40 }
+});
+assert.strictEqual(approvedZeroLengthResult.status, 'NOT_APPLICABLE');
+assert.ok(!approvedZeroLengthResult.reasons.includes('CARD_VERIFICATION_PENDING'));
+assert.strictEqual(approvedZeroLengthResult.dailyFacts[0].cardVerificationStatus,
+    'HR_APPROVED_ZERO_LENGTH');
+assert.ok(approvedZeroLengthResult.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
+
 const chronologicalCandidates = analyze([6.58, 6.37, 9.18, 9.03, 6.35, 8, 0]);
 assert.strictEqual(chronologicalCandidates.sixthDay.hmeromhnia, '2026-08-01');
 
