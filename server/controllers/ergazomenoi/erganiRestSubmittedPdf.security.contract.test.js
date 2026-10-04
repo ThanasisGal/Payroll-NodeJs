@@ -98,6 +98,19 @@ test('successful submitted PDF retry clears deferred state and stale PDF errors'
         savedPdfPath,
         /success: true,[\s\S]*pdfSaved: true,[\s\S]*pdfDeferred: false,[\s\S]*pdfUrl:/
     );
+    assert.match(savedPdfPath, /pdfFilename: buildSubmittedErganiPdfDisplayFilename\(erganhLog\)/);
+});
+
+test('WTODailyA retry passes period-level submission identity to shared PDF storage', () => {
+    const retryHandler = erganhController.slice(
+        erganhController.indexOf('static retrySubmittedErganiPdf'),
+        erganhController.indexOf('static getCompanyErganhDashboard')
+    );
+    assert.match(
+        retryHandler,
+        /saveSubmittedErganiPdfToS3\(\{[\s\S]*submissionFolder: submissionCode,[\s\S]*submissionContext: erganhLog/
+    );
+    assert.doesNotMatch(retryHandler, /ErgazomenoiErganhModel\.create|uploadJsonDocumentToErgani/);
 });
 
 test('existing submitted PDF self-heals stale metadata without contacting ERGANI', () => {
@@ -118,6 +131,7 @@ test('existing submitted PDF self-heals stale metadata without contacting ERGANI
         existingPdfPath,
         /success: true,[\s\S]*pdfSaved: true,[\s\S]*pdfDeferred: false,[\s\S]*pdfUrl: existingPdfUrl/
     );
+    assert.match(existingPdfPath, /pdfFilename: buildSubmittedErganiPdfDisplayFilename\(erganhLog\)/);
     assert.doesNotMatch(existingPdfPath, /PasswordsModel|authenticateErgani|getSubmissionDocument|downloadSubmittedErganiPdfWithPlaywright/);
     assert.ok(retryHandler.indexOf('if (existingPdfUrl)') < retryHandler.indexOf('PasswordsModel.findOne'));
 });

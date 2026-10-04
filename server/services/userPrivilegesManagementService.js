@@ -3,7 +3,9 @@ const { UserPrivilegesModel } = require('../models/privileges');
 const UserPrivilegeFormCatalogModel = require('../models/userPrivilegeFormCatalog');
 const {
     userPrivilegeSidebarHierarchy,
+    userPrivilegeNonNavigationPlacements,
     validateUserPrivilegeSidebarHierarchy,
+    validateUserPrivilegeNonNavigationPlacements,
     compareHierarchyEntries
 } = require('../constants/userPrivilegeSidebarHierarchy');
 
@@ -74,28 +76,60 @@ function serializePrivilegeDocuments(
     catalogEntries,
     documents,
     schemaKeys = getSchemaPrivilegeKeys(),
-    hierarchyEntries = userPrivilegeSidebarHierarchy
+    hierarchyEntries = userPrivilegeSidebarHierarchy,
+    nonNavigationPlacements = userPrivilegeNonNavigationPlacements
 ) {
     const columns = [...schemaKeys];
     const catalog = validateCatalogEntries(catalogEntries);
     validateUserPrivilegeSidebarHierarchy(hierarchyEntries);
     const hierarchyByForm = new Map(hierarchyEntries.map((item) => [item.form, item]));
-    if (hierarchyByForm.size !== catalog.length ||
-        catalog.some((entry) => !hierarchyByForm.has(entry.form)) ||
-        hierarchyEntries.some((item) => !catalog.some((entry) => entry.form === item.form))) {
+    const catalogByForm = new Map(catalog.map((entry) => [entry.form, entry]));
+    const relevantNonNavigationPlacements = nonNavigationPlacements.filter((item) =>
+        catalogByForm.has(item.form)
+    );
+    validateUserPrivilegeNonNavigationPlacements(
+        relevantNonNavigationPlacements,
+        hierarchyEntries
+    );
+    const placementByForm = new Map(
+        relevantNonNavigationPlacements.map((item) => [item.form, item])
+    );
+    if (hierarchyEntries.some((item) => !catalogByForm.has(item.form))) {
         throw contractError(
             'PRIVILEGE_HIERARCHY_MISMATCH',
             'Η ρύθμιση πλοήγησης δικαιωμάτων δεν συμφωνεί με τον κατάλογο',
             500
         );
     }
+    const catalogWithoutPlacement = catalog.find((entry) =>
+        !hierarchyByForm.has(entry.form) && !placementByForm.has(entry.form)
+    );
+    if (catalogWithoutPlacement) {
+        throw contractError(
+            'PRIVILEGE_PLACEMENT_MISSING',
+            'Ο κατάλογος περιέχει φόρμα χωρίς εγκεκριμένη θέση στη διαχείριση δικαιωμάτων',
+            500
+        );
+    }
+    const placementWithDifferentLabel = catalog.find((entry) =>
+        placementByForm.has(entry.form) &&
+        placementByForm.get(entry.form).itemLabel.trim() !== entry.formLabel
+    );
+    if (placementWithDifferentLabel) {
+        throw contractError(
+            'PRIVILEGE_PLACEMENT_MISMATCH',
+            'Η εγκεκριμένη θέση της φόρμας δεν συμφωνεί με την ονομασία του καταλόγου',
+            500
+        );
+    }
+    const navigationByForm = new Map([...hierarchyByForm, ...placementByForm]);
     const documentsByForm = new Map(
         (Array.isArray(documents) ? documents : []).map((doc) => [String(doc.form), doc])
     );
     const rows = catalog
         .map((entry) => {
             const doc = documentsByForm.get(entry.form);
-            const navigation = hierarchyByForm.get(entry.form);
+            const navigation = navigationByForm.get(entry.form);
             const raw = doc?.privileges?.toObject
                 ? doc.privileges.toObject()
                 : (doc?.privileges || {});
@@ -121,8 +155,8 @@ function serializePrivilegeDocuments(
             };
         })
         .sort((left, right) => compareHierarchyEntries(
-            hierarchyByForm.get(left.form),
-            hierarchyByForm.get(right.form)
+            navigationByForm.get(left.form),
+            navigationByForm.get(right.form)
         ));
     return { columns, rows };
 }

@@ -103,6 +103,10 @@ function entry(form, sidebarNodeId, itemLabel, itemOrder, ancestors) {
     return { form, sidebarNodeId, itemLabel, itemOrder, ancestors };
 }
 
+function nonNavigationPlacement(form, itemLabel, itemOrder, ancestors) {
+    return { form, itemLabel, itemOrder, ancestors };
+}
+
 const files = { key: 'files', label: 'Αρχεία', order: 100 };
 const movements = { key: 'movements', label: 'Κινήσεις', order: 200 };
 const reports = { key: 'reports', label: 'Εκτυπώσεις', order: 300 };
@@ -132,6 +136,7 @@ const userPrivilegeSidebarHierarchy = [
     entry('CalcApasxolhseisPeriodoy', 'li235', 'Υπολογισμός Απασχολήσεων Βάσει των Ψηφιακών Καρτών', 400, [files, ergani]),
     entry('ElegxosApasxolhseonPeriodoy', 'li236', 'Έλεγχος Απασχολήσεων', 500, [files, ergani]),
     entry('KatastashElegxouApologistikouPinaka', 'li2374', 'Κατάσταση Ελέγχου Απολογιστικού Πίνακα', 550, [files, ergani]),
+    entry('EktyposhOristikouApologistikouPinaka', 'li2375', 'Εκτύπωση Οριστικού Απολογιστικού Πίνακα', 560, [files, ergani]),
     entry('ApologistikosPinakasYperorion', 'li2372', 'Απολογιστικός Πίνακας Υπερωριών', 200, [files, ergani, submissions]),
     entry('YpobolhAdeion', 'li2373', 'Υποβολή Αδειών', 400, [files, ergani, submissions]),
     entry('Krathseis', 'li24', 'Κρατήσεις', 400, [files]),
@@ -146,9 +151,87 @@ const userPrivilegeSidebarHierarchy = [
     entry('EktyposhSymbaseonErgazomenon', 'li422', 'Εργαζόμενων', 100, [reports, contractReports])
 ];
 
+const userPrivilegeNonNavigationPlacements = [
+    nonNavigationPlacement(
+        'ApologistikosPinakasOrarion',
+        'Απολογιστικός Πίνακας Ωραρίων',
+        100,
+        [files, ergani, submissions]
+    )
+];
+
+function validateUserPrivilegeNonNavigationPlacements(
+    entries,
+    sidebarEntries = userPrivilegeSidebarHierarchy
+) {
+    if (!Array.isArray(entries)) {
+        throw hierarchyError('INVALID_NON_NAVIGATION_PRIVILEGE_PLACEMENTS');
+    }
+    validateUserPrivilegeSidebarHierarchy(sidebarEntries);
+    const sidebarForms = new Set(sidebarEntries.map((entry) => entry.form));
+    const knownPaths = new Map();
+    const occupiedLeafOrders = new Map();
+    sidebarEntries.forEach((entry) => {
+        const parentKeys = [];
+        entry.ancestors.forEach((ancestor) => {
+            const parentPath = parentKeys.join('/');
+            const currentPath = [...parentKeys, ancestor.key].join('/');
+            knownPaths.set(currentPath,
+                `${ancestor.label.trim()}\u0000${ancestor.order}\u0000${parentPath}`);
+            parentKeys.push(ancestor.key);
+        });
+        occupiedLeafOrders.set(`${parentKeys.join('/')}\u0000${entry.itemOrder}`, entry.form);
+    });
+
+    const placementForms = new Set();
+    entries.forEach((entry) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry) ||
+            Object.prototype.hasOwnProperty.call(entry, 'sidebarNodeId') ||
+            !FORM_KEY_PATTERN.test(entry.form || '') ||
+            typeof entry.itemLabel !== 'string' || !entry.itemLabel.trim() ||
+            !Number.isInteger(entry.itemOrder) || entry.itemOrder < 0 ||
+            !Array.isArray(entry.ancestors) || entry.ancestors.length === 0) {
+            throw hierarchyError('INVALID_NON_NAVIGATION_PRIVILEGE_PLACEMENT');
+        }
+        if (sidebarForms.has(entry.form)) {
+            throw hierarchyError('NON_NAVIGATION_PRIVILEGE_FORM_HAS_SIDEBAR_ENTRY');
+        }
+        if (placementForms.has(entry.form)) {
+            throw hierarchyError('DUPLICATE_NON_NAVIGATION_PRIVILEGE_FORM');
+        }
+        placementForms.add(entry.form);
+
+        const parentKeys = [];
+        entry.ancestors.forEach((ancestor) => {
+            if (!ancestor || typeof ancestor !== 'object' || Array.isArray(ancestor) ||
+                !PATH_KEY_PATTERN.test(ancestor.key || '') ||
+                typeof ancestor.label !== 'string' || !ancestor.label.trim() ||
+                !Number.isInteger(ancestor.order) || ancestor.order < 0) {
+                throw hierarchyError('INVALID_NON_NAVIGATION_PRIVILEGE_ANCESTOR');
+            }
+            const parentPath = parentKeys.join('/');
+            const currentPath = [...parentKeys, ancestor.key].join('/');
+            const definition = `${ancestor.label.trim()}\u0000${ancestor.order}\u0000${parentPath}`;
+            if (knownPaths.get(currentPath) !== definition) {
+                throw hierarchyError('UNKNOWN_NON_NAVIGATION_PRIVILEGE_PATH');
+            }
+            parentKeys.push(ancestor.key);
+        });
+        const orderKey = `${parentKeys.join('/')}\u0000${entry.itemOrder}`;
+        if (occupiedLeafOrders.has(orderKey)) {
+            throw hierarchyError('DUPLICATE_NON_NAVIGATION_PRIVILEGE_ORDER');
+        }
+        occupiedLeafOrders.set(orderKey, entry.form);
+    });
+    return true;
+}
+
 validateUserPrivilegeSidebarHierarchy(userPrivilegeSidebarHierarchy);
 userPrivilegeSidebarHierarchy.sort(compareHierarchyEntries);
 deepFreeze(userPrivilegeSidebarHierarchy);
+validateUserPrivilegeNonNavigationPlacements(userPrivilegeNonNavigationPlacements);
+userPrivilegeNonNavigationPlacements.sort(compareHierarchyEntries);
+deepFreeze(userPrivilegeNonNavigationPlacements);
 
 const hierarchyByForm = new Map(userPrivilegeSidebarHierarchy.map((item) => [item.form, item]));
 
@@ -158,7 +241,9 @@ function getUserPrivilegeNavigation(form) {
 
 module.exports = {
     userPrivilegeSidebarHierarchy,
+    userPrivilegeNonNavigationPlacements,
     validateUserPrivilegeSidebarHierarchy,
+    validateUserPrivilegeNonNavigationPlacements,
     compareHierarchyEntries,
     getUserPrivilegeNavigation,
     pathIdentity

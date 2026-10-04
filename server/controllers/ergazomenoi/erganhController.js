@@ -43,6 +43,11 @@ const {
     downloadSubmittedErganiPdfWithPlaywright
 } = require('../../utils/erganh/erganiSubmittedPdfDownloader');
 const {
+    safeFilenamePart,
+    buildSubmittedErganiPdfStorageIdentity,
+    buildSubmittedErganiPdfDisplayFilename
+} = require('../../services/ergazomenoi/submittedErganiPdfStorageIdentityService');
+const {
     SCHEDULE_CATEGORY: ERGANI_SCHEDULE_CATEGORY,
     parseErganiScheduleCell
 } = require('../../services/ergani/erganiScheduleCellParserService');
@@ -6168,23 +6173,14 @@ function parseErganiSubmitDate(value) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function safeFilenamePart(value, fallback = 'UNKNOWN') {
-    const cleaned = String(value || fallback)
-        .trim()
-        .replace(/[\\/:*?"<>|]/g, '_')
-        .replace(/\s+/g, '_')
-        .substring(0, 80);
-
-    return cleaned || fallback;
-}
-
 async function saveSubmittedErganiPdfToS3({
     pdfBuffer,
     contentType,
     ergazomenos,
     companyData,
     restResult,
-    submissionFolder = 'E7N'
+    submissionFolder = 'E7N',
+    submissionContext = {}
 }) {
     if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer) || pdfBuffer.length === 0) {
         return {
@@ -6202,18 +6198,18 @@ async function saveSubmittedErganiPdfToS3({
     try {
         const { uploadBufferToS3 } = require('../../utils/s3Helper');
 
-        const employeeId = safeFilenamePart(ergazomenos?._id || ergazomenos?.kodikos || 'E7N');
-        const eponymo = safeFilenamePart(ergazomenos?.eponymo || 'UNKNOWN');
-        const onoma = safeFilenamePart(ergazomenos?.onoma || 'UNKNOWN');
-        const protocol = safeFilenamePart(restResult?.protocol || 'NO_PROTOCOL');
-        const datePart = safeFilenamePart(String(restResult?.submitDate || '').replace(/\//g, '-'));
-
-        const filename = `${employeeId}_${eponymo}_${onoma}_${protocol}_${datePart}.pdf`;
+        const storageIdentity = buildSubmittedErganiPdfStorageIdentity({
+            submissionCode: submissionContext.submission_code || submissionFolder,
+            submission: submissionContext,
+            ergazomenos,
+            restResult
+        });
+        const filename = storageIdentity.filename;
         const companyNameClean = safeFilenamePart(
             companyData?.eponymia || companyData?.perigrafh || 'UNKNOWN'
         );
         const companyKod = safeFilenamePart(companyData?.kod || companyData?.kodikos || 'UNKNOWN');
-        const team = safeFilenamePart(ergazomenos?.team || 'NO_TEAM');
+        const team = storageIdentity.team;
 
         const s3Key = `ergani-submissions/${team}/${companyKod}_${companyNameClean}/${safeFilenamePart(submissionFolder, 'E7N')}/${filename}`;
 
@@ -9312,10 +9308,19 @@ class erganhController {
                 employment_period_start: scope.period_start, employment_period_end: scope.period_end,
                 submission_code: 'WTODailyA', payload_fingerprint: fingerprint,
                 submission_status: 'SUCCESS', is_final: true, document_status: 'ACTIVE' }).lean();
-            if (existing) return res.json({ success: true, idempotent: true,
-                submissionCode: 'WTODailyA', protocol: existing.protocol,
-                submitDate: existing.submit_date_text, erganhSubmissionId: existing.erganh_submission_id,
-                erganhLogId: existing._id, pdfUrl: existing.pdf_s3_url || '' });
+            if (existing) {
+                const existingPdfSaved = Boolean(
+                    existing.pdf_s3_key || existing.pdf_relative_path || existing.pdf_s3_url
+                );
+                return res.json({ success: true, idempotent: true,
+                    submissionCode: 'WTODailyA', protocol: existing.protocol,
+                    submitDate: existing.submit_date_text, erganhSubmissionId: existing.erganh_submission_id,
+                    erganhLogId: existing._id,
+                    pdfFilename: buildSubmittedErganiPdfDisplayFilename(existing),
+                    pdfSaved: existingPdfSaved,
+                    pdfUrl: existingPdfSaved ? getErganiPdfRoute(existing._id) : '',
+                    pdfDeferred: !existingPdfSaved && existing.pdf_deferred === true });
+            }
             const [company, branch, password] = await Promise.all([
                 CompaniesModel.findOne({ _id: scope.company_kod, team: scope.team }).lean(),
                 YpokatasthmataModel.findOne({ companykod_object: scope.company_kod, team: scope.team,
@@ -9339,9 +9344,13 @@ class erganhController {
             const pdfBuffer = restResult?.submittedPdf?.buffer;
             if (Buffer.isBuffer(pdfBuffer) && pdfBuffer.subarray(0, 5).toString() === '%PDF-') {
                 pdfStorage = await saveSubmittedErganiPdfToS3({ pdfBuffer, contentType: 'application/pdf',
-                    ergazomenos: { team: scope.team, kodikos: `PERIOD_${projection.f_from_date}_${projection.f_to_date}`,
-                        eponymo: 'WTO', onoma: 'DAILY' }, companyData: company, restResult,
-                    submissionFolder: 'WTODailyA' });
+                    ergazomenos: { team: scope.team }, companyData: company, restResult,
+                    submissionFolder: 'WTODailyA', submissionContext: {
+                        submission_code: 'WTODailyA', team: scope.team,
+                        ypokatasthma_kodikos: scope.ypokatasthma,
+                        employment_period_start: scope.period_start,
+                        employment_period_end: scope.period_end
+                    } });
             }
             const submittedAt = parseErganiSubmitDate(restResult.submitDate);
             if (!submittedAt || !restResult.protocol || !restResult.id) {
@@ -9376,7 +9385,9 @@ class erganhController {
                 submissionCode: 'WTODailyA', protocol: restResult.protocol,
                 submitDate: restResult.submitDate, erganhSubmissionId: restResult.id,
                 erganhLogId: record._id, pdfSaved: pdfStorage.pdfSaved,
-                pdfUrl: pdfStorage.pdfS3Url || '', pdfDeferred: !pdfStorage.pdfSaved });
+                pdfFilename: pdfStorage.pdfFilename || '',
+                pdfUrl: pdfStorage.pdfSaved ? getErganiPdfRoute(record._id) : '',
+                pdfDeferred: !pdfStorage.pdfSaved });
         } catch (error) {
             console.error('[submitFinalWTODayilyA]', error.code || error.message);
             if (externalSuccess) return res.status(503).json({ success: false,
@@ -16247,6 +16258,7 @@ class erganhController {
                     pdfSaved: true,
                     pdfDeferred: false,
                     pdfUrl: existingPdfUrl,
+                    pdfFilename: buildSubmittedErganiPdfDisplayFilename(erganhLog),
                     protocol: erganhLog.protocol || null,
                     submitDate: erganhLog.submit_date_text || erganhLog.submit_date || null
                 });
@@ -16417,7 +16429,8 @@ class erganhController {
                     protocol,
                     submitDate
                 },
-                submissionFolder: submissionCode
+                submissionFolder: submissionCode,
+                submissionContext: erganhLog
             });
 
             if (!pdfStorage.pdfSaved) {
@@ -16455,6 +16468,7 @@ class erganhController {
                 pdfSaved: true,
                 pdfDeferred: false,
                 pdfUrl: getErganiPdfRoute(erganhLog._id),
+                pdfFilename: buildSubmittedErganiPdfDisplayFilename(erganhLog),
                 protocol,
                 submitDate,
                 erganhLogId: erganhLog._id

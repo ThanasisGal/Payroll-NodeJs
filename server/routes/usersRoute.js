@@ -25,6 +25,7 @@ const symbaseisController = require('../controllers/symbaseisController.js');
 const programmataController = require('../controllers/ergazomenoi/programmataController.js');
 const erganhController = require('../controllers/ergazomenoi/erganhController.js');
 const apologistikosPinakasControlReportController = require('../controllers/ergazomenoi/apologistikosPinakasControlReportController.js');
+const wtoDailyFinalSubmittedDocumentController = require('../controllers/ergazomenoi/wtoDailyFinalSubmittedDocumentController.js');
 const wtoLeaveController = require('../controllers/ergazomenoi/wtoLeaveController.js');
 const wtoOvertimeController = require('../controllers/ergazomenoi/wtoOvertimeController.js');
 const kinhseisController = require('../controllers/Kinhseis/kinhseisController.js');
@@ -820,6 +821,22 @@ router.get(
     requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'export'),
     authorizeProgrammataSessionCompany,
     apologistikosPinakasControlReportController.pdf
+);
+
+router.get(
+    '/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka',
+    checkAuth,
+    requireUserPrivilegeAction('EktyposhOristikouApologistikouPinaka', 'read'),
+    authorizeProgrammataSessionCompany,
+    wtoDailyFinalSubmittedDocumentController.page
+);
+
+router.get(
+    '/api/prodhlomena-oraria/review/period-control/submission/final/document',
+    checkAuth,
+    requireUserPrivilegeAction('EktyposhOristikouApologistikouPinaka', 'export'),
+    authorizeProgrammataSessionCompany,
+    wtoDailyFinalSubmittedDocumentController.document
 );
 
 // ============================================================================

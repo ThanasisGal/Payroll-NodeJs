@@ -3,7 +3,9 @@
 const assert = require('assert');
 const {
     userPrivilegeSidebarHierarchy,
+    userPrivilegeNonNavigationPlacements,
     validateUserPrivilegeSidebarHierarchy,
+    validateUserPrivilegeNonNavigationPlacements,
     compareHierarchyEntries,
     pathIdentity
 } = require('./userPrivilegeSidebarHierarchy');
@@ -36,6 +38,10 @@ assert.ok(userPrivilegeSidebarHierarchy.some((entry) => entry.ancestors.length =
 assert.ok(Object.isFrozen(userPrivilegeSidebarHierarchy));
 assert.ok(Object.isFrozen(userPrivilegeSidebarHierarchy[0]));
 assert.ok(Object.isFrozen(userPrivilegeSidebarHierarchy[0].ancestors));
+assert.ok(Object.isFrozen(userPrivilegeNonNavigationPlacements));
+assert.strictEqual(validateUserPrivilegeNonNavigationPlacements(
+    userPrivilegeNonNavigationPlacements
+), true);
 assert.ok(userPrivilegeSidebarHierarchy.every((entry) => /^li[0-9]+$/.test(entry.sidebarNodeId)));
 const byForm = new Map(userPrivilegeSidebarHierarchy.map((entry) => [entry.form, entry]));
 assert.equal(byForm.has('ApologistikosPinakasOrarion'), false,
@@ -44,6 +50,21 @@ assert.deepStrictEqual(byForm.get('KatastashElegxouApologistikouPinaka').ancesto
     ['files', 'ergani-ii']);
 assert.ok(byForm.get('ElegxosApasxolhseonPeriodoy').itemOrder <
     byForm.get('KatastashElegxouApologistikouPinaka').itemOrder);
+assert.deepStrictEqual(byForm.get('EktyposhOristikouApologistikouPinaka').ancestors.map((item) => item.key),
+    ['files', 'ergani-ii']);
+assert.ok(byForm.get('KatastashElegxouApologistikouPinaka').itemOrder <
+    byForm.get('EktyposhOristikouApologistikouPinaka').itemOrder);
+assert.strictEqual(byForm.has('ApologistikosPinakasOrarion'), false);
+assert.deepStrictEqual(userPrivilegeNonNavigationPlacements, [{
+    form: 'ApologistikosPinakasOrarion',
+    itemLabel: 'Απολογιστικός Πίνακας Ωραρίων',
+    itemOrder: 100,
+    ancestors: [
+        { key: 'files', label: 'Αρχεία', order: 100 },
+        { key: 'ergani-ii', label: 'ΕΡΓΑΝΗ ΙΙ', order: 300 },
+        { key: 'file-submissions', label: 'Αποστολή Αρχείων', order: 600 }
+    ]
+}]);
 assert.deepStrictEqual(byForm.get('ApologistikosPinakasYperorion').ancestors.map((item) => item.key),
     ['files', 'ergani-ii', 'file-submissions']);
 assert.deepStrictEqual(byForm.get('YpobolhAdeion').ancestors.map((item) => item.key),
