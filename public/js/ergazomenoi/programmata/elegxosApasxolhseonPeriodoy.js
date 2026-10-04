@@ -5,6 +5,144 @@ function employmentReviewSaveErrorMessage(payload) {
     return message || 'Η ενημέρωση δεν ολοκληρώθηκε. Παρακαλώ δοκιμάστε ξανά.';
 }
 
+function employmentReviewErrorEscapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function employmentReviewErrorHtml({ paragraphs = [], steps = [], nothingSaved = true,
+    referenceCode = '' } = {}) {
+    const paragraphHtml = paragraphs.map((value) =>
+        `<p>${employmentReviewErrorEscapeHtml(value)}</p>`).join('');
+    const stepsHtml = steps.length
+        ? `<p><strong>Τι να κάνετε:</strong></p><ol>${steps.map((value) =>
+            `<li>${employmentReviewErrorEscapeHtml(value)}</li>`).join('')}</ol>` : '';
+    const savedHtml = nothingSaved
+        ? '<p><strong>Καμία αλλαγή δεν αποθηκεύτηκε.</strong></p>' : '';
+    const referenceHtml = referenceCode
+        ? `<p class="small text-muted mb-0">Κωδικός αναφοράς: ${
+            employmentReviewErrorEscapeHtml(referenceCode)}</p>` : '';
+    return `${paragraphHtml}${stepsHtml}${savedHtml}${referenceHtml}`;
+}
+
+function dailyResolutionOverlapPresentation(command = {}) {
+    const work = (command.work_intervals || []).map((interval) => ({ ...interval,
+        startMinute: reviewTimeToMinute(interval.start),
+        endMinute: reviewTimeToMinute(interval.end) }));
+    const leave = command.emergency_hourly_leave_intervals || [];
+    for (const workInterval of work) {
+        for (const leaveInterval of leave) {
+            const overlapStart = Math.max(workInterval.startMinute, leaveInterval.apo_lepto);
+            const overlapEnd = Math.min(workInterval.endMinute, leaveInterval.eos_lepto);
+            if (Number.isInteger(overlapStart) && Number.isInteger(overlapEnd) &&
+                overlapStart < overlapEnd) {
+                return {
+                    title: 'Η εργασία και η ωροάδεια επικαλύπτονται',
+                    html: employmentReviewErrorHtml({ paragraphs: [
+                        'Προσπαθήσατε να αποθηκεύσετε τις πραγματικές ώρες της ημέρας.',
+                        `Πραγματική εργασία: ${workInterval.start}–${workInterval.end}`,
+                        `Ωροάδεια: ${minuteToReviewTime(leaveInterval.apo_lepto)}–${
+                            minuteToReviewTime(leaveInterval.eos_lepto)}`,
+                        `Το διάστημα ${minuteToReviewTime(overlapStart)}–${
+                            minuteToReviewTime(overlapEnd)} δεν μπορεί να είναι ταυτόχρονα εργασία και ωροάδεια.`,
+                        'Για λόγους ασφάλειας η αποθήκευση σταμάτησε.'
+                    ], steps: ['Διορθώστε ένα από τα δύο διαστήματα.',
+                        'Πατήστε ξανά «Αποθήκευση».'],
+                    referenceCode: 'HR_DAILY_WORK_LEAVE_OVERLAP' }),
+                    referenceCode: 'HR_DAILY_WORK_LEAVE_OVERLAP', nothingSaved: true
+                };
+            }
+        }
+    }
+    return null;
+}
+
+function employmentReviewUserErrorDetails(payload, context = {}) {
+    if (payload?.userPresentation) return payload.userPresentation;
+    const responsePayload = payload?.payload && typeof payload.payload === 'object'
+        ? payload.payload : payload || {};
+    const code = String(responsePayload.code || payload?.code || '').trim();
+    if (code === 'HR_DAILY_PREVIEW_STALE') return {
+        title: 'Δεν έγινε η αποθήκευση',
+        html: employmentReviewErrorHtml({ paragraphs: [
+            'Προσπαθήσατε να αποθηκεύσετε τις πραγματικές ώρες της ημέρας.',
+            'Η εφαρμογή είχε κάνει τον απαραίτητο έλεγχο πριν από την επιβεβαίωση, αλλά πριν από την τελική αποθήκευση διαπίστωσε ότι κάποιο από τα στοιχεία της ημέρας ή του διαλείμματος δεν είναι πλέον ακριβώς ίδιο.',
+            'Για λόγους ασφάλειας η αλλαγή σταμάτησε.'
+        ], steps: ['Κλείστε αυτό το μήνυμα.',
+            'Ελέγξτε ξανά τις ώρες που έχετε συμπληρώσει.',
+            'Πατήστε ξανά «Αποθήκευση».',
+            'Διαβάστε ξανά την «Ακριβή επιβεβαίωση ημέρας».',
+            'Αν το ίδιο μήνυμα εμφανιστεί ξανά χωρίς να έχετε αλλάξει τίποτα, επικοινωνήστε με τον διαχειριστή.'],
+        referenceCode: code }), referenceCode: code, nothingSaved: true
+    };
+    if (code === 'HR_DAILY_PREVIEW_REQUIRED') return {
+        title: 'Δεν έγινε η αποθήκευση',
+        html: employmentReviewErrorHtml({ paragraphs: [
+            'Προσπαθήσατε να αποθηκεύσετε τις πραγματικές ώρες της ημέρας.',
+            'Η τελική αποθήκευση χρειάζεται πρώτα έναν νέο ακριβή έλεγχο των ωρών που έχετε συμπληρώσει.',
+            'Η εφαρμογή σταμάτησε για να μην αποθηκεύσει ώρες που δεν έχουν επιβεβαιωθεί.'
+        ], steps: ['Κλείστε αυτό το μήνυμα.', 'Πατήστε ξανά «Αποθήκευση».',
+            'Ελέγξτε τις τιμές στην «Ακριβή επιβεβαίωση ημέρας» και επιβεβαιώστε τις.'],
+        referenceCode: code }), referenceCode: code, nothingSaved: true
+    };
+    if (['HR_DAILY_LEAVE_CATEGORY_REQUIRED', 'HR_DAILY_LEAVE_CATEGORY_INVALID']
+        .includes(code)) {
+        const intervals = (context.dailyActualWorkCommand
+            ?.emergency_hourly_leave_intervals || []).map((interval) =>
+            `${minuteToReviewTime(interval.apo_lepto)}–${minuteToReviewTime(
+                interval.eos_lepto)}`).join(', ') || 'το διάστημα που συμπληρώσατε';
+        return {
+            title: code === 'HR_DAILY_LEAVE_CATEGORY_REQUIRED'
+                ? 'Δεν έχει επιλεγεί κατηγορία άδειας'
+                : 'Η κατηγορία άδειας δεν μπορεί να χρησιμοποιηθεί',
+            html: employmentReviewErrorHtml({ paragraphs: [
+                `Προσπαθήσατε να αποθηκεύσετε έκτακτη ωροάδεια ${intervals}.`,
+                code === 'HR_DAILY_LEAVE_CATEGORY_REQUIRED'
+                    ? 'Δεν έχει επιλεγεί κατηγορία άδειας.'
+                    : 'Η κατηγορία άδειας που επιλέξατε δεν είναι διαθέσιμη για αυτή την ωροάδεια.',
+                'Η εφαρμογή σταμάτησε για να μην αποθηκεύσει ωροάδεια χωρίς επιτρεπτή κατηγορία.'
+            ], steps: [
+                'Επιλέξτε άλλη κατηγορία από το πεδίο «Κατηγορία άδειας απολογιστικά».',
+                'Πατήστε ξανά «Αποθήκευση».'
+            ], referenceCode: code }),
+            referenceCode: code,
+            nothingSaved: true
+        };
+    }
+    if (code === 'HR_DAILY_EMERGENCY_LEAVE_WTO_CLOCK_INVALID') return {
+        title: 'Η ώρα της ωροάδειας δεν είναι έγκυρη',
+        html: employmentReviewErrorHtml({ paragraphs: [
+            'Προσπαθήσατε να αποθηκεύσετε έκτακτη ωροάδεια με ώρα 24:00.',
+            'Η ώρα 24:00 δεν μπορεί να αποθηκευτεί ως όριο ωροάδειας.'
+        ], steps: ['Επιλέξτε ώρα από 00:00 έως 23:59.',
+            'Πατήστε ξανά «Αποθήκευση».'], referenceCode: code }),
+        referenceCode: code,
+        nothingSaved: true
+    };
+    if (code === 'HR_DAILY_WORK_LEAVE_OVERLAP') {
+        const overlap = dailyResolutionOverlapPresentation(context.dailyActualWorkCommand);
+        if (overlap) return overlap;
+    }
+    const message = typeof responsePayload.message === 'string' && responsePayload.message.trim()
+        ? responsePayload.message.trim()
+        : 'Η αποθήκευση δεν ολοκληρώθηκε. Κλείστε αυτό το μήνυμα, ελέγξτε ξανά τα στοιχεία και δοκιμάστε ξανά.';
+    return { title: 'Δεν έγινε η αποθήκευση',
+        html: employmentReviewErrorHtml({ paragraphs: [message],
+            steps: ['Ελέγξτε ξανά τα στοιχεία που συμπληρώσατε.',
+                'Πατήστε ξανά «Αποθήκευση».'], referenceCode: code }),
+        referenceCode: code, nothingSaved: true };
+}
+
+function showEmploymentReviewSaveError(payload, context = {}) {
+    const presentation = employmentReviewUserErrorDetails(payload, context);
+    return employmentReviewSwal({ icon: 'error', title: presentation.title,
+        html: presentation.html });
+}
+
 const employmentReviewSwalCommonClasses = Object.freeze({
     title: 'custom-title',
     popup: 'custom-swal-popup employment-review-swal-popup',
@@ -13645,7 +13783,7 @@ function renderDailyActualWorkResolutionSection(row = {}, visible = false) {
         <div class="small mb-2">Τα αρχικά χτυπήματα κάρτας εμφανίζονται μόνο για έλεγχο και δεν μεταβάλλονται.</div>
         <div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary" id="dailyAddWorkInterval" ${approved ? 'disabled' : ''}>Προσθήκη διαστήματος εργασίας</button><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary" id="dailyRemoveWorkInterval" ${approved ? 'disabled' : ''}>Αφαίρεση τελευταίου διαστήματος εργασίας</button></div>
         <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="dailyEmergencyLeaveEnabled" ${row.ektakth_oroadeia_apologistika ? 'checked' : ''} ${approved ? 'disabled' : ''}><label class="form-check-label" for="dailyEmergencyLeaveEnabled">Έκτακτη ωροάδεια</label></div>
-        <div class="row g-2">${[0, 1, 2].map((index) => `<div class="col-md-4"><label class="form-label">Ωροάδεια ${index + 1}</label><div class="input-group"><input type="text" inputmode="numeric" pattern="(?:[01]\\d|2[0-3]):[0-5]\\d" placeholder="HH:MM" class="form-control daily-leave-start" value="${escapeHtml(minuteToReviewTime(segments[index]?.apo_lepto))}" ${leaveDisabled ? 'disabled' : ''}><input type="text" inputmode="numeric" pattern="(?:[01]\\d|2[0-3]):[0-5]\\d" placeholder="HH:MM" class="form-control daily-leave-end" value="${escapeHtml(minuteToReviewTime(segments[index]?.eos_lepto))}" ${leaveDisabled ? 'disabled' : ''}></div></div>`).join('')}</div>
+        <div class="row g-2">${[0, 1, 2].map((index) => `<div class="col-md-4"><label class="form-label">Ωροάδεια ${index + 1}</label><div class="input-group"><input type="time" step="60" class="form-control daily-leave-start" value="${escapeHtml(minuteToReviewTime(segments[index]?.apo_lepto))}" ${leaveDisabled ? 'disabled' : ''}><input type="time" step="60" class="form-control daily-leave-end" value="${escapeHtml(minuteToReviewTime(segments[index]?.eos_lepto))}" ${leaveDisabled ? 'disabled' : ''}></div></div>`).join('')}</div>
         <div class="d-flex gap-2 mt-2"><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary" id="dailyAddLeaveInterval" ${leaveDisabled ? 'disabled' : ''}>Προσθήκη διαστήματος ωροάδειας</button><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary" id="dailyRemoveLeaveInterval" ${leaveDisabled ? 'disabled' : ''}>Αφαίρεση τελευταίου διαστήματος ωροάδειας</button></div>
         <div class="small mt-2"><strong>Κατηγορία άδειας:</strong> επιλέγεται από το αντίστοιχο πεδίο «Κατηγορία άδειας απολογιστικά» παρακάτω.</div>
         <button type="button" class="btn btn-sm mt-2 employment-review-action-btn ${row?.suspicious_short_card_interval?.suspicious === true ? 'employment-review-action-success' : 'employment-review-action-secondary'}" id="dailyUseRawCards" ${approved ? 'disabled' : ''}>${row?.suspicious_short_card_interval?.suspicious === true ? 'Η κάρτα είναι σωστή' : 'Χρήση αρχικών χτυπημάτων κάρτας'}</button>
@@ -13654,25 +13792,104 @@ function renderDailyActualWorkResolutionSection(row = {}, visible = false) {
     </div>`;
 }
 
+function dailyEmergencyLeaveValidationError(code, title, paragraphs, steps) {
+    const error = new Error(paragraphs.join(' '));
+    error.code = code;
+    error.userPresentation = {
+        title,
+        html: employmentReviewErrorHtml({ paragraphs, steps, referenceCode: code }),
+        referenceCode: code,
+        nothingSaved: true
+    };
+    return error;
+}
+
+function validateDailyEmergencyLeaveInputs() {
+    const enabled = document.getElementById('dailyEmergencyLeaveEnabled')?.checked === true;
+    if (!enabled) return { intervals: [], leaveCategory: '' };
+
+    const starts = [...document.querySelectorAll('.daily-leave-start')];
+    const ends = [...document.querySelectorAll('.daily-leave-end')];
+    const intervals = [];
+    for (let index = 0; index < Math.max(starts.length, ends.length); index += 1) {
+        const startValue = String(starts[index]?.value || '').trim();
+        const endValue = String(ends[index]?.value || '').trim();
+        const intervalNumber = index + 1;
+        if (!startValue && !endValue) continue;
+        if (startValue && !endValue) {
+            throw dailyEmergencyLeaveValidationError('HR_DAILY_LEAVE_END_REQUIRED',
+                'Η ωροάδεια δεν είναι πλήρης', [
+                    `Στην Ωροάδεια ${intervalNumber} έχετε συμπληρώσει ώρα Από (${startValue}), αλλά δεν έχετε συμπληρώσει ώρα Έως.`
+                ], [`Συμπληρώστε την ώρα Έως στην Ωροάδεια ${intervalNumber}.`,
+                    'Αν δεν χρειάζεστε αυτό το διάστημα, αδειάστε και τα δύο πεδία.',
+                    'Πατήστε ξανά «Αποθήκευση».']);
+        }
+        if (!startValue && endValue) {
+            throw dailyEmergencyLeaveValidationError('HR_DAILY_LEAVE_START_REQUIRED',
+                'Η ωροάδεια δεν είναι πλήρης', [
+                    `Στην Ωροάδεια ${intervalNumber} έχετε συμπληρώσει ώρα Έως (${endValue}), αλλά δεν έχετε συμπληρώσει ώρα Από.`
+                ], [`Συμπληρώστε την ώρα Από στην Ωροάδεια ${intervalNumber}.`,
+                    'Αν δεν χρειάζεστε αυτό το διάστημα, αδειάστε και τα δύο πεδία.',
+                    'Πατήστε ξανά «Αποθήκευση».']);
+        }
+
+        const startMinute = reviewTimeToMinute(startValue);
+        const endMinute = reviewTimeToMinute(endValue);
+        if (!Number.isInteger(startMinute) || !Number.isInteger(endMinute)) {
+            throw dailyEmergencyLeaveValidationError('HR_DAILY_LEAVE_TIME_INVALID',
+                'Η ώρα της ωροάδειας δεν είναι έγκυρη', [
+                    `Η Ωροάδεια ${intervalNumber} έχει Από: ${startValue || 'κενό'} και Έως: ${endValue || 'κενό'}.`,
+                    'Οι ώρες πρέπει να είναι από 00:00 έως 23:59. Η τιμή 24:00 δεν επιτρέπεται.'
+                ], ['Διορθώστε την ώρα Από ή την ώρα Έως.',
+                    'Πατήστε ξανά «Αποθήκευση».']);
+        }
+        if (startMinute >= endMinute) {
+            throw dailyEmergencyLeaveValidationError('HR_DAILY_LEAVE_ORDER_INVALID',
+                'Η ώρα Έως πρέπει να είναι μετά από την ώρα Από', [
+                    `Ωροάδεια ${intervalNumber}: Από: ${startValue} · Έως: ${endValue}.`,
+                    'Το διάστημα πρέπει να ξεκινά νωρίτερα και να τελειώνει αργότερα.'
+                ], ['Διορθώστε μία από τις δύο ώρες.',
+                    'Πατήστε ξανά «Αποθήκευση».']);
+        }
+        intervals.push(Object.freeze({ apo_lepto: startMinute, eos_lepto: endMinute }));
+    }
+
+    if (!intervals.length) {
+        throw dailyEmergencyLeaveValidationError('HR_DAILY_LEAVE_INTERVAL_REQUIRED',
+            'Δεν έχει συμπληρωθεί διάστημα ωροάδειας', [
+                'Έχετε επιλέξει «Έκτακτη ωροάδεια», αλλά δεν έχετε συμπληρώσει πλήρες διάστημα Από–Έως.'
+            ], ['Συμπληρώστε την ώρα Από και την ώρα Έως σε μία Ωροάδεια.',
+                'Αν δεν υπάρχει έκτακτη ωροάδεια, αποεπιλέξτε το αντίστοιχο πλαίσιο.',
+                'Πατήστε ξανά «Αποθήκευση».']);
+    }
+
+    const leaveCategory = String(document.getElementById(
+        'edit_kathgoria_adeias_apologistika_hidden')?.value || '').trim();
+    if (!leaveCategory) {
+        const intervalText = intervals.map((interval) =>
+            `${minuteToReviewTime(interval.apo_lepto)}–${minuteToReviewTime(interval.eos_lepto)}`)
+            .join(', ');
+        throw dailyEmergencyLeaveValidationError('HR_DAILY_LEAVE_CATEGORY_REQUIRED',
+            'Δεν έχει επιλεγεί κατηγορία άδειας', [
+                `Έχετε δηλώσει έκτακτη ωροάδεια ${intervalText}, αλλά δεν έχετε επιλέξει κατηγορία άδειας.`
+            ], ['Επιλέξτε κατηγορία από το πεδίο «Κατηγορία άδειας απολογιστικά».',
+                'Πατήστε ξανά «Αποθήκευση».']);
+    }
+    return { intervals, leaveCategory };
+}
+
 function buildFrozenDailyActualWorkCommand(row, reviseApproved = false) {
     const work_intervals = [1, 2, 3].map((pairNumber) => ({ pairNumber,
         start: document.getElementById(`edit_apo_ora_0${pairNumber}_apologistika`)?.value || '',
         end: document.getElementById(`edit_eos_ora_0${pairNumber}_apologistika`)?.value || ''
     })).filter((item) => item.start || item.end).map(Object.freeze);
-    const starts = [...document.querySelectorAll('.daily-leave-start')];
-    const ends = [...document.querySelectorAll('.daily-leave-end')];
-    const emergencyLeaveEnabled = document.getElementById('dailyEmergencyLeaveEnabled')?.checked === true;
-    const emergency_hourly_leave_intervals = (emergencyLeaveEnabled ? starts : []).map((input, index) => ({
-        apo_lepto: reviewTimeToMinute(input.value), eos_lepto: reviewTimeToMinute(ends[index]?.value)
-    })).filter((item) => item.apo_lepto !== null || item.eos_lepto !== null).map(Object.freeze);
+    const emergencyLeave = validateDailyEmergencyLeaveInputs();
     return Object.freeze({ approve: true, ...(reviseApproved ? { revise_approved: true } : {}),
         source_case: row.suspicious_short_card_interval?.suspicious
             ? 'SUSPICIOUS_SHORT_CARD_INTERVAL' : 'HR_CORRECTED_ACTUAL_DAY',
         work_intervals: Object.freeze(work_intervals),
-        emergency_hourly_leave_intervals: Object.freeze(emergency_hourly_leave_intervals),
-        leave_category: emergencyLeaveEnabled
-            ? document.getElementById('edit_kathgoria_adeias_apologistika_hidden')
-                ?.value?.trim() || '' : '' });
+        emergency_hourly_leave_intervals: Object.freeze(emergencyLeave.intervals),
+        leave_category: emergencyLeave.leaveCategory });
 }
 
 function dailyResolutionSummary(command = {}, row = {}) {
@@ -13726,10 +13943,19 @@ async function requestFrozenDailyResolutionPreview(row, command, reason) {
         body: JSON.stringify({ daily_actual_work_resolution: command, reason })
     });
     const payload = await response.json();
-    if (!response.ok || !payload.success) throw new Error(payload.message ||
-        'Αποτυχία διακομιστικής προεπισκόπησης της πραγματικής ημέρας.');
+    if (!response.ok || !payload.success) {
+        const error = new Error(payload.message ||
+            'Δεν ολοκληρώθηκε ο ακριβής έλεγχος της ημέρας.');
+        error.code = payload.code || 'HR_DAILY_PREVIEW_FAILED';
+        error.payload = payload;
+        throw error;
+    }
     if (!/^[a-f0-9]{64}$/.test(String(payload.preview?.previewFingerprint || ''))) {
-        throw new Error('Η διακομιστική προεπισκόπηση δεν επέστρεψε έγκυρο δακτυλικό αποτύπωμα.');
+        const error = new Error(
+            'Δεν ολοκληρώθηκε ο ακριβής έλεγχος που απαιτείται πριν από την αποθήκευση.');
+        error.code = 'HR_DAILY_PREVIEW_REQUIRED';
+        error.payload = { code: error.code, message: error.message };
+        throw error;
     }
     return payload.preview;
 }
@@ -14030,6 +14256,7 @@ function showDetailsModal(row, { orphanResolution = false,
     });
 
     document.getElementById('saveRecordBtn')?.addEventListener('click', async () => {
+        let dailyActualWorkCommand = null;
         try {
             const updates = {
                 apo_ora_01_apologistika:
@@ -14146,7 +14373,6 @@ function showDetailsModal(row, { orphanResolution = false,
                 if (!await confirmFrozenZeroLengthResolution(row, frozenCommand)) return;
             }
 
-            let dailyActualWorkCommand = null;
             const shouldSubmitDailyResolution = Boolean(
                 document.getElementById('dailyActualWorkResolutionSection')) &&
                 (!approvedDailyResolution || dailyResolutionRevisionActive);
@@ -14158,13 +14384,6 @@ function showDetailsModal(row, { orphanResolution = false,
                         !item.start || !item.end || item.start >= item.end)) {
                     employmentReviewSwal({ icon: 'warning', title: 'Πραγματική εργασία',
                         text: 'Συμπληρώστε έως τρία πλήρη, θετικά διαστήματα εργασίας.' });
-                    return;
-                }
-                if (dailyActualWorkCommand.emergency_hourly_leave_intervals.some((item) =>
-                    !Number.isInteger(item.apo_lepto) || !Number.isInteger(item.eos_lepto) ||
-                    item.apo_lepto >= item.eos_lepto || item.eos_lepto > 1439)) {
-                    employmentReviewSwal({ icon: 'warning', title: 'Έκτακτη ωροάδεια',
-                        text: 'Συμπληρώστε πλήρη, θετικά διαστήματα από 00:00 έως 23:59. Η τιμή 24:00 δεν υποστηρίζεται από το WTOLeave.' });
                     return;
                 }
                 const serverPreview = await requestFrozenDailyResolutionPreview(
@@ -14194,11 +14413,7 @@ function showDetailsModal(row, { orphanResolution = false,
             const payload = await response.json();
 
             if (!payload.success) {
-                employmentReviewSwal({
-                    icon: 'error',
-                    title: 'Σφάλμα',
-                    text: employmentReviewSaveErrorMessage(payload)
-                });
+                showEmploymentReviewSaveError(payload, { dailyActualWorkCommand });
 
                 return;
             }
@@ -14214,12 +14429,7 @@ function showDetailsModal(row, { orphanResolution = false,
             await loadResults();
         } catch (error) {
             console.error(error);
-
-            employmentReviewSwal({
-                icon: 'error',
-                title: 'Σφάλμα',
-                text: employmentReviewSaveErrorMessage(null)
-            });
+            showEmploymentReviewSaveError(error, { dailyActualWorkCommand });
         }
     });
 

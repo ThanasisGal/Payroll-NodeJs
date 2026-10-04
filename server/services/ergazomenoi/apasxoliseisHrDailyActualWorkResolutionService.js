@@ -31,6 +31,12 @@ const PREVIEW_ROW_FIELDS = Object.freeze([
     })
 ]);
 
+function withHrDailyPreviewRowFields(selectFields = '') {
+    const fields = new Set(String(selectFields || '').trim().split(/\s+/).filter(Boolean));
+    PREVIEW_ROW_FIELDS.forEach((field) => fields.add(field));
+    return [...fields].join(' ');
+}
+
 function fail(code, message, statusCode = 400) {
     throw Object.assign(new Error(message), { code, statusCode });
 }
@@ -147,10 +153,10 @@ function buildHrDailyActualWorkPreviewFingerprint({ row = {}, command = {},
 function assertHrDailyActualWorkPreviewFingerprint(input = {}) {
     const supplied = String(input.command?.preview_fingerprint || '').trim();
     if (!/^[a-f0-9]{64}$/.test(supplied)) fail('HR_DAILY_PREVIEW_REQUIRED',
-        'Απαιτείται νέα διακομιστική προεπισκόπηση πριν από την αποθήκευση.', 409);
+        'Δεν μπορεί να γίνει η τελική αποθήκευση χωρίς νέο ακριβή έλεγχο της ημέρας.', 409);
     const expected = buildHrDailyActualWorkPreviewFingerprint(input);
     if (supplied !== expected) fail('HR_DAILY_PREVIEW_STALE',
-        'Τα δεδομένα της ημέρας ή του διαλείμματος άλλαξαν. Δημιουργήστε νέα προεπισκόπηση.', 409);
+        'Η τελική αποθήκευση σταμάτησε, επειδή ο προηγούμενος έλεγχος δεν συμφωνεί πλέον ακριβώς με τα διαθέσιμα στοιχεία.', 409);
     return expected;
 }
 
@@ -235,7 +241,7 @@ function resolveHrDailyActualWorkResolution({ row = {}, command = {}, effectiveE
     if (Array.isArray(leave) && leave.some((segment) =>
         Number(segment?.apo_lepto) === 1440 || Number(segment?.eos_lepto) === 1440)) {
         fail('HR_DAILY_EMERGENCY_LEAVE_WTO_CLOCK_INVALID',
-            'Η έκτακτη ωροάδεια πρέπει να έχει όρια από 00:00 έως 23:59. Η τιμή 24:00 δεν υποστηρίζεται από το WTOLeave.');
+            'Η ώρα 24:00 δεν επιτρέπεται ως όριο έκτακτης ωροάδειας. Επιλέξτε ώρα από 00:00 έως 23:59.');
     }
     if (!validEmergencyHourlyLeaveSegments(leave)) fail('HR_DAILY_EMERGENCY_LEAVE_INVALID',
         'Τα διαστήματα έκτακτης ωροάδειας δεν είναι έγκυρα.');
@@ -378,7 +384,7 @@ async function persistHrDailyActualWorkResolutionWrite({ oldRecord, semanticUpda
 }
 
 module.exports = { POLICY_VERSION, RESOLUTION_KIND, SOURCE_CASES,
-    PREVIEW_FINGERPRINT_VERSION,
+    PREVIEW_FINGERPRINT_VERSION, PREVIEW_ROW_FIELDS, withHrDailyPreviewRowFields,
     isApprovedHrDailyActualWorkResolution,
     buildHrDailyActualWorkPreviewFingerprint, assertHrDailyActualWorkPreviewFingerprint,
     previewHrDailyActualWorkResolution, resolveHrDailyActualWorkResolution,

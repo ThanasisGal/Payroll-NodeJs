@@ -22,7 +22,9 @@ assert.strictEqual(sandbox.employmentReviewSaveErrorMessage({
 }), 'Η ενημέρωση δεν ολοκληρώθηκε. Παρακαλώ δοκιμάστε ξανά.');
 assert.strictEqual(sandbox.employmentReviewSaveErrorMessage(null),
     'Η ενημέρωση δεν ολοκληρώθηκε. Παρακαλώ δοκιμάστε ξανά.');
-assert(source.includes('text: employmentReviewSaveErrorMessage(payload)'));
-assert(source.includes('text: employmentReviewSaveErrorMessage(null)'));
+assert(source.includes('showEmploymentReviewSaveError(payload, { dailyActualWorkCommand })'));
+assert(source.includes('showEmploymentReviewSaveError(error, { dailyActualWorkCommand })'));
+assert(source.includes("title: 'Δεν έγινε η αποθήκευση'"));
+assert(source.includes('Καμία αλλαγή δεν αποθηκεύτηκε.'));
 
 console.log('orphan safe error frontend behavioral test: PASS');
