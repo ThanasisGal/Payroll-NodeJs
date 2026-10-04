@@ -6,11 +6,28 @@ const {
     applyCanonicalAbsenceMetrics
 } = require('./apasxoliseisStage1DailyClassificationBulkService');
 const { positiveClassification } = require('./apasxoliseisStage3FingerprintService');
+const { isApprovedOrphanResolution } = require('./apasxoliseisOrphanCardResolutionService');
 
 const ALLOWED = new Set(['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO']);
 
 function error(code, message, statusCode = 400) {
     return Object.assign(new Error(message), { code, statusCode });
+}
+
+function applyPredeclaredRepoBookRule(row = {}, updates = {}) {
+    const finalState = { ...row, ...updates };
+    const approvedOrphanType = String(
+        finalState.orphan_card_resolution?.orphan_type || ''
+    ).trim();
+    if (isApprovedOrphanResolution(finalState) &&
+        ['START_ONLY', 'END_ONLY'].includes(approvedOrphanType)) {
+        return { ...updates, apologistiko_biblio: true };
+    }
+    if (finalState.repo !== true || finalState.repo_apologistika !== true ||
+        String(finalState.kathgoria_ergasias_apologistika || '').trim() !== 'ΑΝ') {
+        return updates;
+    }
+    return { ...updates, apologistiko_biblio: false };
 }
 
 function buildCanonicalClassificationUpdates({ classification, leave_category = '', row = {} } = {}) {
@@ -36,11 +53,11 @@ function buildCanonicalClassificationUpdates({ classification, leave_category = 
             ores_ergasias_apologistika: 0 };
     }
     if (normalized === 'REST_REPO') {
-        return { apologistiko_biblio: true,
+        return applyPredeclaredRepoBookRule(row, { apologistiko_biblio: true,
             kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true,
             adeia_apologistika: false, kathgoria_adeias_apologistika: '',
             astheneia_apologistika: false, apousia_apologistika: false,
-            ores_ergasias_apologistika: 0 };
+            ores_ergasias_apologistika: 0 });
     }
     return classificationUpdates({ classification: normalized,
         kathgoria_adeias_apologistika: String(leave_category || '').trim() }, row);
@@ -87,5 +104,6 @@ async function writeCanonicalDailyClassification({
         updates, row: { ...row, ...updates } };
 }
 
-module.exports = { ALLOWED, buildCanonicalClassificationUpdates, planCanonicalDailyClassification,
+module.exports = { ALLOWED, applyPredeclaredRepoBookRule,
+    buildCanonicalClassificationUpdates, planCanonicalDailyClassification,
     writeCanonicalDailyClassification };

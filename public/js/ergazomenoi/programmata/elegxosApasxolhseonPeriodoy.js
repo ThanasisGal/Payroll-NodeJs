@@ -1655,21 +1655,36 @@ function breakSubtractedHoursValue(row) {
     return 0;
 }
 
+function stage4WorkMinutes(row = {}) {
+    return Math.max(0, Math.round(effectiveWorkHoursValue(row) * 60));
+}
+
+function formatStage4HoursMinutes(minutes) {
+    const safeMinutes = Number.isSafeInteger(minutes) && minutes >= 0 ? minutes : 0;
+    return `${String(Math.floor(safeMinutes / 60)).padStart(2, '0')}:` +
+        String(safeMinutes % 60).padStart(2, '0');
+}
+
+function renderStage4HoursValue(effectiveHours, exactMinutes = null) {
+    const numericHours = num(effectiveHours);
+    if (numericHours === 0) {
+        return `<div class="stage4-hours-value">
+            <span class="stage4-hours-decimal">${hours(numericHours)}</span>
+        </div>`;
+    }
+    const minutes = Number.isSafeInteger(exactMinutes) && exactMinutes >= 0
+        ? exactMinutes
+        : Math.max(0, Math.round(numericHours * 60));
+    return `<div class="stage4-hours-value">
+        <span class="stage4-hours-clock">${formatStage4HoursMinutes(minutes)}</span>
+        <span class="stage4-hours-decimal">${hours(numericHours)}</span>
+    </div>`;
+}
+
 function renderHoursCell(row) {
     const effectiveHours = effectiveWorkHoursValue(row);
-    const rawCardHours = num(row.cards_ores_ergasias);
-    const breakHours = breakSubtractedHoursValue(row);
-
-    if (breakHours <= 0) {
-        return `<div class="fw-semibold">${hours(effectiveHours)}</div>`;
-    }
-
-    return `
-        <div class="fw-semibold">${hours(effectiveHours)}</div>
-        <small class="review-hours-note">
-            Κάρτες ${hours(rawCardHours)} − διάλ. ${hours(breakHours)}
-        </small>
-    `;
+    const minutes = stage4WorkMinutes(row);
+    return renderStage4HoursValue(effectiveHours, minutes);
 }
 
 function ensureReviewTableStructure() {
@@ -2367,7 +2382,7 @@ function appendEmployeeTotalsRow(tbody, totals, groupId) {
         <td colspan="6" class="fw-bold text-end">
             Σύνολα εργαζομένου
         </td>
-        <td class="fw-bold">${hours(totals.ores_ergasias_apologistika)}</td>
+        <td class="fw-bold">${renderStage4HoursValue(totals.ores_ergasias_apologistika)}</td>
         <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia cell-apoysia-total' : 'cell-apoysia-total'}">
             ${hours(totals.ores_apoysias_apologistika)}
         </td>        
@@ -3122,7 +3137,7 @@ function appendGrandTotalsRow(tbody, totals) {
         <td colspan="6" class="fw-bold text-end">
             Γενικά σύνολα φίλτρου
         </td>
-        <td class="fw-bold">${hours(totals.ores_ergasias_apologistika)}</td>
+        <td class="fw-bold">${renderStage4HoursValue(totals.ores_ergasias_apologistika)}</td>
         <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia' : ''}">${hours(totals.ores_apoysias_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
@@ -3555,6 +3570,7 @@ function resolveReviewRowPresentation(
     derived = {},
     repoTransferState = null
 ) {
+    const preservesPredeclaredRepo = isPredeclaredRepoPreservedInApologistika(row);
     const declaredCategory = String(
         row.kathgoria_ergasias_original || row.kathgoria_ergasias || ''
     ).trim();
@@ -3577,7 +3593,9 @@ function resolveReviewRowPresentation(
         resolvedApologistiko.text !== '-';
     const useDeclaredNeutralFallback =
         isOriginalDeclaredNeutral && !hasResolvedApologistikoSemantic;
-    const apologistiko = useDeclaredNeutralFallback
+    const apologistiko = preservesPredeclaredRepo
+        ? { text: '-', className: '', source: 'predeclared_repo_preserved' }
+        : useDeclaredNeutralFallback
         ? {
             text: '-',
             className: '',
@@ -3593,8 +3611,12 @@ function resolveReviewRowPresentation(
 
     return {
         declared: {
-            text: derived.declaredText || '-',
-            className: derived.declaredClass || ''
+            text: preservesPredeclaredRepo
+                ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
+                : derived.declaredText || '-',
+            className: preservesPredeclaredRepo
+                ? 'cell-declared-repo-day'
+                : derived.declaredClass || ''
         },
         apologistiko: {
             ...apologistiko,
@@ -3610,6 +3632,12 @@ function resolveReviewRowPresentation(
         isOriginalDeclaredNeutral,
         useDeclaredNeutralFallback
     };
+}
+
+function isPredeclaredRepoPreservedInApologistika(row = {}) {
+    return row.repo === true &&
+        row.repo_apologistika === true &&
+        String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΑΝ';
 }
 
 function resolveStoredStage1DailyPresentation(row = {}) {

@@ -11,14 +11,12 @@ const start = source.indexOf('function createEmptyTotals');
 const end = source.indexOf('function buildDeviationsByKodikos', start);
 const sandbox = {
     num: (value) => Number(value || 0),
-    hours: (value) => Number(value || 0).toFixed(2),
-    breakSubtractedHoursValue: () => 0
+    hours: (value) => Number(value || 0).toFixed(2)
 };
 vm.createContext(sandbox);
 const effectiveHoursSource = source.slice(source.indexOf('function effectiveWorkHoursValue'),
-    source.indexOf('// function breakSubtractedHoursValue'));
-const renderHoursSource = source.match(/function renderHoursCell\([\s\S]*?\n}/)?.[0] || '';
-vm.runInContext(`${effectiveHoursSource}\n${renderHoursSource}\n${source.slice(start, end)}
+    source.indexOf('function ensureReviewTableStructure'));
+vm.runInContext(`${effectiveHoursSource}\n${source.slice(start, end)}
 this.emptyTotals = createEmptyTotals;
 this.add = addRowToTotals;
 this.uiOvertime = sumUiYperoria;

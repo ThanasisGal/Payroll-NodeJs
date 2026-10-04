@@ -2,7 +2,10 @@
 
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
-const { buildCanonicalClassificationUpdates, planCanonicalDailyClassification,
+const { POLICY_VERSION: ORPHAN_POLICY_VERSION } =
+    require('./apasxoliseisOrphanCardResolutionService');
+const { applyPredeclaredRepoBookRule, buildCanonicalClassificationUpdates,
+    planCanonicalDailyClassification,
     writeCanonicalDailyClassification } = require('./apasxoliseisCanonicalDailyClassificationWriterService');
 
 assert.deepEqual(buildCanonicalClassificationUpdates({ classification: 'NON_WORK' }), {
@@ -19,6 +22,32 @@ assert.deepEqual(buildCanonicalClassificationUpdates({ classification: 'REST_REP
     astheneia_apologistika: false, apousia_apologistika: false,
     ores_ergasias_apologistika: 0
 });
+assert.equal(buildCanonicalClassificationUpdates({ classification: 'REST_REPO',
+    row: { repo: true } }).apologistiko_biblio, false);
+assert.equal(buildCanonicalClassificationUpdates({ classification: 'REST_REPO',
+    row: { repo: false } }).apologistiko_biblio, true);
+assert.equal(buildCanonicalClassificationUpdates({ classification: 'REST_REPO',
+    row: { repo: true, repo_apologistika: false } }).apologistiko_biblio, false,
+    'the writer sets repo_apologistika=true in the same authoritative update');
+const existing = { apologistiko_biblio: true, marker: 'unchanged' };
+assert.strictEqual(applyPredeclaredRepoBookRule({ repo: false,
+    repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΑΝ' }, existing), existing);
+assert.strictEqual(applyPredeclaredRepoBookRule({ repo: true,
+    repo_apologistika: false, kathgoria_ergasias_apologistika: 'ΑΝ' }, existing), existing);
+assert.strictEqual(applyPredeclaredRepoBookRule({ repo: true,
+    repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΜΕ' }, existing), existing);
+assert.deepEqual(applyPredeclaredRepoBookRule({ repo: true,
+    repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΑΝ' }, existing), {
+    apologistiko_biblio: false, marker: 'unchanged'
+});
+for (const orphanType of ['START_ONLY', 'END_ONLY']) {
+    assert.deepEqual(applyPredeclaredRepoBookRule({ repo: true,
+        repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΑΝ',
+        orphan_card_resolution: { status: 'HR_APPROVED',
+            policy_version: ORPHAN_POLICY_VERSION, orphan_type: orphanType }
+    }, existing), { apologistiko_biblio: true, marker: 'unchanged' },
+    `approved ${orphanType} orphan resolution keeps apologistiko_biblio=true`);
+}
 assert.deepEqual(planCanonicalDailyClassification({ classification: 'REST_REPO', row: {} }),
     buildCanonicalClassificationUpdates({ classification: 'REST_REPO' }));
 assert.throws(() => buildCanonicalClassificationUpdates({ classification: 'SICKNESS' }),
@@ -65,6 +94,15 @@ await writeCanonicalDailyClassification({ row, classification: 'LEAVE',
         return { matchedCount: 1 }; } },
     prodhlomenaAuditModel: { create: async () => {} } });
 assert.equal(updateCall[1].$set.ores_ergasias_apologistika, 6);
+await writeCanonicalDailyClassification({ row: { ...row, repo: true },
+    classification: 'REST_REPO', reason: 'Προδηλωμένο ρεπό', actor_name: 'HR', session: {},
+    prodhlomenaModel: { updateOne: async (...args) => { updateCall = args;
+        return { matchedCount: 1 }; } },
+    prodhlomenaAuditModel: { create: async (...args) => { auditCall = args; } } });
+assert.equal(updateCall[1].$set.apologistiko_biblio, false);
+assert.equal(updateCall[1].$set.repo_apologistika, true);
+assert.equal(updateCall[1].$set.kathgoria_ergasias_apologistika, 'ΑΝ');
+assert.equal(auditCall[0][0].newValues.apologistiko_biblio, false);
 await assert.rejects(() => writeCanonicalDailyClassification({ row,
     classification: 'NON_WORK' }), { code: 'DAILY_CLASSIFICATION_TRANSACTION_REQUIRED' });
 let auditWritten = false;

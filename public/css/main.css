@@ -15609,6 +15609,22 @@ body.loader-active > *:not(.app-loader) {
     text-align: right;
 }
 
+#employmentReviewStage4Collapse .stage4-hours-value {
+    display: grid;
+    min-width: 4.25rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+}
+
+#employmentReviewStage4Collapse .stage4-hours-clock {
+    justify-self: start;
+    font-weight: 650;
+}
+
+#employmentReviewStage4Collapse .stage4-hours-decimal {
+    justify-self: end;
+}
+
 #employmentReviewStage4Collapse #resultsTable > tbody > .employee-group-row > td {
     font-size: 0.94rem;
     letter-spacing: 0.01em;
