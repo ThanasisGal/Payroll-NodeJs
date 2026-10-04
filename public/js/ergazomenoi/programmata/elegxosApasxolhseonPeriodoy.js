@@ -8856,7 +8856,13 @@ function weeklyHrStage1Key(scope) {
 
 function canonicalLifecyclePayloadKey(payload) {
     const scope = payload?.scope || {};
-    return [scope.employee_kodikos, scope.week_start].join('|');
+    const branch = String(scope.ypokatasthma || '').trim();
+    const employeeId = String(scope.employee_id || '').trim();
+    const employeeCode = String(scope.employee_kodikos || '').trim();
+    return [branch ? branch.padStart(4, '0') : '',
+        employeeId ? `ID:${employeeId}` : `CODE:${employeeCode}`,
+        String(scope.week_start || '').slice(0, 10),
+        String(scope.week_end || '').slice(0, 10)].join('|');
 }
 
 function replaceCanonicalLifecyclePayload(payload) {
@@ -11888,6 +11894,7 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
             (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
             weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
             weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
+            replaceCanonicalLifecyclePayload(payload);
             if (isWeeklyHrStage1Selectable(payload)) weeklyHrStage1Selected.add(weeklyHrStage1Key(scope));
         }
     } catch (error) {
