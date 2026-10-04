@@ -458,6 +458,8 @@ const cardSandbox = {
     renderWeeklyHrOrphanItem: () => '',
     weeklyHrZeroLengthRows: () => [],
     renderWeeklyHrZeroLengthItem: () => '',
+    weeklyHrSuspiciousShortRows: () => [],
+    renderWeeklyHrSuspiciousShortItem: () => '',
     formatStage1DateKey: scopeSandbox.helpers.formatStage1DateKey,
     escapeHtml: String
 };
@@ -799,6 +801,23 @@ assert.match(pendingTextSandbox.render({
 }, 'OPEN', false), /2 εκκρεμότητες/);
 assert.match(source, /Εκκρεμότητες χαρακτηρισμού: <strong>\$\{counts\.needsAction}/);
 assert.doesNotMatch(source, />Εκκρεμότητες: <strong>\$\{counts\.needsAction}/);
+assert.match(source, /ΥΠΟΠΤΑ ΜΙΚΡΟ ΔΙΑΣΤΗΜΑ ΚΑΡΤΑΣ/);
+assert.match(source, /Προδηλωμένο ωράριο:/);
+assert.match(source, /Αρχικά χτυπήματα κάρτας:/);
+assert.match(source, /Έλεγχος πραγματικής ημέρας/);
+const blockedExplanationSource = source.match(
+    /function weeklyHrBlockedExplanation\([\s\S]*?\n}/)?.[0] || '';
+const orphanOnlySource = source.match(
+    /function weeklyHrHasOnlyOrphanBlockers\([\s\S]*?\n}/)?.[0] || '';
+const explanationSandbox = {};
+vm.runInNewContext(`${blockedExplanationSource}\n${orphanOnlySource}\nthis.explain = weeklyHrBlockedExplanation;this.onlyOrphan = weeklyHrHasOnlyOrphanBlockers;`,
+    explanationSandbox);
+const suspiciousPayload = { lifecycle_projection: { stages: { stage1: {
+    business_status: 'BLOCKED', blockers: [
+        'SUSPICIOUS_SHORT_CARD_INTERVAL_REQUIRES_HR_DECISION'
+    ] } } } };
+assert.match(explanationSandbox.explain(suspiciousPayload), /ύποπτα μικρό διάστημα κάρτας/);
+assert.equal(explanationSandbox.onlyOrphan(suspiciousPayload), false);
 assert.match(css,
     /\.employment-review-swal-popup \.swal2-confirm\.weekly-hr-stage1-bulk-confirm\s*\{[\s\S]*?white-space:\s*nowrap/);
 assert.doesNotMatch(css, /\.swal2-confirm\s*\{[^}]*white-space:\s*nowrap/);

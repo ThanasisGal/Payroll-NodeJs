@@ -23,7 +23,8 @@ function projection(source, rows, state) {
         persistedStage3State: state.stage3,
         scope: source.scope,
         periodScope: inputs.periodScope,
-        employmentDateScope: inputs.employmentDateScope
+        employmentDateScope: inputs.employmentDateScope,
+        companySettings: inputs.companySettings
     });
 }
 function rebaseTrustedStage1(state, lifecycle, source) {

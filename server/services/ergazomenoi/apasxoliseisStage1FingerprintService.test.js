@@ -76,6 +76,23 @@ assert.equal(buildStage1Fingerprint(week({ ...safeStartOnly,
 assert.notEqual(buildStage1Fingerprint(week({ ...safeStartOnly,
     cards_apo_ora_01: '10:00' })).fingerprint, safeFingerprint);
 
+const suspiciousPolicy = { elegxos_ypopta_mikron_diastimaton_kartas: true,
+    poly_mikro_diastima_kartas_eos_lepta: 5,
+    mikro_diastima_kartas_eos_lepta: 60,
+    mikro_diastima_kartas_max_pososto_programmatos: 25,
+    mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta: 60 };
+const shortRow = { ...actualWork, apo_ora_01: '10:00', eos_ora_01: '14:00',
+    ores_ergasias: 4, cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30',
+    cards_ores_ergasias: 0.5, ores_ergasias_apologistika: 0.5 };
+const shortDisabledFingerprint = buildStage1Fingerprint(week(shortRow)).fingerprint;
+const shortEnabledFingerprint = buildStage1Fingerprint(week(shortRow), {
+    companySettings: suspiciousPolicy
+}).fingerprint;
+assert.notEqual(shortEnabledFingerprint, shortDisabledFingerprint);
+assert.notEqual(buildStage1Fingerprint(week(shortRow), { companySettings: {
+    ...suspiciousPolicy, mikro_diastima_kartas_eos_lepta: 29
+} }).fingerprint, shortEnabledFingerprint);
+
 const persisted = { status: 'COMPLETED', completion_fingerprint: originalFingerprint,
     completed_at: new Date('2026-08-14T10:00:00Z'), completed_by_user_name: 'HR' };
 const snapshotBeforeResolution = JSON.stringify(persisted);

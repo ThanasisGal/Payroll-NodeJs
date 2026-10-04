@@ -158,7 +158,9 @@ async function completeWeeklyHrWorkflowStage1({
             'Απαιτείται write fence για τα ημερήσια δεδομένα της εβδομάδας.');
     }
     validateWorkflowPrerequisite(weekRows, workflow_context);
-    const initialFingerprint = buildStage1Fingerprint(weekRows).fingerprint;
+    const initialFingerprint = buildStage1Fingerprint(weekRows, {
+        companySettings: workflow_context.companySettings
+    }).fingerprint;
     const identity = commandIdentity({ scope, fingerprint: initialFingerprint, actor, reason });
 
     return transactionRunner(async (session) => {
@@ -178,7 +180,9 @@ async function completeWeeklyHrWorkflowStage1({
         await fenceWeeklyInput({ scope, session, initial_fingerprint: initialFingerprint });
         const freshRows = await loadFreshWeekRows({ scope, session });
         validateWorkflowPrerequisite(freshRows, workflow_context);
-        const finalFingerprint = buildStage1Fingerprint(freshRows).fingerprint;
+        const finalFingerprint = buildStage1Fingerprint(freshRows, {
+            companySettings: workflow_context.companySettings
+        }).fingerprint;
         if (finalFingerprint !== initialFingerprint) {
             throw commandError('STAGE1_INPUT_CHANGED', 409,
                 'Τα ημερήσια δεδομένα άλλαξαν πριν από την ολοκλήρωση του Stage 1.');

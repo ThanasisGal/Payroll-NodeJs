@@ -1769,6 +1769,14 @@ router.patch(
 );
 
 router.post(
+    '/api/prodhlomena-oraria/review/:id/daily-actual-work-resolution/preview',
+    checkAuth,
+    requireEmploymentReviewAccess,
+    requireCriticalEmploymentDecisionRole,
+    erganhController.previewHrDailyActualWorkResolution
+);
+
+router.post(
     '/api/prodhlomena-oraria/review/:id/orphan-resolution/preview',
     checkAuth,
     requireEmploymentReviewAccess,

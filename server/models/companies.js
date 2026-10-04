@@ -61,6 +61,13 @@ const CompaniesSchema = new Schema(
         hmeromhnia_payshs_polyetias_apo: { type: Date },
         hmeromhnia_payshs_polyetias_eos: { type: Date },
         xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta: { type: Number, default: 0 },
+        elegxos_ypopta_mikron_diastimaton_kartas: { type: Boolean, default: false },
+        poly_mikro_diastima_kartas_eos_lepta: { type: Number, default: 5, min: 0, max: 1440 },
+        mikro_diastima_kartas_eos_lepta: { type: Number, default: 60, min: 0, max: 1440 },
+        mikro_diastima_kartas_max_pososto_programmatos: { type: Number, default: 25, min: 0, max: 100 },
+        mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta: {
+            type: Number, default: 60, min: 0, max: 1440
+        },
         tropos_ypologismoy_pragmatikoy_oromisthioy: {
             type: String,
             enum: ['actual_plus_extra', 'full_legal_plus_extra'],

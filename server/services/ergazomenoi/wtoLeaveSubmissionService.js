@@ -4,6 +4,10 @@ const crypto = require('crypto');
 const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 const { validApprovedHourlyLeaveSegments } =
     require('../../utils/ergazomenoi/approvedHourlyLeaveSegments');
+const { validEmergencyHourlyLeaveSegments } =
+    require('../../utils/ergazomenoi/emergencyHourlyLeaveSegments');
+const { isApprovedHrDailyActualWorkResolution } = require(
+    './apasxoliseisHrDailyActualWorkResolutionService');
 const { employeeIsEligibleForProdhlomenaOraria } =
     require('./erganiImportedEmployeeScopeService');
 const { calculateAnnualLeaveEntitlement, dateKey } =
@@ -34,22 +38,57 @@ function employeeEligibleForWtoLeave(employee) {
 }
 function candidateKind(row) {
     const type = String(row.kathgoria_adeias_apologistika ?? '');
+    if (type === 'POSSIBLE_LEAVE' && row.ektakth_oroadeia_apologistika === true) {
+        return Object.freeze({ kind: 'blocked',
+            code: 'WTOLEAVE_EMERGENCY_POSSIBLE_LEAVE_INVALID',
+            message: 'Η ΠΙΘΑΝΗ ΑΔΕΙΑ δεν είναι επιβεβαιωμένη κατηγορία HR για έκτακτη ωροάδεια.' });
+    }
     if (type === 'POSSIBLE_LEAVE') return Object.freeze({ kind: 'excluded' });
     const fullDay = row.adeia_apologistika === true || row.astheneia_apologistika === true;
     const hourly = row.egkekrimenh_oroadeia_apologistika === true;
-    if (!fullDay && !hourly) return Object.freeze({ kind: 'excluded' });
+    const emergencyHourly = row.ektakth_oroadeia_apologistika === true;
+    if (hourly && emergencyHourly) return Object.freeze({ kind: 'blocked',
+        code: 'WTOLEAVE_AGREEMENT_EMERGENCY_HOURLY_CONFLICT',
+        message: 'Δεν επιτρέπεται ταυτόχρονα ωροάδεια συμφωνίας και έκτακτη ωροάδεια.' });
+    if (fullDay && emergencyHourly) return Object.freeze({ kind: 'blocked',
+        code: 'WTOLEAVE_FULL_DAY_EMERGENCY_HOURLY_CONFLICT',
+        message: 'Δεν επιτρέπεται ταυτόχρονα ολοήμερη και έκτακτη ωριαία άδεια.' });
+    if (emergencyHourly && !isApprovedHrDailyActualWorkResolution(row)) {
+        return Object.freeze({ kind: 'blocked',
+            code: 'WTOLEAVE_EMERGENCY_HOURLY_APPROVAL_INVALID',
+            message: 'Η έκτακτη ωροάδεια δεν έχει έγκυρη εγκεκριμένη ημερήσια επίλυση.' });
+    }
+    if (!fullDay && !hourly && !emergencyHourly) return Object.freeze({ kind: 'excluded' });
     if (!type.trim()) return Object.freeze({ kind: 'blocked', code: 'WTOLEAVE_EMPTY_TYPE',
         message: 'Η επιβεβαιωμένη άδεια δεν έχει κατηγορία άδειας.' });
-    if (type === 'ΑΔΚΑΝ' && hourly) return Object.freeze({ kind: 'blocked',
+    if (type === 'ΑΔΚΑΝ' && (hourly || emergencyHourly)) return Object.freeze({ kind: 'blocked',
         code: 'WTOLEAVE_ADKAN_HOURLY_CONFLICT',
         message: 'Η ΑΔΚΑΝ δεν επιτρέπεται να δηλωθεί ως ωριαία άδεια.' });
-    if (hourly) {
-        const intervals = row.egkekrimena_diastimata_oroadeias_apologistika;
-        if (!validApprovedHourlyLeaveSegments(intervals) || intervals.length === 0) {
+    if (hourly || emergencyHourly) {
+        const intervals = emergencyHourly
+            ? row.ektakta_diastimata_oroadeias_apologistika
+            : row.egkekrimena_diastimata_oroadeias_apologistika;
+        const valid = emergencyHourly
+            ? validEmergencyHourlyLeaveSegments(intervals)
+            : validApprovedHourlyLeaveSegments(intervals);
+        if (!valid || intervals.length === 0) {
             return Object.freeze({ kind: 'blocked', code: 'WTOLEAVE_INVALID_HOURLY_SEGMENTS',
                 message: 'Η εγκεκριμένη ωριαία άδεια δεν έχει έγκυρα διαστήματα.' });
         }
-        return Object.freeze({ kind: 'hourly', type, intervals });
+        if (emergencyHourly) {
+            const metadataIntervals = row.hr_daily_actual_work_resolution
+                ?.emergency_hourly_leave_intervals;
+            const intervalHours = intervals.reduce((sum, interval) =>
+                sum + interval.eos_lepto - interval.apo_lepto, 0) / 60;
+            if (JSON.stringify(metadataIntervals) !== JSON.stringify(intervals) ||
+                Math.abs(Number(row.ores_ektakths_oroadeias_apologistika) - intervalHours) > 1e-9) {
+                return Object.freeze({ kind: 'blocked',
+                    code: 'WTOLEAVE_EMERGENCY_HOURLY_CONTRACT_MISMATCH',
+                    message: 'Τα στοιχεία της έκτακτης ωροάδειας δεν συμφωνούν μεταξύ τους.' });
+            }
+        }
+        return Object.freeze({ kind: 'hourly', type, intervals,
+            ...(emergencyHourly ? { candidateKind: 'EMERGENCY_HOURLY' } : {}) });
     }
     return Object.freeze({ kind: 'full_day', type, intervals: [] });
 }
@@ -157,6 +196,8 @@ function buildWtoLeaveCanonicalDataset({ sourceRows = [], employees = [],
             }
         }
         rows.push(Object.freeze({
+            candidate_kind: selection.candidateKind ||
+                (selection.kind === 'hourly' ? 'AGREEMENT_HOURLY' : 'FULL_DAY'),
             source_record_id: clean(source._id), employee_code: clean(employee.kodikos),
             afm: clean(employee.afm), eponymo: clean(employee.eponymo), onoma: clean(employee.onoma),
             date: dateKey(source.hmeromhnia), leave_type: selection.type,

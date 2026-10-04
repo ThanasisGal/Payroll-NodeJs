@@ -5,6 +5,7 @@ const Schema = _Schema;
 const { employmentProfileFields, attachEmploymentProfileValidation } = require('./employeeEmploymentProfileFields');
 const { validTimeShiftSegments, validTimeShiftCompensation } = require('../utils/ergazomenoi/approvedTimeShiftCompensation');
 const { validApprovedHourlyLeaveSegments } = require('../utils/ergazomenoi/approvedHourlyLeaveSegments');
+const { validEmergencyHourlyLeaveSegments } = require('../utils/ergazomenoi/emergencyHourlyLeaveSegments');
 
 const ErgazomenoiSchema = new Schema(
     {
@@ -417,6 +418,7 @@ const ProdhlomenaOrariaSchema = new Schema(
         cards_ores_ergasias: { type: Number, default: 0 },
         orphan_card_resolution: { type: Schema.Types.Mixed, default: null },
         zero_length_card_resolution: { type: Schema.Types.Mixed, default: null },
+        hr_daily_actual_work_resolution: { type: Schema.Types.Mixed, default: null },
         apo_ora_01_apologistika: { type: String },
         eos_ora_01_apologistika: { type: String },
         apo_ora_02_apologistika: { type: String },
@@ -453,6 +455,25 @@ const ProdhlomenaOrariaSchema = new Schema(
                 message: 'Approved hourly leave segments must have safe integer bounds, positive duration and ascending non-overlapping order.'
             }
         },
+        ektakth_oroadeia_apologistika: { type: Boolean, default: false },
+        ektakta_diastimata_oroadeias_apologistika: {
+            type: [new Schema({
+                apo_lepto: { type: Number, required: true },
+                eos_lepto: { type: Number, required: true }
+            }, { _id: false })],
+            default: () => [],
+            set: value => {
+                if (value !== undefined && !Array.isArray(value)) {
+                    throw new TypeError('Emergency hourly leave segments must be an array.');
+                }
+                return value;
+            },
+            validate: {
+                validator: validEmergencyHourlyLeaveSegments,
+                message: 'Τα διαστήματα έκτακτης ωροάδειας πρέπει να είναι ταξινομημένα, χωρίς επικάλυψη και αναπαραστάσιμα στο WTOLeave από 00:00 έως 23:59.'
+            }
+        },
+        ores_ektakths_oroadeias_apologistika: { type: Number, default: 0, min: 0, max: 24 },
         ores_argias_pistomenes_apologistika: { type: Number, default: 0 },
         egkekrimenh_anaplhrosh_apologistika: {
             type: timeShiftCompensationSchema,
@@ -521,6 +542,7 @@ ProdhlomenaOrariaSchema.pre('init', function rejectMalformedArrangementArrays(ra
     const timeShift = raw.egkekrimenh_anaplhrosh_apologistika;
     for (const [path, value] of [
         ['egkekrimena_diastimata_oroadeias_apologistika', raw.egkekrimena_diastimata_oroadeias_apologistika],
+        ['ektakta_diastimata_oroadeias_apologistika', raw.ektakta_diastimata_oroadeias_apologistika],
         ['egkekrimenh_anaplhrosh_apologistika.diastimata_elleimmatos', timeShift?.diastimata_elleimmatos],
         ['egkekrimenh_anaplhrosh_apologistika.diastimata_anaplhroshs', timeShift?.diastimata_anaplhroshs]
     ]) {

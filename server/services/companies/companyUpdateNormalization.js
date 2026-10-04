@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const { normalizeCompanySuspiciousShortCardPolicy } =
+    require('./companySuspiciousShortCardPolicyService');
 
 class CompanyUpdateValidationError extends Error {
     constructor(fieldName) {
@@ -63,7 +65,9 @@ function normalizeObjectIdArray(value, fieldName) {
 }
 
 function normalizeCompanyUpdatePayload(formData) {
+    const suspiciousShortPolicy = normalizeCompanySuspiciousShortCardPolicy(formData);
     const company = {
+        ...suspiciousShortPolicy,
         eponymia: formData.eponymia,
         firstname: formData.firstName,
         fathername: formData.fatherName,

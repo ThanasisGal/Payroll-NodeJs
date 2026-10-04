@@ -245,4 +245,35 @@ assert.ok(!invalidPairFacts.reasons.includes(
 assert.notStrictEqual(invalidPairFacts.cardVerificationStatus, 'READY');
 assert.strictEqual(invalidPairFacts.cardVerificationStatus, 'PARTIALLY_VERIFIED');
 
+const approvedDailyFacts = resolveDailyActualWorkFacts({
+    kathgoria_ergasias: 'ΕΡΓ', ores_ergasias: 4,
+    apo_ora_01: '10:00', eos_ora_01: '14:00',
+    cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30', cards_ores_ergasias: 0.5,
+    apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '10:30',
+    apo_ora_02_apologistika: '13:00', eos_ora_02_apologistika: '14:04',
+    ores_ergasias_apologistika: 94 / 60,
+    ektakth_oroadeia_apologistika: true,
+    ektakta_diastimata_oroadeias_apologistika: [{ apo_lepto: 630, eos_lepto: 780 }],
+    ores_ektakths_oroadeias_apologistika: 2.5,
+    kathgoria_adeias_apologistika: 'ΑΔΑΣ',
+    hr_daily_actual_work_resolution: { status: 'HR_APPROVED',
+        policy_version: 'hr-daily-actual-work:v1',
+        resolution_kind: 'HR_DAILY_ACTUAL_WORK_AND_EMERGENCY_HOURLY_LEAVE',
+        source_case: 'SUSPICIOUS_SHORT_CARD_INTERVAL', reason: 'Έγκριση HR',
+        approved_work_intervals: [{ pairNumber: 1, start: '10:00', end: '10:30' },
+            { pairNumber: 2, start: '13:00', end: '14:04' }],
+        emergency_hourly_leave_intervals: [{ apo_lepto: 630, eos_lepto: 780 }],
+        leave_category: 'ΑΔΑΣ', raw_card_snapshot: {
+            cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30',
+            cards_apo_ora_02: '', cards_eos_ora_02: '',
+            cards_apo_ora_03: '', cards_eos_ora_03: ''
+        }, raw_cards_preserved: true,
+        approved_by: 'HR', approved_at: new Date(), revision_number: 0 }
+});
+assert.equal(approvedDailyFacts.cardVerificationStatus, 'HR_APPROVED_DAILY_ACTUAL_WORK');
+assert.equal(approvedDailyFacts.actualWorkHours, 94 / 60);
+assert.equal(approvedDailyFacts.leaveHours, 2.5);
+assert.equal(approvedDailyFacts.contractualCoveredHours, 244 / 60);
+assert.deepStrictEqual(approvedDailyFacts.reasons, []);
+
 console.log('daily actual-work facts tests passed');

@@ -1,10 +1,12 @@
 'use strict';
 
 // Ενιαία χρονική αφαίρεση διαλείμματος πριν από κάθε ταξινόμηση μισθοδοσίας.
-const CALCULATION_SOURCE_VERSION = 'weekly-illegal-overtime:45b046b:v3';
+const CALCULATION_SOURCE_VERSION = 'weekly-illegal-overtime:45b046b:v4';
 const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
 const { buildWeeklyIllegalOvertimePersistenceMapping } = require('./apasxoliseisWeeklyIllegalOvertimeMappingService');
 const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
+const { isApprovedHrDailyActualWorkResolution } =
+    require('./apasxoliseisHrDailyActualWorkResolutionService');
 
 function timeToMinutesSafe(time) {
     if (!time) return null;
@@ -277,7 +279,8 @@ function getPayrollCalculationIntervals(rec, ergazomenos = null) {
     }).workIntervals;
 
     if ((rec?.orphan_card_resolution?.status === 'HR_APPROVED' ||
-        rec?.zero_length_card_resolution?.status === 'HR_APPROVED') &&
+        rec?.zero_length_card_resolution?.status === 'HR_APPROVED' ||
+        isApprovedHrDailyActualWorkResolution(rec)) &&
         apologistikaIntervals.length > 0) {
         return resolve(apologistikaIntervals);
     }

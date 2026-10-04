@@ -49,7 +49,9 @@ const WEEKLY_FIELDS = words(`_id team company_kod ypokatasthma kodikos hmeromhni
         `apo_ora_${n}_apologistika`, `eos_ora_${n}_apologistika`,
         `apo_ora_${n}`, `eos_ora_${n}`, `dialleima_apo_ora_${n}`, `dialleima_eos_ora_${n}`]));
 const TARGET_INPUT_FIELDS = [...WEEKLY_FIELDS, ...words(`apousia_apologistika explicit_hourly_leave_hours
-    hr_declared_leave orphan_card_resolution zero_length_card_resolution ores_apoysias_apologistika
+    hr_declared_leave orphan_card_resolution zero_length_card_resolution hr_daily_actual_work_resolution
+    ektakth_oroadeia_apologistika ektakta_diastimata_oroadeias_apologistika
+    ores_ektakths_oroadeias_apologistika ores_apoysias_apologistika
     ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika
     ores_argias_pistomenes_apologistika compensation_breakdown_apologistika`),
 ...['01', '02', '03'].flatMap((n) => [`apo_ora_${n}`, `eos_ora_${n}`]),

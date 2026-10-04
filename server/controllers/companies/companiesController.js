@@ -15,6 +15,8 @@ const {
     normalizeCompanyUpdatePayload
 } = require('../../services/companies/companyUpdateNormalization');
 const { presentCompanyForEdit } = require('../../services/companies/companyEditPresentation');
+const { normalizeCompanySuspiciousShortCardPolicy } =
+    require('../../services/companies/companySuspiciousShortCardPolicyService');
 const {
     buildManagedUserFilter,
     canManageAllUserTeams,
@@ -406,6 +408,7 @@ class companiesController {
         }
 
         try {
+            const suspiciousShortPolicy = normalizeCompanySuspiciousShortCardPolicy(formData);
             // produce next kod
             const lastRecord = await CompaniesModel.find({ team: sessionUserTeam })
                 .sort({ _id: -1 })
@@ -415,6 +418,7 @@ class companiesController {
             const aa_kod = (isNaN(kodValue) ? 0 : kodValue) + 1;
 
             const newCompany = new CompaniesModel({
+                ...suspiciousShortPolicy,
                 team: sessionUserTeam,
                 user_id: sessionUserId,
                 kod: aa_kod.toString().padStart(4, '0'),
@@ -627,6 +631,10 @@ class companiesController {
 
             return res.json({ success: true, redirectUrl: '/companies/genikastoixeia' });
         } catch (error) {
+            if (error?.code === 'COMPANY_SUSPICIOUS_SHORT_POLICY_INVALID') {
+                return res.status(400).json({ success: false, code: error.code,
+                    message: error.message });
+            }
             console.error(error);
             return res.status(500).json({ success: false, message: 'Σφάλμα δημιουργίας' });
         }
@@ -827,6 +835,10 @@ class companiesController {
                     code: 'COMPANY_UPDATE_VALIDATION_ERROR',
                     message: error.message
                 });
+            }
+            if (error?.code === 'COMPANY_SUSPICIOUS_SHORT_POLICY_INVALID') {
+                return res.status(400).json({ success: false, code: error.code,
+                    message: error.message });
             }
             logCompanyUpdateError('COMPANY_BASE_UPDATE', error);
             return res.status(500).json({

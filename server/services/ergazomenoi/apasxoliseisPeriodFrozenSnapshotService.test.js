@@ -125,6 +125,24 @@ for (const forbidden of ['corrected_result', 'corrective_delta', 'baselineSnapsh
         (error) => error.code === 'CORRECTIVE_AUTHORITATIVE_FIELD_FORBIDDEN');
 }
 
+// Η εγκεκριμένη ημερήσια επίλυση και η χωριστή έκτακτη ωροάδεια
+// αποτελούν authoritative παγωμένα δεδομένα.
+{
+    const frozen = buildEmploymentPeriodFrozenSnapshot({ dailyResults: [{
+        kodikos: '001', hmeromhnia: '2026-09-08',
+        ektakth_oroadeia_apologistika: true,
+        ektakta_diastimata_oroadeias_apologistika: [{ apo_lepto: 630, eos_lepto: 780 }],
+        ores_ektakths_oroadeias_apologistika: 2.5,
+        hr_daily_actual_work_resolution: { status: 'HR_APPROVED', revision_number: 0 }
+    }] });
+    assert.equal(frozen.snapshot.daily_results[0].ektakth_oroadeia_apologistika, true);
+    assert.deepStrictEqual(frozen.snapshot.daily_results[0]
+        .ektakta_diastimata_oroadeias_apologistika,
+    [{ apo_lepto: 630, eos_lepto: 780 }]);
+    assert.equal(frozen.snapshot.daily_results[0]
+        .hr_daily_actual_work_resolution.status, 'HR_APPROVED');
+}
+
 for (const model of [FrozenModel, CorrectiveModel, AuditModel]) {
     assert.strictEqual(model.schema.options.autoIndex, false);
     assert.strictEqual(model.schema.options.autoCreate, false);

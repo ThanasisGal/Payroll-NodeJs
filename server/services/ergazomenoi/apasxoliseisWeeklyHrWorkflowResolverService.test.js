@@ -87,7 +87,8 @@ function resolve(rows, options = {}) {
             options.remaining_possible_leave_review_completed ?? false,
         profile_changed_inside_week: options.profile_changed_inside_week === true,
         expected_date_keys: options.expected_date_keys ?? null,
-        actionable_date_keys: options.actionable_date_keys ?? null
+        actionable_date_keys: options.actionable_date_keys ?? null,
+        companySettings: options.companySettings || {}
     });
 }
 
@@ -394,5 +395,39 @@ assert.ok(unscopedContextOnly.blocking_reasons.includes(
     'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
 assert.ok(unscopedContextOnly.blocking_reasons.includes(
     'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+
+const shortPolicy = { elegxos_ypopta_mikron_diastimaton_kartas: true,
+    poly_mikro_diastima_kartas_eos_lepta: 5,
+    mikro_diastima_kartas_eos_lepta: 60,
+    mikro_diastima_kartas_max_pososto_programmatos: 25,
+    mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta: 60 };
+const suspiciousShort = { ...workRow(DATES[0]), ores_ergasias: 4,
+    apo_ora_01: '10:00', eos_ora_01: '14:00', cards_apo_ora_01: '10:00',
+    cards_eos_ora_01: '10:30', cards_ores_ergasias: 0.5,
+    ores_ergasias_apologistika: 0.5 };
+const suspiciousWeek = resolve(weekWith(suspiciousShort), { companySettings: shortPolicy });
+assert.ok(suspiciousWeek.blocking_reasons.includes(
+    'SUSPICIOUS_SHORT_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+const approvedShort = { ...suspiciousShort, is_locked: true,
+    ores_ergasias_apologistika: 0.5,
+    apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '10:30',
+    ektakth_oroadeia_apologistika: false,
+    ektakta_diastimata_oroadeias_apologistika: [],
+    ores_ektakths_oroadeias_apologistika: 0,
+    kathgoria_adeias_apologistika: '',
+    hr_daily_actual_work_resolution: { status: 'HR_APPROVED',
+        policy_version: 'hr-daily-actual-work:v1',
+        resolution_kind: 'HR_DAILY_ACTUAL_WORK_AND_EMERGENCY_HOURLY_LEAVE',
+        source_case: 'SUSPICIOUS_SHORT_CARD_INTERVAL', reason: 'Έγκριση HR',
+        approved_work_intervals: [{ pairNumber: 1, start: '10:00', end: '10:30' }],
+        emergency_hourly_leave_intervals: [], leave_category: '',
+        raw_card_snapshot: { cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30',
+            cards_apo_ora_02: '', cards_eos_ora_02: '',
+            cards_apo_ora_03: '', cards_eos_ora_03: '' }, raw_cards_preserved: true,
+        approved_by: 'HR', approved_at: new Date(), revision_number: 0 } };
+const approvedWeek = resolve(weekWith(approvedShort), { companySettings: shortPolicy });
+assert.ok(!approvedWeek.blocking_reasons.includes(
+    'SUSPICIOUS_SHORT_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+assert.ok(!approvedWeek.blocking_reasons.includes('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
 
 console.log('weekly HR workflow resolver tests passed (11 locked scenarios)');

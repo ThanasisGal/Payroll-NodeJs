@@ -28,7 +28,7 @@ const SOURCE_HASHES = {
     "isMinuteNight": "5e832a7ed7bd6e29f8deb2b568fd150675e2e39a4559317b2e50fa9f367e7b62",
     "isMinuteSundayOrHoliday": "a28b0a5d0eee062101ac7142fd10d2afdd687134a5e9fd4012a793eae456cd0e",
     "getApologistikaIntervals": "ae1ca7310596193cd5338390495fbecbecf2ed09326f67d815bce35e7fdd4612",
-    "getPayrollCalculationIntervals": "22b25e08d14a6425ba78b85a55e8af7d7484865f0dcdf1efbd32c8e56ed1c416"
+    "getPayrollCalculationIntervals": "f491b4923ab097f8ddd442506786d022ddc1536ef9e144bbcb7e36cdf7095f05"
 };
 const VECTOR_HASHES = {
     "exact legacy parity 2026-04-03 12:30-17:59": "50719fa788265bea5601d10acf5455b785a0127394f2fb143dd94b1237edb07e",
@@ -145,4 +145,34 @@ test('εγκεκριμένο μηδενικό διάστημα χρησιμοπ�
     };
     assert.deepEqual(service.getPayrollCalculationIntervals(rec, { dialleima_se_lepta: 0 })
         .map(({ start, end }) => [start, end]), [[844, 1324]]);
+});
+
+test('εγκεκριμένη ημερήσια επίλυση υπολογίζει μόνο τη φυσική εργασία και όχι την ωροάδεια', () => {
+    const rec = { hmeromhnia: '2026-08-03',
+        apo_ora_01: '10:00', eos_ora_01: '14:00',
+        cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:05',
+        apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '10:30',
+        apo_ora_02_apologistika: '13:00', eos_ora_02_apologistika: '14:04',
+        ektakth_oroadeia_apologistika: true,
+        ektakta_diastimata_oroadeias_apologistika: [{ apo_lepto: 630, eos_lepto: 780 }],
+        ores_ektakths_oroadeias_apologistika: 2.5,
+        kathgoria_adeias_apologistika: 'ΑΔΑΣ',
+        hr_daily_actual_work_resolution: {
+            status: 'HR_APPROVED', policy_version: 'hr-daily-actual-work:v1',
+            resolution_kind: 'HR_DAILY_ACTUAL_WORK_AND_EMERGENCY_HOURLY_LEAVE',
+            source_case: 'SUSPICIOUS_SHORT_CARD_INTERVAL', reason: 'Έγκριση',
+            approved_work_intervals: [
+                { pairNumber: 1, start: '10:00', end: '10:30' },
+                { pairNumber: 2, start: '13:00', end: '14:04' }
+            ], emergency_hourly_leave_intervals: [{ apo_lepto: 630, eos_lepto: 780 }],
+            leave_category: 'ΑΔΑΣ', raw_card_snapshot: {
+                cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:05',
+                cards_apo_ora_02: '', cards_eos_ora_02: '',
+                cards_apo_ora_03: '', cards_eos_ora_03: ''
+            }, raw_cards_preserved: true, approved_by: 'HR', approved_at: new Date(),
+            revision_number: 0
+        }
+    };
+    assert.deepEqual(service.getPayrollCalculationIntervals(rec, { dialleima_se_lepta: 0 })
+        .map(({ start, end }) => [start, end]), [[600, 630], [780, 844]]);
 });

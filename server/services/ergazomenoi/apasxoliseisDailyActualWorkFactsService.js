@@ -1,4 +1,5 @@
 const { validApprovedHourlyLeaveSegments } = require('../../utils/ergazomenoi/approvedHourlyLeaveSegments');
+const { emergencyHourlyLeaveMinutes } = require('../../utils/ergazomenoi/emergencyHourlyLeaveSegments');
 // Pure daily facts used by weekly compliance and payroll calculations.
 
 const REASON = Object.freeze({
@@ -33,6 +34,10 @@ const {
 const {
     isApprovedZeroLengthResolution
 } = require('./apasxoliseisZeroLengthCardResolutionService');
+const { isApprovedHrDailyActualWorkResolution } =
+    require('./apasxoliseisHrDailyActualWorkResolutionService');
+const { detectSuspiciousShortCardInterval } =
+    require('./apasxoliseisSuspiciousShortCardIntervalService');
 
 function nonNegativeNumber(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -57,7 +62,8 @@ function categoryOf(row = {}) {
 
 function resolveDailyActualWorkFacts(row = {}, {
     calculatedWorkHoursAuthoritative = false,
-    isCalculatedWorkHoursAuthoritativeForRow = null
+    isCalculatedWorkHoursAuthoritativeForRow = null,
+    companySettings = {}
 } = {}) {
     const calculatedHoursAreAuthoritative =
         typeof isCalculatedWorkHoursAuthoritativeForRow === 'function'
@@ -125,6 +131,21 @@ function resolveDailyActualWorkFacts(row = {}, {
             reasons,
             warnings
         });
+    }
+
+    if (isApprovedHrDailyActualWorkResolution(row)) {
+        const actualWorkHours = calculatedWork.ok ? calculatedWork.value : 0;
+        const emergencyMinutes = emergencyHourlyLeaveMinutes(
+            row.ektakta_diastimata_oroadeias_apologistika || []);
+        const leaveHours = emergencyMinutes === null ? 0 : emergencyMinutes / 60;
+        return Object.freeze({ category: 'ΕΡΓ', declaredWorkHours: declared.value,
+            cardHours: cards.value, hasCompleteCardEvidence, ...verificationFacts,
+            cardVerificationStatus: 'HR_APPROVED_DAILY_ACTUAL_WORK', actualWorkHours,
+            leaveHours, emergencyHourlyLeaveHours: leaveHours,
+            contractualCoveredHours: actualWorkHours + leaveHours,
+            holidayCreditedHours: 0, sicknessHours: 0,
+            countsAsActualWorkDay: actualWorkHours > 0, reasons: [],
+            warnings: ['HR_APPROVED_DAILY_ACTUAL_WORK_RESOLUTION'] });
     }
 
     if (hasIncompleteCardInterval && approvedZeroLength) {
@@ -202,6 +223,19 @@ function resolveDailyActualWorkFacts(row = {}, {
             reasons: [],
             warnings: [WARNING.INCOMPLETE_CARD_INTERVAL]
         });
+    }
+
+    const suspiciousShort = detectSuspiciousShortCardInterval(row, companySettings);
+    if (suspiciousShort.suspicious) {
+        const actualWorkHours = calculatedHoursAreAuthoritative && calculatedWork.ok
+            ? calculatedWork.value : cardVerification.verifiedHours;
+        return Object.freeze({ category: 'ΕΡΓ', declaredWorkHours: declared.value,
+            cardHours: cards.value, hasCompleteCardEvidence, ...verificationFacts,
+            cardVerificationStatus: 'SUSPICIOUS_SHORT_CARD_INTERVAL', actualWorkHours,
+            leaveHours: 0, holidayCreditedHours: 0, sicknessHours: 0,
+            countsAsActualWorkDay: actualWorkHours > 0,
+            suspiciousShortCardInterval: suspiciousShort,
+            reasons: [suspiciousShort.reason], warnings: [] });
     }
 
     let actualWorkHours = 0;

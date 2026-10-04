@@ -16,6 +16,7 @@ const DAILY_NUMBER_FIELDS = Object.freeze([
     ['ores_ergasias_apologistika', 'Ώρες εργασίας'],
     ['ores_pragmatikhs_ergasias_apologistika', 'Πραγματικές ώρες'],
     ['ores_adeias_pistomenes_apologistika', 'Πιστωμένες ώρες άδειας'],
+    ['ores_ektakths_oroadeias_apologistika', 'Ώρες έκτακτης ωροάδειας'],
     ['ores_argias_pistomenes_apologistika', 'Πιστωμένες ώρες αργίας'],
     ['hmeres_apoysias_apologistika', 'Ημέρες απουσίας'],
     ['ores_apoysias_base_apologistika', 'Βασικές ώρες απουσίας'],

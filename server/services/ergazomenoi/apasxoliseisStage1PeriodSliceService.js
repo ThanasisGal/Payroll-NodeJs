@@ -48,11 +48,12 @@ function deriveStage1PeriodSlice({ weekRows = [], week_start, week_end,
     return Object.freeze({ period_start: key(periodStart), period_end: key(periodEnd),
         actionable_dates: Object.freeze(actionable), context_only_dates: Object.freeze(contextOnly) });
 }
-function buildStage1PeriodSliceFingerprints({ weekRows = [], slice } = {}) {
+function buildStage1PeriodSliceFingerprints({ weekRows = [], slice,
+    companySettings = {} } = {}) {
     const actionable = new Set(slice?.actionable_dates || []);
     const actionableRows = weekRows.filter((row) => actionable.has(key(row.hmeromhnia)));
-    const contextFingerprint = buildStage1Fingerprint(weekRows).fingerprint;
-    const rowFingerprint = buildStage1Fingerprint(actionableRows);
+    const contextFingerprint = buildStage1Fingerprint(weekRows, { companySettings }).fingerprint;
+    const rowFingerprint = buildStage1Fingerprint(actionableRows, { companySettings });
     const material = { contract: 'weekly-hr-stage1-period-slice:v1',
         period_start: key(slice?.period_start), period_end: key(slice?.period_end),
         actionable_dates: [...actionable].sort(), actionable_rows: rowFingerprint.canonical_input.rows };

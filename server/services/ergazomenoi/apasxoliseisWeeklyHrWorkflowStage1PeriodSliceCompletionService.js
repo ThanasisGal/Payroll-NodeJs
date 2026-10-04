@@ -42,7 +42,7 @@ function queryLean(query, session) {
 
 async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_end,
     weekRows = [], effectiveProfile = {}, effectiveProfilesByDate = {}, actor: rawActor,
-    employment_date_scope = null,
+    employment_date_scope = null, companySettings = {},
     reason_or_notes, request_id, loadFreshWeekRows, transactionRunner,
     stateModel = StateModel, auditModel = AuditModel, now = () => new Date() } = {}) {
     const performedBy = actor(rawActor); const reason = text(reason_or_notes, 2001);
@@ -55,7 +55,7 @@ async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_e
     const slice = deriveStage1PeriodSlice({ weekRows, week_start: scope.week_start,
         week_end: scope.week_end, period_start, period_end,
         employment_date_scope });
-    const initial = buildStage1PeriodSliceFingerprints({ weekRows, slice });
+    const initial = buildStage1PeriodSliceFingerprints({ weekRows, slice, companySettings });
     const commandIdentity = identity({ scope, slice, fingerprint: initial.completion_fingerprint,
         contextFingerprint: initial.context_fingerprint, performedBy, reason });
     return transactionRunner(async (transactionValue) => {
@@ -73,13 +73,15 @@ async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_e
         const freshSlice = deriveStage1PeriodSlice({ weekRows: freshRows,
             week_start: scope.week_start, week_end: scope.week_end, period_start, period_end,
             employment_date_scope });
-        const fresh = buildStage1PeriodSliceFingerprints({ weekRows: freshRows, slice: freshSlice });
+        const fresh = buildStage1PeriodSliceFingerprints({ weekRows: freshRows,
+            slice: freshSlice, companySettings });
         if (fresh.context_fingerprint !== initial.context_fingerprint ||
             fresh.completion_fingerprint !== initial.completion_fingerprint ||
             periodSliceKey(freshSlice) !== periodSliceKey(slice)) fail('STAGE1_INPUT_CHANGED',
             'Τα δεδομένα του τμήματος περιόδου άλλαξαν πριν από την ολοκλήρωση.', 409);
         const workflow = resolveWeeklyHrWorkflow({ weekRows: freshRows, effectiveProfile,
             effectiveProfilesByDate, leave_classification_completed: false,
+            companySettings,
             expected_date_keys: employment_date_scope?.employment_owned_dates || null });
         if ((workflow.blocking_reasons || []).length) fail('STAGE1_COMPLETION_BLOCKED',
             'Υπάρχει πραγματικό εμπόδιο Σταδίου 1.', 409);

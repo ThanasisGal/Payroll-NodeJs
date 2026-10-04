@@ -40,6 +40,17 @@ assert.deepStrictEqual(analytics(payload([raw({ apo_ora_02_apologistika: '18:00'
     { f_type: 'ΕΡΓ', f_from: '18:00', f_to: '20:00' }
 ]);
 
+// Η έκτακτη ωροάδεια δεν μετατρέπεται σε φυσική εργασία WTODaily.
+assert.deepStrictEqual(analytics(payload([raw({
+    apo_ora_01_apologistika: '10:00', eos_ora_01_apologistika: '10:30',
+    apo_ora_02_apologistika: '13:00', eos_ora_02_apologistika: '14:04',
+    ektakth_oroadeia_apologistika: true,
+    ektakta_diastimata_oroadeias_apologistika: [{ apo_lepto: 630, eos_lepto: 780 }]
+})])), [
+    { f_type: 'ΕΡΓ', f_from: '10:00', f_to: '10:30' },
+    { f_type: 'ΕΡΓ', f_from: '13:00', f_to: '14:04' }
+]);
+
 // 3-5. ΑΝ/ΜΕ με κενές ώρες και ΤΗΛ με ακριβώς τα canonical intervals.
 for (const category of ['ΑΝ', 'ΜΕ']) {
     assert.deepStrictEqual(analytics(payload([raw({ kathgoria_ergasias_apologistika: category,
