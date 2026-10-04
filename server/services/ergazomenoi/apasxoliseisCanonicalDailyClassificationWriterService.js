@@ -6,28 +6,13 @@ const {
     applyCanonicalAbsenceMetrics
 } = require('./apasxoliseisStage1DailyClassificationBulkService');
 const { positiveClassification } = require('./apasxoliseisStage3FingerprintService');
-const { isApprovedOrphanResolution } = require('./apasxoliseisOrphanCardResolutionService');
+const { applyPredeclaredRepoBookRule } =
+    require('./apasxoliseisPredeclaredRepoBookRuleService');
 
 const ALLOWED = new Set(['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO']);
 
 function error(code, message, statusCode = 400) {
     return Object.assign(new Error(message), { code, statusCode });
-}
-
-function applyPredeclaredRepoBookRule(row = {}, updates = {}) {
-    const finalState = { ...row, ...updates };
-    const approvedOrphanType = String(
-        finalState.orphan_card_resolution?.orphan_type || ''
-    ).trim();
-    if (isApprovedOrphanResolution(finalState) &&
-        ['START_ONLY', 'END_ONLY'].includes(approvedOrphanType)) {
-        return { ...updates, apologistiko_biblio: true };
-    }
-    if (finalState.repo !== true || finalState.repo_apologistika !== true ||
-        String(finalState.kathgoria_ergasias_apologistika || '').trim() !== 'ΑΝ') {
-        return updates;
-    }
-    return { ...updates, apologistiko_biblio: false };
 }
 
 function buildCanonicalClassificationUpdates({ classification, leave_category = '', row = {} } = {}) {

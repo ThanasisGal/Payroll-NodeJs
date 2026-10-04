@@ -143,6 +143,23 @@ for (const forbidden of ['corrected_result', 'corrective_delta', 'baselineSnapsh
         .hr_daily_actual_work_resolution.status, 'HR_APPROVED');
 }
 
+// Future frozen snapshots retain the authoritative orphan marker so the shared
+// Apologistiko Book predicate can preserve its higher-priority ownership.
+{
+    const orphanResolution = { status: 'HR_APPROVED',
+        policy_version: 'orphan-card-continuous:v1', orphan_type: 'START_ONLY',
+        raw_cards_preserved: true, apologistiko_biblio: true };
+    const frozen = buildEmploymentPeriodFrozenSnapshot({ dailyResults: [{
+        kodikos: '001', hmeromhnia: '2026-09-09', apologistiko_biblio: true,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        orphan_card_resolution: orphanResolution
+    }] });
+    assert.deepStrictEqual(frozen.snapshot.daily_results[0].orphan_card_resolution,
+        orphanResolution);
+    assert.deepStrictEqual(frozen.snapshot.weekly_calculation_context.rows[0]
+        .orphan_card_resolution, orphanResolution);
+}
+
 for (const model of [FrozenModel, CorrectiveModel, AuditModel]) {
     assert.strictEqual(model.schema.options.autoIndex, false);
     assert.strictEqual(model.schema.options.autoCreate, false);

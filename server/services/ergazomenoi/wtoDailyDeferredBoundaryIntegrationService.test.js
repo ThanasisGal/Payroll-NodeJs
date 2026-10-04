@@ -50,6 +50,36 @@ assert.deepStrictEqual(buildWTODayilyAPayload(april.projection).WTOS.WTO[0].Erga
 [{ f_type: 'ΕΡΓ', f_from: '08:00', f_to: '16:00' }]);
 assert.equal(frozen.daily_results[0].kathgoria_ergasias_apologistika, 'ΑΝ');
 
+// Legacy finalized snapshots remain immutable, but current canonical semantics
+// exclude preserved predeclared repo even when the frozen book flag is true.
+const legacyFrozen = { scope: { ypokatasthma: '0001' }, daily_results: [
+    { _id: 'legacy-preserved-repo', hmeromhnia: '2026-04-28',
+        ypokatasthma: '0001', kodikos: '1', apologistiko_biblio: true,
+        repo: true, repo_apologistika: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ' },
+    { _id: 'normal-book-work', hmeromhnia: '2026-04-29',
+        ypokatasthma: '0001', kodikos: '1', apologistiko_biblio: true,
+        repo: false, repo_apologistika: false,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        apo_ora_01_apologistika: '08:00', eos_ora_01_apologistika: '16:00' }
+], employees: [{ kodikos: '1', afm: '123456789', eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΑΝΝΑ',
+    afora_daneismo_ergazomenoy: false, typos_ergodoth_daneismoy: false }] };
+const legacyBefore = JSON.parse(JSON.stringify(legacyFrozen));
+const legacyPrepared = prepareFinalWtoDailyInput({ frozenSnapshot: legacyFrozen,
+    deferredWeeks: [], decisions: [], periodStart: '2026-04-01', periodEnd: '2026-04-30',
+    branch: '0001' });
+assert.deepStrictEqual(legacyPrepared.canonicalRows.map(
+    (row) => row.source_record_id), ['normal-book-work']);
+assert.deepStrictEqual(legacyPrepared.controlReport.canonicalRows,
+    legacyPrepared.canonicalRows);
+assert.deepStrictEqual(legacyPrepared.projection.canonicalRows,
+    legacyPrepared.canonicalRows);
+assert.deepStrictEqual(buildWTODayilyAPayload(legacyPrepared.projection).WTOS.WTO[0]
+    .Ergazomenoi.ErgazomenoiWTO[0].ErgazomenosAnalytics.ErgazomenosWTOAnalytics,
+[{ f_type: 'ΕΡΓ', f_from: '08:00', f_to: '16:00' }]);
+assert.deepStrictEqual(legacyFrozen, legacyBefore,
+    'canonical read projection must not rewrite the frozen snapshot');
+
 const eligibilityFrozen = { scope: { ypokatasthma: '0001' }, daily_results: [
     { _id: 'included', hmeromhnia: '2026-04-29', ypokatasthma: '0001', kodikos: '1',
         apologistiko_biblio: true, kathgoria_ergasias_apologistika: 'ΑΝ' },
