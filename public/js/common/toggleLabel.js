@@ -14,7 +14,8 @@ document.addEventListener('DOMContentLoaded', function () {
         'nomiko_prosopo',
         'karta_ergasias',
         'apasxolhsh_kata_tis_argies',
-        'leitoyrgia_stis_mh_ypoxreotikes_argies'
+        'leitoyrgia_stis_mh_ypoxreotikes_argies',
+        'elegxos_ypopta_mikron_diastimaton_kartas'
     ];
 
     // Επανάληψη της λίστας για να καλέσω την setupCheckbox για κάθε checkbox
@@ -25,13 +26,13 @@ function setupCheckbox(checkboxId) {
     var checkbox = document.getElementById(checkboxId);
     if (checkbox) {
         checkbox.addEventListener('change', function () {
-            toggleCheckboxState(checkboxId, checkbox.checked);
+            toggleCheckboxState(checkboxId, false);
         });
-        toggleCheckboxState(checkboxId, checkbox.checked); // Περνά την τρέχουσα κατάσταση του checkbox
+        toggleCheckboxState(checkboxId, true);
     }
 }
 
-function toggleCheckboxState(checkboxId) {
+function toggleCheckboxState(checkboxId, isInitialState) {
     var isChecked = document.getElementById(checkboxId).checked;
     var labelId = 'label-' + checkboxId;
     var label = document.getElementById(labelId);
@@ -90,7 +91,31 @@ function toggleCheckboxState(checkboxId) {
         case 'nomiko_prosopo':
             setFieldsDisabled(['nomikh_morfh'], !isChecked);
             break;
+        case 'elegxos_ypopta_mikron_diastimaton_kartas':
+            setSuspiciousShortCardPolicyFields(isChecked, isInitialState === true);
+            break;
     }
+}
+
+function setSuspiciousShortCardPolicyFields(isChecked, preserveEnabledValues) {
+    var defaults = {
+        poly_mikro_diastima_kartas_eos_lepta: 5,
+        mikro_diastima_kartas_eos_lepta: 60,
+        mikro_diastima_kartas_max_pososto_programmatos: 25,
+        mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta: 60
+    };
+
+    Object.keys(defaults).forEach(function (fieldId) {
+        var field = document.getElementById(fieldId);
+        if (!field) return;
+
+        field.disabled = !isChecked;
+        if (!isChecked) {
+            field.value = '0';
+        } else if (!preserveEnabledValues) {
+            field.value = String(defaults[fieldId]);
+        }
+    });
 }
 
 function setFieldsDisabled(fieldIds, disabled) {
