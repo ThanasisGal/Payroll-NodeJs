@@ -19,4 +19,9 @@ const finalMethod = controller.slice(controller.indexOf('static submitFinalWTODa
     controller.indexOf('static linkEmploymentReviewPeriodSubmission'));
 assert.doesNotMatch(finalMethod, /ErgazomenoiModel\.find/);
 assert.match(controller, /linkEmploymentPeriodSubmission/);
+assert.match(finalMethod,
+    /submissionFolder: 'WTODailyA', submissionContext: \{[\s\S]*submission_code: 'WTODailyA'[\s\S]*ypokatasthma_kodikos: scope\.ypokatasthma[\s\S]*employment_period_start: scope\.period_start[\s\S]*employment_period_end: scope\.period_end/);
+assert.match(finalMethod, /pdfFilename: pdfStorage\.pdfFilename \|\| ''/);
+assert.match(finalMethod, /pdfUrl: pdfStorage\.pdfSaved \? getErganiPdfRoute\(record\._id\) : ''/);
+assert.match(finalMethod, /pdfFilename: buildSubmittedErganiPdfDisplayFilename\(existing\)/);
 console.log('WTODailyA final endpoint contract tests passed');

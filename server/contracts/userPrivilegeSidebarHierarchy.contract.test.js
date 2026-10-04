@@ -74,8 +74,8 @@ const nonNavigationCatalogForms = visibleCatalog
     .map((entry) => entry.form)
     .filter((form) => !sidebarFormNames.includes(form));
 
-assert.strictEqual(sidebarForms.length, 27);
-assert.strictEqual(sortedHierarchy.length, 27);
+assert.strictEqual(sidebarForms.length, 28);
+assert.strictEqual(sortedHierarchy.length, 28);
 assert.deepStrictEqual(nonNavigationCatalogForms, ['ApologistikosPinakasOrarion']);
 assert.ok(catalogByForm.has('ApologistikosPinakasOrarion'));
 assert.ok(!sidebarFormNames.includes('ApologistikosPinakasOrarion'));
@@ -106,6 +106,10 @@ const employmentReviewIndex = sidebarFormNames.indexOf('ElegxosApasxolhseonPerio
 assert.strictEqual(
     sidebarFormNames[employmentReviewIndex + 1],
     'KatastashElegxouApologistikouPinaka'
+);
+assert.strictEqual(
+    sidebarFormNames[employmentReviewIndex + 2],
+    'EktyposhOristikouApologistikouPinaka'
 );
 for (const form of ['ApologistikosPinakasYperorion', 'YpobolhAdeion']) {
     assert.deepStrictEqual(

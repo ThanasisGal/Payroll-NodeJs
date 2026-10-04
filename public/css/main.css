@@ -15866,6 +15866,37 @@ body.loader-active > *:not(.app-loader) {
     line-height: 1.45;
 }
 
+.final-wto-reason-row {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.swal2-popup.employment-review-swal-popup .final-wto-reason-row .swal2-textarea {
+    width: 100% !important;
+    min-width: 0;
+    margin: 0 !important;
+    box-sizing: border-box;
+}
+
+/* Final WTODailyA document: use the available page height without an inner scroller. */
+.final-wto-submitted-document-card {
+    overflow: visible;
+}
+
+.final-wto-submitted-document-body {
+    min-height: clamp(24rem, 52vh, 31rem);
+    overflow: visible !important;
+}
+
+@media (max-width: 767.98px), (max-height: 700px) {
+    .final-wto-submitted-document-body {
+        min-height: auto;
+    }
+}
+
 .employment-review-swal-popup .swal2-confirm.class-info,
 .employment-review-swal-popup .swal2-confirm.class-normal {
     color: #084298 !important;

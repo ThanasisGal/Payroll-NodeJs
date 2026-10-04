@@ -8544,6 +8544,7 @@ async function runEmploymentPeriodLifecycleAction(kind) {
 async function submitFinalWTODayilyA() {
     const state = currentEmploymentPeriodControl;
     const summary = state?.final_submission_summary || {};
+    const defaultReason = 'Υποβολή απολογιστικού πίνακα μετά από την οριστικοποίηση της περιόδου';
     const confirmation = await employmentReviewSwal({ icon: 'warning',
         title: 'Οριστική υποβολή στο ΕΡΓΑΝΗ',
         html: `<div class="text-start"><div><strong>Περίοδος:</strong> ${escapeHtml(summary.period_start || '')} – ${escapeHtml(summary.period_end || '')}</div>` +
@@ -8551,23 +8552,34 @@ async function submitFinalWTODayilyA() {
             `<div><strong>Εργαζόμενοι:</strong> ${Number(summary.employees_count) || 0}</div>` +
             `<div><strong>Ημερήσιες εγγραφές:</strong> ${Number(summary.employee_days_count) || 0}</div>` +
             '<div class="alert alert-danger mt-3 mb-0">Πρόκειται για ΟΡΙΣΤΙΚΗ υποβολή Απολογιστικού Πίνακα Ωραρίων.</div>' +
-            '<label class="form-label mt-3" for="finalWtoReason">Αιτιολογία</label><textarea id="finalWtoReason" class="swal2-textarea"></textarea></div>',
+            '<div class="final-wto-reason-row mt-3">' +
+            '<label class="form-label mb-0" for="finalWtoReason">Αιτιολογία</label>' +
+            `<textarea id="finalWtoReason" class="swal2-textarea" required>${escapeHtml(defaultReason)}</textarea>` +
+            '</div></div>',
         showCancelButton: true, confirmButtonText: 'Οριστική υποβολή', cancelButtonText: 'Ακύρωση',
         preConfirm: () => { const reason = String(document.getElementById('finalWtoReason')?.value || '').trim();
             if (!reason) { Swal.showValidationMessage('Η αιτιολογία είναι υποχρεωτική.'); return false; }
             return reason; }
     });
     if (!confirmation.isConfirmed) return;
+    const branch = currentCorrectiveBranch();
     const response = await fetch('/api/prodhlomena-oraria/review/period-control/submission/final', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrfToken },
-        body: JSON.stringify({ ypokatasthma: currentCorrectiveBranch(), reason: confirmation.value,
+        body: JSON.stringify({ ypokatasthma: branch, reason: confirmation.value,
             request_id: `wtodailya-final-${Date.now()}-${Math.random().toString(16).slice(2)}` })
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || 'Η τελική υποβολή απέτυχε.');
-    await loadEmploymentPeriodControl(currentCorrectiveBranch());
-    await employmentReviewSwal({ icon: 'success', title: payload.idempotent ? 'Ήδη υποβλημένο' : 'Οριστική υποβολή ολοκληρώθηκε',
-        text: `Πρωτόκολλο: ${payload.protocol || '-'}` });
+    try {
+        await loadEmploymentPeriodControl(branch);
+    } catch (error) {
+        console.error('[WTODailyA] Η υποβολή ολοκληρώθηκε, αλλά η ανανέωση της περιόδου απέτυχε.', error);
+    }
+    await window.ErganiRestSubmissionUi.presentSubmissionResultSafely({
+        ...payload,
+        processDescription: 'Οργάνωση Χρόνου Εργασίας - Απολογιστικός Πίνακας Ωραρίων',
+        pdfViewerVariant: 'compact-portrait'
+    });
 }
 
 async function loadEmploymentPeriodControl(ypokatasthma, { render = true } = {}) {

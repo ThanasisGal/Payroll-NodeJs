@@ -856,6 +856,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js"
     "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.orphanQualityCheck.js"
     "public/js/ergazomenoi/programmata/katastashElegxouApologistikouPinaka.js"
+    "public/js/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka.js"
     "public/js/ergazomenoi/programmata/sendApologistikoButton.js"
     "public/js/ergazomenoi/programmata/wtoOvertime.js"
     "public/js/ergazomenoi/programmata/wtoLeave.js"

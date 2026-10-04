@@ -24,6 +24,10 @@ const {
     validateFullUpdatePayload,
     updateAllPrivilegesAtomically
 } = require('../services/userPrivilegesManagementService');
+const {
+    userPrivilegeSidebarHierarchy,
+    userPrivilegeNonNavigationPlacements
+} = require('../constants/userPrivilegeSidebarHierarchy');
 const UserModel = require('../models/userModel');
 const { requireUserPrivilegesManagerRole } = require('../middlewares/requireAdminRole');
 const userPrivilegesController = require('./userPrivilegesController');
@@ -145,6 +149,70 @@ test('serialization produces stable safe columns and per-row applicability', () 
         itemOrder: 0,
         ancestors: [{ key: 'test-root', label: 'Δοκιμές', order: 0 }]
     });
+});
+
+test('visible catalog serializes sidebar and approved catalog-only forms together', () => {
+    const visibleCatalog = USER_PRIVILEGE_FORM_CATALOG_SEED.filter((entry) =>
+        entry.active === true && entry.showInPrivileges === true
+    );
+    const result = serializePrivilegeDocuments(visibleCatalog, []);
+    assert.strictEqual(result.rows.length, visibleCatalog.length);
+    const catalogOnly = result.rows.find((row) => row.form === 'ApologistikosPinakasOrarion');
+    assert.ok(catalogOnly);
+    assert.strictEqual(catalogOnly.formLabel, 'Απολογιστικός Πίνακας Ωραρίων');
+    assert.deepStrictEqual(catalogOnly.navigation, {
+        itemLabel: 'Απολογιστικός Πίνακας Ωραρίων',
+        itemOrder: 100,
+        ancestors: [
+            { key: 'files', label: 'Αρχεία', order: 100 },
+            { key: 'ergani-ii', label: 'ΕΡΓΑΝΗ ΙΙ', order: 300 },
+            { key: 'file-submissions', label: 'Αποστολή Αρχείων', order: 600 }
+        ]
+    });
+    assert.strictEqual(userPrivilegeSidebarHierarchy.some((entry) =>
+        entry.form === 'ApologistikosPinakasOrarion'), false);
+    assert.strictEqual(userPrivilegeNonNavigationPlacements.some((entry) =>
+        entry.form === 'ApologistikosPinakasOrarion'), true);
+
+    const submittedDocument = result.rows.find((row) =>
+        row.form === 'EktyposhOristikouApologistikouPinaka'
+    );
+    assert.ok(submittedDocument);
+    assert.deepStrictEqual(submittedDocument.navigation.ancestors.map((item) => item.key),
+        ['files', 'ergani-ii']);
+    assert.strictEqual(userPrivilegeSidebarHierarchy.some((entry) =>
+        entry.form === 'EktyposhOristikouApologistikouPinaka'), true);
+    assert.strictEqual(userPrivilegeNonNavigationPlacements.some((entry) =>
+        entry.form === 'EktyposhOristikouApologistikouPinaka'), false);
+});
+
+test('serialization rejects unknown catalog-only forms and missing hierarchy forms', () => {
+    const navigationCatalog = [
+        { form: 'First', formLabel: 'Πρώτη', sidebarOrder: 1 },
+        { form: 'Second', formLabel: 'Δεύτερη', sidebarOrder: 2 }
+    ];
+    const hierarchy = hierarchyFor(navigationCatalog);
+    assert.throws(
+        () => serializePrivilegeDocuments([
+            navigationCatalog[0],
+            { form: 'UnexpectedCatalogOnly', formLabel: 'Άγνωστη', sidebarOrder: 3 }
+        ], [], undefined, [hierarchy[0]], []),
+        (error) => error.code === 'PRIVILEGE_PLACEMENT_MISSING' && error.status === 500
+    );
+    assert.throws(
+        () => serializePrivilegeDocuments([navigationCatalog[0]], [], undefined, hierarchy, []),
+        (error) => error.code === 'PRIVILEGE_HIERARCHY_MISMATCH' && error.status === 500
+    );
+    assert.throws(
+        () => serializePrivilegeDocuments([
+            navigationCatalog[0],
+            { form: 'ApprovedCatalogOnly', formLabel: 'Σωστή ονομασία', sidebarOrder: 3 }
+        ], [], undefined, [hierarchy[0]], [{
+            form: 'ApprovedCatalogOnly', itemLabel: 'Διαφορετική ονομασία', itemOrder: 1,
+            ancestors: [{ key: 'test-root', label: 'Δοκιμές', order: 0 }]
+        }]),
+        (error) => error.code === 'PRIVILEGE_PLACEMENT_MISMATCH' && error.status === 500
+    );
 });
 
 test('seed catalog validates unique forms and visible orders', () => {
@@ -670,8 +738,8 @@ test('privilege catalog is the canonical superset of the navigation-only sidebar
         .filter((entry) => entry.active && entry.showInPrivileges !== false)
         .sort((a, b) => a.sidebarOrder - b.sidebarOrder || a.form.localeCompare(b.form));
     const catalogForms = visibleCatalog.map((entry) => entry.form);
-    assert.strictEqual(sidebarForms.length, 27);
-    assert.strictEqual(visibleCatalog.length, 28);
+    assert.strictEqual(sidebarForms.length, 28);
+    assert.strictEqual(visibleCatalog.length, 29);
     assert.deepStrictEqual(catalogForms.filter((form) => !sidebarForms.includes(form)),
         ['ApologistikosPinakasOrarion']);
     assert.ok(sidebarForms.every((form) => catalogForms.includes(form)));
@@ -680,7 +748,7 @@ test('privilege catalog is the canonical superset of the navigation-only sidebar
     assert.deepStrictEqual(
         visibleCatalog.map((entry) => entry.sidebarOrder),
         [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 9500,
-            10000, 10500, 11000, 12000, 13000, 14000, 14500, 14750, 15000, 16000,
+            10000, 10500, 11000, 12000, 13000, 14000, 14500, 14600, 14750, 15000, 16000,
             17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000]
     );
     const employmentReview = visibleCatalog.find((entry) => entry.form === 'ElegxosApasxolhseonPeriodoy');
@@ -689,6 +757,8 @@ test('privilege catalog is the canonical superset of the navigation-only sidebar
     const employmentReviewNavigationIndex = sidebarForms.indexOf('ElegxosApasxolhseonPeriodoy');
     assert.strictEqual(sidebarForms[employmentReviewNavigationIndex + 1],
         'KatastashElegxouApologistikouPinaka');
+    assert.strictEqual(sidebarForms[employmentReviewNavigationIndex + 2],
+        'EktyposhOristikouApologistikouPinaka');
     assert.ok(sidebarForms.indexOf('ApologistikosPinakasYperorion') >
         sidebarForms.indexOf('KatastashElegxouApologistikouPinaka'));
     assert.ok(sidebarForms.indexOf('YpobolhAdeion') >

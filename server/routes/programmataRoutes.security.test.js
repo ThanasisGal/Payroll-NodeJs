@@ -38,6 +38,8 @@ const contracts = [
     ['POST', '/api/ergazomenoi/programmata/wto-overtime/submit', "requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'export')", 'authorizeProgrammataExternalAction'],
     ['GET', '/ergazomenoi/programmata/katastashElegxouApologistikouPinaka', "requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/katastashElegxouApologistikouPinaka/pdf', "requireUserPrivilegeAction('KatastashElegxouApologistikouPinaka', 'export')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka', "requireUserPrivilegeAction('EktyposhOristikouApologistikouPinaka', 'read')", 'authorizeProgrammataSessionCompany'],
+    ['GET', '/api/prodhlomena-oraria/review/period-control/submission/final/document', "requireUserPrivilegeAction('EktyposhOristikouApologistikouPinaka', 'export')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/calcApasxolhseisPeriodoy', "requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'read')", 'authorizeProgrammataSessionCompany'],
     ['POST', '/ergazomenoi/programmata/calcApasxolhseisPeriodoy', "requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'update')", 'authorizeProgrammataCalculation'],
     ['GET', '/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy', "requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'read')", 'authorizeProgrammataSessionCompany']
@@ -60,7 +62,9 @@ for (const route of [
     '/api/ergazomenoi/programmata/wto-leave/submit',
     '/ergazomenoi/programmata/apologistikosPinakasYperorion',
     '/api/ergazomenoi/programmata/wto-overtime/preview',
-    '/api/ergazomenoi/programmata/wto-overtime/submit'
+    '/api/ergazomenoi/programmata/wto-overtime/submit',
+    '/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka',
+    '/api/prodhlomena-oraria/review/period-control/submission/final/document'
 ]) {
     const start = routes.indexOf(`'${route}'`);
     const block = routes.slice(start, start + 500);
