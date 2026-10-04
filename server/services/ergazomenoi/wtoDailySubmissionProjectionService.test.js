@@ -100,6 +100,26 @@ assert.match(xml, /<f_type>ΕΡΓ<\/f_type>/);
 assert.match(xml, /<f_from>08:00<\/f_from>/);
 assert.match(xml, /<f_to>16:00<\/f_to>/);
 
+// Preserved predeclared repo is absent from the shared control rows, payload and XML.
+const preservedRepo = raw({ _id: 'preserved-repo', hmeromhnia: '2026-08-06',
+    repo: true, repo_apologistika: true,
+    kathgoria_ergasias_apologistika: 'ΑΝ',
+    apo_ora_01_apologistika: '', eos_ora_01_apologistika: '' });
+const submitWork = raw({ _id: 'submit-work', hmeromhnia: '2026-08-07' });
+const semanticCanonical = canonical([preservedRepo, submitWork]);
+assert.deepStrictEqual(semanticCanonical.map((row) => row.source_record_id), ['submit-work']);
+const semanticProjection = projection(semanticCanonical);
+const semanticPayload = buildWTODayilyAPayload(semanticProjection);
+assert.strictEqual(assertWtoDailyControlPayloadParity(
+    semanticCanonical, semanticPayload).valid, true);
+assert.deepStrictEqual(flattenWtoDailyPayloadFacts(semanticPayload), [{
+    afm: '123456789', date: '2026-08-07', category: 'ΕΡΓ',
+    from: '08:00', to: '16:00'
+}]);
+const semanticXml = buildWTOXML(semanticProjection);
+assert.doesNotMatch(semanticXml, /06\/08\/2026|<f_type>ΑΝ<\/f_type>/);
+assert.match(semanticXml, /07\/08\/2026/);
+
 const generatorSource = fs.readFileSync(require.resolve('../../utils/xmlGenerators/wto_v1Generator'),
     'utf8');
 assert.match(generatorSource, /filterEligibleApologistikosSource\(\{ rows: validRows,/);

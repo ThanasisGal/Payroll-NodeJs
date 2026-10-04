@@ -74,8 +74,8 @@ function calculate(row, effectiveEmployee = fullTimeProfile) {
     }).sanitizedUpdate;
 }
 
-function assertCanonicalNoWork(update, { category, repo }) {
-    assert.equal(update.apologistiko_biblio, true);
+function assertCanonicalNoWork(update, { category, repo, apologistikoBiblio = true }) {
+    assert.equal(update.apologistiko_biblio, apologistikoBiblio);
     assert.equal(update.kathgoria_ergasias_apologistika, category);
     assert.equal(update.repo_apologistika, repo);
     assert.equal(update.adeia_apologistika, false);
@@ -87,7 +87,8 @@ function assertCanonicalNoWork(update, { category, repo }) {
 
 test('normal no-work/no-card πλήρους απασχόλησης παράγει πλήρες canonical ΑΝ', () => {
     const update = calculate(noWorkRow());
-    assertCanonicalNoWork(update, { category: 'ΑΝ', repo: true });
+    assertCanonicalNoWork(update, { category: 'ΑΝ', repo: true,
+        apologistikoBiblio: false });
 });
 
 test('normal no-work/no-card εκ περιτροπής παράγει πλήρες canonical ΜΕ', () => {
@@ -191,5 +192,6 @@ test('κανονικός και διορθωτικός υπολογισμός έ
         ores_ergasias_apologistika: 5
     }));
     assert.deepEqual(corrective, normal);
-    assertCanonicalNoWork(corrective, { category: 'ΑΝ', repo: true });
+    assertCanonicalNoWork(corrective, { category: 'ΑΝ', repo: true,
+        apologistikoBiblio: false });
 });

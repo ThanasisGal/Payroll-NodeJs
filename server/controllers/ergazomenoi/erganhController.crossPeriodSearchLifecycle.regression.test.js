@@ -14,13 +14,13 @@ const mainRead = search.slice(search.indexOf('ProdhlomenaOrariaModel.find(filter
     search.indexOf('ProdhlomenaOrariaModel.countDocuments(filter)'));
 const weekRead = search.slice(search.indexOf('ProdhlomenaOrariaModel.find(deviationContextFilter)'),
     search.indexOf('const kodikoiRows ='));
-for (const read of [mainRead, weekRead]) {
-    // Both the visible rows and the natural-week enrichment must carry every
-    // stored field used by the Stage-1 fingerprint on a resolved absence day.
-    for (const field of ['kathestos_apasxolhshs_hmeras',
-        'hmeres_apoysias_apologistika', 'ores_adeias_pistomenes_apologistika']) {
-        assert.ok(read.includes(field), `${field} missing from Search row selection`);
-    }
+assert.doesNotMatch(weekRead, /\.select\(/,
+    'Search lifecycle rows must stay complete like the Stage-1 detail loader');
+// The visible rows remain intentionally projected for the table. The separate
+// natural-week lifecycle read above is complete and feeds the canonical status.
+for (const field of ['kathestos_apasxolhshs_hmeras',
+    'hmeres_apoysias_apologistika', 'ores_adeias_pistomenes_apologistika']) {
+    assert.ok(mainRead.includes(field), `${field} missing from visible Search selection`);
 }
 assert.match(source, /stage3AuditDecisionDates: stage3AuditDatesByEmployeeWeek\.get\(/);
 assert.match(source, /stage3AuditDecisionDates: stage3Audits\.map\(/);
@@ -68,6 +68,13 @@ function project(weekRows, periodScope, extra = {}) {
 }
 const correctMay = project(rows, mayPeriod);
 assert.equal(correctMay.stages.stage1.business_status, 'COMPLETED');
+assert.equal(correctMay.stages.stage1.pending_count, 0);
+const detailLoadOfSameRows = project(rows, mayPeriod);
+assert.equal(detailLoadOfSameRows.stages.stage1.business_status,
+    correctMay.stages.stage1.business_status,
+    'opening Stage 1 must not change the canonical Search summary');
+assert.equal(detailLoadOfSameRows.stages.stage1.pending_count,
+    correctMay.stages.stage1.pending_count);
 assert.equal(correctMay.stages.stage1.current_context_fingerprint,
     stage1.period_slices[0].context_fingerprint);
 assert.equal(correctMay.stages.stage1.current_completion_fingerprint,

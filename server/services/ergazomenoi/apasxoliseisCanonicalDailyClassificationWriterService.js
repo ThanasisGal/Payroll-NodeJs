@@ -6,6 +6,8 @@ const {
     applyCanonicalAbsenceMetrics
 } = require('./apasxoliseisStage1DailyClassificationBulkService');
 const { positiveClassification } = require('./apasxoliseisStage3FingerprintService');
+const { applyPredeclaredRepoBookRule } =
+    require('./apasxoliseisPredeclaredRepoBookRuleService');
 
 const ALLOWED = new Set(['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO']);
 
@@ -36,11 +38,11 @@ function buildCanonicalClassificationUpdates({ classification, leave_category = 
             ores_ergasias_apologistika: 0 };
     }
     if (normalized === 'REST_REPO') {
-        return { apologistiko_biblio: true,
+        return applyPredeclaredRepoBookRule(row, { apologistiko_biblio: true,
             kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true,
             adeia_apologistika: false, kathgoria_adeias_apologistika: '',
             astheneia_apologistika: false, apousia_apologistika: false,
-            ores_ergasias_apologistika: 0 };
+            ores_ergasias_apologistika: 0 });
     }
     return classificationUpdates({ classification: normalized,
         kathgoria_adeias_apologistika: String(leave_category || '').trim() }, row);
@@ -87,5 +89,6 @@ async function writeCanonicalDailyClassification({
         updates, row: { ...row, ...updates } };
 }
 
-module.exports = { ALLOWED, buildCanonicalClassificationUpdates, planCanonicalDailyClassification,
+module.exports = { ALLOWED, applyPredeclaredRepoBookRule,
+    buildCanonicalClassificationUpdates, planCanonicalDailyClassification,
     writeCanonicalDailyClassification };

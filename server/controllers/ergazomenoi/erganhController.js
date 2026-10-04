@@ -7551,14 +7551,10 @@ class erganhController {
                 ProdhlomenaOrariaModel.countDocuments(filter),
                 requestedPeriodStart && requestedPeriodEnd
                     ? ProdhlomenaOrariaModel.find(deviationContextFilter)
-                          .select(
-                              'team company_kod ypokatasthma kodikos hmeromhnia kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_adeias_pistomenes_apologistika kathgoria_ergasias kathgoria_ergasias_apologistika ' +
-                                  'egkekrimenh_anaplhrosh_apologistika repo repo_apologistika adeia kathgoria_adeias ores_apoysias explicit_hourly_leave_hours egkekrimenh_oroadeia_apologistika hr_declared_leave adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika argia argia_apologistika ' +
-                                  'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
-                                  'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
-                                  'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
-                                  'ores_ergasias ores_ergasias_apologistika ores_apoysias_apologistika cards_ores_ergasias orphan_card_resolution zero_length_card_resolution hr_daily_actual_work_resolution ektakth_oroadeia_apologistika ektakta_diastimata_oroadeias_apologistika ores_ektakths_oroadeias_apologistika is_locked'
-                          )
+                          // This natural-week set is the authoritative lifecycle input.
+                          // Keep complete documents, exactly as the Stage-1 detail loader
+                          // does, so Search and lazy detail cannot derive different states
+                          // from different row projections.
                           .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
                           .lean()
                     : []

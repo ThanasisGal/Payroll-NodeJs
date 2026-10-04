@@ -5,10 +5,13 @@ const { ProdhlomenaOrariaModel, ErgazomenoiModel } = require('../../models/ergaz
 const { CompaniesModel } = require('../../models/companies');
 const { employeeIsEligibleForProdhlomenaOraria } =
     require('./erganiImportedEmployeeScopeService');
+const { belongsToCanonicalApologistikoBook } =
+    require('./apasxoliseisPredeclaredRepoBookRuleService');
 
 const PRODHLomena_PROJECTION = Object.freeze([
     '_id', 'ypokatasthma', 'kodikos', 'hmeromhnia', 'apologistiko_biblio',
-    'kathgoria_ergasias_apologistika', 'kathgoria_ergasias',
+    'kathgoria_ergasias_apologistika', 'kathgoria_ergasias', 'repo',
+    'repo_apologistika', 'orphan_card_resolution',
     'apo_ora_01_apologistika', 'eos_ora_01_apologistika',
     'apo_ora_02_apologistika', 'eos_ora_02_apologistika',
     'apo_ora_03_apologistika', 'eos_ora_03_apologistika'
@@ -100,7 +103,7 @@ function filterEligibleApologistikosSource({ rows = [], employees = [],
 
 function buildCanonicalApologistikosRows({ rows = [], employees = [] } = {}) {
     const employeesByCode = new Map(employees.map((employee) => [clean(employee.kodikos), employee]));
-    const canonicalRows = rows.filter((row) => row?.apologistiko_biblio === true).map((row) => {
+    const canonicalRows = rows.filter(belongsToCanonicalApologistikoBook).map((row) => {
         const employeeCode = clean(row.kodikos);
         const employee = employeesByCode.get(employeeCode) || {};
         const intervals = [];

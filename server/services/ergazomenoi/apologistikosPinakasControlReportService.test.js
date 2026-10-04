@@ -38,6 +38,10 @@ function companyModelReturning(company, calls) {
         { _id: 'lending-side', ypokatasthma: '0000', kodikos: '0003', hmeromhnia: '2026-08-02',
             apologistiko_biblio: true, kathgoria_ergasias_apologistika: 'ΕΡΓ',
             apo_ora_01_apologistika: '08:00', eos_ora_01_apologistika: '16:00' },
+        { _id: 'preserved-repo', ypokatasthma: '0000', kodikos: '0004',
+            hmeromhnia: '2026-08-02', apologistiko_biblio: true,
+            repo: true, repo_apologistika: true,
+            kathgoria_ergasias_apologistika: 'ΑΝ' },
         { _id: 'hidden', ypokatasthma: '0000', kodikos: '7777', hmeromhnia: '2026-08-01',
             apologistiko_biblio: false, kathgoria_ergasias_apologistika: 'ΜΕ' }
     ];
@@ -47,7 +51,9 @@ function companyModelReturning(company, calls) {
         { kodikos: '0002', afm: '222222222', eponymo: 'ΒΗΤΑ', onoma: 'ΒΑΣΩ',
             afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: true },
         { kodikos: '0003', afm: '333333333', eponymo: 'ΓΑΜΜΑ', onoma: 'ΓΕΩΡΓΙΑ',
-            afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false }
+            afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false },
+        { kodikos: '0004', afm: '444444444', eponymo: 'ΔΕΛΤΑ', onoma: 'ΔΗΜΗΤΡΑ',
+            afora_daneismo_ergazomenoy: false, typos_ergodoth_daneismoy: false }
     ];
     const report = await service.buildReport({ team: 'team-session', company_kod: 'company-session',
         input: { ypokatasthma: '0', apo_hmeromhnia: '2026-08-01', eos_hmeromhnia: '2026-08-02' },
@@ -66,10 +72,16 @@ function companyModelReturning(company, calls) {
     assert.strictEqual(report.rows[1].zeugos2, '18:04 – 21:04');
     assert.ok(!report.rows.some((row) => row.source_record_id === 'hidden'));
     assert.ok(!report.rows.some((row) => row.source_record_id === 'lending-side'));
+    assert.ok(!report.rows.some((row) => row.source_record_id === 'preserved-repo'));
     assert.strictEqual(calls[0].projection, service.PRODHLomena_PROJECTION.join(' '));
     assert.ok(service.PRODHLomena_PROJECTION.includes('_id'));
+    for (const field of ['repo', 'repo_apologistika', 'kathgoria_ergasias_apologistika',
+        'apologistiko_biblio', 'orphan_card_resolution']) {
+        assert.ok(service.PRODHLomena_PROJECTION.includes(field),
+            `${field} is required by the canonical Apologistiko Book predicate`);
+    }
     assert.ok(!calls[0].projection.includes('cards_'));
-    assert.deepStrictEqual(calls[1].query.kodikos.$in, ['0002', '0001', '0003']);
+    assert.deepStrictEqual(calls[1].query.kodikos.$in, ['0002', '0001', '0003', '0004']);
     assert.ok(calls[1].projection.includes('afora_daneismo_ergazomenoy'));
     assert.ok(calls[1].projection.includes('typos_ergodoth_daneismoy'));
 
@@ -133,6 +145,27 @@ function companyModelReturning(company, calls) {
         apo_ora_01_apologistika: '', eos_ora_01_apologistika: '',
         apo_ora_02_apologistika: '18:00', eos_ora_02_apologistika: '20:00' }], employees });
     assert.deepStrictEqual(emptyRemoved[0].intervals, [{ from: '18:00', to: '20:00' }]);
+
+    const exactPreserved = { ...storedRows[0], repo: true, repo_apologistika: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ' };
+    assert.strictEqual(service.buildCanonicalApologistikosRows({
+        rows: [exactPreserved], employees }).length, 0);
+    for (const nonmatching of [
+        { ...exactPreserved, repo: false },
+        { ...exactPreserved, repo_apologistika: false },
+        { ...exactPreserved, kathgoria_ergasias_apologistika: 'ΜΕ' },
+        { ...exactPreserved, kathgoria_ergasias_apologistika: 'ΕΡΓ' }
+    ]) assert.strictEqual(service.buildCanonicalApologistikosRows({
+        rows: [nonmatching], employees }).length, 1);
+    for (const orphanType of ['START_ONLY', 'END_ONLY']) {
+        const approvedOrphan = { ...exactPreserved, _id: `orphan-${orphanType}`,
+            orphan_card_resolution: { status: 'HR_APPROVED',
+                policy_version: 'orphan-card-continuous:v1', orphan_type: orphanType } };
+        const orphanCanonical = service.buildCanonicalApologistikosRows({
+            rows: [approvedOrphan], employees });
+        assert.strictEqual(orphanCanonical.length, 1);
+        assert.strictEqual(orphanCanonical[0].source_record_id, `orphan-${orphanType}`);
+    }
 
     const companyCalls = [];
     assert.strictEqual(await service.loadCompanyName({ team: 'T', company_kod: 'C',

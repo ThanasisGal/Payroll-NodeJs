@@ -17,6 +17,76 @@ const dynamicCss = dynamicSource.match(/style\.textContent = `([\s\S]*?)`;/)?.[1
 assert.ok(dynamicCss.includes('var(--stage4-absence-bg)'));
 assert.doesNotMatch(dynamicCss, /\.cell-apoysia\s*\{\s*background-color:\s*#dc3545/i);
 
+const rowPresentationStart = source.indexOf('function resolveReviewRowPresentation(');
+const rowPresentationEnd = source.indexOf('function resolveStoredStage1DailyPresentation(',
+    rowPresentationStart);
+const rowPresentationSandbox = {
+    num: (value) => Number(value || 0),
+    hasValidCardInterval: () => false,
+    hasMeaningfulValue: (value) => ![null, undefined, '', '-', '0', '0.00'].includes(value),
+    resolveReviewApologistikoPresentation: () => ({
+        text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', className: 'cell-repo-day', source: 'existing'
+    })
+};
+vm.createContext(rowPresentationSandbox);
+vm.runInContext(`${source.slice(rowPresentationStart, rowPresentationEnd)}
+this.resolve = resolveReviewRowPresentation;
+this.isPreserved = isPredeclaredRepoPreservedInApologistika;`, rowPresentationSandbox);
+const exactPredeclaredRepo = { repo: true, repo_apologistika: true,
+    apologistiko_biblio: false,
+    kathgoria_ergasias_apologistika: 'ΑΝ' };
+assert.equal(rowPresentationSandbox.isPreserved(exactPredeclaredRepo), true);
+assert.deepEqual(JSON.parse(JSON.stringify(rowPresentationSandbox.resolve(
+    exactPredeclaredRepo, { declaredText: '-', declaredClass: '' }))), {
+    declared: { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', className: 'cell-declared-repo-day' },
+    apologistiko: { text: '-', className: '', source: 'predeclared_repo_preserved' },
+    badgeState: {}, isAppliedRow: false, isAppliedRepoTarget: false,
+    isOriginalDeclaredRepo: false, isOriginalDeclaredNonWork: false,
+    isOriginalDeclaredNeutral: false, useDeclaredNeutralFallback: false
+});
+for (const nonmatching of [
+    { ...exactPredeclaredRepo, repo: false },
+    { ...exactPredeclaredRepo, repo_apologistika: false },
+    { ...exactPredeclaredRepo, kathgoria_ergasias_apologistika: 'ΜΕ' }
+]) {
+    assert.equal(rowPresentationSandbox.isPreserved(nonmatching), false);
+    const presentation = rowPresentationSandbox.resolve(nonmatching,
+        { declaredText: '09:00 - 17:00', declaredClass: 'original' });
+    assert.equal(presentation.declared.text, '09:00 - 17:00');
+    assert.equal(presentation.apologistiko.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+}
+
+const hoursStart = source.indexOf('function effectiveWorkHoursValue(');
+const hoursEnd = source.indexOf('function ensureReviewTableStructure(', hoursStart);
+const hoursSandbox = { num: (value) => Number(value || 0),
+    hours: (value) => Number(value || 0).toFixed(2) };
+vm.createContext(hoursSandbox);
+vm.runInContext(`${source.slice(hoursStart, hoursEnd)}
+this.render = renderHoursCell;
+this.minutes = stage4WorkMinutes;`, hoursSandbox);
+for (const [value, clock, decimal] of [
+    [7.5, '07:30', '7.50'], [8, '08:00', '8.00']
+]) {
+    const html = hoursSandbox.render({ ores_ergasias_apologistika: value });
+    assert.match(html, new RegExp(`stage4-hours-clock[^>]*>${clock}<`));
+    assert.match(html, new RegExp(`stage4-hours-decimal[^>]*>${decimal}<`));
+}
+const zeroHoursHtml = hoursSandbox.render({ ores_ergasias_apologistika: 0 });
+assert.match(zeroHoursHtml, /stage4-hours-decimal[^>]*>0\.00</);
+assert.doesNotMatch(zeroHoursHtml, /stage4-hours-clock|00:00/,
+    'zero hours use the required semantic single-line decimal presentation');
+assert.equal(hoursSandbox.minutes({ ores_ergasias_apologistika: 7.781 }), 467,
+    'decimal fallback rounds deterministically to a whole minute');
+const roundedFallbackHtml = hoursSandbox.render({ ores_ergasias_apologistika: 7.781 });
+assert.match(roundedFallbackHtml, /stage4-hours-clock[^>]*>07:47</,
+    'the fallback clock uses deterministic whole-minute rounding');
+assert.match(roundedFallbackHtml, /stage4-hours-decimal[^>]*>7\.78</,
+    'the decimal line retains the stored numeric meaning');
+assert.match(source, /renderStage4HoursValue\(totals\.ores_ergasias_apologistika\)/,
+    'Stage-4 subtotal and grand-total Hours cells use the same two-line renderer');
+assert.match(css, /\.stage4-hours-clock\s*\{[\s\S]*?justify-self:\s*start/);
+assert.match(css, /\.stage4-hours-decimal\s*\{[\s\S]*?justify-self:\s*end/);
+
 const completed = { scope: { employee_kodikos: '0013', week_start: '2026-05-25',
     week_end: '2026-05-31' }, lifecycle_projection: { stages: { stage4: {
     business_status: 'COMPLETED', pending_count: 0,
@@ -132,7 +202,11 @@ assert.match(row, /stage4-week-code/);
                 <div class="stage4-summary-strip">✓ Τελικός εβδομαδιαίος έλεγχος ολοκληρώθηκε</div>
                 <table id="resultsTable"><thead><tr><th>Ημ/νία</th></tr></thead>
                 <tbody><tr class="employee-detail-row"><td>04/05</td>
-                    <td class="cell-apoysia cell-stage1-absence">${absenceHtml}</td></tr>
+                    <td class="cell-apoysia cell-stage1-absence">${absenceHtml}</td>
+                    <td class="hours-check-cell">${hoursSandbox.render({
+                        ores_ergasias_apologistika: 7.5 })}</td></tr>
+                    <tr><td colspan="2">Μηδενικές ώρες</td>
+                    <td class="zero-hours-check-cell">${zeroHoursHtml}</td></tr>
                     <tr class="employee-deviation-row"><td><table class="weekly-deviation-table">
                     <thead><tr><th>6η ημέρα</th></tr></thead><tbody><tr><td>${sixthHtml}</td></tr>
                     </tbody></table></td></tr></tbody></table>
@@ -154,7 +228,15 @@ assert.match(row, /stage4-week-code/);
                 pillBg: getComputedStyle(pill).backgroundColor,
                 sixthBg: getComputedStyle(sixth).backgroundColor,
                 headerPosition: getComputedStyle(document.querySelector('#resultsTable > thead th')).position,
-                weeklyHeaderPosition: getComputedStyle(document.querySelector('.weekly-deviation-table th')).position };
+                weeklyHeaderPosition: getComputedStyle(document.querySelector('.weekly-deviation-table th')).position,
+                hoursDisplay: getComputedStyle(document.querySelector('.stage4-hours-value')).display,
+                hoursLines: document.querySelector('.stage4-hours-value').children.length,
+                clockAlignment: getComputedStyle(document.querySelector('.stage4-hours-clock')).justifySelf,
+                decimalAlignment: getComputedStyle(document.querySelector('.stage4-hours-decimal')).justifySelf,
+                zeroHoursLines: document.querySelector(
+                    '.zero-hours-check-cell .stage4-hours-value').children.length,
+                zeroHoursText: document.querySelector(
+                    '.zero-hours-check-cell .stage4-hours-value').textContent.trim() };
         });
         assert.equal(styles.absenceBg, 'rgb(247, 232, 232)', JSON.stringify(styles));
         assert.equal(styles.absenceText, 'rgb(122, 52, 52)', JSON.stringify(styles));
@@ -162,6 +244,12 @@ assert.match(row, /stage4-week-code/);
         assert.equal(styles.sixthBg, 'rgb(251, 243, 223)', JSON.stringify(styles));
         assert.equal(styles.headerPosition, 'sticky');
         assert.equal(styles.weeklyHeaderPosition, 'sticky');
+        assert.equal(styles.hoursDisplay, 'grid');
+        assert.equal(styles.hoursLines, 2);
+        assert.equal(styles.clockAlignment, 'start');
+        assert.equal(styles.decimalAlignment, 'end');
+        assert.equal(styles.zeroHoursLines, 1);
+        assert.equal(styles.zeroHoursText, '0.00');
         const sizes = await page.evaluate(() => [...document.querySelectorAll(
             '.badge-check-cell')].map((cell) => {
             const badge = cell.querySelector('.stage4-sixth-day-badge');
