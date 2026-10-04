@@ -235,7 +235,7 @@
     <hr />
     <div class="row form-group g-3 align-items-center mb-0-5">
         <div class="col-4 right-align"><label for="elegxos_ypopta_mikron_diastimaton_kartas" class="col-form-label label-font-size">Έλεγχος ύποπτα μικρών διαστημάτων κάρτας</label></div>
-        <div class="col-1 left-align checkbox-flex-center"><input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="elegxos_ypopta_mikron_diastimaton_kartas" name="elegxos_ypopta_mikron_diastimaton_kartas" /><label for="elegxos_ypopta_mikron_diastimaton_kartas" class="margin-left-0_75rem fw600">ΟΧΙ</label></div>
+        <div class="col-1 left-align checkbox-flex-center"><input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="elegxos_ypopta_mikron_diastimaton_kartas" name="elegxos_ypopta_mikron_diastimaton_kartas" /><label for="elegxos_ypopta_mikron_diastimaton_kartas" id="label-elegxos_ypopta_mikron_diastimaton_kartas" class="margin-left-0_75rem fw600">ΟΧΙ</label></div>
     </div>
     <% const shortCardFields = [
         ['poly_mikro_diastima_kartas_eos_lepta', 'Πολύ μικρό διάστημα έως (λεπτά)', 5],
@@ -246,10 +246,11 @@
     <% shortCardFields.forEach(([field, label, value]) => { %>
     <div class="row form-group g-3 align-items-center mb-0-5">
         <div class="col-4 right-align"><label for="<%= field %>" class="col-form-label label-font-size"><%= label %></label></div>
-        <div class="col-2"><input type="number" min="0" max="<%= field.includes('pososto') ? 100 : 1440 %>" step="1" class="form-control" id="<%= field %>" name="<%= field %>" value="<%= value %>" /></div>
+        <div class="col-2"><input type="number" min="0" max="<%= field.includes('pososto') ? 100 : 1440 %>" step="1" class="form-control" id="<%= field %>" name="<%= field %>" value="0" disabled /></div>
         <% if (field.includes('elaxistos_xronos')) { %><div class="col-6 text-muted small">Πόσος χρόνος πρέπει να λείπει από τις κάρτες σε σχέση με το προδηλωμένο ωράριο για να ζητηθεί έλεγχος.</div><% } %>
     </div>
     <% }); %>
+    <hr />
 
     <div
         class="row form-group align-items-start margin-left--1rem margin-right--1rem margin-top--0_5rem"

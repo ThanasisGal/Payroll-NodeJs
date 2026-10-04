@@ -22,6 +22,21 @@ test('valid configured values round-trip', () => {
     assert.equal(value.elegxos_ypopta_mikron_diastimaton_kartas, true);
     assert.equal(value.mikro_diastima_kartas_eos_lepta, 45);
 });
+test('disabled policy preserves the four explicit zero values from the company UI', () => {
+    assert.deepEqual(normalizeCompanySuspiciousShortCardPolicy({
+        elegxos_ypopta_mikron_diastimaton_kartas: false,
+        poly_mikro_diastima_kartas_eos_lepta: '0',
+        mikro_diastima_kartas_eos_lepta: '0',
+        mikro_diastima_kartas_max_pososto_programmatos: '0',
+        mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta: '0'
+    }), {
+        elegxos_ypopta_mikron_diastimaton_kartas: false,
+        poly_mikro_diastima_kartas_eos_lepta: 0,
+        mikro_diastima_kartas_eos_lepta: 0,
+        mikro_diastima_kartas_max_pososto_programmatos: 0,
+        mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta: 0
+    });
+});
 test('invalid ranges and inconsistent thresholds fail closed', () => {
     assert.throws(() => normalizeCompanySuspiciousShortCardPolicy({
         poly_mikro_diastima_kartas_eos_lepta: 61,
