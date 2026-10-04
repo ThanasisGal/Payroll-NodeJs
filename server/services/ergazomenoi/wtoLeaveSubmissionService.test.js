@@ -154,6 +154,11 @@ assert.equal(result.blockers[0].code, 'WTOLEAVE_FULL_DAY_EMERGENCY_HOURLY_CONFLI
 result = buildWtoLeaveCanonicalDataset({ sourceRows: [{ ...emergency,
     ores_ektakths_oroadeias_apologistika: 1 }], employees: [employee()] });
 assert.equal(result.blockers[0].code, 'WTOLEAVE_EMERGENCY_HOURLY_APPROVAL_INVALID');
+result = buildWtoLeaveCanonicalDataset({ sourceRows: [{ ...emergency,
+    kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' }], employees: [employee()] });
+assert.equal(result.rows.length, 0);
+assert.equal(result.blockers[0].code, 'WTOLEAVE_EMERGENCY_POSSIBLE_LEAVE_INVALID');
+assert.match(result.blockers[0].message, /δεν είναι επιβεβαιωμένη κατηγορία HR/);
 
 result = buildWtoLeaveCanonicalDataset({ sourceRows: [row('2026-08-10', {
     adeia_apologistika: false, egkekrimenh_oroadeia_apologistika: true,

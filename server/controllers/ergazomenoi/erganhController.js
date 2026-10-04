@@ -271,6 +271,8 @@ const {
 } = require('../../services/ergazomenoi/apasxoliseisZeroLengthCardResolutionService');
 const {
     isApprovedHrDailyActualWorkResolution,
+    previewHrDailyActualWorkResolution,
+    assertHrDailyActualWorkPreviewFingerprint,
     resolveHrDailyActualWorkResolution,
     persistHrDailyActualWorkResolutionWrite
 } = require('../../services/ergazomenoi/apasxoliseisHrDailyActualWorkResolutionService');
@@ -4437,13 +4439,32 @@ async function applyEmploymentDepartureScopeToFilters({
 
 const REVIEW_SELECT_FIELDS =
     'kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_apoysias_base_apologistika ' +
-    'team company_kod updatedAt ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution zero_length_card_resolution hr_daily_actual_work_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia argia_apologistika perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ektakth_oroadeia_apologistika ektakta_diastimata_oroadeias_apologistika ores_ektakths_oroadeias_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
+    'team company_kod updatedAt ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution zero_length_card_resolution hr_daily_actual_work_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia argia_apologistika perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ektakth_oroadeia_apologistika ektakta_diastimata_oroadeias_apologistika ores_ektakths_oroadeias_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
 
 const SUSPICIOUS_SHORT_COMPANY_SELECT_FIELDS =
     'elegxos_ypopta_mikron_diastimaton_kartas ' +
     'poly_mikro_diastima_kartas_eos_lepta mikro_diastima_kartas_eos_lepta ' +
     'mikro_diastima_kartas_max_pososto_programmatos ' +
     'mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta';
+
+async function loadHrDailyActualWorkResolutionContext({ sessionTeam, companyId, row }) {
+    const [employee, histories] = await Promise.all([
+        ErgazomenoiModel.findOne({ team: sessionTeam, company_kod: companyId,
+            ypokatasthma: row.ypokatasthma, kodikos: row.kodikos }).lean(),
+        IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
+            company_kod: companyId, kodikos: row.kodikos })
+            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
+    ]);
+    const breakConfiguration = resolveBreakConfigurationForDate(
+        row.hmeromhnia, histories, employee || {});
+    const effectiveEmployee = {
+        ...getEffectiveEmployeeForDate(row, employee || {}, histories),
+        dialleima_entos_ektos_orarioy: breakConfiguration.break_inside_schedule,
+        dialleima_se_lepta: breakConfiguration.break_minutes,
+        _breakConfiguration: breakConfiguration
+    };
+    return { effectiveEmployee, breakConfiguration };
+}
 
 async function loadSuspiciousShortCompanySettings({ team, companyId, session = null }) {
     let query = CompaniesModel.findOne({ _id: companyId, team })
@@ -13065,6 +13086,47 @@ class erganhController {
         }
     };
 
+    static previewHrDailyActualWorkResolution = async (req, res) => {
+        try {
+            if (!canReviewEdit(req)) return res.status(403).json({ success: false,
+                message: 'Δεν έχετε δικαίωμα για προεπισκόπηση ημερήσιας επίλυσης.' });
+            const { id } = req.params;
+            const command = req.body?.daily_actual_work_resolution;
+            const reason = String(req.body?.reason || '').trim();
+            if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({
+                success: false, message: 'Μη έγκυρο ID εγγραφής.' });
+            const row = await ProdhlomenaOrariaModel.findOne({ _id: id,
+                team: req.session.userTeam,
+                company_kod: req.session.companyInUse }).select(REVIEW_SELECT_FIELDS).lean();
+            if (!row) return res.status(404).json({ success: false,
+                message: 'Δεν βρέθηκε η εγγραφή.' });
+            await assertActiveEmploymentReviewCardEvidenceResolutionPeriod(
+                req, row.ypokatasthma, row.hmeromhnia,
+                'ημερήσιας πραγματικής εργασίας',
+                'PERIOD_CONTROL_DAILY_ACTUAL_WORK_RESOLUTION_NOT_ALLOWED');
+            const emergencyIntervals = command?.emergency_hourly_leave_intervals;
+            if (Array.isArray(emergencyIntervals) && emergencyIntervals.length > 0) {
+                const category = await Models_A.KathgoriesAdeiasModel.findOne({
+                    kodikos: String(command?.leave_category || '').trim(),
+                    ...buildHrSelectableLeaveCategoryQuery()
+                }).select('_id').lean();
+                if (!category) throw Object.assign(new Error(
+                    'Επιλέξτε έγκυρη κατηγορία έκτακτης ωροάδειας.'), {
+                    code: 'HR_DAILY_LEAVE_CATEGORY_INVALID', statusCode: 400
+                });
+            }
+            const { effectiveEmployee } = await loadHrDailyActualWorkResolutionContext({
+                sessionTeam: req.session.userTeam, companyId: req.session.companyInUse, row
+            });
+            const preview = previewHrDailyActualWorkResolution({ row, command,
+                effectiveEmployee, reason });
+            return res.json({ success: true, preview });
+        } catch (error) {
+            const response = buildEmploymentReviewUpdateErrorResponse(error);
+            return res.status(response.status).json(response.body);
+        }
+    };
+
     static updateProdhlomenaOrariaReviewRecord = async (req, res) => {
         try {
             const boundaryOverrides = orphanResolutionBoundaryTestOverrides || {};
@@ -13440,22 +13502,12 @@ class erganhController {
                             code: 'HR_DAILY_LEAVE_CATEGORY_INVALID', statusCode: 400
                         });
                     }
-                    const [employee, histories] = await Promise.all([
-                        ErgazomenoiModel.findOne({ team: sessionTeam, company_kod: companyId,
-                            ypokatasthma: oldRecord.ypokatasthma,
-                            kodikos: oldRecord.kodikos }).lean(),
-                        IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
-                            company_kod: companyId, kodikos: oldRecord.kodikos })
-                            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
-                    ]);
-                    const breakConfiguration = resolveBreakConfigurationForDate(
-                        oldRecord.hmeromhnia, histories, employee || {});
-                    const effectiveEmployee = {
-                        ...getEffectiveEmployeeForDate(oldRecord, employee || {}, histories),
-                        dialleima_entos_ektos_orarioy: breakConfiguration.break_inside_schedule,
-                        dialleima_se_lepta: breakConfiguration.break_minutes,
-                        _breakConfiguration: breakConfiguration
-                    };
+                    const { effectiveEmployee } =
+                        await loadHrDailyActualWorkResolutionContext({
+                            sessionTeam, companyId, row: oldRecord });
+                    assertHrDailyActualWorkPreviewFingerprint({ row: oldRecord,
+                        command: dailyResolutionCommand, effectiveEmployee,
+                        reason: String(reason).trim() });
                     approvedDailyResolution = resolveHrDailyActualWorkResolution({
                         row: oldRecord, command: dailyResolutionCommand, effectiveEmployee,
                         actor: changedBy, reason: String(reason).trim()

@@ -1,6 +1,8 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
+const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
 const { validEmergencyHourlyLeaveSegments, emergencyHourlyLeaveMinutes } =
     require('../../utils/ergazomenoi/emergencyHourlyLeaveSegments');
@@ -12,6 +14,21 @@ const RESOLUTION_KIND = 'HR_DAILY_ACTUAL_WORK_AND_EMERGENCY_HOURLY_LEAVE';
 const SOURCE_CASES = new Set([
     'SUSPICIOUS_SHORT_CARD_INTERVAL',
     'HR_CORRECTED_ACTUAL_DAY'
+]);
+const PREVIEW_FINGERPRINT_VERSION = 'hr-daily-actual-work-preview:v1';
+const PREVIEW_ROW_FIELDS = Object.freeze([
+    '_id', 'updatedAt', 'hmeromhnia', 'kodikos', 'ypokatasthma', 'kathgoria_ergasias',
+    'repo', 'argia', 'adeia', 'astheneia', 'hr_declared_leave', 'is_locked',
+    'adeia_apologistika', 'astheneia_apologistika',
+    'egkekrimenh_oroadeia_apologistika', 'hr_daily_actual_work_resolution',
+    'ektakth_oroadeia_apologistika', 'ektakta_diastimata_oroadeias_apologistika',
+    'ores_ektakths_oroadeias_apologistika', 'kathgoria_adeias_apologistika',
+    ...[1, 2, 3].flatMap((number) => {
+        const pair = String(number).padStart(2, '0');
+        return [`apo_ora_${pair}`, `eos_ora_${pair}`, `dialleima_apo_ora_${pair}`,
+            `dialleima_eos_ora_${pair}`, `cards_apo_ora_${pair}`, `cards_eos_ora_${pair}`,
+            `apo_ora_${pair}_apologistika`, `eos_ora_${pair}_apologistika`];
+    })
 ]);
 
 function fail(code, message, statusCode = 400) {
@@ -112,6 +129,31 @@ function rawCardSnapshot(row) {
     })));
 }
 
+function commandWithoutPreviewFingerprint(command = {}) {
+    const { preview_fingerprint: _previewFingerprint, ...semanticCommand } = command;
+    return semanticCommand;
+}
+
+function buildHrDailyActualWorkPreviewFingerprint({ row = {}, command = {},
+    effectiveEmployee = {}, reason = '' } = {}) {
+    const semanticRow = Object.fromEntries(PREVIEW_ROW_FIELDS
+        .filter((field) => row[field] !== undefined).map((field) => [field, row[field]]));
+    const semanticInput = canonicalize({ version: PREVIEW_FINGERPRINT_VERSION,
+        row: semanticRow, effectiveEmployee, reason: String(reason).trim(),
+        command: commandWithoutPreviewFingerprint(command) });
+    return crypto.createHash('sha256').update(JSON.stringify(semanticInput)).digest('hex');
+}
+
+function assertHrDailyActualWorkPreviewFingerprint(input = {}) {
+    const supplied = String(input.command?.preview_fingerprint || '').trim();
+    if (!/^[a-f0-9]{64}$/.test(supplied)) fail('HR_DAILY_PREVIEW_REQUIRED',
+        'Απαιτείται νέα διακομιστική προεπισκόπηση πριν από την αποθήκευση.', 409);
+    const expected = buildHrDailyActualWorkPreviewFingerprint(input);
+    if (supplied !== expected) fail('HR_DAILY_PREVIEW_STALE',
+        'Τα δεδομένα της ημέρας ή του διαλείμματος άλλαξαν. Δημιουργήστε νέα προεπισκόπηση.', 409);
+    return expected;
+}
+
 function insideDeclaredSchedule(segment, declared) {
     return declared.some(interval => segment.apo_lepto >= interval.startMinutes &&
         segment.eos_lepto <= (interval.isOvernight ? 1440 : interval.endMinutes));
@@ -126,10 +168,23 @@ function minutesInsideDeclaredSchedule(workIntervals = [], declared = []) {
             Math.min(work.end, interval.end) - Math.max(work.start, interval.start)), 0), 0);
 }
 
+function assertCompatibleCardWorkflow(row = {}) {
+    for (const number of [1, 2, 3]) {
+        const pair = String(number).padStart(2, '0');
+        const start = String(row[`cards_apo_ora_${pair}`] || '').trim();
+        const end = String(row[`cards_eos_ora_${pair}`] || '').trim();
+        if (Boolean(start) !== Boolean(end)) fail('HR_DAILY_ORPHAN_CARD_CONFLICT',
+            'Η ημέρα ανήκει πρώτα στη ροή επίλυσης ορφανού χτυπήματος κάρτας.', 409);
+        if (start && end && start === end) fail('HR_DAILY_ZERO_LENGTH_CARD_CONFLICT',
+            'Η ημέρα ανήκει πρώτα στη ροή επίλυσης μηδενικού διαστήματος κάρτας.', 409);
+    }
+}
+
 function resolveHrDailyActualWorkResolution({ row = {}, command = {}, effectiveEmployee = {},
     actor = '', reason = '', now = new Date(), sourceCase = '' } = {}) {
     const allowed = ['approve', 'revise_approved', 'work_intervals',
-        'emergency_hourly_leave_intervals', 'leave_category', 'source_case'];
+        'emergency_hourly_leave_intervals', 'leave_category', 'source_case',
+        'preview_fingerprint'];
     if (!command || typeof command !== 'object' || Array.isArray(command) ||
         Object.keys(command).some(field => !allowed.includes(field))) {
         fail('HR_DAILY_RESOLUTION_FIELDS_NOT_ALLOWED', 'Η εντολή ημερήσιας επίλυσης περιέχει μη επιτρεπτά πεδία.');
@@ -140,6 +195,14 @@ function resolveHrDailyActualWorkResolution({ row = {}, command = {}, effectiveE
     const resolvedSourceCase = String(command.source_case || sourceCase || '').trim();
     if (!SOURCE_CASES.has(resolvedSourceCase)) fail('HR_DAILY_SOURCE_CASE_REQUIRED',
         'Δεν είναι διαθέσιμη έγκυρη αιτία έναρξης του ελέγχου.');
+    assertCompatibleCardWorkflow(row);
+    const declared = buildDeclaredIntervals(row);
+    if (resolvedSourceCase === 'HR_CORRECTED_ACTUAL_DAY' &&
+        (!declared.length || row.repo === true || row.argia === true ||
+            ['ΑΝ', 'ΜΕ'].includes(String(row.kathgoria_ergasias || '').trim()))) {
+        fail('HR_DAILY_MANUAL_WORKING_DAY_REQUIRED',
+            'Η χειροκίνητη επίλυση επιτρέπεται μόνο σε προδηλωμένη εργάσιμη ημέρα.', 409);
+    }
     const revisingApproved = command.revise_approved === true;
     if (revisingApproved && (!isApprovedHrDailyActualWorkResolution(row) || row.is_locked !== true)) {
         fail('HR_DAILY_APPROVED_REVISION_NOT_ALLOWED', 'Δεν υπάρχει έγκυρη κλειδωμένη ημερήσια επίλυση προς διόρθωση.', 409);
@@ -169,9 +232,13 @@ function resolveHrDailyActualWorkResolution({ row = {}, command = {}, effectiveE
     assertOrderedNonOverlapping(work, 'HR_DAILY_WORK_INTERVAL_OVERLAP', 'Πραγματική εργασία');
 
     const leave = command.emergency_hourly_leave_intervals ?? [];
+    if (Array.isArray(leave) && leave.some((segment) =>
+        Number(segment?.apo_lepto) === 1440 || Number(segment?.eos_lepto) === 1440)) {
+        fail('HR_DAILY_EMERGENCY_LEAVE_WTO_CLOCK_INVALID',
+            'Η έκτακτη ωροάδεια πρέπει να έχει όρια από 00:00 έως 23:59. Η τιμή 24:00 δεν υποστηρίζεται από το WTOLeave.');
+    }
     if (!validEmergencyHourlyLeaveSegments(leave)) fail('HR_DAILY_EMERGENCY_LEAVE_INVALID',
         'Τα διαστήματα έκτακτης ωροάδειας δεν είναι έγκυρα.');
-    const declared = buildDeclaredIntervals(row);
     if (leave.some(segment => !insideDeclaredSchedule(segment, declared))) fail(
         'HR_DAILY_EMERGENCY_LEAVE_OUTSIDE_DECLARED_SCHEDULE',
         'Η έκτακτη ωροάδεια πρέπει να βρίσκεται μέσα στο προδηλωμένο ωράριο.');
@@ -252,7 +319,29 @@ function resolveHrDailyActualWorkResolution({ row = {}, command = {}, effectiveE
         netWorkMinutes: netMinutes, emergencyLeaveMinutes: leaveMinutes,
         coveredMinutes: netMinutes + leaveMinutes, contractualCoveredMinutes,
         workMinutesInsideDeclared, absenceMinutes, revisingApproved,
-        idempotentReplay: replayingApproved });
+        idempotentReplay: replayingApproved,
+        breakResolution: Object.freeze({ ...breakResolution,
+            breakIntervals: Object.freeze(breakResolution.breakIntervals.map(Object.freeze)),
+            workIntervals: Object.freeze(breakResolution.workIntervals.map(Object.freeze)) }) });
+}
+
+function previewHrDailyActualWorkResolution(input = {}) {
+    const resolution = resolveHrDailyActualWorkResolution({ ...input,
+        command: commandWithoutPreviewFingerprint(input.command), actor: 'SERVER_PREVIEW',
+        now: new Date(0) });
+    return Object.freeze({
+        normalizedWorkIntervals: resolution.metadata.approved_work_intervals,
+        emergencyLeaveIntervals: resolution.metadata.emergency_hourly_leave_intervals,
+        leaveCategory: resolution.metadata.leave_category,
+        netWorkMinutes: resolution.netWorkMinutes,
+        emergencyLeaveMinutes: resolution.emergencyLeaveMinutes,
+        coveredMinutes: resolution.coveredMinutes,
+        contractualCoveredMinutes: resolution.contractualCoveredMinutes,
+        absenceMinutes: resolution.absenceMinutes,
+        rawCardSnapshot: resolution.metadata.raw_card_snapshot,
+        breakResolution: resolution.breakResolution,
+        previewFingerprint: buildHrDailyActualWorkPreviewFingerprint(input)
+    });
 }
 
 async function persistHrDailyActualWorkResolutionWrite({ oldRecord, semanticUpdates, changedBy,
@@ -289,5 +378,8 @@ async function persistHrDailyActualWorkResolutionWrite({ oldRecord, semanticUpda
 }
 
 module.exports = { POLICY_VERSION, RESOLUTION_KIND, SOURCE_CASES,
+    PREVIEW_FINGERPRINT_VERSION,
     isApprovedHrDailyActualWorkResolution,
-    resolveHrDailyActualWorkResolution, persistHrDailyActualWorkResolutionWrite };
+    buildHrDailyActualWorkPreviewFingerprint, assertHrDailyActualWorkPreviewFingerprint,
+    previewHrDailyActualWorkResolution, resolveHrDailyActualWorkResolution,
+    persistHrDailyActualWorkResolutionWrite };

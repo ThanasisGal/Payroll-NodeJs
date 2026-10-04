@@ -470,7 +470,7 @@ const ProdhlomenaOrariaSchema = new Schema(
             },
             validate: {
                 validator: validEmergencyHourlyLeaveSegments,
-                message: 'Emergency hourly leave segments must be ordered, non-overlapping same-day intervals.'
+                message: 'Τα διαστήματα έκτακτης ωροάδειας πρέπει να είναι ταξινομημένα, χωρίς επικάλυψη και αναπαραστάσιμα στο WTOLeave από 00:00 έως 23:59.'
             }
         },
         ores_ektakths_oroadeias_apologistika: { type: Number, default: 0, min: 0, max: 24 },

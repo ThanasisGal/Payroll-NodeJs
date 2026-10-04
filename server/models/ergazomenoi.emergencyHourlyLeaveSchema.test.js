@@ -19,4 +19,11 @@ test('emergency hourly leave validates same-day ordered non-overlapping minutes'
         { apo_lepto: 600, eos_lepto: 700 }, { apo_lepto: 650, eos_lepto: 800 }
     ] });
     assert.ok(invalid.validateSync()?.errors?.ektakta_diastimata_oroadeias_apologistika);
+    const midnightBoundary = new ProdhlomenaOrariaModel({
+        ektakta_diastimata_oroadeias_apologistika: [
+            { apo_lepto: 1380, eos_lepto: 1440 }
+        ]
+    });
+    assert.ok(midnightBoundary.validateSync()
+        ?.errors?.ektakta_diastimata_oroadeias_apologistika);
 });

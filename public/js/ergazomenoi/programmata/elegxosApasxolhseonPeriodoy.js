@@ -13586,16 +13586,51 @@ function validateReviewSave(updates) {
 
 function minuteToReviewTime(value) {
     const minute = Number(value);
-    if (!Number.isInteger(minute) || minute < 0 || minute > 1440) return '';
-    if (minute === 1440) return '24:00';
+    if (!Number.isInteger(minute) || minute < 0 || minute > 1439) return '';
     return `${String(Math.floor(minute / 60) % 24).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 }
 
 function reviewTimeToMinute(value) {
-    const match = /^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.exec(String(value || ''));
+    const match = /^(?:[01]\d|2[0-3]):[0-5]\d$/.exec(String(value || ''));
     if (!match) return null;
     const parts = String(value).split(':').map(Number);
     return parts[0] * 60 + parts[1];
+}
+
+function canStartManualDailyActualWorkResolution(row = {}) {
+    const declaredWorkingInterval = [1, 2, 3].some((number) => {
+        const pair = String(number).padStart(2, '0');
+        const start = reviewTimeToMinute(row[`apo_ora_${pair}`]);
+        const end = reviewTimeToMinute(row[`eos_ora_${pair}`]);
+        return Number.isInteger(start) && Number.isInteger(end) && start !== end;
+    });
+    const unresolvedOrphan = row?.orphan_card_resolution_preview?.orphanVisible === true &&
+        row?.orphan_card_resolution?.status !== 'HR_APPROVED';
+    const zeroLength = [1, 2, 3].some((number) => {
+        const pair = String(number).padStart(2, '0');
+        const start = String(row[`cards_apo_ora_${pair}`] || '').trim();
+        return start && start === String(row[`cards_eos_ora_${pair}`] || '').trim();
+    });
+    const periodWritable = typeof currentEmploymentPeriodControl === 'undefined' ||
+        currentEmploymentPeriodControl?.allowed_actions?.manual_edit === true;
+    const currentDate = typeof isCurrentPeriodReviewDate !== 'function' ||
+        isCurrentPeriodReviewDate(row);
+    return periodWritable && currentDate && declaredWorkingInterval && row.is_locked !== true &&
+        row?.suspicious_short_card_interval?.suspicious !== true && !unresolvedOrphan &&
+        !zeroLength && row?.hr_daily_actual_work_resolution?.status !== 'HR_APPROVED' &&
+        row.egkekrimenh_oroadeia_apologistika !== true && row.adeia_apologistika !== true &&
+        row.astheneia_apologistika !== true && row.adeia !== true && row.astheneia !== true &&
+        row.hr_declared_leave !== true && row.repo !== true && row.argia !== true &&
+        !['ΑΝ', 'ΜΕ'].includes(String(row.kathgoria_ergasias || '').trim());
+}
+
+function renderManualDailyActualWorkResolutionAction(row = {}, active = false) {
+    if (active || !canStartManualDailyActualWorkResolution(row)) return '';
+    return `<div class="review-modal-section" id="manualDailyActualWorkResolutionAction">
+        <div class="review-modal-section-title">Πραγματική εργασία και έκτακτη ωροάδεια</div>
+        <div class="small mb-2">Προαιρετική ενέργεια όταν η πραγματική ημέρα περιλαμβάνει εργασία και έκτακτη ωροάδεια.</div>
+        <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary" id="startManualDailyResolutionBtn">Εργασία / έκτακτη ωροάδεια</button>
+    </div>`;
 }
 
 function renderDailyActualWorkResolutionSection(row = {}, visible = false) {
@@ -13604,14 +13639,16 @@ function renderDailyActualWorkResolutionSection(row = {}, visible = false) {
     const segments = row.ektakta_diastimata_oroadeias_apologistika || [];
     const leaveDisabled = approved || row.ektakth_oroadeia_apologistika !== true;
     return `<div id="dailyActualWorkResolutionSection" class="review-modal-section">
-        <div class="review-modal-section-title">${approved ? 'Εγκεκριμένη ημερήσια επίλυση' : 'ΥΠΟΠΤΑ ΜΙΚΡΟ ΔΙΑΣΤΗΜΑ ΚΑΡΤΑΣ'}</div>
+        <div class="review-modal-section-title">${approved ? 'Εγκεκριμένη ημερήσια επίλυση' :
+            row?.suspicious_short_card_interval?.suspicious === true
+                ? 'ΥΠΟΠΤΑ ΜΙΚΡΟ ΔΙΑΣΤΗΜΑ ΚΑΡΤΑΣ' : 'Επίλυση πραγματικής ημέρας'}</div>
         <div class="small mb-2">Τα αρχικά χτυπήματα κάρτας εμφανίζονται μόνο για έλεγχο και δεν μεταβάλλονται.</div>
         <div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-sm" id="dailyAddWorkInterval" ${approved ? 'disabled' : ''}>Προσθήκη διαστήματος εργασίας</button><button type="button" class="btn btn-sm" id="dailyRemoveWorkInterval" ${approved ? 'disabled' : ''}>Αφαίρεση τελευταίου διαστήματος εργασίας</button></div>
         <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="dailyEmergencyLeaveEnabled" ${row.ektakth_oroadeia_apologistika ? 'checked' : ''} ${approved ? 'disabled' : ''}><label class="form-check-label" for="dailyEmergencyLeaveEnabled">Έκτακτη ωροάδεια</label></div>
-        <div class="row g-2">${[0, 1, 2].map((index) => `<div class="col-md-4"><label class="form-label">Ωροάδεια ${index + 1}</label><div class="input-group"><input type="text" inputmode="numeric" pattern="(?:[01]\\d|2[0-3]):[0-5]\\d" placeholder="HH:MM" class="form-control daily-leave-start" value="${escapeHtml(minuteToReviewTime(segments[index]?.apo_lepto))}" ${leaveDisabled ? 'disabled' : ''}><input type="text" inputmode="numeric" pattern="(?:(?:[01]\\d|2[0-3]):[0-5]\\d|24:00)" placeholder="HH:MM" class="form-control daily-leave-end" value="${escapeHtml(minuteToReviewTime(segments[index]?.eos_lepto))}" ${leaveDisabled ? 'disabled' : ''}></div></div>`).join('')}</div>
+        <div class="row g-2">${[0, 1, 2].map((index) => `<div class="col-md-4"><label class="form-label">Ωροάδεια ${index + 1}</label><div class="input-group"><input type="text" inputmode="numeric" pattern="(?:[01]\\d|2[0-3]):[0-5]\\d" placeholder="HH:MM" class="form-control daily-leave-start" value="${escapeHtml(minuteToReviewTime(segments[index]?.apo_lepto))}" ${leaveDisabled ? 'disabled' : ''}><input type="text" inputmode="numeric" pattern="(?:[01]\\d|2[0-3]):[0-5]\\d" placeholder="HH:MM" class="form-control daily-leave-end" value="${escapeHtml(minuteToReviewTime(segments[index]?.eos_lepto))}" ${leaveDisabled ? 'disabled' : ''}></div></div>`).join('')}</div>
         <div class="d-flex gap-2 mt-2"><button type="button" class="btn btn-sm" id="dailyAddLeaveInterval" ${leaveDisabled ? 'disabled' : ''}>Προσθήκη διαστήματος ωροάδειας</button><button type="button" class="btn btn-sm" id="dailyRemoveLeaveInterval" ${leaveDisabled ? 'disabled' : ''}>Αφαίρεση τελευταίου διαστήματος ωροάδειας</button></div>
         <div class="small mt-2"><strong>Κατηγορία άδειας:</strong> επιλέγεται από το αντίστοιχο πεδίο «Κατηγορία άδειας απολογιστικά» παρακάτω.</div>
-        <button type="button" class="btn btn-sm mt-2" id="dailyUseRawCards" ${approved ? 'disabled' : ''}>Η κάρτα είναι σωστή</button>
+        <button type="button" class="btn btn-sm mt-2" id="dailyUseRawCards" ${approved ? 'disabled' : ''}>${row?.suspicious_short_card_interval?.suspicious === true ? 'Η κάρτα είναι σωστή' : 'Χρήση αρχικών χτυπημάτων κάρτας'}</button>
         ${approved ? '<button type="button" class="btn employment-review-action-btn employment-review-action-warning mt-2" id="dailyResolutionRevisionBtn">Διόρθωση εγκεκριμένης ημερήσιας επίλυσης</button>' : ''}
         <div id="dailyResolutionSummary" class="alert alert-light border mt-2 mb-0"></div>
     </div>`;
@@ -13669,19 +13706,37 @@ function dailyResolutionSummary(command = {}, row = {}) {
 
 function renderDailyResolutionSummary(command, row) {
     const value = dailyResolutionSummary(command, row);
-    return `Πραγματική εργασία: ${value.work} λεπτά · Έκτακτη ωροάδεια: ${value.leave} λεπτά · Σύνολο καλυμμένων ωρών: ${value.covered} λεπτά · Απουσία: ${value.absence} λεπτά · Προδηλωμένο: ${value.declared} λεπτά`;
+    return `Προσωρινή εκτίμηση πριν από τον διακομιστικό έλεγχο διαλείμματος: πραγματική εργασία ${value.work} λεπτά · έκτακτη ωροάδεια ${value.leave} λεπτά · σύνολο ${value.covered} λεπτά · απουσία ${value.absence} λεπτά · προδηλωμένο ${value.declared} λεπτά`;
 }
 
-function buildDailyResolutionConfirmationHtml(command, row) {
-    const work = command.work_intervals.map(item => `${item.start}–${item.end}`).join(', ') || '-';
-    const leave = command.emergency_hourly_leave_intervals.map(item =>
+function buildDailyResolutionConfirmationHtml(command, preview = {}) {
+    const work = (preview.normalizedWorkIntervals || command.work_intervals)
+        .map(item => `${item.start}–${item.end}`).join(', ') || '-';
+    const leave = (preview.emergencyLeaveIntervals || command.emergency_hourly_leave_intervals).map(item =>
         `${minuteToReviewTime(item.apo_lepto)}–${minuteToReviewTime(item.eos_lepto)}`).join(', ') || '-';
-    return `<div><strong>Πραγματική εργασία:</strong> ${escapeHtml(work)}</div><div><strong>Έκτακτη ωροάδεια:</strong> ${escapeHtml(leave)}</div><div>${escapeHtml(renderDailyResolutionSummary(command, row))}</div>`;
+    const breakText = preview.breakResolution?.removedMinutes > 0
+        ? ` · Αφαιρούμενο διάλειμμα: ${preview.breakResolution.removedMinutes} λεπτά`
+        : '';
+    return `<div><strong>Πραγματικά διαστήματα:</strong> ${escapeHtml(work)}</div><div><strong>Έκτακτη ωροάδεια:</strong> ${escapeHtml(leave)}</div><div class="mt-2"><strong>Κανονικοποιημένο αποτέλεσμα διακομιστή:</strong> καθαρή πραγματική εργασία ${escapeHtml(preview.netWorkMinutes)} λεπτά · έκτακτη ωροάδεια ${escapeHtml(preview.emergencyLeaveMinutes)} λεπτά · συμβατικά καλυμμένα ${escapeHtml(preview.contractualCoveredMinutes)} λεπτά · απουσία ${escapeHtml(preview.absenceMinutes)} λεπτά${escapeHtml(breakText)}</div>`;
 }
 
-async function confirmFrozenDailyResolution(command, row) {
+async function requestFrozenDailyResolutionPreview(row, command, reason) {
+    const response = await fetch(`/api/prodhlomena-oraria/review/${row._id}/daily-actual-work-resolution/preview`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({ daily_actual_work_resolution: command, reason })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message ||
+        'Αποτυχία διακομιστικής προεπισκόπησης της πραγματικής ημέρας.');
+    if (!/^[a-f0-9]{64}$/.test(String(payload.preview?.previewFingerprint || ''))) {
+        throw new Error('Η διακομιστική προεπισκόπηση δεν επέστρεψε έγκυρο δακτυλικό αποτύπωμα.');
+    }
+    return payload.preview;
+}
+
+async function confirmFrozenDailyResolution(command, preview) {
     const result = await employmentReviewSwal({ icon: 'warning', title: 'Ακριβής επιβεβαίωση ημέρας',
-        html: buildDailyResolutionConfirmationHtml(command, row),
+        html: buildDailyResolutionConfirmationHtml(command, preview),
         showCancelButton: true, confirmButtonText: 'Επιβεβαίωση ακριβών τιμών', cancelButtonText: 'Ακύρωση' });
     return result.isConfirmed === true;
 }
@@ -13703,7 +13758,9 @@ function showDetailsModal(row, { orphanResolution = false,
     const initialReason = approvedZeroLength || approvedDailyResolution ? '' : reusableOrphanReason || (zeroLengthResolution === true
         ? 'Επίλυση πραγματικής απασχόλησης λόγω αποτυχίας διαβίβασης ψηφιακής κάρτας'
         : dailyActualWorkResolution === true
-        ? 'Έλεγχος πραγματικής ημέρας λόγω ύποπτα μικρού διαστήματος κάρτας'
+        ? row?.suspicious_short_card_interval?.suspicious === true
+            ? 'Έλεγχος πραγματικής ημέρας λόγω ύποπτα μικρού διαστήματος κάρτας'
+            : 'Επίλυση πραγματικής ημέρας με εργασία και έκτακτη ωροάδεια'
         : orphanResolution === true
         ? defaultOrphanResolutionReason(
             row?.orphan_card_resolution_preview?.unresolvedPairs || [])
@@ -13743,6 +13800,7 @@ function showDetailsModal(row, { orphanResolution = false,
         ${renderOrphanCardResolutionSection(row)}
         ${renderZeroLengthCardResolutionSection(row)}
         ${renderDailyActualWorkResolutionSection(row, dailyActualWorkResolution)}
+        ${renderManualDailyActualWorkResolutionAction(row, dailyActualWorkResolution)}
 
         <div class="review-modal-section">
             <div class="review-modal-section-title">Ενδείξεις</div>
@@ -13818,6 +13876,11 @@ function showDetailsModal(row, { orphanResolution = false,
     }
 
     modal.show();
+
+    document.getElementById('startManualDailyResolutionBtn')?.addEventListener('click', () => {
+        modal.hide();
+        setTimeout(() => showDetailsModal(row, { dailyActualWorkResolution: true }), 150);
+    });
 
     // initModalKathgoriaAdeiasTomSelect();
     setTimeout(() => {
@@ -14099,12 +14162,16 @@ function showDetailsModal(row, { orphanResolution = false,
                 }
                 if (dailyActualWorkCommand.emergency_hourly_leave_intervals.some((item) =>
                     !Number.isInteger(item.apo_lepto) || !Number.isInteger(item.eos_lepto) ||
-                    item.apo_lepto >= item.eos_lepto)) {
+                    item.apo_lepto >= item.eos_lepto || item.eos_lepto > 1439)) {
                     employmentReviewSwal({ icon: 'warning', title: 'Έκτακτη ωροάδεια',
-                        text: 'Συμπληρώστε πλήρη, θετικά διαστήματα έκτακτης ωροάδειας.' });
+                        text: 'Συμπληρώστε πλήρη, θετικά διαστήματα από 00:00 έως 23:59. Η τιμή 24:00 δεν υποστηρίζεται από το WTOLeave.' });
                     return;
                 }
-                if (!await confirmFrozenDailyResolution(dailyActualWorkCommand, row)) return;
+                const serverPreview = await requestFrozenDailyResolutionPreview(
+                    row, dailyActualWorkCommand, reason);
+                if (!await confirmFrozenDailyResolution(dailyActualWorkCommand, serverPreview)) return;
+                dailyActualWorkCommand = Object.freeze({ ...dailyActualWorkCommand,
+                    preview_fingerprint: serverPreview.previewFingerprint });
             }
 
             const response = await fetch(`/api/prodhlomena-oraria/review/${row._id}`, {

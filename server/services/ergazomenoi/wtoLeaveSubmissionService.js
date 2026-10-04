@@ -38,6 +38,11 @@ function employeeEligibleForWtoLeave(employee) {
 }
 function candidateKind(row) {
     const type = String(row.kathgoria_adeias_apologistika ?? '');
+    if (type === 'POSSIBLE_LEAVE' && row.ektakth_oroadeia_apologistika === true) {
+        return Object.freeze({ kind: 'blocked',
+            code: 'WTOLEAVE_EMERGENCY_POSSIBLE_LEAVE_INVALID',
+            message: 'Η ΠΙΘΑΝΗ ΑΔΕΙΑ δεν είναι επιβεβαιωμένη κατηγορία HR για έκτακτη ωροάδεια.' });
+    }
     if (type === 'POSSIBLE_LEAVE') return Object.freeze({ kind: 'excluded' });
     const fullDay = row.adeia_apologistika === true || row.astheneia_apologistika === true;
     const hourly = row.egkekrimenh_oroadeia_apologistika === true;

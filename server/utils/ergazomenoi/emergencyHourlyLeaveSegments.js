@@ -13,7 +13,7 @@ function validEmergencyHourlyLeaveSegments(value) {
         const start = source.apo_lepto;
         const end = source.eos_lepto;
         const valid = Number.isSafeInteger(start) && Number.isSafeInteger(end) &&
-            start >= 0 && start < end && end <= 1440 && start >= previousEnd;
+            start >= 0 && start < end && end <= 1439 && start >= previousEnd;
         if (valid) previousEnd = end;
         return valid;
     });

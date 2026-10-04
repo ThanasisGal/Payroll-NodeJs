@@ -2,8 +2,17 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { resolveHrDailyActualWorkResolution, isApprovedHrDailyActualWorkResolution,
+    previewHrDailyActualWorkResolution, assertHrDailyActualWorkPreviewFingerprint,
     persistHrDailyActualWorkResolutionWrite } =
     require('./apasxoliseisHrDailyActualWorkResolutionService');
+const { detectSuspiciousShortCardInterval } = require(
+    './apasxoliseisSuspiciousShortCardIntervalService');
+const { buildCanonicalApologistikosRows } = require(
+    './apologistikosPinakasControlReportService');
+const { buildWtoDailySubmissionProjection, buildWTODayilyAPayload } = require(
+    './wtoDailySubmissionProjectionService');
+const { buildWtoLeaveCanonicalDataset, buildWtoLeavePayload } = require(
+    './wtoLeaveSubmissionService');
 
 function base() { return { _id: 'row', apo_ora_01: '10:00', eos_ora_01: '14:00',
     ores_ergasias: 4, cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30', is_locked: false }; }
@@ -110,6 +119,52 @@ test('work followed by emergency hourly leave fully covers the declared schedule
     assert.equal(result.approvedUpdates.ores_adeias_pistomenes_apologistika, 3.5);
 });
 
+test('non-suspicious manual mixed day persists physical work and emergency leave separately', () => {
+    const row = { ...base(), _id: 'manual-row', team: 'T', company_kod: 'C',
+        ypokatasthma: '0001', kodikos: '0001', hmeromhnia: '2026-08-12',
+        kathgoria_ergasias: 'ΕΡΓ', cards_apo_ora_01: '10:00',
+        cards_eos_ora_01: '12:00' };
+    const policy = { elegxos_ypopta_mikron_diastimaton_kartas: true,
+        poly_mikro_diastima_kartas_eos_lepta: 5,
+        mikro_diastima_kartas_eos_lepta: 60,
+        mikro_diastima_kartas_max_pososto_programmatos: 25,
+        mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta: 60 };
+    assert.equal(detectSuspiciousShortCardInterval(row, policy).suspicious, false);
+    const resolved = resolveHrDailyActualWorkResolution({ row, effectiveEmployee: noBreak,
+        reason: 'Μικτή πραγματική ημέρα', actor: 'HR', command: {
+            ...command([{ pairNumber: 1, start: '10:00', end: '12:00' }],
+                [{ apo_lepto: 720, eos_lepto: 840 }], 'ΑΔΑΛΛΗ'),
+            source_case: 'HR_CORRECTED_ACTUAL_DAY'
+        } });
+    assert.equal(resolved.metadata.source_case, 'HR_CORRECTED_ACTUAL_DAY');
+    assert.equal(resolved.absenceMinutes, 0);
+    const persisted = { ...row, ...resolved.approvedUpdates,
+        hr_daily_actual_work_resolution: resolved.metadata };
+    const employee = { kodikos: '0001', afm: '123456789', eponymo: 'ΔΟΚΙΜΗ',
+        onoma: 'ΜΑΡΙΑ', karta_ergasias: true, afora_daneismo_ergazomenoy: false,
+        typos_ergodoth_daneismoy: false };
+    const canonicalDaily = buildCanonicalApologistikosRows({ rows: [persisted],
+        employees: [employee] });
+    const dailyPayload = buildWTODayilyAPayload(buildWtoDailySubmissionProjection({
+        canonicalRows: canonicalDaily, branch: '0001',
+        periodStart: '2026-08-01', periodEnd: '2026-08-31'
+    }));
+    assert.deepEqual(dailyPayload.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0]
+        .ErgazomenosAnalytics.ErgazomenosWTOAnalytics, [
+        { f_type: 'ΕΡΓ', f_from: '10:00', f_to: '12:00' }
+    ]);
+    const leaveRows = buildWtoLeaveCanonicalDataset({ sourceRows: [persisted],
+        employees: [employee] });
+    assert.equal(leaveRows.blockers.length, 0);
+    const leavePayload = buildWtoLeavePayload({ canonicalRows: leaveRows.rows,
+        branch: '0001' });
+    assert.deepEqual(leavePayload.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0]
+        .ErgazomenosAnalytics.ErgazomenosWTOAnalytics, [
+        { f_type: 'ΑΔΑΛΛΗ', f_from: '12:00', f_to: '14:00',
+            f_year: '', f_req_days: '' }
+    ]);
+});
+
 test('work outside the declared schedule does not conceal an internal contractual gap', () => {
     const result = resolveHrDailyActualWorkResolution({ row: base(), effectiveEmployee: noBreak,
         reason: 'Μερική κάλυψη', actor: 'HR', command: command([
@@ -123,16 +178,15 @@ test('work outside the declared schedule does not conceal an internal contractua
     assert.equal(result.absenceMinutes, 30);
 });
 
-test('same-day emergency leave may reach midnight inside an overnight schedule', () => {
+test('emergency leave ending at 24:00 fails before approval because WTOLeave cannot represent it', () => {
     const row = { ...base(), apo_ora_01: '22:00', eos_ora_01: '06:00',
         ores_ergasias: 8, cards_apo_ora_01: '22:00', cards_eos_ora_01: '22:30' };
-    const result = resolveHrDailyActualWorkResolution({ row, effectiveEmployee: noBreak,
+    assert.throws(() => resolveHrDailyActualWorkResolution({ row, effectiveEmployee: noBreak,
         reason: 'Έκτακτη αποχώρηση πριν τα μεσάνυχτα', actor: 'HR',
         command: command([{ pairNumber: 1, start: '22:00', end: '22:30' }],
-            [{ apo_lepto: 1350, eos_lepto: 1440 }], 'ΑΔΑΣ') });
-    assert.equal(result.emergencyLeaveMinutes, 90);
-    assert.deepEqual(result.approvedUpdates.ektakta_diastimata_oroadeias_apologistika,
-        [{ apo_lepto: 1350, eos_lepto: 1440 }]);
+            [{ apo_lepto: 1350, eos_lepto: 1440 }], 'ΑΔΑΣ') }),
+    (error) => error.code === 'HR_DAILY_EMERGENCY_LEAVE_WTO_CLOCK_INVALID' &&
+        /24:00 δεν υποστηρίζεται από το WTOLeave/.test(error.message));
 });
 
 test('interval, schedule, reason, actor and command boundaries fail closed', () => {
@@ -171,6 +225,36 @@ test('shared break policy applies fallback once and skips breaks for split sched
             { pairNumber: 2, start: '16:00', end: '20:00' }
         ]) });
     assert.equal(split.netWorkMinutes, 480);
+});
+
+test('server preview and final resolver use identical canonical break numbers and fingerprint', () => {
+    const row = { ...base(), apo_ora_01: '10:00', eos_ora_01: '14:04',
+        cards_apo_ora_01: '10:00', cards_eos_ora_01: '14:04', updatedAt: new Date(0) };
+    const effectiveEmployee = { dialleima_se_lepta: 4,
+        dialleima_entos_ektos_orarioy: false };
+    const frozen = { ...command([{ pairNumber: 1, start: '10:00', end: '14:04' }]),
+        source_case: 'HR_CORRECTED_ACTUAL_DAY' };
+    const preview = previewHrDailyActualWorkResolution({ row, command: frozen,
+        effectiveEmployee, reason: 'Έλεγχος canonical διαλείμματος' });
+    assert.equal(preview.breakResolution.grossMinutes, 244);
+    assert.equal(preview.netWorkMinutes, 240);
+    assert.equal(preview.breakResolution.removedMinutes, 4);
+    const finalCommand = { ...frozen, preview_fingerprint: preview.previewFingerprint };
+    assert.equal(assertHrDailyActualWorkPreviewFingerprint({ row, command: finalCommand,
+        effectiveEmployee, reason: 'Έλεγχος canonical διαλείμματος' }),
+    preview.previewFingerprint);
+    const persisted = resolveHrDailyActualWorkResolution({ row, command: finalCommand,
+        effectiveEmployee, reason: 'Έλεγχος canonical διαλείμματος', actor: 'HR' });
+    assert.equal(persisted.netWorkMinutes, preview.netWorkMinutes);
+    assert.equal(persisted.emergencyLeaveMinutes, preview.emergencyLeaveMinutes);
+    assert.equal(persisted.contractualCoveredMinutes, preview.contractualCoveredMinutes);
+    assert.equal(persisted.absenceMinutes, preview.absenceMinutes);
+    assert.equal(persisted.approvedUpdates.ores_pragmatikhs_ergasias_apologistika,
+        preview.netWorkMinutes / 60);
+    assert.throws(() => assertHrDailyActualWorkPreviewFingerprint({
+        row: { ...row, updatedAt: new Date(1) }, command: finalCommand,
+        effectiveEmployee, reason: 'Έλεγχος canonical διαλείμματος'
+    }), { code: 'HR_DAILY_PREVIEW_STALE' });
 });
 
 test('locked approval allows exact replay but requires revision for changed values', () => {

@@ -52,6 +52,7 @@ const sandbox = {
     renderOrphanCardResolutionSection: () => '',
     renderZeroLengthCardResolutionSection: () => '',
     renderDailyActualWorkResolutionSection: () => '',
+    renderManualDailyActualWorkResolutionAction: () => '',
     renderScenarioDetailsSection: () => '',
     renderApologistikaFields: () => '', userCanReviewEdit: () => true,
     escapeHtml: (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;'),
