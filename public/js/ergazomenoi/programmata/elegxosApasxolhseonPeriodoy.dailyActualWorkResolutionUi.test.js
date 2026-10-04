@@ -28,11 +28,42 @@ reviewTimeToMinute,minuteToReviewTime};`, sandbox);
 const row = { ores_ergasias: 4, cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30',
     suspicious_short_card_interval: { suspicious: true } };
 const html = sandbox.api.renderDailyActualWorkResolutionSection(row, true);
+const validActionVariants = [
+    'employment-review-action-primary', 'employment-review-action-secondary',
+    'employment-review-action-success', 'employment-review-action-warning',
+    'employment-review-action-danger'
+];
+function assertActionButton(renderedHtml, id, variant) {
+    const tag = renderedHtml.match(new RegExp(`<button\\b[^>]*\\bid="${id}"[^>]*>`))?.[0];
+    assert.ok(tag, `missing action button ${id}`);
+    const classes = tag.match(/\bclass="([^"]*)"/)?.[1]?.split(/\s+/) || [];
+    assert.ok(classes.includes('employment-review-action-btn'), `${id} is not namespaced`);
+    assert.ok(classes.includes(variant), `${id} is missing ${variant}`);
+    assert.equal(classes.some((className) => className.startsWith('btn-outline-')), false,
+        `${id} must not use an outline button`);
+}
+function assertNoPlainDailyResolutionButtons(renderedHtml) {
+    const buttonTags = renderedHtml.match(/<button\b[^>]*>/g) || [];
+    assert.ok(buttonTags.length > 0);
+    buttonTags.forEach((tag) => {
+        const classes = tag.match(/\bclass="([^"]*)"/)?.[1]?.split(/\s+/) || [];
+        assert.ok(classes.includes('employment-review-action-btn'), tag);
+        assert.ok(validActionVariants.some((variant) => classes.includes(variant)), tag);
+        assert.equal(classes.some((className) => className.startsWith('btn-outline-')), false, tag);
+        assert.notDeepEqual(classes, ['btn', 'btn-sm']);
+    });
+}
 assert.match(html, /ΥΠΟΠΤΑ ΜΙΚΡΟ ΔΙΑΣΤΗΜΑ ΚΑΡΤΑΣ/);
 assert.match(html, /Η κάρτα είναι σωστή/);
 assert.match(html, /Έκτακτη ωροάδεια/);
 assert.match(html, /Προσθήκη διαστήματος εργασίας/);
 assert.match(html, /Αφαίρεση τελευταίου διαστήματος ωροάδειας/);
+assertActionButton(html, 'dailyAddWorkInterval', 'employment-review-action-primary');
+assertActionButton(html, 'dailyRemoveWorkInterval', 'employment-review-action-secondary');
+assertActionButton(html, 'dailyAddLeaveInterval', 'employment-review-action-primary');
+assertActionButton(html, 'dailyRemoveLeaveInterval', 'employment-review-action-secondary');
+assertActionButton(html, 'dailyUseRawCards', 'employment-review-action-success');
+assertNoPlainDailyResolutionButtons(html);
 assert.doesNotMatch(html, /24:00/);
 assert.equal(sandbox.api.reviewTimeToMinute('24:00'), null);
 assert.equal(sandbox.api.minuteToReviewTime(1440), '');
@@ -66,8 +97,10 @@ const manualRow = { apo_ora_01: '10:00', eos_ora_01: '14:00',
 assert.equal(sandbox.api.buildFrozenDailyActualWorkCommand(manualRow, false).source_case,
     'HR_CORRECTED_ACTUAL_DAY');
 assert.equal(sandbox.api.canStartManualDailyActualWorkResolution(manualRow), true);
-assert.match(sandbox.api.renderManualDailyActualWorkResolutionAction(manualRow),
-    /Εργασία \/ έκτακτη ωροάδεια/);
+const manualAction = sandbox.api.renderManualDailyActualWorkResolutionAction(manualRow);
+assert.match(manualAction, /Εργασία \/ έκτακτη ωροάδεια/);
+assertActionButton(manualAction, 'startManualDailyResolutionBtn',
+    'employment-review-action-primary');
 for (const incompatible of [
     { is_locked: true }, { adeia_apologistika: true }, { astheneia_apologistika: true },
     { egkekrimenh_oroadeia_apologistika: true },
@@ -83,9 +116,14 @@ const generic = sandbox.api.renderDailyActualWorkResolutionSection(manualRow, tr
 assert.match(generic, /Επίλυση πραγματικής ημέρας/);
 assert.doesNotMatch(generic, /ΥΠΟΠΤΑ ΜΙΚΡΟ ΔΙΑΣΤΗΜΑ ΚΑΡΤΑΣ/);
 assert.doesNotMatch(generic, /Η κάρτα είναι σωστή/);
+assert.match(generic, /Χρήση αρχικών χτυπημάτων κάρτας/);
+assertActionButton(generic, 'dailyUseRawCards', 'employment-review-action-secondary');
+assertNoPlainDailyResolutionButtons(generic);
 assert.match(source, /Επίλυση πραγματικής ημέρας με εργασία και έκτακτη ωροάδεια/);
 const approved = sandbox.api.renderDailyActualWorkResolutionSection({ ...row,
     hr_daily_actual_work_resolution: { status: 'HR_APPROVED' } }, false);
 assert.match(approved, /Διόρθωση εγκεκριμένης ημερήσιας επίλυσης/);
+assertActionButton(approved, 'dailyResolutionRevisionBtn', 'employment-review-action-warning');
+assertNoPlainDailyResolutionButtons(approved);
 assert.match(source, /requestFrozenDailyResolutionPreview\([\s\S]*confirmFrozenDailyResolution\(dailyActualWorkCommand, serverPreview\)[\s\S]*preview_fingerprint: serverPreview\.previewFingerprint[\s\S]*daily_actual_work_resolution: dailyActualWorkCommand/);
 console.log('employment review daily actual-work resolution UI tests passed');
