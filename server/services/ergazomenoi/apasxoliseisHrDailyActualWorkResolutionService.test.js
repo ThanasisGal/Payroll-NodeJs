@@ -3,7 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { resolveHrDailyActualWorkResolution, isApprovedHrDailyActualWorkResolution,
     previewHrDailyActualWorkResolution, assertHrDailyActualWorkPreviewFingerprint,
-    persistHrDailyActualWorkResolutionWrite } =
+    buildHrDailyActualWorkPreviewFingerprint, PREVIEW_ROW_FIELDS,
+    withHrDailyPreviewRowFields, persistHrDailyActualWorkResolutionWrite } =
     require('./apasxoliseisHrDailyActualWorkResolutionService');
 const { detectSuspiciousShortCardInterval } = require(
     './apasxoliseisSuspiciousShortCardIntervalService');
@@ -178,7 +179,7 @@ test('work outside the declared schedule does not conceal an internal contractua
     assert.equal(result.absenceMinutes, 30);
 });
 
-test('emergency leave ending at 24:00 fails before approval because WTOLeave cannot represent it', () => {
+test('emergency leave ending at 24:00 fails before approval with a user-friendly message', () => {
     const row = { ...base(), apo_ora_01: '22:00', eos_ora_01: '06:00',
         ores_ergasias: 8, cards_apo_ora_01: '22:00', cards_eos_ora_01: '22:30' };
     assert.throws(() => resolveHrDailyActualWorkResolution({ row, effectiveEmployee: noBreak,
@@ -186,7 +187,8 @@ test('emergency leave ending at 24:00 fails before approval because WTOLeave can
         command: command([{ pairNumber: 1, start: '22:00', end: '22:30' }],
             [{ apo_lepto: 1350, eos_lepto: 1440 }], 'ΑΔΑΣ') }),
     (error) => error.code === 'HR_DAILY_EMERGENCY_LEAVE_WTO_CLOCK_INVALID' &&
-        /24:00 δεν υποστηρίζεται από το WTOLeave/.test(error.message));
+        /24:00 δεν επιτρέπεται/.test(error.message) &&
+        /00:00 έως 23:59/.test(error.message) && !/WTOLeave/.test(error.message));
 });
 
 test('interval, schedule, reason, actor and command boundaries fail closed', () => {
@@ -254,6 +256,66 @@ test('server preview and final resolver use identical canonical break numbers an
     assert.throws(() => assertHrDailyActualWorkPreviewFingerprint({
         row: { ...row, updatedAt: new Date(1) }, command: finalCommand,
         effectiveEmployee, reason: 'Έλεγχος canonical διαλείμματος'
+    }), { code: 'HR_DAILY_PREVIEW_STALE' });
+});
+
+test('preview projection and full final row keep false/true agreement-hourly-leave semantics', () => {
+    const projectForPreview = (row) => Object.fromEntries(
+        withHrDailyPreviewRowFields('').split(/\s+/)
+            .filter((field) => row[field] !== undefined)
+            .map((field) => [field, row[field]])
+    );
+    const fullRow = { ...base(), _id: 'real-dev-row', updatedAt: new Date(0),
+        apo_ora_01: '10:00', eos_ora_01: '15:00', ores_ergasias: 5,
+        cards_apo_ora_01: '14:04', cards_eos_ora_01: '14:53',
+        egkekrimenh_oroadeia_apologistika: false };
+    const effectiveEmployee = { dialleima_se_lepta: 0 };
+    const frozen = { ...command([{ pairNumber: 1, start: '10:00', end: '14:53' }]),
+        source_case: 'SUSPICIOUS_SHORT_CARD_INTERVAL' };
+    const reason = 'Διόρθωση πραγματικής ημέρας';
+    const previewRow = projectForPreview(fullRow);
+    assert.equal(previewRow.egkekrimenh_oroadeia_apologistika, false);
+    const projectedFingerprint = buildHrDailyActualWorkPreviewFingerprint({ row: previewRow,
+        command: frozen, effectiveEmployee, reason });
+    const fullFingerprint = buildHrDailyActualWorkPreviewFingerprint({ row: fullRow,
+        command: frozen, effectiveEmployee, reason });
+    assert.equal(projectedFingerprint, fullFingerprint);
+    const preview = previewHrDailyActualWorkResolution({ row: previewRow, command: frozen,
+        effectiveEmployee, reason });
+    const finalCommand = { ...frozen, preview_fingerprint: preview.previewFingerprint };
+    assert.equal(assertHrDailyActualWorkPreviewFingerprint({ row: fullRow,
+        command: finalCommand, effectiveEmployee, reason }), preview.previewFingerprint);
+    const resolved = resolveHrDailyActualWorkResolution({ row: fullRow, command: finalCommand,
+        effectiveEmployee, reason, actor: 'HR' });
+    assert.equal(resolved.approvedUpdates.apo_ora_01_apologistika, '10:00');
+    assert.equal(resolved.approvedUpdates.eos_ora_01_apologistika, '14:53');
+    assert.equal(resolved.metadata.raw_card_snapshot.cards_apo_ora_01, '14:04');
+    assert.equal(resolved.metadata.raw_card_snapshot.cards_eos_ora_01, '14:53');
+
+    const agreementRow = { ...fullRow, egkekrimenh_oroadeia_apologistika: true };
+    assert.notEqual(buildHrDailyActualWorkPreviewFingerprint({ row: agreementRow,
+        command: frozen, effectiveEmployee, reason }), fullFingerprint);
+    assert.throws(() => resolveHrDailyActualWorkResolution({ row: agreementRow,
+        command: frozen, effectiveEmployee, reason, actor: 'HR' }),
+    { code: 'HR_DAILY_AGREEMENT_HOURLY_LEAVE_CONFLICT' });
+    assert.ok(PREVIEW_ROW_FIELDS.includes('egkekrimenh_oroadeia_apologistika'));
+});
+
+test('a genuine semantic row or break change still invalidates the preview fingerprint', () => {
+    const row = { ...base(), updatedAt: new Date(0),
+        egkekrimenh_oroadeia_apologistika: false };
+    const effectiveEmployee = { dialleima_se_lepta: 0 };
+    const frozen = command([{ pairNumber: 1, start: '10:00', end: '10:30' }]);
+    const reason = 'Έλεγχος πραγματικής αλλαγής';
+    const preview = previewHrDailyActualWorkResolution({ row, command: frozen,
+        effectiveEmployee, reason });
+    const finalCommand = { ...frozen, preview_fingerprint: preview.previewFingerprint };
+    assert.throws(() => assertHrDailyActualWorkPreviewFingerprint({
+        row: { ...row, cards_eos_ora_01: '10:31' }, command: finalCommand,
+        effectiveEmployee, reason
+    }), { code: 'HR_DAILY_PREVIEW_STALE' });
+    assert.throws(() => assertHrDailyActualWorkPreviewFingerprint({ row,
+        command: finalCommand, effectiveEmployee: { dialleima_se_lepta: 1 }, reason
     }), { code: 'HR_DAILY_PREVIEW_STALE' });
 });
 

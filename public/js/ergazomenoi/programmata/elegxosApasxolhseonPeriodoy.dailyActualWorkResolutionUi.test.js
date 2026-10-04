@@ -20,11 +20,14 @@ const sandbox = { escapeHtml: String, document: {
     querySelectorAll: (selector) => selector === '.daily-leave-start' ? leaveStarts : leaveEnds
 } };
 vm.createContext(sandbox);
+const errorHelpersStart = source.indexOf('function employmentReviewErrorEscapeHtml');
+const errorHelpersEnd = source.indexOf('const employmentReviewSwalCommonClasses');
+vm.runInContext(source.slice(errorHelpersStart, errorHelpersEnd), sandbox);
 vm.runInContext(`${source.slice(start, end)};this.api={renderDailyActualWorkResolutionSection,
 buildFrozenDailyActualWorkCommand,dailyResolutionSummary,renderDailyResolutionSummary,
 buildDailyResolutionConfirmationHtml,confirmFrozenDailyResolution,
 canStartManualDailyActualWorkResolution,renderManualDailyActualWorkResolutionAction,
-reviewTimeToMinute,minuteToReviewTime};`, sandbox);
+reviewTimeToMinute,minuteToReviewTime,validateDailyEmergencyLeaveInputs};`, sandbox);
 const row = { ores_ergasias: 4, cards_apo_ora_01: '10:00', cards_eos_ora_01: '10:30',
     suspicious_short_card_interval: { suspicious: true } };
 const html = sandbox.api.renderDailyActualWorkResolutionSection(row, true);
@@ -65,6 +68,9 @@ assertActionButton(html, 'dailyRemoveLeaveInterval', 'employment-review-action-s
 assertActionButton(html, 'dailyUseRawCards', 'employment-review-action-success');
 assertNoPlainDailyResolutionButtons(html);
 assert.doesNotMatch(html, /24:00/);
+assert.equal((html.match(/type="time"/g) || []).length, 6);
+assert.equal((html.match(/step="60"/g) || []).length, 6);
+assert.doesNotMatch(html, /inputmode="numeric"|pattern="/);
 assert.equal(sandbox.api.reviewTimeToMinute('24:00'), null);
 assert.equal(sandbox.api.minuteToReviewTime(1440), '');
 const command = sandbox.api.buildFrozenDailyActualWorkCommand(row, false);
@@ -78,6 +84,47 @@ assert.deepEqual(JSON.parse(JSON.stringify(command.emergency_hourly_leave_interv
 assert.equal(Object.isFrozen(command), true);
 assert.equal(Object.isFrozen(command.work_intervals), true);
 assert.equal(Object.isFrozen(command.work_intervals[0]), true);
+
+function assertLeaveValidation({ start = '', end = '', category = 'ΑΔΑΣ', index = 0, code,
+    title, message }) {
+    leaveStarts.forEach((input) => { input.value = ''; });
+    leaveEnds.forEach((input) => { input.value = ''; });
+    leaveStarts[index].value = start;
+    leaveEnds[index].value = end;
+    values.edit_kathgoria_adeias_apologistika_hidden = category;
+    assert.throws(() => sandbox.api.validateDailyEmergencyLeaveInputs(), (error) => {
+        assert.equal(error.code, code);
+        assert.equal(error.userPresentation.title, title);
+        assert.match(error.userPresentation.html, message);
+        assert.match(error.userPresentation.html, /Καμία αλλαγή δεν αποθηκεύτηκε/);
+        assert.match(error.userPresentation.html,
+            new RegExp(`Κωδικός αναφοράς: ${code}`));
+        return true;
+    });
+}
+assertLeaveValidation({ start: '13:51', code: 'HR_DAILY_LEAVE_END_REQUIRED',
+    title: 'Η ωροάδεια δεν είναι πλήρης', message: /Ωροάδεια 1[\s\S]*13:51/ });
+assertLeaveValidation({ start: '15:10', index: 1, code: 'HR_DAILY_LEAVE_END_REQUIRED',
+    title: 'Η ωροάδεια δεν είναι πλήρης', message: /Ωροάδεια 2[\s\S]*15:10/ });
+assertLeaveValidation({ end: '14:00', code: 'HR_DAILY_LEAVE_START_REQUIRED',
+    title: 'Η ωροάδεια δεν είναι πλήρης', message: /Ωροάδεια 1[\s\S]*14:00/ });
+assertLeaveValidation({ start: '13:51', end: '13:30',
+    code: 'HR_DAILY_LEAVE_ORDER_INVALID',
+    title: 'Η ώρα Έως πρέπει να είναι μετά από την ώρα Από',
+    message: /Ωροάδεια 1:[\s\S]*13:51[\s\S]*13:30/ });
+assertLeaveValidation({ start: '13:51', end: '24:00',
+    code: 'HR_DAILY_LEAVE_TIME_INVALID',
+    title: 'Η ώρα της ωροάδειας δεν είναι έγκυρη', message: /24:00 δεν επιτρέπεται/ });
+assertLeaveValidation({ code: 'HR_DAILY_LEAVE_INTERVAL_REQUIRED',
+    title: 'Δεν έχει συμπληρωθεί διάστημα ωροάδειας',
+    message: /δεν έχετε συμπληρώσει πλήρες διάστημα/ });
+assertLeaveValidation({ start: '13:51', end: '14:00', category: '',
+    code: 'HR_DAILY_LEAVE_CATEGORY_REQUIRED',
+    title: 'Δεν έχει επιλεγεί κατηγορία άδειας',
+    message: /13:51–14:00[\s\S]*Κατηγορία άδειας απολογιστικά/ });
+leaveStarts[0].value = '10:30';
+leaveEnds[0].value = '13:00';
+values.edit_kathgoria_adeias_apologistika_hidden = 'ΑΔΑΣ';
 assert.deepEqual(JSON.parse(JSON.stringify(sandbox.api.dailyResolutionSummary(command, row))),
     { work: 94, leave: 150, covered: 244, absence: 0, declared: 240 });
 const serverPreview = { normalizedWorkIntervals: command.work_intervals,
