@@ -61,10 +61,14 @@ test('0069 deterministic polluted group always corrects authoritative 0005', () 
             effectiveFrom: '2026-05-02', employeePatch: {},
             historyPatch: { hmeromhnia_lhxhs_symbashs: '2026-10-31' }
         }, currentEmployee, intentHint: INTENTS.MAINTENANCE });
-        assert.equal(plan.state, STATES.CORRECT_EXISTING, historyId);
+        assert.equal(plan.state, historyId === null
+            ? STATES.NO_HISTORY_CHANGE
+            : STATES.CORRECT_EXISTING, historyId);
         assert.equal(plan.targetHistoryId, REAL_0069_IDS['0005'], historyId);
         assert.deepEqual(plan.employeePatch, {}, historyId);
-        assert.deepEqual(plan.historyPatch, { hmeromhnia_lhxhs_symbashs: '2026-10-31' }, historyId);
+        assert.deepEqual(plan.historyPatch, historyId === null
+            ? {}
+            : { hmeromhnia_lhxhs_symbashs: '2026-10-31' }, historyId);
         assert.deepEqual(plan.rowsToDelete.map(item => item.historyId),
             [REAL_0069_IDS['0002'], REAL_0069_IDS['0003'], REAL_0069_IDS['0004']], historyId);
     }
@@ -108,6 +112,124 @@ test('schedule-from change is a same-id boundary move', () => {
             hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-02' } } });
     assert.equal(plan.state, STATES.MOVE_EXISTING_BOUNDARY);
     assert.equal(plan.targetHistoryId, 'history-1');
+});
+
+function fullProfileVersion(id, from, type = '0', extra = {}) {
+    const input = { kathestos_apasxolhshs: type, typos_apasxolhshs: type,
+        typos_ebdomadas: '5HMERH', hmeres_ergasias_ebdomadas: 5,
+        ores_ergasias_ebdomadas: type === '0' ? 40 : 20,
+        mo_oron_hmerhsias_ergasias: type === '0' ? 8 : 4 };
+    return { _id: id, ...scope,
+        ...buildCompleteProfileSnapshot({ input, current: input, effectiveFrom: from }),
+        aa_eggrafhs: '0001', hmeromhnia_proslhpshs: '2026-02-02',
+        hmeromhnia_allaghs_symbashs: from,
+        hmeromhnia_allaghs_orarioy_apo: from,
+        hmeromhnia_allaghs_orarioy_eos: '2026-04-07',
+        hmeromhnia_isxyos_oron_ergasias_apo: from,
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_lhxhs_symbashs: '2027-01-31',
+        hmeromhnia_apoxorhshs: null, ...extra };
+}
+
+function maintenanceTransition({ existing, employee = null, effectiveFrom,
+    employeePatch = {}, historyPatch = {}, historyId = existing._id }) {
+    return resolveEmployeeHistoryMutation({ scope,
+        currentEmployee: employee || { ...existing, _id: 'employee', energos: true, archived: false },
+        historyRows: [existing], historyId, intentHint: INTENTS.MAINTENANCE,
+        submittedState: { effectiveFrom, employeePatch, historyPatch } });
+}
+
+test('current-form transition echoes collapse to NO_HISTORY_CHANGE without a selected history id', () => {
+    const existing = fullProfileVersion('existing', '2026-04-01');
+    const employee = { ...existing, _id: 'employee', energos: true, archived: false,
+        hmeromhnia_allaghs_orarioy_eos: '2026-04-14' };
+    const plan = maintenanceTransition({ existing, employee, effectiveFrom: '2026-04-01',
+        historyId: null,
+        historyPatch: { hmeromhnia_allaghs_orarioy_eos: '2026-04-14' } });
+    assert.equal(plan.state, STATES.NO_HISTORY_CHANGE);
+    assert.deepEqual(plan.historyPatch, {});
+    assert.equal(plan.targetHistoryId, existing._id);
+});
+
+test('same-date semantic correction preserves the stable target and never appends', () => {
+    const existing = fullProfileVersion('existing-partial', '2026-09-29', '1');
+    const plan = maintenanceTransition({ existing, effectiveFrom: '2026-09-29',
+        employeePatch: { ores_ergasias_ebdomadas: 24, mo_oron_hmerhsias_ergasias: 4.8 },
+        historyPatch: { ores_ergasias_ebdomadas: 24, mo_oron_hmerhsias_ergasias: 4.8 } });
+    assert.equal(plan.state, STATES.CORRECT_EXISTING);
+    assert.equal(plan.targetHistoryId, existing._id);
+});
+
+test('later boundary-only Maintenance remains a stable-id boundary move', () => {
+    const existing = fullProfileVersion('existing-full', '2026-04-01');
+    const plan = maintenanceTransition({ existing, effectiveFrom: '2026-09-29',
+        historyPatch: { hmeromhnia_allaghs_symbashs: '2026-09-29',
+            hmeromhnia_allaghs_orarioy_apo: '2026-09-29',
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-29' } });
+    assert.equal(plan.state, STATES.MOVE_EXISTING_BOUNDARY);
+    assert.equal(plan.targetHistoryId, existing._id);
+});
+
+test('later semantic Maintenance change is ambiguous and never inferred as append', () => {
+    const existing = fullProfileVersion('existing-full', '2026-04-01');
+    const plan = maintenanceTransition({ existing, effectiveFrom: '2026-09-29',
+        historyId: null,
+        employeePatch: { kathestos_apasxolhshs: '1', typos_apasxolhshs: '1' },
+        historyPatch: { hmeromhnia_allaghs_symbashs: '2026-09-29',
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-29',
+            kathestos_apasxolhshs: '1', typos_apasxolhshs: '1' } });
+    assert.equal(plan.state, STATES.CONFLICT);
+    assert.equal(plan.responseCode, 'CONFLICT_PROFILE_CHANGE_INTENT_REQUIRED');
+});
+
+test('retrospective semantic Maintenance change fails closed', () => {
+    const existing = fullProfileVersion('latest', '2026-09-29');
+    const plan = maintenanceTransition({ existing, effectiveFrom: '2026-09-28',
+        historyId: null,
+        employeePatch: { kathestos_apasxolhshs: '1', typos_apasxolhshs: '1' },
+        historyPatch: { hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-28',
+            kathestos_apasxolhshs: '1', typos_apasxolhshs: '1' } });
+    assert.equal(plan.state, STATES.CONFLICT);
+    assert.equal(plan.responseCode, 'NEW_VERSION_NOT_FUTURE');
+});
+
+test('closed relationship semantic Maintenance change fails closed', () => {
+    const existing = fullProfileVersion('closed', '2026-04-01', '0', {
+        hmeromhnia_apoxorhshs: '2026-09-01' });
+    const employee = { ...existing, _id: 'employee', energos: false, archived: false };
+    const plan = maintenanceTransition({ existing, employee, effectiveFrom: '2026-09-29',
+        historyId: null,
+        employeePatch: { kathestos_apasxolhshs: '1', typos_apasxolhshs: '1' },
+        historyPatch: { hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-29',
+            kathestos_apasxolhshs: '1', typos_apasxolhshs: '1' } });
+    assert.equal(plan.state, STATES.CONFLICT);
+    assert.equal(plan.responseCode,
+        'EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP');
+});
+
+test('an older explicitly selected stable id is never promoted to append', () => {
+    const older = { ...fullProfileVersion('older', '2026-04-01'),
+        hmeromhnia_isxyos_oron_ergasias_eos: '2026-08-31' };
+    const latest = { ...fullProfileVersion('latest', '2026-09-01'), aa_eggrafhs: '0002' };
+    const employee = { ...latest, _id: 'employee', energos: true, archived: false };
+    const plan = resolveEmployeeHistoryMutation({ scope, currentEmployee: employee,
+        historyRows: [older, latest], historyId: older._id, intentHint: INTENTS.MAINTENANCE,
+        submittedState: { effectiveFrom: '2026-04-01', employeePatch: {},
+            historyPatch: { ores_ergasias_ebdomadas: 39 } } });
+    assert.equal(plan.state, STATES.CORRECT_EXISTING);
+    assert.equal(plan.targetHistoryId, older._id);
+});
+
+test('an explicitly selected current row keeps future semantic edits on that stable id', () => {
+    const latest = fullProfileVersion('latest', '2026-04-01');
+    const employee = { ...latest, _id: 'employee', energos: true, archived: false };
+    const plan = resolveEmployeeHistoryMutation({ scope, currentEmployee: employee,
+        historyRows: [latest], historyId: latest._id, intentHint: INTENTS.MAINTENANCE,
+        submittedState: { effectiveFrom: '2026-09-01', employeePatch: {},
+            historyPatch: { ores_ergasias_ebdomadas: 39,
+                hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-01' } } });
+    assert.equal(plan.state, STATES.MOVE_EXISTING_BOUNDARY);
+    assert.equal(plan.targetHistoryId, latest._id);
 });
 
 test('schedule-to and work-terms-to corrections stay on the same row', () => {

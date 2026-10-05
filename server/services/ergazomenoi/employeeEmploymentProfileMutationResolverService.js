@@ -1,7 +1,8 @@
 'use strict';
 
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
-const { IDENTITY_FIELDS } = require('../../utils/ergazomenoi/employmentProfileTransition');
+const { IDENTITY_FIELDS, TRANSITION_FIELDS, semanticEmploymentProfileChanged } =
+    require('../../utils/ergazomenoi/employmentProfileTransition');
 const { effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { REBUILD_STATUSES, isSparseHireLifecycleEvidence,
     rebuildEmployeeHistory } = require('./employeeHistoryRebuilderService');
@@ -50,9 +51,14 @@ function changedPatch(stored = {}, submitted = {}) {
         .filter(([field, value]) => JSON.stringify(comparable(stored[field])) !== JSON.stringify(comparable(value))));
 }
 
-function semanticHistoryPatch(target = {}, currentEmployee = {}, submitted = {}) {
+function semanticHistoryPatch(target = {}, currentEmployee = {}, submitted = {},
+    { currentFormBaseline = false } = {}) {
+    const transitionFields = new Set(TRANSITION_FIELDS);
     const baseline = Object.fromEntries(Object.keys(submitted).map(field => [field,
-        Object.hasOwn(target, field) ? target[field] : currentEmployee[field]]));
+        currentFormBaseline && transitionFields.has(field) &&
+            Object.hasOwn(currentEmployee, field)
+            ? currentEmployee[field]
+            : Object.hasOwn(target, field) ? target[field] : currentEmployee[field]]));
     return changedPatch(baseline, submitted);
 }
 
@@ -124,6 +130,52 @@ function matchesCompleteIdentity(row, identity) {
             field === 'hmeromhnia_isxyos_oron_ergasias_eos' ? effectiveEnd(row) : row[field];
         return comparable(stored) === comparable(identity[field]);
     });
+}
+
+function withoutLifecycleIdentity(values = {}) {
+    return Object.fromEntries(Object.entries(values).filter(([field, value]) =>
+        value !== undefined && !IDENTITY_FIELDS.includes(field)));
+}
+
+function sameCalendarDate(left, right) {
+    return comparable(left) === comparable(right);
+}
+
+function ambiguousMaintenanceProfileChange({ currentEmployee, canonicalRows, target,
+    effectiveFrom, employeeSubmitted, historySubmitted }) {
+    const currentHire = currentEmployee?.hmeromhnia_proslhpshs;
+    const currentHireKey = comparable(currentHire);
+    if (!currentHireKey || !effectiveFrom || !target) return null;
+
+    const submittedHires = [employeeSubmitted.hmeromhnia_proslhpshs,
+        historySubmitted.hmeromhnia_proslhpshs].filter(value => value !== undefined);
+    if (submittedHires.some(value => !sameCalendarDate(value, currentHire))) return null;
+    const submittedDepartures = [employeeSubmitted.hmeromhnia_apoxorhshs,
+        historySubmitted.hmeromhnia_apoxorhshs]
+        .filter(value => value !== undefined && value !== null && value !== '');
+    if (submittedDepartures.length) return null;
+
+    const currentCycleProfiles = canonicalRows.filter(row =>
+        comparable(row.hmeromhnia_proslhpshs) === currentHireKey &&
+        !isSparseHireLifecycleEvidence(row) && effectiveStart(row));
+    const latestStart = Math.max(0, ...currentCycleProfiles.map(row => effectiveStart(row).getTime()));
+    const latestProfiles = currentCycleProfiles.filter(row =>
+        effectiveStart(row).getTime() === latestStart);
+    if (latestProfiles.length !== 1 || String(latestProfiles[0]._id) !== String(target._id) ||
+        !C.readEmploymentProfile(latestProfiles[0]).recorded ||
+        effectiveStart(currentEmployee)?.getTime() !== latestStart) return null;
+
+    const semanticChange = semanticEmploymentProfileChanged(latestProfiles[0], {
+        employeeChanges: withoutLifecycleIdentity(employeeSubmitted),
+        historyChanges: withoutLifecycleIdentity(historySubmitted)
+    });
+    if (!semanticChange || effectiveFrom.getTime() === latestStart) return null;
+    if (effectiveFrom.getTime() < latestStart) return 'NEW_VERSION_NOT_FUTURE';
+    if (C.calendarDate(currentEmployee?.hmeromhnia_apoxorhshs) ||
+        currentEmployee?.archived === true) {
+        return 'EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP';
+    }
+    return 'CONFLICT_PROFILE_CHANGE_INTENT_REQUIRED';
 }
 
 function plan(state, target, employeePatch, historyPatch, options = {}) {
@@ -267,7 +319,20 @@ function resolveEmployeeHistoryMutation({
     if (polluted.polluted && !polluted.target) return conflict('CONFLICT_INCONSISTENT_HISTORY');
     if (polluted.target) target = polluted.target;
     const persistedTarget = rows.find(row => String(row._id) === String(target._id)) || target;
-    const historyPatch = semanticHistoryPatch(persistedTarget, currentEmployee || {}, historySubmitted);
+    if (intentHint === INTENTS.MAINTENANCE && !requestedTarget) {
+        const ambiguousReason = ambiguousMaintenanceProfileChange({
+            currentEmployee, canonicalRows, target, effectiveFrom,
+            employeeSubmitted, historySubmitted
+        });
+        if (ambiguousReason) return conflict(ambiguousReason, 'effectiveFrom');
+    }
+    const historyPatch = semanticHistoryPatch(persistedTarget, currentEmployee || {},
+        historySubmitted, {
+            // The ordinary Edit form echoes the current employee snapshot. When
+            // no stable history id was explicitly selected, echoed transition
+            // fields are not requests to rewrite an older or sparse history row.
+            currentFormBaseline: intentHint === INTENTS.MAINTENANCE && !requestedTarget
+        });
     if (Object.hasOwn(historyPatch, 'hmeromhnia_proslhpshs')) {
         return conflict('HIRE_DATE_REQUIRES_CONTROLLED_LIFECYCLE', 'hmeromhnia_proslhpshs');
     }

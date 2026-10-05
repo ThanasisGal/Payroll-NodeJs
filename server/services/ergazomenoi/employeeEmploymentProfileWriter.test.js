@@ -20,6 +20,8 @@ const { REAL_0002_IDS, buildReal0002SanitizedHistoryFixture } =
     require('./fixtures/real0002SanitizedHistoryFixture');
 const { SUPPORTED_COLLECTIONS } =
     require('./employeeHistoryReferenceDefinitionsService');
+const { OPERATION: CONTRACT_END_SEGMENT_SYNC_OPERATION } =
+    require('./employeeContractEndCorrectionPlannerService');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
@@ -214,6 +216,21 @@ test('trusted full future-version double submit reuses the existing canonical ve
     assert.equal(second.idempotent, true);
     assert.equal(db.state().history.length, 2);
     assert.equal(db.writes(), writesAfterFirst);
+});
+
+test('ordinary future Maintenance profile difference is ambiguous and performs no write', async () => {
+    const initial = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' }),
+        hmeromhnia_proslhpshs: '2026-04-01' };
+    const state = { employee: { _id: 'employee', ...scope, ...initial },
+        history: [{ _id: 'old', ...scope, ...initial, aa_eggrafhs: '0001' }] };
+    const db = database(state);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', input: arrangement, effectiveFrom: '2026-09-15',
+        maintenance: { employeeChanges: {}, historyChanges: {},
+            submittedHistoryChanges: {}, submittedProfileFields: Object.keys(arrangement) }
+    }), error => error.code === 'CONFLICT_PROFILE_CHANGE_INTENT_REQUIRED');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), state);
 });
 
 const LEGACY_SHADOW_IDS = Object.freeze({
@@ -1020,7 +1037,9 @@ test('0068 sparse legacy contract-end correction keeps the same row and repeated
     assert.equal(db.state().history.length, 1);
     assert.equal(db.state().employee.hmeromhnia_lhxhs_symbashs, '2026-10-31');
     assert.equal(db.state().history[0].hmeromhnia_lhxhs_symbashs, '2026-10-31');
-    assert.equal(db.writes(), 2);
+    assert.equal(db.writes(), 3);
+    assert.equal(db.state().audits.length, 1);
+    assert.equal(db.state().audits[0].mutationSource, CONTRACT_END_SEGMENT_SYNC_OPERATION);
     const writesAfterFirst = db.writes();
     const second = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
         employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance });
@@ -1028,6 +1047,169 @@ test('0068 sparse legacy contract-end correction keeps the same row and repeated
     assert.equal(second.idempotent, true);
     assert.equal(db.writes(), writesAfterFirst);
     assert.equal(db.state().history.length, 1);
+});
+
+const CONTRACT_SEGMENT_IDS = Object.freeze({ first: 'contract-segment-first',
+    latest: 'contract-segment-latest' });
+const contractSegmentFacts = {
+    kathestos_apasxolhshs: '0', typos_apasxolhshs: '0', typos_ebdomadas: '5HMERH',
+    hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
+    mo_oron_hmerhsias_ergasias: 8
+};
+function contractSegmentWriterRow(id, sequence, from, until, hireEvent) {
+    return { ...buildCompleteProfileSnapshot({ input: contractSegmentFacts,
+        current: contractSegmentFacts, effectiveFrom: from }), _id: id, ...scope,
+    aa_eggrafhs: sequence, hmeromhnia_proslhpshs: '2026-01-01',
+    hmeromhnia_allaghs_symbashs: '2026-01-01',
+    hmeromhnia_lhxhs_symbashs: '2026-12-31',
+    hmeromhnia_allaghs_orarioy_apo: from,
+    hmeromhnia_allaghs_orarioy_eos: from,
+    hmeromhnia_isxyos_oron_ergasias_apo: from,
+    hmeromhnia_isxyos_oron_ergasias_eos: until,
+    afora_proslhpsh: hireEvent, afora_allagh_oron_ergasias: true,
+    createdAt: `2026-01-0${sequence}T00:00:00.000Z`,
+    updatedAt: `2026-01-0${sequence}T00:00:00.000Z` };
+}
+function contractSegmentWriterState({ partial = false } = {}) {
+    const first = contractSegmentWriterRow(CONTRACT_SEGMENT_IDS.first, '1',
+        '2026-01-01', '2026-05-31', true);
+    const latest = contractSegmentWriterRow(CONTRACT_SEGMENT_IDS.latest, '2',
+        '2026-06-01', null, false);
+    const employee = { ...latest, _id: 'employee', aa_eggrafhs: undefined,
+        afora_proslhpsh: undefined, afora_allagh_oron_ergasias: undefined,
+        energos: true, archived: false };
+    if (partial) {
+        employee.hmeromhnia_lhxhs_symbashs = '2027-01-31';
+        latest.hmeromhnia_lhxhs_symbashs = '2027-01-31';
+    }
+    return { employee, history: [first, latest] };
+}
+function saveContractSegment(db) {
+    return writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-06-01', input: {},
+        maintenance: {
+            originalHistoryId: CONTRACT_SEGMENT_IDS.latest,
+            employeeChanges: { hmeromhnia_lhxhs_symbashs: '2027-01-31' },
+            historyChanges: { hmeromhnia_lhxhs_symbashs: '2027-01-31' },
+            submittedEmployeeFields: ['hmeromhnia_lhxhs_symbashs'],
+            submittedHistoryChanges: { hmeromhnia_lhxhs_symbashs: '2027-01-31' },
+            submittedProfileFields: []
+        }
+    });
+}
+
+test('contract-end Save synchronizes the canonical segment without changing stable ids', async () => {
+    const initial = contractSegmentWriterState();
+    const ids = initial.history.map(row => row._id);
+    const db = database(initial);
+    const result = await saveContractSegment(db);
+    assert.equal(result.mode, CONTRACT_END_SEGMENT_SYNC_OPERATION);
+    assert.equal(result.status, 'APPLYABLE');
+    assert.deepEqual(db.state().history.map(row => row._id), ids);
+    assert.ok(db.state().history.every(row =>
+        row.hmeromhnia_lhxhs_symbashs === '2027-01-31'));
+    assert.equal(db.state().employee.hmeromhnia_lhxhs_symbashs, '2027-01-31');
+    assert.deepEqual(db.operations(), { employeeUpdates: 1, employeeCreates: 0,
+        employeeDeletes: 0, historyUpdates: 2, historyFenceUpdates: 0,
+        historyDeletes: 0, historyCreates: 0, auditCreates: 1, deletedCounts: [] });
+});
+
+test('partial contract-end synchronization updates only stale segment rows', async () => {
+    const db = database(contractSegmentWriterState({ partial: true }));
+    const result = await saveContractSegment(db);
+    assert.equal(result.status, 'APPLYABLE_PARTIAL_SEGMENT_SYNC');
+    assert.deepEqual(result.contractEndSegmentPlan.currentPatch, {});
+    assert.deepEqual(result.contractEndSegmentPlan.changedHistoryIds,
+        [CONTRACT_SEGMENT_IDS.first]);
+    assert.equal(db.operations().employeeUpdates, 0);
+    assert.equal(db.operations().historyUpdates, 1);
+});
+
+test('contract-end synchronization preserves frozen references', async () => {
+    const db = database(contractSegmentWriterState());
+    db.dependencies.referenceChecker = async ({ historyIds }) => historyIds.map(historyId => ({
+        historyId, collection: 'Apasxoliseis_Period_Frozen_Snapshots',
+        documentId: `frozen-${historyId}`
+    }));
+    const result = await saveContractSegment(db);
+    assert.equal(result.cleanup.referencedUpdates.length, 2);
+    assert.equal(db.state().audits[0].diagnostics.referencedUpdates.length, 2);
+});
+
+test('contract-end synchronization rolls back on write or final-verification failure', async () => {
+    for (const [name, db] of [
+        ['history update', database(contractSegmentWriterState(),
+            `close:${CONTRACT_SEGMENT_IDS.first}`)],
+        ['final verification', database(contractSegmentWriterState(), '', false,
+            { pretendUpdateSuccess: true })]
+    ]) {
+        const before = structuredClone(db.state());
+        await assert.rejects(saveContractSegment(db), name);
+        assert.deepEqual(db.state(), before, name);
+    }
+});
+
+const lifecycleSaveScope = { team: 'LIFECYCLE', company_kod: 'company', kodikos: '0014' };
+function lifecycleSaveRow(id, sequence, extra = {}) {
+    return { _id: id, ...lifecycleSaveScope, aa_eggrafhs: sequence,
+        hmeromhnia_proslhpshs: '2026-04-25',
+        hmeromhnia_allaghs_symbashs: '2026-04-25',
+        hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        afora_proslhpsh: true, afora_allagh_oron_ergasias: false, ...extra };
+}
+function lifecycleSaveState() {
+    const history = [
+        lifecycleSaveRow('lifecycle-hire', '0001', {
+            hmeromhnia_allaghs_orarioy_apo: '2026-04-25' }),
+        lifecycleSaveRow('lifecycle-profile-1', '0002', {
+            hmeromhnia_allaghs_orarioy_apo: '2026-05-25',
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-25',
+            hmeromhnia_isxyos_oron_ergasias_eos: '2026-06-14',
+            afora_allagh_oron_ergasias: true }),
+        lifecycleSaveRow('lifecycle-technical-1', '0003', {
+            hmeromhnia_allaghs_orarioy_apo: '2026-06-02' }),
+        lifecycleSaveRow('lifecycle-technical-2', '0004', {
+            hmeromhnia_allaghs_orarioy_apo: '2026-06-14' }),
+        lifecycleSaveRow('lifecycle-profile-2', '0005', {
+            hmeromhnia_allaghs_orarioy_apo: '2026-06-16',
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-15',
+            hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-20',
+            afora_allagh_oron_ergasias: true }),
+        lifecycleSaveRow('lifecycle-departure', '0006', {
+            hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
+            hmeromhnia_apoxorhshs: '2026-09-20' })
+    ];
+    return { employee: { _id: 'lifecycle-employee', ...lifecycleSaveScope,
+        hmeromhnia_proslhpshs: '2026-04-25', hmeromhnia_apoxorhshs: '2026-09-20' },
+    history };
+}
+function saveLifecycleRepair(db) {
+    return writeEmployeeEmploymentProfile({ ...db.dependencies, scope: lifecycleSaveScope,
+        employeeId: 'lifecycle-employee', effectiveFrom: '2026-06-15', input: {},
+        maintenance: { employeeChanges: {}, historyChanges: {} } });
+}
+
+test('ordinary Save applies only uniquely proven lifecycle reclassification', async () => {
+    const initial = lifecycleSaveState();
+    const ids = initial.history.map(row => row._id);
+    const db = database(initial);
+    const result = await saveLifecycleRepair(db);
+    assert.equal(result.mode, 'NO_HISTORY_CHANGE');
+    assert.deepEqual(db.state().history.map(row => row._id), ids);
+    assert.equal(db.state().history[0].afora_proslhpsh, true);
+    assert.ok(db.state().history.slice(1).every(row => row.afora_proslhpsh === false));
+    assert.equal(db.state().audits.length, 1);
+    assert.equal(db.state().audits[0].mutationSource,
+        'HISTORY_LIFECYCLE_RECLASSIFICATION');
+});
+
+test('ordinary lifecycle repair rolls back when final verification detects unapplied flags', async () => {
+    const initial = lifecycleSaveState();
+    const db = database(initial, '', false, { pretendUpdateSuccess: true });
+    await assert.rejects(saveLifecycleRepair(db), error =>
+        error.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+    assert.deepEqual(db.state(), initial);
 });
 
 test('successful mutation advances revision, stale second tab writes nothing and no-op keeps revision', async () => {
