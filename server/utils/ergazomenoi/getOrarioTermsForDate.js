@@ -2,6 +2,7 @@ const T = require('./employmentProfileTemporal');
 const C = require('./employmentProfileContract');
 const { resolveBreakConfigurationForDate } = require('./resolveBreakConfigurationForDate');
 const { semanticHistoryRows } = require('./employmentHistoryCanonicalStatus');
+const { normalizeEmploymentTypeValue } = require('./employmentTypeSemantics');
 // ============================================================================
 // getOrarioTermsForDate.js
 // ============================================================================
@@ -35,37 +36,6 @@ function toNumberOrZero(value) {
 
     const n = Number(String(value).replace(',', '.').trim());
     return Number.isFinite(n) ? n : 0;
-}
-
-function normalizeEmploymentTypeValue(value) {
-    const raw = String(value ?? '')
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, '_');
-
-    if (['0', '00', 'ΠΛΗΡΗΣ', 'PLHRHS', 'PLIRIS', 'FULL', 'FULL_TIME'].includes(raw)) {
-        return '0';
-    }
-
-    if (['1', '01', 'ΜΕΡΙΚΗ', 'MERIKH', 'MERIKI', 'PART_TIME'].includes(raw)) {
-        return '1';
-    }
-
-    if (
-        [
-            '2',
-            '02',
-            'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ',
-            'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ_ΑΠΑΣΧΟΛΗΣΗ',
-            'EK_PERITROPHS',
-            'EK_PERITROPHIS',
-            'ROTATIONAL'
-        ].includes(raw)
-    ) {
-        return '2';
-    }
-
-    return '';
 }
 
 function resolveEmploymentTypeValue(record = {}) {
@@ -324,6 +294,7 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
 
 module.exports = {
     getOrarioTermsForDate,
+    normalizeEmploymentTypeValue,
     resolveEmploymentTypeValue,
     resolveEmploymentTypeFromFormData,
     normalizeWeeklyWorkdaysValue,

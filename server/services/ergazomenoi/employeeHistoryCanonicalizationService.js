@@ -7,6 +7,9 @@ const { BASE_HISTORY_FIELDS, effectiveStart, effectiveEnd } =
 const { REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD, REDUNDANT_REFERENCED,
     isPersistedReferencedRedundant } =
     require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+const { EMPLOYMENT_TYPE_SEMANTIC_STATUSES, LEGACY_ALIAS_STATUSES,
+    resolveEmploymentTypeSemantics } =
+    require('../../utils/ergazomenoi/employmentTypeSemantics');
 
 const CANONICAL_STATUSES = Object.freeze({
     CLEAN: 'CLEAN',
@@ -61,8 +64,12 @@ const PERIOD_STATE_FIELDS = Object.freeze([...new Set([
     'ores_ergasias_ebdomadas',
     'mo_oron_hmerhsias_ergasias'
 ])]);
+const EMPLOYMENT_TYPE_ALIAS_FIELDS = Object.freeze([
+    'kathestos_apasxolhshs',
+    'typos_apasxolhshs'
+]);
 const PROFILE_EQUIVALENCE_FIELDS = Object.freeze(PERIOD_STATE_FIELDS.filter(field =>
-    field !== 'hmeromhnia_lhxhs_symbashs'));
+    field !== 'hmeromhnia_lhxhs_symbashs' && !EMPLOYMENT_TYPE_ALIAS_FIELDS.includes(field)));
 const CURRENT_SYNC_FIELDS = Object.freeze([...new Set([
     ...BASE_HISTORY_FIELDS,
     ...C.FACT_FIELDS,
@@ -171,7 +178,10 @@ function ambiguity(reason, historyIds = [], diagnostics = {}) {
 }
 
 function substantiveFingerprint(row = {}) {
-    return JSON.stringify(PROFILE_EQUIVALENCE_FIELDS.map(field => comparable(row[field])));
+    return JSON.stringify([
+        ...PROFILE_EQUIVALENCE_FIELDS.map(field => comparable(row[field])),
+        resolveEmploymentTypeSemantics(row).comparisonKey
+    ]);
 }
 
 function matchesCurrent(row, currentEmployee) {
@@ -179,11 +189,49 @@ function matchesCurrent(row, currentEmployee) {
         (effectiveStart(row)?.getTime() ?? null) !== (effectiveStart(currentEmployee)?.getTime() ?? null)) return false;
     const comparableFields = PROFILE_EQUIVALENCE_FIELDS.filter(field => meaningful(row[field]) &&
         meaningful(currentEmployee[field]));
-    return comparableFields.length > 0 && comparableFields.every(field => equal(row[field], currentEmployee[field]));
+    if (!comparableFields.every(field => equal(row[field], currentEmployee[field]))) return false;
+    const rowEmploymentType = resolveEmploymentTypeSemantics(row);
+    const currentEmploymentType = resolveEmploymentTypeSemantics(currentEmployee);
+    const employmentTypeComparable = rowEmploymentType.hasEvidence && currentEmploymentType.hasEvidence;
+    if (employmentTypeComparable &&
+        rowEmploymentType.comparisonKey !== currentEmploymentType.comparisonKey) return false;
+    return comparableFields.length > 0 || employmentTypeComparable;
+}
+
+function hasOnlyCompatibleSparseDifferences(rows = []) {
+    return PROFILE_EQUIVALENCE_FIELDS.every(field => {
+        const values = new Set(rows.filter(row => meaningful(row[field]))
+            .map(row => JSON.stringify(comparable(row[field]))));
+        return values.size <= 1;
+    });
+}
+
+function chooseLegacyEmploymentTypeAliasSurvivor(rows = [], currentEmployee) {
+    if (rows.length < 2 || !hasOnlyCompatibleSparseDifferences(rows)) return null;
+    const analyzed = rows.map(row => ({ row, semantics: resolveEmploymentTypeSemantics(row) }));
+    if (analyzed.some(item => item.semantics.status !== EMPLOYMENT_TYPE_SEMANTIC_STATUSES.RESOLVED)) {
+        return null;
+    }
+    if (new Set(analyzed.map(item => item.semantics.effectiveValue)).size !== 1) return null;
+    if (!analyzed.some(item =>
+        item.semantics.legacyAliasStatus === LEGACY_ALIAS_STATUSES.INVALID_IGNORED)) return null;
+    const validAliasRows = analyzed.filter(item =>
+        item.semantics.legacyAliasStatus === LEGACY_ALIAS_STATUSES.CONSISTENT);
+    if (!validAliasRows.length) return null;
+
+    const exactCurrent = validAliasRows.filter(item => matchesCurrent(item.row, currentEmployee));
+    const foundations = validAliasRows.filter(item =>
+        item.row.employment_profile_source === 'EMPLOYEE_PROFILE_FOUNDATION');
+    const preferred = exactCurrent.length ? exactCurrent
+        : foundations.length ? foundations : validAliasRows;
+    return latestRow(preferred.map(item => item.row));
 }
 
 function chooseProfileSurvivor(rows, currentEmployee, currentCycle) {
     if (rows.length === 1) return { survivor: rows[0], ambiguous: false };
+    const aliasSurvivor = chooseLegacyEmploymentTypeAliasSurvivor(rows, currentEmployee);
+    if (aliasSurvivor) return { survivor: aliasSurvivor, ambiguous: false,
+        normalizationReason: 'INVALID_LEGACY_EMPLOYMENT_TYPE_ALIAS' };
     const fullRows = rows.filter(row => C.readEmploymentProfile(row).recorded);
     const exactCurrent = currentCycle ? rows.filter(row => matchesCurrent(row, currentEmployee)) : [];
     if (exactCurrent.length === 1) return { survivor: exactCurrent[0], ambiguous: false };
@@ -361,7 +409,9 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
             const redundant = group.filter(row => row !== survivor);
             for (const row of redundant) replacementByDeletedId[String(row._id)] = String(survivor._id);
             if (redundant.length) diagnostics.collapsedGroups.push({ cycleNo: cycle.cycle_no,
-                survivorId: String(survivor._id), deletedIds: redundant.map(row => String(row._id)) });
+                survivorId: String(survivor._id), deletedIds: redundant.map(row => String(row._id)),
+                ...(selected.normalizationReason
+                    ? { normalizationReason: selected.normalizationReason } : {}) });
         }
 
         cycleProfiles.sort((left, right) => effectiveStart(left) - effectiveStart(right) ||
@@ -455,6 +505,7 @@ module.exports = {
     DEFAULT_MAX_HISTORY_ROWS,
     PERIOD_IDENTITY_FIELDS,
     PERIOD_STATE_FIELDS,
+    EMPLOYMENT_TYPE_ALIAS_FIELDS,
     PROFILE_EQUIVALENCE_FIELDS,
     CURRENT_SYNC_FIELDS,
     REDUNDANT_STATUS_FIELD,
