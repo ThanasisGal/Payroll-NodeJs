@@ -9,12 +9,141 @@ const { EVENT_TYPES, ROW_DISPOSITIONS, CANONICAL_STATUSES,
 const { REAL_0002_IDS, buildReal0002SanitizedHistoryFixture } =
     require('./fixtures/real0002SanitizedHistoryFixture');
 const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const { CANONICAL_EMPLOYMENT_TYPES, EMPLOYMENT_TYPE_SEMANTIC_STATUSES,
+    LEGACY_ALIAS_STATUSES, resolveEmploymentTypeSemantics } =
+    require('../../utils/ergazomenoi/employmentTypeSemantics');
 const { IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
+const { buildLegacyEmploymentTypeAliasFalsePositiveFixtures } =
+    require('./fixtures/legacyEmploymentTypeAliasFalsePositiveFixtures');
 
 function normalized(result) {
     return result.canonicalRows.map(row => ({ ...row,
         _id: String(row._id) }));
 }
+
+function applyCanonicalDiffInMemory(historyRows, result) {
+    const deleted = new Set(result.rowsToDelete.map(item => String(item.historyId)));
+    const updates = new Map(result.rowsToUpdate.map(item => [String(item.historyId), item.patch]));
+    return historyRows.filter(row => !deleted.has(String(row._id)))
+        .map(row => ({ ...row, ...(updates.get(String(row._id)) || {}) }));
+}
+
+test('employment-type semantics use canonical status, legacy fallback and fail closed on valid conflict', () => {
+    assert.deepEqual(CANONICAL_EMPLOYMENT_TYPES, ['0', '1', '2']);
+    const staleAlias = resolveEmploymentTypeSemantics({
+        kathestos_apasxolhshs: '1', typos_apasxolhshs: '5'
+    });
+    assert.equal(staleAlias.status, EMPLOYMENT_TYPE_SEMANTIC_STATUSES.RESOLVED);
+    assert.equal(staleAlias.effectiveValue, '1');
+    assert.equal(staleAlias.legacyAliasStatus, LEGACY_ALIAS_STATUSES.INVALID_IGNORED);
+    const fallback = resolveEmploymentTypeSemantics({ typos_apasxolhshs: 'MERIKH' });
+    assert.equal(fallback.effectiveValue, '1');
+    assert.equal(fallback.source, 'LEGACY_FALLBACK');
+    const conflict = resolveEmploymentTypeSemantics({
+        kathestos_apasxolhshs: '1', typos_apasxolhshs: '0'
+    });
+    assert.equal(conflict.status, EMPLOYMENT_TYPE_SEMANTIC_STATUSES.CONFLICTING_VALID_ALIASES);
+    assert.equal(resolveEmploymentTypeSemantics({ typos_apasxolhshs: '5' }).status,
+        EMPLOYMENT_TYPE_SEMANTIC_STATUSES.INVALID_LEGACY_FALLBACK);
+});
+
+test('five sanitized legacy-alias shapes become deterministic, preserve the valid id and are idempotent', () => {
+    for (const fixture of buildLegacyEmploymentTypeAliasFalsePositiveFixtures()) {
+        const first = canonicalizeEmployeeHistory({ scope: fixture.scope,
+            currentEmployee: fixture.currentEmployee, historyRows: fixture.historyRows });
+        assert.equal(first.status, CANONICAL_STATUSES.AUTO_REPAIRABLE, fixture.name);
+        assert.deepEqual(first.rowsToDelete.map(item => item.historyId),
+            [fixture.expectedRedundantId], fixture.name);
+        assert.ok(first.canonicalRows.some(row => String(row._id) === fixture.expectedSurvivorId),
+            fixture.name);
+        assert.equal(first.diagnostics.collapsedGroups.some(group =>
+            group.normalizationReason === 'INVALID_LEGACY_EMPLOYMENT_TYPE_ALIAS'), true,
+            fixture.name);
+
+        const afterFirst = applyCanonicalDiffInMemory(fixture.historyRows, first);
+        const second = canonicalizeEmployeeHistory({ scope: fixture.scope,
+            currentEmployee: fixture.currentEmployee, historyRows: afterFirst });
+        assert.equal(second.status, CANONICAL_STATUSES.CLEAN, fixture.name);
+        assert.deepEqual(second.rowsToDelete, [], fixture.name);
+        assert.deepEqual(second.rowsToUpdate, [], fixture.name);
+        assert.ok(second.canonicalRows.some(row => String(row._id) === fixture.expectedSurvivorId),
+            fixture.name);
+
+        const afterSecond = applyCanonicalDiffInMemory(afterFirst, second);
+        const third = canonicalizeEmployeeHistory({ scope: fixture.scope,
+            currentEmployee: fixture.currentEmployee, historyRows: afterSecond });
+        assert.equal(third.status, CANONICAL_STATUSES.CLEAN, fixture.name);
+        assert.deepEqual(normalized(third), normalized(second), fixture.name);
+    }
+});
+
+function conflictingAliasFixture(field, left, right, current) {
+    const fixture = buildLegacyEmploymentTypeAliasFalsePositiveFixtures()[0];
+    const base = fixture.historyRows[0];
+    const first = { ...base, _id: `negative-${field}-a`, aa_eggrafhs: '0001',
+        typos_apasxolhshs: base.kathestos_apasxolhshs, [field]: left };
+    const second = { ...base, _id: `negative-${field}-b`, aa_eggrafhs: '0002',
+        typos_apasxolhshs: base.kathestos_apasxolhshs, [field]: right };
+    return { ...fixture, historyRows: [first, second],
+        currentEmployee: { ...fixture.currentEmployee, [field]: current } };
+}
+
+test('valid canonical employment-type differences remain true ambiguity', () => {
+    const fixture = conflictingAliasFixture('kathestos_apasxolhshs', '0', '1', '2');
+    fixture.historyRows[0].typos_apasxolhshs = '0';
+    fixture.historyRows[1].typos_apasxolhshs = '1';
+    fixture.currentEmployee.typos_apasxolhshs = '2';
+    const result = canonicalizeEmployeeHistory({ scope: fixture.scope,
+        currentEmployee: fixture.currentEmployee, historyRows: fixture.historyRows });
+    assert.equal(result.status, CANONICAL_STATUSES.TRUE_AMBIGUITY);
+    assert.equal(result.diagnostics.reason, 'CONFLICTING_PROFILE_EVENTS');
+});
+
+for (const control of [
+    ['ores_ergasias_ebdomadas', 20, 30, 25],
+    ['hmeres_ergasias_ebdomadas', 4, 5, 6],
+    ['pragmatikosMisthos', 400, 600, 500],
+    ['synolo_symbashs_basei_oron_ergasias', 400, 600, 500],
+    ['eidikothta_symbashs', 'SPECIALTY-A', 'SPECIALTY-B', 'SPECIALTY-C']
+]) {
+    test(`material ${control[0]} difference remains true ambiguity`, () => {
+        const fixture = conflictingAliasFixture(...control);
+        const result = canonicalizeEmployeeHistory({ scope: fixture.scope,
+            currentEmployee: fixture.currentEmployee, historyRows: fixture.historyRows });
+        assert.equal(result.status, CANONICAL_STATUSES.TRUE_AMBIGUITY);
+        assert.equal(result.diagnostics.reason, 'CONFLICTING_PROFILE_EVENTS');
+    });
+}
+
+test('different effective boundaries remain separate and overlap rules still fail closed', () => {
+    const fixture = buildLegacyEmploymentTypeAliasFalsePositiveFixtures()[0];
+    const closed = { ...fixture.historyRows[0], _id: 'boundary-closed', aa_eggrafhs: '0001',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-01-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: '2026-02-28' };
+    const open = { ...fixture.historyRows[0], _id: 'boundary-open', aa_eggrafhs: '0002',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-03-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: null };
+    const separate = canonicalizeEmployeeHistory({ scope: fixture.scope,
+        currentEmployee: { ...fixture.currentEmployee,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-03-01' },
+        historyRows: [closed, open] });
+    assert.equal(separate.status, CANONICAL_STATUSES.CLEAN);
+    assert.equal(separate.canonicalRows.length, 2);
+    assert.deepEqual(separate.rowsToDelete, []);
+
+    const first = { ...fixture.historyRows[0], _id: 'boundary-a', aa_eggrafhs: '0001',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-01-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: '2026-03-31' };
+    const second = { ...fixture.historyRows[0], _id: 'boundary-b', aa_eggrafhs: '0002',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-03-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: null };
+    const result = canonicalizeEmployeeHistory({ scope: fixture.scope,
+        currentEmployee: { ...fixture.currentEmployee,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-03-01' },
+        historyRows: [first, second] });
+    assert.equal(result.status, CANONICAL_STATUSES.TRUE_AMBIGUITY);
+    assert.equal(result.diagnostics.reason, 'OVERLAPPING_GENUINE_PERIODS');
+});
 
 test('legacy copied profile fields on departure do not create another profile period', () => {
     const fixture = buildReal0002SanitizedHistoryFixture();
