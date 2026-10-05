@@ -33,6 +33,16 @@ const { assertOpenCycleHireGuard } = require('./employeeOpenCycleHireGuardServic
 const { PLAN_STATUSES: LEGACY_CLEANUP_PLAN_STATUSES, FOUNDATION_SOURCE, stableStringify,
     planEmployeeLegacyOpenCycleCleanup } =
     require('./employeeLegacyOpenCycleCleanupService');
+const { OPERATION: LIFECYCLE_RECLASSIFICATION_OPERATION,
+    AMBIGUITY_REASON: LIFECYCLE_RECLASSIFICATION_AMBIGUITY_REASON,
+    PLAN_STATUSES: LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES,
+    planEmployeeHistoryLifecycleReclassification } =
+    require('./employeeHistoryLifecycleReclassificationPlannerService');
+const { OPERATION: CONTRACT_END_SEGMENT_SYNC_OPERATION,
+    CONTRACT_END_FIELD,
+    PLAN_STATUSES: CONTRACT_END_CORRECTION_PLAN_STATUSES,
+    planEmployeeContractEndCorrection } =
+    require('./employeeContractEndCorrectionPlannerService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -114,6 +124,63 @@ async function checkedHistoryReferences({ referenceChecker, connection, historyI
     if (referenceChecker === findHistoryIdReferences &&
         typeof connection?.collection !== 'function') return [];
     return referenceChecker({ connection, historyIds, session });
+}
+async function prepareCanonicalHistoryForMutation({ scope, currentEmployee,
+    completeHistoryRows, referenceChecker, connection, session }) {
+    const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee,
+        historyRows: completeHistoryRows });
+    if (canonical.status !== CANONICAL_STATUSES.TRUE_AMBIGUITY ||
+        canonical.diagnostics?.reason !== LIFECYCLE_RECLASSIFICATION_AMBIGUITY_REASON) {
+        return { canonical, historyRows: canonical.canonicalRows || completeHistoryRows,
+            reclassificationPlan: null };
+    }
+    const protectedReferenceSummary = {};
+    for (const row of completeHistoryRows) {
+        const id = String(row._id);
+        try {
+            protectedReferenceSummary[id] = await checkedHistoryReferences({
+                referenceChecker, connection, historyIds: [id], session
+            });
+        } catch {
+            throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
+        }
+    }
+    const reclassificationPlan = planEmployeeHistoryLifecycleReclassification({
+        scope, currentEmployee, completeHistoryRows, protectedReferenceSummary
+    });
+    if (reclassificationPlan.status !== LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE &&
+        reclassificationPlan.status !== LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.NO_OP) {
+        const error = failure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+        error.canonicalReason = canonical.diagnostics?.reason;
+        error.reclassificationStatus = reclassificationPlan.status;
+        error.reclassificationReason = reclassificationPlan.reason;
+        throw error;
+    }
+    return { canonical: reclassificationPlan.canonicalResult,
+        historyRows: reclassificationPlan.desiredHistoryRows,
+        reclassificationPlan };
+}
+
+function lifecycleReclassificationAuditDiagnostics(plan, originalRows, diagnostics = {}) {
+    if (!plan || plan.status !== LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE) {
+        return diagnostics;
+    }
+    const originalById = new Map(originalRows.map(row => [String(row._id), row]));
+    return {
+        ...diagnostics,
+        requestedMutationOperation: diagnostics.operation || 'EMPLOYEE_MAINTENANCE_SAVE',
+        operation: LIFECYCLE_RECLASSIFICATION_OPERATION,
+        planFingerprint: plan.planFingerprint,
+        employeeId: plan.currentEmployeeId,
+        changedHistoryIds: [...plan.changedHistoryIds],
+        aforaProslhpshChanges: Object.fromEntries(plan.changedHistoryIds.map(id => [id, {
+            old: originalById.get(id)?.afora_proslhpsh,
+            new: plan.historyPatches[id]?.afora_proslhpsh
+        }])),
+        finalLifecycleEvents: { ...plan.diagnostics.finalLifecycleEvents },
+        cycleSummaries: [...plan.diagnostics.cycleSummariesAfter],
+        protectedReferenceSummary: { ...plan.diagnostics.protectedReferenceSummary }
+    };
 }
 function normalizeHistoryObjectIds(historyIds = []) {
     if (!Array.isArray(historyIds)) throw new TypeError('historyIds must be an array');
@@ -268,11 +335,44 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     auditCollectionChecker, referenceChecker, connection, diagnostics,
     targetedHistoryId = null, targetedPatch = {}, historyDocumentFactory = null,
     canonicalRepairRequired = false, deleteCurrent = false,
-    controlledLegacyOpenCycleCleanup = false }) {
+    controlledLegacyOpenCycleCleanup = false,
+    controlledContractEndSegmentSync = false,
+    contractEndSegmentSyncPlan = null,
+    contractEndSegmentSyncCurrentPatch = null }) {
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
         ? { ...currentPatch } : { ...currentBefore, ...currentPatch };
-    if (controlledLegacyOpenCycleCleanup) {
+    if (controlledLegacyOpenCycleCleanup && controlledContractEndSegmentSync) {
+        throw failure('EMPLOYEE_CONTRACT_END_SEGMENT_SYNC_INVALID_BOUNDARY');
+    }
+    if (controlledContractEndSegmentSync) {
+        const plannedUpdateIds = [...new Set(physicalPlan.rowsToUpdate
+            .map(row => String(row.historyId)))].sort();
+        const expectedUpdateIds = [...(contractEndSegmentSyncPlan?.changedHistoryIds || [])]
+            .map(String).sort();
+        const exactHistoryPatches = physicalPlan.rowsToUpdate.every(item => {
+            const keys = Object.keys(item.patch || {}).filter(field => field !== 'updatedAt');
+            return keys.length === 1 && keys[0] === CONTRACT_END_FIELD &&
+                C.calendarDate(item.patch[CONTRACT_END_FIELD])?.getTime() ===
+                    C.calendarDate(contractEndSegmentSyncPlan?.diagnostics?.newContractEnd)?.getTime();
+        });
+        const currentPatchValid = contractEndSegmentSyncCurrentPatch &&
+            stableStringify(currentPatch || {}) ===
+                stableStringify(contractEndSegmentSyncCurrentPatch);
+        const beforeIds = physicalPlan.beforeRows.map(row => String(row._id)).sort();
+        const finalIds = physicalPlan.finalRows.map(row => String(row._id)).sort();
+        if (deleteCurrent || diagnostics?.operation !== CONTRACT_END_SEGMENT_SYNC_OPERATION ||
+            ![CONTRACT_END_CORRECTION_PLAN_STATUSES.APPLYABLE,
+                CONTRACT_END_CORRECTION_PLAN_STATUSES.APPLYABLE_PARTIAL_SEGMENT_SYNC]
+                .includes(contractEndSegmentSyncPlan?.status) ||
+            diagnostics?.planFingerprint !== contractEndSegmentSyncPlan?.planFingerprint ||
+            !currentPatchValid || physicalPlan.rowsToDelete.length ||
+            physicalPlan.rowsToInsert.length || !exactHistoryPatches ||
+            stableStringify(plannedUpdateIds) !== stableStringify(expectedUpdateIds) ||
+            stableStringify(beforeIds) !== stableStringify(finalIds)) {
+            throw failure('EMPLOYEE_CONTRACT_END_SEGMENT_SYNC_INVALID_BOUNDARY');
+        }
+    } else if (controlledLegacyOpenCycleCleanup) {
         if (deleteCurrent || diagnostics?.operation !== 'LEGACY_OPEN_CYCLE_CLEANUP' ||
             Object.keys(currentPatch || {}).length) {
             throw failure('EMPLOYEE_LEGACY_OPEN_CYCLE_CLEANUP_INVALID_BOUNDARY');
@@ -440,6 +540,25 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         verified = await verifyFinalMutationState({ filter, employeeId, session, employeeModel,
             historyModel, expectedCurrent, expectedHistory: physicalPlan.finalRows,
             targetedHistoryId, targetedPatch });
+        if (controlledContractEndSegmentSync) {
+            const canonical = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: verified.history });
+            const second = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: canonical.canonicalRows });
+            const segmentIds = new Set(contractEndSegmentSyncPlan.targetSegmentHistoryIds);
+            const requestedTime = C.calendarDate(
+                contractEndSegmentSyncPlan.diagnostics.newContractEnd)?.getTime() ?? null;
+            const segmentConsistent = verified.history.filter(row => segmentIds.has(String(row._id)))
+                .every(row => (C.calendarDate(row[CONTRACT_END_FIELD])?.getTime() ?? null) ===
+                    requestedTime);
+            if (!segmentConsistent || canonical.status !== CANONICAL_STATUSES.CLEAN ||
+                canonical.cleanupRequired || !canonical.idempotent ||
+                second.status !== CANONICAL_STATUSES.CLEAN || second.cleanupRequired ||
+                !second.idempotent || stableStringify(second.canonicalRows) !==
+                    stableStringify(canonical.canonicalRows)) {
+                throw failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+            }
+        }
     }
     return { inserted, verified, auditWritten: auditRequired,
         updated: physicalPlan.rowsToUpdate.length, deleted: deletedIds.length,
@@ -777,20 +896,24 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 : await completeHistoryLean(historyModel, filter, session);
             const persistedRows = rows;
             let canonicalBefore = null;
+            let lifecycleReclassificationPlan = null;
             if (current && rows.length) {
                 if (planningState) {
                     canonicalBefore = { status: CANONICAL_STATUSES.CLEAN,
                         canonicalRows: rows, rowsToUpdate: [], rowsToDelete: [],
                         replacementByDeletedId: {}, cleanupRequired: false, diagnostics: {} };
                 } else {
-                    canonicalBefore = canonicalizeEmployeeHistory({ scope: filter,
-                        currentEmployee: current, historyRows: rows });
+                    const prepared = await prepareCanonicalHistoryForMutation({ scope: filter,
+                        currentEmployee: current, completeHistoryRows: rows,
+                        referenceChecker, connection, session });
+                    canonicalBefore = prepared.canonical;
+                    lifecycleReclassificationPlan = prepared.reclassificationPlan;
                     if (canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
                         const error = failure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
                         error.canonicalReason = canonicalBefore.diagnostics?.reason;
                         throw error;
                     }
-                    rows = canonicalBefore.canonicalRows;
+                    rows = prepared.historyRows;
                 }
             }
             if (preMutationHistoryPatches) {
@@ -827,6 +950,9 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 !semanticEmploymentProfileChanged(current, maintenance, input);
             let patch = legacyMaintenance ? legacyMaintenancePatch(maintenance.employeeChanges, current) : cleanMaintenancePatch(maintenance?.employeeChanges);
             let historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
+            // Hire-event identity is owned by the server-side lifecycle plan.
+            // Ordinary Maintenance may echo it, but cannot author it.
+            if (!editorOperation && !rehireOperation) delete historyPatch.afora_proslhpsh;
             if (!rehireOperation && C.calendarDate(current?.hmeromhnia_apoxorhshs) &&
                 Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') &&
                 !C.calendarDate(patch.hmeromhnia_apoxorhshs)) {
@@ -893,7 +1019,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 const mutationRequest = {
                     scope: filter,
                     currentEmployee: current,
-                    historyRows: persistedRows,
+                    historyRows: lifecycleReclassificationPlan ? rows : persistedRows,
                     submittedState: {
                         effectiveFrom: from,
                         identity: maintenance.identity,
@@ -925,6 +1051,106 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 }
                 rows = mutationPlan.canonicalRows;
                 datedRows = rows.filter(row => effectiveStart(row));
+                const contractEndExplicitlySubmitted =
+                    Object.hasOwn(submittedEmployeePatch, CONTRACT_END_FIELD) ||
+                    Object.hasOwn(submittedHistory, CONTRACT_END_FIELD);
+                const contractEndHistoryMutationFields = Object.keys(mutationPlan.historyPatch || {});
+                const currentProfileMutationFields = Object.keys(mutationPlan.employeePatch || {})
+                    .filter(field => HISTORY_CURRENT_FIELDS.has(field));
+                const submittedContractEnds = [
+                    submittedEmployeePatch[CONTRACT_END_FIELD],
+                    submittedHistory[CONTRACT_END_FIELD]
+                ].filter(value => value !== undefined);
+                const requestedContractEndTimes = [...new Set(submittedContractEnds.map(value =>
+                    C.calendarDate(value)?.getTime() ?? null))];
+                const contractEndOnlyMutation = contractEndExplicitlySubmitted &&
+                    [MUTATION_STATES.NO_HISTORY_CHANGE, MUTATION_STATES.CORRECT_EXISTING]
+                        .includes(mutationPlan.state) &&
+                    mutationPlan.cleanupRequired !== true && !lifecycleReclassificationPlan &&
+                    requestedContractEndTimes.length === 1 &&
+                    requestedContractEndTimes[0] !== null &&
+                    contractEndHistoryMutationFields.every(field => field === CONTRACT_END_FIELD) &&
+                    currentProfileMutationFields.every(field => field === CONTRACT_END_FIELD);
+                if (contractEndOnlyMutation) {
+                    const protectedReferences = {};
+                    for (const row of persistedRows) {
+                        const historyIdValue = String(row._id);
+                        try {
+                            protectedReferences[historyIdValue] = await checkedHistoryReferences({
+                                referenceChecker, connection,
+                                historyIds: [historyIdValue], session
+                            });
+                        } catch {
+                            throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
+                        }
+                    }
+                    const contractEndPlan = planEmployeeContractEndCorrection({
+                        scope: filter,
+                        currentEmployee: current,
+                        completeHistoryRows: persistedRows,
+                        requestedContractEnd: submittedContractEnds[0],
+                        protectedReferences
+                    });
+                    if (![CONTRACT_END_CORRECTION_PLAN_STATUSES.APPLYABLE,
+                        CONTRACT_END_CORRECTION_PLAN_STATUSES.APPLYABLE_PARTIAL_SEGMENT_SYNC,
+                        CONTRACT_END_CORRECTION_PLAN_STATUSES.NO_OP]
+                        .includes(contractEndPlan.status)) {
+                        const error = failure('EMPLOYEE_CONTRACT_END_SEGMENT_SYNC_BLOCKED');
+                        error.contractEndSegmentStatus = contractEndPlan.status;
+                        error.contractEndSegmentReason = contractEndPlan.reason;
+                        throw error;
+                    }
+                    if (contractEndPlan.status !== CONTRACT_END_CORRECTION_PLAN_STATUSES.NO_OP) {
+                        const combinedCurrentPatch = {
+                            ...mutationPlan.employeePatch,
+                            ...contractEndPlan.currentPatch
+                        };
+                        const physicalPlan = buildFinalHistoryMutationPlan({
+                            beforeRows: persistedRows,
+                            desiredRows: contractEndPlan.desiredHistoryRows,
+                            historyModel
+                        });
+                        const cleanup = await applyOrExecuteFinalMutationPlan({ physicalPlan,
+                            currentBefore: current, currentPatch: combinedCurrentPatch,
+                            filter, employeeId: current._id, session, employeeModel, historyModel,
+                            auditModel, auditCollectionChecker, referenceChecker, connection,
+                            diagnostics: {
+                                ...contractEndPlan.diagnostics,
+                                operation: CONTRACT_END_SEGMENT_SYNC_OPERATION,
+                                planFingerprint: contractEndPlan.planFingerprint,
+                                currentPatch: { ...contractEndPlan.currentPatch },
+                                maintenanceCurrentPatchFields:
+                                    Object.keys(mutationPlan.employeePatch || {}).sort()
+                            },
+                            canonicalRepairRequired: true,
+                            controlledContractEndSegmentSync: true,
+                            contractEndSegmentSyncPlan: contractEndPlan,
+                            contractEndSegmentSyncCurrentPatch: combinedCurrentPatch
+                        }, planningState);
+                        result = {
+                            facts: {}, history: cleanup.verified.history.find(row =>
+                                String(row._id) === contractEndPlan.diagnostics
+                                    .latestCanonicalProfileId) || null,
+                            currentUpdated: Object.keys(combinedCurrentPatch).length > 0,
+                            employee: cleanup.verified.current,
+                            mode: CONTRACT_END_SEGMENT_SYNC_OPERATION,
+                            status: contractEndPlan.status,
+                            cleanupRequired: false,
+                            cleanup,
+                            diagnostics: contractEndPlan.diagnostics,
+                            idempotent: true,
+                            contractEndSegmentPlan: contractEndPlan,
+                            maintenanceMutationPlan: {
+                                state: mutationPlan.state,
+                                employeePatchFields:
+                                    Object.keys(mutationPlan.employeePatch || {}).sort(),
+                                historyPatchFields:
+                                    Object.keys(mutationPlan.historyPatch || {}).sort()
+                            }
+                        };
+                        return;
+                    }
+                }
                 if (mutationPlan.state === MUTATION_STATES.NO_HISTORY_CHANGE) {
                     const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: persistedRows,
                         desiredRows: rows, historyModel,
@@ -933,8 +1159,12 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                         currentBefore: current, currentPatch: mutationPlan.employeePatch,
                         filter, employeeId: current._id, session, employeeModel, historyModel,
                         auditModel, auditCollectionChecker, referenceChecker, connection,
-                        diagnostics: mutationPlan.diagnostics,
-                        canonicalRepairRequired: mutationPlan.cleanupRequired === true }, planningState);
+                        diagnostics: lifecycleReclassificationAuditDiagnostics(
+                            lifecycleReclassificationPlan, persistedRows,
+                            mutationPlan.diagnostics),
+                        canonicalRepairRequired: mutationPlan.cleanupRequired === true ||
+                            lifecycleReclassificationPlan?.status ===
+                                LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE }, planningState);
                     const target = cleanup.verified.history.find(row =>
                         String(row._id) === mutationPlan.targetHistoryId) || null;
                     result = { facts: {}, history: target,
@@ -958,7 +1188,13 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             if (selection.mode === MODE_CORRECT_EXISTING) {
                 const target = rows.find((row) => String(row._id) === selectedHistoryId);
                 const boundaryMove = mutationPlan?.state === MUTATION_STATES.MOVE_EXISTING_BOUNDARY;
+                const contractEndSynchronization = mutationPlan?.state ===
+                    MUTATION_STATES.CORRECT_EXISTING &&
+                    mutationPlan.cleanupRequired !== true &&
+                    Object.keys(mutationPlan.historyPatch || {}).length === 1 &&
+                    Object.hasOwn(mutationPlan.historyPatch, CONTRACT_END_FIELD);
                 if (!target || !effectiveStart(target) || (!editorOperation && !boundaryMove &&
+                    !contractEndSynchronization &&
                     effectiveStart(target).getTime() !== from.getTime())) {
                     throw failure('EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH');
                 }
@@ -981,8 +1217,9 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 if (editorOperation && baseline && originalFrom.getTime() === T.day(baseline.before).getTime() && from.getTime() !== originalFrom.getTime()) {
                     throw failure('EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED');
                 }
-                const boundaryChanged = from.getTime() !== originalFrom.getTime() ||
-                    (end?.getTime() ?? null) !== (effectiveEnd(target)?.getTime() ?? null);
+                const boundaryChanged = !contractEndSynchronization &&
+                    (from.getTime() !== originalFrom.getTime() ||
+                    (end?.getTime() ?? null) !== (effectiveEnd(target)?.getTime() ?? null));
                 if (editorOperation && boundaryChanged && (!latest || from < originalFrom ||
                     (end && end < from) || !C.readEmploymentProfile(target).recorded)) {
                     throw failure('EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED');
@@ -994,7 +1231,8 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 const currentFrom = effectiveStart(current);
                 // A latest-row correction can update current only when its identity
                 // agrees. Missing current dates are allowed for legacy Maintenance.
-                if (latest && currentFrom && currentFrom.getTime() !== originalFrom.getTime()) {
+                if (latest && currentFrom && currentFrom.getTime() !== originalFrom.getTime() &&
+                    !contractEndSynchronization) {
                     throw failure('EMPLOYEE_PROFILE_CURRENT_IDENTITY_MISMATCH');
                 }
                 if (!latest || editorOperation) {
@@ -1007,11 +1245,15 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 }
                 if (legacyMaintenance) historyPatch = legacyMaintenancePatch(maintenance.historyChanges, target, true);
                 const source = { ...(latest && !editorOperation ? { ...current, ...target } : target), ...historyPatch };
-                const snapshot = legacyMaintenance ? {} : buildCompleteProfileSnapshot({ input, current: source, effectiveFrom: from });
-                const capturedBaseline = latest && !legacyMaintenance ? T.capture(current, rows, from) : null;
-                const facts = legacyMaintenance ? {} : Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
+                const snapshot = legacyMaintenance || contractEndSynchronization ? {} :
+                    buildCompleteProfileSnapshot({ input, current: source, effectiveFrom: from });
+                const capturedBaseline = latest && !legacyMaintenance &&
+                    !contractEndSynchronization ? T.capture(current, rows, from) : null;
+                const facts = legacyMaintenance || contractEndSynchronization ? {} :
+                    Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
                 const proposedCurrentChanges = latest ? { ...patch, ...facts,
-                    ...(!legacyMaintenance ? currentProfileProjection(snapshot) : {}),
+                    ...(!legacyMaintenance && !contractEndSynchronization
+                        ? currentProfileProjection(snapshot) : {}),
                     ...(capturedBaseline ? { [T.ANCHOR]: capturedBaseline } : {}) } :
                     Object.fromEntries(Object.entries(patch).filter(([field]) => !HISTORY_CURRENT_FIELDS.has(field)));
                 const currentChanges = minimalSetPatch(current, proposedCurrentChanges);
@@ -1023,8 +1265,11 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 }
                 // Include the existing Maintenance contract mapping; preserve all
                 // identity dates, sequence, creation time and surrounding rows.
-                const correction = legacyMaintenance ? { ...historyPatch } : { ...historyPatch, ...snapshot,
-                    afora_allagh_dialleimatos: true, hmeromhnia_isxyos_dialleimatos_apo: from };
+                const correction = legacyMaintenance || contractEndSynchronization
+                    ? { ...historyPatch }
+                    : { ...historyPatch, ...snapshot,
+                        afora_allagh_dialleimatos: true,
+                        hmeromhnia_isxyos_dialleimatos_apo: from };
                 // Corrections cannot move any identity date or overwrite the sequence.
                 const mutationCorrectableFields = new Set(correctableIdentityFields);
                 if (mutationPlan) {
@@ -1065,8 +1310,11 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                     currentBefore: current, currentPatch: currentChanges,
                     filter, employeeId: current._id, session, employeeModel, historyModel,
                     auditModel, auditCollectionChecker, referenceChecker, connection,
-                    diagnostics: mutationPlan.diagnostics,
-                    canonicalRepairRequired: mutationPlan.cleanupRequired === true,
+                    diagnostics: lifecycleReclassificationAuditDiagnostics(
+                        lifecycleReclassificationPlan, persistedRows, mutationPlan.diagnostics),
+                    canonicalRepairRequired: mutationPlan.cleanupRequired === true ||
+                        lifecycleReclassificationPlan?.status ===
+                            LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE,
                     targetedHistoryId: target._id,
                     targetedPatch: minimalSetPatch(target, correction) }, planningState);
                 storedHistory = cleanup.verified.history.find(row =>
@@ -1136,7 +1384,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             const sequence = Math.max(0, ...rows.map((row) => Number(row.aa_eggrafhs) || 0)) + 1;
             const record = { ...historyPatch, ...filter, ...snapshot,
                 aa_eggrafhs: String(sequence).padStart(4, '0'),
-                afora_proslhpsh: historyPatch.afora_proslhpsh ?? !current };
+                afora_proslhpsh: !current || rehireOperation };
             if (mutationPlan && rows.length === 0 && current) {
                 for (const field of T.STANDARD_FIELDS) {
                     if ((!Object.hasOwn(record, field) || record[field] === undefined) &&
@@ -1192,8 +1440,11 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 currentBefore: current, currentPatch: plannedCurrentPatch,
                 filter, employeeId: current?._id || employee._id, session, employeeModel, historyModel,
                 auditModel, auditCollectionChecker, referenceChecker, connection,
-                diagnostics: mutationPlan.diagnostics,
-                canonicalRepairRequired: mutationPlan.cleanupRequired === true,
+                diagnostics: lifecycleReclassificationAuditDiagnostics(
+                    lifecycleReclassificationPlan, persistedRows, mutationPlan.diagnostics),
+                canonicalRepairRequired: mutationPlan.cleanupRequired === true ||
+                    lifecycleReclassificationPlan?.status ===
+                        LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE,
                 targetedHistoryId: record._id,
                 targetedPatch: auditProjection(physicalPlan.finalRows.find(row =>
                     normalizedHistoryId(row._id) === normalizedHistoryId(record._id)) || {}),
