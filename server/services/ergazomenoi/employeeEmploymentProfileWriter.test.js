@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const mongoose = require('mongoose');
 const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentHistoryOperations,
-    writeEmployeeDeparture, repairEmployeeHistoryCanonical, repairEmployeeLegacyOpenCycles,
+    writeEmployeeDeparture, writeEmployeeInvalidDepartureCorrection,
+    repairEmployeeHistoryCanonical, repairEmployeeLegacyOpenCycles,
     deleteEmployeeAndEmploymentHistory,
     selectMaintenanceMode, MODE_CORRECT_EXISTING,
     normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter } = require('./employeeEmploymentProfileWriter');
@@ -1017,6 +1018,180 @@ test('maintenance departure forces current master inactive', async () => {
         }
     });
     assert.equal(db.state().employee.energos, false);
+});
+
+function deferredAmbiguityDepartureState() {
+    const base = { ...scope,
+        hmeromhnia_proslhpshs: new Date('2026-06-27T00:00:00.000Z'),
+        hmeromhnia_apoxorhshs: null,
+        hmeromhnia_lhxhs_symbashs: new Date('2026-10-15T00:00:00.000Z'),
+        employment_profile_source: 'ERGOMENOI_CONTROLLER',
+        afora_allagh_oron_ergasias: true };
+    const row = (id, aa, from, until, scheduleFrom, scheduleUntil, facts) => ({
+        _id: id, ...base, aa_eggrafhs: aa,
+        hmeromhnia_allaghs_symbashs: new Date(`${facts.contractChange}T00:00:00.000Z`),
+        hmeromhnia_allaghs_orarioy_apo: new Date(`${scheduleFrom}T00:00:00.000Z`),
+        hmeromhnia_allaghs_orarioy_eos: new Date(`${scheduleUntil}T00:00:00.000Z`),
+        hmeromhnia_isxyos_oron_ergasias_apo: new Date(`${from}T00:00:00.000Z`),
+        hmeromhnia_isxyos_oron_ergasias_eos: until
+            ? new Date(`${until}T00:00:00.000Z`) : null,
+        afora_proslhpsh: aa !== '0003', kathestos_apasxolhshs: facts.regime,
+        typos_apasxolhshs: facts.type, typos_ebdomadas: facts.weekType,
+        hmeres_ergasias_ebdomadas: facts.days,
+        ores_ergasias_ebdomadas: facts.hours,
+        mo_oron_hmerhsias_ergasias: facts.average,
+        pragmatikosMisthos: facts.wage,
+        createdAt: new Date(`${scheduleFrom}T06:00:00.000Z`),
+        updatedAt: new Date(`${scheduleFrom}T06:10:00.000Z`) });
+    const old = row('507f1f77bcf86cd799439301', '0001', '2026-06-27', '2026-07-22',
+        '2026-06-27', '2026-07-03', { contractChange: '2026-06-27', regime: '2',
+            type: '5', weekType: '', days: 2, hours: 16, average: 8, wage: 435.6 });
+    const overlap = row('507f1f77bcf86cd799439302', '0002', '2026-06-27', null,
+        '2026-07-13', '2026-07-19', { contractChange: '2026-06-27', regime: '2',
+            type: '5', weekType: '', days: 4, hours: 34, average: 8.5, wage: 925.65 });
+    const latest = row('507f1f77bcf86cd799439303', '0003', '2026-07-23', null,
+        '2026-07-23', '2026-07-29', { contractChange: '2026-07-23', regime: '0',
+            type: '0', weekType: '5HMERH', days: 5, hours: 40, average: 8, wage: 1089 });
+    return { employee: { ...latest, _id: 'employee', aa_eggrafhs: undefined,
+        afora_proslhpsh: undefined, energos: true }, history: [old, overlap, latest], audits: [] };
+}
+
+test('departure with older-only ambiguity preserves old rows and changes the unique anchor', async () => {
+    const initial = deferredAmbiguityDepartureState();
+    const oldBefore = structuredClone(initial.history.slice(0, 2));
+    const db = database(initial);
+    const result = await writeEmployeeDeparture({ ...db.dependencies, scope, employeeId: 'employee',
+        departureDate: '2026-09-29', effectiveFrom: '2026-07-23',
+        input: {}, maintenance: { employeeChanges: {}, submittedEmployeeFields: [],
+            historyChanges: {}, submittedHistoryChanges: {}, submittedFormFields: [] } });
+    const state = db.state();
+    assert.equal(result.deferredAmbiguityDeparturePlan.status,
+        'APPLYABLE_DEPARTURE_WITH_DEFERRED_HISTORY_AMBIGUITY');
+    assert.equal(result.deferredAmbiguityDeparturePostcondition.ok, true);
+    assert.deepEqual(state.history.slice(0, 2), oldBefore);
+    assert.equal(state.history.length, 3);
+    assert.equal(state.employee.hmeromhnia_apoxorhshs.toISOString(),
+        '2026-09-29T00:00:00.000Z');
+    assert.equal(state.history[2].hmeromhnia_apoxorhshs.toISOString(),
+        '2026-09-29T00:00:00.000Z');
+    assert.equal(state.audits[0].mutationSource,
+        'DEPARTURE_WITH_DEFERRED_HISTORY_AMBIGUITY');
+});
+
+test('deferred-ambiguity departure rejects a simultaneous employee change before writes', async () => {
+    const db = database(deferredAmbiguityDepartureState());
+    await assert.rejects(writeEmployeeDeparture({ ...db.dependencies, scope,
+        employeeId: 'employee', departureDate: '2026-09-29', effectiveFrom: '2026-07-23',
+        maintenance: { employeeChanges: { email: 'changed@example.invalid' },
+            submittedEmployeeFields: ['email'], submittedFormFields: ['email'],
+            historyChanges: {}, submittedHistoryChanges: {} } }), error =>
+        error.code === 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+    assert.equal(db.writes(), 0);
+});
+
+test('deferred-ambiguity final verification failure rolls back the whole transaction', async () => {
+    const initial = deferredAmbiguityDepartureState();
+    const db = database(initial, '', false, { pretendUpdateSuccess: true });
+    await assert.rejects(writeEmployeeDeparture({ ...db.dependencies, scope,
+        employeeId: 'employee', departureDate: '2026-09-29', effectiveFrom: '2026-07-23',
+        maintenance: { employeeChanges: {}, submittedEmployeeFields: [],
+            historyChanges: {}, submittedHistoryChanges: {}, submittedFormFields: [] } }),
+    error => error.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+    assert.deepEqual(db.state(), initial);
+});
+
+const INVALID_DEPARTURE_HISTORY_ID = '6a149e44452cce439d38287a';
+function invalidDepartureWriterState({ extraHistory = [] } = {}) {
+    const profile = buildCompleteProfileSnapshot({ effectiveFrom: '2026-05-01' });
+    const lifecycle = {
+        hmeromhnia_proslhpshs: '2026-05-01',
+        hmeromhnia_apoxorhshs: '2026-04-30',
+        hmeromhnia_allaghs_symbashs: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_eos: '2026-05-07',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_lhxhs_symbashs: '2026-10-31'
+    };
+    const row = { _id: INVALID_DEPARTURE_HISTORY_ID, ...scope, ...profile, ...lifecycle,
+        aa_eggrafhs: '0001', afora_proslhpsh: true,
+        createdAt: '2026-05-01T08:00:00.000Z', updatedAt: '2026-05-02T08:00:00.000Z' };
+    return { employee: { ...row, _id: 'employee', energos: true, archived: false },
+        history: [row, ...extraHistory], audits: [] };
+}
+function invalidDepartureRequest(db, overrides = {}) {
+    const state = db.state();
+    return writeEmployeeInvalidDepartureCorrection({ ...db.dependencies, scope,
+        employeeId: 'employee',
+        expectedRevision: state.history.find(row => row._id === INVALID_DEPARTURE_HISTORY_ID)?.updatedAt,
+        expectedStoredDeparture: state.employee.hmeromhnia_apoxorhshs,
+        input: {}, maintenance: {}, ...overrides });
+}
+
+test('server-owned invalid departure correction clears only the proven current and history fact', async () => {
+    const initial = invalidDepartureWriterState();
+    const db = database(initial);
+    const result = await invalidDepartureRequest(db);
+    const stored = db.state();
+    assert.equal(result.mode, 'MODE_INVALID_DEPARTURE_CORRECTION');
+    assert.equal(stored.employee.hmeromhnia_apoxorhshs, null);
+    assert.equal(stored.employee.hmeromhnia_proslhpshs, '2026-05-01');
+    assert.equal(stored.employee.energos, true);
+    assert.equal(stored.history.length, 1);
+    assert.equal(stored.history[0]._id, INVALID_DEPARTURE_HISTORY_ID);
+    assert.equal(stored.history[0].hmeromhnia_apoxorhshs, null);
+    assert.equal(stored.audits.length, 1);
+    assert.equal(stored.audits[0].mutationSource, 'HISTORY_INVALID_DEPARTURE_CORRECTION');
+});
+
+test('server-owned invalid departure correction rejects competing evidence without writes', async () => {
+    const base = invalidDepartureWriterState();
+    const competing = { ...base.history[0], _id: '6a149e44452cce439d38287b',
+        aa_eggrafhs: '0002', updatedAt: '2026-05-03T08:00:00.000Z' };
+    const initial = invalidDepartureWriterState({ extraHistory: [competing] });
+    const db = database(initial);
+    await assert.rejects(invalidDepartureRequest(db), error =>
+        error.code === 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_TARGET_MISMATCH');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+});
+
+test('invalid departure correction rejects stale revision and stored-departure mismatch', async () => {
+    for (const overrides of [{ expectedRevision: '2026-05-01T00:00:00.000Z' },
+        { expectedStoredDeparture: '2026-04-29' }]) {
+        const initial = invalidDepartureWriterState();
+        const db = database(initial);
+        await assert.rejects(invalidDepartureRequest(db, overrides), error =>
+            error.code === 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE');
+        assert.equal(db.writes(), 0);
+        assert.deepEqual(db.state(), initial);
+    }
+});
+
+test('invalid departure correction blocks unknown protected-reference semantics', async () => {
+    const initial = invalidDepartureWriterState();
+    const db = database(initial);
+    await assert.rejects(invalidDepartureRequest(db, {
+        referenceChecker: async () => [{ collection: 'Unknown_Protected_Collection' }]
+    }), error => error.code === 'EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
+    assert.deepEqual(db.state(), initial);
+});
+
+test('invalid departure final verification mismatch rolls back employee, history and audit', async () => {
+    const initial = invalidDepartureWriterState();
+    const db = database(initial, '', false, { pretendUpdateSuccess: true });
+    await assert.rejects(invalidDepartureRequest(db), error =>
+        error.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+    assert.deepEqual(db.state(), initial);
+});
+
+test('invalid departure correction fails closed without transaction support', async () => {
+    const initial = invalidDepartureWriterState();
+    const db = database(initial);
+    await assert.rejects(invalidDepartureRequest(db, { capabilityProbe: async () => false }),
+        error => error.code === 'EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
 });
 
 test('0068 sparse legacy contract-end correction keeps the same row and repeated Save is a no-op', async () => {
