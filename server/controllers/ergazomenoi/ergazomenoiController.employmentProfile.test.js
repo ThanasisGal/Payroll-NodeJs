@@ -182,8 +182,11 @@ function handler(mode, db) {
             : { action: 'CREATE_NEW', afm: '' }),
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
         writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }),
+        writeEmployeeDepartureDateCorrection: args =>
+            W.writeEmployeeDepartureDateCorrection({ ...args, ...db.deps }),
         writeEmployeeDepartureCancellation: args => W.writeEmployeeDepartureCancellation({ ...args, ...db.deps }),
         ...require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService'),
+        buildEmployeeMaintenanceIdentity,
         dateKeyUtc: require('../../utils/date/mondaySundayWeek').dateKeyUtc
     });
 }
@@ -411,101 +414,15 @@ test('imported legacy employee with no history saves departure in one baseline t
     assert.equal(db.state().history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
     assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-10');
 });
-test('Maintenance first departure with empty history ID closes a schedule-only terminal row', async () => {
+test('first departure with an unrelated profile mutation is rejected as a separate Save', async () => {
     const stored = await initial();
-    stored.employee.hmeromhnia_proslhpshs = '2026-04-25';
-    stored.employee.hmeromhnia_apoxorhshs = null;
-    stored.employee.energos = true;
-    stored.employee.hmeromhnia_isxyos_oron_ergasias_apo = '2026-05-25';
-    stored.employee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-15';
-    stored.employee.hmeromhnia_lhxhs_symbashs = '2026-10-31';
-    stored.employee.hmeromhnia_allaghs_orarioy_apo = '2026-07-06';
-    stored.employee.hmeromhnia_allaghs_orarioy_eos = '2026-07-12';
-    stored.history = [
-        ['0001', '2026-04-25', '2026-05-24'], ['0002', '2026-05-25', '2026-05-31'],
-        ['0003', '2026-06-01', '2026-06-07'], ['0004', '2026-06-08', '2026-06-14'],
-        ['0005', '2026-06-15', null], ['0006', null, null]
-    ].map(([number, start, end]) => ({ ...plain(stored.history[0]),
-        _id: `maintenance-${number}`, aa_eggrafhs: number,
-        hmeromhnia_proslhpshs: '2026-04-25', hmeromhnia_apoxorhshs: null,
-        hmeromhnia_isxyos_oron_ergasias_apo: start,
-        hmeromhnia_isxyos_oron_ergasias_eos: end,
-        hmeromhnia_allaghs_orarioy_apo: number === '0006' ? '2026-07-06' : null,
-        hmeromhnia_allaghs_orarioy_eos: number === '0006' ? '2026-07-12' : null,
-        afora_allagh_oron_ergasias: number !== '0006',
-        createdAt: `2026-07-${number === '0006' ? '06' : '01'}T00:00:00.000Z`
-    }));
-    const before = plain(stored.history);
-    const departureDb = memory(stored);
-    departureDb.logs = [];
-    const { db, res } = await submit('edit', { ...form(), istorikoId: '',
-        hmeromhnia_proslhpshs: '2026-04-25',
-        hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
-        hmeromhnia_allaghs_orarioy_eos: '2026-07-12',
-        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-25',
-        hmeromhnia_isxyos_oron_ergasias_eos: '2026-10-15', energos: true,
-        hmeromhnia_apoxorhshs: '2026-09-20',
-        logos_peratoshs_stathera: 'Καταγγελία σύμβασης',
-        parathrhseis_peratoshs: 'departure note',
-        kataggelia_me_proeidopoihsh: true,
-        hmnia_koinopoihshs_kataggelias: '2026-09-01',
-        mhnes_proeidopoihshs: 1,
-        email: 'departure@example.invalid', nomimosMisthos: 1300 }, departureDb);
-    assert.equal(res.code, 200, `${res.body?.reason}: ${res.body?.errorMessage}; ` +
-        JSON.stringify(departureDb.logs));
-    const after = db.state();
-    assert.equal(after.history.length, 6);
-    assert.deepEqual(after.history.slice(0, 4), before.slice(0, 4));
-    assert.deepEqual(after.history.map(row => row._id), before.map(row => row._id));
-    assert.equal(after.employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-20');
-    assert.equal(after.employee.energos, false);
-    assert.equal(after.employee.hmeromhnia_isxyos_oron_ergasias_eos.slice(0, 10), '2026-09-20');
-    assert.equal(after.employee.hmeromhnia_lhxhs_symbashs, '2026-10-31');
-    assert.equal(after.employee.logos_peratosis, 'Καταγγελία σύμβασης');
-    assert.equal(after.employee.parathrhseis_peratosis, 'departure note');
-    assert.equal(after.employee.afora_kataggelia_me_proeidopoihsh, true);
-    assert.equal(after.employee.hmeromhnia_koinopoihshs_kataggelias.slice(0, 10), '2026-09-01');
-    assert.equal(after.employee.mhnes_proeidopoihshs, 1);
-    assert.equal(after.employee.email, 'departure@example.invalid');
-    assert.equal(after.employee.nomimosMisthos, 1300);
-    assert.equal(after.history[4].hmeromhnia_isxyos_oron_ergasias_eos.slice(0, 10), '2026-09-20');
-    assert.equal(after.history[4].nomimosMisthos, 1300);
-    assert.equal(after.history[5].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-20');
-    assert.equal(after.history[5].hmeromhnia_isxyos_oron_ergasias_apo, null);
-    const { updatedAt: revisedDeparture, ...afterTerminal } = after.history[5];
-    const { updatedAt: previousDepartureRevision, ...beforeTerminal } = before[5];
-    assert.deepEqual({ ...afterTerminal, hmeromhnia_apoxorhshs: null }, beforeTerminal);
-    assert(new Date(revisedDeparture) > new Date(previousDepartureRevision));
-    const repeated = await submit('edit', { ...form(), istorikoId: '',
-        hmeromhnia_proslhpshs: '2026-04-25',
-        hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
-        hmeromhnia_allaghs_orarioy_eos: '2026-07-12',
-        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-25',
-        hmeromhnia_isxyos_oron_ergasias_eos: '2026-10-15', energos: true,
-        hmeromhnia_apoxorhshs: '2026-09-20',
-        email: 'repeated@example.invalid', nomimosMisthos: 1400 }, memory(after));
-    assert.equal(repeated.res.code, 200, repeated.res.body?.errorMessage);
-    assert.equal(repeated.db.state().history.length, 6);
-    assert.equal(repeated.db.state().employee.email, 'repeated@example.invalid');
-    assert.equal(repeated.db.state().employee.nomimosMisthos, 1400);
-    assert.equal(repeated.db.state().employee.logos_peratosis, 'Καταγγελία σύμβασης');
-    assert.equal(repeated.db.state().employee.parathrhseis_peratosis, 'departure note');
-    assert.equal(repeated.db.state().employee.afora_kataggelia_me_proeidopoihsh, true);
-    assert.equal(repeated.db.state().history[4].nomimosMisthos, 1400);
-    assert.equal(repeated.db.state().history[5].hmeromhnia_isxyos_oron_ergasias_apo, null);
-    const clear = await submit('edit', { ...form(), istorikoId: '',
-        hmeromhnia_proslhpshs: '2026-04-25',
-        hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
-        hmeromhnia_allaghs_orarioy_eos: '2026-07-12',
-        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-25',
-        hmeromhnia_apoxorhshs: '2026-09-20',
-        kataggelia_me_proeidopoihsh: false, mhnes_proeidopoihshs: 0,
-        parathrhseis_peratoshs: '' }, memory(repeated.db.state()));
-    assert.equal(clear.res.code, 200, clear.res.body?.errorMessage);
-    assert.equal(clear.db.state().employee.afora_kataggelia_me_proeidopoihsh, false);
-    assert.equal(clear.db.state().employee.mhnes_proeidopoihshs, 0);
-    assert.equal(clear.db.state().employee.parathrhseis_peratosis, '');
-    assert.equal(clear.db.state().history.length, 6);
+    stored.employee.email = 'before@example.invalid';
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '2026-09-20',
+        email: 'after@example.invalid' }, db);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+    assert.deepEqual(db.state(), stored);
 });
 test('same-departure Maintenance ignores a submitted active flag without a new cycle', async () => {
     const stored = await initial();
@@ -532,6 +449,7 @@ test('explicit departure cancellation reopens the same cycle through the control
     const closed = departed.db.state();
     assert.equal(closed.employee.energos, false);
     const reopened = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '',
+        historyExpectedRevision: closed.history.at(-1).updatedAt,
         energos: true }, memory(closed));
     assert.equal(reopened.res.code, 200, reopened.res.body?.errorMessage);
     const after = reopened.db.state();
@@ -551,11 +469,106 @@ test('departure cancellation never acknowledges an unrelated email change withou
     assert.equal(departed.res.code, 200, departed.res.body?.errorMessage);
     const closed = departed.db.state();
     const attempt = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '',
+        historyExpectedRevision: closed.history.at(-1).updatedAt,
         energos: true, email: 'new@example.test' }, memory(closed));
     assert.equal(attempt.res.code, 409);
     assert.equal(attempt.res.body.reason, 'EMPLOYEE_DEPARTURE_CANCELLATION_SEPARATE_SAVE_REQUIRED');
     assert.match(attempt.res.body.errorMessage, /ακύρωση αποχώρησης πρέπει να αποθηκευτεί χωριστά/);
     assert.deepEqual(attempt.db.state(), closed);
+});
+
+test('stale departure cancellation is rejected before any mutation', async () => {
+    const departed = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '2026-09-20',
+        energos: true }, memory(await initial()));
+    const closed = departed.db.state();
+    const stale = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '',
+        historyExpectedRevision: '2026-01-01T00:00:00.000Z', energos: true }, memory(closed));
+    assert.equal(stale.res.code, 409);
+    assert.equal(stale.res.body.reason, 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE');
+    assert.deepEqual(stale.db.state(), closed);
+});
+
+for (const [label, requestedDate] of [['later', '2026-09-23'], ['earlier', '2026-09-18']]) {
+    test(`${label} departure-date correction uses the controlled writer path`, async () => {
+        const departed = await submit('edit', { ...form(),
+            hmeromhnia_apoxorhshs: '2026-09-20', energos: true }, memory(await initial()));
+        assert.equal(departed.res.code, 200, departed.res.body?.errorMessage);
+        const closed = departed.db.state();
+        const terminal = closed.history.at(-1);
+        const corrected = await submit('edit', { ...form(),
+            hmeromhnia_apoxorhshs: requestedDate,
+            historyExpectedRevision: terminal.updatedAt,
+            energos: false }, memory(closed));
+        assert.equal(corrected.res.code, 200, corrected.res.body?.errorMessage);
+        assert.equal(corrected.db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10),
+            requestedDate);
+        assert.equal(corrected.db.state().history.at(-1).hmeromhnia_apoxorhshs.slice(0, 10),
+            requestedDate);
+        assert.deepEqual(corrected.db.state().history.map(row => row._id),
+            closed.history.map(row => row._id));
+    });
+}
+
+test('departure-date correction before hire is rejected without writes', async () => {
+    const departed = await submit('edit', { ...form(),
+        hmeromhnia_apoxorhshs: '2026-09-20', energos: true }, memory(await initial()));
+    const closed = departed.db.state();
+    const attempt = await submit('edit', { ...form(),
+        hmeromhnia_apoxorhshs: '2026-03-31',
+        historyExpectedRevision: closed.history.at(-1).updatedAt,
+        energos: false }, memory(closed));
+    assert.equal(attempt.res.code, 409);
+    assert.equal(attempt.res.body.reason, 'EMPLOYEE_DEPARTURE_BEFORE_HIRE');
+    assert.deepEqual(attempt.db.state(), closed);
+});
+
+test('stale departure correction cannot overwrite a concurrent newer correction', async () => {
+    const departed = await submit('edit', { ...form(),
+        hmeromhnia_apoxorhshs: '2026-09-20', energos: true }, memory(await initial()));
+    const loadedByUserA = departed.db.state();
+    const oldRevision = loadedByUserA.history.at(-1).updatedAt;
+    const changedByUserB = await submit('edit', { ...form(),
+        hmeromhnia_apoxorhshs: '2026-09-22', historyExpectedRevision: oldRevision,
+        energos: false }, memory(loadedByUserA));
+    assert.equal(changedByUserB.res.code, 200, changedByUserB.res.body?.errorMessage);
+    const latest = changedByUserB.db.state();
+    const stale = await submit('edit', { ...form(),
+        hmeromhnia_apoxorhshs: '2026-09-23', historyExpectedRevision: oldRevision,
+        energos: false }, memory(latest));
+    assert.equal(stale.res.code, 409);
+    assert.equal(stale.res.body.reason, 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE');
+    assert.deepEqual(stale.db.state(), latest);
+});
+
+test('normal cancellation repairs one uniquely proven invalid departure-before-hire', async () => {
+    const invalid = await initial();
+    invalid.employee.hmeromhnia_apoxorhshs = '2026-03-31';
+    invalid.employee.energos = true;
+    invalid.history[0].hmeromhnia_apoxorhshs = '2026-03-31';
+    const revision = invalid.history[0].updatedAt;
+    const repaired = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '',
+        historyExpectedRevision: revision, energos: true }, memory(invalid));
+    assert.equal(repaired.res.code, 200, repaired.res.body?.errorMessage);
+    assert.equal(repaired.db.state().employee.hmeromhnia_apoxorhshs, null);
+    assert.equal(repaired.db.state().history[0].hmeromhnia_apoxorhshs, null);
+    assert.equal(repaired.db.state().history.length, 1);
+});
+
+test('invalid departure cancellation rejects competing matching history evidence', async () => {
+    const invalid = await initial();
+    invalid.employee.hmeromhnia_apoxorhshs = '2026-03-31';
+    invalid.employee.energos = true;
+    invalid.history[0].hmeromhnia_apoxorhshs = '2026-03-31';
+    invalid.history.push({ ...plain(invalid.history[0]), _id: 'competing-invalid',
+        aa_eggrafhs: '0002', updatedAt: '2026-04-02T00:00:00.000Z' });
+    const before = plain(invalid);
+    const attempt = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '',
+        historyExpectedRevision: invalid.history[0].updatedAt,
+        energos: true }, memory(invalid));
+    assert.equal(attempt.res.code, 409);
+    assert.equal(attempt.res.body.reason,
+        'EMPLOYEE_HISTORY_INVALID_DEPARTURE_TARGET_MISMATCH');
+    assert.deepEqual(attempt.db.state(), before);
 });
 test('Maintenance invalid departure returns a lifecycle error without writes', async () => {
     const stored = await initial();
@@ -659,14 +672,16 @@ for (const [name, input, check] of [
     const { db, res } = await submit('edit', { ...form(), ...input }, memory(stored));
     assert.equal(res.code, 200, res.body?.errorMessage); check(db.state().employee); check(db.state().history[0]);
 });
-test('EDIT ordinary endpoint ignores forged APPEND_NEW_VERSION and retains one history row', async () => {
+test('EDIT ordinary endpoint rejects forged APPEND_NEW_VERSION when business intent is ambiguous', async () => {
     const stored = await initial();
+    const before = plain(stored);
     const { db, res } = await submit('edit', { ...form(), ...enabled,
         historyMutationIntent: 'APPEND_NEW_VERSION',
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-15', nomimosMisthos: 1400, poso_symbashs_01: 1400 }, memory(stored));
-    assert.equal(res.code, 200, res.body?.errorMessage);
-    assert.equal(db.state().history.length, 1);
-    assert.equal(db.state().history[0]._id, stored.history[0]._id);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'CONFLICT_PROFILE_CHANGE_INTENT_REQUIRED');
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.writes(), 0);
 });
 test('EDIT loaded historyId moves the same existing boundary instead of appending', async () => {
     const stored = await initial();

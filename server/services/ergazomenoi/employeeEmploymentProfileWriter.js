@@ -5,6 +5,8 @@ const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../mod
 const EmployeeHistoryRepairAuditModel = require('../../models/employeeHistoryRepairAudit');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { departureMaintenanceValuesEqual, departureMaintenanceFormEchoMatchesCurrent } =
+    require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { IDENTITY_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged,
     semanticEmploymentProfilePatch } = require('../../utils/ergazomenoi/employmentProfileTransition');
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
@@ -43,6 +45,21 @@ const { OPERATION: CONTRACT_END_SEGMENT_SYNC_OPERATION,
     PLAN_STATUSES: CONTRACT_END_CORRECTION_PLAN_STATUSES,
     planEmployeeContractEndCorrection } =
     require('./employeeContractEndCorrectionPlannerService');
+const { OPERATION: INVALID_DEPARTURE_CORRECTION_OPERATION,
+    BLOCKER_REASON: INVALID_DEPARTURE_BLOCKER_REASON,
+    DEPARTURE_FIELD: INVALID_DEPARTURE_FIELD,
+    PLAN_STATUSES: INVALID_DEPARTURE_PLAN_STATUSES,
+    planEmployeeHistoryInvalidDepartureCorrection } =
+    require('./employeeHistoryInvalidDepartureCorrectionPlannerService');
+const { OPERATION: DEPARTURE_DATE_CORRECTION_OPERATION,
+    PLAN_STATUSES: DEPARTURE_DATE_CORRECTION_PLAN_STATUSES,
+    planEmployeeDepartureDateCorrection } =
+    require('./employeeDepartureDateCorrectionPlannerService');
+const { OPERATION: DEFERRED_AMBIGUITY_DEPARTURE_OPERATION,
+    PLAN_STATUSES: DEFERRED_AMBIGUITY_DEPARTURE_PLAN_STATUSES,
+    planEmployeeDepartureWithDeferredHistoryAmbiguity,
+    verifyDepartureWithDeferredHistoryAmbiguity } =
+    require('./employeeDepartureDeferredAmbiguityPlannerService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -116,6 +133,28 @@ function normalizedHistoryId(value) {
 function minimalSetPatch(stored, proposed) {
     return Object.fromEntries(Object.entries(proposed).filter(([field, value]) => value !== undefined &&
         JSON.stringify(storedComparable(stored?.[field])) !== JSON.stringify(storedComparable(value))));
+}
+function revisionKey(value) {
+    if (value == null || value === '') return '';
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
+}
+function assertExpectedHistoryRevision({ rows, targetHistoryId, expectedRevision }) {
+    // Legacy internal callers that predate the Maintenance concurrency contract
+    // omit the option entirely. The production controller always supplies it;
+    // an explicit null/empty value therefore still fails closed.
+    if (expectedRevision === undefined) return;
+    const target = rows.find(row => normalizedHistoryId(row._id) ===
+        normalizedHistoryId(targetHistoryId));
+    if (!target || !expectedRevision || revisionKey(target.updatedAt) !== revisionKey(expectedRevision)) {
+        throw failure('EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE');
+    }
+}
+function assertExpectedDeparture(current, expectedDepartureDate) {
+    if (expectedDepartureDate === undefined) return;
+    const stored = C.calendarDate(current?.hmeromhnia_apoxorhshs)?.getTime() ?? null;
+    const expected = C.calendarDate(expectedDepartureDate)?.getTime() ?? null;
+    if (stored !== expected) throw failure('EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE');
 }
 async function checkedHistoryReferences({ referenceChecker, connection, historyIds, session }) {
     // Unit-level in-memory stores intentionally have no Mongo collection API.
@@ -278,7 +317,7 @@ function normalizedAuditRows(rows = []) {
 
 async function verifyFinalMutationState({ filter, employeeId, session, employeeModel,
     historyModel, expectedCurrent, expectedHistory, targetedHistoryId = null,
-    targetedPatch = {} }) {
+    targetedPatch = {}, allowHistoricalAmbiguity = false }) {
     const persistedCurrent = await requestScopedLean(
         employeeModel.findOne({ ...filter, _id: employeeId }), session,
         LARGE_EMPLOYEE_FIELDS_EXCLUSION);
@@ -316,7 +355,8 @@ async function verifyFinalMutationState({ filter, employeeId, session, employeeM
     }
     const rebuilt = rebuildEmployeeHistory({ scope: filter, currentEmployee: persistedCurrent,
         authoritativeCurrent: persistedCurrent, historyRows: persistedHistory });
-    if (rebuilt.status === REBUILD_STATUSES.MANUAL_REVIEW_REQUIRED || rebuilt.cleanupRequired) {
+    if (!allowHistoricalAmbiguity &&
+        (rebuilt.status === REBUILD_STATUSES.MANUAL_REVIEW_REQUIRED || rebuilt.cleanupRequired)) {
         failVerification(rebuilt.diagnostics?.reason || 'NOT_IDEMPOTENT');
     }
     const currentFields = [...new Set(['team', 'company_kod', 'kodikos', ...CURRENT_SYNC_FIELDS])];
@@ -336,16 +376,76 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     targetedHistoryId = null, targetedPatch = {}, historyDocumentFactory = null,
     canonicalRepairRequired = false, deleteCurrent = false,
     controlledLegacyOpenCycleCleanup = false,
+    controlledInvalidDepartureCorrection = false,
+    invalidDepartureCorrectionPlan = null,
     controlledContractEndSegmentSync = false,
     contractEndSegmentSyncPlan = null,
-    contractEndSegmentSyncCurrentPatch = null }) {
+    contractEndSegmentSyncCurrentPatch = null,
+    controlledDeferredAmbiguityDeparture = false,
+    deferredAmbiguityDeparturePlan = null,
+    auditAfterMutation = false }) {
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
         ? { ...currentPatch } : { ...currentBefore, ...currentPatch };
-    if (controlledLegacyOpenCycleCleanup && controlledContractEndSegmentSync) {
-        throw failure('EMPLOYEE_CONTRACT_END_SEGMENT_SYNC_INVALID_BOUNDARY');
+    const controlledBoundaries = [controlledLegacyOpenCycleCleanup,
+        controlledInvalidDepartureCorrection, controlledContractEndSegmentSync,
+        controlledDeferredAmbiguityDeparture].filter(Boolean).length;
+    if (controlledBoundaries > 1) {
+        throw failure(controlledInvalidDepartureCorrection
+            ? 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY'
+            : 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY');
     }
-    if (controlledContractEndSegmentSync) {
+    if (controlledDeferredAmbiguityDeparture) {
+        const expectedUpdateIds = [...(deferredAmbiguityDeparturePlan?.changedHistoryIds || [])]
+            .map(String).sort();
+        const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
+        const exactPatches = physicalPlan.rowsToUpdate.every(item => {
+            const expected = deferredAmbiguityDeparturePlan?.historyPatches?.[String(item.historyId)];
+            const actual = Object.fromEntries(Object.entries(item.patch || {})
+                .filter(([field]) => field !== 'updatedAt'));
+            return expected && stableStringify(actual) === stableStringify(expected);
+        });
+        const beforeIds = physicalPlan.beforeRows.map(row => String(row._id)).sort();
+        const finalIds = physicalPlan.finalRows.map(row => String(row._id)).sort();
+        if (deleteCurrent || diagnostics?.operation !== DEFERRED_AMBIGUITY_DEPARTURE_OPERATION ||
+            deferredAmbiguityDeparturePlan?.status !==
+                DEFERRED_AMBIGUITY_DEPARTURE_PLAN_STATUSES.APPLYABLE ||
+            diagnostics?.planFingerprint !== deferredAmbiguityDeparturePlan.planFingerprint ||
+            stableStringify(currentPatch || {}) !==
+                stableStringify(deferredAmbiguityDeparturePlan.currentPatch) ||
+            physicalPlan.rowsToDelete.length || physicalPlan.rowsToInsert.length || !exactPatches ||
+            stableStringify(plannedUpdateIds) !== stableStringify(expectedUpdateIds) ||
+            stableStringify(beforeIds) !== stableStringify(finalIds)) {
+            throw failure('EMPLOYEE_DEPARTURE_DEFERRED_AMBIGUITY_INVALID_BOUNDARY');
+        }
+    } else if (controlledInvalidDepartureCorrection) {
+        const targetId = String(invalidDepartureCorrectionPlan?.targetHistoryId || '');
+        const targetBefore = physicalPlan.beforeRows.find(row => String(row._id) === targetId);
+        const targetAfter = physicalPlan.finalRows.find(row => String(row._id) === targetId);
+        const plannedUpdateIds = [...new Set(physicalPlan.rowsToUpdate
+            .map(row => String(row.historyId)))].sort();
+        const expectedUpdateIds = [...(invalidDepartureCorrectionPlan?.updateIds || [])]
+            .map(String).sort();
+        const targetUpdate = physicalPlan.rowsToUpdate.find(item =>
+            String(item.historyId) === targetId);
+        const targetPatch = Object.fromEntries(Object.entries(targetUpdate?.patch || {})
+            .filter(([field]) => field !== 'updatedAt'));
+        if (deleteCurrent || diagnostics?.operation !== INVALID_DEPARTURE_CORRECTION_OPERATION ||
+            invalidDepartureCorrectionPlan?.status !== INVALID_DEPARTURE_PLAN_STATUSES.APPLYABLE ||
+            diagnostics?.planFingerprint !== invalidDepartureCorrectionPlan.planFingerprint ||
+            stableStringify(currentPatch) !==
+                stableStringify(invalidDepartureCorrectionPlan.currentPatch) ||
+            Object.keys(currentPatch || {}).length !== 1 ||
+            currentPatch[INVALID_DEPARTURE_FIELD] !== null || !targetBefore || !targetAfter ||
+            targetAfter[INVALID_DEPARTURE_FIELD] !== null ||
+            physicalPlan.rowsToDelete.length || physicalPlan.rowsToInsert.length ||
+            physicalPlan.rowsToUpdate.length !== 1 ||
+            stableStringify(targetPatch) !==
+                stableStringify({ [INVALID_DEPARTURE_FIELD]: null }) ||
+            stableStringify(plannedUpdateIds) !== stableStringify(expectedUpdateIds)) {
+            throw failure('EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY');
+        }
+    } else if (controlledContractEndSegmentSync) {
         const plannedUpdateIds = [...new Set(physicalPlan.rowsToUpdate
             .map(row => String(row.historyId)))].sort();
         const expectedUpdateIds = [...(contractEndSegmentSyncPlan?.changedHistoryIds || [])]
@@ -387,12 +487,13 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     }
     const postMutationCanonical = canonicalizeEmployeeHistory({ scope: filter,
         currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows });
-    if (postMutationCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
+    if (!controlledDeferredAmbiguityDeparture &&
+        postMutationCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
         const error = failure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
         error.canonicalReason = postMutationCanonical.diagnostics?.reason;
         throw error;
     }
-    if (postMutationCanonical.cleanupRequired) {
+    if (!controlledDeferredAmbiguityDeparture && postMutationCanonical.cleanupRequired) {
         physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: physicalPlan.beforeRows,
             desiredRows: postMutationCanonical.canonicalRows, historyModel,
             historyDocumentFactory,
@@ -408,7 +509,9 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     let deletedIds = [...proposedDeletedIds];
     let deleteFilter = buildScopedHistoryDeleteFilter(filter, deletedIds);
     const referencedRedundant = [];
-    const auditRequired = canonicalRepairRequired || proposedDeletedIds.length > 0;
+    const auditRequired = canonicalRepairRequired || proposedDeletedIds.length > 0 ||
+        controlledDeferredAmbiguityDeparture || controlledInvalidDepartureCorrection;
+    let pendingAuditRecord = null;
     if (auditRequired) {
         let auditCollectionExists;
         try {
@@ -469,7 +572,12 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
             }
             if (!references.length) continue;
-            const partitioned = partitionHistoryUpdateReferences(references);
+            let partitioned;
+            try {
+                partitioned = partitionHistoryUpdateReferences(references);
+            } catch {
+                throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
+            }
             if (partitioned.liveDereference.length) {
                 const error = failure('EMPLOYEE_HISTORY_REFERENCED_UPDATE_REQUIRES_REPLACEMENT');
                 error.references = partitioned.liveDereference;
@@ -479,7 +587,19 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         }
     }
     if (auditRequired) {
-        await auditModel.create([{
+        const auditDiagnostics = controlledInvalidDepartureCorrection ? {
+            ...diagnostics,
+            targetHistoryId: invalidDepartureCorrectionPlan.targetHistoryId,
+            previousDeparture: invalidDepartureCorrectionPlan.previousDeparture,
+            newDeparture: null,
+            currentEmployeeDepartureCleared: true,
+            canonicalUpdateIds: [...new Set(physicalPlan.rowsToUpdate
+                .map(row => String(row.historyId)))].sort(),
+            survivingHistoryIds: physicalPlan.finalRows.map(row => String(row._id)).sort(),
+            referencedRedundant,
+            referencedUpdates
+        } : { ...diagnostics, referencedRedundant, referencedUpdates };
+        pendingAuditRecord = {
             employeeScope: { ...filter, employee_id: currentBefore._id },
             repairedAt: new Date(),
             currentBefore: auditProjection(currentBefore),
@@ -488,8 +608,12 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             survivingHistoryIds: physicalPlan.finalRows.map(row => String(row._id)),
             deletedLegacyHistoryIds: deletedIds,
             mutationSource: diagnostics?.operation || 'EMPLOYEE_MAINTENANCE_SAVE',
-            diagnostics: { ...diagnostics, referencedRedundant, referencedUpdates }
-        }], { session });
+            diagnostics: auditDiagnostics
+        };
+        if (!auditAfterMutation) {
+            await auditModel.create([pendingAuditRecord], { session });
+            pendingAuditRecord = null;
+        }
     }
     let createdCurrent = null;
     if (deleteCurrent) {
@@ -522,6 +646,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         const created = await historyModel.create([historyDocument], { session });
         inserted.push(created[0]);
     }
+    if (pendingAuditRecord) await auditModel.create([pendingAuditRecord], { session });
     const expectedCurrent = createdCurrent || { ...currentBefore, ...currentPatch };
     let verified;
     if (deleteCurrent) {
@@ -539,8 +664,38 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     } else {
         verified = await verifyFinalMutationState({ filter, employeeId, session, employeeModel,
             historyModel, expectedCurrent, expectedHistory: physicalPlan.finalRows,
-            targetedHistoryId, targetedPatch });
-        if (controlledContractEndSegmentSync) {
+            targetedHistoryId, targetedPatch,
+            allowHistoricalAmbiguity: controlledDeferredAmbiguityDeparture });
+        if (controlledDeferredAmbiguityDeparture) {
+            const postcondition = verifyDepartureWithDeferredHistoryAmbiguity({
+                plan: deferredAmbiguityDeparturePlan,
+                currentBefore,
+                historyBefore: physicalPlan.beforeRows,
+                currentAfter: verified.current,
+                historyAfter: verified.history
+            });
+            if (!postcondition.ok) {
+                const error = failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+                error.verificationReason = postcondition.reason;
+                throw error;
+            }
+            verified.deferredAmbiguityDeparturePostcondition = postcondition;
+        } else if (controlledInvalidDepartureCorrection) {
+            const persistedTarget = verified.history.find(row => String(row._id) ===
+                String(invalidDepartureCorrectionPlan.targetHistoryId));
+            const canonical = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: verified.history });
+            const second = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: canonical.canonicalRows });
+            if (!persistedTarget || persistedTarget[INVALID_DEPARTURE_FIELD] !== null ||
+                verified.current?.[INVALID_DEPARTURE_FIELD] !== null ||
+                canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired ||
+                !canonical.idempotent || second.status !== CANONICAL_STATUSES.CLEAN ||
+                second.cleanupRequired || !second.idempotent ||
+                stableStringify(second.canonicalRows) !== stableStringify(canonical.canonicalRows)) {
+                throw failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+            }
+        } else if (controlledContractEndSegmentSync) {
             const canonical = canonicalizeEmployeeHistory({ scope: filter,
                 currentEmployee: verified.current, historyRows: verified.history });
             const second = canonicalizeEmployeeHistory({ scope: filter,
@@ -1482,16 +1637,66 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
     return inProfileTransaction(connection, capabilityProbe, async session => {
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
+        if (maintenance.rejectConcurrentProfileChanges === true) {
+            assertDepartureCorrectionMaintenanceUnchanged({ current, input, maintenance });
+        }
         const persistedRows = await completeHistoryLean(historyModel, filter, session);
-        const canonicalBefore = canonicalizeEmployeeHistory({ scope: filter,
+        const initialCanonical = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: current, historyRows: persistedRows });
-        if (canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
+        let deferredAmbiguityDeparturePlan = null;
+        let deferredAmbiguityFormEchoFields = new Set();
+        let prepared;
+        if (initialCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY &&
+            initialCanonical.diagnostics?.reason === 'OVERLAPPING_GENUINE_PERIODS') {
+            const maintenanceDelta = assertDepartureCorrectionMaintenanceUnchanged({
+                current, input, maintenance
+            });
+            deferredAmbiguityFormEchoFields = new Set(
+                maintenanceDelta.semanticallyUnchangedFields || []);
+            const protectedReferences = {};
+            for (const row of persistedRows) {
+                const id = String(row._id);
+                try {
+                    protectedReferences[id] = await checkedHistoryReferences({
+                        referenceChecker, connection, historyIds: [id], session
+                    });
+                } catch {
+                    throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
+                }
+            }
+            deferredAmbiguityDeparturePlan = planEmployeeDepartureWithDeferredHistoryAmbiguity({
+                scope: filter,
+                currentEmployee: current,
+                completeHistoryRows: persistedRows,
+                requestedDepartureDate: departureDate,
+                protectedReferences
+            });
+            if (deferredAmbiguityDeparturePlan.status !==
+                DEFERRED_AMBIGUITY_DEPARTURE_PLAN_STATUSES.APPLYABLE) {
+                const error = failure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+                error.canonicalReason = initialCanonical.diagnostics?.reason;
+                error.deferredDepartureStatus = deferredAmbiguityDeparturePlan.status;
+                error.deferredDepartureReason = deferredAmbiguityDeparturePlan.reason;
+                throw error;
+            }
+            prepared = { canonical: initialCanonical, historyRows: persistedRows,
+                reclassificationPlan: null };
+        } else {
+            prepared = await prepareCanonicalHistoryForMutation({ scope: filter,
+                currentEmployee: current, completeHistoryRows: persistedRows,
+                referenceChecker, connection, session });
+        }
+        const canonicalBefore = prepared.canonical;
+        const lifecycleReclassificationPlan = prepared.reclassificationPlan;
+        if (!deferredAmbiguityDeparturePlan &&
+            canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
             const error = failure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
             error.canonicalReason = canonicalBefore.diagnostics?.reason;
             throw error;
         }
-        const rows = canonicalBefore.canonicalRows;
-        const transition = buildEmployeeDepartureTransition({ currentEmployee: current, history: rows, departureDate });
+        const rows = prepared.historyRows;
+        const transition = deferredAmbiguityDeparturePlan?.transition ||
+            buildEmployeeDepartureTransition({ currentEmployee: current, history: rows, departureDate });
         if (!rows.length) {
             // Imported employees retain the established one-row baseline transaction.
             // A future schedule start is not the validity start of a same-day
@@ -1508,6 +1713,9 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         if (maintenance.submittedEmployeeFields) {
             const owned = new Set(maintenance.submittedEmployeeFields);
             for (const field of Object.keys(mappedEmployee)) if (!owned.has(field)) delete mappedEmployee[field];
+        }
+        if (deferredAmbiguityDeparturePlan) {
+            for (const field of deferredAmbiguityFormEchoFields) delete mappedEmployee[field];
         }
         for (const field of [...IDENTITY_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo']) {
             if (field === 'hmeromhnia_apoxorhshs' || field === 'hmeromhnia_isxyos_oron_ergasias_eos') continue;
@@ -1551,6 +1759,9 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         else delete employeePatch.hmeromhnia_isxyos_oron_ergasias_eos;
         const mappedHistory = cleanMaintenancePatch(
             maintenance.submittedHistoryChanges || maintenance.historyChanges);
+        if (deferredAmbiguityDeparturePlan) {
+            for (const field of deferredAmbiguityFormEchoFields) delete mappedHistory[field];
+        }
         const profilePatch = { ...factChanges };
         for (const [field, value] of Object.entries(mappedHistory)) {
             if (field === 'hmeromhnia_isxyos_dialleimatos_apo') {
@@ -1593,24 +1804,449 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
             }
             historyPatches.set(id, storedPatch);
         }
+        if (deferredAmbiguityDeparturePlan) {
+            const plannedHistoryPatches = Object.fromEntries([...historyPatches]
+                .filter(([, patch]) => Object.keys(patch).length)
+                .sort(([left], [right]) => left.localeCompare(right)));
+            if (stableStringify(storedEmployeePatch) !==
+                    stableStringify(deferredAmbiguityDeparturePlan.currentPatch) ||
+                stableStringify(plannedHistoryPatches) !==
+                    stableStringify(deferredAmbiguityDeparturePlan.historyPatches)) {
+                throw failure('EMPLOYEE_DEPARTURE_DEFERRED_AMBIGUITY_INVALID_BOUNDARY');
+            }
+        }
         const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: persistedRows, desiredRows,
             historyModel, replacementByDeletedId: canonicalBefore.replacementByDeletedId });
         const applied = await executeFinalMutationPlan({ physicalPlan,
             currentBefore: current, currentPatch: storedEmployeePatch,
             filter, employeeId: current._id, session, employeeModel, historyModel,
             auditModel, auditCollectionChecker, referenceChecker, connection,
-            diagnostics: { operation: MUTATION_INTENTS.DEPARTURE },
-            canonicalRepairRequired: canonicalBefore.cleanupRequired === true,
+            diagnostics: deferredAmbiguityDeparturePlan
+                ? { ...deferredAmbiguityDeparturePlan.diagnostics,
+                    planFingerprint: deferredAmbiguityDeparturePlan.planFingerprint,
+                    currentPatch: deferredAmbiguityDeparturePlan.currentPatch,
+                    historyPatches: deferredAmbiguityDeparturePlan.historyPatches }
+                : lifecycleReclassificationAuditDiagnostics(
+                    lifecycleReclassificationPlan, persistedRows,
+                    { operation: MUTATION_INTENTS.DEPARTURE }),
+            canonicalRepairRequired: canonicalBefore.cleanupRequired === true ||
+                lifecycleReclassificationPlan?.status ===
+                    LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE,
+            controlledDeferredAmbiguityDeparture: Boolean(deferredAmbiguityDeparturePlan),
+            deferredAmbiguityDeparturePlan,
             targetedHistoryId: terminal._id,
             targetedPatch: historyPatches.get(String(terminal._id)) || {} });
         return { employee: applied.verified.current, mode: 'MODE_DEPARTURE',
-            history: applied.verified.history.find(row => String(row._id) === String(terminal._id)) };
+            history: applied.verified.history.find(row => String(row._id) === String(terminal._id)),
+            deferredAmbiguityDeparturePlan,
+            deferredAmbiguityDeparturePostcondition:
+                applied.verified.deferredAmbiguityDeparturePostcondition || null };
+    });
+}
+
+async function loadDepartureCorrectionAuditContext({ auditModel, filter, employeeId, session }) {
+    if (typeof auditModel?.find !== 'function') return [];
+    let query = auditModel.find({
+        'employeeScope.team': filter.team,
+        'employeeScope.company_kod': filter.company_kod,
+        'employeeScope.kodikos': filter.kodikos,
+        'employeeScope.employee_id': employeeId
+    });
+    if (typeof query.sort === 'function') query = query.sort({ repairedAt: -1, _id: -1 });
+    if (typeof query.limit === 'function') query = query.limit(100);
+    if (typeof query.session === 'function') query = query.session(session);
+    return typeof query.lean === 'function' ? query.lean() : query;
+}
+
+function departureCorrectionFailure(plan) {
+    const code = plan.status === DEPARTURE_DATE_CORRECTION_PLAN_STATUSES.BLOCKED_INVALID_DATE &&
+        plan.reason === 'REQUESTED_DEPARTURE_BEFORE_HIRE'
+        ? 'EMPLOYEE_DEPARTURE_BEFORE_HIRE'
+        : plan.status === DEPARTURE_DATE_CORRECTION_PLAN_STATUSES.BLOCKED_INVALID_DATE
+            ? 'EMPLOYEE_DEPARTURE_INVALID_DATE'
+            : 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED';
+    const error = failure(code);
+    error.correctionStatus = plan.status;
+    error.correctionReason = plan.reason;
+    error.planFingerprint = plan.planFingerprint;
+    return error;
+}
+
+function departureCorrectionMaintenanceDelta({ current, input, maintenance }) {
+    const submittedEmployee = new Set(maintenance.submittedEmployeeFields || []);
+    const employeeChanges = cleanMaintenancePatch(maintenance.employeeChanges);
+    const ignoredEmployeeFields = new Set([
+        'energos', 'updatedAt', 'hmeromhnia_apoxorhshs'
+    ]);
+    const submittedEmployeeChanges = Object.fromEntries([...submittedEmployee]
+        .filter(field => Object.hasOwn(employeeChanges, field))
+        .map(field => [field, employeeChanges[field]]));
+    const isControlledCorrectionFormEcho = field => {
+        if (field === 'logos_peratosis' && employeeChanges[field] === '' &&
+            current[field] !== undefined && current[field] !== null && current[field] !== '') {
+            return true;
+        }
+        const match = /^stoixeio_symbashs_(\d{2})_hidden$/.exec(field);
+        if (!match) return false;
+        const authoritativeField = `stoixeio_symbashs_${match[1]}`;
+        if (!Object.hasOwn(employeeChanges, authoritativeField)) return false;
+        return departureMaintenanceValuesEqual(field, employeeChanges[field],
+            employeeChanges[authoritativeField]) &&
+            departureMaintenanceValuesEqual(authoritativeField,
+                employeeChanges[authoritativeField], current[authoritativeField]);
+    };
+    const semanticallyUnchangedFields = new Set([...submittedEmployee].filter(field =>
+        Object.hasOwn(employeeChanges, field) &&
+        departureMaintenanceFormEchoMatchesCurrent({
+            field,
+            currentValue: current[field],
+            mappedValue: employeeChanges[field],
+            formData: maintenance.submittedFormValues || {}
+        })));
+    const employeeFields = [...submittedEmployee].filter(field =>
+        !ignoredEmployeeFields.has(field) && Object.hasOwn(employeeChanges, field) &&
+        !semanticallyUnchangedFields.has(field) &&
+        !isControlledCorrectionFormEcho(field) &&
+        !departureMaintenanceValuesEqual(field, employeeChanges[field], current[field]));
+    const semanticEmployeeChanges = Object.fromEntries(Object.entries(submittedEmployeeChanges)
+        .filter(([field]) => !semanticallyUnchangedFields.has(field)));
+    const semanticHistoryChanges = Object.fromEntries(Object.entries(
+        maintenance.submittedHistoryChanges || {})
+        .filter(([field]) => !semanticallyUnchangedFields.has(field)));
+    const semanticInput = Object.fromEntries(Object.entries(input || {})
+        .filter(([field]) => !semanticallyUnchangedFields.has(field)));
+    const semanticPatch = semanticEmploymentProfilePatch(current, {
+        employeeChanges: semanticEmployeeChanges,
+        historyChanges: semanticHistoryChanges
+    }, semanticInput);
+    for (const field of ['energos', 'updatedAt', 'hmeromhnia_apoxorhshs']) {
+        delete semanticPatch[field];
+    }
+    return {
+        employeeFields: employeeFields.sort(),
+        profileOrLifecycleFields: Object.keys(semanticPatch).sort(),
+        semanticallyUnchangedFields: [...semanticallyUnchangedFields].sort()
+    };
+}
+
+function assertDepartureCorrectionMaintenanceUnchanged({ current, input, maintenance }) {
+    const delta = departureCorrectionMaintenanceDelta({ current, input, maintenance });
+    if (delta.employeeFields.length || delta.profileOrLifecycleFields.length) {
+        const error = failure('EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+        error.departureCorrectionChangedFields = [...new Set([
+            ...delta.employeeFields, ...delta.profileOrLifecycleFields
+        ])].sort();
+        throw error;
+    }
+    return delta;
+}
+
+function assertDepartureCorrectionPhysicalPlan({ physicalPlan, correctionPlan,
+    lifecycleReclassificationPlan }) {
+    if (physicalPlan.rowsToDelete.length || physicalPlan.rowsToInsert.length ||
+        stableStringify(physicalPlan.beforeRows.map(row => String(row._id)).sort()) !==
+            stableStringify(physicalPlan.finalRows.map(row => String(row._id)).sort())) {
+        throw failure('EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY');
+    }
+    const expected = new Map();
+    for (const [id, patch] of Object.entries(lifecycleReclassificationPlan?.historyPatches || {})) {
+        expected.set(String(id), { ...(expected.get(String(id)) || {}), ...patch });
+    }
+    for (const [id, patch] of Object.entries(correctionPlan.historyPatches || {})) {
+        expected.set(String(id), { ...(expected.get(String(id)) || {}), ...patch });
+    }
+    const actual = new Map(physicalPlan.rowsToUpdate.map(item => [String(item.historyId),
+        Object.fromEntries(Object.entries(item.patch || {}).filter(([field]) => field !== 'updatedAt'))]));
+    if (stableStringify(Object.fromEntries([...actual].sort())) !==
+        stableStringify(Object.fromEntries([...expected].sort()))) {
+        throw failure('EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY');
+    }
+}
+
+// Correcting an already stored departure is a dedicated lifecycle operation.
+// The form supplies only the requested date and expected revision. Fresh
+// persisted state and server-owned lifecycle evidence determine every row patch.
+async function writeEmployeeDepartureDateCorrection({ scope, employeeId, requestedDepartureDate,
+    expectedRevision, expectedStoredDeparture, input = {}, maintenance = {},
+    connection = mongoose.connection, employeeModel = ErgazomenoiModel,
+    historyModel = IstorikoProslhpseonAllagonModel,
+    auditModel = EmployeeHistoryRepairAuditModel,
+    auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
+    referenceChecker = findHistoryIdReferences,
+    departureAuditContextLoader = loadDepartureCorrectionAuditContext,
+    capabilityProbe = transactionCapability }) {
+    if (!scope || !['team', 'company_kod', 'kodikos'].every(key =>
+        typeof scope[key] === 'string' && scope[key].trim()) ||
+        typeof employeeId !== 'string' || !employeeId.trim()) {
+        C.invalid('scope', 'complete employee scope required');
+    }
+    const filter = Object.fromEntries(['team', 'company_kod', 'kodikos']
+        .map(key => [key, scope[key]]));
+    return inProfileTransaction(connection, capabilityProbe, async session => {
+        const current = await employeeModel.findOne({ ...filter, _id: employeeId })
+            .session(session).lean();
+        if (!current || current.archived === true) {
+            throw failure('EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED');
+        }
+        assertExpectedDeparture(current, expectedStoredDeparture);
+        assertDepartureCorrectionMaintenanceUnchanged({ current, input, maintenance });
+        const persistedRows = await completeHistoryLean(historyModel, filter, session);
+        const prepared = await prepareCanonicalHistoryForMutation({ scope: filter,
+            currentEmployee: current, completeHistoryRows: persistedRows,
+            referenceChecker, connection, session });
+        const rows = prepared.historyRows;
+        const protectedReferences = {};
+        for (const row of rows) {
+            const id = String(row._id);
+            try {
+                protectedReferences[id] = await checkedHistoryReferences({
+                    referenceChecker, connection, historyIds: [id], session
+                });
+            } catch {
+                throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
+            }
+        }
+        let departureAuditContext;
+        try {
+            departureAuditContext = await departureAuditContextLoader({
+                auditModel, filter, employeeId: current._id, session
+            });
+        } catch {
+            throw failure('EMPLOYEE_HISTORY_AUDIT_COLLECTION_CHECK_FAILED');
+        }
+        const correctionPlan = planEmployeeDepartureDateCorrection({
+            scope: filter,
+            currentEmployee: current,
+            completeHistoryRows: rows,
+            requestedDepartureDate,
+            protectedReferences,
+            departureAuditContext
+        });
+        if (!correctionPlan.terminalHistoryId) throw departureCorrectionFailure(correctionPlan);
+        assertExpectedHistoryRevision({ rows: persistedRows,
+            targetHistoryId: correctionPlan.terminalHistoryId, expectedRevision });
+        if (correctionPlan.status === DEPARTURE_DATE_CORRECTION_PLAN_STATUSES.NO_OP) {
+            return { employee: current, mode: 'MODE_DEPARTURE_DATE_CORRECTION_NO_OP',
+                history: rows.find(row => String(row._id) === correctionPlan.terminalHistoryId) || null,
+                plan: correctionPlan, idempotent: true };
+        }
+        if (![DEPARTURE_DATE_CORRECTION_PLAN_STATUSES.APPLYABLE_DEPARTURE_ONLY,
+            DEPARTURE_DATE_CORRECTION_PLAN_STATUSES.APPLYABLE_WITH_PROVEN_CLAMP]
+            .includes(correctionPlan.status)) {
+            throw departureCorrectionFailure(correctionPlan);
+        }
+        const verifiedPlan = planEmployeeDepartureDateCorrection({
+            scope: filter,
+            currentEmployee: current,
+            completeHistoryRows: rows,
+            requestedDepartureDate,
+            protectedReferences,
+            departureAuditContext
+        });
+        if (verifiedPlan.planFingerprint !== correctionPlan.planFingerprint ||
+            verifiedPlan.status !== correctionPlan.status) {
+            throw failure('EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY');
+        }
+        const physicalPlan = buildFinalHistoryMutationPlan({
+            beforeRows: persistedRows,
+            desiredRows: correctionPlan.desiredHistoryRows,
+            historyModel,
+            replacementByDeletedId: prepared.canonical.replacementByDeletedId
+        });
+        assertDepartureCorrectionPhysicalPlan({ physicalPlan, correctionPlan,
+            lifecycleReclassificationPlan: prepared.reclassificationPlan });
+        const changedFields = {
+            current: Object.keys(correctionPlan.currentPatch).sort(),
+            history: Object.fromEntries(Object.entries(correctionPlan.historyPatches)
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([id, patch]) => [id, Object.keys(patch).sort()]))
+        };
+        const applied = await executeFinalMutationPlan({
+            physicalPlan,
+            currentBefore: current,
+            currentPatch: correctionPlan.currentPatch,
+            filter,
+            employeeId: current._id,
+            session,
+            employeeModel,
+            historyModel,
+            auditModel,
+            auditCollectionChecker,
+            referenceChecker,
+            connection,
+            targetedHistoryId: correctionPlan.terminalHistoryId,
+            targetedPatch: correctionPlan.historyPatches[correctionPlan.terminalHistoryId],
+            diagnostics: {
+                operation: DEPARTURE_DATE_CORRECTION_OPERATION,
+                oldDeparture: correctionPlan.oldDeparture,
+                newDeparture: correctionPlan.newDeparture,
+                terminalHistoryId: correctionPlan.terminalHistoryId,
+                changedFields,
+                clampOwnership: correctionPlan.clampOwnership,
+                currentPatch: correctionPlan.currentPatch,
+                historyPatch: correctionPlan.historyPatches,
+                protectedReferenceSummary:
+                    correctionPlan.diagnostics.protectedReferenceSummary,
+                planFingerprint: correctionPlan.planFingerprint,
+                finalLifecycleEvents: correctionPlan.diagnostics.finalLifecycleEvents,
+                lifecycleReclassification: prepared.reclassificationPlan ? {
+                    status: prepared.reclassificationPlan.status,
+                    planFingerprint: prepared.reclassificationPlan.planFingerprint,
+                    changedHistoryIds: prepared.reclassificationPlan.changedHistoryIds
+                } : null
+            },
+            canonicalRepairRequired: true,
+            auditAfterMutation: true
+        });
+        const finalCanonical = canonicalizeEmployeeHistory({ scope: filter,
+            currentEmployee: applied.verified.current, historyRows: applied.verified.history });
+        const secondCanonical = canonicalizeEmployeeHistory({ scope: filter,
+            currentEmployee: applied.verified.current,
+            historyRows: finalCanonical.canonicalRows });
+        if (finalCanonical.status !== CANONICAL_STATUSES.CLEAN ||
+            finalCanonical.cleanupRequired || !finalCanonical.idempotent ||
+            secondCanonical.status !== CANONICAL_STATUSES.CLEAN ||
+            secondCanonical.cleanupRequired || !secondCanonical.idempotent ||
+            stableStringify(secondCanonical.canonicalRows) !==
+                stableStringify(finalCanonical.canonicalRows) ||
+            stableStringify(applied.verified.history.map(row => String(row._id)).sort()) !==
+                stableStringify(persistedRows.map(row => String(row._id)).sort())) {
+            throw failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+        }
+        return {
+            employee: applied.verified.current,
+            mode: 'MODE_DEPARTURE_DATE_CORRECTION',
+            history: applied.verified.history.find(row =>
+                String(row._id) === correctionPlan.terminalHistoryId),
+            plan: correctionPlan,
+            canonical: finalCanonical,
+            idempotent: true
+        };
+    });
+}
+
+function invalidDepartureCorrectionFailure(plan) {
+    const code = typeof plan?.reason === 'string' &&
+        plan.reason.startsWith('EMPLOYEE_HISTORY_INVALID_DEPARTURE_')
+        ? plan.reason : 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_BLOCKED_OTHER';
+    const error = failure(code);
+    error.correctionStatus = plan?.status;
+    error.correctionReason = plan?.reason;
+    error.planFingerprint = plan?.planFingerprint;
+    return error;
+}
+
+async function applyEmployeeInvalidDepartureCorrection({ filter, current, persistedRows,
+    expectedRevision, expectedStoredDeparture, input, maintenance, session, employeeModel,
+    historyModel, auditModel, auditCollectionChecker, referenceChecker, connection }) {
+    if (!current || current.archived === true) {
+        throw failure('EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_BLOCKED_OTHER');
+    }
+    assertExpectedDeparture(current, expectedStoredDeparture);
+    assertDepartureCorrectionMaintenanceUnchanged({ current, input, maintenance });
+    const currentHire = C.calendarDate(current.hmeromhnia_proslhpshs);
+    const currentDeparture = C.calendarDate(current[INVALID_DEPARTURE_FIELD]);
+    if (!currentHire || !currentDeparture || currentDeparture >= currentHire) {
+        throw failure('EMPLOYEE_HISTORY_INVALID_DEPARTURE_NOT_APPLICABLE');
+    }
+    const matchingRows = persistedRows.filter(row =>
+        !isPersistedReferencedRedundant(row) &&
+        (C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() ?? null) === currentHire.getTime() &&
+        (C.calendarDate(row[INVALID_DEPARTURE_FIELD])?.getTime() ?? null) ===
+            currentDeparture.getTime());
+    if (matchingRows.length !== 1) {
+        throw failure('EMPLOYEE_HISTORY_INVALID_DEPARTURE_TARGET_MISMATCH');
+    }
+    const targetHistoryId = String(matchingRows[0]._id);
+    assertExpectedHistoryRevision({ rows: persistedRows, targetHistoryId, expectedRevision });
+    const correctionPlan = planEmployeeHistoryInvalidDepartureCorrection({
+        scope: filter,
+        currentEmployee: current,
+        completeHistoryRows: persistedRows,
+        targetHistoryId
+    });
+    if (correctionPlan.status !== INVALID_DEPARTURE_PLAN_STATUSES.APPLYABLE) {
+        throw invalidDepartureCorrectionFailure(correctionPlan);
+    }
+    const verifiedPlan = planEmployeeHistoryInvalidDepartureCorrection({
+        scope: filter,
+        currentEmployee: current,
+        completeHistoryRows: persistedRows,
+        targetHistoryId
+    });
+    if (verifiedPlan.status !== correctionPlan.status ||
+        verifiedPlan.planFingerprint !== correctionPlan.planFingerprint) {
+        throw failure('EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY');
+    }
+    const physicalPlan = buildFinalHistoryMutationPlan({
+        beforeRows: persistedRows,
+        desiredRows: correctionPlan.desiredHistoryRows,
+        historyModel
+    });
+    const applied = await executeFinalMutationPlan({
+        physicalPlan,
+        currentBefore: current,
+        currentPatch: correctionPlan.currentPatch,
+        filter,
+        employeeId: current._id,
+        session,
+        employeeModel,
+        historyModel,
+        auditModel,
+        auditCollectionChecker,
+        referenceChecker,
+        connection,
+        diagnostics: {
+            ...correctionPlan.diagnostics,
+            operation: INVALID_DEPARTURE_CORRECTION_OPERATION,
+            planFingerprint: correctionPlan.planFingerprint
+        },
+        targetedHistoryId: targetHistoryId,
+        targetedPatch: { [INVALID_DEPARTURE_FIELD]: null },
+        canonicalRepairRequired: true,
+        controlledInvalidDepartureCorrection: true,
+        invalidDepartureCorrectionPlan: correctionPlan,
+        auditAfterMutation: true
+    });
+    return {
+        employee: applied.verified.current,
+        mode: 'MODE_INVALID_DEPARTURE_CORRECTION',
+        history: applied.verified.history.find(row => String(row._id) === targetHistoryId) || null,
+        plan: correctionPlan,
+        idempotent: true
+    };
+}
+
+// This public boundary remains server-owned: callers express only cancellation.
+// The target history identity is derived from fresh scoped state inside the transaction.
+async function writeEmployeeInvalidDepartureCorrection({ scope, employeeId, expectedRevision,
+    expectedStoredDeparture, input = {}, maintenance = {}, connection = mongoose.connection,
+    employeeModel = ErgazomenoiModel, historyModel = IstorikoProslhpseonAllagonModel,
+    auditModel = EmployeeHistoryRepairAuditModel,
+    auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
+    referenceChecker = findHistoryIdReferences,
+    capabilityProbe = transactionCapability }) {
+    if (!scope || !['team', 'company_kod', 'kodikos'].every(key =>
+        typeof scope[key] === 'string' && scope[key].trim()) ||
+        typeof employeeId !== 'string' || !employeeId.trim()) {
+        C.invalid('scope', 'complete employee scope required');
+    }
+    const filter = Object.fromEntries(['team', 'company_kod', 'kodikos']
+        .map(key => [key, scope[key]]));
+    return inProfileTransaction(connection, capabilityProbe, async session => {
+        const current = await employeeModel.findOne({ ...filter, _id: employeeId })
+            .session(session).lean();
+        const persistedRows = await completeHistoryLean(historyModel, filter, session);
+        return applyEmployeeInvalidDepartureCorrection({ filter, current, persistedRows,
+            expectedRevision, expectedStoredDeparture, input, maintenance, session, employeeModel,
+            historyModel, auditModel, auditCollectionChecker, referenceChecker, connection });
     });
 }
 
 // A mistaken departure is reversed only with the before-image recorded by the
 // departure writer. Older clamped records without provenance fail closed.
 async function writeEmployeeDepartureCancellation({ scope, employeeId, input = {}, maintenance = {},
+    expectedRevision, expectedStoredDeparture,
     connection = mongoose.connection, employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel,
     auditModel = EmployeeHistoryRepairAuditModel,
@@ -1623,10 +2259,22 @@ async function writeEmployeeDepartureCancellation({ scope, employeeId, input = {
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]]));
     return inProfileTransaction(connection, capabilityProbe, async session => {
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
-        if (!current || current.archived === true || current.energos !== false) {
+        if (!current || current.archived === true) {
             throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
         }
+        assertExpectedDeparture(current, expectedStoredDeparture);
         const persistedRows = await completeHistoryLean(historyModel, filter, session);
+        const currentHire = C.calendarDate(current.hmeromhnia_proslhpshs);
+        const currentDeparture = C.calendarDate(current.hmeromhnia_apoxorhshs);
+        if (currentHire && currentDeparture && currentDeparture < currentHire) {
+            return applyEmployeeInvalidDepartureCorrection({ filter, current, persistedRows,
+                expectedRevision, expectedStoredDeparture, input, maintenance, session,
+                employeeModel, historyModel, auditModel, auditCollectionChecker,
+                referenceChecker, connection });
+        }
+        if (current.energos !== false) {
+            throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
+        }
         const canonicalBefore = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: current, historyRows: persistedRows });
         if (canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
@@ -1680,6 +2328,8 @@ async function writeEmployeeDepartureCancellation({ scope, employeeId, input = {
             (marker.profile_end_clamped && C.calendarDate(profile.hmeromhnia_isxyos_oron_ergasias_eos)?.getTime() !== departure.getTime())) {
             throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
         }
+        assertExpectedHistoryRevision({ rows: persistedRows,
+            targetHistoryId: terminal._id, expectedRevision });
         const employeePatch = { hmeromhnia_apoxorhshs: null, energos: true,
             employment_departure_restore: null };
         if (marker.employee_end_clamped) employeePatch.hmeromhnia_isxyos_oron_ergasias_eos = marker.employee_end_before;
@@ -1977,7 +2627,8 @@ async function repairEmployeeLegacyOpenCycles({ scope, employeeId,
 }
 module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE,
     transactionCapability, normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter,
-    writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation,
+    writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureDateCorrection,
+    writeEmployeeDepartureCancellation, writeEmployeeInvalidDepartureCorrection,
     writeEmployeeRehire,
     writeEmployeeEmploymentHistoryOperations, deleteEmployeeAndEmploymentHistory,
     repairEmployeeHistoryCanonical, repairEmployeeLegacyOpenCycles, selectMaintenanceMode };

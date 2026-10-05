@@ -1,7 +1,10 @@
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations, deleteEmployeeAndEmploymentHistory, selectMaintenanceMode } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations,
+    writeEmployeeDepartureDateCorrection,
+    deleteEmployeeAndEmploymentHistory, selectMaintenanceMode } =
+    require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { buildEmployeeMaintenanceIdentity } =
     require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
@@ -827,8 +830,20 @@ class ergazomenoiController {
                 buildEmployeeMaintenanceIdentity(ergazomenoiData),
                 ergazomenoiData
             ).historyId || '';
-            const originalEmploymentHistoryRevision = rawIstorikoData.find(row =>
+            let originalEmploymentHistoryRevision = rawIstorikoData.find(row =>
                 String(row._id) === String(originalEmploymentHistoryId))?.updatedAt?.toISOString?.() || '';
+            if (!originalEmploymentHistoryRevision) {
+                const currentDeparture = dateKeyUtc(ergazomenoiData.hmeromhnia_apoxorhshs);
+                const currentHire = dateKeyUtc(ergazomenoiData.hmeromhnia_proslhpshs);
+                const matchingDepartureRows = rawIstorikoData.filter(row =>
+                    currentDeparture && currentHire &&
+                    dateKeyUtc(row.hmeromhnia_apoxorhshs) === currentDeparture &&
+                    dateKeyUtc(row.hmeromhnia_proslhpshs) === currentHire);
+                if (matchingDepartureRows.length === 1) {
+                    originalEmploymentHistoryRevision =
+                        matchingDepartureRows[0].updatedAt?.toISOString?.() || '';
+                }
+            }
             const perifereies = await PerifereiesModel.find().sort('perigrafh');
             const genikesParametroi = await GenikesParametroiModel.find()
                 .sort({ kodikos: 1 })
@@ -3832,16 +3847,42 @@ class ergazomenoiController {
                 /^\d{4}-\d{2}-\d{2}$/.test(formData.hmeromhnia_apoxorhshs) &&
                 dateKeyUtc(formData.hmeromhnia_apoxorhshs);
             const storedDeparture = dateKeyUtc(scopedAccess.employee.hmeromhnia_apoxorhshs);
+            const departureUnchanged = Boolean(storedDeparture && submittedDeparture &&
+                storedDeparture === submittedDeparture);
+            if (departureUnchanged) {
+                if (Object.hasOwn(filteredDataErgazomenoi, 'energos')) {
+                    filteredDataErgazomenoi.energos = scopedAccess.employee.energos;
+                }
+                const authoritativeReason = scopedAccess.employee.logos_peratosis;
+                const echoedReason = formData.logos_peratosis ?? formData.logos_peratoshs;
+                if (filteredDataErgazomenoi.logos_peratosis === '' &&
+                    echoedReason === authoritativeReason && authoritativeReason) {
+                    filteredDataErgazomenoi.logos_peratosis = authoritativeReason;
+                }
+                for (const field of ['foreas_epikoyrikhs_asfalishs', 'typos_metabolhs']) {
+                    const value = filteredDataErgazomenoi[field];
+                    if (!Array.isArray(value) || value.length !== 1 ||
+                        typeof value[0] !== 'string') continue;
+                    try {
+                        const decoded = JSON.parse(value[0]);
+                        if (Array.isArray(decoded)) filteredDataErgazomenoi[field] = decoded;
+                    } catch {
+                        // A genuine non-JSON selection remains unchanged.
+                    }
+                }
+                for (let index = 1; index <= 15; index += 1) {
+                    const suffix = String(index).padStart(2, '0');
+                    const field = `stoixeio_symbashs_${suffix}`;
+                    const hidden = `${field}_hidden`;
+                    if (filteredDataErgazomenoi[hidden] === filteredDataErgazomenoi[field] &&
+                        filteredDataErgazomenoi[field] === scopedAccess.employee[field]) {
+                        delete filteredDataErgazomenoi[hidden];
+                    }
+                }
+            }
             if (rehireIntent !== true && formData.hmeromhnia_apoxorhshs && !submittedDeparture) {
                 const error = new Error('EMPLOYEE_DEPARTURE_INVALID_DATE');
                 error.code = 'EMPLOYEE_DEPARTURE_INVALID_DATE';
-                error.statusCode = 409;
-                throw error;
-            }
-            if (rehireIntent !== true && submittedDeparture && storedDeparture &&
-                storedDeparture !== submittedDeparture) {
-                const error = new Error('EMPLOYEE_DEPARTURE_CONFLICT');
-                error.code = 'EMPLOYEE_DEPARTURE_CONFLICT';
                 error.statusCode = 409;
                 throw error;
             }
@@ -3870,9 +3911,29 @@ class ergazomenoiController {
                         maintenance: { employeeChanges: filteredDataErgazomenoi,
                             submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
                             historyChanges: updateFieldsIstoriko,
-                            submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData) }
+                            submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
+                            submittedFormValues: formData },
+                        expectedRevision: formData.historyExpectedRevision || null,
+                        expectedStoredDeparture: storedDeparture
                     })
-                : submittedDeparture && (!storedDeparture || storedDeparture === submittedDeparture)
+                : storedDeparture && submittedDeparture && storedDeparture !== submittedDeparture
+                    ? await writeEmployeeDepartureDateCorrection({
+                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
+                            kodikos: kodikosErgazomenoy },
+                        employeeId: ergazomenoiId,
+                        requestedDepartureDate: submittedDeparture,
+                        expectedRevision: formData.historyExpectedRevision || null,
+                        expectedStoredDeparture: storedDeparture,
+                        input: profileInput(formData, 'edit'),
+                        maintenance: { employeeChanges: filteredDataErgazomenoi,
+                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(
+                                filteredDataErgazomenoi, formData),
+                            historyChanges: updateFieldsIstoriko,
+                            submittedHistoryChanges: historyEditorChanges(
+                                updateFieldsIstoriko, formData),
+                            submittedFormValues: formData }
+                    })
+                : submittedDeparture && !storedDeparture
                     ? await writeEmployeeDeparture({
                         scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
                             kodikos: kodikosErgazomenoy },
@@ -3882,9 +3943,11 @@ class ergazomenoiController {
                         effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
                             formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
                         maintenance: { employeeChanges: filteredDataErgazomenoi,
+                            rejectConcurrentProfileChanges: true,
                             submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
                             historyChanges: updateFieldsIstoriko,
                             submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
+                            submittedFormValues: formData,
                             submittedFormFields: Object.keys(formData),
                             identity: formData.istorikoId ? undefined : buildEmployeeMaintenanceIdentity(formData),
                             originalHistoryId: formData.istorikoId || null,

@@ -1,6 +1,91 @@
 'use strict';
 const C = require('./employmentProfileContract');
 
+const DEPARTURE_FORM_ECHO_ALIASES = Object.freeze({
+    typos_taytothtas: ['taytothta_stathera'],
+    yphkoothta: ['yphkoothta_stathera'],
+    eidikh_kathgoria_ergazomenoy: ['eidikh_kathgoria_stathera'],
+    oikogeneiakh_katastash: ['oikogeneiakh_katastash_stathera'],
+    perifereia: ['perifereia_stathera'],
+    nomos: ['nomos_stathera'],
+    dhmos: ['dhmos_stathera'],
+    polh: ['polh_stathera'],
+    ekpaideytiko_epipedo: ['ekpaideytiko_epipedo_stathera'],
+    kathestos_apasxolhshs: ['kathestos_apasxolhshs_stathera'],
+    sxesh_ergasias: ['sxesh_ergasias_stathera'],
+    thesh_eythynhs: ['thesh_eythynhs_stathera'],
+    apasxolhsh_basei_symbashs: ['apasxolhsh_basei_symbashs_stathera'],
+    eidikothta_erganh: ['eidikothta_erganh_stathera'],
+    typos_ergazomenon: ['typos_ergazomenon_stathera'],
+    ypokatasthma: ['ypokatasthma_stathera'],
+    foreas_kyrias_asfalishs: ['foreas_kyrias_asfalishs_stathera'],
+    foreas_epikoyrikhs_asfalishs: ['foreas_epikoyrikhs_asfalishs_stathera'],
+    symbash: ['symbash_stathera'],
+    kathgoria_symbashs: ['kathgoria_symbashs_stathera'],
+    eidikothta_symbashs: ['eidikothta_symbashs_stathera']
+});
+const DEPARTURE_FORM_NEUTRAL_DEFAULTS = Object.freeze({
+    corrective_payroll_withholding_rate_percent: 0,
+    pososto_prosayxhshs_6hs_hmeras: 0,
+    typos_ergodoth_daneismoy: false
+});
+const DEPARTURE_FORM_JSON_ARRAY_FIELDS = new Set([
+    'foreas_epikoyrikhs_asfalishs', 'typos_metabolhs'
+]);
+
+function decodeDepartureFormArrayEcho(value) {
+    if (Array.isArray(value)) return value.map(item => departureFormComparable(null, item));
+    if (typeof value !== 'string') return value;
+    try {
+        const decoded = JSON.parse(value);
+        return Array.isArray(decoded)
+            ? decoded.map(item => departureFormComparable(null, item)) : value;
+    } catch {
+        return value;
+    }
+}
+
+function departureFormComparable(field, value) {
+    if (value instanceof Date) return Number.isNaN(value.getTime())
+        ? String(value) : value.toISOString().slice(0, 10);
+    if (value === null || value === undefined || value === '') {
+        return Object.hasOwn(DEPARTURE_FORM_NEUTRAL_DEFAULTS, field)
+            ? DEPARTURE_FORM_NEUTRAL_DEFAULTS[field] : null;
+    }
+    if (field === 'forologikh_klimaka') {
+        const normalized = String(value).trim();
+        const match = normalized.match(/^(?:\d{4})?(\d{4})(?:\s*-\s*.*)?$/u);
+        return match ? match[1] : normalized;
+    }
+    if (DEPARTURE_FORM_JSON_ARRAY_FIELDS.has(field)) {
+        if (Array.isArray(value) && value.length === 1 && typeof value[0] === 'string') {
+            const decoded = decodeDepartureFormArrayEcho(value[0]);
+            if (Array.isArray(decoded)) return decoded;
+        }
+        return decodeDepartureFormArrayEcho(value);
+    }
+    if (Array.isArray(value)) return value.map(item => departureFormComparable(null, item));
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
+    return value;
+}
+
+function departureMaintenanceValuesEqual(field, left, right) {
+    return JSON.stringify(departureFormComparable(field, left)) ===
+        JSON.stringify(departureFormComparable(field, right));
+}
+
+function departureMaintenanceFormEchoMatchesCurrent({ field, currentValue, mappedValue,
+    formData = {} }) {
+    if (departureMaintenanceValuesEqual(field, mappedValue, currentValue)) return true;
+    const visible = formData[field];
+    const emptyVisible = visible === null || visible === undefined || visible === '' ||
+        (Array.isArray(visible) && visible.length === 0);
+    if (!Object.hasOwn(formData, field) || !emptyVisible) return false;
+    const aliases = DEPARTURE_FORM_ECHO_ALIASES[field] || [`${field}_stathera`];
+    return aliases.some(alias => Object.hasOwn(formData, alias) &&
+        departureMaintenanceValuesEqual(field, formData[alias], currentValue));
+}
+
 // Extract facts from the existing Add/Edit payload. No client-owned version stamps.
 function profileInput(formData, mode) {
     const input = Object.fromEntries(C.FACT_FIELDS.filter(field =>
@@ -42,6 +127,7 @@ function isEmploymentProfileError(error) {
     return error?.code === 'INVALID_EMPLOYMENT_PROFILE' ||
         code.startsWith('EMPLOYEE_PROFILE_') ||
         code.startsWith('EMPLOYEE_HISTORY_') ||
+        code.startsWith('EMPLOYEE_DEPARTURE_') ||
         code.startsWith('EMPLOYEE_OPEN_CYCLE_') ||
         code.startsWith('EMPLOYMENT_CYCLE_') ||
         code.startsWith('CONFLICT_') ||
@@ -58,6 +144,19 @@ function profileError(res, error) {
         EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE: 'Η ίδια υποβολή αλλάζει χρονικά όρια ή στοιχεία προφίλ που απαιτούν χωριστή μεταβολή. Αποθηκεύστε πρώτα αυτή τη μεταβολή και έπειτα την αποχώρηση.',
         EMPLOYEE_DEPARTURE_CANCELLATION_SEPARATE_SAVE_REQUIRED: 'Η ακύρωση αποχώρησης πρέπει να αποθηκευτεί χωριστά από άλλες αλλαγές στοιχείων εργαζομένου. Δεν αποθηκεύτηκε καμία αλλαγή.',
         EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED: 'Δεν υπάρχουν ασφαλή στοιχεία για την επαναφορά των ορίων που ίσχυαν πριν από την αποχώρηση. Δεν αποθηκεύτηκε καμία αλλαγή.',
+        EMPLOYEE_DEPARTURE_CANCELLATION_REQUIRES_CONTROLLED_FLOW: 'Η αποχώρηση δεν μπορεί να ακυρωθεί από απλή αλλαγή ιστορικού. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε την αποθηκευμένη πρόσληψη και αποχώρηση. 3. Επαναλάβετε την ακύρωση μόνο αν τα στοιχεία παραμένουν σωστά. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_DEPARTURE_CANCELLATION_REQUIRES_CONTROLLED_FLOW',
+        EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED: 'Η εφαρμογή δεν μπόρεσε να αποδείξει με ασφάλεια ποια εργασιακή σχέση αφορά η νέα ημερομηνία αποχώρησης. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε την πρόσληψη, την αποχώρηση και τυχόν επαναπρόσληψη. 3. Επαναλάβετε μόνο αν η διόρθωση αφορά τη μοναδική τρέχουσα σχέση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED',
+        EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY: 'Η τελική κατάσταση δεν συμφώνησε με την ασφαλή διόρθωση αποχώρησης που υπολογίστηκε. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ότι δεν άλλαξαν ενδιάμεσα τα στοιχεία. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY',
+        EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE: 'Η αποχώρηση ή το ιστορικό άλλαξε αφού ανοίξατε τη φόρμα. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τη νεότερη ημερομηνία αποχώρησης. 3. Υποβάλετε ξανά μόνο τη σωστή διόρθωση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE',
+        EMPLOYEE_DEPARTURE_DEFERRED_AMBIGUITY_INVALID_BOUNDARY: 'Η αποχώρηση θα επηρέαζε παλαιότερη ασάφεια ή διαφορετική εργασιακή περίοδο. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε την τρέχουσα σχέση απασχόλησης. 3. Ζητήστε έλεγχο ιστορικού αν το πρόβλημα παραμένει. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_DEPARTURE_DEFERRED_AMBIGUITY_INVALID_BOUNDARY',
+        EMPLOYEE_HISTORY_INVALID_DEPARTURE_NOT_APPLICABLE: 'Η αποθηκευμένη κατάσταση δεν είναι η μοναδική περίπτωση αποχώρησης πριν από πρόσληψη που μπορεί να διορθωθεί αυτόματα. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις ημερομηνίες πρόσληψης και αποχώρησης. 3. Ζητήστε έλεγχο ιστορικού αν η ασυνέπεια παραμένει. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_INVALID_DEPARTURE_NOT_APPLICABLE',
+        EMPLOYEE_HISTORY_INVALID_DEPARTURE_TARGET_MISMATCH: 'Η εφαρμογή δεν βρήκε μία μοναδική ιστορική εγγραφή που να συμφωνεί με την άκυρη αποχώρηση. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις ημερομηνίες της τρέχουσας σχέσης. 3. Μην επαναλάβετε την ακύρωση αν υπάρχουν πολλαπλές πιθανές περίοδοι. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_INVALID_DEPARTURE_TARGET_MISMATCH',
+        EMPLOYEE_HISTORY_INVALID_DEPARTURE_COMPETING_DEPARTURE: 'Βρέθηκε δεύτερη πιθανή αποχώρηση για την ίδια εργασιακή σχέση. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε όλες τις ημερομηνίες του κύκλου. 3. Ζητήστε έλεγχο ιστορικού πριν από νέα προσπάθεια. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_INVALID_DEPARTURE_COMPETING_DEPARTURE',
+        EMPLOYEE_HISTORY_INVALID_DEPARTURE_CURRENT_CHANGE_REQUIRED: 'Η ακύρωση θα απαιτούσε και άλλη αλλαγή στην τρέχουσα εργασιακή κατάσταση. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε την πρόσληψη και την ενεργή κατάσταση. 3. Ζητήστε έλεγχο ιστορικού. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_INVALID_DEPARTURE_CURRENT_CHANGE_REQUIRED',
+        EMPLOYEE_HISTORY_INVALID_DEPARTURE_REMAINING_AMBIGUITY: 'Η αφαίρεση της άκυρης αποχώρησης δεν αρκεί για συνεπές ιστορικό. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις υπόλοιπες περιόδους. 3. Ζητήστε έλεγχο ιστορικού πριν από νέα αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_INVALID_DEPARTURE_REMAINING_AMBIGUITY',
+        EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_BLOCKED_OTHER: 'Η εφαρμογή δεν μπόρεσε να αποδείξει μία μοναδική ασφαλή διόρθωση της άκυρης αποχώρησης. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις ημερομηνίες. 3. Ζητήστε έλεγχο ιστορικού. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_BLOCKED_OTHER',
+        EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_REQUEST: 'Το αίτημα ακύρωσης δεν συμφωνεί με τη νεότερη αποθηκευμένη κατάσταση. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε την αποχώρηση. 3. Υποβάλετε ξανά μόνο αν εξακολουθεί να χρειάζεται ακύρωση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_REQUEST',
+        EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY: 'Η τελική κατάσταση δεν συμφώνησε με τη μοναδική ασφαλή διόρθωση που υπολογίστηκε. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε αν άλλαξαν τα στοιχεία. 3. Επαναλάβετε μόνο μετά τον έλεγχο. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY',
         EMPLOYEE_PROFILE_DELETE_IDENTITY_MISMATCH: 'Η συγκεκριμένη εγγραφή ιστορικού προς διαγραφή δεν βρέθηκε. Δεν αποθηκεύτηκε καμία αλλαγή.',
         EMPLOYEE_PROFILE_DELETE_CURRENT_VERSION_UNSUPPORTED: 'Η διαγραφή αφαιρεί το ισχύον πλήρες ιστορικό του εργαζομένου χωρίς ασφαλή αντικατάσταση. Δεν γίνεται αυτόματη επαναφορά σε προηγούμενη περίοδο. Δεν αποθηκεύτηκε καμία αλλαγή.',
         EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED: 'Δεν υποστηρίζεται αναδρομική αλλαγή ορίων περιόδου ή μετακίνηση ορίων ελλιπούς ιστορικού. Δεν αποθηκεύτηκε καμία αλλαγή.',
@@ -96,4 +195,5 @@ function profileError(res, error) {
         field: error.field, operation: error.operation || 'EMPLOYEE_MAINTENANCE', message, errorMessage: message });
 }
 module.exports = { profileInput, profileError, isEmploymentProfileError, historyEditorChanges,
-    submittedEmployeeMaintenanceFields };
+    submittedEmployeeMaintenanceFields, departureMaintenanceValuesEqual,
+    departureMaintenanceFormEchoMatchesCurrent };
