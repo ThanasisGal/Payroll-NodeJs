@@ -3907,7 +3907,9 @@ class ergazomenoiController {
             if (resolutionConfirmation && (rehireIntent === true || isDepartureCancellation ||
                 isDepartureCorrection || isFirstDeparture)) {
                 const code = !Object.hasOwn(resolutionConfirmation, 'choiceId')
-                    ? 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE'
+                    ? resolutionConfirmation.responsibilityAccepted === true
+                        ? 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE'
+                        : 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE'
                     : resolutionConfirmation.choiceId === 'APPLY_UNIQUE_SAFE_PLAN'
                         ? 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE'
                         : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE';

@@ -10,6 +10,7 @@
     const EXPECTED_CHOICE = 'APPLY_UNIQUE_SAFE_PLAN';
     const GUIDED_KIND = 'GUIDED_BUSINESS_CHOICE';
     const FACT_KIND = 'BUSINESS_FACT_COLLECTION';
+    const USER_CORRECTION_KIND = 'USER_CONFIRMED_HISTORY_CORRECTION';
     const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/;
     const OPTION_ID_PATTERN = /^[A-Z0-9_]{3,100}$/;
     const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -27,6 +28,11 @@
             'PAY_APPLIED_FROM_HIRE', 'PAY_APPLIED_FROM_OTHER_DATE'
         ])
     });
+    const USER_CORRECTION_INTENTS = Object.freeze([
+        'FROM_HIRE', 'FROM_KNOWN_HISTORY_DATE', 'OTHER_DATE', 'CONFIRM_EXISTING',
+        'CORRECT_EXISTING_HISTORICAL_FACT', 'REAL_HISTORICAL_CHANGE',
+        'ENTER_DIFFERENT_VALUE', 'CONFIRM_REAL_PERIOD', 'RETIRE_ERRONEOUS_ARTIFACT'
+    ]);
 
     function isPlainObject(value) {
         return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -107,6 +113,57 @@
             condition: Object.freeze(expectedCondition) });
     }
 
+    function normalizeCorrectionControl(control) {
+        if (!isPlainObject(control) || control.required !== true ||
+            !['SINGLE_CHOICE', 'DATE', 'INTEGER', 'DECIMAL', 'CATALOG_CHOICE',
+                'BOOLEAN', 'PROFILE_FIELDS'].includes(control.type)) return null;
+        if (control.type === 'DATE') {
+            if (!validCalendarDate(control.min) || !validCalendarDate(control.max) ||
+                control.min > control.max || !String(control.label || '').trim()) return null;
+        }
+        if (control.allowedValues !== undefined && (!Array.isArray(control.allowedValues) ||
+            !control.allowedValues.length || control.allowedValues.some(item =>
+                !isPlainObject(item) || item.value === undefined ||
+                !String(item.label || '').trim()))) return null;
+        if (control.type === 'PROFILE_FIELDS' &&
+            (!Array.isArray(control.baselineValues) || !control.baselineValues.length ||
+            !Array.isArray(control.fields) || !control.fields.length)) return null;
+        return Object.freeze(structuredClone(control));
+    }
+
+    function normalizeCorrectionConflict(conflict, previousIds) {
+        if (!isPlainObject(conflict) || !OPTION_ID_PATTERN.test(String(conflict.conflictId || '')) ||
+            !['BOUNDARY', 'FIELD', 'PROFILE', 'STRUCTURAL_PERIOD'].includes(conflict.kind) ||
+            conflict.required !== true || !String(conflict.issue || '').trim() ||
+            !String(conflict.decisionRequired || '').trim() || !isPlainObject(conflict.period) ||
+            !validCalendarDate(conflict.period.from) || !String(conflict.period.label || '').trim() ||
+            (conflict.period.to !== null && !validCalendarDate(conflict.period.to)) ||
+            !Array.isArray(conflict.intents) || !conflict.intents.length) return null;
+        if (conflict.condition && (!isPlainObject(conflict.condition) ||
+            !previousIds.has(conflict.condition.conflictId) ||
+            !USER_CORRECTION_INTENTS.includes(conflict.condition.intent))) return null;
+        const intents = [];
+        const ids = new Set();
+        for (const intent of conflict.intents) {
+            if (!isPlainObject(intent) || !USER_CORRECTION_INTENTS.includes(intent.id) ||
+                ids.has(intent.id) || !String(intent.label || '').trim() ||
+                !String(intent.description || '').trim()) return null;
+            ids.add(intent.id);
+            const valueControl = intent.valueControl === undefined ? null
+                : normalizeCorrectionControl(intent.valueControl);
+            const effectiveDateControl = intent.effectiveDateControl === undefined ? null
+                : normalizeCorrectionControl(intent.effectiveDateControl);
+            if (intent.valueControl !== undefined && !valueControl ||
+                intent.effectiveDateControl !== undefined &&
+                (!effectiveDateControl || effectiveDateControl.type !== 'DATE')) return null;
+            intents.push(Object.freeze({ id: intent.id, label: String(intent.label),
+                description: String(intent.description),
+                ...(valueControl ? { valueControl } : {}),
+                ...(effectiveDateControl ? { effectiveDateControl } : {}) }));
+        }
+        return Object.freeze({ ...structuredClone(conflict), intents: Object.freeze(intents) });
+    }
+
     function normalizeResolutionResponse(data) {
         const resolution = data?.resolution;
         if (data?.resolutionRequired !== true || !isPlainObject(resolution) ||
@@ -126,6 +183,30 @@
                     'Χρειάζονται πραγματικά στοιχεία για το ιστορικό'),
                 explanation: String(resolution.explanation || ''),
                 questions: Object.freeze(questions),
+                fingerprint: String(resolution.fingerprint)
+            });
+        }
+
+        if (resolution.kind === USER_CORRECTION_KIND) {
+            if (!Array.isArray(resolution.conflicts) || !resolution.conflicts.length ||
+                !String(resolution.responsibilityText || '').trim()) return null;
+            const ids = new Set();
+            const conflicts = [];
+            for (const raw of resolution.conflicts) {
+                const conflict = normalizeCorrectionConflict(raw, ids);
+                if (!conflict || ids.has(conflict.conflictId)) return null;
+                ids.add(conflict.conflictId);
+                conflicts.push(conflict);
+            }
+            const serialized = JSON.stringify(conflicts);
+            if (/(?:"_id"|historyId|aa_eggrafhs|survivorId|deleteId|"patch"|mongo)/i
+                .test(serialized)) return null;
+            return Object.freeze({
+                kind: USER_CORRECTION_KIND,
+                title: String(resolution.title || 'Χρειάζεται διόρθωση του ιστορικού'),
+                explanation: String(resolution.explanation || ''),
+                conflicts: Object.freeze(conflicts),
+                responsibilityText: String(resolution.responsibilityText),
                 fingerprint: String(resolution.fingerprint)
             });
         }
@@ -368,7 +449,265 @@
         };
     }
 
+    function appendChoiceOptions(documentRef, select, values) {
+        const empty = documentRef.createElement('option');
+        empty.value = '';
+        empty.textContent = 'Επιλέξτε…';
+        select.appendChild(empty);
+        for (const item of values || []) {
+            const option = documentRef.createElement('option');
+            option.value = String(item.value);
+            option.textContent = String(item.label);
+            select.appendChild(option);
+        }
+    }
+
+    function buildCorrectionValueControl(documentRef, control, emitValidity) {
+        const wrapper = documentRef.createElement('div');
+        wrapper.className = 'ms-4 mt-2';
+        const state = { control, wrapper, element: null, fieldElements: [] };
+        if (control.type === 'PROFILE_FIELDS') {
+            appendText(documentRef, wrapper, 'label', 'Εκδοχή βάσης', 'form-label small');
+            const baseline = documentRef.createElement('select');
+            baseline.className = 'form-select';
+            baseline.value = '';
+            appendChoiceOptions(documentRef, baseline, control.baselineValues);
+            wrapper.appendChild(baseline);
+            state.element = baseline;
+            for (const field of control.fields) {
+                const fieldWrapper = documentRef.createElement('div');
+                fieldWrapper.className = 'mt-2';
+                appendText(documentRef, fieldWrapper, 'label', field.label,
+                    'form-label small');
+                const input = documentRef.createElement(field.inputType === 'CATALOG_CHOICE'
+                    ? 'select' : 'input');
+                input.value = '';
+                input.className = field.inputType === 'CATALOG_CHOICE'
+                    ? 'form-select' : 'form-control';
+                if (field.inputType === 'CATALOG_CHOICE') {
+                    appendChoiceOptions(documentRef, input, field.catalogValues || []);
+                } else {
+                    input.type = field.inputType === 'BOOLEAN' ? 'checkbox' : 'number';
+                    if (field.min !== undefined) input.min = field.min;
+                    if (field.max !== undefined) input.max = field.max;
+                    if (field.inputType === 'DECIMAL') input.step = 'any';
+                }
+                input.disabled = true;
+                fieldWrapper.appendChild(input);
+                wrapper.appendChild(fieldWrapper);
+                state.fieldElements.push({ field, input });
+                if (typeof input.addEventListener === 'function') {
+                    input.addEventListener('input', emitValidity);
+                    input.addEventListener('change', emitValidity);
+                }
+            }
+            if (typeof baseline.addEventListener === 'function') {
+                baseline.addEventListener('change', emitValidity);
+            }
+            return state;
+        }
+        appendText(documentRef, wrapper, 'label', control.label || 'Τιμή',
+            'form-label small');
+        const input = documentRef.createElement(
+            ['SINGLE_CHOICE', 'CATALOG_CHOICE'].includes(control.type) ? 'select' : 'input');
+        input.className = ['SINGLE_CHOICE', 'CATALOG_CHOICE'].includes(control.type)
+            ? 'form-select' : 'form-control';
+        input.value = '';
+        if (['SINGLE_CHOICE', 'CATALOG_CHOICE'].includes(control.type)) {
+            appendChoiceOptions(documentRef, input, control.allowedValues || []);
+        } else if (control.type === 'DATE') {
+            input.type = 'date'; input.min = control.min; input.max = control.max;
+        } else if (control.type === 'BOOLEAN') {
+            input.type = 'checkbox'; input.checked = false;
+        } else {
+            input.type = 'number';
+            if (control.min !== undefined) input.min = control.min;
+            if (control.max !== undefined) input.max = control.max;
+            if (control.type === 'DECIMAL') input.step = 'any';
+        }
+        input.disabled = true;
+        wrapper.appendChild(input);
+        state.element = input;
+        if (typeof input.addEventListener === 'function') {
+            input.addEventListener('input', emitValidity);
+            input.addEventListener('change', emitValidity);
+        }
+        return state;
+    }
+
+    function normalizedControlValue(state) {
+        const { control, element } = state;
+        if (control.type === 'PROFILE_FIELDS') {
+            const values = {};
+            for (const { field, input } of state.fieldElements) {
+                const raw = field.inputType === 'BOOLEAN' ? input.checked : input.value;
+                if (raw === '' || raw === undefined) continue;
+                if (['INTEGER', 'DECIMAL'].includes(field.inputType)) {
+                    const number = Number(raw);
+                    if (!Number.isFinite(number) || field.min !== undefined && number < field.min ||
+                        field.max !== undefined && number > field.max ||
+                        field.inputType === 'INTEGER' && !Number.isInteger(number)) return null;
+                    values[field.id] = number;
+                } else values[field.id] = raw;
+            }
+            return element.value && Object.keys(values).length === state.fieldElements.length
+                ? { value: element.value, values } : null;
+        }
+        if (control.type === 'BOOLEAN') return { value: element.checked === true };
+        const raw = element.value;
+        if (control.type === 'DATE') return validCalendarDate(raw) && raw >= control.min &&
+            raw <= control.max ? { effectiveDate: raw } : null;
+        if (['INTEGER', 'DECIMAL'].includes(control.type)) {
+            const number = Number(raw);
+            if (raw === '' || !Number.isFinite(number) ||
+                control.min !== undefined && number < control.min ||
+                control.max !== undefined && number > control.max ||
+                control.type === 'INTEGER' && !Number.isInteger(number)) return null;
+            return { value: number };
+        }
+        const allowed = control.allowedValues || [];
+        return allowed.some(item => String(item.value) === String(raw)) ? { value: raw } : null;
+    }
+
+    function buildUserCorrectionContent(documentRef, resolution,
+        onValidityChange = () => {}) {
+        const container = documentRef.createElement('div');
+        appendText(documentRef, container, 'p', resolution.explanation);
+        const state = { intents: {}, responsibilityAccepted: false, normalizedDecisions: null };
+        const controls = [];
+        const activeConflict = conflict => !conflict.condition ||
+            state.intents[conflict.condition.conflictId] === conflict.condition.intent;
+        const emitValidity = () => {
+            const decisions = [];
+            let valid = state.responsibilityAccepted === true;
+            for (const control of controls) {
+                const active = activeConflict(control.conflict);
+                control.wrapper.hidden = !active;
+                if (!active) continue;
+                const intentId = state.intents[control.conflict.conflictId];
+                const selected = control.intentControls.find(item => item.intent.id === intentId);
+                if (!selected) { valid = false; continue; }
+                const decision = { conflictId: control.conflict.conflictId, intent: intentId };
+                if (selected.valueState) {
+                    const normalized = normalizedControlValue(selected.valueState);
+                    if (!normalized) { valid = false; continue; }
+                    Object.assign(decision, normalized);
+                }
+                if (selected.dateState) {
+                    const normalized = normalizedControlValue(selected.dateState);
+                    if (!normalized) { valid = false; continue; }
+                    Object.assign(decision, normalized);
+                }
+                decisions.push(decision);
+            }
+            state.normalizedDecisions = valid ? decisions : null;
+            onValidityChange(valid);
+            return valid;
+        };
+        const refresh = () => {
+            for (const control of controls) {
+                const selectedId = state.intents[control.conflict.conflictId];
+                for (const item of control.intentControls) {
+                    const enabled = activeConflict(control.conflict) && item.intent.id === selectedId;
+                    for (const valueState of [item.valueState, item.dateState].filter(Boolean)) {
+                        valueState.element.disabled = !enabled;
+                        for (const field of valueState.fieldElements) field.input.disabled = !enabled;
+                        valueState.wrapper.hidden = !enabled;
+                    }
+                }
+            }
+            emitValidity();
+        };
+
+        for (const conflict of resolution.conflicts) {
+            const wrapper = documentRef.createElement('section');
+            wrapper.className = 'text-start border rounded p-3 mb-3';
+            appendText(documentRef, wrapper, 'div', `Περίοδος: ${conflict.period.label}`,
+                'fw-semibold');
+            if (conflict.field?.label) appendText(documentRef, wrapper, 'div',
+                conflict.field.label, 'fw-semibold mt-2');
+            appendText(documentRef, wrapper, 'p', conflict.issue, 'mb-1 mt-2');
+            if (Array.isArray(conflict.historicalValues)) for (const item of conflict.historicalValues) {
+                appendText(documentRef, wrapper, 'div', `Ιστορική τιμή: ${item.label}`,
+                    'small');
+            }
+            if (conflict.laterValue) appendText(documentRef, wrapper, 'div',
+                `Μεταγενέστερη τιμή: ${conflict.laterValue.label}`, 'small');
+            appendText(documentRef, wrapper, 'div', conflict.decisionRequired,
+                'form-label mt-3');
+            const intentControls = [];
+            for (const intent of conflict.intents) {
+                const intentWrapper = documentRef.createElement('div');
+                intentWrapper.className = 'form-check mb-2';
+                const radio = documentRef.createElement('input');
+                radio.type = 'radio';
+                radio.name = `employee-history-correction-${conflict.conflictId}`;
+                radio.value = intent.id;
+                radio.checked = false;
+                radio.className = 'form-check-input';
+                const label = documentRef.createElement('label');
+                label.className = 'form-check-label';
+                label.textContent = intent.label;
+                intentWrapper.appendChild(radio);
+                intentWrapper.appendChild(label);
+                appendText(documentRef, intentWrapper, 'div', intent.description,
+                    'small text-muted ms-4');
+                const valueState = intent.valueControl
+                    ? buildCorrectionValueControl(documentRef, intent.valueControl, emitValidity)
+                    : null;
+                const dateState = intent.effectiveDateControl
+                    ? buildCorrectionValueControl(documentRef, intent.effectiveDateControl, emitValidity)
+                    : null;
+                for (const nested of [valueState, dateState].filter(Boolean)) {
+                    nested.wrapper.hidden = true;
+                    intentWrapper.appendChild(nested.wrapper);
+                }
+                if (typeof radio.addEventListener === 'function') radio.addEventListener('change', () => {
+                    if (!radio.checked) return;
+                    state.intents[conflict.conflictId] = intent.id;
+                    refresh();
+                });
+                intentControls.push({ intent, radio, valueState, dateState });
+                wrapper.appendChild(intentWrapper);
+            }
+            controls.push({ conflict, wrapper, intentControls });
+            container.appendChild(wrapper);
+        }
+        const responsibilityWrapper = documentRef.createElement('div');
+        responsibilityWrapper.className = 'form-check text-start mt-3';
+        const responsibilityCheckbox = documentRef.createElement('input');
+        responsibilityCheckbox.type = 'checkbox';
+        responsibilityCheckbox.checked = false;
+        responsibilityCheckbox.className = 'form-check-input';
+        const responsibilityLabel = documentRef.createElement('label');
+        responsibilityLabel.className = 'form-check-label';
+        responsibilityLabel.textContent = resolution.responsibilityText;
+        responsibilityWrapper.appendChild(responsibilityCheckbox);
+        responsibilityWrapper.appendChild(responsibilityLabel);
+        container.appendChild(responsibilityWrapper);
+        if (typeof responsibilityCheckbox.addEventListener === 'function') {
+            responsibilityCheckbox.addEventListener('change', () => {
+                state.responsibilityAccepted = responsibilityCheckbox.checked === true;
+                emitValidity();
+            });
+        }
+        refresh();
+        return {
+            element: container,
+            controls,
+            responsibilityCheckbox,
+            selected() {
+                if (!emitValidity()) return null;
+                return { responsibilityAccepted: true,
+                    decisions: state.normalizedDecisions.map(decision => ({ ...decision })) };
+            }
+        };
+    }
+
     function buildSafeContent(documentRef, resolution, onValidityChange) {
+        if (resolution.kind === USER_CORRECTION_KIND) {
+            return buildUserCorrectionContent(documentRef, resolution, onValidityChange);
+        }
         if (resolution.kind === GUIDED_KIND) {
             return buildGuidedContent(documentRef, resolution, onValidityChange);
         }
@@ -380,6 +719,19 @@
 
     function buildRetryPayload(originalPayload, resolution, selection = null) {
         const payload = { ...(isPlainObject(originalPayload) ? originalPayload : {}) };
+        if (resolution.kind === USER_CORRECTION_KIND) {
+            if (!selection || selection.responsibilityAccepted !== true ||
+                !Array.isArray(selection.decisions) || !selection.decisions.length) {
+                throw new TypeError('Valid user-confirmed correction required');
+            }
+            payload.resolution = {
+                fingerprint: resolution.fingerprint,
+                responsibilityAccepted: true,
+                decisions: selection.decisions.map(decision => ({ ...decision,
+                    ...(decision.values ? { values: { ...decision.values } } : {}) }))
+            };
+            return payload;
+        }
         if (resolution.kind === FACT_KIND) {
             const questions = resolution.questions;
             if (!selection || !isPlainObject(selection.answers)) {
@@ -445,7 +797,8 @@
             if (!valid && typeof swal.disableConfirmButton === 'function') swal.disableConfirmButton();
         };
         const content = buildSafeContent(documentRef, resolution, setConfirmValidity);
-        const guided = resolution.kind === GUIDED_KIND || resolution.kind === FACT_KIND;
+        const guided = resolution.kind === GUIDED_KIND || resolution.kind === FACT_KIND ||
+            resolution.kind === USER_CORRECTION_KIND;
         const result = await swal.fire({
             backdrop: false,
             allowOutsideClick: false,
@@ -463,7 +816,7 @@
                 const selection = content.selected();
                 if (!selection) {
                     if (typeof swal.showValidationMessage === 'function') {
-                        swal.showValidationMessage('Επιλέξτε τι συνέβη πραγματικά και συμπληρώστε την απαιτούμενη ημερομηνία. Δεν αποθηκεύτηκε αλλαγή.');
+                        swal.showValidationMessage('Συμπληρώστε όλες τις απαιτούμενες αποφάσεις και επιβεβαιώστε την ευθύνη σας. Δεν αποθηκεύτηκε καμία αλλαγή.');
                     }
                     return false;
                 }
@@ -500,6 +853,7 @@
         EXPECTED_CHOICE,
         GUIDED_KIND,
         FACT_KIND,
+        USER_CORRECTION_KIND,
         normalizeResolutionResponse,
         readResolutionFromResponse,
         buildSafeContent,

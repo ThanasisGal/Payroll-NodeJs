@@ -201,3 +201,79 @@ test('business-fact failures have numbered fail-closed messages and support refe
         assert.match(payload.message, new RegExp(`Κωδικός αναφοράς: ${code}$`), code);
     }
 });
+
+test('η απαίτηση επιβεβαιωμένης διόρθωσης εκθέτει μόνο ασφαλές επιχειρησιακό φύλλο', () => {
+    let payload;
+    const res = { status() { return this; }, json(value) { payload = value; return value; } };
+    profileError(res, {
+        code: 'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED', statusCode: 409,
+        resolutionRequired: true,
+        resolution: {
+            version: 1, kind: 'USER_CONFIRMED_HISTORY_CORRECTION',
+            title: 'Χρειάζεται διόρθωση του ιστορικού',
+            explanation: 'Επιλέξτε τι ίσχυε πραγματικά.',
+            conflicts: [{ conflictId: 'FIELD_KPK', kind: 'FIELD', required: true,
+                period: { from: '2026-04-24', to: '2026-05-24',
+                    label: '24/04/2026 – 24/05/2026' },
+                field: { id: 'KPK', label: 'Ασφαλιστική κατηγορία / ΚΠΚ',
+                    inputType: 'CATALOG_CHOICE' },
+                issue: 'Η ιστορική τιμή 0111 διαφέρει από τη μεταγενέστερη 0115.',
+                decisionRequired: 'Τι ίσχυε πραγματικά;',
+                historicalValues: [{ value: '0111', label: '0111 — ΣΥΝΤΑΞΗ' }],
+                laterValue: { value: '0115', label: '0115 — ΒΑΡΕΑ' },
+                intents: [{ id: 'CONFIRM_EXISTING', label: 'Το 0111 ήταν σωστό',
+                    description: 'Η ιστορική τιμή παραμένει.' }]
+            }],
+            responsibilityText: 'Επιβεβαιώνω ότι οι παραπάνω επιλογές αποτυπώνουν τα πραγματικά ιστορικά στοιχεία του εργαζομένου.',
+            fingerprint: '7'.repeat(64),
+            internalRules: { historyId: 'must-not-leak' }
+        }
+    });
+    assert.equal(payload.resolutionRequired, true);
+    assert.equal(payload.resolution.kind, 'USER_CONFIRMED_HISTORY_CORRECTION');
+    assert.equal(JSON.stringify(payload).includes('must-not-leak'), false);
+    assert.equal(JSON.stringify(payload).includes('historyId'), false);
+    assert.match(payload.resolution.responsibilityText, /Επιβεβαιώνω/);
+    assert.match(payload.message, /1\./);
+    assert.match(payload.message, /2\./);
+    assert.match(payload.message, /3\./);
+    assert.match(payload.message, /Δεν αποθηκεύτηκε καμία αλλαγή\./);
+});
+
+test('όλα τα σφάλματα διόρθωσης εξηγούν ενέργεια, αιτία, βήματα και μη αποθήκευση', () => {
+    for (const code of [
+        'EMPLOYEE_HISTORY_USER_CORRECTION_RESPONSIBILITY_REQUIRED',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_INCOMPLETE',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_STALE',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_CATALOG_UNAVAILABLE',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_VALUE',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_SIMULATION_FAILED',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_FINAL_VERIFICATION_FAILED'
+    ]) {
+        let payload;
+        const res = { status() { return this; }, json(value) { payload = value; return value; } };
+        profileError(res, { code, statusCode: 409 });
+        assert.match(payload.message, /1\./, code);
+        assert.match(payload.message, /2\./, code);
+        assert.match(payload.message, /3\./, code);
+        assert.match(payload.message, /Δεν αποθηκεύτηκε καμία αλλαγή\./, code);
+        assert.match(payload.message, new RegExp(`Κωδικός αναφοράς: ${code}$`), code);
+        assert.doesNotMatch(payload.message, /Mongo|aa_eggrafhs|stack/i, code);
+    }
+});
+
+test('κακόβουλο φύλλο διόρθωσης απορρίπτεται και δεν ανακλά τεχνικές ταυτότητες', () => {
+    let payload;
+    const res = { status() { return this; }, json(value) { payload = value; return value; } };
+    profileError(res, { code: 'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED', statusCode: 409,
+        resolutionRequired: true, resolution: {
+            version: 1, kind: 'USER_CONFIRMED_HISTORY_CORRECTION',
+            conflicts: [{ conflictId: 'BAD', historyId: 'forged' }],
+            responsibilityText: 'Επιβεβαιώνω', fingerprint: '6'.repeat(64)
+        } });
+    assert.equal(payload.resolutionRequired, undefined);
+    assert.equal(payload.resolution, undefined);
+    assert.equal(JSON.stringify(payload).includes('forged'), false);
+});

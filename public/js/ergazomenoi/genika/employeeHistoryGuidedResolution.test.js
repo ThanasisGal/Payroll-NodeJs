@@ -120,6 +120,112 @@ function factResolutionData({ pay = false, overrides = {} } = {}) {
     };
 }
 
+function correctionResolutionData(overrides = {}) {
+    return {
+        resolutionRequired: true,
+        resolution: {
+            version: 1,
+            kind: 'USER_CONFIRMED_HISTORY_CORRECTION',
+            title: 'Χρειάζεται διόρθωση του ιστορικού',
+            explanation: 'Επιλέξτε τι ίσχυε πραγματικά.',
+            conflicts: [{
+                conflictId: 'INITIAL_PROFILE_START', kind: 'BOUNDARY', required: true,
+                period: { from: '2026-04-24', to: '2026-05-24',
+                    label: '24/04/2026 – 24/05/2026' },
+                issue: 'Η πρώτη πλήρης εκδοχή αρχίζει αργότερα από την πρόσληψη.',
+                decisionRequired: 'Από πότε ίσχυαν οι πρώτοι πλήρεις όροι;',
+                intents: [
+                    { id: 'FROM_HIRE', label: 'Από την πρόσληψη',
+                        description: 'Ίσχυαν από 24/04/2026.' },
+                    { id: 'OTHER_DATE', label: 'Από άλλη ημερομηνία',
+                        description: 'Δηλώστε την πραγματική ημερομηνία.',
+                        effectiveDateControl: { type: 'DATE', required: true,
+                            label: 'Ημερομηνία έναρξης', min: '2026-04-24',
+                            max: '2026-05-24' } }
+                ]
+            }, {
+                conflictId: 'FIELD_KPK', kind: 'FIELD', required: true,
+                period: { from: '2026-04-24', to: '2026-05-24',
+                    label: '24/04/2026 – 24/05/2026' },
+                field: { id: 'KPK', label: 'Ασφαλιστική κατηγορία / ΚΠΚ',
+                    inputType: 'CATALOG_CHOICE' },
+                issue: 'Η ιστορική τιμή 0111 διαφέρει από τη μεταγενέστερη 0115.',
+                decisionRequired: 'Τι ίσχυε πραγματικά;',
+                historicalValues: [{ value: '0111', label: '0111 — ΣΥΝΤΑΞΗ' }],
+                laterValue: { value: '0115',
+                    label: '0115 — ΣΥΝΤΑΞΗ, ΒΑΡΕΑ, ΙΚΑ-ΤΕΑΜ' },
+                intents: [
+                    { id: 'CONFIRM_EXISTING', label: 'Το 0111 ήταν σωστό',
+                        description: 'Η ιστορική τιμή παραμένει.' },
+                    { id: 'CORRECT_EXISTING_HISTORICAL_FACT',
+                        label: 'Το 0111 ήταν λανθασμένο',
+                        description: 'Διορθώνεται μόνο το ΚΠΚ.',
+                        valueControl: { id: 'KPK', label: 'ΚΠΚ',
+                            type: 'CATALOG_CHOICE', required: true,
+                            allowedValues: [
+                                { value: '0111', label: '0111 — ΣΥΝΤΑΞΗ' },
+                                { value: '0115', label: '0115 — ΒΑΡΕΑ' }
+                            ] } },
+                    { id: 'REAL_HISTORICAL_CHANGE',
+                        label: 'Έγινε πραγματική αλλαγή',
+                        description: 'Οι δύο τιμές ίσχυαν σε διαφορετικές περιόδους.',
+                        valueControl: { id: 'KPK', label: 'Νέος ΚΠΚ',
+                            type: 'CATALOG_CHOICE', required: true,
+                            allowedValues: [
+                                { value: '0111', label: '0111 — ΣΥΝΤΑΞΗ' },
+                                { value: '0115', label: '0115 — ΒΑΡΕΑ' }
+                            ] },
+                        effectiveDateControl: { type: 'DATE', required: true,
+                            label: 'Ημερομηνία πραγματικής αλλαγής',
+                            min: '2026-04-24', max: '2026-05-24' } },
+                    { id: 'ENTER_DIFFERENT_VALUE', label: 'Άλλος έγκυρος ΚΠΚ',
+                        description: 'Επιλέξτε από τον επίσημο κατάλογο.',
+                        valueControl: { id: 'KPK', label: 'ΚΠΚ',
+                            type: 'CATALOG_CHOICE', required: true,
+                            allowedValues: [{ value: '0109', label: '0109 — ΜΙΚΤΑ' }] } }
+                ]
+            }],
+            responsibilityText: 'Επιβεβαιώνω ότι οι παραπάνω επιλογές αποτυπώνουν τα πραγματικά ιστορικά στοιχεία του εργαζομένου.',
+            fingerprint,
+            ...overrides
+        }
+    };
+}
+
+function minimalProfileCorrectionResolutionData() {
+    return correctionResolutionData({ conflicts: [{
+        conflictId: 'INITIAL_PROFILE_TERMS', kind: 'PROFILE', required: true,
+        period: { from: '2026-04-23', to: '2026-05-24',
+            label: '23/04/2026 – 24/05/2026' },
+        issue: 'Λείπουν αναγκαίοι όροι από την αρχική ιστορική περίοδο.',
+        decisionRequired: 'Τι ίσχυε πραγματικά στην αρχική περίοδο;',
+        intents: [{
+            id: 'ENTER_DIFFERENT_VALUE', label: 'Ίσχυαν διαφορετικοί όροι',
+            description: 'Συμπληρώστε μόνο τα τέσσερα αναγκαία πεδία.',
+            valueControl: {
+                type: 'PROFILE_FIELDS', required: true,
+                baselineValues: [{ value: 'PROFILE_CANDIDATE_1',
+                    label: 'Υφιστάμενη εκδοχή 1' }],
+                fields: [
+                    { id: 'KPK', label: 'Ασφαλιστική κατηγορία / ΚΠΚ',
+                        inputType: 'CATALOG_CHOICE',
+                        catalogValues: [{ value: '0109', label: '0109 — ΜΙΚΤΑ' }] },
+                    { id: 'WORK_DAYS', label: 'Ημέρες εργασίας ανά εβδομάδα',
+                        inputType: 'INTEGER', min: 1, max: 7 },
+                    { id: 'WEEKLY_HOURS', label: 'Ώρες εργασίας ανά εβδομάδα',
+                        inputType: 'DECIMAL', min: 0.01, max: 168 },
+                    { id: 'DAILY_HOURS', label: 'Μέσος όρος ημερήσιας εργασίας',
+                        inputType: 'DECIMAL', min: 0.01, max: 24 }
+                ]
+            }
+        }]
+    }] });
+}
+
+function allElements(root) {
+    return [root, ...(root?.children || []).flatMap(allElements)];
+}
+
 test('εμφανίζει ασφαλές παράθυρο χωρίς αυτόματη επιβεβαίωση και με textContent', async () => {
     let receivedOptions;
     let retries = 0;
@@ -528,4 +634,175 @@ test('παρωχημένη απάντηση συλλογής γεγονότων 
     });
     assert.equal(retries, 1);
     assert.equal(result.response, stale);
+});
+
+test('το φύλλο διόρθωσης εμφανίζει περίοδο, ετικέτα και τιμές ΚΠΚ χωρίς εσωτερικές ταυτότητες', () => {
+    const resolution = guided.normalizeResolutionResponse(correctionResolutionData());
+    assert.equal(resolution.kind, 'USER_CONFIRMED_HISTORY_CORRECTION');
+    const content = guided.buildSafeContent(fakeDocument(), resolution);
+    const text = allElements(content.element).map(item => item.textContent).join(' ');
+    assert.match(text, /24\/04\/2026 – 24\/05\/2026/);
+    assert.match(text, /Ασφαλιστική κατηγορία \/ ΚΠΚ/);
+    assert.match(text, /0111 — ΣΥΝΤΑΞΗ/);
+    assert.match(text, /0115 — ΣΥΝΤΑΞΗ, ΒΑΡΕΑ/);
+    for (const forbidden of ['historyId', '_id', 'aa_eggrafhs', 'survivorId', 'patch']) {
+        assert.equal(JSON.stringify(resolution).includes(forbidden), false);
+    }
+});
+
+test('δεν υπάρχει προεπιλογή, η ευθύνη αρχίζει ψευδής και η εφαρμογή μένει ανενεργή', () => {
+    const resolution = guided.normalizeResolutionResponse(correctionResolutionData());
+    const validity = [];
+    const content = guided.buildSafeContent(fakeDocument(), resolution,
+        value => validity.push(value));
+    assert.equal(content.responsibilityCheckbox.checked, false);
+    assert.equal(content.selected(), null);
+    assert.ok(content.controls.every(control => control.intentControls.every(item =>
+        item.radio.checked === false)));
+    assert.equal(validity.at(-1), false);
+});
+
+test('H1: η διεπαφή αποδίδει ακριβώς τέσσερα επεξεργάσιμα πεδία και απαιτεί και τα τέσσερα', () => {
+    const resolution = guided.normalizeResolutionResponse(
+        minimalProfileCorrectionResolutionData());
+    const content = guided.buildSafeContent(fakeDocument(), resolution);
+    const intent = content.controls[0].intentControls[0];
+    assert.deepEqual(intent.valueState.fieldElements.map(item => item.field.id),
+        ['KPK', 'WORK_DAYS', 'WEEKLY_HOURS', 'DAILY_HOURS']);
+    assert.equal(intent.valueState.fieldElements.length, 4);
+    for (const absent of ['SPECIALTY', 'CONTRACT_TYPE', 'CONTRACT_CATEGORY',
+        'LEGAL_PAY', 'ACTUAL_PAY', 'CONTRACT_PAY']) {
+        assert.equal(intent.valueState.fieldElements.some(item => item.field.id === absent), false);
+    }
+
+    intent.radio.checked = true;
+    intent.radio.dispatch('change');
+    intent.valueState.element.value = 'PROFILE_CANDIDATE_1';
+    intent.valueState.element.dispatch('change');
+    const values = ['0109', '5', '40', '8'];
+    for (let index = 0; index < 3; index += 1) {
+        intent.valueState.fieldElements[index].input.value = values[index];
+        intent.valueState.fieldElements[index].input.dispatch('change');
+    }
+    content.responsibilityCheckbox.checked = true;
+    content.responsibilityCheckbox.dispatch('change');
+    assert.equal(content.selected(), null);
+    intent.valueState.fieldElements[3].input.value = values[3];
+    intent.valueState.fieldElements[3].input.dispatch('change');
+    assert.deepEqual(content.selected(), { responsibilityAccepted: true, decisions: [{
+        conflictId: 'INITIAL_PROFILE_TERMS', intent: 'ENTER_DIFFERENT_VALUE',
+        value: 'PROFILE_CANDIDATE_1', values: {
+            KPK: '0109', WORK_DAYS: 5, WEEKLY_HOURS: 40, DAILY_HOURS: 8
+        }
+    }] });
+});
+
+test('CORRECT_EXISTING ενεργοποιείται μόνο με πλήρεις αποφάσεις και ρητή επιβεβαίωση', () => {
+    const resolution = guided.normalizeResolutionResponse(correctionResolutionData());
+    const validity = [];
+    const content = guided.buildSafeContent(fakeDocument(), resolution,
+        value => validity.push(value));
+    const fromHire = content.controls[0].intentControls.find(item =>
+        item.intent.id === 'FROM_HIRE');
+    fromHire.radio.checked = true;
+    fromHire.radio.dispatch('change');
+    const correction = content.controls[1].intentControls.find(item =>
+        item.intent.id === 'CORRECT_EXISTING_HISTORICAL_FACT');
+    correction.radio.checked = true;
+    correction.radio.dispatch('change');
+    correction.valueState.element.value = '0115';
+    correction.valueState.element.dispatch('change');
+    assert.equal(content.selected(), null);
+    content.responsibilityCheckbox.checked = true;
+    content.responsibilityCheckbox.dispatch('change');
+    assert.deepEqual(content.selected(), { responsibilityAccepted: true, decisions: [
+        { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
+        { conflictId: 'FIELD_KPK', intent: 'CORRECT_EXISTING_HISTORICAL_FACT', value: '0115' }
+    ] });
+    assert.equal(validity.at(-1), true);
+});
+
+test('REAL_CHANGE εμφανίζει και απαιτεί ημερομηνία μόνο για τη συγκεκριμένη επιλογή', () => {
+    const resolution = guided.normalizeResolutionResponse(correctionResolutionData());
+    const content = guided.buildSafeContent(fakeDocument(), resolution);
+    const fromHire = content.controls[0].intentControls.find(item =>
+        item.intent.id === 'FROM_HIRE');
+    fromHire.radio.checked = true; fromHire.radio.dispatch('change');
+    const realChange = content.controls[1].intentControls.find(item =>
+        item.intent.id === 'REAL_HISTORICAL_CHANGE');
+    realChange.radio.checked = true; realChange.radio.dispatch('change');
+    assert.equal(realChange.dateState.wrapper.hidden, false);
+    assert.equal(realChange.dateState.element.disabled, false);
+    realChange.valueState.element.value = '0115';
+    realChange.valueState.element.dispatch('change');
+    content.responsibilityCheckbox.checked = true;
+    content.responsibilityCheckbox.dispatch('change');
+    assert.equal(content.selected(), null);
+    realChange.dateState.element.value = '2026-05-13';
+    realChange.dateState.element.dispatch('change');
+    assert.deepEqual(content.selected().decisions[1], {
+        conflictId: 'FIELD_KPK', intent: 'REAL_HISTORICAL_CHANGE',
+        value: '0115', effectiveDate: '2026-05-13'
+    });
+});
+
+test('Ακύρωση δεν κάνει επανάληψη και Εφαρμογή κάνει ακριβώς μία με το αυστηρό συμβόλαιο', async () => {
+    let retries = 0;
+    const cancelled = await guided.handleInitialResponse({
+        response: responseWith(correctionResolutionData()), originalPayload: {},
+        retryRequest: async () => { retries += 1; },
+        swal: { close() {}, disableConfirmButton() {}, fire: async options => {
+            options.didOpen(); return { isConfirmed: false };
+        } }, documentRef: fakeDocument()
+    });
+    assert.equal(cancelled.cancelled, true);
+    assert.equal(retries, 0);
+
+    let retryPayload;
+    const applied = await guided.handleInitialResponse({
+        response: responseWith(correctionResolutionData()),
+        originalPayload: { safe: 'original' },
+        retryRequest: async payload => { retries += 1; retryPayload = payload;
+            return { status: 200 }; },
+        swal: { close() {}, disableConfirmButton() {}, enableConfirmButton() {},
+            disableButtons() {}, fire: async options => {
+                options.didOpen();
+                const elements = allElements(options.html);
+                for (const value of ['FROM_HIRE', 'CORRECT_EXISTING_HISTORICAL_FACT']) {
+                    const radio = elements.find(item => item.type === 'radio' && item.value === value);
+                    radio.checked = true; radio.dispatch('change');
+                }
+                const select = elements.find(item => item.tagName === 'select' &&
+                    item.disabled === false);
+                select.value = '0115'; select.dispatch('change');
+                const checkbox = elements.find(item => item.type === 'checkbox');
+                checkbox.checked = true; checkbox.dispatch('change');
+                return { isConfirmed: true, value: await options.preConfirm() };
+            } }, documentRef: fakeDocument()
+    });
+    assert.equal(applied.cancelled, false);
+    assert.equal(retries, 1);
+    assert.deepEqual(retryPayload.resolution, {
+        fingerprint, responsibilityAccepted: true, decisions: [
+            { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
+            { conflictId: 'FIELD_KPK', intent: 'CORRECT_EXISTING_HISTORICAL_FACT', value: '0115' }
+        ]
+    });
+});
+
+test('παρωχημένη απάντηση διόρθωσης επιστρέφεται αυτούσια και κακόβουλο φύλλο απορρίπτεται', async () => {
+    const malicious = correctionResolutionData();
+    malicious.resolution.conflicts[0].historyId = 'forged';
+    assert.equal(guided.normalizeResolutionResponse(malicious), null);
+
+    const stale = responseWith({ success: false,
+        code: 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE' }, 409);
+    const selection = { responsibilityAccepted: true, decisions: [
+        { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
+        { conflictId: 'FIELD_KPK', intent: 'CONFIRM_EXISTING' }
+    ] };
+    const resolution = guided.normalizeResolutionResponse(correctionResolutionData());
+    const payload = guided.buildRetryPayload({}, resolution, selection);
+    assert.equal(payload.resolution.responsibilityAccepted, true);
+    assert.equal(stale.status, 409);
 });
