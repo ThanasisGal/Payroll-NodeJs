@@ -26,6 +26,11 @@ const { OPERATION: CONTRACT_END_SEGMENT_SYNC_OPERATION } =
     require('./employeeContractEndCorrectionPlannerService');
 const { shapeALifecycleFixture, shapeBCorrectedProfileFixture } =
     require('./fixtures/uniqueSafeEmployeeHistoryRepairFixtures');
+const { samePeriodMateriallyDifferentProfilesFixture,
+    correctionFromHireOrSpecialtyChangeFixture,
+    optionalIntermediateProfileFixture,
+    realStartOfFourDayProfileFixture } =
+    require('./fixtures/multipleSafeEmployeeHistoryResolutionFixtures');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
@@ -2047,4 +2052,210 @@ test('repeating a successfully repaired Save uses ordinary clean behavior with n
     const repeated = await uniqueSafeRepairRequest(db, fixture);
     assert.notEqual(repeated.uniqueSafeRepairApplied, true);
     assert.equal(db.operations().auditCreates, audits);
+    const writesBeforeStaleConfirmation = db.writes();
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+    }), error => error.code === 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
+    assert.equal(db.writes(), writesBeforeStaleConfirmation);
+});
+
+const multipleFactories = [
+    samePeriodMateriallyDifferentProfilesFixture,
+    correctionFromHireOrSpecialtyChangeFixture,
+    optionalIntermediateProfileFixture,
+    realStartOfFourDayProfileFixture
+];
+
+async function requiredMultipleResolution(db, fixture, overrides = {}) {
+    let resolution;
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, null, overrides), error => {
+        assert.equal(error.code, 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED');
+        assert.equal(error.resolutionRequired, true);
+        resolution = error.resolution;
+        return true;
+    });
+    return resolution;
+}
+
+for (const factory of multipleFactories) test(
+    `${factory().name} first Save returns guided choices and performs zero writes`, async () => {
+        const fixture = factory();
+        const initial = { employee: fixture.currentEmployee, history: fixture.completeHistoryRows };
+        const db = referencedFixtureDatabase(fixture);
+        const resolution = await requiredMultipleResolution(db, fixture);
+        assert.equal(db.writes(), 0);
+        assert.deepEqual(db.state(), initial);
+        assert.equal(resolution.kind, 'GUIDED_BUSINESS_CHOICE');
+        assert.equal(resolution.options.length, 3);
+        assert.match(resolution.fingerprint, /^[a-f0-9]{64}$/);
+        assert.equal(JSON.stringify(resolution).includes('historyId'), false);
+        assert.equal(JSON.stringify(resolution).includes('_id'), false);
+    });
+
+test('all four fixed business choices commit atomically and preserve the original Save', async () => {
+    const cases = [
+        [samePeriodMateriallyDifferentProfilesFixture, 'SPLIT_AT_2026_06_29'],
+        [correctionFromHireOrSpecialtyChangeFixture, 'SPECIALTY_CHANGE_2026_07_02'],
+        [optionalIntermediateProfileFixture, 'INTERMEDIATE_PROFILE_FROM_2026_06_02'],
+        [realStartOfFourDayProfileFixture, 'FOUR_DAY_PROFILE_FROM_2026_07_13']
+    ];
+    for (const [factory, choiceId] of cases) {
+        const fixture = factory();
+        const maintenance = { employeeChanges: { email: `${fixture.name}@example.test` },
+            submittedEmployeeFields: ['email'], historyChanges: {},
+            submittedHistoryChanges: {}, submittedProfileFields: [], identity: null,
+            originalHistoryId: null, correctableIdentityFields: [] };
+        const db = referencedFixtureDatabase(fixture);
+        const resolution = await requiredMultipleResolution(db, fixture, { maintenance });
+        const saved = await uniqueSafeRepairRequest(db, fixture, {
+            choiceId, fingerprint: resolution.fingerprint
+        }, { maintenance });
+        assert.equal(saved.guidedBusinessResolutionApplied, true, fixture.name);
+        assert.equal(saved.guidedBusinessResolutionAuditWritten, true, fixture.name);
+        assert.equal(db.state().employee.email, `${fixture.name}@example.test`, fixture.name);
+        assert.equal(db.operations().auditCreates, 1, fixture.name);
+        const audit = db.state().audits[0];
+        assert.equal(audit.diagnostics.resolutionClass,
+            'MULTIPLE_SAFE_BUSINESS_PLANS', fixture.name);
+        assert.equal(audit.diagnostics.selectedBusinessOptionId, choiceId, fixture.name);
+        assert.match(audit.diagnostics.stateFingerprint, /^[a-f0-9]{64}$/, fixture.name);
+        assert.match(audit.diagnostics.executionPlanFingerprint,
+            /^[a-f0-9]{64}$/, fixture.name);
+        assert.ok(Array.isArray(audit.diagnostics.affectedStableIds), fixture.name);
+        assert.ok(audit.diagnostics.referenceClassifications, fixture.name);
+        assert.ok(audit.currentBefore && audit.historyBefore && audit.historyAfter, fixture.name);
+        assert.ok(audit.repairedAt instanceof Date, fixture.name);
+        assert.deepEqual(audit.diagnostics.actor,
+            { userId: 'synthetic-user', userName: 'Synthetic User' }, fixture.name);
+    }
+});
+
+test('M2 correction from hire is the only guided plan that physically deletes a row', async () => {
+    const m2 = correctionFromHireOrSpecialtyChangeFixture();
+    const m2db = referencedFixtureDatabase(m2);
+    const resolution = await requiredMultipleResolution(m2db, m2);
+    await uniqueSafeRepairRequest(m2db, m2, {
+        choiceId: 'CORRECTION_FROM_HIRE', fingerprint: resolution.fingerprint
+    });
+    assert.equal(m2db.operations().historyDeletes, 1);
+    assert.equal(m2db.state().history.some(row =>
+        row._id === '507f1f77bcf86cd799439211'), false);
+
+    for (const [factory, choiceId] of [
+        [samePeriodMateriallyDifferentProfilesFixture, 'KEEP_TWO_DAY_PROFILE'],
+        [optionalIntermediateProfileFixture, 'INTERMEDIATE_PROFILE_NOT_REAL'],
+        [realStartOfFourDayProfileFixture, 'FOUR_DAY_PROFILE_FROM_HIRE']
+    ]) {
+        const fixture = factory();
+        const db = referencedFixtureDatabase(fixture);
+        const offered = await requiredMultipleResolution(db, fixture);
+        await uniqueSafeRepairRequest(db, fixture, {
+            choiceId, fingerprint: offered.fingerprint
+        });
+        assert.equal(db.operations().historyDeletes, 0, fixture.name);
+        assert.ok(db.state().history.some(row =>
+            row.employment_history_canonical_status === 'REDUNDANT_REFERENCED'));
+    }
+});
+
+test('M2 correction from hire fails closed if a reference appears before physical deletion', async () => {
+    const fixture = correctionFromHireOrSpecialtyChangeFixture();
+    const firstDb = referencedFixtureDatabase(fixture);
+    const resolution = await requiredMultipleResolution(firstDb, fixture);
+    const db = referencedFixtureDatabase(fixture);
+    let checks = 0;
+    db.dependencies.referenceChecker = async ({ historyIds }) => {
+        checks += 1;
+        if (checks <= fixture.completeHistoryRows.length) return [];
+        return [{ collection: 'EmployeeHistoryRepairAudit', historyId: String(historyIds[0]) }];
+    };
+    const before = structuredClone(db.state());
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'CORRECTION_FROM_HIRE', fingerprint: resolution.fingerprint
+    }), error => error.code === 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE');
+    assert.deepEqual(db.state(), before);
+});
+
+test('OTHER_DATE is validated by current server bounds before every write', async () => {
+    const fixture = realStartOfFourDayProfileFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredMultipleResolution(db, fixture);
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'FOUR_DAY_PROFILE_FROM_OTHER_DATE',
+        fingerprint: resolution.fingerprint,
+        answers: { effectiveDate: '2026-07-23' }
+    }), error => error.code === 'EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE');
+    assert.equal(db.writes(), 0);
+    const saved = await uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'FOUR_DAY_PROFILE_FROM_OTHER_DATE',
+        fingerprint: resolution.fingerprint,
+        answers: { effectiveDate: '2026-07-05' }
+    });
+    assert.equal(saved.guidedBusinessResolutionApplied, true);
+});
+
+test('guided confirmation is stale after employee, history, references or option-set drift', async () => {
+    const original = realStartOfFourDayProfileFixture();
+    const firstDb = referencedFixtureDatabase(original);
+    const resolution = await requiredMultipleResolution(firstDb, original);
+    for (const kind of ['employee', 'history', 'references', 'options']) {
+        const fixture = realStartOfFourDayProfileFixture();
+        if (kind === 'employee') fixture.currentEmployee.updatedAt = new Date('2026-10-01');
+        if (kind === 'history') fixture.completeHistoryRows[0].updatedAt = new Date('2026-10-01');
+        if (kind === 'references') fixture.protectedReferenceSummary['m4-full-time'] = [];
+        if (kind === 'options') fixture.completeHistoryRows[1].hmeromhnia_allaghs_orarioy_apo =
+            '2026-07-14';
+        const db = referencedFixtureDatabase(fixture);
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+            choiceId: 'FOUR_DAY_PROFILE_FROM_2026_07_13', fingerprint: resolution.fingerprint
+        }), error => error.code === 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE');
+        assert.equal(db.writes(), 0, kind);
+    }
+});
+
+test('unknown guided choice and malformed answers are rejected with zero writes', async () => {
+    const fixture = optionalIntermediateProfileFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredMultipleResolution(db, fixture);
+    for (const confirmation of [
+        { choiceId: 'UNKNOWN_CHOICE', fingerprint: resolution.fingerprint },
+        { choiceId: 'INTERMEDIATE_PROFILE_OTHER_DATE', fingerprint: resolution.fingerprint },
+        { choiceId: 'INTERMEDIATE_PROFILE_OTHER_DATE', fingerprint: resolution.fingerprint,
+            answers: { effectiveDate: 'bad' } }
+    ]) {
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, confirmation), error =>
+            ['EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST',
+                'EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID'].includes(error.code));
+        assert.equal(db.writes(), 0);
+    }
+});
+
+test('guided audit failure and final verification failure roll back resolution and original Save', async () => {
+    for (const [failure, behavior, expected] of [
+        ['audit', {}, 'audit failed'],
+        ['', { pretendUpdateSuccess: true }, 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED']
+    ]) {
+        const fixture = samePeriodMateriallyDifferentProfilesFixture();
+        const firstDb = referencedFixtureDatabase(fixture);
+        const resolution = await requiredMultipleResolution(firstDb, fixture);
+        const db = referencedFixtureDatabase(fixture, failure, behavior);
+        const before = structuredClone(db.state());
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+            choiceId: 'SPLIT_AT_2026_06_29', fingerprint: resolution.fingerprint
+        }), error => error.code === expected || error.message === expected);
+        assert.deepEqual(db.state(), before);
+    }
+});
+
+test('resolved guided state is idempotent and does not write a second resolution audit', async () => {
+    const fixture = samePeriodMateriallyDifferentProfilesFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredMultipleResolution(db, fixture);
+    await uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'KEEP_TWO_DAY_PROFILE', fingerprint: resolution.fingerprint
+    });
+    const auditCount = db.operations().auditCreates;
+    const repeated = await uniqueSafeRepairRequest(db, fixture);
+    assert.notEqual(repeated.guidedBusinessResolutionApplied, true);
+    assert.equal(db.operations().auditCreates, auditCount);
 });

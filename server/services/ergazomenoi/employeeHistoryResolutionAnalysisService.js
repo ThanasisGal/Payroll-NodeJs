@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { CANONICAL_STATUSES } = require('./employeeHistoryCanonicalizationService');
 
 const RESOLUTION_ANALYSIS_VERSION = 'employee-history-resolution-analysis:v1';
@@ -23,6 +24,11 @@ const UNIQUE_SAFE_REPAIR_ACTION = 'APPLY_UNIQUE_SAFE_PLAN';
 const UNIQUE_SAFE_REPAIR_TITLE = 'Βρέθηκε ασυνέπεια στο ιστορικό';
 const UNIQUE_SAFE_REPAIR_EXPLANATION =
     'Η ασυνέπεια μπορεί να τακτοποιηθεί με ασφάλεια χωρίς να αλλάξει η πραγματική εργασιακή σχέση.';
+const GUIDED_BUSINESS_CHOICE_CONTRACT_VERSION = 1;
+const GUIDED_BUSINESS_CHOICE_KIND = 'GUIDED_BUSINESS_CHOICE';
+const GUIDED_BUSINESS_CHOICE_TITLE = 'Χρειάζεται επιβεβαίωση του ιστορικού';
+const GUIDED_BUSINESS_CHOICE_EXPLANATION =
+    'Υπάρχουν περισσότερες από μία ασφαλείς ερμηνείες. Επιλέξτε τι συνέβη πραγματικά.';
 
 function stableValue(value) {
     if (Array.isArray(value)) return value.map(stableValue);
@@ -103,6 +109,28 @@ function buildUniqueSafeRepairStateFingerprint({ scope, currentEmployee,
     });
 }
 
+function buildMultipleSafeResolutionStateFingerprint({ scope, currentEmployee,
+    completeHistoryRows = [], protectedReferenceSummary = {}, canonicalResult,
+    problemScope, multiplePlan, normalizedSaveRequest = {} } = {}) {
+    if (multiplePlan?.status !== 'APPLICABLE' ||
+        multiplePlan?.resolutionClass !== RESOLUTION_CLASSES.MULTIPLE_SAFE_BUSINESS_PLANS ||
+        !Array.isArray(multiplePlan.businessOptions) || multiplePlan.businessOptions.length < 2) {
+        throw new TypeError('Applicable multiple-safe resolution plan required');
+    }
+    return buildFingerprint({
+        contract: 'employee-history-guided-business-choice-confirmation:v1',
+        scope,
+        employee: currentEmployee,
+        completeHistory: completeHistoryRows,
+        referenceState: protectedReferenceSummary,
+        currentAmbiguity: canonicalSourceStateFingerprint(canonicalResult),
+        problemScope,
+        exactServerPlan: multiplePlan,
+        exactOptionSet: multiplePlan.businessOptions,
+        normalizedSaveRequest
+    });
+}
+
 function buildUniqueSafeRepairResolutionAnalysis({ repairPlan,
     sourceStateFingerprint } = {}) {
     if (repairPlan?.status !== 'APPLICABLE' || !sourceStateFingerprint) return null;
@@ -153,6 +181,86 @@ function buildUniqueSafeRepairPublicResolution({ analysis, fingerprint } = {}) {
     });
 }
 
+function validatePublicBusinessOptions(options) {
+    if (!Array.isArray(options) || options.length < 2 || options.length > 10) {
+        throw new TypeError('Guided business options must contain 2..10 entries');
+    }
+    const ids = new Set();
+    return options.map(option => {
+        if (!option || typeof option !== 'object' || Array.isArray(option) ||
+            !/^[A-Z0-9_]{3,100}$/.test(String(option.id || '')) ||
+            !String(option.label || '').trim() || !String(option.description || '').trim()) {
+            throw new TypeError('Invalid guided business option');
+        }
+        const allowed = new Set(['id', 'label', 'description', 'inputs']);
+        if (Object.keys(option).some(key => !allowed.has(key)) || ids.has(option.id)) {
+            throw new TypeError('Unsafe guided business option');
+        }
+        ids.add(option.id);
+        const result = { id: String(option.id), label: String(option.label),
+            description: String(option.description) };
+        if (option.inputs !== undefined) {
+            if (!Array.isArray(option.inputs) || option.inputs.length !== 1) {
+                throw new TypeError('Only one guided input is supported');
+            }
+            const input = option.inputs[0];
+            const inputKeys = Object.keys(input || {}).sort();
+            if (inputKeys.join(',') !== 'id,label,max,min,required,type' ||
+                input.id !== 'effectiveDate' || input.type !== 'date' ||
+                input.required !== true || !String(input.label || '').trim()) {
+                throw new TypeError('Invalid guided date input');
+            }
+            const min = C.calendarDate(input.min, 'min').toISOString().slice(0, 10);
+            const max = C.calendarDate(input.max, 'max').toISOString().slice(0, 10);
+            if (min > max) throw new TypeError('Invalid guided date bounds');
+            result.inputs = [{ id: 'effectiveDate', type: 'date',
+                label: String(input.label), required: true, min, max }];
+        }
+        return Object.freeze(result);
+    });
+}
+
+function buildMultipleSafeResolutionAnalysis({ multiplePlan,
+    sourceStateFingerprint } = {}) {
+    if (multiplePlan?.status !== 'APPLICABLE' || !sourceStateFingerprint ||
+        multiplePlan.resolutionClass !== RESOLUTION_CLASSES.MULTIPLE_SAFE_BUSINESS_PLANS ||
+        ![REFERENCE_CLASSES.NO_REFERENCES, REFERENCE_CLASSES.PROVENANCE_ONLY]
+            .includes(multiplePlan.referenceClass)) return null;
+    const options = validatePublicBusinessOptions(multiplePlan.businessOptions);
+    return buildEmployeeHistoryResolutionAnalysis({
+        resolutionClass: RESOLUTION_CLASSES.MULTIPLE_SAFE_BUSINESS_PLANS,
+        resolutionKind: GUIDED_BUSINESS_CHOICE_KIND,
+        reason: multiplePlan.reason,
+        title: GUIDED_BUSINESS_CHOICE_TITLE,
+        explanation: GUIDED_BUSINESS_CHOICE_EXPLANATION,
+        candidateBusinessPlans: options,
+        missingBusinessFacts: [],
+        referenceClass: multiplePlan.referenceClass,
+        sourceStateFingerprint,
+        hypotheticalCanonicalResult: {
+            status: 'CHOICE_REQUIRED',
+            reason: multiplePlan.shapeKind,
+            blocksOrdinaryMaintenance: true
+        }
+    });
+}
+
+function buildMultipleSafePublicResolution({ analysis, fingerprint } = {}) {
+    if (analysis?.resolutionClass !== RESOLUTION_CLASSES.MULTIPLE_SAFE_BUSINESS_PLANS ||
+        analysis?.resolutionKind !== GUIDED_BUSINESS_CHOICE_KIND ||
+        !/^[a-f0-9]{64}$/.test(String(fingerprint || ''))) {
+        throw new TypeError('Valid multiple-safe resolution analysis and fingerprint required');
+    }
+    return Object.freeze({
+        version: GUIDED_BUSINESS_CHOICE_CONTRACT_VERSION,
+        kind: GUIDED_BUSINESS_CHOICE_KIND,
+        title: GUIDED_BUSINESS_CHOICE_TITLE,
+        explanation: GUIDED_BUSINESS_CHOICE_EXPLANATION,
+        options: Object.freeze(validatePublicBusinessOptions(analysis.candidateBusinessPlans)),
+        fingerprint: String(fingerprint)
+    });
+}
+
 function resolutionRequestError(code = 'EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST') {
     const error = new Error(code);
     error.code = code;
@@ -172,6 +280,62 @@ function normalizeUniqueSafeRepairConfirmation(value) {
     }
     return Object.freeze({ choiceId: UNIQUE_SAFE_REPAIR_ACTION,
         fingerprint: String(value.fingerprint) });
+}
+
+function normalizeEmployeeHistoryResolutionConfirmation(value) {
+    if (value == null) return null;
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        Object.getPrototypeOf(value) !== Object.prototype) throw resolutionRequestError();
+    const keys = Object.keys(value).sort();
+    if (![['choiceId', 'fingerprint'], ['answers', 'choiceId', 'fingerprint']]
+        .some(expected => expected.length === keys.length &&
+            expected.every((key, index) => key === keys[index])) ||
+        !/^[A-Z0-9_]{3,100}$/.test(String(value.choiceId || '')) ||
+        !/^[a-f0-9]{64}$/.test(String(value.fingerprint || ''))) {
+        throw resolutionRequestError();
+    }
+    if (Object.hasOwn(value, 'answers')) {
+        const answers = value.answers;
+        if (!answers || typeof answers !== 'object' || Array.isArray(answers) ||
+            Object.getPrototypeOf(answers) !== Object.prototype ||
+            Object.keys(answers).some(key => key !== 'effectiveDate')) {
+            throw resolutionRequestError();
+        }
+    }
+    return Object.freeze({ choiceId: String(value.choiceId),
+        fingerprint: String(value.fingerprint),
+        ...(Object.hasOwn(value, 'answers') ? { answers: Object.freeze({ ...value.answers }) } : {}) });
+}
+
+function normalizeMultipleSafeResolutionConfirmation(value, businessOptions) {
+    const normalized = normalizeEmployeeHistoryResolutionConfirmation(value);
+    if (!normalized) return null;
+    const options = validatePublicBusinessOptions(businessOptions);
+    const selected = options.find(option => option.id === normalized.choiceId);
+    if (!selected) throw resolutionRequestError();
+    const input = selected.inputs?.[0];
+    if (!input) {
+        if (Object.hasOwn(normalized, 'answers')) throw resolutionRequestError();
+        return normalized;
+    }
+    if (!normalized.answers || Object.keys(normalized.answers).length !== 1 ||
+        !Object.hasOwn(normalized.answers, input.id)) throw resolutionRequestError();
+    let effectiveDate;
+    try {
+        if (typeof normalized.answers.effectiveDate !== 'string' ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(normalized.answers.effectiveDate)) {
+            throw new TypeError('Exact calendar date required');
+        }
+        effectiveDate = C.calendarDate(normalized.answers.effectiveDate,
+            'effectiveDate').toISOString().slice(0, 10);
+    } catch {
+        throw resolutionRequestError('EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID');
+    }
+    if (effectiveDate < input.min || effectiveDate > input.max) {
+        throw resolutionRequestError('EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE');
+    }
+    return Object.freeze({ ...normalized,
+        answers: Object.freeze({ effectiveDate }) });
 }
 
 function canonicalSourceStateFingerprint(canonicalResult = {}) {
@@ -229,11 +393,21 @@ module.exports = {
     UNIQUE_SAFE_REPAIR_ACTION,
     UNIQUE_SAFE_REPAIR_TITLE,
     UNIQUE_SAFE_REPAIR_EXPLANATION,
+    GUIDED_BUSINESS_CHOICE_CONTRACT_VERSION,
+    GUIDED_BUSINESS_CHOICE_KIND,
+    GUIDED_BUSINESS_CHOICE_TITLE,
+    GUIDED_BUSINESS_CHOICE_EXPLANATION,
     canonicalSourceStateFingerprint,
     buildEmployeeHistoryResolutionAnalysis,
     analyzeCanonicalLegacyAliasResolution,
     buildUniqueSafeRepairStateFingerprint,
+    buildMultipleSafeResolutionStateFingerprint,
     buildUniqueSafeRepairResolutionAnalysis,
+    buildMultipleSafeResolutionAnalysis,
     buildUniqueSafeRepairPublicResolution,
-    normalizeUniqueSafeRepairConfirmation
+    buildMultipleSafePublicResolution,
+    normalizeUniqueSafeRepairConfirmation,
+    normalizeEmployeeHistoryResolutionConfirmation,
+    normalizeMultipleSafeResolutionConfirmation,
+    validatePublicBusinessOptions
 };

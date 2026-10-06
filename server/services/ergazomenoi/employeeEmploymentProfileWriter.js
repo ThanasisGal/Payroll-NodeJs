@@ -64,11 +64,24 @@ const { OPERATION: UNIQUE_SAFE_REPAIR_OPERATION,
     PLAN_STATUSES: UNIQUE_SAFE_REPAIR_PLAN_STATUSES,
     planEmployeeHistoryUniqueSafeRepair } =
     require('./employeeHistoryUniqueSafeRepairPlannerService');
+const { OPERATION: MULTIPLE_SAFE_RESOLUTION_OPERATION,
+    PLAN_STATUSES: MULTIPLE_SAFE_RESOLUTION_PLAN_STATUSES,
+    planEmployeeHistoryMultipleSafeResolution,
+    resolveEmployeeHistoryMultipleSafeChoice } =
+    require('./employeeHistoryMultipleSafeResolutionPlannerService');
 const { buildUniqueSafeRepairStateFingerprint,
     buildUniqueSafeRepairResolutionAnalysis,
     buildUniqueSafeRepairPublicResolution,
-    normalizeUniqueSafeRepairConfirmation } =
+    buildMultipleSafeResolutionStateFingerprint,
+    buildMultipleSafeResolutionAnalysis,
+    buildMultipleSafePublicResolution,
+    normalizeUniqueSafeRepairConfirmation,
+    normalizeEmployeeHistoryResolutionConfirmation,
+    normalizeMultipleSafeResolutionConfirmation,
+    RESOLUTION_CLASSES } =
     require('./employeeHistoryResolutionAnalysisService');
+const { identifyEmployeeHistoryProblemScope } =
+    require('./employeeHistoryProblemScopeService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -395,19 +408,45 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     deferredAmbiguityDeparturePlan = null,
     controlledUniqueSafeRepair = false,
     uniqueSafeRepairPlan = null,
+    controlledMultipleSafeResolution = false,
+    multipleSafeResolutionPlan = null,
     auditAfterMutation = false }) {
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
         ? { ...currentPatch } : { ...currentBefore, ...currentPatch };
     const controlledBoundaries = [controlledLegacyOpenCycleCleanup,
         controlledInvalidDepartureCorrection, controlledContractEndSegmentSync,
-        controlledDeferredAmbiguityDeparture, controlledUniqueSafeRepair].filter(Boolean).length;
+        controlledDeferredAmbiguityDeparture, controlledUniqueSafeRepair,
+        controlledMultipleSafeResolution].filter(Boolean).length;
     if (controlledBoundaries > 1) {
         throw failure(controlledInvalidDepartureCorrection
             ? 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY'
             : 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY');
     }
-    if (controlledUniqueSafeRepair) {
+    if (controlledMultipleSafeResolution) {
+        const expectedUpdateIds = [...(multipleSafeResolutionPlan?.changedHistoryIds || [])]
+            .map(String).sort();
+        const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
+        const expectedDeleteIds = [...(multipleSafeResolutionPlan?.physicalDeleteIds || [])]
+            .map(String).sort();
+        const plannedDeleteIds = physicalPlan.rowsToDelete.map(item => String(item.historyId)).sort();
+        const exactPatches = physicalPlan.rowsToUpdate.every(item => {
+            const expected = multipleSafeResolutionPlan?.historyPatches?.[String(item.historyId)];
+            const actual = Object.fromEntries(Object.entries(item.patch || {})
+                .filter(([field]) => field !== 'updatedAt'));
+            return expected && stableStringify(actual) === stableStringify(expected);
+        });
+        if (deleteCurrent || diagnostics?.operation !== MULTIPLE_SAFE_RESOLUTION_OPERATION ||
+            multipleSafeResolutionPlan?.status !== MULTIPLE_SAFE_RESOLUTION_PLAN_STATUSES.APPLICABLE ||
+            diagnostics?.planFingerprint !== multipleSafeResolutionPlan.planFingerprint ||
+            stableStringify(currentPatch || {}) !==
+                stableStringify(multipleSafeResolutionPlan.currentPatch || {}) ||
+            physicalPlan.rowsToInsert.length || !exactPatches ||
+            stableStringify(plannedUpdateIds) !== stableStringify(expectedUpdateIds) ||
+            stableStringify(plannedDeleteIds) !== stableStringify(expectedDeleteIds)) {
+            throw failure('EMPLOYEE_HISTORY_MULTIPLE_SAFE_INVALID_BOUNDARY');
+        }
+    } else if (controlledUniqueSafeRepair) {
         const expectedUpdateIds = [...(uniqueSafeRepairPlan?.changedHistoryIds || [])]
             .map(String).sort();
         const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
@@ -545,7 +584,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     const referencedRedundant = [];
     const auditRequired = canonicalRepairRequired || proposedDeletedIds.length > 0 ||
         controlledDeferredAmbiguityDeparture || controlledInvalidDepartureCorrection ||
-        controlledUniqueSafeRepair;
+        controlledUniqueSafeRepair || controlledMultipleSafeResolution;
     let pendingAuditRecord = null;
     if (auditRequired) {
         let auditCollectionExists;
@@ -572,6 +611,9 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
             }
             if (!references.length) continue;
+            if (controlledMultipleSafeResolution) {
+                throw failure('EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE');
+            }
             const deletion = physicalPlan.rowsToDelete.find(item => item.historyId === historyId);
             if (!deletion?.survivingHistoryId) {
                 const error = failure('EMPLOYEE_HISTORY_REFERENCED_DELETE_FORBIDDEN');
@@ -1713,7 +1755,7 @@ function uniqueSafeRepairFailure(code, statusCode = 409, extra = {}) {
     return error;
 }
 
-async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
+async function writeEmployeeEmploymentProfileWithGuidedResolution({
     resolutionConfirmation: rawResolutionConfirmation = null,
     repairActor = null,
     connection = mongoose.connection,
@@ -1725,7 +1767,7 @@ async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
     capabilityProbe = transactionCapability,
     ...profileRequest
 } = {}) {
-    const resolutionConfirmation = normalizeUniqueSafeRepairConfirmation(
+    const resolutionConfirmation = normalizeEmployeeHistoryResolutionConfirmation(
         rawResolutionConfirmation);
     const { scope, employeeId } = profileRequest;
     if (!scope || !EMPLOYEE_SCOPE_FIELDS.every(field => String(scope[field] ?? '').trim()) ||
@@ -1749,6 +1791,8 @@ async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
             currentEmployee: current, historyRows: completeHistoryRows });
         let protectedReferenceSummary = {};
         let repairPlan = null;
+        let multiplePlan = null;
+        let problemScope = null;
         if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY && completeHistoryRows.length) {
             for (const row of completeHistoryRows) {
                 const id = String(row._id);
@@ -1767,9 +1811,26 @@ async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
                 canonicalResult: canonical,
                 protectedReferenceSummary
             });
+            if (repairPlan.status !== UNIQUE_SAFE_REPAIR_PLAN_STATUSES.APPLICABLE) {
+                problemScope = identifyEmployeeHistoryProblemScope({
+                    scope: filter,
+                    currentEmployee: current,
+                    completeHistoryRows
+                });
+                multiplePlan = planEmployeeHistoryMultipleSafeResolution({
+                    scope: filter,
+                    currentEmployee: current,
+                    completeHistoryRows,
+                    canonicalResult: canonical,
+                    problemScope,
+                    protectedReferenceSummary
+                });
+            }
         }
 
         if (repairPlan?.status === UNIQUE_SAFE_REPAIR_PLAN_STATUSES.APPLICABLE) {
+            const uniqueConfirmation = rawResolutionConfirmation == null ? null
+                : normalizeUniqueSafeRepairConfirmation(rawResolutionConfirmation);
             const normalizedSaveRequest = normalizedUniqueSafeRepairSaveRequest(profileRequest);
             const confirmationFingerprint = buildUniqueSafeRepairStateFingerprint({
                 scope: filter,
@@ -1785,7 +1846,7 @@ async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
             if (!resolutionAnalysis) {
                 throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
             }
-            if (!resolutionConfirmation) {
+            if (!uniqueConfirmation) {
                 throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED', 409, {
                     resolutionRequired: true,
                     resolution: buildUniqueSafeRepairPublicResolution({
@@ -1794,7 +1855,7 @@ async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
                     })
                 });
             }
-            if (resolutionConfirmation.fingerprint !== confirmationFingerprint) {
+            if (uniqueConfirmation.fingerprint !== confirmationFingerprint) {
                 throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
             }
 
@@ -1805,7 +1866,9 @@ async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
             });
             const actor = repairActor && typeof repairActor === 'object' ? {
                 userId: String(repairActor.userId || '').trim() || null,
-                userName: String(repairActor.userName || '').trim() || null
+                userName: String(repairActor.userName || '').trim() || null,
+                ...(String(repairActor.sessionId || '').trim()
+                    ? { sessionId: String(repairActor.sessionId).trim() } : {})
             } : null;
             const repair = await executeFinalMutationPlan({
                 physicalPlan,
@@ -1843,8 +1906,120 @@ async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
                 uniqueSafeRepairAuditWritten: repair.auditWritten === true };
         }
 
+        if (multiplePlan?.status === MULTIPLE_SAFE_RESOLUTION_PLAN_STATUSES.APPLICABLE) {
+            const normalizedSaveRequest = normalizedUniqueSafeRepairSaveRequest(profileRequest);
+            const confirmationFingerprint = buildMultipleSafeResolutionStateFingerprint({
+                scope: filter,
+                currentEmployee: current,
+                completeHistoryRows,
+                protectedReferenceSummary,
+                canonicalResult: canonical,
+                problemScope,
+                multiplePlan,
+                normalizedSaveRequest
+            });
+            const resolutionAnalysis = buildMultipleSafeResolutionAnalysis({
+                multiplePlan,
+                sourceStateFingerprint: confirmationFingerprint
+            });
+            if (!resolutionAnalysis) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+            }
+            if (!resolutionConfirmation) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED',
+                    409, {
+                        resolutionRequired: true,
+                        resolution: buildMultipleSafePublicResolution({
+                            analysis: resolutionAnalysis,
+                            fingerprint: confirmationFingerprint
+                        })
+                    });
+            }
+            if (resolutionConfirmation.fingerprint !== confirmationFingerprint) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE');
+            }
+            const validatedConfirmation = normalizeMultipleSafeResolutionConfirmation(
+                resolutionConfirmation, multiplePlan.businessOptions);
+            const selectedPlan = resolveEmployeeHistoryMultipleSafeChoice({
+                plannerResult: multiplePlan,
+                choiceId: validatedConfirmation.choiceId,
+                answers: validatedConfirmation.answers,
+                currentEmployee: current,
+                completeHistoryRows
+            });
+            const physicalPlan = buildFinalHistoryMutationPlan({
+                beforeRows: completeHistoryRows,
+                desiredRows: selectedPlan.desiredHistoryRows,
+                historyModel,
+                replacementByDeletedId: selectedPlan.replacementByDeletedId
+            });
+            const actor = repairActor && typeof repairActor === 'object' ? {
+                userId: String(repairActor.userId || '').trim() || null,
+                userName: String(repairActor.userName || '').trim() || null,
+                ...(String(repairActor.sessionId || '').trim()
+                    ? { sessionId: String(repairActor.sessionId).trim() } : {})
+            } : null;
+            const resolution = await executeFinalMutationPlan({
+                physicalPlan,
+                currentBefore: current,
+                currentPatch: selectedPlan.currentPatch,
+                filter,
+                employeeId,
+                session,
+                employeeModel,
+                historyModel,
+                auditModel,
+                auditCollectionChecker,
+                referenceChecker,
+                connection,
+                diagnostics: {
+                    operation: MULTIPLE_SAFE_RESOLUTION_OPERATION,
+                    resolutionClass: RESOLUTION_CLASSES.MULTIPLE_SAFE_BUSINESS_PLANS,
+                    resolutionKind: multiplePlan.resolutionKind,
+                    shapeKind: multiplePlan.shapeKind,
+                    selectedBusinessOptionId: selectedPlan.choiceId,
+                    normalizedAnswers: selectedPlan.normalizedAnswers,
+                    stateFingerprint: confirmationFingerprint,
+                    executionPlanFingerprint: selectedPlan.planFingerprint,
+                    planFingerprint: selectedPlan.planFingerprint,
+                    actor,
+                    affectedStableIds: [...new Set([
+                        ...selectedPlan.changedHistoryIds,
+                        ...selectedPlan.physicalDeleteIds
+                    ])].sort(),
+                    referenceClass: selectedPlan.referenceClass,
+                    referenceClassifications: multiplePlan.diagnostics.referenceState
+                },
+                canonicalRepairRequired: true,
+                controlledMultipleSafeResolution: true,
+                multipleSafeResolutionPlan: selectedPlan
+            });
+            const finalCanonical = canonicalizeEmployeeHistory({
+                scope: filter,
+                currentEmployee: resolution.verified.current,
+                historyRows: resolution.verified.history
+            });
+            if (finalCanonical.status !== CANONICAL_STATUSES.CLEAN ||
+                finalCanonical.cleanupRequired || !finalCanonical.idempotent) {
+                throw failure('EMPLOYEE_HISTORY_MULTIPLE_SAFE_FINAL_VERIFICATION_FAILED');
+            }
+            const saved = await writeEmployeeEmploymentProfile({
+                ...profileRequest,
+                ...dependencies,
+                [ACTIVE_SESSION]: session
+            });
+            return { ...saved,
+                guidedBusinessResolutionApplied: true,
+                guidedBusinessResolutionKind: multiplePlan.shapeKind,
+                guidedBusinessResolutionChoice: selectedPlan.choiceId,
+                guidedBusinessResolutionAuditWritten: resolution.auditWritten === true };
+        }
+
         if (resolutionConfirmation) {
-            throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
+            const code = resolutionConfirmation.choiceId === 'APPLY_UNIQUE_SAFE_PLAN'
+                ? 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE'
+                : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE';
+            throw uniqueSafeRepairFailure(code);
         }
         return writeEmployeeEmploymentProfile({
             ...profileRequest,
@@ -1853,6 +2028,9 @@ async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
         });
     });
 }
+
+const writeEmployeeEmploymentProfileWithUniqueSafeRepair =
+    writeEmployeeEmploymentProfileWithGuidedResolution;
 
 // First departure closes the current cycle's terminal evidence and latest
 // work-terms profile without inserting another history version.
@@ -2860,7 +3038,8 @@ async function repairEmployeeLegacyOpenCycles({ scope, employeeId,
 }
 module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE,
     transactionCapability, normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter,
-    writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithUniqueSafeRepair,
+    writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithGuidedResolution,
+    writeEmployeeEmploymentProfileWithUniqueSafeRepair,
     normalizedUniqueSafeRepairSaveRequest,
     writeEmployeeDeparture, writeEmployeeDepartureDateCorrection,
     writeEmployeeDepartureCancellation, writeEmployeeInvalidDepartureCorrection,

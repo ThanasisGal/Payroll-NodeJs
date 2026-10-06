@@ -9,7 +9,7 @@ const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithUnique
     require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { buildEmployeeMaintenanceIdentity } =
     require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
-const { normalizeUniqueSafeRepairConfirmation } =
+const { normalizeEmployeeHistoryResolutionConfirmation } =
     require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
@@ -3394,7 +3394,7 @@ class ergazomenoiController {
             req.body || {};
         let resolutionConfirmation;
         try {
-            resolutionConfirmation = normalizeUniqueSafeRepairConfirmation(
+            resolutionConfirmation = normalizeEmployeeHistoryResolutionConfirmation(
                 req.body?.resolution);
         } catch (error) {
             return profileError(res, error);
@@ -3906,8 +3906,11 @@ class ergazomenoiController {
             const isFirstDeparture = submittedDeparture && !storedDeparture;
             if (resolutionConfirmation && (rehireIntent === true || isDepartureCancellation ||
                 isDepartureCorrection || isFirstDeparture)) {
-                const error = new Error('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
-                error.code = 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE';
+                const code = resolutionConfirmation.choiceId === 'APPLY_UNIQUE_SAFE_PLAN'
+                    ? 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE'
+                    : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE';
+                const error = new Error(code);
+                error.code = code;
                 error.statusCode = 409;
                 throw error;
             }
@@ -4008,7 +4011,8 @@ class ergazomenoiController {
                     resolutionConfirmation,
                     repairActor: {
                         userId: req.session?.userId,
-                        userName: req.session?.userName || req.session?.username
+                        userName: req.session?.userName || req.session?.username,
+                        sessionId: req.sessionID || req.session?.id
                     }
                 });
             updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);
