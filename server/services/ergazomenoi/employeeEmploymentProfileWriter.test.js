@@ -31,6 +31,8 @@ const { samePeriodMateriallyDifferentProfilesFixture,
     optionalIntermediateProfileFixture,
     realStartOfFourDayProfileFixture } =
     require('./fixtures/multipleSafeEmployeeHistoryResolutionFixtures');
+const { competingDepartureDatesFixture, departureAndHistoricalPayFactFixture } =
+    require('./fixtures/businessFactEmployeeHistoryResolutionFixtures');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
@@ -2258,4 +2260,255 @@ test('resolved guided state is idempotent and does not write a second resolution
     const repeated = await uniqueSafeRepairRequest(db, fixture);
     assert.notEqual(repeated.guidedBusinessResolutionApplied, true);
     assert.equal(db.operations().auditCreates, auditCount);
+});
+
+async function requiredBusinessFactResolution(db, fixture, overrides = {}) {
+    let resolution;
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, null, {
+        businessFactAsOfDate: fixture.asOfDate,
+        ...overrides
+    }), error => {
+        assert.equal(error.code, 'EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED');
+        assert.equal(error.resolutionRequired, true);
+        resolution = error.resolution;
+        return true;
+    });
+    return resolution;
+}
+
+test('πρώτη αποθήκευση για κάθε ελεγχόμενο σχήμα γεγονότων επιστρέφει 409 χωρίς εγγραφή', async () => {
+    for (const fixture of [competingDepartureDatesFixture(),
+        departureAndHistoricalPayFactFixture()]) {
+        const initial = { employee: fixture.currentEmployee,
+            history: fixture.completeHistoryRows };
+        const db = referencedFixtureDatabase(fixture);
+        const resolution = await requiredBusinessFactResolution(db, fixture);
+        assert.equal(db.writes(), 0);
+        assert.deepEqual(db.state(), initial);
+        assert.equal(resolution.kind, 'BUSINESS_FACT_COLLECTION');
+        assert.match(resolution.fingerprint, /^[a-f0-9]{64}$/);
+        assert.equal(JSON.stringify(resolution).includes('historyId'), false);
+        assert.equal(JSON.stringify(resolution).includes('_id'), false);
+        assert.equal(JSON.stringify(resolution).includes('patch'), false);
+    }
+});
+
+test('επιβεβαιωμένη αποχώρηση, μη αποχώρηση και D2 εκτελούνται συναλλακτικά με πλήρες audit', async () => {
+    const cases = [
+        [competingDepartureDatesFixture(), {
+            departureOutcome: 'DEPARTED_ON_FIRST_RECORDED_DATE'
+        }],
+        [competingDepartureDatesFixture({ name: 'no-departure' }), {
+            departureOutcome: 'NO_DEPARTURE'
+        }],
+        [departureAndHistoricalPayFactFixture(), {
+            departureOutcome: 'DEPARTED_ON_OTHER_DATE', departureDate: '2026-08-15',
+            payEffectiveOutcome: 'PAY_APPLIED_FROM_OTHER_DATE',
+            payEffectiveDate: '2026-07-01'
+        }]
+    ];
+    for (const [fixture, answers] of cases) {
+        const db = referencedFixtureDatabase(fixture);
+        const resolution = await requiredBusinessFactResolution(db, fixture);
+        const saved = await uniqueSafeRepairRequest(db, fixture, {
+            fingerprint: resolution.fingerprint, answers
+        }, { businessFactAsOfDate: fixture.asOfDate });
+        assert.equal(saved.businessFactResolutionApplied, true);
+        assert.equal(saved.businessFactResolutionAuditWritten, true);
+        assert.equal(db.operations().auditCreates, 1);
+        const audit = db.state().audits[0];
+        assert.equal(audit.diagnostics.resolutionClass, 'BUSINESS_FACT_REQUIRED');
+        assert.equal(audit.diagnostics.resolutionKind, 'BUSINESS_FACT_COLLECTION');
+        assert.deepEqual(audit.diagnostics.normalizedBusinessAnswers, {
+            ...answers,
+            ...(answers.departureOutcome === 'NO_DEPARTURE'
+                ? { departureDate: null } : {}),
+            ...(answers.departureOutcome !== 'DEPARTED_ON_OTHER_DATE' &&
+                answers.departureOutcome !== 'NO_DEPARTURE'
+                ? { departureDate: fixture.completeHistoryRows
+                    .filter(row => row.hmeromhnia_apoxorhshs)
+                    .map(row => new Date(row.hmeromhnia_apoxorhshs).toISOString().slice(0, 10))[0] }
+                : {})
+        });
+        assert.match(audit.diagnostics.stateFingerprint, /^[a-f0-9]{64}$/);
+        assert.match(audit.diagnostics.executionPlanFingerprint, /^[a-f0-9]{64}$/);
+        assert.ok(Array.isArray(audit.diagnostics.questionIds));
+        assert.ok(Array.isArray(audit.diagnostics.affectedStableIds));
+        assert.ok(audit.diagnostics.referenceClassifications);
+        assert.equal(audit.diagnostics.currentLifecycleBefore.energos, true);
+        assert.equal(audit.diagnostics.currentLifecycleAfter.energos,
+            answers.departureOutcome === 'NO_DEPARTURE');
+        assert.deepEqual(audit.diagnostics.actor,
+            { userId: 'synthetic-user', userName: 'Synthetic User' });
+    }
+});
+
+test('η επίλυση γεγονότων συνεχίζει την αρχική αποθήκευση χωρίς να επαναφέρει την αντίφαση', async () => {
+    const fixture = competingDepartureDatesFixture();
+    const maintenance = {
+        employeeChanges: {
+            email: 'fact-resolution@example.test',
+            energos: true,
+            hmeromhnia_apoxorhshs: fixture.currentEmployee.hmeromhnia_apoxorhshs
+        },
+        submittedEmployeeFields: ['email', 'energos', 'hmeromhnia_apoxorhshs'],
+        historyChanges: {
+            hmeromhnia_apoxorhshs: fixture.currentEmployee.hmeromhnia_apoxorhshs
+        },
+        submittedHistoryChanges: {
+            hmeromhnia_apoxorhshs: fixture.currentEmployee.hmeromhnia_apoxorhshs
+        },
+        submittedProfileFields: [], identity: null, originalHistoryId: null,
+        correctableIdentityFields: []
+    };
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredBusinessFactResolution(db, fixture, { maintenance });
+    await uniqueSafeRepairRequest(db, fixture, {
+        fingerprint: resolution.fingerprint,
+        answers: { departureOutcome: 'DEPARTED_ON_FIRST_RECORDED_DATE' }
+    }, { businessFactAsOfDate: fixture.asOfDate, maintenance });
+    assert.equal(db.state().employee.email, 'fact-resolution@example.test');
+    assert.equal(db.state().employee.energos, false);
+    assert.equal(new Date(db.state().employee.hmeromhnia_apoxorhshs)
+        .toISOString().slice(0, 10), '2026-08-19');
+    assert.equal(db.operations().auditCreates, 1);
+});
+
+test('μεταβολή εργαζομένου, ιστορικού, συσχετίσεων ή ερωτήσεων επιστρέφει STALE με μηδενικές εγγραφές', async () => {
+    const original = competingDepartureDatesFixture();
+    const firstDb = referencedFixtureDatabase(original);
+    const resolution = await requiredBusinessFactResolution(firstDb, original);
+    for (const kind of ['employee', 'history', 'references', 'questions']) {
+        const fixture = competingDepartureDatesFixture();
+        if (kind === 'employee') fixture.currentEmployee.updatedAt = new Date('2026-10-01');
+        if (kind === 'history') fixture.completeHistoryRows[0].updatedAt = new Date('2026-10-01');
+        if (kind === 'references') {
+            fixture.protectedReferenceSummary[String(fixture.completeHistoryRows[0]._id)] =
+                [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'changed' }];
+        }
+        const db = referencedFixtureDatabase(fixture);
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+            fingerprint: resolution.fingerprint,
+            answers: { departureOutcome: 'DEPARTED_ON_FIRST_RECORDED_DATE' }
+        }, { businessFactAsOfDate: kind === 'questions' ? '2026-10-07' : fixture.asOfDate }),
+        error => error.code === 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE');
+        assert.equal(db.writes(), 0, kind);
+    }
+});
+
+test('άγνωστες ή ελλιπείς απαντήσεις γεγονότων απορρίπτονται πριν από κάθε εγγραφή', async () => {
+    const fixture = departureAndHistoricalPayFactFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredBusinessFactResolution(db, fixture);
+    for (const answers of [
+        { departureOutcome: 'UNKNOWN', payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE' },
+        { departureOutcome: 'NO_DEPARTURE' },
+        { departureOutcome: 'DEPARTED_ON_OTHER_DATE', departureDate: 'bad',
+            payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE' },
+        { departureOutcome: 'NO_DEPARTURE', payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE',
+            historyId: 'forged' }
+    ]) {
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+            fingerprint: resolution.fingerprint, answers
+        }, { businessFactAsOfDate: fixture.asOfDate }), error =>
+            ['EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST',
+                'EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID'].includes(error.code));
+        assert.equal(db.writes(), 0);
+    }
+});
+
+test('η φυσική διαγραφή επανελέγχει NO_REFERENCES αμέσως πριν τη μετάλλαξη', async () => {
+    const fixture = competingDepartureDatesFixture();
+    const firstDb = referencedFixtureDatabase(fixture);
+    const resolution = await requiredBusinessFactResolution(firstDb, fixture);
+    const db = referencedFixtureDatabase(fixture);
+    let checks = 0;
+    db.dependencies.referenceChecker = async () => {
+        checks += 1;
+        if (checks <= fixture.completeHistoryRows.length) return [];
+        return [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots',
+            documentId: 'appeared-before-delete' }];
+    };
+    const before = structuredClone(db.state());
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+        fingerprint: resolution.fingerprint,
+        answers: { departureOutcome: 'NO_DEPARTURE' }
+    }, { businessFactAsOfDate: fixture.asOfDate }), error =>
+        error.code === 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE');
+    assert.deepEqual(db.state(), before);
+});
+
+test('οι PROVENANCE_ONLY εγγραφές αποσύρονται λογικά χωρίς φυσική διαγραφή', async () => {
+    const fixture = competingDepartureDatesFixture({
+        referencedIds: [
+            '507f1f77bcf86cd799439302',
+            '507f1f77bcf86cd799439303',
+            '507f1f77bcf86cd799439304'
+        ]
+    });
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredBusinessFactResolution(db, fixture);
+    await uniqueSafeRepairRequest(db, fixture, {
+        fingerprint: resolution.fingerprint,
+        answers: { departureOutcome: 'DEPARTED_ON_FIRST_RECORDED_DATE' }
+    }, { businessFactAsOfDate: fixture.asOfDate });
+    assert.equal(db.operations().historyDeletes, 0);
+    assert.ok(db.state().history.some(row =>
+        row.employment_history_canonical_status === 'REDUNDANT_REFERENCED'));
+});
+
+test('αποτυχία audit ή τελικής επαλήθευσης αναστρέφει επίλυση και αρχική αποθήκευση', async () => {
+    for (const [failure, behavior, expected] of [
+        ['audit', {}, 'audit failed'],
+        ['', { pretendUpdateSuccess: true },
+            'EMPLOYEE_HISTORY_BUSINESS_FACT_FINAL_VERIFICATION_FAILED']
+    ]) {
+        const fixture = competingDepartureDatesFixture();
+        const firstDb = referencedFixtureDatabase(fixture);
+        const resolution = await requiredBusinessFactResolution(firstDb, fixture);
+        const db = referencedFixtureDatabase(fixture, failure, behavior);
+        const before = structuredClone(db.state());
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+            fingerprint: resolution.fingerprint,
+            answers: { departureOutcome: 'DEPARTED_ON_FIRST_RECORDED_DATE' }
+        }, { businessFactAsOfDate: fixture.asOfDate }), error =>
+            error.code === expected || error.message === expected);
+        assert.deepEqual(db.state(), before);
+    }
+});
+
+test('νόμιμη σύγκρουση της αρχικής αποθήκευσης αναστρέφει και την επίλυση γεγονότων', async () => {
+    const fixture = competingDepartureDatesFixture();
+    const overrides = {
+        businessFactAsOfDate: fixture.asOfDate,
+        input: arrangement,
+        effectiveFrom: '2026-10-01',
+        maintenance: { employeeChanges: {}, historyChanges: {},
+            submittedHistoryChanges: {}, submittedProfileFields: Object.keys(arrangement) }
+    };
+    const firstDb = referencedFixtureDatabase(fixture);
+    const resolution = await requiredBusinessFactResolution(firstDb, fixture, overrides);
+    const db = referencedFixtureDatabase(fixture);
+    const before = structuredClone(db.state());
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+        fingerprint: resolution.fingerprint,
+        answers: { departureOutcome: 'DEPARTED_ON_FIRST_RECORDED_DATE' }
+    }, overrides), error =>
+        error.code === 'EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP');
+    assert.deepEqual(db.state(), before);
+});
+
+test('καθαρή επανάληψη δεν δημιουργεί δεύτερο audit επίλυσης γεγονότων', async () => {
+    const fixture = competingDepartureDatesFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredBusinessFactResolution(db, fixture);
+    await uniqueSafeRepairRequest(db, fixture, {
+        fingerprint: resolution.fingerprint,
+        answers: { departureOutcome: 'NO_DEPARTURE' }
+    }, { businessFactAsOfDate: fixture.asOfDate });
+    const audits = db.operations().auditCreates;
+    const repeated = await uniqueSafeRepairRequest(db, fixture, null,
+        { businessFactAsOfDate: fixture.asOfDate });
+    assert.notEqual(repeated.businessFactResolutionApplied, true);
+    assert.equal(db.operations().auditCreates, audits);
 });

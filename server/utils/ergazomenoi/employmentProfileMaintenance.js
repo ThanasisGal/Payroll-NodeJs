@@ -1,6 +1,6 @@
 'use strict';
 const C = require('./employmentProfileContract');
-const { validatePublicBusinessOptions } =
+const { validatePublicBusinessOptions, validatePublicFactQuestions } =
     require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
 
 const DEPARTURE_FORM_ECHO_ALIASES = Object.freeze({
@@ -138,8 +138,22 @@ function isEmploymentProfileError(error) {
 }
 function sanitizedEmployeeHistoryResolution(value) {
     if (!value || typeof value !== 'object' || value.version !== 1 ||
-        !/^[a-f0-9]{64}$/.test(String(value.fingerprint || '')) ||
-        !Array.isArray(value.options)) return null;
+        !/^[a-f0-9]{64}$/.test(String(value.fingerprint || ''))) return null;
+    if (value.kind === 'BUSINESS_FACT_COLLECTION') {
+        let questions;
+        try { questions = validatePublicFactQuestions(value.questions); } catch { return null; }
+        return {
+            version: 1,
+            kind: 'BUSINESS_FACT_COLLECTION',
+            title: String(value.title || ''),
+            explanation: String(value.explanation || ''),
+            questions: questions.map(question => ({ ...question,
+                ...(question.options ? { options: question.options.map(option => ({ ...option })) } : {}),
+                ...(question.condition ? { condition: { ...question.condition } } : {}) })),
+            fingerprint: String(value.fingerprint)
+        };
+    }
+    if (!Array.isArray(value.options)) return null;
     if (value.kind === 'GUIDED_BUSINESS_CHOICE') {
         let options;
         try { options = validatePublicBusinessOptions(value.options); } catch { return null; }
@@ -211,6 +225,11 @@ function profileError(res, error) {
         EMPLOYEE_HISTORY_MULTIPLE_SAFE_INVALID_BOUNDARY: 'Η επιλεγμένη ερμηνεία δεν μπορούσε πλέον να εφαρμοστεί ακριβώς και με ασφάλεια. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ξανά το ιστορικό. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MULTIPLE_SAFE_INVALID_BOUNDARY',
         EMPLOYEE_HISTORY_MULTIPLE_SAFE_SIMULATION_FAILED: 'Η επιλεγμένη ερμηνεία δεν οδηγεί πλέον σε συνεπές ιστορικό. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις διαθέσιμες επιλογές και τις ημερομηνίες. 3. Μην συνεχίσετε αν το πρόβλημα παραμένει. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MULTIPLE_SAFE_SIMULATION_FAILED',
         EMPLOYEE_HISTORY_MULTIPLE_SAFE_FINAL_VERIFICATION_FAILED: 'Η τελική επαλήθευση του ιστορικού δεν ολοκληρώθηκε με ασφάλεια. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ότι δεν άλλαξαν ενδιάμεσα τα στοιχεία. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MULTIPLE_SAFE_FINAL_VERIFICATION_FAILED',
+        EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED: 'Η αποθήκευση σταμάτησε επειδή το υπάρχον ιστορικό περιέχει αντικρουόμενα στοιχεία αποχώρησης. 1. Επιβεβαιώστε τι συνέβη πραγματικά. 2. Συμπληρώστε κάθε ημερομηνία που ζητείται. 3. Πατήστε «Συνέχεια» ή «Ακύρωση». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED',
+        EMPLOYEE_HISTORY_BUSINESS_FACT_STALE: 'Η κατάσταση του εργαζομένου, του ιστορικού, των συσχετίσεων ή των απαιτούμενων στοιχείων άλλαξε. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τα νεότερα στοιχεία και τις ερωτήσεις. 3. Πατήστε ξανά Αποθήκευση μόνο αν εξακολουθούν να είναι σωστά. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BUSINESS_FACT_STALE',
+        EMPLOYEE_HISTORY_BUSINESS_FACT_INVALID_BOUNDARY: 'Τα στοιχεία που επιβεβαιώθηκαν δεν μπορούσαν πλέον να εφαρμοστούν ακριβώς και με ασφάλεια στο ιστορικό. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ξανά τις ημερομηνίες πρόσληψης και αποχώρησης. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BUSINESS_FACT_INVALID_BOUNDARY',
+        EMPLOYEE_HISTORY_BUSINESS_FACT_SIMULATION_FAILED: 'Τα στοιχεία που επιβεβαιώθηκαν δεν οδηγούν πλέον σε συνεπές ιστορικό. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις απαντήσεις και τις ημερομηνίες. 3. Μην συνεχίσετε αν το πρόβλημα παραμένει. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BUSINESS_FACT_SIMULATION_FAILED',
+        EMPLOYEE_HISTORY_BUSINESS_FACT_FINAL_VERIFICATION_FAILED: 'Η τελική επαλήθευση του ιστορικού μετά την επιβεβαίωση δεν ολοκληρώθηκε με ασφάλεια. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ότι δεν άλλαξαν ενδιάμεσα τα στοιχεία. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BUSINESS_FACT_FINAL_VERIFICATION_FAILED',
         EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID: 'Η ημερομηνία που δηλώθηκε δεν είναι έγκυρη ημερολογιακή ημέρα. 1. Επιλέξτε ημερομηνία από το διαθέσιμο πεδίο. 2. Βεβαιωθείτε ότι είναι πραγματική ημερομηνία. 3. Πατήστε ξανά «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID',
         EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE: 'Η ημερομηνία που δηλώθηκε βρίσκεται έξω από τα ασφαλή όρια της εργασιακής περιόδου. 1. Ελέγξτε την ελάχιστη και τη μέγιστη επιτρεπτή ημερομηνία. 2. Επιλέξτε ημερομηνία μέσα σε αυτά τα όρια. 3. Πατήστε ξανά «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE',
         EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST: 'Η επιβεβαίωση τακτοποίησης δεν ήταν έγκυρη. 1. Ανανεώστε τη φόρμα. 2. Πατήστε ξανά Αποθήκευση. 3. Επιβεβαιώστε μόνο την επιλογή που εμφανίζει η εφαρμογή. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST',
@@ -241,7 +260,8 @@ function profileError(res, error) {
         message, errorMessage: message };
     const resolution = sanitizedEmployeeHistoryResolution(error.resolution);
     if (['EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
-        'EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED'].includes(error.code) &&
+        'EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED',
+        'EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED'].includes(error.code) &&
         error.resolutionRequired === true && resolution) {
         response.resolutionRequired = true;
         response.resolution = resolution;

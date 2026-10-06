@@ -29,6 +29,11 @@ const GUIDED_BUSINESS_CHOICE_KIND = 'GUIDED_BUSINESS_CHOICE';
 const GUIDED_BUSINESS_CHOICE_TITLE = 'Χρειάζεται επιβεβαίωση του ιστορικού';
 const GUIDED_BUSINESS_CHOICE_EXPLANATION =
     'Υπάρχουν περισσότερες από μία ασφαλείς ερμηνείες. Επιλέξτε τι συνέβη πραγματικά.';
+const BUSINESS_FACT_COLLECTION_CONTRACT_VERSION = 1;
+const BUSINESS_FACT_COLLECTION_KIND = 'BUSINESS_FACT_COLLECTION';
+const BUSINESS_FACT_COLLECTION_TITLE = 'Χρειάζονται πραγματικά στοιχεία για το ιστορικό';
+const BUSINESS_FACT_COLLECTION_EXPLANATION =
+    'Το υπάρχον ιστορικό περιέχει αντικρουόμενα στοιχεία. Επιβεβαιώστε τι συνέβη πραγματικά.';
 
 function stableValue(value) {
     if (Array.isArray(value)) return value.map(stableValue);
@@ -127,6 +132,30 @@ function buildMultipleSafeResolutionStateFingerprint({ scope, currentEmployee,
         problemScope,
         exactServerPlan: multiplePlan,
         exactOptionSet: multiplePlan.businessOptions,
+        normalizedSaveRequest
+    });
+}
+
+function buildBusinessFactResolutionStateFingerprint({ scope, currentEmployee,
+    completeHistoryRows = [], protectedReferenceSummary = {}, canonicalResult,
+    problemScope, businessFactPlan, normalizedSaveRequest = {} } = {}) {
+    if (businessFactPlan?.status !== 'APPLICABLE' ||
+        businessFactPlan?.resolutionClass !== RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED ||
+        businessFactPlan?.resolutionKind !== BUSINESS_FACT_COLLECTION_KIND ||
+        !Array.isArray(businessFactPlan.factQuestions) || !businessFactPlan.factQuestions.length) {
+        throw new TypeError('Applicable business-fact resolution plan required');
+    }
+    return buildFingerprint({
+        contract: 'employee-history-business-fact-collection-confirmation:v1',
+        scope,
+        employee: currentEmployee,
+        completeHistory: completeHistoryRows,
+        referenceState: protectedReferenceSummary,
+        currentAmbiguity: canonicalSourceStateFingerprint(canonicalResult),
+        problemScope,
+        exactServerRules: businessFactPlan.internalResolutionRules,
+        exactQuestionSet: businessFactPlan.factQuestions,
+        exactServerPlan: businessFactPlan,
         normalizedSaveRequest
     });
 }
@@ -261,6 +290,119 @@ function buildMultipleSafePublicResolution({ analysis, fingerprint } = {}) {
     });
 }
 
+const FACT_QUESTION_IDS = Object.freeze([
+    'departureOutcome', 'departureDate', 'payEffectiveOutcome', 'payEffectiveDate'
+]);
+const FACT_ANSWER_IDS = Object.freeze({
+    departureOutcome: [
+        'DEPARTED_ON_FIRST_RECORDED_DATE',
+        'DEPARTED_ON_SECOND_RECORDED_DATE',
+        'DEPARTED_ON_OTHER_DATE',
+        'NO_DEPARTURE'
+    ],
+    payEffectiveOutcome: ['PAY_APPLIED_FROM_HIRE', 'PAY_APPLIED_FROM_OTHER_DATE']
+});
+
+function exactKeys(value, expected) {
+    const keys = Object.keys(value || {}).sort();
+    const sorted = [...expected].sort();
+    return keys.length === sorted.length && keys.every((key, index) => key === sorted[index]);
+}
+
+function validatePublicFactQuestions(questions) {
+    if (!Array.isArray(questions) || ![2, 4].includes(questions.length)) {
+        throw new TypeError('Business-fact questions must contain one or two controlled pairs');
+    }
+    const expectedOrder = questions.length === 2
+        ? ['departureOutcome', 'departureDate']
+        : ['departureOutcome', 'departureDate', 'payEffectiveOutcome', 'payEffectiveDate'];
+    if (questions.some((question, index) => question?.id !== expectedOrder[index])) {
+        throw new TypeError('Unexpected business-fact question order');
+    }
+    return questions.map(question => {
+        if (!question || typeof question !== 'object' || Array.isArray(question) ||
+            !FACT_QUESTION_IDS.includes(question.id) || !String(question.label || '').trim() ||
+            question.required !== true) throw new TypeError('Invalid business-fact question');
+        if (question.type === 'SINGLE_CHOICE') {
+            if (!exactKeys(question, ['id', 'type', 'label', 'required', 'options']) ||
+                !Array.isArray(question.options)) throw new TypeError('Invalid fact choice question');
+            const expectedOptions = FACT_ANSWER_IDS[question.id];
+            if (!expectedOptions || question.options.length !== expectedOptions.length ||
+                question.options.some((option, index) =>
+                    !exactKeys(option, ['id', 'label']) || option.id !== expectedOptions[index] ||
+                    !String(option.label || '').trim())) {
+                throw new TypeError('Invalid fact answer options');
+            }
+            return Object.freeze({ id: question.id, type: 'SINGLE_CHOICE',
+                label: String(question.label), required: true,
+                options: Object.freeze(question.options.map(option => Object.freeze({
+                    id: option.id, label: String(option.label)
+                }))) });
+        }
+        if (question.type !== 'DATE' ||
+            !exactKeys(question, ['condition', 'id', 'label', 'max', 'min', 'required', 'type']) ||
+            !exactKeys(question.condition, ['equals', 'questionId'])) {
+            throw new TypeError('Invalid fact date question');
+        }
+        const expectedCondition = question.id === 'departureDate'
+            ? { questionId: 'departureOutcome', equals: 'DEPARTED_ON_OTHER_DATE' }
+            : question.id === 'payEffectiveDate'
+                ? { questionId: 'payEffectiveOutcome', equals: 'PAY_APPLIED_FROM_OTHER_DATE' }
+                : null;
+        if (!expectedCondition || question.condition.questionId !== expectedCondition.questionId ||
+            question.condition.equals !== expectedCondition.equals) {
+            throw new TypeError('Invalid fact date condition');
+        }
+        const min = C.calendarDate(question.min, 'min').toISOString().slice(0, 10);
+        const max = C.calendarDate(question.max, 'max').toISOString().slice(0, 10);
+        if (min > max) throw new TypeError('Invalid fact date bounds');
+        return Object.freeze({ id: question.id, type: 'DATE', label: String(question.label),
+            required: true, min, max, condition: Object.freeze(expectedCondition) });
+    });
+}
+
+function buildBusinessFactResolutionAnalysis({ businessFactPlan,
+    sourceStateFingerprint } = {}) {
+    if (businessFactPlan?.status !== 'APPLICABLE' || !sourceStateFingerprint ||
+        businessFactPlan.resolutionClass !== RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED ||
+        businessFactPlan.resolutionKind !== BUSINESS_FACT_COLLECTION_KIND ||
+        ![REFERENCE_CLASSES.NO_REFERENCES, REFERENCE_CLASSES.PROVENANCE_ONLY]
+            .includes(businessFactPlan.referenceClass)) return null;
+    const questions = validatePublicFactQuestions(businessFactPlan.factQuestions);
+    return buildEmployeeHistoryResolutionAnalysis({
+        resolutionClass: RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED,
+        resolutionKind: BUSINESS_FACT_COLLECTION_KIND,
+        reason: businessFactPlan.reason,
+        title: BUSINESS_FACT_COLLECTION_TITLE,
+        explanation: BUSINESS_FACT_COLLECTION_EXPLANATION,
+        candidateBusinessPlans: [],
+        missingBusinessFacts: questions,
+        referenceClass: businessFactPlan.referenceClass,
+        sourceStateFingerprint,
+        hypotheticalCanonicalResult: {
+            status: 'FACTS_REQUIRED',
+            reason: businessFactPlan.shapeKind,
+            blocksOrdinaryMaintenance: true
+        }
+    });
+}
+
+function buildBusinessFactPublicResolution({ analysis, fingerprint } = {}) {
+    if (analysis?.resolutionClass !== RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED ||
+        analysis?.resolutionKind !== BUSINESS_FACT_COLLECTION_KIND ||
+        !/^[a-f0-9]{64}$/.test(String(fingerprint || ''))) {
+        throw new TypeError('Valid business-fact resolution analysis and fingerprint required');
+    }
+    return Object.freeze({
+        version: BUSINESS_FACT_COLLECTION_CONTRACT_VERSION,
+        kind: BUSINESS_FACT_COLLECTION_KIND,
+        title: BUSINESS_FACT_COLLECTION_TITLE,
+        explanation: BUSINESS_FACT_COLLECTION_EXPLANATION,
+        questions: Object.freeze(validatePublicFactQuestions(analysis.missingBusinessFacts)),
+        fingerprint: String(fingerprint)
+    });
+}
+
 function resolutionRequestError(code = 'EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST') {
     const error = new Error(code);
     error.code = code;
@@ -287,14 +429,15 @@ function normalizeEmployeeHistoryResolutionConfirmation(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value) ||
         Object.getPrototypeOf(value) !== Object.prototype) throw resolutionRequestError();
     const keys = Object.keys(value).sort();
-    if (![['choiceId', 'fingerprint'], ['answers', 'choiceId', 'fingerprint']]
+    const guided = [['choiceId', 'fingerprint'], ['answers', 'choiceId', 'fingerprint']]
         .some(expected => expected.length === keys.length &&
-            expected.every((key, index) => key === keys[index])) ||
-        !/^[A-Z0-9_]{3,100}$/.test(String(value.choiceId || '')) ||
-        !/^[a-f0-9]{64}$/.test(String(value.fingerprint || ''))) {
+            expected.every((key, index) => key === keys[index]));
+    const fact = keys.length === 2 && keys[0] === 'answers' && keys[1] === 'fingerprint';
+    if ((!guided && !fact) || !/^[a-f0-9]{64}$/.test(String(value.fingerprint || '')) ||
+        (guided && !/^[A-Z0-9_]{3,100}$/.test(String(value.choiceId || '')))) {
         throw resolutionRequestError();
     }
-    if (Object.hasOwn(value, 'answers')) {
+    if (guided && Object.hasOwn(value, 'answers')) {
         const answers = value.answers;
         if (!answers || typeof answers !== 'object' || Array.isArray(answers) ||
             Object.getPrototypeOf(answers) !== Object.prototype ||
@@ -302,8 +445,18 @@ function normalizeEmployeeHistoryResolutionConfirmation(value) {
             throw resolutionRequestError();
         }
     }
-    return Object.freeze({ choiceId: String(value.choiceId),
-        fingerprint: String(value.fingerprint),
+    if (fact) {
+        const answers = value.answers;
+        if (!answers || typeof answers !== 'object' || Array.isArray(answers) ||
+            Object.getPrototypeOf(answers) !== Object.prototype ||
+            !Object.keys(answers).length || Object.keys(answers).some(key =>
+                !FACT_QUESTION_IDS.includes(key) || typeof answers[key] !== 'string')) {
+            throw resolutionRequestError();
+        }
+        return Object.freeze({ fingerprint: String(value.fingerprint),
+            answers: Object.freeze({ ...answers }) });
+    }
+    return Object.freeze({ choiceId: String(value.choiceId), fingerprint: String(value.fingerprint),
         ...(Object.hasOwn(value, 'answers') ? { answers: Object.freeze({ ...value.answers }) } : {}) });
 }
 
@@ -336,6 +489,41 @@ function normalizeMultipleSafeResolutionConfirmation(value, businessOptions) {
     }
     return Object.freeze({ ...normalized,
         answers: Object.freeze({ effectiveDate }) });
+}
+
+function normalizeBusinessFactResolutionConfirmation(value, factQuestions) {
+    const normalized = normalizeEmployeeHistoryResolutionConfirmation(value);
+    if (!normalized || Object.hasOwn(normalized, 'choiceId')) throw resolutionRequestError();
+    const questions = validatePublicFactQuestions(factQuestions);
+    const answers = normalized.answers;
+    const expectedKeys = [];
+    for (const question of questions) {
+        if (question.type === 'SINGLE_CHOICE') {
+            if (!question.options.some(option => option.id === answers[question.id])) {
+                throw resolutionRequestError();
+            }
+            expectedKeys.push(question.id);
+            continue;
+        }
+        if (answers[question.condition.questionId] !== question.condition.equals) continue;
+        const raw = answers[question.id];
+        let date;
+        try {
+            if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+                throw new TypeError('Exact calendar date required');
+            }
+            date = C.calendarDate(raw, question.id).toISOString().slice(0, 10);
+        } catch {
+            throw resolutionRequestError('EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID');
+        }
+        if (date < question.min || date > question.max) {
+            throw resolutionRequestError('EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE');
+        }
+        expectedKeys.push(question.id);
+    }
+    if (!exactKeys(answers, expectedKeys)) throw resolutionRequestError();
+    return Object.freeze({ fingerprint: normalized.fingerprint,
+        answers: Object.freeze(Object.fromEntries(expectedKeys.map(key => [key, answers[key]]))) });
 }
 
 function canonicalSourceStateFingerprint(canonicalResult = {}) {
@@ -397,17 +585,26 @@ module.exports = {
     GUIDED_BUSINESS_CHOICE_KIND,
     GUIDED_BUSINESS_CHOICE_TITLE,
     GUIDED_BUSINESS_CHOICE_EXPLANATION,
+    BUSINESS_FACT_COLLECTION_CONTRACT_VERSION,
+    BUSINESS_FACT_COLLECTION_KIND,
+    BUSINESS_FACT_COLLECTION_TITLE,
+    BUSINESS_FACT_COLLECTION_EXPLANATION,
     canonicalSourceStateFingerprint,
     buildEmployeeHistoryResolutionAnalysis,
     analyzeCanonicalLegacyAliasResolution,
     buildUniqueSafeRepairStateFingerprint,
     buildMultipleSafeResolutionStateFingerprint,
+    buildBusinessFactResolutionStateFingerprint,
     buildUniqueSafeRepairResolutionAnalysis,
     buildMultipleSafeResolutionAnalysis,
+    buildBusinessFactResolutionAnalysis,
     buildUniqueSafeRepairPublicResolution,
     buildMultipleSafePublicResolution,
+    buildBusinessFactPublicResolution,
     normalizeUniqueSafeRepairConfirmation,
     normalizeEmployeeHistoryResolutionConfirmation,
     normalizeMultipleSafeResolutionConfirmation,
-    validatePublicBusinessOptions
+    normalizeBusinessFactResolutionConfirmation,
+    validatePublicBusinessOptions,
+    validatePublicFactQuestions
 };

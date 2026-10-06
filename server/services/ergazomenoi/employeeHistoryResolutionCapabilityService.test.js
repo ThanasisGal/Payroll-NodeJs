@@ -12,15 +12,20 @@ const { samePeriodMateriallyDifferentProfilesFixture,
     optionalIntermediateProfileFixture,
     realStartOfFourDayProfileFixture } =
     require('./fixtures/multipleSafeEmployeeHistoryResolutionFixtures');
+const { competingDepartureDatesFixture, departureAndHistoricalPayFactFixture } =
+    require('./fixtures/businessFactEmployeeHistoryResolutionFixtures');
 
 test('capability classification preserves UNIQUE and identifies exactly the four generic MULTIPLE shapes', () => {
-    assert.equal(classifyEmployeeHistoryResolutionCapability(shapeALifecycleFixture())
-        .resolutionClass, RESOLUTION_CLASSES.UNIQUE_SAFE_PLAN);
+    const unique = classifyEmployeeHistoryResolutionCapability(shapeALifecycleFixture());
+    assert.equal(unique.resolutionClass, RESOLUTION_CLASSES.UNIQUE_SAFE_PLAN);
+    assert.equal(unique.factCollectionReady, false);
     for (const factory of [samePeriodMateriallyDifferentProfilesFixture,
         correctionFromHireOrSpecialtyChangeFixture, optionalIntermediateProfileFixture,
         realStartOfFourDayProfileFixture]) {
-        assert.equal(classifyEmployeeHistoryResolutionCapability(factory()).resolutionClass,
+        const result = classifyEmployeeHistoryResolutionCapability(factory());
+        assert.equal(result.resolutionClass,
             RESOLUTION_CLASSES.MULTIPLE_SAFE_BUSINESS_PLANS, factory().name);
+        assert.equal(result.factCollectionReady, false, factory().name);
     }
 });
 
@@ -62,4 +67,42 @@ test('unknown and live references fail closed as ADMIN_REVIEW_REQUIRED', () => {
     delete unknown.protectedReferenceSummary['m1-two-day'];
     assert.equal(classifyEmployeeHistoryResolutionCapability(unknown).resolutionClass,
         RESOLUTION_CLASSES.ADMIN_REVIEW_REQUIRED);
+});
+
+test('exactly five generic departure cases remain BUSINESS_FACT_REQUIRED and become collection-ready', () => {
+    const fixtures = [
+        competingDepartureDatesFixture({ name: 'departure-one', hire: '2026-04-29',
+            firstDeparture: '2026-08-19', secondDeparture: '2026-08-20' }),
+        departureAndHistoricalPayFactFixture(),
+        competingDepartureDatesFixture({ name: 'departure-three', hire: '2026-04-23',
+            firstDeparture: '2026-07-04', secondDeparture: '2026-07-05',
+            includeOpenProfile: false }),
+        competingDepartureDatesFixture({ name: 'departure-four', hire: '2026-05-02',
+            firstDeparture: '2026-06-25', secondDeparture: '2026-06-28' }),
+        competingDepartureDatesFixture({ name: 'departure-five', hire: '2026-06-22',
+            firstDeparture: '2026-07-27', secondDeparture: '2026-07-31' })
+    ];
+    for (const fixture of fixtures) {
+        const result = classifyEmployeeHistoryResolutionCapability(fixture);
+        assert.equal(result.resolutionClass, RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED);
+        assert.equal(result.factCollectionReady, true);
+        assert.equal(result.businessFactPlan.status, 'APPLICABLE');
+    }
+});
+
+test('initial-profile fact shapes stay BUSINESS_FACT_REQUIRED without incomplete questions', () => {
+    const deferred = [
+        ['missing-initial-work-terms', row => { row.hmeres_ergasias_ebdomadas = 3; }],
+        ['conflicting-initial-hours', row => { row.ores_ergasias_ebdomadas = 29; }],
+        ['specialty-and-terms-required', row => {
+            row.eidikothta_symbashs = '0099'; row.hmeres_ergasias_ebdomadas = 4;
+        }]
+    ];
+    for (const [name, mutate] of deferred) {
+        const fixture = departureAndHistoricalPayFactFixture();
+        mutate(fixture.completeHistoryRows[2]);
+        const result = classifyEmployeeHistoryResolutionCapability(fixture);
+        assert.equal(result.resolutionClass, RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED, name);
+        assert.equal(result.factCollectionReady, false, name);
+    }
 });
