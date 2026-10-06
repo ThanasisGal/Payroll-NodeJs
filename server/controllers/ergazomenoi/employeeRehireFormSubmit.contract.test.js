@@ -11,7 +11,7 @@ const source = fs.readFileSync(
 
 assert.match(
     source,
-    /writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations/
+    /writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithUniqueSafeRepair,[\s\S]*writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire,[\s\S]*writeEmployeeEmploymentHistoryOperations/
 );
 
 const start = source.indexOf('static postErgazomenoiUpdate');
@@ -35,7 +35,7 @@ assert.match(
     /historyChanges: \{\s*\.\.\.updateFieldsIstoriko,\s*afora_proslhpsh: true/
 );
 assert.match(handler, /input: profileInput\(formData, 'edit'\)/);
-assert.match(handler, /: await writeEmployeeEmploymentProfile\(\{/);
+assert.match(handler, /: await writeEmployeeEmploymentProfileWithUniqueSafeRepair\(\{/);
 assert.match(handler, /startsWith\('EMPLOYEE_REHIRE_'\)/);
 
 console.log('PASS rehire final-submit controller contract');

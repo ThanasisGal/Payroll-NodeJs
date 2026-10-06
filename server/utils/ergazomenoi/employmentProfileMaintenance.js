@@ -134,6 +134,25 @@ function isEmploymentProfileError(error) {
         ['HIRE_DATE_REQUIRES_CONTROLLED_LIFECYCLE', 'LEGACY_FACTS_REQUIRED',
             'NEW_VERSION_NOT_FUTURE'].includes(code);
 }
+function sanitizedEmployeeHistoryResolution(value) {
+    if (!value || typeof value !== 'object' || value.version !== 1 ||
+        value.kind !== 'UNIQUE_SAFE_REPAIR' ||
+        !/^[a-f0-9]{64}$/.test(String(value.fingerprint || '')) ||
+        !Array.isArray(value.options) || value.options.length !== 1 ||
+        value.options[0]?.id !== 'APPLY_UNIQUE_SAFE_PLAN') return null;
+    return {
+        version: 1,
+        kind: 'UNIQUE_SAFE_REPAIR',
+        title: String(value.title || ''),
+        explanation: String(value.explanation || ''),
+        options: [{
+            id: 'APPLY_UNIQUE_SAFE_PLAN',
+            label: String(value.options[0].label || ''),
+            description: String(value.options[0].description || '')
+        }],
+        fingerprint: String(value.fingerprint)
+    };
+}
 function profileError(res, error) {
     const messages = {
         EMPLOYEE_DEPARTURE_INVALID_DATE: 'Η ημερομηνία αποχώρησης δεν είναι έγκυρη. Δεν αποθηκεύτηκε καμία αλλαγή.',
@@ -169,6 +188,10 @@ function profileError(res, error) {
         EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE: 'Δεν επιτρέπεται αλλαγή ή νέα καταχώριση πρόσληψης όσο η τρέχουσα εργασιακή σχέση δεν έχει ημερομηνία αποχώρησης. Καταχωρήστε πρώτα την αποχώρηση και στη συνέχεια χρησιμοποιήστε τη διαδικασία Επαναπρόσληψης.',
         EMPLOYEE_PROFILE_HIRE_DATE_CHANGE_REQUIRES_LIFECYCLE_REPAIR: 'Η ημερομηνία πρόσληψης υπάρχουσας ιστορικής εγγραφής δεν αλλάζει από τον απλό editor. Απαιτείται ελεγχόμενη διόρθωση του ιστορικού.',
         EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED: 'Βρέθηκαν ασυνεπείς παλαιότερες εγγραφές ιστορικού και η αλλαγή δεν μπορεί να αποθηκευτεί με ασφάλεια. Δεν έγινε καμία αλλαγή. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ιστορικού.',
+        EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED: 'Η αποθήκευση σταμάτησε επειδή βρέθηκε ασυνέπεια στο ιστορικό που μπορεί να τακτοποιηθεί με ασφάλεια. 1. Επιλέξτε «Ακύρωση» για να μη γίνει καμία ενέργεια. 2. Επιλέξτε «Τακτοποίηση ιστορικού» για να επιβεβαιώσετε τη διόρθωση και την αρχική αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
+        EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE: 'Η κατάσταση του εργαζομένου ή του ιστορικού άλλαξε μετά την εμφάνιση της επιβεβαίωσης. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τα νεότερα στοιχεία. 3. Πατήστε ξανά Αποθήκευση μόνο αν εξακολουθούν να είναι σωστά. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE',
+        EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_INVALID_BOUNDARY: 'Η τελική διόρθωση δεν συμφώνησε με το μοναδικό ασφαλές σχέδιο που είχε επιβεβαιωθεί. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε το ιστορικό. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_INVALID_BOUNDARY',
+        EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST: 'Η επιβεβαίωση τακτοποίησης δεν ήταν έγκυρη. 1. Ανανεώστε τη φόρμα. 2. Πατήστε ξανά Αποθήκευση. 3. Επιβεβαιώστε μόνο την επιλογή που εμφανίζει η εφαρμογή. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST',
         EMPLOYEE_HISTORY_REFERENCED_CLEANUP_REQUIRED: 'Βρέθηκαν παλαιότερες εγγραφές ιστορικού που χρησιμοποιούνται από άλλες καταχωρίσεις και δεν μπορούν να αφαιρεθούν αυτόματα. Δεν έγινε καμία αλλαγή. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ιστορικού.',
         EMPLOYEE_HISTORY_REFERENCED_DELETE_FORBIDDEN: 'Η εγγραφή ιστορικού χρησιμοποιείται ήδη από υπολογισμούς ή αποθηκευμένα στοιχεία και δεν μπορεί να διαγραφεί. Δεν έγινε καμία αλλαγή.',
         EMPLOYEE_HISTORY_REFERENCED_UPDATE_REQUIRES_REPLACEMENT: 'Η εγγραφή ιστορικού χρησιμοποιείται από άλλη καταχώριση που εξαρτάται από τα ζωντανά στοιχεία της και δεν μπορεί να διορθωθεί επιτόπου. Δεν έγινε καμία αλλαγή.',
@@ -191,9 +214,17 @@ function profileError(res, error) {
     const message = error.code === 'INVALID_EMPLOYMENT_PROFILE'
         ? `Μη έγκυρα στοιχεία εργασίας (${error.field}): ${error.message}`
         : messages[error.code] || 'Η αποθήκευση εργαζομένου και ιστορικού απέτυχε. Δεν αποθηκεύτηκε η μεταβολή.';
-    return res.status(error.statusCode || 500).json({ success: false, reason: error.code || 'EMPLOYEE_PROFILE_SAVE_FAILED',
-        field: error.field, operation: error.operation || 'EMPLOYEE_MAINTENANCE', message, errorMessage: message });
+    const response = { success: false, reason: error.code || 'EMPLOYEE_PROFILE_SAVE_FAILED',
+        field: error.field, operation: error.operation || 'EMPLOYEE_MAINTENANCE',
+        message, errorMessage: message };
+    const resolution = sanitizedEmployeeHistoryResolution(error.resolution);
+    if (error.code === 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED' &&
+        error.resolutionRequired === true && resolution) {
+        response.resolutionRequired = true;
+        response.resolution = resolution;
+    }
+    return res.status(error.statusCode || 500).json(response);
 }
 module.exports = { profileInput, profileError, isEmploymentProfileError, historyEditorChanges,
     submittedEmployeeMaintenanceFields, departureMaintenanceValuesEqual,
-    departureMaintenanceFormEchoMatchesCurrent };
+    departureMaintenanceFormEchoMatchesCurrent, sanitizedEmployeeHistoryResolution };

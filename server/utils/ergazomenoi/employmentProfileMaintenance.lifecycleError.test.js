@@ -50,3 +50,46 @@ test('PR C lifecycle failures have actionable fail-closed user messages', () => 
         assert.match(payload.errorMessage, new RegExp(`Κωδικός αναφοράς: ${code}$`), code);
     }
 });
+
+test('unique-safe conflict serializes only the public allowlist and actionable message', () => {
+    let statusCode = null;
+    let payload = null;
+    const res = {
+        status(value) { statusCode = value; return this; },
+        json(value) { payload = value; return value; }
+    };
+    profileError(res, {
+        code: 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
+        statusCode: 409,
+        resolutionRequired: true,
+        resolution: {
+            version: 1,
+            kind: 'UNIQUE_SAFE_REPAIR',
+            title: 'Βρέθηκε ασυνέπεια στο ιστορικό',
+            explanation: 'Ασφαλής εξήγηση',
+            options: [{ id: 'APPLY_UNIQUE_SAFE_PLAN', label: 'Τακτοποίηση ιστορικού',
+                description: 'Ασφαλής περιγραφή', historyId: 'must-not-leak' }],
+            fingerprint: 'a'.repeat(64),
+            historyId: 'must-not-leak',
+            diagnostics: { _id: 'must-not-leak' }
+        }
+    });
+    assert.equal(statusCode, 409);
+    assert.equal(payload.resolutionRequired, true);
+    assert.deepEqual(Object.keys(payload.resolution).sort(),
+        ['explanation', 'fingerprint', 'kind', 'options', 'title', 'version']);
+    assert.equal(JSON.stringify(payload).includes('must-not-leak'), false);
+    assert.match(payload.message, /1\./);
+    assert.match(payload.message, /2\./);
+    assert.match(payload.message, /Δεν αποθηκεύτηκε καμία αλλαγή\./);
+});
+
+test('malformed repair metadata is never reflected to the browser', () => {
+    let payload;
+    const res = { status() { return this; }, json(value) { payload = value; return value; } };
+    profileError(res, { code: 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
+        statusCode: 409, resolutionRequired: true,
+        resolution: { kind: 'UNIQUE_SAFE_REPAIR', historyId: 'forged' } });
+    assert.equal(payload.resolutionRequired, undefined);
+    assert.equal(payload.resolution, undefined);
+});

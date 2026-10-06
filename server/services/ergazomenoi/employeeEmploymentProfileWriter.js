@@ -60,6 +60,15 @@ const { OPERATION: DEFERRED_AMBIGUITY_DEPARTURE_OPERATION,
     planEmployeeDepartureWithDeferredHistoryAmbiguity,
     verifyDepartureWithDeferredHistoryAmbiguity } =
     require('./employeeDepartureDeferredAmbiguityPlannerService');
+const { OPERATION: UNIQUE_SAFE_REPAIR_OPERATION,
+    PLAN_STATUSES: UNIQUE_SAFE_REPAIR_PLAN_STATUSES,
+    planEmployeeHistoryUniqueSafeRepair } =
+    require('./employeeHistoryUniqueSafeRepairPlannerService');
+const { buildUniqueSafeRepairStateFingerprint,
+    buildUniqueSafeRepairResolutionAnalysis,
+    buildUniqueSafeRepairPublicResolution,
+    normalizeUniqueSafeRepairConfirmation } =
+    require('./employeeHistoryResolutionAnalysisService');
 
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
@@ -72,6 +81,7 @@ const LARGE_EMPLOYEE_FIELDS_EXCLUSION = [
     'arxeio_apodoxhs_oron_atomikhs_symbashs_base64',
     'arxeio_symbashs_daneismoy_base64'
 ].map(field => `-${field}`).join(' ');
+const EMPLOYEE_SCOPE_FIELDS = Object.freeze(['team', 'company_kod', 'kodikos']);
 
 function currentProfileProjection(snapshot) {
     return Object.fromEntries(T.STANDARD_FIELDS.filter(field =>
@@ -383,19 +393,43 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     contractEndSegmentSyncCurrentPatch = null,
     controlledDeferredAmbiguityDeparture = false,
     deferredAmbiguityDeparturePlan = null,
+    controlledUniqueSafeRepair = false,
+    uniqueSafeRepairPlan = null,
     auditAfterMutation = false }) {
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
         ? { ...currentPatch } : { ...currentBefore, ...currentPatch };
     const controlledBoundaries = [controlledLegacyOpenCycleCleanup,
         controlledInvalidDepartureCorrection, controlledContractEndSegmentSync,
-        controlledDeferredAmbiguityDeparture].filter(Boolean).length;
+        controlledDeferredAmbiguityDeparture, controlledUniqueSafeRepair].filter(Boolean).length;
     if (controlledBoundaries > 1) {
         throw failure(controlledInvalidDepartureCorrection
             ? 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY'
             : 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY');
     }
-    if (controlledDeferredAmbiguityDeparture) {
+    if (controlledUniqueSafeRepair) {
+        const expectedUpdateIds = [...(uniqueSafeRepairPlan?.changedHistoryIds || [])]
+            .map(String).sort();
+        const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
+        const exactPatches = physicalPlan.rowsToUpdate.every(item => {
+            const expected = uniqueSafeRepairPlan?.historyPatches?.[String(item.historyId)];
+            const actual = Object.fromEntries(Object.entries(item.patch || {})
+                .filter(([field]) => field !== 'updatedAt'));
+            return expected && stableStringify(actual) === stableStringify(expected);
+        });
+        const beforeIds = physicalPlan.beforeRows.map(row => String(row._id)).sort();
+        const finalIds = physicalPlan.finalRows.map(row => String(row._id)).sort();
+        if (deleteCurrent || diagnostics?.operation !== UNIQUE_SAFE_REPAIR_OPERATION ||
+            uniqueSafeRepairPlan?.status !== UNIQUE_SAFE_REPAIR_PLAN_STATUSES.APPLICABLE ||
+            diagnostics?.planFingerprint !== uniqueSafeRepairPlan.planFingerprint ||
+            stableStringify(currentPatch || {}) !==
+                stableStringify(uniqueSafeRepairPlan.currentPatch || {}) ||
+            physicalPlan.rowsToDelete.length || physicalPlan.rowsToInsert.length || !exactPatches ||
+            stableStringify(plannedUpdateIds) !== stableStringify(expectedUpdateIds) ||
+            stableStringify(beforeIds) !== stableStringify(finalIds)) {
+            throw failure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_INVALID_BOUNDARY');
+        }
+    } else if (controlledDeferredAmbiguityDeparture) {
         const expectedUpdateIds = [...(deferredAmbiguityDeparturePlan?.changedHistoryIds || [])]
             .map(String).sort();
         const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
@@ -510,7 +544,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     let deleteFilter = buildScopedHistoryDeleteFilter(filter, deletedIds);
     const referencedRedundant = [];
     const auditRequired = canonicalRepairRequired || proposedDeletedIds.length > 0 ||
-        controlledDeferredAmbiguityDeparture || controlledInvalidDepartureCorrection;
+        controlledDeferredAmbiguityDeparture || controlledInvalidDepartureCorrection ||
+        controlledUniqueSafeRepair;
     let pendingAuditRecord = null;
     if (auditRequired) {
         let auditCollectionExists;
@@ -680,6 +715,24 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 throw error;
             }
             verified.deferredAmbiguityDeparturePostcondition = postcondition;
+        } else if (controlledUniqueSafeRepair) {
+            const canonical = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: verified.history });
+            const second = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: canonical.canonicalRows });
+            const persistedIds = verified.history.map(row => String(row._id)).sort();
+            const plannedIds = uniqueSafeRepairPlan.desiredHistoryRows
+                .map(row => String(row._id)).sort();
+            if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired ||
+                !canonical.idempotent || canonical.rowsToDelete.length ||
+                canonical.rowsToInsert.length || canonical.rowsToUpdate.length ||
+                Object.keys(canonical.employeePatch || {}).length ||
+                second.status !== CANONICAL_STATUSES.CLEAN || second.cleanupRequired ||
+                !second.idempotent || stableStringify(second.canonicalRows) !==
+                    stableStringify(canonical.canonicalRows) ||
+                stableStringify(persistedIds) !== stableStringify(plannedIds)) {
+                throw failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+            }
         } else if (controlledInvalidDepartureCorrection) {
             const persistedTarget = verified.history.find(row => String(row._id) ===
                 String(invalidDepartureCorrectionPlan.targetHistoryId));
@@ -1619,6 +1672,186 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
         result.employee?.$session?.(null);
         return result;
     }, activeSession);
+}
+
+function withoutVolatileRequestFields(value) {
+    if (Array.isArray(value)) return value.map(withoutVolatileRequestFields);
+    if (!value || typeof value !== 'object' || value instanceof Date ||
+        typeof value.toHexString === 'function') return value;
+    return Object.fromEntries(Object.entries(value)
+        .filter(([field, nested]) => field !== 'updatedAt' && nested !== undefined)
+        .map(([field, nested]) => [field, withoutVolatileRequestFields(nested)]));
+}
+
+function normalizedUniqueSafeRepairSaveRequest({ input = {}, effectiveFrom, mode,
+    historyId, maintenance = null } = {}) {
+    const maintenanceState = maintenance ? {
+        expectedRevision: maintenance.expectedRevision ?? null,
+        employeeChanges: maintenance.employeeChanges || {},
+        submittedEmployeeFields: maintenance.submittedEmployeeFields || [],
+        historyChanges: maintenance.historyChanges || {},
+        submittedHistoryChanges: maintenance.submittedHistoryChanges || {},
+        submittedProfileFields: maintenance.submittedProfileFields || [],
+        identity: maintenance.identity || null,
+        originalHistoryId: maintenance.originalHistoryId || null,
+        correctableIdentityFields: maintenance.correctableIdentityFields || [],
+        intentHint: maintenance.intentHint || null
+    } : null;
+    return withoutVolatileRequestFields({
+        input,
+        effectiveFrom: C.calendarDate(effectiveFrom)?.toISOString() || null,
+        mode,
+        historyId,
+        maintenance: maintenanceState
+    });
+}
+
+function uniqueSafeRepairFailure(code, statusCode = 409, extra = {}) {
+    const error = failure(code);
+    error.statusCode = statusCode;
+    Object.assign(error, extra);
+    return error;
+}
+
+async function writeEmployeeEmploymentProfileWithUniqueSafeRepair({
+    resolutionConfirmation: rawResolutionConfirmation = null,
+    repairActor = null,
+    connection = mongoose.connection,
+    employeeModel = ErgazomenoiModel,
+    historyModel = IstorikoProslhpseonAllagonModel,
+    auditModel = EmployeeHistoryRepairAuditModel,
+    auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
+    referenceChecker = findHistoryIdReferences,
+    capabilityProbe = transactionCapability,
+    ...profileRequest
+} = {}) {
+    const resolutionConfirmation = normalizeUniqueSafeRepairConfirmation(
+        rawResolutionConfirmation);
+    const { scope, employeeId } = profileRequest;
+    if (!scope || !EMPLOYEE_SCOPE_FIELDS.every(field => String(scope[field] ?? '').trim()) ||
+        typeof employeeId !== 'string' || !employeeId.trim()) {
+        C.invalid('scope', 'existing scoped employee required');
+    }
+    const filter = Object.fromEntries(EMPLOYEE_SCOPE_FIELDS
+        .map(field => [field, String(scope[field])]));
+    const dependencies = { connection, employeeModel, historyModel, auditModel,
+        auditCollectionChecker, referenceChecker, capabilityProbe };
+    return inProfileTransaction(connection, capabilityProbe, async session => {
+        const current = await requestScopedLean(
+            employeeModel.findOne({ ...filter, _id: employeeId }), session,
+            LARGE_EMPLOYEE_FIELDS_EXCLUSION);
+        if (!current || String(current._id) !== String(employeeId)) {
+            throw failure('EMPLOYEE_PROFILE_STALE');
+        }
+        const completeHistoryRows = (await completeHistoryLean(historyModel, filter, session))
+            .sort((left, right) => String(left._id).localeCompare(String(right._id)));
+        const canonical = canonicalizeEmployeeHistory({ scope: filter,
+            currentEmployee: current, historyRows: completeHistoryRows });
+        let protectedReferenceSummary = {};
+        let repairPlan = null;
+        if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY && completeHistoryRows.length) {
+            for (const row of completeHistoryRows) {
+                const id = String(row._id);
+                try {
+                    protectedReferenceSummary[id] = await checkedHistoryReferences({
+                        referenceChecker, connection, historyIds: [id], session
+                    });
+                } catch {
+                    throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
+                }
+            }
+            repairPlan = planEmployeeHistoryUniqueSafeRepair({
+                scope: filter,
+                currentEmployee: current,
+                completeHistoryRows,
+                canonicalResult: canonical,
+                protectedReferenceSummary
+            });
+        }
+
+        if (repairPlan?.status === UNIQUE_SAFE_REPAIR_PLAN_STATUSES.APPLICABLE) {
+            const normalizedSaveRequest = normalizedUniqueSafeRepairSaveRequest(profileRequest);
+            const confirmationFingerprint = buildUniqueSafeRepairStateFingerprint({
+                scope: filter,
+                currentEmployee: current,
+                completeHistoryRows,
+                protectedReferenceSummary,
+                repairPlan,
+                normalizedSaveRequest
+            });
+            const resolutionAnalysis = buildUniqueSafeRepairResolutionAnalysis({
+                repairPlan, sourceStateFingerprint: confirmationFingerprint
+            });
+            if (!resolutionAnalysis) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+            }
+            if (!resolutionConfirmation) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED', 409, {
+                    resolutionRequired: true,
+                    resolution: buildUniqueSafeRepairPublicResolution({
+                        analysis: resolutionAnalysis,
+                        fingerprint: confirmationFingerprint
+                    })
+                });
+            }
+            if (resolutionConfirmation.fingerprint !== confirmationFingerprint) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
+            }
+
+            const physicalPlan = buildFinalHistoryMutationPlan({
+                beforeRows: completeHistoryRows,
+                desiredRows: repairPlan.desiredHistoryRows,
+                historyModel
+            });
+            const actor = repairActor && typeof repairActor === 'object' ? {
+                userId: String(repairActor.userId || '').trim() || null,
+                userName: String(repairActor.userName || '').trim() || null
+            } : null;
+            const repair = await executeFinalMutationPlan({
+                physicalPlan,
+                currentBefore: current,
+                currentPatch: repairPlan.currentPatch,
+                filter,
+                employeeId,
+                session,
+                employeeModel,
+                historyModel,
+                auditModel,
+                auditCollectionChecker,
+                referenceChecker,
+                connection,
+                diagnostics: {
+                    operation: UNIQUE_SAFE_REPAIR_OPERATION,
+                    repairKind: repairPlan.planKind,
+                    planFingerprint: repairPlan.planFingerprint,
+                    confirmationFingerprint,
+                    actor,
+                    referenceClass: repairPlan.referenceClass,
+                    changedHistoryIds: [...repairPlan.changedHistoryIds]
+                },
+                canonicalRepairRequired: true,
+                controlledUniqueSafeRepair: true,
+                uniqueSafeRepairPlan: repairPlan
+            });
+            const saved = await writeEmployeeEmploymentProfile({
+                ...profileRequest,
+                ...dependencies,
+                [ACTIVE_SESSION]: session
+            });
+            return { ...saved, uniqueSafeRepairApplied: true,
+                uniqueSafeRepairKind: repairPlan.planKind,
+                uniqueSafeRepairAuditWritten: repair.auditWritten === true };
+        }
+
+        if (resolutionConfirmation) {
+            throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
+        }
+        return writeEmployeeEmploymentProfile({
+            ...profileRequest,
+            ...dependencies,
+            [ACTIVE_SESSION]: session
+        });
+    });
 }
 
 // First departure closes the current cycle's terminal evidence and latest
@@ -2627,7 +2860,9 @@ async function repairEmployeeLegacyOpenCycles({ scope, employeeId,
 }
 module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE,
     transactionCapability, normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter,
-    writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureDateCorrection,
+    writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithUniqueSafeRepair,
+    normalizedUniqueSafeRepairSaveRequest,
+    writeEmployeeDeparture, writeEmployeeDepartureDateCorrection,
     writeEmployeeDepartureCancellation, writeEmployeeInvalidDepartureCorrection,
     writeEmployeeRehire,
     writeEmployeeEmploymentHistoryOperations, deleteEmployeeAndEmploymentHistory,
