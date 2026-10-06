@@ -9,12 +9,19 @@ const { RESOLUTION_ANALYSIS_VERSION, RESOLUTION_CLASSES, REFERENCE_CLASSES,
     buildEmployeeHistoryResolutionAnalysis, analyzeCanonicalLegacyAliasResolution,
     canonicalSourceStateFingerprint, buildUniqueSafeRepairStateFingerprint,
     buildUniqueSafeRepairResolutionAnalysis, buildUniqueSafeRepairPublicResolution,
-    normalizeUniqueSafeRepairConfirmation } =
+    buildMultipleSafeResolutionStateFingerprint, buildMultipleSafeResolutionAnalysis,
+    buildMultipleSafePublicResolution, normalizeUniqueSafeRepairConfirmation,
+    normalizeEmployeeHistoryResolutionConfirmation,
+    normalizeMultipleSafeResolutionConfirmation } =
     require('./employeeHistoryResolutionAnalysisService');
 const { planEmployeeHistoryUniqueSafeRepair } =
     require('./employeeHistoryUniqueSafeRepairPlannerService');
 const { shapeALifecycleFixture } =
     require('./fixtures/uniqueSafeEmployeeHistoryRepairFixtures');
+const { realStartOfFourDayProfileFixture } =
+    require('./fixtures/multipleSafeEmployeeHistoryResolutionFixtures');
+const { planEmployeeHistoryMultipleSafeResolution } =
+    require('./employeeHistoryMultipleSafeResolutionPlannerService');
 
 test('pure resolution analysis represents every future class with a deterministic versioned fingerprint', () => {
     for (const resolutionClass of Object.values(RESOLUTION_CLASSES)) {
@@ -145,4 +152,88 @@ test('confirmation input accepts only the exact choice and sha256 fingerprint', 
         ['APPLY_UNIQUE_SAFE_PLAN', fingerprint]
     ]) assert.throws(() => normalizeUniqueSafeRepairConfirmation(invalid),
         error => error.code === 'EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST');
+});
+
+test('multiple-safe fingerprint covers employee, history, references, ambiguity, options and Save', () => {
+    const fixture = realStartOfFourDayProfileFixture();
+    const canonicalResult = canonicalizeEmployeeHistory({ scope: fixture.scope,
+        currentEmployee: fixture.currentEmployee, historyRows: fixture.completeHistoryRows });
+    const multiplePlan = planEmployeeHistoryMultipleSafeResolution(fixture);
+    const base = { scope: fixture.scope, currentEmployee: fixture.currentEmployee,
+        completeHistoryRows: fixture.completeHistoryRows,
+        protectedReferenceSummary: fixture.protectedReferenceSummary,
+        canonicalResult, problemScope: multiplePlan.problemScope, multiplePlan,
+        normalizedSaveRequest: { effectiveFrom: '2026-07-23' } };
+    const original = buildMultipleSafeResolutionStateFingerprint(base);
+    assert.equal(original, buildMultipleSafeResolutionStateFingerprint(base));
+    for (const variant of [
+        { ...base, currentEmployee: { ...base.currentEmployee, updatedAt: 'changed' } },
+        { ...base, completeHistoryRows: base.completeHistoryRows.map((row, index) =>
+            index ? row : { ...row, updatedAt: 'changed' }) },
+        { ...base, protectedReferenceSummary: { ...base.protectedReferenceSummary,
+            'm4-full-time': [] } },
+        { ...base, canonicalResult: { ...base.canonicalResult,
+            diagnostics: { ...base.canonicalResult.diagnostics, changed: true } } },
+        { ...base, multiplePlan: { ...base.multiplePlan,
+            optionSetFingerprint: 'changed' } },
+        { ...base, normalizedSaveRequest: { effectiveFrom: '2026-07-24' } }
+    ]) assert.notEqual(buildMultipleSafeResolutionStateFingerprint(variant), original);
+});
+
+test('multiple-safe public contract exposes only business options and server date bounds', () => {
+    const fixture = realStartOfFourDayProfileFixture();
+    const multiplePlan = planEmployeeHistoryMultipleSafeResolution(fixture);
+    const fingerprint = 'b'.repeat(64);
+    const analysis = buildMultipleSafeResolutionAnalysis({ multiplePlan,
+        sourceStateFingerprint: fingerprint });
+    const publicResolution = buildMultipleSafePublicResolution({ analysis, fingerprint });
+    assert.equal(publicResolution.kind, 'GUIDED_BUSINESS_CHOICE');
+    assert.deepEqual(publicResolution.options[2].inputs, [{
+        id: 'effectiveDate', type: 'date', label: 'Ημερομηνία έναρξης',
+        required: true, min: '2026-06-28', max: '2026-07-22'
+    }]);
+    for (const forbidden of ['historyId', '_id', 'aa_eggrafhs', 'survivorId',
+        'deleteId', 'patch']) assert.equal(JSON.stringify(publicResolution).includes(forbidden), false);
+});
+
+test('generic confirmation envelope has a strict top-level and answer allowlist', () => {
+    const fingerprint = 'c'.repeat(64);
+    assert.deepEqual(normalizeEmployeeHistoryResolutionConfirmation({
+        choiceId: 'BUSINESS_CHOICE', fingerprint
+    }), { choiceId: 'BUSINESS_CHOICE', fingerprint });
+    assert.deepEqual(normalizeEmployeeHistoryResolutionConfirmation({
+        choiceId: 'BUSINESS_CHOICE', fingerprint,
+        answers: { effectiveDate: '2026-07-01' }
+    }), { choiceId: 'BUSINESS_CHOICE', fingerprint,
+        answers: { effectiveDate: '2026-07-01' } });
+    for (const invalid of [
+        { choiceId: 'BUSINESS_CHOICE', fingerprint, historyId: 'x' },
+        { choiceId: 'BUSINESS_CHOICE', fingerprint, answers: { historyId: 'x' } },
+        { choiceId: 'bad-choice', fingerprint }
+    ]) assert.throws(() => normalizeEmployeeHistoryResolutionConfirmation(invalid),
+        error => error.code === 'EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST');
+});
+
+test('selected option schema controls required and forbidden answers server-side', () => {
+    const fixture = realStartOfFourDayProfileFixture();
+    const options = planEmployeeHistoryMultipleSafeResolution(fixture).businessOptions;
+    const fingerprint = 'd'.repeat(64);
+    assert.deepEqual(normalizeMultipleSafeResolutionConfirmation({
+        choiceId: 'FOUR_DAY_PROFILE_FROM_HIRE', fingerprint
+    }, options), { choiceId: 'FOUR_DAY_PROFILE_FROM_HIRE', fingerprint });
+    assert.deepEqual(normalizeMultipleSafeResolutionConfirmation({
+        choiceId: 'FOUR_DAY_PROFILE_FROM_OTHER_DATE', fingerprint,
+        answers: { effectiveDate: '2026-07-05' }
+    }, options), { choiceId: 'FOUR_DAY_PROFILE_FROM_OTHER_DATE', fingerprint,
+        answers: { effectiveDate: '2026-07-05' } });
+    for (const invalid of [
+        { choiceId: 'UNKNOWN', fingerprint },
+        { choiceId: 'FOUR_DAY_PROFILE_FROM_HIRE', fingerprint, answers: {} },
+        { choiceId: 'FOUR_DAY_PROFILE_FROM_OTHER_DATE', fingerprint,
+            answers: { effectiveDate: '2026-07-23' } },
+        { choiceId: 'FOUR_DAY_PROFILE_FROM_OTHER_DATE', fingerprint,
+            answers: { effectiveDate: '2026-07-05T00:00:00.000Z' } },
+        { choiceId: 'FOUR_DAY_PROFILE_FROM_OTHER_DATE', fingerprint,
+            answers: { effectiveDate: '2026-07-05T03:00:00+03:00' } }
+    ]) assert.throws(() => normalizeMultipleSafeResolutionConfirmation(invalid, options));
 });

@@ -1,5 +1,7 @@
 'use strict';
 const C = require('./employmentProfileContract');
+const { validatePublicBusinessOptions } =
+    require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
 
 const DEPARTURE_FORM_ECHO_ALIASES = Object.freeze({
     typos_taytothtas: ['taytothta_stathera'],
@@ -136,9 +138,22 @@ function isEmploymentProfileError(error) {
 }
 function sanitizedEmployeeHistoryResolution(value) {
     if (!value || typeof value !== 'object' || value.version !== 1 ||
-        value.kind !== 'UNIQUE_SAFE_REPAIR' ||
         !/^[a-f0-9]{64}$/.test(String(value.fingerprint || '')) ||
-        !Array.isArray(value.options) || value.options.length !== 1 ||
+        !Array.isArray(value.options)) return null;
+    if (value.kind === 'GUIDED_BUSINESS_CHOICE') {
+        let options;
+        try { options = validatePublicBusinessOptions(value.options); } catch { return null; }
+        return {
+            version: 1,
+            kind: 'GUIDED_BUSINESS_CHOICE',
+            title: String(value.title || ''),
+            explanation: String(value.explanation || ''),
+            options: options.map(option => ({ ...option,
+                ...(option.inputs ? { inputs: option.inputs.map(input => ({ ...input })) } : {}) })),
+            fingerprint: String(value.fingerprint)
+        };
+    }
+    if (value.kind !== 'UNIQUE_SAFE_REPAIR' || value.options.length !== 1 ||
         value.options[0]?.id !== 'APPLY_UNIQUE_SAFE_PLAN') return null;
     return {
         version: 1,
@@ -191,6 +206,13 @@ function profileError(res, error) {
         EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED: 'Η αποθήκευση σταμάτησε επειδή βρέθηκε ασυνέπεια στο ιστορικό που μπορεί να τακτοποιηθεί με ασφάλεια. 1. Επιλέξτε «Ακύρωση» για να μη γίνει καμία ενέργεια. 2. Επιλέξτε «Τακτοποίηση ιστορικού» για να επιβεβαιώσετε τη διόρθωση και την αρχική αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
         EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE: 'Η κατάσταση του εργαζομένου ή του ιστορικού άλλαξε μετά την εμφάνιση της επιβεβαίωσης. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τα νεότερα στοιχεία. 3. Πατήστε ξανά Αποθήκευση μόνο αν εξακολουθούν να είναι σωστά. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE',
         EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_INVALID_BOUNDARY: 'Η τελική διόρθωση δεν συμφώνησε με το μοναδικό ασφαλές σχέδιο που είχε επιβεβαιωθεί. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε το ιστορικό. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_INVALID_BOUNDARY',
+        EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED: 'Η αποθήκευση σταμάτησε επειδή υπάρχουν περισσότερες από μία ασφαλείς ερμηνείες του ιστορικού. 1. Διαβάστε τις διαθέσιμες επιλογές. 2. Επιλέξτε τι συνέβη πραγματικά. 3. Πατήστε «Συνέχεια» ή «Ακύρωση». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED',
+        EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE: 'Η κατάσταση του εργαζομένου, του ιστορικού, των συσχετίσεων ή των διαθέσιμων επιλογών άλλαξε. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τα νεότερα στοιχεία και τις νέες επιλογές. 3. Πατήστε ξανά Αποθήκευση μόνο αν εξακολουθούν να είναι σωστά. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE',
+        EMPLOYEE_HISTORY_MULTIPLE_SAFE_INVALID_BOUNDARY: 'Η επιλεγμένη ερμηνεία δεν μπορούσε πλέον να εφαρμοστεί ακριβώς και με ασφάλεια. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ξανά το ιστορικό. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MULTIPLE_SAFE_INVALID_BOUNDARY',
+        EMPLOYEE_HISTORY_MULTIPLE_SAFE_SIMULATION_FAILED: 'Η επιλεγμένη ερμηνεία δεν οδηγεί πλέον σε συνεπές ιστορικό. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις διαθέσιμες επιλογές και τις ημερομηνίες. 3. Μην συνεχίσετε αν το πρόβλημα παραμένει. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MULTIPLE_SAFE_SIMULATION_FAILED',
+        EMPLOYEE_HISTORY_MULTIPLE_SAFE_FINAL_VERIFICATION_FAILED: 'Η τελική επαλήθευση του ιστορικού δεν ολοκληρώθηκε με ασφάλεια. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ότι δεν άλλαξαν ενδιάμεσα τα στοιχεία. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MULTIPLE_SAFE_FINAL_VERIFICATION_FAILED',
+        EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID: 'Η ημερομηνία που δηλώθηκε δεν είναι έγκυρη ημερολογιακή ημέρα. 1. Επιλέξτε ημερομηνία από το διαθέσιμο πεδίο. 2. Βεβαιωθείτε ότι είναι πραγματική ημερομηνία. 3. Πατήστε ξανά «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID',
+        EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE: 'Η ημερομηνία που δηλώθηκε βρίσκεται έξω από τα ασφαλή όρια της εργασιακής περιόδου. 1. Ελέγξτε την ελάχιστη και τη μέγιστη επιτρεπτή ημερομηνία. 2. Επιλέξτε ημερομηνία μέσα σε αυτά τα όρια. 3. Πατήστε ξανά «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE',
         EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST: 'Η επιβεβαίωση τακτοποίησης δεν ήταν έγκυρη. 1. Ανανεώστε τη φόρμα. 2. Πατήστε ξανά Αποθήκευση. 3. Επιβεβαιώστε μόνο την επιλογή που εμφανίζει η εφαρμογή. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST',
         EMPLOYEE_HISTORY_REFERENCED_CLEANUP_REQUIRED: 'Βρέθηκαν παλαιότερες εγγραφές ιστορικού που χρησιμοποιούνται από άλλες καταχωρίσεις και δεν μπορούν να αφαιρεθούν αυτόματα. Δεν έγινε καμία αλλαγή. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ιστορικού.',
         EMPLOYEE_HISTORY_REFERENCED_DELETE_FORBIDDEN: 'Η εγγραφή ιστορικού χρησιμοποιείται ήδη από υπολογισμούς ή αποθηκευμένα στοιχεία και δεν μπορεί να διαγραφεί. Δεν έγινε καμία αλλαγή.',
@@ -218,7 +240,8 @@ function profileError(res, error) {
         field: error.field, operation: error.operation || 'EMPLOYEE_MAINTENANCE',
         message, errorMessage: message };
     const resolution = sanitizedEmployeeHistoryResolution(error.resolution);
-    if (error.code === 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED' &&
+    if (['EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
+        'EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED'].includes(error.code) &&
         error.resolutionRequired === true && resolution) {
         response.resolutionRequired = true;
         response.resolution = resolution;
