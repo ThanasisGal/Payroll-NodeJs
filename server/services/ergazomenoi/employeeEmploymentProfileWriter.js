@@ -74,6 +74,13 @@ const { OPERATION: BUSINESS_FACT_RESOLUTION_OPERATION,
     planEmployeeHistoryBusinessFactResolution,
     resolveEmployeeHistoryBusinessFacts } =
     require('./employeeHistoryBusinessFactResolutionPlannerService');
+const { OPERATION: USER_CONFIRMED_CORRECTION_OPERATION,
+    PLAN_STATUSES: USER_CONFIRMED_CORRECTION_PLAN_STATUSES,
+    planEmployeeHistoryUserConfirmedCorrection,
+    resolveEmployeeHistoryUserConfirmedCorrection } =
+    require('./employeeHistoryUserConfirmedCorrectionPlannerService');
+const { loadEmployeeHistoryCorrectionCatalogs } =
+    require('./employeeHistoryCorrectionCatalogService');
 const { buildUniqueSafeRepairStateFingerprint,
     buildUniqueSafeRepairResolutionAnalysis,
     buildUniqueSafeRepairPublicResolution,
@@ -81,12 +88,16 @@ const { buildUniqueSafeRepairStateFingerprint,
     buildMultipleSafeResolutionAnalysis,
     buildMultipleSafePublicResolution,
     buildBusinessFactResolutionStateFingerprint,
+    buildUserConfirmedCorrectionStateFingerprint,
     buildBusinessFactResolutionAnalysis,
+    buildUserConfirmedCorrectionAnalysis,
     buildBusinessFactPublicResolution,
+    buildUserConfirmedCorrectionPublicResolution,
     normalizeUniqueSafeRepairConfirmation,
     normalizeEmployeeHistoryResolutionConfirmation,
     normalizeMultipleSafeResolutionConfirmation,
     normalizeBusinessFactResolutionConfirmation,
+    normalizeUserConfirmedCorrectionConfirmation,
     RESOLUTION_CLASSES } =
     require('./employeeHistoryResolutionAnalysisService');
 const { identifyEmployeeHistoryProblemScope } =
@@ -421,6 +432,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     multipleSafeResolutionPlan = null,
     controlledBusinessFactResolution = false,
     businessFactResolutionPlan = null,
+    controlledUserConfirmedCorrection = false,
+    userConfirmedCorrectionPlan = null,
     auditAfterMutation = false }) {
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
@@ -428,13 +441,35 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     const controlledBoundaries = [controlledLegacyOpenCycleCleanup,
         controlledInvalidDepartureCorrection, controlledContractEndSegmentSync,
         controlledDeferredAmbiguityDeparture, controlledUniqueSafeRepair,
-        controlledMultipleSafeResolution, controlledBusinessFactResolution].filter(Boolean).length;
+        controlledMultipleSafeResolution, controlledBusinessFactResolution,
+        controlledUserConfirmedCorrection].filter(Boolean).length;
     if (controlledBoundaries > 1) {
         throw failure(controlledInvalidDepartureCorrection
             ? 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY'
             : 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY');
     }
-    if (controlledBusinessFactResolution) {
+    if (controlledUserConfirmedCorrection) {
+        const expectedUpdateIds = [...(userConfirmedCorrectionPlan?.changedHistoryIds || [])]
+            .map(String).sort();
+        const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
+        const exactPatches = physicalPlan.rowsToUpdate.every(item => {
+            const expected = userConfirmedCorrectionPlan?.historyPatches?.[String(item.historyId)];
+            const actual = Object.fromEntries(Object.entries(item.patch || {})
+                .filter(([field]) => field !== 'updatedAt'));
+            return expected && stableStringify(actual) === stableStringify(expected);
+        });
+        if (deleteCurrent || diagnostics?.operation !== USER_CONFIRMED_CORRECTION_OPERATION ||
+            userConfirmedCorrectionPlan?.status !== USER_CONFIRMED_CORRECTION_PLAN_STATUSES.APPLICABLE ||
+            diagnostics?.planFingerprint !== userConfirmedCorrectionPlan.planFingerprint ||
+            stableStringify(currentPatch || {}) !==
+                stableStringify(userConfirmedCorrectionPlan.currentPatch || {}) ||
+            physicalPlan.rowsToDelete.length || !exactPatches ||
+            physicalPlan.rowsToInsert.length !==
+                (userConfirmedCorrectionPlan.insertedRows || []).length ||
+            stableStringify(plannedUpdateIds) !== stableStringify(expectedUpdateIds)) {
+            throw failure('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY');
+        }
+    } else if (controlledBusinessFactResolution) {
         const expectedUpdateIds = [...(businessFactResolutionPlan?.changedHistoryIds || [])]
             .map(String).sort();
         const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
@@ -594,13 +629,19 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     }
     const postMutationCanonical = canonicalizeEmployeeHistory({ scope: filter,
         currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows });
+    if (controlledUserConfirmedCorrection &&
+        (postMutationCanonical.status !== CANONICAL_STATUSES.CLEAN ||
+        postMutationCanonical.cleanupRequired || !postMutationCanonical.idempotent)) {
+        throw failure('EMPLOYEE_HISTORY_USER_CORRECTION_SIMULATION_FAILED');
+    }
     if (!controlledDeferredAmbiguityDeparture &&
         postMutationCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
         const error = failure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
         error.canonicalReason = postMutationCanonical.diagnostics?.reason;
         throw error;
     }
-    if (!controlledDeferredAmbiguityDeparture && postMutationCanonical.cleanupRequired) {
+    if (!controlledDeferredAmbiguityDeparture && !controlledUserConfirmedCorrection &&
+        postMutationCanonical.cleanupRequired) {
         physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: physicalPlan.beforeRows,
             desiredRows: postMutationCanonical.canonicalRows, historyModel,
             historyDocumentFactory,
@@ -619,7 +660,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     const auditRequired = canonicalRepairRequired || proposedDeletedIds.length > 0 ||
         controlledDeferredAmbiguityDeparture || controlledInvalidDepartureCorrection ||
         controlledUniqueSafeRepair || controlledMultipleSafeResolution ||
-        controlledBusinessFactResolution;
+        controlledBusinessFactResolution || controlledUserConfirmedCorrection;
     let pendingAuditRecord = null;
     if (auditRequired) {
         let auditCollectionExists;
@@ -646,7 +687,11 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
             }
             if (!references.length) continue;
-            if (controlledMultipleSafeResolution || controlledBusinessFactResolution) {
+            if (controlledMultipleSafeResolution || controlledBusinessFactResolution ||
+                controlledUserConfirmedCorrection) {
+                if (controlledUserConfirmedCorrection) {
+                    throw failure('EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
+                }
                 throw failure(controlledBusinessFactResolution
                     ? 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE'
                     : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE');
@@ -691,15 +736,18 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             } catch {
                 throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
             }
-            if (controlledBusinessFactResolution) {
-                const expected = businessFactResolutionPlan
+            if (controlledBusinessFactResolution || controlledUserConfirmedCorrection) {
+                const expected = (controlledUserConfirmedCorrection
+                    ? userConfirmedCorrectionPlan : businessFactResolutionPlan)
                     ?.referenceClassifications?.[String(historyId)];
                 const actual = { count: partitioned.frozenProvenance.length,
                     collections: [...new Set(partitioned.frozenProvenance
                         .map(reference => String(reference.collection)))].sort() };
                 if (!expected || partitioned.liveDereference.length ||
                     stableStringify(expected) !== stableStringify(actual)) {
-                    throw failure('EMPLOYEE_HISTORY_BUSINESS_FACT_STALE');
+                    throw failure(controlledUserConfirmedCorrection
+                        ? 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE'
+                        : 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE');
                 }
             }
             if (!references.length) continue;
@@ -805,6 +853,20 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 throw error;
             }
             verified.deferredAmbiguityDeparturePostcondition = postcondition;
+        } else if (controlledUserConfirmedCorrection) {
+            const canonical = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: verified.history });
+            const second = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: canonical.canonicalRows });
+            if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired ||
+                !canonical.idempotent || canonical.rowsToDelete.length ||
+                canonical.rowsToInsert.length || canonical.rowsToUpdate.length ||
+                Object.keys(canonical.employeePatch || {}).length ||
+                second.status !== CANONICAL_STATUSES.CLEAN || second.cleanupRequired ||
+                !second.idempotent || stableStringify(second.canonicalRows) !==
+                    stableStringify(canonical.canonicalRows)) {
+                throw failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+            }
         } else if (controlledBusinessFactResolution) {
             const canonical = canonicalizeEmployeeHistory({ scope: filter,
                 currentEmployee: verified.current, historyRows: verified.history });
@@ -1859,6 +1921,45 @@ function originalSaveAfterBusinessFactResolution(profileRequest, selectedPlan, c
     };
 }
 
+function originalSaveAfterUserConfirmedCorrection(profileRequest, selectedPlan, currentBefore,
+    verifiedHistory = []) {
+    const maintenance = profileRequest.maintenance;
+    if (!maintenance) return profileRequest;
+    const correctedFields = new Set([
+        ...BUSINESS_FACT_AUTHORITATIVE_FIELDS,
+        ...Object.values(selectedPlan.historyPatches || {}).flatMap(patch => Object.keys(patch))
+            .filter(field => !['employment_history_canonical_status',
+                'employment_history_canonical_survivor_id'].includes(field))
+    ]);
+    const withoutCorrected = value => Object.fromEntries(Object.entries(value || {})
+        .filter(([field]) => !correctedFields.has(field)));
+    const withoutCorrectedNames = value => (value || [])
+        .filter(field => !correctedFields.has(field));
+    const authoritativeCurrent = { ...currentBefore, ...selectedPlan.currentPatch };
+    const continuedTarget = maintenance.originalHistoryId == null ? null
+        : verifiedHistory.find(row => String(row._id) === String(maintenance.originalHistoryId));
+    return {
+        ...profileRequest,
+        maintenance: {
+            ...maintenance,
+            employeeChanges: withoutCorrected(maintenance.employeeChanges),
+            submittedEmployeeFields: withoutCorrectedNames(maintenance.submittedEmployeeFields),
+            historyChanges: withoutCorrected(maintenance.historyChanges),
+            submittedHistoryChanges: withoutCorrected(maintenance.submittedHistoryChanges),
+            submittedProfileFields: withoutCorrectedNames(maintenance.submittedProfileFields),
+            expectedRevision: continuedTarget?.updatedAt || maintenance.expectedRevision,
+            identity: maintenance.identity ? {
+                ...maintenance.identity,
+                hmeromhnia_isxyos_oron_ergasias_apo:
+                    authoritativeCurrent.hmeromhnia_isxyos_oron_ergasias_apo,
+                hmeromhnia_isxyos_oron_ergasias_eos:
+                    authoritativeCurrent.hmeromhnia_isxyos_oron_ergasias_eos,
+                hmeromhnia_apoxorhshs: authoritativeCurrent.hmeromhnia_apoxorhshs
+            } : maintenance.identity
+        }
+    };
+}
+
 async function writeEmployeeEmploymentProfileWithGuidedResolution({
     resolutionConfirmation: rawResolutionConfirmation = null,
     repairActor = null,
@@ -1870,6 +1971,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
     referenceChecker = findHistoryIdReferences,
     capabilityProbe = transactionCapability,
     businessFactAsOfDate = new Date(),
+    correctionCatalogLoader = loadEmployeeHistoryCorrectionCatalogs,
     ...profileRequest
 } = {}) {
     const resolutionConfirmation = normalizeEmployeeHistoryResolutionConfirmation(
@@ -1898,6 +2000,8 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
         let repairPlan = null;
         let multiplePlan = null;
         let businessFactPlan = null;
+        let userCorrectionPlan = null;
+        let correctionCatalogs = {};
         let problemScope = null;
         if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY && completeHistoryRows.length) {
             for (const row of completeHistoryRows) {
@@ -1941,6 +2045,23 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                         protectedReferenceSummary,
                         asOfDate: businessFactAsOfDate
                     });
+                    if (businessFactPlan.status !==
+                        BUSINESS_FACT_RESOLUTION_PLAN_STATUSES.APPLICABLE) {
+                        try {
+                            correctionCatalogs = await correctionCatalogLoader({ session });
+                        } catch {
+                            throw failure('EMPLOYEE_HISTORY_USER_CORRECTION_CATALOG_UNAVAILABLE');
+                        }
+                        userCorrectionPlan = planEmployeeHistoryUserConfirmedCorrection({
+                            scope: filter,
+                            currentEmployee: current,
+                            completeHistoryRows,
+                            canonicalResult: canonical,
+                            problemScope,
+                            protectedReferenceSummary,
+                            catalogs: correctionCatalogs
+                        });
+                    }
                 }
             }
         }
@@ -2262,8 +2383,131 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                 businessFactResolutionAuditWritten: resolution.auditWritten === true };
         }
 
+        if (userCorrectionPlan?.status ===
+            USER_CONFIRMED_CORRECTION_PLAN_STATUSES.APPLICABLE) {
+            const normalizedSaveRequest = normalizedUniqueSafeRepairSaveRequest(profileRequest);
+            const confirmationFingerprint = buildUserConfirmedCorrectionStateFingerprint({
+                scope: filter,
+                currentEmployee: current,
+                completeHistoryRows,
+                protectedReferenceSummary,
+                canonicalResult: canonical,
+                problemScope,
+                userCorrectionPlan,
+                normalizedSaveRequest
+            });
+            const resolutionAnalysis = buildUserConfirmedCorrectionAnalysis({
+                userCorrectionPlan,
+                sourceStateFingerprint: confirmationFingerprint
+            });
+            if (!resolutionAnalysis) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+            }
+            if (!resolutionConfirmation) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED', 409, {
+                    resolutionRequired: true,
+                    resolution: buildUserConfirmedCorrectionPublicResolution({
+                        analysis: resolutionAnalysis,
+                        fingerprint: confirmationFingerprint
+                    })
+                });
+            }
+            if (resolutionConfirmation.fingerprint !== confirmationFingerprint) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
+            }
+            const validatedConfirmation = normalizeUserConfirmedCorrectionConfirmation(
+                resolutionConfirmation, userCorrectionPlan.conflicts);
+            let selectedPlan;
+            try {
+                selectedPlan = resolveEmployeeHistoryUserConfirmedCorrection({
+                    plannerResult: userCorrectionPlan,
+                    confirmation: validatedConfirmation,
+                    currentEmployee: current,
+                    completeHistoryRows
+                });
+            } catch (error) {
+                if (String(error?.code || '').startsWith('EMPLOYEE_HISTORY_USER_CORRECTION_')) {
+                    throw error;
+                }
+                throw uniqueSafeRepairFailure(
+                    'EMPLOYEE_HISTORY_USER_CORRECTION_SIMULATION_FAILED');
+            }
+            const physicalPlan = buildFinalHistoryMutationPlan({
+                beforeRows: completeHistoryRows,
+                desiredRows: selectedPlan.desiredHistoryRows,
+                historyModel
+            });
+            const actor = repairActor && typeof repairActor === 'object' ? {
+                userId: String(repairActor.userId || '').trim() || null,
+                userName: String(repairActor.userName || '').trim() || null,
+                ...(String(repairActor.sessionId || '').trim()
+                    ? { sessionId: String(repairActor.sessionId).trim() } : {})
+            } : null;
+            let resolution;
+            try {
+                resolution = await executeFinalMutationPlan({
+                    physicalPlan,
+                    currentBefore: current,
+                    currentPatch: selectedPlan.currentPatch,
+                    filter,
+                    employeeId,
+                    session,
+                    employeeModel,
+                    historyModel,
+                    auditModel,
+                    auditCollectionChecker,
+                    referenceChecker,
+                    connection,
+                    diagnostics: {
+                        operation: USER_CONFIRMED_CORRECTION_OPERATION,
+                        resolutionClass: RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED,
+                        resolutionKind: userCorrectionPlan.resolutionKind,
+                        shapeKind: userCorrectionPlan.shapeKind,
+                        responsibilityAccepted: true,
+                        conflictsShown: selectedPlan.conflictsShown,
+                        normalizedBusinessDecisions: selectedPlan.normalizedDecisions,
+                        correctionIntents: selectedPlan.normalizedDecisions
+                            .filter(decision => [
+                                'CORRECT_EXISTING_HISTORICAL_FACT',
+                                'REAL_HISTORICAL_CHANGE'
+                            ].includes(decision.intent))
+                            .map(decision => decision.intent),
+                        stateFingerprint: confirmationFingerprint,
+                        executionPlanFingerprint: selectedPlan.planFingerprint,
+                        planFingerprint: selectedPlan.planFingerprint,
+                        fieldImpactRegistryVersion: selectedPlan.fieldImpactRegistryVersion,
+                        actor,
+                        affectedStableIds: selectedPlan.affectedStableIds,
+                        referenceClass: selectedPlan.referenceClass,
+                        referenceClassifications: selectedPlan.referenceClassifications
+                    },
+                    canonicalRepairRequired: true,
+                    controlledUserConfirmedCorrection: true,
+                    userConfirmedCorrectionPlan: selectedPlan
+                });
+            } catch (error) {
+                if (error?.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED') {
+                    throw failure('EMPLOYEE_HISTORY_USER_CORRECTION_FINAL_VERIFICATION_FAILED');
+                }
+                throw error;
+            }
+            const continuedRequest = originalSaveAfterUserConfirmedCorrection(
+                profileRequest, selectedPlan, current, resolution.verified.history);
+            const saved = await writeEmployeeEmploymentProfile({
+                ...continuedRequest,
+                ...dependencies,
+                [ACTIVE_SESSION]: session
+            });
+            return { ...saved,
+                userConfirmedCorrectionApplied: true,
+                userConfirmedCorrectionKind: userCorrectionPlan.shapeKind,
+                userConfirmedCorrectionAuditWritten: resolution.auditWritten === true };
+        }
+
         if (resolutionConfirmation) {
-            const code = !Object.hasOwn(resolutionConfirmation, 'choiceId')
+            const code = resolutionConfirmation.responsibilityAccepted === true
+                ? 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE'
+                : !Object.hasOwn(resolutionConfirmation, 'choiceId')
                 ? 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE'
                 : resolutionConfirmation.choiceId === 'APPLY_UNIQUE_SAFE_PLAN'
                     ? 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE'

@@ -34,6 +34,13 @@ const BUSINESS_FACT_COLLECTION_KIND = 'BUSINESS_FACT_COLLECTION';
 const BUSINESS_FACT_COLLECTION_TITLE = 'Χρειάζονται πραγματικά στοιχεία για το ιστορικό';
 const BUSINESS_FACT_COLLECTION_EXPLANATION =
     'Το υπάρχον ιστορικό περιέχει αντικρουόμενα στοιχεία. Επιβεβαιώστε τι συνέβη πραγματικά.';
+const USER_CONFIRMED_CORRECTION_CONTRACT_VERSION = 1;
+const USER_CONFIRMED_CORRECTION_KIND = 'USER_CONFIRMED_HISTORY_CORRECTION';
+const USER_CONFIRMED_CORRECTION_TITLE = 'Χρειάζεται διόρθωση του ιστορικού';
+const USER_CONFIRMED_CORRECTION_EXPLANATION =
+    'Το ιστορικό περιέχει ελλιπή ή αντικρουόμενα στοιχεία. Επιλέξτε τι ίσχυε πραγματικά.';
+const USER_CONFIRMED_CORRECTION_RESPONSIBILITY_TEXT =
+    'Επιβεβαιώνω ότι οι παραπάνω επιλογές αποτυπώνουν τα πραγματικά ιστορικά στοιχεία του εργαζομένου.';
 
 function stableValue(value) {
     if (Array.isArray(value)) return value.map(stableValue);
@@ -156,6 +163,32 @@ function buildBusinessFactResolutionStateFingerprint({ scope, currentEmployee,
         exactServerRules: businessFactPlan.internalResolutionRules,
         exactQuestionSet: businessFactPlan.factQuestions,
         exactServerPlan: businessFactPlan,
+        normalizedSaveRequest
+    });
+}
+
+function buildUserConfirmedCorrectionStateFingerprint({ scope, currentEmployee,
+    completeHistoryRows = [], protectedReferenceSummary = {}, canonicalResult,
+    problemScope, userCorrectionPlan, normalizedSaveRequest = {} } = {}) {
+    if (userCorrectionPlan?.status !== 'APPLICABLE' ||
+        userCorrectionPlan?.resolutionClass !== RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED ||
+        userCorrectionPlan?.resolutionKind !== USER_CONFIRMED_CORRECTION_KIND ||
+        !Array.isArray(userCorrectionPlan.conflicts) || !userCorrectionPlan.conflicts.length) {
+        throw new TypeError('Applicable user-confirmed correction plan required');
+    }
+    return buildFingerprint({
+        contract: 'employee-history-user-confirmed-correction-confirmation:v1',
+        scope,
+        employee: currentEmployee,
+        completeHistory: completeHistoryRows,
+        referenceState: protectedReferenceSummary,
+        currentAmbiguity: canonicalSourceStateFingerprint(canonicalResult),
+        problemScope,
+        exactConflictWorksheet: userCorrectionPlan.conflicts,
+        exactServerRules: userCorrectionPlan.internalRules,
+        exactServerPlan: userCorrectionPlan,
+        fieldImpactRegistryVersion: userCorrectionPlan.fieldImpactRegistryVersion,
+        registryFingerprintMaterial: userCorrectionPlan.registryFingerprintMaterial,
         normalizedSaveRequest
     });
 }
@@ -403,6 +436,128 @@ function buildBusinessFactPublicResolution({ analysis, fingerprint } = {}) {
     });
 }
 
+const USER_CORRECTION_INTENTS = new Set([
+    'FROM_HIRE', 'FROM_KNOWN_HISTORY_DATE', 'OTHER_DATE', 'CONFIRM_EXISTING',
+    'CORRECT_EXISTING_HISTORICAL_FACT', 'REAL_HISTORICAL_CHANGE',
+    'ENTER_DIFFERENT_VALUE', 'CONFIRM_REAL_PERIOD', 'RETIRE_ERRONEOUS_ARTIFACT'
+]);
+const USER_CORRECTION_INPUT_TYPES = new Set([
+    'SINGLE_CHOICE', 'DATE', 'INTEGER', 'DECIMAL', 'CATALOG_CHOICE', 'BOOLEAN',
+    'PROFILE_FIELDS'
+]);
+
+function assertNoInternalIdentity(value) {
+    if (Array.isArray(value)) return value.forEach(assertNoInternalIdentity);
+    if (!value || typeof value !== 'object') return;
+    for (const [key, nested] of Object.entries(value)) {
+        if (/(?:^_id$|historyId|aa_eggrafhs|rowNumber|survivorId|deleteId|patch|mongo)/i.test(key)) {
+            throw new TypeError('Internal history identity cannot appear in correction worksheet');
+        }
+        assertNoInternalIdentity(nested);
+    }
+}
+
+function validatePublicUserCorrectionConflicts(conflicts) {
+    if (!Array.isArray(conflicts) || !conflicts.length || conflicts.length > 30) {
+        throw new TypeError('Correction worksheet must contain 1..30 conflicts');
+    }
+    const ids = new Set();
+    const normalized = stableValue(conflicts);
+    assertNoInternalIdentity(normalized);
+    for (const conflict of normalized) {
+        if (!conflict || typeof conflict !== 'object' || Array.isArray(conflict) ||
+            !/^[A-Z0-9_]{3,100}$/.test(String(conflict.conflictId || '')) ||
+            ids.has(conflict.conflictId) || conflict.required !== true ||
+            !['BOUNDARY', 'FIELD', 'PROFILE', 'STRUCTURAL_PERIOD'].includes(conflict.kind) ||
+            !String(conflict.issue || '').trim() ||
+            !String(conflict.decisionRequired || '').trim() ||
+            !conflict.period || typeof conflict.period !== 'object' ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(String(conflict.period.from || '')) ||
+            !String(conflict.period.label || '').trim() ||
+            !Array.isArray(conflict.intents) || conflict.intents.length < 1 ||
+            conflict.intents.length > 10) {
+            throw new TypeError('Invalid user-correction conflict');
+        }
+        ids.add(conflict.conflictId);
+        const intentIds = new Set();
+        for (const intent of conflict.intents) {
+            if (!intent || typeof intent !== 'object' || Array.isArray(intent) ||
+                !USER_CORRECTION_INTENTS.has(intent.id) || intentIds.has(intent.id) ||
+                !String(intent.label || '').trim() || !String(intent.description || '').trim()) {
+                throw new TypeError('Invalid user-correction intent');
+            }
+            intentIds.add(intent.id);
+            for (const control of [intent.valueControl, intent.effectiveDateControl]
+                .filter(Boolean)) {
+                if (!USER_CORRECTION_INPUT_TYPES.has(control.type) || control.required !== true) {
+                    throw new TypeError('Invalid user-correction input control');
+                }
+                if (control.type === 'DATE' &&
+                    (!/^\d{4}-\d{2}-\d{2}$/.test(String(control.min || '')) ||
+                    !/^\d{4}-\d{2}-\d{2}$/.test(String(control.max || '')) ||
+                    control.min > control.max)) {
+                    throw new TypeError('Invalid user-correction date control');
+                }
+                if (control.allowedValues !== undefined &&
+                    (!Array.isArray(control.allowedValues) || !control.allowedValues.length ||
+                    control.allowedValues.some(item => item == null ||
+                        typeof item !== 'object' || item.value === undefined ||
+                        !String(item.label || '').trim()))) {
+                    throw new TypeError('Invalid user-correction allowed values');
+                }
+            }
+        }
+        if (conflict.condition && (!ids.has(conflict.condition.conflictId) ||
+            !USER_CORRECTION_INTENTS.has(conflict.condition.intent))) {
+            throw new TypeError('Invalid user-correction condition');
+        }
+    }
+    return Object.freeze(normalized.map(conflict => Object.freeze(conflict)));
+}
+
+function buildUserConfirmedCorrectionAnalysis({ userCorrectionPlan,
+    sourceStateFingerprint } = {}) {
+    if (userCorrectionPlan?.status !== 'APPLICABLE' || !sourceStateFingerprint ||
+        userCorrectionPlan.resolutionClass !== RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED ||
+        userCorrectionPlan.resolutionKind !== USER_CONFIRMED_CORRECTION_KIND ||
+        ![REFERENCE_CLASSES.NO_REFERENCES, REFERENCE_CLASSES.PROVENANCE_ONLY]
+            .includes(userCorrectionPlan.referenceClass)) return null;
+    const conflicts = validatePublicUserCorrectionConflicts(userCorrectionPlan.conflicts);
+    return buildEmployeeHistoryResolutionAnalysis({
+        resolutionClass: RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED,
+        resolutionKind: USER_CONFIRMED_CORRECTION_KIND,
+        reason: userCorrectionPlan.reason,
+        title: USER_CONFIRMED_CORRECTION_TITLE,
+        explanation: USER_CONFIRMED_CORRECTION_EXPLANATION,
+        candidateBusinessPlans: [],
+        missingBusinessFacts: conflicts,
+        referenceClass: userCorrectionPlan.referenceClass,
+        sourceStateFingerprint,
+        hypotheticalCanonicalResult: {
+            status: 'USER_DECISIONS_REQUIRED',
+            reason: userCorrectionPlan.shapeKind,
+            blocksOrdinaryMaintenance: true
+        }
+    });
+}
+
+function buildUserConfirmedCorrectionPublicResolution({ analysis, fingerprint } = {}) {
+    if (analysis?.resolutionClass !== RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED ||
+        analysis?.resolutionKind !== USER_CONFIRMED_CORRECTION_KIND ||
+        !/^[a-f0-9]{64}$/.test(String(fingerprint || ''))) {
+        throw new TypeError('Valid user-confirmed correction analysis and fingerprint required');
+    }
+    return Object.freeze({
+        version: USER_CONFIRMED_CORRECTION_CONTRACT_VERSION,
+        kind: USER_CONFIRMED_CORRECTION_KIND,
+        title: USER_CONFIRMED_CORRECTION_TITLE,
+        explanation: USER_CONFIRMED_CORRECTION_EXPLANATION,
+        conflicts: validatePublicUserCorrectionConflicts(analysis.missingBusinessFacts),
+        responsibilityText: USER_CONFIRMED_CORRECTION_RESPONSIBILITY_TEXT,
+        fingerprint: String(fingerprint)
+    });
+}
+
 function resolutionRequestError(code = 'EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST') {
     const error = new Error(code);
     error.code = code;
@@ -429,6 +584,59 @@ function normalizeEmployeeHistoryResolutionConfirmation(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value) ||
         Object.getPrototypeOf(value) !== Object.prototype) throw resolutionRequestError();
     const keys = Object.keys(value).sort();
+    const userCorrection = exactKeys(value,
+        ['decisions', 'fingerprint', 'responsibilityAccepted']);
+    if (userCorrection) {
+        if (!/^[a-f0-9]{64}$/.test(String(value.fingerprint || '')) ||
+            value.responsibilityAccepted !== true || !Array.isArray(value.decisions) ||
+            !value.decisions.length || value.decisions.length > 30) {
+            throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST');
+        }
+        const normalizedDecisions = value.decisions.map(decision => {
+            if (!decision || typeof decision !== 'object' || Array.isArray(decision) ||
+                Object.getPrototypeOf(decision) !== Object.prototype ||
+                Object.keys(decision).some(key => !['conflictId', 'intent', 'value',
+                    'effectiveDate', 'values'].includes(key)) ||
+                !/^[A-Z0-9_]{3,100}$/.test(String(decision.conflictId || '')) ||
+                !USER_CORRECTION_INTENTS.has(decision.intent)) {
+                throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST');
+            }
+            if (decision.value !== undefined && !['string', 'number', 'boolean']
+                .includes(typeof decision.value)) {
+                throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST');
+            }
+            if (decision.effectiveDate !== undefined &&
+                (typeof decision.effectiveDate !== 'string' ||
+                !/^\d{4}-\d{2}-\d{2}$/.test(decision.effectiveDate))) {
+                throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST');
+            }
+            if (decision.values !== undefined && (!decision.values ||
+                typeof decision.values !== 'object' || Array.isArray(decision.values) ||
+                Object.getPrototypeOf(decision.values) !== Object.prototype ||
+                !Object.keys(decision.values).length || Object.keys(decision.values).length > 20 ||
+                Object.entries(decision.values).some(([key, nested]) =>
+                    !/^[A-Z0-9_]{3,100}$/.test(key) ||
+                    !['string', 'number', 'boolean'].includes(typeof nested)))) {
+                throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST');
+            }
+            return Object.freeze({
+                conflictId: String(decision.conflictId),
+                intent: String(decision.intent),
+                ...(decision.value !== undefined ? { value: decision.value } : {}),
+                ...(decision.effectiveDate !== undefined
+                    ? { effectiveDate: decision.effectiveDate } : {}),
+                ...(decision.values !== undefined
+                    ? { values: Object.freeze({ ...decision.values }) } : {})
+            });
+        });
+        if (new Set(normalizedDecisions.map(decision => decision.conflictId)).size !==
+            normalizedDecisions.length) {
+            throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST');
+        }
+        return Object.freeze({ fingerprint: String(value.fingerprint),
+            responsibilityAccepted: true,
+            decisions: Object.freeze(normalizedDecisions) });
+    }
     const guided = [['choiceId', 'fingerprint'], ['answers', 'choiceId', 'fingerprint']]
         .some(expected => expected.length === keys.length &&
             expected.every((key, index) => key === keys[index]));
@@ -458,6 +666,39 @@ function normalizeEmployeeHistoryResolutionConfirmation(value) {
     }
     return Object.freeze({ choiceId: String(value.choiceId), fingerprint: String(value.fingerprint),
         ...(Object.hasOwn(value, 'answers') ? { answers: Object.freeze({ ...value.answers }) } : {}) });
+}
+
+function normalizeUserConfirmedCorrectionConfirmation(value, conflicts) {
+    const normalized = normalizeEmployeeHistoryResolutionConfirmation(value);
+    if (!normalized || normalized.responsibilityAccepted !== true ||
+        !Array.isArray(normalized.decisions)) {
+        throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_RESPONSIBILITY_REQUIRED');
+    }
+    const worksheet = validatePublicUserCorrectionConflicts(conflicts);
+    const decisions = new Map(normalized.decisions.map(decision =>
+        [decision.conflictId, decision]));
+    for (const conflict of worksheet) {
+        const active = !conflict.condition ||
+            decisions.get(conflict.condition.conflictId)?.intent === conflict.condition.intent;
+        const decision = decisions.get(conflict.conflictId);
+        if (active && !decision || !active && decision) {
+            throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INCOMPLETE');
+        }
+        if (!decision) continue;
+        const intent = conflict.intents.find(item => item.id === decision.intent);
+        if (!intent) throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST');
+        const needsValue = Boolean(intent.valueControl);
+        const needsDate = Boolean(intent.effectiveDateControl);
+        if (needsValue && decision.value === undefined && decision.values === undefined ||
+            !needsValue && (decision.value !== undefined || decision.values !== undefined) ||
+            needsDate !== (decision.effectiveDate !== undefined)) {
+            throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INCOMPLETE');
+        }
+    }
+    if (decisions.size !== normalized.decisions.length || decisions.size > worksheet.length) {
+        throw resolutionRequestError('EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST');
+    }
+    return normalized;
 }
 
 function normalizeMultipleSafeResolutionConfirmation(value, businessOptions) {
@@ -589,22 +830,32 @@ module.exports = {
     BUSINESS_FACT_COLLECTION_KIND,
     BUSINESS_FACT_COLLECTION_TITLE,
     BUSINESS_FACT_COLLECTION_EXPLANATION,
+    USER_CONFIRMED_CORRECTION_CONTRACT_VERSION,
+    USER_CONFIRMED_CORRECTION_KIND,
+    USER_CONFIRMED_CORRECTION_TITLE,
+    USER_CONFIRMED_CORRECTION_EXPLANATION,
+    USER_CONFIRMED_CORRECTION_RESPONSIBILITY_TEXT,
     canonicalSourceStateFingerprint,
     buildEmployeeHistoryResolutionAnalysis,
     analyzeCanonicalLegacyAliasResolution,
     buildUniqueSafeRepairStateFingerprint,
     buildMultipleSafeResolutionStateFingerprint,
     buildBusinessFactResolutionStateFingerprint,
+    buildUserConfirmedCorrectionStateFingerprint,
     buildUniqueSafeRepairResolutionAnalysis,
     buildMultipleSafeResolutionAnalysis,
     buildBusinessFactResolutionAnalysis,
+    buildUserConfirmedCorrectionAnalysis,
     buildUniqueSafeRepairPublicResolution,
     buildMultipleSafePublicResolution,
     buildBusinessFactPublicResolution,
+    buildUserConfirmedCorrectionPublicResolution,
     normalizeUniqueSafeRepairConfirmation,
     normalizeEmployeeHistoryResolutionConfirmation,
     normalizeMultipleSafeResolutionConfirmation,
     normalizeBusinessFactResolutionConfirmation,
+    normalizeUserConfirmedCorrectionConfirmation,
     validatePublicBusinessOptions,
-    validatePublicFactQuestions
+    validatePublicFactQuestions,
+    validatePublicUserCorrectionConflicts
 };

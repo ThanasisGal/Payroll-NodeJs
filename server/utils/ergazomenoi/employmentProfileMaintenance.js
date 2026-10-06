@@ -1,6 +1,7 @@
 'use strict';
 const C = require('./employmentProfileContract');
-const { validatePublicBusinessOptions, validatePublicFactQuestions } =
+const { validatePublicBusinessOptions, validatePublicFactQuestions,
+    validatePublicUserCorrectionConflicts } =
     require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
 
 const DEPARTURE_FORM_ECHO_ALIASES = Object.freeze({
@@ -153,6 +154,20 @@ function sanitizedEmployeeHistoryResolution(value) {
             fingerprint: String(value.fingerprint)
         };
     }
+    if (value.kind === 'USER_CONFIRMED_HISTORY_CORRECTION') {
+        let conflicts;
+        try { conflicts = validatePublicUserCorrectionConflicts(value.conflicts); } catch { return null; }
+        if (!String(value.responsibilityText || '').trim()) return null;
+        return {
+            version: 1,
+            kind: 'USER_CONFIRMED_HISTORY_CORRECTION',
+            title: String(value.title || ''),
+            explanation: String(value.explanation || ''),
+            conflicts: JSON.parse(JSON.stringify(conflicts)),
+            responsibilityText: String(value.responsibilityText),
+            fingerprint: String(value.fingerprint)
+        };
+    }
     if (!Array.isArray(value.options)) return null;
     if (value.kind === 'GUIDED_BUSINESS_CHOICE') {
         let options;
@@ -230,6 +245,16 @@ function profileError(res, error) {
         EMPLOYEE_HISTORY_BUSINESS_FACT_INVALID_BOUNDARY: 'Τα στοιχεία που επιβεβαιώθηκαν δεν μπορούσαν πλέον να εφαρμοστούν ακριβώς και με ασφάλεια στο ιστορικό. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ξανά τις ημερομηνίες πρόσληψης και αποχώρησης. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BUSINESS_FACT_INVALID_BOUNDARY',
         EMPLOYEE_HISTORY_BUSINESS_FACT_SIMULATION_FAILED: 'Τα στοιχεία που επιβεβαιώθηκαν δεν οδηγούν πλέον σε συνεπές ιστορικό. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις απαντήσεις και τις ημερομηνίες. 3. Μην συνεχίσετε αν το πρόβλημα παραμένει. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BUSINESS_FACT_SIMULATION_FAILED',
         EMPLOYEE_HISTORY_BUSINESS_FACT_FINAL_VERIFICATION_FAILED: 'Η τελική επαλήθευση του ιστορικού μετά την επιβεβαίωση δεν ολοκληρώθηκε με ασφάλεια. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ότι δεν άλλαξαν ενδιάμεσα τα στοιχεία. 3. Επαναλάβετε την αποθήκευση. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BUSINESS_FACT_FINAL_VERIFICATION_FAILED',
+        EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED: 'Η αποθήκευση σταμάτησε επειδή το ιστορικό περιέχει ελλιπή ή αντικρουόμενα στοιχεία που χρειάζονται δική σας απόφαση. 1. Ελέγξτε κάθε εμφανιζόμενη περίοδο και τιμή. 2. Δηλώστε τι ίσχυε πραγματικά. 3. Αποδεχθείτε την επιβεβαίωση ευθύνης και πατήστε «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED',
+        EMPLOYEE_HISTORY_USER_CORRECTION_RESPONSIBILITY_REQUIRED: 'Η διόρθωση δεν εφαρμόστηκε επειδή δεν επιβεβαιώθηκε η ευθύνη για τα ιστορικά στοιχεία. 1. Διαβάστε ξανά όλες τις επιλογές. 2. Επιβεβαιώστε ότι αποτυπώνουν τα πραγματικά στοιχεία. 3. Επιλέξτε το πλαίσιο επιβεβαίωσης και πατήστε «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_RESPONSIBILITY_REQUIRED',
+        EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST: 'Η εφαρμογή έλαβε επιλογή που δεν ανήκει στο τρέχον φύλλο διόρθωσης. 1. Ακυρώστε το παράθυρο. 2. Ανανεώστε τη φόρμα. 3. Επιλέξτε μόνο τις νέες επιλογές που θα εμφανιστούν. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_REQUEST',
+        EMPLOYEE_HISTORY_USER_CORRECTION_INCOMPLETE: 'Δεν έχουν συμπληρωθεί όλες οι αποφάσεις που χρειάζονται για τη συγκεκριμένη ιστορική περίοδο. 1. Ελέγξτε κάθε ερώτηση. 2. Συμπληρώστε τις απαιτούμενες τιμές ή ημερομηνίες. 3. Επιβεβαιώστε την ευθύνη και πατήστε «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_INCOMPLETE',
+        EMPLOYEE_HISTORY_USER_CORRECTION_STALE: 'Τα στοιχεία εργαζομένου, ιστορικού, συσχετίσεων, καταλόγων ή το φύλλο διόρθωσης άλλαξαν μετά την εμφάνισή του. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε τις νεότερες περιόδους και τιμές. 3. Υποβάλετε ξανά μόνο τις αποφάσεις που εξακολουθούν να ισχύουν. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_STALE',
+        EMPLOYEE_HISTORY_USER_CORRECTION_CATALOG_UNAVAILABLE: 'Η εφαρμογή δεν μπόρεσε να επαληθεύσει τον ισχύοντα κατάλογο επιχειρησιακών τιμών. 1. Μην εισαγάγετε ελεύθερο κωδικό. 2. Ανανεώστε τη φόρμα. 3. Δοκιμάστε ξανά όταν φορτωθεί ο κατάλογος. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_CATALOG_UNAVAILABLE',
+        EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_VALUE: 'Μία από τις επιλεγμένες ιστορικές τιμές δεν είναι έγκυρη ή δεν ανήκει στον ισχύοντα κατάλογο. 1. Ελέγξτε το πεδίο που επισημαίνεται. 2. Επιλέξτε μία από τις διαθέσιμες τιμές. 3. Πατήστε ξανά «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_VALUE',
+        EMPLOYEE_HISTORY_USER_CORRECTION_SIMULATION_FAILED: 'Οι επιλογές σας δεν σχηματίζουν ακόμη μία συνεχή ιστορική γραμμή χωρίς κενό ή επικάλυψη. 1. Ελέγξτε την περίοδο που εμφανίζεται. 2. Διορθώστε την ημερομηνία ή την εκδοχή που ίσχυε. 3. Πατήστε ξανά «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_SIMULATION_FAILED',
+        EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY: 'Η τελική εφαρμογή δεν συμφώνησε ακριβώς με τις αποφάσεις που επιβεβαιώσατε. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε ξανά τις περιόδους και τις τιμές. 3. Επαναλάβετε μόνο με το νέο φύλλο διόρθωσης. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY',
+        EMPLOYEE_HISTORY_USER_CORRECTION_FINAL_VERIFICATION_FAILED: 'Η τελική επαλήθευση δεν μπόρεσε να επιβεβαιώσει μία συνεπή ιστορική γραμμή μετά τη διόρθωση. 1. Ανανεώστε τη φόρμα. 2. Ελέγξτε αν άλλαξαν ενδιάμεσα τα στοιχεία. 3. Επαναλάβετε την αποθήκευση με τις νεότερες επιλογές. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_FINAL_VERIFICATION_FAILED',
         EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID: 'Η ημερομηνία που δηλώθηκε δεν είναι έγκυρη ημερολογιακή ημέρα. 1. Επιλέξτε ημερομηνία από το διαθέσιμο πεδίο. 2. Βεβαιωθείτε ότι είναι πραγματική ημερομηνία. 3. Πατήστε ξανά «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_DATE_INVALID',
         EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE: 'Η ημερομηνία που δηλώθηκε βρίσκεται έξω από τα ασφαλή όρια της εργασιακής περιόδου. 1. Ελέγξτε την ελάχιστη και τη μέγιστη επιτρεπτή ημερομηνία. 2. Επιλέξτε ημερομηνία μέσα σε αυτά τα όρια. 3. Πατήστε ξανά «Συνέχεια». Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_DATE_OUT_OF_RANGE',
         EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST: 'Η επιβεβαίωση τακτοποίησης δεν ήταν έγκυρη. 1. Ανανεώστε τη φόρμα. 2. Πατήστε ξανά Αποθήκευση. 3. Επιβεβαιώστε μόνο την επιλογή που εμφανίζει η εφαρμογή. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST',
@@ -261,7 +286,8 @@ function profileError(res, error) {
     const resolution = sanitizedEmployeeHistoryResolution(error.resolution);
     if (['EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
         'EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED',
-        'EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED'].includes(error.code) &&
+        'EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED',
+        'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED'].includes(error.code) &&
         error.resolutionRequired === true && resolution) {
         response.resolutionRequired = true;
         response.resolution = resolution;

@@ -14,11 +14,15 @@ const { samePeriodMateriallyDifferentProfilesFixture,
     require('./fixtures/multipleSafeEmployeeHistoryResolutionFixtures');
 const { competingDepartureDatesFixture, departureAndHistoricalPayFactFixture } =
     require('./fixtures/businessFactEmployeeHistoryResolutionFixtures');
+const { h1MissingInitialProfileFixture, h2KpkBoundaryFixture,
+    h3IntermediateOverlapFixture } =
+    require('./fixtures/userConfirmedEmployeeHistoryCorrectionFixtures');
 
 test('capability classification preserves UNIQUE and identifies exactly the four generic MULTIPLE shapes', () => {
     const unique = classifyEmployeeHistoryResolutionCapability(shapeALifecycleFixture());
     assert.equal(unique.resolutionClass, RESOLUTION_CLASSES.UNIQUE_SAFE_PLAN);
     assert.equal(unique.factCollectionReady, false);
+    assert.equal(unique.userConfirmedCorrectionReady, false);
     for (const factory of [samePeriodMateriallyDifferentProfilesFixture,
         correctionFromHireOrSpecialtyChangeFixture, optionalIntermediateProfileFixture,
         realStartOfFourDayProfileFixture]) {
@@ -26,6 +30,7 @@ test('capability classification preserves UNIQUE and identifies exactly the four
         assert.equal(result.resolutionClass,
             RESOLUTION_CLASSES.MULTIPLE_SAFE_BUSINESS_PLANS, factory().name);
         assert.equal(result.factCollectionReady, false, factory().name);
+        assert.equal(result.userConfirmedCorrectionReady, false, factory().name);
     }
 });
 
@@ -86,8 +91,25 @@ test('exactly five generic departure cases remain BUSINESS_FACT_REQUIRED and bec
         const result = classifyEmployeeHistoryResolutionCapability(fixture);
         assert.equal(result.resolutionClass, RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED);
         assert.equal(result.factCollectionReady, true);
+        assert.equal(result.userConfirmedCorrectionReady, false);
         assert.equal(result.businessFactPlan.status, 'APPLICABLE');
     }
+});
+
+test('ακριβώς τα τρία γενικά H1/H2/H3 είναι userConfirmedCorrectionReady', () => {
+    const fixtures = [h1MissingInitialProfileFixture(), h2KpkBoundaryFixture(),
+        h3IntermediateOverlapFixture()];
+    const shapes = new Set();
+    for (const fixture of fixtures) {
+        const result = classifyEmployeeHistoryResolutionCapability(fixture);
+        assert.equal(result.resolutionClass, RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED,
+            fixture.name);
+        assert.equal(result.factCollectionReady, false, fixture.name);
+        assert.equal(result.userConfirmedCorrectionReady, true, fixture.name);
+        assert.equal(result.userCorrectionPlan.status, 'APPLICABLE', fixture.name);
+        shapes.add(result.userCorrectionPlan.shapeKind);
+    }
+    assert.equal(shapes.size, 3);
 });
 
 test('initial-profile fact shapes stay BUSINESS_FACT_REQUIRED without incomplete questions', () => {

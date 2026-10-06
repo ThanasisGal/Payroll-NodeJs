@@ -33,6 +33,9 @@ const { samePeriodMateriallyDifferentProfilesFixture,
     require('./fixtures/multipleSafeEmployeeHistoryResolutionFixtures');
 const { competingDepartureDatesFixture, departureAndHistoricalPayFactFixture } =
     require('./fixtures/businessFactEmployeeHistoryResolutionFixtures');
+const { h1MissingInitialProfileFixture, h2KpkBoundaryFixture,
+    h3IntermediateOverlapFixture } =
+    require('./fixtures/userConfirmedEmployeeHistoryCorrectionFixtures');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
@@ -2511,4 +2514,250 @@ test('καθαρή επανάληψη δεν δημιουργεί δεύτερο
         { businessFactAsOfDate: fixture.asOfDate });
     assert.notEqual(repeated.businessFactResolutionApplied, true);
     assert.equal(db.operations().auditCreates, audits);
+});
+
+async function requiredUserCorrectionResolution(db, fixture, overrides = {}) {
+    let resolution;
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, null, {
+        correctionCatalogLoader: async () => fixture.catalogs,
+        ...overrides
+    }), error => {
+        assert.equal(error.code, 'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED');
+        assert.equal(error.resolutionRequired, true);
+        resolution = error.resolution;
+        return true;
+    });
+    return resolution;
+}
+
+function userCorrectionConfirmation(resolution, kind = 'H2_CORRECTION') {
+    const decisions = kind === 'H1' ? [
+        { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
+        { conflictId: 'INITIAL_PROFILE_TERMS', intent: 'CONFIRM_EXISTING',
+            value: 'PROFILE_CANDIDATE_1' }
+    ] : kind === 'H2_REAL_CHANGE' ? [
+        { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
+        { conflictId: 'INITIAL_PROFILE_TERMS', intent: 'CONFIRM_EXISTING',
+            value: 'PROFILE_CANDIDATE_1' },
+        { conflictId: 'FIELD_KPK', intent: 'REAL_HISTORICAL_CHANGE', value: '0115',
+            effectiveDate: '2026-05-13' }
+    ] : kind === 'H3' ? [
+        { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
+        { conflictId: 'INTERMEDIATE_PERIOD_MEANING', intent: 'RETIRE_ERRONEOUS_ARTIFACT' },
+        { conflictId: 'LATER_PROFILE_START', intent: 'FROM_KNOWN_HISTORY_DATE' }
+    ] : [
+        { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
+        { conflictId: 'INITIAL_PROFILE_TERMS', intent: 'CONFIRM_EXISTING',
+            value: 'PROFILE_CANDIDATE_1' },
+        { conflictId: 'FIELD_KPK', intent: 'CORRECT_EXISTING_HISTORICAL_FACT', value: '0115' }
+    ];
+    return { fingerprint: resolution.fingerprint, responsibilityAccepted: true, decisions };
+}
+
+test('PR H πρώτη αποθήκευση H1/H2/H3 επιστρέφει ασφαλές 409 με ακριβώς μηδενικές εγγραφές', async () => {
+    for (const fixture of [h1MissingInitialProfileFixture(), h2KpkBoundaryFixture(),
+        h3IntermediateOverlapFixture()]) {
+        const initial = { employee: fixture.currentEmployee,
+            history: fixture.completeHistoryRows };
+        const db = referencedFixtureDatabase(fixture);
+        const resolution = await requiredUserCorrectionResolution(db, fixture);
+        assert.equal(db.writes(), 0, fixture.name);
+        assert.deepEqual(db.state(), initial, fixture.name);
+        assert.equal(resolution.kind, 'USER_CONFIRMED_HISTORY_CORRECTION');
+        assert.match(resolution.fingerprint, /^[a-f0-9]{64}$/);
+        assert.equal(resolution.responsibilityText,
+            'Επιβεβαιώνω ότι οι παραπάνω επιλογές αποτυπώνουν τα πραγματικά ιστορικά στοιχεία του εργαζομένου.');
+        for (const forbidden of ['historyId', '_id', 'aa_eggrafhs', 'patch', 'survivorId']) {
+            assert.equal(JSON.stringify(resolution).includes(forbidden), false, forbidden);
+        }
+    }
+});
+
+test('PR H H1/H2/H3 εκτελούνται στην ίδια συναλλαγή, χωρίς φυσική διαγραφή και με υποχρεωτικό audit', async () => {
+    for (const [fixture, kind] of [
+        [h1MissingInitialProfileFixture(), 'H1'],
+        [h2KpkBoundaryFixture(), 'H2_CORRECTION'],
+        [h3IntermediateOverlapFixture(), 'H3']
+    ]) {
+        const db = referencedFixtureDatabase(fixture);
+        const resolution = await requiredUserCorrectionResolution(db, fixture);
+        const saved = await uniqueSafeRepairRequest(db, fixture,
+            userCorrectionConfirmation(resolution, kind), {
+                correctionCatalogLoader: async () => fixture.catalogs,
+                repairActor: { userId: 'synthetic-user', userName: 'Synthetic User',
+                    sessionId: 'synthetic-session' }
+            });
+        assert.equal(saved.userConfirmedCorrectionApplied, true, fixture.name);
+        assert.equal(saved.userConfirmedCorrectionAuditWritten, true, fixture.name);
+        assert.equal(db.operations().auditCreates, 1, fixture.name);
+        assert.equal(db.operations().historyDeletes, 0, fixture.name);
+        const audit = db.state().audits[0];
+        assert.equal(audit.diagnostics.resolutionClass, 'BUSINESS_FACT_REQUIRED');
+        assert.equal(audit.diagnostics.resolutionKind,
+            'USER_CONFIRMED_HISTORY_CORRECTION');
+        assert.equal(audit.diagnostics.responsibilityAccepted, true);
+        assert.deepEqual(audit.diagnostics.actor,
+            { userId: 'synthetic-user', userName: 'Synthetic User',
+                sessionId: 'synthetic-session' });
+        assert.match(audit.diagnostics.stateFingerprint, /^[a-f0-9]{64}$/);
+        assert.match(audit.diagnostics.executionPlanFingerprint, /^[a-f0-9]{64}$/);
+        assert.ok(Array.isArray(audit.diagnostics.conflictsShown));
+        assert.ok(Array.isArray(audit.diagnostics.normalizedBusinessDecisions));
+        assert.ok(Array.isArray(audit.diagnostics.affectedStableIds));
+        assert.ok(audit.diagnostics.referenceClassifications);
+        assert.ok(audit.repairedAt instanceof Date);
+    }
+});
+
+test('PR H διόρθωση ΚΠΚ και πραγματική αλλαγή παραμένουν διακριτές μέσα στη συναλλαγή', async () => {
+    for (const kind of ['H2_CORRECTION', 'H2_REAL_CHANGE']) {
+        const fixture = h2KpkBoundaryFixture();
+        const db = referencedFixtureDatabase(fixture);
+        const resolution = await requiredUserCorrectionResolution(db, fixture);
+        await uniqueSafeRepairRequest(db, fixture,
+            userCorrectionConfirmation(resolution, kind), {
+                correctionCatalogLoader: async () => fixture.catalogs
+            });
+        const earlier = db.state().history.find(row => row._id === 'h2-incomplete-initial');
+        const later = db.state().history.find(row => row._id === 'h2-later-profile');
+        assert.equal(earlier.hmeromhnia_allaghs_symbashs, '2026-04-24');
+        assert.equal(later.hmeromhnia_allaghs_symbashs, '2026-04-24');
+        assert.equal(db.operations().historyCreates, 0);
+        if (kind === 'H2_CORRECTION') {
+            assert.equal(earlier.krathsh_01, '0115');
+            assert.equal(new Date(later.hmeromhnia_isxyos_oron_ergasias_apo)
+                .toISOString().slice(0, 10), '2026-05-25');
+            assert.deepEqual(db.state().audits[0].diagnostics.correctionIntents,
+                ['CORRECT_EXISTING_HISTORICAL_FACT']);
+        } else {
+            assert.equal(earlier.krathsh_01, '0111');
+            assert.equal(new Date(earlier.hmeromhnia_isxyos_oron_ergasias_eos)
+                .toISOString().slice(0, 10), '2026-05-12');
+            assert.equal(new Date(later.hmeromhnia_isxyos_oron_ergasias_apo)
+                .toISOString().slice(0, 10), '2026-05-13');
+            assert.deepEqual(db.state().audits[0].diagnostics.correctionIntents,
+                ['REAL_HISTORICAL_CHANGE']);
+        }
+    }
+});
+
+test('PR H συνεχίζει την αρχική αποθήκευση αλλά δεν αφήνει παλιά τιμή να αναιρέσει τη διόρθωση', async () => {
+    const fixture = h2KpkBoundaryFixture();
+    const maintenance = {
+        employeeChanges: { email: 'confirmed-history@example.test', krathsh_01: '0111' },
+        submittedEmployeeFields: ['email', 'krathsh_01'],
+        historyChanges: { krathsh_01: '0111' },
+        submittedHistoryChanges: { krathsh_01: '0111' },
+        submittedProfileFields: ['krathsh_01'], identity: null,
+        originalHistoryId: 'h2-incomplete-initial',
+        expectedRevision: fixture.completeHistoryRows.find(row =>
+            row._id === 'h2-incomplete-initial').updatedAt,
+        correctableIdentityFields: []
+    };
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredUserCorrectionResolution(db, fixture, { maintenance });
+    await uniqueSafeRepairRequest(db, fixture,
+        userCorrectionConfirmation(resolution), {
+            maintenance, correctionCatalogLoader: async () => fixture.catalogs
+        });
+    assert.equal(db.state().employee.email, 'confirmed-history@example.test');
+    assert.equal(db.state().employee.krathsh_01, '0115');
+    assert.equal(db.operations().auditCreates, 1);
+});
+
+test('PR H απορρίπτει ευθύνη, άγνωστα πεδία και ελλιπείς αποφάσεις πριν από κάθε εγγραφή', async () => {
+    const fixture = h2KpkBoundaryFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredUserCorrectionResolution(db, fixture);
+    const valid = userCorrectionConfirmation(resolution);
+    for (const confirmation of [
+        { ...valid, responsibilityAccepted: false },
+        { fingerprint: valid.fingerprint, decisions: valid.decisions },
+        { ...valid, decisions: valid.decisions.slice(0, 2) },
+        { ...valid, decisions: valid.decisions.map((item, index) => index
+            ? item : { ...item, historyId: 'forged' }) }
+    ]) {
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, confirmation, {
+            correctionCatalogLoader: async () => fixture.catalogs
+        }), error => String(error.code || '').startsWith('EMPLOYEE_HISTORY_'));
+        assert.equal(db.writes(), 0);
+    }
+});
+
+test('PR H αποτυχία φόρτωσης επίσημου καταλόγου σταματά πριν από κάθε εγγραφή', async () => {
+    const fixture = h2KpkBoundaryFixture();
+    const db = referencedFixtureDatabase(fixture);
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, null, {
+        correctionCatalogLoader: async () => { throw new Error('catalog offline'); }
+    }), error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_CATALOG_UNAVAILABLE');
+    assert.equal(db.writes(), 0);
+});
+
+test('PR H ανιχνεύει παλαιότητα εργαζομένου, ιστορικού, συσχετίσεων, φύλλου και καταλόγου', async () => {
+    const original = h2KpkBoundaryFixture();
+    const firstDb = referencedFixtureDatabase(original);
+    const resolution = await requiredUserCorrectionResolution(firstDb, original);
+    for (const kind of ['employee', 'history', 'references', 'worksheet', 'catalog']) {
+        const fixture = h2KpkBoundaryFixture();
+        if (kind === 'employee') fixture.currentEmployee.updatedAt = new Date('2026-10-01');
+        if (kind === 'history') fixture.completeHistoryRows[0].updatedAt = new Date('2026-10-01');
+        if (kind === 'references') fixture.protectedReferenceSummary['h2-incomplete-initial'] = [];
+        if (kind === 'worksheet') {
+            fixture.completeHistoryRows.find(row => row._id === 'h2-incomplete-initial')
+                .hmeromhnia_allaghs_orarioy_apo = '2026-04-26';
+        }
+        const catalogs = kind === 'catalog' ? { ...fixture.catalogs,
+            KPK_EFKA: [...fixture.catalogs.KPK_EFKA,
+                { code: '0999', label: 'Συνθετική νέα τιμή' }] } : fixture.catalogs;
+        const db = referencedFixtureDatabase(fixture);
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture,
+            userCorrectionConfirmation(resolution), {
+                correctionCatalogLoader: async () => catalogs
+            }), error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
+        assert.equal(db.writes(), 0, kind);
+    }
+});
+
+test('PR H αποτυχία audit, τελικής επαλήθευσης ή αρχικής Save αναστρέφει τα πάντα', async () => {
+    for (const [failure, behavior, overrides, expected] of [
+        ['audit', {}, {}, 'audit failed'],
+        ['', { pretendUpdateSuccess: true }, {},
+            'EMPLOYEE_HISTORY_USER_CORRECTION_FINAL_VERIFICATION_FAILED'],
+        ['', {}, { maintenance: {
+            employeeChanges: { email: 'must-roll-back@example.test' },
+            submittedEmployeeFields: ['email'], historyChanges: {},
+            submittedHistoryChanges: {}, submittedProfileFields: [],
+            originalHistoryId: 'missing-history-row',
+            expectedRevision: '2026-01-01T00:00:00.000Z' } }, 'CONFLICT_AMBIGUOUS_TARGET']
+    ]) {
+        const fixture = h2KpkBoundaryFixture();
+        const firstDb = referencedFixtureDatabase(fixture);
+        const resolution = await requiredUserCorrectionResolution(firstDb, fixture, overrides);
+        const db = referencedFixtureDatabase(fixture, failure, behavior);
+        const before = structuredClone(db.state());
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture,
+            userCorrectionConfirmation(resolution), {
+                ...overrides, correctionCatalogLoader: async () => fixture.catalogs
+            }), error => error.code === expected || error.message === expected);
+        assert.deepEqual(db.state(), before);
+    }
+});
+
+test('PR H καθαρή επανάληψη δεν δημιουργεί δεύτερο audit και παλιό payload γίνεται STALE', async () => {
+    const fixture = h2KpkBoundaryFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredUserCorrectionResolution(db, fixture);
+    const confirmation = userCorrectionConfirmation(resolution);
+    await uniqueSafeRepairRequest(db, fixture, confirmation, {
+        correctionCatalogLoader: async () => fixture.catalogs
+    });
+    const audits = db.operations().auditCreates;
+    const repeated = await uniqueSafeRepairRequest(db, fixture, null, {
+        correctionCatalogLoader: async () => fixture.catalogs
+    });
+    assert.notEqual(repeated.userConfirmedCorrectionApplied, true);
+    assert.equal(db.operations().auditCreates, audits);
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, confirmation, {
+        correctionCatalogLoader: async () => fixture.catalogs
+    }), error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
 });

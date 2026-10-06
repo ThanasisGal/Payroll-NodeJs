@@ -13,9 +13,13 @@ const { RESOLUTION_ANALYSIS_VERSION, RESOLUTION_CLASSES, REFERENCE_CLASSES,
     buildMultipleSafePublicResolution, normalizeUniqueSafeRepairConfirmation,
     buildBusinessFactResolutionStateFingerprint, buildBusinessFactResolutionAnalysis,
     buildBusinessFactPublicResolution, validatePublicFactQuestions,
+    buildUserConfirmedCorrectionStateFingerprint,
+    buildUserConfirmedCorrectionAnalysis, buildUserConfirmedCorrectionPublicResolution,
+    validatePublicUserCorrectionConflicts,
     normalizeEmployeeHistoryResolutionConfirmation,
     normalizeMultipleSafeResolutionConfirmation,
-    normalizeBusinessFactResolutionConfirmation } =
+    normalizeBusinessFactResolutionConfirmation,
+    normalizeUserConfirmedCorrectionConfirmation } =
     require('./employeeHistoryResolutionAnalysisService');
 const { planEmployeeHistoryUniqueSafeRepair } =
     require('./employeeHistoryUniqueSafeRepairPlannerService');
@@ -29,6 +33,12 @@ const { departureAndHistoricalPayFactFixture } =
     require('./fixtures/businessFactEmployeeHistoryResolutionFixtures');
 const { planEmployeeHistoryBusinessFactResolution } =
     require('./employeeHistoryBusinessFactResolutionPlannerService');
+const { h2KpkBoundaryFixture } =
+    require('./fixtures/userConfirmedEmployeeHistoryCorrectionFixtures');
+const { identifyEmployeeHistoryProblemScope } =
+    require('./employeeHistoryProblemScopeService');
+const { planEmployeeHistoryUserConfirmedCorrection } =
+    require('./employeeHistoryUserConfirmedCorrectionPlannerService');
 
 test('pure resolution analysis represents every future class with a deterministic versioned fingerprint', () => {
     for (const resolutionClass of Object.values(RESOLUTION_CLASSES)) {
@@ -316,6 +326,100 @@ test('business-fact confirmation accepts exactly the currently required answer k
         { fingerprint, answers: { departureOutcome: 'NO_DEPARTURE',
             payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE' }, patch: {} }
     ]) assert.throws(() => normalizeBusinessFactResolutionConfirmation(invalid, questions));
+});
+
+function userCorrectionContext() {
+    const fixture = h2KpkBoundaryFixture();
+    const canonicalResult = canonicalizeEmployeeHistory({ scope: fixture.scope,
+        currentEmployee: fixture.currentEmployee, historyRows: fixture.completeHistoryRows });
+    const problemScope = identifyEmployeeHistoryProblemScope({ scope: fixture.scope,
+        currentEmployee: fixture.currentEmployee,
+        completeHistoryRows: fixture.completeHistoryRows });
+    const userCorrectionPlan = planEmployeeHistoryUserConfirmedCorrection({ ...fixture,
+        canonicalResult, problemScope });
+    return { fixture, canonicalResult, problemScope, userCorrectionPlan };
+}
+
+test('το αποτύπωμα διόρθωσης δεσμεύει εργαζόμενο, ιστορικό, συσχετίσεις, φύλλο, κατάλογο και αρχικό Save', () => {
+    const { fixture, canonicalResult, problemScope, userCorrectionPlan } = userCorrectionContext();
+    const base = { scope: fixture.scope, currentEmployee: fixture.currentEmployee,
+        completeHistoryRows: fixture.completeHistoryRows,
+        protectedReferenceSummary: fixture.protectedReferenceSummary,
+        canonicalResult, problemScope, userCorrectionPlan,
+        normalizedSaveRequest: { onoma: 'Συνθετικό' } };
+    const original = buildUserConfirmedCorrectionStateFingerprint(base);
+    assert.equal(original, buildUserConfirmedCorrectionStateFingerprint(base));
+    for (const variant of [
+        { ...base, currentEmployee: { ...base.currentEmployee, updatedAt: 'changed' } },
+        { ...base, completeHistoryRows: base.completeHistoryRows.map((row, index) =>
+            index ? row : { ...row, updatedAt: 'changed' }) },
+        { ...base, protectedReferenceSummary: { ...base.protectedReferenceSummary,
+            'h2-incomplete-initial': [] } },
+        { ...base, userCorrectionPlan: { ...base.userCorrectionPlan,
+            worksheetFingerprint: 'changed' } },
+        { ...base, userCorrectionPlan: { ...base.userCorrectionPlan,
+            registryFingerprintMaterial: { changed: true } } },
+        { ...base, normalizedSaveRequest: { onoma: 'Άλλο' } }
+    ]) assert.notEqual(buildUserConfirmedCorrectionStateFingerprint(variant), original);
+});
+
+test('το δημόσιο φύλλο H2 είναι ελληνικό, περιγράφει ΚΠΚ 0111/0115 και δεν εκθέτει τεχνικές ταυτότητες', () => {
+    const { userCorrectionPlan } = userCorrectionContext();
+    const fingerprint = '9'.repeat(64);
+    const analysis = buildUserConfirmedCorrectionAnalysis({ userCorrectionPlan,
+        sourceStateFingerprint: fingerprint });
+    const resolution = buildUserConfirmedCorrectionPublicResolution({ analysis, fingerprint });
+    assert.equal(resolution.kind, 'USER_CONFIRMED_HISTORY_CORRECTION');
+    assert.match(resolution.title, /ιστορικού/);
+    assert.match(resolution.responsibilityText, /Επιβεβαιώνω/);
+    const serialized = JSON.stringify(resolution);
+    assert.match(serialized, /0111/);
+    assert.match(serialized, /0115/);
+    assert.match(serialized, /Ασφαλιστική κατηγορία/);
+    for (const forbidden of ['historyId', '_id', 'aa_eggrafhs', 'rowNumber',
+        'survivorId', 'deleteId', 'patch', 'mongo']) {
+        assert.equal(serialized.toLowerCase().includes(forbidden.toLowerCase()), false, forbidden);
+    }
+});
+
+test('η επανάληψη δέχεται μόνο το ακριβές σχήμα, πλήρεις τρέχουσες αποφάσεις και ρητή ευθύνη', () => {
+    const { userCorrectionPlan } = userCorrectionContext();
+    const fingerprint = '8'.repeat(64);
+    const valid = { fingerprint, responsibilityAccepted: true, decisions: [
+        { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
+        { conflictId: 'INITIAL_PROFILE_TERMS', intent: 'CONFIRM_EXISTING',
+            value: 'PROFILE_CANDIDATE_1' },
+        { conflictId: 'FIELD_KPK', intent: 'CORRECT_EXISTING_HISTORICAL_FACT', value: '0115' }
+    ] };
+    assert.deepEqual(normalizeUserConfirmedCorrectionConfirmation(valid,
+        userCorrectionPlan.conflicts), valid);
+    for (const invalid of [
+        { ...valid, responsibilityAccepted: false },
+        { fingerprint, decisions: valid.decisions },
+        { ...valid, historyId: 'forged' },
+        { ...valid, decisions: valid.decisions.map((item, index) => index
+            ? item : { ...item, patch: {} }) },
+        { ...valid, decisions: valid.decisions.slice(0, 2) },
+        { ...valid, decisions: [...valid.decisions,
+            { conflictId: 'UNSHOWN', intent: 'FROM_HIRE' }] },
+        { ...valid, decisions: [valid.decisions[0], valid.decisions[0],
+            ...valid.decisions.slice(1)] }
+    ]) assert.throws(() => normalizeUserConfirmedCorrectionConfirmation(invalid,
+        userCorrectionPlan.conflicts), error =>
+        String(error.code || '').startsWith('EMPLOYEE_HISTORY_USER_CORRECTION') ||
+        error.code === 'EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST');
+});
+
+test('ο έλεγχος δημοσίου φύλλου απορρίπτει φυσικές ταυτότητες και αυθαίρετα στοιχεία', () => {
+    const { userCorrectionPlan } = userCorrectionContext();
+    const valid = validatePublicUserCorrectionConflicts(userCorrectionPlan.conflicts);
+    assert.equal(valid.length, 3);
+    for (const injected of [
+        userCorrectionPlan.conflicts.map((item, index) => index
+            ? item : { ...item, historyId: 'forged' }),
+        userCorrectionPlan.conflicts.map((item, index) => index
+            ? item : { ...item, intents: [{ ...item.intents[0], patch: {} }] })
+    ]) assert.throws(() => validatePublicUserCorrectionConflicts(injected));
 });
 
 test('business-fact question schema rejects arbitrary form definitions', () => {
