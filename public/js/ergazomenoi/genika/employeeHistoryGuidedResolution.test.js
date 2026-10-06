@@ -79,6 +79,47 @@ function guidedResolutionData(overrides = {}) {
     };
 }
 
+function factResolutionData({ pay = false, overrides = {} } = {}) {
+    const questions = [{
+        id: 'departureOutcome', type: 'SINGLE_CHOICE',
+        label: 'Τι συνέβη πραγματικά με την αποχώρηση;', required: true,
+        options: [
+            { id: 'DEPARTED_ON_FIRST_RECORDED_DATE', label: 'Αποχώρησε στις 19/08/2026' },
+            { id: 'DEPARTED_ON_SECOND_RECORDED_DATE', label: 'Αποχώρησε στις 20/08/2026' },
+            { id: 'DEPARTED_ON_OTHER_DATE', label: 'Αποχώρησε σε άλλη ημερομηνία' },
+            { id: 'NO_DEPARTURE', label: 'Δεν πραγματοποιήθηκε αποχώρηση' }
+        ]
+    }, {
+        id: 'departureDate', type: 'DATE', label: 'Ημερομηνία αποχώρησης',
+        required: true, min: '2026-04-29', max: '2026-10-06',
+        condition: { questionId: 'departureOutcome', equals: 'DEPARTED_ON_OTHER_DATE' }
+    }];
+    if (pay) questions.push({
+        id: 'payEffectiveOutcome', type: 'SINGLE_CHOICE',
+        label: 'Από πότε ίσχυαν πραγματικά οι αποδοχές 1.006,06;', required: true,
+        options: [
+            { id: 'PAY_APPLIED_FROM_HIRE', label: 'Ίσχυαν από την πρόσληψη' },
+            { id: 'PAY_APPLIED_FROM_OTHER_DATE', label: 'Ίσχυαν από μεταγενέστερη ημερομηνία' }
+        ]
+    }, {
+        id: 'payEffectiveDate', type: 'DATE', label: 'Ημερομηνία έναρξης αποδοχών',
+        required: true, min: '2026-05-02', max: '2026-10-06',
+        condition: { questionId: 'payEffectiveOutcome', equals: 'PAY_APPLIED_FROM_OTHER_DATE' }
+    });
+    return {
+        resolutionRequired: true,
+        resolution: {
+            version: 1,
+            kind: 'BUSINESS_FACT_COLLECTION',
+            title: 'Χρειάζονται πραγματικά στοιχεία για το ιστορικό',
+            explanation: 'Επιβεβαιώστε τι συνέβη πραγματικά.',
+            questions,
+            fingerprint,
+            ...overrides
+        }
+    };
+}
+
 test('εμφανίζει ασφαλές παράθυρο χωρίς αυτόματη επιβεβαίωση και με textContent', async () => {
     let receivedOptions;
     let retries = 0;
@@ -326,4 +367,165 @@ test('μη έγκυρο συμβόλαιο ή πρόσθετο answer αποτυ
         choiceId: 'CHANGE_OTHER_DATE',
         answers: { effectiveDate: '2026-06-28', historyId: 'forged' }
     }), /Valid guided resolution selection/);
+});
+
+test('η συλλογή πραγματικών στοιχείων αποδίδεται χωρίς προεπιλογή και αρχικά είναι ανενεργή', () => {
+    const resolution = guided.normalizeResolutionResponse(factResolutionData());
+    const validity = [];
+    const content = guided.buildSafeContent(fakeDocument(), resolution,
+        value => validity.push(value));
+    const departure = content.controls[0];
+    const date = content.controls[1];
+    assert.equal(resolution.kind, 'BUSINESS_FACT_COLLECTION');
+    assert.ok(departure.radios.every(radio => radio.checked === false));
+    assert.equal(date.wrapper.hidden, true);
+    assert.equal(date.dateInput.disabled, true);
+    assert.equal(content.selected(), null);
+    assert.equal(validity.at(-1), false);
+});
+
+test('γνωστή αποχώρηση και NO_DEPARTURE ολοκληρώνουν το απλό ερωτηματολόγιο', () => {
+    for (const index of [0, 3]) {
+        const resolution = guided.normalizeResolutionResponse(factResolutionData());
+        let valid = null;
+        const content = guided.buildSafeContent(fakeDocument(), resolution,
+            value => { valid = value; });
+        content.controls[0].radios[index].checked = true;
+        content.controls[0].radios[index].dispatch('change');
+        assert.equal(valid, true);
+        const answer = index === 0
+            ? 'DEPARTED_ON_FIRST_RECORDED_DATE' : 'NO_DEPARTURE';
+        assert.deepEqual(content.selected(), { answers: { departureOutcome: answer } });
+        assert.deepEqual(guided.buildRetryPayload({}, resolution,
+            content.selected()).resolution, {
+            fingerprint, answers: { departureOutcome: answer }
+        });
+    }
+});
+
+test('η επιλογή άλλης αποχώρησης εμφανίζει υποχρεωτική ημερομηνία με όρια', () => {
+    const resolution = guided.normalizeResolutionResponse(factResolutionData());
+    let valid = null;
+    const content = guided.buildSafeContent(fakeDocument(), resolution,
+        value => { valid = value; });
+    content.controls[0].radios[2].checked = true;
+    content.controls[0].radios[2].dispatch('change');
+    const date = content.controls[1];
+    assert.equal(date.wrapper.hidden, false);
+    assert.equal(date.dateInput.disabled, false);
+    assert.equal(date.dateInput.min, '2026-04-29');
+    assert.equal(date.dateInput.max, '2026-10-06');
+    assert.equal(valid, false);
+    date.dateInput.value = '2026-08-15';
+    date.dateInput.dispatch('change');
+    assert.equal(valid, true);
+    assert.deepEqual(content.selected(), { answers: {
+        departureOutcome: 'DEPARTED_ON_OTHER_DATE', departureDate: '2026-08-15'
+    } });
+});
+
+test('η ροή D2 απαιτεί ανεξάρτητα και το γεγονός ισχύος αποδοχών', () => {
+    const resolution = guided.normalizeResolutionResponse(factResolutionData({ pay: true }));
+    let valid = null;
+    const content = guided.buildSafeContent(fakeDocument(), resolution,
+        value => { valid = value; });
+    content.controls[0].radios[0].checked = true;
+    content.controls[0].radios[0].dispatch('change');
+    assert.equal(valid, false);
+    content.controls[2].radios[1].checked = true;
+    content.controls[2].radios[1].dispatch('change');
+    assert.equal(content.controls[3].wrapper.hidden, false);
+    assert.equal(valid, false);
+    content.controls[3].dateInput.value = '2026-07-01';
+    content.controls[3].dateInput.dispatch('input');
+    assert.equal(valid, true);
+    assert.deepEqual(content.selected(), { answers: {
+        departureOutcome: 'DEPARTED_ON_FIRST_RECORDED_DATE',
+        payEffectiveOutcome: 'PAY_APPLIED_FROM_OTHER_DATE',
+        payEffectiveDate: '2026-07-01'
+    } });
+});
+
+test('ακύρωση συλλογής γεγονότων κάνει μηδενικές επαναλήψεις και απενεργοποιεί τη συνέχεια', async () => {
+    let retries = 0;
+    let disabled = 0;
+    const swal = {
+        close() {},
+        disableConfirmButton() { disabled += 1; },
+        fire: async options => {
+            options.didOpen();
+            return { isConfirmed: false };
+        }
+    };
+    const result = await guided.handleInitialResponse({
+        response: responseWith(factResolutionData()), originalPayload: {},
+        retryRequest: async () => { retries += 1; }, swal, documentRef: fakeDocument()
+    });
+    assert.equal(result.cancelled, true);
+    assert.equal(retries, 0);
+    assert.ok(disabled >= 1);
+});
+
+test('επιβεβαίωση γεγονότων κάνει μία επανάληψη με μόνο fingerprint και επιτρεπτές απαντήσεις', async () => {
+    let retries = 0;
+    let retryPayload;
+    const swal = {
+        close() {}, disableConfirmButton() {}, enableConfirmButton() {}, disableButtons() {},
+        fire: async options => {
+            options.didOpen();
+            const departure = options.html.children[1].children[0];
+            const radio = departure.children[1].children[0];
+            radio.checked = true;
+            radio.dispatch('change');
+            return { isConfirmed: true, value: await options.preConfirm() };
+        }
+    };
+    await guided.handleInitialResponse({
+        response: responseWith(factResolutionData()),
+        originalPayload: { formData: { safe: true } },
+        retryRequest: async payload => { retries += 1; retryPayload = payload;
+            return { status: 200 }; }, swal, documentRef: fakeDocument()
+    });
+    assert.equal(retries, 1);
+    assert.deepEqual(retryPayload.resolution, {
+        fingerprint,
+        answers: { departureOutcome: 'DEPARTED_ON_FIRST_RECORDED_DATE' }
+    });
+    for (const forbidden of ['historyId', '_id', 'aa_eggrafhs', 'patch']) {
+        assert.equal(JSON.stringify(retryPayload.resolution).includes(forbidden), false);
+    }
+});
+
+test('πρόσθετες απαντήσεις και μη έγκυρο συμβόλαιο γεγονότων αποτυγχάνουν κλειστά', () => {
+    const resolution = guided.normalizeResolutionResponse(factResolutionData());
+    assert.throws(() => guided.buildRetryPayload({}, resolution, { answers: {
+        departureOutcome: 'NO_DEPARTURE', historyId: 'forged'
+    } }));
+    assert.equal(guided.normalizeResolutionResponse(factResolutionData({ overrides: {
+        questions: factResolutionData().resolution.questions.map((question, index) => index
+            ? question : { ...question, options: question.options.slice(1) })
+    } })), null);
+});
+
+test('παρωχημένη απάντηση συλλογής γεγονότων επιστρέφεται χωρίς δεύτερη επανάληψη', async () => {
+    const stale = responseWith({ success: false,
+        code: 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE' }, 409);
+    let retries = 0;
+    const swal = {
+        close() {}, disableConfirmButton() {}, enableConfirmButton() {}, disableButtons() {},
+        fire: async options => {
+            options.didOpen();
+            const radio = options.html.children[1].children[0].children[1].children[0];
+            radio.checked = true;
+            radio.dispatch('change');
+            return { isConfirmed: true, value: await options.preConfirm() };
+        }
+    };
+    const result = await guided.handleInitialResponse({
+        response: responseWith(factResolutionData()), originalPayload: {},
+        retryRequest: async () => { retries += 1; return stale; },
+        swal, documentRef: fakeDocument()
+    });
+    assert.equal(retries, 1);
+    assert.equal(result.response, stale);
 });

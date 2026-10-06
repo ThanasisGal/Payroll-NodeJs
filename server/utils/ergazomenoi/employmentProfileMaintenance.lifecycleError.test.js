@@ -143,3 +143,61 @@ test('unsafe guided option schema fails closed and is not reflected', () => {
     assert.equal(payload.resolutionRequired, undefined);
     assert.equal(payload.resolution, undefined);
 });
+
+test('business-fact conflict serializes only controlled questions and actionable text', () => {
+    let payload;
+    const res = { status() { return this; }, json(value) { payload = value; return value; } };
+    profileError(res, {
+        code: 'EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED', statusCode: 409,
+        resolutionRequired: true,
+        resolution: {
+            version: 1, kind: 'BUSINESS_FACT_COLLECTION',
+            title: 'Χρειάζονται πραγματικά στοιχεία για το ιστορικό',
+            explanation: 'Επιβεβαιώστε τι συνέβη πραγματικά.',
+            questions: [{
+                id: 'departureOutcome', type: 'SINGLE_CHOICE',
+                label: 'Τι συνέβη πραγματικά με την αποχώρηση;', required: true,
+                options: [
+                    { id: 'DEPARTED_ON_FIRST_RECORDED_DATE', label: 'Πρώτη ημερομηνία' },
+                    { id: 'DEPARTED_ON_SECOND_RECORDED_DATE', label: 'Δεύτερη ημερομηνία' },
+                    { id: 'DEPARTED_ON_OTHER_DATE', label: 'Άλλη ημερομηνία' },
+                    { id: 'NO_DEPARTURE', label: 'Δεν πραγματοποιήθηκε αποχώρηση' }
+                ]
+            }, {
+                id: 'departureDate', type: 'DATE', label: 'Ημερομηνία αποχώρησης',
+                required: true, min: '2026-04-29', max: '2026-10-06',
+                condition: { questionId: 'departureOutcome',
+                    equals: 'DEPARTED_ON_OTHER_DATE' }
+            }],
+            fingerprint: 'd'.repeat(64),
+            internalResolutionRules: { historyId: 'must-not-leak' }
+        }
+    });
+    assert.equal(payload.resolutionRequired, true);
+    assert.equal(payload.resolution.kind, 'BUSINESS_FACT_COLLECTION');
+    assert.equal(JSON.stringify(payload).includes('must-not-leak'), false);
+    assert.deepEqual(Object.keys(payload.resolution).sort(),
+        ['explanation', 'fingerprint', 'kind', 'questions', 'title', 'version']);
+    assert.match(payload.message, /1\./);
+    assert.match(payload.message, /2\./);
+    assert.match(payload.message, /3\./);
+    assert.match(payload.message, /Δεν αποθηκεύτηκε καμία αλλαγή\./);
+});
+
+test('business-fact failures have numbered fail-closed messages and support references', () => {
+    for (const code of [
+        'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE',
+        'EMPLOYEE_HISTORY_BUSINESS_FACT_INVALID_BOUNDARY',
+        'EMPLOYEE_HISTORY_BUSINESS_FACT_SIMULATION_FAILED',
+        'EMPLOYEE_HISTORY_BUSINESS_FACT_FINAL_VERIFICATION_FAILED'
+    ]) {
+        let payload;
+        const res = { status() { return this; }, json(value) { payload = value; return value; } };
+        profileError(res, { code, statusCode: 409 });
+        assert.match(payload.message, /1\./, code);
+        assert.match(payload.message, /2\./, code);
+        assert.match(payload.message, /3\./, code);
+        assert.match(payload.message, /Δεν αποθηκεύτηκε καμία αλλαγή\./, code);
+        assert.match(payload.message, new RegExp(`Κωδικός αναφοράς: ${code}$`), code);
+    }
+});

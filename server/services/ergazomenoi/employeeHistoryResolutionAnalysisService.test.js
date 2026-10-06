@@ -11,8 +11,11 @@ const { RESOLUTION_ANALYSIS_VERSION, RESOLUTION_CLASSES, REFERENCE_CLASSES,
     buildUniqueSafeRepairResolutionAnalysis, buildUniqueSafeRepairPublicResolution,
     buildMultipleSafeResolutionStateFingerprint, buildMultipleSafeResolutionAnalysis,
     buildMultipleSafePublicResolution, normalizeUniqueSafeRepairConfirmation,
+    buildBusinessFactResolutionStateFingerprint, buildBusinessFactResolutionAnalysis,
+    buildBusinessFactPublicResolution, validatePublicFactQuestions,
     normalizeEmployeeHistoryResolutionConfirmation,
-    normalizeMultipleSafeResolutionConfirmation } =
+    normalizeMultipleSafeResolutionConfirmation,
+    normalizeBusinessFactResolutionConfirmation } =
     require('./employeeHistoryResolutionAnalysisService');
 const { planEmployeeHistoryUniqueSafeRepair } =
     require('./employeeHistoryUniqueSafeRepairPlannerService');
@@ -22,6 +25,10 @@ const { realStartOfFourDayProfileFixture } =
     require('./fixtures/multipleSafeEmployeeHistoryResolutionFixtures');
 const { planEmployeeHistoryMultipleSafeResolution } =
     require('./employeeHistoryMultipleSafeResolutionPlannerService');
+const { departureAndHistoricalPayFactFixture } =
+    require('./fixtures/businessFactEmployeeHistoryResolutionFixtures');
+const { planEmployeeHistoryBusinessFactResolution } =
+    require('./employeeHistoryBusinessFactResolutionPlannerService');
 
 test('pure resolution analysis represents every future class with a deterministic versioned fingerprint', () => {
     for (const resolutionClass of Object.values(RESOLUTION_CLASSES)) {
@@ -236,4 +243,89 @@ test('selected option schema controls required and forbidden answers server-side
         { choiceId: 'FOUR_DAY_PROFILE_FROM_OTHER_DATE', fingerprint,
             answers: { effectiveDate: '2026-07-05T03:00:00+03:00' } }
     ]) assert.throws(() => normalizeMultipleSafeResolutionConfirmation(invalid, options));
+});
+
+test('business-fact fingerprint binds state, references, exact questions, rules and original Save', () => {
+    const fixture = departureAndHistoricalPayFactFixture();
+    const canonicalResult = canonicalizeEmployeeHistory({ scope: fixture.scope,
+        currentEmployee: fixture.currentEmployee, historyRows: fixture.completeHistoryRows });
+    const businessFactPlan = planEmployeeHistoryBusinessFactResolution(fixture);
+    const base = { scope: fixture.scope, currentEmployee: fixture.currentEmployee,
+        completeHistoryRows: fixture.completeHistoryRows,
+        protectedReferenceSummary: fixture.protectedReferenceSummary,
+        canonicalResult, problemScope: businessFactPlan.problemScope, businessFactPlan,
+        normalizedSaveRequest: { effectiveFrom: '2026-05-01' } };
+    const original = buildBusinessFactResolutionStateFingerprint(base);
+    assert.equal(original, buildBusinessFactResolutionStateFingerprint(base));
+    for (const variant of [
+        { ...base, currentEmployee: { ...base.currentEmployee, updatedAt: 'changed' } },
+        { ...base, completeHistoryRows: base.completeHistoryRows.map((row, index) =>
+            index ? row : { ...row, updatedAt: 'changed' }) },
+        { ...base, protectedReferenceSummary: { ...base.protectedReferenceSummary,
+            [String(base.completeHistoryRows[0]._id)]: [{ collection: 'changed' }] } },
+        { ...base, businessFactPlan: { ...base.businessFactPlan,
+            questionSetFingerprint: 'changed' } },
+        { ...base, normalizedSaveRequest: { effectiveFrom: '2026-05-02' } }
+    ]) assert.notEqual(buildBusinessFactResolutionStateFingerprint(variant), original);
+});
+
+test('public business-fact contract exposes only controlled questions without physical identities', () => {
+    const fixture = departureAndHistoricalPayFactFixture();
+    const businessFactPlan = planEmployeeHistoryBusinessFactResolution(fixture);
+    const fingerprint = 'e'.repeat(64);
+    const analysis = buildBusinessFactResolutionAnalysis({ businessFactPlan,
+        sourceStateFingerprint: fingerprint });
+    const resolution = buildBusinessFactPublicResolution({ analysis, fingerprint });
+    assert.equal(resolution.kind, 'BUSINESS_FACT_COLLECTION');
+    assert.deepEqual(resolution.questions.map(question => question.id), [
+        'departureOutcome', 'departureDate', 'payEffectiveOutcome', 'payEffectiveDate'
+    ]);
+    assert.deepEqual(resolution.questions[1].condition, {
+        questionId: 'departureOutcome', equals: 'DEPARTED_ON_OTHER_DATE'
+    });
+    for (const forbidden of ['historyId', '_id', 'aa_eggrafhs', 'survivorId',
+        'deleteId', 'patch']) assert.equal(JSON.stringify(resolution).includes(forbidden), false);
+});
+
+test('business-fact confirmation accepts exactly the currently required answer keys', () => {
+    const fixture = departureAndHistoricalPayFactFixture();
+    const questions = planEmployeeHistoryBusinessFactResolution(fixture).factQuestions;
+    const fingerprint = 'f'.repeat(64);
+    assert.deepEqual(normalizeBusinessFactResolutionConfirmation({ fingerprint, answers: {
+        departureOutcome: 'DEPARTED_ON_OTHER_DATE', departureDate: '2026-08-15',
+        payEffectiveOutcome: 'PAY_APPLIED_FROM_OTHER_DATE', payEffectiveDate: '2026-07-01'
+    } }, questions), { fingerprint, answers: {
+        departureOutcome: 'DEPARTED_ON_OTHER_DATE', departureDate: '2026-08-15',
+        payEffectiveOutcome: 'PAY_APPLIED_FROM_OTHER_DATE', payEffectiveDate: '2026-07-01'
+    } });
+    assert.deepEqual(normalizeBusinessFactResolutionConfirmation({ fingerprint, answers: {
+        departureOutcome: 'NO_DEPARTURE', payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE'
+    } }, questions), { fingerprint, answers: {
+        departureOutcome: 'NO_DEPARTURE', payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE'
+    } });
+    for (const invalid of [
+        { fingerprint, answers: { departureOutcome: 'NO_DEPARTURE' } },
+        { fingerprint, answers: { departureOutcome: 'UNKNOWN',
+            payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE' } },
+        { fingerprint, answers: { departureOutcome: 'NO_DEPARTURE', departureDate: '2026-08-15',
+            payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE' } },
+        { fingerprint, answers: { departureOutcome: 'DEPARTED_ON_OTHER_DATE',
+            departureDate: '2026-02-30', payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE' } },
+        { fingerprint, answers: { departureOutcome: 'NO_DEPARTURE',
+            payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE', historyId: 'forged' } },
+        { fingerprint, answers: { departureOutcome: 'NO_DEPARTURE',
+            payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE' }, patch: {} }
+    ]) assert.throws(() => normalizeBusinessFactResolutionConfirmation(invalid, questions));
+});
+
+test('business-fact question schema rejects arbitrary form definitions', () => {
+    const fixture = departureAndHistoricalPayFactFixture();
+    const questions = planEmployeeHistoryBusinessFactResolution(fixture).factQuestions;
+    assert.deepEqual(validatePublicFactQuestions(questions), questions);
+    for (const invalid of [
+        questions.map((question, index) => index ? question : { ...question, historyId: 'x' }),
+        questions.map((question, index) => index === 1 ? { ...question, type: 'text' } : question),
+        questions.map((question, index) => index === 1
+            ? { ...question, condition: { questionId: 'other', equals: 'x' } } : question)
+    ]) assert.throws(() => validatePublicFactQuestions(invalid));
 });

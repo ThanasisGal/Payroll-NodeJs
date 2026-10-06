@@ -3906,9 +3906,11 @@ class ergazomenoiController {
             const isFirstDeparture = submittedDeparture && !storedDeparture;
             if (resolutionConfirmation && (rehireIntent === true || isDepartureCancellation ||
                 isDepartureCorrection || isFirstDeparture)) {
-                const code = resolutionConfirmation.choiceId === 'APPLY_UNIQUE_SAFE_PLAN'
-                    ? 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE'
-                    : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE';
+                const code = !Object.hasOwn(resolutionConfirmation, 'choiceId')
+                    ? 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE'
+                    : resolutionConfirmation.choiceId === 'APPLY_UNIQUE_SAFE_PLAN'
+                        ? 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE'
+                        : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE';
                 const error = new Error(code);
                 error.code = code;
                 error.statusCode = 409;

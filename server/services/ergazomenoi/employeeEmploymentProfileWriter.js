@@ -69,15 +69,24 @@ const { OPERATION: MULTIPLE_SAFE_RESOLUTION_OPERATION,
     planEmployeeHistoryMultipleSafeResolution,
     resolveEmployeeHistoryMultipleSafeChoice } =
     require('./employeeHistoryMultipleSafeResolutionPlannerService');
+const { OPERATION: BUSINESS_FACT_RESOLUTION_OPERATION,
+    PLAN_STATUSES: BUSINESS_FACT_RESOLUTION_PLAN_STATUSES,
+    planEmployeeHistoryBusinessFactResolution,
+    resolveEmployeeHistoryBusinessFacts } =
+    require('./employeeHistoryBusinessFactResolutionPlannerService');
 const { buildUniqueSafeRepairStateFingerprint,
     buildUniqueSafeRepairResolutionAnalysis,
     buildUniqueSafeRepairPublicResolution,
     buildMultipleSafeResolutionStateFingerprint,
     buildMultipleSafeResolutionAnalysis,
     buildMultipleSafePublicResolution,
+    buildBusinessFactResolutionStateFingerprint,
+    buildBusinessFactResolutionAnalysis,
+    buildBusinessFactPublicResolution,
     normalizeUniqueSafeRepairConfirmation,
     normalizeEmployeeHistoryResolutionConfirmation,
     normalizeMultipleSafeResolutionConfirmation,
+    normalizeBusinessFactResolutionConfirmation,
     RESOLUTION_CLASSES } =
     require('./employeeHistoryResolutionAnalysisService');
 const { identifyEmployeeHistoryProblemScope } =
@@ -410,6 +419,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     uniqueSafeRepairPlan = null,
     controlledMultipleSafeResolution = false,
     multipleSafeResolutionPlan = null,
+    controlledBusinessFactResolution = false,
+    businessFactResolutionPlan = null,
     auditAfterMutation = false }) {
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
@@ -417,13 +428,36 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     const controlledBoundaries = [controlledLegacyOpenCycleCleanup,
         controlledInvalidDepartureCorrection, controlledContractEndSegmentSync,
         controlledDeferredAmbiguityDeparture, controlledUniqueSafeRepair,
-        controlledMultipleSafeResolution].filter(Boolean).length;
+        controlledMultipleSafeResolution, controlledBusinessFactResolution].filter(Boolean).length;
     if (controlledBoundaries > 1) {
         throw failure(controlledInvalidDepartureCorrection
             ? 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_INVALID_BOUNDARY'
             : 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_INVALID_BOUNDARY');
     }
-    if (controlledMultipleSafeResolution) {
+    if (controlledBusinessFactResolution) {
+        const expectedUpdateIds = [...(businessFactResolutionPlan?.changedHistoryIds || [])]
+            .map(String).sort();
+        const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
+        const expectedDeleteIds = [...(businessFactResolutionPlan?.physicalDeleteIds || [])]
+            .map(String).sort();
+        const plannedDeleteIds = physicalPlan.rowsToDelete.map(item => String(item.historyId)).sort();
+        const exactPatches = physicalPlan.rowsToUpdate.every(item => {
+            const expected = businessFactResolutionPlan?.historyPatches?.[String(item.historyId)];
+            const actual = Object.fromEntries(Object.entries(item.patch || {})
+                .filter(([field]) => field !== 'updatedAt'));
+            return expected && stableStringify(actual) === stableStringify(expected);
+        });
+        if (deleteCurrent || diagnostics?.operation !== BUSINESS_FACT_RESOLUTION_OPERATION ||
+            businessFactResolutionPlan?.status !== BUSINESS_FACT_RESOLUTION_PLAN_STATUSES.APPLICABLE ||
+            diagnostics?.planFingerprint !== businessFactResolutionPlan.planFingerprint ||
+            stableStringify(currentPatch || {}) !==
+                stableStringify(businessFactResolutionPlan.currentPatch || {}) ||
+            physicalPlan.rowsToInsert.length || !exactPatches ||
+            stableStringify(plannedUpdateIds) !== stableStringify(expectedUpdateIds) ||
+            stableStringify(plannedDeleteIds) !== stableStringify(expectedDeleteIds)) {
+            throw failure('EMPLOYEE_HISTORY_BUSINESS_FACT_INVALID_BOUNDARY');
+        }
+    } else if (controlledMultipleSafeResolution) {
         const expectedUpdateIds = [...(multipleSafeResolutionPlan?.changedHistoryIds || [])]
             .map(String).sort();
         const plannedUpdateIds = physicalPlan.rowsToUpdate.map(item => String(item.historyId)).sort();
@@ -584,7 +618,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     const referencedRedundant = [];
     const auditRequired = canonicalRepairRequired || proposedDeletedIds.length > 0 ||
         controlledDeferredAmbiguityDeparture || controlledInvalidDepartureCorrection ||
-        controlledUniqueSafeRepair || controlledMultipleSafeResolution;
+        controlledUniqueSafeRepair || controlledMultipleSafeResolution ||
+        controlledBusinessFactResolution;
     let pendingAuditRecord = null;
     if (auditRequired) {
         let auditCollectionExists;
@@ -611,8 +646,10 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
             }
             if (!references.length) continue;
-            if (controlledMultipleSafeResolution) {
-                throw failure('EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE');
+            if (controlledMultipleSafeResolution || controlledBusinessFactResolution) {
+                throw failure(controlledBusinessFactResolution
+                    ? 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE'
+                    : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE');
             }
             const deletion = physicalPlan.rowsToDelete.find(item => item.historyId === historyId);
             if (!deletion?.survivingHistoryId) {
@@ -648,13 +685,24 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             } catch {
                 throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
             }
-            if (!references.length) continue;
             let partitioned;
             try {
                 partitioned = partitionHistoryUpdateReferences(references);
             } catch {
                 throw failure('EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
             }
+            if (controlledBusinessFactResolution) {
+                const expected = businessFactResolutionPlan
+                    ?.referenceClassifications?.[String(historyId)];
+                const actual = { count: partitioned.frozenProvenance.length,
+                    collections: [...new Set(partitioned.frozenProvenance
+                        .map(reference => String(reference.collection)))].sort() };
+                if (!expected || partitioned.liveDereference.length ||
+                    stableStringify(expected) !== stableStringify(actual)) {
+                    throw failure('EMPLOYEE_HISTORY_BUSINESS_FACT_STALE');
+                }
+            }
+            if (!references.length) continue;
             if (partitioned.liveDereference.length) {
                 const error = failure('EMPLOYEE_HISTORY_REFERENCED_UPDATE_REQUIRES_REPLACEMENT');
                 error.references = partitioned.liveDereference;
@@ -757,6 +805,26 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 throw error;
             }
             verified.deferredAmbiguityDeparturePostcondition = postcondition;
+        } else if (controlledBusinessFactResolution) {
+            const canonical = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: verified.history });
+            const second = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: verified.current, historyRows: canonical.canonicalRows });
+            const expectedDeparture = C.calendarDate(
+                businessFactResolutionPlan.currentPatch.hmeromhnia_apoxorhshs)?.getTime() ?? null;
+            const actualDeparture = C.calendarDate(
+                verified.current?.hmeromhnia_apoxorhshs)?.getTime() ?? null;
+            if (actualDeparture !== expectedDeparture ||
+                verified.current?.energos !== businessFactResolutionPlan.currentPatch.energos ||
+                canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired ||
+                !canonical.idempotent || canonical.rowsToDelete.length ||
+                canonical.rowsToInsert.length || canonical.rowsToUpdate.length ||
+                Object.keys(canonical.employeePatch || {}).length ||
+                second.status !== CANONICAL_STATUSES.CLEAN || second.cleanupRequired ||
+                !second.idempotent || stableStringify(second.canonicalRows) !==
+                    stableStringify(canonical.canonicalRows)) {
+                throw failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+            }
         } else if (controlledUniqueSafeRepair) {
             const canonical = canonicalizeEmployeeHistory({ scope: filter,
                 currentEmployee: verified.current, historyRows: verified.history });
@@ -1755,6 +1823,42 @@ function uniqueSafeRepairFailure(code, statusCode = 409, extra = {}) {
     return error;
 }
 
+const BUSINESS_FACT_AUTHORITATIVE_FIELDS = Object.freeze([
+    'energos', 'hmeromhnia_apoxorhshs',
+    'hmeromhnia_isxyos_oron_ergasias_apo',
+    'hmeromhnia_isxyos_oron_ergasias_eos'
+]);
+
+function originalSaveAfterBusinessFactResolution(profileRequest, selectedPlan, currentBefore) {
+    const maintenance = profileRequest.maintenance;
+    if (!maintenance) return profileRequest;
+    const withoutAuthoritative = value => Object.fromEntries(Object.entries(value || {})
+        .filter(([field]) => !BUSINESS_FACT_AUTHORITATIVE_FIELDS.includes(field)));
+    const withoutAuthoritativeNames = value => (value || [])
+        .filter(field => !BUSINESS_FACT_AUTHORITATIVE_FIELDS.includes(field));
+    const authoritativeCurrent = { ...currentBefore, ...selectedPlan.currentPatch };
+    return {
+        ...profileRequest,
+        maintenance: {
+            ...maintenance,
+            employeeChanges: withoutAuthoritative(maintenance.employeeChanges),
+            submittedEmployeeFields: withoutAuthoritativeNames(
+                maintenance.submittedEmployeeFields),
+            historyChanges: withoutAuthoritative(maintenance.historyChanges),
+            submittedHistoryChanges: withoutAuthoritative(
+                maintenance.submittedHistoryChanges),
+            identity: maintenance.identity ? {
+                ...maintenance.identity,
+                hmeromhnia_isxyos_oron_ergasias_apo:
+                    authoritativeCurrent.hmeromhnia_isxyos_oron_ergasias_apo,
+                hmeromhnia_isxyos_oron_ergasias_eos:
+                    authoritativeCurrent.hmeromhnia_isxyos_oron_ergasias_eos,
+                hmeromhnia_apoxorhshs: authoritativeCurrent.hmeromhnia_apoxorhshs
+            } : maintenance.identity
+        }
+    };
+}
+
 async function writeEmployeeEmploymentProfileWithGuidedResolution({
     resolutionConfirmation: rawResolutionConfirmation = null,
     repairActor = null,
@@ -1765,6 +1869,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
     auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
     referenceChecker = findHistoryIdReferences,
     capabilityProbe = transactionCapability,
+    businessFactAsOfDate = new Date(),
     ...profileRequest
 } = {}) {
     const resolutionConfirmation = normalizeEmployeeHistoryResolutionConfirmation(
@@ -1792,6 +1897,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
         let protectedReferenceSummary = {};
         let repairPlan = null;
         let multiplePlan = null;
+        let businessFactPlan = null;
         let problemScope = null;
         if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY && completeHistoryRows.length) {
             for (const row of completeHistoryRows) {
@@ -1825,6 +1931,17 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                     problemScope,
                     protectedReferenceSummary
                 });
+                if (multiplePlan.status !== MULTIPLE_SAFE_RESOLUTION_PLAN_STATUSES.APPLICABLE) {
+                    businessFactPlan = planEmployeeHistoryBusinessFactResolution({
+                        scope: filter,
+                        currentEmployee: current,
+                        completeHistoryRows,
+                        canonicalResult: canonical,
+                        problemScope,
+                        protectedReferenceSummary,
+                        asOfDate: businessFactAsOfDate
+                    });
+                }
             }
         }
 
@@ -2015,10 +2132,142 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                 guidedBusinessResolutionAuditWritten: resolution.auditWritten === true };
         }
 
+        if (businessFactPlan?.status === BUSINESS_FACT_RESOLUTION_PLAN_STATUSES.APPLICABLE) {
+            const normalizedSaveRequest = normalizedUniqueSafeRepairSaveRequest(profileRequest);
+            const confirmationFingerprint = buildBusinessFactResolutionStateFingerprint({
+                scope: filter,
+                currentEmployee: current,
+                completeHistoryRows,
+                protectedReferenceSummary,
+                canonicalResult: canonical,
+                problemScope,
+                businessFactPlan,
+                normalizedSaveRequest
+            });
+            const resolutionAnalysis = buildBusinessFactResolutionAnalysis({
+                businessFactPlan,
+                sourceStateFingerprint: confirmationFingerprint
+            });
+            if (!resolutionAnalysis) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+            }
+            if (!resolutionConfirmation) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED', 409, {
+                    resolutionRequired: true,
+                    resolution: buildBusinessFactPublicResolution({
+                        analysis: resolutionAnalysis,
+                        fingerprint: confirmationFingerprint
+                    })
+                });
+            }
+            if (resolutionConfirmation.fingerprint !== confirmationFingerprint) {
+                throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_BUSINESS_FACT_STALE');
+            }
+            const validatedConfirmation = normalizeBusinessFactResolutionConfirmation(
+                resolutionConfirmation, businessFactPlan.factQuestions);
+            const selectedPlan = resolveEmployeeHistoryBusinessFacts({
+                plannerResult: businessFactPlan,
+                answers: validatedConfirmation.answers,
+                currentEmployee: current,
+                completeHistoryRows
+            });
+            const physicalPlan = buildFinalHistoryMutationPlan({
+                beforeRows: completeHistoryRows,
+                desiredRows: selectedPlan.desiredHistoryRows,
+                historyModel,
+                replacementByDeletedId: selectedPlan.replacementByDeletedId
+            });
+            const actor = repairActor && typeof repairActor === 'object' ? {
+                userId: String(repairActor.userId || '').trim() || null,
+                userName: String(repairActor.userName || '').trim() || null,
+                ...(String(repairActor.sessionId || '').trim()
+                    ? { sessionId: String(repairActor.sessionId).trim() } : {})
+            } : null;
+            let resolution;
+            try {
+                resolution = await executeFinalMutationPlan({
+                    physicalPlan,
+                    currentBefore: current,
+                    currentPatch: selectedPlan.currentPatch,
+                    filter,
+                    employeeId,
+                    session,
+                    employeeModel,
+                    historyModel,
+                    auditModel,
+                    auditCollectionChecker,
+                    referenceChecker,
+                    connection,
+                    diagnostics: {
+                        operation: BUSINESS_FACT_RESOLUTION_OPERATION,
+                        resolutionClass: RESOLUTION_CLASSES.BUSINESS_FACT_REQUIRED,
+                        resolutionKind: businessFactPlan.resolutionKind,
+                        shapeKind: businessFactPlan.shapeKind,
+                        questionIds: businessFactPlan.factQuestions.map(question => question.id),
+                        normalizedBusinessAnswers: selectedPlan.normalizedAnswers,
+                        stateFingerprint: confirmationFingerprint,
+                        executionPlanFingerprint: selectedPlan.planFingerprint,
+                        planFingerprint: selectedPlan.planFingerprint,
+                        actor,
+                        affectedStableIds: selectedPlan.affectedStableIds,
+                        referenceClass: selectedPlan.referenceClass,
+                        referenceClassifications: selectedPlan.referenceClassifications,
+                        currentLifecycleBefore: {
+                            energos: current.energos,
+                            hmeromhnia_apoxorhshs: current.hmeromhnia_apoxorhshs,
+                            hmeromhnia_isxyos_oron_ergasias_apo:
+                                current.hmeromhnia_isxyos_oron_ergasias_apo,
+                            hmeromhnia_isxyos_oron_ergasias_eos:
+                                current.hmeromhnia_isxyos_oron_ergasias_eos
+                        },
+                        currentLifecycleAfter: {
+                            energos: selectedPlan.currentPatch.energos,
+                            hmeromhnia_apoxorhshs:
+                                selectedPlan.currentPatch.hmeromhnia_apoxorhshs,
+                            hmeromhnia_isxyos_oron_ergasias_apo:
+                                selectedPlan.currentPatch.hmeromhnia_isxyos_oron_ergasias_apo,
+                            hmeromhnia_isxyos_oron_ergasias_eos:
+                                selectedPlan.currentPatch.hmeromhnia_isxyos_oron_ergasias_eos
+                        }
+                    },
+                    canonicalRepairRequired: true,
+                    controlledBusinessFactResolution: true,
+                    businessFactResolutionPlan: selectedPlan
+                });
+            } catch (error) {
+                if (error?.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED') {
+                    throw failure('EMPLOYEE_HISTORY_BUSINESS_FACT_FINAL_VERIFICATION_FAILED');
+                }
+                throw error;
+            }
+            const finalCanonical = canonicalizeEmployeeHistory({
+                scope: filter,
+                currentEmployee: resolution.verified.current,
+                historyRows: resolution.verified.history
+            });
+            if (finalCanonical.status !== CANONICAL_STATUSES.CLEAN ||
+                finalCanonical.cleanupRequired || !finalCanonical.idempotent) {
+                throw failure('EMPLOYEE_HISTORY_BUSINESS_FACT_FINAL_VERIFICATION_FAILED');
+            }
+            const continuedRequest = originalSaveAfterBusinessFactResolution(
+                profileRequest, selectedPlan, current);
+            const saved = await writeEmployeeEmploymentProfile({
+                ...continuedRequest,
+                ...dependencies,
+                [ACTIVE_SESSION]: session
+            });
+            return { ...saved,
+                businessFactResolutionApplied: true,
+                businessFactResolutionKind: businessFactPlan.shapeKind,
+                businessFactResolutionAuditWritten: resolution.auditWritten === true };
+        }
+
         if (resolutionConfirmation) {
-            const code = resolutionConfirmation.choiceId === 'APPLY_UNIQUE_SAFE_PLAN'
-                ? 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE'
-                : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE';
+            const code = !Object.hasOwn(resolutionConfirmation, 'choiceId')
+                ? 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE'
+                : resolutionConfirmation.choiceId === 'APPLY_UNIQUE_SAFE_PLAN'
+                    ? 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE'
+                    : 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE';
             throw uniqueSafeRepairFailure(code);
         }
         return writeEmployeeEmploymentProfile({
