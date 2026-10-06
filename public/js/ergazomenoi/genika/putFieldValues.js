@@ -1324,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(updateProgress, 250);
             }
 
-            const response = await fetch('/api/ergazomenoi/update/' + ergazomenoiId, {
+            let response = await fetch('/api/ergazomenoi/update/' + ergazomenoiId, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1333,6 +1333,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 credentials: 'include',
                 body: JSON.stringify(v)
             });
+
+            let guidedResolutionHandled = false;
+            if (window.employeeHistoryGuidedResolution) {
+                const guidedResolutionResult =
+                    await window.employeeHistoryGuidedResolution.handleInitialResponse({
+                        response,
+                        originalPayload: v,
+                        retryRequest: (retryPayload) => fetch(
+                            '/api/ergazomenoi/update/' + ergazomenoiId,
+                            {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'CSRF-Token': csrfToken
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify(retryPayload)
+                            }
+                        ),
+                        swal: Swal,
+                        documentRef: document
+                    });
+                if (guidedResolutionResult.handled) {
+                    guidedResolutionHandled = true;
+                    if (guidedResolutionResult.cancelled) return;
+                    response = guidedResolutionResult.response;
+                }
+            }
 
             console.group('[CONTRACT-DEBUG] FETCH RESPONSE');
             console.log('response.status:', response.status);
@@ -1347,7 +1375,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // ✅ SMOOTH PROGRESS COMPLETION
             // ============================================================================
 
-            if (createContract) {
+            if (createContract && !guidedResolutionHandled) {
                 await new Promise((resolve) => setTimeout(resolve, 3000));
 
                 const progressBar = document.getElementById('pdf-progress-bar');

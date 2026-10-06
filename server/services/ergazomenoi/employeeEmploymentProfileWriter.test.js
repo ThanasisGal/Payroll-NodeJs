@@ -2,7 +2,8 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const mongoose = require('mongoose');
-const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentHistoryOperations,
+const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithUniqueSafeRepair,
+    writeEmployeeEmploymentHistoryOperations,
     writeEmployeeDeparture, writeEmployeeInvalidDepartureCorrection,
     repairEmployeeHistoryCanonical, repairEmployeeLegacyOpenCycles,
     deleteEmployeeAndEmploymentHistory,
@@ -23,6 +24,8 @@ const { SUPPORTED_COLLECTIONS } =
     require('./employeeHistoryReferenceDefinitionsService');
 const { OPERATION: CONTRACT_END_SEGMENT_SYNC_OPERATION } =
     require('./employeeContractEndCorrectionPlannerService');
+const { shapeALifecycleFixture, shapeBCorrectedProfileFixture } =
+    require('./fixtures/uniqueSafeEmployeeHistoryRepairFixtures');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
@@ -1840,4 +1843,208 @@ test('stale main-form revision rejects before employee or history writes', async
         } }), error => error.code === 'CONFLICT_STALE' && error.statusCode === 409);
     assert.equal(db.writes(), 0);
     assert.deepEqual(db.state(), initial);
+});
+
+function uniqueSafeRepairRequest(db, fixture, resolutionConfirmation = null, overrides = {}) {
+    const current = fixture.currentEmployee;
+    const input = Object.fromEntries(C.FACT_FIELDS.filter(field =>
+        current[field] !== undefined).map(field => [field, current[field]]));
+    return writeEmployeeEmploymentProfileWithUniqueSafeRepair({
+        ...db.dependencies,
+        scope: fixture.scope,
+        employeeId: String(current._id),
+        effectiveFrom: current.hmeromhnia_isxyos_oron_ergasias_apo ||
+            current.hmeromhnia_allaghs_orarioy_apo || current.hmeromhnia_proslhpshs,
+        input,
+        maintenance: {
+            employeeChanges: {},
+            submittedEmployeeFields: [],
+            historyChanges: {},
+            submittedHistoryChanges: {},
+            submittedProfileFields: [],
+            identity: null,
+            originalHistoryId: null,
+            correctableIdentityFields: []
+        },
+        resolutionConfirmation,
+        repairActor: { userId: 'synthetic-user', userName: 'Synthetic User' },
+        ...overrides
+    });
+}
+
+function referencedFixtureDatabase(fixture, fail = '', behavior = {}) {
+    const db = database({ employee: fixture.currentEmployee,
+        history: fixture.completeHistoryRows }, fail, false, behavior);
+    db.dependencies.referenceChecker = async ({ historyIds }) =>
+        fixture.protectedReferenceSummary[String(historyIds[0])] || [];
+    return db;
+}
+
+async function requiredResolution(db, fixture, overrides = {}) {
+    let resolution;
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, null, overrides), error => {
+        assert.equal(error.code, 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED');
+        assert.equal(error.resolutionRequired, true);
+        resolution = error.resolution;
+        return true;
+    });
+    return resolution;
+}
+
+for (const [name, factory] of [
+    ['Shape A', shapeALifecycleFixture],
+    ['Shape B', shapeBCorrectedProfileFixture]
+]) test(`${name} first Save returns a sanitized resolution and performs zero writes`, async () => {
+    const fixture = factory();
+    const initial = { employee: fixture.currentEmployee, history: fixture.completeHistoryRows };
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredResolution(db, fixture);
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), initial);
+    assert.equal(resolution.kind, 'UNIQUE_SAFE_REPAIR');
+    assert.match(resolution.fingerprint, /^[a-f0-9]{64}$/);
+    assert.equal(JSON.stringify(resolution).includes('shape-'), false);
+    assert.equal(JSON.stringify(resolution).includes('historyId'), false);
+    assert.equal(JSON.stringify(resolution).includes('_id'), false);
+});
+
+for (const [name, factory] of [
+    ['Shape A', shapeALifecycleFixture],
+    ['Shape B', shapeBCorrectedProfileFixture]
+]) test(`${name} confirmed repair and original Save commit atomically with one audit`, async () => {
+    const fixture = factory();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredResolution(db, fixture);
+    const saved = await uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+    });
+    assert.equal(saved.uniqueSafeRepairApplied, true);
+    assert.equal(saved.uniqueSafeRepairAuditWritten, true);
+    assert.equal(db.operations().auditCreates, 1);
+    assert.equal(db.operations().historyDeletes, 0);
+    assert.equal(db.operations().historyCreates, 0);
+    assert.equal(db.state().audits.length, 1);
+    assert.equal(db.state().audits[0].diagnostics.confirmationFingerprint,
+        resolution.fingerprint);
+    assert.deepEqual(db.state().audits[0].diagnostics.actor,
+        { userId: 'synthetic-user', userName: 'Synthetic User' });
+});
+
+test('confirmed repair continues and commits the original requested Maintenance change', async () => {
+    const fixture = shapeALifecycleFixture();
+    const maintenance = {
+        employeeChanges: { email: 'synthetic-updated@example.test' },
+        submittedEmployeeFields: ['email'],
+        historyChanges: {}, submittedHistoryChanges: {}, submittedProfileFields: [],
+        identity: null, originalHistoryId: null, correctableIdentityFields: []
+    };
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredResolution(db, fixture, { maintenance });
+    await uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+    }, { maintenance });
+    assert.equal(db.state().employee.email, 'synthetic-updated@example.test');
+    assert.equal(db.operations().auditCreates, 1);
+    assert.equal(db.operations().historyDeletes, 0);
+});
+
+test('Shape B confirmed repair logically retires the old row and preserves all stable IDs', async () => {
+    const fixture = shapeBCorrectedProfileFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredResolution(db, fixture);
+    await uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+    });
+    assert.deepEqual(db.state().history.map(row => String(row._id)).sort(),
+        fixture.completeHistoryRows.map(row => String(row._id)).sort());
+    const old = db.state().history.find(row => row._id === 'shape-b-older');
+    const survivor = db.state().history.find(row => row._id === 'shape-b-survivor');
+    assert.equal(old.employment_history_canonical_status, 'REDUNDANT_REFERENCED');
+    assert.equal(old.employment_history_canonical_survivor_id, survivor._id);
+    assert.equal(survivor.krathsh_01, '0109');
+    assert.equal(survivor.krathsh_03, '0023');
+    assert.equal(survivor.krathsh_05, '2694');
+    assert.equal(new Date(survivor.hmeromhnia_isxyos_oron_ergasias_eos)
+        .toISOString().slice(0, 10), '2026-06-01');
+    assert.equal(new Date(db.state().employee.hmeromhnia_isxyos_oron_ergasias_eos)
+        .toISOString().slice(0, 10), '2026-06-01');
+});
+
+test('confirmation is stale after employee, history or reference drift and performs zero writes', async () => {
+    const original = shapeALifecycleFixture();
+    const firstDb = referencedFixtureDatabase(original);
+    const resolution = await requiredResolution(firstDb, original);
+    for (const kind of ['employee', 'history', 'references']) {
+        const fixture = shapeALifecycleFixture();
+        if (kind === 'employee') fixture.currentEmployee.updatedAt = new Date('2026-10-01');
+        if (kind === 'history') fixture.completeHistoryRows[0].updatedAt = new Date('2026-10-01');
+        if (kind === 'references') fixture.protectedReferenceSummary['shape-a-profile'] = [];
+        const db = referencedFixtureDatabase(fixture);
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+            choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+        }), error => error.code === 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
+        assert.equal(db.writes(), 0, kind);
+    }
+});
+
+test('audit absence or audit write failure rolls back the entire confirmed operation', async () => {
+    for (const failureMode of ['missing', 'write']) {
+        const fixture = shapeALifecycleFixture();
+        const firstDb = referencedFixtureDatabase(fixture);
+        const resolution = await requiredResolution(firstDb, fixture);
+        const db = referencedFixtureDatabase(fixture, failureMode === 'write' ? 'audit' : '');
+        if (failureMode === 'missing') db.dependencies.auditCollectionChecker = async () => false;
+        const before = structuredClone(db.state());
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+            choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+        }), error => failureMode === 'missing'
+            ? error.code === 'EMPLOYEE_HISTORY_AUDIT_COLLECTION_MISSING'
+            : error.message === 'audit failed');
+        assert.deepEqual(db.state(), before);
+    }
+});
+
+test('final verification failure rolls back repair, audit and original Save', async () => {
+    const fixture = shapeALifecycleFixture();
+    const firstDb = referencedFixtureDatabase(fixture);
+    const resolution = await requiredResolution(firstDb, fixture);
+    const db = referencedFixtureDatabase(fixture, '', { pretendUpdateSuccess: true });
+    const before = structuredClone(db.state());
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+    }), error => error.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+    assert.deepEqual(db.state(), before);
+});
+
+test('a legitimate original Save conflict after repair rolls the repair back', async () => {
+    const fixture = shapeALifecycleFixture();
+    const firstDb = referencedFixtureDatabase(fixture);
+    const resolution = await requiredResolution(firstDb, fixture, {
+        input: arrangement, effectiveFrom: '2026-10-01',
+        maintenance: { employeeChanges: {}, historyChanges: {},
+            submittedHistoryChanges: {}, submittedProfileFields: Object.keys(arrangement) }
+    });
+    const db = referencedFixtureDatabase(fixture);
+    const before = structuredClone(db.state());
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+    }, {
+        input: arrangement, effectiveFrom: '2026-10-01',
+        maintenance: { employeeChanges: {}, historyChanges: {},
+            submittedHistoryChanges: {}, submittedProfileFields: Object.keys(arrangement) }
+    }), error => error.code === 'EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP');
+    assert.deepEqual(db.state(), before);
+});
+
+test('repeating a successfully repaired Save uses ordinary clean behavior with no second repair audit', async () => {
+    const fixture = shapeALifecycleFixture();
+    const db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredResolution(db, fixture);
+    await uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+    });
+    const audits = db.operations().auditCreates;
+    const repeated = await uniqueSafeRepairRequest(db, fixture);
+    assert.notEqual(repeated.uniqueSafeRepairApplied, true);
+    assert.equal(db.operations().auditCreates, audits);
 });

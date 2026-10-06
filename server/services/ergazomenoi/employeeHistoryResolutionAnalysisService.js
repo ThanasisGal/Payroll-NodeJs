@@ -17,6 +17,12 @@ const REFERENCE_CLASSES = Object.freeze({
     LIVE_REFERENCE: 'LIVE_REFERENCE',
     UNKNOWN_REFERENCE: 'UNKNOWN_REFERENCE'
 });
+const UNIQUE_SAFE_REPAIR_CONTRACT_VERSION = 1;
+const UNIQUE_SAFE_REPAIR_KIND = 'UNIQUE_SAFE_REPAIR';
+const UNIQUE_SAFE_REPAIR_ACTION = 'APPLY_UNIQUE_SAFE_PLAN';
+const UNIQUE_SAFE_REPAIR_TITLE = 'Βρέθηκε ασυνέπεια στο ιστορικό';
+const UNIQUE_SAFE_REPAIR_EXPLANATION =
+    'Η ασυνέπεια μπορεί να τακτοποιηθεί με ασφάλεια χωρίς να αλλάξει η πραγματική εργασιακή σχέση.';
 
 function stableValue(value) {
     if (Array.isArray(value)) return value.map(stableValue);
@@ -44,7 +50,8 @@ function buildFingerprint(payload) {
 function buildEmployeeHistoryResolutionAnalysis({ resolutionClass, reason,
     candidateBusinessPlans = [], missingBusinessFacts = [],
     referenceClass = REFERENCE_CLASSES.UNKNOWN_REFERENCE,
-    hypotheticalCanonicalResult = null, sourceStateFingerprint = null } = {}) {
+    hypotheticalCanonicalResult = null, sourceStateFingerprint = null,
+    resolutionKind = null, title = null, explanation = null, action = null } = {}) {
     if (!Object.values(RESOLUTION_CLASSES).includes(resolutionClass)) {
         throw new TypeError('Unknown employee-history resolution class');
     }
@@ -66,12 +73,105 @@ function buildEmployeeHistoryResolutionAnalysis({ resolutionClass, reason,
         candidateBusinessPlans: stableValue(candidateBusinessPlans),
         missingBusinessFacts: stableValue(missingBusinessFacts),
         referenceClass,
+        ...(resolutionKind ? { resolutionKind: String(resolutionKind) } : {}),
+        ...(title ? { title: String(title) } : {}),
+        ...(explanation ? { explanation: String(explanation) } : {}),
+        ...(action ? { action: String(action) } : {}),
         sourceStateFingerprint: sourceStateFingerprint == null
             ? null : String(sourceStateFingerprint),
         hypotheticalCanonicalResult: hypotheticalCanonicalResult
             ? stableValue(hypotheticalCanonicalResult) : null
     };
     return Object.freeze({ ...payload, fingerprint: buildFingerprint(payload) });
+}
+
+function buildUniqueSafeRepairStateFingerprint({ scope, currentEmployee,
+    completeHistoryRows = [], protectedReferenceSummary = {}, repairPlan,
+    normalizedSaveRequest = {} } = {}) {
+    if (repairPlan?.status !== 'APPLICABLE' || repairPlan?.operation !==
+        'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR') {
+        throw new TypeError('Applicable unique-safe repair plan required');
+    }
+    return buildFingerprint({
+        contract: 'employee-history-unique-safe-repair-confirmation:v1',
+        scope,
+        employee: currentEmployee,
+        completeHistory: completeHistoryRows,
+        referenceState: protectedReferenceSummary,
+        exactRepairPlan: repairPlan,
+        normalizedSaveRequest
+    });
+}
+
+function buildUniqueSafeRepairResolutionAnalysis({ repairPlan,
+    sourceStateFingerprint } = {}) {
+    if (repairPlan?.status !== 'APPLICABLE' || !sourceStateFingerprint) return null;
+    if (![REFERENCE_CLASSES.NO_REFERENCES, REFERENCE_CLASSES.PROVENANCE_ONLY]
+        .includes(repairPlan.referenceClass) || repairPlan.physicalDeleteIds?.length ||
+        repairPlan.insertedRows?.length ||
+        repairPlan.hypotheticalCanonicalResult?.status !== CANONICAL_STATUSES.CLEAN) return null;
+    return buildEmployeeHistoryResolutionAnalysis({
+        resolutionClass: RESOLUTION_CLASSES.UNIQUE_SAFE_PLAN,
+        resolutionKind: 'SAFE_HISTORY_REPAIR',
+        reason: repairPlan.reason,
+        title: UNIQUE_SAFE_REPAIR_TITLE,
+        explanation: UNIQUE_SAFE_REPAIR_EXPLANATION,
+        action: UNIQUE_SAFE_REPAIR_ACTION,
+        candidateBusinessPlans: [{
+            id: UNIQUE_SAFE_REPAIR_ACTION,
+            businessMeaning: 'PRESERVE_REAL_EMPLOYMENT_RELATIONSHIP',
+            mutationKind: 'SAFE_HISTORY_REPAIR'
+        }],
+        missingBusinessFacts: [],
+        referenceClass: repairPlan.referenceClass,
+        sourceStateFingerprint,
+        hypotheticalCanonicalResult: {
+            status: CANONICAL_STATUSES.CLEAN,
+            reason: 'CANONICAL_CLEAN',
+            blocksOrdinaryMaintenance: false
+        }
+    });
+}
+
+function buildUniqueSafeRepairPublicResolution({ analysis, fingerprint } = {}) {
+    if (analysis?.resolutionClass !== RESOLUTION_CLASSES.UNIQUE_SAFE_PLAN ||
+        analysis?.action !== UNIQUE_SAFE_REPAIR_ACTION ||
+        !/^[a-f0-9]{64}$/.test(String(fingerprint || ''))) {
+        throw new TypeError('Valid unique-safe resolution analysis and fingerprint required');
+    }
+    return Object.freeze({
+        version: UNIQUE_SAFE_REPAIR_CONTRACT_VERSION,
+        kind: UNIQUE_SAFE_REPAIR_KIND,
+        title: UNIQUE_SAFE_REPAIR_TITLE,
+        explanation: UNIQUE_SAFE_REPAIR_EXPLANATION,
+        options: Object.freeze([Object.freeze({
+            id: UNIQUE_SAFE_REPAIR_ACTION,
+            label: 'Τακτοποίηση ιστορικού',
+            description: 'Η εφαρμογή θα διορθώσει μόνο τις αποδεδειγμένα ασυνεπείς ιστορικές εγγραφές.'
+        })]),
+        fingerprint: String(fingerprint)
+    });
+}
+
+function resolutionRequestError(code = 'EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST') {
+    const error = new Error(code);
+    error.code = code;
+    error.statusCode = 400;
+    return error;
+}
+
+function normalizeUniqueSafeRepairConfirmation(value) {
+    if (value == null) return null;
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        Object.getPrototypeOf(value) !== Object.prototype) throw resolutionRequestError();
+    const keys = Object.keys(value).sort();
+    if (keys.length !== 2 || keys[0] !== 'choiceId' || keys[1] !== 'fingerprint' ||
+        value.choiceId !== UNIQUE_SAFE_REPAIR_ACTION ||
+        !/^[a-f0-9]{64}$/.test(String(value.fingerprint || ''))) {
+        throw resolutionRequestError();
+    }
+    return Object.freeze({ choiceId: UNIQUE_SAFE_REPAIR_ACTION,
+        fingerprint: String(value.fingerprint) });
 }
 
 function canonicalSourceStateFingerprint(canonicalResult = {}) {
@@ -124,7 +224,16 @@ module.exports = {
     RESOLUTION_ANALYSIS_VERSION,
     RESOLUTION_CLASSES,
     REFERENCE_CLASSES,
+    UNIQUE_SAFE_REPAIR_CONTRACT_VERSION,
+    UNIQUE_SAFE_REPAIR_KIND,
+    UNIQUE_SAFE_REPAIR_ACTION,
+    UNIQUE_SAFE_REPAIR_TITLE,
+    UNIQUE_SAFE_REPAIR_EXPLANATION,
     canonicalSourceStateFingerprint,
     buildEmployeeHistoryResolutionAnalysis,
-    analyzeCanonicalLegacyAliasResolution
+    analyzeCanonicalLegacyAliasResolution,
+    buildUniqueSafeRepairStateFingerprint,
+    buildUniqueSafeRepairResolutionAnalysis,
+    buildUniqueSafeRepairPublicResolution,
+    normalizeUniqueSafeRepairConfirmation
 };

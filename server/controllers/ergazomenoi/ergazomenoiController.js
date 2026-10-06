@@ -1,12 +1,16 @@
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire, writeEmployeeEmploymentHistoryOperations,
+const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithUniqueSafeRepair,
+    writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire,
+    writeEmployeeEmploymentHistoryOperations,
     writeEmployeeDepartureDateCorrection,
     deleteEmployeeAndEmploymentHistory, selectMaintenanceMode } =
     require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { buildEmployeeMaintenanceIdentity } =
     require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
+const { normalizeUniqueSafeRepairConfirmation } =
+    require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
 const {
@@ -3388,6 +3392,13 @@ class ergazomenoiController {
         const ergazomenoiId = req.params.ergazomenoiId;
         const { formData = {}, filesToUpdate, rehireIntent = false, rehireDate = null } =
             req.body || {};
+        let resolutionConfirmation;
+        try {
+            resolutionConfirmation = normalizeUniqueSafeRepairConfirmation(
+                req.body?.resolution);
+        } catch (error) {
+            return profileError(res, error);
+        }
         const aforaDaneismoErgazomenoy = formData.afora_daneismo_ergazomenoy === true;
 
         const omadaErgasias = req.session?.userTeam;
@@ -3886,6 +3897,20 @@ class ergazomenoiController {
                 error.statusCode = 409;
                 throw error;
             }
+            const isDepartureCancellation = storedDeparture &&
+                Object.hasOwn(formData, 'hmeromhnia_apoxorhshs') &&
+                (formData.hmeromhnia_apoxorhshs === '' ||
+                    formData.hmeromhnia_apoxorhshs === null);
+            const isDepartureCorrection = storedDeparture && submittedDeparture &&
+                storedDeparture !== submittedDeparture;
+            const isFirstDeparture = submittedDeparture && !storedDeparture;
+            if (resolutionConfirmation && (rehireIntent === true || isDepartureCancellation ||
+                isDepartureCorrection || isFirstDeparture)) {
+                const error = new Error('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
+                error.code = 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE';
+                error.statusCode = 409;
+                throw error;
+            }
             const result = rehireIntent === true
                 ? await writeEmployeeRehire({
                     scope: {
@@ -3902,8 +3927,7 @@ class ergazomenoiController {
                         afora_proslhpsh: true
                     }
                 })
-                : storedDeparture && Object.hasOwn(formData, 'hmeromhnia_apoxorhshs') &&
-                    (formData.hmeromhnia_apoxorhshs === '' || formData.hmeromhnia_apoxorhshs === null)
+                : isDepartureCancellation
                     ? await writeEmployeeDepartureCancellation({
                         scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
                             kodikos: kodikosErgazomenoy }, employeeId: ergazomenoiId,
@@ -3916,7 +3940,7 @@ class ergazomenoiController {
                         expectedRevision: formData.historyExpectedRevision || null,
                         expectedStoredDeparture: storedDeparture
                     })
-                : storedDeparture && submittedDeparture && storedDeparture !== submittedDeparture
+                : isDepartureCorrection
                     ? await writeEmployeeDepartureDateCorrection({
                         scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
                             kodikos: kodikosErgazomenoy },
@@ -3933,7 +3957,7 @@ class ergazomenoiController {
                                 updateFieldsIstoriko, formData),
                             submittedFormValues: formData }
                     })
-                : submittedDeparture && !storedDeparture
+                : isFirstDeparture
                     ? await writeEmployeeDeparture({
                         scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
                             kodikos: kodikosErgazomenoy },
@@ -3953,7 +3977,7 @@ class ergazomenoiController {
                             originalHistoryId: formData.istorikoId || null,
                             correctableIdentityFields: formData.istorikoId ? ['hmeromhnia_apoxorhshs'] : [] }
                     })
-                    : await writeEmployeeEmploymentProfile({
+                    : await writeEmployeeEmploymentProfileWithUniqueSafeRepair({
                     scope: {
                         team: omadaErgasias,
                         company_kod: kodikosEtaireias,
@@ -3980,6 +4004,11 @@ class ergazomenoiController {
                         correctableIdentityFields: formData.istorikoId
                             ? ['hmeromhnia_apoxorhshs']
                             : []
+                    },
+                    resolutionConfirmation,
+                    repairActor: {
+                        userId: req.session?.userId,
+                        userName: req.session?.userName || req.session?.username
                     }
                 });
             updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);

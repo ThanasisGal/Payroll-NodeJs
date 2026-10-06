@@ -7,8 +7,14 @@ const { buildLegacyEmploymentTypeAliasFalsePositiveFixtures } =
     require('./fixtures/legacyEmploymentTypeAliasFalsePositiveFixtures');
 const { RESOLUTION_ANALYSIS_VERSION, RESOLUTION_CLASSES, REFERENCE_CLASSES,
     buildEmployeeHistoryResolutionAnalysis, analyzeCanonicalLegacyAliasResolution,
-    canonicalSourceStateFingerprint } =
+    canonicalSourceStateFingerprint, buildUniqueSafeRepairStateFingerprint,
+    buildUniqueSafeRepairResolutionAnalysis, buildUniqueSafeRepairPublicResolution,
+    normalizeUniqueSafeRepairConfirmation } =
     require('./employeeHistoryResolutionAnalysisService');
+const { planEmployeeHistoryUniqueSafeRepair } =
+    require('./employeeHistoryUniqueSafeRepairPlannerService');
+const { shapeALifecycleFixture } =
+    require('./fixtures/uniqueSafeEmployeeHistoryRepairFixtures');
 
 test('pure resolution analysis represents every future class with a deterministic versioned fingerprint', () => {
     for (const resolutionClass of Object.values(RESOLUTION_CLASSES)) {
@@ -73,4 +79,70 @@ test('automatic alias resolution fails closed for every non-empty reference clas
         REFERENCE_CLASSES.LIVE_REFERENCE, REFERENCE_CLASSES.UNKNOWN_REFERENCE]) {
         assert.equal(analyzeCanonicalLegacyAliasResolution({ canonicalResult, referenceClass }), null);
     }
+});
+
+test('unique-safe analysis and public contract are deterministic and contain no row identity', () => {
+    const fixture = shapeALifecycleFixture();
+    const repairPlan = planEmployeeHistoryUniqueSafeRepair(fixture);
+    const request = { effectiveFrom: '2026-05-25', input: { krathsh_01: '0115' } };
+    const fingerprint = buildUniqueSafeRepairStateFingerprint({
+        scope: fixture.scope, currentEmployee: fixture.currentEmployee,
+        completeHistoryRows: fixture.completeHistoryRows,
+        protectedReferenceSummary: fixture.protectedReferenceSummary,
+        repairPlan, normalizedSaveRequest: request
+    });
+    const repeat = buildUniqueSafeRepairStateFingerprint({
+        scope: fixture.scope, currentEmployee: fixture.currentEmployee,
+        completeHistoryRows: fixture.completeHistoryRows,
+        protectedReferenceSummary: fixture.protectedReferenceSummary,
+        repairPlan, normalizedSaveRequest: request
+    });
+    assert.equal(fingerprint, repeat);
+    const analysis = buildUniqueSafeRepairResolutionAnalysis({ repairPlan,
+        sourceStateFingerprint: fingerprint });
+    assert.equal(analysis.resolutionClass, RESOLUTION_CLASSES.UNIQUE_SAFE_PLAN);
+    assert.equal(analysis.action, 'APPLY_UNIQUE_SAFE_PLAN');
+    const resolution = buildUniqueSafeRepairPublicResolution({ analysis, fingerprint });
+    assert.deepEqual(Object.keys(resolution).sort(),
+        ['explanation', 'fingerprint', 'kind', 'options', 'title', 'version']);
+    assert.equal(JSON.stringify(resolution).includes('shape-a-'), false);
+    assert.equal(JSON.stringify(resolution).includes('historyId'), false);
+    assert.equal(JSON.stringify(resolution).includes('_id'), false);
+});
+
+test('confirmation fingerprint changes for employee, history, references, plan or save request drift', () => {
+    const fixture = shapeALifecycleFixture();
+    const repairPlan = planEmployeeHistoryUniqueSafeRepair(fixture);
+    const base = { scope: fixture.scope, currentEmployee: fixture.currentEmployee,
+        completeHistoryRows: fixture.completeHistoryRows,
+        protectedReferenceSummary: fixture.protectedReferenceSummary,
+        repairPlan, normalizedSaveRequest: { effectiveFrom: '2026-05-25' } };
+    const original = buildUniqueSafeRepairStateFingerprint(base);
+    const variants = [
+        { ...base, currentEmployee: { ...base.currentEmployee, updatedAt: 'changed' } },
+        { ...base, completeHistoryRows: base.completeHistoryRows.map((row, index) =>
+            index ? row : { ...row, updatedAt: 'changed' }) },
+        { ...base, protectedReferenceSummary: { ...base.protectedReferenceSummary,
+            'shape-a-profile': [] } },
+        { ...base, repairPlan: { ...base.repairPlan, planFingerprint: 'changed' } },
+        { ...base, normalizedSaveRequest: { effectiveFrom: '2026-05-26' } }
+    ];
+    for (const variant of variants) {
+        assert.notEqual(buildUniqueSafeRepairStateFingerprint(variant), original);
+    }
+});
+
+test('confirmation input accepts only the exact choice and sha256 fingerprint', () => {
+    const fingerprint = 'a'.repeat(64);
+    assert.deepEqual(normalizeUniqueSafeRepairConfirmation({
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint
+    }), { choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint });
+    for (const invalid of [
+        {},
+        { choiceId: 'DELETE_ROW', fingerprint },
+        { choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: 'bad' },
+        { choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint, historyId: 'forged' },
+        ['APPLY_UNIQUE_SAFE_PLAN', fingerprint]
+    ]) assert.throws(() => normalizeUniqueSafeRepairConfirmation(invalid),
+        error => error.code === 'EMPLOYEE_HISTORY_RESOLUTION_INVALID_REQUEST');
 });

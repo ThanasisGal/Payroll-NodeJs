@@ -7,6 +7,8 @@ const vm = require('node:vm');
 const ejs = require('ejs');
 const Terms = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const Maintenance = require('../../utils/ergazomenoi/employmentProfileMaintenance');
+const { buildEmployeeMaintenanceIdentity } =
+    require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 
 const controllerSource = fs.readFileSync(__dirname + '/ergazomenoiController.js', 'utf8').replaceAll('\r', '');
 const viewSource = fs.readFileSync(
@@ -40,6 +42,7 @@ function historyHandler({ authorized, writerCalls }) {
         console: { error() {} },
         ...Terms,
         ...Maintenance,
+        buildEmployeeMaintenanceIdentity,
         ErgazomenoiModel: { findOne: () => query },
         canManageEmployeeHistory: async (userId) => {
             assert.equal(userId, 'authenticated-user-id');

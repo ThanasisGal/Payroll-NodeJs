@@ -181,11 +181,14 @@ function handler(mode, db) {
                 history: db.state().history[0], afm: '123456789' }
             : { action: 'CREATE_NEW', afm: '' }),
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
+        writeEmployeeEmploymentProfileWithUniqueSafeRepair: args =>
+            W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps }),
         writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }),
         writeEmployeeDepartureDateCorrection: args =>
             W.writeEmployeeDepartureDateCorrection({ ...args, ...db.deps }),
         writeEmployeeDepartureCancellation: args => W.writeEmployeeDepartureCancellation({ ...args, ...db.deps }),
         ...require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService'),
+        ...require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService'),
         buildEmployeeMaintenanceIdentity,
         dateKeyUtc: require('../../utils/date/mondaySundayWeek').dateKeyUtc
     });
