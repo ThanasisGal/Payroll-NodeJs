@@ -10,6 +10,7 @@ const mongoose = require('mongoose');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const H = require('../../utils/ergazomenoi/employmentProfileHistory');
 const W = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const EditorState = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const M = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const Models = require('../../models/ergazomenoi');
 const Terms = require('../../utils/ergazomenoi/getOrarioTermsForDate');
@@ -815,7 +816,7 @@ function historyHandler(db) {
     const start = source.indexOf('static updateIstorikoData = '), end = source.indexOf('    static searchPostErgazomenoi', start);
     const method = source.slice(start, end).trim().replace('static updateIstorikoData = ', '').replace(/;$/, '');
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
-    return vm.runInNewContext(`${helpers}\n(${method})`, { Date, console: { error() {} }, ...Terms, ...M,
+    return vm.runInNewContext(`${helpers}\n(${method})`, { Date, console: { error() {} }, ...Terms, ...M, ...EditorState,
         buildEmployeeMaintenanceIdentity,
         ErgazomenoiModel: db.employeeModel,
         canManageEmployeeHistory: async () => true,
@@ -823,7 +824,11 @@ function historyHandler(db) {
 }
 async function editHistory(db, updates) {
     const req = { session: { userId: 'authorized-user', userTeam: scope.team, companyInUse: scope.company_kod },
-        body: { employeeId: db.state().employee._id, updates } };
+        body: { employeeId: db.state().employee._id, updates,
+            expectedStateToken: EditorState.buildEmployeeHistoryEditorStateToken({
+                currentEmployee: db.state().employee, historyRows: db.state().history.filter(row =>
+                    ['team', 'company_kod', 'kodikos'].every(field =>
+                        String(row[field]) === String(db.state().employee[field]))) }) } };
     const res = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
     await historyHandler(db)(req, res); return res;
 }

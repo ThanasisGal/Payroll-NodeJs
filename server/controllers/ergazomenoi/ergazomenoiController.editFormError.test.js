@@ -4,6 +4,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const EditorState = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
+const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const {
     selectMaintenanceMode
 } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
@@ -46,6 +48,7 @@ function editHandler(historyRows) {
         hmeromhnia_apoxorhshs: new Date('2026-04-24')
     };
     const query = (value) => ({
+        mongooseOptions() { return this; },
         sort() { return this; },
         lean() { return this; },
         exec: async () => value,
@@ -53,6 +56,8 @@ function editHandler(historyRows) {
     });
     const context = {
         Date,
+        ...EditorState,
+        semanticHistoryRows,
         console: { error() {} },
         CompaniesModel: { findById: () => query({ _id: employee.company_kod }) },
         ErgazomenoiModel: { findById: () => query(employee) },

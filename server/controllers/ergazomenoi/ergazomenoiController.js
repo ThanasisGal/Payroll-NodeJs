@@ -18,6 +18,9 @@ const {
     validateEmployeeScheduleDailyRest
 } = require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService');
 const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
+const { buildEmployeeHistoryEditorStateToken, isEmployeeHistoryEditorStateToken,
+    employeeHistoryEditorStaleError } = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
+const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { generatePersistedEmployeeContract } = require('../../services/ergazomenoi/persistedEmployeeContractService');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -820,14 +823,19 @@ class ergazomenoiController {
             // const ergazomenoiKod = req.params.kod;
             const ergazomenoiKod = ergazomenoiData.kodikos;
 
-            const rawIstorikoData = await IstorikoProslhpseonAllagonModel.find({
+            const persistedIstorikoData = await IstorikoProslhpseonAllagonModel.find({
                 team: userTeam,
                 company_kod: companyId,
                 kodikos: ergazomenoiKod
             })
+                .mongooseOptions({ includeRedundantHistoryArtifacts: true })
                 .sort({ aa_eggrafhs: 1 })
                 .lean();
 
+            const employeeHistoryStateToken = buildEmployeeHistoryEditorStateToken({
+                currentEmployee: ergazomenoiData, historyRows: persistedIstorikoData
+            });
+            const rawIstorikoData = semanticHistoryRows(persistedIstorikoData);
             const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
             const originalEmploymentHistoryId = selectMaintenanceMode(
                 rawIstorikoData,
@@ -886,6 +894,7 @@ class ergazomenoiController {
                 istorikoData,
                 originalEmploymentHistoryId,
                 originalEmploymentHistoryRevision,
+                employeeHistoryStateToken,
                 orariaData,
                 ergazomenoiData: {
                     ...ergazomenoiData,
@@ -949,7 +958,7 @@ class ergazomenoiController {
         const companyId = req.session.companyInUse;
 
         try {
-            const { employeeId, updates = [] } = req.body;
+            const { employeeId, expectedStateToken, updates = [] } = req.body;
 
             if (!employeeId) {
                 return res.status(400).json({
@@ -967,6 +976,10 @@ class ergazomenoiController {
                     success: false,
                     message: 'Δεν έχετε δικαίωμα διαχείρισης ιστορικού.'
                 });
+            }
+
+            if (!isEmployeeHistoryEditorStateToken(expectedStateToken)) {
+                throw employeeHistoryEditorStaleError();
             }
 
             const ergazomenos = await ErgazomenoiModel.findOne({
@@ -1034,7 +1047,7 @@ class ergazomenoiController {
             });
             await writeEmployeeEmploymentHistoryOperations({
                 scope: { team: userTeam, company_kod: companyId, kodikos: String(kodikos) },
-                employeeId: String(ergazomenos._id), operations
+                employeeId: String(ergazomenos._id), operations, expectedStateToken
             });
 
             return res.status(200).json({

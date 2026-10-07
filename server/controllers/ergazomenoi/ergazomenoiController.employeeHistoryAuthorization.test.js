@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ejs = require('ejs');
+const EditorState = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const Terms = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const Maintenance = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { buildEmployeeMaintenanceIdentity } =
@@ -40,6 +41,7 @@ function historyHandler({ authorized, writerCalls }) {
     return vm.runInNewContext(`${helpers}\n(${method})`, {
         Date,
         console: { error() {} },
+        ...EditorState,
         ...Terms,
         ...Maintenance,
         buildEmployeeMaintenanceIdentity,
@@ -64,6 +66,7 @@ async function submit(authorized, updates) {
         },
         body: {
             employeeId: 'employee-id',
+            expectedStateToken: 'a'.repeat(64),
             updates,
             privileges: 'A',
             team: 'THA',

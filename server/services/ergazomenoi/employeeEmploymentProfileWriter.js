@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const { assertEmployeeHistoryEditorState } = require('./employeeHistoryEditorStateService');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const EmployeeHistoryRepairAuditModel = require('../../models/employeeHistoryRepairAudit');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
@@ -1056,13 +1057,15 @@ async function inProfileTransaction(connection, capabilityProbe, work, activeSes
 // The existing editor batches modifications, append insertions and exact deletions.
 // Deletions never reopen/extend neighbors or restore current from another period:
 // neither action exists in the baseline editor.
-async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, operations,
-    connection = mongoose.connection, employeeModel = ErgazomenoiModel,
-    historyModel = IstorikoProslhpseonAllagonModel,
-    auditModel = EmployeeHistoryRepairAuditModel,
-    auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
-    referenceChecker = findHistoryIdReferences,
-    capabilityProbe = transactionCapability }) {
+async function writeEmployeeEmploymentHistoryOperations(options) {
+    const hasExpectedStateToken = Object.hasOwn(options, 'expectedStateToken');
+    const { scope, employeeId, operations, expectedStateToken,
+        connection = mongoose.connection, employeeModel = ErgazomenoiModel,
+        historyModel = IstorikoProslhpseonAllagonModel,
+        auditModel = EmployeeHistoryRepairAuditModel,
+        auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
+        referenceChecker = findHistoryIdReferences,
+        capabilityProbe = transactionCapability } = options;
     if (!scope || !['team', 'company_kod', 'kodikos'].every(key => typeof scope[key] === 'string' && scope[key].trim())) C.invalid('scope', 'complete scope required');
     if (typeof employeeId !== 'string' || !employeeId || !Array.isArray(operations) ||
         operations.some(op => !['modified', 'inserted', 'deleted'].includes(op.state) ||
@@ -1075,6 +1078,12 @@ async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, ope
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         const originalRows = await completeHistoryLean(historyModel, filter, session);
+        // The browser expectation is checked on fresh fenced reads, including retries.
+        // Trusted non-editor callers can omit the option; the HTTP boundary requires it.
+        if (hasExpectedStateToken) {
+            assertEmployeeHistoryEditorState({ expectedStateToken,
+                currentEmployee: current, historyRows: originalRows });
+        }
         assertOpenCycleHireGuard({ currentEmployee: current,
             historyRows: originalRows, operations });
         for (const op of operations.filter(op => op.state === 'modified')) {
