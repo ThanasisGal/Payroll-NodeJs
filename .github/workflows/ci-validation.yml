@@ -777,6 +777,17 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/controllers/ergazomenoi/ergazomenoiController.historyCorrection.test.js"
+            "server/services/ergazomenoi/employeeHistoryCorrectionPolicyService.test.js"
+            "public/js/ergazomenoi/genika/employeeHistorySafeCorrection.test.js"
+            "public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.test.js"
+            "server/services/ergazomenoi/employeeHistoryResolutionAnalysisService.test.js"
+            "server/services/ergazomenoi/employeeHistoryUserConfirmedCorrectionPlannerService.test.js"
+            "server/services/ergazomenoi/employeeHistoryCanonicalizationService.test.js"
+            "server/services/ergazomenoi/employeeHistoryReferenceAuditService.test.js"
+            "server/services/ergazomenoi/employeeHistoryReferenceSemanticsService.test.js"
+            "server/services/ergazomenoi/employeeEmploymentCycleResolverService.test.js"
+            "public/css/main.employmentReviewSwal.contract.test.js"
             "server/services/ergazomenoi/employeeEmploymentProfileWriter.supervisorAuthorization.test.js"
             "server/controllers/ergazomenoi/ergazomenoiController.supervisorHistoryAuthorization.test.js"
             "public/js/ergazomenoi/genika/istorikoTable.supervisorAuthorization.test.js"

@@ -39,9 +39,10 @@ test('currently problematic modification passes authorization and existing write
 });
 
 test('problematic Delete passes authorization and remains subject to existing reference safety', async () => {
-    const db = store([problemFixture()]), before = db.state(); let references = 0;
-    await assert.rejects(save(db, [{ state: 'deleted', historyId: problemId }], {
-        referenceChecker: async () => { references++; return [{ historyId: problemId, modelName: 'SyntheticReference' }]; }
+    const initial = fixture(); initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos = null;
+    const db = store([initial]), before = db.state(); let references = 0;
+    await assert.rejects(save(db, [{ state: 'deleted', historyId: cleanId }], {
+        referenceChecker: async () => { references++; return [{ historyId: cleanId, modelName: 'SyntheticReference' }]; }
     }), error => { assert.notEqual(error.code, 'EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN');
         assert.match(error.code, /REFERENCE/); return true; });
     assert.ok(references > 0); assert.deepEqual(db.state(), before);
@@ -122,7 +123,10 @@ test('mixed all-authorized modify/delete/insert batch proceeds to existing busin
     const initial = problemFixture(); initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos = null;
     const db = store([initial]);
     assert.deepEqual(problemScope(db).problematicHistoryIds, [problemId, cleanId]);
-    assert.equal((await save(db, [modify(), { state: 'deleted', historyId: cleanId }, insert()])).success, true);
+    const explicit = modify();
+    explicit.maintenance.historyChanges.hmeromhnia_isxyos_oron_ergasias_eos = '2026-01-31';
+    explicit.maintenance.submittedFields.push('hmeromhnia_isxyos_oron_ergasias_eos');
+    assert.equal((await save(db, [explicit, { state: 'deleted', historyId: cleanId }, insert()])).success, true);
 });
 
 test('one unauthorized operation rejects the entire mixed batch before any writes', async () => {

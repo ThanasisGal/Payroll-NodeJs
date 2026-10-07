@@ -714,7 +714,43 @@ document.addEventListener('DOMContentLoaded', () => {
         bootstrap.Modal.getOrCreateInstance(detailsModalEl).show();
     }
 
-    table.addEventListener('click', (event) => {
+    async function openHistoryCorrection(row) {
+        if (collectUpdates().length) {
+            await Swal.fire({ titleText: 'Υπάρχουν αλλαγές που δεν έχουν αποθηκευτεί',
+                text: 'Η διόρθωση πρέπει να γίνει χωριστά. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Αποθηκεύστε ή ακυρώστε τις αλλαγές στον πίνακα. 2. Ανοίξτε ξανά τη διόρθωση.', icon: 'warning' });
+            return;
+        }
+        const payload = { employeeId: employeeIdInput?.value || '', expectedStateToken, updates: [],
+            correction: { intent: 'REVIEW', targetHistoryId: row.dataset.id, facts: {}, confirmation: null } };
+        const request = body => fetch('/ergazomenoi/ergazomenoi/istoriko/update', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'CSRF-Token': getCsrfToken(), 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify(body) });
+        try {
+            const response = await request(payload);
+            const correction = await window.employeeHistoryGuidedResolution.handleInitialResponse({
+                response, originalPayload: payload, retryRequest: request,
+                swal: Swal, documentRef: document, windowRef: window });
+            if (correction.cancelled) return;
+            const finalResponse = correction.handled ? correction.response : response;
+            const result = await finalResponse.json();
+            if (!finalResponse.ok || result.success === false) {
+                await Swal.fire({ titleText: 'Η διόρθωση σταμάτησε', text: result.message ||
+                    'Η εφαρμογή δεν μπορεί να κάνει τη διόρθωση με ασφάλεια. Δεν έχει γίνει καμία αλλαγή. 1. Κλείστε το παράθυρο. 2. Ανοίξτε ξανά τον εργαζόμενο. 3. Ελέγξτε τα στοιχεία με διαχειριστή.',
+                    icon: 'warning', confirmButtonText: 'Κλείσιμο' });
+                return;
+            }
+            await Swal.fire({ titleText: 'Η διόρθωση αποθηκεύτηκε',
+                text: 'Αποθηκεύτηκαν οι αλλαγές που επιβεβαιώσατε.', icon: 'success', confirmButtonText: 'Κλείσιμο' });
+            window.location.reload();
+        } catch (_) {
+            await Swal.fire({ titleText: 'Η διόρθωση δεν ολοκληρώθηκε',
+                text: 'Η εφαρμογή δεν μπόρεσε να επιβεβαιώσει την αποθήκευση. 1. Κλείστε το παράθυρο. 2. Ανοίξτε ξανά τον εργαζόμενο και ελέγξτε αν αποθηκεύτηκε η αλλαγή. 3. Ζητήστε βοήθεια αν το πρόβλημα παραμένει.',
+                icon: 'warning', confirmButtonText: 'Κλείσιμο' });
+        }
+    }
+
+    table.addEventListener('click', async (event) => {
         const button = event.target.closest('[data-action]');
 
         if (!button) {
@@ -736,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Boolean(row.dataset.id);
         const actionAllowed = isHistoryAdmin || (rowCanManage &&
             (action !== 'add' || supervisorCanAdd));
-        if (['add', 'edit', 'delete', 'undo'].includes(action) && !actionAllowed) {
+        if (['add', 'edit', 'delete', 'undo', 'review'].includes(action) && !actionAllowed) {
             event.preventDefault();
             return;
         }
@@ -760,6 +796,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (action === 'review') { await openHistoryCorrection(row); return; }
+
         if (action === 'delete') {
             if (row.dataset.state === 'inserted') {
                 row.remove();
@@ -767,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            setRowState(row, 'deleted');
+            await openHistoryCorrection(row);
             return;
         }
 

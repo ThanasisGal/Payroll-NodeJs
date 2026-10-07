@@ -16639,3 +16639,11 @@ body.loader-active > *:not(.app-loader) {
         transform: rotate(90deg);
     }
 }
+
+/* Employee History correction actions: scoped to this correction flow. */
+.employee-history-correction-action { border: 1px solid transparent; border-radius: .375rem; padding: .4rem .65rem; }
+.employee-history-correction-confirm { background-color: #fff3cd; color: #664d03; border-color: #ffe69c; }
+.employee-history-correction-confirm:not(:disabled):hover { background-color: #ffc107; color: #212529; border-color: #ffc107; }
+.employee-history-correction-cancel { background-color: #e9ecef; color: #41464b; border-color: #ced4da; }
+.employee-history-correction-cancel:not(:disabled):hover { background-color: #6c757d; color: #fff; border-color: #6c757d; }
+.employee-history-correction-action:disabled { opacity: .55; cursor: not-allowed; }

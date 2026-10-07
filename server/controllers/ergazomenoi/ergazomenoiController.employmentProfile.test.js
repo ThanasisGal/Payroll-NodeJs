@@ -172,7 +172,8 @@ function memory(initial = { employee: null, history: [] }, fail = '') {
     return { employeeModel, historyModel, state: () => committed, writes: () => writes,
         deleteAttempts: () => deleteAttempts, ended: () => ended,
         employeeCount: () => (initial.employee ? 1 : 0) + committedEmployeeCreates,
-        deps: { employeeModel, historyModel, auditModel,
+        deps: { userModel: { findById: () => ({ select() { return this; }, session() { return this; },
+            lean: async () => ({ privileges: 'A', team: 'THA', situation: 'A' }) }) }, employeeModel, historyModel, auditModel,
             auditCollectionChecker: async () => true, referenceChecker: async () => [],
             connection: { startSession: async () => session }, capabilityProbe: async () => true } };
 }
@@ -213,7 +214,7 @@ function handler(mode, db) {
 async function submit(mode, input, db = memory(), body = {}) {
     const requestScope = db.requestScope || scope;
     const req = { body: { formData: plain(input), filesToUpdate: {}, skipContract: true, ...body },
-        session: { userTeam: requestScope.team, companyInUse: requestScope.company_kod },
+        session: { userId:'authorized-user', userTeam: requestScope.team, companyInUse: requestScope.company_kod },
         params: { ergazomenoiId: db.state().employee?._id } };
     const res = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
     await handler(mode, db)(req, res);
@@ -911,7 +912,7 @@ for (const state of ['inserted', 'deleted']) test(`history editor rejects specif
     const stored = await initial(), db = memory(stored);
     const res = await editHistory(db, [{ _id: stored.history[0]._id, state, data: form() }]);
     assert.equal(res.code, 409);
-    assert.equal(res.body.reason, state === 'inserted' ? 'EMPLOYEE_PROFILE_NON_APPEND_CHANGE' : 'EMPLOYEE_PROFILE_DELETE_CURRENT_VERSION_UNSUPPORTED');
+    assert.equal(res.body.reason, state === 'inserted' ? 'EMPLOYEE_PROFILE_NON_APPEND_CHANGE' : 'EMPLOYEE_HISTORY_CORRECTION_REQUIRED');
     assert.deepEqual(db.state(), stored);
 });
 test('history editor cannot change date identity or correct an unknown ID', async () => {
@@ -921,7 +922,7 @@ test('history editor cannot change date identity or correct an unknown ID', asyn
         { _id: 'ffffffffffffffffffffffff', state: 'modified', data: rowData(row) }
     ]) {
         const db = memory(stored); const res = await editHistory(db, [update]);
-        assert.equal(res.code, 409); assert.equal(res.body.reason, update._id === row._id ? 'EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED' : 'EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH');
+        assert.equal(res.code, 409); assert.equal(res.body.reason, update._id === row._id ? 'EMPLOYEE_HISTORY_CORRECTION_REQUIRED' : 'EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH');
         assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
     }
 });
@@ -933,8 +934,8 @@ test('open-cycle hire guard controller rejects crafted History hire request with
         data: rowData(row, { hmeromhnia_proslhpshs: '2026-09-15' }) }]);
     assert.equal(res.code, 409);
     assert.equal(res.body.reason,
-        'EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE');
-    assert.match(res.body.message, /Καταχωρήστε πρώτα την αποχώρηση/);
+        'EMPLOYEE_HISTORY_CORRECTION_REQUIRED');
+    assert.match(res.body.message, /Έλεγχος \/ Διόρθωση/);
     assert.equal(db.writes(), 0);
     assert.deepEqual(db.state(), stored);
 });
@@ -995,6 +996,17 @@ async function twoVersions() {
         } });
     assert.equal(result.mode, W.MODE_NEW_VERSION); return db.state();
 }
+async function safeOlderVersions() {
+    const stored = await twoVersions();
+    Object.assign(stored.history[0], { afora_proslhpsh: false,
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01',
+        hmeromhnia_isxyos_dialleimatos_apo: '2026-05-01' });
+    stored.history.push({ ...scope, _id: 'eeeeeeeeeeeeeeeeeeeeeeee', aa_eggrafhs: '0003',
+        hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_symbashs: '2026-04-01',
+        afora_proslhpsh: true, afora_allagh_oron_ergasias: false,
+        employment_profile_source: 'EMPLOYEE_PROFILE_FOUNDATION' });
+    return stored;
+}
 const insertion = (date, extra = {}) => ({ state: 'inserted', data: { ...form(),
     hmeromhnia_isxyos_oron_ergasias_apo: date, ...extra } });
 const withoutSequence = row => {
@@ -1020,11 +1032,12 @@ test('only retrospective inserted version between existing versions is rejected'
     assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
 });
 test('exact non-latest deletion keeps neighbor boundaries/facts and current, then renumbers', async () => {
-    const stored = await twoVersions(), db = memory(stored);
+    const stored = await safeOlderVersions(), db = memory(stored);
     const res = await editHistory(db, [{ state: 'deleted', _id: stored.history[0]._id }]);
-    assert.equal(res.code, 200, res.body.message); assert.equal(db.state().history.length, 1);
+    assert.equal(res.code, 200, res.body.message); assert.equal(db.state().history.length, 2);
     assert.deepEqual(withoutSequence(db.state().history[0]), withoutSequence(stored.history[1]));
     assert(new Date(db.state().history[0].updatedAt) > new Date(stored.history[1].updatedAt));
+    assert.deepEqual(withoutSequence(db.state().history[1]), withoutSequence(stored.history[2]));
     assert.equal(db.state().history[0].aa_eggrafhs, '0001'); assert.deepEqual(db.state().employee, stored.employee);
 });
 for (const collection of [
@@ -1032,7 +1045,7 @@ for (const collection of [
     'Apasxoliseis_Weekly_Repo_Transfer_Decisions',
     'Apasxoliseis_Period_Frozen_Snapshots'
 ]) test(`history editor blocks a referenced row from ${collection} before delete`, async () => {
-    const stored = await twoVersions(), db = memory(stored);
+    const stored = await safeOlderVersions(), db = memory(stored);
     const id = String(stored.history[0]._id);
     const persistedReference = collection === 'Apasxoliseis_Weekly_Canonical_Decisions'
         ? { _id: 'canonical-reference', canonical_snapshot: { profile_history: [{ _id: id }] } }
@@ -1058,7 +1071,7 @@ for (const collection of [
     assert.deepEqual(db.state(), stored);
 });
 test('history editor fails closed when the reference check fails', async () => {
-    const stored = await twoVersions(), db = memory(stored);
+    const stored = await safeOlderVersions(), db = memory(stored);
     db.deps.referenceChecker = async () => { throw new Error('reference store unavailable'); };
     const res = await editHistory(db, [{ state: 'deleted', _id: stored.history[0]._id }]);
     assert.equal(res.code, 409);
@@ -1097,12 +1110,12 @@ test('nonexistent deletion identity rejects without touching neighbors', async (
     assert.deepEqual(db.state(), stored); assert.equal(db.writes(), 0);
 });
 test('mixed correction and deletion batch commits all facts and numbering together', async () => {
-    const stored = await twoVersions(), db = memory(stored);
+    const stored = await safeOlderVersions(), db = memory(stored);
     const res = await editHistory(db, [
         { state: 'modified', _id: stored.history[1]._id, data: rowData(stored.history[1], { [C.DAYS]: [2, 4] }) },
         { state: 'deleted', _id: stored.history[0]._id }
     ]);
-    assert.equal(res.code, 200, res.body.message); assert.equal(db.state().history.length, 1);
+    assert.equal(res.code, 200, res.body.message); assert.equal(db.state().history.length, 2);
     assert.deepEqual(db.state().employee[C.DAYS], [2, 4]); assert.equal(db.state().history[0].aa_eggrafhs, '0001');
 });
 test('mixed append and older correction batch keeps complete current and baseline ordering', async () => {
@@ -1129,7 +1142,7 @@ test('later batch failure rolls back deletion, append, closed boundaries and cur
     assert.equal(res.code, 409); assert.equal(db.writes(), 0); assert.deepEqual(db.state(), stored);
 });
 test('transaction commit failure rolls back renumbering and accepted deletion/append', async () => {
-    const stored = await twoVersions(), db = memory(stored, 'commit');
+    const stored = await safeOlderVersions(), db = memory(stored, 'commit');
     const res = await editHistory(db, [{ state: 'deleted', _id: stored.history[0]._id }, insertion('2026-10-01')]);
     assert.equal(res.code, 500); assert(db.writes() >= 5); assert.deepEqual(db.state(), stored);
 });
@@ -1183,7 +1196,7 @@ test('six-date append keeps omitted work terms from current in a complete new sn
     assert.equal(db.state().history[1].hmeres_ergasias_ebdomadas, 5);
 });
 test('foreign history ID cannot be deleted and foreign numbering is untouched', async () => {
-    const stored = await twoVersions();
+    const stored = await safeOlderVersions();
     const foreign = { ...stored.history[0], _id: 'ffffffffffffffffffffffff', company_kod: 'foreign', aa_eggrafhs: '0099' };
     stored.history.push(foreign); const db = memory(stored);
     const rejected = await editHistory(db, [{ state: 'deleted', _id: foreign._id }]);
@@ -1527,7 +1540,7 @@ test('browser deletion flags cannot bypass canonical protection of sole old depa
             data: { ...oldDeparture, controlledHistoryDeletion: forged,
                 controlledLifecycleRepair: forged } }]);
         assert.equal(res.code, 409);
-        assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+        assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_CORRECTION_REQUIRED');
         assert.deepEqual(db.state(), stored);
         assert.equal(mongoose.connection.readyState, 0);
     }
