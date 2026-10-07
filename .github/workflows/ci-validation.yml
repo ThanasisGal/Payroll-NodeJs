@@ -732,6 +732,25 @@ jobs:
             exit 1
           fi
 
+      - name: Ensure historical controller regression baseline is available
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          baseline="da765ee8050c91419b7707839b55e4ead0412ef3"
+          historical_path="server/controllers/ergazomenoi/ergazomenoiController.js"
+          head_before=$(git rev-parse HEAD)
+
+          if ! git cat-file -e "${baseline}^{commit}" 2>/dev/null \
+            || ! git cat-file -e "${baseline}:${historical_path}" 2>/dev/null
+          then
+            git fetch --no-tags --depth=1 origin "$baseline"
+          fi
+
+          git cat-file -e "${baseline}^{commit}"
+          git cat-file -e "${baseline}:${historical_path}"
+          test "$(git rev-parse HEAD)" = "$head_before"
+
       - name: Run safe focused tests
         shell: bash
         run: |
