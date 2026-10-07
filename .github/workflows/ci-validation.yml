@@ -777,6 +777,10 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/services/ergazomenoi/employeeHistoryEditorStateService.test.js"
+            "server/services/ergazomenoi/employeeEmploymentProfileWriter.staleState.test.js"
+            "server/controllers/ergazomenoi/ergazomenoiController.historyStaleState.test.js"
+            "public/js/ergazomenoi/genika/istorikoTable.staleState.test.js"
             "server/services/ergazomenoi/employeeEmploymentProfileWriter.serialization.test.js"
             "server/services/ergazomenoi/employeeEmploymentProfileWriter.test.js"
             "server/controllers/ergazomenoi/ergazomenoiController.employmentProfile.test.js"

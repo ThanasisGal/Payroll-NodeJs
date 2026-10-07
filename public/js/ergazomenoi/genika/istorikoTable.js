@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!table) return;
 
     const canManageHistory = table.dataset.canManageHistory === 'true';
+    const expectedStateToken = table.dataset.expectedStateToken || '';
     const currentRelationshipOpen = table.dataset.currentRelationshipOpen === 'true';
     const currentHireDate = table.dataset.currentHireDate || '';
 
@@ -36,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'createdAt',
         'updatedAt',
         'history_reference_fence',
+        'employment_history_canonical_status',
+        'employment_history_canonical_survivor_id',
         '__lookups',
         'employment_profile_source',
         'employment_profile_schema_version',
@@ -828,10 +831,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     'X-CSRF-Token': csrfToken
                 },
                 credentials: 'include',
-                body: JSON.stringify({ employeeId, updates })
+                body: JSON.stringify({ employeeId, expectedStateToken, updates })
             });
 
             const result = await response.json();
+
+            if (response.status === 409 && result.reason === 'EMPLOYEE_HISTORY_EDITOR_STALE') {
+                const recovery = await Swal.fire({
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    icon: 'warning',
+                    title: 'Το Ιστορικό χρειάζεται ανανέωση',
+                    text: result.message,
+                    showCancelButton: true,
+                    confirmButtonText: 'Ανανέωση σελίδας',
+                    cancelButtonText: 'Κλείσιμο'
+                });
+                if (recovery.isConfirmed) window.location.reload();
+                return;
+            }
 
             if (!response.ok || result.success === false) {
                 throw new Error(result.message || 'Αποτυχία ενημέρωσης ιστορικού.');
