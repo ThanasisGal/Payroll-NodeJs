@@ -11,6 +11,8 @@
     const GUIDED_KIND = 'GUIDED_BUSINESS_CHOICE';
     const FACT_KIND = 'BUSINESS_FACT_COLLECTION';
     const USER_CORRECTION_KIND = 'USER_CONFIRMED_HISTORY_CORRECTION';
+    const CORRECTION_MODAL_GAP = 8;
+    const CORRECTION_MODAL_MIN_HEIGHT = 280;
     const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/;
     const OPTION_ID_PATTERN = /^[A-Z0-9_]{3,100}$/;
     const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -33,6 +35,113 @@
         'CORRECT_EXISTING_HISTORICAL_FACT', 'REAL_HISTORICAL_CHANGE',
         'ENTER_DIFFERENT_VALUE', 'CONFIRM_REAL_PERIOD', 'RETIRE_ERRONEOUS_ARTIFACT'
     ]);
+
+    function visibleElementRect(element, windowRef = null) {
+        if (!element || typeof element.getBoundingClientRect !== 'function') return null;
+        const rect = element.getBoundingClientRect();
+        if (!rect || !(rect.width > 0) || !(rect.height > 0)) return null;
+        const style = typeof windowRef?.getComputedStyle === 'function'
+            ? windowRef.getComputedStyle(element) : null;
+        if (style?.display === 'none' || style?.visibility === 'hidden') return null;
+        return rect;
+    }
+
+    function employeeCardBounds(card, windowRef = null) {
+        const children = Array.from(card?.children || []);
+        const headerGroup = children.find(child =>
+            child?.querySelector?.('.card-header .sectionTitle'));
+        const header = headerGroup?.querySelector?.('.card-header');
+        const footer = children.find(child => child?.classList?.contains?.('card-footer'));
+        return visibleElementRect(header, windowRef) && visibleElementRect(footer, windowRef)
+            ? { card, header, footer } : null;
+    }
+
+    function findActiveEmployeeCardBounds(documentRef, windowRef = null) {
+        if (!documentRef || typeof documentRef.querySelectorAll !== 'function') return null;
+        const saveButtons = Array.from(documentRef.querySelectorAll(
+            '.sections form .card > .card-footer .submitButton, .sections form .submitButton'
+        ));
+        for (const button of saveButtons) {
+            if (!visibleElementRect(button, windowRef)) continue;
+            const card = typeof button.closest === 'function' ? button.closest('.card') : null;
+            const bounds = employeeCardBounds(card, windowRef);
+            if (bounds) return bounds;
+        }
+        const cards = Array.from(documentRef.querySelectorAll('.sections section form > .card'));
+        for (const card of cards) {
+            if (!visibleElementRect(card, windowRef)) continue;
+            const bounds = employeeCardBounds(card, windowRef);
+            if (bounds) return bounds;
+        }
+        return null;
+    }
+
+    function deriveCorrectionModalBounds({ headerRect, footerRect, cardRect, viewportHeight, viewportWidth,
+        viewportTop = 0, gap = CORRECTION_MODAL_GAP,
+        minimumHeight = CORRECTION_MODAL_MIN_HEIGHT } = {}) {
+        const safeGap = Number.isFinite(gap) && gap >= 0 ? gap : CORRECTION_MODAL_GAP;
+        const safeViewportTop = Number.isFinite(viewportTop) ? viewportTop : 0;
+        const safeViewportHeight = Number.isFinite(viewportHeight) && viewportHeight > 0
+            ? viewportHeight : 0;
+        const safeViewportWidth = Number.isFinite(viewportWidth) && viewportWidth > 0
+            ? viewportWidth : 0;
+        const viewportBottom = safeViewportTop + safeViewportHeight;
+        const rectTop = Number(headerRect?.bottom);
+        const rectBottom = Number(footerRect?.top);
+        const hasCardBounds = Number.isFinite(rectTop) && Number.isFinite(rectBottom) &&
+            rectBottom > rectTop;
+        let top = Math.max(safeViewportTop + safeGap,
+            hasCardBounds ? rectTop + safeGap : safeViewportTop + safeGap);
+        let bottom = Math.min(viewportBottom - safeGap,
+            hasCardBounds ? rectBottom - safeGap : viewportBottom - safeGap);
+        let viewportFallback = !hasCardBounds;
+        if (bottom - top < minimumHeight) {
+            top = safeViewportTop + safeGap;
+            bottom = viewportBottom - safeGap;
+            viewportFallback = true;
+        }
+        const bodyWidth = Number(cardRect?.width);
+        const availableWidth = Math.max(0, Math.min(
+            safeViewportWidth > 0 ? safeViewportWidth - (2 * safeGap) : Number.POSITIVE_INFINITY,
+            Number.isFinite(bodyWidth) && bodyWidth > 0
+                ? bodyWidth - (2 * safeGap) : Number.POSITIVE_INFINITY
+        ));
+        return Object.freeze({
+            top,
+            bottom: Math.max(top, bottom),
+            height: Math.max(0, bottom - top),
+            maxWidth: Number.isFinite(availableWidth) ? availableWidth : 0,
+            gap: safeGap,
+            viewportFallback
+        });
+    }
+
+    function setImportantStyle(element, property, value) {
+        if (typeof element?.style?.setProperty === 'function') {
+            element.style.setProperty(property, value, 'important');
+        } else if (element?.style) {
+            element.style[property] = value;
+        }
+    }
+
+    function applyCorrectionModalGeometry(popup, cardBounds, windowRef = null) {
+        if (!popup) return null;
+        const visualViewport = windowRef?.visualViewport;
+        const bounds = deriveCorrectionModalBounds({
+            headerRect: cardBounds?.header?.getBoundingClientRect(),
+            footerRect: cardBounds?.footer?.getBoundingClientRect(),
+            cardRect: cardBounds?.card?.getBoundingClientRect(),
+            viewportHeight: Number(visualViewport?.height) || Number(windowRef?.innerHeight),
+            viewportWidth: Number(visualViewport?.width) || Number(windowRef?.innerWidth),
+            viewportTop: Number(visualViewport?.offsetTop) || 0
+        });
+        setImportantStyle(popup, 'position', 'fixed');
+        setImportantStyle(popup, 'top', `${bounds.top}px`);
+        setImportantStyle(popup, 'height', `${bounds.height}px`);
+        setImportantStyle(popup, 'max-height', `${bounds.height}px`);
+        if (bounds.maxWidth > 0) setImportantStyle(popup, 'max-width', `${bounds.maxWidth}px`);
+        return bounds;
+    }
 
     function isPlainObject(value) {
         return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -467,7 +576,7 @@
         wrapper.className = 'ms-4 mt-2';
         const state = { control, wrapper, element: null, fieldElements: [] };
         if (control.type === 'PROFILE_FIELDS') {
-            appendText(documentRef, wrapper, 'label', 'Εκδοχή βάσης', 'form-label small');
+            appendText(documentRef, wrapper, 'label', 'Ποια στοιχεία θα κρατήσουμε για αυτό το διάστημα;', 'form-label small');
             const baseline = documentRef.createElement('select');
             baseline.className = 'form-select';
             baseline.value = '';
@@ -533,6 +642,11 @@
             input.addEventListener('change', emitValidity);
         }
         return state;
+    }
+
+    function setCorrectionInputEnabled(input, enabled) {
+        if (!input) return;
+        input.disabled = !enabled;
     }
 
     function normalizedControlValue(state) {
@@ -610,8 +724,10 @@
                 for (const item of control.intentControls) {
                     const enabled = activeConflict(control.conflict) && item.intent.id === selectedId;
                     for (const valueState of [item.valueState, item.dateState].filter(Boolean)) {
-                        valueState.element.disabled = !enabled;
-                        for (const field of valueState.fieldElements) field.input.disabled = !enabled;
+                        setCorrectionInputEnabled(valueState.element, enabled);
+                        for (const field of valueState.fieldElements) {
+                            setCorrectionInputEnabled(field.input, enabled);
+                        }
                         valueState.wrapper.hidden = !enabled;
                     }
                 }
@@ -628,11 +744,11 @@
                 conflict.field.label, 'fw-semibold mt-2');
             appendText(documentRef, wrapper, 'p', conflict.issue, 'mb-1 mt-2');
             if (Array.isArray(conflict.historicalValues)) for (const item of conflict.historicalValues) {
-                appendText(documentRef, wrapper, 'div', `Ιστορική τιμή: ${item.label}`,
+                appendText(documentRef, wrapper, 'div', `Στο παλιό διάστημα: ${item.label}`,
                     'small');
             }
             if (conflict.laterValue) appendText(documentRef, wrapper, 'div',
-                `Μεταγενέστερη τιμή: ${conflict.laterValue.label}`, 'small');
+                `Σε επόμενη εγγραφή: ${conflict.laterValue.label}`, 'small');
             appendText(documentRef, wrapper, 'div', conflict.decisionRequired,
                 'form-label mt-3');
             const intentControls = [];
@@ -692,6 +808,7 @@
             });
         }
         refresh();
+
         return {
             element: container,
             controls,
@@ -783,8 +900,48 @@
         return payload;
     }
 
+    function createCorrectionModalLifecycle({ swal, documentRef, windowRef } = {}) {
+        let opened = false;
+        let cleaned = false;
+        let popup = null;
+        let cardBounds = null;
+        const cleanupCallbacks = [];
+        const listen = (target, eventName, listener, options) => {
+            if (typeof target?.addEventListener !== 'function') return;
+            target.addEventListener(eventName, listener, options);
+            cleanupCallbacks.push(() => target.removeEventListener?.(eventName, listener, options));
+        };
+        const recalculate = () => {
+            if (!popup) return null;
+            cardBounds = findActiveEmployeeCardBounds(documentRef, windowRef);
+            return applyCorrectionModalGeometry(popup, cardBounds, windowRef);
+        };
+        return Object.freeze({
+            open() {
+                if (opened) return;
+                opened = true;
+                popup = typeof swal?.getPopup === 'function'
+                    ? swal.getPopup() : documentRef?.querySelector?.(
+                        '.swal2-popup.employee-history-correction-popup');
+                recalculate();
+                listen(windowRef, 'resize', recalculate, { passive: true });
+                if (windowRef?.visualViewport && windowRef.visualViewport !== windowRef) {
+                    listen(windowRef.visualViewport, 'resize', recalculate, { passive: true });
+                }
+            },
+            recalculate,
+            close() {
+                if (cleaned) return;
+                cleaned = true;
+                while (cleanupCallbacks.length) cleanupCallbacks.pop()();
+                popup = null;
+                cardBounds = null;
+            }
+        });
+    }
+
     async function handleInitialResponse({ response, originalPayload, retryRequest,
-        swal, documentRef } = {}) {
+        swal, documentRef, windowRef = typeof window !== 'undefined' ? window : null } = {}) {
         const resolution = await readResolutionFromResponse(response);
         if (!resolution) return { handled: false, response };
         if (typeof retryRequest !== 'function' || !swal || !documentRef) {
@@ -799,7 +956,12 @@
         const content = buildSafeContent(documentRef, resolution, setConfirmValidity);
         const guided = resolution.kind === GUIDED_KIND || resolution.kind === FACT_KIND ||
             resolution.kind === USER_CORRECTION_KIND;
-        const result = await swal.fire({
+        const correction = resolution.kind === USER_CORRECTION_KIND;
+        const correctionLifecycle = correction
+            ? createCorrectionModalLifecycle({ swal, documentRef, windowRef }) : null;
+        let result;
+        try {
+            result = await swal.fire({
             backdrop: false,
             allowOutsideClick: false,
             allowEscapeKey: () => !(typeof swal.isLoading === 'function' && swal.isLoading()),
@@ -811,12 +973,19 @@
             confirmButtonText: guided ? 'Συνέχεια' : resolution.option.label,
             cancelButtonText: 'Ακύρωση',
             showLoaderOnConfirm: true,
-            didOpen: () => { if (guided) setConfirmValidity(false); },
+            didOpen: () => {
+                if (guided) setConfirmValidity(false);
+                correctionLifecycle?.open();
+            },
+            willClose: () => correctionLifecycle?.close(),
+            didClose: () => correctionLifecycle?.close(),
             preConfirm: async () => {
                 const selection = content.selected();
                 if (!selection) {
                     if (typeof swal.showValidationMessage === 'function') {
-                        swal.showValidationMessage('Συμπληρώστε όλες τις απαιτούμενες αποφάσεις και επιβεβαιώστε την ευθύνη σας. Δεν αποθηκεύτηκε καμία αλλαγή.');
+                        swal.showValidationMessage(correction
+                            ? 'Δεν αποθηκεύτηκε καμία αλλαγή. 1. Απαντήστε σε όλες τις ερωτήσεις. 2. Συμπληρώστε τα στοιχεία που ζητούνται. 3. Επιβεβαιώστε ότι ελέγξατε τις επιλογές σας.'
+                            : 'Συμπληρώστε όλες τις απαιτούμενες αποφάσεις και επιβεβαιώστε την ευθύνη σας. Δεν αποθηκεύτηκε καμία αλλαγή.');
                     }
                     return false;
                 }
@@ -827,7 +996,9 @@
                 } catch (error) {
                     if (typeof swal.showValidationMessage === 'function') {
                         swal.showValidationMessage(
-                            'Η επανάληψη της αποθήκευσης δεν ολοκληρώθηκε. Δεν αποθηκεύτηκε αλλαγή.'
+                            correction
+                                ? 'Η αποθήκευση δεν ολοκληρώθηκε. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Κλείστε αυτό το παράθυρο. 2. Ανοίξτε ξανά τον εργαζόμενο. 3. Ελέγξτε τα στοιχεία και δοκιμάστε πάλι.'
+                                : 'Η επανάληψη της αποθήκευσης δεν ολοκληρώθηκε. Δεν αποθηκεύτηκε αλλαγή.'
                         );
                     }
                     if (typeof swal.enableButtons === 'function') swal.enableButtons();
@@ -836,12 +1007,20 @@
             },
             customClass: {
                 title: 'custom-title',
-                popup: 'custom-swal-popup',
-                htmlContainer: 'custom-html-container',
+                popup: correction
+                    ? 'custom-swal-popup employee-history-correction-popup'
+                    : 'custom-swal-popup',
+                htmlContainer: correction
+                    ? 'custom-html-container employee-history-correction-html'
+                    : 'custom-html-container',
+                ...(correction ? { actions: 'employee-history-correction-actions' } : {}),
                 confirmButton: 'class-warning custom-confirm-button custom-swal-button',
                 cancelButton: 'custom-cancel-button custom-swal-button'
             }
-        });
+            });
+        } finally {
+            correctionLifecycle?.close();
+        }
 
         if (!result?.isConfirmed) return { handled: true, cancelled: true, response: null };
         return { handled: true, cancelled: false, response: result.value };
@@ -854,6 +1033,10 @@
         GUIDED_KIND,
         FACT_KIND,
         USER_CORRECTION_KIND,
+        CORRECTION_MODAL_GAP,
+        findActiveEmployeeCardBounds,
+        deriveCorrectionModalBounds,
+        applyCorrectionModalGeometry,
         normalizeResolutionResponse,
         readResolutionFromResponse,
         buildSafeContent,

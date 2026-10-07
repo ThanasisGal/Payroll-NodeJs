@@ -74,6 +74,74 @@ function h1DifferentValueDecisions(values = {
     ];
 }
 
+test('το δημόσιο κείμενο H1 εξηγεί τις ημερομηνίες και ποια στοιχεία λείπουν', () => {
+    const plan = planner(h1MissingInitialProfileFixture());
+    const start = plan.conflicts.find(item => item.conflictId === 'INITIAL_PROFILE_START');
+    assert.match(start.issue, /προσλήφθηκε στις 23\/04\/2026/);
+    assert.match(start.issue, /25\/05\/2026/);
+    assert.match(start.decisionRequired, /Από ποια ημερομηνία ίσχυαν/);
+    const terms = plan.conflicts.find(item => item.conflictId === 'INITIAL_PROFILE_TERMS');
+    assert.match(terms.issue, /λείπουν μερικά στοιχεία/);
+    assert.match(terms.issue, /ΚΠΚ/);
+    assert.match(terms.issue, /Ημέρες εργασίας ανά εβδομάδα/);
+    assert.match(terms.issue, /δεν μπορεί να τα συμπληρώσει μόνη της/);
+    assert.equal(terms.decisionRequired, 'Τι ίσχυε σε αυτό το διάστημα;');
+});
+
+test('το δημόσιο κείμενο H2 ξεχωρίζει το λάθος ΚΠΚ από την πραγματική αλλαγή', () => {
+    const plan = planner(h2KpkBoundaryFixture());
+    const field = plan.conflicts.find(item => item.conflictId === 'FIELD_KPK');
+    assert.match(field.issue, /24\/04\/2026 έως 24\/05\/2026/);
+    assert.match(field.issue, /ΚΠΚ: 0111 — ΣΥΝΤΑΞΗ/);
+    assert.match(field.issue, /ΚΠΚ: 0115 — ΣΥΝΤΑΞΗ, ΒΑΡΕΑ, ΙΚΑ-ΤΕΑΜ/);
+    assert.match(field.issue, /δύο ΚΠΚ δεν είναι το ίδιο/);
+    assert.match(field.issue, /Πείτε τι ίσχυε πραγματικά/);
+    const correction = field.intents.find(item => item.id === INTENTS.CORRECT_EXISTING_HISTORICAL_FACT);
+    assert.match(correction.description, /μόνο το ΚΠΚ/);
+    assert.match(correction.description, /Δεν θα δημιουργηθεί νέα αλλαγή σύμβασης/);
+    assert.equal(correction.effectiveDateControl, undefined);
+    const change = field.intents.find(item => item.id === INTENTS.REAL_HISTORICAL_CHANGE);
+    assert.match(change.description, /παλιό ΚΠΚ ήταν σωστό στην αρχή/);
+    assert.match(change.description, /ημερομηνία που έγινε η αλλαγή/);
+    assert.equal(change.effectiveDateControl.label, 'Ημερομηνία που έγινε η αλλαγή');
+    const start = plan.conflicts.find(item => item.conflictId === 'INITIAL_PROFILE_START');
+    assert.equal(start.intents.find(item => item.id === INTENTS.OTHER_DATE)
+        .effectiveDateControl.label, 'Ημερομηνία που άρχισαν να ισχύουν οι όροι');
+});
+
+test('το δημόσιο κείμενο H3 εξηγεί την πραγματική περίοδο και την εγγραφή από λάθος', () => {
+    const plan = planner(h3IntermediateOverlapFixture());
+    const meaning = plan.conflicts.find(item => item.conflictId === 'INTERMEDIATE_PERIOD_MEANING');
+    assert.match(meaning.issue, /18\/05\/2026 έως 24\/05\/2026/);
+    assert.match(meaning.issue, /δεν έχει όλα τα στοιχεία/);
+    assert.match(meaning.issue, /πραγματική αλλαγή στους όρους εργασίας/);
+    assert.match(meaning.issue, /μπήκε κατά λάθος/);
+    assert.match(meaning.decisionRequired, /διαφορετικοί όροι/);
+    assert.match(meaning.intents[0].label, /Ναι/);
+    assert.match(meaning.intents[1].label, /Όχι/);
+    assert.match(meaning.intents[1].description, /δεν θα θεωρεί αυτή την εγγραφή ξεχωριστή περίοδο/);
+    for (const fixture of [h1MissingInitialProfileFixture, h2KpkBoundaryFixture, h3IntermediateOverlapFixture]) {
+        const publicText = JSON.stringify(planner(fixture()).conflicts);
+        assert.doesNotMatch(publicText, /επιχειρησιακή εκδοχή|πλήρης εκδοχή|τεχνικό ιστορικό|φυσική εγγραφή|λογική χρονογραμμή/);
+    }
+});
+
+test('η γενική εξήγηση και η επιβεβαίωση λένε απλά τι πρέπει να ελέγξει ο χρήστης', () => {
+    const { buildUserConfirmedCorrectionAnalysis, buildUserConfirmedCorrectionPublicResolution } =
+        require('./employeeHistoryResolutionAnalysisService');
+    const userCorrectionPlan = planner(h2KpkBoundaryFixture());
+    const fingerprint = 'a'.repeat(64);
+    const analysis = buildUserConfirmedCorrectionAnalysis({ userCorrectionPlan,
+        sourceStateFingerprint: fingerprint });
+    const publicResolution = buildUserConfirmedCorrectionPublicResolution({ analysis, fingerprint });
+    assert.equal(publicResolution.title, 'Χρειάζεται διόρθωση του ιστορικού');
+    assert.match(publicResolution.explanation, /δεν συμφωνούν μεταξύ τους ή δεν έχουν όλα τα στοιχεία/);
+    assert.match(publicResolution.explanation, /δεν θα διαλέξει μόνη της/);
+    assert.match(publicResolution.explanation, /δεν θα αλλάξει τίποτα πριν/);
+    assert.match(publicResolution.responsibilityText, /έλεγξα τις παραπάνω επιλογές/);
+    assert.match(publicResolution.responsibilityText, /ίσχυαν πραγματικά/);
+});
+
 test('τα συνθετικά H1/H2/H3 αναγνωρίζονται γενικά και παράγουν σταθερό φύλλο συγκρούσεων', () => {
     const cases = [
         [h1MissingInitialProfileFixture,

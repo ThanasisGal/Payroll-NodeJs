@@ -165,7 +165,7 @@ function profileSummary(row, catalogs = {}) {
 function publicIntent(id, label, description, extra = {}) {
     return Object.freeze({ id, label, description, ...extra });
 }
-function dateControl(min, max, label = 'Ημερομηνία έναρξης') {
+function dateControl(min, max, label = 'Ημερομηνία που άρχισαν να ισχύουν οι όροι') {
     return Object.freeze({ type: 'DATE', label, required: true, min: day(min), max: day(max) });
 }
 function valueControl(fieldId, catalogs, allowedValues = [], useFullCatalog = false) {
@@ -270,8 +270,8 @@ function candidatePublicOptions(candidateIds, byId, catalogs) {
     return Object.entries(candidateIds).map(([candidateId, id], index) => {
         const row = byId.get(id);
         return Object.freeze({ value: candidateId,
-            label: `Υφιστάμενη εκδοχή ${index + 1}`,
-            description: `Έναρξη ${greekDate(effectiveStart(row))}`,
+            label: `Όροι εργασίας ${index + 1} — εγγραφή από ${greekDate(effectiveStart(row))}`,
+            description: `Τα στοιχεία που γράφει το ιστορικό από ${greekDate(effectiveStart(row))}.`,
             summary: profileSummary(row, catalogs) });
     });
 }
@@ -390,16 +390,17 @@ function buildInitialShape({ plan, activeRows, profileRows, nonProfileRows, hire
         .map(item => item.fieldId);
     const profileIntents = [
         publicIntent(INTENTS.CONFIRM_EXISTING,
-            'Ίσχυαν οι όροι της εμφανιζόμενης εκδοχής',
-            'Επιβεβαιώστε μία από τις υπάρχουσες επιχειρησιακές εκδοχές.', {
+            'Ίσχυαν οι όροι που εμφανίζονται',
+            'Κρατήστε τα στοιχεία που εμφανίζονται για αυτό το διάστημα.', {
                 valueControl: Object.freeze({ type: 'SINGLE_CHOICE', required: true,
+                    label: 'Ποιοι όροι ίσχυαν;',
                     allowedValues: Object.freeze(candidates) })
             })
     ];
     if (profileRequiredFieldIds.length) {
         profileIntents.push(publicIntent(INTENTS.ENTER_DIFFERENT_VALUE,
             'Ίσχυαν διαφορετικοί όροι',
-            'Συμπληρώστε μόνο τα αναγκαία πεδία που λείπουν από την ιστορική περίοδο.', {
+            'Θα σας ζητήσουμε μόνο τα στοιχεία που λείπουν και χρειάζονται για αυτό το διάστημα.', {
                 valueControl: Object.freeze({ type: 'PROFILE_FIELDS', required: true,
                     baselineValues: Object.freeze(candidates),
                     fields: Object.freeze(profileRequiredFieldIds.map(fieldId =>
@@ -408,21 +409,23 @@ function buildInitialShape({ plan, activeRows, profileRows, nonProfileRows, hire
     }
     const conflicts = [
         conflict('INITIAL_PROFILE_START', 'BOUNDARY', period(hire, addDays(profileStart, -1)),
-            `Η πρόσληψη είναι ${greekDate(hire)}, αλλά η πρώτη πλήρης εκδοχή αρχίζει ${greekDate(profileStart)}.`,
-            'Από πότε ίσχυαν πραγματικά οι πρώτοι πλήρεις όροι;', [
+            `Ο εργαζόμενος προσλήφθηκε στις ${greekDate(hire)}.\nΣτο ιστορικό υπάρχει μια παλιά εγγραφή από ${greekDate(knownDate)}. Υπάρχουν επίσης καταγραμμένοι όροι εργασίας από ${greekDate(profileStart)}.\nΔεν είναι ξεκάθαρο από ποια ημερομηνία ίσχυαν πραγματικά αυτοί οι όροι. Πείτε μας από ποια ημερομηνία ίσχυαν.`,
+            'Από ποια ημερομηνία ίσχυαν αυτοί οι όροι εργασίας;', [
                 publicIntent(INTENTS.FROM_HIRE, 'Από την πρόσληψη',
-                    `Οι όροι ίσχυαν από ${greekDate(hire)}.`),
+                    `Οι ίδιοι όροι ίσχυαν από την πρώτη ημέρα, δηλαδή από ${greekDate(hire)}.`),
                 publicIntent(INTENTS.FROM_KNOWN_HISTORY_DATE,
                     `Από ${greekDate(knownDate)}`,
-                    'Οι όροι άρχισαν από την πρώτη γνωστή ιστορική ημερομηνία.'),
+                    `Οι ίδιοι όροι άρχισαν να ισχύουν από ${greekDate(knownDate)}.`),
                 publicIntent(INTENTS.OTHER_DATE, 'Από άλλη ημερομηνία',
-                    'Δηλώστε την πραγματική ημερομηνία έναρξης.', {
+                    'Γράψτε την ημερομηνία από την οποία άρχισαν πραγματικά να ισχύουν.', {
                         effectiveDateControl: dateControl(hire, addDays(profileStart, -1))
                     })
             ], { hireDate: hire, knownHistoryDate: knownDate }),
         conflict('INITIAL_PROFILE_TERMS', 'PROFILE', period(hire, addDays(profileStart, -1)),
-            'Για την αρχική περίοδο δεν υπάρχει πλήρης, ενιαία εκδοχή όλων των όρων.',
-            'Τι ίσχυε πραγματικά στην αρχική περίοδο;', profileIntents,
+            profileRequiredFieldIds.length
+                ? `Για το διάστημα ${greekDate(hire)} έως ${greekDate(addDays(profileStart, -1))} υπάρχουν ήδη κάποια στοιχεία στο ιστορικό, αλλά λείπουν μερικά στοιχεία που χρειάζονται.\nΛείπουν: ${profileRequiredFieldIds.map(id => registryEntry(id).label).join(', ')}.\nΗ εφαρμογή δεν μπορεί να τα συμπληρώσει μόνη της. Πείτε αν οι όροι που εμφανίζονται ήταν σωστοί ή αν ίσχυαν διαφορετικοί όροι.`
+                : `Για το διάστημα ${greekDate(hire)} έως ${greekDate(addDays(profileStart, -1))} υπάρχουν στοιχεία στο ιστορικό, αλλά δεν είναι ξεκάθαρο ποιοι όροι ίσχυαν τότε.\nΗ εφαρμογή δεν μπορεί να διαλέξει μόνη της. Πείτε ποιοι όροι ίσχυαν σε αυτό το διάστημα.`,
+            'Τι ίσχυε σε αυτό το διάστημα;', profileIntents,
             { knownHistoricalSummary: profileSummary(legacy, catalogs),
                 laterProfileSummary: profileSummary(profile, catalogs) })
     ];
@@ -433,24 +436,31 @@ function buildInitialShape({ plan, activeRows, profileRows, nonProfileRows, hire
             values.map(item => item.value));
         const catalogControl = valueControl(entry.id, catalogs,
             values.map(item => item.value), entry.dataType === 'CATALOG_CHOICE');
+        const fieldLabel = entry.id === 'KPK' ? 'ΚΠΚ' : entry.label;
+        const oldValue = displayValue(entry.id, legacy[field], catalogs).label;
+        const newValue = displayValue(entry.id, profile[field], catalogs).label;
+        const oldCode = String(legacy[field]);
         conflicts.push(conflict(`FIELD_${entry.id}`, 'FIELD', period(hire, addDays(profileStart, -1)),
-            `Η ιστορική τιμή (${displayValue(entry.id, legacy[field], catalogs).label}) διαφέρει από τη μεταγενέστερη (${displayValue(entry.id, profile[field], catalogs).label}).`,
-            'Τι ίσχυε πραγματικά;', [
+            `Για το διάστημα ${greekDate(hire)} έως ${greekDate(addDays(profileStart, -1))} το ιστορικό γράφει:\n${fieldLabel}: ${oldValue}\n\nΣε επόμενη εγγραφή γράφει:\n${fieldLabel}: ${newValue}\n\n${entry.id === 'KPK' ? 'Αυτά τα δύο ΚΠΚ δεν είναι το ίδιο.' : 'Οι δύο τιμές είναι διαφορετικές.'}\nΠείτε τι ίσχυε πραγματικά για αυτό το διάστημα.`,
+            `Τι ίσχυε πραγματικά για ${entry.id === 'KPK' ? 'το ΚΠΚ' : `το στοιχείο «${fieldLabel}»`};`, [
                 publicIntent(INTENTS.CONFIRM_EXISTING,
-                    `Η ιστορική τιμή ${displayValue(entry.id, legacy[field], catalogs).label} ήταν σωστή`,
-                    'Η παλαιότερη και η μεταγενέστερη τιμή παραμένουν διαφορετικές.'),
+                    entry.id === 'KPK' ? 'Το παλιό ΚΠΚ ήταν σωστό' : `Η παλιά τιμή για «${fieldLabel}» ήταν σωστή`,
+                    `Το ${oldCode} ήταν σωστό για το παλιό διάστημα. Δεν διορθώνεται αυτή η τιμή.`),
                 publicIntent(INTENTS.CORRECT_EXISTING_HISTORICAL_FACT,
-                    `Η ιστορική τιμή ήταν λανθασμένη`,
-                    'Διορθώνεται μόνο αυτό το πεδίο, χωρίς νέο γεγονός αλλαγής.',
+                    entry.id === 'KPK' ? 'Το παλιό ΚΠΚ ήταν λάθος' : `Η παλιά τιμή για «${fieldLabel}» ήταν λάθος`,
+                    entry.id === 'KPK'
+                        ? 'Το ΚΠΚ γράφτηκε λάθος στο ιστορικό.\nΕπιλέξτε ποιο ΚΠΚ έπρεπε να υπάρχει.\nΘα διορθωθεί μόνο το ΚΠΚ.\nΔεν θα δημιουργηθεί νέα αλλαγή σύμβασης.'
+                        : `Το στοιχείο «${fieldLabel}» γράφτηκε λάθος στο ιστορικό. Επιλέξτε τη σωστή τιμή. Θα διορθωθεί μόνο αυτό το στοιχείο στο ίδιο διάστημα. Δεν θα προστεθεί νέα αλλαγή στους όρους εργασίας.`,
                     { valueControl: existingControl }),
                 publicIntent(INTENTS.REAL_HISTORICAL_CHANGE,
-                    'Έγινε πραγματική αλλαγή',
-                    'Η παλαιότερη τιμή διατηρείται πριν από την πραγματική ημερομηνία αλλαγής.',
+                    entry.id === 'KPK' ? 'Το ΚΠΚ άλλαξε πραγματικά κάποια ημερομηνία' : `Το στοιχείο «${fieldLabel}» άλλαξε πραγματικά κάποια ημερομηνία`,
+                    `Το ${entry.id === 'KPK' ? 'παλιό ΚΠΚ' : 'παλιό στοιχείο'} ήταν σωστό στην αρχή και αργότερα άλλαξε.\nΕπιλέξτε ${entry.id === 'KPK' ? 'το νέο ΚΠΚ' : 'τη νέα τιμή'} και γράψτε την ημερομηνία που έγινε η αλλαγή.`,
                     { valueControl: existingControl,
-                        effectiveDateControl: dateControl(hire, profileStart) }),
+                        effectiveDateControl: dateControl(hire, profileStart,
+                            'Ημερομηνία που έγινε η αλλαγή') }),
                 publicIntent(INTENTS.ENTER_DIFFERENT_VALUE,
-                    `Ίσχυε άλλη έγκυρη τιμή`,
-                    'Επιλέξτε άλλη τιμή που δέχεται ο επίσημος κατάλογος.',
+                    entry.id === 'KPK' ? 'Ίσχυε άλλο ΚΠΚ' : `Ίσχυε άλλη τιμή για «${fieldLabel}»`,
+                    `Καμία από τις τιμές που εμφανίζονται δεν είναι σωστή. Επιλέξτε ${entry.id === 'KPK' ? 'το σωστό ΚΠΚ' : 'τη σωστή τιμή'} από τη λίστα.`,
                     { valueControl: catalogControl })
             ], { field: publicRegistryDescriptor(entry.id, catalogs),
                 historicalValues: Object.freeze([displayValue(entry.id, legacy[field], catalogs)]),
@@ -507,48 +517,49 @@ function buildIntermediateShape({ plan, activeRows, profileRows, nonProfileRows,
     const candidates = candidatePublicOptions(candidateIds, byId, catalogs);
     const conflicts = [
         conflict('INITIAL_PROFILE_START', 'BOUNDARY', period(hire, addDays(earlierStart, -1)),
-            `Η πρόσληψη είναι ${greekDate(hire)}, ενώ η πρώτη πλήρης υποψήφια εκδοχή αρχίζει ${greekDate(earlierStart)}.`,
-            'Από πότε ίσχυε πραγματικά η πρώτη πλήρης εκδοχή;', [
+            `Ο εργαζόμενος προσλήφθηκε στις ${greekDate(hire)}.\nΣτο ιστορικό υπάρχουν όροι εργασίας από ${greekDate(earlierStart)}, αλλά δεν είναι ξεκάθαρο από ποια ημερομηνία ίσχυαν πραγματικά.\nΠείτε μας από ποια ημερομηνία ίσχυαν.`,
+            'Από ποια ημερομηνία ίσχυαν αυτοί οι όροι εργασίας;', [
                 publicIntent(INTENTS.FROM_HIRE, 'Από την πρόσληψη',
-                    `Η πρώτη εκδοχή ίσχυε από ${greekDate(hire)}.`),
+                    `Οι ίδιοι όροι ίσχυαν από την πρώτη ημέρα, δηλαδή από ${greekDate(hire)}.`),
                 publicIntent(INTENTS.FROM_KNOWN_HISTORY_DATE,
                     `Από ${greekDate(earlierStart)}`,
-                    'Η πρώτη πλήρης εκδοχή άρχισε στην ήδη καταχωρισμένη ημερομηνία.'),
+                    `Οι ίδιοι όροι άρχισαν να ισχύουν από ${greekDate(earlierStart)}.`),
                 publicIntent(INTENTS.OTHER_DATE, 'Από άλλη ημερομηνία',
-                    'Δηλώστε την πραγματική ημερομηνία έναρξης.', {
+                    'Γράψτε την ημερομηνία από την οποία άρχισαν πραγματικά να ισχύουν.', {
                         effectiveDateControl: dateControl(hire, earlierStart)
                     })
             ], { hireDate: hire, knownHistoryDate: earlierStart }),
         conflict('INTERMEDIATE_PERIOD_MEANING', 'STRUCTURAL_PERIOD',
             period(artifactStart, artifactEnd),
-            'Υπάρχει ελλιπής ιστορική καταχώριση μέσα σε περίοδο όπου επικαλύπτονται δύο πλήρεις εκδοχές.',
-            'Η περίοδος ήταν πραγματική ή η καταχώριση ήταν λανθασμένη;', [
+            `Στο ιστορικό υπάρχει ξεχωριστή εγγραφή για το διάστημα ${greekDate(artifactStart)} έως ${greekDate(artifactEnd)}.\nΑυτή η εγγραφή δεν έχει όλα τα στοιχεία. Δεν είναι ξεκάθαρο αν υπήρξε πραγματική αλλαγή στους όρους εργασίας ή αν η εγγραφή μπήκε κατά λάθος.\nΠείτε τι συνέβη πραγματικά.`,
+            `Υπήρχαν πραγματικά διαφορετικοί όροι από ${greekDate(artifactStart)} έως ${greekDate(artifactEnd)};`, [
                 publicIntent(INTENTS.CONFIRM_REAL_PERIOD,
-                    `Η περίοδος ${greekDate(artifactStart)}–${greekDate(artifactEnd)} ήταν πραγματική`,
-                    'Θα ζητηθούν μόνο οι όροι που ίσχυαν σε αυτή την περίοδο.'),
+                    'Ναι, εκείνες τις ημέρες ίσχυαν διαφορετικοί όροι',
+                    'Η περίοδος ήταν πραγματική. Θα σας ζητήσουμε μόνο όσα στοιχεία χρειάζονται για να πείτε τι ίσχυε αυτές τις ημέρες.'),
                 publicIntent(INTENTS.RETIRE_ERRONEOUS_ARTIFACT,
-                    'Η καταχώριση ήταν λανθασμένο/τεχνικό ιστορικό στοιχείο',
-                    'Η φυσική εγγραφή διατηρείται και αποσύρεται μόνο από τη λογική χρονογραμμή.')
+                    'Όχι, αυτή η εγγραφή μπήκε κατά λάθος',
+                    'Δεν υπήρξε πραγματική αλλαγή για αυτές τις ημέρες. Η εφαρμογή δεν θα θεωρεί αυτή την εγγραφή ξεχωριστή περίοδο.')
             ], { knownHistoricalSummary: profileSummary(artifact, catalogs) }),
         conflict('INTERMEDIATE_PROFILE_TERMS', 'PROFILE', period(artifactStart, artifactEnd),
-            'Αν η ενδιάμεση περίοδος ήταν πραγματική, πρέπει να προσδιοριστούν οι όροι της.',
-            'Ποια υπάρχουσα επιχειρησιακή εκδοχή ίσχυε;', [
+            `Πείτε ποιοι όροι εργασίας ίσχυαν από ${greekDate(artifactStart)} έως ${greekDate(artifactEnd)}.\nΗ εφαρμογή δεν μπορεί να επιλέξει μόνη της ανάμεσα στα στοιχεία που εμφανίζονται.`,
+            'Ποιοι όροι ίσχυαν αυτές τις ημέρες;', [
                 publicIntent(INTENTS.CONFIRM_EXISTING,
-                    'Επιλογή υπάρχουσας εκδοχής',
-                    'Επιβεβαιώστε μία από τις πλήρεις εκδοχές που εμφανίζονται.', {
+                    'Ίσχυαν οι όροι που εμφανίζονται',
+                    'Επιλέξτε ποιοι από τους όρους που εμφανίζονται ήταν σωστοί για αυτές τις ημέρες.', {
                         valueControl: Object.freeze({ type: 'SINGLE_CHOICE', required: true,
+                            label: 'Ποιοι όροι ίσχυαν;',
                             allowedValues: Object.freeze(candidates) })
                     })
             ], { condition: Object.freeze({ conflictId: 'INTERMEDIATE_PERIOD_MEANING',
                 intent: INTENTS.CONFIRM_REAL_PERIOD }) }),
         conflict('LATER_PROFILE_START', 'BOUNDARY', period(earlierStart, laterStart),
-            'Οι δύο πλήρεις εκδοχές επικαλύπτονται και χρειάζεται πραγματικό όριο μετάβασης.',
-            'Από πότε ίσχυε πραγματικά η μεταγενέστερη πλήρης εκδοχή;', [
+            `Στο ιστορικό υπάρχουν όροι εργασίας από ${greekDate(earlierStart)} και άλλοι όροι από ${greekDate(laterStart)}.\nΟι ημερομηνίες τους δεν δείχνουν καθαρά πότε σταμάτησαν οι παλιοί όροι και πότε άρχισαν οι νέοι.\nΠείτε από ποια ημερομηνία άρχισαν να ισχύουν οι νέοι όροι.`,
+            'Από ποια ημερομηνία ίσχυαν οι νέοι όροι εργασίας;', [
                 publicIntent(INTENTS.FROM_KNOWN_HISTORY_DATE,
                     `Από ${greekDate(laterStart)}`,
-                    'Διατηρείται η ήδη καταχωρισμένη μεταγενέστερη έναρξη.'),
+                    `Οι νέοι όροι άρχισαν να ισχύουν από ${greekDate(laterStart)}.`),
                 publicIntent(INTENTS.OTHER_DATE, 'Από άλλη ημερομηνία',
-                    'Δηλώστε την πραγματική ημερομηνία μετάβασης.', {
+                    'Γράψτε την ημερομηνία από την οποία άρχισαν πραγματικά να ισχύουν οι νέοι όροι.', {
                         effectiveDateControl: dateControl(earlierStart,
                             day(currentCycleEnd(plan.canonicalBefore, later)) || laterStart)
                     })
