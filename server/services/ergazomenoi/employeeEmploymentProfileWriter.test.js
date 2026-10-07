@@ -2878,3 +2878,69 @@ test('PR H καθαρή επανάληψη δεν δημιουργεί δεύτ�
         correctionCatalogLoader: async () => fixture.catalogs
     }), error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
 });
+
+function closedCycleDeletionState(departure = '2025-03-31') {
+    const initial = openCycleHireGuardState();
+    const oldHire = '2025-01-01';
+    const first = { ...buildCompleteProfileSnapshot({ effectiveFrom: oldHire }),
+        _id: '507f1f77bcf86cd799439281', ...scope, aa_eggrafhs: '0001',
+        hmeromhnia_proslhpshs: oldHire, afora_proslhpsh: true,
+        hmeromhnia_isxyos_oron_ergasias_eos: '2025-01-31' };
+    const middle = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2025-02-01' }),
+        _id: '507f1f77bcf86cd799439282', ...scope, aa_eggrafhs: '0002',
+        hmeromhnia_proslhpshs: oldHire, afora_proslhpsh: false,
+        hmeromhnia_isxyos_oron_ergasias_eos: departure };
+    const departureRow = { _id: '507f1f77bcf86cd799439283', ...scope,
+        aa_eggrafhs: '0003', hmeromhnia_proslhpshs: oldHire,
+        hmeromhnia_apoxorhshs: departure, afora_proslhpsh: false };
+    initial.history[0].aa_eggrafhs = '0004';
+    initial.history.unshift(first, middle, departureRow);
+    if (departure === oldHire) {
+        initial.history.splice(1, 1);
+        initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = departure;
+    }
+    return initial;
+}
+
+for (const departure of ['2025-03-31', '2025-01-01']) {
+    test(`deleting sole departure ${departure} would reopen the old cycle before a later hire`, async () => {
+        const initial = closedCycleDeletionState(departure), db = database(initial);
+        const { canonicalizeEmployeeHistory, CANONICAL_STATUSES } =
+            require('./employeeHistoryCanonicalizationService');
+        const before = canonicalizeEmployeeHistory({ scope, currentEmployee: initial.employee,
+            historyRows: initial.history });
+        assert.notEqual(before.status, CANONICAL_STATUSES.TRUE_AMBIGUITY);
+        await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies,
+            scope, employeeId: 'employee', operations: [{ state: 'deleted',
+                historyId: '507f1f77bcf86cd799439283' }] }), error =>
+            error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+            error.canonicalReason === 'EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE');
+        assert.deepEqual(db.state(), initial); // No committed history/current/audit changes.
+        assert.equal(db.ended(), true);
+        assert.equal(mongoose.connection.readyState, 0);
+    });
+}
+
+test('multi-delete with one unsafe departure leaves every history/current/audit change uncommitted', async () => {
+    const initial = closedCycleDeletionState(), db = database(initial);
+    // The middle profile can be deleted alone without inventing neighbor boundaries or flags.
+    const control = database(initial);
+    await writeEmployeeEmploymentHistoryOperations({ ...control.dependencies,
+        scope, employeeId: 'employee', operations: [{ state: 'deleted',
+            historyId: '507f1f77bcf86cd799439282' }] });
+    assert.ok(!control.state().history.some(row => row._id === '507f1f77bcf86cd799439282'));
+    assert.deepEqual(control.state().employee, initial.employee);
+    for (const row of control.state().history) {
+        const original = initial.history.find(item => item._id === row._id);
+        assert.equal(row.afora_proslhpsh, original.afora_proslhpsh);
+    }
+    await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies,
+        scope, employeeId: 'employee', operations: [
+            { state: 'deleted', historyId: '507f1f77bcf86cd799439282' },
+            { state: 'deleted', historyId: '507f1f77bcf86cd799439283' }
+        ] }), error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+            error.canonicalReason === 'EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE');
+    assert.deepEqual(db.state(), initial);
+    assert.equal(db.ended(), true);
+    assert.equal(mongoose.connection.readyState, 0);
+});

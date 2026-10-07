@@ -96,6 +96,7 @@ function memory(initial = { employee: null, history: [] }, fail = '') {
         },
         async updateOne(filter, update, options) {
             assert.equal(options.session, session); writes++;
+            if (fail === 'employee') throw Error('employee failed');
             if (!matches(draft.employee, filter)) return { matchedCount: 0 };
             Object.assign(draft.employee, plain(update.$set)); return { matchedCount: 1 };
         }
@@ -183,9 +184,14 @@ function handler(mode, db) {
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
         writeEmployeeEmploymentProfileWithUniqueSafeRepair: args =>
             W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps }),
-        writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }),
+        writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }).catch(error => {
+            db.departureError = error; throw error;
+        }),
+        writeEmployeeRehire: args => W.writeEmployeeRehire({ ...args, ...db.deps }),
         writeEmployeeDepartureDateCorrection: args =>
-            W.writeEmployeeDepartureDateCorrection({ ...args, ...db.deps }),
+            W.writeEmployeeDepartureDateCorrection({ ...args, ...db.deps }).catch(error => {
+                db.departureCorrectionError = error; throw error;
+            }),
         writeEmployeeDepartureCancellation: args => W.writeEmployeeDepartureCancellation({ ...args, ...db.deps }),
         ...require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService'),
         ...require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService'),
@@ -193,9 +199,9 @@ function handler(mode, db) {
         dateKeyUtc: require('../../utils/date/mondaySundayWeek').dateKeyUtc
     });
 }
-async function submit(mode, input, db = memory()) {
+async function submit(mode, input, db = memory(), body = {}) {
     const requestScope = db.requestScope || scope;
-    const req = { body: { formData: plain(input), filesToUpdate: {}, skipContract: true },
+    const req = { body: { formData: plain(input), filesToUpdate: {}, skipContract: true, ...body },
         session: { userTeam: requestScope.team, companyInUse: requestScope.company_kod },
         params: { ergazomenoiId: db.state().employee?._id } };
     const res = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
@@ -1356,4 +1362,182 @@ test('Add retry preserves absent employee and history fields, but applies explic
     assert.equal(db.state().employee.pososto_apasxolhshs_kk1, 0);
     assert.equal(db.state().employee.hmeromhnia_ekdoshs, null);
     assert.equal(db.state().history[0].stoixeio_symbashs_01, null);
+});
+
+// Sanitized full-form values exercise browser representations at the real controller boundary.
+async function fullFormDepartureState() {
+    return initial({ foreas_epikoyrikhs_asfalishs: ['002'], typos_metabolhs: [],
+        stoixeio_symbashs_01: '0001', hmeromhnia_lhxhs_symbashs: '2026-12-31' });
+}
+function fullFormDeparturePayload(employee, departure = '2026-09-23') {
+    return { ...form(), hmeromhnia_apoxorhshs: departure, energos: true,
+        hmeromhnia_lhxhs_symbashs: '2026-12-31',
+        hmeromhnia_isxyos_oron_ergasias_eos:
+            employee.hmeromhnia_isxyos_oron_ergasias_eos?.slice(0, 10) || '',
+        kathestos_apasxolhshs: '0', kathestos_apasxolhshs_stathera: '0',
+        symbash: 'contract', symbash_stathera: 'contract',
+        hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
+        mo_oron_hmerhsias_ergasias: 8, nomimosMisthos: 1200,
+        foreas_epikoyrikhs_asfalishs: ['002'],
+        foreas_epikoyrikhs_asfalishs_stathera: '["002"]',
+        typos_metabolhs: [], typos_metabolhs_stathera: '[]',
+        stoixeio_symbashs_01: '0001', stoixeio_symbashs_01_hidden: '0001' };
+}
+async function closedFullFormState() {
+    const stored = await fullFormDepartureState();
+    const result = await submit('edit', fullFormDeparturePayload(stored.employee), memory(stored));
+    assert.equal(result.res.code, 200, result.res.body?.errorMessage);
+    return result.db.state();
+}
+
+test('full-form populated controls save only the intended first departure', async () => {
+    const stored = await fullFormDepartureState();
+    const result = await submit('edit', fullFormDeparturePayload(stored.employee), memory(stored));
+    assert.equal(result.res.code, 200, result.res.body?.errorMessage);
+    const after = result.db.state();
+    assert.deepEqual(after.history.map(row => row._id), stored.history.map(row => row._id));
+    assert.equal(after.employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-23');
+    assert.equal(after.employee.energos, false);
+    assert.equal(after.history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-23');
+    for (const field of ['nomimosMisthos', 'ores_ergasias_ebdomadas', 'kathestos_apasxolhshs',
+        'hmeromhnia_proslhpshs', 'hmeromhnia_lhxhs_symbashs',
+        'foreas_epikoyrikhs_asfalishs', 'stoixeio_symbashs_01']) {
+        assert.deepEqual(after.employee[field], stored.employee[field], field);
+    }
+    assert.equal(after.history[0].afora_proslhpsh, stored.history[0].afora_proslhpsh);
+    assert.deepEqual(after.audits, stored.audits);
+});
+
+for (const [label, change] of [
+    ['salary', { nomimosMisthos: 1300 }],
+    ['weekly hours', { ores_ergasias_ebdomadas: 39 }],
+    ['employment status', { kathestos_apasxolhshs: '1' }],
+    ['work-terms start', { hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-02' }],
+    ['schedule boundary', { hmeromhnia_allaghs_orarioy_eos: '2026-04-08' }],
+    ['contract change date', { hmeromhnia_allaghs_symbashs: '2026-04-02' }],
+    ['contract end', { hmeromhnia_lhxhs_symbashs: '2027-01-31' }]
+]) {
+    test(`full-form departure plus a real ${label} change is rejected atomically`, async () => {
+        const stored = await fullFormDepartureState();
+        const db = memory(stored);
+        const { res } = await submit('edit', {
+            ...fullFormDeparturePayload(stored.employee), ...change
+        }, db);
+        assert.equal(res.code, 409);
+        assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+        assert.deepEqual(db.departureError.departureCorrectionChangedFields, Object.keys(change));
+        assert.deepEqual(db.state(), stored); // Includes current, history and audit state.
+        assert.equal(db.writes(), 0);
+    });
+}
+
+test('unchanged departure with full-form echoes is a write-free NO_OP with stable revisions', async () => {
+    const stored = await closedFullFormState(), db = memory(stored);
+    const { res } = await submit('edit', fullFormDeparturePayload(stored.employee), db);
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.writes(), 0);
+});
+
+test('unchanged full-form departure permits an employee-only correction without duplicate events', async () => {
+    const stored = await closedFullFormState(), db = memory(stored);
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+        email: 'correction@example.invalid' }, db);
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.deepEqual(db.state().history, stored.history);
+    assert.deepEqual(db.state().audits, stored.audits);
+    assert.deepEqual(db.state().employee, { ...stored.employee, email: 'correction@example.invalid' });
+});
+
+test('full-form departure correction rejects a genuine multi-select change, not just a JSON echo', async () => {
+    const stored = await closedFullFormState(), db = memory(stored);
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee, '2026-09-24'),
+        historyExpectedRevision: stored.history[0].updatedAt,
+        foreas_epikoyrikhs_asfalishs: ['003'] }, db);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+    assert.deepEqual(db.departureCorrectionError.departureCorrectionChangedFields,
+        ['foreas_epikoyrikhs_asfalishs']);
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.writes(), 0);
+});
+
+test('explicit rehire intent takes precedence over full-form departure cancellation', async () => {
+    const stored = await closedFullFormState(), db = memory(stored);
+    const { res } = await submit('edit', { ...form(),
+        hmeromhnia_proslhpshs: '2026-10-01', hmeromhnia_allaghs_symbashs: '2026-10-01',
+        hmeromhnia_allaghs_orarioy_apo: '2026-10-01',
+        hmeromhnia_allaghs_orarioy_eos: '2026-10-07',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-10-01',
+        hmeromhnia_apoxorhshs: '', energos: true }, db,
+    { rehireIntent: true, rehireDate: '2026-10-01' });
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().employee.hmeromhnia_proslhpshs.slice(0, 10), '2026-10-01');
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs, null);
+    assert.equal(db.state().employee.energos, true);
+    const oldIds = new Set(stored.history.map(row => row._id));
+    const oldRows = db.state().history.filter(row => oldIds.has(row._id));
+    assert.deepEqual(oldRows, stored.history);
+    const newRows = db.state().history.filter(row => !oldIds.has(row._id));
+    assert.equal(newRows.length, 1);
+    assert.equal(newRows[0].afora_proslhpsh, true);
+    assert.equal(newRows[0].hmeromhnia_proslhpshs.slice(0, 10), '2026-10-01');
+});
+
+for (const failure of ['history', 'employee', 'commit']) {
+    test(`controlled full-form departure rolls back current, history and audit on ${failure} failure`, async () => {
+        const stored = await fullFormDepartureState(), db = memory(stored, failure);
+        const { res } = await submit('edit', fullFormDeparturePayload(stored.employee), db);
+        assert.equal(res.code, 500);
+        assert.deepEqual(db.state(), stored);
+        assert.equal(db.ended(), true);
+    });
+}
+
+test('browser deletion flags cannot bypass canonical protection of sole old departure evidence', async () => {
+    const stored = await initial();
+    const oldHire = { _id: '507f1f77bcf86cd799439291', ...scope, aa_eggrafhs: '0001',
+        hmeromhnia_proslhpshs: '2025-01-01', afora_proslhpsh: true };
+    const oldDeparture = { _id: '507f1f77bcf86cd799439292', ...scope, aa_eggrafhs: '0002',
+        hmeromhnia_proslhpshs: '2025-01-01', hmeromhnia_apoxorhshs: '2025-03-31',
+        afora_proslhpsh: false };
+    stored.history[0].aa_eggrafhs = '0003';
+    stored.history.unshift(oldHire, oldDeparture);
+    for (const forged of [false, true]) {
+        const db = memory(stored);
+        const res = await editHistory(db, [{ state: 'deleted', _id: oldDeparture._id,
+            controlledHistoryDeletion: forged, controlledLifecycleRepair: forged,
+            data: { ...oldDeparture, controlledHistoryDeletion: forged,
+                controlledLifecycleRepair: forged } }]);
+        assert.equal(res.code, 409);
+        assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+        assert.deepEqual(db.state(), stored);
+        assert.equal(mongoose.connection.readyState, 0);
+    }
+});
+
+
+test('controlled full-form departure-date correction normalizes hidden/JSON echoes without changing facts', async () => {
+    const stored = await closedFullFormState(), db = memory(stored);
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee, '2026-09-24'),
+        historyExpectedRevision: stored.history[0].updatedAt,
+        kathestos_apasxolhshs: null, foreas_epikoyrikhs_asfalishs: [] }, db);
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-24');
+    assert.equal(db.state().history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-24');
+    assert.deepEqual(db.state().history.map(row => row._id), stored.history.map(row => row._id));
+    for (const field of ['kathestos_apasxolhshs', 'foreas_epikoyrikhs_asfalishs',
+        'nomimosMisthos', 'ores_ergasias_ebdomadas', 'hmeromhnia_lhxhs_symbashs']) {
+        assert.deepEqual(db.state().employee[field], stored.employee[field], field);
+    }
+    assert.ok(db.state().audits?.length > 0);
+});
+
+test('controlled full-form departure-date correction rolls back history/current/audit on audit failure', async () => {
+    const stored = await closedFullFormState(), db = memory(stored, 'audit');
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee, '2026-09-24'),
+        historyExpectedRevision: stored.history[0].updatedAt }, db);
+    assert.equal(res.code, 500);
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.ended(), true);
 });

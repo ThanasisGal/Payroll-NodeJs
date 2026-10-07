@@ -178,3 +178,51 @@ test('invalid contract end and foreign scope fail closed', () => {
     foreign.completeHistoryRows[0].team = 'FOREIGN';
     assert.equal(plan(foreign).status, PLAN_STATUSES.BLOCKED_SCOPE);
 });
+
+for (const [relation, requested] of [
+    ['before', '2026-08-31'], ['equal to', '2026-09-23'], ['after', '2026-11-30']
+]) {
+    test(`valid contract end ${relation} actual departure preserves departure evidence`, () => {
+        const input = contractSegmentFixture();
+        const departure = '2026-09-23';
+        input.currentEmployee.hmeromhnia_apoxorhshs = departure;
+        input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = departure;
+        input.currentEmployee.energos = false;
+        const latest = input.completeHistoryRows[1];
+        latest.hmeromhnia_apoxorhshs = departure;
+        latest.hmeromhnia_isxyos_oron_ergasias_eos = departure;
+        const before = structuredClone(input);
+        const result = plan(input, requested);
+        assert.equal(result.status, PLAN_STATUSES.APPLYABLE);
+        assert.equal(result.currentPatch[CONTRACT_END_FIELD], requested);
+        assert.deepEqual(result.desiredHistoryRows, before.completeHistoryRows.map(row =>
+            ({ ...row, [CONTRACT_END_FIELD]: requested })));
+        assert.deepEqual(input, before);
+    });
+}
+
+test('partial synchronization repairs only the stale current-segment row across two segments', () => {
+    const input = contractSegmentFixture();
+    const old = input.completeHistoryRows[0];
+    old[CONTRACT_END_FIELD] = '2026-05-31';
+    input.currentEmployee.hmeromhnia_allaghs_symbashs = '2026-06-01';
+    input.currentEmployee[CONTRACT_END_FIELD] = '2027-01-31';
+    input.completeHistoryRows[1].hmeromhnia_allaghs_symbashs = '2026-06-01';
+    const synchronized = { ...input.completeHistoryRows[1], _id: 'synchronized-profile',
+        aa_eggrafhs: '3', hmeromhnia_allaghs_orarioy_apo: '2026-08-01',
+        hmeromhnia_allaghs_orarioy_eos: '2026-08-01',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-08-01',
+        [CONTRACT_END_FIELD]: '2027-01-31' };
+    input.completeHistoryRows[1].hmeromhnia_isxyos_oron_ergasias_eos = '2026-07-31';
+    input.completeHistoryRows.push(synchronized);
+    Object.assign(input.currentEmployee, synchronized, { _id: 'employee' });
+    input.protectedReferences[synchronized._id] = [];
+    const before = structuredClone(input);
+    const result = plan(input);
+    assert.equal(result.status, PLAN_STATUSES.APPLYABLE_PARTIAL_SEGMENT_SYNC);
+    assert.deepEqual(result.currentPatch, {});
+    assert.deepEqual(result.changedHistoryIds, [ids.latest]);
+    assert.deepEqual(result.desiredHistoryRows, before.completeHistoryRows.map(row =>
+        row._id === ids.latest ? { ...row, [CONTRACT_END_FIELD]: '2027-01-31' } : row));
+    assert.deepEqual(input, before);
+});
