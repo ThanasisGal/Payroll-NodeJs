@@ -777,6 +777,20 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/services/ergazomenoi/employeeEmploymentProfileWriter.supervisorAuthorization.test.js"
+            "server/controllers/ergazomenoi/ergazomenoiController.supervisorHistoryAuthorization.test.js"
+            "public/js/ergazomenoi/genika/istorikoTable.supervisorAuthorization.test.js"
+            "server/services/ergazomenoi/employeeHistoryAuthorizationService.test.js"
+            "server/services/ergazomenoi/employeeHistoryProblemScopeService.test.js"
+            "server/controllers/ergazomenoi/ergazomenoiController.employeeHistoryAuthorization.test.js"
+            "server/controllers/ergazomenoi/ergazomenoiController.editFormError.test.js"
+            "public/js/ergazomenoi/genika/istorikoTable.modal.test.js"
+            "public/js/ergazomenoi/genika/istorikoTable.lifecycleGuard.contract.test.js"
+            "server/services/ergazomenoi/employeeOpenCycleHireGuardService.test.js"
+            "server/contracts/employeeHistoryCanonicalWriteBoundary.contract.test.js"
+            "server/services/ergazomenoi/employeeHistoryReferenceWriteFenceService.test.js"
+            "server/services/ergazomenoi/employeeMaintenanceHistoryPlannerService.test.js"
+            "server/utils/ergazomenoi/employmentProfileMaintenance.lifecycleError.test.js"
             "server/services/ergazomenoi/employeeHistoryEditorStateService.test.js"
             "server/services/ergazomenoi/employeeEmploymentProfileWriter.staleState.test.js"
             "server/controllers/ergazomenoi/ergazomenoiController.historyStaleState.test.js"

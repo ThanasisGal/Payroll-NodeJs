@@ -12,7 +12,10 @@ const { buildEmployeeMaintenanceIdentity } =
 const { normalizeEmployeeHistoryResolutionConfirmation } =
     require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
-const { canManageEmployeeHistory } = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
+const { ACCESS_MODES, getEmployeeHistoryAccess, authorizationFailure } =
+    require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
+const { identifyEmployeeHistoryProblemScope } =
+    require('../../services/ergazomenoi/employeeHistoryProblemScopeService');
 const {
     rejectEmployeeScheduleDailyRest,
     validateEmployeeScheduleDailyRest
@@ -835,6 +838,12 @@ class ergazomenoiController {
             const employeeHistoryStateToken = buildEmployeeHistoryEditorStateToken({
                 currentEmployee: ergazomenoiData, historyRows: persistedIstorikoData
             });
+            const employeeHistoryAccess = await getEmployeeHistoryAccess(req.session.userId);
+            const historyProblemScope = employeeHistoryAccess.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE
+                ? identifyEmployeeHistoryProblemScope({
+                    scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
+                    currentEmployee: ergazomenoiData, completeHistoryRows: persistedIstorikoData
+                }) : null;
             const rawIstorikoData = semanticHistoryRows(persistedIstorikoData);
             const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
             const originalEmploymentHistoryId = selectMaintenanceMode(
@@ -886,7 +895,10 @@ class ergazomenoiController {
 
             res.render('ergazomenoi/ergazomenoi/edit', {
                 employmentProfileUi: await getEmploymentProfileUiContext(),
-                canManageEmployeeHistory: await canManageEmployeeHistory(req.session.userId),
+                canManageEmployeeHistory: employeeHistoryAccess.mode === ACCESS_MODES.ADMIN_FULL,
+                employeeHistoryAccessMode: employeeHistoryAccess.mode,
+                problematicHistoryIds: historyProblemScope?.deterministicallyResolved
+                    ? historyProblemScope.problematicHistoryIds : [],
                 locals,
                 perifereies,
                 companyData,
@@ -971,11 +983,9 @@ class ergazomenoiController {
                 return res.status(400).json({ success: false, message: 'Μη έγκυρη μεταβολή ιστορικού.' });
             }
 
-            if (updates.length > 0 && !await canManageEmployeeHistory(req.session.userId)) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Δεν έχετε δικαίωμα διαχείρισης ιστορικού.'
-                });
+            const access = await getEmployeeHistoryAccess(req.session.userId);
+            if (access.mode === ACCESS_MODES.NONE) {
+                throw authorizationFailure('EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN');
             }
 
             if (!isEmployeeHistoryEditorStateToken(expectedStateToken)) {
@@ -1032,7 +1042,7 @@ class ergazomenoiController {
                     )
             });
 
-            const operations = updates.map(({ _id, state, data = {} }) => {
+            const operations = updates.map(({ _id, state, data = {}, anchorHistoryId }) => {
                 if (state === 'deleted') return { state, historyId: _id };
                 const rate = parseSixthDayPremiumRate(data.pososto_prosayxhshs_6hs_hmeras);
                 if (Object.prototype.hasOwnProperty.call(data, 'pososto_prosayxhshs_6hs_hmeras') && rate === null) {
@@ -1041,13 +1051,15 @@ class ergazomenoiController {
                 }
                 const historyChanges = historyEditorChanges(buildUpdateData(data), data);
                 return { state, historyId: _id, input: profileInput(data, 'edit'),
+                    ...(state === 'inserted' ? { anchorHistoryId } : {}),
                     effectiveFrom: data.hmeromhnia_isxyos_oron_ergasias_apo || data.hmeromhnia_allaghs_orarioy_apo,
                     maintenance: { historyChanges, employeeChanges: historyChanges, submittedFields: Object.keys(data),
                         identity: buildEmployeeMaintenanceIdentity(data) } };
             });
             await writeEmployeeEmploymentHistoryOperations({
                 scope: { team: userTeam, company_kod: companyId, kodikos: String(kodikos) },
-                employeeId: String(ergazomenos._id), operations, expectedStateToken
+                employeeId: String(ergazomenos._id), operations, expectedStateToken,
+                actorUserId: req.session.userId
             });
 
             return res.status(200).json({

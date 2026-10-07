@@ -1,4 +1,5 @@
 'use strict';
+const Authorization = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -69,7 +70,7 @@ function editHandler(historyRows) {
         mongoose: { trusted: (value) => value },
         enrichIstorikoRowsForDetails: async (rows) => rows,
         getEmploymentProfileUiContext: async () => ({}),
-        canManageEmployeeHistory: async () => false,
+        ...Authorization, getEmployeeHistoryAccess: async () => ({ mode: 'NONE' }),
         buildEmployeeMaintenanceIdentity,
         dateKeyUtc,
         selectMaintenanceMode,

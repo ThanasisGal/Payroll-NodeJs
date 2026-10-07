@@ -1,4 +1,5 @@
 'use strict';
+const Authorization = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -31,10 +32,12 @@ async function submit(db, expectedStateToken, { authorized = true, extra = {}, u
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     const handler = vm.runInNewContext(`${helpers}\n(${method('updateIstorikoData', 'searchPostErgazomenoi')})`, {
         Date, console: { error() {} }, ...S, ...M, ...Terms, buildEmployeeMaintenanceIdentity,
-        canManageEmployeeHistory: async () => authorized,
+        ...Authorization, getEmployeeHistoryAccess: async () => ({ mode: authorized ? 'ADMIN_FULL' : 'NONE' }),
         ErgazomenoiModel: { findOne() { reads++; return { lean: async () => db.state().employees[0] }; } },
         writeEmployeeEmploymentHistoryOperations: args => { writerCalls++;
-            return W.writeEmployeeEmploymentHistoryOperations({ ...args, ...db.deps }); }
+            return W.writeEmployeeEmploymentHistoryOperations({ ...args, ...db.deps,
+                userModel: { findById: () => ({ select() { return this; }, session() { return this; },
+                    lean: async () => ({ privileges: 'A', team: 'THA', situation: 'A' }) }) } }); }
     });
     const req = { session: { userId: 'authorized-test-user', userTeam: scope.team, companyInUse: scope.company_kod },
         body: { employeeId: 'employee', expectedStateToken, updates: updates || [{ state: 'modified',
@@ -57,7 +60,7 @@ test('actual edit handler renders a token from full persisted History before enr
         IstorikoProslhpseonAllagonModel: { find: () => query(initial.history) },
         PerifereiesModel: { find: () => query([]) }, GenikesParametroiModel: { find: () => query([]) },
         ProdhlomenaOrariaModel: { find: () => query([]) }, mongoose: { trusted: value => value },
-        getEmploymentProfileUiContext: async () => ({}), canManageEmployeeHistory: async () => true,
+        getEmploymentProfileUiContext: async () => ({}), ...Authorization, getEmployeeHistoryAccess: async () => ({ mode: 'ADMIN_FULL' }),
         buildEmployeeMaintenanceIdentity, dateKeyUtc, selectMaintenanceMode: W.selectMaintenanceMode,
         enrichIstorikoRowsForDetails: async rows => rows.map(row => ({ ...row, __lookups: { label: 'display-only' } })) };
     const handler = vm.runInNewContext(`(${method('editErgazomenoiForm', 'getIstorikoData')})`, context);

@@ -1,6 +1,8 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const { ACCESS_MODES, getEmployeeHistoryAccess, assertEmployeeHistoryOperationsAuthorized } =
+    require('./employeeHistoryAuthorizationService');
 const { assertEmployeeHistoryEditorState } = require('./employeeHistoryEditorStateService');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const EmployeeHistoryRepairAuditModel = require('../../models/employeeHistoryRepairAudit');
@@ -1059,7 +1061,7 @@ async function inProfileTransaction(connection, capabilityProbe, work, activeSes
 // neither action exists in the baseline editor.
 async function writeEmployeeEmploymentHistoryOperations(options) {
     const hasExpectedStateToken = Object.hasOwn(options, 'expectedStateToken');
-    const { scope, employeeId, operations, expectedStateToken,
+    const { scope, employeeId, operations, expectedStateToken, actorUserId, userModel,
         connection = mongoose.connection, employeeModel = ErgazomenoiModel,
         historyModel = IstorikoProslhpseonAllagonModel,
         auditModel = EmployeeHistoryRepairAuditModel,
@@ -1083,6 +1085,16 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
         if (hasExpectedStateToken) {
             assertEmployeeHistoryEditorState({ expectedStateToken,
                 currentEmployee: current, historyRows: originalRows });
+        }
+        // The HTTP controller always supplies the authenticated session user ID.
+        // Omission is reserved for existing trusted internal writer callers.
+        if (Object.hasOwn(options, 'actorUserId')) {
+            const access = await getEmployeeHistoryAccess(actorUserId, { userModel, session });
+            const problemScope = access.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE
+                ? identifyEmployeeHistoryProblemScope({ scope: filter,
+                    currentEmployee: current, completeHistoryRows: originalRows }) : null;
+            assertEmployeeHistoryOperationsAuthorized({ accessMode: access.mode,
+                operations, originalHistoryRows: originalRows, problemScope });
         }
         assertOpenCycleHireGuard({ currentEmployee: current,
             historyRows: originalRows, operations });

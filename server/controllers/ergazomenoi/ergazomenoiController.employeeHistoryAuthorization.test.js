@@ -1,4 +1,5 @@
 'use strict';
+const Authorization = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -46,9 +47,10 @@ function historyHandler({ authorized, writerCalls }) {
         ...Maintenance,
         buildEmployeeMaintenanceIdentity,
         ErgazomenoiModel: { findOne: () => query },
-        canManageEmployeeHistory: async (userId) => {
+        ...Authorization,
+        getEmployeeHistoryAccess: async (userId) => {
             assert.equal(userId, 'authenticated-user-id');
-            return authorized;
+            return { mode: authorized ? Authorization.ACCESS_MODES.ADMIN_FULL : Authorization.ACCESS_MODES.NONE };
         },
         writeEmployeeEmploymentHistoryOperations: async (args) => {
             writerCalls.push(args);
@@ -102,19 +104,11 @@ test('active Admin/THA capability renders all four existing row actions enabled'
     }
 });
 
-test('client uses the server capability for all dynamic buttons and defensively blocks all actions', () => {
-    assert.match(clientSource, /table\.dataset\.canManageHistory === 'true'/);
-    for (const action of ['add', 'edit', 'delete', 'undo']) {
-        assert.match(
-            clientSource,
-            new RegExp(`data-action="${action}"[^>]+\\$\\{canManageHistory \\? '' : 'disabled aria-disabled="true"'\\}`),
-            action
-        );
-    }
-    assert.match(
-        clientSource,
-        /\['add', 'edit', 'delete', 'undo'\]\.includes\(action\) && !canManageHistory/
-    );
+test('client preserves Admin dynamic actions and guards Supervisor row actions', () => {
+    assert.match(clientSource, /isHistoryAdmin = historyAccessMode === 'ADMIN_FULL'/);
+    assert.match(clientSource, /createActionButtons\(\{ canManage: true, canAdd: isHistoryAdmin \}\)/);
+    assert.match(clientSource, /rowCanManage = isHistorySupervisor && row.dataset.canManageRow === 'true'/);
+    assert.match(clientSource, /\['add', 'edit', 'delete', 'undo'\]\.includes\(action\) && !actionAllowed/);
 });
 
 test('non-capable users render all four existing row actions disabled with aria semantics', () => {
