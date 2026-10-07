@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const mongoose = require('mongoose');
 const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithUniqueSafeRepair,
     writeEmployeeEmploymentHistoryOperations,
-    writeEmployeeDeparture, writeEmployeeInvalidDepartureCorrection,
+    writeEmployeeDeparture, writeEmployeeInvalidDepartureCorrection, writeEmployeeRehire,
     repairEmployeeHistoryCanonical, repairEmployeeLegacyOpenCycles,
     deleteEmployeeAndEmploymentHistory,
     selectMaintenanceMode, MODE_CORRECT_EXISTING,
@@ -207,6 +207,7 @@ test('a new arrangement appends complete history and closes previous version', a
     assert.equal(db.state().history[1][C.ENABLED], true);
     assert.equal(db.state().employee.localNote, 'preserve');
     assert.equal(db.state().history[1].aa_eggrafhs, '0002');
+    assert.equal(db.state().history[1].afora_proslhpsh, false);
 });
 
 test('trusted full future-version double submit reuses the existing canonical version', async () => {
@@ -828,6 +829,119 @@ function historyGuardOperation(state, historyId, historyChanges, effectiveFrom =
             submittedFields: Object.keys(historyChanges) } };
 }
 
+for (const flag of [false, true]) {
+    for (const source of ['historyChanges', 'submittedHistoryChanges', 'employeeChanges']) {
+        for (const boundary of ['editor batch', 'exact correction']) {
+            test(`${boundary} rejects internal ${source} hire flag ${flag} -> ${!flag} with identical dates`, async () => {
+                const initial = openCycleHireGuardState();
+                initial.history[0].afora_proslhpsh = flag;
+                const db = database(initial), row = initial.history[0];
+                const maintenance = { historyChanges: {}, employeeChanges: {},
+                    [source]: { afora_proslhpsh: !flag } };
+                const request = { ...db.dependencies, scope, employeeId: 'employee' };
+                const mutation = boundary === 'editor batch'
+                    ? writeEmployeeEmploymentHistoryOperations({ ...request,
+                        operations: [{ state: 'modified', historyId: row._id,
+                            effectiveFrom: '2026-04-01', maintenance }] })
+                    : writeEmployeeEmploymentProfile({ ...request, mode: MODE_CORRECT_EXISTING,
+                        historyId: row._id, effectiveFrom: '2026-04-01', maintenance });
+                await assert.rejects(mutation, error =>
+                    error.code === 'EMPLOYEE_HISTORY_HIRE_FLAG_SERVER_OWNED');
+                assert.deepEqual(db.state(), initial);
+                assert.equal(db.writes(), 0);
+                assert.equal(db.operations().auditCreates, 0);
+            });
+        }
+    }
+    for (const source of ['historyChanges', 'submittedHistoryChanges', 'both']) {
+        test(`Maintenance strips ${source} hire flag ${flag} -> ${!flag} while saving unrelated history`, async () => {
+            const initial = openCycleHireGuardState();
+            initial.history[0].afora_proslhpsh = flag;
+            const db = database(initial);
+            const historyChanges = { poso_symbashs_01: 1200,
+                ...(source !== 'submittedHistoryChanges' ? { afora_proslhpsh: !flag } : {}) };
+            const submittedHistoryChanges = { poso_symbashs_01: 1200,
+                ...(source !== 'historyChanges' ? { afora_proslhpsh: !flag } : {}) };
+            await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+                employeeId: 'employee', effectiveFrom: '2026-04-01',
+                maintenance: { employeeChanges: {}, historyChanges, submittedHistoryChanges } });
+            assert.equal(db.state().history.length, 1);
+            assert.equal(db.state().history[0]._id, initial.history[0]._id);
+            assert.equal(db.state().history[0].afora_proslhpsh, flag);
+            assert.equal(db.state().history[0].poso_symbashs_01, 1200);
+            assert.equal(db.operations().auditCreates, 0);
+            assert.deepEqual(historyChanges, { poso_symbashs_01: 1200,
+                ...(source !== 'submittedHistoryChanges' ? { afora_proslhpsh: !flag } : {}) });
+        });
+    }
+    test(`generic mixed batch rejects hire flag ${flag} -> ${!flag} atomically`, async () => {
+        const initial = openCycleHireGuardState();
+        initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = '2026-04-30';
+        const latest = { ...initial.history[0], _id: '507f1f77bcf86cd799439189',
+            aa_eggrafhs: '0002', afora_proslhpsh: false,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01',
+            hmeromhnia_isxyos_oron_ergasias_eos: null };
+        initial.history.push(latest);
+        initial.employee = { ...initial.employee, ...latest, _id: 'employee' };
+        initial.audits = [];
+        const unauthorized = flag ? initial.history[0] : latest;
+        const unrelated = flag ? latest : initial.history[0];
+        const db = database(initial);
+        await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies,
+            scope, employeeId: 'employee', operations: [
+                historyGuardOperation('modified', unrelated._id, { poso_symbashs_01: 1300 },
+                    unrelated.hmeromhnia_isxyos_oron_ergasias_apo),
+                historyGuardOperation('modified', unauthorized._id, { afora_proslhpsh: !flag },
+                    unauthorized.hmeromhnia_isxyos_oron_ergasias_apo)
+            ] }), error => error.code === 'EMPLOYEE_HISTORY_HIRE_FLAG_SERVER_OWNED');
+        assert.deepEqual(db.state(), initial);
+        assert.equal(db.writes(), 0);
+        assert.equal(db.operations().auditCreates, 0);
+    });
+    test(`unchanged generic hire flag ${flag} allows an unrelated edit`, async () => {
+        const initial = openCycleHireGuardState();
+        initial.history[0].afora_proslhpsh = flag;
+        const db = database(initial);
+        await writeEmployeeEmploymentHistoryOperations({ ...db.dependencies, scope,
+            employeeId: 'employee', operations: [historyGuardOperation('modified', initial.history[0]._id,
+                { afora_proslhpsh: flag, poso_symbashs_01: 1300 })] });
+        assert.equal(db.state().history[0].afora_proslhpsh, flag);
+        assert.equal(db.state().history[0].poso_symbashs_01, 1300);
+    });
+    test(`initial hire ignores generic submitted hire flag ${flag}`, async () => {
+        const db = database();
+        await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+            newEmployee: { eponymo: 'TEST' }, effectiveFrom: '2026-04-01',
+            maintenance: { employeeChanges: {}, historyChanges: { afora_proslhpsh: flag },
+                submittedHistoryChanges: { afora_proslhpsh: flag } } });
+        assert.equal(db.state().history[0].afora_proslhpsh, true);
+    });
+    test(`generic insert ignores submitted hire flag ${flag} and preserves surviving flags`, async () => {
+        const initial = openCycleHireGuardState(), db = database(initial);
+        await writeEmployeeEmploymentHistoryOperations({ ...db.dependencies, scope,
+            employeeId: 'employee', operations: [historyGuardOperation('inserted', null,
+                { afora_proslhpsh: flag }, '2026-09-15')] });
+        assert.equal(db.state().history.length, 2);
+        assert.equal(db.state().history.find(row => row._id === initial.history[0]._id).afora_proslhpsh, true);
+        assert.equal(db.state().history.find(row => row._id !== initial.history[0]._id).afora_proslhpsh, false);
+    });
+}
+
+test('controlled rehire owns true despite a submitted false flag and preserves the previous hire', async () => {
+    const initial = openCycleHireGuardState();
+    initial.employee.hmeromhnia_apoxorhshs = '2026-04-30';
+    initial.employee.energos = false;
+    initial.history[0].hmeromhnia_apoxorhshs = '2026-04-30';
+    const db = database(initial);
+    await writeEmployeeRehire({ ...db.dependencies, scope, employeeId: 'employee',
+        rehireDate: '2026-09-15', historyChanges: { afora_proslhpsh: false } });
+    assert.equal(db.state().history.length, 2);
+    assert.equal(db.state().history[0].afora_proslhpsh, true);
+    assert.equal(db.state().history[1].afora_proslhpsh, true);
+    assert.equal(new Date(db.state().history[1].hmeromhnia_proslhpshs).toISOString().slice(0, 10), '2026-09-15');
+    assert.equal(new Date(db.state().employee.hmeromhnia_proslhpshs).toISOString().slice(0, 10), '2026-09-15');
+});
+
 test('open-cycle hire guard allows unchanged active-employee Save', async () => {
     const initial = openCycleHireGuardState();
     const db = database(initial);
@@ -1387,6 +1501,9 @@ test('ordinary Save applies only uniquely proven lifecycle reclassification', as
     assert.deepEqual(db.state().history.map(row => row._id), ids);
     assert.equal(db.state().history[0].afora_proslhpsh, true);
     assert.ok(db.state().history.slice(1).every(row => row.afora_proslhpsh === false));
+    const content = row => Object.fromEntries(Object.entries(row).filter(([field]) =>
+        !['afora_proslhpsh', 'updatedAt', 'history_reference_fence'].includes(field)));
+    assert.deepEqual(db.state().history.map(content), initial.history.map(content));
     assert.equal(db.state().audits.length, 1);
     assert.equal(db.state().audits[0].mutationSource,
         'HISTORY_LIFECYCLE_RECLASSIFICATION');

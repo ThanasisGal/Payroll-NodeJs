@@ -1,7 +1,27 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { isEmploymentProfileError, profileError } = require('./employmentProfileMaintenance');
+const { isEmploymentProfileError, profileError, historyEditorChanges } = require('./employmentProfileMaintenance');
+
+for (const flag of [false, true]) test(`generic history input strips hire flag ${flag} and preserves other submitted fields`, () => {
+    const mapped = { afora_proslhpsh: flag, poso_symbashs_01: 1200, symbash: 'contract' };
+    const data = { afora_proslhpsh: flag, poso_symbashs_01: 1200 };
+    assert.deepEqual(historyEditorChanges(mapped, data), { poso_symbashs_01: 1200 });
+    assert.equal(mapped.afora_proslhpsh, flag);
+    assert.equal(data.afora_proslhpsh, flag);
+});
+
+test('internal generic hire-flag rejection has an actionable unchanged-state response', () => {
+    const code = 'EMPLOYEE_HISTORY_HIRE_FLAG_SERVER_OWNED';
+    assert.equal(isEmploymentProfileError({ code }), true);
+    const res = { status(value) { this.code = value; return this; }, json(value) { this.body = value; } };
+    profileError(res, { code, statusCode: 409 });
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, code);
+    assert.match(res.body.message, /1\..*2\..*3\./);
+    assert.match(res.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή\./);
+    assert.match(res.body.message, new RegExp(`Κωδικός αναφοράς: ${code}$`));
+});
 
 test('employment-cycle failures are handled as visible profile conflicts', () => {
     assert.equal(isEmploymentProfileError({ code: 'EMPLOYMENT_CYCLE_OVERLAP' }), true);
