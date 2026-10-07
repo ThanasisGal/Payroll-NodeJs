@@ -57,6 +57,15 @@ test('open-cycle invariant accepts a new hire boundary only when latest cycle wa
     }));
 });
 
+test('ordinary open-cycle guard rejects uncontrolled removal of a later stray hire', () => {
+    const laterStray = { ...openRow, _id: 'later-stray',
+        hmeromhnia_proslhpshs: '2026-09-15', afora_proslhpsh: true };
+    assert.throws(() => assertOpenCycleHireGuard({
+        currentBefore: currentOpen, historyBefore: [openRow, laterStray],
+        currentAfter: currentOpen, historyAfter: [openRow]
+    }), error => error.code === ERROR_CODE);
+});
+
 test('open-cycle invariant exposes only the actionable Greek message', () => {
     const response = { status(code) { this.statusCode = code; return this; },
         json(payload) { this.payload = payload; return this; } };
