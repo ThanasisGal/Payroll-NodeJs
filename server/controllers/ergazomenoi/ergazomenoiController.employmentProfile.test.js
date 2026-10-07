@@ -1,4 +1,5 @@
 'use strict';
+const Authorization = require('../../services/ergazomenoi/employeeHistoryAuthorizationService');
 // Execute the actual controller through its persistence boundary. Later PDF/API/schedule
 // effects are excluded; their source is compared byte-for-byte with the approved checkpoint.
 const { test } = require('node:test');
@@ -819,8 +820,10 @@ function historyHandler(db) {
     return vm.runInNewContext(`${helpers}\n(${method})`, { Date, console: { error() {} }, ...Terms, ...M, ...EditorState,
         buildEmployeeMaintenanceIdentity,
         ErgazomenoiModel: db.employeeModel,
-        canManageEmployeeHistory: async () => true,
-        writeEmployeeEmploymentHistoryOperations: args => W.writeEmployeeEmploymentHistoryOperations({ ...args, ...db.deps }) });
+        ...Authorization, getEmployeeHistoryAccess: async () => ({ mode: 'ADMIN_FULL' }),
+        writeEmployeeEmploymentHistoryOperations: args => W.writeEmployeeEmploymentHistoryOperations({ ...args, ...db.deps,
+                userModel: { findById: () => ({ select() { return this; }, session() { return this; },
+                    lean: async () => ({ privileges: 'A', team: 'THA', situation: 'A' }) }) } }) });
 }
 async function editHistory(db, updates) {
     const req = { session: { userId: 'authorized-user', userTeam: scope.team, companyInUse: scope.company_kod },

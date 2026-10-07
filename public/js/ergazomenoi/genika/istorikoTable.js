@@ -14,7 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!table) return;
 
-    const canManageHistory = table.dataset.canManageHistory === 'true';
+    const historyAccessMode = table.dataset.historyAccessMode ||
+        (table.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
+    const isHistoryAdmin = historyAccessMode === 'ADMIN_FULL';
+    const isHistorySupervisor = historyAccessMode === 'SUPERVISOR_PROBLEM_SCOPE';
     const expectedStateToken = table.dataset.expectedStateToken || '';
     const currentRelationshipOpen = table.dataset.currentRelationshipOpen === 'true';
     const currentHireDate = table.dataset.currentHireDate || '';
@@ -252,29 +255,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function createActionButtons() {
+    function createActionButtons({ canManage = false, canAdd = canManage } = {}) {
         const addTitle = currentRelationshipOpen
             ? 'Προσθήκη μεταβολής στην ίδια εργασιακή σχέση'
             : 'Προσθήκη';
         return `
             <div class="istoriko-actions">
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" title="${addTitle}" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" title="${addTitle}" ${canAdd ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-plus-lg"></i>
                 </button>
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" title="Τροποποίηση" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" title="Τροποποίηση" ${canManage ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-pencil-square"></i>
                 </button>
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" title="Διαγραφή" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" title="Διαγραφή" ${canManage ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-trash3"></i>
                 </button>
-                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-undo" data-action="undo" title="Αναίρεση" ${canManageHistory ? '' : 'disabled aria-disabled="true"'}>
+                <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-undo" data-action="undo" title="Αναίρεση" ${canManage ? '' : 'disabled aria-disabled="true"'}>
                     <i class="bi bi-arrow-counterclockwise"></i>
                 </button>
             </div>
         `;
     }
 
-    function createEmptyRow() {
+    function createEmptyRow(anchorHistoryId = '') {
         const tr = document.createElement('tr');
         tr.className = 'istoriko-row';
         tr.dataset.id = '';
@@ -282,6 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.dataset.original = JSON.stringify({});
         tr.dataset.record = JSON.stringify({});
         tr.dataset.aa = '';
+        tr.dataset.persisted = 'false';
+        tr.dataset.canManageRow = 'true';
+        tr.dataset.anchorHistoryId = isHistorySupervisor ? anchorHistoryId : '';
 
         tr.innerHTML = `
             <td class="text-center istoriko-aa-col"></td>
@@ -295,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="istoriko-state state-inserted"></span>
             </td>
             <td class="istoriko-actions-col text-center">
-                ${createActionButtons()}
+                ${createActionButtons({ canManage: true, canAdd: isHistoryAdmin })}
             </td>
         `;
 
@@ -433,6 +439,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 _id: row.dataset.id || null,
                 state,
                 aa_eggrafhs: row.dataset.aa || '',
+                ...(state === 'inserted' && row.dataset.anchorHistoryId
+                    ? { anchorHistoryId: row.dataset.anchorHistoryId } : {}),
                 data: getRowData(row)
             });
         });
@@ -723,13 +731,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const action = button.dataset.action;
 
-        if (['add', 'edit', 'delete', 'undo'].includes(action) && !canManageHistory) {
+        const rowCanManage = isHistorySupervisor && row.dataset.canManageRow === 'true';
+        const supervisorCanAdd = rowCanManage && row.dataset.persisted === 'true' &&
+            Boolean(row.dataset.id);
+        const actionAllowed = isHistoryAdmin || (rowCanManage &&
+            (action !== 'add' || supervisorCanAdd));
+        if (['add', 'edit', 'delete', 'undo'].includes(action) && !actionAllowed) {
             event.preventDefault();
             return;
         }
 
         if (action === 'add') {
-            const newRow = createEmptyRow();
+            const newRow = createEmptyRow(isHistorySupervisor ? row.dataset.id || '' : '');
             row.insertAdjacentElement('afterend', newRow);
             renumberRows();
             rowToEditMode(newRow);
