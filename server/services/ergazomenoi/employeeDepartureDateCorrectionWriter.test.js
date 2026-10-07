@@ -45,6 +45,15 @@ function database(initial, { fail = '', pretendHistoryUpdate = false,
     const employeeModel = {
         findOne: filter => query(() => matches(draft.employee, filter) ? draft.employee : null),
         async updateOne(filter, update, options) {
+            // Business-state assertions below intentionally exclude hidden fence
+            // metadata; transactional increments/retries have dedicated tests.
+            if (update.$inc?.employee_profile_mutation_sequence === 1) {
+                assert.equal(options.session, session);
+                assert.equal(options.timestamps, false);
+                assert.deepEqual(update, { $inc: { employee_profile_mutation_sequence: 1 } });
+                return { matchedCount: matches(draft.employee, filter) ? 1 : 0 };
+            }
+
             assert.equal(options.session, session);
             writes += 1; operations.employee += 1;
             operationOrder.push('employee');

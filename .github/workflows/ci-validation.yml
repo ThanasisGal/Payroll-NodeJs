@@ -732,12 +732,58 @@ jobs:
             exit 1
           fi
 
+      - name: Ensure focused historical regression baselines are available
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          head_before=$(git rev-parse HEAD)
+
+          ensure_historical_baseline() {
+            local baseline="$1"
+            shift
+            local historical_path needs_fetch=false
+
+            if ! git cat-file -e "${baseline}^{commit}" 2>/dev/null; then
+              needs_fetch=true
+            fi
+            for historical_path in "$@"; do
+              if ! git cat-file -e "${baseline}:${historical_path}" 2>/dev/null; then
+                needs_fetch=true
+              fi
+            done
+
+            if [[ "$needs_fetch" == true ]]; then
+              git fetch --no-tags --depth=1 origin "$baseline"
+            fi
+
+            git cat-file -e "${baseline}^{commit}"
+            for historical_path in "$@"; do
+              git cat-file -e "${baseline}:${historical_path}"
+            done
+          }
+
+          ensure_historical_baseline "da765ee8050c91419b7707839b55e4ead0412ef3" \
+            "server/controllers/ergazomenoi/ergazomenoiController.js"
+          ensure_historical_baseline "bba736417cf30ff9d2de6e460496b96b552b21ba" \
+            "server/utils/ergazomenoi/getOrarioTermsForDate.js" \
+            "server/utils/ergazomenoi/resolveBreakConfigurationForDate.js"
+
+          test "$(git rev-parse HEAD)" = "$head_before"
+
       - name: Run safe focused tests
         shell: bash
         run: |
           set -euo pipefail
 
           tests=(
+            "server/services/ergazomenoi/employeeEmploymentProfileWriter.serialization.test.js"
+            "server/services/ergazomenoi/employeeEmploymentProfileWriter.test.js"
+            "server/controllers/ergazomenoi/ergazomenoiController.employmentProfile.test.js"
+            "server/services/ergazomenoi/employeeDepartureLifecycleWriter.test.js"
+            "server/services/ergazomenoi/employeeDepartureDateCorrectionWriter.test.js"
+            "server/services/ergazomenoi/employeeRehireLifecycleWriter.test.js"
+            "server/utils/ergazomenoi/employmentProfileTemporal.test.js"
             "scripts/ci/audit-production-dependencies.test.js"
             "server/utils/s3Helper.dependencyBoundary.contract.test.js"
             "server/controllers/ergazomenoi/erganhController.scenarioProjection.contract.test.js"

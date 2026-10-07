@@ -1011,6 +1011,32 @@ function applyOrExecuteFinalMutationPlan(options, planningState) {
         ? applyFinalPlanInMemory({ ...options, planningState })
         : executeFinalMutationPlan(options);
 }
+// Transaction-attempt metadata only: the persisted Employee write is the fence.
+// Reset on every driver callback retry; never reuse an earlier attempt's marker.
+const employeeMutationFences = new WeakMap();
+const EMPLOYEE_MUTATION_SEQUENCE = 'employee_profile_mutation_sequence';
+
+async function acquireEmployeeMutationFence({ filter, employeeId, employeeModel,
+    session, notFoundCode = 'EMPLOYEE_PROFILE_NOT_FOUND' }) {
+    const acquired = employeeMutationFences.get(session);
+    if (!acquired) throw failure('EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE');
+    // Legacy internal callers can identify by scope. Read identity only, never
+    // the business state used for planning, before the exact scoped write.
+    const id = employeeId || (await requestScopedLean(
+        employeeModel.findOne(filter), session, '_id'))?._id;
+    if (!id) throw failure(notFoundCode);
+    const identity = JSON.stringify([...EMPLOYEE_SCOPE_FIELDS.map(field =>
+        String(filter[field])), String(id)]);
+    if (!acquired.has(identity)) {
+        const fenced = await employeeModel.updateOne({ ...filter, _id: id }, {
+            $inc: { [EMPLOYEE_MUTATION_SEQUENCE]: 1 }
+        }, { session, timestamps: false });
+        if (fenced.matchedCount !== 1) throw failure(notFoundCode);
+        acquired.add(identity);
+    }
+    return id;
+}
+
 async function inProfileTransaction(connection, capabilityProbe, work, activeSession = null) {
     if (activeSession) return work(activeSession);
     let capable = false;
@@ -1019,7 +1045,11 @@ async function inProfileTransaction(connection, capabilityProbe, work, activeSes
     const session = await connection.startSession();
     try {
         let result;
-        await session.withTransaction(async () => { result = await work(session); });
+        await session.withTransaction(async () => {
+            employeeMutationFences.set(session, new Set());
+            try { result = await work(session); }
+            finally { employeeMutationFences.delete(session); }
+        });
         return result;
     } finally { await session.endSession(); }
 }
@@ -1041,6 +1071,7 @@ async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, ope
     if (new Set(identities).size !== identities.length) C.invalid('historyId', 'duplicate operations on the same row');
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]]));
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         const originalRows = await completeHistoryLean(historyModel, filter, session);
@@ -1174,7 +1205,7 @@ const HISTORY_CURRENT_FIELDS = new Set([...BASE_HISTORY_FIELDS, ...IDENTITY_FIEL
 function cleanMaintenancePatch(patch = {}) {
     return Object.fromEntries(Object.entries(patch).filter(([field, value]) => value !== undefined &&
         !C.FACT_FIELDS.includes(field) && !['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
-            'createdAt', 'updatedAt', T.ANCHOR, 'employment_profile_source', 'afora_proslhpsh',
+            'createdAt', 'updatedAt', EMPLOYEE_MUTATION_SEQUENCE, T.ANCHOR, 'employment_profile_source', 'afora_proslhpsh',
             'employment_departure_restore'].includes(field)));
 }
 function legacyMaintenancePatch(patch = {}, stored, history = false) {
@@ -1290,8 +1321,15 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
     if (mode === MODE_NEW_VERSION && historyId !== null) C.invalid('historyId', 'not allowed for new version');
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map((key) => [key, scope[key]]));
     for (const field of Object.keys(input)) if (!C.FACT_FIELDS.includes(field)) C.invalid(field, 'not an employment profile fact');
-    let from = effectiveFrom ? C.calendarDate(effectiveFrom, 'effectiveFrom') : null;
+    const submittedFrom = effectiveFrom ? C.calendarDate(effectiveFrom, 'effectiveFrom') : null;
+    const submittedNewEmployee = newEmployee;
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        let newEmployee = submittedNewEmployee;
+        const fencedEmployeeId = newEmployee ? null : await acquireEmployeeMutationFence({
+            filter, employeeId, employeeModel, session,
+            notFoundCode: employeeId ? 'EMPLOYEE_PROFILE_STALE' : 'EMPLOYEE_PROFILE_NOT_FOUND'
+        });
+        let from = submittedFrom;
         let result;
         const submittedInput = input, submittedMaintenance = maintenance;
         const write = async () => {
@@ -1301,7 +1339,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 newEmployee = { ...newEmployee, energos: false };
             }
             const current = planningState ? planningState.current : await requestScopedLean(
-                employeeModel.findOne(employeeId ? { ...filter, _id: employeeId } : filter),
+                employeeModel.findOne(fencedEmployeeId ? { ...filter, _id: fencedEmployeeId } : filter),
                 session, LARGE_EMPLOYEE_FIELDS_EXCLUSION);
             if (employeeId && String(current?._id) !== String(employeeId)) throw failure('EMPLOYEE_PROFILE_STALE');
             if (newEmployee && current) throw failure('EMPLOYEE_PROFILE_ALREADY_EXISTS');
@@ -1793,8 +1831,8 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             let employee;
             if (current) {
                 employee = { ...current, ...currentUpdate };
-                // Updating the employee inside the transaction serializes competing
-                // profile writes. Mongo write conflicts retry the entire fresh read.
+                // The outer transaction already acquired the Employee fence before
+                // planning, including corrections that ultimately write History only.
                 // The complete desired employee state is applied by the shared
                 // physical plan after all history changes have been derived.
             } else {
@@ -2025,6 +2063,8 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
     const dependencies = { connection, employeeModel, historyModel, auditModel,
         auditCollectionChecker, referenceChecker, capabilityProbe };
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session,
+            notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
         const current = await requestScopedLean(
             employeeModel.findOne({ ...filter, _id: employeeId }), session,
             LARGE_EMPLOYEE_FIELDS_EXCLUSION);
@@ -2577,7 +2617,10 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         typeof scope[key] === 'string' && scope[key].trim()) ||
         typeof employeeId !== 'string' || !employeeId.trim()) C.invalid('scope', 'complete employee scope required');
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]]));
+    const submittedInput = input, submittedMaintenance = maintenance;
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
+        let input = submittedInput, maintenance = submittedMaintenance;
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         let departureFormEchoFields = new Set();
@@ -2936,6 +2979,8 @@ async function writeEmployeeDepartureDateCorrection({ scope, employeeId, request
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos']
         .map(key => [key, scope[key]]));
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session,
+            notFoundCode: 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED' });
         const current = await employeeModel.findOne({ ...filter, _id: employeeId })
             .session(session).lean();
         if (!current || current.archived === true) {
@@ -3187,6 +3232,8 @@ async function writeEmployeeInvalidDepartureCorrection({ scope, employeeId, expe
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos']
         .map(key => [key, scope[key]]));
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session,
+            notFoundCode: 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_BLOCKED_OTHER' });
         const current = await employeeModel.findOne({ ...filter, _id: employeeId })
             .session(session).lean();
         const persistedRows = await completeHistoryLean(historyModel, filter, session);
@@ -3211,6 +3258,8 @@ async function writeEmployeeDepartureCancellation({ scope, employeeId, input = {
         typeof employeeId !== 'string' || !employeeId.trim()) C.invalid('scope', 'complete employee scope required');
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]]));
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session,
+            notFoundCode: 'EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT' });
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current || current.archived === true) {
             throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
@@ -3330,6 +3379,7 @@ async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
     );
 
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
         const current = await employeeModel
             .findOne({ ...filter, _id: employeeId })
             .session(session)
@@ -3424,6 +3474,7 @@ async function deleteEmployeeAndEmploymentHistory({ scope, employeeId,
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos']
         .map(key => [key, scope[key]]));
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
         const current = await employeeModel.findOne({ ...filter, _id: employeeId })
             .session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
@@ -3459,6 +3510,7 @@ async function repairEmployeeHistoryCanonical({ scope, employeeId,
         return [field, value];
     }));
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
         const current = await employeeModel.findOne({ ...filter, _id: employeeId })
             .session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
@@ -3510,6 +3562,7 @@ async function repairEmployeeLegacyOpenCycles({ scope, employeeId,
         C.invalid('expectedPlanFingerprint', 'valid SHA-256 required');
     }
     return inProfileTransaction(connection, capabilityProbe, async session => {
+        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
         const current = await requestScopedLean(
             employeeModel.findOne({ ...filter, _id: employeeId }), session,
             LARGE_EMPLOYEE_FIELDS_EXCLUSION);
