@@ -2580,21 +2580,22 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
     return inProfileTransaction(connection, capabilityProbe, async session => {
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
+        let departureFormEchoFields = new Set();
         if (maintenance.rejectConcurrentProfileChanges === true) {
-            assertDepartureCorrectionMaintenanceUnchanged({ current, input, maintenance });
+            const delta = assertDepartureCorrectionMaintenanceUnchanged({ current, input, maintenance });
+            departureFormEchoFields = new Set(delta.semanticallyUnchangedFields);
         }
         const persistedRows = await completeHistoryLean(historyModel, filter, session);
         const initialCanonical = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: current, historyRows: persistedRows });
         let deferredAmbiguityDeparturePlan = null;
-        let deferredAmbiguityFormEchoFields = new Set();
         let prepared;
         if (initialCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY &&
             initialCanonical.diagnostics?.reason === 'OVERLAPPING_GENUINE_PERIODS') {
             const maintenanceDelta = assertDepartureCorrectionMaintenanceUnchanged({
                 current, input, maintenance
             });
-            deferredAmbiguityFormEchoFields = new Set(
+            departureFormEchoFields = new Set(
                 maintenanceDelta.semanticallyUnchangedFields || []);
             const protectedReferences = {};
             for (const row of persistedRows) {
@@ -2640,6 +2641,21 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         const rows = prepared.historyRows;
         const transition = deferredAmbiguityDeparturePlan?.transition ||
             buildEmployeeDepartureTransition({ currentEmployee: current, history: rows, departureDate });
+        // Apply the same validated echo interpretation used by the departure guard
+        // before either persistence path derives its patches. Hidden browser values
+        // are never copied: only fields proven unchanged against transactional current
+        // state are omitted, preserving their stored representation.
+        if (departureFormEchoFields.size) {
+            const withoutFormEchoes = patch => Object.fromEntries(Object.entries(patch || {})
+                .filter(([field]) => !departureFormEchoFields.has(field)));
+            maintenance = { ...maintenance,
+                employeeChanges: withoutFormEchoes(maintenance.employeeChanges),
+                historyChanges: withoutFormEchoes(maintenance.historyChanges),
+                ...(maintenance.submittedHistoryChanges ? {
+                    submittedHistoryChanges: withoutFormEchoes(maintenance.submittedHistoryChanges)
+                } : {}) };
+            input = withoutFormEchoes(input);
+        }
         if (!rows.length) {
             // Imported employees retain the established one-row baseline transaction.
             // A future schedule start is not the validity start of a same-day
@@ -2656,9 +2672,6 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         if (maintenance.submittedEmployeeFields) {
             const owned = new Set(maintenance.submittedEmployeeFields);
             for (const field of Object.keys(mappedEmployee)) if (!owned.has(field)) delete mappedEmployee[field];
-        }
-        if (deferredAmbiguityDeparturePlan) {
-            for (const field of deferredAmbiguityFormEchoFields) delete mappedEmployee[field];
         }
         for (const field of [...IDENTITY_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo']) {
             if (field === 'hmeromhnia_apoxorhshs' || field === 'hmeromhnia_isxyos_oron_ergasias_eos') continue;
@@ -2702,9 +2715,6 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         else delete employeePatch.hmeromhnia_isxyos_oron_ergasias_eos;
         const mappedHistory = cleanMaintenancePatch(
             maintenance.submittedHistoryChanges || maintenance.historyChanges);
-        if (deferredAmbiguityDeparturePlan) {
-            for (const field of deferredAmbiguityFormEchoFields) delete mappedHistory[field];
-        }
         const profilePatch = { ...factChanges };
         for (const [field, value] of Object.entries(mappedHistory)) {
             if (field === 'hmeromhnia_isxyos_dialleimatos_apo') {

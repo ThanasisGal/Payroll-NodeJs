@@ -1541,3 +1541,125 @@ test('controlled full-form departure-date correction rolls back history/current/
     assert.deepEqual(db.state(), stored);
     assert.equal(db.ended(), true);
 });
+
+async function hiddenEchoDepartureState() {
+    const stored = await fullFormDepartureState();
+    for (const row of stored.history) {
+        row.kathestos_apasxolhshs = stored.employee.kathestos_apasxolhshs;
+        row.foreas_epikoyrikhs_asfalishs = plain(stored.employee.foreas_epikoyrikhs_asfalishs);
+    }
+    return stored;
+}
+for (const [label, representation] of [
+    ['empty employment status', { kathestos_apasxolhshs: '' }],
+    ['null employment status', { kathestos_apasxolhshs: null }],
+    ['empty insurance selection', { foreas_epikoyrikhs_asfalishs: [] }],
+    ['both empty controls', { kathestos_apasxolhshs: null, foreas_epikoyrikhs_asfalishs: [] }],
+    ['JSON insurance selection', { foreas_epikoyrikhs_asfalishs: '["002"]' }],
+    ['wrapped JSON insurance selection', { foreas_epikoyrikhs_asfalishs: ['["002"]'] }]
+]) {
+    test(`first departure preserves validated unchanged echoes: ${label}`, async () => {
+        const stored = await hiddenEchoDepartureState(), db = memory(stored);
+        const { res } = await submit('edit', {
+            ...fullFormDeparturePayload(stored.employee), ...representation
+        }, db);
+        assert.equal(res.code, 200, res.body?.errorMessage);
+        assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-23');
+        assert.equal(db.state().employee.energos, false);
+        assert.deepEqual(db.state().history.map(row => row._id), stored.history.map(row => row._id));
+        for (const field of ['kathestos_apasxolhshs', 'foreas_epikoyrikhs_asfalishs']) {
+            assert.deepEqual(db.state().employee[field], stored.employee[field], field);
+            for (const [index, row] of db.state().history.entries()) {
+                assert.deepEqual(row[field], stored.history[index][field], field);
+                assert.equal(row.afora_proslhpsh, stored.history[index].afora_proslhpsh);
+            }
+        }
+        assert.deepEqual(db.state().audits, stored.audits);
+    });
+}
+for (const [label, change, changedField] of [
+    ['real status change with stale hidden echo', { kathestos_apasxolhshs: '1' }, 'kathestos_apasxolhshs'],
+    ['real insurance change with stale hidden echo', { foreas_epikoyrikhs_asfalishs: ['003'] }, 'foreas_epikoyrikhs_asfalishs'],
+    ['intentional insurance clear', { foreas_epikoyrikhs_asfalishs: [],
+        foreas_epikoyrikhs_asfalishs_stathera: '[]' }, 'foreas_epikoyrikhs_asfalishs'],
+    ['malformed hidden JSON', { foreas_epikoyrikhs_asfalishs: [],
+        foreas_epikoyrikhs_asfalishs_stathera: '["002"' }, 'foreas_epikoyrikhs_asfalishs'],
+    ['forged hidden status', { kathestos_apasxolhshs: null,
+        kathestos_apasxolhshs_stathera: '1' }, 'kathestos_apasxolhshs'],
+    ['forged hidden insurance', { foreas_epikoyrikhs_asfalishs: [],
+        foreas_epikoyrikhs_asfalishs_stathera: '["003"]' }, 'foreas_epikoyrikhs_asfalishs']
+]) {
+    test(`first departure does not grant hidden-field authority: ${label}`, async () => {
+        const stored = await hiddenEchoDepartureState(), db = memory(stored);
+        const { res } = await submit('edit', {
+            ...fullFormDeparturePayload(stored.employee), ...change
+        }, db);
+        assert.equal(res.code, 409);
+        assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+        assert.ok(db.departureError.departureCorrectionChangedFields.includes(changedField));
+        assert.deepEqual(db.state(), stored);
+        assert.equal(db.writes(), 0);
+    });
+}
+for (const [field, value] of [['kathestos_apasxolhshs', null], ['foreas_epikoyrikhs_asfalishs', []]]) {
+    test(`first departure does not guess an omitted hidden echo: ${field}`, async () => {
+        const stored = await hiddenEchoDepartureState(), db = memory(stored);
+        const payload = { ...fullFormDeparturePayload(stored.employee), [field]: value };
+        delete payload[`${field}_stathera`];
+        const { res } = await submit('edit', payload, db);
+        assert.equal(res.code, 409);
+        assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+        assert.deepEqual(db.state(), stored);
+        assert.equal(db.writes(), 0);
+    });
+}
+test('malformed hidden JSON cannot override a genuine visible insurance selection', async () => {
+    const stored = await hiddenEchoDepartureState(), db = memory(stored);
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+        foreas_epikoyrikhs_asfalishs_stathera: '["003"' }, db);
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.deepEqual(db.state().employee.foreas_epikoyrikhs_asfalishs, ['002']);
+    assert.deepEqual(db.state().history[0].foreas_epikoyrikhs_asfalishs, ['002']);
+});
+test('first departure with validated hidden echoes rolls back after mutation attempts', async () => {
+    const stored = await hiddenEchoDepartureState(), db = memory(stored, 'commit');
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+        kathestos_apasxolhshs: null, foreas_epikoyrikhs_asfalishs: [] }, db);
+    assert.equal(res.code, 500);
+    assert.ok(db.writes() > 0);
+    assert.deepEqual(db.state(), stored); // No committed current/history/audit change.
+    assert.equal(db.ended(), true);
+});
+
+test('first departure preserves echoes when creating the imported employee history baseline', async () => {
+    const stored = await hiddenEchoDepartureState();
+    stored.history = [];
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+        kathestos_apasxolhshs: null, foreas_epikoyrikhs_asfalishs: [] }, db);
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-23');
+    assert.equal(db.state().history.length, 1);
+    assert.equal(db.state().history[0].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-23');
+    assert.equal(db.state().history[0].kathestos_apasxolhshs, '0');
+    assert.equal(db.state().employee.kathestos_apasxolhshs, '0');
+    assert.deepEqual(db.state().employee.foreas_epikoyrikhs_asfalishs, ['002']);
+});
+test('first departure preserves other stored status values and insurance ordering using existing equality', async () => {
+    const stored = await hiddenEchoDepartureState();
+    for (const record of [stored.employee, ...stored.history]) {
+        record.kathestos_apasxolhshs = '1';
+        record.typos_apasxolhshs = '1';
+        record.foreas_epikoyrikhs_asfalishs = ['004', '002'];
+    }
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+        kathestos_apasxolhshs: '', kathestos_apasxolhshs_stathera: '1',
+        foreas_epikoyrikhs_asfalishs: [],
+        foreas_epikoyrikhs_asfalishs_stathera: '["004","002"]' }, db);
+    assert.equal(res.code, 200, res.body?.errorMessage);
+    for (const record of [db.state().employee, ...db.state().history]) {
+        assert.equal(record.kathestos_apasxolhshs, '1');
+        assert.deepEqual(record.foreas_epikoyrikhs_asfalishs, ['004', '002']);
+    }
+});
