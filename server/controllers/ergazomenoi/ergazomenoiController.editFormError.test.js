@@ -7,6 +7,9 @@ const vm = require('node:vm');
 const {
     selectMaintenanceMode
 } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
+const { buildEmployeeMaintenanceIdentity } =
+    require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
+const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const {
     isEmploymentProfileError
 } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
@@ -24,10 +27,6 @@ function extract(startMarker, endMarker) {
 }
 
 function editHandler(historyRows) {
-    const helper = extract(
-        'function getIstorikoDateIdentity(formData = {}) {',
-        '// =========================================================================\n// ✅ HELPERS: Εμπλουτισμός ιστορικού'
-    );
     const method = extract(
         '    static editErgazomenoiForm = async (req, res, next) => {',
         '    static getIstorikoData = async (req, res) => {'
@@ -55,10 +54,6 @@ function editHandler(historyRows) {
     const context = {
         Date,
         console: { error() {} },
-        toDateOrNull(value) {
-            if (!value) return null;
-            return value instanceof Date ? value : new Date(`${value}T00:00:00.000Z`);
-        },
         CompaniesModel: { findById: () => query({ _id: employee.company_kod }) },
         ErgazomenoiModel: { findById: () => query(employee) },
         IstorikoProslhpseonAllagonModel: { find: () => query(historyRows) },
@@ -70,10 +65,12 @@ function editHandler(historyRows) {
         enrichIstorikoRowsForDetails: async (rows) => rows,
         getEmploymentProfileUiContext: async () => ({}),
         canManageEmployeeHistory: async () => false,
+        buildEmployeeMaintenanceIdentity,
+        dateKeyUtc,
         selectMaintenanceMode,
         isEmploymentProfileError
     };
-    vm.runInNewContext(`${helper}\nthis.handler = ${method}`, context);
+    vm.runInNewContext(`this.handler = ${method}`, context);
     return context.handler;
 }
 
