@@ -3151,6 +3151,56 @@ a {
     overflow: visible !important;
 }
 
+/* Employee Maintenance: το μακρύ φύλλο επιβεβαιωμένης ιστορικής διόρθωσης
+   περιορίζεται ανάμεσα στην πράσινη κεφαλίδα και το υποσέλιδο της ενεργής κάρτας. */
+.swal2-popup.employee-history-correction-popup {
+    right: auto !important;
+    left: 50% !important;
+    width: clamp(640px, 48vw, 780px) !important;
+    max-width: calc(100vw - 16px) !important;
+    margin: 0 !important;
+    padding: 1.25rem !important;
+    transform: translateX(-50%) !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+.employee-history-correction-popup > .swal2-icon,
+.employee-history-correction-popup > .swal2-title,
+.employee-history-correction-popup > .swal2-validation-message,
+.employee-history-correction-actions {
+    flex: 0 0 auto;
+}
+
+.employee-history-correction-popup > .employee-history-correction-html {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+}
+
+.employee-history-correction-actions {
+    flex: 0 0 auto;
+    margin: 0.9rem auto 0 !important;
+}
+
+.employee-history-correction-popup input[type="date"] {
+    min-height: 40px !important;
+    height: 40px !important;
+    padding: 8px 12px !important;
+    line-height: 22px !important;
+    box-sizing: border-box;
+}
+
+.employee-history-correction-html p,
+.employee-history-correction-html .text-muted {
+    white-space: pre-line;
+}
+
 .custom-swal-popup .ergani-rest-message {
     max-width: 100% !important;
     max-height: min(48vh, 380px) !important;

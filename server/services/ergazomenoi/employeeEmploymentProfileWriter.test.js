@@ -2566,7 +2566,7 @@ test('PR H πρώτη αποθήκευση H1/H2/H3 επιστρέφει ασφ�
         assert.equal(resolution.kind, 'USER_CONFIRMED_HISTORY_CORRECTION');
         assert.match(resolution.fingerprint, /^[a-f0-9]{64}$/);
         assert.equal(resolution.responsibilityText,
-            'Επιβεβαιώνω ότι οι παραπάνω επιλογές αποτυπώνουν τα πραγματικά ιστορικά στοιχεία του εργαζομένου.');
+            'Επιβεβαιώνω ότι έλεγξα τις παραπάνω επιλογές και ότι περιγράφουν αυτά που ίσχυαν πραγματικά για τον εργαζόμενο.');
         for (const forbidden of ['historyId', '_id', 'aa_eggrafhs', 'patch', 'survivorId']) {
             assert.equal(JSON.stringify(resolution).includes(forbidden), false, forbidden);
         }

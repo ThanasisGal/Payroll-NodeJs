@@ -45,10 +45,29 @@ function fakeDocument() {
                 className: '',
                 children: [],
                 listeners: {},
-                appendChild(child) { this.children.push(child); },
+                appendChild(child) { this.children.push(child); child.parentElement = this; },
                 addEventListener(name, listener) { this.listeners[name] = listener; },
                 dispatch(name) { this.listeners[name]?.({ target: this }); }
             };
+        }
+    };
+}
+
+function fakeClassList(initial = []) {
+    const values = new Set(initial);
+    return {
+        add(...items) { for (const item of items) values.add(item); },
+        contains(item) { return values.has(item); },
+        values() { return [...values]; }
+    };
+}
+
+function fakeStyle() {
+    const values = {};
+    return {
+        values,
+        setProperty(property, value, priority = '') {
+            values[property] = { value, priority };
         }
     };
 }
@@ -648,6 +667,202 @@ test('το φύλλο διόρθωσης εμφανίζει περίοδο, ετ
     for (const forbidden of ['historyId', '_id', 'aa_eggrafhs', 'survivorId', 'patch']) {
         assert.equal(JSON.stringify(resolution).includes(forbidden), false);
     }
+});
+
+test('οι κλάσεις πλάτους και εσωτερικής κύλισης εφαρμόζονται μόνο στο παράθυρο διόρθωσης', async () => {
+    let correctionOptions;
+    await guided.handleInitialResponse({
+        response: responseWith(correctionResolutionData()), originalPayload: {},
+        retryRequest: async () => {}, documentRef: fakeDocument(),
+        swal: { close() {}, fire: async options => {
+            correctionOptions = options;
+            return { isConfirmed: false };
+        } }
+    });
+    assert.match(correctionOptions.customClass.popup,
+        /employee-history-correction-popup/);
+    assert.match(correctionOptions.customClass.htmlContainer,
+        /employee-history-correction-html/);
+    assert.equal(correctionOptions.customClass.actions,
+        'employee-history-correction-actions');
+
+    let ordinaryOptions;
+    await guided.handleInitialResponse({
+        response: responseWith(resolutionData()), originalPayload: {},
+        retryRequest: async () => {}, documentRef: fakeDocument(),
+        swal: { close() {}, fire: async options => {
+            ordinaryOptions = options;
+            return { isConfirmed: false };
+        } }
+    });
+    assert.equal(ordinaryOptions.customClass.popup, 'custom-swal-popup');
+    assert.equal(ordinaryOptions.customClass.htmlContainer, 'custom-html-container');
+    assert.equal(ordinaryOptions.customClass.actions, undefined);
+});
+
+function employeeCardFixture(headerBottom = 90, footerTop = 700, width = 900) {
+    const header = { getBoundingClientRect: () => ({ top: headerBottom - 35,
+        bottom: headerBottom, width, height: 35 }) };
+    const headerGroup = { querySelector: () => header };
+    const body = { classList: fakeClassList(['card-body']),
+        getBoundingClientRect: () => ({ top: headerBottom + 70, bottom: footerTop,
+            width, height: footerTop - headerBottom - 70 }) };
+    const footer = { classList: fakeClassList(['card-footer']),
+        getBoundingClientRect: () => ({ top: footerTop, bottom: footerTop + 65,
+            width, height: 65 }) };
+    const card = { children: [headerGroup, body, footer],
+        getBoundingClientRect: () => ({ top: headerBottom - 35,
+            bottom: footerTop + 65, width, height: footerTop - headerBottom + 100 }) };
+    const button = { getBoundingClientRect: () => ({ width: 120, height: 32 }),
+        closest: selector => selector === '.card' ? card : null };
+    return { card, header, footer, body, button };
+}
+
+test('τα όρια προέρχονται από την πράσινη κεφαλίδα και το υποσέλιδο της ενεργής κάρτας', () => {
+    const fixture = employeeCardFixture();
+    const hiddenButton = { getBoundingClientRect: () => ({ width: 0, height: 0 }) };
+    const documentRef = { querySelectorAll: selector => selector.includes('.submitButton')
+        ? [hiddenButton, fixture.button] : [fixture.card] };
+    const windowRef = { innerHeight: 900, innerWidth: 1200,
+        getComputedStyle: () => ({ display: 'block', visibility: 'visible' }) };
+    const cardBounds = guided.findActiveEmployeeCardBounds(documentRef, windowRef);
+    assert.equal(cardBounds.header, fixture.header);
+    assert.equal(cardBounds.footer, fixture.footer);
+    const popup = { style: fakeStyle() };
+    const bounds = guided.applyCorrectionModalGeometry(popup, cardBounds, windowRef);
+    assert.equal(bounds.top, 98);
+    assert.equal(bounds.bottom, 692);
+    assert.equal(bounds.height, 594);
+    assert.ok(bounds.top < fixture.body.getBoundingClientRect().top);
+    assert.ok(bounds.bottom < fixture.footer.getBoundingClientRect().top);
+    assert.equal(popup.style.values.top.value, '98px');
+    assert.equal(popup.style.values.height.value, '594px');
+    assert.equal(popup.style.values['max-width'].value, '884px');
+    const smaller = employeeCardFixture(70, 480, 720);
+    const smallBounds = guided.applyCorrectionModalGeometry(popup, smaller,
+        { ...windowRef, innerHeight: 520, innerWidth: 800 });
+    assert.equal(smallBounds.top, 78);
+    assert.equal(smallBounds.bottom, 472);
+    assert.equal(smallBounds.viewportFallback, false);
+    const fallback = guided.applyCorrectionModalGeometry(popup, null,
+        { innerHeight: 600, innerWidth: 800 });
+    assert.equal(fallback.top, 8);
+    assert.equal(fallback.bottom, 592);
+    assert.equal(fallback.viewportFallback, true);
+    const tooSmall = guided.deriveCorrectionModalBounds({ headerRect: { bottom: 410 },
+        footerRect: { top: 500 }, viewportHeight: 600, viewportWidth: 800 });
+    assert.equal(tooSmall.top, 8);
+    assert.equal(tooSmall.bottom, 592);
+    assert.equal(tooSmall.viewportFallback, true);
+});
+
+test('μόνο το περιεχόμενο κυλά και οι ημερομηνίες έχουν επαρκές ύψος στο ειδικό CSS', () => {
+    const css = fs.readFileSync(path.resolve(__dirname, '../../../css/main.css'), 'utf8');
+    const popupRule = css.match(/\.swal2-popup\.employee-history-correction-popup\s*\{([^}]+)\}/)?.[1] || '';
+    const htmlRule = css.match(/\.employee-history-correction-popup\s*>\s*\.employee-history-correction-html\s*\{([^}]+)\}/)?.[1] || '';
+    const dateRule = css.match(/\.employee-history-correction-popup input\[type="date"\]\s*\{([^}]+)\}/)?.[1] || '';
+    assert.match(popupRule, /width:\s*clamp\(640px,\s*48vw,\s*780px\)/);
+    assert.match(popupRule, /flex-direction:\s*column/);
+    assert.match(popupRule, /overflow:\s*hidden/);
+    assert.match(htmlRule, /flex:\s*1 1 auto/);
+    assert.match(htmlRule, /min-height:\s*0/);
+    assert.match(htmlRule, /overflow-y:\s*auto/);
+    assert.match(css, /\.employee-history-correction-actions\s*\{[^}]*flex:\s*0 0 auto/s);
+    assert.match(dateRule, /min-height:\s*40px/);
+    assert.match(dateRule, /padding:\s*8px 12px/);
+    assert.match(dateRule, /line-height:\s*22px/);
+    assert.doesNotMatch(css, /employee-history-correction-dropdown/);
+});
+
+test('οι εγγενείς λίστες διατηρούν ακριβώς τις τιμές και ενημερώνουν την εγκυρότητα', () => {
+    const validity = [];
+    const content = guided.buildSafeContent(fakeDocument(),
+        guided.normalizeResolutionResponse(correctionResolutionData()), value => validity.push(value));
+    const correction = content.controls[1].intentControls.find(item =>
+        item.intent.id === 'CORRECT_EXISTING_HISTORICAL_FACT');
+    const nativeSelect = correction.valueState.element;
+    assert.equal(nativeSelect.tagName.toUpperCase(), 'SELECT');
+    assert.equal(nativeSelect.className, 'form-select');
+    assert.deepEqual(nativeSelect.children.map(option => ({ value: option.value, label: option.textContent })), [
+        { value: '', label: 'Επιλέξτε…' },
+        { value: '0111', label: '0111 — ΣΥΝΤΑΞΗ' },
+        { value: '0115', label: '0115 — ΒΑΡΕΑ' }
+    ]);
+    const fromHire = content.controls[0].intentControls.find(item => item.intent.id === 'FROM_HIRE');
+    fromHire.radio.checked = true;
+    fromHire.radio.dispatch('change');
+    correction.radio.checked = true;
+    correction.radio.dispatch('change');
+    assert.equal(correction.dateState, null);
+    nativeSelect.value = '0115';
+    nativeSelect.dispatch('change');
+    assert.equal(validity.at(-1), false);
+    content.responsibilityCheckbox.checked = true;
+    content.responsibilityCheckbox.dispatch('change');
+    assert.equal(validity.at(-1), true);
+    assert.equal(content.selected().decisions[1].value, '0115');
+});
+
+test('οι λίστες βάσης και καταλόγου PROFILE_FIELDS παραμένουν εγγενείς', () => {
+    const content = guided.buildSafeContent(fakeDocument(),
+        guided.normalizeResolutionResponse(minimalProfileCorrectionResolutionData()));
+    const intent = content.controls[0].intentControls[0];
+    for (const select of [intent.valueState.element, intent.valueState.fieldElements[0].input]) {
+        assert.equal(select.tagName.toUpperCase(), 'SELECT');
+        assert.equal(select.className, 'form-select');
+    }
+    assert.ok(intent.valueState.fieldElements.slice(1).every(item =>
+        item.input.tagName.toUpperCase() === 'INPUT'));
+});
+
+test('το παράθυρο επανυπολογίζει τα όρια και αφαιρεί ακροατές χωρίς Tom Select σε επαναλαμβανόμενο άνοιγμα', async () => {
+    let fixture = employeeCardFixture();
+    const documentRef = fakeDocument();
+    documentRef.querySelectorAll = selector => selector.includes('.submitButton')
+        ? [fixture.button] : [fixture.card];
+    const popup = { style: fakeStyle() };
+    const listeners = new Map();
+    const viewportListeners = new Map();
+    let tomSelectCreations = 0;
+    const windowRef = {
+        innerHeight: 900, innerWidth: 1200,
+        TomSelect: function () { tomSelectCreations += 1; },
+        getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+        addEventListener(name, listener) { listeners.set(name, listener); },
+        removeEventListener(name) { listeners.delete(name); },
+        visualViewport: { height: 900, width: 1200, offsetTop: 0,
+            addEventListener(name, listener) { viewportListeners.set(name, listener); },
+            removeEventListener(name) { viewportListeners.delete(name); } }
+    };
+    for (let opening = 0; opening < 2; opening += 1) {
+        fixture = employeeCardFixture();
+        const result = await guided.handleInitialResponse({
+            response: responseWith(correctionResolutionData()), originalPayload: {},
+            retryRequest: async () => {}, documentRef, windowRef,
+            swal: { close() {}, disableConfirmButton() {}, getPopup: () => popup,
+                fire: async options => {
+                    options.didOpen();
+                    options.didOpen();
+                    assert.equal(listeners.size, 1);
+                    assert.equal(popup.style.values.top.value, '98px');
+                    fixture = employeeCardFixture(120, 620, 760);
+                    listeners.get('resize')();
+                    assert.equal(popup.style.values.top.value, '128px');
+                    assert.equal(popup.style.values.height.value, '484px');
+                    fixture = employeeCardFixture(110, 610, 740);
+                    viewportListeners.get('resize')();
+                    assert.equal(popup.style.values.top.value, '118px');
+                    assert.equal(allElements(options.html).some(item =>
+                        /ts-wrapper|ts-dropdown/.test(item.className)), false);
+                    options.willClose();
+                    return { isConfirmed: false };
+                } }
+        });
+        assert.equal(result.cancelled, true);
+        assert.equal(listeners.size, 0);
+        assert.equal(viewportListeners.size, 0);
+    }
+    assert.equal(tomSelectCreations, 0);
 });
 
 test('δεν υπάρχει προεπιλογή, η ευθύνη αρχίζει ψευδής και η εφαρμογή μένει ανενεργή', () => {

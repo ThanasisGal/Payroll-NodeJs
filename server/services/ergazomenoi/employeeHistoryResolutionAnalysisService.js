@@ -38,9 +38,11 @@ const USER_CONFIRMED_CORRECTION_CONTRACT_VERSION = 1;
 const USER_CONFIRMED_CORRECTION_KIND = 'USER_CONFIRMED_HISTORY_CORRECTION';
 const USER_CONFIRMED_CORRECTION_TITLE = 'Χρειάζεται διόρθωση του ιστορικού';
 const USER_CONFIRMED_CORRECTION_EXPLANATION =
-    'Το ιστορικό περιέχει ελλιπή ή αντικρουόμενα στοιχεία. Επιλέξτε τι ίσχυε πραγματικά.';
+    'Βρέθηκαν παλιές εγγραφές του εργαζομένου που δεν συμφωνούν μεταξύ τους ή δεν έχουν όλα τα στοιχεία.\n\n' +
+    'Για να συνεχιστεί η αποθήκευση, πρέπει να μας πείτε τι ίσχυε πραγματικά στις ημερομηνίες που εμφανίζονται παρακάτω.\n\n' +
+    'Η εφαρμογή δεν θα διαλέξει μόνη της και δεν θα αλλάξει τίποτα πριν ολοκληρώσετε τις επιλογές σας.';
 const USER_CONFIRMED_CORRECTION_RESPONSIBILITY_TEXT =
-    'Επιβεβαιώνω ότι οι παραπάνω επιλογές αποτυπώνουν τα πραγματικά ιστορικά στοιχεία του εργαζομένου.';
+    'Επιβεβαιώνω ότι έλεγξα τις παραπάνω επιλογές και ότι περιγράφουν αυτά που ίσχυαν πραγματικά για τον εργαζόμενο.';
 
 function stableValue(value) {
     if (Array.isArray(value)) return value.map(stableValue);
