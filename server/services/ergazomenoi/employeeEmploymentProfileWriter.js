@@ -106,6 +106,9 @@ const { buildUniqueSafeRepairStateFingerprint,
 const { identifyEmployeeHistoryProblemScope } =
     require('./employeeHistoryProblemScopeService');
 
+const { normalizeCorrectionRequest, assertOrdinaryHistoryPolicy, assertCorrectionRolePolicy, planHistoryCorrection,
+    correctionError } = require('./employeeHistoryCorrectionPolicyService');
+
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
 // Selected internally from fresh transactional reads; callers cannot force it.
@@ -1061,6 +1064,11 @@ async function inProfileTransaction(connection, capabilityProbe, work, activeSes
 // neither action exists in the baseline editor.
 async function writeEmployeeEmploymentHistoryOperations(options) {
     const hasExpectedStateToken = Object.hasOwn(options, 'expectedStateToken');
+    const correctionRequest = options.correction == null ? null : normalizeCorrectionRequest(options.correction);
+    if (correctionRequest && (!hasExpectedStateToken || options.operations?.length)) {
+        throw correctionError('EMPLOYEE_HISTORY_CORRECTION_INVALID_REQUEST',
+            'Η διόρθωση του Ιστορικού πρέπει να γίνει χωριστά από άλλες αλλαγές.');
+    }
     const { scope, employeeId, operations, expectedStateToken, actorUserId, userModel,
         connection = mongoose.connection, employeeModel = ErgazomenoiModel,
         historyModel = IstorikoProslhpseonAllagonModel,
@@ -1088,14 +1096,90 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
         }
         // The HTTP controller always supplies the authenticated session user ID.
         // Omission is reserved for existing trusted internal writer callers.
+        let access = { mode: ACCESS_MODES.ADMIN_FULL };
+        let problemScope = null;
         if (Object.hasOwn(options, 'actorUserId')) {
-            const access = await getEmployeeHistoryAccess(actorUserId, { userModel, session });
-            const problemScope = access.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE
+            access = await getEmployeeHistoryAccess(actorUserId, { userModel, session });
+            problemScope = access.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE
                 ? identifyEmployeeHistoryProblemScope({ scope: filter,
                     currentEmployee: current, completeHistoryRows: originalRows }) : null;
             assertEmployeeHistoryOperationsAuthorized({ accessMode: access.mode,
-                operations, originalHistoryRows: originalRows, problemScope });
+                operations: correctionRequest ? [{ state: 'modified', historyId: correctionRequest.targetHistoryId }] : operations,
+                originalHistoryRows: originalRows, problemScope });
         }
+        if (correctionRequest) {
+            const catalogs = ['INSERT_EVENT','REVIEW','REPLACE_START'].includes(correctionRequest.intent)
+                ? await (options.correctionCatalogLoader || loadEmployeeHistoryCorrectionCatalogs)({ session }) : {};
+            const proposal = planHistoryCorrection({ scope: filter, currentEmployee: current,
+                historyRows: originalRows, request: correctionRequest, accessMode: access.mode,
+                catalogs, insertId: new mongoose.Types.ObjectId().toHexString() });
+            if (proposal.desiredRows) {
+                assertEmployeeHistoryOperationsAuthorized({ accessMode: access.mode,
+                    operations: proposal.affectedIds.map(historyId => ({ state: 'modified', historyId })),
+                    originalHistoryRows: originalRows, problemScope });
+                assertOpenCycleHireGuard({ currentBefore: current, historyBefore: originalRows,
+                    currentAfter: { ...current, ...proposal.currentPatch }, historyAfter: proposal.desiredRows });
+                const correctionDocumentFactory = source => typeof historyModel === 'function'
+                    ? new historyModel(source, null, source.employment_profile_source === FOUNDATION_SOURCE
+                        ? { defaults: false } : undefined) : source;
+                const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: originalRows,
+                    desiredRows: proposal.desiredRows, historyModel,
+                    historyDocumentFactory: correctionDocumentFactory });
+                const correctionReferences = async historyId => {
+                    try {
+                        return await checkedHistoryReferences({ referenceChecker, connection,
+                            historyIds: [historyId], session });
+                    } catch {
+                        throw correctionError('EMPLOYEE_HISTORY_CORRECTION_REFERENCE_CHECK_FAILED',
+                            'Η εφαρμογή δεν μπορεί να ελέγξει αν η εγγραφή χρησιμοποιείται από άλλα στοιχεία.');
+                    }
+                };
+                for (const deletion of physicalPlan.rowsToDelete) {
+                    const references = await correctionReferences(deletion.historyId);
+                    if (references.length) {
+                        proposal.blocked = true;
+                        proposal.public.phase = 'BLOCKED'; proposal.public.recommendation = null;
+                        proposal.public.explanation = 'Η εγγραφή χρησιμοποιείται από άλλα αποθηκευμένα στοιχεία και δεν μπορεί να αφαιρεθεί. Δεν έχει γίνει καμία αλλαγή. 1. Ακυρώστε τη διόρθωση. 2. Ζητήστε έλεγχο από διαχειριστή.';
+                    }
+                }
+                for (const update of physicalPlan.rowsToUpdate) {
+                    const references = await correctionReferences(update.historyId);
+                    let partitioned;
+                    try { partitioned = partitionHistoryUpdateReferences(references); } catch {
+                        throw correctionError('EMPLOYEE_HISTORY_CORRECTION_REFERENCE_CHECK_FAILED',
+                            'Η εφαρμογή δεν μπορεί να ελέγξει αν η εγγραφή χρησιμοποιείται από άλλα στοιχεία.');
+                    }
+                    if (partitioned.liveDereference.length) {
+                        proposal.blocked = true; proposal.public.phase = 'BLOCKED';
+                        proposal.public.recommendation = null;
+                        proposal.public.explanation = 'Η εγγραφή χρησιμοποιείται από άλλα στοιχεία που χρειάζονται τους υπάρχοντες όρους. Δεν έχει γίνει καμία αλλαγή. 1. Ακυρώστε τη διόρθωση. 2. Ζητήστε έλεγχο από διαχειριστή.';
+                    }
+                }
+                if (correctionRequest.confirmation && !proposal.blocked) {
+                    if (correctionRequest.confirmation.fingerprint !== proposal.public.fingerprint) {
+                        throw correctionError('EMPLOYEE_HISTORY_CORRECTION_CHANGED',
+                            'Τα στοιχεία της διόρθωσης άλλαξαν. Ανοίξτε ξανά το Ιστορικό.');
+                    }
+                    await executeFinalMutationPlan({ physicalPlan, currentBefore: current,
+                        currentPatch: proposal.currentPatch, filter, employeeId, session,
+                        employeeModel, historyModel, auditModel, auditCollectionChecker,
+                        referenceChecker, connection, canonicalRepairRequired: true,
+                        historyDocumentFactory: correctionDocumentFactory,
+                        diagnostics: { operation: 'EMPLOYEE_HISTORY_SAFE_CORRECTION',
+                            intent: correctionRequest.intent, actorUserId: actorUserId || null,
+                            planFingerprint: proposal.public.fingerprint } });
+                    return { success: true };
+                }
+            }
+            // Throwing out of the transaction also rolls the D0a fence back on
+            // preview, refusal and cancellation; there are no committed writes.
+            const error = correctionError('EMPLOYEE_HISTORY_SAFE_CORRECTION_REQUIRED',
+                'Ελέγξτε τη διόρθωση στο παράθυρο πριν την αποθήκευση.');
+            error.resolutionRequired = true; error.resolution = proposal.public;
+            throw error;
+        }
+        assertOrdinaryHistoryPolicy({ scope: filter, currentEmployee: current,
+            historyRows: originalRows, operations });
         assertOpenCycleHireGuard({ currentEmployee: current,
             historyRows: originalRows, operations });
         for (const op of operations.filter(op => op.state === 'modified')) {
@@ -1114,6 +1198,16 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
                 throw error;
             }
         }
+        if (operations.some(op => op.state === 'deleted') && canonicalBefore.rowsToUpdate?.some(item => {
+            if (operations.some(op => op.state === 'deleted' && op.historyId === item.historyId)) return false;
+            const explicit = operations.find(op => op.state === 'modified' && op.historyId === item.historyId);
+            return ['hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos']
+                .some(field => Object.hasOwn(item.patch, field) &&
+                    !Object.hasOwn(explicit?.maintenance?.historyChanges || {}, field));
+        })) {
+            throw correctionError('EMPLOYEE_HISTORY_CORRECTION_REQUIRED',
+                'Η διαγραφή θα άλλαζε και τα όρια άλλης περιόδου. Επιλέξτε «Έλεγχος / Διόρθωση» για να ελέγξετε όλες τις αλλαγές.');
+        }
         const originalLatest = Math.max(0, ...originalRows.map(row => effectiveStart(row)?.getTime() || 0));
         const appendFloor = Math.max(originalLatest, effectiveStart(current)?.getTime() || 0);
         const planningState = { current, history: canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY
@@ -1122,6 +1216,11 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
         for (let op of operations) {
             if (op.state === 'deleted') {
                 const target = planningState.history.find(row => String(row._id) === op.historyId);
+                if (!target && canonicalBefore.replacementByDeletedId?.[op.historyId] &&
+                    originalRows.some(row => String(row._id) === op.historyId)) {
+                    deleted.push(originalRows.find(row => String(row._id) === op.historyId));
+                    continue;
+                }
                 if (!target) throw failure('EMPLOYEE_PROFILE_DELETE_IDENTITY_MISMATCH');
                 deleted.push(target);
                 planningState.history = planningState.history.filter(row =>
@@ -1187,6 +1286,9 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
         }
         const finalCurrent = planningState.current;
         const finalRows = rows;
+        assertCorrectionRolePolicy({ scope: filter, currentEmployee: current,
+            historyBefore: originalRows, historyAfter: finalRows,
+            currentAfter: finalCurrent, accessMode: access.mode });
         assertOpenCycleHireGuard({
             currentBefore: current,
             historyBefore: originalRows,
@@ -1200,9 +1302,20 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
             error.canonicalReason = canonicalAfter.diagnostics?.reason;
             throw error;
         }
+        if (deleted.length && canonicalAfter.rowsToUpdate.some(item => {
+            const planned = finalRows.find(row => String(row._id) === item.historyId);
+            return ['hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos']
+                .some(field => Object.hasOwn(item.patch, field) &&
+                    (C.calendarDate(item.patch[field])?.getTime() ?? null) !==
+                    (C.calendarDate(planned?.[field])?.getTime() ?? null));
+        })) {
+            throw correctionError('EMPLOYEE_HISTORY_CORRECTION_REQUIRED',
+                'Η διαγραφή θα άλλαζε και τα όρια άλλης περιόδου. Επιλέξτε «Έλεγχος / Διόρθωση» για να ελέγξετε όλες τις αλλαγές.');
+        }
         const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: originalRows,
             desiredRows: canonicalAfter.canonicalRows, historyModel,
-            replacementByDeletedId: canonicalAfter.replacementByDeletedId });
+            replacementByDeletedId: { ...canonicalBefore.replacementByDeletedId,
+                ...canonicalAfter.replacementByDeletedId } });
         // A generic batch (including delete/canonicalization) cannot reclassify
         // surviving rows. Controlled lifecycle plans use their own writer path.
         assertGenericHireFlagsUnchanged(originalRows, physicalPlan.finalRows);
@@ -2061,6 +2174,7 @@ function originalSaveAfterUserConfirmedCorrection(profileRequest, selectedPlan, 
 async function writeEmployeeEmploymentProfileWithGuidedResolution({
     resolutionConfirmation: rawResolutionConfirmation = null,
     repairActor = null,
+    actorUserId = undefined, userModel = undefined,
     connection = mongoose.connection,
     employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel,
@@ -2094,6 +2208,14 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
         }
         const completeHistoryRows = (await completeHistoryLean(historyModel, filter, session))
             .sort((left, right) => String(left._id).localeCompare(String(right._id)));
+        let correctionAccess = null;
+        const assertResolutionRole = async (desiredHistoryRows, currentPatch = {}) => {
+            if (actorUserId === undefined) return;
+            correctionAccess ||= await getEmployeeHistoryAccess(actorUserId, { userModel, session });
+            assertCorrectionRolePolicy({ scope: filter, currentEmployee: current,
+                historyBefore: completeHistoryRows, historyAfter: desiredHistoryRows,
+                currentAfter: { ...current, ...currentPatch }, accessMode: correctionAccess.mode });
+        };
         const canonical = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: current, historyRows: completeHistoryRows });
         let protectedReferenceSummary = {};
@@ -2185,6 +2307,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                 throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
             }
             if (!uniqueConfirmation) {
+                await assertResolutionRole(repairPlan.desiredHistoryRows, repairPlan.currentPatch);
                 throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED', 409, {
                     resolutionRequired: true,
                     resolution: buildUniqueSafeRepairPublicResolution({
@@ -2197,6 +2320,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                 throw uniqueSafeRepairFailure('EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_STALE');
             }
 
+            await assertResolutionRole(repairPlan.desiredHistoryRows, repairPlan.currentPatch);
             const physicalPlan = buildFinalHistoryMutationPlan({
                 beforeRows: completeHistoryRows,
                 desiredRows: repairPlan.desiredHistoryRows,
@@ -2285,6 +2409,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                 currentEmployee: current,
                 completeHistoryRows
             });
+            await assertResolutionRole(selectedPlan.desiredHistoryRows, selectedPlan.currentPatch);
             const physicalPlan = buildFinalHistoryMutationPlan({
                 beforeRows: completeHistoryRows,
                 desiredRows: selectedPlan.desiredHistoryRows,
@@ -2392,6 +2517,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                 currentEmployee: current,
                 completeHistoryRows
             });
+            await assertResolutionRole(selectedPlan.desiredHistoryRows, selectedPlan.currentPatch);
             const physicalPlan = buildFinalHistoryMutationPlan({
                 beforeRows: completeHistoryRows,
                 desiredRows: selectedPlan.desiredHistoryRows,
@@ -2532,6 +2658,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
                 throw uniqueSafeRepairFailure(
                     'EMPLOYEE_HISTORY_USER_CORRECTION_SIMULATION_FAILED');
             }
+            await assertResolutionRole(selectedPlan.desiredHistoryRows, selectedPlan.currentPatch);
             const physicalPlan = buildFinalHistoryMutationPlan({
                 beforeRows: completeHistoryRows,
                 desiredRows: selectedPlan.desiredHistoryRows,

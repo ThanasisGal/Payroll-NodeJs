@@ -991,7 +991,7 @@ test('open-cycle hire guard rejects History editor hire identity modification wi
     await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies, scope,
         employeeId: 'employee', operations: [historyGuardOperation('modified', row._id,
             { hmeromhnia_proslhpshs: '2026-09-15' })] }),
-    error => error.code === 'EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE');
+    error => error.code === 'EMPLOYEE_HISTORY_CORRECTION_REQUIRED');
     assert.equal(db.writes(), 0);
     assert.deepEqual(db.state(), initial);
 });
@@ -1016,7 +1016,7 @@ test('open-cycle hire guard rejects conflicting crafted History request with zer
     operation.maintenance.employeeChanges = { hmeromhnia_proslhpshs: '2026-09-16' };
     await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies, scope,
         employeeId: 'employee', operations: [operation] }),
-    error => error.code === 'EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE');
+    error => error.code === 'EMPLOYEE_HISTORY_CORRECTION_REQUIRED');
     assert.equal(db.writes(), 0);
     assert.deepEqual(db.state(), initial);
 });
@@ -2922,8 +2922,7 @@ for (const departure of ['2025-03-31', '2025-01-01']) {
         await assert.rejects(writeEmployeeEmploymentHistoryOperations({ ...db.dependencies,
             scope, employeeId: 'employee', operations: [{ state: 'deleted',
                 historyId: '507f1f77bcf86cd799439283' }] }), error =>
-            error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
-            error.canonicalReason === 'EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE');
+            error.code === 'EMPLOYEE_HISTORY_CORRECTION_REQUIRED');
         assert.deepEqual(db.state(), initial); // No committed history/current/audit changes.
         assert.equal(db.ended(), true);
         assert.equal(mongoose.connection.readyState, 0);
@@ -2947,8 +2946,7 @@ test('multi-delete with one unsafe departure leaves every history/current/audit 
         scope, employeeId: 'employee', operations: [
             { state: 'deleted', historyId: '507f1f77bcf86cd799439282' },
             { state: 'deleted', historyId: '507f1f77bcf86cd799439283' }
-        ] }), error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
-            error.canonicalReason === 'EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE');
+        ] }), error => error.code === 'EMPLOYEE_HISTORY_CORRECTION_REQUIRED');
     assert.deepEqual(db.state(), initial);
     assert.equal(db.ended(), true);
     assert.equal(mongoose.connection.readyState, 0);

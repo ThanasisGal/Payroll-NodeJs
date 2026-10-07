@@ -49,12 +49,12 @@ function browser(mode = 'SUPERVISOR_PROBLEM_SCOPE') {
         } };
     vm.runInNewContext(source, { document, Date, Intl,
         bootstrap: { Modal: { getOrCreateInstance: () => ({ show() { modalShows++; } }) } },
-        window: { location: { reload() {} } }, Swal: { async fire(options) { dialogs.push(options); return { isConfirmed: true }; } },
+        window: { employeeHistoryGuidedResolution: { async handleInitialResponse() { return { handled:true,cancelled:true }; } }, location: { reload() {} } }, Swal: { async fire(options) { dialogs.push(options); return { isConfirmed: true }; } },
         async fetch(url, options) { requests.push(JSON.parse(options.body)); return { status: 200, json: async () => ({ success: true }) }; } });
     return { rows, problem, clean, requests, dialogs, details, modalShows: () => modalShows,
         save: () => save(), action(target, action) {
             const button = { dataset: { action }, closest: selector => selector === 'tr.istoriko-row' ? target : null };
-            click({ target: { closest: selector => selector === '[data-action]' ? button : null }, preventDefault() {} });
+            return click({ target: { closest: selector => selector === '[data-action]' ? button : null }, preventDefault() {} });
         }, openDetails(target) {
             click({ target: { closest: selector => selector === 'tr.istoriko-row' ? target : null }, preventDefault() {} });
         } };
@@ -100,11 +100,13 @@ for (const action of ['delete', 'undo']) test(`Supervisor ${action} removes loca
     await page.save(); assert.equal(page.requests.length, 0);
 });
 
-test('Supervisor local persisted-row edit/delete/undo preserves its original identity', () => {
+test('Supervisor local persisted-row edit/delete/undo preserves identity and deletion opens correction', async () => {
     const page = browser(); page.action(page.problem, 'edit');
     assert.equal(page.problem.dataset.editing, '1');
     page.action(page.problem, 'undo'); assert.equal(page.problem.dataset.editing, '0');
-    page.action(page.problem, 'delete'); assert.equal(page.problem.dataset.state, 'deleted');
+    await page.action(page.problem, 'delete'); assert.equal(page.problem.dataset.state, 'clean');
+    assert.equal(page.requests.length, 1); assert.equal(page.requests[0].correction.intent, 'REVIEW');
+    assert.deepEqual(page.requests[0].updates, []);
     page.action(page.problem, 'undo'); assert.equal(page.problem.dataset.state, 'clean');
     assert.equal(page.problem.dataset.id, 'persisted-problem');
 });

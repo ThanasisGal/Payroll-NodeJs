@@ -970,7 +970,7 @@ class ergazomenoiController {
         const companyId = req.session.companyInUse;
 
         try {
-            const { employeeId, expectedStateToken, updates = [] } = req.body;
+            const { employeeId, expectedStateToken, updates = [], correction = null } = req.body;
 
             if (!employeeId) {
                 return res.status(400).json({
@@ -1059,6 +1059,7 @@ class ergazomenoiController {
             await writeEmployeeEmploymentHistoryOperations({
                 scope: { team: userTeam, company_kod: companyId, kodikos: String(kodikos) },
                 employeeId: String(ergazomenos._id), operations, expectedStateToken,
+                ...(correction ? { correction } : {}),
                 actorUserId: req.session.userId
             });
 
@@ -4038,6 +4039,7 @@ class ergazomenoiController {
                             : []
                     },
                     resolutionConfirmation,
+                    actorUserId: req.session?.userId ?? null,
                     repairActor: {
                         userId: req.session?.userId,
                         userName: req.session?.userName || req.session?.username,

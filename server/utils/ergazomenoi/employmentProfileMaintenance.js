@@ -1,5 +1,6 @@
 'use strict';
 const C = require('./employmentProfileContract');
+const { sanitizePublicCorrection } = require('../../services/ergazomenoi/employeeHistoryCorrectionPolicyService');
 const { validatePublicBusinessOptions, validatePublicFactQuestions,
     validatePublicUserCorrectionConflicts } =
     require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
@@ -140,6 +141,7 @@ function isEmploymentProfileError(error) {
             'NEW_VERSION_NOT_FUTURE'].includes(code);
 }
 function sanitizedEmployeeHistoryResolution(value) {
+    if (value?.kind === 'EMPLOYEE_HISTORY_SAFE_CORRECTION') return sanitizePublicCorrection(value);
     if (!value || typeof value !== 'object' || value.version !== 1 ||
         !/^[a-f0-9]{64}$/.test(String(value.fingerprint || ''))) return null;
     if (value.kind === 'BUSINESS_FACT_COLLECTION') {
@@ -283,7 +285,10 @@ function profileError(res, error) {
         LEGACY_FACTS_REQUIRED: 'Η παλαιά εγγραφή δεν περιέχει αρκετά στοιχεία για ασφαλή διόρθωση. Συμπληρώστε ρητά τα στοιχεία της περιόδου.',
         NEW_VERSION_NOT_FUTURE: 'Η νέα μεταβολή πρέπει να αρχίζει μετά την τελευταία περίοδο του ίδιου κύκλου απασχόλησης.'
     };
-    const message = error.code === 'INVALID_EMPLOYMENT_PROFILE'
+    const message = String(error.code || '').startsWith('EMPLOYEE_HISTORY_CORRECTION_') ||
+        error.code === 'EMPLOYEE_HISTORY_SAFE_CORRECTION_REQUIRED'
+        ? `${error.publicMessage || 'Η εφαρμογή δεν μπορεί να κάνει τη διόρθωση. Δεν έχει γίνει καμία αλλαγή. 1. Ακυρώστε τη διόρθωση. 2. Ζητήστε έλεγχο από διαχειριστή.'} Κωδικός αναφοράς: ${error.code}`
+        : error.code === 'INVALID_EMPLOYMENT_PROFILE'
         ? `Μη έγκυρα στοιχεία εργασίας (${error.field}): ${error.message}`
         : messages[error.code] || 'Η αποθήκευση εργαζομένου και ιστορικού απέτυχε. Δεν αποθηκεύτηκε η μεταβολή.';
     const response = { success: false, reason: error.code || 'EMPLOYEE_PROFILE_SAVE_FAILED',
@@ -293,7 +298,8 @@ function profileError(res, error) {
     if (['EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
         'EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED',
         'EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED',
-        'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED'].includes(error.code) &&
+        'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED',
+        'EMPLOYEE_HISTORY_SAFE_CORRECTION_REQUIRED'].includes(error.code) &&
         error.resolutionRequired === true && resolution) {
         response.resolutionRequired = true;
         response.resolution = resolution;

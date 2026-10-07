@@ -131,6 +131,7 @@
                                     <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" data-id="<%= row._id %>" title="Τροποποίηση" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
+                                    <button type="button" class="btn btn-sm employee-history-correction-action employee-history-correction-confirm" data-action="review" data-id="<%= row._id %>" title="Έλεγχος / Διόρθωση" aria-label="Έλεγχος / Διόρθωση" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>Έλεγχος / Διόρθωση</button>
                                     <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" data-id="<%= row._id %>" title="Διαγραφή" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-trash3"></i>
                                     </button>
