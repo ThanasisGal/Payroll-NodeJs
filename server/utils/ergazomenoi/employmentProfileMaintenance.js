@@ -106,7 +106,9 @@ function historyEditorChanges(mapped, data) {
         fields.add('kathestos_apasxolhshs'); fields.add('typos_apasxolhshs');
     }
     if (fields.has('hmeres_ergasias_ebdomadas')) fields.add('typos_ebdomadas');
-    return Object.fromEntries(Object.entries(mapped).filter(([field]) => fields.has(field)));
+    // Hire/rehire classification belongs to the server's lifecycle plan.
+    return Object.fromEntries(Object.entries(mapped).filter(([field]) =>
+        field !== 'afora_proslhpsh' && fields.has(field)));
 }
 function submittedEmployeeMaintenanceFields(mapped, data) {
     const aliases = {
@@ -199,6 +201,7 @@ function sanitizedEmployeeHistoryResolution(value) {
 }
 function profileError(res, error) {
     const messages = {
+        EMPLOYEE_HISTORY_HIRE_FLAG_SERVER_OWNED: 'Η διόρθωση ιστορικού σταμάτησε επειδή επιχειρήθηκε αλλαγή της ένδειξης πρόσληψης μέσω γενικής επεξεργασίας. Η ένδειξη αλλάζει μόνο από ελεγχόμενη διαδικασία πρόσληψης ή διόρθωσης ιστορικού. 1. Ανανεώστε τη φόρμα. 2. Επαναλάβετε μόνο τις αλλαγές στα στοιχεία της περιόδου. 3. Για διόρθωση πρόσληψης, ζητήστε έλεγχο από διαχειριστή. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_HIRE_FLAG_SERVER_OWNED',
         EMPLOYEE_DEPARTURE_INVALID_DATE: 'Η ημερομηνία αποχώρησης δεν είναι έγκυρη. Δεν αποθηκεύτηκε καμία αλλαγή.',
         EMPLOYEE_DEPARTURE_BEFORE_HIRE: 'Η αποχώρηση δεν μπορεί να προηγείται της πρόσληψης. Δεν αποθηκεύτηκε καμία αλλαγή.',
         EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH: 'Η τρέχουσα εργασιακή σχέση δεν συμφωνεί με το ιστορικό. Απαιτείται έλεγχος πριν από την αποχώρηση.',

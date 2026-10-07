@@ -951,6 +951,33 @@ const REHIRE_OPERATION = Symbol('employeeRehireOperation');
 const PREMUTATION_HISTORY_PATCHES = Symbol('preMutationHistoryPatches');
 const PLANNING_STATE = Symbol('employeeProfilePlanningState');
 
+function withoutHireEventFlag(patch) {
+    if (!patch) return patch;
+    return Object.fromEntries(Object.entries(patch).filter(([field]) =>
+        field !== 'afora_proslhpsh'));
+}
+
+function assertGenericHireFlagPatch(target, maintenance = {}) {
+    if (!target) return;
+    for (const patch of [maintenance.historyChanges, maintenance.submittedHistoryChanges,
+        maintenance.employeeChanges]) {
+        if (patch?.afora_proslhpsh !== undefined &&
+            patch.afora_proslhpsh !== (target.afora_proslhpsh === true)) {
+            throw failure('EMPLOYEE_HISTORY_HIRE_FLAG_SERVER_OWNED');
+        }
+    }
+}
+
+function assertGenericHireFlagsUnchanged(beforeRows, afterRows) {
+    const beforeById = new Map(beforeRows.map(row => [String(row._id), row]));
+    for (const row of afterRows) {
+        const before = beforeById.get(String(row._id));
+        if (before && (row.afora_proslhpsh === true) !== (before.afora_proslhpsh === true)) {
+            throw failure('EMPLOYEE_HISTORY_HIRE_FLAG_SERVER_OWNED');
+        }
+    }
+}
+
 function applyFinalPlanInMemory({ physicalPlan, currentBefore, currentPatch, filter,
     targetedHistoryId = null, targetedPatch = {}, historyModel,
     historyDocumentFactory = null, planningState }) {
@@ -1019,6 +1046,10 @@ async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, ope
         const originalRows = await completeHistoryLean(historyModel, filter, session);
         assertOpenCycleHireGuard({ currentEmployee: current,
             historyRows: originalRows, operations });
+        for (const op of operations.filter(op => op.state === 'modified')) {
+            assertGenericHireFlagPatch(originalRows.find(row =>
+                String(row._id) === op.historyId), op.maintenance);
+        }
         const canonicalBefore = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: current, historyRows: originalRows });
         if (canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
@@ -1120,6 +1151,9 @@ async function writeEmployeeEmploymentHistoryOperations({ scope, employeeId, ope
         const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: originalRows,
             desiredRows: canonicalAfter.canonicalRows, historyModel,
             replacementByDeletedId: canonicalAfter.replacementByDeletedId });
+        // A generic batch (including delete/canonicalization) cannot reclassify
+        // surviving rows. Controlled lifecycle plans use their own writer path.
+        assertGenericHireFlagsUnchanged(originalRows, physicalPlan.finalRows);
         await executeFinalMutationPlan({ physicalPlan,
             currentBefore: current, currentPatch: minimalSetPatch(current, finalCurrent),
             filter, employeeId,
@@ -1140,7 +1174,7 @@ const HISTORY_CURRENT_FIELDS = new Set([...BASE_HISTORY_FIELDS, ...IDENTITY_FIEL
 function cleanMaintenancePatch(patch = {}) {
     return Object.fromEntries(Object.entries(patch).filter(([field, value]) => value !== undefined &&
         !C.FACT_FIELDS.includes(field) && !['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
-            'createdAt', 'updatedAt', T.ANCHOR, 'employment_profile_source',
+            'createdAt', 'updatedAt', T.ANCHOR, 'employment_profile_source', 'afora_proslhpsh',
             'employment_departure_restore'].includes(field)));
 }
 function legacyMaintenancePatch(patch = {}, stored, history = false) {
@@ -1275,6 +1309,14 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             let rows = planningState ? planningState.history
                 : await completeHistoryLean(historyModel, filter, session);
             const persistedRows = rows;
+            if (!rehireOperation && mode === MODE_CORRECT_EXISTING) {
+                assertGenericHireFlagPatch(rows.find(row => String(row._id) === historyId),
+                    maintenance || {});
+            }
+            if (maintenance && !rehireOperation) maintenance = { ...maintenance,
+                employeeChanges: withoutHireEventFlag(maintenance.employeeChanges),
+                historyChanges: withoutHireEventFlag(maintenance.historyChanges),
+                submittedHistoryChanges: withoutHireEventFlag(maintenance.submittedHistoryChanges) };
             let canonicalBefore = null;
             let lifecycleReclassificationPlan = null;
             if (current && rows.length) {
@@ -1330,9 +1372,6 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 !semanticEmploymentProfileChanged(current, maintenance, input);
             let patch = legacyMaintenance ? legacyMaintenancePatch(maintenance.employeeChanges, current) : cleanMaintenancePatch(maintenance?.employeeChanges);
             let historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
-            // Hire-event identity is owned by the server-side lifecycle plan.
-            // Ordinary Maintenance may echo it, but cannot author it.
-            if (!editorOperation && !rehireOperation) delete historyPatch.afora_proslhpsh;
             if (!rehireOperation && C.calendarDate(current?.hmeromhnia_apoxorhshs) &&
                 Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') &&
                 !C.calendarDate(patch.hmeromhnia_apoxorhshs)) {

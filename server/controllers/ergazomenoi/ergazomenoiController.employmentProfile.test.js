@@ -815,6 +815,51 @@ async function editHistory(db, updates) {
 function rowData(row, extra = {}) {
     return { ...row, pososto_prosayxhshs_6hs_hmeras: 40, ...extra };
 }
+
+for (const flag of [false, true]) {
+    test(`HTTP History ignores hire flag ${flag} -> ${!flag} and saves an unrelated edit`, async () => {
+        const stored = await initial();
+        stored.history[0].afora_proslhpsh = flag;
+        const db = memory(stored), row = stored.history[0];
+        const res = await editHistory(db, [{ state: 'modified', _id: row._id,
+            data: rowData(row, { afora_proslhpsh: !flag, [C.DAYS]: [7, 1] }) }]);
+        assert.equal(res.code, 200, res.body.message);
+        assert.equal(db.state().history.length, 1);
+        assert.equal(db.state().history[0]._id, row._id);
+        assert.equal(db.state().history[0].afora_proslhpsh, flag);
+        assert.deepEqual(db.state().history[0][C.DAYS], [1, 7]);
+        assert.equal(mongoose.connection.readyState, 0);
+    });
+    for (const legacy of [false, true]) {
+        test(`HTTP Maintenance (${legacy ? 'legacy' : 'recorded'}) ignores hire flag ${flag} -> ${!flag}`, async () => {
+            const stored = legacy ? await legacyInitial() : await initial();
+            stored.history[0].afora_proslhpsh = flag;
+            const { db, res } = await submit('edit', { ...form(), afora_proslhpsh: !flag,
+                email: 'maintenance@example.invalid' }, memory(stored));
+            assert.equal(res.code, 200, res.body?.errorMessage);
+            assert.equal(db.state().employee.email, 'maintenance@example.invalid');
+            assert.equal(db.state().history.length, 1);
+            assert.equal(db.state().history[0]._id, stored.history[0]._id);
+            assert.equal(db.state().history[0].afora_proslhpsh, flag);
+            if (legacy) assertLegacy(db.state());
+        });
+    }
+}
+
+test('HTTP History insert cannot claim hire ownership and initial Add cannot suppress it', async () => {
+    const { db: added, res: addResponse } = await submit('add', { ...form(), afora_proslhpsh: false });
+    assert.equal(addResponse.code, 200, addResponse.body?.errorMessage);
+    assert.equal(added.state().history[0].afora_proslhpsh, true);
+    const stored = added.state(), db = memory(stored);
+    const res = await editHistory(db, [{ state: 'inserted', data: rowData(stored.history[0], {
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-01',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01', afora_proslhpsh: true
+    }) }]);
+    assert.equal(res.code, 200, res.body.message);
+    assert.equal(db.state().history.length, 2);
+    assert.equal(db.state().history.find(row => row._id === stored.history[0]._id).afora_proslhpsh, true);
+    assert.equal(db.state().history.find(row => row._id !== stored.history[0]._id).afora_proslhpsh, false);
+});
 function nestedValues(value, segments) {
     if (Array.isArray(value)) return value.flatMap(item => nestedValues(item, segments));
     if (!segments.length) return [value];
