@@ -353,6 +353,12 @@ ErgazomenoiSchema.index(
     { partialFilterExpression: { archived: true } }
 );
 
+// Internal transactional contention metadata. $inc initializes missing legacy
+// values on first use; no default, business revision, or history snapshot field.
+ErgazomenoiSchema.add({
+    employee_profile_mutation_sequence: { type: Number, min: 0, select: false }
+});
+
 ErgazomenoiSchema.add(employmentProfileFields());
 attachEmploymentProfileValidation(ErgazomenoiSchema);
 

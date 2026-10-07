@@ -29,7 +29,15 @@ function memory(employee = legacy(), history = [], fail = false) {
     const query = read => ({ session(s) { assert.equal(s, session); return this; }, sort() { return this; }, async lean() { return clone(read()); } });
     const employeeModel = {
         findOne: filter => query(() => matches(draft.employee, filter) ? draft.employee : null),
-        async updateOne(filter, update, { session: s }) { assert.equal(s, session); assert(matches(draft.employee, filter)); Object.assign(draft.employee, clone(update.$set)); return { matchedCount: 1 }; }
+        async updateOne(filter, update, { session: s, timestamps }) {
+            assert.equal(s, session); assert(matches(draft.employee, filter));
+            // Hidden fence metadata is covered by the serialization suite.
+            if (update.$inc?.employee_profile_mutation_sequence === 1) {
+                assert.equal(timestamps, false);
+                return { matchedCount: 1 };
+            }
+            Object.assign(draft.employee, clone(update.$set)); return { matchedCount: 1 };
+        }
     };
     const historyModel = Object.assign(function HistoryDocument(row) { return clone(row); }, {
         find: filter => query(() => draft.history.filter(row => matches(row, filter))),

@@ -95,6 +95,15 @@ function memory(initial = { employee: null, history: [] }, fail = '') {
             draft.employee = plain(doc); draftEmployeeCreates++; return [doc];
         },
         async updateOne(filter, update, options) {
+            // Business-state assertions below intentionally exclude hidden fence
+            // metadata; transactional increments/retries have dedicated tests.
+            if (update.$inc?.employee_profile_mutation_sequence === 1) {
+                assert.equal(options.session, session);
+                assert.equal(options.timestamps, false);
+                assert.deepEqual(update, { $inc: { employee_profile_mutation_sequence: 1 } });
+                return { matchedCount: matches(draft.employee, filter) ? 1 : 0 };
+            }
+
             assert.equal(options.session, session); writes++;
             if (fail === 'employee') throw Error('employee failed');
             if (!matches(draft.employee, filter)) return { matchedCount: 0 };

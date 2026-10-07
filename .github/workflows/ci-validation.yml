@@ -738,6 +738,13 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/services/ergazomenoi/employeeEmploymentProfileWriter.serialization.test.js"
+            "server/services/ergazomenoi/employeeEmploymentProfileWriter.test.js"
+            "server/controllers/ergazomenoi/ergazomenoiController.employmentProfile.test.js"
+            "server/services/ergazomenoi/employeeDepartureLifecycleWriter.test.js"
+            "server/services/ergazomenoi/employeeDepartureDateCorrectionWriter.test.js"
+            "server/services/ergazomenoi/employeeRehireLifecycleWriter.test.js"
+            "server/utils/ergazomenoi/employmentProfileTemporal.test.js"
             "scripts/ci/audit-production-dependencies.test.js"
             "server/utils/s3Helper.dependencyBoundary.contract.test.js"
             "server/controllers/ergazomenoi/erganhController.scenarioProjection.contract.test.js"

@@ -75,6 +75,15 @@ function database(initial = { employee: null, history: [] }, fail = '', castCurr
     const employeeModel = {
         findOne: () => query(() => draft.employee),
         async updateOne(filter, update, options) {
+            // Business-state assertions below intentionally exclude hidden fence
+            // metadata; transactional increments/retries have dedicated tests.
+            if (update.$inc?.employee_profile_mutation_sequence === 1) {
+                assert.equal(options.session, session);
+                assert.equal(options.timestamps, false);
+                assert.deepEqual(update, { $inc: { employee_profile_mutation_sequence: 1 } });
+                return { matchedCount: matches(draft.employee, filter) ? 1 : 0 };
+            }
+
             assert.equal(options.session, session); writes++; operations.employeeUpdates++;
             if (fail === 'employee') throw new Error('employee failed');
             if (!matches(draft.employee, filter)) return { matchedCount: 0 };
