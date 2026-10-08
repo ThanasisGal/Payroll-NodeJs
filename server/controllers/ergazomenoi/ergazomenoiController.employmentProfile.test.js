@@ -26,6 +26,19 @@ const { twoDaySchedule } = require('../../../test/fixtures/employeeDailyRestFixt
 const source = fs.readFileSync(__dirname + '/ergazomenoiController.js', 'utf8').replaceAll('\r', '');
 const scope = { team: 'fixture', company_kod: 'company', kodikos: '0001' };
 const plain = value => JSON.parse(JSON.stringify(value));
+function assertSaveHistoryAction(res) {
+    assert.equal(res.code, 200);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.actionRequired, true);
+    assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+    assert.deepEqual(plain(res.body.nextAction), {
+        type: 'OPEN_EMPLOYEE_HISTORY_REVIEW', targetHistoryId: null
+    });
+    assert.match(res.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή/);
+    assert.match(res.body.message, /Πατήστε «Έλεγχος Ιστορικού»/);
+    assert.deepEqual(Object.keys(res.body).sort(),
+        ['success', 'actionRequired', 'reason', 'message', 'nextAction'].sort());
+}
 const enabled = { [C.ENABLED]: true, [C.TYPE]: 'APPROVED_LEAVE_INTERRUPTION',
     [C.FROM]: '2026-09-01', [C.START]: '13:00', [C.END]: '14:00', [C.CATEGORY]: 'existing-code' };
 const form = () => ({ hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_symbashs: '2026-04-01',
@@ -446,10 +459,43 @@ test('first departure with an unrelated profile mutation is rejected as a separa
     const db = memory(stored);
     const { res } = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '2026-09-20',
         email: 'after@example.invalid' }, db);
-    assert.equal(res.code, 409);
-    assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+    assertSaveHistoryAction(res);
     assert.deepEqual(db.state(), stored);
 });
+test('Save business stop ignores forged client target and rolls back Employee, History and Audit', async () => {
+    const stored = await initial();
+    stored.audits = [{ sentinel: 'unchanged' }];
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...form(),
+        istorikoId: 'ffffffffffffffffffffffff',
+        hmeromhnia_apoxorhshs: '2026-09-20', email: 'after@example.invalid' }, db);
+    assertSaveHistoryAction(res);
+    assert.equal(db.writes(), 0);
+    assert.equal(db.ended(), true);
+    assert.deepEqual(db.state().employee, stored.employee);
+    assert.deepEqual(db.state().history, stored.history);
+    assert.deepEqual(db.state().audits, stored.audits);
+});
+
+test('action transport is endpoint-specific and cannot expose internal or unproven target metadata', () => {
+    const error = Object.assign(new Error('internal'), {
+        code: 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE', statusCode: 409,
+        historyReviewTargetId: 'ffffffffffffffffffffffff',
+        departureCorrectionChangedFields: ['internal'], patch: { secret: true }
+    });
+    const res = { status(code) { this.code = code; return this; },
+        json(body) { this.body = body; return this; } };
+    M.profileError(res, error);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.actionRequired, undefined);
+    M.profileError(res, error, { employeeSaveActionRequired: true });
+    assertSaveHistoryAction(res);
+    M.profileError(res, { code: 'EMPLOYEE_HISTORY_EDITOR_STALE', statusCode: 409 },
+        { employeeSaveActionRequired: true });
+    assert.equal(res.code, 409);
+    assert.equal(res.body.actionRequired, undefined);
+});
+
 test('same-departure Maintenance ignores a submitted active flag without a new cycle', async () => {
     const stored = await initial();
     stored.employee.hmeromhnia_apoxorhshs = '2026-09-20';
@@ -784,6 +830,8 @@ test('EDIT stale history revision returns actionable 409 before any write', asyn
         historyExpectedRevision: '2026-09-26T07:59:59.000Z', email: 'stale@example.test' }, memory(stored));
     assert.equal(res.code, 409);
     assert.equal(res.body.reason, 'CONFLICT_STALE');
+    assert.equal(res.body.actionRequired, undefined);
+    assert.equal(res.body.nextAction, undefined);
     assert.match(res.body.message, /άλλαξαν από άλλο χρήστη/);
     assert.equal(db.writes(), 0);
     assert.deepEqual(db.state(), stored);
@@ -1539,8 +1587,7 @@ for (const [label, change] of [
         const { res } = await submit('edit', {
             ...fullFormDeparturePayload(stored.employee), ...change
         }, db);
-        assert.equal(res.code, 409);
-        assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+        assertSaveHistoryAction(res);
         assert.deepEqual(db.departureError.departureCorrectionChangedFields, Object.keys(change));
         assert.deepEqual(db.state(), stored); // Includes current, history and audit state.
         assert.equal(db.writes(), 0);
@@ -1570,8 +1617,7 @@ test('full-form departure correction rejects a genuine multi-select change, not 
     const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee, '2026-09-24'),
         historyExpectedRevision: stored.history[0].updatedAt,
         foreas_epikoyrikhs_asfalishs: ['003'] }, db);
-    assert.equal(res.code, 409);
-    assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+    assertSaveHistoryAction(res);
     assert.deepEqual(db.departureCorrectionError.departureCorrectionChangedFields,
         ['foreas_epikoyrikhs_asfalishs']);
     assert.deepEqual(db.state(), stored);
@@ -1710,8 +1756,7 @@ for (const [label, change, changedField] of [
         const { res } = await submit('edit', {
             ...fullFormDeparturePayload(stored.employee), ...change
         }, db);
-        assert.equal(res.code, 409);
-        assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+        assertSaveHistoryAction(res);
         assert.ok(db.departureError.departureCorrectionChangedFields.includes(changedField));
         assert.deepEqual(db.state(), stored);
         assert.equal(db.writes(), 0);
@@ -1723,8 +1768,7 @@ for (const [field, value] of [['kathestos_apasxolhshs', null], ['foreas_epikoyri
         const payload = { ...fullFormDeparturePayload(stored.employee), [field]: value };
         delete payload[`${field}_stathera`];
         const { res } = await submit('edit', payload, db);
-        assert.equal(res.code, 409);
-        assert.equal(res.body.reason, 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE');
+        assertSaveHistoryAction(res);
         assert.deepEqual(db.state(), stored);
         assert.equal(db.writes(), 0);
     });

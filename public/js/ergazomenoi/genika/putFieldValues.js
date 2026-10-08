@@ -52,6 +52,53 @@ function createSingleFlight() {
     };
 }
 
+async function handleEmployeeSaveHistoryAction(response, data, { swal, documentRef }) {
+    const action = data?.nextAction;
+    if (response.status !== 200 || !response.ok || data?.success !== false ||
+        data?.actionRequired !== true ||
+        data?.reason !== 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE' ||
+        action?.type !== 'OPEN_EMPLOYEE_HISTORY_REVIEW' ||
+        !(action.targetHistoryId === null ||
+            (typeof action.targetHistoryId === 'string' && /^[a-f0-9]{24}$/i.test(action.targetHistoryId))) ||
+        typeof data.message !== 'string' || !data.message.trim()) return false;
+
+    const choice = await swal.fire({
+        icon: 'warning', title: 'Χρειάζεται έλεγχος του Ιστορικού',
+        text: data.message, showCancelButton: true,
+        confirmButtonText: 'Έλεγχος Ιστορικού', cancelButtonText: 'Παραμονή στη φόρμα',
+        allowOutsideClick: false, allowEscapeKey: true, returnFocus: false
+    });
+    if (!choice.isConfirmed) return true;
+
+    const historyTab = [...documentRef.querySelectorAll('.menu_Links li')].find(
+        link => link.textContent.trim() === 'Ιστορικό Προσλήψεων/Αλλαγών');
+    if (historyTab && !historyTab.classList.contains('active')) historyTab.click();
+
+    const table = documentRef.getElementById('istorikoTable');
+    const targetRows = action.targetHistoryId && table
+        ? table.querySelectorAll(`tr.istoriko-row[data-id="${action.targetHistoryId}"]`) : [];
+    const row = targetRows.length === 1 ? targetRows[0] : null;
+    const review = row?.querySelector('[data-action="review"]');
+    const accessMode = table?.dataset.historyAccessMode ||
+        (table?.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
+    const allowed = accessMode === 'ADMIN_FULL' ||
+        (accessMode === 'SUPERVISOR_PROBLEM_SCOPE' && row?.dataset.canManageRow === 'true');
+    if (historyTab?.classList.contains('active') && review && allowed &&
+        row.dataset.state !== 'deleted' && !review.disabled &&
+        !review.matches(':disabled') && review.getAttribute('aria-disabled') !== 'true') {
+        review.click();
+        return true;
+    }
+    await swal.fire({
+        icon: 'info', title: 'Επιλέξτε την εγγραφή στο Ιστορικό',
+        text: 'Η εφαρμογή δεν μπορεί να επιλέξει με ασφάλεια ποια εγγραφή αφορά η αλλαγή. ' +
+            'Ελέγξτε το Ιστορικό και επιλέξτε «Έλεγχος / Διόρθωση» στην εγγραφή που γνωρίζετε ότι αφορά τη μεταβολή. ' +
+            'Δεν αποθηκεύτηκε καμία αλλαγή.',
+        confirmButtonText: 'Κλείσιμο', allowOutsideClick: false
+    });
+    return true;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const Swal = new Proxy(window.Swal, {
         get(target, property) {
@@ -1489,6 +1536,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ct.includes('application/json')) {
                 const data = await response.json();
                 message = data?.message || data?.errorMessage || '';
+                if (await handleEmployeeSaveHistoryAction(response, data, {
+                    swal: Swal, documentRef: document
+                })) return;
 
                 console.group('[CONTRACT-DEBUG] RESPONSE JSON');
                 console.log('success:', data?.success);
