@@ -1214,6 +1214,42 @@ test('departure with older-only ambiguity preserves old rows and changes the uni
         'DEPARTURE_WITH_DEFERRED_HISTORY_AMBIGUITY');
 });
 
+test('repeated deferred-ambiguity departure preserves the first committed result without new evidence', async () => {
+    const initial = deferredAmbiguityDepartureState();
+    const db = database(initial);
+    const request = { ...db.dependencies, scope, employeeId: 'employee',
+        departureDate: '2026-09-29', effectiveFrom: '2026-07-23', input: {},
+        maintenance: { employeeChanges: {}, submittedEmployeeFields: [],
+            historyChanges: {}, submittedHistoryChanges: {}, submittedFormFields: [] } };
+    const first = await writeEmployeeDeparture(request);
+    assert.equal(first.deferredAmbiguityDeparturePostcondition.ok, true);
+    assert.equal(db.state().employee.energos, false);
+    assert.deepEqual(db.state().history.slice(0, 2), initial.history.slice(0, 2));
+    const afterFirst = structuredClone(db.state());
+    const writesAfterFirst = db.writes();
+    await assert.rejects(writeEmployeeDeparture(request), error =>
+        error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.deferredDepartureReason === 'NOT_FIRST_DEPARTURE');
+    assert.deepEqual(db.state(), afterFirst);
+    assert.equal(db.writes(), writesAfterFirst);
+    assert.equal(db.state().history.length, initial.history.length);
+    assert.equal(db.state().audits.length, 1);
+    assert.equal(db.state().audits[0].mutationSource,
+        'DEPARTURE_WITH_DEFERRED_HISTORY_AMBIGUITY');
+});
+
+test('ordinary maintenance cannot repair or bypass the deferred-ambiguity history', async () => {
+    const initial = deferredAmbiguityDepartureState();
+    const db = database(initial);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-07-23', input: {},
+        maintenance: { employeeChanges: {}, historyChanges: {} } }), error =>
+        error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'OVERLAPPING_GENUINE_PERIODS');
+    assert.deepEqual(db.state(), initial);
+    assert.equal(db.writes(), 0);
+});
+
 test('deferred-ambiguity departure rejects a simultaneous employee change before writes', async () => {
     const db = database(deferredAmbiguityDepartureState());
     await assert.rejects(writeEmployeeDeparture({ ...db.dependencies, scope,
@@ -1434,6 +1470,67 @@ test('partial contract-end synchronization updates only stale segment rows', asy
         [CONTRACT_SEGMENT_IDS.first]);
     assert.equal(db.operations().employeeUpdates, 0);
     assert.equal(db.operations().historyUpdates, 1);
+});
+
+function savePersonalCorrectionWithPartialContractSync(db) {
+    return writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+        employeeId: 'employee', effectiveFrom: '2026-06-01', input: {},
+        maintenance: {
+            originalHistoryId: CONTRACT_SEGMENT_IDS.latest,
+            employeeChanges: { email: 'after@example.invalid',
+                hmeromhnia_lhxhs_symbashs: '2027-01-31' },
+            historyChanges: { hmeromhnia_lhxhs_symbashs: '2027-01-31' },
+            submittedEmployeeFields: ['email', 'hmeromhnia_lhxhs_symbashs'],
+            submittedHistoryChanges: { hmeromhnia_lhxhs_symbashs: '2027-01-31' },
+            submittedProfileFields: []
+        }
+    });
+}
+
+test('personal correction and partial contract synchronization commit the combined current patch', async () => {
+    const initial = contractSegmentWriterState({ partial: true });
+    initial.employee.email = 'before@example.invalid';
+    const db = database(initial);
+    let sessionStarts = 0;
+    const startSession = db.dependencies.connection.startSession;
+    db.dependencies.connection.startSession = async () => { sessionStarts++; return startSession(); };
+    const result = await savePersonalCorrectionWithPartialContractSync(db);
+    assert.equal(sessionStarts, 1);
+    assert.equal(result.mode, CONTRACT_END_SEGMENT_SYNC_OPERATION);
+    assert.equal(result.status, 'APPLYABLE_PARTIAL_SEGMENT_SYNC');
+    assert.deepEqual(result.contractEndSegmentPlan.currentPatch, {});
+    assert.deepEqual(result.maintenanceMutationPlan, {
+        state: 'NO_HISTORY_CHANGE', employeePatchFields: ['email'], historyPatchFields: []
+    });
+    assert.equal(result.currentUpdated, true);
+    assert.deepEqual(db.state().employee, { ...initial.employee, email: 'after@example.invalid' });
+    assert.deepEqual(result.employee, db.state().employee);
+    assert.deepEqual(result.contractEndSegmentPlan.changedHistoryIds, [CONTRACT_SEGMENT_IDS.first]);
+    assert.deepEqual(db.state().history.map(({ updatedAt, ...row }) => row),
+        initial.history.map(({ updatedAt, ...row }) => ({ ...row,
+            hmeromhnia_lhxhs_symbashs: '2027-01-31' })));
+    assert.deepEqual(db.state().history[1], initial.history[1]);
+    assert.equal(db.state().audits.length, 1);
+    assert.equal(db.state().audits[0].mutationSource, CONTRACT_END_SEGMENT_SYNC_OPERATION);
+    assert.deepEqual(db.state().audits[0].diagnostics.maintenanceCurrentPatchFields, ['email']);
+    assert.equal(result.cleanup.verified.rebuilt.status, 'CLEAN');
+    assert.equal(result.cleanup.verified.rebuilt.cleanupRequired, false);
+});
+
+test('combined personal correction and partial contract sync roll back on later failure', async () => {
+    for (const [failure, behavior] of [
+        [`close:${CONTRACT_SEGMENT_IDS.first}`, {}], ['audit', {}], ['commit', {}],
+        ['', { pretendUpdateSuccess: true }]
+    ]) {
+        const initial = contractSegmentWriterState({ partial: true });
+        initial.employee.email = 'before@example.invalid';
+        const db = database(initial, failure, false, behavior);
+        await assert.rejects(savePersonalCorrectionWithPartialContractSync(db), error =>
+            failure ? error.message === `${failure.split(':')[0]} failed`
+                : error.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+        assert.deepEqual(db.state(), initial);
+        assert.equal(db.ended(), true);
+    }
 });
 
 test('contract-end synchronization preserves frozen references', async () => {

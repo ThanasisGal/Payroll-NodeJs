@@ -23,6 +23,25 @@ test('internal generic hire-flag rejection has an actionable unchanged-state res
     assert.match(res.body.message, new RegExp(`Κωδικός αναφοράς: ${code}$`));
 });
 
+test('closed relationship conflict explains why new work terms cannot be saved', () => {
+    const code = 'EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP';
+    assert.equal(isEmploymentProfileError({ code }), true);
+    const res = { status(value) { this.code = value; return this; }, json(value) { this.body = value; } };
+    profileError(res, { code, statusCode: 409 });
+    assert.equal(res.code, 409);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.reason, code);
+    assert.equal(res.body.message, res.body.errorMessage);
+    assert.match(res.body.message, /εργασιακή σχέση έχει ήδη κλείσει/);
+    assert.match(res.body.message, /Δεν μπορεί να προστεθεί νέα μεταβολή σε αυτή τη σχέση/);
+    assert.match(res.body.message, /1\. Ελέγξτε το Ιστορικό.*2\. Επιλέξτε τη σωστή εργασιακή σχέση/);
+    assert.match(res.body.message, /διορθώστε τα στοιχεία της σχέσης/);
+    assert.match(res.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή\./);
+    assert.match(res.body.message, new RegExp(`Κωδικός αναφοράς: ${code}$`));
+    assert.doesNotMatch(res.body.message,
+        /lifecycle|canonical|planner|transaction|schema|Mongo|V1|Η αποθήκευση εργαζομένου και ιστορικού απέτυχε/i);
+});
+
 test('employment-cycle failures are handled as visible profile conflicts', () => {
     assert.equal(isEmploymentProfileError({ code: 'EMPLOYMENT_CYCLE_OVERLAP' }), true);
     let statusCode = null;
