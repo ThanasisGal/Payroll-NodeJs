@@ -36,6 +36,43 @@ function resolutionData(overrides = {}) {
     };
 }
 
+for (const status of [200, 409]) {
+    test(`readResolutionFromResponse accepts a valid resolution envelope from HTTP ${status}`, async () => {
+        for (const data of [resolutionData(), guidedResolutionData(), factResolutionData(), correctionResolutionData()]) {
+            const response = responseWith(data, status);
+            assert.deepEqual(await guided.readResolutionFromResponse(response),
+                guided.normalizeResolutionResponse(data));
+            assert.ok(await guided.readResolutionFromResponse(response));
+            assert.deepEqual(await response.clone().json(), data);
+        }
+    });
+}
+
+test('readResolutionFromResponse does not interpret ordinary HTTP 200 success as a resolution', async () => {
+    assert.equal(await guided.readResolutionFromResponse(responseWith({ success: true }, 200)), null);
+    assert.equal(await guided.readResolutionFromResponse(responseWith({
+        ...resolutionData(), resolutionRequired: false
+    }, 200)), null);
+});
+
+test('readResolutionFromResponse rejects malformed or unsafe HTTP 200 resolution envelopes', async () => {
+    for (const overrides of [{ version: 2 }, { fingerprint: 'invalid' }, { kind: 'UNKNOWN' }, { options: [] }]) {
+        assert.equal(await guided.readResolutionFromResponse(responseWith(resolutionData(overrides), 200)), null);
+    }
+    const unsafe = guidedResolutionData();
+    unsafe.resolution.options[0].id = '$set';
+    assert.equal(await guided.readResolutionFromResponse(responseWith(unsafe, 200)), null);
+    assert.equal(await guided.readResolutionFromResponse({ status: 200,
+        clone() { return { json: async () => { throw new SyntaxError('invalid JSON'); } }; }
+    }), null);
+});
+
+test('readResolutionFromResponse leaves HTTP 409 stale errors without a resolution to error handling', async () => {
+    assert.equal(await guided.readResolutionFromResponse(responseWith({ success: false,
+        reason: 'EMPLOYEE_HISTORY_EDITOR_STALE'
+    }, 409)), null);
+});
+
 function fakeDocument() {
     return {
         createElement(tagName) {

@@ -14,7 +14,7 @@ function data(request=req(),f=fixture()) {
         request,accessMode:'ADMIN_FULL',catalogs:{},insertId:historyId('employee',9)});
     return {resolutionRequired:true,resolution:plan.public};
 }
-const response=(value,status=409)=>({status,clone(){return {json:async()=>structuredClone(value)};}});
+const response=(value,status=200)=>({status,clone(){return {json:async()=>structuredClone(value)};}});
 function document() {
     return {createElement(tagName){return {tagName,textContent:'',value:'',checked:false,disabled:false,
         className:'',children:[],attributes:{},listeners:{},appendChild(child){this.children.push(child);},
@@ -24,6 +24,13 @@ function document() {
 const all=node=>[node,...node.children.flatMap(all)];
 const text=node=>all(node).map(n=>n.textContent).join('\n');
 function normalized(value){const result=guided.normalizeResolutionResponse(value);assert.ok(result);return result;}
+
+for(const status of [200,409]) test(`safe correction envelopes remain recognized with HTTP ${status}`,async()=>{
+    for(const request of [req(),req('REMOVE_ROW')]) {
+        const value=data(request);
+        assert.deepEqual(await guided.readResolutionFromResponse(response(value,status)),normalized(value));
+    }
+});
 
 for(const [name,request] of [['choice',req()],['preview',req('REMOVE_ROW')]]) {
     test(`simple Greek ${name}: no forbidden technical terms or first-person plural`,()=>{
@@ -68,9 +75,10 @@ test('preview renders every business event and exactly the server before/after',
 for(const tamper of [v=>v.plan={deleteIds:[]},v=>v.preview.before[0].historyId='secret',
     v=>v.preview.before[0].details.push('Mongo 507f1f77bcf86cd799439101'),v=>v.fingerprint='bad',
     v=>v.phase='UNKNOWN',v=>v.choices[0].id='PHYSICAL_DELETE',v=>v.recommendation='Automatic repair']) {
-    test(`malformed public correction rejects ${tamper.toString()}`,()=>{
+    test(`malformed public correction rejects ${tamper.toString()}`,async()=>{
         const value=data();tamper(value.resolution);assert.equal(guided.normalizeResolutionResponse(value),null);
         assert.equal(P.sanitizePublicCorrection(value.resolution),null);
+        assert.equal(await guided.readResolutionFromResponse(response(value,200)),null);
     });
 }
 

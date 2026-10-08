@@ -395,7 +395,8 @@
     }
 
     async function readResolutionFromResponse(response) {
-        if (!response || response.status !== 409 || typeof response.clone !== 'function') return null;
+        if (!response || ![200, 409].includes(response.status) ||
+            typeof response.clone !== 'function') return null;
         try {
             return normalizeResolutionResponse(await response.clone().json());
         } catch (_) {
