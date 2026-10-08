@@ -202,6 +202,18 @@ function sanitizedEmployeeHistoryResolution(value) {
     };
 }
 function profileError(res, error, options = {}) {
+    if (options.employeeSaveActionRequired === true &&
+        error.code === 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE') {
+        const message = 'Η εφαρμογή εντόπισε ότι η ίδια αποθήκευση περιλαμβάνει αποχώρηση μαζί με άλλη αλλαγή στα στοιχεία ή στις ημερομηνίες της εργασιακής σχέσης.\n\n' +
+            'Για να παραμείνει σωστό το Ιστορικό, οι αλλαγές αυτές πρέπει να ελεγχθούν χωριστά.\n\n' +
+            'Δεν αποθηκεύτηκε καμία αλλαγή.\n\n' +
+            'Πατήστε «Έλεγχος Ιστορικού» για να δείτε τι χρειάζεται διόρθωση.';
+        // The concurrent-change guard runs before History is read/planned.
+        // Neither a submitted id nor changed fields prove a unique REVIEW anchor.
+        return res.status(200).json({ success: false, actionRequired: true,
+            reason: error.code, message,
+            nextAction: { type: 'OPEN_EMPLOYEE_HISTORY_REVIEW', targetHistoryId: null } });
+    }
     const messages = {
         EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP: 'Η προσθήκη νέας μεταβολής όρων εργασίας σταμάτησε επειδή η εργασιακή σχέση έχει ήδη κλείσει. Δεν μπορεί να προστεθεί νέα μεταβολή σε αυτή τη σχέση. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ελέγξτε το Ιστορικό του εργαζομένου. 2. Επιλέξτε τη σωστή εργασιακή σχέση ή διορθώστε τα στοιχεία της σχέσης που αφορά η μεταβολή πριν συνεχίσετε. Κωδικός αναφοράς: EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP',
         EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN: 'Η αποθήκευση του Ιστορικού σταμάτησε επειδή ο λογαριασμός σας δεν έχει δικαίωμα διαχείρισής του. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ανοίξτε ξανά τον εργαζόμενο. 2. Ζητήστε έλεγχο των δικαιωμάτων σας από διαχειριστή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN',

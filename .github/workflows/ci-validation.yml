@@ -874,7 +874,7 @@ jobs:
       - name: Run real SweetAlert Employee History regression
         run: |
           npx playwright install --with-deps chromium
-          node --test public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js
+          node --test public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js
 
       - name: Audit production dependencies
         run: node scripts/ci/audit-production-dependencies.js
