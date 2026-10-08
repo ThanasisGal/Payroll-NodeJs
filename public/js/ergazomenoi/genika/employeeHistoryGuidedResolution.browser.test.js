@@ -67,6 +67,7 @@ async function withPage(work) {
 
 async function open(page, resolution, originalPayload = {}) {
     await page.evaluate(({ resolution, originalPayload, endpoint }) => {
+        window.previousModalPopup = Swal.getPopup();
         window.modalResult = null;
         window.employeeHistoryGuidedResolution.handleInitialResponse({
             response: new Response(JSON.stringify({ resolutionRequired: true, resolution }), { status: 409 }),
@@ -75,7 +76,19 @@ async function open(page, resolution, originalPayload = {}) {
             }), swal: Swal, documentRef: document, windowRef: window
         }).then(result => { window.modalResult = { cancelled: result.cancelled, status: result.response?.status }; });
     }, { resolution, originalPayload, endpoint });
-    await page.waitForFunction(() => Swal.isVisible() && Swal.getConfirmButton()?.disabled === true);
+    // Cancel resolves before its closing animation finishes. Visibility alone can
+    // therefore match the previous popup instead of the one being opened.
+    await page.waitForFunction(() => {
+        const popup = Swal.getPopup();
+        return popup && popup !== window.previousModalPopup && Swal.isVisible() &&
+            popup.classList.contains('swal2-show');
+    });
+    await page.evaluate(async () => {
+        const popup = Swal.getPopup();
+        await Promise.all(popup.getAnimations().map(animation => animation.finished));
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+        if (Swal.getPopup() !== popup) throw new Error('Popup changed while opening');
+    });
 }
 
 async function state(page, disabled, requests, count = 0) {
@@ -117,7 +130,8 @@ test('real SweetAlert requires all decisions and responsibility; invalidation di
 
 test('real SweetAlert Cancel stays available before and after acceptance and sends no request', async () => {
     await withPage(async (page, requests) => {
-        for (const accepted of [false, true]) {
+        for (let opening = 0; opening < 10; opening += 1) {
+            const accepted = opening % 2 === 1;
             await open(page, safePreview(), { correction });
             await state(page, true, requests);
             if (accepted) {
