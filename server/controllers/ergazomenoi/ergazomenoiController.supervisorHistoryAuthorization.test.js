@@ -31,7 +31,7 @@ function authenticatedRequest(body = {}) {
 }
 async function page(user = supervisor, initial = problemFixture()) {
     const captures = [];
-    const query = value => ({ mongooseOptions(options) { assert.equal(options.includeRedundantHistoryArtifacts, true); return this; },
+    const query = value => ({ mongooseOptions(options) { assert.equal(options.includeRedundantHistoryArtifacts, true); return options; },
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
     const context = { Date, console: { error() {} }, ...A, ...S, ...M, semanticHistoryRows,
