@@ -413,10 +413,10 @@ test('επιλογή ημερομηνίας απαιτεί έγκυρη τιμή
 
 test('ακύρωση πολλαπλής επιλογής κάνει μηδενικές επαναλήψεις και αρχικά απενεργοποιεί τη συνέχεια', async () => {
     let retries = 0;
-    let disabled = 0;
+    const confirmButton = { disabled: false };
     const swal = {
         close() {},
-        disableConfirmButton() { disabled += 1; },
+        getConfirmButton: () => confirmButton,
         fire: async options => {
             options.didOpen();
             return { isConfirmed: false };
@@ -428,19 +428,19 @@ test('ακύρωση πολλαπλής επιλογής κάνει μηδενι
     });
     assert.equal(result.cancelled, true);
     assert.equal(retries, 0);
-    assert.equal(disabled, 1);
+    assert.equal(confirmButton.disabled, true);
 });
 
 test('ρητή επιχειρησιακή επιλογή κάνει ακριβώς μία επανάληψη με ασφαλές payload', async () => {
     let retries = 0;
     let retryPayload;
-    let enabled = 0;
+    const confirmButton = { disabled: false };
     const retryResponse = { status: 200 };
     const swal = {
-        close() {}, disableButtons() {}, disableConfirmButton() {},
-        enableConfirmButton() { enabled += 1; },
+        close() {}, disableButtons() {}, getConfirmButton: () => confirmButton,
         fire: async options => {
             options.didOpen();
+            assert.equal(confirmButton.disabled, true);
             const radio = options.html.children[1].children[0].children[0];
             radio.checked = true;
             radio.dispatch('change');
@@ -454,7 +454,7 @@ test('ρητή επιχειρησιακή επιλογή κάνει ακριβώ
     });
     assert.equal(result.response, retryResponse);
     assert.equal(retries, 1);
-    assert.ok(enabled >= 1);
+    assert.equal(confirmButton.disabled, false);
     assert.deepEqual(Object.keys(retryPayload.resolution).sort(), ['choiceId', 'fingerprint']);
     assert.equal(JSON.stringify(retryPayload.resolution).includes('historyId'), false);
 });
@@ -464,7 +464,7 @@ test('παρωχημένη απάντηση επιχειρησιακής επι�
     const stale = responseWith({ success: false,
         code: 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE' }, 409);
     const swal = {
-        close() {}, disableButtons() {}, disableConfirmButton() {}, enableConfirmButton() {},
+        close() {}, disableButtons() {}, getConfirmButton: () => ({ disabled: false }),
         fire: async options => {
             options.didOpen();
             const radio = options.html.children[1].children[0].children[0];
@@ -573,10 +573,10 @@ test('η ροή D2 απαιτεί ανεξάρτητα και το γεγονό�
 
 test('ακύρωση συλλογής γεγονότων κάνει μηδενικές επαναλήψεις και απενεργοποιεί τη συνέχεια', async () => {
     let retries = 0;
-    let disabled = 0;
+    const confirmButton = { disabled: false };
     const swal = {
         close() {},
-        disableConfirmButton() { disabled += 1; },
+        getConfirmButton: () => confirmButton,
         fire: async options => {
             options.didOpen();
             return { isConfirmed: false };
@@ -588,14 +588,14 @@ test('ακύρωση συλλογής γεγονότων κάνει μηδενι
     });
     assert.equal(result.cancelled, true);
     assert.equal(retries, 0);
-    assert.ok(disabled >= 1);
+    assert.equal(confirmButton.disabled, true);
 });
 
 test('επιβεβαίωση γεγονότων κάνει μία επανάληψη με μόνο fingerprint και επιτρεπτές απαντήσεις', async () => {
     let retries = 0;
     let retryPayload;
     const swal = {
-        close() {}, disableConfirmButton() {}, enableConfirmButton() {}, disableButtons() {},
+        close() {}, getConfirmButton: () => ({ disabled: false }), disableButtons() {},
         fire: async options => {
             options.didOpen();
             const departure = options.html.children[1].children[0];
@@ -637,7 +637,7 @@ test('παρωχημένη απάντηση συλλογής γεγονότων 
         code: 'EMPLOYEE_HISTORY_BUSINESS_FACT_STALE' }, 409);
     let retries = 0;
     const swal = {
-        close() {}, disableConfirmButton() {}, enableConfirmButton() {}, disableButtons() {},
+        close() {}, getConfirmButton: () => ({ disabled: false }), disableButtons() {},
         fire: async options => {
             options.didOpen();
             const radio = options.html.children[1].children[0].children[1].children[0];
@@ -839,7 +839,7 @@ test('το παράθυρο επανυπολογίζει τα όρια και α
         const result = await guided.handleInitialResponse({
             response: responseWith(correctionResolutionData()), originalPayload: {},
             retryRequest: async () => {}, documentRef, windowRef,
-            swal: { close() {}, disableConfirmButton() {}, getPopup: () => popup,
+            swal: { close() {}, getConfirmButton: () => ({ disabled: false }), getPopup: () => popup,
                 fire: async options => {
                     options.didOpen();
                     options.didOpen();
@@ -966,7 +966,7 @@ test('Ακύρωση δεν κάνει επανάληψη και Εφαρμογ�
     const cancelled = await guided.handleInitialResponse({
         response: responseWith(correctionResolutionData()), originalPayload: {},
         retryRequest: async () => { retries += 1; },
-        swal: { close() {}, disableConfirmButton() {}, fire: async options => {
+        swal: { close() {}, getConfirmButton: () => ({ disabled: false }), fire: async options => {
             options.didOpen(); return { isConfirmed: false };
         } }, documentRef: fakeDocument()
     });
@@ -979,7 +979,7 @@ test('Ακύρωση δεν κάνει επανάληψη και Εφαρμογ�
         originalPayload: { safe: 'original' },
         retryRequest: async payload => { retries += 1; retryPayload = payload;
             return { status: 200 }; },
-        swal: { close() {}, disableConfirmButton() {}, enableConfirmButton() {},
+        swal: { close() {}, getConfirmButton: () => ({ disabled: false }),
             disableButtons() {}, fire: async options => {
                 options.didOpen();
                 const elements = allElements(options.html);
@@ -1020,4 +1020,23 @@ test('παρωχημένη απάντηση διόρθωσης επιστρέφ�
     const payload = guided.buildRetryPayload({}, resolution, selection);
     assert.equal(payload.resolution.responsibilityAccepted, true);
     assert.equal(stale.status, 409);
+});
+
+test('η εγκυρότητα χρησιμοποιεί μόνο το πραγματικό στοιχείο επιβεβαίωσης και ανέχεται την απουσία του', async () => {
+    const source = fs.readFileSync(path.join(__dirname, 'employeeHistoryGuidedResolution.js'), 'utf8');
+    assert.doesNotMatch(source, /enableConfirmButton|disableConfirmButton/);
+    for (const getConfirmButton of [undefined, () => null]) {
+        let retries = 0;
+        const result = await guided.handleInitialResponse({
+            response: responseWith(correctionResolutionData()), originalPayload: {},
+            retryRequest: async () => { retries += 1; }, documentRef: fakeDocument(),
+            swal: { close() {}, getConfirmButton, fire: async options => {
+                options.didOpen();
+                assert.equal(await options.preConfirm(), false);
+                return { isConfirmed: false };
+            } }
+        });
+        assert.equal(result.cancelled, true);
+        assert.equal(retries, 0);
+    }
 });

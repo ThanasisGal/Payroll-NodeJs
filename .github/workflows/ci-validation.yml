@@ -870,6 +870,11 @@ jobs:
           echo "SKIP isolated localhost POST test:"
           echo "server/middlewares/repoTransferDecisionBodyParser.test.js"
 
+      - name: Run real SweetAlert Employee History regression
+        run: |
+          npx playwright install --with-deps chromium
+          node --test public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js
+
       - name: Audit production dependencies
         run: node scripts/ci/audit-production-dependencies.js
 

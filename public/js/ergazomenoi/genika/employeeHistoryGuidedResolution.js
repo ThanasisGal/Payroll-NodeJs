@@ -1116,8 +1116,9 @@
 
         if (typeof swal.close === 'function') swal.close();
         const setConfirmValidity = valid => {
-            if (valid && typeof swal.enableConfirmButton === 'function') swal.enableConfirmButton();
-            if (!valid && typeof swal.disableConfirmButton === 'function') swal.disableConfirmButton();
+            const confirmButton = typeof swal.getConfirmButton === 'function'
+                ? swal.getConfirmButton() : null;
+            if (confirmButton) confirmButton.disabled = !valid;
         };
         const content = buildSafeContent(documentRef, resolution, setConfirmValidity);
         const guided = resolution.kind === GUIDED_KIND || resolution.kind === FACT_KIND ||
