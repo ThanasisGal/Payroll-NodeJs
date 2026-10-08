@@ -1077,3 +1077,9 @@ test('η εγκυρότητα χρησιμοποιεί μόνο το πραγμ�
         assert.equal(retries, 0);
     }
 });
+
+for (const status of [200, 409]) test(`HTTP ${status} success:true cannot also open a guided resolution`, async () => {
+    for (const envelope of [resolutionData(), guidedResolutionData(), factResolutionData(), correctionResolutionData()]) {
+        assert.equal(await guided.readResolutionFromResponse(responseWith({ ...envelope, success: true }, status)), null);
+    }
+});

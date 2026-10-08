@@ -1823,3 +1823,59 @@ test('first departure preserves other stored status values and insurance orderin
         assert.deepEqual(record.foreas_epikoyrikhs_asfalishs, ['004', '002']);
     }
 });
+
+function userCorrectionTransportResolution() {
+    const fixture = require('../../services/ergazomenoi/fixtures/userConfirmedEmployeeHistoryCorrectionFixtures').h2KpkBoundaryFixture();
+    const analysis = require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
+    const planner = require('../../services/ergazomenoi/employeeHistoryUserConfirmedCorrectionPlannerService')
+        .planEmployeeHistoryUserConfirmedCorrection(fixture);
+    const fingerprint = 'a'.repeat(64);
+    return analysis.buildUserConfirmedCorrectionPublicResolution({
+        analysis: analysis.buildUserConfirmedCorrectionAnalysis({ userCorrectionPlan: planner,
+            sourceStateFingerprint: fingerprint }), fingerprint });
+}
+
+test('normal Save transports only allowlisted sanitized guided errors with HTTP 200', async () => {
+    const stored = await initial();
+    const resolution = userCorrectionTransportResolution();
+    const original = W.writeEmployeeEmploymentProfileWithUniqueSafeRepair;
+    try {
+        for (const code of ['EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
+            'EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED', 'EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED',
+            'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED', 'EMPLOYEE_HISTORY_SAFE_CORRECTION_REQUIRED']) {
+            W.writeEmployeeEmploymentProfileWithUniqueSafeRepair = async () => {
+                throw Object.assign(new Error(code), { code, statusCode: 409, resolutionRequired: true, resolution });
+            };
+            const db = memory(stored);
+            const { res } = await submit('edit', form(), db);
+            assert.equal(res.code, 200, code);
+            assert.equal(res.body.success, false);
+            assert.equal(res.body.resolutionRequired, true);
+            assert.deepEqual(plain(res.body.resolution), plain(resolution));
+            assert.equal(db.writes(), 0);
+        }
+    } finally { W.writeEmployeeEmploymentProfileWithUniqueSafeRepair = original; }
+});
+
+test('normal Save keeps stale and invalid guided envelopes at their original status with zero writes', async () => {
+    const stored = await initial();
+    const resolution = userCorrectionTransportResolution();
+    const original = W.writeEmployeeEmploymentProfileWithUniqueSafeRepair;
+    try {
+        for (const error of [
+            { code: 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE', statusCode: 409 },
+            { code: 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE', statusCode: 409, resolutionRequired: true, resolution },
+            { code: 'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED', statusCode: 409, resolutionRequired: false, resolution },
+            { code: 'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED', statusCode: 409, resolutionRequired: true, resolution: {} },
+            { code: 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED', statusCode: 500 }
+        ]) {
+            W.writeEmployeeEmploymentProfileWithUniqueSafeRepair = async () => { throw Object.assign(new Error(error.code), error); };
+            const db = memory(stored);
+            const { res } = await submit('edit', form(), db);
+            assert.equal(res.code, error.statusCode);
+            assert.equal(res.body.success, false);
+            assert.equal(res.body.resolutionRequired, undefined);
+            assert.equal(db.writes(), 0);
+        }
+    } finally { W.writeEmployeeEmploymentProfileWithUniqueSafeRepair = original; }
+});

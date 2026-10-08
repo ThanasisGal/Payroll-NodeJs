@@ -4059,7 +4059,8 @@ class ergazomenoiController {
         } catch (error) {
             if (isEmploymentProfileError(error) ||
                 String(error?.code || '').startsWith('EMPLOYEE_DEPARTURE_')) {
-                return profileError(res, error, { employeeSaveActionRequired: true });
+                return profileError(res, error, { employeeSaveActionRequired: true,
+                    resolutionStatusCode: 200 });
             }
             if (String(error?.code || '').startsWith('EMPLOYEE_REHIRE_')) {
                 const message = 'Η επαναπρόσληψη δεν ολοκληρώθηκε. Ελέγξτε τα στοιχεία της νέας πρόσληψης και δοκιμάστε ξανά.';
