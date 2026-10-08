@@ -194,11 +194,16 @@ function handler(mode, db) {
                 history: db.state().history[0], afm: '123456789' }
             : { action: 'CREATE_NEW', afm: '' }),
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
-        writeEmployeeEmploymentProfileWithUniqueSafeRepair: args =>
-            W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps }),
-        writeEmployeeDeparture: args => W.writeEmployeeDeparture({ ...args, ...db.deps }).catch(error => {
-            db.departureError = error; throw error;
-        }),
+        writeEmployeeEmploymentProfileWithUniqueSafeRepair: args => {
+            db.dispatch?.push('writeEmployeeEmploymentProfileWithUniqueSafeRepair');
+            return W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps });
+        },
+        writeEmployeeDeparture: args => {
+            db.dispatch?.push('writeEmployeeDeparture');
+            return W.writeEmployeeDeparture({ ...args, ...db.deps }).catch(error => {
+                db.departureError = error; throw error;
+            });
+        },
         writeEmployeeRehire: args => W.writeEmployeeRehire({ ...args, ...db.deps }),
         writeEmployeeDepartureDateCorrection: args =>
             W.writeEmployeeDepartureDateCorrection({ ...args, ...db.deps }).catch(error => {
@@ -1392,6 +1397,87 @@ test('Add retry preserves absent employee and history fields, but applies explic
     assert.equal(db.state().employee.pososto_apasxolhshs_kk1, 0);
     assert.equal(db.state().employee.hmeromhnia_ekdoshs, null);
     assert.equal(db.state().history[0].stoixeio_symbashs_01, null);
+});
+
+async function historicalOverlapWithUniqueLatestState() {
+    const stored = plain(await initial());
+    const latest = stored.history[0];
+    for (const target of [stored.employee, latest]) {
+        target.hmeromhnia_proslhpshs = '2026-02-01';
+        target.hmeromhnia_apoxorhshs = null;
+        target.energos = true;
+    }
+    latest.aa_eggrafhs = '0003';
+    latest.afora_proslhpsh = false;
+    const older = (id, aa, end, scheduleFrom, days, hours, wage) => ({
+        ...plain(latest), _id: id, aa_eggrafhs: aa,
+        hmeromhnia_allaghs_symbashs: '2026-02-01',
+        hmeromhnia_allaghs_orarioy_apo: scheduleFrom,
+        hmeromhnia_allaghs_orarioy_eos: scheduleFrom,
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-02-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: end,
+        afora_proslhpsh: true, afora_allagh_oron_ergasias: true,
+        hmeres_ergasias_ebdomadas: days, ores_ergasias_ebdomadas: hours,
+        pragmatikosMisthos: wage,
+        createdAt: `${scheduleFrom}T06:00:00.000Z`,
+        updatedAt: `${scheduleFrom}T06:10:00.000Z`
+    });
+    stored.history = [
+        older('507f1f77bcf86cd799439311', '0001', '2026-03-31', '2026-02-01', 2, 16, 435.6),
+        older('507f1f77bcf86cd799439312', '0002', null, '2026-03-01', 4, 34, 925.65),
+        latest
+    ];
+    stored.audits = [];
+    return stored;
+}
+
+test('controller repeats departure on the accepted older overlap without persisting another event', async () => {
+    const stored = await historicalOverlapWithUniqueLatestState();
+    const db = memory(stored); db.dispatch = [];
+    db.deps.correctionCatalogLoader = async () => ({
+        CONTRACT_TYPE: [{ code: 'contract', label: 'Σύμβαση δοκιμής' }],
+        KPK_EFKA: [], CONTRACT_CATEGORY: [], CONTRACT_SPECIALTY: []
+    });
+    const payload = { ...form(), hmeromhnia_proslhpshs: '2026-02-01',
+        hmeromhnia_apoxorhshs: '2026-09-29' };
+    const first = await submit('edit', payload, db);
+    assert.equal(first.res.code, 200, first.res.body?.errorMessage);
+    assert.deepEqual(db.dispatch, ['writeEmployeeDeparture']);
+    assert.deepEqual(db.state().history.slice(0, 2), stored.history.slice(0, 2));
+    assert.equal(db.state().employee.energos, false);
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-29');
+    assert.equal(db.state().history[2].hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-29');
+    assert.equal(db.state().audits.length, 1);
+    assert.equal(db.state().audits[0].mutationSource,
+        'DEPARTURE_WITH_DEFERRED_HISTORY_AMBIGUITY');
+    const afterFirst = plain(db.state());
+    const writesAfterFirst = db.writes();
+    const repeated = await submit('edit', payload, db);
+    assert.equal(repeated.res.code, 409);
+    assert.equal(repeated.res.body.reason, 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+    assert.deepEqual(db.dispatch,
+        ['writeEmployeeDeparture', 'writeEmployeeEmploymentProfileWithUniqueSafeRepair']);
+    assert.deepEqual(db.state(), afterFirst);
+    assert.equal(db.writes(), writesAfterFirst);
+});
+
+test('controller ordinary maintenance rejects the same older overlap without hidden repairs', async () => {
+    const stored = await historicalOverlapWithUniqueLatestState();
+    const db = memory(stored); db.dispatch = [];
+    db.deps.correctionCatalogLoader = async () => ({
+        CONTRACT_TYPE: [{ code: 'contract', label: 'Σύμβαση δοκιμής' }],
+        KPK_EFKA: [], CONTRACT_CATEGORY: [], CONTRACT_SPECIALTY: []
+    });
+    const { res } = await submit('edit', { ...form(),
+        hmeromhnia_proslhpshs: '2026-02-01' }, db);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+    assert.equal(res.body.success, false);
+    assert.match(res.body.message, /Δεν έγινε καμία αλλαγή/);
+    assert.match(res.body.message, /διαχειριστή.*έλεγχο του ιστορικού/);
+    assert.deepEqual(db.dispatch, ['writeEmployeeEmploymentProfileWithUniqueSafeRepair']);
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.writes(), 0);
 });
 
 // Sanitized full-form values exercise browser representations at the real controller boundary.
