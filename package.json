@@ -61,7 +61,7 @@
         "qrcode": "1.5.4",
         "selenium-webdriver": "^4.44.0",
         "socket.io": "^4.8.4",
-        "sweetalert2": "11.4.8",
+        "sweetalert2": "11.26.25",
         "winston": "3.17.0",
         "xmlbuilder": "15.1.1"
     },
