@@ -501,3 +501,54 @@ test('LIVE και UNKNOWN συσχετίσεις αποτυγχάνουν κλε
     assert.equal(result.status, PLAN_STATUSES.BLOCKED);
     assert.match(result.reason, /LIVE_REFERENCE/);
 });
+
+function bsonIdentityFixture(factory = h2KpkBoundaryFixture) {
+    const fixture = factory();
+    const { Types } = require('mongoose');
+    const references = {};
+    fixture.completeHistoryRows.forEach((row, index) => {
+        const oldId = String(row._id);
+        row._id = new Types.ObjectId(`507f1f77bcf86cd7994391${String(index).padStart(2, '0')}`);
+        references[String(row._id)] = fixture.protectedReferenceSummary[oldId];
+    });
+    fixture.currentEmployee._id = new Types.ObjectId('507f1f77bcf86cd799439199');
+    fixture.protectedReferenceSummary = references;
+    return fixture;
+}
+
+test('real BSON identities survive the confirmed initial boundary and KPK correction', () => {
+    const fixture = bsonIdentityFixture();
+    const before = fixture.completeHistoryRows.map(row => String(row._id));
+    const decisions = initialDecisions({ intent: INTENTS.CORRECT_EXISTING_HISTORICAL_FACT, value: '0115' });
+    decisions[0].intent = INTENTS.FROM_KNOWN_HISTORY_DATE;
+    const result = resolve(fixture, decisions);
+    assertClean(result);
+    assert.deepEqual(result.desiredHistoryRows.map(row => String(row._id)), before);
+    assert.ok(result.desiredHistoryRows.every(row => typeof row._id.toHexString === 'function'));
+    assert.equal(fixture.completeHistoryRows[0].krathsh_01, '0111');
+    assert.equal(result.desiredHistoryRows[0].krathsh_01, '0115');
+});
+
+test('BSON identity is preserved by the independent confirmed-field timeline path', () => {
+    const fixture = bsonIdentityFixture();
+    const row = fixture.completeHistoryRows[1];
+    const result = applyConfirmedFieldDecisionToTimeline({ rows: [row], targetHistoryId: String(row._id),
+        fieldId: 'KPK', decision: { intent: INTENTS.CORRECT_EXISTING_HISTORICAL_FACT, value: '0109' },
+        allowedValues: ['0109', '0115'] });
+    assert.equal(String(result.rows[0]._id), String(row._id));
+    assert.equal(typeof result.rows[0]._id.toHexString, 'function');
+    assert.equal(result.rows[0].krathsh_01, '0109');
+    assert.equal(row.krathsh_01, '0115');
+});
+
+test('a genuinely missing BSON stable row still produces USER_CORRECTION_STALE', () => {
+    const fixture = bsonIdentityFixture();
+    const plan = planner(fixture);
+    const selectedId = plan.internalRules.candidateIds.PROFILE_CANDIDATE_1;
+    assert.throws(() => resolveEmployeeHistoryUserConfirmedCorrection({ plannerResult: plan,
+        currentEmployee: fixture.currentEmployee,
+        completeHistoryRows: fixture.completeHistoryRows.filter(row => String(row._id) !== selectedId),
+        confirmation: { responsibilityAccepted: true, decisions: initialDecisions({
+            intent: INTENTS.CORRECT_EXISTING_HISTORICAL_FACT, value: '0115' }) }
+    }), error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
+});

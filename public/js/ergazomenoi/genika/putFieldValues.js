@@ -99,6 +99,19 @@ async function handleEmployeeSaveHistoryAction(response, data, { swal, documentR
     return true;
 }
 
+async function handleEmployeeSaveHistoryStale(response, data, { swal }) {
+    if (response.status !== 409 || data?.success !== false ||
+        data?.reason !== 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE') return false;
+    await swal.fire({
+        icon: 'warning', title: 'Τα στοιχεία άλλαξαν',
+        text: 'Τα στοιχεία του εργαζομένου ή του Ιστορικού άλλαξαν όσο ήταν ανοιχτή η διόρθωση.\n\n' +
+            'Για λόγους ασφάλειας δεν αποθηκεύτηκε καμία αλλαγή.\n\n' +
+            'Κλείστε το παράθυρο και ανοίξτε ξανά τον έλεγχο του Ιστορικού για να επιβεβαιώσετε τις νεότερες πληροφορίες.',
+        confirmButtonText: 'Κλείσιμο', allowOutsideClick: false
+    });
+    return true;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const Swal = new Proxy(window.Swal, {
         get(target, property) {
@@ -1539,6 +1552,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (await handleEmployeeSaveHistoryAction(response, data, {
                     swal: Swal, documentRef: document
                 })) return;
+
+                if (await handleEmployeeSaveHistoryStale(response, data, { swal: Swal })) return;
 
                 console.group('[CONTRACT-DEBUG] RESPONSE JSON');
                 console.log('success:', data?.success);

@@ -117,6 +117,8 @@ function normalizedScope(scope = {}) {
 function historyId(row = {}) { return row._id == null ? '' : String(row._id); }
 function clone(value) {
     if (value instanceof Date) return new Date(value.getTime());
+    // BSON identities must retain their type when copying lean History rows.
+    if (typeof value?.toHexString === 'function') return value;
     if (Array.isArray(value)) return value.map(clone);
     if (!value || typeof value !== 'object') return value;
     return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, clone(nested)]));

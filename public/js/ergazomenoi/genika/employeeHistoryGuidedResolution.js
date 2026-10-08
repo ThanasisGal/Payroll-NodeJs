@@ -314,7 +314,7 @@
 
     function normalizeResolutionResponse(data) {
         const resolution = data?.resolution;
-        if (data?.resolutionRequired !== true || !isPlainObject(resolution) ||
+        if (data?.success === true || data?.resolutionRequired !== true || !isPlainObject(resolution) ||
             resolution.version !== EXPECTED_VERSION ||
             !FINGERPRINT_PATTERN.test(String(resolution.fingerprint || ''))) return null;
 

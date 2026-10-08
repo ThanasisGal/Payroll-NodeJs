@@ -3048,3 +3048,90 @@ test('multi-delete with one unsafe departure leaves every history/current/audit 
     assert.equal(db.ended(), true);
     assert.equal(mongoose.connection.readyState, 0);
 });
+
+// Store strings like the existing transaction fake; return fresh native BSON ids
+// from every lean read, matching MongoDB without structuredClone losing prototypes.
+function bsonGuidedFixtureDatabase(fixture) {
+    const db = referencedFixtureDatabase(fixture);
+    const employeeFind = db.dependencies.employeeModel.findOne;
+    db.dependencies.employeeModel.findOne = filter => {
+        const query = employeeFind(filter);
+        const lean = query.lean;
+        query.lean = async () => {
+            const row = await lean();
+            return row ? { ...row, _id: new mongoose.Types.ObjectId(String(row._id)) } : row;
+        };
+        return query;
+    };
+    const historyFind = db.dependencies.historyModel.find;
+    db.dependencies.historyModel.find = filter => {
+        const query = historyFind(filter);
+        const lean = query.lean;
+        query.lean = async () => (await lean()).map(row => ({ ...row,
+            _id: new mongoose.Types.ObjectId(String(row._id)) }));
+        return query;
+    };
+    for (const model of [db.dependencies.employeeModel, db.dependencies.historyModel]) {
+        const update = model.updateOne;
+        model.updateOne = (filter, ...args) => update({ ...filter,
+            ...(filter._id ? { _id: String(filter._id) } : {}) }, ...args);
+    }
+    return db;
+}
+function bsonGuidedFixture() {
+    const fixture = h2KpkBoundaryFixture();
+    const references = {};
+    fixture.completeHistoryRows.forEach((row, index) => {
+        const oldId = row._id;
+        row._id = `507f1f77bcf86cd7994391${String(index).padStart(2, '0')}`;
+        references[row._id] = fixture.protectedReferenceSummary[oldId];
+    });
+    fixture.currentEmployee._id = '507f1f77bcf86cd799439199';
+    fixture.protectedReferenceSummary = references;
+    return fixture;
+}
+function realShapeConfirmation(resolution) {
+    const confirmation = userCorrectionConfirmation(resolution);
+    confirmation.decisions[0].intent = 'FROM_KNOWN_HISTORY_DATE';
+    return confirmation;
+}
+
+test('fresh BSON reads accept the same worksheet fingerprint and continue Save atomically', async () => {
+    const fixture = bsonGuidedFixture();
+    const firstDb = bsonGuidedFixtureDatabase(fixture);
+    const before = structuredClone(firstDb.state());
+    const resolution = await requiredUserCorrectionResolution(firstDb, fixture);
+    assert.deepEqual(firstDb.state(), before);
+    assert.equal(firstDb.writes(), 0);
+    const freshDb = bsonGuidedFixtureDatabase(bsonGuidedFixture());
+    const saved = await uniqueSafeRepairRequest(freshDb, fixture, realShapeConfirmation(resolution), {
+        correctionCatalogLoader: async () => fixture.catalogs
+    });
+    assert.equal(saved.userConfirmedCorrectionApplied, true);
+    assert.equal(saved.userConfirmedCorrectionAuditWritten, true);
+    assert.equal(freshDb.operations().auditCreates, 1);
+    assert.equal(freshDb.operations().historyDeletes, 0);
+});
+
+for (const changed of ['employee', 'history', 'revision', 'references', 'catalog', 'request']) {
+    test(`BSON confirmation rejects genuine ${changed} change with zero committed changes`, async () => {
+        const original = bsonGuidedFixture();
+        const resolution = await requiredUserCorrectionResolution(bsonGuidedFixtureDatabase(original), original);
+        const fixture = bsonGuidedFixture();
+        if (changed === 'employee') fixture.currentEmployee.nomimosMisthos += 1;
+        if (changed === 'history') fixture.completeHistoryRows[0].krathsh_01 = '0109';
+        if (changed === 'revision') fixture.completeHistoryRows[0].updatedAt = new Date('2026-10-08');
+        if (changed === 'references') fixture.protectedReferenceSummary[fixture.completeHistoryRows[0]._id] = [];
+        if (changed === 'catalog') fixture.catalogs.KPK_EFKA.push({ code: '0999', label: 'Συνθετική νέα τιμή' });
+        const overrides = { correctionCatalogLoader: async () => fixture.catalogs };
+        if (changed === 'request') overrides.maintenance = { employeeChanges: { krathsh_01: '0109' },
+            submittedEmployeeFields: ['krathsh_01'], historyChanges: {}, submittedHistoryChanges: {},
+            submittedProfileFields: [], identity: null, originalHistoryId: null, correctableIdentityFields: [] };
+        const db = bsonGuidedFixtureDatabase(fixture);
+        const before = structuredClone(db.state());
+        await assert.rejects(uniqueSafeRepairRequest(db, fixture, realShapeConfirmation(resolution), overrides),
+            error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
+        assert.deepEqual(db.state(), before);
+        assert.equal(db.writes(), 0);
+    });
+}

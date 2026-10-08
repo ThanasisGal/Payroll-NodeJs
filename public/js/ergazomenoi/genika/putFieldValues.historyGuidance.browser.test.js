@@ -19,6 +19,7 @@ assert.ok(saveStart > 0 && saveEnd > saveStart);
 // Execute the complete production Save function, including serialization, POST,
 // JSON dispatch, downstream success branches and its genuine-error catch.
 const saveFunction = source.slice(saveStart, saveEnd);
+const saveOnceFunction = source.slice(saveEnd, source.indexOf('\n    }', saveEnd) + 6);
 const target = historyId('employee', 1);
 const otherTarget = historyId('employee', 2);
 const reason = 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE';
@@ -39,7 +40,7 @@ const preview = policy.planHistoryCorrection({ scope, currentEmployee: previewFi
 assert.ok(preview);
 
 async function withPage({ payload = action(), status = 200, disabled = false,
-    missing = false, accessMode = 'ADMIN_FULL', duplicate = false } = {}, work) {
+    missing = false, accessMode = 'ADMIN_FULL', duplicate = false, replies = null, departure = '2026-09-20' } = {}, work) {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage();
@@ -48,7 +49,7 @@ async function withPage({ payload = action(), status = 200, disabled = false,
         page.on('pageerror', err => pageErrors.push(err.message));
         const requiredNames = [...source.matchAll(/addError\(\s*'([^']+)'/g)].map(match => match[1]);
         const values = Object.fromEntries(requiredNames.map(name => [name, '1']));
-        Object.assign(values, { hmeromhnia_apoxorhshs: '2026-09-20',
+        Object.assign(values, { hmeromhnia_apoxorhshs: departure,
             email: 'entered@example.test', hmeromhnia_proslhpshs: '2026-04-01' });
         for (let day = 1; day <= 7; day++) values[`kathgoria_ergasias_${String(day).padStart(2, '0')}`] = 'ΜΕ';
         const fields = Object.entries(values).map(([name, value]) =>
@@ -73,7 +74,8 @@ async function withPage({ payload = action(), status = 200, disabled = false,
             if (request.method() !== 'POST') return route.fulfill({ contentType: 'text/html', body: html });
             requests.push({ url: request.url(), body: request.postDataJSON() });
             if (request.url() === 'https://payroll.test/api/ergazomenoi/update/synthetic-employee') {
-                return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload) });
+                const reply = replies?.[requests.filter(item => item.url.includes('/api/ergazomenoi/update/')).length - 1] || { status, payload };
+                return route.fulfill({ status: reply.status, contentType: 'application/json', body: JSON.stringify(reply.payload) });
             }
             assert.equal(request.url(), 'https://payroll.test/ergazomenoi/ergazomenoi/istoriko/update');
             return route.fulfill({ status: 200, contentType: 'application/json',
@@ -83,7 +85,7 @@ async function withPage({ payload = action(), status = 200, disabled = false,
         await page.addStyleTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.css') });
         await page.addScriptTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js') });
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
-        for (const file of ['public/js/common/sectionsVisible.js',
+        for (const file of ['public/js/common/csrfFetchPatch.js', 'public/js/common/sectionsVisible.js',
             'public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js',
             'public/js/ergazomenoi/genika/istorikoTable.js']) {
             await page.addScriptTag({ path: path.join(root, file) });
@@ -95,14 +97,36 @@ async function withPage({ payload = action(), status = 200, disabled = false,
             async function blockSaveForDailyRestViolation() { return false; }
             window.validateEmploymentProfileBreak = () => true;
             window.serializeEmploymentProfileField = () => false;
-            window.pdfUploadModule = { getFileAsBase64: async () => null };
+            window.pdfUploadModule = { getFileAsBase64: async () => null, hasPendingUpload: () => false };
             window.swalCalls = [];
+            window.guidedCounts = { retryRequest: 0, preConfirm: 0, successContinuation: 0, redirect: 0 };
+            const guided = window.employeeHistoryGuidedResolution;
+            window.employeeHistoryGuidedResolution = { ...guided, handleInitialResponse: options => {
+                const retry = options.retryRequest;
+                return guided.handleInitialResponse({ ...options, retryRequest: payload => {
+                    window.guidedCounts.retryRequest++; return retry(payload);
+                } });
+            } };
+            const finish = finishEmployeeUpdateAfterUploads;
+            finishEmployeeUpdateAfterUploads = results => {
+                window.guidedCounts.successContinuation++;
+                return finish(results, () => { window.guidedCounts.redirect++; });
+            };
+            const runFormSubmissionOnce = createSingleFlight();
             const originalFire = Swal.fire.bind(Swal);
-            Swal.fire = options => { window.swalCalls.push(options); return originalFire(options); };
+            Swal.fire = options => {
+                window.swalCalls.push(options);
+                if (options.titleText === 'Χρειάζεται διόρθωση του ιστορικού') {
+                    const confirm = options.preConfirm;
+                    options.preConfirm = async () => { window.guidedCounts.preConfirm++; return confirm(); };
+                }
+                return originalFire(options);
+            };
             ${saveFunction}
+            ${saveOnceFunction}
             document.getElementById('save').addEventListener('click', event => {
                 window.saveFinished = false;
-                handleFormSubmit(event).then(() => { window.saveFinished = true; });
+                handleFormSubmitOnce(event).then(result => { if (!result?.skipped) window.saveFinished = true; });
             });
             document.dispatchEvent(new Event('DOMContentLoaded'));
         ` });
@@ -215,4 +239,81 @@ test('only a complete allowlisted HTTP 200 envelope is handled', async () => {
         assert.equal(await context.handleEmployeeSaveHistoryAction({ status, ok: status === 200 }, payload,
             { swal: { fire() { assert.fail('invalid envelope opened a modal'); } }, documentRef: null }), false);
     }
+});
+
+function initialUserCorrectionResponse() {
+    const fixture = require('../../../../server/services/ergazomenoi/fixtures/userConfirmedEmployeeHistoryCorrectionFixtures').h2KpkBoundaryFixture();
+    const analysis = require('../../../../server/services/ergazomenoi/employeeHistoryResolutionAnalysisService');
+    const planner = require('../../../../server/services/ergazomenoi/employeeHistoryUserConfirmedCorrectionPlannerService')
+        .planEmployeeHistoryUserConfirmedCorrection(fixture);
+    const fingerprint = 'a'.repeat(64);
+    const resolution = analysis.buildUserConfirmedCorrectionPublicResolution({
+        analysis: analysis.buildUserConfirmedCorrectionAnalysis({ userCorrectionPlan: planner,
+            sourceStateFingerprint: fingerprint }), fingerprint });
+    return { success: false, reason: 'EMPLOYEE_HISTORY_USER_CORRECTION_REQUIRED', resolutionRequired: true, resolution };
+}
+async function completeUserCorrection(page) {
+    await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Χρειάζεται διόρθωση του ιστορικού');
+    // The production single-flight wrapper must reject a second Save during the worksheet.
+    await page.evaluate(() => document.getElementById('save').click());
+    await page.locator('input[name="employee-history-correction-INITIAL_PROFILE_START"][value="FROM_KNOWN_HISTORY_DATE"]').check();
+    await page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"][value="CONFIRM_EXISTING"]').check();
+    await page.locator('.swal2-html-container select:enabled').selectOption('PROFILE_CANDIDATE_1');
+    await page.locator('input[name="employee-history-correction-FIELD_KPK"][value="CORRECT_EXISTING_HISTORICAL_FACT"]').check();
+    const section = page.locator('section').filter({ has: page.locator('input[name="employee-history-correction-FIELD_KPK"]') });
+    await section.locator('select:enabled').selectOption('0115');
+    assert.equal(await page.locator('.swal2-confirm').isEnabled(), false);
+    await page.locator('.swal2-html-container input[type="checkbox"]').check();
+    assert.equal(await page.locator('.swal2-confirm').isEnabled(), true);
+    await page.locator('.swal2-confirm').click();
+}
+function assertConfirmationRequests(requests) {
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].body.resolution, undefined);
+    assert.deepEqual(requests[1].body.resolution, { fingerprint: 'a'.repeat(64), responsibilityAccepted: true,
+        decisions: [
+            { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_KNOWN_HISTORY_DATE' },
+            { conflictId: 'INITIAL_PROFILE_TERMS', intent: 'CONFIRM_EXISTING', value: 'PROFILE_CANDIDATE_1' },
+            { conflictId: 'FIELD_KPK', intent: 'CORRECT_EXISTING_HISTORICAL_FACT', value: '0115' }
+        ] });
+    assert.deepEqual({ ...requests[1].body, resolution: undefined }, { ...requests[0].body, resolution: undefined });
+}
+for (const status of [200, 409]) test(`normal Save guided HTTP ${status} confirms once and continues success once`, async () => {
+    await withPage({ departure: '', replies: [ { status, payload: initialUserCorrectionResponse() },
+        { status: 200, payload: { success: true, message: 'Η ενημέρωση ολοκληρώθηκε.' } } ] },
+    async ({ page, requests, errors }) => {
+        await save(page);
+        await completeUserCorrection(page);
+        await page.waitForFunction(() => window.saveFinished);
+        assertConfirmationRequests(requests);
+        assert.deepEqual(errors.filter(text => !text.includes('Failed to load resource')), []);
+        assert.deepEqual(await page.evaluate(() => window.guidedCounts),
+            { retryRequest: 1, preConfirm: 1, successContinuation: 1, redirect: 1 });
+        assert.equal(await page.evaluate(() => window.swalCalls.filter(call => call.icon === 'success').length), 1);
+        assert.equal(await page.evaluate(() => window.swalCalls.some(call => call.title === 'Αποτυχία αποθήκευσης')), false);
+        assert.deepEqual(errors.filter(text => !text.includes('Failed to load resource')), []);
+        if (status === 200) assert.deepEqual(errors, []);
+    });
+});
+
+test('normal Save genuine stale has dedicated UX, no generic errors, retry, success or redirect', async () => {
+    await withPage({ departure: '', replies: [ { status: 200, payload: initialUserCorrectionResponse() },
+        { status: 409, payload: { success: false, reason: 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE' } } ] },
+    async ({ page, requests, errors }) => {
+        await save(page);
+        await completeUserCorrection(page);
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Τα στοιχεία άλλαξαν');
+        const options = await page.evaluate(() => window.swalCalls.at(-1));
+        assert.equal(options.timer, undefined);
+        assert.equal(options.confirmButtonText, 'Κλείσιμο');
+        assert.match(options.text, /Για λόγους ασφάλειας δεν αποθηκεύτηκε καμία αλλαγή/);
+        assert.match(options.text, /ανοίξτε ξανά τον έλεγχο του Ιστορικού/);
+        assertConfirmationRequests(requests);
+        await page.locator('.swal2-confirm').click();
+        await page.waitForFunction(() => window.saveFinished);
+        assertConfirmationRequests(requests);
+        assert.deepEqual(await page.evaluate(() => window.guidedCounts),
+            { retryRequest: 1, preConfirm: 1, successContinuation: 0, redirect: 0 });
+        await expectNoFalseSuccess(page, errors.filter(text => !text.includes('Failed to load resource')));
+    });
 });
