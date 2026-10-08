@@ -66,17 +66,17 @@ async function withPage(work) {
     }
 }
 
-async function open(page, resolution, originalPayload = {}) {
-    await page.evaluate(({ resolution, originalPayload, endpoint }) => {
+async function open(page, resolution, originalPayload = {}, status = 200) {
+    await page.evaluate(({ resolution, originalPayload, endpoint, status }) => {
         window.previousModalPopup = Swal.getPopup();
         window.modalResult = null;
         window.employeeHistoryGuidedResolution.handleInitialResponse({
-            response: new Response(JSON.stringify({ resolutionRequired: true, resolution }), { status: 409 }),
+            response: new Response(JSON.stringify({ resolutionRequired: true, resolution }), { status }),
             originalPayload, retryRequest: payload => fetch(endpoint, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             }), swal: Swal, documentRef: document, windowRef: window
         }).then(result => { window.modalResult = { cancelled: result.cancelled, status: result.response?.status }; });
-    }, { resolution, originalPayload, endpoint });
+    }, { resolution, originalPayload, endpoint, status });
     // Cancel resolves before its closing animation finishes. Visibility alone can
     // therefore match the previous popup instead of the one being opened.
     await page.waitForFunction(() => {
@@ -133,7 +133,7 @@ test('real SweetAlert Cancel stays available before and after acceptance and sen
     await withPage(async (page, requests) => {
         for (let opening = 0; opening < 10; opening += 1) {
             const accepted = opening % 2 === 1;
-            await open(page, safePreview(), { correction });
+            await open(page, safePreview(), { correction }, accepted ? 409 : 200);
             await state(page, true, requests);
             if (accepted) {
                 await page.locator('.swal2-html-container input[type="checkbox"]').check();

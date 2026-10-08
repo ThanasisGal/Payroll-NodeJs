@@ -316,3 +316,47 @@ test('κακόβουλο φύλλο διόρθωσης απορρίπτεται 
     assert.equal(payload.resolution, undefined);
     assert.equal(JSON.stringify(payload).includes('forged'), false);
 });
+
+test('endpoint transport override requires an allowed error and a sanitized resolution with a strict flag', () => {
+    const resolution = { version: 1, kind: 'UNIQUE_SAFE_REPAIR',
+        title: 'Έλεγχος ιστορικού', explanation: 'Χρειάζεται επιβεβαίωση.',
+        options: [{ id: 'APPLY_UNIQUE_SAFE_PLAN', label: 'Επιβεβαίωση',
+            description: 'Ελέγξτε τα στοιχεία.', historyId: 'must-not-leak' }],
+        fingerprint: 'a'.repeat(64), diagnostics: { _id: 'must-not-leak' } };
+    const required = { code: 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED', statusCode: 409,
+        resolutionRequired: true, resolution };
+    const send = (error, options) => {
+        const res = { status(code) { this.code = code; return this; },
+            json(body) { this.body = body; return this; } };
+        profileError(res, error, options);
+        return res;
+    };
+    const legacy = send(required);
+    const interactive = send(required, { resolutionStatusCode: 200 });
+    assert.equal(legacy.code, 409);assert.equal(interactive.code, 200);
+    assert.deepEqual(interactive.body, legacy.body);
+    assert.equal(interactive.body.success, false);assert.equal(interactive.body.resolutionRequired, true);
+    assert.equal(JSON.stringify(interactive.body).includes('must-not-leak'), false);
+    for (const error of [
+        { ...required, resolutionRequired: undefined },
+        { ...required, resolutionRequired: false },
+        { ...required, resolutionRequired: 'true' },
+        { ...required, resolution: undefined },
+        { ...required, resolution: { ...resolution, fingerprint: 'invalid' } },
+        { ...required, code: 'EMPLOYEE_HISTORY_EDITOR_STALE' },
+        { ...required, code: 'CONFLICT_STALE' },
+        { ...required, code: 'CONFLICT_OVERLAP' },
+        { ...required, code: 'EMPLOYEE_HISTORY_CORRECTION_INVALID_REQUEST' },
+        { ...required, code: 'EMPLOYEE_HISTORY_CORRECTION_INVALID_BOUNDARY' },
+        { ...required, code: 'EMPLOYEE_HISTORY_CORRECTION_CHANGED' },
+        { ...required, code: 'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN', statusCode: 403 },
+        { ...required, code: 'EMPLOYEE_PROFILE_SAVE_FAILED', statusCode: undefined }
+    ]) {
+        const normal = send(error);
+        const overridden = send(error, { resolutionStatusCode: 200 });
+        assert.equal(overridden.code, error.statusCode || 500, error.code);
+        assert.deepEqual(overridden.body, normal.body);
+        assert.equal(overridden.body.resolutionRequired, undefined);
+        assert.equal(overridden.body.resolution, undefined);
+    }
+});

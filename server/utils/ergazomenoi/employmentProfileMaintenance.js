@@ -201,7 +201,7 @@ function sanitizedEmployeeHistoryResolution(value) {
         fingerprint: String(value.fingerprint)
     };
 }
-function profileError(res, error) {
+function profileError(res, error, options = {}) {
     const messages = {
         EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP: 'Η προσθήκη νέας μεταβολής όρων εργασίας σταμάτησε επειδή η εργασιακή σχέση έχει ήδη κλείσει. Δεν μπορεί να προστεθεί νέα μεταβολή σε αυτή τη σχέση. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ελέγξτε το Ιστορικό του εργαζομένου. 2. Επιλέξτε τη σωστή εργασιακή σχέση ή διορθώστε τα στοιχεία της σχέσης που αφορά η μεταβολή πριν συνεχίσετε. Κωδικός αναφοράς: EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP',
         EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN: 'Η αποθήκευση του Ιστορικού σταμάτησε επειδή ο λογαριασμός σας δεν έχει δικαίωμα διαχείρισής του. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ανοίξτε ξανά τον εργαζόμενο. 2. Ζητήστε έλεγχο των δικαιωμάτων σας από διαχειριστή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN',
@@ -295,7 +295,8 @@ function profileError(res, error) {
     const response = { success: false, reason: error.code || 'EMPLOYEE_PROFILE_SAVE_FAILED',
         field: error.field, operation: error.operation || 'EMPLOYEE_MAINTENANCE',
         message, errorMessage: message };
-    const resolution = sanitizedEmployeeHistoryResolution(error.resolution);
+    let resolution;
+    try { resolution = sanitizedEmployeeHistoryResolution(error.resolution); } catch { resolution = null; }
     if (['EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR_REQUIRED',
         'EMPLOYEE_HISTORY_MULTIPLE_SAFE_RESOLUTION_REQUIRED',
         'EMPLOYEE_HISTORY_BUSINESS_FACT_REQUIRED',
@@ -305,7 +306,11 @@ function profileError(res, error) {
         response.resolutionRequired = true;
         response.resolution = resolution;
     }
-    return res.status(error.statusCode || 500).json(response);
+    // Only an attached, sanitized resolution may use the endpoint's transport status.
+    const statusCode = response.resolutionRequired === true && response.resolution
+        ? options.resolutionStatusCode ?? (error.statusCode || 500)
+        : error.statusCode || 500;
+    return res.status(statusCode).json(response);
 }
 module.exports = { profileInput, profileError, isEmploymentProfileError, historyEditorChanges,
     submittedEmployeeMaintenanceFields, departureMaintenanceValuesEqual,

@@ -1071,7 +1071,8 @@ class ergazomenoiController {
         } catch (error) {
             console.error('updateIstorikoData error:', error);
 
-            if (isEmploymentProfileError(error)) return profileError(res, error);
+            if (isEmploymentProfileError(error)) return profileError(res, error,
+                req.body?.correction ? { resolutionStatusCode: 200 } : undefined);
             if (error.code === 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE') return res.status(400).json({
                 success: false, reason: error.code,
                 message: 'Η προσαύξηση 6ης ημέρας του ιστορικού πρέπει να είναι μη αρνητικός αριθμός.'
