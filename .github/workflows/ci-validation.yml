@@ -777,6 +777,7 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/contracts/sweetAlertVersion.contract.test.js"
             "server/controllers/ergazomenoi/ergazomenoiController.historyCorrection.test.js"
             "server/services/ergazomenoi/employeeHistoryCorrectionPolicyService.test.js"
             "public/js/ergazomenoi/genika/employeeHistorySafeCorrection.test.js"

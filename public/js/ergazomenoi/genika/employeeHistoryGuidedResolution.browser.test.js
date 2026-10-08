@@ -53,6 +53,7 @@ async function withPage(work) {
         await page.addStyleTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.css') });
         await page.addStyleTag({ path: path.join(root, 'public/css/main.css') });
         await page.addScriptTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js') });
+        assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
         await page.addScriptTag({ path: path.join(__dirname, 'employeeHistoryGuidedResolution.js') });
         assert.deepEqual(await page.evaluate(() => ({
             getter: typeof Swal.getConfirmButton,
