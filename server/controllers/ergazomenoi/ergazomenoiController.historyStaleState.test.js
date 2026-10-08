@@ -52,7 +52,7 @@ test('actual edit handler renders a token from full persisted History before enr
         employment_history_canonical_survivor_id: initial.history[0]._id };
     initial.history.push(redundant);
     const options = [];
-    const query = value => ({ mongooseOptions(value) { options.push(value); return this; },
+    const query = value => ({ mongooseOptions(value) { options.push(value); return value; },
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
     const context = { Date, console: { error() {} }, ...S, ...M, semanticHistoryRows,

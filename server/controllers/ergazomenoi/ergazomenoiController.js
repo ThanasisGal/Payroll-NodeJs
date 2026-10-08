@@ -826,12 +826,13 @@ class ergazomenoiController {
             // const ergazomenoiKod = req.params.kod;
             const ergazomenoiKod = ergazomenoiData.kodikos;
 
-            const persistedIstorikoData = await IstorikoProslhpseonAllagonModel.find({
+            const persistedIstorikoQuery = IstorikoProslhpseonAllagonModel.find({
                 team: userTeam,
                 company_kod: companyId,
                 kodikos: ergazomenoiKod
-            })
-                .mongooseOptions({ includeRedundantHistoryArtifacts: true })
+            });
+            persistedIstorikoQuery.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+            const persistedIstorikoData = await persistedIstorikoQuery
                 .sort({ aa_eggrafhs: 1 })
                 .lean();
 

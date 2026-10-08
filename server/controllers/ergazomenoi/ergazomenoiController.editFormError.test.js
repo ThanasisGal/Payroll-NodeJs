@@ -5,6 +5,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const mongoose = require('mongoose');
 const EditorState = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const {
@@ -29,7 +30,7 @@ function extract(startMarker, endMarker) {
     return source.slice(start, end);
 }
 
-function editHandler(historyRows) {
+function editHandler(historyRows, calls = { history: [], writes: [] }) {
     const method = extract(
         '    static editErgazomenoiForm = async (req, res, next) => {',
         '    static getIstorikoData = async (req, res) => {'
@@ -49,24 +50,47 @@ function editHandler(historyRows) {
         hmeromhnia_apoxorhshs: new Date('2026-04-24')
     };
     const query = (value) => ({
-        mongooseOptions() { return this; },
         sort() { return this; },
         lean() { return this; },
         exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); }
+    });
+    const historyQuery = {
+        mongooseOptions(options) {
+            calls.history.push(['mongooseOptions', { ...options }]);
+            return options;
+        },
+        sort(order) { calls.history.push(['sort', { ...order }]); return this; },
+        lean() { calls.history.push(['lean']); return this; },
+        then(resolve, reject) {
+            calls.history.push(['read']);
+            return Promise.resolve(historyRows).then(resolve, reject);
+        }
+    };
+    const readOnlyModel = (methods) => new Proxy(methods, {
+        get(target, name) {
+            if (Object.hasOwn(target, name)) return target[name];
+            return () => {
+                calls.writes.push(name);
+                throw new Error(`Unexpected model operation: ${String(name)}`);
+            };
+        }
     });
     const context = {
         Date,
         ...EditorState,
         semanticHistoryRows,
         console: { error() {} },
-        CompaniesModel: { findById: () => query({ _id: employee.company_kod }) },
-        ErgazomenoiModel: { findById: () => query(employee) },
-        IstorikoProslhpseonAllagonModel: { find: () => query(historyRows) },
-        PerifereiesModel: { find: () => query([]) },
-        GenikesParametroiModel: { find: () => query([]) },
-        ProdhlomenaOrariaModel: { find: () => query([]) },
-        ProgrammataDypaModel: { findOne: () => query(null) },
+        CompaniesModel: readOnlyModel({ findById: () => query({ _id: employee.company_kod }) }),
+        ErgazomenoiModel: readOnlyModel({ findById: () => query(employee) }),
+        IstorikoProslhpseonAllagonModel: readOnlyModel({ find(filter) {
+            calls.history.push(['find', { ...filter }]);
+            return historyQuery;
+        } }),
+        PerifereiesModel: readOnlyModel({ find: () => query([]) }),
+        GenikesParametroiModel: readOnlyModel({ find: () => query([]) }),
+        ProdhlomenaOrariaModel: readOnlyModel({ find: () => query([]) }),
+        ProgrammataDypaModel: readOnlyModel({ findOne: () => query(null) }),
         mongoose: { trusted: (value) => value },
         enrichIstorikoRowsForDetails: async (rows) => rows,
         getEmploymentProfileUiContext: async () => ({}),
@@ -119,7 +143,7 @@ test('edit page returns a completed friendly 409 response for normalized legacy/
     assert.equal(forwarded, null);
 });
 
-test('edit page selects the open modern row and reaches the normal render path', async () => {
+test('edit page reads History and renders without writes when mongooseOptions returns a non-query', async () => {
     const shared = {
         team: 'BLG', company_kod: '69e7812a74cb535fd4d1a6e1', kodikos: '0005',
         hmeromhnia_proslhpshs: new Date('2026-04-23'),
@@ -142,14 +166,37 @@ test('edit page selects the open modern row and reaches the normal render path',
     } };
     const res = { render(view, locals) { this.view = view; this.locals = locals; this.finished = true; } };
     let forwarded = null;
+    const calls = { history: [], writes: [] };
 
-    await editHandler([legacy, modern])(req, res, (error) => { forwarded = error; });
+    await editHandler([legacy, modern], calls)(req, res, (error) => { forwarded = error; });
 
+    assert.equal(forwarded, null);
+    assert.deepEqual(calls.history, [
+        ['find', { team: 'BLG', company_kod: '69e7812a74cb535fd4d1a6e1', kodikos: '0005' }],
+        ['mongooseOptions', { includeRedundantHistoryArtifacts: true }],
+        ['sort', { aa_eggrafhs: 1 }],
+        ['lean'],
+        ['read']
+    ]);
+    assert.deepEqual(calls.writes, []);
     assert.equal(res.finished, true);
     assert.equal(res.view, 'ergazomenoi/ergazomenoi/edit');
     assert.equal(res.locals.originalEmploymentHistoryId, '6a65e737a2ce245e430d4d70');
     assert.equal(res.locals.originalEmploymentHistoryRevision, '2026-09-26T07:30:00.000Z');
     assert.equal(forwarded, null);
+});
+
+test('real Mongoose query retains sort and lean after setting mongooseOptions separately without a database', () => {
+    const query = new mongoose.Query();
+    const options = { includeRedundantHistoryArtifacts: true };
+
+    assert.equal(query.mongooseOptions(options), options);
+    assert.notEqual(options, query);
+    assert.equal(query.mongooseOptions().includeRedundantHistoryArtifacts, true);
+    assert.equal(query.sort({ aa_eggrafhs: 1 }), query);
+    assert.deepEqual(query.options.sort, { aa_eggrafhs: 1 });
+    assert.equal(query.lean(), query);
+    assert.equal(query.mongooseOptions().lean, true);
 });
 
 test('edit page timing labels are not process-global and unexpected failures are forwarded', async () => {
