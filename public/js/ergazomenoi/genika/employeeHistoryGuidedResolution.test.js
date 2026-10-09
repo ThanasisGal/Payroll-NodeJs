@@ -841,8 +841,10 @@ test('οι εγγενείς λίστες διατηρούν ακριβώς τι�
 });
 
 test('οι λίστες βάσης και καταλόγου PROFILE_FIELDS παραμένουν εγγενείς', () => {
-    const content = guided.buildSafeContent(fakeDocument(),
-        guided.normalizeResolutionResponse(minimalProfileCorrectionResolutionData()));
+    const data = minimalProfileCorrectionResolutionData();
+    data.resolution.conflicts[0].intents[0].valueControl.baselineValues.push({
+        value: 'PROFILE_CANDIDATE_2', label: 'Οι καταχωρημένοι όροι της εγγραφής 26/05/2026' });
+    const content = guided.buildSafeContent(fakeDocument(), guided.normalizeResolutionResponse(data));
     const intent = content.controls[0].intentControls[0];
     for (const select of [intent.valueState.element, intent.valueState.fieldElements[0].input]) {
         assert.equal(select.tagName.toUpperCase(), 'SELECT');

@@ -269,11 +269,11 @@ function candidateLogicalIds(rows) {
         [`PROFILE_CANDIDATE_${index + 1}`, historyId(row)]));
 }
 function candidatePublicOptions(candidateIds, byId, catalogs) {
-    return Object.entries(candidateIds).map(([candidateId, id], index) => {
+    return Object.entries(candidateIds).map(([candidateId, id]) => {
         const row = byId.get(id);
         return Object.freeze({ value: candidateId,
-            label: `Όροι εργασίας ${index + 1} — εγγραφή από ${greekDate(effectiveStart(row))}`,
-            description: `Τα στοιχεία που γράφει το ιστορικό από ${greekDate(effectiveStart(row))}.`,
+            label: `Οι καταχωρημένοι όροι της εγγραφής ${greekDate(effectiveStart(row))}`,
+            description: `Οι όροι που είναι καταχωρημένοι στην εγγραφή της ${greekDate(effectiveStart(row))}.`,
             summary: profileSummary(row, catalogs) });
     });
 }
@@ -395,7 +395,7 @@ function buildInitialShape({ plan, activeRows, profileRows, nonProfileRows, hire
             'Ίσχυαν οι όροι που εμφανίζονται',
             'Κρατήστε τα στοιχεία που εμφανίζονται για αυτό το διάστημα.', {
                 valueControl: Object.freeze({ type: 'SINGLE_CHOICE', required: true,
-                    label: 'Ποιοι όροι ίσχυαν;',
+                    label: 'Στοιχεία αναφοράς',
                     allowedValues: Object.freeze(candidates) })
             })
     ];
@@ -549,7 +549,7 @@ function buildIntermediateShape({ plan, activeRows, profileRows, nonProfileRows,
                     'Ίσχυαν οι όροι που εμφανίζονται',
                     'Επιλέξτε ποιοι από τους όρους που εμφανίζονται ήταν σωστοί για αυτές τις ημέρες.', {
                         valueControl: Object.freeze({ type: 'SINGLE_CHOICE', required: true,
-                            label: 'Ποιοι όροι ίσχυαν;',
+                            label: 'Στοιχεία αναφοράς',
                             allowedValues: Object.freeze(candidates) })
                     })
             ], { condition: Object.freeze({ conflictId: 'INTERMEDIATE_PERIOD_MEANING',
@@ -919,7 +919,8 @@ function resolveInitialPlan(plannerResult, decisions, currentEmployee, completeH
             currentTarget[field] = normalized.value;
         }
     }
-    const survivorId = rules.profileHistoryId;
+    // Preserve the persisted BSON reference type in the approved patch.
+    const survivorId = rowForId(rows, rules.profileHistoryId)._id;
     for (const id of rules.retireHistoryIds) {
         const index = rows.findIndex(row => historyId(row) === id);
         if (index >= 0) rows[index] = retire(rows[index], survivorId);
@@ -978,7 +979,7 @@ function resolveIntermediatePlan(plannerResult, decisions, currentEmployee,
     rows[laterIndex].afora_proslhpsh = false;
     const meaning = decisions.get('INTERMEDIATE_PERIOD_MEANING');
     if (meaning.intent.id === INTENTS.RETIRE_ERRONEOUS_ARTIFACT) {
-        rows[artifactIndex] = retire(rows[artifactIndex], rules.earlierHistoryId);
+        rows[artifactIndex] = retire(rows[artifactIndex], rows[earlierIndex]._id);
     } else {
         const terms = decisions.get('INTERMEDIATE_PROFILE_TERMS');
         const sourceId = profileCandidateId(terms, rules.candidateIds);
@@ -992,7 +993,7 @@ function resolveIntermediatePlan(plannerResult, decisions, currentEmployee,
     }
     for (const id of rules.retireHistoryIds) {
         const index = rows.findIndex(row => historyId(row) === id);
-        if (index >= 0) rows[index] = retire(rows[index], rules.earlierHistoryId);
+        if (index >= 0) rows[index] = retire(rows[index], rows[earlierIndex]._id);
     }
     const canonical = canonicalizer({ scope: plannerResult.scope,
         currentEmployee, historyRows: rows });

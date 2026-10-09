@@ -170,3 +170,74 @@ test('real SweetAlert preview retains preConfirm guard and sends exactly one con
             confirmation: { fingerprint: preview.fingerprint, confirmed: true } } });
     });
 });
+
+function plannerProfileResolution(factory) {
+    const fixtures = require('../../../../server/services/ergazomenoi/fixtures/userConfirmedEmployeeHistoryCorrectionFixtures');
+    const analysis = require('../../../../server/services/ergazomenoi/employeeHistoryResolutionAnalysisService');
+    const planner = require('../../../../server/services/ergazomenoi/employeeHistoryUserConfirmedCorrectionPlannerService');
+    const plan = planner.planEmployeeHistoryUserConfirmedCorrection(fixtures[factory]());
+    return analysis.buildUserConfirmedCorrectionPublicResolution({
+        analysis: analysis.buildUserConfirmedCorrectionAnalysis({ userCorrectionPlan: plan,
+            sourceStateFingerprint: fingerprint }), fingerprint });
+}
+
+test('real SweetAlert single profile source is fixed for both intents while business facts remain explicit', async () => {
+    await withPage(async (page, requests) => {
+        await open(page, plannerProfileResolution('h1MissingInitialProfileFixture'));
+        await state(page, true, requests);
+        assert.equal(await page.locator('.swal2-html-container input[type="radio"]:checked').count(), 0);
+        await page.locator('input[name="employee-history-correction-INITIAL_PROFILE_START"][value="FROM_KNOWN_HISTORY_DATE"]').check();
+        const terms = page.locator('section').filter({ has: page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"]') });
+        for (const intent of ['CONFIRM_EXISTING', 'ENTER_DIFFERENT_VALUE']) {
+            await terms.locator(`input[type="radio"][value="${intent}"]`).check();
+            assert.equal(await terms.locator('input[type="hidden"]:enabled').inputValue(), 'PROFILE_CANDIDATE_1');
+            const visible = await terms.innerText();
+            assert.match(visible, /Στοιχεία αναφοράς/);
+            assert.match(visible, /Οι όροι που είναι καταχωρημένοι στην εγγραφή της 25\/05\/2026/);
+            assert.match(visible, /Η ημερομηνία δείχνει από ποια εγγραφή προέρχονται τα στοιχεία/);
+            assert.match(visible, /Δεν αλλάζει την ημερομηνία έναρξης που επιλέξατε προηγουμένως/);
+            assert.doesNotMatch(visible, /PROFILE_CANDIDATE|h1-later-profile|aa_eggrafhs/);
+            await state(page, true, requests);
+        }
+        // A fixed baseline cannot supply the four historical facts requested by
+        // ENTER_DIFFERENT_VALUE; all four must still be entered by the user.
+        await page.locator('.swal2-html-container input[type="checkbox"]').check();
+        await state(page, true, requests);
+        await terms.locator('select:enabled').selectOption('0109');
+        const numbers = terms.locator('input[type="number"]:enabled');
+        await numbers.nth(0).fill('5');
+        await numbers.nth(1).fill('40');
+        await state(page, true, requests);
+        await numbers.nth(2).fill('8');
+        await state(page, false, requests);
+        await page.locator('.swal2-html-container input[type="checkbox"]').uncheck();
+        await state(page, true, requests);
+        await page.locator('.swal2-cancel').click();
+        await page.waitForFunction(() => window.modalResult?.cancelled === true);
+        assert.equal(requests.length, 0);
+    });
+});
+
+test('real SweetAlert multiple profile sources require an explicit source with clear Greek labels', async () => {
+    await withPage(async (page, requests) => {
+        await open(page, plannerProfileResolution('h3IntermediateOverlapFixture'));
+        await page.locator('input[name="employee-history-correction-INTERMEDIATE_PERIOD_MEANING"][value="CONFIRM_REAL_PERIOD"]').check();
+        await page.locator('input[name="employee-history-correction-INTERMEDIATE_PROFILE_TERMS"][value="CONFIRM_EXISTING"]').check();
+        const terms = page.locator('section').filter({ has: page.locator('input[name="employee-history-correction-INTERMEDIATE_PROFILE_TERMS"]') });
+        const select = terms.locator('select:enabled');
+        assert.equal(await select.inputValue(), '');
+        assert.deepEqual(await select.locator('option').allTextContents(), ['Επιλέξτε…',
+            'Οι καταχωρημένοι όροι της εγγραφής 17/05/2026',
+            'Οι καταχωρημένοι όροι της εγγραφής 25/05/2026']);
+        const visible = await terms.innerText();
+        assert.match(visible, /Η ημερομηνία δείχνει από ποια εγγραφή προέρχονται τα στοιχεία/);
+        assert.match(visible, /Δεν αλλάζει την ημερομηνία έναρξης που επιλέξατε προηγουμένως/);
+        assert.doesNotMatch(visible, /PROFILE_CANDIDATE|h3-earlier-profile|h3-later-profile/);
+        await state(page, true, requests);
+        await select.selectOption('PROFILE_CANDIDATE_2');
+        await state(page, true, requests);
+        await page.locator('.swal2-cancel').click();
+        await page.waitForFunction(() => window.modalResult?.cancelled === true);
+        assert.equal(requests.length, 0);
+    });
+});

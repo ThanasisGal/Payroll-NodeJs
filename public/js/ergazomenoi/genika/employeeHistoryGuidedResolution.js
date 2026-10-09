@@ -613,17 +613,36 @@
         }
     }
 
+    function buildProfileSourceControl(documentRef, wrapper, candidates) {
+        appendText(documentRef, wrapper, 'label', 'Στοιχεία αναφοράς', 'form-label small');
+        const sole = candidates.length === 1 ? candidates[0] : null;
+        const input = documentRef.createElement(sole ? 'input' : 'select');
+        if (sole) {
+            // Only the value source is fixed; the user must still select an intent,
+            // supply every required fact and explicitly accept responsibility.
+            input.type = 'hidden';
+            input.value = String(sole.value);
+            appendText(documentRef, wrapper, 'p', sole.description || sole.label, 'mb-1');
+        } else {
+            input.className = 'form-select';
+            input.value = '';
+            appendChoiceOptions(documentRef, input, candidates);
+        }
+        input.disabled = true;
+        wrapper.appendChild(input);
+        appendText(documentRef, wrapper, 'p',
+            'Η ημερομηνία δείχνει από ποια εγγραφή προέρχονται τα στοιχεία. ' +
+            'Δεν αλλάζει την ημερομηνία έναρξης που επιλέξατε προηγουμένως.',
+            'small text-muted mt-2');
+        return input;
+    }
+
     function buildCorrectionValueControl(documentRef, control, emitValidity) {
         const wrapper = documentRef.createElement('div');
         wrapper.className = 'ms-4 mt-2';
         const state = { control, wrapper, element: null, fieldElements: [] };
         if (control.type === 'PROFILE_FIELDS') {
-            appendText(documentRef, wrapper, 'label', 'Ποια στοιχεία θα κρατήσουμε για αυτό το διάστημα;', 'form-label small');
-            const baseline = documentRef.createElement('select');
-            baseline.className = 'form-select';
-            baseline.value = '';
-            appendChoiceOptions(documentRef, baseline, control.baselineValues);
-            wrapper.appendChild(baseline);
+            const baseline = buildProfileSourceControl(documentRef, wrapper, control.baselineValues);
             state.element = baseline;
             for (const field of control.fields) {
                 const fieldWrapper = documentRef.createElement('div');
@@ -654,6 +673,14 @@
             }
             if (typeof baseline.addEventListener === 'function') {
                 baseline.addEventListener('change', emitValidity);
+            }
+            return state;
+        }
+        if (control.type === 'SINGLE_CHOICE' && control.allowedValues?.length &&
+            control.allowedValues.every(item => /^PROFILE_CANDIDATE_[1-9]\d*$/.test(item.value))) {
+            state.element = buildProfileSourceControl(documentRef, wrapper, control.allowedValues);
+            if (typeof state.element.addEventListener === 'function') {
+                state.element.addEventListener('change', emitValidity);
             }
             return state;
         }
