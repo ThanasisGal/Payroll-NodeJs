@@ -48,6 +48,7 @@ function browser(mode = 'SUPERVISOR_PROBLEM_SCOPE') {
             return null;
         } };
     vm.runInNewContext(source, { document, Date, Intl,
+        employeeHistoryFieldLabels: require('./employeeHistoryFieldLabels'),
         bootstrap: { Modal: { getOrCreateInstance: () => ({ show() { modalShows++; } }) } },
         window: { employeeHistoryGuidedResolution: { async handleInitialResponse() { return { handled:true,cancelled:true }; } }, location: { reload() {} } }, Swal: { async fire(options) { dialogs.push(options); return { isConfirmed: true }; } },
         async fetch(url, options) { requests.push(JSON.parse(options.body)); return { status: 200, json: async () => ({ success: true }) }; } });

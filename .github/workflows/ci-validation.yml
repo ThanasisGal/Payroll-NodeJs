@@ -805,6 +805,8 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryReferenceWriteFenceService.test.js"
             "server/services/ergazomenoi/employeeMaintenanceHistoryPlannerService.test.js"
             "server/utils/ergazomenoi/employmentProfileMaintenance.lifecycleError.test.js"
+            "server/services/ergazomenoi/employeeHistoryReconstructionPreviewService.test.js"
+            "server/controllers/ergazomenoi/employeeHistoryReconstructionPreviewController.test.js"
             "server/services/ergazomenoi/employeeHistoryEditorStateService.test.js"
             "server/services/ergazomenoi/employeeEmploymentProfileWriter.staleState.test.js"
             "server/controllers/ergazomenoi/ergazomenoiController.historyStaleState.test.js"
@@ -876,7 +878,7 @@ jobs:
       - name: Run real SweetAlert Employee History regression
         run: |
           npx playwright install --with-deps chromium
-          node --test public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js
+          node --test public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js
 
       - name: Audit production dependencies
         run: node scripts/ci/audit-production-dependencies.js

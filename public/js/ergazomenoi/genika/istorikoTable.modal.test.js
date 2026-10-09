@@ -12,6 +12,7 @@ const table = { dataset: { canManageHistory: 'false' }, addEventListener() {} };
 const document = { addEventListener(event, callback) { if (event === 'DOMContentLoaded') callback(); },
     getElementById(id) { return id === 'istorikoTable' ? table : null; } };
 const context = { document, Intl };
+vm.runInNewContext(fs.readFileSync(__dirname + '/employeeHistoryFieldLabels.js', 'utf8'), context);
 vm.runInNewContext(source, context);
 const { render, labels, excluded } = context.modalContract;
 

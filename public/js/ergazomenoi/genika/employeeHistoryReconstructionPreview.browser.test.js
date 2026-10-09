@@ -1,0 +1,188 @@
+'use strict';
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const ejs = require('ejs');
+const { chromium } = require('playwright');
+const { planEmployeeHistoryAutomaticReconstruction: plan } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService');
+const { buildEmployeeHistoryReconstructionPreview: project } = require('../../../../server/services/ergazomenoi/employeeHistoryReconstructionPreviewService');
+const F = require('../../../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const root = path.resolve(__dirname, '../../../..');
+const dto = input => project({ plan: plan(input), completeHistoryRows: input.completeHistoryRows });
+const modal = '#employeeHistoryReconstructionPreviewModal';
+const body = '#employeeHistoryReconstructionPreviewBody';
+const button = '#employeeHistoryReconstructionPreviewBtn';
+async function withPage({ input = F.caseA(), status = 200, payload, viewport = { width: 1440, height: 1000 }, delay = 0 } = {}, work) {
+    const browser = await chromium.launch({ headless: true });
+    try {
+        const page = await browser.newPage({ viewport });
+        const requests = [], errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        const partial = await ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
+            ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
+            employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: 'synthetic', problematicHistoryIds: []
+        });
+        await page.route('https://payroll.test/**', async route => {
+            const request = route.request();
+            if (!request.url().includes('/history-reconstruction-preview')) return route.fulfill({ contentType: 'text/html',
+                body: `<!doctype html><html lang="el"><head><meta charset="utf-8"></head><body>${partial}</body></html>` });
+            requests.push({ method: request.method(), path: new URL(request.url()).pathname });
+            if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+            return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input) }) }).catch(() => {});
+        });
+        await page.goto('https://payroll.test/');
+        for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
+            await page.addStyleTag({ path: path.join(root, file) });
+        for (const file of ['public/js/bootstrap.bundle.min.js', 'node_modules/sweetalert2/dist/sweetalert2.all.js',
+            'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag({ path: path.join(root, file) });
+        assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
+        await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
+        await work({ page, requests });
+        assert.deepEqual(errors, []);
+        assert.ok(requests.every(request => request.method === 'GET'));
+    } finally { await browser.close(); }
+}
+async function open(page) {
+    await page.click(button);
+    await page.locator(`${body} .history-preview-summary`).waitFor();
+    await page.waitForFunction(selector => document.querySelector(selector).classList.contains('show'), modal);
+    await page.waitForTimeout(350);
+}
+
+test('real Bootstrap modal is wide, Greek, read-only; meaningful changes precede collapsed lazy defaults', async () => {
+    await withPage({}, async ({ page, requests }) => {
+        await open(page);
+        const width = await page.locator(`${modal} .modal-dialog`).evaluate(element => element.getBoundingClientRect().width);
+        assert.ok(width > 1300, `modal width ${width}`);
+        const text = await page.locator(modal).innerText();
+        assert.match(text, /Δεν έχει αποθηκευτεί καμία αλλαγή/);
+        assert.match(text, /24\/04\/2026 → 24\/05\/2026/);
+        assert.match(text, /25\/05\/2026 → 05\/10\/2026/);
+        assert.doesNotMatch(text, /fingerprint|ObjectId|sourceHistoryId|APPLICATION_|hmeromhnia_|SYNTHETIC_/);
+        assert.deepEqual(await page.locator(`${modal} .modal-footer button`).allTextContents(), ['Κλείσιμο']);
+        assert.equal(await page.locator(`${body} .history-preview-defaults`).getAttribute('open'), null);
+        assert.equal(await page.locator(`${body} .history-preview-defaults tr`).count(), 0);
+        assert.match(await page.locator(`${body} .history-preview-change-list tbody tr`).first().innerText(), /Ισχύος Όρων/);
+        await page.locator('.history-preview-defaults > summary').click();
+        const group = page.locator('.history-preview-defaults details').first();
+        await group.waitFor();
+        assert.match(await group.locator('summary').innerText(), /Εγγραφή 0001 — 43/);
+        assert.equal(await group.locator('tr').count(), 0);
+        await group.locator('summary').click();
+        await page.waitForFunction(() => document.querySelectorAll('.history-preview-defaults tbody tr').length === 43);
+        assert.equal(await page.locator('.history-preview-defaults tbody tr').count(), 43);
+        assert.equal(requests.length, 1);
+    });
+});
+
+test('all 105 display fields are reachable in expandable Greek groups; schedule dates explicitly informational', async () => {
+    await withPage({}, async ({ page }) => {
+        await open(page);
+        const original = page.locator('.history-preview-section').nth(0);
+        const row = original.locator(':scope > details').first();
+        await row.locator(':scope > summary').click();
+        await page.waitForFunction(() => document.querySelectorAll('.history-preview-section details details').length === 6);
+        const groups = row.locator('details');
+        for (let i = 0; i < 6; i++) {
+            await groups.nth(i).locator(':scope > summary').click();
+            await groups.nth(i).locator('dl').waitFor();
+        }
+        assert.equal(await row.locator('dt').count(), 105);
+        assert.equal(await row.locator('dt small').count(), 2);
+        assert.match(await row.locator('dt small').first().innerText(), /Πληροφοριακό πεδίο.*δεν χρησιμοποιείται/);
+        for (const text of await row.locator('dt').allTextContents()) assert.match(text, /[Α-Ωα-ω]/u);
+        assert.doesNotMatch(await row.innerText(), /hmeromhnia_|aa_eggrafhs|_id|sourceHistoryId/);
+    });
+});
+
+test('asymmetric Case B combines the initial rows and renders review assumptions with visible BEFORE/AFTER', async () => {
+    await withPage({ input: F.caseBWithProfileEvidence() }, async ({ page }) => {
+        await open(page);
+        assert.match(await page.locator('.history-preview-periods').innerText(), /23\/04\/2026 → 16\/05\/2026/);
+        assert.match(await page.locator('.history-preview-periods').innerText(), /0001, 0002/);
+        assert.match(await page.locator('.history-preview-attention').innerText(), /ΚΠΚ.*προτείνει 0115/s);
+        const conflict = page.locator('.history-preview-change-list tbody tr').filter({ hasText: 'ΚΠΚ' }).filter({ hasText: '0111' });
+        assert.match(await conflict.innerText(), /0111.*0115.*Υπόθεση Εφαρμογής.*Χρειάζεται Έλεγχο/s);
+    });
+});
+
+for (const state of ['NO_OP', 'BLOCKED']) test(`${state} has a normal Greek explanation and safely closes/restores focus`, async () => {
+    const input = F.caseA();
+    if (state === 'NO_OP') input.completeHistoryRows = plan(input).proposedRows;
+    else input.completeHistoryRows[1]._id = input.completeHistoryRows[0]._id;
+    await withPage({ input }, async ({ page }) => {
+        await open(page);
+        assert.match(await page.locator('.history-preview-message').innerText(), state === 'NO_OP'
+            ? /Το Ιστορικό δεν χρειάζεται τακτοποίηση/ : /Δεν ήταν δυνατό.*Δεν έχει αποθηκευτεί.*1\..*2\./s);
+        assert.doesNotMatch(await page.locator(modal).innerText(), /NO_OP|BLOCKED|INVALID_/);
+        await page.locator(`${modal} .modal-footer button`).click();
+        await page.waitForFunction(selector => !document.querySelector(selector).classList.contains('show'), modal);
+        await page.waitForTimeout(350);
+        assert.equal(await page.locator(body).innerText(), '');
+        assert.equal(await page.locator(button).evaluate(element => element === document.activeElement), true);
+        assert.equal(await page.locator('.modal-backdrop').count(), 0);
+    });
+});
+
+test('server failure never dumps its technical body, and can be closed/retried', async () => {
+    await withPage({ status: 500, payload: { stack: 'SECRET_INTERNAL_STACK', _id: '507f1f77bcf86cd799439011' } }, async ({ page, requests }) => {
+        await page.click(button);
+        await page.locator('.history-preview-message').waitFor();
+        assert.match(await page.locator(body).innerText(), /Ο έλεγχος.*δεν ολοκληρώθηκε.*Δεν έχει αποθηκευτεί.*1\..*2\./s);
+        assert.doesNotMatch(await page.locator(body).innerText(), /SECRET|507f/);
+        await page.waitForTimeout(350);
+        await page.locator(`${modal} .modal-footer button`).click();
+        await page.waitForTimeout(400);
+        await page.click(button);
+        await page.waitForTimeout(350);
+        assert.equal(requests.length, 2);
+    });
+});
+
+test('closing a pending request aborts it, suppresses stale output and preserves existing correction buttons', async () => {
+    await withPage({ delay: 1000 }, async ({ page, requests }) => {
+        const corrections = await page.locator('[data-action="review"]').count();
+        assert.ok(corrections > 0);
+        await page.click(button);
+        await page.waitForTimeout(350);
+        assert.equal(await page.locator(button).isDisabled(), true);
+        await page.locator(`${modal} .modal-footer button`).click();
+        await page.waitForTimeout(1100);
+        assert.equal(await page.locator(body).innerText(), '');
+        assert.equal(await page.locator(button).isEnabled(), true);
+        assert.equal(await page.locator('[data-action="review"]').count(), corrections);
+        assert.equal(requests.length, 1);
+    });
+});
+
+test('untrusted display strings are escaped rather than executed', async () => {
+    const input = F.caseBWithProfileEvidence();
+    const payload = { success: true, preview: dto(input) };
+    payload.preview.changes[0].before = '<img src=x onerror="window.previewInjected=true">';
+    await withPage({ input, payload }, async ({ page }) => {
+        await open(page);
+        assert.match(await page.locator(body).innerText(), /<img src=x/);
+        assert.equal(await page.evaluate(() => window.previewInjected), undefined);
+        assert.equal(await page.locator(`${body} img`).count(), 0);
+    });
+});
+
+for (const count of [1, 3, 20]) test(`${count} rows on mobile stay responsive, scrollable and avoid horizontal overflow`, async () => {
+    const input = F.caseA();
+    input.completeHistoryRows = Array.from({ length: count }, (_, i) => F.row(String(i).padStart(4, '0'), {
+        hmeromhnia_proslhpshs: '2026-04-24', hmeromhnia_isxyos_oron_ergasias_apo: `2026-05-${String(i + 1).padStart(2, '0')}`, ...F.workTerms }));
+    await withPage({ input, viewport: { width: 390, height: 844 } }, async ({ page }) => {
+        const started = performance.now();
+        await open(page);
+        assert.ok(performance.now() - started < 5000);
+        assert.equal(await page.locator('.history-preview-section').first().locator(':scope > details').count(), count);
+        const dimensions = await page.locator(`${modal} .modal-body`).evaluate(element => ({
+            width: element.clientWidth, scrollWidth: element.scrollWidth, height: element.clientHeight, scrollHeight: element.scrollHeight,
+            overflow: getComputedStyle(element).overflowY
+        }));
+        assert.ok(dimensions.scrollWidth <= dimensions.width + 1, JSON.stringify(dimensions));
+        assert.equal(dimensions.overflow, 'auto');
+        assert.ok(dimensions.scrollHeight > dimensions.height);
+        assert.equal(await page.locator('.history-preview-defaults tr').count(), 0);
+    });
+});

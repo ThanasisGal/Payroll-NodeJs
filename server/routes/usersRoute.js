@@ -20,6 +20,7 @@ const antistoixiseisController = require('../controllers/companies/antistoixisei
 const krathseisController = require('../controllers/krathseisController.js');
 const genikaAPIsController = require('../controllers/genikaAPIsController.js');
 const ergazomenoiController = require('../controllers/ergazomenoi/ergazomenoiController.js');
+const { employeeHistoryReconstructionPreview } = require('../controllers/ergazomenoi/employeeHistoryReconstructionPreviewController');
 const employeeRehireController = require('../controllers/ergazomenoi/employeeRehireController.js');
 const symbaseisController = require('../controllers/symbaseisController.js');
 const programmataController = require('../controllers/ergazomenoi/programmataController.js');
@@ -478,6 +479,13 @@ router.delete(
     '/api/ergazomenoi/:id/documents/symbash-daneismoy',
     checkAuth,
     ergazomenoiController.deleteSymbashDaneismoyPdf
+);
+
+router.get(
+    '/api/ergazomenoi/:id/history-reconstruction-preview',
+    checkAuth,
+    requireUserPrivilegeAction('Ergazomenoi', 'read'),
+    employeeHistoryReconstructionPreview
 );
 
 router.get(
