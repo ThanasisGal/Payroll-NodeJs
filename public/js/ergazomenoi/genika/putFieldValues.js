@@ -112,6 +112,22 @@ async function handleEmployeeSaveHistoryStale(response, data, { swal }) {
     return true;
 }
 
+async function handleEmployeeSaveHistoryInvalidBoundary(response, data, { swal }) {
+    if (response.status !== 409 || data?.success !== false ||
+        data?.reason !== 'EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY') return false;
+    await swal.fire({
+        icon: 'warning', title: 'Η διόρθωση δεν εφαρμόστηκε',
+        text: 'Η εφαρμογή σταμάτησε τη διόρθωση επειδή το τελικό σχέδιο αλλαγών ' +
+            'δεν συμφώνησε με όσα επιβεβαιώθηκαν.\n\n' +
+            'Δεν αποθηκεύτηκε καμία αλλαγή.\n\n' +
+            '1. Κλείστε το παράθυρο.\n2. Ελέγξτε ξανά το Ιστορικό.\n' +
+            '3. Ανοίξτε ξανά τη διόρθωση μετά τον έλεγχο.',
+        footer: 'Κωδικός αναφοράς: EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY',
+        confirmButtonText: 'Κλείσιμο', allowOutsideClick: false
+    });
+    return true;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const Swal = new Proxy(window.Swal, {
         get(target, property) {
@@ -1554,6 +1570,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })) return;
 
                 if (await handleEmployeeSaveHistoryStale(response, data, { swal: Swal })) return;
+                if (await handleEmployeeSaveHistoryInvalidBoundary(response, data, { swal: Swal })) return;
 
                 console.group('[CONTRACT-DEBUG] RESPONSE JSON');
                 console.log('success:', data?.success);

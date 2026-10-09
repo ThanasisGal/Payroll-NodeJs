@@ -3078,8 +3078,8 @@ function bsonGuidedFixtureDatabase(fixture) {
     }
     return db;
 }
-function bsonGuidedFixture() {
-    const fixture = h2KpkBoundaryFixture();
+function bsonGuidedFixture(factory = h2KpkBoundaryFixture) {
+    const fixture = factory();
     const references = {};
     fixture.completeHistoryRows.forEach((row, index) => {
         const oldId = row._id;
@@ -3135,3 +3135,156 @@ for (const changed of ['employee', 'history', 'revision', 'references', 'catalog
         assert.equal(db.writes(), 0);
     });
 }
+
+// Real lean reads contain native schema types, including ObjectIds in reference
+// fields. Keep the transaction fake's string identities, cast reads using the
+// actual Mongoose paths, and store ObjectId update values as strings again.
+function schemaGuidedFixtureDatabase(fixture) {
+    const db = bsonGuidedFixtureDatabase(fixture);
+    const stored = value => {
+        if (value instanceof Date) return value;
+        if (typeof value?.toHexString === 'function') return value.toHexString();
+        if (Array.isArray(value)) return Array.from(value, stored);
+        if (value && typeof value === 'object') return Object.fromEntries(
+            Object.entries(value).map(([field, item]) => [field, stored(item)]));
+        return value;
+    };
+    const auditCreate = db.dependencies.auditModel.create;
+    db.dependencies.auditModel.create = (records, options) => auditCreate(stored(records), options);
+    for (const [model, schema, method] of [
+        [db.dependencies.historyModel, IstorikoProslhpseonAllagonModel.schema, 'find'],
+        [db.dependencies.employeeModel, ErgazomenoiModel.schema, 'findOne']
+    ]) {
+        model.schema = schema;
+        const find = model[method];
+        const cast = row => row && Object.fromEntries(Object.entries(row).map(([field, value]) =>
+            [field, value === undefined || !schema.path(field) ? value : schema.path(field).cast(value)]));
+        model[method] = filter => {
+            const query = find(filter);
+            const lean = query.lean;
+            query.lean = async () => {
+                const result = await lean();
+                return Array.isArray(result) ? result.map(cast) : cast(result);
+            };
+            return query;
+        };
+        const update = model.updateOne;
+        model.updateOne = (filter, changes, options) => update(filter, {
+            ...changes,
+            ...(changes.$set ? { $set: stored(changes.$set) } : {})
+        }, options);
+    }
+    return db;
+}
+
+for (const kind of ['KNOWN_HISTORY_DATE', 'H2_CORRECTION', 'H2_REAL_CHANGE']) {
+    test(`schema-cast H2 ${kind} preserves exact approved boundary parity and commits atomically`, async () => {
+        const fixture = bsonGuidedFixture();
+        const db = schemaGuidedFixtureDatabase(fixture);
+        const resolution = await requiredUserCorrectionResolution(db, fixture);
+        assert.equal(db.writes(), 0);
+        const confirmation = kind === 'KNOWN_HISTORY_DATE' ? realShapeConfirmation(resolution)
+            : userCorrectionConfirmation(resolution, kind);
+        const saved = await uniqueSafeRepairRequest(db, fixture, confirmation, {
+            correctionCatalogLoader: async () => fixture.catalogs
+        });
+        assert.equal(saved.userConfirmedCorrectionApplied, true);
+        assert.equal(saved.userConfirmedCorrectionAuditWritten, true);
+        assert.equal(db.operations().historyDeletes, 0);
+        assert.equal(db.operations().historyCreates, 0);
+        assert.equal(db.operations().auditCreates, 1);
+        const legacy = db.state().history[0];
+        const spare = db.state().history[2];
+        assert.equal(legacy.krathsh_01, kind === 'H2_REAL_CHANGE' ? '0111' : '0115');
+        assert.equal(String(spare.employment_history_canonical_survivor_id),
+            String(fixture.completeHistoryRows[1]._id));
+        assert.equal(spare.employment_history_canonical_status, 'REDUNDANT_REFERENCED');
+        if (kind === 'KNOWN_HISTORY_DATE') {
+            assert.equal(new Date(legacy.hmeromhnia_isxyos_oron_ergasias_apo)
+                .toISOString().slice(0, 10), '2026-04-25');
+            assert.equal(new Date(spare.hmeromhnia_isxyos_oron_ergasias_apo)
+                .toISOString().slice(0, 10), '2026-04-24');
+            assert.equal(new Date(spare.hmeromhnia_isxyos_oron_ergasias_eos)
+                .toISOString().slice(0, 10), '2026-04-24');
+            assert.equal(spare.afora_proslhpsh, true);
+        }
+        assert.equal(mongoose.connection.readyState, 0);
+    });
+}
+
+// Expose lexical functions only in this isolated test module. The production
+// writer keeps its public API and all boundary clauses unchanged.
+function boundaryTestInternals() {
+    const fs = require('node:fs');
+    const Module = require('node:module');
+    const filename = require.resolve('./employeeEmploymentProfileWriter');
+    const isolated = new Module(filename, module);
+    isolated.filename = filename;
+    isolated.paths = Module._nodeModulePaths(__dirname);
+    isolated._compile(fs.readFileSync(filename, 'utf8') + '\nmodule.exports = { ' +
+        'buildFinalHistoryMutationPlan, executeFinalMutationPlan, inProfileTransaction };', filename);
+    return isolated.exports;
+}
+
+const boundaryTampering = {
+    'modified physical patch': options => { options.physicalPlan.rowsToUpdate[0].patch.krathsh_01 = '0109'; },
+    'unexpected update id': options => { options.physicalPlan.rowsToUpdate.push({
+        historyId: '507f1f77bcf86cd799439188', patch: { krathsh_01: '0115' } }); },
+    'unexpected insert': options => { options.physicalPlan.rowsToInsert.push({ krathsh_01: '0115' }); },
+    'unexpected delete': options => { options.physicalPlan.rowsToDelete.push({ historyId: '507f1f77bcf86cd799439101' }); },
+    'plan fingerprint mismatch': options => { options.diagnostics.planFingerprint = 'f'.repeat(64); },
+    'current patch mismatch': options => { options.currentPatch = { krathsh_01: '0109' }; },
+    'delete current': options => { options.deleteCurrent = true; },
+    'operation mismatch': options => { options.diagnostics.operation = 'UNAPPROVED_OPERATION'; },
+    'status not applicable': options => { options.userConfirmedCorrectionPlan.status = 'BLOCKED'; },
+    'missing expected update': options => { options.physicalPlan.rowsToUpdate.pop(); }
+};
+
+for (const [name, tamper] of Object.entries(boundaryTampering)) {
+    test(`user-confirmed correction rejects ${name} with zero writes and zero committed changes`, async () => {
+        const internals = boundaryTestInternals();
+        const fixture = bsonGuidedFixture();
+        const db = schemaGuidedFixtureDatabase(fixture);
+        const before = structuredClone(db.state());
+        const plannerService = require('./employeeHistoryUserConfirmedCorrectionPlannerService');
+        await assert.rejects(internals.inProfileTransaction(db.dependencies.connection,
+            db.dependencies.capabilityProbe, async session => {
+                const current = await db.dependencies.employeeModel.findOne({}).session(session).lean();
+                const rows = await db.dependencies.historyModel.find({}).session(session).lean();
+                const plan = plannerService.planEmployeeHistoryUserConfirmedCorrection({
+                    ...fixture, currentEmployee: current, completeHistoryRows: rows
+                });
+                const selected = plannerService.resolveEmployeeHistoryUserConfirmedCorrection({
+                    plannerResult: plan, currentEmployee: current, completeHistoryRows: rows,
+                    confirmation: realShapeConfirmation({ fingerprint: 'a'.repeat(64) })
+                });
+                const options = { ...db.dependencies, session, currentBefore: current,
+                    currentPatch: selected.currentPatch, filter: fixture.scope, employeeId: current._id,
+                    controlledUserConfirmedCorrection: true, userConfirmedCorrectionPlan: selected,
+                    diagnostics: { operation: selected.operation, planFingerprint: selected.planFingerprint },
+                    physicalPlan: internals.buildFinalHistoryMutationPlan({ beforeRows: rows,
+                        desiredRows: selected.desiredHistoryRows, historyModel: db.dependencies.historyModel }) };
+                tamper(options);
+                await internals.executeFinalMutationPlan(options);
+            }), error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY' &&
+                error.statusCode === 409);
+        assert.deepEqual(db.state(), before);
+        assert.equal(db.writes(), 0);
+        assert.equal(db.ended(), true);
+        assert.equal(mongoose.connection.readyState, 0);
+    });
+}
+
+
+test('schema-cast H3 retirement preserves native approved survivor references', async () => {
+    const fixture = bsonGuidedFixture(h3IntermediateOverlapFixture);
+    const db = schemaGuidedFixtureDatabase(fixture);
+    const resolution = await requiredUserCorrectionResolution(db, fixture);
+    const result = await uniqueSafeRepairRequest(db, fixture, userCorrectionConfirmation(resolution, 'H3'), {
+        correctionCatalogLoader: async () => fixture.catalogs
+    });
+    assert.equal(result.userConfirmedCorrectionApplied, true);
+    assert.equal(db.operations().historyDeletes, 0);
+    assert.equal(db.operations().auditCreates, 1);
+    assert.equal(mongoose.connection.readyState, 0);
+});

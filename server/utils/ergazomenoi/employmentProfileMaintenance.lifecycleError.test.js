@@ -360,3 +360,17 @@ test('endpoint transport override requires an allowed error and a sanitized reso
         assert.equal(overridden.body.resolution, undefined);
     }
 });
+
+test('user-confirmed boundary parity failure explains stopped changes without blaming dates', () => {
+    const code = 'EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY';
+    const res = { status(value) { this.code = value; return this; }, json(value) { this.body = value; } };
+    profileError(res, { code, statusCode: 409 });
+    assert.equal(res.code, 409);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.reason, code);
+    assert.match(res.body.message, /τελικό σχέδιο αλλαγών δεν συμφώνησε με όσα επιβεβαιώθηκαν/);
+    assert.match(res.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή/);
+    assert.match(res.body.message, /1\. Κλείστε το παράθυρο\. 2\. Ελέγξτε ξανά το Ιστορικό/);
+    assert.match(res.body.message, new RegExp(`Κωδικός αναφοράς: ${code}$`));
+    assert.doesNotMatch(res.body.message, /οι ημερομηνίες που προέκυψαν|Ελέγξτε τις ημερομηνίες/);
+});

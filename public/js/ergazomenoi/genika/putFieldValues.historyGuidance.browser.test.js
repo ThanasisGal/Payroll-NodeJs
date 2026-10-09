@@ -258,7 +258,15 @@ async function completeUserCorrection(page) {
     await page.evaluate(() => document.getElementById('save').click());
     await page.locator('input[name="employee-history-correction-INITIAL_PROFILE_START"][value="FROM_KNOWN_HISTORY_DATE"]').check();
     await page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"][value="CONFIRM_EXISTING"]').check();
-    await page.locator('.swal2-html-container select:enabled').selectOption('PROFILE_CANDIDATE_1');
+    const terms = page.locator('section').filter({ has: page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"]') });
+    assert.equal(await terms.locator('select').count(), 0);
+    assert.equal(await terms.locator('input[type="hidden"]:enabled').inputValue(), 'PROFILE_CANDIDATE_1');
+    assert.match(await terms.innerText(), /Στοιχεία αναφοράς/);
+    assert.match(await terms.innerText(), /εγγραφή της 25\/05\/2026/);
+    assert.match(await terms.innerText(), /Δεν αλλάζει την ημερομηνία έναρξης που επιλέξατε προηγουμένως/);
+    assert.doesNotMatch(await page.locator('.swal2-html-container').innerText(), /PROFILE_CANDIDATE_1/);
+    assert.equal(await page.locator('.swal2-confirm').isEnabled(), false);
+    assert.equal(await page.locator('.swal2-cancel').isEnabled(), true);
     await page.locator('input[name="employee-history-correction-FIELD_KPK"][value="CORRECT_EXISTING_HISTORICAL_FACT"]').check();
     const section = page.locator('section').filter({ has: page.locator('input[name="employee-history-correction-FIELD_KPK"]') });
     await section.locator('select:enabled').selectOption('0115');
@@ -308,6 +316,31 @@ test('normal Save genuine stale has dedicated UX, no generic errors, retry, succ
         assert.equal(options.confirmButtonText, 'Κλείσιμο');
         assert.match(options.text, /Για λόγους ασφάλειας δεν αποθηκεύτηκε καμία αλλαγή/);
         assert.match(options.text, /ανοίξτε ξανά τον έλεγχο του Ιστορικού/);
+        assertConfirmationRequests(requests);
+        await page.locator('.swal2-confirm').click();
+        await page.waitForFunction(() => window.saveFinished);
+        assertConfirmationRequests(requests);
+        assert.deepEqual(await page.evaluate(() => window.guidedCounts),
+            { retryRequest: 1, preConfirm: 1, successContinuation: 0, redirect: 0 });
+        await expectNoFalseSuccess(page, errors.filter(text => !text.includes('Failed to load resource')));
+    });
+});
+
+test('normal Save genuine boundary failure has dedicated UX and no application console errors', async () => {
+    const code = 'EMPLOYEE_HISTORY_USER_CORRECTION_INVALID_BOUNDARY';
+    await withPage({ departure: '', replies: [ { status: 200, payload: initialUserCorrectionResponse() },
+        { status: 409, payload: { success: false, reason: code } } ] },
+    async ({ page, requests, errors }) => {
+        await save(page);
+        await completeUserCorrection(page);
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Η διόρθωση δεν εφαρμόστηκε');
+        const options = await page.evaluate(() => window.swalCalls.at(-1));
+        assert.equal(options.timer, undefined);
+        assert.equal(options.confirmButtonText, 'Κλείσιμο');
+        assert.match(options.text, /τελικό σχέδιο αλλαγών δεν συμφώνησε με όσα επιβεβαιώθηκαν/);
+        assert.match(options.text, /Δεν αποθηκεύτηκε καμία αλλαγή/);
+        assert.match(options.text, /1\. Κλείστε το παράθυρο\.\n2\. Ελέγξτε ξανά το Ιστορικό/);
+        assert.equal(options.footer, `Κωδικός αναφοράς: ${code}`);
         assertConfirmationRequests(requests);
         await page.locator('.swal2-confirm').click();
         await page.waitForFunction(() => window.saveFinished);

@@ -552,3 +552,51 @@ test('a genuinely missing BSON stable row still produces USER_CORRECTION_STALE',
             intent: INTENTS.CORRECT_EXISTING_HISTORICAL_FACT, value: '0115' }) }
     }), error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
 });
+
+test('known-date H2 includes both persisted patches and preserves native redundant survivor reference', () => {
+    const fixture = bsonIdentityFixture();
+    const decisions = initialDecisions({ intent: INTENTS.CORRECT_EXISTING_HISTORICAL_FACT, value: '0115' });
+    decisions[0].intent = INTENTS.FROM_KNOWN_HISTORY_DATE;
+    const initial = planner(fixture);
+    const result = resolve(fixture, decisions);
+    const [legacy, later, spare] = result.desiredHistoryRows;
+    const { REDUNDANT_SURVIVOR_FIELD, REDUNDANT_STATUS_FIELD } =
+        require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+    assert.deepEqual(result.changedHistoryIds, [String(legacy._id), String(spare._id)].sort());
+    assert.deepEqual(Object.keys(result.historyPatches).sort(), result.changedHistoryIds);
+    assert.equal(result.insertedRows.length, 0);
+    assert.deepEqual(result.physicalDeleteIds, []);
+    assert.deepEqual(result.currentPatch, {});
+    assert.deepEqual(initial.internalRules.retireHistoryIds, [String(spare._id)]);
+    assert.equal(spare[REDUNDANT_STATUS_FIELD], REDUNDANT_REFERENCED);
+    assert.equal(typeof spare[REDUNDANT_SURVIVOR_FIELD].toHexString, 'function');
+    assert.equal(String(spare[REDUNDANT_SURVIVOR_FIELD]), String(later._id));
+    assert.equal(typeof result.historyPatches[String(spare._id)][REDUNDANT_SURVIVOR_FIELD].toHexString, 'function');
+    assert.equal(legacy.hmeromhnia_isxyos_oron_ergasias_apo.toISOString().slice(0, 10), '2026-04-25');
+    assert.equal(legacy.hmeromhnia_isxyos_oron_ergasias_eos.toISOString().slice(0, 10), '2026-05-24');
+    assert.equal(spare.hmeromhnia_isxyos_oron_ergasias_apo.toISOString().slice(0, 10), '2026-04-24');
+    assert.equal(spare.hmeromhnia_isxyos_oron_ergasias_eos.toISOString().slice(0, 10), '2026-04-24');
+    for (const row of [legacy, spare]) {
+        assert.equal(row.afora_proslhpsh, true);
+        assert.equal(row.hmeromhnia_proslhpshs.toISOString().slice(0, 10), '2026-04-24');
+    }
+    assertClean(result);
+});
+
+test('both public profile-source controls identify the source record with clear Greek labels', () => {
+    const initial = planner(h1MissingInitialProfileFixture());
+    const terms = initial.conflicts.find(conflict => conflict.conflictId === 'INITIAL_PROFILE_TERMS');
+    for (const intent of terms.intents) {
+        const sources = intent.valueControl.allowedValues || intent.valueControl.baselineValues;
+        assert.equal(sources[0].label, 'Οι καταχωρημένοι όροι της εγγραφής 25/05/2026');
+        assert.equal(sources[0].description, 'Οι όροι που είναι καταχωρημένοι στην εγγραφή της 25/05/2026.');
+        assert.doesNotMatch(sources[0].label + sources[0].description, /PROFILE_CANDIDATE|εγγραφή από/);
+    }
+    const multiple = planner(h3IntermediateOverlapFixture());
+    const sourceIntent = multiple.conflicts.find(conflict => conflict.conflictId === 'INTERMEDIATE_PROFILE_TERMS')
+        .intents.find(intent => intent.id === 'CONFIRM_EXISTING');
+    assert.equal(sourceIntent.valueControl.allowedValues.length, 2);
+    for (const source of sourceIntent.valueControl.allowedValues) {
+        assert.match(source.label, /^Οι καταχωρημένοι όροι της εγγραφής \d{2}\/\d{2}\/2026$/);
+    }
+});
