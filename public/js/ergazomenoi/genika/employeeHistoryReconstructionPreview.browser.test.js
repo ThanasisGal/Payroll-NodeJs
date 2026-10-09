@@ -18,7 +18,8 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage({ viewport });
-        const requests = [], errors = [];
+        const requests = [], errors = [], allRequests = [];
+        page.on('request', request => allRequests.push({ method: request.method(), url: request.url() }));
         page.on('pageerror', error => errors.push(error.message));
         const partial = await ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
             ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
@@ -54,7 +55,7 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
                 'public/js/ergazomenoi/genika/istorikoTable.js'] : [])]) await page.addScriptTag({ path: path.join(root, file) });
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
-        await work({ page, requests });
+        await work({ page, requests, allRequests });
         assert.deepEqual(errors, []);
         assert.ok(requests.every(request => request.method === 'GET' ||
             applyHandler && request.method === 'POST' && Object.keys(request.data).sort().join(',') === 'approvalAccepted,previewToken' ||
@@ -370,18 +371,62 @@ for (const failure of ['specific', 'legacy-generic', 'non-json']) test(`manual $
     });
 });
 
-for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`one approval enables ${plan(input).status}; unchecking disables; token is never displayed`, async () => {
-    await withPage({ input }, async ({ page, requests }) => {
+for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`approval visual state and native input/label/keyboard toggles for ${plan(input).status}; zero POST`, async () => {
+    await withPage({ input }, async ({ page, requests, allRequests }) => {
         await open(page);
+        await page.waitForFunction(selector => document.querySelector(selector).getAnimations({ subtree: true })
+            .every(animation => animation.playState !== 'running'), modal);
         const apply = page.locator('#employeeHistoryReconstructionApplyBtn');
         const checkbox = page.locator('#employeeHistoryReconstructionApprovalAccepted');
-        assert.equal(await apply.isDisabled(), true);
+        const label = page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]');
+        assert.equal(await label.count(), 1);
+        assert.equal(await label.evaluate(e => e.control === document.getElementById(e.htmlFor)), true);
+        const style = () => apply.evaluate(e => {
+            const s = getComputedStyle(e);
+            return { background: s.backgroundColor, opacity: s.opacity, cursor: s.cursor };
+        });
+        async function assertDisabled() {
+            assert.equal(await checkbox.isChecked(), false);
+            assert.equal(await apply.isDisabled(), true);
+            assert.equal(await apply.evaluate(e => e.matches('.btn-success:disabled')), true);
+            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(108, 117, 125)');
+            const s = await style();
+            assert.equal(s.background, 'rgb(108, 117, 125)');
+            assert.equal(s.opacity, '0.65');
+            assert.equal(s.cursor, 'not-allowed');
+        }
+        async function assertEnabled() {
+            assert.equal(await checkbox.isChecked(), true);
+            assert.equal(await apply.isEnabled(), true);
+            assert.equal(await apply.evaluate(e => e.matches('.btn-success:enabled')), true);
+            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(25, 135, 84)');
+            const s = await style();
+            assert.equal(s.background, 'rgb(25, 135, 84)');
+            assert.equal(s.opacity, '1');
+            assert.equal(s.cursor, 'pointer');
+        }
+        await assertDisabled();
         assert.equal(await page.locator(`${modal} input[type="checkbox"]`).count(), 1);
-        await checkbox.check(); assert.equal(await apply.isEnabled(), true);
-        await checkbox.uncheck(); assert.equal(await apply.isDisabled(), true);
+        // Native disabled buttons ignore pointer and keyboard activation.
+        const box = await apply.boundingBox();
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        await apply.evaluate(e => e.focus());
+        assert.equal(await apply.evaluate(e => document.activeElement === e), false);
+        await page.mouse.move(0, 0);
+        const layout = await page.locator(`${modal} .modal-content`).boundingBox();
+        await checkbox.click(); await assertEnabled();
+        await checkbox.click(); await assertDisabled();
+        await label.click(); await assertEnabled();
+        assert.deepEqual(await page.locator(`${modal} .modal-content`).boundingBox(), layout);
+        await label.click(); await assertDisabled();
+        await checkbox.focus();
+        await page.keyboard.press('Space'); await assertEnabled();
+        assert.equal(await checkbox.evaluate(e => document.activeElement === e), true);
+        await page.keyboard.press('Space'); await assertDisabled();
         const token = buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input) });
         assert.ok(!(await page.locator(modal).innerText()).includes(token));
         assert.equal(requests.length, 1);
+        assert.equal(allRequests.some(request => request.method === 'POST'), false);
     });
 });
 for (const failure of ['stale', 'forbidden', 'rejected', 'non-json', 'commit-uncertain']) test(`Apply ${failure}: real compact SweetAlert, zero automatic retry, invalidated approval`, async () => {
@@ -417,6 +462,10 @@ test('Apply is single-flight, prevents modal dismissal during request and succes
         await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
         await page.locator('#employeeHistoryReconstructionApplyBtn').click();
         assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
+        const approvalCheckbox = page.locator('#employeeHistoryReconstructionApprovalAccepted');
+        assert.equal(await approvalCheckbox.isDisabled(), true);
+        await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click({ force: true });
+        assert.equal(await approvalCheckbox.isChecked(), true);
         await page.locator('#employeeHistoryReconstructionApplyBtn').evaluate(e => e.dispatchEvent(new MouseEvent('click', { bubbles: true })));
         await page.keyboard.press('Escape');
         assert.equal(await page.locator(modal).isVisible(), true);
