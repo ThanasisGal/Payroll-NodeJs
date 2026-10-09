@@ -784,6 +784,8 @@ jobs:
             "public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.test.js"
             "server/services/ergazomenoi/employeeHistoryResolutionAnalysisService.test.js"
             "server/services/ergazomenoi/employeeHistoryUserConfirmedCorrectionPlannerService.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionContract.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService.test.js"
             "server/services/ergazomenoi/employeeHistoryCanonicalizationService.test.js"
             "server/services/ergazomenoi/employeeHistoryReferenceAuditService.test.js"
             "server/services/ergazomenoi/employeeHistoryReferenceSemanticsService.test.js"
