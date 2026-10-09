@@ -31,4 +31,17 @@ function caseB() {
     ] };
 }
 
-module.exports = { scope, workTerms, row, caseA, caseB };
+// Separate enriched variant: keep the exact sparse Case B unchanged for the
+// before/after default-count comparison and exercise complementary/conflicting facts.
+function caseBWithProfileEvidence() {
+    const input = caseB();
+    Object.assign(input.completeHistoryRows.find(row => row.aa_eggrafhs === '0001'), {
+        krathsh_01: '0111', pragmatikosMisthos: 1200
+    });
+    Object.assign(input.completeHistoryRows.find(row => row.aa_eggrafhs === '0002'), {
+        krathsh_01: '0115', symbash: 'SYNTHETIC_CONTRACT', synexes_diakekomeno: false
+    });
+    return input;
+}
+
+module.exports = { scope, workTerms, row, caseA, caseB, caseBWithProfileEvidence };

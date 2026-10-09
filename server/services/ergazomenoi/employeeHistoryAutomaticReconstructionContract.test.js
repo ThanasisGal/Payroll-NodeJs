@@ -12,6 +12,7 @@ test('every persisted History path has exactly one explicit classification and p
     assert.deepEqual([...classified].sort(), Object.keys(paths).sort(), 'new schema paths require a deliberate decision');
     for (const field of C.PROFILE_FIELDS) assert.equal(C.PROFILE_FIELD_TYPES[field], paths[field].instance, field);
     assert.equal(Object.keys(C.FIELD_CLASSIFICATION).length, classified.length);
+    assert.equal(classified.length, 118, 'display/schema coverage stays 118/118 independently of physical proposals');
 });
 
 test('schedule dates are exclusively informational and identity/metadata fields cannot be reconstructed', () => {

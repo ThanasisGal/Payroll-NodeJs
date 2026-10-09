@@ -11,7 +11,7 @@ const SOURCES = Object.freeze({
     NEXT_BOUNDARY: 'DETERMINISTIC_NEXT_PERIOD_BOUNDARY', CONTINUATION: 'DETERMINISTIC_CONTINUATION_BOUNDARY',
     PREVIOUS: 'PREVIOUS_PERIOD', NEXT: 'NEXT_PERIOD', CURRENT: 'CURRENT_EMPLOYEE',
     DEFAULT: 'DEFAULT_VALUE', ASSUMPTION: 'APPLICATION_ASSUMPTION',
-    FINAL_END: 'AUTHORITATIVE_FINAL_BOUNDARY'
+    FINAL_END: 'AUTHORITATIVE_FINAL_BOUNDARY', OPEN_END: 'DETERMINISTIC_OPEN_BOUNDARY'
 });
 
 function day(value) {
@@ -27,7 +27,10 @@ function clone(value) {
     // Preserve native BSON identity, including survivor references. Do not
     // spread or JSON-clone ObjectId internals (PR #302/#303 regression).
     if (value?._bsontype === 'ObjectId' && typeof value.toHexString === 'function') {
-        return new value.constructor(value.toHexString());
+        try { return new value.constructor(value.toHexString()); }
+        // A corrupt BSON identity is opaque and cannot be reconstructed. The
+        // blocked path retains it untouched instead of throwing while reporting.
+        catch { return value; }
     }
     if (Buffer.isBuffer(value)) return Buffer.from(value);
     if (value instanceof Uint8Array) return new Uint8Array(value);
@@ -61,18 +64,17 @@ function usable(field, value) {
     default: return false;
     }
 }
-function defaultValue(field) {
-    return ({ Number: 0, Boolean: false, String: '', Array: [], Date: null })[C.PROFILE_FIELD_TYPES[field]];
-}
 function compatible(left, right) {
     return C.COMPATIBILITY_FIELDS.every(field =>
         !usable(field, left[field]) || !usable(field, right[field]) || equal(left[field], right[field]));
 }
 
 function validIdentity(value) {
-    return (typeof value === 'string' && value.trim() !== '') ||
-        (value?._bsontype === 'ObjectId' && typeof value.toHexString === 'function' &&
-            /^[a-f0-9]{24}$/i.test(value.toHexString()));
+    try {
+        return (typeof value === 'string' && value.trim() !== '') ||
+            (value?._bsontype === 'ObjectId' && typeof value.toHexString === 'function' &&
+                /^[a-f0-9]{24}$/i.test(value.toHexString()));
+    } catch { return false; }
 }
 
 // This is an input-state token for future stale protection, not a hash of the
@@ -105,11 +107,12 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         }
     };
     const assumption = (code, extra = {}) => {
-        plan.assumptions.push({ code, sourceType: SOURCES.ASSUMPTION, ...extra });
+        plan.assumptions.push({ code, sourceType: SOURCES.ASSUMPTION, confidence: 'ASSUMED', ...extra });
     };
     const blocked = code => {
         plan.status = 'BLOCKED';
         warning(code);
+        plan.warnings.at(-1).classification = C.BLOCKED_REASON_CLASSIFICATION[code];
         plan.logicalPeriods = [];
         plan.rowDiffs = [];
         plan.proposedRows = Array.isArray(completeHistoryRows) ? clone(completeHistoryRows) : [];
@@ -117,6 +120,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
     };
     if (!Array.isArray(completeHistoryRows) || !currentEmployee || typeof currentEmployee !== 'object' ||
         completeHistoryRows.some(row => !row || typeof row !== 'object') ||
+        (nonEmpty(currentEmployee._id) && !validIdentity(currentEmployee._id)) ||
         !C.SCOPE_FIELDS.every(field => typeof scope?.[field] === 'string' && scope[field].trim() &&
             currentEmployee[field] === scope[field] && completeHistoryRows.every(row => row[field] === scope[field])) ||
         completeHistoryRows.some(row => !validIdentity(row._id)) ||
@@ -124,6 +128,11 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         return blocked('INVALID_OR_CONFLICTING_INPUT');
     }
     if (completeHistoryRows.length > MAX_HISTORY_ROWS) return blocked('HISTORY_SIZE_LIMIT_EXCEEDED');
+    if (completeHistoryRows.some(row => nonEmpty(row.employment_history_canonical_survivor_id) &&
+        (!validIdentity(row.employment_history_canonical_survivor_id) ||
+            String(row.employment_history_canonical_survivor_id) === String(row._id)))) {
+        return blocked('INVALID_CANONICAL_REFERENCE');
+    }
     plan.semanticFingerprint = semanticFingerprint({ scope, currentEmployee, completeHistoryRows });
     const rows = [...completeHistoryRows].sort((a, b) => compare(id(a), id(b)));
     plan.proposedRows = clone(rows);
@@ -146,7 +155,14 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
     const currentHire = day(currentEmployee[C.HIRE]);
     const hires = [...new Set(active.map(row => day(row[C.HIRE])).filter(Boolean))].sort();
     if (!hires.length && currentHire) hires.push(currentHire);
-    if (!hires.length) return blocked('NO_HIRE_EVIDENCE');
+    const inferredHire = !hires.length;
+    if (inferredHire) {
+        const baseline = [currentEmployee, ...active].flatMap(row => [day(row[C.START]), day(row[C.CHANGE])])
+            .filter(Boolean).sort()[0];
+        if (!baseline) return blocked('NO_TEMPORAL_BASELINE');
+        hires.push(baseline);
+        assumption('HIRE_INFERRED_FROM_EARLIEST_PROFILE_EVENT', { periodFrom: baseline });
+    }
     const cycles = hires.map((hire, index) => ({ hire, nextHire: hires[index + 1] || null, rows: [], groups: [] }));
     for (const row of active) {
         const hire = day(row[C.HIRE]);
@@ -154,13 +170,19 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         const candidates = hire ? cycles.filter(cycle => cycle.hire === hire)
             : anchor ? cycles.filter(cycle => anchor >= cycle.hire && (!cycle.nextHire || anchor < cycle.nextHire))
                 : cycles.length === 1 ? cycles : [];
-        if (candidates.length !== 1) return blocked('UNRESOLVED_EMPLOYMENT_CYCLE');
-        candidates[0].rows.push(row);
+        const chosen = candidates.length === 1 ? candidates[0]
+            : [...cycles].reverse().find(cycle => anchor && anchor >= cycle.hire) || cycles[0];
+        if (candidates.length !== 1) assumption('EMPLOYMENT_CYCLE_ASSUMED', {
+            sourceHistoryIds: [clone(row._id)], periodFrom: chosen.hire,
+            resolution: 'LATEST_HIRE_NOT_AFTER_PROFILE_ANCHOR_ELSE_EARLIEST_HIRE'
+        });
+        chosen.rows.push(row);
     }
 
     const changeField = (row, field, value, provenance) => {
         // Date-only inputs are semantically equivalent to midnight BSON dates.
-        if (equal(row[field], value) || (value instanceof Date && day(row[field]) === day(value))) return;
+        if (equal(row[field], value) || ((value instanceof Date || C.PROFILE_FIELD_TYPES[field] === 'Date') &&
+            day(value) && day(row[field]) === day(value))) return;
         proposedById.get(id(row))[field] = clone(value);
         plan.rowDiffs.push({ historyId: clone(row._id), field,
             before: row[field] === undefined ? null : clone(row[field]),
@@ -182,11 +204,23 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         for (const row of cycle.rows) {
             const start = day(row[C.START]);
             const change = day(row[C.CHANGE]);
-            if (start && start >= cycle.hire && (!cycle.nextHire || start < cycle.nextHire)) {
-                add(row, start, evidence(SOURCES.EXISTING, row._id, C.START, 'EXISTING'));
-                if (row.afora_proslhpsh === true && start > cycle.hire && (!change || change === cycle.hire)) {
-                    assumption('EXISTING_INITIAL_START_AFTER_HIRE', { sourceHistoryIds: [clone(row._id)] });
-                }
+            const genuineHire = row.afora_proslhpsh === true && (!change || change <= cycle.hire);
+            if (genuineHire) {
+                add(row, cycle.hire, evidence(SOURCES.HIRE,
+                    day(row[C.HIRE]) ? row._id : hireSource?._id, C.HIRE, 'DETERMINISTIC'));
+                if (start && start !== cycle.hire) assumption('EXISTING_INITIAL_START_AFTER_HIRE', {
+                    field: C.START, sourceHistoryIds: [clone(row._id)], periodFrom: cycle.hire,
+                    resolution: 'GENUINE_HIRE_ESTABLISHES_INITIAL_PERIOD'
+                });
+            } else if (start && start >= cycle.hire && (!cycle.nextHire || start < cycle.nextHire)) {
+                const competingChange = change && change !== start && change >= cycle.hire &&
+                    (!cycle.nextHire || change < cycle.nextHire);
+                add(row, start, evidence(competingChange ? SOURCES.ASSUMPTION : SOURCES.EXISTING,
+                    row._id, C.START, competingChange ? 'ASSUMED' : 'EXISTING'));
+                if (competingChange) assumption('COMPETING_PROFILE_START_BOUNDARIES', {
+                    sourceHistoryIds: [clone(row._id)], periodFrom: start,
+                    candidatePeriodStarts: [change, start].sort(), resolution: 'EXPLICIT_WORK_TERMS_START'
+                });
             } else if (change && change >= cycle.hire && (!cycle.nextHire || change < cycle.nextHire)) {
                 add(row, change, evidence(change === cycle.hire ? SOURCES.HIRE : SOURCES.CONTRACT_CHANGE,
                     row._id, C.CHANGE, 'DETERMINISTIC'));
@@ -221,10 +255,16 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 continue;
             }
             const compatibleGroups = groups.filter(group => group.rows.every(other => compatible(row, other)));
-            if (compatibleGroups.length !== 1) return blocked('UNRESOLVED_PERIOD_START');
-            add(row, compatibleGroups[0].from, evidence(SOURCES.ASSUMPTION,
-                compatibleGroups[0].rows[0]._id, C.START, 'ASSUMED'));
-            assumption('UNDATED_ROW_ATTACHED_TO_UNIQUE_COMPATIBLE_PERIOD', { sourceHistoryIds: [clone(row._id)] });
+            // Prefer the earliest compatible state; if none is compatible,
+            // establish the hire baseline or select the earliest known state.
+            // Identity only breaks ties; schedule dates and aa never participate.
+            const chosen = compatibleGroups[0] || groups[0];
+            const from = chosen?.from || cycle.hire;
+            add(row, from, evidence(SOURCES.ASSUMPTION, chosen?.rows[0]._id, C.START, 'ASSUMED'));
+            assumption(compatibleGroups.length === 1 ? 'UNDATED_ROW_ATTACHED_TO_UNIQUE_COMPATIBLE_PERIOD'
+                : 'UNDATED_ROW_PLACEMENT_ASSUMED', { sourceHistoryIds: [clone(row._id)],
+                periodFrom: from, candidatePeriodStarts: (compatibleGroups.length ? compatibleGroups : groups).map(item => item.from),
+                resolution: 'EARLIEST_COMPATIBLE_PERIOD_ELSE_EARLIEST_STATE_ELSE_HIRE' });
         }
         cycle.groups = [...byStart.values()].sort((a, b) => compare(a.from, b.from));
         for (const group of cycle.groups) {
@@ -232,16 +272,32 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
             group.raw = {};
             group.donors = {};
             group.conflictingFields = new Set();
+            const quality = row => [
+                Number(day(row[C.START]) === group.from),
+                Number((row.afora_proslhpsh === true && group.from === cycle.hire &&
+                    (!day(row[C.CHANGE]) || day(row[C.CHANGE]) <= cycle.hire)) || day(row[C.CHANGE]) === group.from),
+                C.PROFILE_FIELDS.filter(field => usable(field, row[field])).length
+            ];
+            const rank = (left, right) => {
+                const a = quality(left), b = quality(right);
+                for (let index = 0; index < a.length; index += 1) if (a[index] !== b[index]) return b[index] - a[index];
+                return compare(id(left), id(right));
+            };
             for (const field of C.PROFILE_FIELDS) {
-                const donors = group.rows.filter(row => usable(field, row[field]));
+                const donors = group.rows.filter(row => usable(field, row[field])).sort(rank);
                 if (!donors.length) continue;
                 group.raw[field] = donors[0][field];
                 group.donors[field] = donors[0];
-                if (donors.some(row => !equal(row[field], donors[0][field]))) {
+                if (donors.some(row => C.PROFILE_FIELD_TYPES[field] === 'Date'
+                    ? day(row[field]) !== day(donors[0][field]) : !equal(row[field], donors[0][field]))) {
                     group.conflictingFields.add(field);
                     assumption('SAME_DATE_NON_EMPTY_CONFLICT', { field,
                         sourceHistoryIds: donors.map(row => clone(row._id)),
-                        selectedSourceHistoryId: clone(donors[0]._id), resolution: 'PRESERVE_PHYSICAL_VALUES' });
+                        sourceValues: donors.map(row => ({ historyId: clone(row._id), value: clone(row[field]) })),
+                        selectedSourceHistoryId: clone(donors[0]._id),
+                        selectionRule: equal(quality(donors[0]), quality(donors[1]))
+                            ? 'STABLE_PHYSICAL_IDENTITY_TIE_BREAK' : 'EXPLICIT_START_THEN_LIFECYCLE_THEN_PROFILE_COMPLETENESS',
+                        resolution: 'COHERENT_LOGICAL_PERIOD_VALUE' });
                 }
             }
         }
@@ -291,7 +347,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                     for (const direction of [-1, 1]) {
                         for (let otherIndex = index + direction; otherIndex >= 0 && otherIndex < cycle.groups.length; otherIndex += direction) {
                             const other = cycle.groups[otherIndex];
-                            if (!compatible(group.resolved, other.resolved) || other.conflictingFields.size) break;
+                            if (!compatible(group.resolved, other.resolved)) break;
                             filled = inherit(group, other, direction) || filled;
                         }
                     }
@@ -338,12 +394,14 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                     } else if (value) warning('INCONSISTENT_TERMINATING_EVENT', field);
                 }
                 const departureCandidates = candidates.filter(item => item.field === C.DEPARTURE);
-                if (cycle.rows.some(source => day(source[C.DEPARTURE]) &&
+                const eventAfterDeparture = cycle.rows.some(source => day(source[C.DEPARTURE]) &&
                     day(source[C.DEPARTURE]) < group.from) ||
                     (!cycle.rows.some(source => day(source[C.DEPARTURE])) &&
                         currentHire === cycle.hire && day(currentEmployee[C.DEPARTURE]) &&
-                        day(currentEmployee[C.DEPARTURE]) < group.from)) {
-                    return blocked('PROFILE_EVENT_AFTER_DEPARTURE');
+                        day(currentEmployee[C.DEPARTURE]) < group.from);
+                if (eventAfterDeparture) {
+                    assumption('PROFILE_EVENT_AFTER_DEPARTURE', { periodFrom: group.from,
+                        resolution: 'PRESERVE_LATER_PROFILE_EVENT_IGNORE_EARLIER_TERMINATION' });
                 }
                 const preferred = departureCandidates.length ? departureCandidates : candidates;
                 preferred.sort((a, b) => compare(b.rank, a.rank) || compare(a.value, b.value) ||
@@ -356,23 +414,35 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 group.to = chosen?.value || null;
                 finalEvidence = chosen ? { ...evidence(SOURCES.FINAL_END, chosen.source?._id, chosen.field, 'DETERMINISTIC'),
                     originSourceType: chosen.source ? SOURCES.EXISTING : SOURCES.CURRENT }
-                    : evidence(SOURCES.DEFAULT, null, null, 'DEFAULT');
-                if (cycle.nextHire && !chosen) return blocked('UNRESOLVED_CYCLE_TERMINATION');
+                    : evidence(SOURCES.OPEN_END, null, null, 'DETERMINISTIC');
+                if (eventAfterDeparture || new Set(candidates.map(item => item.value)).size > 1) {
+                    finalEvidence = { ...finalEvidence, sourceType: SOURCES.ASSUMPTION, confidence: 'ASSUMED' };
+                }
+                if (cycle.nextHire && !chosen) {
+                    group.to = addDays(cycle.nextHire, -1);
+                    finalEvidence = evidence(SOURCES.ASSUMPTION, cycles.find(item => item.hire === cycle.nextHire)?.rows[0]?._id,
+                        C.HIRE, 'ASSUMED');
+                    assumption('CYCLE_TERMINATION_ASSUMED_BEFORE_REHIRE', { periodFrom: group.from,
+                        periodTo: group.to, resolution: 'NEXT_HIRE_MINUS_ONE_DAY' });
+                }
             }
             group.profile = {};
             group.fieldProvenance = {};
             for (const field of C.PROFILE_FIELDS) {
+                // Schema/display coverage comes from the complete contract. It
+                // never requires manufacturing empty optional physical facts.
+                if (!usable(field, group.resolved[field]) && C.PROFILE_FIELD_TYPES[field] !== 'Number') continue;
                 const selected = usable(field, group.resolved[field]) ? {
                     value: group.resolved[field], provenance: group.resolvedProvenance[field]
-                } : { value: defaultValue(field), provenance: evidence(SOURCES.DEFAULT, null, field, 'DEFAULT') };
+                } : { value: 0, provenance: evidence(SOURCES.DEFAULT, null, field, 'DEFAULT') };
                 if (selected.provenance.sourceType === SOURCES.CURRENT) {
                     assumption('CURRENT_EMPLOYEE_PROFILE_FALLBACK', { field, periodFrom: group.from });
                 }
                 group.profile[field] = clone(selected.value);
                 group.fieldProvenance[field] = clone(selected.provenance);
                 for (const row of group.rows) {
-                    if (usable(field, row[field])) continue;
-                    if (nonEmpty(row[field]) && !equal(row[field], selected.value)) {
+                    if (usable(field, row[field]) && !group.conflictingFields.has(field)) continue;
+                    if (!usable(field, row[field]) && nonEmpty(row[field]) && !equal(row[field], selected.value)) {
                         assumption(C.CRITICAL_NUMBERS.includes(field) && row[field] === 0
                             ? 'LEGACY_ZERO_PLACEHOLDER_REPLACED' : 'UNUSABLE_PROFILE_VALUE_REPLACED',
                         { field, sourceHistoryIds: [clone(row._id)] });
@@ -385,10 +455,14 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 const oldEnd = day(row[C.END]);
                 if (oldEnd && oldEnd !== group.to) assumption('EXISTING_PERIOD_END_REBUILT', {
                     field: C.END, sourceHistoryIds: [clone(row._id)] });
-                changeField(row, C.END, group.to ? calendarDate(group.to) : null, finalEvidence);
+                // An open interval is a logical fact; an absent optional end
+                // needs no physical null. Clearing an invalid/stale end does.
+                if (group.to || nonEmpty(row[C.END])) {
+                    changeField(row, C.END, group.to ? calendarDate(group.to) : null, finalEvidence);
+                }
                 if (!day(row[C.HIRE])) changeField(row, C.HIRE, calendarDate(cycle.hire),
-                    evidence(hireSource ? SOURCES.HIRE : SOURCES.CURRENT,
-                        hireSource?._id, C.HIRE, 'DETERMINISTIC'));
+                    evidence(inferredHire ? SOURCES.ASSUMPTION : hireSource ? SOURCES.HIRE : SOURCES.CURRENT,
+                        hireSource?._id, inferredHire ? C.START : C.HIRE, inferredHire ? 'ASSUMED' : 'DETERMINISTIC'));
             }
             const [days, hours, average] = C.CRITICAL_NUMBERS.map(field => group.profile[field]);
             if ((days > 0 && (!Number.isInteger(days) || days > 7)) ||
