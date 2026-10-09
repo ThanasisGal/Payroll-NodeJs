@@ -32,9 +32,11 @@ test('HTTP correction preview is sanitized and commits zero changes; confirmatio
     const db=store(),before=db.state(),call=endpoint(db),r=correction();
     const p=await call({correction:r});assert.equal(p.code,200);assert.equal(p.body.resolutionRequired,true);assert.equal(p.body.success,false);
     assert.equal(p.body.resolution.phase,'PREVIEW');assert.deepEqual(db.state(),before);
+    assert.equal(db.events.some(event=>['fence','write','commit'].includes(event.type)),false);
     assert.doesNotMatch(JSON.stringify({...p.body.resolution,fingerprint:undefined}),/507f|historyId|"patch"|survivorId|deleteId/);
     const final=await call({correction:{...r,confirmation:{fingerprint:p.body.resolution.fingerprint,confirmed:true}}});
     assert.equal(final.code,200);assert.equal(final.body.success,true);assert.equal(db.state().history.length,2);
+    assert.equal(db.events.filter(event=>event.type==='fence').length,1);
 });
 
 test('HTTP malformed correction cannot choose writes or weaken the transaction',async()=>{
@@ -90,6 +92,17 @@ test('HTTP REVIEW evaluates the correction as 200 with a sanitized choice and ze
     assert.match(result.body.resolution.fingerprint,/^[a-f0-9]{64}$/);
     assert.doesNotMatch(JSON.stringify({...result.body.resolution,fingerprint:undefined}),/507f|historyId|"patch"|survivorId|deleteId/);
     assert.deepEqual(db.state(),before);assert.equal(db.events.some(event=>event.type==='commit'),false);
+    assert.equal(db.events.some(event=>['fence','write'].includes(event.type)),false);
+});
+
+test('HTTP review failure explains the stopped check without exposing the internal exception',async()=>{
+    const db=store(),before=db.state();
+    const result=await endpoint(db,admin,{},async()=>{throw Error('LOCAL_READ_ONLY_GUARD');})({correction:correction('REVIEW')});
+    assert.equal(result.code,500);
+    assert.equal(result.body.reason,'EMPLOYEE_HISTORY_CORRECTION_REVIEW_UNAVAILABLE');
+    assert.match(result.body.message,/έλεγχος.*επιλεγμένης εγγραφής.*επιλογές διόρθωσης.*Δεν έχει αποθηκευτεί καμία αλλαγή.*1\..*2\..*Κωδικός αναφοράς:/s);
+    assert.doesNotMatch(JSON.stringify(result.body),/LOCAL_READ_ONLY_GUARD|Σφάλμα κατά την ενημέρωση|"error":/);
+    assert.deepEqual(db.state(),before);
 });
 
 for (const [name,withCorrection,resolutionRequired,malformed] of [

@@ -3233,7 +3233,8 @@ a {
     justify-content: center !important;
 }
 
-.custom-title {
+.custom-title,
+.swal2-title.custom-title {
     font-size: 1.2rem;
     font-weight: bold;
 }

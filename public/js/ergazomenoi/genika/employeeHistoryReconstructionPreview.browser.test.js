@@ -12,7 +12,8 @@ const dto = input => project({ plan: plan(input), completeHistoryRows: input.com
 const modal = '#employeeHistoryReconstructionPreviewModal';
 const body = '#employeeHistoryReconstructionPreviewBody';
 const button = '#employeeHistoryReconstructionPreviewBtn';
-async function withPage({ input = F.caseA(), status = 200, payload, viewport = { width: 1440, height: 1000 }, delay = 0 } = {}, work) {
+async function withPage({ input = F.caseA(), status = 200, payload, viewport = { width: 1440, height: 1000 }, delay = 0,
+    manualHandler, stateToken = 'synthetic' } = {}, work) {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage({ viewport });
@@ -20,10 +21,17 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
         page.on('pageerror', error => errors.push(error.message));
         const partial = await ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
             ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
-            employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: 'synthetic', problematicHistoryIds: []
+            employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: stateToken, problematicHistoryIds: []
         });
         await page.route('https://payroll.test/**', async route => {
             const request = route.request();
+            if (manualHandler && request.url().endsWith('/istoriko/update')) {
+                const data = request.postDataJSON();
+                requests.push({ method: request.method(), path: new URL(request.url()).pathname, data });
+                const reply = await manualHandler(data);
+                return route.fulfill({ status: reply.status, contentType: reply.contentType || 'application/json',
+                    body: reply.rawBody ?? JSON.stringify(reply.body) });
+            }
             if (!request.url().includes('/history-reconstruction-preview')) return route.fulfill({ contentType: 'text/html',
                 body: `<!doctype html><html lang="el"><head><meta charset="utf-8"></head><body>${partial}</body></html>` });
             requests.push({ method: request.method(), path: new URL(request.url()).pathname });
@@ -34,12 +42,15 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
         for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
             await page.addStyleTag({ path: path.join(root, file) });
         for (const file of ['public/js/bootstrap.bundle.min.js', 'node_modules/sweetalert2/dist/sweetalert2.all.js',
-            'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag({ path: path.join(root, file) });
+            'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js',
+            ...(manualHandler ? ['public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js',
+                'public/js/ergazomenoi/genika/istorikoTable.js'] : [])]) await page.addScriptTag({ path: path.join(root, file) });
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
         await work({ page, requests });
         assert.deepEqual(errors, []);
-        assert.ok(requests.every(request => request.method === 'GET'));
+        assert.ok(requests.every(request => request.method === 'GET' ||
+            manualHandler && request.method === 'POST' && request.data.updates.length === 0 && request.data.correction.confirmation === null));
     } finally { await browser.close(); }
 }
 async function open(page) {
@@ -274,5 +285,76 @@ test('catalog descriptions and unresolved code fallback are readable in period c
         const category = page.locator('.history-preview-period').first().locator('dl > div').filter({ hasText: 'Κατηγορία Σύμβασης' });
         assert.equal(await category.locator('dd').innerText(), '0001');
         assert.doesNotMatch(await page.locator(modal).innerText(), /[a-f0-9]{24}|SAME_DATE|APPLICATION_ASSUMPTION|sourceHistoryId|fingerprint/);
+    });
+});
+
+async function closePreviewThenReview(page) {
+    await open(page);
+    await page.locator(`${modal} .modal-footer button`).click();
+    await page.waitForFunction(() => !document.querySelector('.modal-backdrop'));
+    await page.locator('[data-action="review"]').first().click();
+    await page.locator('.swal2-popup').waitFor();
+}
+
+test('preview footer leads through the real manual client and writer to read-only choices and cancellation', async () => {
+    const { fixture, store, scope } = require('../../../../test/fixtures/employeeProfileTransactionStore');
+    const { token, userModel } = require('../../../../test/fixtures/employeeHistorySupervisor');
+    const W = require('../../../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
+    const { profileError } = require('../../../../server/utils/ergazomenoi/employmentProfileMaintenance');
+    const f = fixture(), db = store([f]), before = db.state();
+    const input = { scope, currentEmployee: f.employee, completeHistoryRows: f.history };
+    const manualHandler = async data => {
+        const deny = async () => assert.fail('manual entry attempted a database write');
+        try {
+            await W.writeEmployeeEmploymentHistoryOperations({ ...db.deps, scope, employeeId: data.employeeId,
+                operations: data.updates, expectedStateToken: data.expectedStateToken, correction: data.correction,
+                actorUserId: 'authenticated', userModel: userModel({ privileges: 'A', team: 'THA', situation: 'A' }),
+                correctionCatalogLoader: async () => ({}), employeeModel: { ...db.deps.employeeModel, updateOne: deny } });
+            assert.fail('an unconfirmed request cannot save');
+        } catch (error) {
+            const res = { status(status) { this.statusCode = status; return this; }, json(body) { this.body = body; } };
+            profileError(res, error, { resolutionStatusCode: 200 });
+            return { status: res.statusCode, body: res.body };
+        }
+    };
+    await withPage({ input, stateToken: token(db), manualHandler }, async ({ page, requests }) => {
+        await closePreviewThenReview(page);
+        assert.match(await page.locator('.swal2-title').innerText(), /Έλεγχος \/ Διόρθωση Ιστορικού/);
+        assert.ok(await page.locator('.swal2-popup input[type="radio"]').count() > 0);
+        assert.match(await page.locator('.swal2-popup').getAttribute('class'), /custom-swal-popup employee-history-correction-popup/);
+        assert.match(await page.locator('.swal2-cancel').getAttribute('class'), /employee-history-correction-cancel/);
+        assert.ok(parseFloat(await page.locator('.swal2-title').evaluate(e => getComputedStyle(e).fontSize)) < 22);
+        await page.locator('.swal2-cancel').click();
+        await page.waitForFunction(() => !document.querySelector('.swal2-container'));
+        assert.deepEqual(requests.map(r => r.method), ['GET', 'POST']);
+        assert.equal(requests[1].data.correction.intent, 'REVIEW');
+        assert.equal(requests[1].data.correction.confirmation, null);
+        assert.equal(await page.locator('[data-action="review"]').first().isEnabled(), true);
+    });
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.events.some(e => ['fence', 'write', 'commit'].includes(e.type)), false);
+});
+
+for (const failure of ['specific', 'legacy-generic', 'non-json']) test(`manual ${failure} failure after preview uses the common styled notice and safe read-only wording`, async () => {
+    const message = 'Η επιλεγμένη εγγραφή δεν υπάρχει πλέον στο Ιστορικό. Δεν έχει γίνει καμία αλλαγή. 1. Κλείστε το παράθυρο. 2. Ανοίξτε ξανά τον εργαζόμενο. Κωδικός αναφοράς: EMPLOYEE_HISTORY_CORRECTION_TARGET_MISSING';
+    const manualHandler = async () => ({ status: failure === 'specific' ? 409 : 500,
+        ...(failure === 'specific' ? { body: { success: false, reason: 'EMPLOYEE_HISTORY_CORRECTION_TARGET_MISSING', message } }
+            : failure === 'legacy-generic' ? { body: { success: false, message: 'Σφάλμα κατά την ενημέρωση του Ιστορικού.' } }
+            : { contentType: 'text/html', rawBody: '<!doctype html><title>Unavailable</title>' }) });
+    await withPage({ manualHandler }, async ({ page, requests }) => {
+        await closePreviewThenReview(page);
+        const notice = page.locator('.swal2-popup');
+        assert.match(await notice.getAttribute('class'), /custom-swal-popup/);
+        assert.match(await page.locator('.swal2-title').getAttribute('class'), /custom-title/);
+        assert.match(await page.locator('.swal2-confirm').getAttribute('class'), /class-warning custom-confirm-button custom-swal-button/);
+        assert.equal(await page.locator('.swal2-cancel').isVisible(), false);
+        assert.equal(await page.locator('.swal2-confirm').innerText(), 'Κλείσιμο');
+        assert.ok(parseFloat(await page.locator('.swal2-title').evaluate(e => getComputedStyle(e).fontSize)) < 22);
+        const text = await page.locator('.swal2-html-container').innerText();
+        if (failure === 'specific') assert.equal(text, message);
+        else assert.match(text, /έλεγχος.*δεν ολοκληρώθηκε.*Δεν έχει αποθηκευτεί καμία αλλαγή.*1\..*2\..*Κωδικός αναφοράς:/s);
+        assert.doesNotMatch(text, /Σφάλμα κατά την ενημέρωση|ελέγξτε αν αποθηκεύτηκε/i);
+        assert.deepEqual(requests.map(r => r.method), ['GET', 'POST']);
+        await page.locator('.swal2-confirm').click();
     });
 });

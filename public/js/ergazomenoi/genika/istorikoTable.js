@@ -662,37 +662,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function openHistoryCorrection(row) {
+        const correctionSwal = Swal.mixin({
+            allowOutsideClick: false,
+            showCancelButton: false,
+            confirmButtonText: 'Κλείσιμο',
+            cancelButtonText: 'Ακύρωση',
+            customClass: {
+                title: 'custom-title', popup: 'custom-swal-popup',
+                htmlContainer: 'custom-html-container',
+                confirmButton: 'class-warning custom-confirm-button custom-swal-button'
+            }
+        });
+        const reviewFailure = 'Ο έλεγχος της επιλεγμένης εγγραφής δεν ολοκληρώθηκε και η διόρθωση δεν άνοιξε. Δεν έχει αποθηκευτεί καμία αλλαγή. 1. Ανοίξτε ξανά τον εργαζόμενο και δοκιμάστε τον έλεγχο. 2. Αν το πρόβλημα παραμένει, ζητήστε βοήθεια από διαχειριστή. Κωδικός αναφοράς: ΙΣΤ-ΕΛΕΓΧΟΣ-01.';
+        const confirmationFailure = 'Η εφαρμογή δεν μπόρεσε να επιβεβαιώσει την αποθήκευση. 1. Κλείστε το παράθυρο. 2. Ανοίξτε ξανά τον εργαζόμενο και ελέγξτε αν αποθηκεύτηκε η αλλαγή. 3. Ζητήστε βοήθεια αν το πρόβλημα παραμένει.';
         if (collectUpdates().length) {
-            await Swal.fire({ titleText: 'Υπάρχουν αλλαγές που δεν έχουν αποθηκευτεί',
+            await correctionSwal.fire({ titleText: 'Υπάρχουν αλλαγές που δεν έχουν αποθηκευτεί',
                 text: 'Η διόρθωση πρέπει να γίνει χωριστά. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Αποθηκεύστε ή ακυρώστε τις αλλαγές στον πίνακα. 2. Ανοίξτε ξανά τη διόρθωση.', icon: 'warning' });
             return;
         }
         const payload = { employeeId: employeeIdInput?.value || '', expectedStateToken, updates: [],
             correction: { intent: 'REVIEW', targetHistoryId: row.dataset.id, facts: {}, confirmation: null } };
-        const request = body => fetch('/ergazomenoi/ergazomenoi/istoriko/update', {
-            method: 'POST', credentials: 'include',
-            headers: { 'Content-Type': 'application/json', 'CSRF-Token': getCsrfToken(), 'X-CSRF-Token': getCsrfToken() },
-            body: JSON.stringify(body) });
+        let confirmationSent = false;
+        const request = body => {
+            confirmationSent ||= body.correction?.confirmation?.confirmed === true;
+            return fetch('/ergazomenoi/ergazomenoi/istoriko/update', {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json', 'CSRF-Token': getCsrfToken(), 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify(body) });
+        };
         try {
             const response = await request(payload);
             const correction = await window.employeeHistoryGuidedResolution.handleInitialResponse({
                 response, originalPayload: payload, retryRequest: request,
-                swal: Swal, documentRef: document, windowRef: window });
+                swal: correctionSwal, documentRef: document, windowRef: window });
             if (correction.cancelled) return;
             const finalResponse = correction.handled ? correction.response : response;
             const result = await finalResponse.json();
             if (!finalResponse.ok || result.success === false) {
-                await Swal.fire({ titleText: 'Η διόρθωση σταμάτησε', text: result.message ||
-                    'Η εφαρμογή δεν μπορεί να κάνει τη διόρθωση με ασφάλεια. Δεν έχει γίνει καμία αλλαγή. 1. Κλείστε το παράθυρο. 2. Ανοίξτε ξανά τον εργαζόμενο. 3. Ελέγξτε τα στοιχεία με διαχειριστή.',
+                const message = result.message && (confirmationSent || result.reason || finalResponse.status < 500)
+                    ? result.message : confirmationSent ? confirmationFailure : reviewFailure;
+                await correctionSwal.fire({ titleText: confirmationSent ? 'Η διόρθωση σταμάτησε' : 'Ο έλεγχος δεν ολοκληρώθηκε', text: message,
                     icon: 'warning', confirmButtonText: 'Κλείσιμο' });
                 return;
             }
-            await Swal.fire({ titleText: 'Η διόρθωση αποθηκεύτηκε',
+            await correctionSwal.fire({ titleText: 'Η διόρθωση αποθηκεύτηκε',
                 text: 'Αποθηκεύτηκαν οι αλλαγές που επιβεβαιώσατε.', icon: 'success', confirmButtonText: 'Κλείσιμο' });
             window.location.reload();
         } catch (_) {
-            await Swal.fire({ titleText: 'Η διόρθωση δεν ολοκληρώθηκε',
-                text: 'Η εφαρμογή δεν μπόρεσε να επιβεβαιώσει την αποθήκευση. 1. Κλείστε το παράθυρο. 2. Ανοίξτε ξανά τον εργαζόμενο και ελέγξτε αν αποθηκεύτηκε η αλλαγή. 3. Ζητήστε βοήθεια αν το πρόβλημα παραμένει.',
+            await correctionSwal.fire({ titleText: confirmationSent ? 'Η διόρθωση δεν ολοκληρώθηκε' : 'Ο έλεγχος δεν ολοκληρώθηκε',
+                text: confirmationSent ? confirmationFailure : reviewFailure,
                 icon: 'warning', confirmButtonText: 'Κλείσιμο' });
         }
     }

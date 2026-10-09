@@ -1077,6 +1077,13 @@ class ergazomenoiController {
                 success: false, reason: error.code,
                 message: 'Η προσαύξηση 6ης ημέρας του ιστορικού πρέπει να είναι μη αρνητικός αριθμός.'
             });
+            if (req.body?.correction && req.body.correction.confirmation === null) {
+                return res.status(500).json({
+                    success: false,
+                    reason: 'EMPLOYEE_HISTORY_CORRECTION_REVIEW_UNAVAILABLE',
+                    message: 'Ο έλεγχος της επιλεγμένης εγγραφής δεν ολοκληρώθηκε, επειδή η εφαρμογή δεν μπόρεσε να προετοιμάσει τις επιλογές διόρθωσης. Δεν έχει αποθηκευτεί καμία αλλαγή. 1. Ανοίξτε ξανά τον εργαζόμενο και δοκιμάστε τον έλεγχο. 2. Αν το πρόβλημα παραμένει, ζητήστε βοήθεια από διαχειριστή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_CORRECTION_REVIEW_UNAVAILABLE.'
+                });
+            }
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ενημέρωση του Ιστορικού.',
