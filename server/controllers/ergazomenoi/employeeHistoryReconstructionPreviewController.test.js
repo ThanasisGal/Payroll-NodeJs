@@ -31,6 +31,7 @@ function setup(options = {}) {
         companyModel: guard({ findOne(filter) { reads.push(['company', filter]); return query(options.company === null ? null : { _id: companyId }); } }),
         historyModel: guard({ find(filter) { reads.push(['history', filter]); const q = query(input.completeHistoryRows);
             q.mongooseOptions = value => { reads.push(['options', value]); return q; }; return q; } }),
+        loadCatalogs: async () => { reads.push(['catalogs']); return options.catalogs || {}; },
         planner(args) { plans.push(args); if (options.throw) throw new Error('SECRET_PII_STACK'); return plan(args); }
     });
     return { input, reads, plans, req, res, controller };
@@ -74,6 +75,17 @@ for (const [name, mutate, options, status] of [
     assert.equal(plans.length, 0);
     assert.equal(res.body.success, false);
     assert.match(res.body.message, /Δεν έχει αποθηκευτεί.*\n1\..*\n2\..*Κωδικός αναφοράς/s);
+});
+
+test('authorized preview loads catalog descriptions read-only; denied requests never load catalogs', async () => {
+    const context = setup({ catalogs: { KPK_EFKA: [{ code: '0111', label: 'Περιγραφή δοκιμής' }] } });
+    context.input.completeHistoryRows[0].krathsh_01 = '0111';
+    await context.controller(context.req, context.res);
+    assert.equal(context.reads.filter(([kind]) => kind === 'catalogs').length, 1);
+    assert.match(JSON.stringify(context.res.body.preview), /0111 - Περιγραφή δοκιμής/);
+    const denied = setup(); delete denied.req.session.userId;
+    await denied.controller(denied.req, denied.res);
+    assert.equal(denied.reads.length, 0);
 });
 
 test('server failures expose a normal actionable Greek message without exception or data dumping', async () => {

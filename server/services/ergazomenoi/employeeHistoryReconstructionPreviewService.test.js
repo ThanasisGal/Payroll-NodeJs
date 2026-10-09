@@ -137,3 +137,30 @@ for (const count of [1, 3, 20]) test(`${count} History rows project completely w
     assert.deepEqual(input, before);
     assert.ok(performance.now() - started < 3000);
 });
+
+test('catalog labels reuse the existing registry in original fields, period facts, changes and conflicts; missing codes stay unchanged', () => {
+    const input = F.caseBWithProfileEvidence();
+    input.completeHistoryRows.forEach(row => Object.assign(row, { symbash: '0002', kathgoria_symbashs: '0001', eidikothta_symbashs: '0003' }));
+    const catalogs = { CONTRACT_TYPE: [{ code: '0002', label: 'Σύμβαση δοκιμής' }],
+        CONTRACT_CATEGORY: [{ code: '0001', label: 'Κατηγορία δοκιμής' }],
+        CONTRACT_SPECIALTY: [{ code: '0003', label: 'Ειδικότητα δοκιμής' }],
+        KPK_EFKA: [{ code: '0115', label: 'Ασφάλιση δοκιμής' }, { code: '0111', label: 'Ασφάλιση δοκιμής' }] };
+    const result = plan(input), before = structuredClone({ input, result, catalogs });
+    const dto = P.buildEmployeeHistoryReconstructionPreview({ plan: result, completeHistoryRows: input.completeHistoryRows, catalogs });
+    for (const [field, code, description] of [['symbash', '0002', 'Σύμβαση δοκιμής'], ['kathgoria_symbashs', '0001', 'Κατηγορία δοκιμής'],
+        ['eidikothta_symbashs', '0003', 'Ειδικότητα δοκιμής'], ['krathsh_01', result.logicalPeriods[0].profile.krathsh_01, 'Ασφάλιση δοκιμής']]) {
+        assert.equal(dto.periods[0].facts.find(f => f.label === L[field]).value, `${code} - ${description}`);
+        assert.equal(P.formatValue(field, code, {}), code);
+        assert.equal(P.formatValue(field, code, { [({ symbash: 'CONTRACT_TYPE', kathgoria_symbashs: 'CONTRACT_CATEGORY', eidikothta_symbashs: 'CONTRACT_SPECIALTY', krathsh_01: 'KPK_EFKA' })[field]]: [] }), code);
+    }
+    const conflict = dto.attention.find(item => item.conflict);
+    assert.equal(conflict.category, 'Ασφάλιση / ΚΠΚ');
+    const source = result.assumptions.find(item => item.code === 'SAME_DATE_NON_EMPTY_CONFLICT');
+    const selected = input.completeHistoryRows.find(row => String(row._id) === String(source.selectedSourceHistoryId));
+    assert.deepEqual([...conflict.conflict.values].sort(), ['0111 - Ασφάλιση δοκιμής', '0115 - Ασφάλιση δοκιμής']);
+    assert.equal(conflict.conflict.proposed, `${selected.krathsh_01} - Ασφάλιση δοκιμής`);
+    assert.equal(conflict.conflict.sourceRow, selected.aa_eggrafhs);
+    assert.equal(dto.changes.find(change => change.field.includes('ΚΠΚ')).after, conflict.conflict.proposed);
+    assert.equal(dto.originalRows[1].groups.flatMap(g => g.fields).find(f => f.label === L.symbash).value, '0002 - Σύμβαση δοκιμής');
+    assert.deepEqual(structuredClone({ input, result, catalogs }), before);
+});

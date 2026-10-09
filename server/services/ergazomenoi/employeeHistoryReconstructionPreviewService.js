@@ -3,6 +3,7 @@
 const C = require('./employeeHistoryAutomaticReconstructionContract');
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
+const { registryEntryForCanonicalField } = require('./employeeHistoryCorrectionFieldRegistryService');
 
 // Explicit public allowlist. Everything else in the 118-path contract stays
 // server-side, including identities, scope, timestamps, versions and references.
@@ -26,7 +27,7 @@ function formatDate(value) {
         return date ? date.toISOString().slice(0, 10).split('-').reverse().join('/') : 'Μη έγκυρη ημερομηνία';
     } catch { return 'Μη έγκυρη ημερομηνία'; }
 }
-function formatValue(field, value) {
+function formatValue(field, value, catalogs = {}) {
     if (empty(value)) return 'Δεν έχει καταχωριστεί';
     if (DATE_FIELDS.has(field)) return formatDate(value);
     if (typeof value === 'boolean') {
@@ -43,6 +44,9 @@ function formatValue(field, value) {
             ? value.map(v => days[v - 1]).join(', ') : 'Χρειάζεται έλεγχος των ημερών';
     }
     if (typeof value !== 'string') return 'Μη διαθέσιμη περιγραφή';
+    const catalog = registryEntryForCanonicalField(field)?.catalog;
+    const description = catalog && catalogs[catalog]?.find(item => item.code === value)?.label;
+    if (typeof description === 'string' && description.trim()) return safeText(`${value} - ${description}`);
     if (field === 'kathestos_apasxolhshs') {
         return ({ '0': 'Πλήρης Απασχόληση', '1': 'Μερική Απασχόληση', '2': 'Εκ Περιτροπής Εργασία' })[value] || safeText(value);
     }
@@ -107,13 +111,14 @@ const ISSUE_MESSAGES = Object.freeze({
     INCONSISTENT_RECONSTRUCTED_PROFILE: 'Ορισμένα στοιχεία ωραρίου, διαλείμματος ή εγκεκριμένης ρύθμισης χρειάζονται έλεγχο.'
 });
 
-function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows }) {
+function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows, catalogs = {} }) {
+    const displayValue = (field, value) => formatValue(field, value, catalogs);
     const orderedRows = [...completeHistoryRows].sort((a, b) =>
         String(a.aa_eggrafhs || '').localeCompare(String(b.aa_eggrafhs || ''), 'el') || identity(a._id).localeCompare(identity(b._id)));
     const rowLabels = new Map(orderedRows.map((row, index) => [identity(row._id),
         safeText(String(row.aa_eggrafhs || '')) || String(index + 1).padStart(4, '0')]));
     const rowLabel = id => rowLabels.get(identity(id)) || 'Μη διαθέσιμη εγγραφή';
-    const publicField = (field, value) => ({ label: labels[field], value: formatValue(field, value),
+    const publicField = (field, value) => ({ label: labels[field], value: displayValue(field, value),
         ...(SCHEDULE_FIELDS.has(field) ? { informational: true, note: INFORMATIONAL_NOTE } : {}) });
     const originalRows = orderedRows.map(row => ({ label: rowLabel(row._id),
         summary: `${formatValue(C.START, row[C.START])} → ${empty(row[C.END]) ? 'Χωρίς καταχωρισμένη λήξη' : formatDate(row[C.END])}`,
@@ -123,7 +128,7 @@ function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows }
             fields: DISPLAY_FIELDS.filter(field => groupFor(field) === title).map(field => publicField(field, row[field])) }))
     }));
     const publicChange = diff => ({ row: rowLabel(diff.historyId), field: labels[diff.field],
-        before: formatValue(diff.field, diff.beforeMissing ? undefined : diff.before), after: formatValue(diff.field, diff.after),
+        before: displayValue(diff.field, diff.beforeMissing ? undefined : diff.before), after: displayValue(diff.field, diff.after),
         source: SOURCE_LABELS[diff.sourceType] || 'Διαθέσιμα Ιστορικά Στοιχεία',
         ...(diff.sourceHistoryId ? { sourceRow: rowLabel(diff.sourceHistoryId) } : {}),
         confidence: confidence(diff) });
@@ -144,12 +149,19 @@ function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows }
             .map(field => publicField(field, period.profile[field])) }));
     const issue = item => {
         let message = ISSUE_MESSAGES[item.code] || 'Ορισμένα στοιχεία χρειάζονται έλεγχο πριν από μελλοντική τακτοποίηση.';
+        let conflict;
         if (item.code === 'SAME_DATE_NON_EMPTY_CONFLICT') {
-            const values = (item.sourceValues || []).map(value => formatValue(item.field, value.value));
+            const values = (item.sourceValues || []).map(value => displayValue(item.field, value.value));
             const selected = (item.sourceValues || []).find(value => identity(value.historyId) === identity(item.selectedSourceHistoryId));
-            message = `Βρέθηκαν διαφορετικές τιμές για το πεδίο «${labels[item.field] || 'Στοιχείο Ιστορικού'}» στην ίδια περίοδο: ${values.join(' / ')}. Η εφαρμογή προτείνει ${formatValue(item.field, selected?.value)}.`;
+            message = `Βρέθηκαν διαφορετικές τιμές για το πεδίο «${labels[item.field] || 'Στοιχείο Ιστορικού'}» στην ίδια περίοδο: ${values.join(' / ')}. Η εφαρμογή προτείνει ${displayValue(item.field, selected?.value)}.`;
+            conflict = { values, proposed: displayValue(item.field, selected?.value),
+                ...(selected ? { sourceRow: rowLabel(selected.historyId) } : {}) };
         }
-        return { message, ...(labels[item.field] ? { field: labels[item.field] } : {}),
+        const group = groupFor(item.field || '');
+        const category = group === GROUP_TITLES[0] || /HIRE|BOUNDAR|START|UNDATED|TERMINAT|DEPARTURE|PERIOD_END|TEMPORAL|CYCLE/.test(item.code)
+            ? 'Ημερομηνίες' : group === GROUP_TITLES[3] ? 'Αποδοχές' : group === GROUP_TITLES[2] ? 'Σύμβαση'
+                : group === GROUP_TITLES[4] ? 'Ασφάλιση / ΚΠΚ' : 'Λοιπά';
+        return { message, category, ...(conflict ? { conflict } : {}), ...(labels[item.field] ? { field: labels[item.field] } : {}),
             ...(item.sourceHistoryIds ? { rows: item.sourceHistoryIds.map(rowLabel) } : {}) };
     };
     const blocked = plan.status === 'BLOCKED';

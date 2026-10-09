@@ -78,7 +78,7 @@ test('real Bootstrap modal is wide, Greek, read-only; meaningful changes precede
 test('all 105 display fields are reachable in expandable Greek groups; schedule dates explicitly informational', async () => {
     await withPage({}, async ({ page }) => {
         await open(page);
-        const original = page.locator('.history-preview-section').nth(0);
+        const original = page.locator('.history-preview-original');
         const row = original.locator(':scope > details').first();
         await row.locator(':scope > summary').click();
         await page.waitForFunction(() => document.querySelectorAll('.history-preview-section details details').length === 6);
@@ -100,7 +100,10 @@ test('asymmetric Case B combines the initial rows and renders review assumptions
         await open(page);
         assert.match(await page.locator('.history-preview-periods').innerText(), /23\/04\/2026 → 16\/05\/2026/);
         assert.match(await page.locator('.history-preview-periods').innerText(), /0001, 0002/);
-        assert.match(await page.locator('.history-preview-attention').innerText(), /ΚΠΚ.*προτείνει 0115/s);
+        assert.equal(await page.locator('.history-preview-attention').getAttribute('open'), null);
+        await page.locator('.history-preview-attention > summary').click();
+        await page.locator('.history-preview-attention li').waitFor();
+        assert.match(await page.locator('.history-preview-attention').innerText(), /ΚΠΚ.*Υπάρχουσες τιμές.*0115 \/ 0111.*Πρόταση.*0115.*Πηγή: Εγγραφή 0002/s);
         const conflict = page.locator('.history-preview-change-list tbody tr').filter({ hasText: 'ΚΠΚ' }).filter({ hasText: '0111' });
         assert.match(await conflict.innerText(), /0111.*0115.*Υπόθεση Εφαρμογής.*Χρειάζεται Έλεγχο/s);
     });
@@ -175,7 +178,7 @@ for (const count of [1, 3, 20]) test(`${count} rows on mobile stay responsive, s
         const started = performance.now();
         await open(page);
         assert.ok(performance.now() - started < 5000);
-        assert.equal(await page.locator('.history-preview-section').first().locator(':scope > details').count(), count);
+        assert.equal(await page.locator('.history-preview-original').locator(':scope > details').count(), count);
         const dimensions = await page.locator(`${modal} .modal-body`).evaluate(element => ({
             width: element.clientWidth, scrollWidth: element.scrollWidth, height: element.clientHeight, scrollHeight: element.scrollHeight,
             overflow: getComputedStyle(element).overflowY
@@ -184,5 +187,92 @@ for (const count of [1, 3, 20]) test(`${count} rows on mobile stay responsive, s
         assert.equal(dimensions.overflow, 'auto');
         assert.ok(dimensions.scrollHeight > dimensions.height);
         assert.equal(await page.locator('.history-preview-defaults tr').count(), 0);
+    });
+});
+
+test('15 attention points are initially collapsed, grouped on expansion, and collapse again', async () => {
+    const input = F.caseBWithProfileEvidence();
+    const preview = dto(input);
+    const point = preview.attention[0];
+    preview.attention = Array.from({ length: 15 }, (_, i) => ({ ...point, ...(i === 0 ? { conflict: undefined, field: 'Νόμιμος Μισθός' } : {}), category: i < 10 ? 'Αποδοχές' : 'Ασφάλιση / ΚΠΚ' }));
+    preview.summary.assumptions = 15;
+    await withPage({ input, payload: { success: true, preview } }, async ({ page }) => {
+        await open(page);
+        const attention = page.locator('.history-preview-attention');
+        assert.match(await attention.innerText(), /15 σημεία χρειάζονται την προσοχή σας.*Προβολή λεπτομερειών/s);
+        assert.equal(await attention.getAttribute('open'), null);
+        assert.equal(await attention.locator('li').count(), 0);
+        assert.ok(await attention.evaluate(e => e.getBoundingClientRect().height < 75));
+        const summary = await page.locator('.history-preview-summary').innerText();
+        assert.match(summary, /Προτεινόμενες Αλλαγές.*Σημεία προς Έλεγχο.*Προειδοποιήσεις/s);
+        assert.doesNotMatch(summary, /Υποθέσεις|Αυτόματες Αλλαγές/);
+        await attention.locator('summary').click();
+        await attention.locator('li').first().waitFor();
+        assert.equal(await attention.locator('li').count(), 15);
+        assert.match(await attention.locator('li').first().innerText(), /Νόμιμος Μισθός — Βρέθηκαν διαφορετικές τιμές/);
+        assert.deepEqual(await attention.locator('h6').allTextContents(), ['Αποδοχές', 'Ασφάλιση / ΚΠΚ']);
+        await attention.locator('summary').click();
+        assert.equal(await attention.getAttribute('open'), null);
+        assert.equal(await attention.locator('li').first().isVisible(), false);
+    });
+});
+
+test('zero attention hides the section; proposed periods and changes precede original rows and fallback note', async () => {
+    await withPage({}, async ({ page }) => {
+        await open(page);
+        assert.equal(await page.locator('.history-preview-attention').count(), 0);
+        assert.deepEqual(await page.locator('.history-preview-section > h6').allTextContents(),
+            ['1. Προτεινόμενες Περίοδοι', '2. Προτεινόμενες Αλλαγές', '3. Υπάρχον Ιστορικό']);
+        assert.equal(await page.locator('.history-preview-period-explanation').count(), 0);
+        assert.ok(await page.locator('.history-preview-change-list').evaluate(e =>
+            !!(e.compareDocumentPosition(document.querySelector('.history-preview-defaults')) & Node.DOCUMENT_POSITION_FOLLOWING)));
+    });
+    await withPage({ input: F.caseBWithProfileEvidence() }, async ({ page }) => {
+        await open(page);
+        assert.match(await page.locator('.history-preview-period-explanation').innerText(),
+            /Οι εγγραφές 0001 και 0002 φαίνεται να περιγράφουν την ίδια εργασιακή περίοδο και συνδυάστηκαν στην πρόταση/);
+        const headings = await page.locator('.history-preview-original > details > summary').allTextContents();
+        assert.ok(headings.every(text => text.includes('Ισχύς Όρων Εργασίας:')));
+        assert.match(headings[0], /Δεν έχει καταχωριστεί → Χωρίς καταχωρισμένη λήξη/);
+        const note = page.locator('.history-preview-message');
+        assert.match(await note.innerText(), /Αν χρειάζεται διόρθωση σήμερα.*έλεγχο της αντίστοιχης εγγραφής/s);
+        assert.equal(await note.evaluate(e => e === e.parentElement.lastElementChild && e.classList.contains('small') && !e.classList.contains('alert-warning')), true);
+        assert.ok(await page.locator('[data-action="review"]').count() > 0);
+    });
+});
+
+for (const count of [1, 2, 3]) for (const width of [390, 1440]) test(`${count} periods at ${width}px use full single width, desktop columns or mobile stacking`, async () => {
+    const input = F.caseA();
+    input.completeHistoryRows = Array.from({ length: count }, (_, i) => F.row(String(i + 1).padStart(4, '0'), {
+        hmeromhnia_proslhpshs: '2026-04-24', hmeromhnia_isxyos_oron_ergasias_apo: `2026-05-${String(i + 1).padStart(2, '0')}`, ...F.workTerms }));
+    await withPage({ input, viewport: { width, height: 1000 } }, async ({ page }) => {
+        await open(page);
+        const grid = await page.locator('.history-preview-periods').boundingBox();
+        const cards = await page.locator('.history-preview-period').evaluateAll(items => items.map(e => {
+            const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width };
+        }));
+        assert.equal(cards.length, count);
+        if (count === 1 || width < 768) assert.ok(cards.every(card => Math.abs(card.width - grid.width) < 2));
+        if (count > 1 && width >= 768) {
+            assert.equal(cards[0].y, cards[1].y);
+            assert.ok(cards[1].x > cards[0].x + cards[0].width);
+        }
+        if (count > 1 && width < 768) assert.ok(cards[1].y > cards[0].y);
+    });
+});
+
+test('catalog descriptions and unresolved code fallback are readable in period cards and original fields', async () => {
+    const input = F.caseBWithProfileEvidence();
+    input.completeHistoryRows.forEach(row => Object.assign(row, { symbash: '0002', kathgoria_symbashs: '0001' }));
+    const preview = project({ plan: plan(input), completeHistoryRows: input.completeHistoryRows,
+        catalogs: { CONTRACT_TYPE: [{ code: '0002', label: 'Σύμβαση δοκιμής' }], KPK_EFKA: [{ code: '0115', label: 'Ασφάλιση δοκιμής' }, { code: '0111', label: 'Ασφάλιση δοκιμής' }] } });
+    await withPage({ input, payload: { success: true, preview } }, async ({ page }) => {
+        await open(page);
+        const text = await page.locator('.history-preview-periods').innerText();
+        assert.match(text, /0002 - Σύμβαση δοκιμής/);
+        assert.match(text, /011[15] - Ασφάλιση δοκιμής/);
+        const category = page.locator('.history-preview-period').first().locator('dl > div').filter({ hasText: 'Κατηγορία Σύμβασης' });
+        assert.equal(await category.locator('dd').innerText(), '0001');
+        assert.doesNotMatch(await page.locator(modal).innerText(), /[a-f0-9]{24}|SAME_DATE|APPLICATION_ASSUMPTION|sourceHistoryId|fingerprint/);
     });
 });

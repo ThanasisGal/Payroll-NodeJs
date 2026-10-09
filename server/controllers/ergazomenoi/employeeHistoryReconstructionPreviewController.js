@@ -6,10 +6,12 @@ const { CompaniesModel } = require('../../models/companies');
 const { normalizeRequiredUserTeam, CANONICAL_ALL_TEAMS_CODE } = require('../../services/userTeamScopeService');
 const { planEmployeeHistoryAutomaticReconstruction } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService');
 const { buildEmployeeHistoryReconstructionPreview } = require('../../services/ergazomenoi/employeeHistoryReconstructionPreviewService');
+const { loadEmployeeHistoryCorrectionCatalogs } = require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService');
 
 function createEmployeeHistoryReconstructionPreviewController({ employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel, companyModel = CompaniesModel,
-    planner = planEmployeeHistoryAutomaticReconstruction, project = buildEmployeeHistoryReconstructionPreview } = {}) {
+    planner = planEmployeeHistoryAutomaticReconstruction, project = buildEmployeeHistoryReconstructionPreview,
+    loadCatalogs = loadEmployeeHistoryCorrectionCatalogs } = {}) {
     return async function employeeHistoryReconstructionPreview(req, res) {
         res.set('Cache-Control', 'no-store');
         const fail = (status, explanation, reference) => res.status(status).json({ success: false,
@@ -37,7 +39,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
             query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
             const history = await query.lean();
             const plan = planner({ scope, currentEmployee: employee, completeHistoryRows: history });
-            return res.json({ success: true, preview: project({ plan, completeHistoryRows: history }) });
+            const catalogs = await loadCatalogs();
+            return res.json({ success: true, preview: project({ plan, completeHistoryRows: history, catalogs }) });
         } catch (error) {
             // No response bodies, employee values, scope, cookies or exceptions
             // are logged. All planner diagnostics stay behind the projection.
