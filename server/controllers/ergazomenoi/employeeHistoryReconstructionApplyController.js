@@ -37,6 +37,8 @@ function createEmployeeHistoryReconstructionApplyController({ employeeModel = Er
             return res.json(await apply({ scope: { team, company_kod: company, kodikos: identity.kodikos },
                 employeeId: identity._id, previewToken: body.previewToken, approvalAccepted: true, actorUserId: req.session.userId }));
         } catch (error) {
+            if (error?.code === PREFIX + 'COMMIT_UNCERTAIN') return res.status(503).json({ success: false, code: error.code,
+                message: 'Η εφαρμογή δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε η τακτοποίηση λόγω διακοπής της επικοινωνίας.\n1. Ανοίξτε ξανά τον εργαζόμενο και ελέγξτε το αποθηκευμένο Ιστορικό.\n2. Αν χρειάζεται, ζητήστε βοήθεια από τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΕΦΑΡΜ-02.' });
             if (error?.code === PREFIX + 'STALE') return res.status(409).json({ success: false, code: error.code,
                 message: 'Τα στοιχεία του Ιστορικού άλλαξαν από τότε που έγινε ο έλεγχος. Δεν αποθηκεύτηκε καμία αλλαγή. Ανοίξτε ξανά την προεπισκόπηση.' });
             if (error?.statusCode === 403 || error?.code === 'INVALID_TEAM_SCOPE') {

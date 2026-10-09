@@ -100,6 +100,10 @@ async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, 
         });
     } catch (error) {
         if (error?.[noOp]) return error.result;
+        // A lost commit acknowledgement cannot truthfully be reported as a
+        // rollback. The same token remains safe for completed-action detection.
+        if (error?.hasErrorLabel?.('UnknownTransactionCommitResult') ||
+            error?.errorLabels?.includes('UnknownTransactionCommitResult')) throw A.failure('COMMIT_UNCERTAIN', 503);
         throw error;
     }
 }

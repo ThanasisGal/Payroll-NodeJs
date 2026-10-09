@@ -317,3 +317,20 @@ test('standalone database capability fails closed before acquiring fence or writ
     await assert.rejects(() => run({ capabilityProbe: async () => false }), { code: 'EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE' });
     noCommittedChanges(db, before); assert.equal(db.events.length, 0);
 });
+
+test('lost commit acknowledgement has a controlled uncertain result; identical request finds one committed audit safely', async () => {
+    const { db, run } = setup(), startSession = db.deps.connection.startSession;
+    let first = true;
+    db.deps.connection.startSession = async () => {
+        const session = await startSession(), withTransaction = session.withTransaction;
+        session.withTransaction = async work => {
+            await withTransaction(work);
+            if (first) { first = false; throw Object.assign(new Error('synthetic lost commit acknowledgement'), {
+                errorLabels: ['UnknownTransactionCommitResult'] }); }
+        };
+        return session;
+    };
+    await rejectsCode(run, 'COMMIT_UNCERTAIN'); assert.equal(db.state().audits.length, 1);
+    const before = db.state(), result = await run(); assert.equal(result.alreadyApplied, true);
+    noCommittedChanges(db, before);
+});

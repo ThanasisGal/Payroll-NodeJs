@@ -384,10 +384,10 @@ for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`one approva
         assert.equal(requests.length, 1);
     });
 });
-for (const failure of ['stale', 'forbidden', 'rejected', 'non-json']) test(`Apply ${failure}: real compact SweetAlert, zero automatic retry, invalidated approval`, async () => {
+for (const failure of ['stale', 'forbidden', 'rejected', 'non-json', 'commit-uncertain']) test(`Apply ${failure}: real compact SweetAlert, zero automatic retry, invalidated approval`, async () => {
     const applyHandler = async () => ({ status: failure === 'stale' ? 409 : failure === 'forbidden' ? 403 : 500,
         ...(failure === 'non-json' ? { contentType: 'text/html', rawBody: '<html>unavailable</html>' }
-            : { body: { success: false, code: failure === 'stale' ? 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE' : 'PRIVATE_INTERNAL' } }) });
+            : { body: { success: false, code: failure === 'stale' ? 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE' : failure === 'commit-uncertain' ? 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_COMMIT_UNCERTAIN' : 'PRIVATE_INTERNAL' } }) });
     await withPage({ applyHandler }, async ({ page, requests }) => {
         await open(page);
         await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
@@ -403,7 +403,7 @@ for (const failure of ['stale', 'forbidden', 'rejected', 'non-json']) test(`Appl
             assert.equal(await page.locator('.swal2-title').innerText(), 'Τα στοιχεία άλλαξαν');
             assert.match(await page.locator('.swal2-html-container').innerText(), /δεν αποθηκεύτηκε καμία αλλαγή.*Ανοίξτε ξανά/s);
         }
-        if (failure === 'non-json') assert.match(await page.locator('.swal2-html-container').innerText(), /δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε/);
+        if (['non-json', 'commit-uncertain'].includes(failure)) assert.match(await page.locator('.swal2-html-container').innerText(), /δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε/);
         assert.equal(await page.locator('#employeeHistoryReconstructionApprovalAccepted').isChecked(), false);
         assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
     });

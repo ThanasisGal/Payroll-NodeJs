@@ -86,3 +86,11 @@ test('new endpoint retains authentication, form update permission and global CSR
     const ordinaryController = readFileSync(__dirname + '/ergazomenoiController.js', 'utf8');
     assert.doesNotMatch(ordinaryController, /applyEmployeeHistoryAutomaticReconstruction|history-reconstruction-apply/);
 });
+
+test('uncertain commit acknowledgement never claims rollback or automatic retry', async () => {
+    const { req, res, controller, calls } = setup(A.failure('COMMIT_UNCERTAIN', 503));
+    await controller(req, res); assert.equal(res.code, 503); assert.equal(calls.length, 1);
+    assert.equal(res.body.code, A.PREFIX + 'COMMIT_UNCERTAIN');
+    assert.match(res.body.message, /δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε.*1\..*2\./s);
+    assert.doesNotMatch(res.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή/);
+});

@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ previewToken, approvalAccepted: true }) });
             const payload = await response.json();
             if (response.status === 409 && payload.code === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE') failure = 'stale';
+            else if (payload.code === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_COMMIT_UNCERTAIN') failure = 'uncertain';
             else if (response.status === 403) failure = 'forbidden';
             else if (!response.ok || response.redirected || !payload.success) failure = 'rejected';
             else result = payload;
