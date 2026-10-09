@@ -861,6 +861,8 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/programmata/sendApologistikoButton.js"
     "public/js/ergazomenoi/programmata/wtoOvertime.js"
     "public/js/ergazomenoi/programmata/wtoLeave.js"
+    "public/js/ergazomenoi/genika/employeeHistoryFieldLabels.js"
+    "public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js"
     "public/js/ergazomenoi/genika/istorikoTable.js"
     "public/js/ergazomenoi/genika/alles_parathrhseis.js"
 )

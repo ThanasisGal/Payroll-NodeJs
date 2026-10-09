@@ -87,6 +87,7 @@ async function withPage({ payload = action(), status = 200, disabled = false,
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
         for (const file of ['public/js/common/csrfFetchPatch.js', 'public/js/common/sectionsVisible.js',
             'public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js',
+            'public/js/ergazomenoi/genika/employeeHistoryFieldLabels.js',
             'public/js/ergazomenoi/genika/istorikoTable.js']) {
             await page.addScriptTag({ path: path.join(root, file) });
         }

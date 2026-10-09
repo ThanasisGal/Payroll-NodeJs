@@ -1043,7 +1043,7 @@ async function acquireEmployeeMutationFence({ filter, employeeId, employeeModel,
     return id;
 }
 
-async function inProfileTransaction(connection, capabilityProbe, work, activeSession = null) {
+async function inProfileTransaction(connection, capabilityProbe, work, activeSession = null, transactionOptions = undefined) {
     if (activeSession) return work(activeSession);
     let capable = false;
     try { capable = await capabilityProbe(connection); } catch { capable = false; }
@@ -1055,7 +1055,7 @@ async function inProfileTransaction(connection, capabilityProbe, work, activeSes
             employeeMutationFences.set(session, new Set());
             try { result = await work(session); }
             finally { employeeMutationFences.delete(session); }
-        });
+        }, transactionOptions);
         return result;
     } finally { await session.endSession(); }
 }
@@ -1083,8 +1083,13 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
     const identities = operations.filter(op => op.state !== 'inserted').map(op => op.historyId);
     if (new Set(identities).size !== identities.length) C.invalid('historyId', 'duplicate operations on the same row');
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]]));
+    const readOnlyCorrection = correctionRequest !== null && correctionRequest.confirmation === null;
     return inProfileTransaction(connection, capabilityProbe, async session => {
-        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
+        // Choice, refusal and before/after preview only read a consistent snapshot.
+        // A confirmed correction still fences, rereads and validates before writing.
+        if (!readOnlyCorrection) {
+            await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
+        }
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         const originalRows = await completeHistoryLean(historyModel, filter, session);
@@ -1171,8 +1176,8 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
                     return { success: true };
                 }
             }
-            // Throwing out of the transaction also rolls the D0a fence back on
-            // preview, refusal and cancellation; there are no committed writes.
+            // Unconfirmed requests have performed no writes, including fences.
+            // A refused confirmation also rolls its D0a fence back.
             const error = correctionError('EMPLOYEE_HISTORY_SAFE_CORRECTION_REQUIRED',
                 'Ελέγξτε τη διόρθωση στο παράθυρο πριν την αποθήκευση.');
             error.resolutionRequired = true; error.resolution = proposal.public;
@@ -1328,7 +1333,7 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
                 operation: MUTATION_INTENTS.HISTORY_CORRECTION },
             canonicalRepairRequired: canonicalBefore.cleanupRequired === true });
         return { success: true };
-    });
+    }, null, readOnlyCorrection ? { readConcern: { level: 'snapshot' } } : undefined);
 }
 
 

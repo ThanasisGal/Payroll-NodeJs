@@ -53,6 +53,14 @@
         </label>
     </div>
 
+    <div class="employee-history-preview-controls p-3 border-bottom">
+        <button type="button" id="employeeHistoryReconstructionPreviewBtn" class="btn btn-brown rounded-4">
+            Έλεγχος &amp; Αυτόματη Τακτοποίηση
+        </button>
+        <p class="text-muted small mb-0 mt-2">Η εφαρμογή μπορεί να ελέγξει όλες τις εγγραφές του Ιστορικού και να
+            προτείνει μία συνεπή μορφή, χωρίς να αποθηκεύσει καμία αλλαγή.</p>
+    </div>
+
     <div class="istoriko-table-wrapper">
 
         <table class="table table-striped table-bordered table-sm table-hover mb-0 istoriko-table" id="istorikoTable"
@@ -226,6 +234,26 @@
                 <button type="button" class="btn btn-brown rounded-4" data-bs-dismiss="modal">
                     Κλείσιμο
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade employee-history-preview" id="employeeHistoryReconstructionPreviewModal"
+    tabindex="-1" aria-labelledby="employeeHistoryReconstructionPreviewTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content istoriko-details-modal">
+            <div class="modal-header istoriko-details-modal-header">
+                <h5 class="modal-title" id="employeeHistoryReconstructionPreviewTitle">Έλεγχος &amp; Προτεινόμενη Τακτοποίηση Ιστορικού</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Κλείσιμο"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Δεν έχει αποθηκευτεί καμία αλλαγή.
+                    Η εφαρμογή ελέγχει το Ιστορικό και εμφανίζει τι θα πρότεινε.</p>
+                <div id="employeeHistoryReconstructionPreviewBody" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-brown rounded-4" data-bs-dismiss="modal">Κλείσιμο</button>
             </div>
         </div>
     </div>

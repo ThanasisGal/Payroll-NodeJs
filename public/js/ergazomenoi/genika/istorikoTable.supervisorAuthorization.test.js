@@ -47,9 +47,20 @@ function browser(mode = 'SUPERVISOR_PROBLEM_SCOPE') {
             if (id === 'istorikoDetailsBody') return details;
             return null;
         } };
+    const swal = {
+        async fire(options) { dialogs.push(options); return { isConfirmed: true }; },
+        mixin(defaults) {
+            return { fire(options) {
+                return swal.fire({ ...defaults, ...options, customClass: {
+                    ...(defaults.customClass || {}), ...(options.customClass || {})
+                } });
+            } };
+        }
+    };
     vm.runInNewContext(source, { document, Date, Intl,
+        employeeHistoryFieldLabels: require('./employeeHistoryFieldLabels'),
         bootstrap: { Modal: { getOrCreateInstance: () => ({ show() { modalShows++; } }) } },
-        window: { employeeHistoryGuidedResolution: { async handleInitialResponse() { return { handled:true,cancelled:true }; } }, location: { reload() {} } }, Swal: { async fire(options) { dialogs.push(options); return { isConfirmed: true }; } },
+        window: { employeeHistoryGuidedResolution: { async handleInitialResponse() { return { handled:true,cancelled:true }; } }, location: { reload() {} } }, Swal: swal,
         async fetch(url, options) { requests.push(JSON.parse(options.body)); return { status: 200, json: async () => ({ success: true }) }; } });
     return { rows, problem, clean, requests, dialogs, details, modalShows: () => modalShows,
         save: () => save(), action(target, action) {
@@ -109,6 +120,19 @@ test('Supervisor local persisted-row edit/delete/undo preserves identity and del
     assert.deepEqual(page.requests[0].updates, []);
     page.action(page.problem, 'undo'); assert.equal(page.problem.dataset.state, 'clean');
     assert.equal(page.problem.dataset.id, 'persisted-problem');
+});
+
+test('Supervisor correction with unsaved changes retains the common notice defaults without a request', async () => {
+    const page = browser(); page.action(page.problem, 'add');
+    await page.action(page.problem, 'review');
+    assert.equal(page.requests.length, 0); assert.equal(page.dialogs.length, 1);
+    const dialog = page.dialogs[0];
+    assert.equal(dialog.titleText, 'Υπάρχουν αλλαγές που δεν έχουν αποθηκευτεί');
+    assert.equal(dialog.icon, 'warning'); assert.equal(dialog.allowOutsideClick, false);
+    assert.equal(dialog.showCancelButton, false); assert.equal(dialog.confirmButtonText, 'Κλείσιμο');
+    assert.equal(dialog.customClass.title, 'custom-title');
+    assert.equal(dialog.customClass.popup, 'custom-swal-popup');
+    assert.equal(dialog.customClass.confirmButton, 'class-warning custom-confirm-button custom-swal-button');
 });
 
 test('Admin retains Add from clean and unsaved rows without needing persisted anchors', () => {

@@ -45,6 +45,41 @@ async function confirm(db, correction, extra={}) {
 }
 const noChange=(db,before)=>assert.deepEqual(db.state(),before);
 
+test('manual REVIEW and before/after proposals use snapshot reads and never attempt a mutation fence',async()=>{
+    const db=store(),before=db.state();let transactionOptions;
+    const startSession=db.deps.connection.startSession;
+    db.deps.connection.startSession=async()=>{
+        const session=await startSession();const withTransaction=session.withTransaction;
+        session.withTransaction=(work,options)=>{transactionOptions=options;return withTransaction(work);};
+        return session;
+    };
+    const deny=async()=>{assert.fail('an unconfirmed correction attempted a database write');};
+    const employeeModel={...db.deps.employeeModel,updateOne:deny,create:deny,deleteOne:deny};
+    const historyModel={...db.deps.historyModel,updateOne:deny,create:deny,deleteOne:deny};
+    assert.equal((await propose(db,request('REVIEW',middle),{employeeModel,historyModel})).phase,'CHOICE');
+    assert.equal((await propose(db,request('REMOVE_ROW',middle),{employeeModel,historyModel})).phase,'PREVIEW');
+    assert.deepEqual(transactionOptions,{readConcern:{level:'snapshot'}});
+    assert.equal(db.events.some(event=>['fence','write','commit'].includes(event.type)),false);
+    noChange(db,before);
+});
+
+test('a concurrent change during a read-only review cannot be applied with the old editor token',async()=>{
+    const db=store(),expectedStateToken=token(db);
+    db.hooks.read=async(session,kind)=>{
+        if(kind==='employees'&&!session.changed){session.changed=true;
+            db.changeCommittedHistory(middle,{hmeromhnia_lhxhs_symbashs:'2026-11-30'});}
+    };
+    const proposal=await propose(db,request('REMOVE_ROW',middle),{expectedStateToken});
+    assert.equal(proposal.phase,'PREVIEW');
+    assert.equal(db.events.some(event=>event.type==='fence'),false);
+    db.hooks.read=null;const before=db.state();
+    await assert.rejects(invoke(db,request('REMOVE_ROW',middle,{},
+        {fingerprint:proposal.fingerprint,confirmed:true}),{expectedStateToken}),
+        {code:'EMPLOYEE_HISTORY_EDITOR_STALE'});
+    assert.equal(db.events.filter(event=>event.type==='fence').length,1);
+    noChange(db,before);
+});
+
 for (const [name,make,index] of [['open',fixture,0],['closed',closedFixture,0],['rehire',rehireFixture,3]]) {
     test(`A/H: authentic ${name} hire is protected from ordinary removal`,async()=>{
         const f=make(),db=store([f]),before=db.state();
