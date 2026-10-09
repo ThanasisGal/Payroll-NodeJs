@@ -90,7 +90,7 @@ test('NO_OP and empty History return normal Greek unchanged states', () => {
     input.completeHistoryRows = plan(input).proposedRows;
     const dto = preview(input);
     assert.equal(dto.status, 'unchanged');
-    assert.equal(dto.message, 'Το Ιστορικό δεν χρειάζεται τακτοποίηση.');
+    assert.equal(dto.message, 'Το Ιστορικό είναι ήδη τακτοποιημένο.');
     assert.equal(dto.summary.changes, 0);
     input.completeHistoryRows = [];
     assert.equal(preview(input).status, 'unchanged');
@@ -108,7 +108,7 @@ test('BLOCKED technical and absent-baseline states preserve original rows withou
         assert.equal(dto.status, 'unavailable');
         assert.equal(dto.originalRows.length, 2);
         assert.equal(dto.summary.changes, 0);
-        assert.match(dto.message, /Δεν ήταν δυνατό.*Δεν έχει αποθηκευτεί.*\n1\..*\n2\./s);
+        assert.match(dto.message, /Δεν είναι δυνατό.*Δεν έχει αποθηκευτεί.*\n1\..*\n2\./s);
         assert.doesNotMatch(JSON.stringify(dto), /BLOCKED|INVALID_OR|NO_TEMPORAL/);
     }
 });

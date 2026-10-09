@@ -1,6 +1,8 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const AutomaticReconstruction = require('./employeeHistoryAutomaticReconstructionApplyContract');
+const { planEmployeeHistoryAutomaticReconstruction } = require('./employeeHistoryAutomaticReconstructionPlannerService');
 const { ACCESS_MODES, getEmployeeHistoryAccess, assertEmployeeHistoryOperationsAuthorized } =
     require('./employeeHistoryAuthorizationService');
 const { assertEmployeeHistoryEditorState } = require('./employeeHistoryEditorStateService');
@@ -440,7 +442,62 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     businessFactResolutionPlan = null,
     controlledUserConfirmedCorrection = false,
     userConfirmedCorrectionPlan = null,
-    auditAfterMutation = false }) {
+    auditAfterMutation = false,
+    controlledAutomaticReconstruction = false, automaticReconstructionPlan = null,
+    automaticHistoryBefore = null, automaticAuditRecord = null }) {
+    if (controlledAutomaticReconstruction) {
+        const A = AutomaticReconstruction;
+        if (!session || !employeeMutationFences.get(session)?.has(JSON.stringify([
+            ...EMPLOYEE_SCOPE_FIELDS.map(field => String(filter[field])), String(employeeId)])) || !currentBefore ||
+            String(currentBefore._id) !== String(employeeId) ||
+            !EMPLOYEE_SCOPE_FIELDS.every(field => currentBefore[field] === filter[field]) ||
+            Object.keys(currentPatch || {}).length || deleteCurrent || controlledLegacyOpenCycleCleanup ||
+            controlledInvalidDepartureCorrection || controlledContractEndSegmentSync ||
+            controlledDeferredAmbiguityDeparture || controlledUniqueSafeRepair ||
+            controlledMultipleSafeResolution || controlledBusinessFactResolution || controlledUserConfirmedCorrection) {
+            throw A.failure('BOUNDARY_FAILED');
+        }
+        A.assertAutomaticReconstructionBoundary({ plan: automaticReconstructionPlan,
+            completeHistoryRows: automaticHistoryBefore, physicalPlan });
+        if (!automaticAuditRecord || automaticAuditRecord.mutationSource !== A.OPERATION ||
+            !A.equal(automaticAuditRecord.currentBefore, currentBefore) ||
+            !A.equal(automaticAuditRecord.historyBefore, automaticHistoryBefore) ||
+            !A.equal(automaticAuditRecord.historyAfter, physicalPlan.expectedRows) ||
+            !A.equal(automaticAuditRecord.employeeScope, { ...filter, employee_id: currentBefore._id }) ||
+            automaticAuditRecord.deletedLegacyHistoryIds.length ||
+            !A.equal([...automaticAuditRecord.survivingHistoryIds].sort(), automaticHistoryBefore.map(row => String(row._id)).sort())) {
+            throw A.failure('BOUNDARY_FAILED');
+        }
+        if (!await auditCollectionChecker({ connection })) throw A.failure('AUDIT_UNAVAILABLE', 503);
+        for (const update of physicalPlan.rowsToUpdate) {
+            let partition;
+            try {
+                partition = partitionHistoryUpdateReferences(await checkedHistoryReferences({
+                    referenceChecker, connection, historyIds: [update.historyId], session }));
+            } catch { throw A.failure('REFERENCE_CHECK_FAILED'); }
+            if (partition.liveDereference.length) throw A.failure('REFERENCE_CHECK_FAILED');
+        }
+        for (const update of physicalPlan.rowsToUpdate) {
+            const row = automaticHistoryBefore.find(item => String(item._id) === update.historyId);
+            const result = await historyModel.updateOne({ ...filter, _id: row._id }, { $set: update.patch },
+                { session, timestamps: false, upsert: false, runValidators: true });
+            if (result.matchedCount !== 1) throw A.failure('FINAL_VERIFICATION_FAILED');
+        }
+        const createdAudit = await auditModel.create([automaticAuditRecord], { session });
+        if (createdAudit?.length !== 1 || !createdAudit[0]) throw A.failure('AUDIT_FAILED');
+        const persistedCurrent = await employeeModel.findOne({ ...filter, _id: employeeId })
+            .select('+employee_profile_mutation_sequence').session(session).lean();
+        const historyQuery = historyModel.find(filter);
+        historyQuery.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+        const persistedHistory = await historyQuery.select('+history_reference_fence').session(session).lean();
+        if (!A.equal(currentBefore, persistedCurrent) ||
+            !A.equal(A.ordered(physicalPlan.expectedRows), A.ordered(persistedHistory))) throw A.failure('FINAL_VERIFICATION_FAILED');
+        const finalPlan = planEmployeeHistoryAutomaticReconstruction({ scope: filter,
+            currentEmployee: persistedCurrent, completeHistoryRows: persistedHistory });
+        if (!A.isNoOp(finalPlan) || finalPlan.rowDiffs.length) throw A.failure('FINAL_VERIFICATION_FAILED');
+        return { success: true, applied: true, changedRows: physicalPlan.rowsToUpdate.length,
+            changedFields: automaticReconstructionPlan.rowDiffs.length };
+    }
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
         ? { ...currentPatch } : { ...currentBefore, ...currentPatch };
@@ -3784,8 +3841,16 @@ async function repairEmployeeLegacyOpenCycles({ scope, employeeId,
             changed: true, cleanupPlan, canonical: verifiedCanonical, applied };
     });
 }
+// Automatic reconstruction retains the sole physical write boundary above.
+// Callers must acquire the existing Employee fence and authorize every row.
+async function executeEmployeeHistoryAutomaticReconstructionPlan(options) {
+    return executeFinalMutationPlan({ ...options, controlledAutomaticReconstruction: true, currentPatch: {} });
+}
+
 module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE,
-    transactionCapability, normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter,
+    transactionCapability, inProfileTransaction, acquireEmployeeMutationFence,
+    executeEmployeeHistoryAutomaticReconstructionPlan,
+    normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter,
     writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithGuidedResolution,
     writeEmployeeEmploymentProfileWithUniqueSafeRepair,
     normalizedUniqueSafeRepairSaveRequest,

@@ -249,10 +249,15 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted small">Δεν έχει αποθηκευτεί καμία αλλαγή.
-                    Η εφαρμογή ελέγχει το Ιστορικό και εμφανίζει τι θα πρότεινε.</p>
+                    Η εφαρμογή ελέγχει το Ιστορικό και εμφανίζει τις προτεινόμενες αλλαγές.</p>
                 <div id="employeeHistoryReconstructionPreviewBody" aria-live="polite"></div>
             </div>
             <div class="modal-footer">
+                <div class="form-check w-100" id="employeeHistoryReconstructionApproval" hidden>
+                    <input class="form-check-input" type="checkbox" id="employeeHistoryReconstructionApprovalAccepted">
+                    <label class="form-check-label" for="employeeHistoryReconstructionApprovalAccepted">Έλεγξα τις προτεινόμενες αλλαγές και εγκρίνω την τακτοποίηση του Ιστορικού.</label>
+                </div>
+                <button type="button" class="btn btn-brown rounded-4" id="employeeHistoryReconstructionApplyBtn" disabled hidden>Εφαρμογή Τακτοποίησης</button>
                 <button type="button" class="btn btn-brown rounded-4" data-bs-dismiss="modal">Κλείσιμο</button>
             </div>
         </div>

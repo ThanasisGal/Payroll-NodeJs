@@ -7,13 +7,14 @@ const { chromium } = require('playwright');
 const { planEmployeeHistoryAutomaticReconstruction: plan } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService');
 const { buildEmployeeHistoryReconstructionPreview: project } = require('../../../../server/services/ergazomenoi/employeeHistoryReconstructionPreviewService');
 const F = require('../../../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const { buildAutomaticReconstructionPreviewToken } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const root = path.resolve(__dirname, '../../../..');
 const dto = input => project({ plan: plan(input), completeHistoryRows: input.completeHistoryRows });
 const modal = '#employeeHistoryReconstructionPreviewModal';
 const body = '#employeeHistoryReconstructionPreviewBody';
 const button = '#employeeHistoryReconstructionPreviewBtn';
 async function withPage({ input = F.caseA(), status = 200, payload, viewport = { width: 1440, height: 1000 }, delay = 0,
-    manualHandler, stateToken = 'synthetic' } = {}, work) {
+    manualHandler, applyHandler, stateToken = 'synthetic' } = {}, work) {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage({ viewport });
@@ -25,6 +26,12 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
         });
         await page.route('https://payroll.test/**', async route => {
             const request = route.request();
+            if (applyHandler && request.url().endsWith('/history-reconstruction-apply')) {
+                const data = request.postDataJSON();
+                requests.push({ method: request.method(), path: new URL(request.url()).pathname, data });
+                const reply = await applyHandler(data);
+                return route.fulfill({ status: reply.status, contentType: reply.contentType || 'application/json', body: reply.rawBody ?? JSON.stringify(reply.body) });
+            }
             if (manualHandler && request.url().endsWith('/istoriko/update')) {
                 const data = request.postDataJSON();
                 requests.push({ method: request.method(), path: new URL(request.url()).pathname, data });
@@ -36,7 +43,7 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
                 body: `<!doctype html><html lang="el"><head><meta charset="utf-8"></head><body>${partial}</body></html>` });
             requests.push({ method: request.method(), path: new URL(request.url()).pathname });
             if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-            return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input) }) }).catch(() => {});
+            return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input), previewToken: buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input) }) }) }).catch(() => {});
         });
         await page.goto('https://payroll.test/');
         for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
@@ -50,6 +57,7 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
         await work({ page, requests });
         assert.deepEqual(errors, []);
         assert.ok(requests.every(request => request.method === 'GET' ||
+            applyHandler && request.method === 'POST' && Object.keys(request.data).sort().join(',') === 'approvalAccepted,previewToken' ||
             manualHandler && request.method === 'POST' && request.data.updates.length === 0 && request.data.correction.confirmation === null));
     } finally { await browser.close(); }
 }
@@ -60,7 +68,7 @@ async function open(page) {
     await page.waitForTimeout(350);
 }
 
-test('real Bootstrap modal is wide, Greek, read-only; meaningful changes precede collapsed lazy defaults', async () => {
+test('real Bootstrap modal is wide, Greek, approval-capable; meaningful changes precede collapsed lazy defaults', async () => {
     await withPage({}, async ({ page, requests }) => {
         await open(page);
         const width = await page.locator(`${modal} .modal-dialog`).evaluate(element => element.getBoundingClientRect().width);
@@ -70,7 +78,8 @@ test('real Bootstrap modal is wide, Greek, read-only; meaningful changes precede
         assert.match(text, /24\/04\/2026 → 24\/05\/2026/);
         assert.match(text, /25\/05\/2026 → 05\/10\/2026/);
         assert.doesNotMatch(text, /fingerprint|ObjectId|sourceHistoryId|APPLICATION_|hmeromhnia_|SYNTHETIC_/);
-        assert.deepEqual(await page.locator(`${modal} .modal-footer button`).allTextContents(), ['Κλείσιμο']);
+        assert.deepEqual(await page.locator(`${modal} .modal-footer button`).allTextContents(), ['Εφαρμογή Τακτοποίησης', 'Κλείσιμο']);
+        assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
         assert.equal(await page.locator(`${body} .history-preview-defaults`).getAttribute('open'), null);
         assert.equal(await page.locator(`${body} .history-preview-defaults tr`).count(), 0);
         assert.match(await page.locator(`${body} .history-preview-change-list tbody tr`).first().innerText(), /Ισχύος Όρων/);
@@ -127,9 +136,11 @@ for (const state of ['NO_OP', 'BLOCKED']) test(`${state} has a normal Greek expl
     await withPage({ input }, async ({ page }) => {
         await open(page);
         assert.match(await page.locator('.history-preview-message').innerText(), state === 'NO_OP'
-            ? /Το Ιστορικό δεν χρειάζεται τακτοποίηση/ : /Δεν ήταν δυνατό.*Δεν έχει αποθηκευτεί.*1\..*2\./s);
+            ? /Το Ιστορικό είναι ήδη τακτοποιημένο/ : /Δεν είναι δυνατό.*Δεν έχει αποθηκευτεί.*1\..*2\./s);
         assert.doesNotMatch(await page.locator(modal).innerText(), /NO_OP|BLOCKED|INVALID_/);
-        await page.locator(`${modal} .modal-footer button`).click();
+        assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isVisible(), false);
+        assert.equal(await page.locator('#employeeHistoryReconstructionApproval').isVisible(), false);
+        await page.locator(`${modal} .modal-footer [data-bs-dismiss="modal"]`).click();
         await page.waitForFunction(selector => !document.querySelector(selector).classList.contains('show'), modal);
         await page.waitForTimeout(350);
         assert.equal(await page.locator(body).innerText(), '');
@@ -145,7 +156,7 @@ test('server failure never dumps its technical body, and can be closed/retried',
         assert.match(await page.locator(body).innerText(), /Ο έλεγχος.*δεν ολοκληρώθηκε.*Δεν έχει αποθηκευτεί.*1\..*2\./s);
         assert.doesNotMatch(await page.locator(body).innerText(), /SECRET|507f/);
         await page.waitForTimeout(350);
-        await page.locator(`${modal} .modal-footer button`).click();
+        await page.locator(`${modal} .modal-footer [data-bs-dismiss="modal"]`).click();
         await page.waitForTimeout(400);
         await page.click(button);
         await page.waitForTimeout(350);
@@ -160,7 +171,7 @@ test('closing a pending request aborts it, suppresses stale output and preserves
         await page.click(button);
         await page.waitForTimeout(350);
         assert.equal(await page.locator(button).isDisabled(), true);
-        await page.locator(`${modal} .modal-footer button`).click();
+        await page.locator(`${modal} .modal-footer [data-bs-dismiss="modal"]`).click();
         await page.waitForTimeout(1100);
         assert.equal(await page.locator(body).innerText(), '');
         assert.equal(await page.locator(button).isEnabled(), true);
@@ -246,7 +257,7 @@ test('zero attention hides the section; proposed periods and changes precede ori
         assert.ok(headings.every(text => text.includes('Ισχύς Όρων Εργασίας:')));
         assert.match(headings[0], /Δεν έχει καταχωριστεί → Χωρίς καταχωρισμένη λήξη/);
         const note = page.locator('.history-preview-message');
-        assert.match(await note.innerText(), /Αν χρειάζεται διόρθωση σήμερα.*έλεγχο της αντίστοιχης εγγραφής/s);
+        assert.match(await note.innerText(), /Αν συμφωνείτε με την πρόταση.*έγκριση.*έλεγχο της αντίστοιχης εγγραφής/s);
         assert.equal(await note.evaluate(e => e === e.parentElement.lastElementChild && e.classList.contains('small') && !e.classList.contains('alert-warning')), true);
         assert.ok(await page.locator('[data-action="review"]').count() > 0);
     });
@@ -290,7 +301,7 @@ test('catalog descriptions and unresolved code fallback are readable in period c
 
 async function closePreviewThenReview(page) {
     await open(page);
-    await page.locator(`${modal} .modal-footer button`).click();
+    await page.locator(`${modal} .modal-footer [data-bs-dismiss="modal"]`).click();
     await page.waitForFunction(() => !document.querySelector('.modal-backdrop'));
     await page.locator('[data-action="review"]').first().click();
     await page.locator('.swal2-popup').waitFor();
@@ -356,5 +367,65 @@ for (const failure of ['specific', 'legacy-generic', 'non-json']) test(`manual $
         assert.doesNotMatch(text, /Σφάλμα κατά την ενημέρωση|ελέγξτε αν αποθηκεύτηκε/i);
         assert.deepEqual(requests.map(r => r.method), ['GET', 'POST']);
         await page.locator('.swal2-confirm').click();
+    });
+});
+
+for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`one approval enables ${plan(input).status}; unchecking disables; token is never displayed`, async () => {
+    await withPage({ input }, async ({ page, requests }) => {
+        await open(page);
+        const apply = page.locator('#employeeHistoryReconstructionApplyBtn');
+        const checkbox = page.locator('#employeeHistoryReconstructionApprovalAccepted');
+        assert.equal(await apply.isDisabled(), true);
+        assert.equal(await page.locator(`${modal} input[type="checkbox"]`).count(), 1);
+        await checkbox.check(); assert.equal(await apply.isEnabled(), true);
+        await checkbox.uncheck(); assert.equal(await apply.isDisabled(), true);
+        const token = buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input) });
+        assert.ok(!(await page.locator(modal).innerText()).includes(token));
+        assert.equal(requests.length, 1);
+    });
+});
+for (const failure of ['stale', 'forbidden', 'rejected', 'non-json']) test(`Apply ${failure}: real compact SweetAlert, zero automatic retry, invalidated approval`, async () => {
+    const applyHandler = async () => ({ status: failure === 'stale' ? 409 : failure === 'forbidden' ? 403 : 500,
+        ...(failure === 'non-json' ? { contentType: 'text/html', rawBody: '<html>unavailable</html>' }
+            : { body: { success: false, code: failure === 'stale' ? 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE' : 'PRIVATE_INTERNAL' } }) });
+    await withPage({ applyHandler }, async ({ page, requests }) => {
+        await open(page);
+        await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+        await page.locator('.swal2-popup').waitFor();
+        assert.match(await page.locator('.swal2-popup').getAttribute('class'), /custom-swal-popup/);
+        assert.match(await page.locator('.swal2-confirm').getAttribute('class'), /custom-swal-button/);
+        assert.equal(requests.filter(r => r.method === 'POST').length, 1);
+        assert.deepEqual(Object.keys(requests[1].data).sort(), ['approvalAccepted', 'previewToken']);
+        assert.equal(requests[1].data.approvalAccepted, true);
+        assert.doesNotMatch(await page.locator('.swal2-popup').innerText(), /PRIVATE_INTERNAL|EMPLOYEE_HISTORY_/);
+        if (failure === 'stale') {
+            assert.equal(await page.locator('.swal2-title').innerText(), 'Τα στοιχεία άλλαξαν');
+            assert.match(await page.locator('.swal2-html-container').innerText(), /δεν αποθηκεύτηκε καμία αλλαγή.*Ανοίξτε ξανά/s);
+        }
+        if (failure === 'non-json') assert.match(await page.locator('.swal2-html-container').innerText(), /δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε/);
+        assert.equal(await page.locator('#employeeHistoryReconstructionApprovalAccepted').isChecked(), false);
+        assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
+    });
+});
+test('Apply is single-flight, prevents modal dismissal during request and success reloads persisted History without Employee Save', async () => {
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    const applyHandler = async () => { await pending; return { status: 200, body: { success: true, applied: true, changedRows: 2, changedFields: 97 } }; };
+    await withPage({ applyHandler }, async ({ page, requests }) => {
+        await open(page);
+        await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+        assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
+        await page.locator('#employeeHistoryReconstructionApplyBtn').evaluate(e => e.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator(modal).isVisible(), true);
+        release();
+        await page.locator('.swal2-popup').waitFor();
+        assert.equal(await page.locator('.swal2-title').innerText(), 'Το Ιστορικό Τακτοποιήθηκε');
+        assert.equal(await page.locator('.swal2-html-container').innerText(), 'Οι εγκεκριμένες αλλαγές αποθηκεύτηκαν επιτυχώς.');
+        assert.equal(requests.filter(r => r.method === 'POST').length, 1);
+        await Promise.all([page.waitForEvent('load'), page.locator('.swal2-confirm').click()]);
+        assert.equal(requests.filter(r => r.method === 'POST').length, 1);
     });
 });
