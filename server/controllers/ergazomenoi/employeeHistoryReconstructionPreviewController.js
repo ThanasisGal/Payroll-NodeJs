@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const { buildAutomaticReconstructionPreviewToken, isNoOp } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { CompaniesModel } = require('../../models/companies');
 const { normalizeRequiredUserTeam, CANONICAL_ALL_TEAMS_CODE } = require('../../services/userTeamScopeService');
@@ -40,7 +41,9 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
             const history = await query.lean();
             const plan = planner({ scope, currentEmployee: employee, completeHistoryRows: history });
             const catalogs = await loadCatalogs();
-            return res.json({ success: true, preview: project({ plan, completeHistoryRows: history, catalogs }) });
+            return res.json({ success: true, preview: project({ plan, completeHistoryRows: history, catalogs }),
+                ...(!isNoOp(plan) && ['PLANNED', 'REVIEW_REQUIRED'].includes(plan.status) ? { previewToken:
+                    buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: employee, completeHistoryRows: history, plan }) } : {}) });
         } catch (error) {
             // No response bodies, employee values, scope, cookies or exceptions
             // are logged. All planner diagnostics stay behind the projection.

@@ -1,6 +1,7 @@
 'use strict';
 
 const C = require('./employeeHistoryAutomaticReconstructionContract');
+const { isNoOp } = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
 const { registryEntryForCanonicalField } = require('./employeeHistoryCorrectionFieldRegistryService');
@@ -148,7 +149,7 @@ function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows, 
         rows: period.sourceHistoryIds.map(rowLabel), facts: important.filter(field => !empty(period.profile[field]))
             .map(field => publicField(field, period.profile[field])) }));
     const issue = item => {
-        let message = ISSUE_MESSAGES[item.code] || 'Ορισμένα στοιχεία χρειάζονται έλεγχο πριν από μελλοντική τακτοποίηση.';
+        let message = ISSUE_MESSAGES[item.code] || 'Ορισμένα στοιχεία χρειάζονται έλεγχο πριν από την τακτοποίηση.';
         let conflict;
         if (item.code === 'SAME_DATE_NON_EMPTY_CONFLICT') {
             const values = (item.sourceValues || []).map(value => displayValue(item.field, value.value));
@@ -165,11 +166,11 @@ function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows, 
             ...(item.sourceHistoryIds ? { rows: item.sourceHistoryIds.map(rowLabel) } : {}) };
     };
     const blocked = plan.status === 'BLOCKED';
-    const unchanged = ['NO_OP', 'NO_HISTORY', 'NO_ACTIVE_HISTORY'].includes(plan.status);
+    const unchanged = isNoOp(plan);
     return { status: blocked ? 'unavailable' : unchanged ? 'unchanged' : plan.status === 'REVIEW_REQUIRED' ? 'review' : 'ready',
-        message: blocked ? 'Δεν ήταν δυνατό να δημιουργηθεί ασφαλής πρόταση για αυτό το Ιστορικό. Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Ελέγξτε την πρόσληψη και τις ημερομηνίες του Ιστορικού.\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΕΠ-01.'
-            : unchanged ? 'Το Ιστορικό δεν χρειάζεται τακτοποίηση.'
-                : plan.status === 'REVIEW_REQUIRED' ? 'Η πρόταση περιλαμβάνει σημεία που χρειάζονται την προσοχή σας. Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Συγκρίνετε τις αρχικές και τις προτεινόμενες τιμές στα σημεία προσοχής.\n2. Αν χρειάζεται διόρθωση σήμερα, κλείστε την προεπισκόπηση και χρησιμοποιήστε τον έλεγχο της αντίστοιχης εγγραφής.'
+        message: blocked ? 'Δεν είναι δυνατό να εφαρμοστεί αυτόματα ασφαλής τακτοποίηση. Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Ελέγξτε την πρόσληψη και τις ημερομηνίες του Ιστορικού.\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΕΠ-01.'
+            : unchanged ? 'Το Ιστορικό είναι ήδη τακτοποιημένο.'
+                : plan.status === 'REVIEW_REQUIRED' ? 'Η πρόταση περιλαμβάνει σημεία που χρειάζονται την προσοχή σας. Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Συγκρίνετε τις αρχικές και τις προτεινόμενες τιμές στα σημεία προσοχής.\n2. Αν συμφωνείτε με την πρόταση, επιλέξτε την έγκριση και εφαρμόστε την τακτοποίηση. Αν χρειάζεται διαφορετική διόρθωση, κλείστε την προεπισκόπηση και χρησιμοποιήστε τον έλεγχο της αντίστοιχης εγγραφής.'
                     : 'Η προτεινόμενη τακτοποίηση είναι έτοιμη για προβολή. Δεν έχει αποθηκευτεί καμία αλλαγή.',
         summary: { historyRows: completeHistoryRows.length, periods: periods.length, changes: changes.length,
             assumptions: plan.assumptions.length, warnings: plan.warnings.length, numericDefaults: numericDefaults.length },

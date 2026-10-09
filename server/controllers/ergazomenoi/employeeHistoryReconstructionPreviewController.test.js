@@ -124,16 +124,19 @@ test('GET route retains authentication and existing Employee read permission, wi
 });
 
 
-test('preview markup and script have no write/approval action or inline handlers and share Greek labels with existing details', () => {
+test('preview markup and script use explicit approval without inline handlers or client physical plans', () => {
     const root = __dirname + '/../../..';
     const client = readFileSync(root + '/public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js', 'utf8');
     const partial = readFileSync(root + '/views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs', 'utf8');
     const modalStart = partial.indexOf('<div class="modal fade employee-history-preview"');
     assert.ok(modalStart >= 0);
     const modal = partial.slice(modalStart);
-    assert.doesNotMatch(modal, /on(click|submit|change)=|style=|type="submit"|Αποθήκευση|Εφαρμογή|Επιβεβαίωση|checkbox/);
-    assert.doesNotMatch(client, /method:\s*['"](?:POST|PUT|PATCH|DELETE)|console\.|logger\.|sourceHistoryId|fingerprint/);
-    assert.equal((client.match(/await fetch\(/g) || []).length, 1);
+    assert.doesNotMatch(modal, /on(click|submit|change)=|style=|type="submit"|Αποθήκευση/);
+    assert.doesNotMatch(client, /console\.|logger\.|sourceHistoryId|fingerprint|proposedRows|rowDiffs/);
+    assert.match(client, /JSON\.stringify\(\{ previewToken, approvalAccepted: true \}\)/);
+    assert.match(modal, /type="checkbox"/);
+    assert.match(modal, /id="employeeHistoryReconstructionApplyBtn" disabled hidden/);
+    assert.equal((client.match(/await fetch\(/g) || []).length, 2);
     const view = readFileSync(root + '/views/ergazomenoi/ergazomenoi/edit.ejs', 'utf8');
     assert.ok(view.indexOf("script('ergazomenoi/genika/employeeHistoryFieldLabels')") < view.indexOf("script('ergazomenoi/genika/istorikoTable')"));
     assert.ok(partial.includes('data-action="review"'));

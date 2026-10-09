@@ -16658,6 +16658,11 @@ body.loader-active > *:not(.app-loader) {
 .employee-history-preview .modal-content { max-height: calc(100dvh - 2rem); }
 .employee-history-preview .modal-body { overflow-y: auto; overflow-x: hidden; }
 .employee-history-preview .modal-title { white-space: normal; }
+#employeeHistoryReconstructionApplyBtn {
+    --bs-btn-disabled-bg: var(--bs-secondary);
+    --bs-btn-disabled-border-color: var(--bs-secondary);
+}
+#employeeHistoryReconstructionApplyBtn:disabled { cursor: not-allowed; }
 .employee-history-preview .history-preview-message { white-space: pre-line; }
 .history-preview-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1rem; }
 .history-preview-summary > div { background: var(--bs-tertiary-bg, #f2f4f6); padding: 1rem; border-radius: .5rem; }

@@ -1,6 +1,6 @@
 'use strict';
 
-// This UI has exactly one GET and no reconstruction mutation/confirmation path.
+// One preview, one explicit approval, one server-owned transactional apply.
 document.addEventListener('DOMContentLoaded', () => {
     const button = document.getElementById('employeeHistoryReconstructionPreviewBtn');
     const modalElement = document.getElementById('employeeHistoryReconstructionPreviewModal');
@@ -11,6 +11,75 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
     let controller = null;
     let generation = 0;
+    let previewToken = null;
+    let previewEmployeeId = null;
+    let applying = false;
+    const approval = document.getElementById('employeeHistoryReconstructionApproval');
+    const checkbox = document.getElementById('employeeHistoryReconstructionApprovalAccepted');
+    const applyButton = document.getElementById('employeeHistoryReconstructionApplyBtn');
+    function resetApproval() {
+        previewToken = null;
+        previewEmployeeId = null;
+        if (checkbox) checkbox.checked = false;
+        if (approval) approval.hidden = true;
+        if (applyButton) { applyButton.hidden = true; applyButton.disabled = true; }
+    }
+    function notice(titleText, text, icon) {
+        return Swal.fire({ titleText, text, icon, confirmButtonText: 'Κλείσιμο', allowOutsideClick: false,
+            customClass: { title: 'custom-title', popup: 'custom-swal-popup', htmlContainer: 'custom-html-container',
+                confirmButton: 'class-warning custom-confirm-button custom-swal-button' } });
+    }
+    checkbox?.addEventListener('change', () => {
+        applyButton.disabled = applying || !checkbox.checked || !previewToken;
+    });
+    modalElement.addEventListener('hide.bs.modal', event => {
+        if (applying) event.preventDefault();
+    });
+    applyButton?.addEventListener('click', async () => {
+        if (applying || !checkbox.checked || !previewToken || previewEmployeeId !== employee.value) return;
+        applying = true;
+        applyButton.disabled = true;
+        checkbox.disabled = true;
+        modalElement.querySelectorAll('[data-bs-dismiss="modal"]').forEach(element => { element.disabled = true; });
+        let result, failure;
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(previewEmployeeId)}/history-reconstruction-apply`, {
+                method: 'POST', credentials: 'same-origin', cache: 'no-store',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'CSRF-Token': csrf, 'X-CSRF-Token': csrf },
+                body: JSON.stringify({ previewToken, approvalAccepted: true }) });
+            const payload = await response.json();
+            if (response.status === 409 && payload.code === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE') failure = 'stale';
+            else if (payload.code === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_COMMIT_UNCERTAIN') failure = 'uncertain';
+            else if (response.status === 403) failure = 'forbidden';
+            else if (!response.ok || response.redirected || !payload.success) failure = 'rejected';
+            else result = payload;
+        } catch { failure = 'uncertain'; }
+        finally {
+            applying = false;
+            checkbox.disabled = false;
+            modalElement.querySelectorAll('[data-bs-dismiss="modal"]').forEach(element => { element.disabled = false; });
+            resetApproval();
+        }
+        await new Promise(resolve => {
+            modalElement.addEventListener('hidden.bs.modal', resolve, { once: true });
+            modal.hide();
+        });
+        if (result) {
+            await notice(result.applied || result.alreadyApplied ? 'Το Ιστορικό Τακτοποιήθηκε' : 'Έλεγχος Ιστορικού',
+                result.applied || result.alreadyApplied ? 'Οι εγκεκριμένες αλλαγές αποθηκεύτηκαν επιτυχώς.' : 'Το Ιστορικό είναι ήδη τακτοποιημένο.', 'success');
+            window.location.reload();
+        } else if (failure === 'stale') {
+            await notice('Τα στοιχεία άλλαξαν', 'Το Ιστορικό άλλαξε μετά την προεπισκόπηση. Για λόγους ασφάλειας δεν αποθηκεύτηκε καμία αλλαγή. Ανοίξτε ξανά τον έλεγχο και εξετάστε τη νέα πρόταση.', 'warning');
+        } else {
+            const message = failure === 'uncertain'
+                ? 'Η εφαρμογή δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε η τακτοποίηση λόγω διακοπής της επικοινωνίας. 1. Ανοίξτε ξανά τον εργαζόμενο και ελέγξτε το αποθηκευμένο Ιστορικό. 2. Αν χρειάζεται, ζητήστε βοήθεια από τον διαχειριστή. Κωδικός αναφοράς: ΙΣΤ-ΕΦΑΡΜ-02.'
+                : failure === 'forbidden'
+                    ? 'Η τακτοποίηση σταμάτησε επειδή δεν έχετε δικαίωμα διόρθωσης όλων των επηρεαζόμενων εγγραφών. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Κλείστε το παράθυρο. 2. Ζητήστε από διαχειριστή να ελέγξει την πρόταση. Κωδικός αναφοράς: ΙΣΤ-ΕΦΑΡΜ-03.'
+                    : 'Η τακτοποίηση δεν ολοκληρώθηκε επειδή ο έλεγχος ασφαλούς αποθήκευσης απέτυχε. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ανοίξτε ξανά την προεπισκόπηση. 2. Αν το πρόβλημα παραμένει, ζητήστε βοήθεια από τον διαχειριστή. Κωδικός αναφοράς: ΙΣΤ-ΕΦΑΡΜ-04.';
+            await notice('Η τακτοποίηση δεν ολοκληρώθηκε', message, 'warning');
+        }
+    });
     const escape = value => String(value ?? '').replace(/[&<>"']/g,
         char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     const failureMessage = 'Ο έλεγχος του Ιστορικού δεν ολοκληρώθηκε. Δεν ήταν δυνατό να φορτωθεί η πρόταση. Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.\n2. Αν το πρόβλημα παραμένει, συνδεθείτε ξανά ή επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΕΠ-05.';
@@ -133,20 +202,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (preview.status !== 'unavailable') body.appendChild(message);
     }
     button.addEventListener('click', async () => {
-        if (controller) return;
+        if (controller || applying) return;
+        resetApproval();
         const requestGeneration = ++generation;
+        const requestEmployeeId = employee.value;
         controller = new AbortController();
         button.disabled = true;
         body.setAttribute('aria-busy', 'true');
         body.textContent = 'Γίνεται έλεγχος των αποθηκευμένων εγγραφών του Ιστορικού…';
         modal.show();
         try {
-            const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(employee.value)}/history-reconstruction-preview`,
+            const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(requestEmployeeId)}/history-reconstruction-preview`,
                 { method: 'GET', credentials: 'same-origin', cache: 'no-store', signal: controller.signal, headers: { Accept: 'application/json' } });
             if (!response.ok || response.redirected) throw new Error('Preview unavailable');
             const payload = await response.json();
             if (!payload.success || !payload.preview) throw new Error('Preview unavailable');
-            if (requestGeneration === generation) renderPreview(payload.preview);
+            if (requestGeneration === generation) {
+                renderPreview(payload.preview);
+                if (['ready', 'review'].includes(payload.preview.status) && typeof payload.previewToken === 'string') {
+                    previewToken = payload.previewToken;
+                    previewEmployeeId = requestEmployeeId;
+                    if (approval) approval.hidden = false;
+                    if (applyButton) applyButton.hidden = false;
+                }
+            }
         } catch (error) {
             if (error.name !== 'AbortError' && requestGeneration === generation) {
                 body.replaceChildren();
@@ -163,7 +242,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-    modalElement.addEventListener('hide.bs.modal', () => {
+    modalElement.addEventListener('hide.bs.modal', event => {
+        if (event.defaultPrevented) return;
+        resetApproval();
         generation += 1;
         controller?.abort();
         controller = null;

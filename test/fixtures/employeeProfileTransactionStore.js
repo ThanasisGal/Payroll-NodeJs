@@ -36,7 +36,8 @@ function transient() {
 // Test-only snapshot isolation model. Document owners simulate Mongo contention;
 // production owns no JS locks. Commits apply document deltas and check versions,
 // rather than replacing the store and losing concurrent unrelated commits.
-function store(fixtures = [fixture()]) {
+function store(fixtures = [fixture()], { cloneFn = structuredClone } = {}) {
+    const clone = cloneFn;
     let committed = { employees: fixtures.map(f => clone(f.employee)),
         history: fixtures.flatMap(f => clone(f.history)), audits: [] };
     let nextSession = 0;
@@ -105,6 +106,7 @@ function store(fixtures = [fixture()]) {
                 await hooks.read?.(this.s, kind);
                 if (kind === 'employees' && value) {
                     if (this.projection === '_id') return { _id: value._id };
+                    if (this.projection?.includes('+employee_profile_mutation_sequence')) return clone(value);
                     const { [FIELD]: ignored, ...businessState } = value;
                     return clone(businessState);
                 }
