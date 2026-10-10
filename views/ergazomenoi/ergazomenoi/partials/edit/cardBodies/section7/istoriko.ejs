@@ -18,14 +18,16 @@
         if (!v) return '';
         const d = new Date(v);
         if (Number.isNaN(d.getTime())) return '';
-        return d.toLocaleDateString('el-GR');
+        return d.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    const showIfChanged = (row, prev, field) => {
-        if (!prev) return fmtDate(row[field]);
-        const current = fmtDate(row[field]);
-        const previous = fmtDate(prev[field]);
-        return current !== previous ? current : '';
+    const summaryDate = (row, prev, field) => {
+        const value = fmtDate(row[field]);
+        const repeated = Boolean(value && prev && value === fmtDate(prev[field]));
+        return { text: value ? (repeated ? `↳ ${value}` : value) : '—',
+            muted: !value || repeated,
+            description: !value ? 'Δεν υπάρχει καταχωρισμένη τιμή'
+                : repeated ? 'Ίδια τιμή με την προηγούμενη εγγραφή' : '' };
     };
 
     const escapeDataAttrJson = (obj) => JSON.stringify(obj || {})
@@ -52,6 +54,8 @@
             Ιστορικό Προσλήψεων - Αλλαγών
         </label>
     </div>
+
+    <div id="employeeHistoryReconstructionSuccess" class="alert alert-success py-2 px-3 mx-3 mt-2 mb-0 small" role="status" hidden></div>
 
     <div class="employee-history-preview-controls p-3 border-bottom">
         <button type="button" id="employeeHistoryReconstructionPreviewBtn" class="btn btn-brown rounded-4">
@@ -120,12 +124,13 @@
                             data-original='<%- escapeDataAttrJson(originalForRow(row)) %>'>
 
                             <td class="text-center istoriko-aa-col"><%= row.aa_eggrafhs || '' %></td>
-                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_proslhpshs') %></td>
-                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_allaghs_symbashs') %></td>
-                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_isxyos_oron_ergasias_apo') %></td>
-                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_isxyos_oron_ergasias_eos') %></td>
-                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_lhxhs_symbashs') %></td>
-                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_apoxorhshs') %></td>
+                            <% for (const field of ['hmeromhnia_proslhpshs', 'hmeromhnia_allaghs_symbashs',
+                                'hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos',
+                                'hmeromhnia_lhxhs_symbashs', 'hmeromhnia_apoxorhshs']) {
+                                const date = summaryDate(row, prev, field); %>
+                                <td class="text-center"><span class="istoriko-summary-date<%= date.muted ? ' text-muted' : '' %>"
+                                    title="<%= date.description %>" aria-label="<%= date.description ? `${date.text}, ${date.description}` : date.text %>"><%= date.text %></span></td>
+                            <% } %>
 
                             <td class="text-center istoriko-state-col">
                                 <span class="istoriko-state state-clean"></span>

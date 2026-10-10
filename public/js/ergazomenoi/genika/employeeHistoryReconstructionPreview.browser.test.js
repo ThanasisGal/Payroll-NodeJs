@@ -478,3 +478,72 @@ test('Apply is single-flight, prevents modal dismissal during request and succes
         assert.equal(requests.filter(r => r.method === 'POST').length, 1);
     });
 });
+
+
+const feedbackKey = id => `employeeHistoryReconstructionSuccess:${id}`;
+const feedbackScript = path.join(root, 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js');
+async function consumeFeedbackAfterReload(page) {
+    await page.reload();
+    await page.addScriptTag({ path: path.join(root, 'public/js/bootstrap.bundle.min.js') });
+    await page.addScriptTag({ path: feedbackScript });
+    await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
+}
+test('confirmed standalone Apply stores only server counts and time; reload consumes accessible feedback once', async () => {
+    await withPage({ applyHandler: async () => ({ status: 200,
+        body: { success: true, applied: true, changedRows: 3, changedFields: 25 } }) }, async ({ page }) => {
+        await open(page);
+        await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+        await page.locator('.swal2-confirm').waitFor();
+        const id = await page.locator('#istorikoEmployeeId').inputValue();
+        const stored = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)), feedbackKey(id));
+        assert.deepEqual(Object.keys(stored).sort(), ['changedFields', 'changedRows', 'timestamp']);
+        assert.equal(stored.changedRows, 3); assert.equal(stored.changedFields, 25);
+        await page.locator('.swal2-confirm').click();
+        await page.waitForLoadState();
+        await consumeFeedbackAfterReload(page);
+        const notice = page.locator('#employeeHistoryReconstructionSuccess');
+        assert.equal(await notice.isVisible(), true);
+        assert.match(await notice.innerText(), /Ενημερώθηκαν 3 εγγραφές και 25 πεδία/);
+        assert.equal(await notice.getAttribute('role'), 'status');
+        assert.equal(await page.evaluate(key => sessionStorage.getItem(key), feedbackKey(id)), null);
+        await consumeFeedbackAfterReload(page);
+        assert.equal(await notice.isVisible(), false);
+    });
+});
+for (const scenario of ['expired', 'other employee', 'invalid', 'future']) test(`feedback ignores ${scenario}`, async () => {
+    await withPage({}, async ({ page }) => {
+        await page.evaluate(scenario => {
+            const id = document.getElementById('istorikoEmployeeId').value;
+            sessionStorage.setItem(`employeeHistoryReconstructionSuccess:${scenario === 'other employee' ? 'other' : id}`,
+                scenario === 'invalid' ? '{broken' : JSON.stringify({ changedRows: 3, changedFields: 25,
+                    timestamp: Date.now() + (scenario === 'future' ? 60000 : scenario === 'expired' ? -300001 : 0) }));
+        }, scenario);
+        await consumeFeedbackAfterReload(page);
+        assert.equal(await page.locator('#employeeHistoryReconstructionSuccess').isVisible(), false);
+    });
+});
+for (const reply of [
+    { status: 409, body: { success: false, code: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE' } },
+    { status: 503, body: { success: false, code: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_COMMIT_UNCERTAIN' } },
+    { status: 400, body: { success: false } },
+    { status: 200, body: { success: true, applied: false, alreadyApplied: true, changedRows: 0, changedFields: 0 } }
+]) test(`failed/stale/uncertain/NO_OP Apply never stores feedback: ${reply.status}/${reply.body.code || reply.body.applied}`, async () => {
+    await withPage({ applyHandler: async () => reply }, async ({ page }) => {
+        await open(page);
+        assert.equal(await page.evaluate(() => sessionStorage.length), 0);
+        await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+        await page.locator('.swal2-confirm').waitFor();
+        assert.equal(await page.evaluate(() => sessionStorage.length), 0);
+    });
+});
+test('Greek list helper formats one through four labels without modifying the rows', async () => {
+    await withPage({}, async ({ page }) => {
+        for (const [items, expected] of [[['0001'], '0001'], [['0001', '0002'], '0001 και 0002'],
+            [['0001', '0002', '0003'], '0001, 0002 και 0003'],
+            [['0001', '0002', '0003', '0004'], '0001, 0002, 0003 και 0004']]) {
+            assert.deepEqual(await page.evaluate(items => ({ value: formatGreekList(items), items }), items), { value: expected, items });
+        }
+    });
+});

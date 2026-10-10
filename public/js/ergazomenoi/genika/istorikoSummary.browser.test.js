@@ -30,7 +30,7 @@ test('History summary renders nine ordered columns with work-terms dates; editor
             'Λήξης Σύμβασης', 'Αποχώρησης', 'Κατ.', 'Ενέργειες']);
         assert.equal(await page.locator('#istorikoTable colgroup col').count(), 9);
         assert.equal(await page.locator('#istorikoTable thead tr').first().locator('[colspan="6"]').count(), 1);
-        const display = value => new Date(value).toLocaleDateString('el-GR');
+        const display = value => new Date(value).toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const domRows = page.locator('#istorikoTable tbody tr.istoriko-row');
         const initial = await domRows.evaluateAll(elements => elements.map(row => row.textContent));
         for (let i = 0; i < rows.length; i++) {
@@ -38,7 +38,7 @@ test('History summary renders nine ordered columns with work-terms dates; editor
             assert.equal(await cells.count(), 9);
             for (const [column, field] of [[3, 'hmeromhnia_isxyos_oron_ergasias_apo'],
                 [4, 'hmeromhnia_isxyos_oron_ergasias_eos']]) {
-                const expected = i > 0 && rows[i][field] === rows[i - 1][field] ? '' : display(rows[i][field]);
+                const expected = i > 0 && rows[i][field] === rows[i - 1][field] ? `↳ ${display(rows[i][field])}` : display(rows[i][field]);
                 assert.equal((await cells.nth(column).innerText()).trim(), expected);
             }
             assert.doesNotMatch(await row.innerText(), /2044/);
@@ -64,5 +64,34 @@ test('History summary renders nine ordered columns with work-terms dates; editor
         assert.deepEqual(errors, []);
         await page.setContent(await render([]));
         assert.equal(await page.locator('#istorikoTable .istoriko-empty-row').getAttribute('colspan'), '9');
+    } finally { await browser.close(); }
+});
+
+
+test('all six summary dates distinguish persisted repetition from missing values without copying', async () => {
+    const fields = ['hmeromhnia_proslhpshs', 'hmeromhnia_allaghs_symbashs',
+        'hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos',
+        'hmeromhnia_lhxhs_symbashs', 'hmeromhnia_apoxorhshs'];
+    const dates = ['2026-04-23', '2026-04-23', '2026-05-25', null, null];
+    const synthetic = dates.map((date, i) => ({ ...rows[0], _id: `date-${i}`,
+        ...Object.fromEntries(fields.map(field => [field, date])) }));
+    const browser = await chromium.launch({ headless: true });
+    try {
+        const page = await browser.newPage();
+        await page.setContent(await render(synthetic));
+        for (let i = 0; i < dates.length; i++) {
+            const cells = page.locator('.istoriko-row').nth(i).locator('.istoriko-summary-date');
+            assert.equal(await cells.count(), 6);
+            const expected = ['23/04/2026', '↳ 23/04/2026', '25/05/2026', '—', '—'][i];
+            assert.deepEqual(await cells.allTextContents(), Array(6).fill(expected));
+            for (const cell of await cells.all()) {
+                const description = i === 1 ? 'Ίδια τιμή με την προηγούμενη εγγραφή'
+                    : i > 2 ? 'Δεν υπάρχει καταχωρισμένη τιμή' : '';
+                assert.equal(await cell.getAttribute('title'), description);
+                assert.equal(await cell.getAttribute('aria-label'), description ? `${expected}, ${description}` : expected);
+            }
+        }
+        await page.setContent(await render([synthetic[3]]));
+        assert.deepEqual(await page.locator('.istoriko-summary-date').allTextContents(), Array(6).fill('—'));
     } finally { await browser.close(); }
 });

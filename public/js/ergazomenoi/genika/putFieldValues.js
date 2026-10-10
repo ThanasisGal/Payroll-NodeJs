@@ -66,7 +66,13 @@ async function continueEmployeeSaveAfterReconstruction({ response, originalPaylo
     const approved = await previewUi.approveForSave({ preview: data.reconstructionPreview, token: data.previewToken });
     if (!approved) return { cancelled: true };
     const approvedPayload = { ...originalPayload, reconstruction: { previewToken: data.previewToken, approvalAccepted: true } };
-    return { response: await retryRequest(approvedPayload), originalPayload: approvedPayload };
+    const finalResponse = await retryRequest(approvedPayload);
+    if (finalResponse.ok && !finalResponse.redirected &&
+        finalResponse.headers.get('content-type')?.includes('application/json')) {
+        const result = await finalResponse.clone().json();
+        previewUi.recordSaveSuccess?.(result, data.reconstructionPreview);
+    }
+    return { response: finalResponse, originalPayload: approvedPayload };
 }
 
 async function handleEmployeeSaveHistoryAction(response, data, { swal, documentRef }) {

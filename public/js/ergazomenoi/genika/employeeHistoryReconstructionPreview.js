@@ -1,11 +1,44 @@
 'use strict';
 
+// Employee identity lives only in the scoped key; the value contains counts and time.
+function historyReconstructionCounts(result, preview) {
+    const rows = new Set([...(preview?.changes || []), ...(preview?.defaultGroups || [])].map(item => item.row));
+    const counts = { changedRows: result?.changedRows ?? rows.size,
+        changedFields: result?.changedFields ?? preview?.summary?.changes };
+    return Object.values(counts).every(value => Number.isSafeInteger(value) && value > 0) ? counts : null;
+}
+function storeHistoryReconstructionSuccess(employeeId, counts) {
+    if (!employeeId || !counts) return;
+    try {
+        sessionStorage.setItem(`employeeHistoryReconstructionSuccess:${employeeId}`, JSON.stringify({
+            changedRows: counts.changedRows, changedFields: counts.changedFields, timestamp: Date.now() }));
+    } catch { /* Optional feedback must never interrupt a successful Save. */ }
+}
+function consumeHistoryReconstructionSuccess(employeeId) {
+    const element = document.getElementById('employeeHistoryReconstructionSuccess');
+    if (!employeeId || !element) return;
+    try {
+        const key = `employeeHistoryReconstructionSuccess:${employeeId}`;
+        const raw = sessionStorage.getItem(key);
+        sessionStorage.removeItem(key);
+        if (!raw) return;
+        const value = JSON.parse(raw), age = Date.now() - value.timestamp;
+        if (!historyReconstructionCounts(value) || !Number.isFinite(value.timestamp) || !Number.isFinite(age) || age < 0 || age > 5 * 60 * 1000) return;
+        element.textContent = `✓ Το Ιστορικό τακτοποιήθηκε επιτυχώς. Ενημερώθηκαν ${value.changedRows} εγγραφές και ${value.changedFields} πεδία.`;
+        element.hidden = false;
+    } catch { /* Unavailable or invalid storage simply omits the notice. */ }
+}
+function formatGreekList(items) {
+    return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} και ${items[items.length - 1]}`;
+}
+
 // One preview, one explicit approval, one server-owned transactional apply.
 document.addEventListener('DOMContentLoaded', () => {
     const button = document.getElementById('employeeHistoryReconstructionPreviewBtn');
     const modalElement = document.getElementById('employeeHistoryReconstructionPreviewModal');
     const body = document.getElementById('employeeHistoryReconstructionPreviewBody');
     const employee = document.getElementById('istorikoEmployeeId');
+    consumeHistoryReconstructionSuccess(employee?.value);
     if (!button || !modalElement || !body || !employee || !globalThis.bootstrap?.Modal) return;
     document.body.appendChild(modalElement);
     const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
@@ -13,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let generation = 0;
     let previewToken = null;
     let previewEmployeeId = null;
+    let previewCounts = null;
     let applying = false;
     let saveResolver = null;
     let saveApproved = false;
@@ -30,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkbox = document.getElementById('employeeHistoryReconstructionApprovalAccepted');
     const applyButton = document.getElementById('employeeHistoryReconstructionApplyBtn');
     function resetApproval() {
+        previewCounts = null;
         previewToken = null;
         previewEmployeeId = null;
         if (checkbox) checkbox.checked = false;
@@ -55,6 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
             modal.hide();
             return;
         }
+        const approvedCounts = previewCounts;
+        const approvedEmployeeId = previewEmployeeId;
         applying = true;
         applyButton.disabled = true;
         checkbox.disabled = true;
@@ -84,6 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
             modal.hide();
         });
         if (result) {
+            if (result.success === true && result.applied === true) storeHistoryReconstructionSuccess(approvedEmployeeId,
+                historyReconstructionCounts({ changedRows: result.changedRows ?? approvedCounts?.changedRows,
+                    changedFields: result.changedFields ?? approvedCounts?.changedFields }));
             await notice(result.applied || result.alreadyApplied ? 'Το Ιστορικό Τακτοποιήθηκε' : 'Έλεγχος Ιστορικού',
                 result.applied || result.alreadyApplied ? 'Οι εγκεκριμένες αλλαγές αποθηκεύτηκαν επιτυχώς.' : 'Το Ιστορικό είναι ήδη τακτοποιημένο.', 'success');
             window.location.reload();
@@ -175,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         periods.className = 'history-preview-periods';
         periods.innerHTML = preview.periods.map(period => `<article class="history-preview-period"><h6>${escape(period.from)} → ${escape(period.to)}</h6>
             <p>Προέρχεται από τις εγγραφές: <strong>${period.rows.map(escape).join(', ')}</strong></p>
-            ${period.rows.length > 1 ? `<p class="history-preview-period-explanation">Οι εγγραφές ${period.rows.map(escape).join(' και ')} φαίνεται να περιγράφουν την ίδια εργασιακή περίοδο και συνδυάστηκαν στην πρόταση.</p>` : ''}
+            ${period.rows.length > 1 ? `<p class="history-preview-period-explanation">Οι εγγραφές ${formatGreekList(period.rows.map(escape))} φαίνεται να περιγράφουν την ίδια εργασιακή περίοδο και συνδυάστηκαν στην πρόταση.</p>` : ''}
             <dl class="history-preview-fields">${period.facts.map(field => `<div><dt>${escape(field.label)}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl></article>`).join('');
         proposed.appendChild(periods);
         if (!preview.periods.length) proposed.append(preview.status === 'unavailable'
@@ -220,6 +260,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (preview.status !== 'unavailable') body.appendChild(message);
     }
     window.employeeHistoryReconstructionPreview = {
+        recordSaveSuccess(result, approvedPreview) {
+            if (result?.success === true && result.automaticReconstructionApplied === true) {
+                storeHistoryReconstructionSuccess(employee.value, historyReconstructionCounts(result, approvedPreview));
+            }
+        },
         approveForSave({ preview, token }) {
             if (controller || applying || saveResolver) return Promise.resolve(false);
             resetApproval();
@@ -257,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (requestGeneration === generation) {
                 renderPreview(payload.preview);
                 if (['ready', 'review'].includes(payload.preview.status) && typeof payload.previewToken === 'string') {
+                    previewCounts = historyReconstructionCounts(null, payload.preview);
                     previewToken = payload.previewToken;
                     previewEmployeeId = requestEmployeeId;
                     if (approval) approval.hidden = false;

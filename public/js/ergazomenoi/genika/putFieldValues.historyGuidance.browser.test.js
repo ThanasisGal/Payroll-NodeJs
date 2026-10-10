@@ -432,3 +432,48 @@ test('Phase 3B: stale continuation retains form without reload or second Save an
         assert.deepEqual(errors.filter(text => !text.includes('Failed to load resource')), []);
     });
 });
+
+
+test('Phase 3B successful Save uses exact approved 0006-shaped preview counts and consumes feedback after reload', async () => {
+    const envelope = automaticEnvelope();
+    envelope.reconstructionPreview.summary.changes = 25;
+    envelope.reconstructionPreview.changes = envelope.reconstructionPreview.changes.slice(0, 19).map((item, index) =>
+        ({ ...item, row: ['0001', '0002'][index % 2] }));
+    envelope.reconstructionPreview.defaultGroups = [{ row: '0003', count: 6, changes: [] }];
+    await withPage({ automatic: true, departure: '', replies: [{ status: 200, payload: envelope },
+        { status: 200, payload: { success: true, automaticReconstructionApplied: true } }] }, async ({ page }) => {
+        await save(page); await expectAutomatic(page);
+        await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+        await page.waitForFunction(() => window.saveFinished);
+        const key = 'employeeHistoryReconstructionSuccess:synthetic-employee';
+        const stored = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)), key);
+        assert.deepEqual(Object.keys(stored).sort(), ['changedFields', 'changedRows', 'timestamp']);
+        assert.equal(stored.changedRows, 3); assert.equal(stored.changedFields, 25);
+        await page.reload();
+        for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js'])
+            await page.addScriptTag({ path: path.join(root, file) });
+        await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
+        assert.match(await page.locator('#employeeHistoryReconstructionSuccess').innerText(), /Ενημερώθηκαν 3 εγγραφές και 25 πεδία/);
+        assert.equal(await page.evaluate(key => sessionStorage.getItem(key), key), null);
+    });
+});
+for (const final of [{ status: 409, payload: { success: false } }, { status: 500, payload: { success: false } },
+    { status: 200, payload: { success: true, automaticReconstructionApplied: false } }]) {
+    test(`Phase 3B ${final.status}/${final.payload.automaticReconstructionApplied} does not store misleading feedback`, async () => {
+        await withPage({ automatic: true, departure: '', replies: [{ status: 200, payload: automaticEnvelope() }, final] }, async ({ page }) => {
+            await save(page); await expectAutomatic(page);
+            await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+            await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+            await page.waitForFunction(() => window.saveFinished);
+            assert.equal(await page.evaluate(() => sessionStorage.length), 0);
+        });
+    });
+}
+test('ordinary Save never records reconstruction feedback', async () => {
+    await withPage({ automatic: true, departure: '', payload: { success: true } }, async ({ page }) => {
+        await save(page);
+        await page.waitForFunction(() => window.saveFinished);
+        assert.equal(await page.evaluate(() => sessionStorage.length), 0);
+    });
+});
