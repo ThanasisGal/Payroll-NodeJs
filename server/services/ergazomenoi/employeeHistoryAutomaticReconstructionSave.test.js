@@ -216,3 +216,24 @@ test('composite prediction matches existing Mongoose Employee casts and strict f
     const reconstruction = await preview(); await run({ reconstruction });
     assert.equal(db.state().employees[0].pososto_apasxolhshs_kk1, 42);
 });
+
+test('full-form unchanged empty end date is an echo, not a command to undo reconstructed contract end', async () => {
+    const input = F.caseA(); input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = null;
+    const { db, run, preview } = setup(input, undefined, { maintenance: {
+        originalHistoryId: 'synthetic-0002', employeeChanges: { parathrhseis: 'synthetic note', hmeromhnia_isxyos_oron_ergasias_eos: null },
+        submittedEmployeeFields: ['parathrhseis', 'hmeromhnia_isxyos_oron_ergasias_eos'],
+        historyChanges: { hmeromhnia_isxyos_oron_ergasias_eos: null }, submittedHistoryChanges: { hmeromhnia_isxyos_oron_ergasias_eos: null }
+    } });
+    const reconstruction = await preview(); await run({ reconstruction });
+    assert.equal(new Date(db.state().history.find(row => row._id === 'synthetic-0002').hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0, 10), '2026-10-05');
+    assert.equal(db.state().employees[0].parathrhseis, 'synthetic note');
+    assert.equal(db.state().audits.length, 1);
+});
+test('changed submitted end date remains an actual competing intent and is rejected before writes', async () => {
+    const input = F.caseA(); input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = null;
+    const { db, run } = setup(input, undefined, { maintenance: {
+        originalHistoryId: 'synthetic-0002', employeeChanges: { hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-30' },
+        historyChanges: { hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-30' }, submittedHistoryChanges: { hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-30' }
+    } }); const before = db.state();
+    await assert.rejects(run, { code: A.PREFIX + 'SAVE_CONFLICT' }); noWrites(db, before);
+});

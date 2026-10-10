@@ -2894,8 +2894,9 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
                 throw failure('EMPLOYEE_PROFILE_STALE');
             }
             const targetAfter = physicalPlan.expectedRows.find(row => String(row._id) === targetId);
-            const continuedRequest = { ...profileRequest, ...(maintenance ? { maintenance: {
-                ...maintenance, expectedRevision: targetAfter?.updatedAt || maintenance.expectedRevision
+            const originalIntent = S.originalSaveWithoutReconstructionEchoes(profileRequest, current, plan, targetAfter);
+            const continuedRequest = { ...originalIntent, ...(maintenance ? { maintenance: {
+                ...originalIntent.maintenance, expectedRevision: targetAfter?.updatedAt || maintenance.expectedRevision
             } } : {}) };
             const planningState = { current, history: physicalPlan.expectedRows,
                 canonicalize: true, executionSteps: [], normalizeCurrentPatch(patch) {

@@ -25,6 +25,28 @@ function assertCompatiblePlans(reconstructionPlan, normalFinalRows) {
         if (!final || !A.equal(final[diff.field], diff.after)) throw A.failure('SAVE_CONFLICT');
     }
 }
+// Normal Maintenance sends the whole current form. An unchanged current
+// value is an echo, not an instruction to undo an approved History repair.
+// Only fields actually reconstructed are considered, and genuine current
+// deltas remain intact for the existing writer and the overlap guard.
+function originalSaveWithoutReconstructionEchoes(request, current, plan, targetAfter) {
+    const { departureMaintenanceValuesEqual: equalFormValue } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
+    const fields = new Set(plan.rowDiffs.map(diff => diff.field));
+    const echo = (field, value) => fields.has(field) && equalFormValue(field, value, current[field]);
+    const omitEchoes = patch => Object.fromEntries(Object.entries(patch || {}).filter(([field, value]) => !echo(field, value)));
+    const maintenance = request.maintenance;
+    if (!maintenance) return request;
+    const identity = maintenance.identity && { ...maintenance.identity };
+    // Re-anchor only an exact previously selected History row. This changes
+    // the identity expectation after repair, never the submitted historical facts.
+    if (identity && targetAfter) for (const field of Object.keys(identity)) {
+        if (echo(field, identity[field])) identity[field] = targetAfter[field];
+    }
+    return { ...request, input: omitEchoes(request.input), maintenance: { ...maintenance, identity,
+        employeeChanges: omitEchoes(maintenance.employeeChanges),
+        historyChanges: omitEchoes(maintenance.historyChanges),
+        submittedHistoryChanges: omitEchoes(maintenance.submittedHistoryChanges) } };
+}
 function sendReconstructionSaveError(res, error) {
     if (!String(error?.code || '').startsWith(A.PREFIX)) return false;
     if (error.code === A.PREFIX + 'REQUIRED') {
@@ -48,4 +70,4 @@ function sendReconstructionSaveError(res, error) {
     res.status(error.statusCode || 409).json({ success: false, reason: error.code, message });
     return true;
 }
-module.exports = { VERSION, saveToken, validateApproval, assertCompatiblePlans, sendReconstructionSaveError };
+module.exports = { VERSION, saveToken, validateApproval, assertCompatiblePlans, originalSaveWithoutReconstructionEchoes, sendReconstructionSaveError };
