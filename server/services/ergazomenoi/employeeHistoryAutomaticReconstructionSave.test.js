@@ -32,6 +32,73 @@ function setup(input = F.caseA(), user = { privileges: 'A', team: 'THA', situati
 function noWrites(db, before) { assert.deepEqual(db.state(), before); assert.equal(db.events.some(e => ['write', 'commit', 'fence'].includes(e.type)), false); }
 function noCommit(db, before) { assert.deepEqual(db.state(), before); }
 
+function coincidentArtifactsRequest(input, employeeChanges = {}) {
+    return { maintenance: { employeeChanges,
+        submittedEmployeeFields: Object.keys(employeeChanges),
+        historyChanges: {}, submittedHistoryChanges: {}, submittedProfileFields: [],
+        originalHistoryId: input.completeHistoryRows[1]._id,
+        expectedRevision: input.completeHistoryRows[1].updatedAt } };
+}
+
+test('exact legacy-artifact conflict: normal NO_HISTORY_CHANGE cleanup removes 21 approved values; initial Save preserves all 25', async () => {
+    const input = F.coincidentLegacyArtifacts(), plan = planner(input);
+    assert.equal(plan.status, 'REVIEW_REQUIRED');
+    assert.equal(plan.rowDiffs.length, 25);
+    assert.equal(new Set(plan.rowDiffs.map(diff => diff.historyId)).size, 3);
+    const legacy = require('./employeeMaintenanceHistoryPlannerService').planEmployeeMaintenanceHistory({
+        scope: input.scope, currentEmployee: input.currentEmployee,
+        historyRows: plan.proposedRows, historyId: 'synthetic-0002',
+        submittedState: { effectiveFrom: '2026-05-25', employeePatch: {}, historyPatch: {} }
+    });
+    assert.equal(legacy.state, 'NO_HISTORY_CHANGE');
+    assert.deepEqual(legacy.rowsToDelete.map(row => row.historyId).sort(), ['synthetic-0001', 'synthetic-0002']);
+    const conflicts = plan.rowDiffs.filter(diff => !legacy.canonicalRows.some(row =>
+        row._id === diff.historyId && A.equal(row[diff.field], diff.after)));
+    assert.equal(conflicts.length, 21);
+    const exactConflict = conflicts.find(diff => diff.historyId === 'synthetic-0002' &&
+        diff.field === 'hmeromhnia_isxyos_oron_ergasias_apo');
+    assert.equal(new Date(exactConflict.before).toISOString(), '2026-05-25T00:00:00.000Z');
+    assert.equal(new Date(exactConflict.after).toISOString(), '2026-04-23T00:00:00.000Z');
+    assert.equal(legacy.canonicalRows.find(row => row._id === exactConflict.historyId), undefined);
+    assert.throws(() => S.assertCompatiblePlans(plan, legacy.canonicalRows), { code: A.PREFIX + 'SAVE_CONFLICT' });
+    const { db, run } = setup(input, undefined, coincidentArtifactsRequest(input)), before = db.state();
+    let error; try { await run(); } catch (e) { error = e; }
+    const res = { status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
+    S.sendReconstructionSaveError(res, error);
+    assert.equal(res.body.reason, A.PREFIX + 'REQUIRED');
+    assert.equal(res.code, 200);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.actionRequired, true);
+    noWrites(db, before);
+});
+
+test('coincident artifacts: approval persists exactly 25 approved fields, three rows and one audit; Employee-only edit survives', async () => {
+    const input = F.coincidentLegacyArtifacts(), plan = planner(input);
+    const { db, run, preview } = setup(input, undefined,
+        coincidentArtifactsRequest(input, { parathrhseis: 'intentional note' }));
+    const reconstruction = await preview();
+    const result = await run({ reconstruction }), after = db.state();
+    assert.equal(result.automaticReconstructionApplied, true);
+    assert.equal(after.employees[0].parathrhseis, 'intentional note');
+    assert.equal(after.employees[0].meiosh_eisforon_mhteron, false);
+    assert.equal(after.history.length, 3);
+    S.assertCompatiblePlans(plan, after.history);
+    for (const original of input.completeHistoryRows) {
+        const row = after.history.find(item => item._id === original._id);
+        const approved = plan.rowDiffs.filter(diff => diff.historyId === original._id);
+        const expected = { ...original, ...Object.fromEntries(approved.map(diff => [diff.field, diff.after])) };
+        const withoutRevision = value => Object.fromEntries(Object.entries(value).filter(([field]) => field !== 'updatedAt'));
+        assert.deepEqual(withoutRevision(row), withoutRevision(expected));
+    }
+    assert.equal(after.audits.length, 1);
+    assert.equal(after.audits[0].mutationSource, A.OPERATION);
+    assert.equal(db.events.filter(event => event.type === 'commit').length, 1);
+    assert.equal(A.isNoOp(planner({ ...input, currentEmployee: after.employees[0], completeHistoryRows: after.history })), true);
+    const beforeRetry = db.state();
+    assert.equal((await run({ reconstruction })).alreadyApplied, true);
+    noCommit(db, beforeRetry);
+});
+
 test('H: passive lending, derived seniority and equivalent tax echoes do not stale approval or enter original Save', async () => {
     const input = F.caseA();
     Object.assign(input.currentEmployee, { afora_daneismo_ergazomenoy: false,

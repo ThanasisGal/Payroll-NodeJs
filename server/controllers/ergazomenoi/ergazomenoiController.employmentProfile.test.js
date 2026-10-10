@@ -210,13 +210,15 @@ function handler(mode, db) {
         ...require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract'),
         // Baseline controller regressions keep the original guided persistence
         // boundary; composite integration cases below explicitly opt into it.
-        writeEmployeeEmploymentProfileWithAutomaticReconstruction: args => db.composite
-            ? W.writeEmployeeEmploymentProfileWithAutomaticReconstruction({ ...args, ...db.deps,
+        writeEmployeeEmploymentProfileWithAutomaticReconstruction: args => {
+            db.compositeRequest = args;
+            return db.composite ? W.writeEmployeeEmploymentProfileWithAutomaticReconstruction({ ...args, ...db.deps,
                 correctionCatalogLoader: async () => ({}) })
             : (() => {
                 db.dispatch?.push('writeEmployeeEmploymentProfileWithUniqueSafeRepair');
                 return W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps });
-            })(),
+            })();
+        },
         writeEmployeeEmploymentProfileWithUniqueSafeRepair: args => {
             db.dispatch?.push('writeEmployeeEmploymentProfileWithUniqueSafeRepair');
             return W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps });
@@ -249,6 +251,25 @@ async function submit(mode, input, db = memory(), body = {}) {
     assert.equal(mongoose.connection.readyState, 0);
     return { db, res };
 }
+
+test('clean EFKA checkbox audit: mhteres is not mapped null intent; same-name worker/employer flags remain owned booleans', async () => {
+    const stored = await initial();
+    Object.assign(stored.employee, { meiosh_eisforon_mhteron: false,
+        meiosh_eisforon_ergazomenon: false, epidothsh_eisforon_ergodoth: false });
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...form(), mhteres: false,
+        meiosh_eisforon_ergazomenon: false, epidothsh_eisforon_ergodoth: false }, db);
+    assert.equal(res.code, 200);
+    const maintenance = db.compositeRequest.maintenance;
+    assert.equal(maintenance.employeeChanges.meiosh_eisforon_mhteron, undefined);
+    assert.equal(maintenance.submittedEmployeeFields.includes('meiosh_eisforon_mhteron'), false);
+    assert.equal(db.state().employee.meiosh_eisforon_mhteron, false);
+    for (const field of ['meiosh_eisforon_ergazomenon', 'epidothsh_eisforon_ergodoth']) {
+        assert.equal(maintenance.employeeChanges[field], false);
+        assert.equal(maintenance.submittedEmployeeFields.includes(field), true);
+        assert.equal(db.state().employee[field], false);
+    }
+});
 test('add and update controller paths reject invalid daily rest before any writer', async () => {
     const invalidSchedule = twoDaySchedule(
         [{ start: '14:00', end: '22:00' }],

@@ -1079,6 +1079,31 @@ function applyOrExecuteFinalMutationPlan(options, planningState) {
         ? applyFinalPlanInMemory({ ...options, planningState })
         : executeFinalMutationPlan(options);
 }
+
+// Only the private composite planner can queue this step, after Maintenance
+// has resolved NO_HISTORY_CHANGE. Automatic reconstruction owns the complete
+// History batch; an Employee-only Save must not add implicit legacy cleanup.
+async function executeReconstructionCurrentOnlySave(step) {
+    const { physicalPlan, currentPatch, filter, employeeId, session,
+        employeeModel, historyModel } = step;
+    const A = AutomaticReconstruction;
+    if (!session || !employeeMutationFences.get(session)?.has(JSON.stringify([
+        ...EMPLOYEE_SCOPE_FIELDS.map(field => String(filter[field])), String(employeeId)])) ||
+        physicalPlan.rowsToUpdate.length || physicalPlan.rowsToInsert.length ||
+        physicalPlan.rowsToDelete.length || step.canonicalRepairRequired ||
+        !A.equal(A.ordered(physicalPlan.beforeRows), A.ordered(physicalPlan.finalRows)) ||
+        !A.equal(A.ordered(physicalPlan.beforeRows),
+            A.ordered(await completeHistoryLean(historyModel, filter, session)))) {
+        throw A.failure('BOUNDARY_FAILED');
+    }
+    if (Object.keys(currentPatch).length) {
+        const result = await employeeModel.updateOne({ ...filter, _id: employeeId },
+            { $set: currentPatch }, { session });
+        if (result.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_STALE');
+    }
+    // The composite caller rereads both collections and verifies their exact
+    // planned state and the automatic planner's NO_OP before committing.
+}
 // Transaction-attempt metadata only: the persisted Employee write is the fence.
 // Reset on every driver callback retry; never reuse an earlier attempt's marker.
 const employeeMutationFences = new WeakMap();
@@ -1813,21 +1838,24 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                     }
                 }
                 if (mutationPlan.state === MUTATION_STATES.NO_HISTORY_CHANGE) {
+                    const reconstructionCurrentOnly = planningState?.reconstructionPreservesHistory === true;
                     const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: persistedRows,
-                        desiredRows: rows, historyModel,
+                        desiredRows: reconstructionCurrentOnly ? persistedRows : rows, historyModel,
                         replacementByDeletedId: mutationPlan.replacementByDeletedId });
                     const cleanup = await applyOrExecuteFinalMutationPlan({ physicalPlan,
+                        reconstructionCurrentOnly,
                         currentBefore: current, currentPatch: mutationPlan.employeePatch,
                         filter, employeeId: current._id, session, employeeModel, historyModel,
                         auditModel, auditCollectionChecker, referenceChecker, connection,
                         diagnostics: lifecycleReclassificationAuditDiagnostics(
                             lifecycleReclassificationPlan, persistedRows,
                             mutationPlan.diagnostics),
-                        canonicalRepairRequired: mutationPlan.cleanupRequired === true ||
+                        canonicalRepairRequired: !reconstructionCurrentOnly && (mutationPlan.cleanupRequired === true ||
                             lifecycleReclassificationPlan?.status ===
-                                LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE }, planningState);
+                                LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE) }, planningState);
                     const target = cleanup.verified.history.find(row =>
-                        String(row._id) === mutationPlan.targetHistoryId) || null;
+                        String(row._id) === (reconstructionCurrentOnly && maintenance.originalHistoryId
+                            ? maintenance.originalHistoryId : mutationPlan.targetHistoryId)) || null;
                     result = { facts: {}, history: target,
                         currentUpdated: Object.keys(mutationPlan.employeePatch).length > 0,
                         employee: cleanup.verified.current,
@@ -2907,7 +2935,8 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
                 ...originalIntent.maintenance, expectedRevision: targetAfter?.updatedAt || maintenance.expectedRevision
             } } : {}) };
             const planningState = { current, history: physicalPlan.expectedRows,
-                canonicalize: true, executionSteps: [], normalizeCurrentPatch(patch) {
+                canonicalize: true, reconstructionPreservesHistory: true,
+                executionSteps: [], normalizeCurrentPatch(patch) {
                     if (!employeeModel.schema?.path) return patch;
                     // Match the existing Mongoose update's casts/strict boundary
                     // without applying document defaults to persisted facts.
@@ -2945,7 +2974,10 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
                 currentBefore: current, filter: scope, employeeId, session,
                 automaticReconstructionPlan: plan, automaticHistoryBefore: history, automaticAuditRecord: auditRecord });
             let verified;
-            for (const step of planningState.executionSteps) verified = (await executeFinalMutationPlan(step)).verified;
+            for (const step of planningState.executionSteps) {
+                if (step.reconstructionCurrentOnly) await executeReconstructionCurrentOnlySave(step);
+                else verified = (await executeFinalMutationPlan(step)).verified;
+            }
             const finalCurrent = await employeeModel.findOne({ ...scope, _id: employeeId })
                 .select('+employee_profile_mutation_sequence').session(session).lean();
             const finalQuery = historyModel.find(scope);

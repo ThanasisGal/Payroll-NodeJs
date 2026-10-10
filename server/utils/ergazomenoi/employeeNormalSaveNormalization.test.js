@@ -97,3 +97,26 @@ test('tax representation uses the existing canonical comparison; genuine tax cha
     assert.deepEqual(normalize(request({ forologikh_klimaka: '0200' }), current).maintenance.employeeChanges, {});
     assert.equal(normalize(request({ forologikh_klimaka: '0300' }), current).maintenance.employeeChanges.forologikh_klimaka, '0300');
 });
+
+test('EFKA aliases have no false/null equivalence: explicit null and forged values cannot obtain passive treatment', () => {
+    for (const field of ['meiosh_eisforon_mhteron', 'meiosh_eisforon_ergazomenon', 'epidothsh_eisforon_ergodoth']) {
+        for (const value of [null, 'false', 0, 'forged']) {
+            const actual = normalize(request({ [field]: value }, { mhteres: false,
+                [field]: value, untouched: true, disabled: true }), { [field]: false });
+            assert.equal(Object.hasOwn(actual.maintenance.employeeChanges, field), true);
+            assert.equal(actual.maintenance.employeeChanges[field], value);
+            assert.equal(M.departureMaintenanceValuesEqual(field, false, null), false);
+        }
+    }
+});
+
+for (const [before, after] of [[false, true], [true, false]]) {
+    test(`EFKA explicit mother reduction transition ${before} -> ${after} remains a business write`, async () => {
+        const f = fixture(); f.employee.meiosh_eisforon_mhteron = before;
+        const db = store([f]), changes = { meiosh_eisforon_mhteron: after };
+        await W.writeEmployeeEmploymentProfile({ ...db.deps, ...request(changes),
+            scope: { team: f.employee.team, company_kod: f.employee.company_kod, kodikos: f.employee.kodikos },
+            employeeId: f.employee._id, effectiveFrom: '2026-03-01' });
+        assert.equal(db.state().employees[0].meiosh_eisforon_mhteron, after);
+    });
+}
