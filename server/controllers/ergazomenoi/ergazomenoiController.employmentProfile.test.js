@@ -1955,17 +1955,7 @@ test('Phase 3B controller: normal Save returns a sanitized automatic preview bef
     assert.equal(db.writes(), 0); assert.deepEqual(db.state(), before);
 });
 
-test('first-departure controller: retained original Save previews with zero writes, then commits both audits through the real composite', async () => {
-    const original = await fullFormDepartureState();
-    const sparse = require('../../services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures').caseB();
-    original.history = sparse.completeHistoryRows.map((row, index) => ({ ...row, ...scope,
-        _id: `60000000000000000000000${index + 1}`,
-        ...(row.hmeromhnia_proslhpshs ? { hmeromhnia_proslhpshs: '2026-04-01' } : {}),
-        ...(row.hmeromhnia_allaghs_symbashs ? { hmeromhnia_allaghs_symbashs:
-            row.aa_eggrafhs === '0003' ? '2026-05-01' : '2026-04-01' } : {}),
-        ...(row.hmeromhnia_lhxhs_symbashs ? { hmeromhnia_lhxhs_symbashs: '2026-12-31' } : {}) }));
-    original.employee.hmeromhnia_allaghs_symbashs = '2026-05-01';
-    original.employee.hmeromhnia_isxyos_oron_ergasias_apo = '2026-05-01';
+function departureControllerCompositeDb(original) {
     const cast = (row, model) => Object.fromEntries(Object.entries(row).map(([field, value]) => {
         const castValue = field === '_id' ? String(value) : model.schema.path(field)?.cast(value) ?? value;
         return [field, Array.isArray(castValue) ? [...castValue] : castValue];
@@ -1984,6 +1974,21 @@ test('first-departure controller: retained original Save previews with zero writ
         userModel: { findById: () => ({ select() { return this; }, session() { return this; },
             lean: async () => ({ privileges: 'A', team: 'THA', situation: 'A' }) }) }
     } };
+    return { tx, db };
+}
+
+test('first-departure controller: retained original Save previews with zero writes, then commits both audits through the real composite', async () => {
+    const original = await fullFormDepartureState();
+    const sparse = require('../../services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures').caseB();
+    original.history = sparse.completeHistoryRows.map((row, index) => ({ ...row, ...scope,
+        _id: `60000000000000000000000${index + 1}`,
+        ...(row.hmeromhnia_proslhpshs ? { hmeromhnia_proslhpshs: '2026-04-01' } : {}),
+        ...(row.hmeromhnia_allaghs_symbashs ? { hmeromhnia_allaghs_symbashs:
+            row.aa_eggrafhs === '0003' ? '2026-05-01' : '2026-04-01' } : {}),
+        ...(row.hmeromhnia_lhxhs_symbashs ? { hmeromhnia_lhxhs_symbashs: '2026-12-31' } : {}) }));
+    original.employee.hmeromhnia_allaghs_symbashs = '2026-05-01';
+    original.employee.hmeromhnia_isxyos_oron_ergasias_apo = '2026-05-01';
+    const { tx, db } = departureControllerCompositeDb(original);
     const payload = { ...fullFormDeparturePayload(original.employee, '2026-10-04'),
         hmeromhnia_allaghs_symbashs: '2026-05-01', hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01' };
     const before = tx.state(), first = await submit('edit', payload, db);
@@ -2002,6 +2007,66 @@ test('first-departure controller: retained original Save previews with zero writ
         ['EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION', 'DEPARTURE']);
     assert.equal(tx.events.filter(event => event.type === 'commit').length, 1);
 });
+
+// Structural regression from the read-only inspection of 0059: one sparse
+// hire row, absent current validity/notice/derived aliases, and untouched Edit
+// controls emitting null/false/0. All identifiers, dates and amounts are synthetic.
+async function legacyDefaultDepartureCase() {
+    const original = await fullFormDepartureState();
+    for (const field of ['hmeromhnia_isxyos_oron_ergasias_apo',
+        'afora_kataggelia_me_proeidopoihsh', 'mhnes_proeidopoihshs', 'typos_apasxolhshs', 'typos_ebdomadas']) {
+        delete original.employee[field];
+    }
+    original.history = [{ ...scope, _id: '600000000000000000000001', aa_eggrafhs: '0001',
+        hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_symbashs: '2026-04-01',
+        hmeromhnia_apoxorhshs: null, afora_proslhpsh: true }];
+    const payload = { ...fullFormDeparturePayload(original.employee, '2026-10-04'),
+        hmeromhnia_isxyos_oron_ergasias_apo: null, kataggelia_me_proeidopoihsh: false, mhnes_proeidopoihshs: 0 };
+    return { original, payload, ...departureControllerCompositeDb(original) };
+}
+
+test('legacy untouched full form: exact neutral echoes preview without writes and commit only reconstruction plus departure', async () => {
+    const { tx, db, payload } = await legacyDefaultDepartureCase(), before = tx.state();
+    const first = await submit('edit', payload, db);
+    assert.equal(first.res.body.reason, 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED_FOR_DEPARTURE', JSON.stringify(first.res.body));
+    assert.deepEqual(tx.state(), before);
+    assert.equal(tx.events.some(event => ['write', 'fence', 'commit'].includes(event.type)), false);
+    const continued = await submit('edit', payload, db, { reconstruction: {
+        previewToken: first.res.body.previewToken, approvalAccepted: true } });
+    assert.equal(continued.res.body.success, true, JSON.stringify(continued.res.body));
+    const final = tx.state();
+    assert.equal(final.history.length, 1);
+    assert.equal(final.history[0]._id, before.history[0]._id);
+    assert.equal(final.history[0].aa_eggrafhs, '0001');
+    assert.equal(final.employees[0].hmeromhnia_apoxorhshs.toISOString().slice(0, 10), '2026-10-04');
+    for (const field of ['hmeromhnia_isxyos_oron_ergasias_apo',
+        'afora_kataggelia_me_proeidopoihsh', 'mhnes_proeidopoihshs', 'typos_apasxolhshs', 'typos_ebdomadas']) {
+        assert.equal(Object.hasOwn(final.employees[0], field), false, field);
+    }
+    const A = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
+    const plan = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService').planEmployeeHistoryAutomaticReconstruction({
+        scope, currentEmployee: final.employees[0], completeHistoryRows: final.history });
+    assert.equal(A.isNoOp(plan), true); assert.equal(plan.rowDiffs.length, 0);
+    assert.deepEqual(final.audits.map(a=>a.mutationSource), ['EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION', 'DEPARTURE']);
+    assert.equal(tx.events.filter(event=>event.type==='commit').length, 1);
+});
+
+for (const [label, changes] of [
+    ['explicit validity even at hire date', { hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-01' }],
+    ['notice enabled', { kataggelia_me_proeidopoihsh: true }],
+    ['positive notice months', { mhnes_proeidopoihshs: 1 }],
+    ['changed schedule', { hmeromhnia_allaghs_orarioy_apo: '2026-04-02' }],
+    ['changed employment type', { kathestos_apasxolhshs: '1', kathestos_apasxolhshs_stathera: '1' }],
+    ['changed workdays', { hmeres_ergasias_ebdomadas: 6 }]
+]) {
+    test(`legacy form echoes cannot hide ${label}`, async () => {
+        const { tx, db, payload } = await legacyDefaultDepartureCase(), before = tx.state();
+        const result = await submit('edit', { ...payload, ...changes }, db);
+        assertSaveHistoryAction(result.res);
+        assert.deepEqual(tx.state(), before);
+        assert.equal(tx.events.some(event => ['write', 'fence', 'commit'].includes(event.type)), false);
+    });
+}
 
 for (const field of ['rowDiffs', 'proposedRows', 'sourceHistoryIds', 'historyPatches']) {
     test(`Employee controller rejects client ${field} at the request boundary`, async () => {

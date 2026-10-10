@@ -3099,8 +3099,9 @@ async function writeEmployeeDepartureWithAutomaticReconstruction({ reconstructio
                 .select('+employee_profile_mutation_sequence').session(session).lean();
             if (!current) throw A.failure('STALE');
             const history = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
-            const request = normalizeEmployeeNormalSaveRequest({ ...submittedRequest, maintenance: {
-                ...submittedRequest.maintenance, rejectConcurrentProfileChanges: true } }, current);
+            const request = D.normalizeFirstDepartureRequest(normalizeEmployeeNormalSaveRequest({
+                ...submittedRequest, maintenance: {
+                    ...submittedRequest.maintenance, rejectConcurrentProfileChanges: true } }, current), current);
             const normalizedRequest = { ...normalizedUniqueSafeRepairSaveRequest(request),
                 operation: D.OPERATION, departureDate: C.calendarDate(request.departureDate)?.toISOString() || null,
                 // Bind the retained form too; it is evidence for echo guards,
