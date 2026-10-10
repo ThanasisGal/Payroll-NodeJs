@@ -54,11 +54,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const intro = modalElement.querySelector('.modal-body > p');
     const originalTitle = title.textContent;
     const originalIntro = intro.textContent;
-    function presentation(saveMode) {
-        title.textContent = saveMode ? 'Το Ιστορικό Χρειάζεται Τακτοποίηση' : originalTitle;
-        intro.textContent = saveMode
+    function presentation(saveMode, operation) {
+        const departure = saveMode && operation === 'FIRST_DEPARTURE';
+        title.textContent = departure ? 'Το Ιστορικό Χρειάζεται Τακτοποίηση πριν την Αποχώρηση'
+            : saveMode ? 'Το Ιστορικό Χρειάζεται Τακτοποίηση' : originalTitle;
+        intro.textContent = departure
+            ? 'Για να ολοκληρωθεί η αποχώρηση, η εφαρμογή προτείνει πρώτα τις παρακάτω αλλαγές στο Ιστορικό.' : saveMode
             ? 'Για να ολοκληρωθεί η αποθήκευση, η εφαρμογή προτείνει τις παρακάτω αλλαγές στο Ιστορικό.' : originalIntro;
-        applyButton.textContent = saveMode ? 'Εφαρμογή & Συνέχεια Αποθήκευσης' : 'Εφαρμογή Τακτοποίησης';
+        applyButton.textContent = departure ? 'Τακτοποίηση & Συνέχεια Αποχώρησης'
+            : saveMode ? 'Εφαρμογή & Συνέχεια Αποθήκευσης' : 'Εφαρμογή Τακτοποίησης';
     }
     const approval = document.getElementById('employeeHistoryReconstructionApproval');
     const checkbox = document.getElementById('employeeHistoryReconstructionApprovalAccepted');
@@ -265,10 +269,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 storeHistoryReconstructionSuccess(employee.value, historyReconstructionCounts(result, approvedPreview));
             }
         },
-        approveForSave({ preview, token }) {
+        approveForSave({ preview, token, operation }) {
             if (controller || applying || saveResolver) return Promise.resolve(false);
             resetApproval();
-            presentation(true);
+            presentation(true, operation);
             saveApproved = false;
             renderPreview(preview);
             previewToken = token;

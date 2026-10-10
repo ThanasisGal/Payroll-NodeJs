@@ -446,7 +446,54 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     userConfirmedCorrectionPlan = null,
     auditAfterMutation = false,
     controlledAutomaticReconstruction = false, automaticReconstructionPlan = null,
-    automaticHistoryBefore = null, automaticAuditRecord = null }) {
+    automaticHistoryBefore = null, automaticAuditRecord = null,
+    controlledReconstructedDeparture = false }) {
+    if (controlledReconstructedDeparture) {
+        const A = AutomaticReconstruction;
+        const fail = () => { throw A.failure('BOUNDARY_FAILED'); };
+        if (!session || !employeeMutationFences.get(session)?.has(JSON.stringify([
+            ...EMPLOYEE_SCOPE_FIELDS.map(field => String(filter[field])), String(employeeId)])) ||
+            !currentBefore || String(currentBefore._id) !== String(employeeId) ||
+            !EMPLOYEE_SCOPE_FIELDS.every(field => currentBefore[field] === filter[field]) ||
+            C.calendarDate(currentBefore.hmeromhnia_apoxorhshs) || deleteCurrent ||
+            controlledAutomaticReconstruction || controlledLegacyOpenCycleCleanup || controlledInvalidDepartureCorrection ||
+            controlledContractEndSegmentSync || controlledDeferredAmbiguityDeparture || controlledUniqueSafeRepair ||
+            controlledMultipleSafeResolution || controlledBusinessFactResolution || controlledUserConfirmedCorrection ||
+            physicalPlan.rowsToInsert.length || physicalPlan.rowsToDelete.length) fail();
+        const beforePlan = planEmployeeHistoryAutomaticReconstruction({ scope: filter,
+            currentEmployee: currentBefore, completeHistoryRows: physicalPlan.beforeRows });
+        const afterPlan = planEmployeeHistoryAutomaticReconstruction({ scope: filter,
+            currentEmployee: { ...currentBefore, ...currentPatch }, completeHistoryRows: physicalPlan.finalRows });
+        if (!A.isNoOp(beforePlan) || beforePlan.rowDiffs.length || !A.isNoOp(afterPlan) || afterPlan.rowDiffs.length) fail();
+        const canonical = canonicalizeEmployeeHistory({ scope: filter,
+            currentEmployee: currentBefore, historyRows: physicalPlan.beforeRows });
+        if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) fail();
+        const transition = buildEmployeeDepartureTransition({ currentEmployee: currentBefore,
+            history: canonical.canonicalRows, departureDate: currentPatch.hmeromhnia_apoxorhshs });
+        const departure = C.calendarDate(transition.departure);
+        const withoutRevision = ({ updatedAt, ...row }) => row;
+        const expectedRows = physicalPlan.beforeRows.map(row => ({ ...row,
+            ...(String(row._id) === String(transition.terminalHistoryRow._id) ? { hmeromhnia_apoxorhshs: departure } : {}),
+            ...(transition.clampProfileEnd && String(row._id) === String(transition.latestProfileRow._id)
+                ? { hmeromhnia_isxyos_oron_ergasias_eos: departure } : {}) }));
+        if (!A.equal(A.ordered(expectedRows).map(withoutRevision), A.ordered(physicalPlan.finalRows).map(withoutRevision))) fail();
+        const allowedCurrent = new Set(['hmeromhnia_apoxorhshs', 'energos', 'employment_departure_restore',
+            'hmeromhnia_isxyos_oron_ergasias_eos', ...BASE_ZERO_NORMALIZABLE_FIELDS]);
+        if (Object.keys(currentPatch).some(field => !allowedCurrent.has(field) ||
+            (BASE_ZERO_NORMALIZABLE_FIELDS.includes(field) && (currentPatch[field] !== 0 ||
+                !departureMaintenanceValuesEqual(field, currentBefore[field], 0))))) fail();
+        const expectedCurrentPatch = minimalSetPatch(currentBefore, {
+            ...Object.fromEntries(BASE_ZERO_NORMALIZABLE_FIELDS.filter(field => Object.hasOwn(currentPatch, field))
+                .map(field => [field, 0])), hmeromhnia_apoxorhshs: departure, energos: false,
+            employment_departure_restore: { departure: transition.departure,
+                terminal_id: String(transition.terminalHistoryRow._id), profile_id: String(transition.latestProfileRow._id),
+                employee_end_clamped: Boolean(transition.clampEmployeeEnd), profile_end_clamped: Boolean(transition.clampProfileEnd),
+                employee_end_before: currentBefore.hmeromhnia_isxyos_oron_ergasias_eos ?? null,
+                profile_end_before: transition.latestProfileRow.hmeromhnia_isxyos_oron_ergasias_eos ?? null },
+            ...(transition.clampEmployeeEnd ? { hmeromhnia_isxyos_oron_ergasias_eos: departure } : {})
+        });
+        if (!A.equal(currentPatch, expectedCurrentPatch)) fail();
+    }
     if (controlledAutomaticReconstruction) {
         const A = AutomaticReconstruction;
         if (!session || !employeeMutationFences.get(session)?.has(JSON.stringify([
@@ -705,7 +752,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         error.canonicalReason = postMutationCanonical.diagnostics?.reason;
         throw error;
     }
-    if (!controlledDeferredAmbiguityDeparture && !controlledUserConfirmedCorrection &&
+    if (!controlledDeferredAmbiguityDeparture && !controlledUserConfirmedCorrection && !controlledReconstructedDeparture &&
         postMutationCanonical.cleanupRequired) {
         physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: physicalPlan.beforeRows,
             desiredRows: postMutationCanonical.canonicalRows, historyModel,
@@ -722,7 +769,13 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     let deletedIds = [...proposedDeletedIds];
     let deleteFilter = buildScopedHistoryDeleteFilter(filter, deletedIds);
     const referencedRedundant = [];
-    const auditRequired = canonicalRepairRequired || proposedDeletedIds.length > 0 ||
+    if (controlledReconstructedDeparture && (physicalPlan.rowsToDelete.length ||
+        physicalPlan.rowsToInsert.length || diagnostics?.operation !== MUTATION_INTENTS.DEPARTURE ||
+        physicalPlan.rowsToUpdate.some(({ patch }) => Object.keys(patch).some(field =>
+            !['hmeromhnia_apoxorhshs', 'hmeromhnia_isxyos_oron_ergasias_eos', 'updatedAt'].includes(field))))) {
+        throw AutomaticReconstruction.failure('BOUNDARY_FAILED');
+    }
+    const auditRequired = controlledReconstructedDeparture || canonicalRepairRequired || proposedDeletedIds.length > 0 ||
         controlledDeferredAmbiguityDeparture || controlledInvalidDepartureCorrection ||
         controlledUniqueSafeRepair || controlledMultipleSafeResolution ||
         controlledBusinessFactResolution || controlledUserConfirmedCorrection;
@@ -849,7 +902,10 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             diagnostics: auditDiagnostics
         };
         if (!auditAfterMutation) {
-            await auditModel.create([pendingAuditRecord], { session });
+            const created = await auditModel.create([pendingAuditRecord], { session });
+            if (controlledReconstructedDeparture && (created?.length !== 1 || !created[0])) {
+                throw AutomaticReconstruction.failure('AUDIT_FAILED');
+            }
             pendingAuditRecord = null;
         }
     }
@@ -903,7 +959,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         verified = await verifyFinalMutationState({ filter, employeeId, session, employeeModel,
             historyModel, expectedCurrent, expectedHistory: physicalPlan.finalRows,
             targetedHistoryId, targetedPatch,
-            allowHistoricalAmbiguity: controlledDeferredAmbiguityDeparture });
+            allowHistoricalAmbiguity: controlledDeferredAmbiguityDeparture || controlledReconstructedDeparture });
         if (controlledDeferredAmbiguityDeparture) {
             const postcondition = verifyDepartureWithDeferredHistoryAmbiguity({
                 plan: deferredAmbiguityDeparturePlan,
@@ -3004,6 +3060,146 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
 const writeEmployeeEmploymentProfileWithUniqueSafeRepair =
     writeEmployeeEmploymentProfileWithGuidedResolution;
 
+// A first-departure Save owns discovery, approval and both mutations. Private
+// planning symbols reuse the actual departure guards without touching the DB.
+async function writeEmployeeDepartureWithAutomaticReconstruction({ reconstruction = null, actorUserId,
+    userModel = require('../../models/userModel'), connection = mongoose.connection,
+    employeeModel = ErgazomenoiModel, historyModel = IstorikoProslhpseonAllagonModel,
+    auditModel = EmployeeHistoryRepairAuditModel,
+    auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
+    referenceChecker = findHistoryIdReferences, capabilityProbe = transactionCapability,
+    correctionCatalogLoader = loadEmployeeHistoryCorrectionCatalogs, ...submittedRequest } = {}) {
+    const A = AutomaticReconstruction;
+    const S = require('./employeeHistoryAutomaticReconstructionSaveContract');
+    const D = require('./employeeDepartureAutomaticReconstructionContract');
+    const { authorize, buildAutomaticReconstructionAudit } = require('./employeeHistoryAutomaticReconstructionApplyService');
+    const { buildEmployeeHistoryReconstructionPreview } = require('./employeeHistoryReconstructionPreviewService');
+    S.validateApproval(reconstruction);
+    const { scope, employeeId } = submittedRequest;
+    if (!scope || !EMPLOYEE_SCOPE_FIELDS.every(field => typeof scope[field] === 'string' && scope[field].trim()) ||
+        typeof employeeId !== 'string' || !employeeId.trim()) throw A.failure('INVALID_REQUEST', 400);
+    const dependencies = { connection, employeeModel, historyModel, auditModel, auditCollectionChecker,
+        referenceChecker, capabilityProbe };
+    const historyFailure = error => ['EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED',
+        'EMPLOYEE_DEPARTURE_HISTORY_REQUIRED', 'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH',
+        'EMPLOYEE_DEPARTURE_CONFLICT'].includes(error?.code);
+    const planningState = (current, history, preserve = false) => ({ current, history,
+        reconstructionPreservesHistory: preserve, executionSteps: [], normalizeCurrentPatch(patch) {
+            if (!employeeModel.schema?.path) return patch;
+            return Object.fromEntries(Object.entries(patch).flatMap(([field, value]) => {
+                const path = employeeModel.schema.path(field);
+                return path ? [[field, path.applySetters(value, null)]] : [];
+            }));
+        } });
+    try {
+        return await inProfileTransaction(connection, capabilityProbe, async session => {
+            if (reconstruction) await acquireEmployeeMutationFence({ filter: scope, employeeId,
+                employeeModel, session, notFoundCode: A.PREFIX + 'STALE' });
+            const current = await employeeModel.findOne({ ...scope, _id: employeeId })
+                .select('+employee_profile_mutation_sequence').session(session).lean();
+            if (!current) throw A.failure('STALE');
+            const history = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
+            const request = normalizeEmployeeNormalSaveRequest({ ...submittedRequest, maintenance: {
+                ...submittedRequest.maintenance, rejectConcurrentProfileChanges: true } }, current);
+            const normalizedRequest = { ...normalizedUniqueSafeRepairSaveRequest(request),
+                operation: D.OPERATION, departureDate: C.calendarDate(request.departureDate)?.toISOString() || null,
+                // Bind the retained form too; it is evidence for echo guards,
+                // never an authority for selecting or patching a History row.
+                submittedFormValues: withoutVolatileRequestFields(request.maintenance?.submittedFormValues || {}),
+                submittedFormFields: request.maintenance?.submittedFormFields || [],
+                rejectConcurrentProfileChanges: request.maintenance?.rejectConcurrentProfileChanges === true };
+            const plan = planEmployeeHistoryAutomaticReconstruction({ scope,
+                currentEmployee: current, completeHistoryRows: history });
+            const token = D.previewToken({ scope, current, history, plan, request: normalizedRequest, actorUserId });
+            if (reconstruction && (!A.tokenMatches(reconstruction.previewToken, token) ||
+                C.calendarDate(current.hmeromhnia_apoxorhshs))) throw A.failure('STALE');
+            const normal = planningState(current, history);
+            let normalError;
+            try {
+                await writeEmployeeDeparture({ ...request, ...dependencies,
+                    [ACTIVE_SESSION]: session, [PLANNING_STATE]: normal });
+            } catch (error) { normalError = error; }
+            if (!reconstruction && !normalError) {
+                return writeEmployeeDeparture({ ...request, ...dependencies, [ACTIVE_SESSION]: session });
+            }
+            if (!normalError) throw A.failure('STALE');
+            if (normalError && !historyFailure(normalError)) throw normalError;
+            if (A.isNoOp(plan) || !['PLANNED', 'REVIEW_REQUIRED'].includes(plan.status)) {
+                throw reconstruction ? A.failure('STALE') : D.manualReview(normalError || plan.status);
+            }
+            await authorize({ actorUserId, userModel, session, scope, current, history, plan });
+            const physicalPlan = A.buildAutomaticReconstructionPhysicalPlan({ plan, completeHistoryRows: history });
+            const reconstructed = planningState(current, physicalPlan.expectedRows, true);
+            let saved;
+            try {
+                saved = await writeEmployeeDeparture({ ...request, ...dependencies,
+                    [ACTIVE_SESSION]: session, [PLANNING_STATE]: reconstructed });
+            } catch (error) {
+                if (historyFailure(error) || error?.code === A.PREFIX + 'BOUNDARY_FAILED') throw D.manualReview(error);
+                throw error;
+            }
+            const finalPlan = planEmployeeHistoryAutomaticReconstruction({ scope,
+                currentEmployee: reconstructed.current, completeHistoryRows: reconstructed.history });
+            if (!A.isNoOp(finalPlan) || finalPlan.rowDiffs.length || reconstructed.executionSteps.length !== 1) {
+                throw D.manualReview('NON_IDEMPOTENT_DEPARTURE');
+            }
+            // Reference eligibility is checked before offering approval and
+            // checked again at both writers' boundaries in the transaction.
+            for (const id of new Set([...physicalPlan.rowsToUpdate,
+                ...reconstructed.executionSteps[0].physicalPlan.rowsToUpdate].map(update => update.historyId))) {
+                try {
+                    const references = await checkedHistoryReferences({ referenceChecker, connection, historyIds: [id], session });
+                    if (partitionHistoryUpdateReferences(references).liveDereference.length) throw A.failure('REFERENCE_CHECK_FAILED');
+                } catch { throw A.failure('REFERENCE_CHECK_FAILED'); }
+            }
+            if (!reconstruction) {
+                const error = A.failure('REQUIRED_FOR_DEPARTURE', 200);
+                error.previewToken = token;
+                error.reconstructionPreview = buildEmployeeHistoryReconstructionPreview({ plan,
+                    completeHistoryRows: history, catalogs: await correctionCatalogLoader({ session }) });
+                throw error;
+            }
+            const reconstructionOnlyPlan = planEmployeeHistoryAutomaticReconstruction({ scope,
+                currentEmployee: current, completeHistoryRows: physicalPlan.expectedRows });
+            const persistedToken = A.buildAutomaticReconstructionPreviewToken({ scope,
+                currentEmployee: current, completeHistoryRows: physicalPlan.expectedRows, plan: reconstructionOnlyPlan });
+            const audit = buildAutomaticReconstructionAudit({ scope, current, history, physicalPlan, plan,
+                actorUserId, previewToken: token, persistedToken });
+            Object.assign(audit.diagnostics, { compositeVersion: D.VERSION, compositeOperation: D.OPERATION,
+                saveRequestHash: A.hash(normalizedRequest), requestedDeparture: normalizedRequest.departureDate });
+            await executeEmployeeHistoryAutomaticReconstructionPlan({ ...dependencies, physicalPlan,
+                currentBefore: current, filter: scope, employeeId, session,
+                automaticReconstructionPlan: plan, automaticHistoryBefore: history, automaticAuditRecord: audit });
+            // Recompute the real lifecycle plan from fresh, reconstructed
+            // transactional documents, rather than executing discovery's plan.
+            const afterReconstruction = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
+            const afterCurrent = await employeeModel.findOne({ ...scope, _id: employeeId })
+                .select('+employee_profile_mutation_sequence').session(session).lean();
+            const actual = planningState(afterCurrent, afterReconstruction, true);
+            saved = await writeEmployeeDeparture({ ...request, ...dependencies,
+                [ACTIVE_SESSION]: session, [PLANNING_STATE]: actual });
+            if (actual.executionSteps.length !== 1) throw A.failure('FINAL_VERIFICATION_FAILED');
+            await executeFinalMutationPlan(actual.executionSteps[0]);
+            const finalCurrent = await employeeModel.findOne({ ...scope, _id: employeeId })
+                .select('+employee_profile_mutation_sequence').session(session).lean();
+            const finalHistory = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
+            const final = planEmployeeHistoryAutomaticReconstruction({ scope,
+                currentEmployee: finalCurrent, completeHistoryRows: finalHistory });
+            const employeeState = ({ updatedAt, employee_profile_mutation_sequence, ...row }) => row;
+            if (!A.isNoOp(final) || final.rowDiffs.length ||
+                !A.equal(employeeState(finalCurrent), employeeState(actual.current)) ||
+                !A.equal(A.ordered(finalHistory), A.ordered(actual.history))) throw A.failure('FINAL_VERIFICATION_FAILED');
+            return { ...saved, employee: finalCurrent,
+                history: finalHistory.find(row => String(row._id) === String(saved.history._id)),
+                automaticReconstructionApplied: true };
+        });
+    } catch (error) {
+        if (error?.hasErrorLabel?.('UnknownTransactionCommitResult') ||
+            error?.errorLabels?.includes('UnknownTransactionCommitResult')) throw A.failure('COMMIT_UNCERTAIN', 503);
+        throw error;
+    }
+}
+
 // First departure closes the current cycle's terminal evidence and latest
 // work-terms profile without inserting another history version.
 async function writeEmployeeDeparture({ scope, employeeId, departureDate, input = {}, effectiveFrom,
@@ -3012,16 +3208,18 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
     auditModel = EmployeeHistoryRepairAuditModel,
     auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
     referenceChecker = findHistoryIdReferences,
-    capabilityProbe = transactionCapability }) {
+    capabilityProbe = transactionCapability, [ACTIVE_SESSION]: activeSession = null,
+    [PLANNING_STATE]: planningState = null }) {
     if (!scope || !['team', 'company_kod', 'kodikos'].every(key =>
         typeof scope[key] === 'string' && scope[key].trim()) ||
         typeof employeeId !== 'string' || !employeeId.trim()) C.invalid('scope', 'complete employee scope required');
     const filter = Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, scope[key]]));
     const submittedInput = input, submittedMaintenance = maintenance;
     return inProfileTransaction(connection, capabilityProbe, async session => {
-        await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
+        if (!planningState) await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
         let input = submittedInput, maintenance = submittedMaintenance;
-        const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
+        const current = planningState ? planningState.current
+            : await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         // Normalize submitted base values before checking intent. Unlike derived
         // echoes, canonical zeros must survive omission of unchanged form fields.
@@ -3041,7 +3239,8 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
             const delta = assertDepartureCorrectionMaintenanceUnchanged({ current, input, maintenance });
             departureFormEchoFields = new Set([...departureFormEchoFields, ...delta.semanticallyUnchangedFields]);
         }
-        const persistedRows = await completeHistoryLean(historyModel, filter, session);
+        const persistedRows = planningState ? planningState.history
+            : await completeHistoryLean(historyModel, filter, session);
         const initialCanonical = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: current, historyRows: persistedRows });
         let deferredAmbiguityDeparturePlan = null;
@@ -3123,7 +3322,7 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
                 ? current.hmeromhnia_proslhpshs : effectiveFrom;
             return writeEmployeeEmploymentProfile({ scope, employeeId, input, effectiveFrom: baselineFrom,
                 maintenance, connection, employeeModel, historyModel, capabilityProbe,
-                [ACTIVE_SESSION]: session });
+                [ACTIVE_SESSION]: session, [PLANNING_STATE]: planningState });
         }
         const departure = C.calendarDate(transition.departure);
         const submitted = new Set(maintenance.submittedFormFields || []);
@@ -3227,12 +3426,23 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
                 throw failure('EMPLOYEE_DEPARTURE_DEFERRED_AMBIGUITY_INVALID_BOUNDARY');
             }
         }
-        const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: persistedRows, desiredRows,
+        const preserve = planningState?.reconstructionPreservesHistory === true;
+        // Canonical equivalence is used only to resolve the existing lifecycle
+        // target. Reconstruction owns all original rows; departure may close
+        // the proven terminal/profile row, never collapse equivalent artifacts.
+        if (preserve && (deferredAmbiguityDeparturePlan || lifecycleReclassificationPlan?.status ===
+            LIFECYCLE_RECLASSIFICATION_PLAN_STATUSES.APPLYABLE || Object.keys(profilePatch).length)) {
+            throw AutomaticReconstruction.failure('BOUNDARY_FAILED');
+        }
+        const departureRows = preserve ? persistedRows.map(row => ({ ...row,
+            ...(historyPatches.get(String(row._id)) || {}) })) : desiredRows;
+        const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: persistedRows, desiredRows: departureRows,
             historyModel, replacementByDeletedId: canonicalBefore.replacementByDeletedId });
-        const applied = await executeFinalMutationPlan({ physicalPlan,
+        const applied = await applyOrExecuteFinalMutationPlan({ physicalPlan,
             currentBefore: current, currentPatch: storedEmployeePatch,
             filter, employeeId: current._id, session, employeeModel, historyModel,
             auditModel, auditCollectionChecker, referenceChecker, connection,
+            controlledReconstructedDeparture: preserve,
             diagnostics: deferredAmbiguityDeparturePlan
                 ? { ...deferredAmbiguityDeparturePlan.diagnostics,
                     planFingerprint: deferredAmbiguityDeparturePlan.planFingerprint,
@@ -3247,13 +3457,13 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
             controlledDeferredAmbiguityDeparture: Boolean(deferredAmbiguityDeparturePlan),
             deferredAmbiguityDeparturePlan,
             targetedHistoryId: terminal._id,
-            targetedPatch: historyPatches.get(String(terminal._id)) || {} });
+            targetedPatch: historyPatches.get(String(terminal._id)) || {} }, planningState);
         return { employee: applied.verified.current, mode: 'MODE_DEPARTURE',
             history: applied.verified.history.find(row => String(row._id) === String(terminal._id)),
             deferredAmbiguityDeparturePlan,
             deferredAmbiguityDeparturePostcondition:
                 applied.verified.deferredAmbiguityDeparturePostcondition || null };
-    });
+    }, activeSession);
 }
 
 async function loadDepartureCorrectionAuditContext({ auditModel, filter, employeeId, session }) {
@@ -4064,6 +4274,7 @@ module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENA
     writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithGuidedResolution,
     writeEmployeeEmploymentProfileWithUniqueSafeRepair,
     writeEmployeeEmploymentProfileWithAutomaticReconstruction,
+    writeEmployeeDepartureWithAutomaticReconstruction,
     normalizedUniqueSafeRepairSaveRequest,
     writeEmployeeDeparture, writeEmployeeDepartureDateCorrection,
     writeEmployeeDepartureCancellation, writeEmployeeInvalidDepartureCorrection,

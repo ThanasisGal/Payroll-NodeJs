@@ -55,15 +55,19 @@ function createSingleFlight() {
 async function continueEmployeeSaveAfterReconstruction({ response, originalPayload, retryRequest, previewUi, swal }) {
     if (!response.headers.get('content-type')?.includes('application/json')) return { response, originalPayload };
     const data = await response.clone().json();
+    const departure = data?.reason === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED_FOR_DEPARTURE' &&
+        data.operation === 'FIRST_DEPARTURE' &&
+        data.nextAction?.type === 'APPROVE_HISTORY_RECONSTRUCTION_AND_CONTINUE_DEPARTURE';
     if (response.status !== 200 || data?.actionRequired !== true ||
-        data.reason !== 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED') return { response, originalPayload };
+        (!departure && data.reason !== 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED')) return { response, originalPayload };
     swal.close();
     if (!previewUi?.approveForSave) {
         await swal.fire({ icon: 'warning', title: 'Η αποθήκευση σταμάτησε',
             text: 'Δεν φορτώθηκε η προεπισκόπηση του Ιστορικού. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Κλείστε το μήνυμα· οι αλλαγές παραμένουν στη φόρμα.\n2. Δοκιμάστε ξανά ή ζητήστε βοήθεια από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΠΟΘ-01.' });
         return { cancelled: true };
     }
-    const approved = await previewUi.approveForSave({ preview: data.reconstructionPreview, token: data.previewToken });
+    const approved = await previewUi.approveForSave({ preview: data.reconstructionPreview, token: data.previewToken,
+        operation: departure ? 'FIRST_DEPARTURE' : 'EMPLOYEE_SAVE' });
     if (!approved) return { cancelled: true };
     const approvedPayload = { ...originalPayload, reconstruction: { previewToken: data.previewToken, approvalAccepted: true } };
     const finalResponse = await retryRequest(approvedPayload);
@@ -77,6 +81,16 @@ async function continueEmployeeSaveAfterReconstruction({ response, originalPaylo
 
 async function handleEmployeeSaveHistoryAction(response, data, { swal, documentRef }) {
     const action = data?.nextAction;
+    if (response.status === 200 && response.ok && data?.success === false && data.actionRequired === true &&
+        data.reason === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_DEPARTURE_BLOCKED' &&
+        data.operation === 'FIRST_DEPARTURE' && action?.type === 'OPEN_EMPLOYEE_HISTORY_TAB') {
+        const tab = [...documentRef.querySelectorAll('.menu_Links li')].find(
+            link => link.textContent.trim() === 'Ιστορικό Προσλήψεων/Αλλαγών');
+        if (tab && !tab.classList.contains('active')) tab.click();
+        await swal.fire({ icon: 'info', title: 'Χρειάζεται έλεγχος του Ιστορικού', text: data.message,
+            confirmButtonText: 'Κλείσιμο', allowOutsideClick: false, returnFocus: false });
+        return true;
+    }
     if (response.status !== 200 || !response.ok || data?.success !== false ||
         data?.actionRequired !== true ||
         data?.reason !== 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE' ||
@@ -97,26 +111,12 @@ async function handleEmployeeSaveHistoryAction(response, data, { swal, documentR
         link => link.textContent.trim() === 'Ιστορικό Προσλήψεων/Αλλαγών');
     if (historyTab && !historyTab.classList.contains('active')) historyTab.click();
 
-    const table = documentRef.getElementById('istorikoTable');
-    const targetRows = action.targetHistoryId && table
-        ? table.querySelectorAll(`tr.istoriko-row[data-id="${action.targetHistoryId}"]`) : [];
-    const row = targetRows.length === 1 ? targetRows[0] : null;
-    const review = row?.querySelector('[data-action="review"]');
-    const accessMode = table?.dataset.historyAccessMode ||
-        (table?.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
-    const allowed = accessMode === 'ADMIN_FULL' ||
-        (accessMode === 'SUPERVISOR_PROBLEM_SCOPE' && row?.dataset.canManageRow === 'true');
-    if (historyTab?.classList.contains('active') && review && allowed &&
-        row.dataset.state !== 'deleted' && !review.disabled &&
-        !review.matches(':disabled') && review.getAttribute('aria-disabled') !== 'true') {
-        review.click();
-        return true;
-    }
     await swal.fire({
-        icon: 'info', title: 'Επιλέξτε την εγγραφή στο Ιστορικό',
-        text: 'Η εφαρμογή δεν μπορεί να επιλέξει με ασφάλεια ποια εγγραφή αφορά η αλλαγή. ' +
-            'Ελέγξτε το Ιστορικό και επιλέξτε «Έλεγχος / Διόρθωση» στην εγγραφή που γνωρίζετε ότι αφορά τη μεταβολή. ' +
-            'Δεν αποθηκεύτηκε καμία αλλαγή.',
+        icon: 'info', title: 'Ελέγξτε το Ιστορικό',
+        text: 'Η αποχώρηση χρειάζεται έλεγχο πριν συνεχιστεί. Δεν αποθηκεύτηκε καμία αλλαγή.\n' +
+            '1. Ελέγξτε το Ιστορικό· οι αλλαγές σας παραμένουν στη φόρμα.\n' +
+            '2. Επιλέξτε «Έλεγχος & Αυτόματη Τακτοποίηση», αν είναι διαθέσιμο, ή χρησιμοποιήστε «Έλεγχος / Διόρθωση» στην εγγραφή που αφορά τη μεταβολή.\n' +
+            'Κωδικός αναφοράς: ' + data.reason + '.',
         confirmButtonText: 'Κλείσιμο', allowOutsideClick: false
     });
     return true;

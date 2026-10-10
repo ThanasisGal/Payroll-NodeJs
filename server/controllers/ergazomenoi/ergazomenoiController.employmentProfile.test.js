@@ -223,9 +223,11 @@ function handler(mode, db) {
             db.dispatch?.push('writeEmployeeEmploymentProfileWithUniqueSafeRepair');
             return W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps });
         },
-        writeEmployeeDeparture: args => {
+        writeEmployeeDepartureWithAutomaticReconstruction: args => {
             db.dispatch?.push('writeEmployeeDeparture');
-            return W.writeEmployeeDeparture({ ...args, ...db.deps }).catch(error => {
+            db.departureCompositeRequest = args;
+            const writer = db.departureComposite ? W.writeEmployeeDepartureWithAutomaticReconstruction : W.writeEmployeeDeparture;
+            return writer({ ...args, ...db.deps }).catch(error => {
                 db.departureError = error; throw error;
             });
         },
@@ -1952,6 +1954,65 @@ test('Phase 3B controller: normal Save returns a sanitized automatic preview bef
     assert.doesNotMatch(JSON.stringify(res.body), /rowDiffs|proposedRows|sourceHistoryIds/);
     assert.equal(db.writes(), 0); assert.deepEqual(db.state(), before);
 });
+
+test('first-departure controller: retained original Save previews with zero writes, then commits both audits through the real composite', async () => {
+    const original = await fullFormDepartureState();
+    const sparse = require('../../services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures').caseB();
+    original.history = sparse.completeHistoryRows.map((row, index) => ({ ...row, ...scope,
+        _id: `60000000000000000000000${index + 1}`,
+        ...(row.hmeromhnia_proslhpshs ? { hmeromhnia_proslhpshs: '2026-04-01' } : {}),
+        ...(row.hmeromhnia_allaghs_symbashs ? { hmeromhnia_allaghs_symbashs:
+            row.aa_eggrafhs === '0003' ? '2026-05-01' : '2026-04-01' } : {}),
+        ...(row.hmeromhnia_lhxhs_symbashs ? { hmeromhnia_lhxhs_symbashs: '2026-12-31' } : {}) }));
+    original.employee.hmeromhnia_allaghs_symbashs = '2026-05-01';
+    original.employee.hmeromhnia_isxyos_oron_ergasias_apo = '2026-05-01';
+    const cast = (row, model) => Object.fromEntries(Object.entries(row).map(([field, value]) => {
+        const castValue = field === '_id' ? String(value) : model.schema.path(field)?.cast(value) ?? value;
+        return [field, Array.isArray(castValue) ? [...castValue] : castValue];
+    }));
+    const tx = require('../../../test/fixtures/employeeProfileTransactionStore').store([{
+        employee: cast(original.employee, Models.ErgazomenoiModel),
+        history: original.history.map(row => cast(row, Models.IstorikoProslhpseonAllagonModel))
+    }]);
+    const db = { departureComposite: true, requestScope: scope, state() {
+        const state = tx.state(); return { employee: state.employees[0], history: state.history, audits: state.audits };
+    }, employeeModel: {
+        findOne: () => ({ select() { return this; }, lean: async () => db.state().employee }),
+        hydrate: Models.ErgazomenoiModel.hydrate.bind(Models.ErgazomenoiModel)
+    }, historyModel: tx.deps.historyModel, deps: { ...tx.deps,
+        correctionCatalogLoader: async () => ({}),
+        userModel: { findById: () => ({ select() { return this; }, session() { return this; },
+            lean: async () => ({ privileges: 'A', team: 'THA', situation: 'A' }) }) }
+    } };
+    const payload = { ...fullFormDeparturePayload(original.employee, '2026-10-04'),
+        hmeromhnia_allaghs_symbashs: '2026-05-01', hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01' };
+    const before = tx.state(), first = await submit('edit', payload, db);
+    assert.equal(first.res.body.reason, 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED_FOR_DEPARTURE',
+        JSON.stringify(first.res.body));
+    assert.equal(first.res.body.nextAction.type, 'APPROVE_HISTORY_RECONSTRUCTION_AND_CONTINUE_DEPARTURE');
+    assert.equal(db.departureCompositeRequest.departureDate, '2026-10-04');
+    assert.equal(db.departureCompositeRequest.actorUserId, 'authorized-user');
+    assert.deepEqual(tx.state(), before);
+    assert.equal(tx.events.some(event => ['write', 'fence', 'commit'].includes(event.type)), false);
+    const continued = await submit('edit', payload, db, { reconstruction: {
+        previewToken: first.res.body.previewToken, approvalAccepted: true } });
+    assert.equal(continued.res.body.success, true, JSON.stringify(continued.res.body));
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.toISOString().slice(0, 10), '2026-10-04');
+    assert.deepEqual(db.state().audits.map(audit => audit.mutationSource),
+        ['EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION', 'DEPARTURE']);
+    assert.equal(tx.events.filter(event => event.type === 'commit').length, 1);
+});
+
+for (const field of ['rowDiffs', 'proposedRows', 'sourceHistoryIds', 'historyPatches']) {
+    test(`Employee controller rejects client ${field} at the request boundary`, async () => {
+        const stored = await initial(), db = memory(stored);
+        const { res } = await submit('edit', form(), db, { [field]: [] });
+        assert.equal(res.code, 400);
+        assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_INVALID_REQUEST');
+        assert.equal(db.writes(), 0);
+        assert.deepEqual(db.state(), stored);
+    });
+}
 for (const reconstruction of [{ approvalAccepted: false }, { approvalAccepted: true }, { approvalAccepted: true, previewToken: [] }]) {
     test('Phase 3B controller rejects invalid continuation before any writer', async () => {
         const stored = await initial(), db = memory(stored); db.composite = true;

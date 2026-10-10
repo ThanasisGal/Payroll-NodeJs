@@ -11,7 +11,7 @@ const source = fs.readFileSync(
 
 assert.match(
     source,
-    /writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithAutomaticReconstruction,[\s\S]*writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire,[\s\S]*writeEmployeeEmploymentHistoryOperations/
+    /writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithAutomaticReconstruction,[\s\S]*writeEmployeeDepartureWithAutomaticReconstruction, writeEmployeeDepartureCancellation, writeEmployeeRehire,[\s\S]*writeEmployeeEmploymentHistoryOperations/
 );
 
 const start = source.indexOf('static postErgazomenoiUpdate');

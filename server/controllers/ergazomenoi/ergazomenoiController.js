@@ -3,7 +3,7 @@ const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazome
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
 const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithAutomaticReconstruction,
-    writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire,
+    writeEmployeeDepartureWithAutomaticReconstruction, writeEmployeeDepartureCancellation, writeEmployeeRehire,
     writeEmployeeEmploymentHistoryOperations,
     writeEmployeeDepartureDateCorrection,
     deleteEmployeeAndEmploymentHistory, selectMaintenanceMode } =
@@ -3430,7 +3430,7 @@ class ergazomenoiController {
             req.body || {};
         let resolutionConfirmation;
         try {
-            validateApproval(req.body?.reconstruction);
+            validateApproval(req.body?.reconstruction, req.body);
             resolutionConfirmation = normalizeEmployeeHistoryResolutionConfirmation(
                 req.body?.resolution);
         } catch (error) {
@@ -3957,7 +3957,7 @@ class ergazomenoiController {
                 error.statusCode = 409;
                 throw error;
             }
-            if (req.body?.reconstruction && (rehireIntent === true || isDepartureCancellation || isDepartureCorrection || isFirstDeparture)) {
+            if (req.body?.reconstruction && (rehireIntent === true || isDepartureCancellation || isDepartureCorrection)) {
                 throw Object.assign(new Error('EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_SAVE_CONFLICT'), {
                     code: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_SAVE_CONFLICT', statusCode: 409 });
             }
@@ -4008,11 +4008,13 @@ class ergazomenoiController {
                             submittedFormValues: formData }
                     })
                 : isFirstDeparture
-                    ? await writeEmployeeDeparture({
+                    ? await writeEmployeeDepartureWithAutomaticReconstruction({
                         scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
                             kodikos: kodikosErgazomenoy },
                         employeeId: ergazomenoiId,
                         departureDate: submittedDeparture,
+                        reconstruction: req.body?.reconstruction,
+                        actorUserId: req.session?.userId ?? null,
                         input: profileInput(formData, 'edit'),
                         effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
                             formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
