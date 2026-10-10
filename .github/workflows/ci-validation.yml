@@ -787,6 +787,8 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionContract.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyService.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionSave.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionReal0006.test.js"
             "server/controllers/ergazomenoi/employeeHistoryReconstructionApplyController.test.js"
             "server/services/ergazomenoi/employeeHistoryCanonicalizationService.test.js"
             "server/services/ergazomenoi/employeeHistoryReferenceAuditService.test.js"
@@ -807,6 +809,7 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryReferenceWriteFenceService.test.js"
             "server/services/ergazomenoi/employeeMaintenanceHistoryPlannerService.test.js"
             "server/utils/ergazomenoi/employmentProfileMaintenance.lifecycleError.test.js"
+            "server/utils/ergazomenoi/employeeNormalSaveNormalization.test.js"
             "server/services/ergazomenoi/employeeHistoryReconstructionPreviewService.test.js"
             "server/controllers/ergazomenoi/employeeHistoryReconstructionPreviewController.test.js"
             "server/services/ergazomenoi/employeeHistoryEditorStateService.test.js"
@@ -880,7 +883,7 @@ jobs:
       - name: Run real SweetAlert Employee History regression
         run: |
           npx playwright install --with-deps chromium
-          node --test public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js
+          node --test public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js public/js/ergazomenoi/genika/calcProyphresia.browser.test.js public/js/ergazomenoi/genika/istorikoSummary.browser.test.js
 
       - name: Audit production dependencies
         run: node scripts/ci/audit-production-dependencies.js

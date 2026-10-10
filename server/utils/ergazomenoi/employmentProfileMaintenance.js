@@ -5,6 +5,22 @@ const { validatePublicBusinessOptions, validatePublicFactQuestions,
     validatePublicUserCorrectionConflicts } =
     require('../../services/ergazomenoi/employeeHistoryResolutionAnalysisService');
 
+// Employee-only business normalization. Do not extend to unrelated numbers.
+const BASE_ZERO_NORMALIZABLE_FIELDS = Object.freeze([
+    'proyphresia_se_eth', 'proyphresia_se_mhnes', 'proyphresia_adeias_se_eth'
+]);
+// calcProyphresia.js overwrites these on page load using today's date.
+// They carry no authoritative user intent during a first departure.
+const AUTO_DERIVED_READONLY_FIELDS = Object.freeze([
+    'synolo_proyphresias_se_eth', 'synolo_proyphresias_se_mhnes',
+    'proyphresia_apozhmioshs_se_eth', 'misthologiko_klimakio'
+]);
+function normalizeBaseExperienceValue(value) {
+    if (value === undefined || value === null || value === '') return 0;
+    if (typeof value === 'string' && value.trim() !== '' && Number(value) === 0) return 0;
+    return value;
+}
+
 const DEPARTURE_FORM_ECHO_ALIASES = Object.freeze({
     typos_taytothtas: ['taytothta_stathera'],
     yphkoothta: ['yphkoothta_stathera'],
@@ -50,6 +66,7 @@ function decodeDepartureFormArrayEcho(value) {
 }
 
 function departureFormComparable(field, value) {
+    if (BASE_ZERO_NORMALIZABLE_FIELDS.includes(field)) return normalizeBaseExperienceValue(value);
     if (value instanceof Date) return Number.isNaN(value.getTime())
         ? String(value) : value.toISOString().slice(0, 10);
     if (value === null || value === undefined || value === '') {
@@ -326,4 +343,5 @@ function profileError(res, error, options = {}) {
 }
 module.exports = { profileInput, profileError, isEmploymentProfileError, historyEditorChanges,
     submittedEmployeeMaintenanceFields, departureMaintenanceValuesEqual,
-    departureMaintenanceFormEchoMatchesCurrent, sanitizedEmployeeHistoryResolution };
+    departureMaintenanceFormEchoMatchesCurrent, sanitizedEmployeeHistoryResolution,
+    BASE_ZERO_NORMALIZABLE_FIELDS, AUTO_DERIVED_READONLY_FIELDS, normalizeBaseExperienceValue };

@@ -30,7 +30,7 @@ test('η διόρθωση ιστορικού επαναχρησιμοποιεί 
 test('ο ελεγκτής αντλεί ομάδα, εταιρεία και κωδικό εργαζομένου από το εξουσιοδοτημένο πλαίσιο', () => {
     const source = controllerSource();
     const scopeCheck = source.indexOf('requireScopedEmployeeForUpdate({');
-    const writer = source.indexOf('writeEmployeeEmploymentProfileWithUniqueSafeRepair({',
+    const writer = source.indexOf('writeEmployeeEmploymentProfileWithAutomaticReconstruction({',
         scopeCheck);
     assert.ok(scopeCheck > 0 && writer > scopeCheck);
     const block = source.slice(scopeCheck, writer + 2500);

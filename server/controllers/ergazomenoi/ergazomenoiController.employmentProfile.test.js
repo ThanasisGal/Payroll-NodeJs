@@ -88,7 +88,7 @@ function memory(initial = { employee: null, history: [] }, fail = '') {
     }, async endSession() { ended = true; } };
     const matches = (row, filter) => row && Object.entries(filter).every(([key, value]) =>
         value == null ? row[key] == null : value instanceof Date ? new Date(row[key]).getTime() === value.getTime() : String(row[key]) === String(value));
-    function query(read) { let sort; return { session(s) { assert.equal(s, session); return this; }, select() { return this; },
+    function query(read) { let sort; return { mongooseOptions() { return this; }, session(s) { assert.equal(s, session); return this; }, select() { return this; },
         sort(value) { sort = value; return this; }, limit: async () => [], lean: async () => {
             const result = plain(read());
             if (sort && Array.isArray(result)) result.sort((a, b) => {
@@ -207,6 +207,18 @@ function handler(mode, db) {
                 history: db.state().history[0], afm: '123456789' }
             : { action: 'CREATE_NEW', afm: '' }),
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
+        ...require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract'),
+        // Baseline controller regressions keep the original guided persistence
+        // boundary; composite integration cases below explicitly opt into it.
+        writeEmployeeEmploymentProfileWithAutomaticReconstruction: args => {
+            db.compositeRequest = args;
+            return db.composite ? W.writeEmployeeEmploymentProfileWithAutomaticReconstruction({ ...args, ...db.deps,
+                correctionCatalogLoader: async () => ({}) })
+            : (() => {
+                db.dispatch?.push('writeEmployeeEmploymentProfileWithUniqueSafeRepair');
+                return W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps });
+            })();
+        },
         writeEmployeeEmploymentProfileWithUniqueSafeRepair: args => {
             db.dispatch?.push('writeEmployeeEmploymentProfileWithUniqueSafeRepair');
             return W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps });
@@ -239,6 +251,25 @@ async function submit(mode, input, db = memory(), body = {}) {
     assert.equal(mongoose.connection.readyState, 0);
     return { db, res };
 }
+
+test('clean EFKA checkbox audit: mhteres is not mapped null intent; same-name worker/employer flags remain owned booleans', async () => {
+    const stored = await initial();
+    Object.assign(stored.employee, { meiosh_eisforon_mhteron: false,
+        meiosh_eisforon_ergazomenon: false, epidothsh_eisforon_ergodoth: false });
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...form(), mhteres: false,
+        meiosh_eisforon_ergazomenon: false, epidothsh_eisforon_ergodoth: false }, db);
+    assert.equal(res.code, 200);
+    const maintenance = db.compositeRequest.maintenance;
+    assert.equal(maintenance.employeeChanges.meiosh_eisforon_mhteron, undefined);
+    assert.equal(maintenance.submittedEmployeeFields.includes('meiosh_eisforon_mhteron'), false);
+    assert.equal(db.state().employee.meiosh_eisforon_mhteron, false);
+    for (const field of ['meiosh_eisforon_ergazomenon', 'epidothsh_eisforon_ergodoth']) {
+        assert.equal(maintenance.employeeChanges[field], false);
+        assert.equal(maintenance.submittedEmployeeFields.includes(field), true);
+        assert.equal(db.state().employee[field], false);
+    }
+});
 test('add and update controller paths reject invalid daily rest before any writer', async () => {
     const invalidSchedule = twoDaySchedule(
         [{ start: '14:00', end: '22:00' }],
@@ -863,7 +894,9 @@ test('controller downstream Save response, uploads, ERGANI and schedule code unc
         if (start.includes('ΕΠΕΞΕΡΓΑΣΙΑ PDF') || start.includes('ΑΝΑΚΤΗΣΗ ΔΕΔΟΜΕΝΩΝ')) chunk = chunk.replace(
             /hmeromhnia: \{\n\s*\$gte: new Date\(formData\.hmeromhnia_allaghs_orarioy_apo\),\n\s*\$lte: new Date\(formData\.hmeromhnia_allaghs_orarioy_eos\)\n\s*\}/,
             match => match.replace('hmeromhnia: {', 'hmeromhnia: mongoose.trusted({').replace(/\n(\s*)\}$/, '\n$1})'));
-        assert(source.slice(newStart).startsWith(chunk), start);
+        const compared = source.slice(newStart)
+            .replace("message: automaticReconstructionApplied ? 'Η αποθήκευση ολοκληρώθηκε και το Ιστορικό τακτοποιήθηκε.' : 'Εργαζόμενος ενημερώθηκε επιτυχώς',\n            automaticReconstructionApplied,", "message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',");
+        assert(compared.startsWith(chunk), start);
     }
 });
 
@@ -1266,7 +1299,7 @@ test('generic Add/Edit database failures keep baseline error responses', async (
         message: 'Σφάλμα κατά την ενημέρωση εργαζόμενου',
         errorMessage: 'Σφάλμα κατά την ενημέρωση εργαζόμενου' });
 });
-test('semantic controller audit: allocation and Add/Edit field maps retain baseline parity', () => {
+test('semantic controller audit: field maps retain baseline parity except approved base experience zeros', () => {
     const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
     const part = (code, start, end, offset = 0) => { const a = code.indexOf(start, offset); const b = code.indexOf(end, a); assert(a >= 0 && b > a); return code.slice(a, b).trim(); };
     const addOffset = code => code.indexOf('static postErgazomenoiForm');
@@ -1275,8 +1308,12 @@ test('semantic controller audit: allocation and Add/Edit field maps retain basel
     assert.match(source, /submittedAddPatch\(newErgazomenos, submittedFormKeys, addEmployeeOwnedFields\)/);
     const editOffset = code => code.indexOf('static postErgazomenoiUpdate');
     const noDivider = text => text.replace(/\n\s*\/\/ =+$/, '').trim();
-    assert.equal(part(source, '        const filteredDataErgazomenoi =', '        const updateFieldsIstoriko =', editOffset(source)),
-        noDivider(part(baseline, '        const filteredDataErgazomenoi =', '        // ✅ 5)', editOffset(baseline))));
+    let expectedEditMap = noDivider(part(baseline, '        const filteredDataErgazomenoi =', '        // ✅ 5)', editOffset(baseline)));
+    for (const field of ['proyphresia_se_eth', 'proyphresia_se_mhnes', 'proyphresia_adeias_se_eth']) {
+        expectedEditMap = expectedEditMap.replace(`${field}: formData.${field},`,
+            `${field}: normalizeBaseExperienceValue(formData.${field}),`);
+    }
+    assert.equal(part(source, '        const filteredDataErgazomenoi =', '        const updateFieldsIstoriko =', editOffset(source)), expectedEditMap);
     assert.equal(part(source, '            const toNumber =', '            const submittedDeparture =', editOffset(source)),
         part(baseline, '            const toNumber =', '            updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate', editOffset(baseline)));
     assert.match(source, /const addHistoryValues = \{/);
@@ -1878,4 +1915,193 @@ test('normal Save keeps stale and invalid guided envelopes at their original sta
             assert.equal(db.writes(), 0);
         }
     } finally { W.writeEmployeeEmploymentProfileWithUniqueSafeRepair = original; }
+});
+
+// Phase 3B executes the actual new composite boundary, while the earlier
+// regression cases above keep exercising the guided boundary independently.
+test('Phase 3B controller retains raw lending intent before cleanup and excludes only passive defaults', async () => {
+    const stored = await initial();
+    delete stored.history[0].poso_symbashs_02;
+    const defaults = require('../../utils/ergazomenoi/employeeNormalSaveNormalization').PASSIVE_LENDING_DEFAULTS;
+    for (const field of Object.keys(defaults)) delete stored.employee[field];
+    stored.employee.afora_daneismo_ergazomenoy = false;
+    const db = memory(stored); db.composite = true;
+    const before = plain(db.state());
+    const clean = { ...form(), afora_daneismo_ergazomenoy: false, ...defaults };
+    const first = await submit('edit', clean, db);
+    const forged = await submit('edit', { ...clean, afm_daneizontos_ergodoth: '123456789',
+        untouched: true, readonly: true }, db);
+    assert.equal(first.res.body.reason, 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED');
+    assert.equal(forged.res.body.reason, first.res.body.reason);
+    assert.notEqual(forged.res.body.previewToken, first.res.body.previewToken,
+        'raw non-neutral value must not receive passive treatment after controller cleanup');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), before);
+});
+
+test('Phase 3B controller: normal Save returns a sanitized automatic preview before any business writes', async () => {
+    const stored = await initial();
+    delete stored.history[0].poso_symbashs_02;
+    const db = memory(stored); db.composite = true;
+    const before = plain(db.state());
+    const { res } = await submit('edit', { ...form(), parathrhseis: 'unsaved synthetic note' }, db);
+    assert.equal(res.code, 200); assert.equal(res.body.actionRequired, true);
+    assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED');
+    assert.equal(res.body.nextAction.type, 'APPROVE_HISTORY_RECONSTRUCTION_AND_CONTINUE_SAVE');
+    assert.equal(typeof res.body.previewToken, 'string');
+    assert.doesNotMatch(JSON.stringify(res.body), /rowDiffs|proposedRows|sourceHistoryIds/);
+    assert.equal(db.writes(), 0); assert.deepEqual(db.state(), before);
+});
+for (const reconstruction of [{ approvalAccepted: false }, { approvalAccepted: true }, { approvalAccepted: true, previewToken: [] }]) {
+    test('Phase 3B controller rejects invalid continuation before any writer', async () => {
+        const stored = await initial(), db = memory(stored); db.composite = true;
+        const before = plain(db.state()); const { res } = await submit('edit', form(), db, { reconstruction });
+        assert.equal(res.code, 400); assert.equal(db.writes(), 0); assert.deepEqual(db.state(), before);
+    });
+}
+
+// Experience intent is owned by the server, independently of browser metadata.
+const baseExperienceFields = ['proyphresia_se_eth', 'proyphresia_se_mhnes', 'proyphresia_adeias_se_eth'];
+const derivedExperienceFields = ['synolo_proyphresias_se_eth', 'synolo_proyphresias_se_mhnes',
+    'proyphresia_apozhmioshs_se_eth', 'misthologiko_klimakio'];
+function assertDepartureHistoryStable(before, after) {
+    assert.deepEqual(after.history.map(row => [row._id, row.aa_eggrafhs]),
+        before.history.map(row => [row._id, row.aa_eggrafhs]));
+    for (const [index, row] of after.history.entries()) {
+        const { hmeromhnia_apoxorhshs, hmeromhnia_isxyos_oron_ergasias_eos, updatedAt, ...rest } = row;
+        const { hmeromhnia_apoxorhshs: oldDeparture, hmeromhnia_isxyos_oron_ergasias_eos: oldEnd,
+            updatedAt: oldUpdatedAt, ...oldRest } = before.history[index];
+        assert.deepEqual(rest, oldRest);
+        for (const field of baseExperienceFields) assert.equal(Object.hasOwn(row, field), false, field);
+    }
+    assert.deepEqual(after.audits, before.audits); // No reconstruction Apply.
+}
+test('first departure atomically saves three canonical numeric zeros and ignores page-load totals', async () => {
+    const stored = await fullFormDepartureState();
+    delete stored.employee.proyphresia_se_eth;
+    stored.employee.proyphresia_se_mhnes = null;
+    stored.employee.proyphresia_adeias_se_eth = '';
+    const payload = { ...fullFormDeparturePayload(stored.employee),
+        ...Object.fromEntries(baseExperienceFields.map(field => [field, '0'])),
+        ...Object.fromEntries(derivedExperienceFields.map(field => [field, 77])) };
+    const db = memory(stored), { res } = await submit('edit', payload, db);
+    assert.equal(res.body.success, true, JSON.stringify(res.body));
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-23');
+    assert.equal(db.state().employee.energos, false);
+    for (const field of baseExperienceFields) assert.equal(db.state().employee[field], 0, field);
+    for (const field of derivedExperienceFields) assert.equal(db.state().employee[field], stored.employee[field], field);
+    assertDepartureHistoryStable(stored, db.state());
+});
+for (const field of baseExperienceFields) {
+    for (const before of [undefined, null, '']) for (const submitted of [0, '0', '', null]) {
+        test(`first departure persists ${field}: ${String(before)} -> ${JSON.stringify(submitted)}`, async () => {
+            const stored = await fullFormDepartureState();
+            if (before === undefined) delete stored.employee[field]; else stored.employee[field] = before;
+            const db = memory(stored), { res } = await submit('edit', {
+                ...fullFormDeparturePayload(stored.employee), [field]: submitted
+            }, db);
+            assert.equal(res.body.success, true, JSON.stringify(res.body));
+            assert.equal(db.state().employee[field], 0);
+            assertDepartureHistoryStable(stored, db.state());
+        });
+    }
+    for (const [before, submitted] of [[0, 3], [0, 5], [2, 5], [3, 7], [2, 0], [2, ''], [undefined, 999]]) {
+        test(`first departure protects genuine ${field}: ${String(before)} -> ${submitted}`, async () => {
+            const stored = await fullFormDepartureState();
+            if (before === undefined) delete stored.employee[field]; else stored.employee[field] = before;
+            const db = memory(stored), { res } = await submit('edit', {
+                ...fullFormDeparturePayload(stored.employee), [field]: submitted,
+                derived: true, readonly: true, autoCalculated: true,
+                ...Object.fromEntries(derivedExperienceFields.map(output => [output, 999]))
+            }, db);
+            assertSaveHistoryAction(res);
+            assert.ok(db.departureError.departureCorrectionChangedFields.includes(field));
+            assert.deepEqual(db.state(), stored);
+            assert.equal(db.writes(), 0);
+        });
+    }
+    test(`ordinary Save persists canonical ${field} zero without changing history`, async () => {
+        const stored = await fullFormDepartureState(); delete stored.employee[field];
+        const db = memory(stored), { res } = await submit('edit', {
+            ...fullFormDeparturePayload(stored.employee, ''), [field]: ''
+        }, db);
+        assert.equal(res.body.success, true, JSON.stringify(res.body));
+        assert.equal(db.state().employee[field], 0);
+        assert.deepEqual(db.state().history, stored.history);
+    });
+}
+for (const field of derivedExperienceFields) {
+    test(`first departure ignores only browser-derived ${field}, preserving Employee and History`, async () => {
+        const stored = await fullFormDepartureState(), db = memory(stored);
+        const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+            [field]: Number(stored.employee[field] || 0) + 10 }, db);
+        assert.equal(res.body.success, true, JSON.stringify(res.body));
+        assert.equal(db.state().employee[field], stored.employee[field]);
+        assertDepartureHistoryStable(stored, db.state());
+    });
+    test(`ordinary Save excludes browser-derived ${field} from business intent`, async () => {
+        const stored = await fullFormDepartureState(), db = memory(stored);
+        const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee, ''),
+            [field]: 8 }, db);
+        assert.equal(res.body.success, true, JSON.stringify(res.body));
+        assert.equal(db.state().employee[field], stored.employee[field]);
+        assert.deepEqual(db.state().history, stored.history);
+    });
+}
+for (const failure of ['history', 'commit']) {
+    test(`first departure canonical zeros roll back with ${failure} failure`, async () => {
+        const stored = await fullFormDepartureState();
+        for (const field of baseExperienceFields) delete stored.employee[field];
+        const db = memory(stored, failure), { res } = await submit('edit', {
+            ...fullFormDeparturePayload(stored.employee),
+            ...Object.fromEntries(baseExperienceFields.map(field => [field, 0]))
+        }, db);
+        assert.equal(res.code, 500);
+        assert.ok(db.writes() > 0);
+        assert.deepEqual(db.state(), stored);
+    });
+}
+test('experience exception does not normalize unrelated missing numeric fields', async () => {
+    assert.equal(M.departureMaintenanceValuesEqual('unrelated_numeric', undefined, 0), false);
+    const stored = await fullFormDepartureState(); delete stored.employee.poso_symbashs_02;
+    const db = memory(stored), { res } = await submit('edit', {
+        ...fullFormDeparturePayload(stored.employee), poso_symbashs_02: 3
+    }, db);
+    assertSaveHistoryAction(res); assert.deepEqual(db.state(), stored);
+});
+test('browser-derived outputs cannot mask an authoritative hire-date change', async () => {
+    const stored = await fullFormDepartureState(), db = memory(stored);
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+        hmeromhnia_proslhpshs: '2026-04-02',
+        ...Object.fromEntries(derivedExperienceFields.map(field => [field, 99])) }, db);
+    assertSaveHistoryAction(res);
+    assert.ok(db.departureError.departureCorrectionChangedFields.includes('hmeromhnia_proslhpshs'));
+    assert.deepEqual(db.state(), stored);
+});
+
+test('first departure preserves already-validated stale hidden contract echoes and termination reason', async () => {
+    const stored = await fullFormDepartureState();
+    stored.employee.stoixeio_symbashs_01_hidden = 'stale-browser-echo';
+    stored.employee.stoixeio_symbashs_02_hidden = 'another-stale-echo';
+    stored.employee.logos_peratosis = 'existing-reason';
+    const db = memory(stored), { res } = await submit('edit', {
+        ...fullFormDeparturePayload(stored.employee),
+        stoixeio_symbashs_02: '', stoixeio_symbashs_02_hidden: '', logos_peratosis: ''
+    }, db);
+    assert.equal(res.body.success, true, JSON.stringify(res.body));
+    for (const field of ['stoixeio_symbashs_01_hidden', 'stoixeio_symbashs_02_hidden', 'logos_peratosis']) {
+        assert.equal(db.state().employee[field], stored.employee[field], field);
+    }
+    assertDepartureHistoryStable(stored, db.state());
+});
+test('stale hidden contract echo still cannot authorize a genuine contract change', async () => {
+    const stored = await fullFormDepartureState();
+    stored.employee.stoixeio_symbashs_01_hidden = 'stale-browser-echo';
+    const db = memory(stored), { res } = await submit('edit', {
+        ...fullFormDeparturePayload(stored.employee), stoixeio_symbashs_01: 'changed-contract',
+        stoixeio_symbashs_01_hidden: 'changed-contract'
+    }, db);
+    assertSaveHistoryAction(res);
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.writes(), 0);
 });

@@ -110,6 +110,11 @@ function store(fixtures = [fixture()], { cloneFn = structuredClone } = {}) {
                     const { [FIELD]: ignored, ...businessState } = value;
                     return clone(businessState);
                 }
+                // Match History's Mongoose select:false metadata. A full-document
+                // boundary must explicitly request it on every compared read.
+                if (kind === 'history' && !this.projection?.includes('+history_reference_fence')) {
+                    return clone(value.map(({ history_reference_fence, ...row }) => row));
+                }
                 return clone(value);
             }
         };

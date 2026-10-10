@@ -413,3 +413,23 @@ test('rehire after audited departure starts a new cycle without altering schedul
     assert.equal(cycles[0].departure_date, '2026-09-20');
     assert.equal(cycles[1].hire_date, '2026-10-01');
 });
+
+for (const field of ['proyphresia_se_eth', 'proyphresia_se_mhnes', 'proyphresia_adeias_se_eth']) {
+    test(`writer owns numeric zero normalization without controller conversion: ${field}`, async () => {
+        const initial = auditedFixture(); delete initial.employee[field];
+        const db = database(initial);
+        await depart(db, '2026-09-20', { maintenance: {
+            rejectConcurrentProfileChanges: true,
+            employeeChanges: { [field]: '0', synolo_proyphresias_se_mhnes: 999,
+                misthologiko_klimakio: 999 },
+            submittedEmployeeFields: [field, 'synolo_proyphresias_se_mhnes', 'misthologiko_klimakio'],
+            submittedHistoryChanges: { misthologiko_klimakio: 999 }
+        } });
+        assert.equal(db.state().employee[field], 0);
+        assert.equal(db.state().employee.synolo_proyphresias_se_mhnes, initial.employee.synolo_proyphresias_se_mhnes);
+        assert.equal(db.state().employee.misthologiko_klimakio, initial.employee.misthologiko_klimakio);
+        assert.deepEqual(db.state().history.map(row => [row._id, row.aa_eggrafhs, row.misthologiko_klimakio]),
+            initial.history.map(row => [row._id, row.aa_eggrafhs, row.misthologiko_klimakio]));
+        for (const row of db.state().history) assert.equal(Object.hasOwn(row, field), false);
+    });
+}

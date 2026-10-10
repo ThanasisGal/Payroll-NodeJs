@@ -34,6 +34,22 @@ async function authorize({ actorUserId, userModel, session, scope, current, hist
         problemScope: access.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE
             ? identifyEmployeeHistoryProblemScope({ scope, currentEmployee: current, completeHistoryRows: history }) : null });
 }
+function buildAutomaticReconstructionAudit({ scope, current, history, physicalPlan, plan, actorUserId, previewToken, persistedToken }) {
+    return { employeeScope: { ...scope, employee_id: current._id },
+    currentBefore: current, historyBefore: history, historyAfter: physicalPlan.expectedRows,
+    survivingHistoryIds: history.map(row => String(row._id)), deletedLegacyHistoryIds: [],
+    repairedAt: new Date(), mutationSource: A.OPERATION,
+    diagnostics: { operation: A.OPERATION, version: A.APPLY_VERSION, engineVersion: C.VERSION,
+        actor: { userId: String(actorUserId) }, semanticFingerprint: plan.semanticFingerprint,
+        applyTokenHash: A.hash(previewToken), persistedStateHash: A.hash(persistedToken),
+        plannerStatus: plan.status, assumptionCount: plan.assumptions.length, warningCount: plan.warnings.length,
+        provenanceCounts: plan.diagnostics.provenanceCounts,
+        affectedStableIds: physicalPlan.rowsToUpdate.map(update => update.historyId),
+        changedFieldNames: [...new Set(plan.rowDiffs.map(diff => diff.field))].sort(),
+        changedFieldCount: plan.rowDiffs.length, approvalAccepted: true }
+            };
+}
+
 async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, previewToken, approvalAccepted,
     actorUserId, connection = mongoose.connection, employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel, auditModel = AuditModel, userModel = UserModel,
@@ -80,19 +96,8 @@ async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, 
             const expectedPlan = planner({ scope, currentEmployee: current, completeHistoryRows: physicalPlan.expectedRows });
             const persistedToken = A.buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: current,
                 completeHistoryRows: physicalPlan.expectedRows, plan: expectedPlan });
-            const auditRecord = { employeeScope: { ...scope, employee_id: current._id },
-                currentBefore: current, historyBefore: history, historyAfter: physicalPlan.expectedRows,
-                survivingHistoryIds: history.map(row => String(row._id)), deletedLegacyHistoryIds: [],
-                repairedAt: new Date(), mutationSource: A.OPERATION,
-                diagnostics: { operation: A.OPERATION, version: A.APPLY_VERSION, engineVersion: C.VERSION,
-                    actor: { userId: String(actorUserId) }, semanticFingerprint: plan.semanticFingerprint,
-                    applyTokenHash: A.hash(previewToken), persistedStateHash: A.hash(persistedToken),
-                    plannerStatus: plan.status, assumptionCount: plan.assumptions.length, warningCount: plan.warnings.length,
-                    provenanceCounts: plan.diagnostics.provenanceCounts,
-                    affectedStableIds: physicalPlan.rowsToUpdate.map(update => update.historyId),
-                    changedFieldNames: [...new Set(plan.rowDiffs.map(diff => diff.field))].sort(),
-                    changedFieldCount: plan.rowDiffs.length, approvalAccepted: true }
-            };
+            const auditRecord = buildAutomaticReconstructionAudit({ scope, current, history, physicalPlan,
+                plan, actorUserId, previewToken, persistedToken });
             return executeEmployeeHistoryAutomaticReconstructionPlan({ physicalPlan, currentBefore: current,
                 filter: scope, employeeId, session, employeeModel, historyModel, auditModel,
                 connection, auditCollectionChecker, referenceChecker,
@@ -107,4 +112,4 @@ async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, 
         throw error;
     }
 }
-module.exports = { applyEmployeeHistoryAutomaticReconstruction };
+module.exports = { applyEmployeeHistoryAutomaticReconstruction, actorAccess, authorize, buildAutomaticReconstructionAudit };
