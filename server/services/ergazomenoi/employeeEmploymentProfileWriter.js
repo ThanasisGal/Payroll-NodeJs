@@ -144,12 +144,12 @@ function requestScopedLean(query, session, projection = '') {
     return selected.session(session).lean();
 }
 
-function completeHistoryLean(historyModel, filter, session) {
+function completeHistoryLean(historyModel, filter, session, projection = '') {
     const query = historyModel.find(filter);
     if (typeof query.mongooseOptions === 'function') {
         query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
     }
-    return query.session(session).lean();
+    return requestScopedLean(query, session, projection);
 }
 
 const AUDIT_FIELDS = [...new Set(['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
@@ -1087,13 +1087,15 @@ async function executeReconstructionCurrentOnlySave(step) {
     const { physicalPlan, currentPatch, filter, employeeId, session,
         employeeModel, historyModel } = step;
     const A = AutomaticReconstruction;
+    // Reconstruction's planned rows include this select:false metadata. Read
+    // the same complete documents; keep full typed parity, including the fence.
     if (!session || !employeeMutationFences.get(session)?.has(JSON.stringify([
         ...EMPLOYEE_SCOPE_FIELDS.map(field => String(filter[field])), String(employeeId)])) ||
         physicalPlan.rowsToUpdate.length || physicalPlan.rowsToInsert.length ||
         physicalPlan.rowsToDelete.length || step.canonicalRepairRequired ||
         !A.equal(A.ordered(physicalPlan.beforeRows), A.ordered(physicalPlan.finalRows)) ||
         !A.equal(A.ordered(physicalPlan.beforeRows),
-            A.ordered(await completeHistoryLean(historyModel, filter, session)))) {
+            A.ordered(await completeHistoryLean(historyModel, filter, session, '+history_reference_fence')))) {
         throw A.failure('BOUNDARY_FAILED');
     }
     if (Object.keys(currentPatch).length) {

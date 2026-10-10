@@ -81,5 +81,30 @@ function coincidentLegacyArtifacts() {
     ] };
 }
 
+// Sanitized structural reproduction of 0006: no real ids, personal data or DB
+// access. Keep the same 16/5/4 field differences and hidden fence values.
+function real0006BoundaryStructure() {
+    const { Types } = require('mongoose');
+    const input = coincidentLegacyArtifacts();
+    input.scope = { ...scope, kodikos: '0006' };
+    Object.assign(input.currentEmployee, input.scope, {
+        _id: new Types.ObjectId('600000000000000000000006'),
+        updatedAt: new Date('2026-06-02'), __v: 0,
+        afora_daneismo_ergazomenoy: false, synolo_proyphresias_se_mhnes: 3,
+        forologikh_klimaka: '20260200 - synthetic description'
+    });
+    input.completeHistoryRows.forEach((record, index) => {
+        Object.assign(record, input.scope, {
+            _id: new Types.ObjectId(`60000000000000000000000${index + 1}`),
+            createdAt: new Date(`2026-05-0${index + 1}`),
+            history_reference_fence: [1, 3, 1][index], __v: 0
+        });
+        for (const [field, value] of Object.entries(record)) {
+            if (field.startsWith('hmeromhnia_') && typeof value === 'string') record[field] = new Date(value);
+        }
+    });
+    return input;
+}
+
 module.exports = { scope, workTerms, row, caseA, caseB, caseBWithProfileEvidence,
-    coincidentLegacyArtifacts };
+    coincidentLegacyArtifacts, real0006BoundaryStructure };

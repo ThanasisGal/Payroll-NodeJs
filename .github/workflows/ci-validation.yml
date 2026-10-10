@@ -788,6 +788,7 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyService.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionSave.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionReal0006.test.js"
             "server/controllers/ergazomenoi/employeeHistoryReconstructionApplyController.test.js"
             "server/services/ergazomenoi/employeeHistoryCanonicalizationService.test.js"
             "server/services/ergazomenoi/employeeHistoryReferenceAuditService.test.js"
