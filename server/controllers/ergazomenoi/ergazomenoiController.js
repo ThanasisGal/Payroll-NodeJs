@@ -21,7 +21,7 @@ const {
     rejectEmployeeScheduleDailyRest,
     validateEmployeeScheduleDailyRest
 } = require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService');
-const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
+const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields, normalizeBaseExperienceValue } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { buildEmployeeHistoryEditorStateToken, isEmployeeHistoryEditorStateToken,
     employeeHistoryEditorStaleError } = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
@@ -3553,10 +3553,10 @@ class ergazomenoiController {
             hmnia_lhxhs_dokimastikhs_periodoy: formData.hmnia_lhxhs_dokimastikhs_periodoy || null,
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
             sxesh_ergasias: formData.sxesh_ergasias,
-            proyphresia_se_eth: formData.proyphresia_se_eth,
+            proyphresia_se_eth: normalizeBaseExperienceValue(formData.proyphresia_se_eth),
             proyphresia_apozhmioshs_se_eth: formData.proyphresia_apozhmioshs_se_eth,
-            proyphresia_se_mhnes: formData.proyphresia_se_mhnes,
-            proyphresia_adeias_se_eth: formData.proyphresia_adeias_se_eth,
+            proyphresia_se_mhnes: normalizeBaseExperienceValue(formData.proyphresia_se_mhnes),
+            proyphresia_adeias_se_eth: normalizeBaseExperienceValue(formData.proyphresia_adeias_se_eth),
             synolo_proyphresias_se_eth: formData.synolo_proyphresias_se_eth,
             synolo_proyphresias_se_mhnes: formData.synolo_proyphresias_se_mhnes,
             misthologiko_klimakio: formData.misthologiko_klimakio,

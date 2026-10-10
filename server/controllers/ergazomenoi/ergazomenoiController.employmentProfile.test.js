@@ -1278,7 +1278,7 @@ test('generic Add/Edit database failures keep baseline error responses', async (
         message: 'Σφάλμα κατά την ενημέρωση εργαζόμενου',
         errorMessage: 'Σφάλμα κατά την ενημέρωση εργαζόμενου' });
 });
-test('semantic controller audit: allocation and Add/Edit field maps retain baseline parity', () => {
+test('semantic controller audit: field maps retain baseline parity except approved base experience zeros', () => {
     const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
     const part = (code, start, end, offset = 0) => { const a = code.indexOf(start, offset); const b = code.indexOf(end, a); assert(a >= 0 && b > a); return code.slice(a, b).trim(); };
     const addOffset = code => code.indexOf('static postErgazomenoiForm');
@@ -1287,8 +1287,12 @@ test('semantic controller audit: allocation and Add/Edit field maps retain basel
     assert.match(source, /submittedAddPatch\(newErgazomenos, submittedFormKeys, addEmployeeOwnedFields\)/);
     const editOffset = code => code.indexOf('static postErgazomenoiUpdate');
     const noDivider = text => text.replace(/\n\s*\/\/ =+$/, '').trim();
-    assert.equal(part(source, '        const filteredDataErgazomenoi =', '        const updateFieldsIstoriko =', editOffset(source)),
-        noDivider(part(baseline, '        const filteredDataErgazomenoi =', '        // ✅ 5)', editOffset(baseline))));
+    let expectedEditMap = noDivider(part(baseline, '        const filteredDataErgazomenoi =', '        // ✅ 5)', editOffset(baseline)));
+    for (const field of ['proyphresia_se_eth', 'proyphresia_se_mhnes', 'proyphresia_adeias_se_eth']) {
+        expectedEditMap = expectedEditMap.replace(`${field}: formData.${field},`,
+            `${field}: normalizeBaseExperienceValue(formData.${field}),`);
+    }
+    assert.equal(part(source, '        const filteredDataErgazomenoi =', '        const updateFieldsIstoriko =', editOffset(source)), expectedEditMap);
     assert.equal(part(source, '            const toNumber =', '            const submittedDeparture =', editOffset(source)),
         part(baseline, '            const toNumber =', '            updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate', editOffset(baseline)));
     assert.match(source, /const addHistoryValues = \{/);
@@ -1914,3 +1918,123 @@ for (const reconstruction of [{ approvalAccepted: false }, { approvalAccepted: t
         assert.equal(res.code, 400); assert.equal(db.writes(), 0); assert.deepEqual(db.state(), before);
     });
 }
+
+// Experience intent is owned by the server, independently of browser metadata.
+const baseExperienceFields = ['proyphresia_se_eth', 'proyphresia_se_mhnes', 'proyphresia_adeias_se_eth'];
+const derivedExperienceFields = ['synolo_proyphresias_se_eth', 'synolo_proyphresias_se_mhnes',
+    'proyphresia_apozhmioshs_se_eth', 'misthologiko_klimakio'];
+function assertDepartureHistoryStable(before, after) {
+    assert.deepEqual(after.history.map(row => [row._id, row.aa_eggrafhs]),
+        before.history.map(row => [row._id, row.aa_eggrafhs]));
+    for (const [index, row] of after.history.entries()) {
+        const { hmeromhnia_apoxorhshs, hmeromhnia_isxyos_oron_ergasias_eos, updatedAt, ...rest } = row;
+        const { hmeromhnia_apoxorhshs: oldDeparture, hmeromhnia_isxyos_oron_ergasias_eos: oldEnd,
+            updatedAt: oldUpdatedAt, ...oldRest } = before.history[index];
+        assert.deepEqual(rest, oldRest);
+        for (const field of baseExperienceFields) assert.equal(Object.hasOwn(row, field), false, field);
+    }
+    assert.deepEqual(after.audits, before.audits); // No reconstruction Apply.
+}
+test('first departure atomically saves three canonical numeric zeros and ignores page-load totals', async () => {
+    const stored = await fullFormDepartureState();
+    delete stored.employee.proyphresia_se_eth;
+    stored.employee.proyphresia_se_mhnes = null;
+    stored.employee.proyphresia_adeias_se_eth = '';
+    const payload = { ...fullFormDeparturePayload(stored.employee),
+        ...Object.fromEntries(baseExperienceFields.map(field => [field, '0'])),
+        ...Object.fromEntries(derivedExperienceFields.map(field => [field, 77])) };
+    const db = memory(stored), { res } = await submit('edit', payload, db);
+    assert.equal(res.body.success, true, JSON.stringify(res.body));
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-23');
+    assert.equal(db.state().employee.energos, false);
+    for (const field of baseExperienceFields) assert.equal(db.state().employee[field], 0, field);
+    for (const field of derivedExperienceFields) assert.equal(db.state().employee[field], stored.employee[field], field);
+    assertDepartureHistoryStable(stored, db.state());
+});
+for (const field of baseExperienceFields) {
+    for (const before of [undefined, null, '']) for (const submitted of [0, '0', '', null]) {
+        test(`first departure persists ${field}: ${String(before)} -> ${JSON.stringify(submitted)}`, async () => {
+            const stored = await fullFormDepartureState();
+            if (before === undefined) delete stored.employee[field]; else stored.employee[field] = before;
+            const db = memory(stored), { res } = await submit('edit', {
+                ...fullFormDeparturePayload(stored.employee), [field]: submitted
+            }, db);
+            assert.equal(res.body.success, true, JSON.stringify(res.body));
+            assert.equal(db.state().employee[field], 0);
+            assertDepartureHistoryStable(stored, db.state());
+        });
+    }
+    for (const [before, submitted] of [[0, 3], [0, 5], [2, 5], [3, 7], [2, 0], [2, ''], [undefined, 999]]) {
+        test(`first departure protects genuine ${field}: ${String(before)} -> ${submitted}`, async () => {
+            const stored = await fullFormDepartureState();
+            if (before === undefined) delete stored.employee[field]; else stored.employee[field] = before;
+            const db = memory(stored), { res } = await submit('edit', {
+                ...fullFormDeparturePayload(stored.employee), [field]: submitted,
+                derived: true, readonly: true, autoCalculated: true,
+                ...Object.fromEntries(derivedExperienceFields.map(output => [output, 999]))
+            }, db);
+            assertSaveHistoryAction(res);
+            assert.ok(db.departureError.departureCorrectionChangedFields.includes(field));
+            assert.deepEqual(db.state(), stored);
+            assert.equal(db.writes(), 0);
+        });
+    }
+    test(`ordinary Save persists canonical ${field} zero without changing history`, async () => {
+        const stored = await fullFormDepartureState(); delete stored.employee[field];
+        const db = memory(stored), { res } = await submit('edit', {
+            ...fullFormDeparturePayload(stored.employee, ''), [field]: ''
+        }, db);
+        assert.equal(res.body.success, true, JSON.stringify(res.body));
+        assert.equal(db.state().employee[field], 0);
+        assert.deepEqual(db.state().history, stored.history);
+    });
+}
+for (const field of derivedExperienceFields) {
+    test(`first departure ignores only browser-derived ${field}, preserving Employee and History`, async () => {
+        const stored = await fullFormDepartureState(), db = memory(stored);
+        const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+            [field]: Number(stored.employee[field] || 0) + 10 }, db);
+        assert.equal(res.body.success, true, JSON.stringify(res.body));
+        assert.equal(db.state().employee[field], stored.employee[field]);
+        assertDepartureHistoryStable(stored, db.state());
+    });
+    test(`ordinary Save retains existing ${field} write semantics`, async () => {
+        const stored = await fullFormDepartureState(), db = memory(stored);
+        const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee, ''),
+            [field]: 8 }, db);
+        assert.equal(res.body.success, true, JSON.stringify(res.body));
+        assert.equal(db.state().employee[field], 8);
+        if (field === 'misthologiko_klimakio') assert.equal(db.state().history[0][field], 8);
+        else assert.deepEqual(db.state().history, stored.history);
+    });
+}
+for (const failure of ['history', 'commit']) {
+    test(`first departure canonical zeros roll back with ${failure} failure`, async () => {
+        const stored = await fullFormDepartureState();
+        for (const field of baseExperienceFields) delete stored.employee[field];
+        const db = memory(stored, failure), { res } = await submit('edit', {
+            ...fullFormDeparturePayload(stored.employee),
+            ...Object.fromEntries(baseExperienceFields.map(field => [field, 0]))
+        }, db);
+        assert.equal(res.code, 500);
+        assert.ok(db.writes() > 0);
+        assert.deepEqual(db.state(), stored);
+    });
+}
+test('experience exception does not normalize unrelated missing numeric fields', async () => {
+    assert.equal(M.departureMaintenanceValuesEqual('unrelated_numeric', undefined, 0), false);
+    const stored = await fullFormDepartureState(); delete stored.employee.poso_symbashs_02;
+    const db = memory(stored), { res } = await submit('edit', {
+        ...fullFormDeparturePayload(stored.employee), poso_symbashs_02: 3
+    }, db);
+    assertSaveHistoryAction(res); assert.deepEqual(db.state(), stored);
+});
+test('browser-derived outputs cannot mask an authoritative hire-date change', async () => {
+    const stored = await fullFormDepartureState(), db = memory(stored);
+    const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee),
+        hmeromhnia_proslhpshs: '2026-04-02',
+        ...Object.fromEntries(derivedExperienceFields.map(field => [field, 99])) }, db);
+    assertSaveHistoryAction(res);
+    assert.ok(db.departureError.departureCorrectionChangedFields.includes('hmeromhnia_proslhpshs'));
+    assert.deepEqual(db.state(), stored);
+});

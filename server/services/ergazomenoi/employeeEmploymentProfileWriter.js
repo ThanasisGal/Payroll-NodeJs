@@ -10,7 +10,8 @@ const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../mod
 const EmployeeHistoryRepairAuditModel = require('../../models/employeeHistoryRepairAudit');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
-const { departureMaintenanceValuesEqual, departureMaintenanceFormEchoMatchesCurrent } =
+const { departureMaintenanceValuesEqual, departureMaintenanceFormEchoMatchesCurrent,
+    BASE_ZERO_NORMALIZABLE_FIELDS, AUTO_DERIVED_READONLY_FIELDS, normalizeBaseExperienceValue } =
     require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { IDENTITY_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged,
     semanticEmploymentProfilePatch } = require('../../utils/ergazomenoi/employmentProfileTransition');
@@ -2981,10 +2982,23 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         let input = submittedInput, maintenance = submittedMaintenance;
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
-        let departureFormEchoFields = new Set();
+        // Normalize submitted base values before checking intent. Unlike derived
+        // echoes, canonical zeros must survive omission of unchanged form fields.
+        const normalizedEmployeeChanges = { ...maintenance.employeeChanges };
+        const canonicalZeroWrites = {};
+        const ownedEmployeeFields = new Set(maintenance.submittedEmployeeFields ||
+            Object.keys(normalizedEmployeeChanges));
+        for (const field of BASE_ZERO_NORMALIZABLE_FIELDS) {
+            if (!ownedEmployeeFields.has(field) || !Object.hasOwn(normalizedEmployeeChanges, field)) continue;
+            normalizedEmployeeChanges[field] = normalizeBaseExperienceValue(normalizedEmployeeChanges[field]);
+            if (normalizedEmployeeChanges[field] === 0 && current[field] !== 0 &&
+                departureMaintenanceValuesEqual(field, current[field], 0)) canonicalZeroWrites[field] = 0;
+        }
+        maintenance = { ...maintenance, employeeChanges: normalizedEmployeeChanges };
+        let departureFormEchoFields = new Set(AUTO_DERIVED_READONLY_FIELDS);
         if (maintenance.rejectConcurrentProfileChanges === true) {
             const delta = assertDepartureCorrectionMaintenanceUnchanged({ current, input, maintenance });
-            departureFormEchoFields = new Set(delta.semanticallyUnchangedFields);
+            departureFormEchoFields = new Set([...departureFormEchoFields, ...delta.semanticallyUnchangedFields]);
         }
         const persistedRows = await completeHistoryLean(historyModel, filter, session);
         const initialCanonical = canonicalizeEmployeeHistory({ scope: filter,
@@ -2996,8 +3010,8 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
             const maintenanceDelta = assertDepartureCorrectionMaintenanceUnchanged({
                 current, input, maintenance
             });
-            departureFormEchoFields = new Set(
-                maintenanceDelta.semanticallyUnchangedFields || []);
+            departureFormEchoFields = new Set([...departureFormEchoFields,
+                ...(maintenanceDelta.semanticallyUnchangedFields || [])]);
             const protectedReferences = {};
             for (const row of persistedRows) {
                 const id = String(row._id);
@@ -3057,6 +3071,9 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
                 } : {}) };
             input = withoutFormEchoes(input);
         }
+        maintenance = { ...maintenance, employeeChanges: {
+            ...maintenance.employeeChanges, ...canonicalZeroWrites
+        } };
         if (!rows.length) {
             // Imported employees retain the established one-row baseline transaction.
             // A future schedule start is not the validity start of a same-day
@@ -3257,6 +3274,11 @@ function departureCorrectionMaintenanceDelta({ current, input, maintenance }) {
             mappedValue: employeeChanges[field],
             formData: maintenance.submittedFormValues || {}
         })));
+    // First departure owns lifecycle boundaries, not today's browser seniority
+    // totals. Source inputs still pass through the unchanged mixed-change guard.
+    if (!C.calendarDate(current.hmeromhnia_apoxorhshs)) {
+        for (const field of AUTO_DERIVED_READONLY_FIELDS) semanticallyUnchangedFields.add(field);
+    }
     const employeeFields = [...submittedEmployee].filter(field =>
         !ignoredEmployeeFields.has(field) && Object.hasOwn(employeeChanges, field) &&
         !semanticallyUnchangedFields.has(field) &&
