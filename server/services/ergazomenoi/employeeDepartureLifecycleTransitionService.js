@@ -2,7 +2,6 @@
 
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
-const { complete } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
 
 function departureError(code) {
@@ -19,7 +18,10 @@ function latestCycleRows(cycle, history) {
 // Schedule dates describe a predeclared plan. The legacy effectiveStart helper
 // falls back to them, so it cannot prove that work terms changed after departure.
 function explicitWorkTermsStart(row = {}) {
-    if (row.afora_allagh_oron_ergasias === false && !complete(row)) return null;
+    // Explicit validity is period evidence, including on a reconstructed legacy
+    // profile. The event flag and V1 completeness describe its provenance; they
+    // cannot invalidate a real period that canonical preparation has retained.
+    // Missing/empty validity still cannot turn a schedule-only record into one.
     return dateKeyUtc(row.hmeromhnia_isxyos_oron_ergasias_apo);
 }
 
@@ -38,6 +40,17 @@ function departureProfileStart(row) {
     if (row.afora_allagh_oron_ergasias === false ||
         Object.hasOwn(row, 'hmeromhnia_isxyos_oron_ergasias_apo')) return null;
     return dateKeyUtc(row.hmeromhnia_allaghs_orarioy_apo);
+}
+
+function latestDepartureProfile(rows, departure) {
+    const candidates = rows.map(row => ({ row, start: departureProfileStart(row) }))
+        .filter(({ start }) => start && start <= departure);
+    const latestStart = candidates.reduce((latest, { start }) => start > latest ? start : latest, '');
+    const latest = candidates.filter(({ start }) => start === latestStart);
+    // The writer supplies canonical rows. An unresolved tie must never be
+    // broken by sequence number, ObjectId, creation time or array position.
+    if (latest.length > 1) throw departureError('EMPLOYEE_DEPARTURE_HISTORY_REQUIRED');
+    return latest[0]?.row || null;
 }
 
 function buildEmployeeDepartureTransition({ currentEmployee, history = [], departureDate }) {
@@ -80,10 +93,7 @@ function buildEmployeeDepartureTransition({ currentEmployee, history = [], depar
     })) throw departureError('EMPLOYEE_DEPARTURE_CONFLICT');
 
     const terminalHistoryRow = rows.at(-1) || null;
-    const latestProfileRow = [...rows].reverse().find(row => {
-        const start = departureProfileStart(row);
-        return start && start <= departure;
-    }) || null;
+    const latestProfileRow = latestDepartureProfile(rows, departure);
     if (rows.length && (!terminalHistoryRow || !latestProfileRow)) {
         throw departureError('EMPLOYEE_DEPARTURE_HISTORY_REQUIRED');
     }

@@ -820,6 +820,7 @@ jobs:
             "server/services/ergazomenoi/employeeEmploymentProfileWriter.test.js"
             "server/controllers/ergazomenoi/ergazomenoiController.employmentProfile.test.js"
             "server/services/ergazomenoi/employeeDepartureLifecycleWriter.test.js"
+            "server/services/ergazomenoi/employeeDepartureLifecycleTransitionService.test.js"
             "server/services/ergazomenoi/employeeDepartureDateCorrectionWriter.test.js"
             "server/services/ergazomenoi/employeeRehireLifecycleWriter.test.js"
             "server/utils/ergazomenoi/employmentProfileTemporal.test.js"
