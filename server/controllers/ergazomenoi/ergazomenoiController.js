@@ -1,7 +1,8 @@
+const { sendReconstructionSaveError, validateApproval } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract');
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithUniqueSafeRepair,
+const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithAutomaticReconstruction,
     writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire,
     writeEmployeeEmploymentHistoryOperations,
     writeEmployeeDepartureDateCorrection,
@@ -3429,9 +3430,11 @@ class ergazomenoiController {
             req.body || {};
         let resolutionConfirmation;
         try {
+            validateApproval(req.body?.reconstruction);
             resolutionConfirmation = normalizeEmployeeHistoryResolutionConfirmation(
                 req.body?.resolution);
         } catch (error) {
+            if (sendReconstructionSaveError(res, error)) return;
             return profileError(res, error);
         }
         const aforaDaneismoErgazomenoy = formData.afora_daneismo_ergazomenoy === true;
@@ -3829,6 +3832,7 @@ class ergazomenoiController {
         // ✅ 5) UPDATE ΕΡΓΑΖΟΜΕΝΟΥ ΣΤΗ ΒΔ
         // =========================================================================
         let updatedErgazomenos = null;
+        let automaticReconstructionApplied = false;
 
         try {
             // Helper για ελληνικά δεκαδικά
@@ -3953,6 +3957,10 @@ class ergazomenoiController {
                 error.statusCode = 409;
                 throw error;
             }
+            if (req.body?.reconstruction && (rehireIntent === true || isDepartureCancellation || isDepartureCorrection || isFirstDeparture)) {
+                throw Object.assign(new Error('EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_SAVE_CONFLICT'), {
+                    code: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_SAVE_CONFLICT', statusCode: 409 });
+            }
             const result = rehireIntent === true
                 ? await writeEmployeeRehire({
                     scope: {
@@ -4019,7 +4027,7 @@ class ergazomenoiController {
                             originalHistoryId: formData.istorikoId || null,
                             correctableIdentityFields: formData.istorikoId ? ['hmeromhnia_apoxorhshs'] : [] }
                     })
-                    : await writeEmployeeEmploymentProfileWithUniqueSafeRepair({
+                    : await writeEmployeeEmploymentProfileWithAutomaticReconstruction({
                     scope: {
                         team: omadaErgasias,
                         company_kod: kodikosEtaireias,
@@ -4048,6 +4056,7 @@ class ergazomenoiController {
                             : []
                     },
                     resolutionConfirmation,
+                    reconstruction: req.body?.reconstruction,
                     actorUserId: req.session?.userId ?? null,
                     repairActor: {
                         userId: req.session?.userId,
@@ -4055,6 +4064,7 @@ class ergazomenoiController {
                         sessionId: req.sessionID || req.session?.id
                     }
                 });
+            automaticReconstructionApplied = result.automaticReconstructionApplied === true;
             updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);
 
             if (!updatedErgazomenos) {
@@ -4064,6 +4074,7 @@ class ergazomenoiController {
                 });
             }
         } catch (error) {
+            if (sendReconstructionSaveError(res, error)) return;
             if (isEmploymentProfileError(error) ||
                 String(error?.code || '').startsWith('EMPLOYEE_DEPARTURE_')) {
                 return profileError(res, error, { employeeSaveActionRequired: true,
@@ -4775,7 +4786,8 @@ class ergazomenoiController {
         // =========================================================================
         return res.json({
             success: true,
-            message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',
+            message: automaticReconstructionApplied ? 'Η αποθήκευση ολοκληρώθηκε και το Ιστορικό τακτοποιήθηκε.' : 'Εργαζόμενος ενημερώθηκε επιτυχώς',
+            automaticReconstructionApplied,
             data: {
                 _id: ergazomenoiId,
                 kodikos: updatedErgazomenos.kodikos,

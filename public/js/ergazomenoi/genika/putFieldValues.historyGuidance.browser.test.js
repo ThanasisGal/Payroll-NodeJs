@@ -6,6 +6,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { chromium } = require('playwright');
+const ejs = require('ejs');
+const F = require('../../../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const { planEmployeeHistoryAutomaticReconstruction: automaticPlan } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService');
+const { buildEmployeeHistoryReconstructionPreview: automaticPreview } = require('../../../../server/services/ergazomenoi/employeeHistoryReconstructionPreviewService');
 const maintenance = require('../../../../server/utils/ergazomenoi/employmentProfileMaintenance');
 const policy = require('../../../../server/services/ergazomenoi/employeeHistoryCorrectionPolicyService');
 const { fixture, scope, historyId } = require('../../../../test/fixtures/employeeProfileTransactionStore');
@@ -39,7 +43,7 @@ const preview = policy.planHistoryCorrection({ scope, currentEmployee: previewFi
     accessMode: 'ADMIN_FULL', catalogs: {}, insertId: historyId('employee', 9) }).public;
 assert.ok(preview);
 
-async function withPage({ payload = action(), status = 200, disabled = false,
+async function withPage({ automatic = false, payload = action(), status = 200, disabled = false,
     missing = false, accessMode = 'ADMIN_FULL', duplicate = false, replies = null, departure = '2026-09-20' } = {}, work) {
     const browser = await chromium.launch({ headless: true });
     try {
@@ -57,6 +61,12 @@ async function withPage({ payload = action(), status = 200, disabled = false,
         const row = id => `<tr class="istoriko-row" data-id="${id}" data-state="clean"
             data-can-manage-row="true"><td><button data-action="review"
             ${disabled ? 'disabled aria-disabled="true"' : ''}>Έλεγχος / Διόρθωση</button></td></tr>`;
+        const input = F.caseA();
+        const reconstructionPartial = automatic ? await ejs.renderFile(path.join(root,
+            'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
+            ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
+            employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: 'synthetic', problematicHistoryIds: []
+        }) : '';
         const html = `<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="csrf-token" content="synthetic"></head>
             <body data-mode="edit" data-context="ergazomenoi">
             <div class="menu_Links"><ul><li class="active">Σταθερά Στοιχεία</li>
@@ -68,7 +78,7 @@ async function withPage({ payload = action(), status = 200, disabled = false,
             <section><div class="sectionTitle"></div><table id="istorikoTable"
             data-history-access-mode="${accessMode}" data-expected-state-token="${'b'.repeat(64)}">
             <tbody>${row(otherTarget)}${missing ? '' : row(target)}${duplicate ? row(target) : ''}</tbody></table></section></div>
-            </body></html>`;
+            ${reconstructionPartial}</body></html>`;
         await page.route('https://payroll.test/**', async route => {
             const request = route.request();
             if (request.method() !== 'POST') return route.fulfill({ contentType: 'text/html', body: html });
@@ -82,6 +92,10 @@ async function withPage({ payload = action(), status = 200, disabled = false,
                 body: JSON.stringify({ success: false, resolutionRequired: true, resolution: preview }) });
         });
         await page.goto('https://payroll.test/');
+        if (automatic) {
+            for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css']) await page.addStyleTag({ path: path.join(root, file) });
+            for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag({ path: path.join(root, file) });
+        }
         await page.addStyleTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.css') });
         await page.addScriptTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js') });
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
@@ -349,5 +363,72 @@ test('normal Save genuine boundary failure has dedicated UX and no application c
         assert.deepEqual(await page.evaluate(() => window.guidedCounts),
             { retryRequest: 1, preConfirm: 1, successContinuation: 0, redirect: 0 });
         await expectNoFalseSuccess(page, errors.filter(text => !text.includes('Failed to load resource')));
+    });
+});
+
+function automaticEnvelope() {
+    const input = F.caseA();
+    return { success: false, actionRequired: true, reason: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED',
+        previewToken: 'a'.repeat(43), reconstructionPreview: automaticPreview({ plan: automaticPlan(input), completeHistoryRows: input.completeHistoryRows }),
+        nextAction: { type: 'APPROVE_HISTORY_RECONSTRUCTION_AND_CONTINUE_SAVE' } };
+}
+async function expectAutomatic(page) {
+    await page.locator('#employeeHistoryReconstructionPreviewModal.show').waitFor();
+    await page.waitForTimeout(350);
+    assert.equal(await page.locator('#employeeHistoryReconstructionPreviewTitle').textContent(), 'Το Ιστορικό Χρειάζεται Τακτοποίηση');
+    assert.equal(await page.locator('#employeeHistoryReconstructionApprovalAccepted').isChecked(), false);
+    assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
+    assert.match(await page.locator('#employeeHistoryReconstructionApplyBtn').textContent(), /Εφαρμογή & Συνέχεια Αποθήκευσης/);
+}
+test('Phase 3B: cancel retains original full form; native label and keyboard work; second Save reopens unchecked', async () => {
+    await withPage({ automatic: true, departure: '', replies: [{ status: 200, payload: automaticEnvelope() }, { status: 200, payload: automaticEnvelope() }] }, async ({ page, requests, errors }) => {
+        await page.locator('#email').fill('unsaved@example.test');
+        await save(page); await expectAutomatic(page);
+        const apply = page.locator('#employeeHistoryReconstructionApplyBtn');
+        const grey = await apply.evaluate(e => getComputedStyle(e).backgroundColor);
+        await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
+        assert.equal(await apply.isEnabled(), true);
+        await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(25, 135, 84)');
+        const green = await apply.evaluate(e => getComputedStyle(e).backgroundColor);
+        assert.notEqual(grey, green); assert.equal(green, 'rgb(25, 135, 84)');
+        await page.locator('#employeeHistoryReconstructionApprovalAccepted').focus(); await page.keyboard.press('Space');
+        assert.equal(await apply.isDisabled(), true);
+        await page.evaluate(() => document.getElementById('save').click());
+        assert.equal(requests.length, 1);
+        await page.locator('#employeeHistoryReconstructionPreviewModal .modal-footer [data-bs-dismiss]').click();
+        await page.waitForFunction(() => window.saveFinished);
+        assert.equal(await page.locator('#email').inputValue(), 'unsaved@example.test');
+        assert.equal(requests.length, 1); assert.equal(await page.evaluate(() => window.guidedCounts.redirect), 0);
+        await save(page); await expectAutomatic(page);
+        assert.equal(requests.length, 2); assert.deepEqual(errors, []);
+    });
+});
+test('Phase 3B: one approval sends only retained Save intent and token; double click continues success once', async () => {
+    await withPage({ automatic: true, departure: '', replies: [{ status: 200, payload: automaticEnvelope() },
+        { status: 200, payload: { success: true, automaticReconstructionApplied: true } }] }, async ({ page, requests, errors }) => {
+        await save(page); await expectAutomatic(page);
+        await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
+        await page.evaluate(() => { const button = document.getElementById('employeeHistoryReconstructionApplyBtn'); button.click(); button.click(); document.getElementById('save').click(); });
+        await page.waitForFunction(() => window.saveFinished);
+        assert.equal(requests.length, 2);
+        assert.deepEqual(requests[1].body, { ...requests[0].body, reconstruction: { previewToken: 'a'.repeat(43), approvalAccepted: true } });
+        assert.deepEqual(await page.evaluate(() => window.guidedCounts), { retryRequest: 0, preConfirm: 0, successContinuation: 1, redirect: 1 });
+        assert.equal(await page.evaluate(() => window.swalCalls.filter(call => call.icon === 'success').length), 1);
+        assert.deepEqual(errors, []);
+    });
+});
+test('Phase 3B: stale continuation retains form without reload or second Save and shows required Greek text', async () => {
+    const message = 'Το Ιστορικό άλλαξε μετά την προεπισκόπηση. Δεν αποθηκεύτηκε καμία αλλαγή. Ελέγξτε ξανά τη νέα πρόταση.';
+    await withPage({ automatic: true, departure: '', replies: [{ status: 200, payload: automaticEnvelope() },
+        { status: 409, payload: { success: false, reason: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE', message } }] }, async ({ page, requests, errors }) => {
+        await page.locator('#email').fill('unsaved@example.test');
+        await save(page); await expectAutomatic(page);
+        await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
+        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Τα στοιχεία άλλαξαν');
+        assert.equal(await page.locator('.swal2-html-container').textContent(), message);
+        assert.equal(await page.locator('#email').inputValue(), 'unsaved@example.test');
+        assert.equal(requests.length, 2); assert.equal(await page.evaluate(() => window.guidedCounts.redirect), 0);
+        assert.deepEqual(errors.filter(text => !text.includes('Failed to load resource')), []);
     });
 });

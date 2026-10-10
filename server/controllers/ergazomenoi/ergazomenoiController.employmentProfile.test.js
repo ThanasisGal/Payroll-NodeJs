@@ -88,7 +88,7 @@ function memory(initial = { employee: null, history: [] }, fail = '') {
     }, async endSession() { ended = true; } };
     const matches = (row, filter) => row && Object.entries(filter).every(([key, value]) =>
         value == null ? row[key] == null : value instanceof Date ? new Date(row[key]).getTime() === value.getTime() : String(row[key]) === String(value));
-    function query(read) { let sort; return { session(s) { assert.equal(s, session); return this; }, select() { return this; },
+    function query(read) { let sort; return { mongooseOptions() { return this; }, session(s) { assert.equal(s, session); return this; }, select() { return this; },
         sort(value) { sort = value; return this; }, limit: async () => [], lean: async () => {
             const result = plain(read());
             if (sort && Array.isArray(result)) result.sort((a, b) => {
@@ -207,6 +207,16 @@ function handler(mode, db) {
                 history: db.state().history[0], afm: '123456789' }
             : { action: 'CREATE_NEW', afm: '' }),
         writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
+        ...require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract'),
+        // Baseline controller regressions keep the original guided persistence
+        // boundary; composite integration cases below explicitly opt into it.
+        writeEmployeeEmploymentProfileWithAutomaticReconstruction: args => db.composite
+            ? W.writeEmployeeEmploymentProfileWithAutomaticReconstruction({ ...args, ...db.deps,
+                correctionCatalogLoader: async () => ({}) })
+            : (() => {
+                db.dispatch?.push('writeEmployeeEmploymentProfileWithUniqueSafeRepair');
+                return W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps });
+            })(),
         writeEmployeeEmploymentProfileWithUniqueSafeRepair: args => {
             db.dispatch?.push('writeEmployeeEmploymentProfileWithUniqueSafeRepair');
             return W.writeEmployeeEmploymentProfileWithUniqueSafeRepair({ ...args, ...db.deps });
@@ -863,7 +873,9 @@ test('controller downstream Save response, uploads, ERGANI and schedule code unc
         if (start.includes('ΕΠΕΞΕΡΓΑΣΙΑ PDF') || start.includes('ΑΝΑΚΤΗΣΗ ΔΕΔΟΜΕΝΩΝ')) chunk = chunk.replace(
             /hmeromhnia: \{\n\s*\$gte: new Date\(formData\.hmeromhnia_allaghs_orarioy_apo\),\n\s*\$lte: new Date\(formData\.hmeromhnia_allaghs_orarioy_eos\)\n\s*\}/,
             match => match.replace('hmeromhnia: {', 'hmeromhnia: mongoose.trusted({').replace(/\n(\s*)\}$/, '\n$1})'));
-        assert(source.slice(newStart).startsWith(chunk), start);
+        const compared = source.slice(newStart)
+            .replace("message: automaticReconstructionApplied ? 'Η αποθήκευση ολοκληρώθηκε και το Ιστορικό τακτοποιήθηκε.' : 'Εργαζόμενος ενημερώθηκε επιτυχώς',\n            automaticReconstructionApplied,", "message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',");
+        assert(compared.startsWith(chunk), start);
     }
 });
 
@@ -1879,3 +1891,26 @@ test('normal Save keeps stale and invalid guided envelopes at their original sta
         }
     } finally { W.writeEmployeeEmploymentProfileWithUniqueSafeRepair = original; }
 });
+
+// Phase 3B executes the actual new composite boundary, while the earlier
+// regression cases above keep exercising the guided boundary independently.
+test('Phase 3B controller: normal Save returns a sanitized automatic preview before any business writes', async () => {
+    const stored = await initial();
+    delete stored.history[0].poso_symbashs_02;
+    const db = memory(stored); db.composite = true;
+    const before = plain(db.state());
+    const { res } = await submit('edit', { ...form(), parathrhseis: 'unsaved synthetic note' }, db);
+    assert.equal(res.code, 200); assert.equal(res.body.actionRequired, true);
+    assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED');
+    assert.equal(res.body.nextAction.type, 'APPROVE_HISTORY_RECONSTRUCTION_AND_CONTINUE_SAVE');
+    assert.equal(typeof res.body.previewToken, 'string');
+    assert.doesNotMatch(JSON.stringify(res.body), /rowDiffs|proposedRows|sourceHistoryIds/);
+    assert.equal(db.writes(), 0); assert.deepEqual(db.state(), before);
+});
+for (const reconstruction of [{ approvalAccepted: false }, { approvalAccepted: true }, { approvalAccepted: true, previewToken: [] }]) {
+    test('Phase 3B controller rejects invalid continuation before any writer', async () => {
+        const stored = await initial(), db = memory(stored); db.composite = true;
+        const before = plain(db.state()); const { res } = await submit('edit', form(), db, { reconstruction });
+        assert.equal(res.code, 400); assert.equal(db.writes(), 0); assert.deepEqual(db.state(), before);
+    });
+}

@@ -14,6 +14,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let previewToken = null;
     let previewEmployeeId = null;
     let applying = false;
+    let saveResolver = null;
+    let saveApproved = false;
+    const title = document.getElementById('employeeHistoryReconstructionPreviewTitle');
+    const intro = modalElement.querySelector('.modal-body > p');
+    const originalTitle = title.textContent;
+    const originalIntro = intro.textContent;
+    function presentation(saveMode) {
+        title.textContent = saveMode ? 'Το Ιστορικό Χρειάζεται Τακτοποίηση' : originalTitle;
+        intro.textContent = saveMode
+            ? 'Για να ολοκληρωθεί η αποθήκευση, η εφαρμογή προτείνει τις παρακάτω αλλαγές στο Ιστορικό.' : originalIntro;
+        applyButton.textContent = saveMode ? 'Εφαρμογή & Συνέχεια Αποθήκευσης' : 'Εφαρμογή Τακτοποίησης';
+    }
     const approval = document.getElementById('employeeHistoryReconstructionApproval');
     const checkbox = document.getElementById('employeeHistoryReconstructionApprovalAccepted');
     const applyButton = document.getElementById('employeeHistoryReconstructionApplyBtn');
@@ -37,6 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     applyButton?.addEventListener('click', async () => {
         if (applying || !checkbox.checked || !previewToken || previewEmployeeId !== employee.value) return;
+        if (saveResolver) {
+            applyButton.disabled = true;
+            saveApproved = true;
+            modal.hide();
+            return;
+        }
         applying = true;
         applyButton.disabled = true;
         checkbox.disabled = true;
@@ -201,8 +219,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!preview.originalRows.length) original.append('Δεν υπάρχουν εγγραφές Ιστορικού.');
         if (preview.status !== 'unavailable') body.appendChild(message);
     }
+    window.employeeHistoryReconstructionPreview = {
+        approveForSave({ preview, token }) {
+            if (controller || applying || saveResolver) return Promise.resolve(false);
+            resetApproval();
+            presentation(true);
+            saveApproved = false;
+            renderPreview(preview);
+            previewToken = token;
+            previewEmployeeId = employee.value;
+            approval.hidden = false;
+            applyButton.hidden = false;
+            // Resolution waits for the modal transition so subsequent SweetAlert
+            // decisions and normal Save continuation have a single focus owner.
+            const answer = new Promise(resolve => { saveResolver = resolve; });
+            modal.show();
+            return answer;
+        }
+    };
     button.addEventListener('click', async () => {
-        if (controller || applying) return;
+        if (controller || applying || saveResolver) return;
+        presentation(false);
         resetApproval();
         const requestGeneration = ++generation;
         const requestEmployeeId = employee.value;
@@ -253,6 +290,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     modalElement.addEventListener('hidden.bs.modal', () => {
         body.replaceChildren();
-        button.focus();
+        const resolve = saveResolver;
+        saveResolver = null;
+        if (resolve) resolve(saveApproved);
+        else button.focus();
     });
 });

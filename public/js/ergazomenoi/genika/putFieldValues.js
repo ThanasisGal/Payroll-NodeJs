@@ -52,6 +52,23 @@ function createSingleFlight() {
     };
 }
 
+async function continueEmployeeSaveAfterReconstruction({ response, originalPayload, retryRequest, previewUi, swal }) {
+    if (!response.headers.get('content-type')?.includes('application/json')) return { response, originalPayload };
+    const data = await response.clone().json();
+    if (response.status !== 200 || data?.actionRequired !== true ||
+        data.reason !== 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED') return { response, originalPayload };
+    swal.close();
+    if (!previewUi?.approveForSave) {
+        await swal.fire({ icon: 'warning', title: 'Η αποθήκευση σταμάτησε',
+            text: 'Δεν φορτώθηκε η προεπισκόπηση του Ιστορικού. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Κλείστε το μήνυμα· οι αλλαγές παραμένουν στη φόρμα.\n2. Δοκιμάστε ξανά ή ζητήστε βοήθεια από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΠΟΘ-01.' });
+        return { cancelled: true };
+    }
+    const approved = await previewUi.approveForSave({ preview: data.reconstructionPreview, token: data.previewToken });
+    if (!approved) return { cancelled: true };
+    const approvedPayload = { ...originalPayload, reconstruction: { previewToken: data.previewToken, approvalAccepted: true } };
+    return { response: await retryRequest(approvedPayload), originalPayload: approvedPayload };
+}
+
 async function handleEmployeeSaveHistoryAction(response, data, { swal, documentRef }) {
     const action = data?.nextAction;
     if (response.status !== 200 || !response.ok || data?.success !== false ||
@@ -101,7 +118,12 @@ async function handleEmployeeSaveHistoryAction(response, data, { swal, documentR
 
 async function handleEmployeeSaveHistoryStale(response, data, { swal }) {
     if (response.status !== 409 || data?.success !== false ||
-        data?.reason !== 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE') return false;
+        !['EMPLOYEE_HISTORY_USER_CORRECTION_STALE', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE'].includes(data?.reason)) return false;
+    if (data.reason === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE') {
+        await swal.fire({ icon: 'warning', title: 'Τα στοιχεία άλλαξαν', text: data.message,
+            confirmButtonText: 'Κλείσιμο', allowOutsideClick: false });
+        return true;
+    }
     await swal.fire({
         icon: 'warning', title: 'Τα στοιχεία άλλαξαν',
         text: 'Τα στοιχεία του εργαζομένου ή του Ιστορικού άλλαξαν όσο ήταν ανοιχτή η διόρθωση.\n\n' +
@@ -1400,22 +1422,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(updateProgress, 250);
             }
 
-            let response = await fetch('/api/ergazomenoi/update/' + ergazomenoiId, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'CSRF-Token': csrfToken
-                },
-                credentials: 'include',
-                body: JSON.stringify(v)
+            const retryEmployeeSave = retryPayload => fetch('/api/ergazomenoi/update/' + ergazomenoiId, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+                credentials: 'include', body: JSON.stringify(retryPayload)
             });
+            let response = await retryEmployeeSave(v);
+            const reconstructionResult = await continueEmployeeSaveAfterReconstruction({ response,
+                originalPayload: v, retryRequest: retryEmployeeSave,
+                previewUi: window.employeeHistoryReconstructionPreview, swal: Swal });
+            if (reconstructionResult.cancelled) return;
+            response = reconstructionResult.response;
 
             let guidedResolutionHandled = false;
             if (window.employeeHistoryGuidedResolution) {
                 const guidedResolutionResult =
                     await window.employeeHistoryGuidedResolution.handleInitialResponse({
                         response,
-                        originalPayload: v,
+                        originalPayload: reconstructionResult.originalPayload,
                         retryRequest: (retryPayload) => fetch(
                             '/api/ergazomenoi/update/' + ergazomenoiId,
                             {
@@ -2119,7 +2142,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             icon: 'success',
                             title: 'Επιτυχής καταχώριση!',
                             html: `
-                <p>Ο εργαζόμενος αποθηκεύτηκε!</p>
+                <p>${data.automaticReconstructionApplied ? 'Η αποθήκευση ολοκληρώθηκε και το Ιστορικό τακτοποιήθηκε.' : 'Ο εργαζόμενος αποθηκεύτηκε!'}</p>
                 ${
                     successfulPdfs.length > 0
                         ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
