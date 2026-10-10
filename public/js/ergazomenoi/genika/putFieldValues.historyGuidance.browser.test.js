@@ -48,6 +48,7 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage();
+        page.setDefaultTimeout(10000);
         const requests = [], errors = [], pageErrors = [];
         page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
         page.on('pageerror', err => pageErrors.push(err.message));
@@ -187,14 +188,19 @@ for (const exit of ['cancel', 'escape']) test(`real Save ${exit} preserves form 
     });
 });
 
-test('exact server target uses actual tab and review listener once, opening existing guided modal', async () => {
+test('even an exact server target opens History only; row correction requires an explicit manual click', async () => {
     await withPage({ payload: action(target) }, async ({ page, requests, errors }) => {
         await save(page);
         await expectGuidance(page);
         await page.locator('.swal2-confirm').click();
-        await page.waitForFunction(() => window.saveFinished && window.swalCalls.length === 3);
+        await page.waitForFunction(() => window.swalCalls.length === 3);
         assert.equal(await page.locator('.menu_Links li.active').textContent(), 'Ιστορικό Προσλήψεων/Αλλαγών');
         assert.equal(await page.locator('.sections section.visible table').getAttribute('id'), 'istorikoTable');
+        assert.equal(requests.length, 1);
+        assert.equal(await page.locator('.swal2-title').textContent(), 'Ελέγξτε το Ιστορικό');
+        await page.locator('.swal2-confirm').click();
+        await page.locator(`tr[data-id="${target}"] [data-action="review"]`).click();
+        await page.waitForFunction(title => Swal.getTitle()?.textContent === title, preview.title);
         assert.equal(requests.length, 2);
         assert.deepEqual(requests[1].body, { employeeId: 'synthetic-employee', updates: [],
             expectedStateToken: 'b'.repeat(64), correction: {
@@ -217,8 +223,8 @@ for (const [label, options] of [
         await save(page);
         await expectGuidance(page);
         await page.locator('.swal2-confirm').click();
-        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Επιλέξτε την εγγραφή στο Ιστορικό');
-        assert.match(await page.locator('.swal2-html-container').textContent(), /δεν μπορεί να επιλέξει με ασφάλεια/);
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Ελέγξτε το Ιστορικό');
+        assert.match(await page.locator('.swal2-html-container').textContent(), /οι αλλαγές σας παραμένουν στη φόρμα/);
         assert.equal(await page.locator('.menu_Links li.active').textContent(), 'Ιστορικό Προσλήψεων/Αλλαγών');
         assert.equal(requests.length, 1);
         await page.locator('.swal2-confirm').click();
@@ -372,6 +378,96 @@ function automaticEnvelope() {
         previewToken: 'a'.repeat(43), reconstructionPreview: automaticPreview({ plan: automaticPlan(input), completeHistoryRows: input.completeHistoryRows }),
         nextAction: { type: 'APPROVE_HISTORY_RECONSTRUCTION_AND_CONTINUE_SAVE' } };
 }
+function departureAutomaticEnvelope() {
+    return { ...automaticEnvelope(), operation: 'FIRST_DEPARTURE',
+        reason: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED_FOR_DEPARTURE',
+        nextAction: { type: 'APPROVE_HISTORY_RECONSTRUCTION_AND_CONTINUE_DEPARTURE' } };
+}
+async function expectDepartureAutomatic(page) {
+    await page.locator('#employeeHistoryReconstructionPreviewModal.show').waitFor();
+    await page.waitForTimeout(350);
+    assert.equal(await page.locator('#employeeHistoryReconstructionPreviewTitle').textContent(),
+        'Το Ιστορικό Χρειάζεται Τακτοποίηση πριν την Αποχώρηση');
+    assert.equal(await page.locator('#employeeHistoryReconstructionPreviewModal .modal-body > p').textContent(),
+        'Για να ολοκληρωθεί η αποχώρηση, η εφαρμογή προτείνει πρώτα τις παρακάτω αλλαγές στο Ιστορικό.');
+    assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').textContent(), 'Τακτοποίηση & Συνέχεια Αποχώρησης');
+    assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
+    assert.equal(await page.locator('#employeeHistoryReconstructionApprovalAccepted').isChecked(), false);
+}
+
+for (const exit of ['cancel', 'escape']) test(`first departure preview ${exit} preserves every form field and date without reload`, async () => {
+    await withPage({ automatic: true, payload: departureAutomaticEnvelope() }, async ({ page, requests, errors }) => {
+        await page.locator('#email').fill('unsaved@example.test');
+        const values = await page.locator('input[name]').evaluateAll(fields => fields.map(field => [field.name, field.value]));
+        await save(page); await expectDepartureAutomatic(page);
+        if (exit === 'escape') await page.keyboard.press('Escape');
+        else await page.locator('#employeeHistoryReconstructionPreviewModal .modal-footer [data-bs-dismiss]').click();
+        await page.waitForFunction(() => window.saveFinished);
+        assert.deepEqual(await page.locator('input[name]').evaluateAll(fields => fields.map(field => [field.name, field.value])), values);
+        assert.equal(requests.length, 1);
+        assert.equal(await page.locator('#hmeromhnia_apoxorhshs').inputValue(), '2026-09-20');
+        assert.equal(await page.evaluate(() => window.guidedCounts.redirect), 0);
+        assert.deepEqual(errors, []);
+    });
+});
+
+test('first departure: Save once, explicit approval, retained original payload, one automatic success continuation', async () => {
+    await withPage({ automatic: true, replies: [{ status: 200, payload: departureAutomaticEnvelope() },
+        { status: 200, payload: { success: true, automaticReconstructionApplied: true } }] }, async ({ page, requests, errors }) => {
+        await save(page); await expectDepartureAutomatic(page);
+        await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
+        await page.evaluate(() => { const button = document.getElementById('employeeHistoryReconstructionApplyBtn'); button.click(); button.click(); });
+        await page.waitForFunction(() => window.saveFinished);
+        assert.equal(requests.length, 2);
+        assert.deepEqual(requests[1].body, { ...requests[0].body,
+            reconstruction: { previewToken: 'a'.repeat(43), approvalAccepted: true } });
+        assert.equal(requests[1].body.formData.hmeromhnia_apoxorhshs, '2026-09-20');
+        assert.doesNotMatch(JSON.stringify(requests.map(request => request.body)), /rowDiffs|proposedRows|sourceHistoryIds|historyPatches/);
+        assert.deepEqual(await page.evaluate(() => window.guidedCounts),
+            { retryRequest: 0, preConfirm: 0, successContinuation: 1, redirect: 1 });
+        assert.equal(await page.evaluate(() => window.swalCalls.filter(call => call.icon === 'success').length), 1);
+        assert.deepEqual(errors, []);
+    });
+});
+
+test('first departure stale approval preserves the complete form and does not reload, retry or open row correction', async () => {
+    const message = 'Τα στοιχεία άλλαξαν μετά την προεπισκόπηση. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ελέγξτε τη φόρμα.\n2. Ζητήστε νέα πρόταση.';
+    await withPage({ automatic: true, replies: [{ status: 200, payload: departureAutomaticEnvelope() },
+        { status: 409, payload: { success: false, reason: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE', message } }] }, async ({ page, requests, errors }) => {
+        await page.locator('#email').fill('unsaved@example.test');
+        const values = await page.locator('input[name]').evaluateAll(fields => fields.map(field => [field.name, field.value]));
+        await save(page); await expectDepartureAutomatic(page);
+        await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
+        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Τα στοιχεία άλλαξαν');
+        assert.deepEqual(await page.locator('input[name]').evaluateAll(fields => fields.map(field => [field.name, field.value])), values);
+        assert.equal(requests.length, 2);
+        assert.equal(await page.evaluate(() => window.guidedCounts.redirect), 0);
+        assert.deepEqual(errors.filter(text => !text.includes('Failed to load resource')), []);
+    });
+});
+
+test('blocked first departure opens only History, retains unsaved form and leaves both manual tools available', async () => {
+    const D = require('../../../../server/services/ergazomenoi/employeeDepartureAutomaticReconstructionContract');
+    let payload;
+    D.sendDepartureReconstructionAction({ status() { return this; }, json(body) { payload = body; } }, D.manualReview('BLOCKED'));
+    await withPage({ automatic: true, payload }, async ({ page, requests, errors }) => {
+        await page.locator('#email').fill('unsaved@example.test');
+        await save(page);
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Χρειάζεται έλεγχος του Ιστορικού');
+        assert.equal(await page.locator('.menu_Links li.active').textContent(), 'Ιστορικό Προσλήψεων/Αλλαγών');
+        assert.match(await page.locator('.swal2-html-container').textContent(), /Η αποχώρηση δεν μπορεί να ολοκληρωθεί αυτόματα/);
+        await page.locator('.swal2-confirm').click();
+        await page.waitForFunction(() => window.saveFinished);
+        assert.equal(await page.locator('#email').inputValue(), 'unsaved@example.test');
+        assert.equal(await page.locator('#hmeromhnia_apoxorhshs').inputValue(), '2026-09-20');
+        assert.equal(await page.locator('#employeeHistoryReconstructionPreviewBtn').isEnabled(), true);
+        assert.equal(await page.locator(`tr[data-id="${target}"] [data-action="review"]`).isEnabled(), true);
+        assert.equal(requests.length, 1);
+        assert.equal(await page.evaluate(() => window.guidedCounts.redirect), 0);
+        assert.deepEqual(errors, []);
+    });
+});
 async function expectAutomatic(page) {
     await page.locator('#employeeHistoryReconstructionPreviewModal.show').waitFor();
     await page.waitForTimeout(350);
