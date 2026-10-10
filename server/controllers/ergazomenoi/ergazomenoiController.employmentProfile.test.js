@@ -2038,3 +2038,30 @@ test('browser-derived outputs cannot mask an authoritative hire-date change', as
     assert.ok(db.departureError.departureCorrectionChangedFields.includes('hmeromhnia_proslhpshs'));
     assert.deepEqual(db.state(), stored);
 });
+
+test('first departure preserves already-validated stale hidden contract echoes and termination reason', async () => {
+    const stored = await fullFormDepartureState();
+    stored.employee.stoixeio_symbashs_01_hidden = 'stale-browser-echo';
+    stored.employee.stoixeio_symbashs_02_hidden = 'another-stale-echo';
+    stored.employee.logos_peratosis = 'existing-reason';
+    const db = memory(stored), { res } = await submit('edit', {
+        ...fullFormDeparturePayload(stored.employee),
+        stoixeio_symbashs_02: '', stoixeio_symbashs_02_hidden: '', logos_peratosis: ''
+    }, db);
+    assert.equal(res.body.success, true, JSON.stringify(res.body));
+    for (const field of ['stoixeio_symbashs_01_hidden', 'stoixeio_symbashs_02_hidden', 'logos_peratosis']) {
+        assert.equal(db.state().employee[field], stored.employee[field], field);
+    }
+    assertDepartureHistoryStable(stored, db.state());
+});
+test('stale hidden contract echo still cannot authorize a genuine contract change', async () => {
+    const stored = await fullFormDepartureState();
+    stored.employee.stoixeio_symbashs_01_hidden = 'stale-browser-echo';
+    const db = memory(stored), { res } = await submit('edit', {
+        ...fullFormDeparturePayload(stored.employee), stoixeio_symbashs_01: 'changed-contract',
+        stoixeio_symbashs_01_hidden: 'changed-contract'
+    }, db);
+    assertSaveHistoryAction(res);
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.writes(), 0);
+});

@@ -3268,12 +3268,12 @@ function departureCorrectionMaintenanceDelta({ current, input, maintenance }) {
     };
     const semanticallyUnchangedFields = new Set([...submittedEmployee].filter(field =>
         Object.hasOwn(employeeChanges, field) &&
-        departureMaintenanceFormEchoMatchesCurrent({
+        (isControlledCorrectionFormEcho(field) || departureMaintenanceFormEchoMatchesCurrent({
             field,
             currentValue: current[field],
             mappedValue: employeeChanges[field],
             formData: maintenance.submittedFormValues || {}
-        })));
+        }))));
     // First departure owns lifecycle boundaries, not today's browser seniority
     // totals. Source inputs still pass through the unchanged mixed-change guard.
     if (!C.calendarDate(current.hmeromhnia_apoxorhshs)) {
@@ -3282,7 +3282,6 @@ function departureCorrectionMaintenanceDelta({ current, input, maintenance }) {
     const employeeFields = [...submittedEmployee].filter(field =>
         !ignoredEmployeeFields.has(field) && Object.hasOwn(employeeChanges, field) &&
         !semanticallyUnchangedFields.has(field) &&
-        !isControlledCorrectionFormEcho(field) &&
         !departureMaintenanceValuesEqual(field, employeeChanges[field], current[field]));
     const semanticEmployeeChanges = Object.fromEntries(Object.entries(submittedEmployeeChanges)
         .filter(([field]) => !semanticallyUnchangedFields.has(field)));
