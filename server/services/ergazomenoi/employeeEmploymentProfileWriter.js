@@ -1,4 +1,5 @@
 'use strict';
+const { normalizeEmployeeNormalSaveRequest } = require('../../utils/ergazomenoi/employeeNormalSaveNormalization');
 
 const mongoose = require('mongoose');
 const AutomaticReconstruction = require('./employeeHistoryAutomaticReconstructionApplyContract');
@@ -1544,6 +1545,9 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             if (employeeId && String(current?._id) !== String(employeeId)) throw failure('EMPLOYEE_PROFILE_STALE');
             if (newEmployee && current) throw failure('EMPLOYEE_PROFILE_ALREADY_EXISTS');
             if (!newEmployee && !current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
+            if (!editorOperation && !rehireOperation && current) {
+                ({ input, maintenance } = normalizeEmployeeNormalSaveRequest({ input, maintenance }, current));
+            }
             let rows = planningState ? planningState.history
                 : await completeHistoryLean(historyModel, filter, session);
             const persistedRows = rows;
@@ -2838,7 +2842,7 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
         typeof employeeId !== 'string' || !employeeId.trim()) C.invalid('scope', 'existing scoped employee required');
     const dependencies = { connection, employeeModel, historyModel, auditModel,
         auditCollectionChecker, referenceChecker, capabilityProbe };
-    const normalizedRequest = normalizedUniqueSafeRepairSaveRequest(profileRequest);
+    const submittedRequest = profileRequest;
     const noWrite = Symbol('compositeNoWrite');
     const stateToken = (current, history, plan) => A.buildAutomaticReconstructionPreviewToken({
         scope, currentEmployee: current, completeHistoryRows: history, plan });
@@ -2851,6 +2855,8 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
             const current = await employeeModel.findOne({ ...scope, _id: employeeId })
                 .select('+employee_profile_mutation_sequence').session(session).lean();
             if (!current) throw failure('EMPLOYEE_PROFILE_STALE');
+            const profileRequest = normalizeEmployeeNormalSaveRequest(submittedRequest, current);
+            const normalizedRequest = normalizedUniqueSafeRepairSaveRequest(profileRequest);
             const query = historyModel.find(scope);
             query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
             const history = await query.select('+history_reference_fence').session(session).lean();
@@ -2867,7 +2873,8 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
                     'diagnostics.applyTokenHash': A.hash(reconstruction.previewToken),
                     'diagnostics.actor.userId': String(actorUserId) }).session(session).lean();
                 if (!completed || completed.diagnostics.compositeVersion !== S.VERSION ||
-                    completed.diagnostics.saveRequestHash !== A.hash(normalizedRequest) ||
+                    completed.diagnostics.saveRequestHash !== A.hash(normalizedUniqueSafeRepairSaveRequest(
+                        normalizeEmployeeNormalSaveRequest(submittedRequest, completed.currentBefore))) ||
                     completed.diagnostics.persistedStateHash !== A.hash(freshStateToken)) {
                     throw A.failure('STALE');
                 }

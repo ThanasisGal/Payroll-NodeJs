@@ -32,6 +32,48 @@ function setup(input = F.caseA(), user = { privileges: 'A', team: 'THA', situati
 function noWrites(db, before) { assert.deepEqual(db.state(), before); assert.equal(db.events.some(e => ['write', 'commit', 'fence'].includes(e.type)), false); }
 function noCommit(db, before) { assert.deepEqual(db.state(), before); }
 
+test('H: passive lending, derived seniority and equivalent tax echoes do not stale approval or enter original Save', async () => {
+    const input = F.caseA();
+    Object.assign(input.currentEmployee, { afora_daneismo_ergazomenoy: false,
+        synolo_proyphresias_se_mhnes: 3, forologikh_klimaka: '20260200 - existing description' });
+    const { db, run, preview, options } = setup(input);
+    const reconstruction = await preview();
+    const defaults = require('../../utils/ergazomenoi/employeeNormalSaveNormalization').PASSIVE_LENDING_DEFAULTS;
+    const employeeChanges = { ...options.maintenance.employeeChanges, ...defaults,
+        synolo_proyphresias_se_mhnes: 5, forologikh_klimaka: '0200' };
+    await run({ reconstruction, maintenance: { ...options.maintenance, employeeChanges,
+        submittedEmployeeFields: Object.keys(employeeChanges), submittedFormValues: employeeChanges } });
+    const after = db.state().employees[0];
+    for (const field of Object.keys(defaults)) assert.equal(Object.hasOwn(after, field), false, field);
+    assert.equal(after.synolo_proyphresias_se_mhnes, 3);
+    assert.equal(after.forologikh_klimaka, input.currentEmployee.forologikh_klimaka);
+    assert.equal(after.parathrhseis, 'synthetic note');
+});
+
+test('forged non-neutral lending submission changes approval intent even when non-lending controller cleanup is neutral', async () => {
+    const { db, run, preview, options } = setup(), reconstruction = await preview(), before = db.state();
+    const employeeChanges = { ...options.maintenance.employeeChanges, afm_daneizontos_ergodoth: '' };
+    await assert.rejects(() => run({ reconstruction, maintenance: { ...options.maintenance, employeeChanges,
+        submittedFormValues: { afm_daneizontos_ergodoth: '123456789' } } }), { code: A.PREFIX + 'STALE' });
+    noCommit(db, before);
+});
+
+test('duplicate continuation verifies original pre-save normalization after real lending cleanup and tax change', async () => {
+    const input = F.caseA();
+    Object.assign(input.currentEmployee, { afora_daneismo_ergazomenoy: true, forologikh_klimaka: '0100',
+        afm_daneizontos_ergodoth: '123456789' });
+    const defaults = require('../../utils/ergazomenoi/employeeNormalSaveNormalization').PASSIVE_LENDING_DEFAULTS;
+    const employeeChanges = { afora_daneismo_ergazomenoy: false, ...defaults, forologikh_klimaka: '0200' };
+    const { db, preview, run } = setup(input, undefined, { maintenance: { employeeChanges,
+        submittedEmployeeFields: Object.keys(employeeChanges), historyChanges: {}, submittedHistoryChanges: {} } });
+    const reconstruction = await preview();
+    await run({ reconstruction });
+    const before = db.state();
+    assert.equal((await run({ reconstruction })).alreadyApplied, true);
+    noCommit(db, before);
+    assert.equal(db.events.filter(e => e.type === 'commit').length, 1);
+});
+
 test('B/C: initial Save is HTTP 200 actionRequired, zero writes including fence; cancellation is just no continuation', async () => {
     const { db, run } = setup(), before = db.state();
     let error; try { await run(); } catch (e) { error = e; }

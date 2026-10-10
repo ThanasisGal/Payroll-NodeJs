@@ -4047,6 +4047,7 @@ class ergazomenoiController {
                         historyChanges: updateFieldsIstoriko,
                         submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
                         submittedProfileFields: Object.keys(profileInput(formData, 'edit')),
+                        submittedFormValues: formData,
                         identity: formData.istorikoId
                             ? undefined
                             : buildEmployeeMaintenanceIdentity(formData),

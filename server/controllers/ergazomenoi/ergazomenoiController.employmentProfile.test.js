@@ -1898,6 +1898,26 @@ test('normal Save keeps stale and invalid guided envelopes at their original sta
 
 // Phase 3B executes the actual new composite boundary, while the earlier
 // regression cases above keep exercising the guided boundary independently.
+test('Phase 3B controller retains raw lending intent before cleanup and excludes only passive defaults', async () => {
+    const stored = await initial();
+    delete stored.history[0].poso_symbashs_02;
+    const defaults = require('../../utils/ergazomenoi/employeeNormalSaveNormalization').PASSIVE_LENDING_DEFAULTS;
+    for (const field of Object.keys(defaults)) delete stored.employee[field];
+    stored.employee.afora_daneismo_ergazomenoy = false;
+    const db = memory(stored); db.composite = true;
+    const before = plain(db.state());
+    const clean = { ...form(), afora_daneismo_ergazomenoy: false, ...defaults };
+    const first = await submit('edit', clean, db);
+    const forged = await submit('edit', { ...clean, afm_daneizontos_ergodoth: '123456789',
+        untouched: true, readonly: true }, db);
+    assert.equal(first.res.body.reason, 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED');
+    assert.equal(forged.res.body.reason, first.res.body.reason);
+    assert.notEqual(forged.res.body.previewToken, first.res.body.previewToken,
+        'raw non-neutral value must not receive passive treatment after controller cleanup');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), before);
+});
+
 test('Phase 3B controller: normal Save returns a sanitized automatic preview before any business writes', async () => {
     const stored = await initial();
     delete stored.history[0].poso_symbashs_02;
@@ -1998,14 +2018,13 @@ for (const field of derivedExperienceFields) {
         assert.equal(db.state().employee[field], stored.employee[field]);
         assertDepartureHistoryStable(stored, db.state());
     });
-    test(`ordinary Save retains existing ${field} write semantics`, async () => {
+    test(`ordinary Save excludes browser-derived ${field} from business intent`, async () => {
         const stored = await fullFormDepartureState(), db = memory(stored);
         const { res } = await submit('edit', { ...fullFormDeparturePayload(stored.employee, ''),
             [field]: 8 }, db);
         assert.equal(res.body.success, true, JSON.stringify(res.body));
-        assert.equal(db.state().employee[field], 8);
-        if (field === 'misthologiko_klimakio') assert.equal(db.state().history[0][field], 8);
-        else assert.deepEqual(db.state().history, stored.history);
+        assert.equal(db.state().employee[field], stored.employee[field]);
+        assert.deepEqual(db.state().history, stored.history);
     });
 }
 for (const failure of ['history', 'commit']) {
