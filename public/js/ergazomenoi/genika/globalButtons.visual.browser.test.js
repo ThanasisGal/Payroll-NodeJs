@@ -105,6 +105,200 @@ async function geometry(element) {
     });
 }
 
+// Compare the actual helper markup against the legacy stylesheet, with the
+// action layer omitted. No historical Git objects, CDN or database are needed.
+const sharedCSS = fs.readFileSync(path.join(root, 'public/css/main.css'), 'utf8');
+const actionSystemStart = sharedCSS.indexOf('/* Primary action buttons share one system.');
+assert.ok(actionSystemStart > 100000, 'legacy styles and the action system boundary must be present');
+const legacyCSS = sharedCSS.slice(0, actionSystemStart);
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const dropdownSource = read('public/js/dropdown-item.js');
+const dropdownHelpers = dropdownSource.slice(dropdownSource.indexOf('function makeUnfocusable('),
+    dropdownSource.indexOf('window.tomDropdownConfig ='));
+const editRoot = 'views/ergazomenoi/ergazomenoi/partials/edit/';
+
+async function helperMarkup(screen) {
+    if (screen === 'home') {
+        return read('views/partials/sidebar.ejs').match(/<div class="sidebar-bottom-buttons">[\s\S]*?<\/div>/)[0]
+            .replace(/src="\/static\/img\/([^"]+)"/g, (_, file) =>
+                `src="data:image/png;base64,${fs.readFileSync(path.join(root, 'public/img', file)).toString('base64')}"`);
+    }
+    if (screen === 'login') {
+        return ejs.renderFile(path.join(root, 'views/login/login.ejs'), { csrfToken: 'visual-fixture', userName: '' });
+    }
+    const dypa = await ejs.renderFile(path.join(root, editRoot, 'cardBodies/section1/accordion/dypa.ejs'), { rec: {} });
+    const link = dypa.match(/<a\s+id="gotoProgrammaDypa"[\s\S]*?<\/a>/)[0];
+    const trash = file => read(editRoot + file).match(/<button\s[^>]*class="[^"]*tom-trash[\s\S]*?<\/button>/)[0];
+    const singleTrash = trash('cardBodies/section2/apodoxes.ejs');
+    const multiTrash = ejs.render(trash('cardBodies/section3/krathseis.ejs'), { idNum: 1 });
+    const clearRow = (file, variable, value) => read(file)
+        .match(/<button type="button" class="[^"]*clear-row[\s\S]*?<\/button>/)[0]
+        .replaceAll('${' + variable + '}', value);
+    const rowHelpers = clearRow('public/js/ergazomenoi/genika/addStoixeiaSymbaseon.js', 'idNum', '1')
+        + clearRow('public/js/kinhseis/apasxolhseis/loadKrathseis.js', 'index', '2');
+    const footer = await ejs.renderFile(path.join(root, editRoot, 'cardFooters/cardFooter_Edit.ejs'));
+    return `<h1>Συντήρηση εργαζομένου</h1><form>
+        ${[['name', 'Ονοματεπώνυμο', 'text', 'Δοκιμή'], ['afm', 'ΑΦΜ', 'text', '000000000'],
+        ['date', 'Ημερομηνία', 'date', '2026-07-23'], ['time', 'Ώρα', 'time', '12:30'],
+        ['locked', 'Κλειδωμένο πεδίο', 'text', 'Δοκιμή'], ['empty', 'Κενό πεδίο', 'text', '']]
+            .map(([id, label, type, value]) => `<label class="d-block mb-2">${label}
+                <input id="${id}" type="${type}" class="form-control" value="${value}" ${id === 'locked' ? 'readonly' : ''}>
+                </label>`).join('')}
+        <label class="d-block mb-3">Απλή επιλογή</label><div class="ts-wrapper single" id="single">
+            <select id="single-select" hidden></select><div class="ts-control"><div class="item">Δοκιμαστική επιλογή</div></div></div>
+        <label class="d-block my-3">Πολλαπλή επιλογή</label><div class="ts-wrapper multi" id="multi">
+            <select id="multi-select" hidden></select><div class="ts-control">
+                ${['Πρώτη επιλογή', 'Δεύτερη επιλογή', 'Τρίτη επιλογή'].map((text, i) =>
+                    `<div class="item" data-value="${i + 1}">${text}<a class="remove" role="button" href="#">×</a></div>`).join('')}
+            </div></div>
+        <div class="d-flex align-items-center my-3" id="editApodoxesTomDropdownScope">Σύμβαση ${singleTrash}</div>
+        <div class="d-flex align-items-center my-3" id="editKrathseisTomDropdownScope">Κρατήσεις ${multiTrash}</div>
+        <div class="d-flex align-items-center my-3">Καθαρισμός πεδίων γραμμής ${rowHelpers}</div>
+        <div class="d-flex align-items-center my-3">Πρόγραμμα Δ.ΥΠ.Α. ${link}</div>
+        ${footer}</form>`;
+}
+
+async function helperSnapshot(page, selectors) {
+    const session = await page.context().newCDPSession(page);
+    try {
+        await session.send('DOM.enable');
+        await session.send('CSS.enable');
+        const { root: documentNode } = await session.send('DOM.getDocument');
+        const result = {};
+        for (const selector of selectors) {
+            const { nodeId } = await session.send('DOM.querySelector', { nodeId: documentNode.nodeId, selector });
+            assert.ok(nodeId, selector);
+            result[selector] = {};
+            for (const [state, forcedPseudoClasses] of Object.entries({ normal: [], hover: ['hover'],
+                focus: ['focus', 'focus-visible'], active: ['hover', 'active'] })) {
+                await session.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses });
+                result[selector][state] = await page.locator(selector).evaluate(e => {
+                    const properties = ['display', 'position', 'top', 'right', 'width', 'height', 'min-width', 'min-height',
+                        'max-width', 'max-height', 'padding', 'margin', 'border-radius', 'border-width', 'border-color',
+                        'border-style', 'background-color', 'color', 'font-size', 'line-height', 'font-weight', 'white-space',
+                        'align-items', 'justify-content', 'vertical-align', 'transform', 'opacity', 'pointer-events',
+                        'cursor', 'box-shadow', 'outline', 'outline-offset', 'flex-grow', 'flex-shrink'];
+                    const styles = element => Object.fromEntries(properties.map(p => [p, getComputedStyle(element).getPropertyValue(p)]));
+                    const box = e.getBoundingClientRect();
+                    return { styles: styles(e), width: box.width, height: box.height,
+                        icons: [...e.querySelectorAll('i, svg, img')].map(styles) };
+                });
+            }
+            await session.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
+        }
+        return result;
+    } finally { await session.detach(); }
+}
+
+for (const width of [1440, 390]) {
+    for (const screen of ['home', 'login', 'employee']) {
+        test(`helper scope: ${screen} matches legacy geometry and all states at ${width}px`, async () => {
+            const browser = await chromium.launch({ headless: true });
+            try {
+                const page = await browser.newPage({ viewport: { width, height: 1200 } });
+                page.setDefaultTimeout(5000);
+                const requests = [], errors = [];
+                page.on('pageerror', error => errors.push(error.message));
+                const markup = await helperMarkup(screen);
+                await page.route('**/*', route => {
+                    requests.push({ url: route.request().url(), method: route.request().method() });
+                    if (route.request().url() === 'https://cdn.webpayrollsolutions.com/assets/img/wps1.png')
+                        return route.fulfill({ contentType: 'image/png', body: fs.readFileSync(path.join(root, 'public/img/wps1.png')) });
+                    return route.request().url() === `${origin}/__helper_scope__`
+                        ? route.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="el">
+                            <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+                            <body><main style="max-width:${screen === 'home' ? 240 : 800}px;padding:16px;margin:auto">${markup}</main></body></html>` })
+                        : route.abort();
+                });
+                await page.goto(`${origin}/__helper_scope__`);
+                await page.addStyleTag({ path: path.join(root, 'public/css/bootstrap.min.css') });
+                const stylesheet = await page.addStyleTag({ content: legacyCSS });
+                await page.addStyleTag({ content: `*, *::before, *::after { transition: none !important; animation: none !important; }
+                    #single, #multi { position:relative; width:min(260px, calc(100% - 64px)); }
+                    .ts-control { border:1px solid #ccc; padding:6px; min-height:32px; }
+                    .ts-control .item { font-size:14px; }
+                    .ts-overflow-popup { position:absolute; top:40px; width:260px; z-index:10; background:white; }` });
+                if (process.env.PAYROLL_VISUAL_ICON_CSS && process.env.PAYROLL_VISUAL_ICON_FONT) {
+                    const font = fs.readFileSync(process.env.PAYROLL_VISUAL_ICON_FONT).toString('base64');
+                    await page.addStyleTag({ content: fs.readFileSync(process.env.PAYROLL_VISUAL_ICON_CSS, 'utf8')
+                        .replace(/url\("[^"]+"\)/g, `url("data:font/woff2;base64,${font}")`) });
+                } else {
+                    await page.locator('i.bi').evaluateAll(icons => icons.forEach(icon => {
+                        icon.innerHTML = '<svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16"><path d="M4 4h8v10H4z"/></svg>';
+                    }));
+                }
+                if (screen === 'login') {
+                    await page.locator('#email').fill('visual@example.test');
+                    await page.addScriptTag({ path: path.join(root, 'public/js/common/clearableInputs.js') });
+                    await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
+                } else if (screen === 'employee') {
+                    await page.addScriptTag({ path: path.join(root, 'public/js/ergazomenoi/genika/clearableInputs.js') });
+                    await page.evaluate(() => window.initClearableInputs());
+                    await page.locator('.edit-apodoxes-tom-trash, .edit-employee-tom-trash').evaluateAll(buttons =>
+                        buttons.forEach(button => { button.hidden = false; }));
+                    // Production rendering functions, synthetic selections; no lookup or save request.
+                    await page.addScriptTag({ content: dropdownHelpers });
+                    await page.evaluate(() => {
+                        for (const mode of ['single', 'multi']) {
+                            const wrapper = document.getElementById(mode);
+                            const tom = { wrapper, input: wrapper.querySelector('select'), settings: { mode },
+                                items: mode === 'single' ? ['1'] : ['1', '2', '3'], on() {},
+                                control_input: document.createElement('input'),
+                                options: { 1: { label: 'Πρώτη επιλογή' }, 2: { label: 'Δεύτερη επιλογή' }, 3: { label: 'Τρίτη επιλογή' } } };
+                            updateOverflow(tom);
+                        }
+                    });
+                }
+                await page.evaluate(() => document.fonts.ready);
+                const selectors = screen === 'home' ? ['.sidebar-mini-btn:nth-child(1)', '.sidebar-mini-btn:nth-child(2)', '.sidebar-mini-btn:nth-child(3)']
+                    : screen === 'login' ? ['.clear-btn'] : ['#name + .clear-btn', '#afm + .clear-btn', '#date + .clear-btn', '#time + .clear-btn',
+                        '#locked + .clear-btn', '#empty + .clear-btn', '.ts-single-reset-btn', '.ts-multi-reset-btn',
+                        '.ts-overflow-indicator', '.ts-control .item:first-child .remove',
+                        '.edit-apodoxes-tom-trash', '.edit-employee-tom-trash', '#clearSelectSymbaseon-1',
+                        '#clearSelectKrathseon_2', '#gotoProgrammaDypa'];
+                const before = await helperSnapshot(page, selectors);
+                await capture(page, `scope-${screen}-legacy`, width);
+                await stylesheet.evaluate((element, css) => { element.textContent = css; }, sharedCSS);
+                assert.deepEqual(await helperSnapshot(page, selectors), before, 'all helper styles must match the legacy appearance');
+                if (screen === 'home') {
+                    for (const selector of selectors) assert.equal(before[selector].normal.height, 28);
+                } else if (screen === 'employee') {
+                    // Overflow row delete buttons are generated only after expanding +N.
+                    await page.locator('.ts-overflow-indicator').dispatchEvent('pointerdown');
+                    await page.locator('.ts-popup-row button').first().waitFor({ state: 'attached' });
+                    if (!process.env.PAYROLL_VISUAL_ICON_CSS || !process.env.PAYROLL_VISUAL_ICON_FONT) {
+                        await page.locator('.ts-popup-row i').evaluateAll(icons => icons.forEach(icon => {
+                            icon.innerHTML = '<svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16"><path d="M4 4h8v10H4z"/></svg>';
+                        }));
+                    }
+                    await page.locator('.ts-popup-row button').first().waitFor();
+                    const popupSelector = ['.ts-popup-row:first-child button'];
+                    const current = await helperSnapshot(page, popupSelector);
+                    await stylesheet.evaluate((element, css) => { element.textContent = css; }, legacyCSS);
+                    assert.deepEqual(await helperSnapshot(page, popupSelector), current);
+                    await stylesheet.evaluate((element, css) => { element.textContent = css; }, sharedCSS);
+                    // Restoring the action layer starts its 150ms color transition.
+                    await page.waitForTimeout(200);
+                    await capture(page, 'scope-employee-overflow', width);
+                    await page.locator('.ts-overflow-popup').evaluate(element => element.remove());
+                    assert.equal(before['.ts-single-reset-btn'].normal.height, 28);
+                    assert.equal(before['.ts-multi-reset-btn'].normal.height, 28);
+                    for (const selector of ['form .submitButton', 'form .cardFooter01 a.btn']) {
+                        const primary = await geometry(page.locator(selector));
+                        assert.equal(primary.align, 'center'); assert.equal(primary.whiteSpace, 'nowrap');
+                        assert.equal(primary.radius, 6); assert.equal(primary.border, primary.color);
+                    }
+                }
+                await capture(page, `scope-${screen}-restored`, width);
+                assert.deepEqual(errors, []);
+                assert.deepEqual(requests.filter(request => !request.url.endsWith('/wps1.png')),
+                    [{ url: `${origin}/__helper_scope__`, method: 'GET' }]);
+                assert.ok(requests.every(request => request.method === 'GET'));
+            } finally { await browser.close(); }
+        });
+    }
+}
+
 for (const width of [1440, 390]) {
     test(`global buttons: forms, table, links, variants and legacy overrides at ${width}px`, async () => {
         await fixture(width, async page => {
@@ -228,15 +422,22 @@ for (const width of [1440, 390]) {
                 assert.equal(await page.locator('.swal2-popup').isVisible(), false);
             }
 
-            for (const options of [{ icon: 'error', title: 'Η αποθήκευση σταμάτησε', text: 'Δεν αποθηκεύτηκε καμία αλλαγή.' },
-                { icon: 'question', title: 'Επιβεβαίωση', text: 'Θέλετε να συνεχίσετε;', showCancelButton: true },
-                { icon: 'success', title: 'Επιτυχής καταχώριση!', showConfirmButton: true, timer: undefined }]) {
+            for (const options of [{ icon: 'error', title: 'Η αποθήκευση σταμάτησε', text: 'Δεν αποθηκεύτηκε καμία αλλαγή.', confirmButtonText: 'Κλείσιμο' },
+                { icon: 'question', title: 'Επιβεβαίωση', text: 'Θέλετε να συνεχίσετε;', showCancelButton: true,
+                    confirmButtonText: 'Συνέχεια', cancelButtonText: 'Ακύρωση' },
+                { icon: 'success', title: 'Επιτυχής καταχώριση!', showConfirmButton: true, confirmButtonText: 'Κλείσιμο', timer: undefined }]) {
                 await page.evaluate(options => {
                     void Swal.fire(options.icon === 'success' ? employeeSaveSuccessOptions(options) : options);
                 }, options);
                 await page.clock.runFor(5000);
                 assert.equal(await page.locator('.swal2-popup').isVisible(), true);
                 assert.equal(await page.evaluate(() => Swal.getTimerLeft()), undefined);
+                for (const element of await page.locator('.swal2-actions button:visible').all()) {
+                    const action = await geometry(element);
+                    assert.equal(action.align, 'center'); assert.equal(action.justify, 'center');
+                    assert.equal(action.whiteSpace, 'nowrap'); assert.equal(action.radius, 6);
+                }
+                await capture(page, `scope-dialog-${options.icon}`, width);
                 await page.evaluate(() => Swal.close());
             }
         });

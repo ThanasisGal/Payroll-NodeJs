@@ -16742,14 +16742,27 @@ body.loader-active > *:not(.app-loader) {
 .swal2-popup.employee-maintenance-swal .swal2-actions > button { font-size: 1rem !important; }
 .employee-maintenance-swal .swal2-actions,
 .employee-history-preview .modal-footer { display: flex; flex-wrap: wrap; gap: .5rem; }
-/* One button system; important declarations in this layer also supersede old
-   unlayered ID/utility overrides, without changing cards, tabs or plain links. */
-body :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop) {
+/* Primary action buttons share one system. Branded service links and compact
+   field helpers retain their legacy geometry, colors and interaction states.
+   Apply the same exclusions to layout, sizes, colors, states and icon rules.
+   Flat selectors also remain compatible with the project's CSS minifier.
+   Important declarations in the layer supersede legacy ID/utility overrides. */
+body :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+    .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+    .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+    .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+    #gotoProgrammaDypa
+)):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop) {
     display: inline-flex;
 }
 
 @layer application-buttons {
-    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]) {
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         align-items: center !important;
         justify-content: center !important;
         white-space: nowrap !important;
@@ -16758,7 +16771,12 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     }
 
     /* Disclosure controls retain their component layout and selected state. */
-    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close) {
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close) {
         --button-color: #795548;
         --button-light: #f5eeeb;
         --maintenance-color: var(--button-color);
@@ -16781,48 +16799,108 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         transition: background-color .15s ease, color .15s ease, box-shadow .15s ease !important;
     }
 
-    :is(.btn-sm, .btn-small, .istoriko-btn) {
+    :is(.btn-sm, .btn-small, .istoriko-btn):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         min-height: 2rem !important;
         padding: .3rem .55rem !important;
         font-size: .875rem !important;
     }
 
-    :is(.btn-primary, .btn-outline-primary, .policy-preview-decision-primary, .employment-review-action-primary, .btn-message-custom) {
+    :is(.btn-primary, .btn-outline-primary, .policy-preview-decision-primary, .employment-review-action-primary, .btn-message-custom):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         --button-color: #0b5ed7 !important; --button-light: #e8f0ff !important;
     }
-    :is(.btn-success, .btn-outline-success, .btn-green, .btn-toTop, .btn-refresh-custom, .class-success, .employee-maintenance-button, .save-button, .istoriko-btn-add, .istoriko-footer-btn-save, .policy-preview-decision-success, .employment-review-action-success, #employeeHistoryReconstructionApplyBtn) {
+    :is(.btn-success, .btn-outline-success, .btn-green, .btn-toTop, .btn-refresh-custom, .class-success, .employee-maintenance-button, .save-button, .istoriko-btn-add, .istoriko-footer-btn-save, .policy-preview-decision-success, .employment-review-action-success, #employeeHistoryReconstructionApplyBtn):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         --button-color: #146c43 !important; --button-light: #e8f5ee !important;
     }
-    :is(.btn-danger, .btn-outline-danger, .class-error, .class-danger, .user-admin-action-danger, .delete-button, .istoriko-btn-delete, .policy-preview-decision-danger, .employment-review-action-danger) {
+    :is(.btn-danger, .btn-outline-danger, .class-error, .class-danger, .user-admin-action-danger, .delete-button, .istoriko-btn-delete, .policy-preview-decision-danger, .employment-review-action-danger):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         --button-color: #b02a37 !important; --button-light: #fbe9ec !important;
     }
-    :is(.btn-warning, .btn-outline-warning, .btn-orange, .class-warning, .istoriko-btn-edit, .amendment-button, .policy-preview-decision-warning, .employment-review-action-warning) {
+    :is(.btn-warning, .btn-outline-warning, .btn-orange, .class-warning, .istoriko-btn-edit, .amendment-button, .policy-preview-decision-warning, .employment-review-action-warning):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         --button-color: #805800 !important; --button-light: #fff3cd !important;
     }
-    :is(.btn-info, .btn-outline-info, .class-info, .policy-preview-decision-info) {
+    :is(.btn-info, .btn-outline-info, .class-info, .policy-preview-decision-info):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         --button-color: #08728a !important; --button-light: #e5f5fa !important;
     }
-    :is(.btn-secondary, .btn-outline-secondary, .btn-light, .btn-outline-light, .btn-dark, .btn-outline-dark, .swal2-cancel, .swal2-deny, .user-admin-action-secondary, .custom-cancel-button-normal, .undo-button, .istoriko-btn-undo, .policy-preview-decision-secondary, .employment-review-action-secondary) {
+    :is(.btn-secondary, .btn-outline-secondary, .btn-light, .btn-outline-light, .btn-dark, .btn-outline-dark, .swal2-cancel, .swal2-deny, .user-admin-action-secondary, .custom-cancel-button-normal, .undo-button, .istoriko-btn-undo, .policy-preview-decision-secondary, .employment-review-action-secondary):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         --button-color: #545b62 !important; --button-light: #f0f1f2 !important;
     }
-    :is(.btn-brown, .class-normal, .cardFooter01 .submitButton, #employeeHistoryReconstructionPreviewBtn) {
+    :is(.btn-brown, .class-normal, .cardFooter01 .submitButton, #employeeHistoryReconstructionPreviewBtn):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) {
         --button-color: #795548 !important; --button-light: #f5eeeb !important;
     }
 
-    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close):is(:hover, :active, .active):not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close):is(:hover, :active, .active):not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: var(--button-color) !important;
         border-color: var(--button-color) !important;
         color: #fff !important;
     }
-    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):focus-visible {
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )):focus-visible {
         outline: 2px solid var(--button-color, #795548) !important;
         outline-offset: 3px !important;
         box-shadow: 0 0 0 3px #fff !important;
     }
-    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):active:not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )):active:not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         box-shadow: inset 0 2px 4px #0003 !important;
     }
-    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):is(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )):is(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: #e9ecef !important;
         border-color: #adb5bd !important;
         color: #626970 !important;
@@ -16830,14 +16908,24 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         box-shadow: none !important;
         cursor: not-allowed !important;
     }
-    :is(button, .btn, a.buttons-content, [role="button"]) :is(i, svg, .bi) {
+    :is(button, .btn, a.buttons-content, [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) :is(i, svg, .bi) {
         color: inherit !important;
         line-height: 1 !important;
         vertical-align: middle !important;
         margin-block: 0 !important;
         flex-shrink: 0 !important;
     }
-    :is(button, .btn, a.buttons-content, [role="button"]) .bi::before {
+    :is(button, .btn, a.buttons-content, [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa
+    )) .bi::before {
         vertical-align: 0 !important;
     }
 }
