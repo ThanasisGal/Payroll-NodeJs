@@ -10,6 +10,7 @@ const { buildEmployeeHistoryReconstructionPreview: project } = require('../../..
 const F = require('../../../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const { buildAutomaticReconstructionPreviewToken } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const root = path.resolve(__dirname, '../../../..');
+const { origin, asset, assertChoiceAligned } = require('../../../../test/fixtures/employeeMaintenanceBrowserAssets');
 const dto = input => project({ plan: plan(input), completeHistoryRows: input.completeHistoryRows });
 const modal = '#employeeHistoryReconstructionPreviewModal';
 const body = '#employeeHistoryReconstructionPreviewBody';
@@ -26,7 +27,8 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
             ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
             employeeHistoryAccessMode: historyAccessMode, employeeHistoryStateToken: stateToken, problematicHistoryIds
         });
-        await page.route('https://payroll.test/**', async route => {
+        await page.route(`${origin}/**`, async route => {
+            if (route.request().url().startsWith(`${origin}/static/`)) return route.continue();
             const request = route.request();
             if (applyHandler && request.url().endsWith('/history-reconstruction-apply')) {
                 const data = request.postDataJSON();
@@ -47,13 +49,13 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
             if (delay) await new Promise(resolve => setTimeout(resolve, delay));
             return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input), previewToken: buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input), actorUserId: 'synthetic-actor' }) }) }).catch(() => {});
         });
-        await page.goto('https://payroll.test/');
+        await page.goto(`${origin}/`);
         for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
-            await page.addStyleTag({ path: path.join(root, file) });
+            await page.addStyleTag(asset(root, file));
         for (const file of ['public/js/bootstrap.bundle.min.js', 'node_modules/sweetalert2/dist/sweetalert2.all.js',
             'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js',
             ...(manualHandler ? ['public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js',
-                'public/js/ergazomenoi/genika/istorikoTable.js'] : [])]) await page.addScriptTag({ path: path.join(root, file) });
+                'public/js/ergazomenoi/genika/istorikoTable.js'] : [])]) await page.addScriptTag(asset(root, file));
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
         await work({ page, requests, allRequests });
@@ -449,6 +451,11 @@ for (const failure of ['stale', 'forbidden', 'rejected', 'non-json', 'commit-unc
             assert.equal(await page.locator('.swal2-title').innerText(), 'Τα στοιχεία άλλαξαν');
             assert.match(await page.locator('.swal2-html-container').innerText(), /δεν αποθηκεύτηκε καμία αλλαγή.*Ανοίξτε ξανά/s);
         }
+        if (failure === 'forbidden') {
+            const message = await page.locator('.swal2-html-container').innerText();
+            assert.match(message, /δικαίωμά σας να ενημερώνετε τον συγκεκριμένο εργαζόμενο/);
+            assert.doesNotMatch(message, /διόρθωσης όλων των επηρεαζόμενων εγγραφών/);
+        }
         if (['non-json', 'commit-uncertain'].includes(failure)) assert.match(await page.locator('.swal2-html-container').innerText(), /δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε/);
         assert.equal(await page.locator('#employeeHistoryReconstructionApprovalAccepted').isChecked(), false);
         assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
@@ -482,11 +489,10 @@ test('Apply is single-flight, prevents modal dismissal during request and succes
 
 
 const feedbackKey = id => `employeeHistoryReconstructionSuccess:${id}`;
-const feedbackScript = path.join(root, 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js');
 async function consumeFeedbackAfterReload(page) {
     await page.reload();
-    await page.addScriptTag({ path: path.join(root, 'public/js/bootstrap.bundle.min.js') });
-    await page.addScriptTag({ path: feedbackScript });
+    await page.addScriptTag(asset(root, 'public/js/bootstrap.bundle.min.js'));
+    await page.addScriptTag(asset(root, 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js'));
     await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
 }
 test('confirmed standalone Apply stores only server counts and time; reload consumes accessible feedback once', async () => {
@@ -579,9 +585,8 @@ test(`real legacy automatic apply and manual policy ${historyAccessMode} at ${wi
         const rows = page.locator('#istorikoTable tbody tr.istoriko-row');
         for (let i = 0; i < 2; i++) for (const action of ['add', 'edit', 'review', 'delete', 'undo']) {
             const control = rows.nth(i).locator(`[data-action="${action}"]`);
-            const disabled = historyAccessMode === 'NONE' || i === 0;
-            assert.equal(await control.isDisabled(), disabled, `${i}/${action}`);
-            if (disabled) assert.equal(await control.getAttribute('aria-disabled'), 'true');
+            assert.equal(await control.isDisabled(), true, `${i}/${action}`);
+            assert.equal(await control.getAttribute('aria-disabled'), 'true');
         }
         assert.equal(await page.locator(button).isEnabled(), true);
         await capture('rows');
@@ -591,6 +596,7 @@ test(`real legacy automatic apply and manual policy ${historyAccessMode} at ${wi
         assert.equal(await apply.isDisabled(), true);
         await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
         assert.equal(await apply.isEnabled(), true);
+        await assertChoiceAligned(page, 'employeeHistoryReconstructionApprovalAccepted');
         await capture('approval');
         await apply.click();
         await page.locator('.swal2-confirm').waitFor();
@@ -605,9 +611,9 @@ test(`real legacy automatic apply and manual policy ${historyAccessMode} at ${wi
         await consumeFeedbackAfterReload(page);
         assert.equal(await page.locator('#employeeHistoryReconstructionSuccess').isVisible(), true);
         assert.equal(await rows.nth(0).getAttribute('data-record'), JSON.stringify(input.completeHistoryRows[0]));
-        if (historyAccessMode === 'NONE') assert.equal(await rows.locator('[data-action]:enabled').count(), 0);
+        assert.equal(await rows.locator('[data-action]:enabled').count(), 0);
         for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css'])
-            await page.addStyleTag({ path: path.join(root, file) });
+            await page.addStyleTag(asset(root, file));
         await capture('reloaded');
         assert.equal(requests.filter(r => r.method === 'POST').length, 1);
         assert.ok(requests.some(r => r.path.endsWith('/history-reconstruction-apply')));

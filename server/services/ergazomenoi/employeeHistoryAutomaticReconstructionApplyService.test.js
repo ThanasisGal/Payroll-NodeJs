@@ -217,9 +217,14 @@ test(`maintenance permission ${JSON.stringify(privileges)} denies before any fen
     assert.equal(db.events.some(e => ['write', 'fence'].includes(e.type)), false);
 });
 
-test('maintenance admin permission alone also authorizes automatic application', async () => {
-    const { run } = setup();
+for (const role of ['C', 'S', 'A']) test(`${role}: maintenance form admin permission authorizes automatic application without changing manual access`, async () => {
+    const user = { privileges: role, team: 'TEST', situation: 'A' };
+    const { accessForUser } = require('./employeeHistoryAuthorizationService');
+    const before = accessForUser(user).mode;
+    const { run } = setup(F.caseA, user);
     assert.equal((await run({ privilegeModel: { findOne: () => query({ privileges: { admin: true, update: false } }) } })).applied, true);
+    assert.equal(user.privileges, role);
+    assert.equal(accessForUser(user).mode, before);
 });
 
 for (const field of ['team', 'company_kod', 'kodikos', 'employeeId'])

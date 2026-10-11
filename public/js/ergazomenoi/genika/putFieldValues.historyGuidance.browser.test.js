@@ -15,6 +15,7 @@ const policy = require('../../../../server/services/ergazomenoi/employeeHistoryC
 const { fixture, scope, historyId } = require('../../../../test/fixtures/employeeProfileTransactionStore');
 
 const root = path.resolve(__dirname, '../../../..');
+const { origin, asset, assertChoiceAligned } = require('../../../../test/fixtures/employeeMaintenanceBrowserAssets');
 const source = fs.readFileSync(path.join(__dirname, 'putFieldValues.js'), 'utf8');
 const helpers = source.slice(0, source.indexOf("document.addEventListener('DOMContentLoaded'"));
 const saveStart = source.indexOf('    async function handleFormSubmit(event)');
@@ -45,10 +46,10 @@ assert.ok(preview);
 
 async function withPage({ automatic = false, payload = action(), status = 200, disabled = false,
     missing = false, accessMode = 'ADMIN_FULL', duplicate = false, replies = null, departure = '2026-09-20',
-    saveHandler = null, fieldValues = {}, reconstructionFixture = null } = {}, work) {
+    saveHandler = null, fieldValues = {}, reconstructionFixture = null, viewport } = {}, work) {
     const browser = await chromium.launch({ headless: true });
     try {
-        const page = await browser.newPage();
+        const page = await browser.newPage(viewport ? { viewport } : {});
         page.setDefaultTimeout(10000);
         const requests = [], errors = [], pageErrors = [];
         page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
@@ -81,23 +82,24 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
             data-history-access-mode="${accessMode}" data-expected-state-token="${'b'.repeat(64)}">
             <tbody>${row(otherTarget)}${missing ? '' : row(target)}${duplicate ? row(target) : ''}</tbody></table></section></div>
             ${reconstructionPartial}</body></html>`;
-        await page.route('https://payroll.test/**', async route => {
+        await page.route(`${origin}/**`, async route => {
+            if (route.request().url().startsWith(`${origin}/static/`)) return route.continue();
             const request = route.request();
             if (request.method() !== 'POST') return route.fulfill({ contentType: 'text/html', body: html });
             requests.push({ url: request.url(), body: request.postDataJSON() });
-            if (request.url() === 'https://payroll.test/api/ergazomenoi/update/synthetic-employee') {
+            if (request.url() === `${origin}/api/ergazomenoi/update/synthetic-employee`) {
                 const reply = saveHandler ? await saveHandler(request.postDataJSON())
                     : replies?.[requests.filter(item => item.url.includes('/api/ergazomenoi/update/')).length - 1] || { status, payload };
                 return route.fulfill({ status: reply.status, contentType: 'application/json', body: JSON.stringify(reply.payload) });
             }
-            assert.equal(request.url(), 'https://payroll.test/ergazomenoi/ergazomenoi/istoriko/update');
+            assert.equal(request.url(), `${origin}/ergazomenoi/ergazomenoi/istoriko/update`);
             return route.fulfill({ status: 200, contentType: 'application/json',
                 body: JSON.stringify({ success: false, resolutionRequired: true, resolution: preview }) });
         });
-        await page.goto('https://payroll.test/');
+        await page.goto(`${origin}/`);
         if (automatic) {
-            for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css']) await page.addStyleTag({ path: path.join(root, file) });
-            for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag({ path: path.join(root, file) });
+            for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css']) await page.addStyleTag(asset(root, file));
+            for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag(asset(root, file));
         }
         await page.addStyleTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.css') });
         await page.addScriptTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js') });
@@ -106,7 +108,7 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
             'public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js',
             'public/js/ergazomenoi/genika/employeeHistoryFieldLabels.js',
             'public/js/ergazomenoi/genika/istorikoTable.js']) {
-            await page.addScriptTag({ path: path.join(root, file) });
+            await page.addScriptTag(asset(root, file));
         }
         await page.addScriptTag({ content: helpers + `
             const isEmpty = value => !String(value ?? '').trim();
@@ -165,7 +167,7 @@ async function expectNoFalseSuccess(page, errors) {
     assert.deepEqual(errors, []);
     const calls = await page.evaluate(() => window.swalCalls.map(call => ({ title: call.title, icon: call.icon })));
     assert.ok(calls.every(call => call.title !== 'Αποτυχία αποθήκευσης' && call.icon !== 'success'));
-    assert.equal(page.url(), 'https://payroll.test/');
+    assert.equal(page.url(), `${origin}/`);
     assert.equal(await page.locator('#email').inputValue(), 'entered@example.test');
 }
 for (const [label, options] of [
@@ -493,7 +495,7 @@ test('Phase 3B successful Save uses exact approved 0006-shaped preview counts an
         assert.equal(stored.changedRows, 3); assert.equal(stored.changedFields, 25);
         await page.reload();
         for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js'])
-            await page.addScriptTag({ path: path.join(root, file) });
+            await page.addScriptTag(asset(root, file));
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
         assert.match(await page.locator('#employeeHistoryReconstructionSuccess').innerText(), /Ενημερώθηκαν 3 εγγραφές και 25 πεδία/);
         assert.equal(await page.evaluate(key => sessionStorage.getItem(key), key), null);
@@ -526,7 +528,8 @@ test('ordinary Save never records reconstruction feedback', async () => {
     });
 });
 
-test('real legacy 40 -> 39: one browser Save and approval commit reconstruction plus original intent', async () => {
+for (const width of [1440, 390]) for (const [role, accessMode] of [['C', 'NONE'], ['S', 'SUPERVISOR_PROBLEM_SCOPE']])
+test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save and approval commit reconstruction plus original intent`, async () => {
     const { legacyWeeklyHours } = require('../../../../server/services/ergazomenoi/fixtures/maintenanceWeeklyHoursLegacyFixture');
     const { store } = require('../../../../test/fixtures/employeeProfileTransactionStore');
     const { writeEmployeeMaintenance } = require('../../../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
@@ -538,7 +541,7 @@ test('real legacy 40 -> 39: one browser Save and approval commit reconstruction 
         try {
             const result = await writeEmployeeMaintenance({ ...db.deps, scope: input.scope,
                 employeeId: input.employee._id, actorUserId: 'synthetic-actor', input: {},
-                userModel: { findById: () => query({ team: 'TEST', situation: 'A', privileges: 'C' }) },
+                userModel: { findById: () => query({ team: 'TEST', situation: 'A', privileges: role }) },
                 privilegeModel: { findOne: () => query({ privileges: { update: true } }) },
                 correctionCatalogLoader: async () => ({}), reconstruction: body.reconstruction,
                 maintenance: { employeeChanges: changes, historyChanges: changes,
@@ -555,17 +558,29 @@ test('real legacy 40 -> 39: one browser Save and approval commit reconstruction 
             return reply;
         }
     };
-    await withPage({ automatic: true, departure: '', accessMode: 'NONE', disabled: true,
-        fieldValues: { ores_ergasias_ebdomadas: '39' }, saveHandler,
+    await withPage({ automatic: true, departure: '', accessMode, disabled: true,
+        fieldValues: { ores_ergasias_ebdomadas: '39' }, saveHandler, viewport: { width, height: 1000 },
         reconstructionFixture: { scope: input.scope, currentEmployee: input.employee, completeHistoryRows: input.history } },
     async ({ page, requests, errors }) => {
-        await save(page); await expectAutomatic(page);
+        await page.locator('#save').click();
+        await page.locator('#storage_temporary').waitFor();
+        await assertChoiceAligned(page, 'storage_temporary');
+        await assertChoiceAligned(page, 'storage_permanent');
+        if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
+            fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
+            await page.waitForTimeout(300);
+            await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `ergani-choice-alignment-${role}-${width}.png`), animations: 'disabled' });
+        }
+        await page.locator('.swal2-confirm').filter({ hasText: 'Ενημέρωση' }).click();
+        await expectAutomatic(page);
+        await assertChoiceAligned(page, 'employeeHistoryReconstructionApprovalAccepted');
         assert.deepEqual(db.state(), before);
         assert.equal(db.events.some(e => ['write', 'fence', 'commit'].includes(e.type)), false);
         assert.equal(requests.length, 1);
         if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
             fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
-            await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, 'real-40-to-39-composite-preview.png') });
+            await page.waitForTimeout(350);
+            await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `real-40-to-39-composite-preview-${role}-${width}.png`), animations: 'disabled' });
         }
         await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
         await page.locator('#employeeHistoryReconstructionApplyBtn').click();

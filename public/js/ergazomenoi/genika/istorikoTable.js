@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyAccessMode = table.dataset.historyAccessMode ||
         (table.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
     const isHistoryAdmin = historyAccessMode === 'ADMIN_FULL';
-    const isHistorySupervisor = historyAccessMode === 'SUPERVISOR_PROBLEM_SCOPE';
     const expectedStateToken = table.dataset.expectedStateToken || '';
     const currentRelationshipOpen = table.dataset.currentRelationshipOpen === 'true';
     const currentHireDate = table.dataset.currentHireDate || '';
@@ -224,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    function createEmptyRow(anchorHistoryId = '') {
+    function createEmptyRow() {
         const tr = document.createElement('tr');
         tr.className = 'istoriko-row';
         tr.dataset.id = '';
@@ -234,7 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.dataset.aa = '';
         tr.dataset.persisted = 'false';
         tr.dataset.canManageRow = 'true';
-        tr.dataset.anchorHistoryId = isHistorySupervisor ? anchorHistoryId : '';
 
         tr.innerHTML = `
             <td class="text-center istoriko-aa-col"></td>
@@ -733,18 +731,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const action = button.dataset.action;
 
-        const rowCanManage = isHistorySupervisor && row.dataset.canManageRow === 'true';
-        const supervisorCanAdd = rowCanManage && row.dataset.persisted === 'true' &&
-            Boolean(row.dataset.id);
-        const actionAllowed = isHistoryAdmin || (rowCanManage &&
-            (action !== 'add' || supervisorCanAdd));
+        // Restricted History is read-only here, including problematic rows.
+        // Automatic reconstruction has its own Employee Maintenance approval.
+        const actionAllowed = isHistoryAdmin;
         if (['add', 'edit', 'delete', 'undo', 'review'].includes(action) && !actionAllowed) {
             event.preventDefault();
             return;
         }
 
         if (action === 'add') {
-            const newRow = createEmptyRow(isHistorySupervisor ? row.dataset.id || '' : '');
+            const newRow = createEmptyRow();
             row.insertAdjacentElement('afterend', newRow);
             renumberRows();
             rowToEditMode(newRow);
@@ -801,6 +797,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     saveBtn?.addEventListener('click', async () => {
+        if (!isHistoryAdmin) return;
         const employeeId = employeeIdInput?.value || '';
         const csrfToken = getCsrfToken();
         const updates = collectUpdates();

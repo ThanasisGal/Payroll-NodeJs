@@ -1026,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <!-- ── Radio group: Τρόπος Αποθήκευσης ── -->
                         <p class="font-weight-600 margin-bottom-0_5rem">Τρόπος Αποθήκευσης:</p>
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                 id="storage_temporary"
                                 name="storage_mode"
@@ -1039,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 Προσωρινή Αποθήκευση (XML)
                             </label>
                         </div>
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                 id="storage_permanent"
                                 name="storage_mode"

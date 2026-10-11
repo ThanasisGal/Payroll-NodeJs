@@ -11266,6 +11266,21 @@ body.loader-active > *:not(.app-loader) {
     transition: all 0.2s;
     color: #000000;
 }
+.employee-maintenance-choice {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding-left: 0;
+}
+.employee-maintenance-choice > input {
+    flex: 0 0 auto;
+    float: none;
+    margin: 0;
+}
+.employee-maintenance-choice > label {
+    margin: 0;
+    min-width: 0;
+}
 .no_update_message {
     color: #856404;
     background-color: #fff3cd;
