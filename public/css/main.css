@@ -16742,61 +16742,132 @@ body.loader-active > *:not(.app-loader) {
 .swal2-popup.employee-maintenance-swal .swal2-actions > button { font-size: 1rem !important; }
 .employee-maintenance-swal .swal2-actions,
 .employee-history-preview .modal-footer { display: flex; flex-wrap: wrap; gap: .5rem; }
-.employee-maintenance-swal .swal2-actions > button,
-.employee-history-preview .modal-footer > button,
-#employeeHistoryReconstructionPreviewBtn,
-.employee-history-correction-action,
-.cardFooter01 .submitButton {
-    width: auto !important;
-    min-width: max-content;
-    white-space: nowrap !important;
-    padding: .6rem 1rem;
-}
-.employee-maintenance-swal .swal2-confirm,
-.employee-maintenance-button,
-#employeeHistoryReconstructionApplyBtn {
-    --maintenance-color: #146c43;
-    --maintenance-light: #e8f5ee;
-    background: var(--maintenance-light) !important;
-    border: 1px solid var(--maintenance-color) !important;
-    color: var(--maintenance-color) !important;
-}
-.employee-maintenance-swal .swal2-confirm.class-warning {
-    --maintenance-color: #805800; --maintenance-light: #fff3cd;
-}
-.employee-maintenance-swal .swal2-confirm.class-error {
-    --maintenance-color: #b02a37; --maintenance-light: #fbe9ec;
-}
-.employee-maintenance-swal .swal2-confirm.class-info {
-    --maintenance-color: #08728a; --maintenance-light: #e5f5fa;
-}
-.employee-maintenance-swal .swal2-cancel {
-    --maintenance-color: #545b62; --maintenance-light: #f0f1f2;
-    background: var(--maintenance-light) !important;
-    border: 1px solid var(--maintenance-color) !important;
-    color: var(--maintenance-color) !important;
-}
-#employeeHistoryReconstructionPreviewBtn,
-.employee-history-preview .btn-brown,
-.cardFooter01 .submitButton {
-    --maintenance-color: #795548; --maintenance-light: #f5eeeb;
-    background: var(--maintenance-light) !important;
-    border: 1px solid var(--maintenance-color) !important;
-    color: var(--maintenance-color) !important;
-}
-.employee-maintenance-swal .swal2-actions > button:not(:disabled):hover,
-.employee-maintenance-button:not(:disabled):hover,
-#employeeHistoryReconstructionApplyBtn:not(:disabled):hover,
-#employeeHistoryReconstructionPreviewBtn:not(:disabled):hover,
-.employee-history-preview .btn-brown:hover,
-.cardFooter01 .submitButton:hover {
-    background: var(--maintenance-color) !important;
-    border-color: var(--maintenance-color) !important;
-    color: #fff !important;
+/* One button system; important declarations in this layer also supersede old
+   unlayered ID/utility overrides, without changing cards, tabs or plain links. */
+body :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop) {
+    display: inline-flex;
 }
 
-#employeeHistoryReconstructionApplyBtn:disabled {
-    background: #e9ecef !important;
-    border-color: #adb5bd !important;
-    color: #6c757d !important;
+@layer application-buttons {
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]) {
+        align-items: center !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+        border-radius: .375rem !important;
+        vertical-align: middle !important;
+    }
+
+    /* Disclosure controls retain their component layout and selected state. */
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close) {
+        --button-color: #795548;
+        --button-light: #f5eeeb;
+        --maintenance-color: var(--button-color);
+        --maintenance-light: var(--button-light);
+        gap: .35em !important;
+        box-sizing: border-box !important;
+        width: auto !important;
+        min-width: max-content !important;
+        height: auto !important;
+        min-height: 2.375rem !important;
+        flex-shrink: 0 !important;
+        padding: .5rem .8rem !important;
+        font-size: 1rem !important;
+        line-height: 1.25 !important;
+        text-align: center !important;
+        border: 1px solid var(--button-color) !important;
+        background: var(--button-light) !important;
+        color: var(--button-color) !important;
+        transform: none !important;
+        transition: background-color .15s ease, color .15s ease, box-shadow .15s ease !important;
+    }
+
+    :is(.btn-sm, .btn-small, .istoriko-btn) {
+        min-height: 2rem !important;
+        padding: .3rem .55rem !important;
+        font-size: .875rem !important;
+    }
+
+    :is(.btn-primary, .btn-outline-primary, .policy-preview-decision-primary, .employment-review-action-primary, .btn-message-custom) {
+        --button-color: #0b5ed7 !important; --button-light: #e8f0ff !important;
+    }
+    :is(.btn-success, .btn-outline-success, .btn-green, .btn-toTop, .btn-refresh-custom, .class-success, .employee-maintenance-button, .save-button, .istoriko-btn-add, .istoriko-footer-btn-save, .policy-preview-decision-success, .employment-review-action-success, #employeeHistoryReconstructionApplyBtn) {
+        --button-color: #146c43 !important; --button-light: #e8f5ee !important;
+    }
+    :is(.btn-danger, .btn-outline-danger, .class-error, .class-danger, .user-admin-action-danger, .delete-button, .istoriko-btn-delete, .policy-preview-decision-danger, .employment-review-action-danger) {
+        --button-color: #b02a37 !important; --button-light: #fbe9ec !important;
+    }
+    :is(.btn-warning, .btn-outline-warning, .btn-orange, .class-warning, .istoriko-btn-edit, .amendment-button, .policy-preview-decision-warning, .employment-review-action-warning) {
+        --button-color: #805800 !important; --button-light: #fff3cd !important;
+    }
+    :is(.btn-info, .btn-outline-info, .class-info, .policy-preview-decision-info) {
+        --button-color: #08728a !important; --button-light: #e5f5fa !important;
+    }
+    :is(.btn-secondary, .btn-outline-secondary, .btn-light, .btn-outline-light, .btn-dark, .btn-outline-dark, .swal2-cancel, .swal2-deny, .user-admin-action-secondary, .custom-cancel-button-normal, .undo-button, .istoriko-btn-undo, .policy-preview-decision-secondary, .employment-review-action-secondary) {
+        --button-color: #545b62 !important; --button-light: #f0f1f2 !important;
+    }
+    :is(.btn-brown, .class-normal, .cardFooter01 .submitButton, #employeeHistoryReconstructionPreviewBtn) {
+        --button-color: #795548 !important; --button-light: #f5eeeb !important;
+    }
+
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close):is(:hover, :active, .active):not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
+        background: var(--button-color) !important;
+        border-color: var(--button-color) !important;
+        color: #fff !important;
+    }
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):focus-visible {
+        outline: 2px solid var(--button-color, #795548) !important;
+        outline-offset: 3px !important;
+        box-shadow: 0 0 0 3px #fff !important;
+    }
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):active:not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
+        box-shadow: inset 0 2px 4px #0003 !important;
+    }
+    :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):is(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
+        background: #e9ecef !important;
+        border-color: #adb5bd !important;
+        color: #626970 !important;
+        opacity: 1 !important;
+        box-shadow: none !important;
+        cursor: not-allowed !important;
+    }
+    :is(button, .btn, a.buttons-content, [role="button"]) :is(i, svg, .bi) {
+        color: inherit !important;
+        line-height: 1 !important;
+        vertical-align: middle !important;
+        margin-block: 0 !important;
+        flex-shrink: 0 !important;
+    }
+    :is(button, .btn, a.buttons-content, [role="button"]) .bi::before {
+        vertical-align: 0 !important;
+    }
+}
+
+/* Button groups wrap between actions; labels never wrap inside an action. */
+.cardFooter01, .swal2-actions, .pdf-modal-footer {
+    flex-wrap: wrap !important;
+    gap: .5rem;
+}
+.card-footer:has(> .cardFooter01) {
+    height: auto !important;
+    min-height: 6vh;
+}
+.cardFooter01 {
+    margin-block: 0 !important;
+}
+
+/* Success HTML contains template newlines, not user-facing line breaks.
+   Keeping pre-line here creates a large empty area below the confirmation. */
+.swal2-popup.employee-save-success {
+    height: auto !important;
+    min-height: 0 !important;
+    grid-template-rows: none !important;
+    align-content: start;
+}
+.swal2-popup.employee-save-success .swal2-html-container {
+    white-space: normal !important;
+    height: auto !important;
+    min-height: 0 !important;
+}
+.swal2-popup.employee-save-success .swal2-html-container > p:last-child {
+    margin-bottom: 0;
 }

@@ -392,7 +392,7 @@ for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`approval vi
             await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(233, 236, 239)');
             const s = await style();
             assert.equal(s.background, 'rgb(233, 236, 239)');
-            assert.equal(s.opacity, '0.65');
+            assert.equal(s.opacity, '1'); // Grey semantic colors keep disabled labels readable.
             assert.equal(s.cursor, 'not-allowed');
         }
         async function assertEnabled() {

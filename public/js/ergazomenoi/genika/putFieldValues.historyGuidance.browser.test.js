@@ -126,12 +126,15 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
             const finish = finishEmployeeUpdateAfterUploads;
             finishEmployeeUpdateAfterUploads = results => {
                 window.guidedCounts.successContinuation++;
-                return finish(results, () => { window.guidedCounts.redirect++; });
+                return finish(results, () => {
+                    window.redirectAt = performance.now(); window.guidedCounts.redirect++;
+                });
             };
             const runFormSubmissionOnce = createSingleFlight();
             const originalFire = Swal.fire.bind(Swal);
             Swal.fire = options => {
                 window.swalCalls.push(options);
+                if (options.icon === 'success' && options.timer) window.successShownAt = performance.now();
                 if (options.titleText === 'Χρειάζεται διόρθωση του ιστορικού') {
                     const confirm = options.preConfirm;
                     options.preConfirm = async () => { window.guidedCounts.preConfirm++; return confirm(); };
@@ -511,5 +514,12 @@ test('ordinary Save never records reconstruction feedback', async () => {
         await save(page);
         await page.waitForFunction(() => window.saveFinished);
         assert.equal(await page.evaluate(() => sessionStorage.length), 0);
+        const timing = await page.evaluate(() => ({ delay: window.redirectAt - window.successShownAt,
+            calls: window.swalCalls.filter(call => call.icon === 'success'), redirects: window.guidedCounts.redirect }));
+        assert.equal(timing.calls.length, 1);
+        assert.equal(timing.calls[0].timer, 2000);
+        assert.equal(timing.calls[0].allowEscapeKey, false);
+        assert.ok(timing.delay >= 2000, `actual Save redirected after ${timing.delay}ms`);
+        assert.equal(timing.redirects, 1);
     });
 });
