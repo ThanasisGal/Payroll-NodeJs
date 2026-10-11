@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
@@ -391,11 +392,11 @@ class ektyposhSymbaseonController {
                 form: 'EktyposhSymbaseonErgazomenon'
             }).lean();
 
-            const ergazomenoi = await ErgazomenoiModel.find({
+            const ergazomenoi = await ErgazomenoiModel.find(finalizedEmployeeFilter({
                 team: sessionTeam,
                 company_kod: companyId,
                 energos: true
-            });
+            }));
 
             const passwordsData = await PasswordsModel.find({
                 companykod_object: companyId,
@@ -465,12 +466,12 @@ class ektyposhSymbaseonController {
                 companykod_object: company,
                 kodikos: '0001'
             }).lean();
-            const employees = await ErgazomenoiModel.find({
+            const employees = await ErgazomenoiModel.find(finalizedEmployeeFilter({
                 team: team,
                 company_kod: company,
                 kodikos: mongoose.trusted({ $in: kodikoi }),
                 ...(ypokatasthma ? { ypokatasthma: ypokatasthma } : {})
-            }).lean();
+            })).lean();
 
             let eponymia_Etairias =
                 (companies.eponymia ? companies.eponymia.trim() : '') +

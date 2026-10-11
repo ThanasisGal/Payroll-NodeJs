@@ -1,4 +1,5 @@
 'use strict';
+const SaveState = require('../../utils/ergazomenoi/employeeSaveState');
 const mongoose = require('mongoose');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const UserModel = require('../../models/userModel');
@@ -73,6 +74,7 @@ async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, 
             const authorizedCurrent = await employeeModel.findOne({ ...scope, _id: employeeId })
                 .select('+employee_profile_mutation_sequence').session(session).lean();
             if (!authorizedCurrent) throw A.failure('STALE');
+            if (SaveState.isTemporaryEmployee(authorizedCurrent)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
             await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current: authorizedCurrent,
                 session, userModel, privilegeModel });
             await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session, notFoundCode: A.PREFIX + 'STALE' });

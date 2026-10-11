@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 const { ProdhlomenaOrariaModel, ErgazomenoiModel, ErgazomenoiErganhModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const FrozenSnapshot = require('../../models/apasxoliseisPeriodFrozenSnapshot');
@@ -71,7 +72,7 @@ async function loadAuthoritativeWeekContext({ deferredWeek, models = {} }) {
         week_end: new Date(`${deferredWeek.week_end}T00:00:00Z`) } : null);
     if (!workflow) throw flowError('DEFERRED_WEEK_IDENTITY_MISMATCH',
         'Δεν βρέθηκε authoritative frozen ταυτότητα για την οριακή εβδομάδα.');
-    const current = await employeeModel.findOne({ _id: workflow.employee_id, team: deferredWeek.team, company_kod: deferredWeek.company_kod })
+    const current = await employeeModel.findOne(finalizedEmployeeFilter({ _id: workflow.employee_id, team: deferredWeek.team, company_kod: deferredWeek.company_kod }))
         .select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean();
     const frozenEmployee = (frozen?.frozen_snapshot?.employees || []).find((item) => String(item.kodikos) === String(workflow.employee_kodikos));
     const employee = frozenEmployee ? { ...(current || {}), ...frozenEmployee, _id: workflow.employee_id,

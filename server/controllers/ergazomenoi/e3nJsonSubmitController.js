@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 
 const { generateE3NJsonPayload } = require('../../utils/jsonGenerators/e3N_v1JsonGenerator');
@@ -57,7 +58,7 @@ class E3NJsonSubmitController {
                 employeeQuery.kodikos = String(ergazomenosId).trim();
             }
 
-            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+            const ergazomenos = await ErgazomenoiModel.findOne(finalizedEmployeeFilter(employeeQuery)).lean();
 
             if (!ergazomenos) {
                 return res.status(404).json({

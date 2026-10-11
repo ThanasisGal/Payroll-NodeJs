@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const crypto = require('crypto');
 const mongoose = require('mongoose');
@@ -105,8 +106,8 @@ async function postCorrectivePayroll({ session: userSession, scope: input, caseI
             'Οι αρχικές μισθοδοτικές εγγραφές δεν συμφωνούν με το παγωμένο αποτέλεσμα.');
         const gross = resolveEmployeeTypeGrossDelta(corrective.corrective_delta, employee, earningsType);
         if (gross === 0) throw periodError('NO_CORRECTIVE_PAYROLL_DIFFERENCE', 409, 'Δεν υπάρχει διορθωτική μισθοδοτική διαφορά προς καταχώριση.');
-        const employeeRecord = await employeeModel.findOne({ team: scope.team, company_kod: scope.company_kod,
-            ypokatasthma: scope.ypokatasthma, kodikos: employee }).select('corrective_payroll_withholding_rate_percent').session(dbSession).lean();
+        const employeeRecord = await employeeModel.findOne(finalizedEmployeeFilter({ team: scope.team, company_kod: scope.company_kod,
+            ypokatasthma: scope.ypokatasthma, kodikos: employee })).select('corrective_payroll_withholding_rate_percent').session(dbSession).lean();
         const balanceScope = { team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
             employee_kodikos: employee, typos_apodoxon: earningsType };
         let balance = await balanceModel.findOne(balanceScope).session(dbSession).lean();

@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 const { exec } = require('child_process');
 const { promisify } = require('util');
@@ -591,7 +592,7 @@ class kinhseisController {
             }
 
             // Εκτέλεση του ερωτήματος με βάση το φίλτρο
-            const ergazomenoi = await ErgazomenoiModel.find(filter).sort('eponymo onoma');
+            const ergazomenoi = await ErgazomenoiModel.find(finalizedEmployeeFilter(filter)).sort('eponymo onoma');
 
             res.json(ergazomenoi);
         } catch (error) {
@@ -611,11 +612,11 @@ class kinhseisController {
         const sessionMhnas = req.session.periodInUse;
 
         try {
-            const ergazomenoi = await ErgazomenoiModel.findOne({
+            const ergazomenoi = await ErgazomenoiModel.findOne(finalizedEmployeeFilter({
                 team: selectedTeam,
                 company_kod: selectedCompany,
                 kodikos: selectedKodikos
-            }).lean();
+            })).lean();
             const sxeshErgasias = await SxeseisErgasiasModel.findOne({
                 kodikos: ergazomenoi.sxesh_ergasias
             }).lean();
@@ -1633,14 +1634,14 @@ class kinhseisController {
             const maxEmployees = maxEmployeesResult.value;
             const kodikoi = normalizeBatchKodikoi(body.kodikoi);
             const employees = await ErgazomenoiModel.find(
-                buildBatchEmployeeQuery({
+                finalizedEmployeeFilter(buildBatchEmployeeQuery({
                     team,
                     company_kod,
                     apoDate,
                     eosDate,
                     ypokatasthma,
                     kodikoi
-                })
+                }))
             )
                 .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
                 .sort({ kodikos: 1 })

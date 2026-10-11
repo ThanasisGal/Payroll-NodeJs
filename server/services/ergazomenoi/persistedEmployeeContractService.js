@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 async function generatePersistedEmployeeContract({
     employeeModel,
@@ -6,7 +7,7 @@ async function generatePersistedEmployeeContract({
     generateContractPDF,
     userContext
 }) {
-    const persistedEmployee = await employeeModel.findOne(employeeScope);
+    const persistedEmployee = await employeeModel.findOne(finalizedEmployeeFilter(employeeScope));
     if (!persistedEmployee) {
         const error = new Error(
             'Ο αποθηκευμένος εργαζόμενος δεν βρέθηκε. Δεν δημιουργήθηκε PDF σύμβασης.'

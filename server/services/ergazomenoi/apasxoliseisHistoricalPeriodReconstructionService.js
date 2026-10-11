@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const crypto = require('crypto');
 const mongoose = require('mongoose');
@@ -158,8 +159,8 @@ async function calculateHolidayDependencies({ scope, start, end, rows, models = 
         }, session);
     const codes = [...new Set(rows.map((row) => String(row.kodikos || '').trim()).filter(Boolean))];
     if (!codes.length) return { fingerprint: hash([]), legacy_compatible: true };
-    const employees = await employeeModel.find({ team: scope.team, company_kod: scope.company_kod,
-        ypokatasthma: scope.ypokatasthma, kodikos: mongoose.trusted({ $in: codes }) }).lean();
+    const employees = await employeeModel.find(finalizedEmployeeFilter({ team: scope.team, company_kod: scope.company_kod,
+        ypokatasthma: scope.ypokatasthma, kodikos: mongoose.trusted({ $in: codes }) })).lean();
     const histories = historyModel ? await historyModel.find({ team: scope.team,
         company_kod: scope.company_kod,
         kodikos: mongoose.trusted({ $in: codes }) }).lean() : [];

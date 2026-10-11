@@ -88,6 +88,9 @@
 				<div class="col-1-5">
 					<input type="date" name="hmeromhnia_metabolhs" id="hmeromhnia_metabolhs" class="date-control" value="" />
 				</div>
+                <% if (recordData.oristikh_enhmerosh === false) { %>
+                <div class="col-12 col-md-auto employee-draft-indicator" role="status">Προσωρινά Αποθηκευμένος</div>
+                <% } %>
 			</div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem d-none" id="allo-parathrhseis-row">

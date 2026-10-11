@@ -16911,7 +16911,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     )) {
         --button-color: #545b62 !important; --button-light: #e9ebed !important;
     }
-    :is(.btn-brown, .class-normal, .cardFooter01 .submitButton, #employeeHistoryReconstructionPreviewBtn):not(:where(
+    :is(.btn-brown, .class-normal, .cardFooter01 .submitButton:not(.employee-draft-save), #employeeHistoryReconstructionPreviewBtn):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
@@ -17042,4 +17042,10 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 @media (max-width: 575.98px) {
     .employee-history-preview .history-preview-fields > div { display: block; }
     .employee-history-preview .history-preview-fields dd { text-align: left; margin-top: .25rem; }
+}
+
+/* Employee draft status shares the date row and wraps safely on narrow screens. */
+.employee-draft-indicator { color: #b02a37; font-weight: 700; font-size: 1rem; line-height: 1.5; }
+@media (max-width: 575.98px) {
+    .employee-draft-indicator { flex: 0 0 100%; max-width: 100%; padding-top: .25rem; }
 }

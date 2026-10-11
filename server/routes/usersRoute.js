@@ -1,3 +1,4 @@
+const requireFinalizedEmployee = require('../middlewares/requireFinalizedEmployee');
 const express = require('express');
 const router = express.Router();
 const multer = require('multer'); // ✅ Κρατάμε για error handling
@@ -436,6 +437,7 @@ router.get('/ergazomenoi/ergazomenoi/add', checkAuth, ergazomenoiController.addE
 router.post(
     '/ergazomenoi/ergazomenoi/add',
     checkAuth,
+    requireUserPrivilegeAction('Ergazomenoi', 'create'),
     sanitizeNumberFields,
     ergazomenoiController.postErgazomenoiForm
 );
@@ -519,6 +521,7 @@ router.get(
 router.post(
     '/ergazomenoi/ergazomenoi/istoriko/update',
     checkAuth,
+    requireFinalizedEmployee,
     ergazomenoiController.updateIstorikoData
 );
 
@@ -539,54 +542,63 @@ router.post('/ergazomenoi/ergazomenoi/search', ergazomenoiController.searchPostE
 router.post(
     '/ergazomenoi/ergazomenoi/upload-e3-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     ergazomenoiController.uploadE3ToErganh
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/upload-ma-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     ergazomenoiController.uploadMAToErganh
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/submit-e7n-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     erganhController.submitE7NToErganh
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/submit-e3n-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     erganhController.submitE3NToErganh
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/e3n/pre-submit-comparison',
     checkAuth,
+    requireFinalizedEmployee,
     erganhController.compareE3NBeforeRestSubmit
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/submit-wtoweek-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     erganhController.submitWTOWeekToErganh
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/submit-ma-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     erganhController.submitMAToErganh
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/submit-e6n-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     erganhController.submitE6NToErganh
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/submit-e5n-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     erganhController.submitE5NToErganh
 );
 
@@ -619,12 +631,14 @@ router.post(
 router.post(
     '/ergazomenoi/ergazomenoi/upload-wto-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     ergazomenoiController.uploadWtoToErganh
 );
 
 router.post(
     '/ergazomenoi/ergazomenoi/upload-wto-temporary-to-erganh',
     checkAuth,
+    requireFinalizedEmployee,
     ergazomenoiController.uploadWtoTemporaryToErganh
 );
 
@@ -999,7 +1013,7 @@ router.get('/symbaseis/klimakia', checkAuth, symbaseisController.mainKlimakiaFor
 // ============================================================================
 router.get('/kinhseis/apasxolhseis', checkAuth, kinhseisController.mainApasxolhseisForm);
 
-router.post('/kinhseis/apasxolhseis/add', checkAuth, kinhseisController.postApasxolhseisForm);
+router.post('/kinhseis/apasxolhseis/add', checkAuth, requireFinalizedEmployee, kinhseisController.postApasxolhseisForm);
 
 router.delete(
     '/kinhseis/apasxolhseis/delete/:id',

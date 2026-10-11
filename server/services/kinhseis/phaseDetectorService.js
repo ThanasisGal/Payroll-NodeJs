@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 
 const {
@@ -1218,11 +1219,11 @@ async function detectPayrollPhases({
         throw error;
     }
 
-    const employee = preparedContext?.employee || await ErgazomenoiModel.findOne({
+    const employee = preparedContext?.employee || await ErgazomenoiModel.findOne(finalizedEmployeeFilter({
         team,
         company_kod,
         kodikos
-    }).lean();
+    })).lean();
 
     if (!employee) {
         const error = new Error('Δεν βρέθηκε εργαζόμενος για τα στοιχεία της συνεδρίας.');

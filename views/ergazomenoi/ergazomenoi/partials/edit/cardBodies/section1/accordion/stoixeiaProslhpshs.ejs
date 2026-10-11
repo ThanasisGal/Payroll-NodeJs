@@ -55,7 +55,7 @@
                     </label>
                 </div>
                 <div class="col-1-5">
-                    <input type="date" name="hmeromhnia_proslhpshs" id="hmeromhnia_proslhpshs" class="date-control" value="<%= safe('hmeromhnia_proslhpshs') ? new Date(safe('hmeromhnia_proslhpshs')).toISOString().split('T')[0] : '' %>" <%- currentRelationshipOpen ? 'readonly aria-readonly="true" title="Καταχωρήστε πρώτα την Αποχώρηση και έπειτα χρησιμοποιήστε την Επαναπρόσληψη."' : '' %> />
+                    <input type="date" name="hmeromhnia_proslhpshs" id="hmeromhnia_proslhpshs" class="date-control" value="<%= safe('hmeromhnia_proslhpshs') ? new Date(safe('hmeromhnia_proslhpshs')).toISOString().split('T')[0] : '' %>" <%- ergazomenoiData.oristikh_enhmerosh !== false ? 'readonly aria-readonly="true" title="Καταχωρήστε πρώτα την Αποχώρηση και έπειτα χρησιμοποιήστε την Επαναπρόσληψη."' : '' %> />
                 </div>
                 
                 <div class="col-2-5"></div>

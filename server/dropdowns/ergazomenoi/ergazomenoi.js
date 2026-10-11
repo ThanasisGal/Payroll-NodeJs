@@ -44,7 +44,7 @@ module.exports = {
         pk: 'kodikos',
         searchFields: ['kodikos', 'eponymo', 'onoma', 'afm', 'amka'],
         extraQueryBuilder: (query) => {
-            const f = {};
+            const f = { oristikh_enhmerosh: require('mongoose').trusted({ $ne: false }) };
 
             const team = cleanQueryValue(query.team);
             const company = cleanQueryValue(query.company || query.company_kod || query.companyKod);
