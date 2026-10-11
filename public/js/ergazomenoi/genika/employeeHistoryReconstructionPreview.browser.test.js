@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
 const ejs = require('ejs');
 const { chromium } = require('playwright');
 const { planEmployeeHistoryAutomaticReconstruction: plan } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService');
@@ -14,16 +15,16 @@ const modal = '#employeeHistoryReconstructionPreviewModal';
 const body = '#employeeHistoryReconstructionPreviewBody';
 const button = '#employeeHistoryReconstructionPreviewBtn';
 async function withPage({ input = F.caseA(), status = 200, payload, viewport = { width: 1440, height: 1000 }, delay = 0,
-    manualHandler, applyHandler, stateToken = 'synthetic' } = {}, work) {
+    manualHandler, applyHandler, stateToken = 'synthetic', historyAccessMode = 'ADMIN_FULL', problematicHistoryIds = [] } = {}, work) {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage({ viewport });
         const requests = [], errors = [], allRequests = [];
         page.on('request', request => allRequests.push({ method: request.method(), url: request.url() }));
         page.on('pageerror', error => errors.push(error.message));
-        const partial = await ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
+        const partial = () => ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
             ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
-            employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: stateToken, problematicHistoryIds: []
+            employeeHistoryAccessMode: historyAccessMode, employeeHistoryStateToken: stateToken, problematicHistoryIds
         });
         await page.route('https://payroll.test/**', async route => {
             const request = route.request();
@@ -41,10 +42,10 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
                     body: reply.rawBody ?? JSON.stringify(reply.body) });
             }
             if (!request.url().includes('/history-reconstruction-preview')) return route.fulfill({ contentType: 'text/html',
-                body: `<!doctype html><html lang="el"><head><meta charset="utf-8"></head><body>${partial}</body></html>` });
+                body: `<!doctype html><html lang="el"><head><meta charset="utf-8"></head><body>${await partial()}</body></html>` });
             requests.push({ method: request.method(), path: new URL(request.url()).pathname });
             if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-            return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input), previewToken: buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input) }) }) }).catch(() => {});
+            return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input), previewToken: buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input), actorUserId: 'synthetic-actor' }) }) }).catch(() => {});
         });
         await page.goto('https://payroll.test/');
         for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
@@ -545,5 +546,70 @@ test('Greek list helper formats one through four labels without modifying the ro
             [['0001', '0002', '0003', '0004'], '0001, 0002, 0003 και 0004']]) {
             assert.deepEqual(await page.evaluate(items => ({ value: formatGreekList(items), items }), items), { value: expected, items });
         }
+    });
+});
+
+for (const width of [1440, 390]) for (const historyAccessMode of ['NONE', 'SUPERVISOR_PROBLEM_SCOPE'])
+test(`real legacy automatic apply and manual policy ${historyAccessMode} at ${width}px`, async () => {
+    const { legacyWeeklyHours } = require('../../../../server/services/ergazomenoi/fixtures/maintenanceWeeklyHoursLegacyFixture');
+    const { store } = require('../../../../test/fixtures/employeeProfileTransactionStore');
+    const { applyEmployeeHistoryAutomaticReconstruction } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyService');
+    const { identifyEmployeeHistoryProblemScope } = require('../../../../server/services/ergazomenoi/employeeHistoryProblemScopeService');
+    const fixture = legacyWeeklyHours(), db = store([fixture]);
+    const input = { scope: fixture.scope, currentEmployee: fixture.employee, completeHistoryRows: fixture.history };
+    const problematicHistoryIds = identifyEmployeeHistoryProblemScope(input).problematicHistoryIds;
+    assert.deepEqual(problematicHistoryIds, [fixture.history[1]._id]);
+    const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
+    const applyHandler = async data => {
+        const result = await applyEmployeeHistoryAutomaticReconstruction({ ...db.deps, ...data,
+            scope: fixture.scope, employeeId: fixture.employee._id, actorUserId: 'synthetic-actor',
+            userModel: { findById: () => query({ team: fixture.scope.team, situation: 'A', privileges: historyAccessMode === 'NONE' ? 'C' : 'S' }) },
+            privilegeModel: { findOne: () => query({ privileges: { update: true } }) } });
+        input.currentEmployee = db.state().employees[0]; input.completeHistoryRows = db.state().history;
+        return { status: 200, body: result };
+    };
+    await withPage({ input, viewport: { width, height: 1000 }, historyAccessMode, problematicHistoryIds,
+        manualHandler: () => assert.fail('No manual request is authorized by automatic approval'), applyHandler }, async ({ page, requests }) => {
+        const capture = async name => {
+            if (!process.env.PAYROLL_VISUAL_ARTIFACT_DIR) return;
+            fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
+            await page.waitForTimeout(300);
+            await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `authorization-${historyAccessMode}-${name}-${width}.png`), animations: 'disabled' });
+        };
+        const rows = page.locator('#istorikoTable tbody tr.istoriko-row');
+        for (let i = 0; i < 2; i++) for (const action of ['add', 'edit', 'review', 'delete', 'undo']) {
+            const control = rows.nth(i).locator(`[data-action="${action}"]`);
+            const disabled = historyAccessMode === 'NONE' || i === 0;
+            assert.equal(await control.isDisabled(), disabled, `${i}/${action}`);
+            if (disabled) assert.equal(await control.getAttribute('aria-disabled'), 'true');
+        }
+        assert.equal(await page.locator(button).isEnabled(), true);
+        await capture('rows');
+        await open(page);
+        assert.equal(db.events.length, 0, 'preview has zero business or fence writes');
+        const apply = page.locator('#employeeHistoryReconstructionApplyBtn');
+        assert.equal(await apply.isDisabled(), true);
+        await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+        assert.equal(await apply.isEnabled(), true);
+        await capture('approval');
+        await apply.click();
+        await page.locator('.swal2-confirm').waitFor();
+        const message = await page.locator('.swal2-html-container').innerText();
+        assert.doesNotMatch(message, /δεν έχετε δικαίωμα|δεν ολοκληρώθηκε/);
+        assert.equal(db.state().audits.length, 1);
+        assert.equal(db.events.filter(e => e.type === 'commit').length, 1);
+        assert.equal(db.state().employees[0].ores_ergasias_ebdomadas, 40, 'standalone does not apply an original Save');
+        await capture('success');
+        await page.locator('.swal2-confirm').click();
+        await page.waitForLoadState();
+        await consumeFeedbackAfterReload(page);
+        assert.equal(await page.locator('#employeeHistoryReconstructionSuccess').isVisible(), true);
+        assert.equal(await rows.nth(0).getAttribute('data-record'), JSON.stringify(input.completeHistoryRows[0]));
+        if (historyAccessMode === 'NONE') assert.equal(await rows.locator('[data-action]:enabled').count(), 0);
+        for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css'])
+            await page.addStyleTag({ path: path.join(root, file) });
+        await capture('reloaded');
+        assert.equal(requests.filter(r => r.method === 'POST').length, 1);
+        assert.ok(requests.some(r => r.path.endsWith('/history-reconstruction-apply')));
     });
 });

@@ -44,7 +44,8 @@ const preview = policy.planHistoryCorrection({ scope, currentEmployee: previewFi
 assert.ok(preview);
 
 async function withPage({ automatic = false, payload = action(), status = 200, disabled = false,
-    missing = false, accessMode = 'ADMIN_FULL', duplicate = false, replies = null, departure = '2026-09-20' } = {}, work) {
+    missing = false, accessMode = 'ADMIN_FULL', duplicate = false, replies = null, departure = '2026-09-20',
+    saveHandler = null, fieldValues = {}, reconstructionFixture = null } = {}, work) {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage();
@@ -55,18 +56,18 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
         const requiredNames = [...source.matchAll(/addError\(\s*'([^']+)'/g)].map(match => match[1]);
         const values = Object.fromEntries(requiredNames.map(name => [name, '1']));
         Object.assign(values, { hmeromhnia_apoxorhshs: departure,
-            email: 'entered@example.test', hmeromhnia_proslhpshs: '2026-04-01' });
+            email: 'entered@example.test', hmeromhnia_proslhpshs: '2026-04-01' }, fieldValues);
         for (let day = 1; day <= 7; day++) values[`kathgoria_ergasias_${String(day).padStart(2, '0')}`] = 'ΜΕ';
         const fields = Object.entries(values).map(([name, value]) =>
             `<input name="${name}" id="${name}" value="${value}">`).join('');
         const row = id => `<tr class="istoriko-row" data-id="${id}" data-state="clean"
             data-can-manage-row="true"><td><button data-action="review"
             ${disabled ? 'disabled aria-disabled="true"' : ''}>Έλεγχος / Διόρθωση</button></td></tr>`;
-        const input = F.caseA();
+        const input = reconstructionFixture || F.caseA();
         const reconstructionPartial = automatic ? await ejs.renderFile(path.join(root,
             'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
             ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
-            employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: 'synthetic', problematicHistoryIds: []
+            employeeHistoryAccessMode: accessMode, employeeHistoryStateToken: 'synthetic', problematicHistoryIds: []
         }) : '';
         const html = `<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="csrf-token" content="synthetic"></head>
             <body data-mode="edit" data-context="ergazomenoi">
@@ -85,7 +86,8 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
             if (request.method() !== 'POST') return route.fulfill({ contentType: 'text/html', body: html });
             requests.push({ url: request.url(), body: request.postDataJSON() });
             if (request.url() === 'https://payroll.test/api/ergazomenoi/update/synthetic-employee') {
-                const reply = replies?.[requests.filter(item => item.url.includes('/api/ergazomenoi/update/')).length - 1] || { status, payload };
+                const reply = saveHandler ? await saveHandler(request.postDataJSON())
+                    : replies?.[requests.filter(item => item.url.includes('/api/ergazomenoi/update/')).length - 1] || { status, payload };
                 return route.fulfill({ status: reply.status, contentType: 'application/json', body: JSON.stringify(reply.payload) });
             }
             assert.equal(request.url(), 'https://payroll.test/ergazomenoi/ergazomenoi/istoriko/update');
@@ -521,5 +523,65 @@ test('ordinary Save never records reconstruction feedback', async () => {
         assert.equal(timing.calls[0].allowEscapeKey, false);
         assert.ok(timing.delay >= 2000, `actual Save redirected after ${timing.delay}ms`);
         assert.equal(timing.redirects, 1);
+    });
+});
+
+test('real legacy 40 -> 39: one browser Save and approval commit reconstruction plus original intent', async () => {
+    const { legacyWeeklyHours } = require('../../../../server/services/ergazomenoi/fixtures/maintenanceWeeklyHoursLegacyFixture');
+    const { store } = require('../../../../test/fixtures/employeeProfileTransactionStore');
+    const { writeEmployeeMaintenance } = require('../../../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
+    const A = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
+    const input = legacyWeeklyHours(), db = store([input]), before = db.state();
+    const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
+    const saveHandler = async body => {
+        const changes = { ores_ergasias_ebdomadas: Number(body.formData.ores_ergasias_ebdomadas) };
+        try {
+            const result = await writeEmployeeMaintenance({ ...db.deps, scope: input.scope,
+                employeeId: input.employee._id, actorUserId: 'synthetic-actor', input: {},
+                userModel: { findById: () => query({ team: 'TEST', situation: 'A', privileges: 'C' }) },
+                privilegeModel: { findOne: () => query({ privileges: { update: true } }) },
+                correctionCatalogLoader: async () => ({}), reconstruction: body.reconstruction,
+                maintenance: { employeeChanges: changes, historyChanges: changes,
+                    submittedEmployeeFields: Object.keys(changes), submittedProfileFields: [], submittedFormValues: changes } });
+            return { status: 200, payload: { success: true, automaticReconstructionApplied: result.automaticReconstructionApplied,
+                employeeUpdated: result.employeeUpdated, historyUpdated: result.historyUpdated } };
+        } catch (error) {
+            let reply;
+            const res = { status(status) { reply = { status }; return this; },
+                json(payload) { reply.payload = payload; } };
+            const { sendReconstructionSaveError } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract');
+            if (!sendReconstructionSaveError(res, error))
+                maintenance.profileError(res, error, { employeeSaveActionRequired: true });
+            return reply;
+        }
+    };
+    await withPage({ automatic: true, departure: '', accessMode: 'NONE', disabled: true,
+        fieldValues: { ores_ergasias_ebdomadas: '39' }, saveHandler,
+        reconstructionFixture: { scope: input.scope, currentEmployee: input.employee, completeHistoryRows: input.history } },
+    async ({ page, requests, errors }) => {
+        await save(page); await expectAutomatic(page);
+        assert.deepEqual(db.state(), before);
+        assert.equal(db.events.some(e => ['write', 'fence', 'commit'].includes(e.type)), false);
+        assert.equal(requests.length, 1);
+        if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
+            fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
+            await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, 'real-40-to-39-composite-preview.png') });
+        }
+        await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
+        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
+        await page.waitForFunction(() => window.saveFinished);
+        assert.equal(requests.length, 2);
+        assert.deepEqual(requests[1].body.formData, requests[0].body.formData);
+        assert.equal(requests[1].body.formData.ores_ergasias_ebdomadas, '39');
+        assert.equal(requests[1].body.reconstruction.approvalAccepted, true);
+        assert.equal(db.state().employees[0].ores_ergasias_ebdomadas, 39);
+        assert.ok(db.state().history.every(row => row.ores_ergasias_ebdomadas === 39));
+        assert.equal(db.events.filter(e => e.type === 'commit').length, 1);
+        assert.deepEqual(db.state().audits.map(a => a.mutationSource), [A.OPERATION, 'EMPLOYEE_MAINTENANCE_SAVE']);
+        assert.equal(A.isNoOp(automaticPlan({ scope: input.scope, currentEmployee: db.state().employees[0],
+            completeHistoryRows: db.state().history })), true);
+        assert.deepEqual(await page.evaluate(() => window.guidedCounts),
+            { retryRequest: 0, preConfirm: 0, successContinuation: 1, redirect: 1 });
+        assert.deepEqual(errors, []);
     });
 });

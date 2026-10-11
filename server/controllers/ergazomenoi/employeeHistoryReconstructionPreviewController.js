@@ -43,7 +43,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
             const catalogs = await loadCatalogs();
             return res.json({ success: true, preview: project({ plan, completeHistoryRows: history, catalogs }),
                 ...(!isNoOp(plan) && ['PLANNED', 'REVIEW_REQUIRED'].includes(plan.status) ? { previewToken:
-                    buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: employee, completeHistoryRows: history, plan }) } : {}) });
+                    buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: employee, completeHistoryRows: history, plan,
+                        actorUserId: req.session.userId }) } : {}) });
         } catch (error) {
             // No response bodies, employee values, scope, cookies or exceptions
             // are logged. All planner diagnostics stay behind the projection.

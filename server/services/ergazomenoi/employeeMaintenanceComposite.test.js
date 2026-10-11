@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const W = require('./employeeEmploymentProfileWriter');
 const { store, fixture } = require('../../../test/fixtures/employeeProfileTransactionStore');
 const { persisted0030 } = require('./fixtures/tha0030SanitizedMaintenanceFixture');
+const { legacyWeeklyHours } = require('./fixtures/maintenanceWeeklyHoursLegacyFixture');
 const { tha0030DepartureStructure } = require('./fixtures/tha0030SanitizedDepartureReconstructionFixture');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const { planEmployeeHistoryAutomaticReconstruction: reconstructionPlanner } = require('./employeeHistoryAutomaticReconstructionPlannerService');
@@ -218,4 +219,60 @@ test('pre-fix proof: ordinary U user was denied History synchronization required
     assert.equal(db.events.some(event=>event.type==='commit'),false);
     const approval=await preview(run,changes);await run(changes,{reconstruction:approval});
     assert.equal(db.state().employees[0].energos,false);
+});
+
+for (const role of ['U', 'C', 'HR', 'S']) test(`real legacy 40 -> 39 (${role}): discovery, approval and original Save atomically`, async () => {
+    const { run, db, request } = setup(legacyWeeklyHours(), role), before = db.state();
+    const changes = { ores_ergasias_ebdomadas: 39 };
+    const approval = await preview(run, changes);
+    unchanged(db, before);
+    assert.equal(before.employees[0].ores_ergasias_ebdomadas, 40);
+    assert.equal(db.events.some(e => ['fence', 'write'].includes(e.type)), false);
+    const start = db.events.length;
+    const result = await run(changes, { reconstruction: approval });
+    oneCommit(db, start);
+    assert.equal(result.employee.ores_ergasias_ebdomadas, 39);
+    assert.equal(result.automaticReconstructionApplied, true);
+    assert.ok(db.state().history.every(row => row.ores_ergasias_ebdomadas === 39));
+    assert.deepEqual(db.state().history.map(row => [row._id, row.aa_eggrafhs]),
+        before.history.map(row => [row._id, row.aa_eggrafhs]));
+    const final = reconstructionPlanner({ scope: request.scope, currentEmployee: result.employee,
+        completeHistoryRows: db.state().history });
+    assert.equal(A.isNoOp(final), true); assert.equal(final.rowDiffs.length, 0);
+    const audits = db.state().audits;
+    assert.deepEqual(audits.map(a => a.mutationSource), [A.OPERATION, 'EMPLOYEE_MAINTENANCE_SAVE']);
+    assert.equal(audits[0].diagnostics.actor.userId, request.actorUserId);
+    assert.equal(audits[0].diagnostics.compositeVersion, 'employee-maintenance:v1');
+    assert.ok(audits[0].historyAfter.every(row => row.ores_ergasias_ebdomadas === 40));
+    assert.ok(audits[1].historyAfter.every(row => row.ores_ergasias_ebdomadas === 39));
+    assert.equal(audits[1].diagnostics.actor.userId, request.actorUserId);
+    // Subsequent normal maintenance keeps physical copies coherent as well.
+    await run({ ores_ergasias_ebdomadas: 38 });
+    assert.ok(db.state().history.every(row => row.ores_ergasias_ebdomadas === 38));
+});
+
+test('real 40 -> 39 failure after both audits rolls back Employee, History, audits and fence', async () => {
+    const { run, db } = setup(legacyWeeklyHours()), before = db.state();
+    const changes = { ores_ergasias_ebdomadas: 39 }, approval = await preview(run, changes);
+    db.hooks.beforeCommit = () => { throw Error('synthetic composite commit failure'); };
+    await assert.rejects(run(changes, { reconstruction: approval }), /synthetic composite commit failure/);
+    unchanged(db, before);
+});
+
+test('reconstruction cannot be offered as a remedy for an unsafe original Save', async () => {
+    const { run, db } = setup(legacyWeeklyHours()), before = db.state();
+    await assert.rejects(run({ ores_ergasias_ebdomadas: 39, [START]: '2026-01-01' }), error => {
+        assert.equal(Boolean(error.previewToken), false);
+        return true;
+    });
+    unchanged(db, before);
+});
+
+test('real 40 -> 39 protected-reference conflict after approval blocks and rolls back everything', async () => {
+    const { run, request, db } = setup(legacyWeeklyHours()), before = db.state();
+    const changes = { ores_ergasias_ebdomadas: 39 }, approval = await preview(run, changes);
+    request.referenceChecker = async () => [{ collection: 'Unsupported_live_reference', documentId: 'synthetic-protected' }];
+    await assert.rejects(run(changes, { reconstruction: approval }));
+    unchanged(db, before);
+    assert.equal(db.events.some(e => e.type === 'write'), false);
 });

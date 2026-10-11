@@ -15,6 +15,7 @@ function setup(factory = F.caseA, user = admin, storeOptions = {}) {
     const input = factory();
     const db = store([{ employee: input.currentEmployee, history: input.completeHistoryRows }], storeOptions);
     db.deps.userModel = { findById: () => query(user) };
+    db.deps.privilegeModel = { findOne: () => query({ privileges: { update: true } }) };
     db.deps.auditModel.findOne = filter => ({ session(session) { this.s = session; return this; }, async lean() {
         return this.s.draft.audits.find(audit => audit.mutationSource === filter.mutationSource &&
             String(audit.employeeScope.employee_id) === String(filter['employeeScope.employee_id']) &&
@@ -24,7 +25,7 @@ function setup(factory = F.caseA, user = admin, storeOptions = {}) {
     } });
     const token = state => A.buildAutomaticReconstructionPreviewToken({ scope: input.scope,
         currentEmployee: state.employees[0], completeHistoryRows: state.history,
-        plan: planner({ scope: input.scope, currentEmployee: state.employees[0], completeHistoryRows: state.history }) });
+        plan: planner({ scope: input.scope, currentEmployee: state.employees[0], completeHistoryRows: state.history }), actorUserId: 'synthetic-actor' });
     const options = { ...db.deps, scope: input.scope, employeeId: input.currentEmployee._id,
         previewToken: token(db.state()), approvalAccepted: true, actorUserId: 'synthetic-actor' };
     return { db, input, options, token, run: overrides => apply({ ...options, ...overrides }) };
@@ -67,7 +68,7 @@ for (const factory of [F.caseA, F.caseB, F.caseBWithProfileEvidence]) test(`${fa
     assert.equal(audit.diagnostics.changedFieldCount, plan.rowDiffs.length);
     assert.doesNotMatch(JSON.stringify(audit.diagnostics), /password|cookie|csrf|sessionId/);
     const events = db.events;
-    assert.deepEqual(events.slice(0, 3).map(e => [e.type, e.kind]), [['fence', 'employees'], ['read', 'employees'], ['read', 'history']]);
+    assert.deepEqual(events.slice(0, 4).map(e => [e.type, e.kind]), [['read', 'employees'], ['fence', 'employees'], ['read', 'employees'], ['read', 'history']]);
     assert.ok(events.filter(e => ['read', 'write', 'fence', 'commit'].includes(e.type)).every(e => e.session === 1));
     if (factory !== F.caseA) {
         const initial = after.history.filter(row => ['0001', '0002'].includes(row.aa_eggrafhs));
@@ -164,9 +165,7 @@ test('missing audit storage fails closed without creating collection or writing 
     noCommittedChanges(db, before); assert.equal(db.events.some(e => e.type === 'write'), false);
 });
 for (const [name, user] of [
-    ['ordinary actor', { privileges: 'U', team: 'TEST', situation: 'A' }],
     ['inactive Admin', { ...admin, situation: 'I' }],
-    ['Admin outside THA', { ...admin, team: 'TEST' }],
     ['Supervisor outside team', { privileges: 'S', team: 'OTHER', situation: 'A' }],
     ['missing actor', null]
 ]) test(`${name}: authorization denied and complete rollback`, async () => {
@@ -174,14 +173,75 @@ for (const [name, user] of [
     await assert.rejects(run, error => error.statusCode === 403); noCommittedChanges(db, before);
     assert.equal(db.events.some(e => e.type === 'write'), false);
 });
-test('Supervisor uses existing exact problematic-row scope: denied if even one affected row is outside it', async () => {
-    const { db, run } = setup(F.caseA, { privileges: 'S', team: 'TEST', situation: 'A' }), before = db.state();
+test('Supervisor maintenance can apply the whole automatic plan; manual scope remains restricted', async () => {
+    const user = { privileges: 'S', team: 'TEST', situation: 'A' };
+    const { db, run, input } = setup(F.caseA, user);
     const { identifyEmployeeHistoryProblemScope } = require('./employeeHistoryProblemScopeService');
-    const input = F.caseA(), scope = identifyEmployeeHistoryProblemScope(input);
-    const ids = [...new Set(planner(input).rowDiffs.map(d => String(d.historyId)))];
-    const permitted = scope.deterministicallyResolved && ids.every(id => scope.problematicHistoryIds.includes(id));
-    if (permitted) { await run(); assert.equal(db.state().audits.length, 1); }
-    else { await assert.rejects(run, { code: 'EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN' }); noCommittedChanges(db, before); }
+    const { accessForUser, assertEmployeeHistoryOperationsAuthorized } = require('./employeeHistoryAuthorizationService');
+    const problemScope = identifyEmployeeHistoryProblemScope(input);
+    const operations = [...new Set(planner(input).rowDiffs.map(d => String(d.historyId)))].map(historyId => ({ state: 'modified', historyId }));
+    assert.throws(() => assertEmployeeHistoryOperationsAuthorized({ accessMode: accessForUser(user).mode,
+        operations, originalHistoryRows: input.completeHistoryRows, problemScope }), { code: 'EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN' });
+    await run(); assert.equal(db.state().audits.length, 1);
+});
+
+for (const role of ['U', 'C', 'HR', 'S', 'A']) test(`${role}: real legacy standalone apply uses maintenance permission only`, async () => {
+    const { legacyWeeklyHours } = require('./fixtures/maintenanceWeeklyHoursLegacyFixture');
+    const factory = () => {
+        const { scope, employee: currentEmployee, history: completeHistoryRows } = legacyWeeklyHours();
+        return { scope, currentEmployee, completeHistoryRows };
+    };
+    const user = { privileges: role, team: 'TEST', situation: 'A' };
+    const { db, run, input } = setup(factory, user), before = db.state();
+    await run();
+    assert.equal(db.state().employees[0].ores_ergasias_ebdomadas, 40);
+    assert.equal(db.state().audits.length, 1);
+    assert.equal(db.state().audits[0].diagnostics.actor.userId, 'synthetic-actor');
+    const { [FIELD]: fence, ...current } = db.state().employees[0];
+    assert.equal(fence, 1); assert.deepEqual(current, before.employees[0]);
+    assert.ok(A.isNoOp(planner({ scope: input.scope, currentEmployee: current, completeHistoryRows: db.state().history })));
+    const { accessForUser, assertEmployeeHistoryOperationsAuthorized } = require('./employeeHistoryAuthorizationService');
+    if (['U', 'C', 'HR'].includes(role)) for (const state of ['inserted', 'modified', 'deleted']) {
+        assert.throws(() => assertEmployeeHistoryOperationsAuthorized({ accessMode: accessForUser(user).mode,
+            operations: [{ state, historyId: before.history[1]._id, anchorHistoryId: before.history[1]._id }],
+            originalHistoryRows: before.history }), { code: 'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN' });
+    }
+});
+
+for (const privileges of [{ read: true }, { update: false, admin: false }, null])
+test(`maintenance permission ${JSON.stringify(privileges)} denies before any fence`, async () => {
+    const { db, run } = setup(), before = db.state();
+    await assert.rejects(() => run({ privilegeModel: { findOne: () => query(privileges ? { privileges } : null) } }),
+        { code: 'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN' });
+    noCommittedChanges(db, before);
+    assert.equal(db.events.some(e => ['write', 'fence'].includes(e.type)), false);
+});
+
+test('maintenance admin permission alone also authorizes automatic application', async () => {
+    const { run } = setup();
+    assert.equal((await run({ privilegeModel: { findOne: () => query({ privileges: { admin: true, update: false } }) } })).applied, true);
+});
+
+for (const field of ['team', 'company_kod', 'kodikos', 'employeeId'])
+test(`standalone exact scope: changed ${field} cannot apply or acquire a fence`, async () => {
+    const { db, run, options } = setup(), before = db.state();
+    const overrides = field === 'employeeId' ? { employeeId: 'another-employee' }
+        : { scope: { ...options.scope, [field]: 'OTHER' } };
+    await rejectsCode(() => run(overrides), 'STALE');
+    noCommittedChanges(db, before);
+    assert.equal(db.events.some(e => ['write', 'fence'].includes(e.type)), false);
+});
+
+test('standalone preview token binds the approving actor and rejects another maintenance-authorized actor', async () => {
+    const { db, run } = setup(), before = db.state();
+    await rejectsCode(() => run({ actorUserId: 'another-authorized-actor' }), 'STALE');
+    noCommittedChanges(db, before);
+});
+
+test('forged valid-shape preview token is stale and cannot commit', async () => {
+    const { db, run } = setup(), before = db.state();
+    await rejectsCode(() => run({ previewToken: 'a'.repeat(43) }), 'STALE');
+    noCommittedChanges(db, before);
 });
 test('already clean preview/apply is zero-write and zero-audit, including rolled-back technical fence', async () => {
     const input = F.caseA(); input.completeHistoryRows = planner(input).proposedRows;

@@ -42,7 +42,7 @@ function createEmployeeHistoryReconstructionApplyController({ employeeModel = Er
             if (error?.code === PREFIX + 'STALE') return res.status(409).json({ success: false, code: error.code,
                 message: 'Τα στοιχεία του Ιστορικού άλλαξαν από τότε που έγινε ο έλεγχος. Δεν αποθηκεύτηκε καμία αλλαγή. Ανοίξτε ξανά την προεπισκόπηση.' });
             if (error?.statusCode === 403 || error?.code === 'INVALID_TEAM_SCOPE') {
-                return fail(403, 'FORBIDDEN', 'Η τακτοποίηση σταμάτησε επειδή δεν έχετε δικαίωμα διόρθωσης όλων των επηρεαζόμενων εγγραφών.');
+                return fail(403, 'FORBIDDEN', 'Η τακτοποίηση του Ιστορικού σταμάτησε επειδή δεν έχετε δικαίωμα ενημέρωσης του συγκεκριμένου εργαζομένου στην επιλεγμένη εταιρεία.');
             }
             if (error?.code === PREFIX + 'BLOCKED') return fail(409, 'BLOCKED', 'Δεν είναι δυνατό να εφαρμοστεί αυτόματα ασφαλής τακτοποίηση.');
             return fail(error?.statusCode === 503 ? 503 : 500,

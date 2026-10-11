@@ -4363,6 +4363,29 @@ async function planEmployeeMaintenance({ request, current, history, session, dep
     if (preserveHistory) {
         const ids = new Set(state.history.map(row => String(row._id)));
         state.history = [...state.history, ...history.filter(row => !ids.has(String(row._id)))];
+        // Reconstruction can retain several physical rows for ONE logical
+        // period. A profile correction belongs to that whole period; leaving
+        // an older physical copy unchanged would make the next reconstruction
+        // undo the approved original Save. Membership comes only from the
+        // server planner, and temporal edits never propagate through this path.
+        const baseline = planEmployeeHistoryAutomaticReconstruction({ scope,
+            currentEmployee: current, completeHistoryRows: history });
+        const targetId = String(result?.history?._id || '');
+        const before = history.find(row => String(row._id) === targetId);
+        const after = state.history.find(row => String(row._id) === targetId);
+        const contract = require('./employeeHistoryAutomaticReconstructionContract');
+        const period = baseline.logicalPeriods.find(item =>
+            item.sourceHistoryIds.some(id => String(id) === targetId));
+        if (AutomaticReconstruction.isNoOp(baseline) && before && after && period?.sourceHistoryIds.length > 1 &&
+            [contract.HIRE, contract.START, contract.END, contract.DEPARTURE].every(field =>
+                AutomaticReconstruction.equal(before[field], after[field]))) {
+            const changedProfile = Object.fromEntries(contract.PROFILE_FIELDS
+                .filter(field => !AutomaticReconstruction.equal(before[field], after[field]))
+                .map(field => [field, after[field]]));
+            const members = new Set(period.sourceHistoryIds.map(String));
+            state.history = state.history.map(row => members.has(String(row._id))
+                ? { ...row, ...changedProfile } : row);
+        }
     }
     const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee: state.current, historyRows: state.history });
     if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY || !preserveHistory && canonical.cleanupRequired) {
@@ -4490,7 +4513,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             const { composed } = planned;
             await executeFinalMutationPlan({ ...dependencies, physicalPlan: composed.physicalPlan,
                 currentBefore: snapshot.current, currentPatch: composed.currentPatch, filter: scope, employeeId, session,
-                canonicalRepairRequired: Boolean(composed.lifecycleOperation),
+                canonicalRepairRequired: Boolean(composed.lifecycleOperation || planned.automatic),
                 controlledMaintenancePreservesHistory: composed.preserveHistory,
                 auditAfterMutation: true,
                 diagnostics: { ...(composed.lifecycleStep?.diagnostics || {}),

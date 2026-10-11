@@ -30,11 +30,11 @@ const ordered = rows => [...rows].sort((a, b) => identity(a).localeCompare(ident
 function failure(suffix, statusCode = 409) {
     return Object.assign(new Error(PREFIX + suffix), { code: PREFIX + suffix, statusCode });
 }
-function buildAutomaticReconstructionPreviewToken({ scope, currentEmployee, completeHistoryRows, plan }) {
+function buildAutomaticReconstructionPreviewToken({ scope, currentEmployee, completeHistoryRows, plan, actorUserId = null }) {
     const project = record => Object.fromEntries(Object.entries(record).filter(([field]) => !TOKEN_IGNORED.has(field)));
     // Public opaque digest, not a client-side execution plan or authorization.
     // Informational schedule dates cannot alter either evidence or token identity.
-    return hash({ operation: APPLY_VERSION, engine: C.VERSION, scope,
+    return hash({ operation: APPLY_VERSION, engine: C.VERSION, scope, actorUserId: actorUserId == null ? null : String(actorUserId),
         semanticFingerprint: plan.semanticFingerprint,
         employee: project(currentEmployee), history: ordered(completeHistoryRows).map(project),
         result: { version: plan.version, status: plan.status, rowDiffs: plan.rowDiffs,

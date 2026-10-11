@@ -3,7 +3,7 @@ const UserModel = require('../../models/userModel');
 const { UserPrivilegesModel } = require('../../models/privileges');
 const { normalizeRequiredUserTeam, CANONICAL_ALL_TEAMS_CODE } = require('../userTeamScopeService');
 
-// This check belongs only to normal Employee Maintenance. Manual History
+// Shared by Employee Maintenance and server-owned automatic reconstruction. Manual History
 // endpoints continue to use employeeHistoryAuthorizationService unchanged.
 async function authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current,
     session, userModel = UserModel, privilegeModel = UserPrivilegesModel }) {
