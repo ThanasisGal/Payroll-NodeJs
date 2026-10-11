@@ -805,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <p class="font-weight-600 margin-bottom-0_5rem">Μεταβολές Εργασιακής Σχέσης:</p>
 
         <!-- ── Checkbox: Ψηφιακή Οργάνωση Χρόνου Εργασίας για Μεταβολές ── -->
-        <div class="display-flex align-items-center gap-0_75rem">
+        <div class="employee-maintenance-choice">
             <input type="checkbox"
                 id="wto_pshfiakh_organosh_xronoy_ergasias_metaboles"
                 name="wto_pshfiakh_organosh_xronoy_ergasias_metaboles"
@@ -817,21 +817,21 @@ document.addEventListener('DOMContentLoaded', () => {
             </label>
         </div>
 
-        <div class="display-flex align-items-center gap-0_75rem">
+        <div class="employee-maintenance-choice">
             <input type="radio" id="metaboles_none" name="metaboles_action"
                 value="none" class="custom-radio" checked />
             <label for="metaboles_none" class="margin-0 cursor-pointer font-size-rem-1_05">
                 Χωρίς Μεταβολή ΕΡΓΑΝΗ
             </label>
         </div>
-        <div class="display-flex align-items-center gap-0_75rem">
+        <div class="employee-maintenance-choice">
             <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs" name="metaboles_action"
                 value="e3_metaboles_ergasiakhs_sxeshs" class="custom-radio" />
             <label for="e3_metaboles_ergasiakhs_sxeshs" class="margin-0 cursor-pointer font-size-rem-1_05">
                 ΜΕΤΑΒΟΛΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ
             </label>
         </div>
-        <div class="display-flex align-items-center gap-0_75rem">
+        <div class="employee-maintenance-choice">
             <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
                 name="metaboles_action"
                 value="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
@@ -851,105 +851,105 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `
                     <hr class="hr-style" />
                     <p class="font-weight-600 margin-bottom-0_5rem">Τύπος Λήξης Εργασίας:</p>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="lhxh_none" name="lhxh_type"
                             value="none" class="custom-radio" checked />
                         <label for="lhxh_none" class="margin-0 cursor-pointer font-size-rem-1_05">
                             Χωρίς Λήξη ΕΡΓΑΝΗ
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_222_lysh_symbashs_orismenoy_xronoy" name="lhxh_type"
                             value="ma_222" class="custom-radio" />
                         <label for="ma_222_lysh_symbashs_orismenoy_xronoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             Λύση Σύμβασης Ορισμένου Χρόνου (E7N)
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_227_lysh_dokimastikhs_periodoy" name="lhxh_type"
                             value="ma_227" class="custom-radio" />
                         <label for="ma_227_lysh_dokimastikhs_periodoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Αυτοδίκαιη Λύση Δοκιμαστικής Περιόδου
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_217_oikeiothelhs_apoxorhsh" name="lhxh_type"
                             value="ma_217" class="custom-radio" />
                         <label for="ma_217_oikeiothelhs_apoxorhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Οικειοθελής Αποχώρηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_221_lysh_kataggelia_me_proeidopoihsh" name="lhxh_type"
                             value="ma_221" class="custom-radio" />
                         <label for="ma_221_lysh_kataggelia_me_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης με Προειδοποίηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_220_lysh_kataggelia_xoris_proeidopoihsh" name="lhxh_type"
                             value="ma_220" class="custom-radio" />
                         <label for="ma_220_lysh_kataggelia_xoris_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης Χωρίς Προειδοποίηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_218_lysh_dhloshs_oxlhshs" name="lhxh_type"
                             value="ma_218" class="custom-radio" />
                         <label for="ma_218_lysh_dhloshs_oxlhshs" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Δήλωση Όχλησης για δυνατότητα Οικειοθελούς Αποχώρησης
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh" name="lhxh_type"
                             value="ma_219" class="custom-radio" />
                         <label for="ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Οικειοθελής Αποχώρηση μετά από Όχληση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_223_lysh_ethelousia_exodos" name="lhxh_type"
                             value="ma_223" class="custom-radio" />
                         <label for="ma_223_lysh_ethelousia_exodos" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Εθελούσια Έξοδος
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_229_lhxh_daneismoy" name="lhxh_type"
                             value="ma_229" class="custom-radio" />
                         <label for="ma_229_lhxh_daneismoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Λήξη Δανεισμού από επιχείρηση/Τοποθέτησης από ΕΠΑ
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_226_lhxh_logo_thanatoy" name="lhxh_type"
                             value="ma_226" class="custom-radio" />
                         <label for="ma_226_lhxh_logo_thanatoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Λήξη λόγω Θανάτου
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_228_metavivash_se_epixeirish" name="lhxh_type"
                             value="ma_228" class="custom-radio" />
                         <label for="ma_228_metavivash_se_epixeirish" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Μεταβίβαση σε Επιχείρηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh" name="lhxh_type"
                             value="ma_224" class="custom-radio" />
                         <label for="ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Συνταξιοδότηση με Οικειοθελή Αποχώρηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh" name="lhxh_type"
                             value="ma_225" class="custom-radio" />
                         <label for="ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Συνταξιοδότηση με Καταγγελία Σύμβασης Χωρίς Προειδοποίηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_236_oikeiothelhs_apoxorhsh_logo_15etias" name="lhxh_type"
                             value="ma_236" class="custom-radio" />
                         <label for="ma_236_oikeiothelhs_apoxorhsh_logo_15etias" class="margin-0 cursor-pointer font-size-rem-1_05">
@@ -968,7 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `
                     <hr class="hr-style" />
                     <p class="font-weight-600 margin-bottom-0_5rem">Ενέργεια ΕΡΓΑΝΗ:</p>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio"
                             id="ergani_action_none"
                             name="ergani_main_action"
@@ -980,7 +980,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             Χωρίς ενέργεια ΕΡΓΑΝΗ
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio"
                             id="e3_anaggelia_proslhpshs"
                             name="ergani_main_action"
@@ -991,7 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             Αναγγελία Πρόσληψης (E3N)
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio"
                             id="wto_pshfiakh_organosh_xronoy_ergasias"
                             name="ergani_main_action"
@@ -1002,7 +1002,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio"
                             id="ergani_action_both"
                             name="ergani_main_action"
@@ -1055,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <!-- ── Checkbox: Δημιουργία Σύμβασης (ανεξάρτητη επιλογή) ── -->
                         <hr class="hr-style" />
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="checkbox"
                                 id="create_contract"
                                 name="files"

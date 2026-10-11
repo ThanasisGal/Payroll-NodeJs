@@ -113,7 +113,7 @@ for (const width of [1440, 390]) test(`visual Employee Maintenance and History a
             await page.waitForTimeout(350);
             const apply = page.locator('#employeeHistoryReconstructionApplyBtn');
             assert.equal(await apply.isDisabled(), true);
-            await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+            await verifyChoice(page, 'employeeHistoryReconstructionApprovalAccepted');
             await button('#employeeHistoryReconstructionApplyBtn');
             await button('#employeeHistoryReconstructionPreviewModal .modal-footer [data-bs-dismiss]');
             await capture(operation ? 'first-departure-preview' : 'reconstruction-preview');
@@ -144,3 +144,93 @@ for (const width of [1440, 390]) test(`visual Employee Maintenance and History a
         assert.deepEqual(mutations, []); assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });
+
+// Render the actual production templates, including every optional ERGANI choice.
+// No save or submission handler is invoked by these presentation-only checks.
+for (const width of [1440, 390]) for (const implementation of ['putFieldValues', 'getFieldValues'])
+    test(`choice geometry and label interaction: ${implementation} at ${width}px`, async () => {
+        const vm = require('node:vm');
+        const production = fs.readFileSync(path.join(__dirname, `${implementation}.js`), 'utf8');
+        const section = production.slice(production.indexOf('// ✅ ΕΡΓΑΝΗ FILES SELECTION'));
+        const template = section.match(/html: `([\s\S]*?)`,\s*focusConfirm:/)[1];
+        const optional = {};
+        for (const name of ['metabolesHtml', 'lhxeisHtml', 'noUpdatesHtml']) {
+            const match = section.match(new RegExp('const ' + name + ' = [\\s\\S]*?\\? `([\\s\\S]*?)`'));
+            optional[name] = match ? match[1] : '';
+        }
+        const browser = await chromium.launch({ headless: true });
+        try {
+            const page = await browser.newPage({ viewport: { width, height: 1000 } });
+            await page.route('**/*', route => route.abort());
+            await page.setContent('<!doctype html><html lang="el"><meta charset="utf-8"><body></body></html>');
+            for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
+                await page.addStyleTag({ path: path.join(root, file) });
+            await page.addScriptTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js') });
+            await page.addScriptTag({ content: helpers });
+            for (const disabled of implementation === 'getFieldValues' ? [false, true] : [false]) {
+                const html = vm.runInNewContext('`' + template + '`', { ...optional, skipScheduleValidation: disabled });
+                await page.evaluate(({ html, implementation }) => {
+                    const options = { icon: 'info', title: 'ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ', html, didOpen() {} };
+                    void Swal.fire(implementation === 'putFieldValues' ? withEmployeeMaintenanceButtonStyles(options) : options);
+                }, { html, implementation });
+                await page.waitForTimeout(350);
+                const inputs = page.locator('.swal2-html-container input');
+                assert.ok(await inputs.count() >= 6);
+                for (const input of await inputs.all()) {
+                    const id = await input.getAttribute('id');
+                    await verifyChoice(page, id);
+                }
+                if (disabled) {
+                    assert.equal(await page.locator('#storage_temporary').isDisabled(), true);
+                    assert.equal(await page.locator('#storage_permanent').isDisabled(), true);
+                }
+                if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
+                    fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
+                    await page.locator('#storage_temporary').scrollIntoViewIfNeeded();
+                    await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,
+                        `alignment-${implementation}-${disabled ? 'disabled-' : ''}${width}.png`) });
+                }
+                await page.evaluate(() => Swal.close());
+            }
+        } finally { await browser.close(); }
+    });
+
+async function verifyChoice(page, id) {
+    const input = page.locator(`#${id}`);
+    const label = page.locator(`label[for="${id}"]`);
+    assert.equal(await label.count(), 1, `${id}: associated label`);
+    await input.scrollIntoViewIfNeeded();
+    const geometry = await input.evaluate(input => {
+        const label = input.labels[0], i = input.getBoundingClientRect(), l = label.getBoundingClientRect();
+        const style = getComputedStyle(input), ls = getComputedStyle(label);
+        const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+        const textNodes = [];
+        while (walker.nextNode()) if (walker.currentNode.textContent.trim()) textNodes.push(walker.currentNode);
+        const range = document.createRange(), first = textNodes[0], last = textNodes.at(-1);
+        range.setStart(first, first.textContent.search(/\S/));
+        range.setEnd(last, last.textContent.trimEnd().length);
+        const text = range.getBoundingClientRect();
+        return { textDelta: Math.abs(i.y + i.height / 2 - text.y - text.height / 2),
+            delta: Math.abs(i.y + i.height / 2 - l.y - l.height / 2),
+            gap: l.x - i.right, width: i.width, height: i.height,
+            marginTop: style.marginTop, marginBottom: style.marginBottom,
+            alignSelf: style.alignSelf, labelDisplay: ls.display, labelAlign: ls.alignItems,
+            labelMarginTop: ls.marginTop, labelMarginBottom: ls.marginBottom, lineHeight: ls.lineHeight, whiteSpace: ls.whiteSpace,
+            right: l.right, viewport: innerWidth };
+    });
+    assert.ok(geometry.textDelta <= 1, `${id}: text center ${JSON.stringify(geometry)}`);
+    assert.ok(geometry.delta <= 1, `${id}: ${JSON.stringify(geometry)}`);
+    assert.equal(geometry.gap, 12, `${id}: original gap`);
+    assert.equal(geometry.width, 20); assert.equal(geometry.height, 20);
+    assert.equal(geometry.marginTop, '0px'); assert.equal(geometry.marginBottom, '0px');
+    assert.equal(geometry.labelMarginTop, '0px'); assert.equal(geometry.labelMarginBottom, '0px');
+    assert.equal(geometry.whiteSpace, 'normal');
+    assert.equal(geometry.alignSelf, 'center'); assert.equal(geometry.labelAlign, 'center');
+    assert.equal(geometry.labelDisplay, 'flex'); // inline-flex is blockified as a flex item
+    assert.ok(geometry.right <= geometry.viewport, `${id}: label overflow ${JSON.stringify(geometry)}`);
+    const checked = await input.isChecked(), disabled = await input.isDisabled();
+    await label.click({ force: disabled });
+    assert.equal(await input.isChecked(), disabled ? checked : await input.getAttribute('type') === 'radio' ? true : !checked);
+    assert.equal(await input.isDisabled(), disabled);
+    console.log(JSON.stringify({ id, viewport: geometry.viewport, centerDeltaPx: geometry.delta, disabled }));
+}
