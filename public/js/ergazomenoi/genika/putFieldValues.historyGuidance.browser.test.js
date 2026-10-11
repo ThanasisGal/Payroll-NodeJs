@@ -427,9 +427,9 @@ test('Phase 3B: cancel retains original full form; native label and keyboard wor
         const grey = await apply.evaluate(e => getComputedStyle(e).backgroundColor);
         await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
         assert.equal(await apply.isEnabled(), true);
-        await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(232, 245, 238)');
+        await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(223, 239, 230)');
         const green = await apply.evaluate(e => getComputedStyle(e).backgroundColor);
-        assert.notEqual(grey, green); assert.equal(green, 'rgb(232, 245, 238)');
+        assert.notEqual(grey, green); assert.equal(green, 'rgb(223, 239, 230)');
         await page.locator('#employeeHistoryReconstructionApprovalAccepted').focus(); await page.keyboard.press('Space');
         assert.equal(await apply.isDisabled(), true);
         await page.evaluate(() => document.getElementById('save').click());

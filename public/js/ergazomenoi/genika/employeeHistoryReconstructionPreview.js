@@ -156,6 +156,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<tr>${cells.map((cell, index) => `<td data-label="${headings[index]}">${cell}</td>`).join('')}</tr>`;
         }).join('')}</tbody></table>`;
     }
+    function renderContractItems(items = []) {
+        if (!items.length) return '';
+        const headings = ['α/α', 'Στοιχείο Σύμβασης', 'Ποσό Βάσει Σύμβασης', 'Αποδοχές Βάσει Όρων Εργασίας'];
+        return `<table class="history-preview-contract-items"><thead><tr>${headings.map(label => `<th scope="col">${label}</th>`).join('')}</tr></thead>
+            <tbody>${items.map(item => `<tr>${[item.index, item.description, item.contractAmount, item.workTermsAmount]
+                .map((value, index) => `<td data-label="${headings[index]}">${escape(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    }
     function lazyDetails(title, render) {
         const details = document.createElement('details');
         details.className = 'history-preview-details';
@@ -220,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         periods.innerHTML = preview.periods.map(period => `<article class="history-preview-period"><h6>${escape(period.from)} → ${escape(period.to)}</h6>
             <p>Προέρχεται από τις εγγραφές: <strong>${period.rows.map(escape).join(', ')}</strong></p>
             ${period.rows.length > 1 ? `<p class="history-preview-period-explanation">Οι εγγραφές ${formatGreekList(period.rows.map(escape))} φαίνεται να περιγράφουν την ίδια εργασιακή περίοδο και συνδυάστηκαν στην πρόταση.</p>` : ''}
-            <dl class="history-preview-fields">${period.facts.map(field => `<div><dt>${escape(field.label)}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl></article>`).join('');
+            <dl class="history-preview-fields">${period.facts.map(field => `<div><dt>${escape(field.label)}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl>${renderContractItems(period.contractItems)}</article>`).join('');
         proposed.appendChild(periods);
         if (!preview.periods.length) proposed.append(preview.status === 'unavailable'
             ? 'Δεν δημιουργήθηκε πρόταση περιόδων. Ελέγξτε τα σημεία προσοχής.' : 'Δεν υπάρχουν περίοδοι προς εμφάνιση.');
@@ -256,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (row.note) { const note = document.createElement('p'); note.textContent = row.note; groups.appendChild(note); }
                 for (const group of row.groups) groups.appendChild(lazyDetails(group.title, () =>
                     `<dl class="history-preview-fields">${group.fields.map(field => `<div><dt>${escape(field.label)}${field.informational
-                        ? `<small>${escape(field.note)}</small>` : ''}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl>`));
+                        ? `<small>${escape(field.note)}</small>` : ''}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl>${renderContractItems(group.contractItems)}`));
                 return groups;
             }));
         }

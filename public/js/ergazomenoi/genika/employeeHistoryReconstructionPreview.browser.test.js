@@ -87,16 +87,16 @@ test('real Bootstrap modal is wide, Greek, approval-capable; meaningful changes 
         await page.locator('.history-preview-defaults > summary').click();
         const group = page.locator('.history-preview-defaults details').first();
         await group.waitFor();
-        assert.match(await group.locator('summary').innerText(), /Εγγραφή 0001 — 43/);
+        assert.match(await group.locator('summary').innerText(), /Εγγραφή 0001 — 13/);
         assert.equal(await group.locator('tr').count(), 0);
         await group.locator('summary').click();
-        await page.waitForFunction(() => document.querySelectorAll('.history-preview-defaults tbody tr').length === 43);
-        assert.equal(await page.locator('.history-preview-defaults tbody tr').count(), 43);
+        await page.waitForFunction(() => document.querySelectorAll('.history-preview-defaults tbody tr').length === 13);
+        assert.equal(await page.locator('.history-preview-defaults tbody tr').count(), 13);
         assert.equal(requests.length, 1);
     });
 });
 
-test('all 105 display fields are reachable in expandable Greek groups; schedule dates explicitly informational', async () => {
+test('non-item fields remain reachable in expandable Greek groups without empty contract placeholders; schedule dates explicitly informational', async () => {
     await withPage({}, async ({ page }) => {
         await open(page);
         const original = page.locator('.history-preview-original');
@@ -108,7 +108,7 @@ test('all 105 display fields are reachable in expandable Greek groups; schedule 
             await groups.nth(i).locator(':scope > summary').click();
             await groups.nth(i).locator('dl').waitFor();
         }
-        assert.equal(await row.locator('dt').count(), 105);
+        assert.equal(await row.locator('dt').count(), 58);
         assert.equal(await row.locator('dt small').count(), 2);
         assert.match(await row.locator('dt small').first().innerText(), /Πληροφοριακό πεδίο.*δεν χρησιμοποιείται/);
         for (const text of await row.locator('dt').allTextContents()) assert.match(text, /[Α-Ωα-ω]/u);
@@ -399,9 +399,9 @@ for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`approval vi
             assert.equal(await checkbox.isChecked(), true);
             assert.equal(await apply.isEnabled(), true);
             assert.equal(await apply.evaluate(e => e.matches('.btn-success:enabled')), true);
-            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(232, 245, 238)');
+            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(223, 239, 230)');
             const s = await style();
-            assert.equal(s.background, 'rgb(232, 245, 238)');
+            assert.equal(s.background, 'rgb(223, 239, 230)');
             assert.equal(s.opacity, '1');
             assert.equal(s.cursor, 'pointer');
         }

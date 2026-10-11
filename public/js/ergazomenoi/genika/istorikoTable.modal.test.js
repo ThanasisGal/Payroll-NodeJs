@@ -44,3 +44,25 @@ test('history details show Greek business labels and no technical keys', () => {
         'unknown_future_key', 'secret']) assert.equal(html.includes(forbidden), false, forbidden);
     assert.equal(/<th>[^<]*[a-z]+_[a-z_]+[^<]*<\/th>/.test(html), false);
 });
+
+test('contract details group every slot with its own amounts and hide zero placeholders', () => {
+    for (let n = 1; n <= 15; n++) {
+        const index = String(n).padStart(2, '0');
+        const record = { [`stoixeio_symbashs_${index}`]: `CODE-${index}`,
+            [`poso_symbashs_${index}`]: 0, [`poso_symbashs_basei_oron_ergasias_${index}`]: n,
+            __lookups: { stoixeiaSymbaseon: { [index]: { perigrafh: `ΠΕΡΙΓΡΑΦΗ ${index}` } } } };
+        const html = render(record);
+        assert.ok(html.includes(`CODE-${index}`)); assert.ok(html.includes(`ΠΕΡΙΓΡΑΦΗ ${index}`));
+        assert.ok(html.includes(`${n},00`));
+        assert.ok(html.includes('data-label="Ποσό Βάσει Σύμβασης"></td>'));
+        assert.doesNotMatch(html, />0,00<|Στοιχείο Σύμβασης \d{2}|stoixeio_symbashs|poso_symbashs/);
+        assert.equal((html.match(/data-label="Στοιχείο Σύμβασης"/g) || []).length, 1);
+    }
+});
+
+test('fresh parent-resolved History descriptions take precedence over stale direct text', () => {
+    const html = render({ symbash: '0002', kathgoria_symbashs: '0003', eidikothta_symbashs: '0001',
+        eidikothta_symbashs_perigrafh: 'ΑΡΧΙΜΑΓΕΙΡΟΣ', __lookups: {
+            eidikothtesAnaKathgoriaSymbaseon: { '0001': { perigrafh: 'ΒΟΗΘΟΣ ΣΕΡΒΙΤΟΡΟΥ' } } } });
+    assert.match(html, /ΒΟΗΘΟΣ ΣΕΡΒΙΤΟΡΟΥ/); assert.doesNotMatch(html, /ΑΡΧΙΜΑΓΕΙΡΟΣ/);
+});

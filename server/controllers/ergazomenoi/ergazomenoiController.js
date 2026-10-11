@@ -1,3 +1,4 @@
+const { contractParentKey, contractItemsForDisplay } = require('../../services/ergazomenoi/employeeContractDescriptionService');
 const { sendReconstructionSaveError, validateApproval } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract');
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
@@ -595,7 +596,7 @@ async function enrichIstorikoRowsForDetails(rows = []) {
     const eidikothtaQueries = rows
         .filter((row) => row.symbash && row.kathgoria_symbashs && row.eidikothta_symbashs)
         .map((row) => ({
-            afora_thn_symbash_kathgoria: `${row.symbash}${row.kathgoria_symbashs}`,
+            afora_thn_symbash_kathgoria: contractParentKey(row.symbash, row.kathgoria_symbashs),
             kodikos: String(row.eidikothta_symbashs)
         }));
 
@@ -612,7 +613,7 @@ async function enrichIstorikoRowsForDetails(rows = []) {
 
     const stoixeiaQueries = [];
     rows.forEach((row) => {
-        const parentKey = `${row.symbash || ''}${row.kathgoria_symbashs || ''}${row.eidikothta_symbashs || ''}`;
+        const parentKey = contractParentKey(row.symbash, row.kathgoria_symbashs, row.eidikothta_symbashs);
         if (!parentKey.trim()) return;
 
         for (let i = 1; i <= 15; i += 1) {
@@ -662,8 +663,8 @@ async function enrichIstorikoRowsForDetails(rows = []) {
         const symbash = row.symbash || '';
         const kathgoria = row.kathgoria_symbashs || '';
         const eidikothta = row.eidikothta_symbashs || '';
-        const eidikothtaParentKey = `${symbash}${kathgoria}`;
-        const stoixeioParentKey = `${symbash}${kathgoria}${eidikothta}`;
+        const eidikothtaParentKey = contractParentKey(symbash, kathgoria);
+        const stoixeioParentKey = contractParentKey(symbash, kathgoria, eidikothta);
 
         const stoixeiaSymbaseon = {};
         for (let i = 1; i <= 15; i += 1) {
@@ -726,6 +727,9 @@ async function enrichIstorikoRowsForDetails(rows = []) {
                           }
                       }
                     : {},
+                contractItems: contractItemsForDisplay(row,
+                    (_code, index) => stoixeiaSymbaseon[index]?.perigrafh || '',
+                    value => new Intl.NumberFormat('el-GR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)),
                 stoixeiaSymbaseon,
                 krathseis: krathseisLookup
             }

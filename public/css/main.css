@@ -7451,7 +7451,7 @@ main {
 }
 
 #nav-tree {
-    padding-right: 8px;
+    padding-right: 2px;
 }
 
 #nav-tree li {
@@ -7546,6 +7546,20 @@ main {
 
 #nav-tree .sidebar-submenu-toggle .user-privileges-hierarchy-chevron {
     align-self: center;
+    margin-left: auto !important;
+    margin-right: 0;
+}
+
+#sidebarMenu #nav-tree a.sidebar-submenu-toggle {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 1rem;
+    align-items: center;
+    padding-right: .2rem !important;
+}
+
+#nav-tree ul.submenu {
+    width: auto;
+    padding-right: 0;
 }
 
 #nav-tree li > ul.submenu > li > a.menu-item:not(.sidebar-submenu-toggle) {
@@ -12478,7 +12492,9 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .istoriko-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, max-content);
+    align-items: center;
     justify-content: center;
     gap: 0.22rem;
 }
@@ -16778,7 +16794,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         #gotoProgrammaDypa
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close) {
         --button-color: #795548;
-        --button-light: #f5eeeb;
+        --button-light: #f0e7e2;
         --maintenance-color: var(--button-color);
         --maintenance-light: var(--button-light);
         gap: .35em !important;
@@ -16810,13 +16826,27 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         font-size: .875rem !important;
     }
 
+    .istoriko-actions .istoriko-btn.btn {
+        padding: .3rem .35rem !important;
+        font-size: .875rem !important;
+    }
+
+    /* Keep the four compact actions above the full-width review action. */
+    .istoriko-actions-col [data-action="review"].employee-history-correction-action {
+        font-size: .74rem !important;
+        padding-inline: .35rem !important;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-self: center;
+    }
+
     :is(.btn-primary, .btn-outline-primary, .policy-preview-decision-primary, .employment-review-action-primary, .btn-message-custom):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa
     )) {
-        --button-color: #0b5ed7 !important; --button-light: #e8f0ff !important;
+        --button-color: #0b5ed7 !important; --button-light: #e1ebfc !important;
     }
     :is(.btn-success, .btn-outline-success, .btn-green, .btn-toTop, .btn-refresh-custom, .class-success, .employee-maintenance-button, .save-button, .istoriko-btn-add, .istoriko-footer-btn-save, .policy-preview-decision-success, .employment-review-action-success, #employeeHistoryReconstructionApplyBtn):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
@@ -16824,7 +16854,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa
     )) {
-        --button-color: #146c43 !important; --button-light: #e8f5ee !important;
+        --button-color: #146c43 !important; --button-light: #dfefe6 !important;
     }
     :is(.btn-danger, .btn-outline-danger, .class-error, .class-danger, .user-admin-action-danger, .delete-button, .istoriko-btn-delete, .policy-preview-decision-danger, .employment-review-action-danger):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
@@ -16832,7 +16862,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa
     )) {
-        --button-color: #b02a37 !important; --button-light: #fbe9ec !important;
+        --button-color: #b02a37 !important; --button-light: #f8e1e5 !important;
     }
     :is(.btn-warning, .btn-outline-warning, .btn-orange, .class-warning, .istoriko-btn-edit, .amendment-button, .policy-preview-decision-warning, .employment-review-action-warning):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
@@ -16840,7 +16870,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa
     )) {
-        --button-color: #805800 !important; --button-light: #fff3cd !important;
+        --button-color: #805800 !important; --button-light: #fbecc1 !important;
     }
     :is(.btn-info, .btn-outline-info, .class-info, .policy-preview-decision-info):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
@@ -16848,7 +16878,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa
     )) {
-        --button-color: #08728a !important; --button-light: #e5f5fa !important;
+        --button-color: #08728a !important; --button-light: #dceff5 !important;
     }
     :is(.btn-secondary, .btn-outline-secondary, .btn-light, .btn-outline-light, .btn-dark, .btn-outline-dark, .swal2-cancel, .swal2-deny, .user-admin-action-secondary, .custom-cancel-button-normal, .undo-button, .istoriko-btn-undo, .policy-preview-decision-secondary, .employment-review-action-secondary):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
@@ -16856,7 +16886,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa
     )) {
-        --button-color: #545b62 !important; --button-light: #f0f1f2 !important;
+        --button-color: #545b62 !important; --button-light: #e9ebed !important;
     }
     :is(.btn-brown, .class-normal, .cardFooter01 .submitButton, #employeeHistoryReconstructionPreviewBtn):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
@@ -16864,7 +16894,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa
     )) {
-        --button-color: #795548 !important; --button-light: #f5eeeb !important;
+        --button-color: #795548 !important; --button-light: #f0e7e2 !important;
     }
 
     :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
@@ -16958,4 +16988,35 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 }
 .swal2-popup.employee-save-success .swal2-html-container > p:last-child {
     margin-bottom: 0;
+}
+
+/* Contract items retain their description and both matching amounts together. */
+.history-preview-contract-items { width: 100%; margin-top: .8rem; border-collapse: collapse; font-size: .9rem; }
+.history-preview-contract-items th, .history-preview-contract-items td { padding: .6rem .4rem; border-bottom: 1px solid #dee2e6; overflow-wrap: anywhere; vertical-align: middle; }
+.history-preview-contract-items th { font-weight: 600; }
+.history-preview-contract-items td:nth-child(n+3) { text-align: right; white-space: nowrap; }
+@media (max-width: 575.98px) {
+    .history-preview-contract-items, .history-preview-contract-items tbody, .history-preview-contract-items tr, .history-preview-contract-items td { display: block; width: 100%; }
+    .history-preview-contract-items thead { display: none; }
+    .history-preview-contract-items tr { border: 1px solid #dee2e6; border-radius: .4rem; margin-bottom: .5rem; }
+    .history-preview-contract-items td::before { content: attr(data-label); display: block; font-weight: 600; }
+    .history-preview-contract-items td:empty { display: none; }
+    .history-preview-contract-items td:nth-child(n+3) { text-align: left; }
+}
+
+@media (max-width: 575.98px) {
+    #istorikoDetailsModal .modal-dialog { width: calc(100vw - 1rem); max-width: none; margin: .5rem auto; }
+    .istoriko-main-contract-table, .istoriko-main-contract-table tbody, .istoriko-main-contract-table tr,
+    .istoriko-main-contract-table th, .istoriko-main-contract-table td { display: block; width: 100%; min-width: 0; white-space: normal; }
+    .istoriko-contract-elements-table, .istoriko-contract-elements-table tbody,
+    .istoriko-contract-elements-table tr, .istoriko-contract-elements-table td { display: block; width: 100% !important; }
+    .istoriko-contract-elements-table thead { display: none; }
+    .istoriko-contract-elements-table td::before { content: attr(data-label); display: block; font-weight: 600; color: #4f4a18; }
+    .istoriko-contract-elements-table td:empty { display: none; }
+    .istoriko-contract-elements-table .istoriko-modal-money-col { text-align: left; }
+}
+
+@media (max-width: 575.98px) {
+    .employee-history-preview .history-preview-fields > div { display: block; }
+    .employee-history-preview .history-preview-fields dd { text-align: left; margin-top: .25rem; }
 }
