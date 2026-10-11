@@ -935,7 +935,7 @@ async function startServer() {
         // ============================================================================
         // ✅ START SERVER (changed from app.listen to server.listen)
         // ============================================================================
-        server.listen(port, '0.0.0.0', () => {
+        server.listen(port, process.env.HOST || '0.0.0.0', () => {
             logger.info('\n' + '='.repeat(70));
             logger.info(`🚀 SERVER STARTED SUCCESSFULLY`);
             logger.info('='.repeat(70));

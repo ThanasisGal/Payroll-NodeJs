@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function notice(titleText, text, icon) {
         return Swal.fire({ titleText, text, icon, confirmButtonText: 'Κλείσιμο', allowOutsideClick: false,
-            customClass: { title: 'custom-title', popup: 'custom-swal-popup', htmlContainer: 'custom-html-container',
+            customClass: { title: 'custom-title', popup: 'custom-swal-popup employee-maintenance-swal', htmlContainer: 'custom-html-container',
                 confirmButton: 'class-warning custom-confirm-button custom-swal-button' } });
     }
     checkbox?.addEventListener('change', () => {

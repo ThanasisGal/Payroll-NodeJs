@@ -219,19 +219,16 @@ function sanitizedEmployeeHistoryResolution(value) {
     };
 }
 function profileError(res, error, options = {}) {
-    if (options.employeeSaveActionRequired === true &&
-        error.code === 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE') {
-        const message = 'Η εφαρμογή εντόπισε ότι η ίδια αποθήκευση περιλαμβάνει αποχώρηση μαζί με άλλη αλλαγή στα στοιχεία ή στις ημερομηνίες της εργασιακής σχέσης.\n\n' +
-            'Για να παραμείνει σωστό το Ιστορικό, οι αλλαγές αυτές πρέπει να ελεγχθούν χωριστά.\n\n' +
-            'Δεν αποθηκεύτηκε καμία αλλαγή.\n\n' +
-            'Πατήστε «Έλεγχος Ιστορικού» για να δείτε τι χρειάζεται διόρθωση.';
-        // The concurrent-change guard runs before History is read/planned.
-        // Neither a submitted id nor changed fields prove a unique REVIEW anchor.
-        return res.status(200).json({ success: false, actionRequired: true,
-            reason: error.code, message,
-            nextAction: { type: 'OPEN_EMPLOYEE_HISTORY_REVIEW', targetHistoryId: null } });
+    if (options.employeeSaveActionRequired === true && error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED') {
+        const message = 'Η αποθήκευση σταμάτησε επειδή τα διαθέσιμα στοιχεία του Ιστορικού δεν επιτρέπουν ασφαλή συνέχεια. ' +
+            'Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ελέγξτε τις περιόδους στην καρτέλα Ιστορικού· οι αλλαγές σας παραμένουν στη φόρμα.\n' +
+            '2. Επιβεβαιώστε τις πραγματικές ημερομηνίες και τους όρους πριν συνεχίσετε ή ζητήστε βοήθεια από την τεχνική υποστήριξη.\n' +
+            'Κωδικός αναφοράς: ' + error.code + '.';
+        return res.status(200).json({ success: false, actionRequired: true, reason: error.code, message,
+            nextAction: { type: 'OPEN_EMPLOYEE_HISTORY_TAB' } });
     }
     const messages = {
+        EMPLOYEE_PROFILE_FORM_ECHO_CONFLICT: 'Η αποθήκευση σταμάτησε επειδή μία κενή επιλογή δεν συμφωνεί με την τιμή της φόρμας. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Επιλέξτε ξανά την επιθυμητή τιμή από τη λίστα. 2. Πατήστε «Αποθήκευση». Κωδικός αναφοράς: EMPLOYEE_PROFILE_FORM_ECHO_CONFLICT.',
         EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP: 'Η προσθήκη νέας μεταβολής όρων εργασίας σταμάτησε επειδή η εργασιακή σχέση έχει ήδη κλείσει. Δεν μπορεί να προστεθεί νέα μεταβολή σε αυτή τη σχέση. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ελέγξτε το Ιστορικό του εργαζομένου. 2. Επιλέξτε τη σωστή εργασιακή σχέση ή διορθώστε τα στοιχεία της σχέσης που αφορά η μεταβολή πριν συνεχίσετε. Κωδικός αναφοράς: EMPLOYEE_PROFILE_NEW_VERSION_REQUIRES_OPEN_RELATIONSHIP',
         EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN: 'Η αποθήκευση του Ιστορικού σταμάτησε επειδή ο λογαριασμός σας δεν έχει δικαίωμα διαχείρισής του. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ανοίξτε ξανά τον εργαζόμενο. 2. Ζητήστε έλεγχο των δικαιωμάτων σας από διαχειριστή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN',
         EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN: 'Η αποθήκευση του Ιστορικού σταμάτησε επειδή επιτρέπεται να διορθώνετε μόνο εγγραφές που χρειάζονται διόρθωση Ιστορικού. Η επιλεγμένη εγγραφή δεν είναι πλέον επιλέξιμη ή η εφαρμογή δεν μπόρεσε να επιβεβαιώσει το δικαίωμα διόρθωσής της. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ανανεώστε τη σελίδα ή ανοίξτε ξανά τον εργαζόμενο. 2. Ελέγξτε ποιες εγγραφές επιτρέπουν διόρθωση. 3. Επαναλάβετε μόνο τις αναγκαίες αλλαγές ή ζητήστε έλεγχο από διαχειριστή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN',
@@ -310,17 +307,25 @@ function profileError(res, error, options = {}) {
         CONFLICT_OVERLAP: 'Η αλλαγή ορίων επικαλύπτεται με άλλη περίοδο ιστορικού. Διορθώστε τις ημερομηνίες και δοκιμάστε ξανά.',
         CONFLICT_AMBIGUOUS_TARGET: 'Βρέθηκαν περισσότερες από μία ασυνεπείς εγγραφές ιστορικού και δεν ήταν δυνατό να προσδιοριστεί με ασφάλεια η σωστή περίοδος. Δεν έγινε καμία αλλαγή. Επιλέξτε τη συγκεκριμένη περίοδο από το Ιστορικό.',
         CONFLICT_INCONSISTENT_HISTORY: 'Βρέθηκαν περισσότερες από μία ασυνεπείς εγγραφές ιστορικού και δεν ήταν δυνατό να προσδιοριστεί με ασφάλεια η σωστή περίοδος. Δεν έγινε καμία αλλαγή. Επιλέξτε τη συγκεκριμένη περίοδο από το Ιστορικό.',
+        EMPLOYEE_PROFILE_STALE: 'Τα στοιχεία του εργαζομένου ή του Ιστορικού άλλαξαν από άλλο χρήστη. Η αποθήκευση σταμάτησε για να μη χαθούν νεότερες αλλαγές. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Κρατήστε σημείωση των διορθώσεών σας.\n2. Ανανεώστε τη φόρμα, ελέγξτε τα νέα στοιχεία και δοκιμάστε ξανά.\nΚωδικός αναφοράς: EMPLOYEE_PROFILE_STALE.',
         CONFLICT_STALE: 'Τα δεδομένα άλλαξαν από άλλο χρήστη. Ανανεώστε τη φόρμα και δοκιμάστε ξανά.',
         HIRE_DATE_REQUIRES_CONTROLLED_LIFECYCLE: 'Η αλλαγή ημερομηνίας πρόσληψης απαιτεί ελεγχόμενη ενέργεια κύκλου απασχόλησης και δεν εκτελείται από την απλή συντήρηση.',
         LEGACY_FACTS_REQUIRED: 'Η παλαιά εγγραφή δεν περιέχει αρκετά στοιχεία για ασφαλή διόρθωση. Συμπληρώστε ρητά τα στοιχεία της περιόδου.',
         NEW_VERSION_NOT_FUTURE: 'Η νέα μεταβολή πρέπει να αρχίζει μετά την τελευταία περίοδο του ίδιου κύκλου απασχόλησης.'
     };
-    const message = String(error.code || '').startsWith('EMPLOYEE_HISTORY_CORRECTION_') ||
+    const period = value => {
+        const format = date => C.calendarDate(date)?.toISOString().slice(0,10).split('-').reverse().join('/') || 'χωρίς λήξη';
+        return `${format(value.from)}–${format(value.until)}`;
+    };
+    const overlap = error.code === 'CONFLICT_OVERLAP' && error.overlapPeriods?.conflicting?.length
+        ? `Η νέα περίοδος ${period(error.overlapPeriods.proposed)} επικαλύπτεται με την περίοδο ${period(error.overlapPeriods.conflicting[0])}. ` +
+            `Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ελέγξτε τις ημερομηνίες των δύο περιόδων.\n2. Διορθώστε τα όρια και πατήστε ξανά «Αποθήκευση».\nΚωδικός αναφοράς: CONFLICT_OVERLAP.` : null;
+    const message = overlap || (String(error.code || '').startsWith('EMPLOYEE_HISTORY_CORRECTION_') ||
         error.code === 'EMPLOYEE_HISTORY_SAFE_CORRECTION_REQUIRED'
         ? `${error.publicMessage || 'Η εφαρμογή δεν μπορεί να κάνει τη διόρθωση. Δεν έχει γίνει καμία αλλαγή. 1. Ακυρώστε τη διόρθωση. 2. Ζητήστε έλεγχο από διαχειριστή.'} Κωδικός αναφοράς: ${error.code}`
         : error.code === 'INVALID_EMPLOYMENT_PROFILE'
         ? `Μη έγκυρα στοιχεία εργασίας (${error.field}): ${error.message}`
-        : messages[error.code] || 'Η αποθήκευση εργαζομένου και ιστορικού απέτυχε. Δεν αποθηκεύτηκε η μεταβολή.';
+        : messages[error.code] || 'Η αποθήκευση εργαζομένου και ιστορικού απέτυχε. Δεν αποθηκεύτηκε η μεταβολή.');
     const response = { success: false, reason: error.code || 'EMPLOYEE_PROFILE_SAVE_FAILED',
         field: error.field, operation: error.operation || 'EMPLOYEE_MAINTENANCE',
         message, errorMessage: message };

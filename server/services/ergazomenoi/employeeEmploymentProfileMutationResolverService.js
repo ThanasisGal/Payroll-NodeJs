@@ -351,9 +351,14 @@ function resolveEmployeeHistoryMutation({
         const from = effectiveStart(proposed);
         const until = effectiveEnd(proposed);
         if (!from || (until && until < from)) return conflict('CONFLICT_OVERLAP', 'effectiveFrom');
-        const overlaps = canonicalRows.some(row => String(row._id) !== String(target._id) && effectiveStart(row) &&
+        const overlaps = canonicalRows.filter(row => String(row._id) !== String(target._id) && effectiveStart(row) &&
             (!until || effectiveStart(row) <= until) && (!effectiveEnd(row) || effectiveEnd(row) >= from));
-        if (overlaps) return conflict('CONFLICT_OVERLAP', 'effectiveFrom');
+        if (overlaps.length) {
+            const result = conflict('CONFLICT_OVERLAP', 'effectiveFrom');
+            result.overlapPeriods = { proposed: { from, until },
+                conflicting: overlaps.map(row => ({ from: effectiveStart(row), until: effectiveEnd(row) })) };
+            return result;
+        }
         return plan(STATES.MOVE_EXISTING_BOUNDARY, target, employeePatch, historyRelevantPatch,
             cleanupOptions);
     }

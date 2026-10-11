@@ -26,7 +26,7 @@ const saveFunction = source.slice(saveStart, saveEnd);
 const saveOnceFunction = source.slice(saveEnd, source.indexOf('\n    }', saveEnd) + 6);
 const target = historyId('employee', 1);
 const otherTarget = historyId('employee', 2);
-const reason = 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE';
+const reason = 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED';
 let envelope;
 maintenance.profileError({ status(code) { assert.equal(code, 200); return this; },
     json(body) { envelope = body; } }, { code: reason, statusCode: 409 },
@@ -156,17 +156,6 @@ async function save(page) {
     await page.locator('.swal2-confirm').filter({ hasText: 'Ενημέρωση' }).click();
 }
 
-async function expectGuidance(page) {
-    await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Χρειάζεται έλεγχος του Ιστορικού');
-    assert.equal(await page.locator('.swal2-confirm').textContent(), 'Έλεγχος Ιστορικού');
-    assert.equal(await page.locator('.swal2-cancel').textContent(), 'Παραμονή στη φόρμα');
-    const options = await page.evaluate(() => window.swalCalls.at(-1));
-    assert.equal(options.icon, 'warning');
-    assert.equal(options.allowOutsideClick, false);
-    assert.equal(options.timer, undefined);
-    assert.equal(options.text, envelope.message);
-}
-
 async function expectNoFalseSuccess(page, errors) {
     assert.deepEqual(errors, []);
     const calls = await page.evaluate(() => window.swalCalls.map(call => ({ title: call.title, icon: call.icon })));
@@ -174,66 +163,24 @@ async function expectNoFalseSuccess(page, errors) {
     assert.equal(page.url(), 'https://payroll.test/');
     assert.equal(await page.locator('#email').inputValue(), 'entered@example.test');
 }
-
-for (const exit of ['cancel', 'escape']) test(`real Save ${exit} preserves form and tab, without errors or further requests`, async () => {
-    await withPage({}, async ({ page, requests, errors }) => {
-        await save(page);
-        await expectGuidance(page);
-        if (exit === 'escape') await page.keyboard.press('Escape');
-        else await page.locator('.swal2-cancel').click();
-        await page.waitForFunction(() => window.saveFinished);
-        assert.equal(await page.locator('.menu_Links li.active').textContent(), 'Σταθερά Στοιχεία');
-        assert.equal(requests.length, 1);
-        await expectNoFalseSuccess(page, errors);
-    });
-});
-
-test('even an exact server target opens History only; row correction requires an explicit manual click', async () => {
-    await withPage({ payload: action(target) }, async ({ page, requests, errors }) => {
-        await save(page);
-        await expectGuidance(page);
-        await page.locator('.swal2-confirm').click();
-        await page.waitForFunction(() => window.swalCalls.length === 3);
-        assert.equal(await page.locator('.menu_Links li.active').textContent(), 'Ιστορικό Προσλήψεων/Αλλαγών');
-        assert.equal(await page.locator('.sections section.visible table').getAttribute('id'), 'istorikoTable');
-        assert.equal(requests.length, 1);
-        assert.equal(await page.locator('.swal2-title').textContent(), 'Ελέγξτε το Ιστορικό');
-        await page.locator('.swal2-confirm').click();
-        await page.locator(`tr[data-id="${target}"] [data-action="review"]`).click();
-        await page.waitForFunction(title => Swal.getTitle()?.textContent === title, preview.title);
-        assert.equal(requests.length, 2);
-        assert.deepEqual(requests[1].body, { employeeId: 'synthetic-employee', updates: [],
-            expectedStateToken: 'b'.repeat(64), correction: {
-                intent: 'REVIEW', targetHistoryId: target, facts: {}, confirmation: null } });
-        assert.equal(await page.locator('.swal2-title').textContent(), preview.title);
-        await page.locator('.swal2-cancel').click();
-        assert.equal(requests.length, 2);
-        await expectNoFalseSuccess(page, errors);
-    });
-});
-
 for (const [label, options] of [
-    ['no server target', {}],
-    ['missing exact row', { payload: action(target), missing: true }],
-    ['disabled review', { payload: action(target), disabled: true }],
-    ['unauthorized review', { payload: action(target), accessMode: 'NONE' }],
-    ['duplicate exact rows', { payload: action(target), duplicate: true }]
-]) test(`${label} activates History and gives manual instruction without guessing or requests`, async () => {
+    ['normal manual-only ambiguity', {}], ['forged exact row is ignored', { payload: action(target) }],
+    ['missing row', { missing: true }], ['disabled review', { disabled: true }],
+    ['normal user', { accessMode: 'NONE' }], ['duplicate physical rows', { duplicate: true }]
+]) test(`${label}: switches tab and explains once, without automatic row actions`, async () => {
     await withPage(options, async ({ page, requests, errors }) => {
         await save(page);
-        await expectGuidance(page);
-        await page.locator('.swal2-confirm').click();
-        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Ελέγξτε το Ιστορικό');
-        assert.match(await page.locator('.swal2-html-container').textContent(), /οι αλλαγές σας παραμένουν στη φόρμα/);
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Χρειάζεται έλεγχος του Ιστορικού');
         assert.equal(await page.locator('.menu_Links li.active').textContent(), 'Ιστορικό Προσλήψεων/Αλλαγών');
+        assert.equal(await page.locator('.swal2-confirm').textContent(), 'Κλείσιμο');
+        assert.match(await page.locator('.swal2-html-container').innerText(), /Δεν αποθηκεύτηκε καμία αλλαγή/);
         assert.equal(requests.length, 1);
         await page.locator('.swal2-confirm').click();
         await page.waitForFunction(() => window.saveFinished);
         await expectNoFalseSuccess(page, errors);
     });
 });
-
-test('unexpected HTTP failure still executes both console-error paths and generic failure Swal', async () => {
+test('unexpected HTTP failure still executes the genuine-error catch', async () => {
     await withPage({ payload: { success: false, reason: 'CONFLICT_STALE', message: 'Στοιχεία άλλαξαν.' }, status: 409 },
         async ({ page, requests, errors }) => {
             await save(page);
@@ -241,25 +188,18 @@ test('unexpected HTTP failure still executes both console-error paths and generi
             assert.ok(errors.some(text => text.includes('JSON response indicates failure')));
             assert.ok(errors.some(text => text.includes('Form submission error')));
             assert.equal(requests.length, 1);
-            assert.equal(await page.locator('.menu_Links li.active').textContent(), 'Σταθερά Στοιχεία');
         });
 });
-
-test('only a complete allowlisted HTTP 200 envelope is handled', async () => {
-    const context = vm.createContext({});
-    vm.runInContext(helpers, context);
+test('only a complete allowlisted HTTP 200 manual-tab envelope is handled', async () => {
+    const context = vm.createContext({}); vm.runInContext(helpers, context);
     const valid = action();
     for (const [status, payload] of [
         [409, valid], [500, valid], [200, { ...valid, success: true }],
         [200, { ...valid, actionRequired: 'true' }], [200, { ...valid, reason: 'CONFLICT_STALE' }],
-        [200, { ...valid, message: '' }], [200, { ...valid, nextAction: null }],
-        [200, { ...valid, nextAction: { type: 'REDIRECT', targetHistoryId: null } }],
-        [200, action('"], tr:first-child')],
+        [200, { ...valid, nextAction: null }], [200, { ...valid, nextAction: { type: 'REDIRECT' } }],
         [200, { ...valid, nextAction: { type: 'OPEN_EMPLOYEE_HISTORY_REVIEW' } }]
-    ]) {
-        assert.equal(await context.handleEmployeeSaveHistoryAction({ status, ok: status === 200 }, payload,
-            { swal: { fire() { assert.fail('invalid envelope opened a modal'); } }, documentRef: null }), false);
-    }
+    ]) assert.equal(await context.handleEmployeeSaveHistoryAction({ status, ok: status === 200 }, payload,
+        { swal: { fire() { assert.fail('invalid envelope opened a modal'); } }, documentRef: null }), false);
 });
 
 function initialUserCorrectionResponse() {
@@ -484,9 +424,9 @@ test('Phase 3B: cancel retains original full form; native label and keyboard wor
         const grey = await apply.evaluate(e => getComputedStyle(e).backgroundColor);
         await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
         assert.equal(await apply.isEnabled(), true);
-        await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(25, 135, 84)');
+        await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(232, 245, 238)');
         const green = await apply.evaluate(e => getComputedStyle(e).backgroundColor);
-        assert.notEqual(grey, green); assert.equal(green, 'rgb(25, 135, 84)');
+        assert.notEqual(grey, green); assert.equal(green, 'rgb(232, 245, 238)');
         await page.locator('#employeeHistoryReconstructionApprovalAccepted').focus(); await page.keyboard.press('Space');
         assert.equal(await apply.isDisabled(), true);
         await page.evaluate(() => document.getElementById('save').click());

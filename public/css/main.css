@@ -2938,16 +2938,16 @@ a {
 
 /* Ordinary dialogs with no declared width follow the application's 600px geometry.
    Preview/review classes and dialogs with an explicit width retain their own layout. */
-.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):has(> .swal2-icon.swal2-error),
-.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):has(> .swal2-icon.swal2-warning),
-.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):has(> .swal2-icon.swal2-success) {
+.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):not(.employee-maintenance-swal):has(> .swal2-icon.swal2-error),
+.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):not(.employee-maintenance-swal):has(> .swal2-icon.swal2-warning),
+.swal2-popup:not([style*="width"]):not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.wide-popup):not(.custom-swal-popup-wide):not(.employee-maintenance-swal):has(> .swal2-icon.swal2-success) {
     width: min(600px, 90vw) !important;
     max-width: 90vw !important;
 }
 
-.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):has(> .swal2-icon.swal2-error) .swal2-html-container,
-.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):has(> .swal2-icon.swal2-warning) .swal2-html-container,
-.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):has(> .swal2-icon.swal2-success) .swal2-html-container {
+.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.employee-maintenance-swal):has(> .swal2-icon.swal2-error) .swal2-html-container,
+.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.employee-maintenance-swal):has(> .swal2-icon.swal2-warning) .swal2-html-container,
+.swal2-popup:not([class*="preview"]):not([class*="review"]):not([class*="dashboard"]):not(.employee-maintenance-swal):has(> .swal2-icon.swal2-success) .swal2-html-container {
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: normal !important;
@@ -16722,4 +16722,81 @@ body.loader-active > *:not(.app-loader) {
     .history-preview-changes td { padding: .45rem .65rem; }
     .history-preview-changes td::before { content: attr(data-label); display: block; font-weight: 600; margin-bottom: .15rem; }
     .history-preview-changes td:last-child { border-bottom: 0; }
+}
+
+/* Employee Maintenance actions grow to fit Greek labels at normal font size. */
+.swal2-popup.employee-maintenance-swal {
+    width: min(44rem, calc(100vw - 2rem)) !important;
+    max-width: calc(100vw - 2rem) !important;
+    left: 0 !important;
+    margin: auto !important;
+    padding: 1.5rem !important;
+}
+.swal2-popup.employee-maintenance-swal .swal2-html-container {
+    white-space: pre-line !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    overflow-wrap: anywhere;
+}
+.swal2-popup.employee-maintenance-swal .swal2-title { font-size: 1.3rem !important; }
+.swal2-popup.employee-maintenance-swal .swal2-actions > button { font-size: 1rem !important; }
+.employee-maintenance-swal .swal2-actions,
+.employee-history-preview .modal-footer { display: flex; flex-wrap: wrap; gap: .5rem; }
+.employee-maintenance-swal .swal2-actions > button,
+.employee-history-preview .modal-footer > button,
+#employeeHistoryReconstructionPreviewBtn,
+.employee-history-correction-action,
+.cardFooter01 .submitButton {
+    width: auto !important;
+    min-width: max-content;
+    white-space: nowrap !important;
+    padding: .6rem 1rem;
+}
+.employee-maintenance-swal .swal2-confirm,
+.employee-maintenance-button,
+#employeeHistoryReconstructionApplyBtn {
+    --maintenance-color: #146c43;
+    --maintenance-light: #e8f5ee;
+    background: var(--maintenance-light) !important;
+    border: 1px solid var(--maintenance-color) !important;
+    color: var(--maintenance-color) !important;
+}
+.employee-maintenance-swal .swal2-confirm.class-warning {
+    --maintenance-color: #805800; --maintenance-light: #fff3cd;
+}
+.employee-maintenance-swal .swal2-confirm.class-error {
+    --maintenance-color: #b02a37; --maintenance-light: #fbe9ec;
+}
+.employee-maintenance-swal .swal2-confirm.class-info {
+    --maintenance-color: #08728a; --maintenance-light: #e5f5fa;
+}
+.employee-maintenance-swal .swal2-cancel {
+    --maintenance-color: #545b62; --maintenance-light: #f0f1f2;
+    background: var(--maintenance-light) !important;
+    border: 1px solid var(--maintenance-color) !important;
+    color: var(--maintenance-color) !important;
+}
+#employeeHistoryReconstructionPreviewBtn,
+.employee-history-preview .btn-brown,
+.cardFooter01 .submitButton {
+    --maintenance-color: #795548; --maintenance-light: #f5eeeb;
+    background: var(--maintenance-light) !important;
+    border: 1px solid var(--maintenance-color) !important;
+    color: var(--maintenance-color) !important;
+}
+.employee-maintenance-swal .swal2-actions > button:not(:disabled):hover,
+.employee-maintenance-button:not(:disabled):hover,
+#employeeHistoryReconstructionApplyBtn:not(:disabled):hover,
+#employeeHistoryReconstructionPreviewBtn:not(:disabled):hover,
+.employee-history-preview .btn-brown:hover,
+.cardFooter01 .submitButton:hover {
+    background: var(--maintenance-color) !important;
+    border-color: var(--maintenance-color) !important;
+    color: #fff !important;
+}
+
+#employeeHistoryReconstructionApplyBtn:disabled {
+    background: #e9ecef !important;
+    border-color: #adb5bd !important;
+    color: #6c757d !important;
 }

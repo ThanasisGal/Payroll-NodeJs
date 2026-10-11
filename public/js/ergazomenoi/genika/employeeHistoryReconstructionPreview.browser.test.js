@@ -389,9 +389,9 @@ for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`approval vi
             assert.equal(await checkbox.isChecked(), false);
             assert.equal(await apply.isDisabled(), true);
             assert.equal(await apply.evaluate(e => e.matches('.btn-success:disabled')), true);
-            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(108, 117, 125)');
+            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(233, 236, 239)');
             const s = await style();
-            assert.equal(s.background, 'rgb(108, 117, 125)');
+            assert.equal(s.background, 'rgb(233, 236, 239)');
             assert.equal(s.opacity, '0.65');
             assert.equal(s.cursor, 'not-allowed');
         }
@@ -399,9 +399,9 @@ for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`approval vi
             assert.equal(await checkbox.isChecked(), true);
             assert.equal(await apply.isEnabled(), true);
             assert.equal(await apply.evaluate(e => e.matches('.btn-success:enabled')), true);
-            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(25, 135, 84)');
+            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(232, 245, 238)');
             const s = await style();
-            assert.equal(s.background, 'rgb(25, 135, 84)');
+            assert.equal(s.background, 'rgb(232, 245, 238)');
             assert.equal(s.opacity, '1');
             assert.equal(s.cursor, 'pointer');
         }

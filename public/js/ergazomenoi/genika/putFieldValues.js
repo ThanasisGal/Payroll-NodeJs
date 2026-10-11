@@ -1,3 +1,9 @@
+function employeeMaintenanceSuccessMessage(data) {
+    return data?.historyUpdated === true
+        ? 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου και το Ιστορικό.'
+        : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.';
+}
+
 // public\js\ergazomenoi\genika\putFieldValues.js
 
 async function runTemporaryTerminationXmlAfterEmployeeSave({
@@ -42,6 +48,12 @@ function withCompactOrdinarySwalClasses(options) {
     } };
 }
 
+function withEmployeeMaintenanceButtonStyles(options) {
+    const styled = withCompactOrdinarySwalClasses(options);
+    return { ...styled, customClass: { ...styled?.customClass,
+        popup: `${styled?.customClass?.popup || ''} employee-maintenance-swal`.trim() } };
+}
+
 function createSingleFlight() {
     let inProgress = false;
     return async action => {
@@ -81,51 +93,22 @@ async function continueEmployeeSaveAfterReconstruction({ response, originalPaylo
 
 async function handleEmployeeSaveHistoryAction(response, data, { swal, documentRef }) {
     const action = data?.nextAction;
-    if (response.status === 200 && response.ok && data?.success === false && data.actionRequired === true &&
-        data.reason === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_DEPARTURE_BLOCKED' &&
-        data.operation === 'FIRST_DEPARTURE' && action?.type === 'OPEN_EMPLOYEE_HISTORY_TAB') {
-        const tab = [...documentRef.querySelectorAll('.menu_Links li')].find(
-            link => link.textContent.trim() === 'Ιστορικό Προσλήψεων/Αλλαγών');
-        if (tab && !tab.classList.contains('active')) tab.click();
-        await swal.fire({ icon: 'info', title: 'Χρειάζεται έλεγχος του Ιστορικού', text: data.message,
-            confirmButtonText: 'Κλείσιμο', allowOutsideClick: false, returnFocus: false });
-        return true;
-    }
     if (response.status !== 200 || !response.ok || data?.success !== false ||
-        data?.actionRequired !== true ||
-        data?.reason !== 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE' ||
-        action?.type !== 'OPEN_EMPLOYEE_HISTORY_REVIEW' ||
-        !(action.targetHistoryId === null ||
-            (typeof action.targetHistoryId === 'string' && /^[a-f0-9]{24}$/i.test(action.targetHistoryId))) ||
-        typeof data.message !== 'string' || !data.message.trim()) return false;
-
-    const choice = await swal.fire({
-        icon: 'warning', title: 'Χρειάζεται έλεγχος του Ιστορικού',
-        text: data.message, showCancelButton: true,
-        confirmButtonText: 'Έλεγχος Ιστορικού', cancelButtonText: 'Παραμονή στη φόρμα',
-        allowOutsideClick: false, allowEscapeKey: true, returnFocus: false
-    });
-    if (!choice.isConfirmed) return true;
-
-    const historyTab = [...documentRef.querySelectorAll('.menu_Links li')].find(
+        data?.actionRequired !== true || action?.type !== 'OPEN_EMPLOYEE_HISTORY_TAB' ||
+        !['EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_DEPARTURE_BLOCKED'].includes(data.reason)) return false;
+    const tab = [...documentRef.querySelectorAll('.menu_Links li')].find(
         link => link.textContent.trim() === 'Ιστορικό Προσλήψεων/Αλλαγών');
-    if (historyTab && !historyTab.classList.contains('active')) historyTab.click();
-
-    await swal.fire({
-        icon: 'info', title: 'Ελέγξτε το Ιστορικό',
-        text: 'Η αποχώρηση χρειάζεται έλεγχο πριν συνεχιστεί. Δεν αποθηκεύτηκε καμία αλλαγή.\n' +
-            '1. Ελέγξτε το Ιστορικό· οι αλλαγές σας παραμένουν στη φόρμα.\n' +
-            '2. Επιλέξτε «Έλεγχος & Αυτόματη Τακτοποίηση», αν είναι διαθέσιμο, ή χρησιμοποιήστε «Έλεγχος / Διόρθωση» στην εγγραφή που αφορά τη μεταβολή.\n' +
-            'Κωδικός αναφοράς: ' + data.reason + '.',
-        confirmButtonText: 'Κλείσιμο', allowOutsideClick: false
-    });
+    if (tab && !tab.classList.contains('active')) tab.click();
+    await swal.fire({ icon: 'info', title: 'Χρειάζεται έλεγχος του Ιστορικού', text: data.message,
+        confirmButtonText: 'Κλείσιμο', allowOutsideClick: false, returnFocus: false,
+        customClass: { popup: 'employee-maintenance-swal', confirmButton: 'employee-maintenance-button' } });
     return true;
 }
 
 async function handleEmployeeSaveHistoryStale(response, data, { swal }) {
     if (response.status !== 409 || data?.success !== false ||
-        !['EMPLOYEE_HISTORY_USER_CORRECTION_STALE', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE'].includes(data?.reason)) return false;
-    if (data.reason === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE') {
+        !['EMPLOYEE_PROFILE_STALE', 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE'].includes(data?.reason)) return false;
+    if (['EMPLOYEE_PROFILE_STALE', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE'].includes(data.reason)) {
         await swal.fire({ icon: 'warning', title: 'Τα στοιχεία άλλαξαν', text: data.message,
             confirmButtonText: 'Κλείσιμο', allowOutsideClick: false });
         return true;
@@ -160,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const Swal = new Proxy(window.Swal, {
         get(target, property) {
             if (property === 'fire') return options =>
-                target.fire(withCompactOrdinarySwalClasses(options));
+                target.fire(withEmployeeMaintenanceButtonStyles(options));
             const value = target[property];
             return typeof value === 'function' ? value.bind(target) : value;
         }
@@ -2148,7 +2131,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             icon: 'success',
                             title: 'Επιτυχής καταχώριση!',
                             html: `
-                <p>${data.automaticReconstructionApplied ? 'Η αποθήκευση ολοκληρώθηκε και το Ιστορικό τακτοποιήθηκε.' : 'Ο εργαζόμενος αποθηκεύτηκε!'}</p>
+                <p>${employeeMaintenanceSuccessMessage(data)}</p>
                 ${
                     successfulPdfs.length > 0
                         ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`

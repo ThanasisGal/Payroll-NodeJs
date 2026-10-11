@@ -2,10 +2,8 @@ const { sendReconstructionSaveError, validateApproval } = require('../../service
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithAutomaticReconstruction,
-    writeEmployeeDepartureWithAutomaticReconstruction, writeEmployeeDepartureCancellation, writeEmployeeRehire,
+const { writeEmployeeMaintenance, writeEmployeeEmploymentProfile, writeEmployeeRehire,
     writeEmployeeEmploymentHistoryOperations,
-    writeEmployeeDepartureDateCorrection,
     deleteEmployeeAndEmploymentHistory, selectMaintenanceMode } =
     require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { buildEmployeeMaintenanceIdentity } =
@@ -3833,6 +3831,7 @@ class ergazomenoiController {
         // =========================================================================
         let updatedErgazomenos = null;
         let automaticReconstructionApplied = false;
+        let maintenanceResult = null;
 
         try {
             // Helper για ελληνικά δεκαδικά
@@ -3957,7 +3956,7 @@ class ergazomenoiController {
                 error.statusCode = 409;
                 throw error;
             }
-            if (req.body?.reconstruction && (rehireIntent === true || isDepartureCancellation || isDepartureCorrection)) {
+            if (req.body?.reconstruction && rehireIntent === true) {
                 throw Object.assign(new Error('EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_SAVE_CONFLICT'), {
                     code: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_SAVE_CONFLICT', statusCode: 409 });
             }
@@ -3977,96 +3976,26 @@ class ergazomenoiController {
                         afora_proslhpsh: true
                     }
                 })
-                : isDepartureCancellation
-                    ? await writeEmployeeDepartureCancellation({
-                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
-                            kodikos: kodikosErgazomenoy }, employeeId: ergazomenoiId,
-                        input: profileInput(formData, 'edit'),
-                        maintenance: { employeeChanges: filteredDataErgazomenoi,
-                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
-                            historyChanges: updateFieldsIstoriko,
-                            submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
-                            submittedFormValues: formData },
-                        expectedRevision: formData.historyExpectedRevision || null,
-                        expectedStoredDeparture: storedDeparture
-                    })
-                : isDepartureCorrection
-                    ? await writeEmployeeDepartureDateCorrection({
-                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
-                            kodikos: kodikosErgazomenoy },
-                        employeeId: ergazomenoiId,
-                        requestedDepartureDate: submittedDeparture,
-                        expectedRevision: formData.historyExpectedRevision || null,
-                        expectedStoredDeparture: storedDeparture,
-                        input: profileInput(formData, 'edit'),
-                        maintenance: { employeeChanges: filteredDataErgazomenoi,
-                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(
-                                filteredDataErgazomenoi, formData),
-                            historyChanges: updateFieldsIstoriko,
-                            submittedHistoryChanges: historyEditorChanges(
-                                updateFieldsIstoriko, formData),
-                            submittedFormValues: formData }
-                    })
-                : isFirstDeparture
-                    ? await writeEmployeeDepartureWithAutomaticReconstruction({
-                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
-                            kodikos: kodikosErgazomenoy },
-                        employeeId: ergazomenoiId,
-                        departureDate: submittedDeparture,
-                        reconstruction: req.body?.reconstruction,
-                        actorUserId: req.session?.userId ?? null,
-                        input: profileInput(formData, 'edit'),
-                        effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
-                            formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
-                        maintenance: { employeeChanges: filteredDataErgazomenoi,
-                            rejectConcurrentProfileChanges: true,
-                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
-                            historyChanges: updateFieldsIstoriko,
-                            submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
-                            submittedFormValues: formData,
-                            submittedFormFields: Object.keys(formData),
-                            identity: formData.istorikoId ? undefined : buildEmployeeMaintenanceIdentity(formData),
-                            originalHistoryId: formData.istorikoId || null,
-                            correctableIdentityFields: formData.istorikoId ? ['hmeromhnia_apoxorhshs'] : [] }
-                    })
-                    : await writeEmployeeEmploymentProfileWithAutomaticReconstruction({
-                    scope: {
-                        team: omadaErgasias,
-                        company_kod: kodikosEtaireias,
-                        kodikos: kodikosErgazomenoy
-                    },
-                    input: profileInput(formData, 'edit'),
+                : await writeEmployeeMaintenance({
+                    expectedStoredDeparture: storedDeparture,
+                    scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
+                        kodikos: kodikosErgazomenoy },
                     employeeId: ergazomenoiId,
-                    effectiveFrom:
-                        formData.hmeromhnia_isxyos_oron_ergasias_apo ||
-                        formData.hmeromhnia_allaghs_orarioy_apo ||
-                        formData.hmeromhnia_proslhpshs,
+                    input: profileInput(formData, 'edit'),
                     maintenance: {
                         expectedRevision: formData.historyExpectedRevision || null,
                         employeeChanges: filteredDataErgazomenoi,
-                        submittedEmployeeFields: submittedEmployeeMaintenanceFields(
-                            filteredDataErgazomenoi, formData),
+                        submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
                         historyChanges: updateFieldsIstoriko,
                         submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
                         submittedProfileFields: Object.keys(profileInput(formData, 'edit')),
                         submittedFormValues: formData,
-                        identity: formData.istorikoId
-                            ? undefined
-                            : buildEmployeeMaintenanceIdentity(formData),
-                        originalHistoryId: formData.istorikoId || null,
-                        correctableIdentityFields: formData.istorikoId
-                            ? ['hmeromhnia_apoxorhshs']
-                            : []
+                        submittedFormFields: Object.keys(formData)
                     },
-                    resolutionConfirmation,
                     reconstruction: req.body?.reconstruction,
-                    actorUserId: req.session?.userId ?? null,
-                    repairActor: {
-                        userId: req.session?.userId,
-                        userName: req.session?.userName || req.session?.username,
-                        sessionId: req.sessionID || req.session?.id
-                    }
+                    actorUserId: req.session?.userId ?? null
                 });
+            maintenanceResult = result;
             automaticReconstructionApplied = result.automaticReconstructionApplied === true;
             updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);
 
@@ -4789,7 +4718,13 @@ class ergazomenoiController {
         // =========================================================================
         return res.json({
             success: true,
-            message: automaticReconstructionApplied ? 'Η αποθήκευση ολοκληρώθηκε και το Ιστορικό τακτοποιήθηκε.' : 'Εργαζόμενος ενημερώθηκε επιτυχώς',
+            message: maintenanceResult?.historyUpdated
+                ? 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου και το Ιστορικό.'
+                : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.',
+            employeeUpdated: maintenanceResult?.employeeUpdated === true,
+            historyUpdated: maintenanceResult?.historyUpdated === true,
+            historyChangedRows: maintenanceResult?.historyChangedRows || 0,
+            lifecycleOperation: maintenanceResult?.lifecycleOperation || null,
             automaticReconstructionApplied,
             data: {
                 _id: ergazomenoiId,

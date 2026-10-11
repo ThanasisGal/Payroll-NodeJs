@@ -33,5 +33,5 @@ test('already styled and intentional progress Swal options remain untouched', ()
 
 test('putFieldValues routes its local Swal.fire through the compact normalizer', () => {
     assert.match(source, /const Swal = new Proxy\(window\.Swal/);
-    assert.match(source, /target\.fire\(withCompactOrdinarySwalClasses\(options\)\)/);
+    assert.match(source, /target\.fire\(withEmployeeMaintenanceButtonStyles\(options\)\)/);
 });
