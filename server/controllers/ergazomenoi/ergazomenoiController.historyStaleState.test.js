@@ -55,8 +55,8 @@ test('actual edit handler renders a token from full persisted History before enr
     const query = value => ({ mongooseOptions(value) { options.push(value); return value; },
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
-    const context = { Date, console: { error() {} }, ...S, ...M, semanticHistoryRows,
-        CompaniesModel: { findById: () => query({}) }, ErgazomenoiModel: { findById: () => query(initial.employee) },
+    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...S, ...M, semanticHistoryRows,
+        CompaniesModel: { findById: () => query({}) }, ErgazomenoiModel: { findOne: () => query(initial.employee) },
         IstorikoProslhpseonAllagonModel: { find: () => query(initial.history) },
         PerifereiesModel: { find: () => query([]) }, GenikesParametroiModel: { find: () => query([]) },
         ProdhlomenaOrariaModel: { find: () => query([]) }, mongoose: { trusted: value => value },

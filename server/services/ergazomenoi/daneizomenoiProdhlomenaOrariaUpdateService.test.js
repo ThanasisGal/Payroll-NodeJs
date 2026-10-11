@@ -127,7 +127,7 @@ test('candidate query excludes every non-explicit flag/team/company/branch varia
     const h = harness({ companies: [{ _id: sourceCompanyId, afm: validAfm }] });
     h.models.employeeModel.find = (filter) => {
         h.calls.employeeFind.push(filter);
-        return query(all.filter((row) => Object.entries(filter).every(([key, value]) => row[key] === value)));
+        return query(all.filter((row) => Object.entries(filter).every(([key, value]) => (value && value.$ne !== undefined ? row[key] !== value.$ne : row[key] === value))));
     };
     const result = await updateBorrowedEmployeeDeclaredSchedules({ scope, models: h.models });
     assert.equal(result.targetEmployeesFound, 1);

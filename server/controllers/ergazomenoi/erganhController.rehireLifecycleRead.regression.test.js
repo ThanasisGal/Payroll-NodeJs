@@ -28,7 +28,7 @@ const loader = section(
     '\nasync function '
 );
 
-assert.match(loader, /ErgazomenoiModel\.find\(employeeFilter\)/);
+assert.match(loader, /ErgazomenoiModel\.find\(finalizedEmployeeFilter\(employeeFilter\)\)/);
 assert.match(loader, /preloadEmployeeEmploymentCycleContexts\(\{/);
 assert.match(loader, /company_kod: companyId/);
 assert.match(loader, /historyModel: IstorikoProslhpseonAllagonModel/);

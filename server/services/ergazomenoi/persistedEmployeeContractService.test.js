@@ -24,7 +24,7 @@ test('automatic Employee Maintenance contract uses the persisted post-save emplo
     const result = await generatePersistedEmployeeContract({
         employeeModel: {
             async findOne(receivedScope) {
-                assert.deepEqual(receivedScope, scope);
+                assert.deepEqual(receivedScope, require('../../utils/ergazomenoi/finalizedEmployeeFilter').finalizedEmployeeFilter(scope));
                 return persistedPostSaveEmployee;
             }
         },
