@@ -146,11 +146,16 @@
                 </div>
             </div>
 
-            <% if (currentRelationshipOpen) { %>
+            <% if (recordData.oristikh_enhmerosh === false || currentRelationshipOpen) { %>
                 <div class="row margin-left--1rem margin-right--1rem mb-2">
-                    <div class="col-12 text-muted small">
-                        Η ημερομηνία πρόσληψης δεν αλλάζει όσο η τρέχουσα εργασιακή σχέση είναι ανοικτή.
-                        Καταχωρήστε πρώτα την Αποχώρηση και στη συνέχεια χρησιμοποιήστε την Επαναπρόσληψη.
+                    <div class="col-12 text-muted small" data-employee-hire-help>
+                        <% if (recordData.oristikh_enhmerosh === false) { %>
+                            Μπορείτε να διορθώσετε την ημερομηνία πρόσληψης όσο ο εργαζόμενος είναι προσωρινά αποθηκευμένος.
+                            Η ημερομηνία κλειδώνει με την Οριστική Αποθήκευση.
+                        <% } else { %>
+                            Η ημερομηνία πρόσληψης δεν αλλάζει όσο η τρέχουσα εργασιακή σχέση είναι ανοικτή.
+                            Καταχωρήστε πρώτα την Αποχώρηση και στη συνέχεια χρησιμοποιήστε την Επαναπρόσληψη.
+                        <% } %>
                     </div>
                 </div>
             <% } %>

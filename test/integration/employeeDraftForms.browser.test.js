@@ -59,6 +59,7 @@ test('real Add and Maintenance forms on loopback, with disposable MongoDB', {ski
     const denied=await context.request.post(origin+'/test/operational',{data:{employeeId:d.data._id}});
     assert.equal(denied.status(),409);assert.equal((await denied.json()).reason,'EMPLOYEE_SAVE_DRAFT_REQUIRED');
     assert.equal(await page.locator('#hmeromhnia_proslhpshs').evaluate(e=>e.readOnly),false);
+    assert.match(await page.locator('[data-employee-hire-help]').innerText(),/προσωρινά αποθηκευμένος/);
     await page.locator('#hmeromhnia_proslhpshs').fill('2026-10-04');
     await page.locator('#hmeromhnia_proslhpshs').press('Tab');
     await page.waitForFunction(()=>document.querySelector('[name="hmeromhnia_isxyos_oron_ergasias_apo"]').value==='2026-10-04');
@@ -98,7 +99,10 @@ test('real Add and Maintenance forms on loopback, with disposable MongoDB', {ski
     await page.goto(origin+d.redirectUrl);
     assert.equal(await page.locator('[data-save-mode="temporary"]').count(),0);
     assert.equal(await page.locator('#hmeromhnia_proslhpshs').evaluate(e=>e.readOnly),true);
-    await page.locator('[data-bs-target="#panelsStayOpen-collapseTwo"]').click();
+    assert.doesNotMatch(await page.locator('[data-employee-hire-help]').innerText(),/προσωρινά αποθηκευμένος/);
+    if (!await page.locator('#hmeromhnia_proslhpshs').isVisible()) {
+        await page.locator('[data-bs-target="#panelsStayOpen-collapseTwo"]').click();
+    }
     await page.locator('#hmeromhnia_proslhpshs').scrollIntoViewIfNeeded();
     await capture('draft-finalized-desktop');assert.deepEqual(errors,[]);
 });
