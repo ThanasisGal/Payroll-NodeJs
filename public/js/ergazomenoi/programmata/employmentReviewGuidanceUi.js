@@ -25,7 +25,16 @@
             const details = (stage.diagnostics || []).filter(item => item.code === code);
             const specificDates = details.flatMap(item => item.dates || []);
             const pendingDates = details.length ? [] : stage.pending_dates || [];
-            return { code, ...guidance.describe(code), dates: [...new Set(
+            // A stale stored attestation is not a failed concurrent write.
+            const description = stage.business_status === 'STALE' && code === 'STAGE1_INPUT_CHANGED'
+                ? { ...guidance.describe(code),
+                    message: 'Η προηγούμενη επιβεβαίωση δεν αντιστοιχεί στα διαθέσιμα στοιχεία της εβδομάδας.',
+                    why: 'Η αποθηκευμένη επιβεβαίωση χρειάζεται έλεγχο πριν επιτραπεί η συνέχιση.',
+                    steps: ['Ελέγξτε τη διάγνωση της εβδομάδας και τις αναφερόμενες ημέρες.',
+                        'Χρησιμοποιήστε μόνο την επιτρεπόμενη ενέργεια του ενεργού σταδίου. Αν η περίοδος είναι οριστικοποιημένη, ζητήστε έλεγχο από τον αρμόδιο υπεύθυνο.'],
+                    next: 'Έλεγχος της προηγούμενης επιβεβαίωσης με διατήρηση των εγκεκριμένων αποφάσεων.' }
+                : guidance.describe(code);
+            return { code, ...description, dates: [...new Set(
                 [...specificDates, ...pendingDates].map(guidance.dateKey).filter(Boolean))].sort(),
             evidence: details.map(item => ({ dates: item.dates || [], facts: item.evidence || {} })),
             reference: guidance.reference(code) };

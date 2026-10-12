@@ -143,7 +143,11 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     await touchPage.waitForFunction(() => typeof loadResults === 'function');
     await refresh(touchPage);
     await touchPage.locator('[data-guidance-stage="STAGE1"] [data-guidance-move="first"]').tap();
+    // Navigation may still be awaiting the read-only weekly payload after tap.
+    // Dismiss the explanation only after that navigation has actually finished.
+    await touchPage.locator('#employmentReviewGuidancePopover').waitFor({ state: 'visible' });
     await touchPage.keyboard.press('Escape');
+    await touchPage.locator('#employmentReviewGuidancePopover').waitFor({ state: 'hidden' });
     const touchButton = touchPage.locator('.weekly-hr-stage1-card [data-guidance-date="2026-09-01"] [data-review-guidance-open]');
     await touchButton.tap();
     await touchPage.locator('#employmentReviewGuidancePopover').waitFor({ state: 'visible' });

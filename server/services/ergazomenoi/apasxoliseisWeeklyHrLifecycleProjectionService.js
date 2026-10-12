@@ -342,16 +342,17 @@ function buildWeeklyHrLifecycleProjection({
             // period's deferred slice. Missing audit evidence still fails closed.
             ...(persistedStage2DecisionState || stage3DecisionInThisPeriod
                 ? ['EXISTING_WEEKLY_DECISION_REQUIRES_FULL_WEEK_VALIDATION'] : [])]);
-        const stale = persistedStatus === BUSINESS_STATUS.STALE;
-        const hasBlocker = stale || blockers.length > 0;
+        // A new read evaluates today's evidence. An obsolete attestation remains
+        // metadata, not a concurrent-write conflict or a new business blocker.
+        const hasBlocker = blockers.length > 0;
         const stages = Object.fromEntries(['stage1', 'stage2', 'stage3', 'stage4'].map((key, index) => {
             const activeBlocker = (index === 0 || index === 3) && hasBlocker;
             const stage2Diagnostics = index === 1 && stage2StateDiagnostic
                 ? [stage2StateDiagnostic] : [];
             return [key, stageResult(`STAGE${index + 1}`, {
-                business_status: activeBlocker ? (stale ? BUSINESS_STATUS.STALE : BUSINESS_STATUS.BLOCKED)
+                business_status: activeBlocker ? BUSINESS_STATUS.BLOCKED
                     : DEFERRED_WEEK_STATUS,
-                presentation_status: activeBlocker ? (stale ? 'STALE' : 'BLOCKED') : DEFERRED_WEEK_STATUS,
+                presentation_status: activeBlocker ? 'BLOCKED' : DEFERRED_WEEK_STATUS,
                 enabled: activeBlocker && index === 0, open_by_default: activeBlocker && index === 0,
                 pending_count: activeBlocker ? Math.max(1, blockers.length) : 0,
                 pending_reasons: activeBlocker ? blockers : stage2Diagnostics,
@@ -427,12 +428,12 @@ function buildWeeklyHrLifecycleProjection({
     const stage1PendingDates = possibleLeaveDates(rows)
         .filter((date) => !actionableDateSet || actionableDateSet.has(date));
     const stage1Blockers = unique(stage1Workflow.blocking_reasons || []);
-    const stage1BusinessStatus = persistedStatus === BUSINESS_STATUS.STALE
-        ? BUSINESS_STATUS.STALE
-        : persistedStatus === BUSINESS_STATUS.COMPLETED
-            ? BUSINESS_STATUS.COMPLETED
-            : stage1Blockers.length
-                ? BUSINESS_STATUS.BLOCKED
+    // Preserve the stored attestation and its fingerprint for write fences,
+    // while deriving actionable status from freshly loaded daily evidence.
+    const stage1BusinessStatus = persistedStatus === BUSINESS_STATUS.COMPLETED
+        ? BUSINESS_STATUS.COMPLETED
+        : stage1Blockers.length
+            ? BUSINESS_STATUS.BLOCKED
             : stage1PendingDates.length
                 ? BUSINESS_STATUS.OPEN
                 : BUSINESS_STATUS.COMPLETED;
@@ -809,7 +810,18 @@ function buildWeeklyHrLifecycleProjection({
 }
 
 function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
-    if (projection.deferred_week?.status === DEFERRED_WEEK_STATUS) return projection;
+    if (projection.deferred_week?.status === DEFERRED_WEEK_STATUS) {
+        // Frozen, reduced evidence cannot revalidate an old attestation. Keep
+        // the existing fail-closed presentation for finalized deferred slices.
+        if (projection.persisted_stage1_status !== BUSINESS_STATUS.STALE) return projection;
+        const stages = { ...projection.stages };
+        for (const key of ['stage1', 'stage4']) stages[key] = Object.freeze({ ...stages[key],
+            business_status: BUSINESS_STATUS.STALE, presentation_status: PRESENTATION_STATUS.STALE,
+            pending_count: Math.max(1, stages[key].pending_count || 0),
+            enabled: key === 'stage1', open_by_default: key === 'stage1' });
+        return Object.freeze({ ...projection, current_stage: 'STAGE1', requires_hr_action: true,
+            total_pending_count: Math.max(1, projection.total_pending_count || 0), stages: Object.freeze(stages) });
+    }
     const completedStages = Object.fromEntries(
         ['stage1', 'stage2', 'stage3', 'stage4'].map((key, index) => {
             const stage = projection?.stages?.[key] || {};

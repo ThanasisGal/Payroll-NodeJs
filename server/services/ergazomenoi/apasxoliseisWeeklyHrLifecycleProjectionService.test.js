@@ -334,11 +334,12 @@ assert.equal(resolvedLastProjection.stages.stage3.pending_count, 0);
 assert.notEqual(resolvedLastProjection.stages.stage4.presentation_status, 'LOCKED');
 
 // A changed weekly input invalidates the completion. The candidate is not
-// treated as reviewed; Stage 1 is STALE and sequentially locks Stage 3.
+// treated as reviewed; fresh Stage 1 is OPEN and sequentially locks Stage 3.
 const stale0014 = buildWeeklyHrLifecycleProjection({ weekRows: employee0014,
     effectiveProfile: profile, persistedStage1State: { status: 'COMPLETED',
         completion_fingerprint: 'a'.repeat(64) } });
-assert.equal(stale0014.stages.stage1.business_status, 'STALE');
+assert.equal(stale0014.stages.stage1.persisted_status, 'STALE');
+assert.equal(stale0014.stages.stage1.business_status, 'OPEN');
 assert.deepEqual(stale0014.stages.stage3.pending_dates, ['2026-06-17']);
 assert.deepEqual(stale0014.stages.stage3.resolved_before_stage3_dates, []);
 assert.equal(stale0014.stages.stage3.business_status, 'OPEN');
@@ -458,7 +459,8 @@ const genuinelyStaleConflict = buildWeeklyHrLifecycleProjection({
     persistedStage1State: { status: 'COMPLETED', version: 2,
         completion_fingerprint: 'a'.repeat(64), effective_fingerprint: 'b'.repeat(64) }
 });
-assert.equal(genuinelyStaleConflict.stages.stage1.business_status, 'STALE');
+assert.equal(genuinelyStaleConflict.stages.stage1.persisted_status, 'STALE');
+assert.equal(genuinelyStaleConflict.stages.stage1.business_status, 'BLOCKED');
 assert.equal(genuinelyStaleConflict.stages.stage2.presentation_status, 'LOCKED');
 assert.deepEqual(buildStage1NoClassificationPreviewItems({
     rows: deterministicFullRepo, possibleDates: ['2026-06-22'], effectiveProfile: profile,
@@ -487,9 +489,10 @@ assert.equal(reachedStage3.stage3.pending_count, 1);
 const stale = buildWeeklyHrLifecycleProjection({ weekRows: week('stale'),
     effectiveProfile: profile,
     persistedStage1State: { status: 'COMPLETED', completion_fingerprint: 'a'.repeat(64) } });
-assert.equal(stale.stages.stage1.business_status, 'STALE');
-assert.equal(stale.stages.stage1.presentation_status, 'STALE');
-assert.equal(stale.stages.stage2.presentation_status, 'LOCKED');
+assert.equal(stale.stages.stage1.persisted_status, 'STALE');
+assert.equal(stale.stages.stage1.business_status, 'COMPLETED');
+assert.equal(stale.stages.stage1.presentation_status, 'COMPLETED');
+assert.equal(stale.stages.stage2.presentation_status, 'COMPLETED');
 
 const stage2Rows = week('stage2');
 Object.assign(stage2Rows[1], { kathgoria_ergasias: 'ΑΝ', repo: true, ores_ergasias: 0,
@@ -730,7 +733,8 @@ const liveJuneAfterJulyChange = buildWeeklyHrLifecycleProjection({
     periodScope: { period_start: '2026-06-01', period_end: '2026-06-30' },
     persistedStage1State: junePersistedSlice
 });
-assert.equal(liveJuneAfterJulyChange.stages.stage1.business_status, 'STALE');
+assert.equal(liveJuneAfterJulyChange.stages.stage1.persisted_status, 'STALE');
+assert.equal(liveJuneAfterJulyChange.stages.stage1.business_status, 'DEFERRED_TO_NEXT_PERIOD');
 const originalFinalizationRows = structuredClone(crossMonth);
 Object.assign(originalFinalizationRows[0], {
     kathestos_apasxolhshs_hmeras: 'PLHRHS',
@@ -772,7 +776,8 @@ const reducedFrozenLifecycle = buildWeeklyHrLifecycleProjection({
         completion_fingerprint: originalFingerprints.completion_fingerprint,
         effective_fingerprint: originalFingerprints.completion_fingerprint }] }
 });
-assert.equal(reducedFrozenLifecycle.stages.stage1.business_status, 'STALE');
+assert.equal(reducedFrozenLifecycle.stages.stage1.persisted_status, 'STALE');
+assert.equal(reducedFrozenLifecycle.stages.stage1.business_status, 'DEFERRED_TO_NEXT_PERIOD');
 const finalizedJune = buildFinalizedWeeklyHrLifecyclePresentation(reducedFrozenLifecycle);
 // Finalization must not silently complete a deferred obligation or hide stale state.
 assert.equal(finalizedJune.deferred_action_required, true);

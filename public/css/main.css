@@ -15441,7 +15441,41 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage1-matrix-day-cell {
     overflow: hidden;
-    vertical-align: top;
+    position: relative;
+    vertical-align: middle;
+    text-align: center;
+}
+
+.weekly-hr-stage1-day-tile > .review-guidance-info {
+    position: absolute;
+    top: .1rem;
+    right: .1rem;
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    font-size: .8rem;
+    line-height: 1;
+}
+
+.weekly-hr-stage1-matrix-day-cell.review-guidance-highlight,
+.weekly-hr-stage1-matrix-day-cell[data-review-guidance-key]:focus-visible {
+    outline: none;
+}
+
+.weekly-hr-stage1-matrix-day-cell.review-guidance-highlight .weekly-hr-stage1-day-tile,
+.weekly-hr-stage1-matrix-day-cell[data-review-guidance-key]:focus-visible .weekly-hr-stage1-day-tile {
+    border-color: var(--bs-primary, #0d6efd);
+    border-width: 2px;
+}
+
+/* A cell has one visual frame; Bootstrap's cell overlay is not a second state. */
+.table > tbody > tr > td.weekly-hr-stage1-matrix-day-cell {
+    box-shadow: none;
+}
+
+@media (max-width: 767.98px) {
+    .weekly-hr-stage1-table-shell { overflow-x: auto; }
+    .weekly-hr-stage1-table-shell > .weekly-hr-stage1-table { min-width: 68rem; }
 }
 
 .table > tbody > tr > td.employment-review-outside-employment {
@@ -15452,7 +15486,10 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage1-day-tile {
     position: relative;
-    min-height: 3.35rem;
+    box-sizing: border-box;
+    width: 100%;
+    height: 4.5rem;
+    container-type: inline-size;
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: 0.3rem;
     background: var(--bs-body-bg, #fff);
@@ -15466,7 +15503,11 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage1-day-tile.has-draft {
     border-color: #8eb6e8;
     background: #eef6ff;
-    box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.06);
+}
+
+.weekly-hr-stage1-day-tile:has(.weekly-hr-stage1-day-select:checked) {
+    border-color: var(--bs-primary, #0d6efd);
+    background: var(--bs-primary-bg-subtle, #cfe2ff);
 }
 
 .weekly-hr-stage1-day-tile .weekly-hr-stage1-day-select {
@@ -15479,7 +15520,7 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage1-draft-marker {
     position: absolute;
-    top: 0.12rem;
+    bottom: 0.12rem;
     right: 0.22rem;
     z-index: 2;
     color: var(--bs-primary, #0d6efd);
@@ -15495,8 +15536,13 @@ body.loader-active > *:not(.app-loader) {
     justify-content: center;
     gap: 0.05rem;
     width: 100%;
-    min-height: 3.25rem;
-    padding: 0.15rem;
+    box-sizing: border-box;
+    height: 100%;
+    min-width: 0;
+    padding: 0.2rem;
+    border-radius: inherit;
+    font-size: .78rem;
+    box-shadow: none;
     border: 0;
     color: inherit;
     background: transparent;
@@ -15514,19 +15560,34 @@ body.loader-active > *:not(.app-loader) {
     display: block;
     max-width: 100%;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: clamp(.6rem, 12cqi, .78rem);
+}
+
+.weekly-hr-stage1-day-tile:focus-within,
+.weekly-hr-stage1-day-tile:hover {
+    border-color: var(--bs-primary, #0d6efd);
 }
 
 .weekly-hr-stage1-open-editor:hover,
 .weekly-hr-stage1-open-editor:focus {
-    outline: 2px solid var(--bs-primary, #0d6efd);
-    outline-offset: -2px;
+    outline: none;
 }
 
+.weekly-hr-stage1-day-tile:has(:focus-visible) {
+    border-color: var(--bs-primary, #0d6efd);
+    border-width: 2px;
+}
+
+.weekly-hr-stage1-open-editor small,
 .weekly-hr-stage1-readonly-tile small {
     color: var(--bs-secondary-color, #6c757d);
     font-size: 0.68rem;
+}
+
+#employmentReviewWorkspace .weekly-hr-stage1-matrix-day-cell small {
+    font-size: clamp(.6rem, 11cqi, .68rem) !important;
+    line-height: 1.15;
 }
 
 .weekly-hr-stage1-day-date {
@@ -16876,7 +16937,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
     .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
     .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-    #gotoProgrammaDypa, .review-guidance-info
+    #gotoProgrammaDypa, .review-guidance-info,
+    .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
 )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop) {
     display: inline-flex;
 }
@@ -16886,7 +16948,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         align-items: center !important;
         justify-content: center !important;
@@ -16900,7 +16963,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close) {
         --button-color: #795548;
         --button-light: #f0e7e2;
@@ -16928,7 +16992,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         min-height: 2rem !important;
         padding: .3rem .55rem !important;
@@ -16953,7 +17018,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         --button-color: #0b5ed7 !important; --button-light: #e1ebfc !important;
     }
@@ -16961,7 +17027,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         --button-color: #146c43 !important; --button-light: #dfefe6 !important;
     }
@@ -16969,7 +17036,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         --button-color: #b02a37 !important; --button-light: #f8e1e5 !important;
     }
@@ -16977,7 +17045,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         --button-color: #805800 !important; --button-light: #fbecc1 !important;
     }
@@ -16985,7 +17054,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         --button-color: #08728a !important; --button-light: #dceff5 !important;
     }
@@ -16993,7 +17063,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         --button-color: #545b62 !important; --button-light: #e9ebed !important;
     }
@@ -17001,7 +17072,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) {
         --button-color: #795548 !important; --button-light: #f0e7e2 !important;
     }
@@ -17010,7 +17082,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close):is(:hover, :active, .active):not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: var(--button-color) !important;
         border-color: var(--button-color) !important;
@@ -17020,7 +17093,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )):focus-visible {
         outline: 2px solid var(--button-color, #795548) !important;
         outline-offset: 3px !important;
@@ -17030,7 +17104,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )):active:not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         box-shadow: inset 0 2px 4px #0003 !important;
     }
@@ -17038,7 +17113,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )):is(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: #e9ecef !important;
         border-color: #adb5bd !important;
@@ -17051,7 +17127,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) :is(i, svg, .bi) {
         color: inherit !important;
         line-height: 1 !important;
@@ -17063,9 +17140,23 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa, .review-guidance-info
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
     )) .bi::before {
         vertical-align: 0 !important;
+    }
+}
+
+/* Matrix status actions keep the shared button appearance, but their text must
+   fit the status column instead of painting behind neighbouring day frames. */
+@layer application-buttons {
+    .weekly-hr-stage1-table .weekly-hr-stage1-status :is(button, .btn):not(.review-guidance-info) {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        padding-inline: .35rem !important;
+        font-size: .875rem !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
     }
 }
 

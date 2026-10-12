@@ -212,11 +212,10 @@ assert.equal(attentionElement.classList.contains('d-none'), true);
 assert.equal(attentionElement['aria-hidden'], 'true');
 
 guideSandbox.renderGuide(staleLifecycle);
-assert.match(attentionElement.innerHTML, /Τα στοιχεία άλλαξαν/);
-assert.match(attentionElement.innerHTML,
-    /Τα στοιχεία της εβδομάδας άλλαξαν από την τελευταία αναζήτηση/);
-assert.match(attentionElement.innerHTML,
-    /Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα/);
+assert.match(attentionElement.innerHTML, /Η προηγούμενη επιβεβαίωση χρειάζεται έλεγχο/);
+assert.match(attentionElement.innerHTML, /Ανοίξτε τη διάγνωση της εβδομάδας/);
+assert.match(attentionElement.innerHTML, /Δεν αποθηκεύτηκε αλλαγή από την προβολή/);
+assert.doesNotMatch(attentionElement.innerHTML, /τελευταία αναζήτηση|Κάντε νέα Αναζήτηση/);
 assert.doesNotMatch(attentionElement.innerHTML, /STALE|Παρωχημέν|ΜΗ ΕΓΚΥΡΟ/);
 
 const deferredLifecycle = { current_stage: null, stages: Object.fromEntries(

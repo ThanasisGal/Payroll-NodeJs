@@ -96,8 +96,10 @@ for (const changed of [current.slice(1), [current[0], current[0]],
 }
 const stale = buildWeeklyHrLifecycleProjection({ ...input, persistedStage1State: {
     status: 'COMPLETED', completion_fingerprint: buildStage1Fingerprint(rows).fingerprint } });
-assert.equal(stale.stages.stage1.business_status, 'STALE');
-assert.equal(stale.requires_hr_action, true);
+assert.equal(stale.stages.stage1.persisted_status, 'STALE');
+assert.equal(stale.stages.stage1.business_status, DEFERRED_WEEK_STATUS);
+assert.equal(stale.requires_hr_action, false);
+assert.equal(buildFinalizedWeeklyHrLifecyclePresentation(stale).stages.stage1.business_status, 'STALE');
 assert.equal(buildWeeklyHrLifecycleProjection({ ...input, effectiveProfile: {
     ...profile, resolution_blocked: true, resolution_reason: 'PROFILE_CONFLICT' } }).requires_hr_action, true);
 const deferredStage2Diagnostic = buildWeeklyHrLifecycleProjection({ ...input,

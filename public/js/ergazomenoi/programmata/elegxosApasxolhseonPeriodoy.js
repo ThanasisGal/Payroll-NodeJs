@@ -9306,7 +9306,7 @@ function weeklyHrOrphanRows(payload = {}) {
         row?.orphan_card_resolution?.status !== 'HR_APPROVED');
 }
 
-function renderWeeklyHrOrphanItem(row = {}) {
+function renderWeeklyHrOrphanItem(row = {}, { compact = false } = {}) {
     const preview = row.orphan_card_resolution_preview || {};
     const proposal = preview.proposal || {};
     const startOnly = preview.orphanType === 'START_ONLY';
@@ -9321,7 +9321,7 @@ function renderWeeklyHrOrphanItem(row = {}) {
         ${proposal.effectiveDailyAverageHours ? `<div><strong>Μ.Ο.:</strong> ${escapeHtml(Number(proposal.effectiveDailyAverageHours).toFixed(2))} ώρες</div>` : ''}
         ${proposal.breakMinutes !== undefined ? `<div><strong>Διάλειμμα:</strong> ${escapeHtml(proposal.breakMinutes)} λεπτά · ${proposal.breakInsideSchedule ? 'εντός' : 'εκτός'} ωραρίου</div>` : ''}
         <div><strong>Προτεινόμενο διάστημα:</strong> ${escapeHtml(proposal.start || '-')}–${escapeHtml(proposal.end || '-')}</div>
-        <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-orphan mt-1" data-row-id="${escapeHtml(row._id)}">Επίλυση ορφανού χτυπήματος</button>
+        <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-orphan mt-1" data-row-id="${escapeHtml(row._id)}" aria-label="Επίλυση ορφανού χτυπήματος">${compact ? 'Επίλυση' : 'Επίλυση ορφανού χτυπήματος'}</button>
     </div>`;
 }
 
@@ -9332,13 +9332,13 @@ function weeklyHrZeroLengthRows(payload = {}) {
         row?.zero_length_card_resolution?.status !== 'HR_APPROVED');
 }
 
-function renderWeeklyHrZeroLengthItem(row = {}) {
+function renderWeeklyHrZeroLengthItem(row = {}, { compact = false } = {}) {
     const evidence = zeroLengthCardPairs(row).map((item) =>
         `${item.rawTime}–${item.rawTime}`).join(', ');
     return `<div class="border rounded p-2 small weekly-hr-zero-length-item" data-row-id="${escapeHtml(row._id)}">
         <div><strong>${escapeHtml(formatStage1DateKey(row.hmeromhnia))}</strong> · Μηδενικό διάστημα: ${escapeHtml(evidence)}</div>
         <div>Τα αρχικά χτυπήματα θα διατηρηθούν.</div>
-        <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-zero-length mt-1" data-row-id="${escapeHtml(row._id)}">Επίλυση πραγματικής απασχόλησης</button>
+        <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-zero-length mt-1" data-row-id="${escapeHtml(row._id)}" aria-label="Επίλυση πραγματικής απασχόλησης">${compact ? 'Επίλυση' : 'Επίλυση πραγματικής απασχόλησης'}</button>
     </div>`;
 }
 
@@ -9350,7 +9350,7 @@ function weeklyHrSuspiciousShortRows(payload = {}) {
         row?.hr_daily_actual_work_resolution?.status !== 'HR_APPROVED');
 }
 
-function renderWeeklyHrSuspiciousShortItem(row = {}) {
+function renderWeeklyHrSuspiciousShortItem(row = {}, { compact = false } = {}) {
     const diagnostic = row.suspicious_short_card_interval || {};
     const rule = diagnostic.matchedRule === 'VERY_SHORT'
         ? `Πολύ μικρό διάστημα έως ${diagnostic.thresholds?.veryShortMinutes ?? '-'} λεπτά`
@@ -9361,7 +9361,7 @@ function renderWeeklyHrSuspiciousShortItem(row = {}) {
         <div><strong>Αρχικά χτυπήματα κάρτας:</strong> ${escapeHtml(formatPolicyPreviewIntervals(row, 'cards_apo_ora', 'cards_eos_ora'))}</div>
         <div><strong>Συνολικός χρόνος κάρτας:</strong> ${escapeHtml(diagnostic.verifiedMinutes ?? 0)} λεπτά</div>
         <div><strong>Κανόνας εταιρείας:</strong> ${escapeHtml(rule)}</div>
-        <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-daily-resolution mt-1" data-row-id="${escapeHtml(row._id)}">Έλεγχος πραγματικής ημέρας</button>
+        <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-warning weekly-hr-open-daily-resolution mt-1" data-row-id="${escapeHtml(row._id)}" aria-label="Έλεγχος πραγματικής ημέρας">${compact ? 'Επίλυση' : 'Έλεγχος πραγματικής ημέρας'}</button>
     </div>`;
 }
 
@@ -11183,8 +11183,8 @@ function employmentReviewAttentionPresentation(lifecycle = {}) {
         actionLabel: '', actionStage: ''
     };
     if (stage.business_status === 'STALE') return {
-        title: 'Τα στοιχεία άλλαξαν.',
-        detail: 'Τα στοιχεία της εβδομάδας άλλαξαν από την τελευταία αναζήτηση. Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα.',
+        title: 'Η προηγούμενη επιβεβαίωση χρειάζεται έλεγχο.',
+        detail: 'Η αποθηκευμένη επιβεβαίωση δεν αντιστοιχεί στα διαθέσιμα στοιχεία και η συνέχιση χρειάζεται έλεγχο. 1. Ανοίξτε τη διάγνωση της εβδομάδας. 2. Εξετάστε τη συγκεκριμένη αιτία και την επιτρεπόμενη ενέργεια· για οριστικοποιημένη περίοδο ζητήστε έλεγχο από τον αρμόδιο υπεύθυνο. Δεν αποθηκεύτηκε αλλαγή από την προβολή.',
         actionLabel: 'Προβολή εβδομάδας', actionStage: currentStage
     };
     if (stage.business_status === 'BLOCKED') {
@@ -11381,6 +11381,12 @@ function showEmploymentReviewGuidancePopover(anchor) {
 }
 
 function initializeEmploymentReviewGuidancePopover() {
+    let touchFocus = false;
+    // Touch focuses before click. Opening an overlay at that point can cover
+    // the information control and redirect the very click meant to open it.
+    document.addEventListener('pointerdown', event => {
+        touchFocus = event.pointerType === 'touch';
+    }, true);
     const target = node => node?.closest?.('[data-review-guidance-key]');
     const inside = node => employmentReviewGuidancePopover?.contains(node) || employmentReviewGuidanceAnchor?.contains(node);
     const deferClose = () => {
@@ -11400,13 +11406,14 @@ function initializeEmploymentReviewGuidancePopover() {
     });
     document.addEventListener('focusin', event => {
         const anchor = target(event.target);
-        if (anchor) showEmploymentReviewGuidancePopover(anchor);
+        if (anchor && !touchFocus) showEmploymentReviewGuidancePopover(anchor);
         if (inside(event.target)) clearTimeout(employmentReviewGuidanceCloseTimer);
     });
     document.addEventListener('focusout', event => {
         if (inside(event.target) && !inside(event.relatedTarget)) deferClose();
     });
     document.addEventListener('click', event => {
+        touchFocus = false;
         if (event.target.closest('[data-review-guidance-close]')) { closeEmploymentReviewGuidancePopover(true); return; }
         const button = event.target.closest('[data-review-guidance-open]');
         if (button) {
@@ -11418,6 +11425,7 @@ function initializeEmploymentReviewGuidancePopover() {
             !inside(event.target)) closeEmploymentReviewGuidancePopover();
     });
     document.addEventListener('keydown', event => {
+        touchFocus = false;
         if (event.key === 'Escape' && employmentReviewGuidanceAnchor) {
             event.preventDefault(); closeEmploymentReviewGuidancePopover(true);
         }
@@ -11972,6 +11980,7 @@ function renderStage1MatrixDayCell(payload, date, relevantDates) {
     const editable = actionable && relevantDates.includes(date) && Boolean(row);
     const state = stage1DayTileState(payload, date, row);
     const guidanceAttributes = employmentReviewGuidanceAttributes(payload, 'STAGE1', date);
+    const context = stage1ContextPeriodPresentation(payload, date);
     if (editable) {
         const rowId = String(row._id);
         return `<td class="weekly-hr-stage1-matrix-day-cell" data-guidance-date="${escapeHtml(date)}" ${guidanceAttributes}>
@@ -11981,22 +11990,23 @@ function renderStage1MatrixDayCell(payload, date, relevantDates) {
                     <span class="weekly-hr-stage1-day-date">${escapeHtml(formatStage1DateKey(date).slice(0, 5))}</span>
                     <strong>${escapeHtml(state.label)}</strong>
                     ${state.leaveCategory ? `<span>${escapeHtml(state.leaveCategory)}</span>` : ''}
+                    <small>${escapeHtml(context.label)}</small>
                     ${state.draft ? '<span class="weekly-hr-stage1-draft-marker" aria-hidden="true">●</span>' : ''}
                 </button>
-            </div>${employmentReviewGuidanceInfo(guidanceAttributes)}</td>`;
+                ${employmentReviewGuidanceInfo(guidanceAttributes)}
+            </div></td>`;
     }
-    const context = actionable ? null : stage1ContextPeriodPresentation(payload, date);
-    const tooltipAttributes = context?.title
+    const tooltipAttributes = !actionable && context.title
         ? `tabindex="0" data-stage1-tooltip="${escapeHtml(context.title)}"` : '';
     const detailsButton = row
         ? `<button type="button" class="weekly-hr-stage1-readonly-tile weekly-hr-open-day" data-row-id="${escapeHtml(String(row._id))}" ${tooltipAttributes}>`
         : `<span class="weekly-hr-stage1-readonly-tile" ${tooltipAttributes}>`;
     const closeTag = row ? '</button>' : '</span>';
     return `<td class="weekly-hr-stage1-matrix-day-cell weekly-hr-stage1-readonly-day" data-guidance-date="${escapeHtml(date)}" ${guidanceAttributes}>
-        ${detailsButton}<span class="weekly-hr-stage1-day-date">${escapeHtml(formatStage1DateKey(date).slice(0, 5))}</span>
+        <div class="weekly-hr-stage1-day-tile">${detailsButton}<span class="weekly-hr-stage1-day-date">${escapeHtml(formatStage1DateKey(date).slice(0, 5))}</span>
         <strong>${escapeHtml(state.label)}</strong>
         ${state.leaveCategory ? `<span>${escapeHtml(state.leaveCategory)}</span>` : ''}
-        ${context ? `<small>${escapeHtml(context.label)}</small>` : ''}${closeTag}${employmentReviewGuidanceInfo(guidanceAttributes)}</td>`;
+        <small>${escapeHtml(context.label)}</small>${closeTag}${employmentReviewGuidanceInfo(guidanceAttributes)}</div></td>`;
 }
 
 function stage1PayloadForRowId(rowId) {
@@ -12097,9 +12107,9 @@ function renderWeeklyHrStage1Card(payload, filteredDates = null) {
     const dayCells = weekDates.map((date) => renderStage1MatrixDayCell(
         payload, date, relevantDates)).join('');
     const orphanItems = Array.isArray(filteredDates) ? '' : [
-        ...weeklyHrOrphanRows(payload).map(renderWeeklyHrOrphanItem),
-        ...weeklyHrZeroLengthRows(payload).map(renderWeeklyHrZeroLengthItem),
-        ...weeklyHrSuspiciousShortRows(payload).map(renderWeeklyHrSuspiciousShortItem)
+        ...weeklyHrOrphanRows(payload).map(row => renderWeeklyHrOrphanItem(row, { compact: true })),
+        ...weeklyHrZeroLengthRows(payload).map(row => renderWeeklyHrZeroLengthItem(row, { compact: true })),
+        ...weeklyHrSuspiciousShortRows(payload).map(row => renderWeeklyHrSuspiciousShortItem(row, { compact: true }))
     ].join('');
     return `<tr class="weekly-hr-stage1-card" data-stage1-key="${escapeHtml(key)}">
         <td>${selection}</td><td>${escapeHtml(scope.employee_kodikos)}</td>

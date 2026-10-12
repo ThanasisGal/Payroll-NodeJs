@@ -157,7 +157,7 @@ async function createGuidanceFixture(uri, vendorDir, { employmentScenarios = fal
         stage1_status: lifecycle.stages.stage1.persisted_status, lifecycle_projection: lifecycle,
         stage1_daily_presentation: rows.map(row => ({ date: guidance.dateKey(row.hmeromhnia), employment_type: '0', employment_label: 'Πλήρης',
             actual_work_hours: row.ores_ergasias_apologistika, declared_hours: row.ores_ergasias,
-            card_hours: row.cards_ores_ergasias, current_apologistiko_classification: row.kathgoria_ergasias_apologistika,
+            card_hours: row.cards_ores_ergasias, current_apologistiko_classification: row.kathgoria_ergasias_apologistika || row.kathgoria_adeias_apologistika || '',
             card_intervals: row.cards_apo_ora_01 ? [{ start: row.cards_apo_ora_01, end: row.cards_eos_ora_01 }] : [] })) };
     }
     async function complete(input, reason, requestId) {
