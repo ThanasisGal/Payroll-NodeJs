@@ -895,6 +895,7 @@ jobs:
       - name: Validate draft and finalized Employee lifecycle on isolated MongoDB
         env:
           PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_draft_test_ci?replicaSet=payrollDraftTest
+          PAYROLL_PERIOD_EMPLOYEES_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_ci?replicaSet=payrollDraftTest
           AWS_EC2_METADATA_DISABLED: "true"
         shell: bash
         run: |
@@ -923,6 +924,18 @@ jobs:
           NODE
           node --test server/utils/ergazomenoi/employeeSaveState.test.js server/controllers/ergazomenoi/employeeDraftSchedules.test.js
           node --test --test-concurrency=1 test/integration/employeeDraftFinalSave.test.js test/integration/employeeDraftForms.browser.test.js
+          node --test server/controllers/ergazomenoi/employmentReviewEmployeesController.test.js
+          node public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.test.js
+          node server/dropdowns/ergazomenoi/ergazomenoi.test.js
+          export PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR="$RUNNER_TEMP/period-employees-tom-vendor"
+          mkdir -p "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.js \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/tom-select.complete.js"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/tom-select.css"
+          node --test --test-concurrency=1 test/integration/employmentReviewEmployees.test.js test/integration/employmentReviewEmployees.browser.test.js
 
       - name: Audit production dependencies
         run: node scripts/ci/audit-production-dependencies.js
