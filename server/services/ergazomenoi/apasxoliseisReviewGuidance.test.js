@@ -14,6 +14,23 @@ const { analysisDiagnostics } = require('./apasxoliseisReviewDiagnosticService')
 const { buildWeeklyHrStage2BulkPreview } = require('./apasxoliseisWeeklyHrStage2BulkPreviewService');
 
 const profile = { typos_apasxolhshs: '0', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 };
+
+test('explanations stay inside the viewport when their table anchor is horizontally off screen', () => {
+    const source = fs.readFileSync(require.resolve(
+        '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy'), 'utf8');
+    const body = source.match(/function calculateWeeklyHrStage1TooltipPosition\([\s\S]*?\n\}/)?.[0];
+    assert.ok(body);
+    const position = Function(`${body}; return calculateWeeklyHrStage1TooltipPosition;`)();
+    for (const viewportWidth of [390, 1440]) for (const left of [-1000, 1163, 2000]) {
+        const width = Math.min(450, viewportWidth - 20);
+        const result = position({ anchorRect: { left, right: left + 22,
+            top: 500, bottom: 540, height: 40 }, tooltipRect: { width, height: 650 },
+            viewportWidth, viewportHeight: 1000 });
+        assert.ok(result.left >= 10 && result.left + width <= viewportWidth - 10,
+            JSON.stringify({ viewportWidth, anchorLeft: left, result }));
+    }
+});
+
 function week() {
     return Array.from({ length: 7 }, (_, i) => ({ _id: String(i), kodikos: '0001',
         hmeromhnia: new Date(Date.UTC(2026, 7, 31 + i)).toISOString().slice(0, 10),

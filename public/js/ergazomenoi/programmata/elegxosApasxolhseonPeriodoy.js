@@ -11724,9 +11724,10 @@ function calculateWeeklyHrStage1TooltipPosition({ anchorRect, tooltipRect,
         viewportWidth - tooltipRect.width - viewportPadding);
     const right = anchorRect.right + gap;
     const left = anchorRect.left - tooltipRect.width - gap;
-    const finalLeft = right + tooltipRect.width <= viewportWidth - viewportPadding
+    const finalLeft = right >= viewportPadding &&
+        right + tooltipRect.width <= viewportWidth - viewportPadding
         ? right
-        : left >= viewportPadding ? left
+        : left >= viewportPadding && left <= maximumLeft ? left
             : Math.min(maximumLeft, Math.max(viewportPadding, right));
     const visibleTop = Math.max(anchorRect.top, viewportPadding);
     const visibleBottom = Math.min(anchorRect.bottom,
