@@ -43,6 +43,8 @@ test('all documented producers and enums have reviewed Greek descriptions and pr
         assert.ok(Object.isFrozen(item), code);
     }
     assert.ok(codes.size > 250);
+    assert.match(guidance.describe('TARGET_HOLIDAY').steps.join(' '),
+        /Αν είναι σωστά, διατηρήστε τα/); // A valid holiday is a constraint, not a reason to alter it.
 });
 
 test('visible rest day, month boundary and blank calculated label alone do not prove BLOCKED', () => {
