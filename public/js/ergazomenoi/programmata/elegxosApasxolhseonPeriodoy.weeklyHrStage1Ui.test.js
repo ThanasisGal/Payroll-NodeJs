@@ -14,15 +14,22 @@ assert.match(source, /weekly-hr-stage1-table/);
 const indexWarningHelper = source.match(
     /function weeklyHrStage1IndexWarning\([\s\S]*?\n}/)?.[0];
 assert.ok(indexWarningHelper);
-const indexWarningSandbox = {};
+const indexWarningSandbox = {
+    EmploymentReviewGuidanceUi: require('./employmentReviewGuidanceUi')
+};
 vm.runInNewContext(`${indexWarningHelper}\nthis.warning = weeklyHrStage1IndexWarning;`,
     indexWarningSandbox);
 assert.equal(indexWarningSandbox.warning({ write_enabled: undefined,
     code: 'INCOMPLETE_NATURAL_WEEK' }), '');
 assert.equal(indexWarningSandbox.warning({ write_enabled: true }), '');
-assert.match(indexWarningSandbox.warning({ write_enabled: false,
-    write_disabled_code: 'WEEKLY_HR_WORKFLOW_INDEXES_NOT_READY' }),
-    /δεν έχουν ενεργοποιηθεί οι απαιτούμενες δικλείδες/);
+const indexWarning = indexWarningSandbox.warning({ write_enabled: false,
+    write_disabled_code: 'WEEKLY_HR_WORKFLOW_INDEXES_NOT_READY' });
+assert.match(indexWarning, /Δεν είναι διαθέσιμη η ασφαλής αποθήκευση/);
+assert.ok(indexWarning.includes(require('./employmentReviewGuidance')
+    .describe('WEEKLY_HR_WORKFLOW_INDEXES_NOT_READY').message));
+assert.match(indexWarning, /<ol>/);
+assert.match(indexWarning, /δεν αποθήκευσε επιχειρησιακές αλλαγές/);
+assert.doesNotMatch(indexWarning, /WEEKLY_HR_WORKFLOW_INDEXES_NOT_READY/);
 assert.equal(indexWarningSandbox.warning({ write_enabled: false,
     write_disabled_code: 'OTHER_FAILURE' }), '');
 assert.match(source, /<tr class="weekly-hr-stage1-card"/);
@@ -75,19 +82,23 @@ const groupedFailureHtml = dailySaveResultSandbox.render({ requested_count: 4, s
     ] });
 assert.match(groupedFailureHtml, /Αποθηκεύτηκαν 1 από 4 ημέρες/);
 assert.match(groupedFailureHtml, /1 ήταν ήδη ίδια/);
-assert.match(groupedFailureHtml, /2 ημέρες απέτυχαν/);
-assert.equal((groupedFailureHtml.match(/EMPLOYMENT_REVIEW_UPDATE_FAILED/g) || []).length, 1);
-assert.equal((groupedFailureHtml.match(/Η ημερήσια αλλαγή δεν αποθηκεύτηκε\./g) || []).length, 1);
+assert.match(groupedFailureHtml, /2 αλλαγές δεν επιβεβαιώθηκαν/);
+assert.doesNotMatch(groupedFailureHtml, /EMPLOYMENT_REVIEW_UPDATE_FAILED|Η ημερήσια αλλαγή δεν αποθηκεύτηκε/);
+assert.match(groupedFailureHtml, /1\. Εκτελέστε νέα «Αναζήτηση»/);
+Object.assign(dailySaveResultSandbox, {
+    EmploymentReviewGuidanceUi: require('./employmentReviewGuidanceUi'),
+    weeklyHrStage1RowsById: new Map()
+});
 const distinctFailureHtml = dailySaveResultSandbox.render({ requested_count: 3,
     saved_count: 0, unchanged_count: 0, failed_count: 3, results: [
-        { status: 'FAILED', code: 'ONE', message: 'Πρώτη αιτία' },
-        { status: 'FAILED', code: 'ONE', message: 'Πρώτη αιτία' },
-        { status: 'REVIEW_REQUIRED', code: 'TWO', message: '<Δεύτερη αιτία>' }
+        { status: 'FAILED', code: 'INVALID_DECLARED_HOURS', message: 'SECRET' },
+        { status: 'FAILED', code: 'INVALID_DECLARED_HOURS', message: 'SECRET' },
+        { status: 'REVIEW_REQUIRED', code: 'CATEGORY_REPO_CONFLICT', message: '<SECRET>' }
     ] });
-assert.match(distinctFailureHtml, /2 ημέρες:[\s\S]*Κωδικός: ONE/);
-assert.match(distinctFailureHtml, /1 ημέρα:[\s\S]*Κωδικός: TWO/);
-assert.match(distinctFailureHtml, /&lt;Δεύτερη αιτία&gt;/);
-assert.doesNotMatch(distinctFailureHtml, /row_id/);
+for (const code of ['INVALID_DECLARED_HOURS', 'CATEGORY_REPO_CONFLICT'])
+    assert.ok(distinctFailureHtml.includes(require('./employmentReviewGuidance').describe(code).message));
+assert.match(distinctFailureHtml, /3 αλλαγές δεν επιβεβαιώθηκαν/);
+assert.doesNotMatch(distinctFailureHtml, /row_id|SECRET|INVALID_DECLARED_HOURS|CATEGORY_REPO_CONFLICT/);
 
 const scopeHelpers = source.slice(source.indexOf('function stage1DateKey'),
     source.indexOf('async function fetchWeeklyHrStage1'));
@@ -673,6 +684,8 @@ const resultRendererSource = source.match(
 const resultRenderer = vm.runInNewContext(`(() => { ${resultRendererSource}
     return renderWeeklyHrStage1BulkResult; })()`, {
     escapeHtml: String,
+    EmploymentReviewGuidanceUi: require('./employmentReviewGuidanceUi'),
+    currentCanonicalLifecyclePayloads: [],
     formatStage1DateKey: scopeSandbox.helpers.formatStage1DateKey
 });
 const failedBulk = resultRenderer({ requested_count: 3, completed_count: 0,
@@ -684,7 +697,9 @@ assert.match(failedBulk.html, /Εβδομάδα/);
 assert.match(failedBulk.html, /Αποτέλεσμα/);
 assert.match(failedBulk.html, /Αιτία/);
 assert.match(failedBulk.html, /01\/06\/2026–07\/06\/2026/);
-assert.match(failedBulk.html, /Απαιτείται ρητή ανακατασκευή ή επανεκτίμηση/);
+assert.ok(failedBulk.html.includes(require('./employmentReviewGuidance').describe(
+    'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED').message));
+assert.doesNotMatch(failedBulk.html, /PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED/);
 assert.match(source, /Τελική εξέταση πιθανής άδειας στο Στάδιο 3\./);
 assert.match(source, /Δεν υπάρχουν ανέλεγκτες πιθανές άδειες\./);
 
@@ -809,14 +824,14 @@ const blockedExplanationSource = source.match(
     /function weeklyHrBlockedExplanation\([\s\S]*?\n}/)?.[0] || '';
 const orphanOnlySource = source.match(
     /function weeklyHrHasOnlyOrphanBlockers\([\s\S]*?\n}/)?.[0] || '';
-const explanationSandbox = {};
+const explanationSandbox = { EmploymentReviewGuidanceUi: require('./employmentReviewGuidanceUi') };
 vm.runInNewContext(`${blockedExplanationSource}\n${orphanOnlySource}\nthis.explain = weeklyHrBlockedExplanation;this.onlyOrphan = weeklyHrHasOnlyOrphanBlockers;`,
     explanationSandbox);
 const suspiciousPayload = { lifecycle_projection: { stages: { stage1: {
     business_status: 'BLOCKED', blockers: [
         'SUSPICIOUS_SHORT_CARD_INTERVAL_REQUIRES_HR_DECISION'
     ] } } } };
-assert.match(explanationSandbox.explain(suspiciousPayload), /ύποπτα μικρό διάστημα κάρτας/);
+assert.match(explanationSandbox.explain(suspiciousPayload), /μικρότερο από το όριο ελέγχου της εταιρείας/);
 assert.equal(explanationSandbox.onlyOrphan(suspiciousPayload), false);
 assert.match(css,
     /\.employment-review-swal-popup \.swal2-confirm\.weekly-hr-stage1-bulk-confirm\s*\{[\s\S]*?white-space:\s*nowrap/);

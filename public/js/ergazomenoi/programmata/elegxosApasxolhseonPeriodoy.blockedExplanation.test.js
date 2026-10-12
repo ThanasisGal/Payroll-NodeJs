@@ -8,7 +8,7 @@ const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
 const start = source.indexOf('function weeklyHrStage1BusinessStatus');
 const end = source.indexOf('function weeklyHrStage1Counts', start);
-const sandbox = {};
+const sandbox = { EmploymentReviewGuidanceUi: require('./employmentReviewGuidanceUi') };
 vm.createContext(sandbox);
 vm.runInContext(source.slice(start, end), sandbox);
 
@@ -23,25 +23,26 @@ const orphan = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
     'ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION',
     'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'
 ]));
-assert.match(orphan, /ορφανό χτύπημα κάρτας/);
+assert.match(orphan, /χτύπημα κάρτας/);
+assert.match(orphan, /δεν μπορεί ακόμη να επιβεβαιωθεί/);
 
 const zeroLength = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
     'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION',
     'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'
 ]));
-assert.match(zeroLength, /μηδενικό διάστημα κάρτας/);
+assert.match(zeroLength, /ίδια ώρα|μηδενικ/);
 assert.doesNotMatch(zeroLength, /ορφανό χτύπημα κάρτας/);
 
 const repo = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
     'MULTIPLE_SOURCE_CANDIDATES'
 ]));
-assert.match(repo, /περισσότερες από μία πιθανές μεταφορές ρεπό/);
+assert.match(repo, /Περισσότερες από μία|περισσότερες από μία/);
 
 const missing = sandbox.weeklyHrBlockedExplanation(payload('BLOCKED', [
     'INCOMPLETE_NATURAL_WEEK'
 ]));
-assert.match(missing, /Λείπουν απαραίτητα στοιχεία απασχόλησης/);
-assert.match(missing, /Συμπληρώστε ή διορθώστε τα στοιχεία πριν συνεχίσετε/);
+assert.match(missing, /εβδομάδα|εβδομάδας/);
+assert.match(missing, /εγγραφές|ημέρες/);
 
 for (const message of [orphan, zeroLength, repo, missing]) {
     assert.doesNotMatch(message,

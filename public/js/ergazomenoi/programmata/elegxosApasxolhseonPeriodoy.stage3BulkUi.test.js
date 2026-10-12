@@ -26,6 +26,7 @@ function sandboxFor(items = [item()]) {
     const fetchCalls = [];
     let loads = 0;
     const sandbox = {
+        EmploymentReviewGuidanceUi: require('./employmentReviewGuidanceUi'),
         weeklyHrStage3BulkSelected: new Set(items.map((entry) => entry.row_id)),
         weeklyHrStage3BulkClassification: 'LEAVE', weeklyHrStage3BulkLeaveCategory: 'ΑΔΚΑΝ',
         weeklyHrStage3FrozenApplyCommand: null, weeklyHrStage3BulkRetryPending: false,
@@ -163,14 +164,16 @@ async function invalidPreviewNeverApplies() {
         return { ok: true, json: async () => ({ success: true, can_apply: false,
             selected_count: 1, preview_fingerprint: '', items: [], invalid_items: [{ row_id: 'row-1',
                 employee_kodikos: '0007', decision_date: '2026-06-03',
+                code: 'STAGE3_INPUT_CHANGED',
                 message: 'Κάντε νέα Αναζήτηση και δοκιμάστε ξανά.' }] }) };
     };
     await context.sandbox.bulk.preview();
     assert.equal(context.fetchCalls.length, 1);
     assert.equal(context.alerts[0].title, 'Χρειάζεται ανανέωση πριν συνεχίσετε.');
     assert.match(context.alerts[0].html, /ΣΠΥΡΙΔΩΝΟΣ ΑΡΕΤΗ — Κωδικός: 0007/);
-    assert.match(context.alerts[0].html, /Κάντε νέα Αναζήτηση και δοκιμάστε ξανά/);
-    assert.doesNotMatch(context.alerts[0].html, /Τα στοιχεία της ημέρας άλλαξαν/);
+    assert.match(context.alerts[0].html, /Τα στοιχεία άλλαξαν μετά την τελευταία ανάγνωση/);
+    assert.match(context.alerts[0].html, /δεν αποθήκευσε επιχειρησιακές αλλαγές/);
+    assert.doesNotMatch(context.alerts[0].html, /STAGE3_INPUT_CHANGED|Κάντε νέα Αναζήτηση και δοκιμάστε ξανά/);
     assert.equal(context.sandbox.weeklyHrStage3BulkSelected.size, 1);
 }
 

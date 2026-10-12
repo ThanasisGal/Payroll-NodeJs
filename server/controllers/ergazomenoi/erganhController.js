@@ -484,6 +484,7 @@ const ApasxoliseisWeeklyHrWorkflowAuditModel = require('../../models/apasxolisei
 const {
     buildWeeklyHrWorkflowProjection
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowProjectionService');
+const { reviewErrorResponse } = require('../../services/ergazomenoi/apasxoliseisReviewErrorPresentationService');
 const {
     buildWeeklyHrLifecycleProjection,
     buildFinalizedWeeklyHrLifecyclePresentation,
@@ -557,9 +558,7 @@ function createWeeklyHrStage2BulkResponseStream(req, res) {
         result: (response) => { write({ type: 'result', ...response }); res.end(); },
         error: (error) => {
             if (!started) return false;
-            write({ type: 'error', code: error.code || 'STAGE2_BULK_COMPLETION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής ολοκλήρωσης Stage 2.' });
+            write({ type: 'error', ...reviewErrorResponse(error, 'STAGE2_BULK_COMPLETION_FAILED') });
             res.end(); return true;
         }
     });
@@ -9586,12 +9585,7 @@ class erganhController {
                     'CANONICAL_DECISION_PROFILE_REFERENCE_INVALID',
                     'CANONICAL_WEEK_NOT_BLOCKED'].includes(error?.code) ? 409
                     : error.statusCode || 500;
-            return res.status(status).json({
-                success: false,
-                code: error.code || undefined,
-                message: status < 500 || status === 503
-                    ? error.message : 'Δεν ήταν δυνατή η καταγραφή της εβδομαδιαίας απόφασης.'
-            });
+            return res.status(status).json(reviewErrorResponse(error, 'CANONICAL_DECISION_SAVE_FAILED'));
         }
     };
 
@@ -9633,12 +9627,7 @@ class erganhController {
                 error?.statusCode || 500,
                 error?.message
             );
-            return res.status(error.statusCode || 500).json({
-                success: false,
-                message: error.statusCode && error.statusCode < 500
-                    ? error.message
-                    : 'Δεν ήταν δυνατή η καταγραφή της απόφασης.'
-            });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'REPO_DECISION_SAVE_FAILED'));
         }
     };
 
@@ -9716,11 +9705,7 @@ class erganhController {
         } catch (error) {
             console.error('[applyWeeklyRepoTransferDecision]', error?.code || 'INTERNAL_ERROR');
             const mapped = REPO_TRANSFER_APPLY_ERRORS[error?.code];
-            return res.status(mapped?.[0] || 500).json({
-                success: false,
-                code: error?.code || undefined,
-                message: mapped?.[1] || 'Η εφαρμογή ακυρώθηκε πλήρως. Δεν αποθηκεύτηκε καμία αλλαγή.'
-            });
+            return res.status(mapped?.[0] || 500).json(reviewErrorResponse(error, 'REPO_APPLY_FAILED'));
         }
     };
 
@@ -12169,9 +12154,7 @@ class erganhController {
                 stage1_status: lifecycleProjection.stages.stage1.persisted_status,
                 lifecycle_projection: lifecycleProjection });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_WORKFLOW_READ_FAILED',
-                message: error.statusCode ? error.message : 'Αποτυχία ανάγνωσης της εβδομαδιαίας ροής HR.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_WORKFLOW_READ_FAILED', { readOnly: true }));
         }
     };
 
@@ -12421,10 +12404,7 @@ class erganhController {
             }
             return res.json({ success: true, payloads });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_WORKFLOW_BULK_READ_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής ανάγνωσης της εβδομαδιαίας ροής HR.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_WORKFLOW_BULK_READ_FAILED', { readOnly: true }));
         }
     };
 
@@ -12473,9 +12453,7 @@ class erganhController {
             });
             return res.json({ success: true, already_completed: result.idempotent === true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_STAGE1_COMPLETION_FAILED',
-                message: error.statusCode ? error.message : 'Αποτυχία ολοκλήρωσης του Stage 1.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_STAGE1_COMPLETION_FAILED'));
         }
     };
 
@@ -12497,10 +12475,7 @@ class erganhController {
             });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_STAGE1_BULK_COMPLETION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής ολοκλήρωσης του Stage 1.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_STAGE1_BULK_COMPLETION_FAILED'));
         }
     };
 
@@ -12539,10 +12514,7 @@ class erganhController {
             });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_STAGE2_COMPLETION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία canonical ολοκλήρωσης του Stage 2.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_STAGE2_COMPLETION_FAILED'));
         }
     };
 
@@ -12570,10 +12542,7 @@ class erganhController {
             return res.json({ success: true, preview_fingerprint: fingerprint,
                 ...pageResult });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE2_BULK_PREVIEW_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία προεπισκόπησης μαζικής ενημέρωσης Stage 2.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'STAGE2_BULK_PREVIEW_FAILED', { readOnly: true }));
         }
     };
 
@@ -12727,10 +12696,7 @@ class erganhController {
             return res.json(response);
         } catch (error) {
             if (responseStream.error(error)) return;
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_STAGE2_BULK_COMPLETION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής ολοκλήρωσης του Stage 2.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_STAGE2_BULK_COMPLETION_FAILED'));
         }
     };
 
@@ -12836,9 +12802,7 @@ class erganhController {
             });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE1_DAILY_CLASSIFICATION_BULK_FAILED',
-                message: error.statusCode ? error.message : 'Αποτυχία μαζικής αποθήκευσης χαρακτηρισμών.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'STAGE1_DAILY_CLASSIFICATION_BULK_FAILED'));
         }
     };
 
@@ -12870,10 +12834,7 @@ class erganhController {
                 } });
             return res.json({ success: true, ...preview });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE3_BULK_PREVIEW_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία προεπισκόπησης μαζικών αποφάσεων Stage 3.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'STAGE3_BULK_PREVIEW_FAILED', { readOnly: true }));
         }
     };
 
@@ -12936,13 +12897,15 @@ class erganhController {
                 }) });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE3_BULK_APPLY_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής εφαρμογής αποφάσεων Stage 3.',
+            return res.status(error.statusCode || 500).json({
+                ...reviewErrorResponse(error, 'STAGE3_BULK_APPLY_FAILED'),
                 applied_count: 0,
-                ...(Array.isArray(error.invalid_items)
-                    ? { invalid_items: error.invalid_items } : {}) });
+                ...(Array.isArray(error.invalid_items) ? { invalid_items:
+                    error.invalid_items.map(item => ({ row_id: item.row_id,
+                        employee_kodikos: item.employee_kodikos,
+                        decision_date: item.decision_date,
+                        ...reviewErrorResponse(item, 'STAGE3_BULK_ITEM_NOT_ELIGIBLE', { readOnly: true }) }))
+                } : {}) });
         }
     };
 
@@ -13011,10 +12974,7 @@ class erganhController {
             });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE3_DAILY_RESOLUTION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία αποθήκευσης της απόφασης Stage 3.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'STAGE3_DAILY_RESOLUTION_FAILED'));
         }
     };
 

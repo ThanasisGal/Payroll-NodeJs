@@ -15,8 +15,8 @@ const { deriveStage1PeriodSlice, buildStage1PeriodSliceFingerprints,
 const ACTION = 'STAGE1_PERIOD_SLICE_COMPLETED';
 const WORKFLOW_VERSION = 'weekly-hr-workflow:v1';
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:._-]{7,99}$/;
-function fail(code, message, statusCode = 400) {
-    throw Object.assign(new Error(message), { code, statusCode });
+function fail(code, message, statusCode = 400, details = {}) {
+    throw Object.assign(new Error(message), { code, statusCode, ...details });
 }
 function text(value, max = Infinity) { return String(value ?? '').trim().slice(0, max); }
 function actor(value = {}) {
@@ -84,7 +84,9 @@ async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_e
             companySettings,
             expected_date_keys: employment_date_scope?.employment_owned_dates || null });
         if ((workflow.blocking_reasons || []).length) fail('STAGE1_COMPLETION_BLOCKED',
-            'Υπάρχει πραγματικό εμπόδιο Σταδίου 1.', 409);
+            'Υπάρχει πραγματικό εμπόδιο Σταδίου 1.', 409, {
+                blocking_reasons: workflow.blocking_reasons, diagnostics: workflow.blocking_details
+            });
         const stateFilter = { team: scope.team, company_kod: scope.company_kod,
             ypokatasthma: scope.ypokatasthma, employee_id: scope.employee_id,
             week_start: scope.week_start, week_end: scope.week_end };

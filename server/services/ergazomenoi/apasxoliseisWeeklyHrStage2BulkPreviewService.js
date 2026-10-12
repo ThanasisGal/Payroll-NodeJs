@@ -24,7 +24,11 @@ function identityKey(identity = {}) {
     return `${identity.employee_id}|${identity.week_start}|${identity.week_end}`;
 }
 function exceptionSummary(context, code, message) {
+    const stage = context.lifecycle?.stages?.stage2 || {};
     return { ...scopeIdentity(context), code: text(code) || 'STAGE2_MANUAL_REVIEW_REQUIRED',
+        reasons: [...new Set([text(code), ...(stage.blockers || []),
+            ...(stage.pending_reasons || [])].filter(Boolean))],
+        diagnostics: stage.diagnostics || [],
         message: text(message) || 'Η περίπτωση απαιτεί έλεγχο HR.' };
 }
 function preparedSafePair(context = {}) {
@@ -162,8 +166,11 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
         },
         safe_scope_ids: safe, preview_fingerprint: previewFingerprint,
         exceptions: exceptions.slice(offset, offset + pageSize),
+        technical_conflicts: technicalConflicts.slice(offset, offset + pageSize),
+        technical_conflict_page_count: Math.max(1, Math.ceil(technicalConflicts.length / pageSize)),
         exception_page: page, exception_page_size: pageSize,
-        exception_page_count: Math.max(1, Math.ceil(exceptions.length / pageSize)),
+        exception_page_count: Math.max(1, Math.ceil(Math.max(exceptions.length,
+            technicalConflicts.length) / pageSize)),
         _all_exceptions: exceptions, _technical_conflicts: technicalConflicts };
 }
 

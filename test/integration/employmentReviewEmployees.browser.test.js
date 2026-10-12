@@ -39,7 +39,7 @@ test('real Chromium, real selection HTTP handler and isolated MongoDB', { skip: 
         if (dir) { fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name+'.png'),fullPage:true}); }
     };
     await page.goto(origin+'/review');
-    await page.waitForFunction(()=>Boolean(document.getElementById('ypokatasthma').tomselect));
+    await page.waitForFunction(()=>Boolean(window.EmploymentReviewEmployees && window.EmploymentReviewBranches && document.getElementById('ypokatasthma').tomselect));
     await page.locator('#ypokatasthma + .ts-wrapper .ts-control').click();
     await page.locator('#ypokatasthma + .ts-wrapper .option[data-value="0000"]').click();
     assert.equal(await page.locator('#ypokatasthma_stathera_advanced').inputValue(),'0000');

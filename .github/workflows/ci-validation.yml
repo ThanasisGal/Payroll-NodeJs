@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feat/departure-auto-history-reconstruction
+      - fix/employment-control-period-employees
     types:
       - opened
       - synchronize
@@ -896,6 +897,8 @@ jobs:
         env:
           PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_draft_test_ci?replicaSet=payrollDraftTest
           PAYROLL_PERIOD_EMPLOYEES_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_ci?replicaSet=payrollDraftTest
+          PAYROLL_GUIDANCE_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_guidance_ci?replicaSet=payrollDraftTest
+          PAYROLL_VISUAL_ARTIFACT_DIR: ${{ runner.temp }}/employment-review-guidance-visual
           AWS_EC2_METADATA_DISABLED: "true"
         shell: bash
         run: |
@@ -936,6 +939,17 @@ jobs:
             https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css \
             -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/tom-select.css"
           node --test --test-concurrency=1 test/integration/employmentReviewEmployees.test.js test/integration/employmentReviewEmployees.browser.test.js
+          node --test server/services/ergazomenoi/apasxoliseisReviewGuidance.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.blockedExplanation.test.js
+          node --test test/integration/employmentReviewGuidance.browser.test.js
+
+      - name: Preserve synthetic Employment Review visual checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: employment-review-guidance-visual
+          path: ${{ runner.temp }}/employment-review-guidance-visual
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Audit production dependencies
         run: node scripts/ci/audit-production-dependencies.js

@@ -3,6 +3,7 @@
 // Pure presentation projection. It coordinates existing authoritative resolvers and never writes.
 
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
+const { diagnostic, analysisDiagnostics } = require('./apasxoliseisReviewDiagnosticService');
 const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
 const { isPossibleLeave } = require('./apasxoliseisLeaveProvenanceService');
 const {
@@ -145,7 +146,7 @@ function stageResult(stage, values = {}) {
     return Object.freeze({ stage, business_status: BUSINESS_STATUS.COMPLETED,
         presentation_status: PRESENTATION_STATUS.COMPLETED, pending_count: 0,
         pending_dates: Object.freeze([]), pending_reasons: Object.freeze([]),
-        blockers: Object.freeze([]), ...values });
+        blockers: Object.freeze([]), diagnostics: Object.freeze([]), ...values });
 }
 
 function resolveStage3ActionableDates({
@@ -355,6 +356,11 @@ function buildWeeklyHrLifecycleProjection({
                 pending_count: activeBlocker ? Math.max(1, blockers.length) : 0,
                 pending_reasons: activeBlocker ? blockers : stage2Diagnostics,
                 blockers: activeBlocker ? blockers : stage2Diagnostics,
+                diagnostics: Object.freeze(activeBlocker ? [
+                    ...(workflow.blocking_details || []),
+                    ...blockers.filter(code => !(workflow.blocking_reasons || []).includes(code))
+                        .map(code => diagnostic(code))
+                ] : stage2Diagnostics.map(code => diagnostic(code))),
                 persisted_status: index === 0 ? persistedStatus : 'OPEN',
                 ...(index === 0 ? { attestation_scope: 'PERIOD_SLICE', period_slice: slice,
                     current_fingerprint: fingerprint,
@@ -456,7 +462,8 @@ function buildWeeklyHrLifecycleProjection({
                 ? ['POSSIBLE_LEAVE_REQUIRES_HR_CLASSIFICATION'] : []),
             ...stage1Blockers
         ])),
-        blockers: Object.freeze(stage1Blockers)
+        blockers: Object.freeze(stage1Blockers),
+        diagnostics: Object.freeze(stage1Workflow.blocking_details || [])
     });
 
     const stage1ResolvedRows = resolverRowsFromStoredDecisions(rows, decisions);
@@ -564,6 +571,11 @@ function buildWeeklyHrLifecycleProjection({
             ...stage2Diagnostics
         ]) : []),
         blockers: Object.freeze(stage2Blockers),
+        diagnostics: Object.freeze(unique([...stage2Blockers,
+            ...(stage2PendingCount ? repoReasons : [])]).map(code => diagnostic(code,
+            code.startsWith('SOURCE_') ? [repoTransfer.source?.hmeromhnia]
+                : code.startsWith('TARGET_') ? [repoTransfer.target?.hmeromhnia]
+                    : stage2CandidateDates))),
         stage2_applicability: stage2ActionableForScope
             ? 'ACTIONABLE' : 'NOT_APPLICABLE',
         workflow_requested_stage2: workflowRequestedStage2,
@@ -727,7 +739,9 @@ function buildWeeklyHrLifecycleProjection({
             ? ['DAILY_EMPLOYMENT_REGIME_UNKNOWN']
             : remainingDates.length ? ['REMAINING_POSSIBLE_LEAVE_REVIEW_REQUIRED'] : []),
         blockers: Object.freeze(unknownRegimeDates.length
-            ? ['DAILY_EMPLOYMENT_REGIME_UNKNOWN'] : [])
+            ? ['DAILY_EMPLOYMENT_REGIME_UNKNOWN'] : []),
+        diagnostics: Object.freeze(unknownRegimeDates.map(date =>
+            diagnostic('DAILY_EMPLOYMENT_REGIME_UNKNOWN', [date])))
     });
 
     const finalAnalysis = analyzeWeeklySixthSeventhDay({
@@ -748,6 +762,7 @@ function buildWeeklyHrLifecycleProjection({
         pending_count: finalBlockers.length,
         pending_reasons: Object.freeze(finalBlockers),
         blockers: Object.freeze(finalBlockers),
+        diagnostics: Object.freeze(analysisDiagnostics(finalBlockers, finalAnalysis)),
         final_weekly_analysis_available: finalBlockers.length === 0,
         final_weekly_analysis: finalAnalysis
     });
@@ -805,7 +820,7 @@ function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
                 enabled: true, open_by_default: false,
                 pending_count: 0, pending_dates: Object.freeze([]),
                 pending_items: Object.freeze([]), pending_reasons: Object.freeze([]),
-                blockers: Object.freeze([]) })];
+                blockers: Object.freeze([]), diagnostics: Object.freeze([]) })];
         })
     );
     completedStages.stage4 = Object.freeze({ ...completedStages.stage4,

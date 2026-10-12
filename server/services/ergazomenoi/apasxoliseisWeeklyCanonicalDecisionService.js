@@ -149,12 +149,12 @@ function scopeFromInput(input = {}) {
         week_end: dateKey(input.week_end, 'week_end')
     };
     if (!scope.team || !scope.company_kod || !scope.ypokatasthma || !scope.employee_kodikos) {
-        throw fail('Λείπει το υποχρεωτικό scope της εβδομαδιαίας απόφασης.');
+        throw fail('Λείπει το υποχρεωτικό scope της εβδομαδιαίας απόφασης.', 400, 'CANONICAL_DECISION_SCOPE_REQUIRED');
     }
     const start = new Date(`${scope.week_start}T00:00:00.000Z`);
     const end = new Date(`${scope.week_end}T00:00:00.000Z`);
     if (start.getUTCDay() !== 1 || end.getUTCDay() !== 0 || (end - start) / 86400000 !== 6) {
-        throw fail('Η απόφαση πρέπει να αφορά ακριβή εβδομάδα Δευτέρα–Κυριακή.');
+        throw fail('Η απόφαση πρέπει να αφορά ακριβή εβδομάδα Δευτέρα–Κυριακή.', 400, 'CANONICAL_DECISION_WEEK_INVALID');
     }
     scope.scope_key = [scope.team, scope.company_kod, scope.ypokatasthma,
         scope.employee_kodikos, scope.week_start, scope.week_end].join('|');
@@ -182,7 +182,7 @@ function buildCanonicalWeeklyDecisionSnapshot(input = {}) {
     const canonicalStatus = text(input.canonical_status, 50).toUpperCase();
     const canonicalReasons = uniqueSorted(input.canonical_reasons);
     if (canonicalStatus !== 'NEEDS_HR_DECISION' || canonicalReasons.length === 0) {
-        throw fail('Απαιτείται canonical NEEDS_HR_DECISION με τουλάχιστον μία αιτία.');
+        throw fail('Απαιτείται canonical NEEDS_HR_DECISION με τουλάχιστον μία αιτία.', 400, 'CANONICAL_DECISION_NO_PENDING_REASON');
     }
     const snapshot = stable({
         snapshot_version: SNAPSHOT_VERSION,
@@ -206,11 +206,11 @@ function validateClassificationByDate(value, scope) {
         const day = dateKey(key, 'classification date');
         const classification = text(source[key], 20).toUpperCase();
         if (day < scope.week_start || day > scope.week_end || !CLASSIFICATIONS.has(classification)) {
-            throw fail('Μη έγκυρη classification_by_date.');
+            throw fail('Μη έγκυρη classification_by_date.', 400, 'CANONICAL_DECISION_DAILY_CLASSIFICATIONS_INVALID');
         }
         result[day] = classification;
     }
-    if (Object.keys(result).length === 0) throw fail('Η classification_by_date είναι κενή.');
+    if (Object.keys(result).length === 0) throw fail('Η classification_by_date είναι κενή.', 400, 'CANONICAL_DECISION_DAILY_CLASSIFICATIONS_REQUIRED');
     return result;
 }
 function validateDecisionPayload(decisionType, payload, snapshotResult) {
@@ -220,7 +220,7 @@ function validateDecisionPayload(decisionType, payload, snapshotResult) {
         const reference = object(source.profile_reference);
         if (!['USE_PROFILE', 'CONFIRM_PROFILE_TRANSITION'].includes(outcome) ||
             (!text(reference.history_id, 50) && !text(reference.effective_date, 10) && !text(reference.source, 100))) {
-            throw fail('Μη έγκυρη απόφαση profile change.');
+            throw fail('Μη έγκυρη απόφαση profile change.', 400, 'CANONICAL_DECISION_PROFILE_CHOICE_INVALID');
         }
         if (outcome === 'USE_PROFILE') {
             const selectedReference = object(source.selected_profile_reference);
@@ -229,7 +229,7 @@ function validateDecisionPayload(decisionType, payload, snapshotResult) {
             const selectedFingerprint = text(source.selected_profile_fingerprint, 64);
             if (!['HISTORY', 'CURRENT_EMPLOYEE'].includes(kind) || !id ||
                 !/^[a-f0-9]{64}$/i.test(selectedFingerprint)) {
-                throw fail('Μη έγκυρη deterministic αναφορά επιλεγμένου profile.');
+                throw fail('Μη έγκυρη deterministic αναφορά επιλεγμένου profile.', 400, 'CANONICAL_DECISION_PROFILE_SELECTION_INVALID');
             }
             return stable({ profile_outcome: outcome, profile_reference: reference,
                 selected_profile_reference: { kind, id },
@@ -239,7 +239,7 @@ function validateDecisionPayload(decisionType, payload, snapshotResult) {
     }
     if (decisionType === 'CARD_VERIFICATION_PENDING') {
         if (source.verified !== true || !text(source.evidence_reference, 500)) {
-            throw fail('Απαιτείται επιβεβαιωμένη αναφορά card evidence.');
+            throw fail('Απαιτείται επιβεβαιωμένη αναφορά card evidence.', 400, 'CANONICAL_DECISION_CARD_REFERENCE_REQUIRED');
         }
         return stable({ verified: true, evidence_reference: text(source.evidence_reference, 500),
             corrected_row_ids: uniqueSorted(source.corrected_row_ids) });
@@ -247,7 +247,7 @@ function validateDecisionPayload(decisionType, payload, snapshotResult) {
     if (decisionType === 'CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC') {
         const identities = uniqueSorted(source.current_repo_identities);
         if (identities.length !== 2 || identities.some((day) => day < scope.week_start || day > scope.week_end)) {
-            throw fail('Απαιτούνται ακριβώς δύο CURRENT repo identities μέσα στην εβδομάδα.');
+            throw fail('Απαιτούνται ακριβώς δύο CURRENT repo identities μέσα στην εβδομάδα.', 400, 'CANONICAL_DECISION_REPO_IDENTITIES_INVALID');
         }
         const applied = snapshotResult.snapshot.applied_atomic_repo_transfer;
         const appliedExecutionId = text(applied?.execution_id, 50);
@@ -262,7 +262,7 @@ function validateDecisionPayload(decisionType, payload, snapshotResult) {
     if (decisionType === 'CLASSIFICATION_BY_DATE') {
         return { classification_by_date: validateClassificationByDate(source.classification_by_date, scope) };
     }
-    throw fail('Ο τύπος απόφασης δεν υποστηρίζεται.');
+    throw fail('Ο τύπος απόφασης δεν υποστηρίζεται.', 400, 'CANONICAL_DECISION_TYPE_INVALID');
 }
 function sessionScope(session = {}, { critical = false } = {}) {
     const role = critical
@@ -280,12 +280,12 @@ function validateDecisionCommand({ session, command = {}, currentInput = {} }) {
         throw fail('Το decision scope είναι εκτός ενεργής συνεδρίας.', 403, 'SCOPE_MISMATCH');
     }
     const decisionType = text(command.decision_type, 100).toUpperCase();
-    if (!DECISION_TYPES.includes(decisionType)) throw fail('Ο τύπος απόφασης δεν υποστηρίζεται.');
+    if (!DECISION_TYPES.includes(decisionType)) throw fail('Ο τύπος απόφασης δεν υποστηρίζεται.', 400, 'CANONICAL_DECISION_TYPE_INVALID');
     const requestId = text(command.request_id, 100);
-    if (!REQUEST_ID_PATTERN.test(requestId)) throw fail('Μη έγκυρο request_id.');
+    if (!REQUEST_ID_PATTERN.test(requestId)) throw fail('Μη έγκυρο request_id.', 400, 'CANONICAL_DECISION_REQUEST_ID_INVALID');
     const decisionPayload = validateDecisionPayload(decisionType, command.decision_payload, snapshotResult);
     const reuseScope = text(command.reuse_scope || REUSE_SCOPE.ONE_TIME, 30).toUpperCase();
-    if (!Object.values(REUSE_SCOPE).includes(reuseScope)) throw fail('Μη έγκυρο εύρος επαναχρησιμοποίησης.');
+    if (!Object.values(REUSE_SCOPE).includes(reuseScope)) throw fail('Μη έγκυρο εύρος επαναχρησιμοποίησης.', 400, 'CANONICAL_DECISION_REUSE_SCOPE_INVALID');
     let reusable = null; let reuseEffectiveFrom = null; let reuseEffectiveTo = null;
     if (reuseScope === REUSE_SCOPE.FUTURE_IDENTICAL) {
         reusable = buildWeeklyReusableDecisionRule({ snapshotResult, decisionType,
@@ -293,9 +293,9 @@ function validateDecisionCommand({ session, command = {}, currentInput = {} }) {
         if (!reusable.eligible) throw fail(reusable.reason, 400, reusable.reason_code);
         reuseEffectiveFrom = utcDateKey(command.reuse_effective_from);
         reuseEffectiveTo = utcDateKey(command.reuse_effective_to);
-        if (!reuseEffectiveFrom) throw fail('Απαιτείται έγκυρη ημερομηνία έναρξης ισχύος.');
+        if (!reuseEffectiveFrom) throw fail('Απαιτείται έγκυρη ημερομηνία έναρξης ισχύος.', 400, 'CANONICAL_DECISION_EFFECTIVE_START_REQUIRED');
         if (reuseEffectiveTo && reuseEffectiveTo < reuseEffectiveFrom) {
-            throw fail('Η ημερομηνία λήξης δεν μπορεί να προηγείται της έναρξης.');
+            throw fail('Η ημερομηνία λήξης δεν μπορεί να προηγείται της έναρξης.', 400, 'CANONICAL_DECISION_EFFECTIVE_RANGE_INVALID');
         }
     }
     const normalized = { decision_type: decisionType, decision_payload: decisionPayload,

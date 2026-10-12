@@ -35,7 +35,7 @@ const {
 const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v4';
 const ROW_FIELDS = Object.freeze(ATOMIC_REPO_TRANSFER_ROW_FIELDS.split(/\s+/).filter(Boolean));
 
-function conflict(message) { const error = new Error(message); error.statusCode = 409; return error; }
+function conflict(message, code = 'REPO_PROPOSAL_NOT_AVAILABLE', reasons = []) { const error = new Error(message); error.statusCode = 409; error.code = code; error.blocking_reasons = reasons; return error; }
 function dateKey(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10); }
 function weekBounds(value) {
     const range = getMondaySundayWeekRange(value);
@@ -78,9 +78,9 @@ async function defaultContextLoader({
     }).select(ROW_FIELDS.join(' ')).lean();
     if (candidates.length !== 2) throw conflict('Η πρόταση δεν είναι πλέον διαθέσιμη. Ανανεώστε τον έλεγχο.');
     const [first, second] = candidates;
-    if (String(first.ypokatasthma) !== String(second.ypokatasthma) || String(first.kodikos) !== String(second.kodikos)) throw conflict('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο.');
+    if (String(first.ypokatasthma) !== String(second.ypokatasthma) || String(first.kodikos) !== String(second.kodikos)) throw conflict('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο.', 'REPO_DECISION_INPUT_CHANGED');
     const week = weekBounds(first.hmeromhnia);
-    if (!week || dateKey(second.hmeromhnia) < week.start || dateKey(second.hmeromhnia) > week.end) throw conflict('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο.');
+    if (!week || dateKey(second.hmeromhnia) < week.start || dateKey(second.hmeromhnia) > week.end) throw conflict('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο.', 'REPO_DECISION_INPUT_CHANGED');
     const weekRows = await prodhlomenaModel.find({
         team: scope.team, company_kod: scope.company_kod, ypokatasthma: first.ypokatasthma,
         kodikos: first.kodikos,
@@ -93,7 +93,7 @@ async function defaultContextLoader({
     })).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean();
     const employee = buildCompanyWideUniqueEmployeeByKodikos(employeeCandidates).get(String(first.kodikos));
     if (!employee || !isEmployeeCompatibleWithBranch(employee, first.ypokatasthma)) {
-        throw conflict('Τα στοιχεία του εργαζομένου έχουν αλλάξει. Ανανεώστε τον έλεγχο.');
+        throw conflict('Τα στοιχεία του εργαζομένου έχουν αλλάξει. Ανανεώστε τον έλεγχο.', 'REPO_EMPLOYEE_REFERENCE_CHANGED');
     }
     const periodStart = new Date(`${week.start}T00:00:00.000Z`);
     const periodEnd = new Date(`${week.end}T23:59:59.999Z`);
@@ -131,7 +131,8 @@ async function defaultContextLoader({
             employee, reviewDate: row.hmeromhnia, normalHistory: history
         });
         if (resolution.blocked === true) throw conflict(
-            resolution.resolution_reason || 'Δεν επιλύθηκε η εταιρεία αργιών.');
+            resolution.resolution_reason || 'Δεν επιλύθηκε η εταιρεία αργιών.',
+            'REPO_HOLIDAY_CONTEXT_UNRESOLVED', [resolution.resolution_reason].filter(Boolean));
         effectiveHolidayContextsByCompany.set(
             resolution.effective_company_id, resolution.holidayContext);
         const key = dateKey(row.hmeromhnia);
@@ -237,7 +238,7 @@ async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLo
     const context = await contextLoader({ scope, sourceId: command.expected_source_id, targetId: command.expected_target_id });
     if (!Array.isArray(context.candidates) || context.candidates.length !== 2) throw conflict('Η πρόταση δεν είναι πλέον διαθέσιμη. Ανανεώστε τον έλεγχο.');
     const candidateScopes = new Set(context.candidates.map((row) => [String(row.team), String(row.company_kod), String(row.ypokatasthma), String(row.kodikos)].join('|')));
-    if (candidateScopes.size !== 1 || context.candidates.some((row) => String(row.team) !== String(scope.team) || String(row.company_kod) !== String(scope.company_kod) || !String(row.ypokatasthma || '').trim() || !String(row.kodikos || '').trim())) throw conflict('Τα στοιχεία της πρότασης δεν ανήκουν στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.');
+    if (candidateScopes.size !== 1 || context.candidates.some((row) => String(row.team) !== String(scope.team) || String(row.company_kod) !== String(scope.company_kod) || !String(row.ypokatasthma || '').trim() || !String(row.kodikos || '').trim())) throw conflict('Τα στοιχεία της πρότασης δεν ανήκουν στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.', 'REPO_PROPOSAL_SCOPE_CONFLICT');
     const auditCounts = new Map(); context.audits.forEach((audit) => { const id = String(audit.prodhlomena_oraria_id); auditCounts.set(id, (auditCounts.get(id) || 0) + 1); });
     const contractVersion = command.expected_proposal_version === PROPOSAL_VERSION
         ? normalizeEmploymentType(context.employmentProfile?.typos_apasxolhshs) ===
@@ -246,14 +247,14 @@ async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLo
             : 'v2'
         : null;
     if (!contractVersion) {
-        throw conflict('Η έκδοση της πρότασης δεν υποστηρίζεται.');
+        throw conflict('Η έκδοση της πρότασης δεν υποστηρίζεται.', 'REPO_PROPOSAL_VERSION_NOT_SUPPORTED');
     }
     const projection = projectionBuilder({ weekRows: context.weekRows, employmentProfile: context.employmentProfile || context.employee, holidayByDateKey: context.holidayByDateKey || new Map(), existingAuditCountByRowKey: auditCounts, contractVersion });
-    if (projection.projection_status !== PROJECTION_STATUS.READY || projection.groups?.length !== 1) throw conflict('Η πρόταση δεν είναι πλέον διαθέσιμη. Ανανεώστε τον έλεγχο.');
+    if (projection.projection_status !== PROJECTION_STATUS.READY || projection.groups?.length !== 1) throw conflict('Η πρόταση δεν είναι πλέον διαθέσιμη. Ανανεώστε τον έλεγχο.', 'REPO_PROPOSAL_NOT_AVAILABLE', projection.reasons || []);
     const group = projection.groups[0]; const items = group.items || [];
-    if (items.length !== 2 || items[0]?.role !== 'SOURCE_BECOMES_WORK' || items[1]?.role !== 'TARGET_BECOMES_REPO') throw conflict('Η συνδεδεμένη πρόταση δεν είναι έγκυρη. Ανανεώστε τον έλεγχο.');
-    if (group.group_id !== command.proposal_id || items[0].prodhlomena_oraria_id !== command.expected_source_id || items[1].prodhlomena_oraria_id !== command.expected_target_id || group.pair_contract.proposal_version !== command.expected_proposal_version || group.pair_contract.choice_code !== command.expected_choice_code) throw conflict('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο.');
-    if (items.some((item) => item.flags?.approval_supported !== false || item.flags?.runtime_apply_supported !== false)) throw conflict('Η πρόταση δεν είναι διαθέσιμη για καταγραφή.');
+    if (items.length !== 2 || items[0]?.role !== 'SOURCE_BECOMES_WORK' || items[1]?.role !== 'TARGET_BECOMES_REPO') throw conflict('Η συνδεδεμένη πρόταση δεν είναι έγκυρη. Ανανεώστε τον έλεγχο.', 'REPO_PROPOSAL_MEMBERS_INVALID');
+    if (group.group_id !== command.proposal_id || items[0].prodhlomena_oraria_id !== command.expected_source_id || items[1].prodhlomena_oraria_id !== command.expected_target_id || group.pair_contract.proposal_version !== command.expected_proposal_version || group.pair_contract.choice_code !== command.expected_choice_code) throw conflict('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο.', 'REPO_DECISION_INPUT_CHANGED');
+    if (items.some((item) => item.flags?.approval_supported !== false || item.flags?.runtime_apply_supported !== false)) throw conflict('Η πρόταση δεν είναι διαθέσιμη για καταγραφή.', 'REPO_PROPOSAL_RECORDING_NOT_AVAILABLE');
     const snapshot = buildCanonicalSnapshot({ scope, context, group });
     return { snapshot, fingerprint: fingerprintSnapshot(snapshot), group, context };
 }
