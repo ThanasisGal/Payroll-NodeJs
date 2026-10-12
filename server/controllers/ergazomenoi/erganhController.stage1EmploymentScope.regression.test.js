@@ -8,6 +8,8 @@ const period = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodS
 const { distinctHireDates } = require('../../services/ergazomenoi/employeeEmploymentCycleContextLoaderService');
 const { buildWeeklyHrLifecycleProjection } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildWeeklyHrWorkflowProjection } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowProjectionService');
+const { deriveStage1PeriodSlice } = require('../../services/ergazomenoi/apasxoliseisStage1PeriodSliceService');
+const { buildWeeklyRepoTransferAtomicInputForPreparedWeek } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
 const { resolveDailyActualWorkFacts } = require('../../services/ergazomenoi/apasxoliseisDailyActualWorkFactsService');
 const source = fs.readFileSync(require.resolve('./erganhController'), 'utf8');
 const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
@@ -71,7 +73,8 @@ async function preparedLifecycle(rows, lifecycleEmployee = employee) {
         periodStart: ownershipPeriod.period_start, periodEnd: ownershipPeriod.period_end })).lifecycleByWeek;
 }
 async function bulkPayload(rows, lifecycle) {
-    rows.__preparedPolicyContextRows = rows.slice();
+    rows.__preparedPolicyContextRows = period.restrictWeeklyReviewRowsToEmploymentDates(
+        rows, lifecycle.get(weekKey)?.employment_date_scope);
     rows.__lifecycleByWeek = lifecycle;
     const body = section('    static getWeeklyHrWorkflowStage1Bulk =',
         '    static exportProdhlomenaOrariaReviewAuditDossierPdf =')
@@ -84,9 +87,7 @@ async function bulkPayload(rows, lifecycle) {
         stage3AuditDecisionDatesByEmployeeWeek: () => new Map(),
         validateApplySession() {}, getWeeklyRepoTransferApplyRuntimeState: async () => ({ enabled: false }),
         getWeeklyHrWorkflowIndexState: async () => ({ ready: true }),
-        // A separate Stage-2 failure must not suppress the Stage-1 payload.
-        buildWeeklyRepoTransferAtomicInputForPreparedWeek: () => ({
-            reason: 'INCOMPLETE_EMPLOYEE_WEEK', diagnostic: { reason: 'INCOMPLETE_EMPLOYEE_WEEK' } }),
+        buildWeeklyRepoTransferAtomicInputForPreparedWeek,
         resolveStage3DailyActualWorkFacts: resolveDailyActualWorkFacts,
         resolveAuthoritativeHolidayClassification: () => ({ eligible: false }),
         stage1HolidayEligibilityContext: () => ({}), normalizeReviewEmploymentType: String,
@@ -98,6 +99,93 @@ async function bulkPayload(rows, lifecycle) {
     assert.equal(result.payloads.length, 1);
     return result.payloads[0];
 }
+
+test('28 September is the only required day of the 28 September–4 October departure week', async () => {
+    const rows = leaveRows();
+    Object.assign(rows[0], { hmeromhnia: new Date('2026-09-28T00:00:00.000Z'),
+        adeia_apologistika: false, kathgoria_adeias_apologistika: '',
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        cards_apo_ora_01: '13:00', cards_eos_ora_01: '21:00', cards_ores_ergasias: 8 });
+    rows.push(...[1, 2, 3, 4].map(day => ({ ...leaveRows()[0],
+        _id: `synthetic-excluded-october-${day}`, hmeromhnia: `2026-10-0${day}`,
+        cards_apo_ora_01: '13:00', cards_ores_ergasias: -1 })));
+    const before = structuredClone(rows);
+    for (const lifecycle of [exportLifecycle(rows), await preparedLifecycle(rows)]) {
+        const payload = await bulkPayload(rows.slice(), lifecycle);
+        assert.deepEqual(payload.rows.map(row => dates.dateKeyUtc(row.hmeromhnia)), ['2026-09-28']);
+        assert.deepEqual(payload.lifecycle_projection.employment_date_scope.employment_owned_dates, ['2026-09-28']);
+        assert.deepEqual(payload.lifecycle_projection.employment_date_scope.authoritative_date_set, ['2026-09-28']);
+        // The natural week crosses September, but its employment-owned dates do not.
+        assert.equal(payload.lifecycle_projection.stages.stage1.period_slice, null);
+        assert.throws(() => deriveStage1PeriodSlice({ weekRows: payload.rows,
+            week_start: scope.week_start, week_end: scope.week_end, ...ownershipPeriod,
+            employment_date_scope: payload.lifecycle_projection.employment_date_scope }),
+        { code: 'STAGE1_PERIOD_SLICE_NOT_CROSS_BOUNDARY' });
+        assert.deepEqual(payload.workflow.blocking_reasons, []);
+        assert.deepEqual(payload.workflow.blocking_details, []);
+        assert.equal(payload.lifecycle_projection.stages.stage1.business_status, 'COMPLETED');
+        assert.deepEqual(payload.lifecycle_projection.stages.stage1.diagnostics, []);
+        assert.equal(payload.stage1_daily_presentation[0].actual_work_hours, 8);
+        assert.equal(payload.stage1_daily_presentation[0].card_hours, 8);
+        for (const stage of Object.values(payload.lifecycle_projection.stages)) {
+            assert.equal(stage.business_status, 'COMPLETED');
+            assert.deepEqual(stage.blockers, []);
+        }
+    }
+    assert.deepEqual(rows, before);
+});
+
+test('departure-week completeness evidence distinguishes a missing day from duplicate 28 September rows', async () => {
+    const employmentDateScope = period.deriveEmploymentOwnedDateScope({
+        natural_week_start: scope.week_start, natural_week_end: scope.week_end,
+        ...ownershipPeriod, hire_date: employee.hmeromhnia_proslhpshs,
+        departure_date: employee.hmeromhnia_apoxorhshs });
+    for (const [input, missing, duplicates, actualCount] of [
+        [leaveRows().slice(1), ['2026-09-28'], [], 0],
+        [[...leaveRows(), { ...leaveRows()[0], _id: 'synthetic-duplicate-28',
+            hmeromhnia: new Date('2026-09-28T00:00:00.000Z') }], [], ['2026-09-28'], 2]
+    ]) {
+        const before = structuredClone(input);
+        const weekRows = period.restrictWeeklyReviewRowsToEmploymentDates(input, employmentDateScope);
+        const projection = buildWeeklyHrWorkflowProjection({ weekRows, effectiveProfile: profile,
+            scope, period_scope: employmentDateScope, employment_date_scope: employmentDateScope,
+            expected_date_keys: employmentDateScope.employment_owned_dates });
+        const diagnostic = projection.workflow.blocking_details.find(item => item.code === 'INCOMPLETE_NATURAL_WEEK');
+        assert.ok(diagnostic);
+        assert.deepEqual(diagnostic.evidence, { missing_dates: missing, duplicate_dates: duplicates,
+            unexpected_dates: [], invalid_date_count: 0, required_count: 1, actual_count: actualCount });
+        assert.throws(() => deriveStage1PeriodSlice({ weekRows,
+            week_start: scope.week_start, week_end: scope.week_end, ...ownershipPeriod,
+            employment_date_scope: employmentDateScope }), { code: 'INCOMPLETE_NATURAL_WEEK' });
+        const lifecycle = buildWeeklyHrLifecycleProjection({ weekRows,
+            effectiveProfile: profile, scope, employmentDateScope });
+        assert.equal(lifecycle.stages.stage1.business_status, 'BLOCKED');
+        assert.deepEqual(lifecycle.stages.stage1.diagnostics.find(item =>
+            item.code === 'INCOMPLETE_NATURAL_WEEK').evidence, diagnostic.evidence);
+        if (duplicates.length) {
+            const payload = await bulkPayload(input.slice(), exportLifecycle(input));
+            assert.deepEqual(payload.workflow.blocking_details.find(item =>
+                item.code === 'INCOMPLETE_NATURAL_WEEK').evidence, diagnostic.evidence);
+        }
+        assert.deepEqual(input, before);
+    }
+});
+
+test('an incomplete full employment week retains its independent Stage-2 preparation diagnostic', async () => {
+    const ongoingEmployee = { ...employee, hmeromhnia_apoxorhshs: null };
+    const rows = [...leaveRows(), ...[1, 2, 3, 4].map(day => ({ ...leaveRows()[0],
+        _id: `synthetic-active-october-${day}`, hmeromhnia: `2026-10-0${day}` }))]
+        .filter(row => row.hmeromhnia !== '2026-09-29');
+    for (const lifecycle of [exportLifecycle(rows, ongoingEmployee),
+        await preparedLifecycle(rows, ongoingEmployee)]) {
+        assert.equal(lifecycle.get(weekKey).employment_date_scope.is_full_natural_week, true);
+        const payload = await bulkPayload(rows.slice(), lifecycle);
+        assert.ok(payload.lifecycle_projection.stages.stage1.blockers.includes('INCOMPLETE_NATURAL_WEEK'));
+        assert.deepEqual(payload.lifecycle_projection.stages.stage1.diagnostics.find(item =>
+            item.code === 'INCOMPLETE_NATURAL_WEEK').evidence.missing_dates, ['2026-09-29']);
+        assert.ok(payload.lifecycle_projection.stages.stage2.blockers.includes('INCOMPLETE_EMPLOYEE_WEEK'));
+    }
+});
 
 test('search, export and bulk Stage 1 exclude post-departure leave without changing it', async () => {
     const rows = leaveRows(); const before = structuredClone(rows);
@@ -117,6 +205,8 @@ test('search, export and bulk Stage 1 exclude post-departure leave without chang
         assert.equal(payload.stage1_daily_presentation[0].actual_work_hours, 0);
         assert.equal(payload.stage1_daily_presentation[0].card_hours, 0);
         assert.equal(payload.stage1_daily_presentation[0].current_apologistiko_classification, 'ΑΔΕΙΑ');
+        assert.equal(payload.lifecycle_projection.stages.stage2.business_status, 'COMPLETED');
+        assert.deepEqual(payload.lifecycle_projection.stages.stage2.blockers, []);
     }
     assert.deepEqual(rows, before);
 });
@@ -183,6 +273,7 @@ test('before hire and a rehire gap are excluded in search, export, bulk and all 
             assert.deepEqual(result.stages.stage1.blockers, []);
             const payload = await bulkPayload(rows.slice(), lifecycle);
             assert.deepEqual(payload.rows.map(row => row.hmeromhnia), item.owned);
+            assert.deepEqual(payload.lifecycle_projection.stages.stage2.blockers, []);
             assert.deepEqual(payload.lifecycle_projection.stages.stage3.pending_dates, []);
         }
     }

@@ -12261,6 +12261,11 @@ class erganhController {
                 const employeeCode = String(requested.employee_kodikos || '').trim();
                 const weekStart = dateKeyUtc(requested.week_start);
                 const key = `${employeeCode}|${weekStart}`;
+                // Weekly repo transfer is not applicable to a partial employment week.
+                // Its owned-date completeness and daily errors remain in the lifecycle.
+                if (lifecycleByWeek.get(key)?.employment_date_scope?.is_full_natural_week === false) {
+                    continue;
+                }
                 const weekRows = (rowsByWeek.get(key) || []).slice().sort((left, right) =>
                     dateKeyUtc(left.hmeromhnia).localeCompare(dateKeyUtc(right.hmeromhnia)));
                 const weekEnd = dateKeyUtc(requested.week_end || endOfWeekSundayUtc(weekStart));
