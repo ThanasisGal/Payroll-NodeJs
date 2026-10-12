@@ -11303,7 +11303,8 @@ let employmentReviewGuidanceIdentity = '';
 function renderEmploymentReviewGuidance(lifecycle, payloads) {
     const active = lifecycle.current_stage;
     const identity = [active, payloads[0]?.scope?.period_start,
-        payloads[0]?.scope?.period_end, payloads[0]?.scope?.ypokatasthma].join('|');
+        payloads[0]?.scope?.period_end, payloads[0]?.scope?.ypokatasthma,
+        payloads[0]?.scope?.employee_id, payloads[0]?.scope?.employee_kodikos].join('|');
     if (identity !== employmentReviewGuidanceIdentity) employmentReviewGuidanceIndex = 0;
     employmentReviewGuidanceIdentity = identity;
     employmentReviewGuidanceTargets = active ? EmploymentReviewGuidanceUi.targets(payloads, active) : [];
