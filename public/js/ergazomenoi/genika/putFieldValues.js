@@ -1,3 +1,30 @@
+function employeeMaintenanceSuccessMessage(data) {
+    return data?.historyUpdated === true
+        ? 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου και το Ιστορικό.'
+        : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.';
+}
+
+// Only successful saves own the timed return; errors, decisions and previews
+// keep their existing dismissal behavior.
+function employeeSaveSuccessOptions(options) {
+    const automatic = options.showConfirmButton === false && Number.isFinite(options.timer);
+    return { ...options,
+        ...(automatic ? { timer: 2000, allowOutsideClick: false, allowEscapeKey: false, returnFocus: false } : {}),
+        customClass: { ...options.customClass,
+            popup: `${options.customClass?.popup || ''} employee-save-success`.trim() }
+    };
+}
+
+async function showEmployeeSaveRedirectNotice(response, destination, swal, origin) {
+    const target = new URL(destination, origin);
+    // Authentication and other redirects keep their own behavior. Only a
+    // successful return to the employee list is a Save confirmation.
+    if (target.origin !== origin || target.pathname !== '/ergazomenoi/ergazomenoi' ||
+        !(response.ok || (response.status >= 300 && response.status < 400))) return;
+    await swal.fire(employeeSaveSuccessOptions({ icon: 'success', title: 'Επιτυχής καταχώριση!',
+        text: employeeMaintenanceSuccessMessage({}), timer: 2000, showConfirmButton: false }));
+}
+
 // public\js\ergazomenoi\genika\putFieldValues.js
 
 async function runTemporaryTerminationXmlAfterEmployeeSave({
@@ -42,6 +69,12 @@ function withCompactOrdinarySwalClasses(options) {
     } };
 }
 
+function withEmployeeMaintenanceButtonStyles(options) {
+    const styled = withCompactOrdinarySwalClasses(options);
+    return { ...styled, customClass: { ...styled?.customClass,
+        popup: `${styled?.customClass?.popup || ''} employee-maintenance-swal`.trim() } };
+}
+
 function createSingleFlight() {
     let inProgress = false;
     return async action => {
@@ -55,15 +88,19 @@ function createSingleFlight() {
 async function continueEmployeeSaveAfterReconstruction({ response, originalPayload, retryRequest, previewUi, swal }) {
     if (!response.headers.get('content-type')?.includes('application/json')) return { response, originalPayload };
     const data = await response.clone().json();
+    const departure = data?.reason === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED_FOR_DEPARTURE' &&
+        data.operation === 'FIRST_DEPARTURE' &&
+        data.nextAction?.type === 'APPROVE_HISTORY_RECONSTRUCTION_AND_CONTINUE_DEPARTURE';
     if (response.status !== 200 || data?.actionRequired !== true ||
-        data.reason !== 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED') return { response, originalPayload };
+        (!departure && data.reason !== 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_REQUIRED')) return { response, originalPayload };
     swal.close();
     if (!previewUi?.approveForSave) {
         await swal.fire({ icon: 'warning', title: 'Η αποθήκευση σταμάτησε',
             text: 'Δεν φορτώθηκε η προεπισκόπηση του Ιστορικού. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Κλείστε το μήνυμα· οι αλλαγές παραμένουν στη φόρμα.\n2. Δοκιμάστε ξανά ή ζητήστε βοήθεια από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΠΟΘ-01.' });
         return { cancelled: true };
     }
-    const approved = await previewUi.approveForSave({ preview: data.reconstructionPreview, token: data.previewToken });
+    const approved = await previewUi.approveForSave({ preview: data.reconstructionPreview, token: data.previewToken,
+        operation: departure ? 'FIRST_DEPARTURE' : 'EMPLOYEE_SAVE' });
     if (!approved) return { cancelled: true };
     const approvedPayload = { ...originalPayload, reconstruction: { previewToken: data.previewToken, approvalAccepted: true } };
     const finalResponse = await retryRequest(approvedPayload);
@@ -78,54 +115,21 @@ async function continueEmployeeSaveAfterReconstruction({ response, originalPaylo
 async function handleEmployeeSaveHistoryAction(response, data, { swal, documentRef }) {
     const action = data?.nextAction;
     if (response.status !== 200 || !response.ok || data?.success !== false ||
-        data?.actionRequired !== true ||
-        data?.reason !== 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE' ||
-        action?.type !== 'OPEN_EMPLOYEE_HISTORY_REVIEW' ||
-        !(action.targetHistoryId === null ||
-            (typeof action.targetHistoryId === 'string' && /^[a-f0-9]{24}$/i.test(action.targetHistoryId))) ||
-        typeof data.message !== 'string' || !data.message.trim()) return false;
-
-    const choice = await swal.fire({
-        icon: 'warning', title: 'Χρειάζεται έλεγχος του Ιστορικού',
-        text: data.message, showCancelButton: true,
-        confirmButtonText: 'Έλεγχος Ιστορικού', cancelButtonText: 'Παραμονή στη φόρμα',
-        allowOutsideClick: false, allowEscapeKey: true, returnFocus: false
-    });
-    if (!choice.isConfirmed) return true;
-
-    const historyTab = [...documentRef.querySelectorAll('.menu_Links li')].find(
+        data?.actionRequired !== true || action?.type !== 'OPEN_EMPLOYEE_HISTORY_TAB' ||
+        !['EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_DEPARTURE_BLOCKED'].includes(data.reason)) return false;
+    const tab = [...documentRef.querySelectorAll('.menu_Links li')].find(
         link => link.textContent.trim() === 'Ιστορικό Προσλήψεων/Αλλαγών');
-    if (historyTab && !historyTab.classList.contains('active')) historyTab.click();
-
-    const table = documentRef.getElementById('istorikoTable');
-    const targetRows = action.targetHistoryId && table
-        ? table.querySelectorAll(`tr.istoriko-row[data-id="${action.targetHistoryId}"]`) : [];
-    const row = targetRows.length === 1 ? targetRows[0] : null;
-    const review = row?.querySelector('[data-action="review"]');
-    const accessMode = table?.dataset.historyAccessMode ||
-        (table?.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
-    const allowed = accessMode === 'ADMIN_FULL' ||
-        (accessMode === 'SUPERVISOR_PROBLEM_SCOPE' && row?.dataset.canManageRow === 'true');
-    if (historyTab?.classList.contains('active') && review && allowed &&
-        row.dataset.state !== 'deleted' && !review.disabled &&
-        !review.matches(':disabled') && review.getAttribute('aria-disabled') !== 'true') {
-        review.click();
-        return true;
-    }
-    await swal.fire({
-        icon: 'info', title: 'Επιλέξτε την εγγραφή στο Ιστορικό',
-        text: 'Η εφαρμογή δεν μπορεί να επιλέξει με ασφάλεια ποια εγγραφή αφορά η αλλαγή. ' +
-            'Ελέγξτε το Ιστορικό και επιλέξτε «Έλεγχος / Διόρθωση» στην εγγραφή που γνωρίζετε ότι αφορά τη μεταβολή. ' +
-            'Δεν αποθηκεύτηκε καμία αλλαγή.',
-        confirmButtonText: 'Κλείσιμο', allowOutsideClick: false
-    });
+    if (tab && !tab.classList.contains('active')) tab.click();
+    await swal.fire({ icon: 'info', title: 'Χρειάζεται έλεγχος του Ιστορικού', text: data.message,
+        confirmButtonText: 'Κλείσιμο', allowOutsideClick: false, returnFocus: false,
+        customClass: { popup: 'employee-maintenance-swal', confirmButton: 'employee-maintenance-button' } });
     return true;
 }
 
 async function handleEmployeeSaveHistoryStale(response, data, { swal }) {
     if (response.status !== 409 || data?.success !== false ||
-        !['EMPLOYEE_HISTORY_USER_CORRECTION_STALE', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE'].includes(data?.reason)) return false;
-    if (data.reason === 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE') {
+        !['EMPLOYEE_PROFILE_STALE', 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE'].includes(data?.reason)) return false;
+    if (['EMPLOYEE_PROFILE_STALE', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_STALE'].includes(data.reason)) {
         await swal.fire({ icon: 'warning', title: 'Τα στοιχεία άλλαξαν', text: data.message,
             confirmButtonText: 'Κλείσιμο', allowOutsideClick: false });
         return true;
@@ -160,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const Swal = new Proxy(window.Swal, {
         get(target, property) {
             if (property === 'fire') return options =>
-                target.fire(withCompactOrdinarySwalClasses(options));
+                target.fire(withEmployeeMaintenanceButtonStyles(options));
             const value = target[property];
             return typeof value === 'function' ? value.bind(target) : value;
         }
@@ -760,7 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και διόρθωσε τα πεδία.
                         </p>
                     `,
-                    confirmButtonText: 'OK',
+                    confirmButtonText: 'Εντάξει',
                     customClass: {
                         confirmButton: 'class-error custom-confirm-button custom-swal-button',
                         title: 'custom-title',
@@ -801,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <p class="font-weight-600 margin-bottom-0_5rem">Μεταβολές Εργασιακής Σχέσης:</p>
 
         <!-- ── Checkbox: Ψηφιακή Οργάνωση Χρόνου Εργασίας για Μεταβολές ── -->
-        <div class="display-flex align-items-center gap-0_75rem">
+        <div class="employee-maintenance-choice">
             <input type="checkbox"
                 id="wto_pshfiakh_organosh_xronoy_ergasias_metaboles"
                 name="wto_pshfiakh_organosh_xronoy_ergasias_metaboles"
@@ -813,21 +817,21 @@ document.addEventListener('DOMContentLoaded', () => {
             </label>
         </div>
 
-        <div class="display-flex align-items-center gap-0_75rem">
+        <div class="employee-maintenance-choice">
             <input type="radio" id="metaboles_none" name="metaboles_action"
                 value="none" class="custom-radio" checked />
             <label for="metaboles_none" class="margin-0 cursor-pointer font-size-rem-1_05">
                 Χωρίς Μεταβολή ΕΡΓΑΝΗ
             </label>
         </div>
-        <div class="display-flex align-items-center gap-0_75rem">
+        <div class="employee-maintenance-choice">
             <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs" name="metaboles_action"
                 value="e3_metaboles_ergasiakhs_sxeshs" class="custom-radio" />
             <label for="e3_metaboles_ergasiakhs_sxeshs" class="margin-0 cursor-pointer font-size-rem-1_05">
                 ΜΕΤΑΒΟΛΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ
             </label>
         </div>
-        <div class="display-flex align-items-center gap-0_75rem">
+        <div class="employee-maintenance-choice">
             <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
                 name="metaboles_action"
                 value="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
@@ -847,105 +851,105 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `
                     <hr class="hr-style" />
                     <p class="font-weight-600 margin-bottom-0_5rem">Τύπος Λήξης Εργασίας:</p>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="lhxh_none" name="lhxh_type"
                             value="none" class="custom-radio" checked />
                         <label for="lhxh_none" class="margin-0 cursor-pointer font-size-rem-1_05">
                             Χωρίς Λήξη ΕΡΓΑΝΗ
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_222_lysh_symbashs_orismenoy_xronoy" name="lhxh_type"
                             value="ma_222" class="custom-radio" />
                         <label for="ma_222_lysh_symbashs_orismenoy_xronoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             Λύση Σύμβασης Ορισμένου Χρόνου (E7N)
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_227_lysh_dokimastikhs_periodoy" name="lhxh_type"
                             value="ma_227" class="custom-radio" />
                         <label for="ma_227_lysh_dokimastikhs_periodoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Αυτοδίκαιη Λύση Δοκιμαστικής Περιόδου
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_217_oikeiothelhs_apoxorhsh" name="lhxh_type"
                             value="ma_217" class="custom-radio" />
                         <label for="ma_217_oikeiothelhs_apoxorhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Οικειοθελής Αποχώρηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_221_lysh_kataggelia_me_proeidopoihsh" name="lhxh_type"
                             value="ma_221" class="custom-radio" />
                         <label for="ma_221_lysh_kataggelia_me_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης με Προειδοποίηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_220_lysh_kataggelia_xoris_proeidopoihsh" name="lhxh_type"
                             value="ma_220" class="custom-radio" />
                         <label for="ma_220_lysh_kataggelia_xoris_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης Χωρίς Προειδοποίηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_218_lysh_dhloshs_oxlhshs" name="lhxh_type"
                             value="ma_218" class="custom-radio" />
                         <label for="ma_218_lysh_dhloshs_oxlhshs" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Δήλωση Όχλησης για δυνατότητα Οικειοθελούς Αποχώρησης
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh" name="lhxh_type"
                             value="ma_219" class="custom-radio" />
                         <label for="ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Οικειοθελής Αποχώρηση μετά από Όχληση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_223_lysh_ethelousia_exodos" name="lhxh_type"
                             value="ma_223" class="custom-radio" />
                         <label for="ma_223_lysh_ethelousia_exodos" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Εθελούσια Έξοδος
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_229_lhxh_daneismoy" name="lhxh_type"
                             value="ma_229" class="custom-radio" />
                         <label for="ma_229_lhxh_daneismoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Λήξη Δανεισμού από επιχείρηση/Τοποθέτησης από ΕΠΑ
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_226_lhxh_logo_thanatoy" name="lhxh_type"
                             value="ma_226" class="custom-radio" />
                         <label for="ma_226_lhxh_logo_thanatoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Λήξη λόγω Θανάτου
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_228_metavivash_se_epixeirish" name="lhxh_type"
                             value="ma_228" class="custom-radio" />
                         <label for="ma_228_metavivash_se_epixeirish" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Μεταβίβαση σε Επιχείρηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh" name="lhxh_type"
                             value="ma_224" class="custom-radio" />
                         <label for="ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Συνταξιοδότηση με Οικειοθελή Αποχώρηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh" name="lhxh_type"
                             value="ma_225" class="custom-radio" />
                         <label for="ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Συνταξιοδότηση με Καταγγελία Σύμβασης Χωρίς Προειδοποίηση
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio" id="ma_236_oikeiothelhs_apoxorhsh_logo_15etias" name="lhxh_type"
                             value="ma_236" class="custom-radio" />
                         <label for="ma_236_oikeiothelhs_apoxorhsh_logo_15etias" class="margin-0 cursor-pointer font-size-rem-1_05">
@@ -964,7 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `
                     <hr class="hr-style" />
                     <p class="font-weight-600 margin-bottom-0_5rem">Ενέργεια ΕΡΓΑΝΗ:</p>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio"
                             id="ergani_action_none"
                             name="ergani_main_action"
@@ -976,7 +980,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             Χωρίς ενέργεια ΕΡΓΑΝΗ
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio"
                             id="e3_anaggelia_proslhpshs"
                             name="ergani_main_action"
@@ -987,7 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             Αναγγελία Πρόσληψης (E3N)
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio"
                             id="wto_pshfiakh_organosh_xronoy_ergasias"
                             name="ergani_main_action"
@@ -998,7 +1002,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
                         </label>
                     </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
+                    <div class="employee-maintenance-choice">
                         <input type="radio"
                             id="ergani_action_both"
                             name="ergani_main_action"
@@ -1022,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <!-- ── Radio group: Τρόπος Αποθήκευσης ── -->
                         <p class="font-weight-600 margin-bottom-0_5rem">Τρόπος Αποθήκευσης:</p>
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                 id="storage_temporary"
                                 name="storage_mode"
@@ -1035,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 Προσωρινή Αποθήκευση (XML)
                             </label>
                         </div>
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                 id="storage_permanent"
                                 name="storage_mode"
@@ -1051,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <!-- ── Checkbox: Δημιουργία Σύμβασης (ανεξάρτητη επιλογή) ── -->
                         <hr class="hr-style" />
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="checkbox"
                                 id="create_contract"
                                 name="files"
@@ -1514,6 +1518,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                await showEmployeeSaveRedirectNotice(response, response.url, Swal, window.location.origin);
                 window.location.href = response.url;
                 return;
             }
@@ -1539,6 +1544,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const abs = loc.startsWith('http')
                         ? loc
                         : new URL(loc, window.location.origin).toString();
+                    await showEmployeeSaveRedirectNotice(response, abs, Swal, window.location.origin);
                     window.location.href = abs;
                     return;
                 }
@@ -1560,11 +1566,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         allowOutsideClick: false,
                         icon: 'warning',
                         title: 'Ο εργαζόμενος αποθηκεύτηκε',
-                        html: `<p><strong>Αλλά το PDF δεν ανέβηκε!</strong></p>
-                            <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
-                                Ο server επέστρεψε 204 No Content χωρίς ID εργαζόμενου.
-                            </p>`,
-                        confirmButtonText: 'OK',
+                        html: `<p>Τα στοιχεία του εργαζομένου αποθηκεύτηκαν, αλλά το αρχείο PDF δεν αποθηκεύτηκε.
+                            Η εφαρμογή δεν επέστρεψε τα στοιχεία που χρειάζονται για την αποθήκευση του αρχείου.</p>
+                            <ol><li>Ανοίξτε ξανά τη Συντήρηση του εργαζομένου από τον πίνακα.</li>
+                            <li>Επιλέξτε ξανά το αρχείο και πατήστε «Αποθήκευση».</li></ol>`,
+                        confirmButtonText: 'Εντάξει',
                         customClass: {
                             confirmButton: 'class-warning custom-confirm-button custom-swal-button',
                             title: 'custom-title',
@@ -1572,19 +1578,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }).then(() => (window.location.href = '/ergazomenoi/ergazomenoi'));
                 } else {
-                    await Swal.fire({
+                    await Swal.fire(employeeSaveSuccessOptions({
                         backdrop: false,
                         allowOutsideClick: false,
                         icon: 'success',
                         title: 'Επιτυχής καταχώριση!',
-                        timer: 1200,
+                        timer: 2000,
                         showConfirmButton: false,
                         customClass: {
                             confirmButton: 'class-success custom-confirm-button custom-swal-button',
                             title: 'custom-title',
                             popup: 'custom-swal-popup'
                         }
-                    }).then(() => (window.location.href = '/ergazomenoi/ergazomenoi'));
+                    })).then(() => (window.location.href = '/ergazomenoi/ergazomenoi'));
                 }
                 return;
             }
@@ -1901,7 +1907,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         ? 'Επιτυχής προσωρινή καταχώριση XML'
                                         : 'Αποτυχία προσωρινής καταχώρισης XML',
                                     text: uploadResult?.message || uploadResult?.error || '',
-                                    confirmButtonText: 'OK',
+                                    confirmButtonText: 'Εντάξει',
                                     customClass: {
                                         confirmButton: uploadResult?.success
                                             ? 'class-success custom-confirm-button custom-swal-button'
@@ -1919,7 +1925,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 icon: 'error',
                                 title: 'Αποτυχία προσωρινής καταχώρισης XML',
                                 text: maResult.error,
-                                confirmButtonText: 'OK',
+                                confirmButtonText: 'Εντάξει',
                                 customClass: {
                                     confirmButton: 'class-error custom-confirm-button custom-swal-button',
                                     title: 'custom-title',
@@ -2142,13 +2148,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     // ✅ COMMON SUCCESS SWAL (εμφανίζεται σε CASE A, B, C)
                     // =====================================================================
                     const showSuccessSwal = async () => {
-                        await Swal.fire({
+                        await Swal.fire(employeeSaveSuccessOptions({
                             backdrop: false,
                             allowOutsideClick: false,
                             icon: 'success',
                             title: 'Επιτυχής καταχώριση!',
                             html: `
-                <p>${data.automaticReconstructionApplied ? 'Η αποθήκευση ολοκληρώθηκε και το Ιστορικό τακτοποιήθηκε.' : 'Ο εργαζόμενος αποθηκεύτηκε!'}</p>
+                <p>${employeeMaintenanceSuccessMessage(data)}</p>
                 ${
                     successfulPdfs.length > 0
                         ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
@@ -2171,21 +2177,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                 isE6NRestSubmit ||
                                 isE6NXmlSubmit
                                     ? null
-                                    : 1500,
+                                    : 2000,
                             showConfirmButton:
                                 hasE3Xml ||
                                 hasWtoXml ||
                                 hasMAXml ||
                                 isE6NRestSubmit ||
                                 isE6NXmlSubmit,
-                            confirmButtonText: 'OK',
+                            confirmButtonText: 'Εντάξει',
                             customClass: {
                                 confirmButton:
                                     'class-success custom-confirm-button custom-swal-button',
                                 title: 'custom-title',
                                 popup: 'custom-swal-popup'
                             }
-                        });
+                        }));
                     };
 
                     // =====================================================================
@@ -2202,10 +2208,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 icon: 'warning',
                                 title: 'PDF Δημιουργήθηκε',
                                 html: `
-                    <p>Το PDF δημιουργήθηκε επιτυχώς!</p>
-                    <p class="text-warning">⚠️ Η αποστολή email δεν είναι διαθέσιμη (missing S3 key)</p>
+                    <p>Τα στοιχεία του εργαζομένου αποθηκεύτηκαν και το αρχείο PDF δημιουργήθηκε.
+                    Η αποστολή με ηλεκτρονικό ταχυδρομείο σταμάτησε επειδή το αρχείο δεν είναι διαθέσιμο για αποστολή.</p>
+                    <ol><li>Ανοίξτε ξανά τη Συντήρηση του εργαζομένου από τον πίνακα.</li>
+                    <li>Δοκιμάστε ξανά τη δημιουργία και αποστολή του εγγράφου ή ζητήστε βοήθεια από την τεχνική υποστήριξη.</li></ol>
                 `,
-                                confirmButtonText: 'OK'
+                                confirmButtonText: 'Εντάξει'
                             }).then(() => {
                                 window.location.href =
                                     data.redirectUrl || '/ergazomenoi/ergazomenoi';
@@ -2337,19 +2345,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                await Swal.fire({
+                await Swal.fire(employeeSaveSuccessOptions({
                     backdrop: false,
                     allowOutsideClick: false,
                     icon: 'success',
                     title: 'Επιτυχής καταχώριση!',
-                    timer: 1200,
+                    timer: 2000,
                     showConfirmButton: false,
                     customClass: {
                         confirmButton: 'class-success custom-confirm-button custom-swal-button',
                         title: 'custom-title',
                         popup: 'custom-swal-popup'
                     }
-                }).then(() => (window.location.href = '/ergazomenoi/ergazomenoi'));
+                })).then(() => (window.location.href = '/ergazomenoi/ergazomenoi'));
                 return;
             }
 
@@ -2665,7 +2673,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 //         : `<p class="text-muted mt-3">Δεν υπάρχει διαθέσιμο PDF για άνοιγμα.</p>`
                 // }
 
-                confirmButtonText: 'OK',
+                confirmButtonText: 'Εντάξει',
                 customClass: {
                     confirmButton: 'class-success custom-confirm-button custom-swal-button',
                     title: 'custom-title',
@@ -2801,7 +2809,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p>${result?.message || result?.userMessage || ''}</p>
                 ${result?.protocol ? `<p>Πρωτόκολλο: <b>${result.protocol}</b></p>` : ''}
             `,
-            confirmButtonText: 'OK',
+            confirmButtonText: 'Εντάξει',
             customClass: {
                 confirmButton: 'class-success custom-confirm-button custom-swal-button',
                 title: 'custom-title',
@@ -3099,7 +3107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'info',
                 title: 'Ακύρωση',
                 text: 'Δεν έγινε οριστική υποβολή στο ΕΡΓΑΝΗ.',
-                confirmButtonText: 'OK',
+                confirmButtonText: 'Εντάξει',
                 customClass: {
                     confirmButton: 'class-secondary custom-confirm-button custom-swal-button',
                     title: 'custom-title',
@@ -3340,7 +3348,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             icon: 'error',
                             title: 'E3 XML - ΕΡΓΑΝΗ ΙΙ',
                             text: 'Δεν βρέθηκε το path του E3 XML για αποστολή.',
-                            confirmButtonText: 'OK',
+                            confirmButtonText: 'Εντάξει',
                             customClass: {
                                 confirmButton:
                                     'class-error custom-confirm-button custom-swal-button',
@@ -3368,7 +3376,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 icon: 'error',
                                 title: 'E3 XML - ΕΡΓΑΝΗ ΙΙ',
                                 text: 'Αποτυχία αποστολής E3 XML.',
-                                confirmButtonText: 'OK',
+                                confirmButtonText: 'Εντάξει',
                                 customClass: {
                                     confirmButton:
                                         'class-error custom-confirm-button custom-swal-button',
@@ -3409,7 +3417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     icon: 'error',
                                     title: 'WTO XML - ΕΡΓΑΝΗ ΙΙ',
                                     text: 'Δεν βρέθηκε το path του WTO XML για αποστολή.',
-                                    confirmButtonText: 'OK',
+                                    confirmButtonText: 'Εντάξει',
                                     customClass: {
                                         confirmButton:
                                             'class-error custom-confirm-button custom-swal-button',
@@ -3462,7 +3470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     ${e?.message || 'Unknown error'}
                                 </p>
                             `,
-                            confirmButtonText: 'OK',
+                            confirmButtonText: 'Εντάξει',
                             customClass: {
                                 confirmButton:
                                     'class-error custom-confirm-button custom-swal-button',
@@ -3509,7 +3517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         icon: 'error',
                         title: 'Σφάλμα',
                         text: 'Δεν βρέθηκε email εργαζόμενου!',
-                        confirmButtonText: 'OK'
+                        confirmButtonText: 'Εντάξει'
                     });
                     return;
                 }
@@ -3595,7 +3603,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         icon: 'error',
                         title: 'Αποτυχία αποστολής email',
                         text: String(error.message || error),
-                        confirmButtonText: 'OK'
+                        confirmButtonText: 'Εντάξει'
                     });
 
                     emailBtn.disabled = false;
@@ -3704,7 +3712,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'info',
                 title: 'ΕΡΓΑΝΗ',
                 text: 'Η υποβολή είναι ήδη σε εξέλιξη. Περίμενε να ολοκληρωθεί.',
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
 
             return {
@@ -3811,7 +3819,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         messages: Array.isArray(payload?.messages) ? payload.messages : []
                     }),
                     width: 700,
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
 
                 return {
@@ -3845,7 +3853,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         </div>
                     `,
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
 
                 return payload;
@@ -3858,7 +3866,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: 'Σφάλματα XML - Αποτυχία Υποβολής',
                 html: buildErrorHtml({ userMessage, errorDetails, messages }),
                 width: 800,
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
 
             return payload;
@@ -3983,7 +3991,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'info',
                 title: 'ΕΡΓΑΝΗ (WTOWeek)',
                 text: 'Η υποβολή είναι ήδη σε εξέλιξη. Περίμενε να ολοκληρωθεί.',
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
 
             return {
@@ -4073,7 +4081,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'info',
                 title: 'ΕΡΓΑΝΗ (WTO Προσωρινή)',
                 text: 'Η υποβολή είναι ήδη σε εξέλιξη. Περίμενε να ολοκληρωθεί.',
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
 
             return {
@@ -4149,7 +4157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 : ''
                         }
                     `,
-                    confirmButtonText: 'OK',
+                    confirmButtonText: 'Εντάξει',
                     customClass: {
                         confirmButton: 'class-error custom-confirm-button custom-swal-button',
                         title: 'custom-title',
@@ -4179,7 +4187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </p>
                         </div>
                     `,
-                    confirmButtonText: 'OK',
+                    confirmButtonText: 'Εντάξει',
                     customClass: {
                         confirmButton: 'class-success custom-confirm-button custom-swal-button',
                         title: 'custom-title',
@@ -4214,7 +4222,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     </div>
                 `,
-                confirmButtonText: 'OK',
+                confirmButtonText: 'Εντάξει',
                 customClass: {
                     confirmButton: 'class-warning custom-confirm-button custom-swal-button',
                     title: 'custom-title',
@@ -4234,7 +4242,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'error',
                 title: 'WTO (Προσωρινή) - Σφάλμα',
                 text: error?.message || 'Unknown error',
-                confirmButtonText: 'OK',
+                confirmButtonText: 'Εντάξει',
                 customClass: {
                     confirmButton: 'class-error custom-confirm-button custom-swal-button',
                     title: 'custom-title',
@@ -4273,7 +4281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${submitDate ? `<p><strong>Ημερομηνία:</strong> ${safeSubmitDate}</p>` : ''}
                 <p class="text-muted">Δεν επιστράφηκε διαθέσιμο URL PDF για προεπισκόπηση.</p>
             `,
-                confirmButtonText: 'OK',
+                confirmButtonText: 'Εντάξει',
                 customClass: {
                     confirmButton: 'class-success custom-confirm-button custom-swal-button',
                     title: 'custom-title',
@@ -4477,7 +4485,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon: 'info',
                     title: 'ΕΡΓΑΝΗ REST',
                     text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
                 return { success: false, userMessage: 'Upload already in progress' };
             }
@@ -4513,7 +4521,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon: 'info',
                     title: 'ΕΡΓΑΝΗ REST',
                     text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
                 return { success: false, userMessage: 'Upload already in progress' };
             }
@@ -4553,7 +4561,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon: 'info',
                     title: 'ΕΡΓΑΝΗ REST',
                     text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
                 return { success: false, userMessage: 'Upload already in progress' };
             }
@@ -4592,7 +4600,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon: 'info',
                     title: 'ΕΡΓΑΝΗ REST',
                     text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
                 return { success: false, userMessage: 'Upload already in progress' };
             }
@@ -4634,7 +4642,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     //     icon: 'error',
                     //     title: 'E7N REST - ΕΡΓΑΝΗ ΙΙ',
                     //     html: `<p>${payload?.message || payload?.error || `HTTP ${uploadResponse.status}`}</p>`,
-                    //     confirmButtonText: 'OK',
+                    //     confirmButtonText: 'Εντάξει',
                     //     customClass: {
                     //         confirmButton: 'class-error custom-confirm-button custom-swal-button',
                     //         title: 'custom-title',
@@ -4681,7 +4689,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon: 'info',
                     title: 'ΕΡΓΑΝΗ XML',
                     text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
                 return { success: false, userMessage: 'Upload already in progress' };
             }
@@ -4727,7 +4735,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'info',
                 title: 'ΕΡΓΑΝΗ (ΜΑ)',
                 text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
             return { success: false, userMessage: 'Upload already in progress' };
         }
@@ -4767,7 +4775,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon: 'error',
                     title: 'ΜΑ XML - ΕΡΓΑΝΗ ΙΙ',
                     text: payload?.userMessage || `HTTP ${uploadResponse.status}`,
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
                 return { success: false, ...payload };
             }
@@ -4778,7 +4786,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     title: 'ΕΡΓΑΝΗ ΙΙ - Μεταβολή',
                     html: `<p>${payload?.userMessage || 'Επιτυχής υποβολή Μεταβολής'}</p>
                     ${payload?.protocol ? `<p>Πρωτόκολλο: <b>${payload.protocol}</b></p>` : ''}`,
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
             } else {
                 await Swal.fire({
@@ -4794,7 +4802,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ${payload?.errorDetails ? `<p class="ergani-swal-details">${payload.errorDetails}</p>` : ''}
     </div>
   `,
-                    confirmButtonText: 'OK'
+                    confirmButtonText: 'Εντάξει'
                 });
             }
 
@@ -4806,7 +4814,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'error',
                 title: 'ΜΑ XML - ΕΡΓΑΝΗ ΙΙ',
                 text: err?.message || 'Αποτυχία αποστολής ΜΑ XML.',
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
             return { success: false, error: err?.message };
         } finally {
@@ -4898,7 +4906,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p>${result?.message || 'Η υποβολή ακυρώθηκε επιτυχώς.'}</p>
                 ${protocol ? `<p><strong>Πρωτόκολλο:</strong> ${protocol}</p>` : ''}
             `,
-                confirmButtonText: 'OK',
+                confirmButtonText: 'Εντάξει',
                 customClass: {
                     confirmButton: 'class-success custom-confirm-button custom-swal-button',
                     title: 'custom-title',
@@ -4916,7 +4924,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p><strong>Μήνυμα:</strong></p>
                 <pre style="white-space:pre-wrap;text-align:left;">${error.message}</pre>
             `,
-                confirmButtonText: 'OK',
+                confirmButtonText: 'Εντάξει',
                 customClass: {
                     confirmButton: 'class-danger custom-confirm-button custom-swal-button',
                     title: 'custom-title',
@@ -5710,7 +5718,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'warning',
                 title: 'PDF ΕΡΓΑΝΗ',
                 text: 'Δεν βρέθηκε ID υποβολής για ανάκτηση PDF.',
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
             return;
         }
@@ -5844,7 +5852,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     </div>
                 `,
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
         } catch (error) {
             await Swal.fire({
@@ -5856,7 +5864,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p class="text-muted">Δεν ανακτήθηκε PDF. Δείτε τα logs [ERGANI PDF RETRY] και [ERGANI PDF PW].</p>
                     </div>
                 `,
-                confirmButtonText: 'OK'
+                confirmButtonText: 'Εντάξει'
             });
         }
 
@@ -6128,7 +6136,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: '✅ ΕΡΓΑΝΗ ΙΙ - Επιτυχία',
                 html: `<p>${data.message || 'Επιτυχής αποστολή!'}</p>${protocolHtml}`,
                 showConfirmButton: true,
-                confirmButtonText: 'OK',
+                confirmButtonText: 'Εντάξει',
                 timer: 8000,
                 timerProgressBar: true,
                 customClass: {

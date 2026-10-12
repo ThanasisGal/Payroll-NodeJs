@@ -520,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem swal-overflow">
                         <p class="font-weight-600 margin-bottom-0_5rem">Τρόπος Αποθήκευσης:</p>
 
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                    id="storage_temporary"
                                    name="storage_mode"
@@ -534,7 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </label>
                         </div>
 
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                    id="storage_permanent"
                                    name="storage_mode"
@@ -551,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <hr class="hr-style" />
                         <p class="font-weight-600 margin-bottom-0_5rem">Ενέργεια ΕΡΓΑΝΗ:</p>
 
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                    id="ergani_action_none"
                                    name="ergani_main_action"
@@ -564,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </label>
                         </div>
 
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                    id="e3_anaggelia_proslhpshs"
                                    name="ergani_main_action"
@@ -578,7 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </label>
                         </div>
 
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                    id="wto_pshfiakh_organosh_xronoy_ergasias"
                                    name="ergani_main_action"
@@ -592,7 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </label>
                         </div>
 
-                        <div class="display-flex align-items-center gap-0_75rem">
+                        <div class="employee-maintenance-choice">
                             <input type="radio"
                                    id="ergani_action_both"
                                    name="ergani_main_action"

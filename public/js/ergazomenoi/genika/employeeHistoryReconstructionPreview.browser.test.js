@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
 const ejs = require('ejs');
 const { chromium } = require('playwright');
 const { planEmployeeHistoryAutomaticReconstruction: plan } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionPlannerService');
@@ -9,23 +10,25 @@ const { buildEmployeeHistoryReconstructionPreview: project } = require('../../..
 const F = require('../../../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const { buildAutomaticReconstructionPreviewToken } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const root = path.resolve(__dirname, '../../../..');
+const { origin, asset, assertChoiceAligned } = require('../../../../test/fixtures/employeeMaintenanceBrowserAssets');
 const dto = input => project({ plan: plan(input), completeHistoryRows: input.completeHistoryRows });
 const modal = '#employeeHistoryReconstructionPreviewModal';
 const body = '#employeeHistoryReconstructionPreviewBody';
 const button = '#employeeHistoryReconstructionPreviewBtn';
 async function withPage({ input = F.caseA(), status = 200, payload, viewport = { width: 1440, height: 1000 }, delay = 0,
-    manualHandler, applyHandler, stateToken = 'synthetic' } = {}, work) {
+    manualHandler, applyHandler, stateToken = 'synthetic', historyAccessMode = 'ADMIN_FULL', problematicHistoryIds = [] } = {}, work) {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage({ viewport });
         const requests = [], errors = [], allRequests = [];
         page.on('request', request => allRequests.push({ method: request.method(), url: request.url() }));
         page.on('pageerror', error => errors.push(error.message));
-        const partial = await ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
+        const partial = () => ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
             ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
-            employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: stateToken, problematicHistoryIds: []
+            employeeHistoryAccessMode: historyAccessMode, employeeHistoryStateToken: stateToken, problematicHistoryIds
         });
-        await page.route('https://payroll.test/**', async route => {
+        await page.route(`${origin}/**`, async route => {
+            if (route.request().url().startsWith(`${origin}/static/`)) return route.continue();
             const request = route.request();
             if (applyHandler && request.url().endsWith('/history-reconstruction-apply')) {
                 const data = request.postDataJSON();
@@ -41,18 +44,18 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
                     body: reply.rawBody ?? JSON.stringify(reply.body) });
             }
             if (!request.url().includes('/history-reconstruction-preview')) return route.fulfill({ contentType: 'text/html',
-                body: `<!doctype html><html lang="el"><head><meta charset="utf-8"></head><body>${partial}</body></html>` });
+                body: `<!doctype html><html lang="el"><head><meta charset="utf-8"></head><body>${await partial()}</body></html>` });
             requests.push({ method: request.method(), path: new URL(request.url()).pathname });
             if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-            return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input), previewToken: buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input) }) }) }).catch(() => {});
+            return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input), previewToken: buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input), actorUserId: 'synthetic-actor' }) }) }).catch(() => {});
         });
-        await page.goto('https://payroll.test/');
+        await page.goto(`${origin}/`);
         for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
-            await page.addStyleTag({ path: path.join(root, file) });
+            await page.addStyleTag(asset(root, file));
         for (const file of ['public/js/bootstrap.bundle.min.js', 'node_modules/sweetalert2/dist/sweetalert2.all.js',
             'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js',
             ...(manualHandler ? ['public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js',
-                'public/js/ergazomenoi/genika/istorikoTable.js'] : [])]) await page.addScriptTag({ path: path.join(root, file) });
+                'public/js/ergazomenoi/genika/istorikoTable.js'] : [])]) await page.addScriptTag(asset(root, file));
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
         await work({ page, requests, allRequests });
@@ -87,16 +90,16 @@ test('real Bootstrap modal is wide, Greek, approval-capable; meaningful changes 
         await page.locator('.history-preview-defaults > summary').click();
         const group = page.locator('.history-preview-defaults details').first();
         await group.waitFor();
-        assert.match(await group.locator('summary').innerText(), /Εγγραφή 0001 — 43/);
+        assert.match(await group.locator('summary').innerText(), /Εγγραφή 0001 — 13/);
         assert.equal(await group.locator('tr').count(), 0);
         await group.locator('summary').click();
-        await page.waitForFunction(() => document.querySelectorAll('.history-preview-defaults tbody tr').length === 43);
-        assert.equal(await page.locator('.history-preview-defaults tbody tr').count(), 43);
+        await page.waitForFunction(() => document.querySelectorAll('.history-preview-defaults tbody tr').length === 13);
+        assert.equal(await page.locator('.history-preview-defaults tbody tr').count(), 13);
         assert.equal(requests.length, 1);
     });
 });
 
-test('all 105 display fields are reachable in expandable Greek groups; schedule dates explicitly informational', async () => {
+test('non-item fields remain reachable in expandable Greek groups without empty contract placeholders; schedule dates explicitly informational', async () => {
     await withPage({}, async ({ page }) => {
         await open(page);
         const original = page.locator('.history-preview-original');
@@ -108,7 +111,7 @@ test('all 105 display fields are reachable in expandable Greek groups; schedule 
             await groups.nth(i).locator(':scope > summary').click();
             await groups.nth(i).locator('dl').waitFor();
         }
-        assert.equal(await row.locator('dt').count(), 105);
+        assert.equal(await row.locator('dt').count(), 58);
         assert.equal(await row.locator('dt small').count(), 2);
         assert.match(await row.locator('dt small').first().innerText(), /Πληροφοριακό πεδίο.*δεν χρησιμοποιείται/);
         for (const text of await row.locator('dt').allTextContents()) assert.match(text, /[Α-Ωα-ω]/u);
@@ -389,19 +392,19 @@ for (const input of [F.caseA(), F.caseBWithProfileEvidence()]) test(`approval vi
             assert.equal(await checkbox.isChecked(), false);
             assert.equal(await apply.isDisabled(), true);
             assert.equal(await apply.evaluate(e => e.matches('.btn-success:disabled')), true);
-            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(108, 117, 125)');
+            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(233, 236, 239)');
             const s = await style();
-            assert.equal(s.background, 'rgb(108, 117, 125)');
-            assert.equal(s.opacity, '0.65');
+            assert.equal(s.background, 'rgb(233, 236, 239)');
+            assert.equal(s.opacity, '1'); // Grey semantic colors keep disabled labels readable.
             assert.equal(s.cursor, 'not-allowed');
         }
         async function assertEnabled() {
             assert.equal(await checkbox.isChecked(), true);
             assert.equal(await apply.isEnabled(), true);
             assert.equal(await apply.evaluate(e => e.matches('.btn-success:enabled')), true);
-            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(25, 135, 84)');
+            await page.waitForFunction(() => getComputedStyle(document.getElementById('employeeHistoryReconstructionApplyBtn')).backgroundColor === 'rgb(223, 239, 230)');
             const s = await style();
-            assert.equal(s.background, 'rgb(25, 135, 84)');
+            assert.equal(s.background, 'rgb(223, 239, 230)');
             assert.equal(s.opacity, '1');
             assert.equal(s.cursor, 'pointer');
         }
@@ -448,6 +451,11 @@ for (const failure of ['stale', 'forbidden', 'rejected', 'non-json', 'commit-unc
             assert.equal(await page.locator('.swal2-title').innerText(), 'Τα στοιχεία άλλαξαν');
             assert.match(await page.locator('.swal2-html-container').innerText(), /δεν αποθηκεύτηκε καμία αλλαγή.*Ανοίξτε ξανά/s);
         }
+        if (failure === 'forbidden') {
+            const message = await page.locator('.swal2-html-container').innerText();
+            assert.match(message, /δικαίωμά σας να ενημερώνετε τον συγκεκριμένο εργαζόμενο/);
+            assert.doesNotMatch(message, /διόρθωσης όλων των επηρεαζόμενων εγγραφών/);
+        }
         if (['non-json', 'commit-uncertain'].includes(failure)) assert.match(await page.locator('.swal2-html-container').innerText(), /δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε/);
         assert.equal(await page.locator('#employeeHistoryReconstructionApprovalAccepted').isChecked(), false);
         assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isDisabled(), true);
@@ -481,11 +489,10 @@ test('Apply is single-flight, prevents modal dismissal during request and succes
 
 
 const feedbackKey = id => `employeeHistoryReconstructionSuccess:${id}`;
-const feedbackScript = path.join(root, 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js');
 async function consumeFeedbackAfterReload(page) {
     await page.reload();
-    await page.addScriptTag({ path: path.join(root, 'public/js/bootstrap.bundle.min.js') });
-    await page.addScriptTag({ path: feedbackScript });
+    await page.addScriptTag(asset(root, 'public/js/bootstrap.bundle.min.js'));
+    await page.addScriptTag(asset(root, 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js'));
     await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
 }
 test('confirmed standalone Apply stores only server counts and time; reload consumes accessible feedback once', async () => {
@@ -545,5 +552,70 @@ test('Greek list helper formats one through four labels without modifying the ro
             [['0001', '0002', '0003', '0004'], '0001, 0002, 0003 και 0004']]) {
             assert.deepEqual(await page.evaluate(items => ({ value: formatGreekList(items), items }), items), { value: expected, items });
         }
+    });
+});
+
+for (const width of [1440, 390]) for (const historyAccessMode of ['NONE', 'SUPERVISOR_PROBLEM_SCOPE'])
+test(`real legacy automatic apply and manual policy ${historyAccessMode} at ${width}px`, async () => {
+    const { legacyWeeklyHours } = require('../../../../server/services/ergazomenoi/fixtures/maintenanceWeeklyHoursLegacyFixture');
+    const { store } = require('../../../../test/fixtures/employeeProfileTransactionStore');
+    const { applyEmployeeHistoryAutomaticReconstruction } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyService');
+    const { identifyEmployeeHistoryProblemScope } = require('../../../../server/services/ergazomenoi/employeeHistoryProblemScopeService');
+    const fixture = legacyWeeklyHours(), db = store([fixture]);
+    const input = { scope: fixture.scope, currentEmployee: fixture.employee, completeHistoryRows: fixture.history };
+    const problematicHistoryIds = identifyEmployeeHistoryProblemScope(input).problematicHistoryIds;
+    assert.deepEqual(problematicHistoryIds, [fixture.history[1]._id]);
+    const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
+    const applyHandler = async data => {
+        const result = await applyEmployeeHistoryAutomaticReconstruction({ ...db.deps, ...data,
+            scope: fixture.scope, employeeId: fixture.employee._id, actorUserId: 'synthetic-actor',
+            userModel: { findById: () => query({ team: fixture.scope.team, situation: 'A', privileges: historyAccessMode === 'NONE' ? 'C' : 'S' }) },
+            privilegeModel: { findOne: () => query({ privileges: { update: true } }) } });
+        input.currentEmployee = db.state().employees[0]; input.completeHistoryRows = db.state().history;
+        return { status: 200, body: result };
+    };
+    await withPage({ input, viewport: { width, height: 1000 }, historyAccessMode, problematicHistoryIds,
+        manualHandler: () => assert.fail('No manual request is authorized by automatic approval'), applyHandler }, async ({ page, requests }) => {
+        const capture = async name => {
+            if (!process.env.PAYROLL_VISUAL_ARTIFACT_DIR) return;
+            fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
+            await page.waitForTimeout(300);
+            await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `authorization-${historyAccessMode}-${name}-${width}.png`), animations: 'disabled' });
+        };
+        const rows = page.locator('#istorikoTable tbody tr.istoriko-row');
+        for (let i = 0; i < 2; i++) for (const action of ['add', 'edit', 'review', 'delete', 'undo']) {
+            const control = rows.nth(i).locator(`[data-action="${action}"]`);
+            assert.equal(await control.isDisabled(), true, `${i}/${action}`);
+            assert.equal(await control.getAttribute('aria-disabled'), 'true');
+        }
+        assert.equal(await page.locator(button).isEnabled(), true);
+        await capture('rows');
+        await open(page);
+        assert.equal(db.events.length, 0, 'preview has zero business or fence writes');
+        const apply = page.locator('#employeeHistoryReconstructionApplyBtn');
+        assert.equal(await apply.isDisabled(), true);
+        await page.locator('#employeeHistoryReconstructionApprovalAccepted').check();
+        assert.equal(await apply.isEnabled(), true);
+        await assertChoiceAligned(page, 'employeeHistoryReconstructionApprovalAccepted');
+        await capture('approval');
+        await apply.click();
+        await page.locator('.swal2-confirm').waitFor();
+        const message = await page.locator('.swal2-html-container').innerText();
+        assert.doesNotMatch(message, /δεν έχετε δικαίωμα|δεν ολοκληρώθηκε/);
+        assert.equal(db.state().audits.length, 1);
+        assert.equal(db.events.filter(e => e.type === 'commit').length, 1);
+        assert.equal(db.state().employees[0].ores_ergasias_ebdomadas, 40, 'standalone does not apply an original Save');
+        await capture('success');
+        await page.locator('.swal2-confirm').click();
+        await page.waitForLoadState();
+        await consumeFeedbackAfterReload(page);
+        assert.equal(await page.locator('#employeeHistoryReconstructionSuccess').isVisible(), true);
+        assert.equal(await rows.nth(0).getAttribute('data-record'), JSON.stringify(input.completeHistoryRows[0]));
+        assert.equal(await rows.locator('[data-action]:enabled').count(), 0);
+        for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css'])
+            await page.addStyleTag(asset(root, file));
+        await capture('reloaded');
+        assert.equal(requests.filter(r => r.method === 'POST').length, 1);
+        assert.ok(requests.some(r => r.path.endsWith('/history-reconstruction-apply')));
     });
 });

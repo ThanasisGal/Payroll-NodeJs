@@ -2,6 +2,8 @@
 const mongoose = require('mongoose');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const UserModel = require('../../models/userModel');
+const { UserPrivilegesModel } = require('../../models/privileges');
+const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
 const AuditModel = require('../../models/employeeHistoryRepairAudit');
 const { inProfileTransaction, acquireEmployeeMutationFence, transactionCapability, executeEmployeeHistoryAutomaticReconstructionPlan } = require('./employeeEmploymentProfileWriter');
 const { employeeHistoryRepairAuditCollectionExists } = require('./employeeHistoryRepairAuditSetupService');
@@ -53,6 +55,7 @@ function buildAutomaticReconstructionAudit({ scope, current, history, physicalPl
 async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, previewToken, approvalAccepted,
     actorUserId, connection = mongoose.connection, employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel, auditModel = AuditModel, userModel = UserModel,
+    privilegeModel = UserPrivilegesModel,
     capabilityProbe = transactionCapability, referenceChecker = findHistoryIdReferences, auditCollectionChecker = employeeHistoryRepairAuditCollectionExists } = {}) {
     if (approvalAccepted !== true) throw A.failure('APPROVAL_REQUIRED', 400);
     if (!actorUserId) throw A.failure('FORBIDDEN', 403);
@@ -65,12 +68,20 @@ async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, 
     const noOp = Symbol('automaticReconstructionNoOp');
     try {
         return await inProfileTransaction(connection, capabilityProbe, async session => {
+            // Automatic application uses the same exact Employee capability as
+            // normal Maintenance. Check it before even the technical fence.
+            const authorizedCurrent = await employeeModel.findOne({ ...scope, _id: employeeId })
+                .select('+employee_profile_mutation_sequence').session(session).lean();
+            if (!authorizedCurrent) throw A.failure('STALE');
+            await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current: authorizedCurrent,
+                session, userModel, privilegeModel });
             await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session, notFoundCode: A.PREFIX + 'STALE' });
             const current = await employeeModel.findOne({ ...scope, _id: employeeId }).select('+employee_profile_mutation_sequence').session(session).lean();
             if (!current) throw A.failure('STALE');
+            await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current, session, userModel, privilegeModel });
             const history = await readHistory(historyModel, scope, session);
             const plan = planner({ scope, currentEmployee: current, completeHistoryRows: history });
-            const freshToken = A.buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: current, completeHistoryRows: history, plan });
+            const freshToken = A.buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: current, completeHistoryRows: history, plan, actorUserId });
             const matching = A.tokenMatches(previewToken, freshToken);
             // Exact duplicate recognition is scoped to this employee and actor,
             // and proves the entire non-informational persisted state still matches.
@@ -83,19 +94,16 @@ async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, 
                 if (!completed || completed.diagnostics.persistedStateHash !== A.hash(freshToken)) throw A.failure('STALE');
             } else if (!matching) throw A.failure('STALE');
             if (A.isNoOp(plan)) {
-                // No mutation is authorized or attempted on this path. Still
-                // require an active History actor before disclosing its result.
-                await actorAccess({ actorUserId, userModel, session, scope });
+                // Authorization above also protects clean/duplicate results.
                 throw { [noOp]: true, result: { success: true, applied: false, alreadyApplied: Boolean(completed),
                     changedRows: 0, changedFields: 0, message: 'Το Ιστορικό είναι ήδη τακτοποιημένο.' } };
             }
             if (!['PLANNED', 'REVIEW_REQUIRED'].includes(plan.status)) throw A.failure('BLOCKED');
-            await authorize({ actorUserId, userModel, session, scope, current, history, plan });
             const physicalPlan = A.buildAutomaticReconstructionPhysicalPlan({ plan, completeHistoryRows: history });
             A.assertAutomaticReconstructionBoundary({ plan, completeHistoryRows: history, physicalPlan });
             const expectedPlan = planner({ scope, currentEmployee: current, completeHistoryRows: physicalPlan.expectedRows });
             const persistedToken = A.buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: current,
-                completeHistoryRows: physicalPlan.expectedRows, plan: expectedPlan });
+                completeHistoryRows: physicalPlan.expectedRows, plan: expectedPlan, actorUserId });
             const auditRecord = buildAutomaticReconstructionAudit({ scope, current, history, physicalPlan,
                 plan, actorUserId, previewToken, persistedToken });
             return executeEmployeeHistoryAutomaticReconstructionPlan({ physicalPlan, currentBefore: current,

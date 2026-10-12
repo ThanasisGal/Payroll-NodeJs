@@ -1,3 +1,4 @@
+const { contractParentKey } = require('../../services/ergazomenoi/employeeContractDescriptionService');
 // server/dropdowns/symbaseis/stoixeiaApoEidikothtes.js
 
 const symbaseisModels = require('../../models/symbaseis');
@@ -42,7 +43,7 @@ module.exports = {
 
             // τριάδα 4+4+4 = 12
             const symKath = `${sym}${kat}`; // 8 ψηφία
-            const symKathEid = `${sym}${kat}${eid}`; // 12 ψηφία
+            const symKathEid = contractParentKey(sym, kat, eid); // 12 ψηφία
 
             return { afora_thn_symbash_kathgoria_eidikothta: symKathEid };
         },

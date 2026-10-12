@@ -1,3 +1,4 @@
+const { contractParentKey } = require('../../services/ergazomenoi/employeeContractDescriptionService');
 // server/dropdowns/symbaseis/eidikothtesApoKathgories.js
 const symbaseisModels = require('../../models/symbaseis');
 const { EidikothtesSymbaseonModel } = symbaseisModels;
@@ -19,7 +20,7 @@ module.exports = {
       }
 
       // Αν το μοντέλο κρατά έτοιμο composite 8-ψηφιο:
-      const afora_thn_symbash_kathgoria = `${sym}${kat}`;
+      const afora_thn_symbash_kathgoria = contractParentKey(sym, kat);
       return { afora_thn_symbash_kathgoria };
     },
 

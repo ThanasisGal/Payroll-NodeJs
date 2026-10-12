@@ -71,27 +71,32 @@ function browser(mode = 'SUPERVISOR_PROBLEM_SCOPE') {
         } };
 }
 
-test('Supervisor Add from persisted problem stores its exact anchor and disables new-row Add', () => {
-    const page = browser(); page.action(page.problem, 'add');
-    assert.equal(page.rows.length, 3);
-    const inserted = page.rows[1];
-    assert.equal(inserted.dataset.anchorHistoryId, 'persisted-problem');
-    assert.equal(inserted.dataset.persisted, 'false'); assert.equal(inserted.dataset.id, '');
-    assert.match(inserted.innerHTML.match(/<button[^>]*data-action="add"[^>]*>/)[0], /disabled aria-disabled="true"/);
-    for (const action of ['edit', 'delete', 'undo']) {
-        assert.doesNotMatch(inserted.innerHTML.match(new RegExp(`<button[^>]*data-action="${action}"[^>]*>`))[0], /disabled/);
+for (const mode of ['SUPERVISOR_PROBLEM_SCOPE', 'NONE']) {
+    for (const action of ['add', 'edit', 'review', 'delete', 'undo']) {
+        test(`${mode}: both clean and problematic rows reject ${action}, even with forged management attributes`, async () => {
+            const page = browser(mode);
+            for (const row of [page.problem, page.clean]) {
+                row.dataset.canManageRow = 'true';
+                await page.action(row, action);
+                assert.equal(row.dataset.state, 'clean');
+                assert.equal(row.dataset.editing, '0');
+            }
+            assert.equal(page.rows.length, 2);
+            assert.equal(page.requests.length, 0);
+            assert.equal(page.dialogs.length, 0);
+        });
     }
-    page.action(inserted, 'add'); assert.equal(page.rows.length, 3, 'programmatic click cannot chain Add either');
-});
+    test(`${mode}: forged local changes cannot submit through the disabled table Save`, async () => {
+        const page = browser(mode);
+        page.problem.dataset.state = 'modified';
+        await page.save();
+        assert.equal(page.requests.length, 0);
+        assert.equal(page.dialogs.length, 0);
+    });
+}
 
-test('Supervisor clean row Add/Edit/Delete/Undo remain blocked by the actual client handler', () => {
-    const page = browser();
-    for (const action of ['add', 'edit', 'delete', 'undo']) page.action(page.clean, action);
-    assert.equal(page.rows.length, 2); assert.equal(page.clean.dataset.state, 'clean'); assert.equal(page.clean.dataset.editing, '0');
-});
-
-test('inserted row local editing retains anchor and sends only narrow insert hint', async () => {
-    const page = browser(); page.action(page.problem, 'add');
+test('Admin inserted row local editing sends no Supervisor authority hint', async () => {
+    const page = browser('ADMIN_FULL'); page.action(page.problem, 'add');
     const inserted = page.rows[1];
     inserted.querySelector('[data-field-input="hmeromhnia_lhxhs_symbashs"]').value = '2026-11-30';
     page.action(inserted, 'edit'); assert.equal(inserted.dataset.editing, '0');
@@ -99,20 +104,20 @@ test('inserted row local editing retains anchor and sends only narrow insert hin
     await page.save();
     assert.equal(page.requests.length, 1);
     const update = page.requests[0].updates[0];
-    assert.equal(update.anchorHistoryId, 'persisted-problem'); assert.equal(update.state, 'inserted');
+    assert.equal(update.anchorHistoryId, undefined); assert.equal(update.state, 'inserted');
     assert.equal(update._id, null); assert.equal(update.data.hmeromhnia_lhxhs_symbashs, '2026-11-30');
-    assert.deepEqual(Object.keys(update).sort(), ['_id', 'aa_eggrafhs', 'anchorHistoryId', 'data', 'state']);
+    assert.deepEqual(Object.keys(update).sort(), ['_id', 'aa_eggrafhs', 'data', 'state']);
     assert.equal(page.requests[0].expectedStateToken, 'a'.repeat(64));
 });
 
-for (const action of ['delete', 'undo']) test(`Supervisor ${action} removes local insertion without turning it into persisted authority`, async () => {
-    const page = browser(); page.action(page.problem, 'add'); page.action(page.rows[1], action);
+for (const action of ['delete', 'undo']) test(`Admin ${action} removes local insertion without turning it into persisted authority`, async () => {
+    const page = browser('ADMIN_FULL'); page.action(page.problem, 'add'); page.action(page.rows[1], action);
     assert.equal(page.rows.length, 2); assert.equal(page.problem.dataset.state, 'clean');
     await page.save(); assert.equal(page.requests.length, 0);
 });
 
-test('Supervisor local persisted-row edit/delete/undo preserves identity and deletion opens correction', async () => {
-    const page = browser(); page.action(page.problem, 'edit');
+test('Admin local persisted-row edit/delete/undo preserves identity and deletion opens correction', async () => {
+    const page = browser('ADMIN_FULL'); page.action(page.problem, 'edit');
     assert.equal(page.problem.dataset.editing, '1');
     page.action(page.problem, 'undo'); assert.equal(page.problem.dataset.editing, '0');
     await page.action(page.problem, 'delete'); assert.equal(page.problem.dataset.state, 'clean');
@@ -122,8 +127,8 @@ test('Supervisor local persisted-row edit/delete/undo preserves identity and del
     assert.equal(page.problem.dataset.id, 'persisted-problem');
 });
 
-test('Supervisor correction with unsaved changes retains the common notice defaults without a request', async () => {
-    const page = browser(); page.action(page.problem, 'add');
+test('Admin correction with unsaved changes retains the common notice defaults without a request', async () => {
+    const page = browser('ADMIN_FULL'); page.action(page.problem, 'add');
     await page.action(page.problem, 'review');
     assert.equal(page.requests.length, 0); assert.equal(page.dialogs.length, 1);
     const dialog = page.dialogs[0];
@@ -137,7 +142,7 @@ test('Supervisor correction with unsaved changes retains the common notice defau
 
 test('Admin retains Add from clean and unsaved rows without needing persisted anchors', () => {
     const page = browser('ADMIN_FULL'); page.action(page.clean, 'add');
-    const inserted = page.rows[2]; assert.equal(inserted.dataset.anchorHistoryId, '');
+    const inserted = page.rows[2]; assert.equal(inserted.dataset.anchorHistoryId, undefined);
     assert.doesNotMatch(inserted.innerHTML.match(/<button[^>]*data-action="add"[^>]*>/)[0], /disabled/);
     page.action(inserted, 'add'); assert.equal(page.rows.length, 4);
 });

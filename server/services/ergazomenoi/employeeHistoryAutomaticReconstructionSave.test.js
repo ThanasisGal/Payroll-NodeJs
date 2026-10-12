@@ -298,7 +298,7 @@ test('G: another controlled actionRequired discovered downstream rolls back reco
     const { db, preview, run } = setup(); const reconstruction = await preview(), before = db.state();
     const update = db.deps.employeeModel.updateOne;
     db.deps.employeeModel.updateOne = async (filter, patch, options) => {
-        if (patch.$set) throw Object.assign(new Error('downstream decision'), { code: 'EMPLOYEE_DEPARTURE_PROFILE_CHANGE_REQUIRES_SEPARATE_SAVE' });
+        if (patch.$set) throw Object.assign(new Error('downstream decision'), { code: 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' });
         return update(filter, patch, options);
     };
     let error; try { await run({ reconstruction }); } catch (e) { error = e; }

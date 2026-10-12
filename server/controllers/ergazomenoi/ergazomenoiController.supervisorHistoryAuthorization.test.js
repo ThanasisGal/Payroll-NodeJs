@@ -58,18 +58,20 @@ async function page(user = supervisor, initial = problemFixture()) {
 function buttons(html, id, disabled) {
     const row = html.slice(html.indexOf(`data-id="${id}"`)).split('</tr>')[0];
     assert.ok(row.includes('data-record='), 'readable History data preserved');
-    for (const action of ['add', 'edit', 'delete', 'undo']) {
+    for (const action of ['add', 'edit', 'review', 'delete', 'undo']) {
         const button = row.match(new RegExp(`<button[^>]*data-action="${action}"[^>]*>`))?.[0];
         assert.ok(button, action); assert.equal(/disabled aria-disabled="true"/.test(button), disabled, action);
     }
 }
 
-test('Supervisor page recomputes from raw full History and enables only problematic persisted row', async () => {
+test('Supervisor page retains problem diagnostics but disables every manual row action', async () => {
     const { res, html } = await page();
     assert.equal(res.locals.employeeHistoryAccessMode, 'SUPERVISOR_PROBLEM_SCOPE');
     assert.equal(res.locals.canManageEmployeeHistory, false, 'broad Admin compatibility never expanded');
     assert.deepEqual(res.locals.problematicHistoryIds, [problemId]);
-    buttons(html, problemId, false); buttons(html, cleanId, true);
+    buttons(html, problemId, true); buttons(html, cleanId, true);
+    assert.match(html.slice(html.indexOf('id="updateIstorikoBtn"')).split('>')[0], /disabled aria-disabled="true"/);
+    assert.doesNotMatch(html.match(/<button[^>]*id="employeeHistoryReconstructionPreviewBtn"[^>]*>/)[0], /disabled/);
     assert.equal(res.locals.employeeHistoryStateToken, S.buildEmployeeHistoryEditorStateToken({
         currentEmployee: problemFixture().employee, historyRows: problemFixture().history }));
 });

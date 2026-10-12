@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyAccessMode = table.dataset.historyAccessMode ||
         (table.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
     const isHistoryAdmin = historyAccessMode === 'ADMIN_FULL';
-    const isHistorySupervisor = historyAccessMode === 'SUPERVISOR_PROBLEM_SCOPE';
     const expectedStateToken = table.dataset.expectedStateToken || '';
     const currentRelationshipOpen = table.dataset.currentRelationshipOpen === 'true';
     const currentHireDate = table.dataset.currentHireDate || '';
@@ -224,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    function createEmptyRow(anchorHistoryId = '') {
+    function createEmptyRow() {
         const tr = document.createElement('tr');
         tr.className = 'istoriko-row';
         tr.dataset.id = '';
@@ -234,7 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.dataset.aa = '';
         tr.dataset.persisted = 'false';
         tr.dataset.canManageRow = 'true';
-        tr.dataset.anchorHistoryId = isHistorySupervisor ? anchorHistoryId : '';
 
         tr.innerHTML = `
             <td class="text-center istoriko-aa-col"></td>
@@ -400,9 +398,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const value = code || '';
         if (!value) return '';
 
-        if (directField && record[directField]) return record[directField];
         if (lookups[group]?.[value]?.perigrafh) return lookups[group][value].perigrafh;
         if (lookups[group]?.perigrafh) return lookups[group].perigrafh;
+        if (directField && !['symbaseis', 'kathgoriesSymbaseon', 'eidikothtesAnaKathgoriaSymbaseon'].includes(group) && record[directField]) return record[directField];
         return '';
     }
 
@@ -485,26 +483,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const code = record[`stoixeio_symbashs_${ii}`];
             if (isEmptyValue(code)) continue;
 
+            const item = record.__lookups?.contractItems?.find(item => item.index === ii);
             rows.push(`
                 <tr>
-                    <td class="istoriko-modal-aa-col">${htmlEscape(ii)}</td>
-                    <td class="istoriko-modal-desc-col">
-                        ${codeWithDescription(code, lookupByIndex(record, 'stoixeiaSymbaseon', ii, code))}
+                    <td class="istoriko-modal-aa-col" data-label="α/α">${htmlEscape(ii)}</td>
+                    <td class="istoriko-modal-desc-col" data-label="Στοιχείο Σύμβασης">
+                        ${item ? htmlEscape(item.description) : codeWithDescription(code, lookupByIndex(record, 'stoixeiaSymbaseon', ii, code))}
                     </td>
-                    <td class="istoriko-modal-money-col">${htmlEscape(formatMoney2(record[`poso_symbashs_${ii}`]))}</td>
-                    <td class="istoriko-modal-money-col">${htmlEscape(formatMoney2(record[`poso_symbashs_basei_oron_ergasias_${ii}`]))}</td>
+                    <td class="istoriko-modal-money-col" data-label="Ποσό Βάσει Σύμβασης">${htmlEscape(item ? item.contractAmount : Number(record[`poso_symbashs_${ii}`]) ? formatMoney2(record[`poso_symbashs_${ii}`]) : '')}</td>
+                    <td class="istoriko-modal-money-col" data-label="Αποδοχές Βάσει Όρων Εργασίας">${htmlEscape(item ? item.workTermsAmount : Number(record[`poso_symbashs_basei_oron_ergasias_${ii}`]) ? formatMoney2(record[`poso_symbashs_basei_oron_ergasias_${ii}`]) : '')}</td>
                 </tr>
             `);
         }
 
         if (!rows.length) return '';
 
-        rows.push(`
+        if (Number(record.synolo_symbashs) || Number(record.synolo_symbashs_basei_oron_ergasias)) rows.push(`
             <tr class="istoriko-modal-totals-row">
                 <td class="istoriko-modal-aa-col">ΣΥΝΟΛΑ</td>
                 <td class="istoriko-modal-desc-col"></td>
-                <td class="istoriko-modal-money-col">${htmlEscape(formatMoney2(record.synolo_symbashs))}</td>
-                <td class="istoriko-modal-money-col">${htmlEscape(formatMoney2(record.synolo_symbashs_basei_oron_ergasias))}</td>
+                <td class="istoriko-modal-money-col">${htmlEscape(Number(record.synolo_symbashs) ? formatMoney2(record.synolo_symbashs) : '')}</td>
+                <td class="istoriko-modal-money-col">${htmlEscape(Number(record.synolo_symbashs_basei_oron_ergasias) ? formatMoney2(record.synolo_symbashs_basei_oron_ergasias) : '')}</td>
             </tr>
         `);
 
@@ -516,8 +515,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <tr>
                             <th class="istoriko-modal-aa-col">α/α</th>
                             <th class="istoriko-modal-desc-col">Στοιχείο Σύμβασης</th>
-                            <th class="istoriko-modal-money-col">Ποσό Σύμβασης</th>
-                            <th class="istoriko-modal-money-col">Ποσό Βάσει Ωρών Εργασίας</th>
+                            <th class="istoriko-modal-money-col">Ποσό Βάσει Σύμβασης</th>
+                            <th class="istoriko-modal-money-col">Αποδοχές Βάσει Όρων Εργασίας</th>
                         </tr>
                     </thead>
                     <tbody>${rows.join('')}</tbody>
@@ -732,18 +731,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const action = button.dataset.action;
 
-        const rowCanManage = isHistorySupervisor && row.dataset.canManageRow === 'true';
-        const supervisorCanAdd = rowCanManage && row.dataset.persisted === 'true' &&
-            Boolean(row.dataset.id);
-        const actionAllowed = isHistoryAdmin || (rowCanManage &&
-            (action !== 'add' || supervisorCanAdd));
+        // Restricted History is read-only here, including problematic rows.
+        // Automatic reconstruction has its own Employee Maintenance approval.
+        const actionAllowed = isHistoryAdmin;
         if (['add', 'edit', 'delete', 'undo', 'review'].includes(action) && !actionAllowed) {
             event.preventDefault();
             return;
         }
 
         if (action === 'add') {
-            const newRow = createEmptyRow(isHistorySupervisor ? row.dataset.id || '' : '');
+            const newRow = createEmptyRow();
             row.insertAdjacentElement('afterend', newRow);
             renumberRows();
             rowToEditMode(newRow);
@@ -800,6 +797,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     saveBtn?.addEventListener('click', async () => {
+        if (!isHistoryAdmin) return;
         const employeeId = employeeIdInput?.value || '';
         const csrfToken = getCsrfToken();
         const updates = collectUpdates();

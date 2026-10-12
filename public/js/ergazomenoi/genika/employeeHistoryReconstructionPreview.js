@@ -54,11 +54,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const intro = modalElement.querySelector('.modal-body > p');
     const originalTitle = title.textContent;
     const originalIntro = intro.textContent;
-    function presentation(saveMode) {
-        title.textContent = saveMode ? 'Το Ιστορικό Χρειάζεται Τακτοποίηση' : originalTitle;
-        intro.textContent = saveMode
+    function presentation(saveMode, operation) {
+        const departure = saveMode && operation === 'FIRST_DEPARTURE';
+        title.textContent = departure ? 'Το Ιστορικό Χρειάζεται Τακτοποίηση πριν την Αποχώρηση'
+            : saveMode ? 'Το Ιστορικό Χρειάζεται Τακτοποίηση' : originalTitle;
+        intro.textContent = departure
+            ? 'Για να ολοκληρωθεί η αποχώρηση, η εφαρμογή προτείνει πρώτα τις παρακάτω αλλαγές στο Ιστορικό.' : saveMode
             ? 'Για να ολοκληρωθεί η αποθήκευση, η εφαρμογή προτείνει τις παρακάτω αλλαγές στο Ιστορικό.' : originalIntro;
-        applyButton.textContent = saveMode ? 'Εφαρμογή & Συνέχεια Αποθήκευσης' : 'Εφαρμογή Τακτοποίησης';
+        applyButton.textContent = departure ? 'Τακτοποίηση & Συνέχεια Αποχώρησης'
+            : saveMode ? 'Εφαρμογή & Συνέχεια Αποθήκευσης' : 'Εφαρμογή Τακτοποίησης';
     }
     const approval = document.getElementById('employeeHistoryReconstructionApproval');
     const checkbox = document.getElementById('employeeHistoryReconstructionApprovalAccepted');
@@ -73,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function notice(titleText, text, icon) {
         return Swal.fire({ titleText, text, icon, confirmButtonText: 'Κλείσιμο', allowOutsideClick: false,
-            customClass: { title: 'custom-title', popup: 'custom-swal-popup', htmlContainer: 'custom-html-container',
+            customClass: { title: 'custom-title', popup: 'custom-swal-popup employee-maintenance-swal', htmlContainer: 'custom-html-container',
                 confirmButton: 'class-warning custom-confirm-button custom-swal-button' } });
     }
     checkbox?.addEventListener('change', () => {
@@ -133,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const message = failure === 'uncertain'
                 ? 'Η εφαρμογή δεν μπόρεσε να επιβεβαιώσει αν αποθηκεύτηκε η τακτοποίηση λόγω διακοπής της επικοινωνίας. 1. Ανοίξτε ξανά τον εργαζόμενο και ελέγξτε το αποθηκευμένο Ιστορικό. 2. Αν χρειάζεται, ζητήστε βοήθεια από τον διαχειριστή. Κωδικός αναφοράς: ΙΣΤ-ΕΦΑΡΜ-02.'
                 : failure === 'forbidden'
-                    ? 'Η τακτοποίηση σταμάτησε επειδή δεν έχετε δικαίωμα διόρθωσης όλων των επηρεαζόμενων εγγραφών. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Κλείστε το παράθυρο. 2. Ζητήστε από διαχειριστή να ελέγξει την πρόταση. Κωδικός αναφοράς: ΙΣΤ-ΕΦΑΡΜ-03.'
+                    ? 'Η τακτοποίηση σταμάτησε επειδή δεν επιβεβαιώθηκε το δικαίωμά σας να ενημερώνετε τον συγκεκριμένο εργαζόμενο στην επιλεγμένη εταιρεία. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Συνδεθείτε ξανά και ανοίξτε τον εργαζόμενο στη σωστή εταιρεία. 2. Αν το πρόβλημα παραμένει, ζητήστε από διαχειριστή να ελέγξει το δικαίωμα ενημέρωσης εργαζομένου. Κωδικός αναφοράς: ΙΣΤ-ΕΦΑΡΜ-03.'
                     : 'Η τακτοποίηση δεν ολοκληρώθηκε επειδή ο έλεγχος ασφαλούς αποθήκευσης απέτυχε. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ανοίξτε ξανά την προεπισκόπηση. 2. Αν το πρόβλημα παραμένει, ζητήστε βοήθεια από τον διαχειριστή. Κωδικός αναφοράς: ΙΣΤ-ΕΦΑΡΜ-04.';
             await notice('Η τακτοποίηση δεν ολοκληρώθηκε', message, 'warning');
         }
@@ -151,6 +155,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 `<span class="history-preview-badge history-preview-${confidenceClass(item.confidence)}">${escape(item.confidence)}</span>`];
             return `<tr>${cells.map((cell, index) => `<td data-label="${headings[index]}">${cell}</td>`).join('')}</tr>`;
         }).join('')}</tbody></table>`;
+    }
+    function renderContractItems(items = []) {
+        if (!items.length) return '';
+        const headings = ['α/α', 'Στοιχείο Σύμβασης', 'Ποσό Βάσει Σύμβασης', 'Αποδοχές Βάσει Όρων Εργασίας'];
+        return `<table class="history-preview-contract-items"><thead><tr>${headings.map(label => `<th scope="col">${label}</th>`).join('')}</tr></thead>
+            <tbody>${items.map(item => `<tr>${[item.index, item.description, item.contractAmount, item.workTermsAmount]
+                .map((value, index) => `<td data-label="${headings[index]}">${escape(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     }
     function lazyDetails(title, render) {
         const details = document.createElement('details');
@@ -216,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         periods.innerHTML = preview.periods.map(period => `<article class="history-preview-period"><h6>${escape(period.from)} → ${escape(period.to)}</h6>
             <p>Προέρχεται από τις εγγραφές: <strong>${period.rows.map(escape).join(', ')}</strong></p>
             ${period.rows.length > 1 ? `<p class="history-preview-period-explanation">Οι εγγραφές ${formatGreekList(period.rows.map(escape))} φαίνεται να περιγράφουν την ίδια εργασιακή περίοδο και συνδυάστηκαν στην πρόταση.</p>` : ''}
-            <dl class="history-preview-fields">${period.facts.map(field => `<div><dt>${escape(field.label)}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl></article>`).join('');
+            <dl class="history-preview-fields">${period.facts.map(field => `<div><dt>${escape(field.label)}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl>${renderContractItems(period.contractItems)}</article>`).join('');
         proposed.appendChild(periods);
         if (!preview.periods.length) proposed.append(preview.status === 'unavailable'
             ? 'Δεν δημιουργήθηκε πρόταση περιόδων. Ελέγξτε τα σημεία προσοχής.' : 'Δεν υπάρχουν περίοδοι προς εμφάνιση.');
@@ -252,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (row.note) { const note = document.createElement('p'); note.textContent = row.note; groups.appendChild(note); }
                 for (const group of row.groups) groups.appendChild(lazyDetails(group.title, () =>
                     `<dl class="history-preview-fields">${group.fields.map(field => `<div><dt>${escape(field.label)}${field.informational
-                        ? `<small>${escape(field.note)}</small>` : ''}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl>`));
+                        ? `<small>${escape(field.note)}</small>` : ''}</dt><dd>${escape(field.value)}</dd></div>`).join('')}</dl>${renderContractItems(group.contractItems)}`));
                 return groups;
             }));
         }
@@ -265,10 +276,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 storeHistoryReconstructionSuccess(employee.value, historyReconstructionCounts(result, approvedPreview));
             }
         },
-        approveForSave({ preview, token }) {
+        approveForSave({ preview, token, operation }) {
             if (controller || applying || saveResolver) return Promise.resolve(false);
             resetApproval();
-            presentation(true);
+            presentation(true, operation);
             saveApproved = false;
             renderPreview(preview);
             previewToken = token;

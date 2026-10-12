@@ -25,10 +25,10 @@ test('φορτώνει τους υφιστάμενους επίσημους κα
             { kodikos: '0111', perigrafh: 'ΣΥΝΤΑΞΗ' }], events, 'kpk'),
         contractTypeModel: model([{ kodikos: '0002', perigrafh: 'Σύμβαση' }],
             events, 'type'),
-        contractCategoryModel: model([{ kodikos: '0004', perigrafh: 'Κατηγορία' }],
+        contractCategoryModel: model([{ kodikos: '0004', perigrafh: 'Κατηγορία', afora_thn_symbash: '0002' }],
             events, 'category'),
-        contractSpecialtyModel: model([{ kodikos: '0003', perigrafh: 'Ειδικότητα' }],
-            events, 'specialty')
+        contractSpecialtyModel: model([{ kodikos: '0003', perigrafh: 'Ειδικότητα', afora_thn_symbash_kathgoria: '00020004' }],
+            events, 'specialty'), contractItemModel: model([], events, 'items')
     });
     assert.deepEqual(catalogs.KPK_EFKA, [
         { code: '0111', label: 'ΣΥΝΤΑΞΗ' },
@@ -37,10 +37,10 @@ test('φορτώνει τους υφιστάμενους επίσημους κα
     assert.deepEqual(catalogs.CONTRACT_TYPE,
         [{ code: '0002', label: 'Σύμβαση' }]);
     assert.deepEqual(catalogs.CONTRACT_CATEGORY,
-        [{ code: '0004', label: 'Κατηγορία' }]);
+        [{ code: '0004', label: 'Κατηγορία', afora_thn_symbash: '0002' }]);
     assert.deepEqual(catalogs.CONTRACT_SPECIALTY,
-        [{ code: '0003', label: 'Ειδικότητα' }]);
-    assert.equal(events.filter(event => event[1] === 'session' && event[2] === session).length, 4);
+        [{ code: '0003', label: 'Ειδικότητα', afora_thn_symbash_kathgoria: '00020004' }]);
+    assert.equal(events.filter(event => event[1] === 'session' && event[2] === session).length, 5);
 });
 
 test('άγνωστες ή ελλιπείς εγγραφές καταλόγου δεν γίνονται επιτρεπτές τιμές', async () => {
@@ -49,8 +49,8 @@ test('άγνωστες ή ελλιπείς εγγραφές καταλόγου �
         { kodikos: '0999', perigrafh: '' }, null], events, 'empty');
     const catalogs = await loadEmployeeHistoryCorrectionCatalogs({
         kpkModel: empty, contractTypeModel: empty,
-        contractCategoryModel: empty, contractSpecialtyModel: empty
+        contractCategoryModel: empty, contractSpecialtyModel: empty, contractItemModel: empty
     });
     assert.deepEqual(catalogs, { KPK_EFKA: [], CONTRACT_TYPE: [],
-        CONTRACT_CATEGORY: [], CONTRACT_SPECIALTY: [] });
+        CONTRACT_CATEGORY: [], CONTRACT_SPECIALTY: [], CONTRACT_ITEM: [] });
 });

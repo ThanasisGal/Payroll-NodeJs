@@ -4,7 +4,10 @@ const VERSION = 'employee-history-automatic-reconstruction-save:v1';
 function saveToken(stateToken, request, actorUserId) {
     return A.hash({ operation: VERSION, stateToken, request, actor: String(actorUserId) });
 }
-function validateApproval(reconstruction) {
+function validateApproval(reconstruction, savePayload) {
+    const mutationKeys = ['rowDiffs', 'proposedRows', 'sourceHistoryIds', 'historyPatches', 'selectedHistoryMutations'];
+    if ([savePayload, savePayload?.formData].some(value => value &&
+        mutationKeys.some(key => Object.hasOwn(value, key)))) throw A.failure('INVALID_REQUEST', 400);
     if (reconstruction == null) return;
     if (!reconstruction || typeof reconstruction !== 'object' || Array.isArray(reconstruction) ||
         Object.keys(reconstruction).some(key => !['previewToken', 'approvalAccepted'].includes(key))) {
@@ -48,6 +51,7 @@ function originalSaveWithoutReconstructionEchoes(request, current, plan, targetA
         submittedHistoryChanges: omitEchoes(maintenance.submittedHistoryChanges) } };
 }
 function sendReconstructionSaveError(res, error) {
+    if (require('./employeeDepartureAutomaticReconstructionContract').sendDepartureReconstructionAction(res, error)) return true;
     if (!String(error?.code || '').startsWith(A.PREFIX)) return false;
     if (error.code === A.PREFIX + 'REQUIRED') {
         res.status(200).json({ success: false, actionRequired: true, reason: error.code,
@@ -58,7 +62,7 @@ function sendReconstructionSaveError(res, error) {
     const stale = error.code === A.PREFIX + 'STALE';
     const uncertain = error.code === A.PREFIX + 'COMMIT_UNCERTAIN';
     const explanation = stale
-        ? 'Το Ιστορικό άλλαξε μετά την προεπισκόπηση. Δεν αποθηκεύτηκε καμία αλλαγή. Ελέγξτε ξανά τη νέα πρόταση.'
+        ? 'Τα στοιχεία του εργαζομένου ή του Ιστορικού άλλαξαν μετά την προεπισκόπηση. Η αποθήκευση σταμάτησε για να ελεγχθούν οι νεότερες πληροφορίες. Δεν αποθηκεύτηκε καμία αλλαγή.'
         : uncertain
             ? 'Η εφαρμογή δεν μπόρεσε να επιβεβαιώσει αν ολοκληρώθηκε η αποθήκευση λόγω διακοπής της επικοινωνίας.'
             : error.code === A.PREFIX + 'SAVE_CONFLICT'

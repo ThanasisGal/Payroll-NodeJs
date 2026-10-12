@@ -188,8 +188,9 @@ test('employee update is covered by CSRF and uses session-scoped filter', () => 
         /expectedRevision: formData\.historyExpectedRevision \|\| null/);
     const writer = read('server/services/ergazomenoi/employeeEmploymentProfileWriter.js');
     assert.match(writer,
-        /requestScopedLean\(\s*employeeModel\.findOne\(employeeId \? \{ \.\.\.filter, _id: employeeId \} : filter\),\s*session/);
-    assert.match(writer, /updateOne\(\{ \.\.\.filter, _id: current\._id \}/);
+        /employeeModel\.findOne\(\{ \.\.\.scope, _id: employeeId \}\)/);
+    assert.match(writer, /acquireEmployeeMutationFence\(\{ filter: scope, employeeId, employeeModel, session/);
+    assert.match(writer, /updateOne\(\{ \.\.\.filter, _id: id \}/);
 });
 
 test('employee history identity and departure state come from the scoped database employee', () => {
@@ -212,7 +213,7 @@ test('employee history identity and departure state come from the scoped databas
         'formData.kodikosHidden = kodikosErgazomenoy'
     );
     const historyLookupIndex = updateHandler.indexOf(
-        'await writeEmployeeEmploymentProfile({'
+        'await writeEmployeeMaintenance({'
     );
     assert.ok(canonicalSyncIndex >= 0);
     assert.ok(historyLookupIndex >= 0);

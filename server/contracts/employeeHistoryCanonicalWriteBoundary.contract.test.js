@@ -67,7 +67,7 @@ test('history editor and lifecycle commands derive one plan before physical hist
         assert.doesNotMatch(operation,
             /historyModel\.(?:create|updateOne|updateMany|deleteOne|deleteMany)\(/,
         start);
-        assert.match(operation, /writeEmployeeEmploymentProfile|executeFinalMutationPlan/, start);
+        assert.match(operation, /writeEmployeeEmploymentProfile|applyOrExecuteFinalMutationPlan|executeFinalMutationPlan/, start);
     }
 });
 

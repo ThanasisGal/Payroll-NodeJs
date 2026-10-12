@@ -17,7 +17,8 @@ test('all 118 schema fields have an explicit display/exclusion decision and all 
     assert.equal(P.DISPLAY_FIELDS.length, 105);
     for (const field of P.DISPLAY_FIELDS) assert.match(L[field], /[Α-Ωα-ω]/u, field);
     const dto = preview(F.caseA());
-    assert.equal(dto.originalRows[0].groups.flatMap(group => group.fields).length, 105);
+    assert.ok(dto.originalRows[0].groups.flatMap(group => group.fields).length <= 60);
+    assert.ok(dto.originalRows[0].groups.flatMap(group => group.fields).every(field => !/Στοιχείο Σύμβασης \d|Ποσό.* \d/.test(field.label)));
     assert.deepEqual(dto.originalRows[0].groups.map(group => group.title), P.GROUP_TITLES);
 });
 
@@ -36,11 +37,11 @@ test('schedule dates are visible and explicitly informational, never evidence or
 });
 
 test('meaningful changes precede exact numeric-zero defaults grouped by public row label', () => {
-    for (const [factory, count, rows] of [[F.caseA, 86, 2], [F.caseB, 129, 3]]) {
+    for (const [factory, count, rows] of [[F.caseA, 26, 2], [F.caseB, 39, 3]]) {
         const dto = preview(factory());
         assert.equal(dto.summary.numericDefaults, count);
         assert.equal(dto.defaultGroups.length, rows);
-        assert.ok(dto.defaultGroups.every(group => group.count === 43));
+        assert.ok(dto.defaultGroups.every(group => group.count === 13));
         assert.equal(dto.defaultGroups.flatMap(group => group.changes).length, count);
         assert.ok(dto.defaultGroups.flatMap(group => group.changes).every(change => change.after === '0' && change.confidence === 'Προεπιλογή'));
         assert.ok(dto.changes.every(change => change.confidence !== 'Προεπιλογή'));
@@ -142,8 +143,8 @@ test('catalog labels reuse the existing registry in original fields, period fact
     const input = F.caseBWithProfileEvidence();
     input.completeHistoryRows.forEach(row => Object.assign(row, { symbash: '0002', kathgoria_symbashs: '0001', eidikothta_symbashs: '0003' }));
     const catalogs = { CONTRACT_TYPE: [{ code: '0002', label: 'Σύμβαση δοκιμής' }],
-        CONTRACT_CATEGORY: [{ code: '0001', label: 'Κατηγορία δοκιμής' }],
-        CONTRACT_SPECIALTY: [{ code: '0003', label: 'Ειδικότητα δοκιμής' }],
+        CONTRACT_CATEGORY: [{ code: '0001', label: 'Κατηγορία δοκιμής', afora_thn_symbash: '0002' }],
+        CONTRACT_SPECIALTY: [{ code: '0003', label: 'Ειδικότητα δοκιμής', afora_thn_symbash_kathgoria: '00020001' }],
         KPK_EFKA: [{ code: '0115', label: 'Ασφάλιση δοκιμής' }, { code: '0111', label: 'Ασφάλιση δοκιμής' }] };
     const result = plan(input), before = structuredClone({ input, result, catalogs });
     const dto = P.buildEmployeeHistoryReconstructionPreview({ plan: result, completeHistoryRows: input.completeHistoryRows, catalogs });

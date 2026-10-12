@@ -104,10 +104,10 @@ test('active Admin/THA capability renders all four existing row actions enabled'
     }
 });
 
-test('client preserves Admin dynamic actions and guards Supervisor row actions', () => {
+test('client preserves Admin dynamic actions and keeps restricted rows read-only', () => {
     assert.match(clientSource, /isHistoryAdmin = historyAccessMode === 'ADMIN_FULL'/);
     assert.match(clientSource, /createActionButtons\(\{ canManage: true, canAdd: isHistoryAdmin \}\)/);
-    assert.match(clientSource, /rowCanManage = isHistorySupervisor && row.dataset.canManageRow === 'true'/);
+    assert.match(clientSource, /actionAllowed = isHistoryAdmin;/);
     assert.match(clientSource, /\['add', 'edit', 'delete', 'undo', 'review'\]\.includes\(action\) && !actionAllowed/);
 });
 

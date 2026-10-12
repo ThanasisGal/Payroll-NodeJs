@@ -168,11 +168,11 @@ function store(fixtures = [fixture()], { cloneFn = structuredClone } = {}) {
         capabilityProbe: async () => true, referenceChecker: async () => [],
         auditCollectionChecker: async () => true }, events, hooks, state: () => clone(committed),
         changeCommittedEmployee(id, patch) {
-            Object.assign(committed.employees.find(row => row._id === id), clone(patch));
+            Object.assign(committed.employees.find(row => String(row._id) === String(id)), clone(patch));
             const key = keyFor('employees', id); versions.set(key, (versions.get(key) || 0) + 1);
         },
         changeCommittedHistory(id, patch) {
-            Object.assign(committed.history.find(row => row._id === id), clone(patch));
+            Object.assign(committed.history.find(row => String(row._id) === String(id)), clone(patch));
             const key = keyFor('history', id); versions.set(key, (versions.get(key) || 0) + 1);
         } };
 }

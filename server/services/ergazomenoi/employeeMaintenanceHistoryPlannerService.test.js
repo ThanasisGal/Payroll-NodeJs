@@ -19,7 +19,7 @@ test('real Save and readiness import and call the same pure maintenance planner'
         'ergazomenoi', 'ergazomenoiController.js'), 'utf8');
     assert.match(writer, /planEmployeeMaintenanceHistory\(mutationRequest\)/);
     assert.match(readiness, /planEmployeeMaintenanceHistory\(\{ scope, currentEmployee,/);
-    assert.match(controller, /buildEmployeeMaintenanceIdentity\(formData\)/);
+    assert.match(controller, /await writeEmployeeMaintenance\(\{/);
     assert.doesNotMatch(controller, /function getIstorikoDateIdentity/);
 });
 

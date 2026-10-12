@@ -1,11 +1,10 @@
+const { contractParentKey, contractItemsForDisplay } = require('../../services/ergazomenoi/employeeContractDescriptionService');
 const { sendReconstructionSaveError, validateApproval } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract');
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeEmploymentProfile, writeEmployeeEmploymentProfileWithAutomaticReconstruction,
-    writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmployeeRehire,
+const { writeEmployeeMaintenance, writeEmployeeEmploymentProfile, writeEmployeeRehire,
     writeEmployeeEmploymentHistoryOperations,
-    writeEmployeeDepartureDateCorrection,
     deleteEmployeeAndEmploymentHistory, selectMaintenanceMode } =
     require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
 const { buildEmployeeMaintenanceIdentity } =
@@ -597,7 +596,7 @@ async function enrichIstorikoRowsForDetails(rows = []) {
     const eidikothtaQueries = rows
         .filter((row) => row.symbash && row.kathgoria_symbashs && row.eidikothta_symbashs)
         .map((row) => ({
-            afora_thn_symbash_kathgoria: `${row.symbash}${row.kathgoria_symbashs}`,
+            afora_thn_symbash_kathgoria: contractParentKey(row.symbash, row.kathgoria_symbashs),
             kodikos: String(row.eidikothta_symbashs)
         }));
 
@@ -614,7 +613,7 @@ async function enrichIstorikoRowsForDetails(rows = []) {
 
     const stoixeiaQueries = [];
     rows.forEach((row) => {
-        const parentKey = `${row.symbash || ''}${row.kathgoria_symbashs || ''}${row.eidikothta_symbashs || ''}`;
+        const parentKey = contractParentKey(row.symbash, row.kathgoria_symbashs, row.eidikothta_symbashs);
         if (!parentKey.trim()) return;
 
         for (let i = 1; i <= 15; i += 1) {
@@ -664,8 +663,8 @@ async function enrichIstorikoRowsForDetails(rows = []) {
         const symbash = row.symbash || '';
         const kathgoria = row.kathgoria_symbashs || '';
         const eidikothta = row.eidikothta_symbashs || '';
-        const eidikothtaParentKey = `${symbash}${kathgoria}`;
-        const stoixeioParentKey = `${symbash}${kathgoria}${eidikothta}`;
+        const eidikothtaParentKey = contractParentKey(symbash, kathgoria);
+        const stoixeioParentKey = contractParentKey(symbash, kathgoria, eidikothta);
 
         const stoixeiaSymbaseon = {};
         for (let i = 1; i <= 15; i += 1) {
@@ -728,6 +727,9 @@ async function enrichIstorikoRowsForDetails(rows = []) {
                           }
                       }
                     : {},
+                contractItems: contractItemsForDisplay(row,
+                    (_code, index) => stoixeiaSymbaseon[index]?.perigrafh || '',
+                    value => new Intl.NumberFormat('el-GR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)),
                 stoixeiaSymbaseon,
                 krathseis: krathseisLookup
             }
@@ -3430,7 +3432,7 @@ class ergazomenoiController {
             req.body || {};
         let resolutionConfirmation;
         try {
-            validateApproval(req.body?.reconstruction);
+            validateApproval(req.body?.reconstruction, req.body);
             resolutionConfirmation = normalizeEmployeeHistoryResolutionConfirmation(
                 req.body?.resolution);
         } catch (error) {
@@ -3833,6 +3835,7 @@ class ergazomenoiController {
         // =========================================================================
         let updatedErgazomenos = null;
         let automaticReconstructionApplied = false;
+        let maintenanceResult = null;
 
         try {
             // Helper για ελληνικά δεκαδικά
@@ -3957,7 +3960,7 @@ class ergazomenoiController {
                 error.statusCode = 409;
                 throw error;
             }
-            if (req.body?.reconstruction && (rehireIntent === true || isDepartureCancellation || isDepartureCorrection || isFirstDeparture)) {
+            if (req.body?.reconstruction && rehireIntent === true) {
                 throw Object.assign(new Error('EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_SAVE_CONFLICT'), {
                     code: 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_SAVE_CONFLICT', statusCode: 409 });
             }
@@ -3977,94 +3980,26 @@ class ergazomenoiController {
                         afora_proslhpsh: true
                     }
                 })
-                : isDepartureCancellation
-                    ? await writeEmployeeDepartureCancellation({
-                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
-                            kodikos: kodikosErgazomenoy }, employeeId: ergazomenoiId,
-                        input: profileInput(formData, 'edit'),
-                        maintenance: { employeeChanges: filteredDataErgazomenoi,
-                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
-                            historyChanges: updateFieldsIstoriko,
-                            submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
-                            submittedFormValues: formData },
-                        expectedRevision: formData.historyExpectedRevision || null,
-                        expectedStoredDeparture: storedDeparture
-                    })
-                : isDepartureCorrection
-                    ? await writeEmployeeDepartureDateCorrection({
-                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
-                            kodikos: kodikosErgazomenoy },
-                        employeeId: ergazomenoiId,
-                        requestedDepartureDate: submittedDeparture,
-                        expectedRevision: formData.historyExpectedRevision || null,
-                        expectedStoredDeparture: storedDeparture,
-                        input: profileInput(formData, 'edit'),
-                        maintenance: { employeeChanges: filteredDataErgazomenoi,
-                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(
-                                filteredDataErgazomenoi, formData),
-                            historyChanges: updateFieldsIstoriko,
-                            submittedHistoryChanges: historyEditorChanges(
-                                updateFieldsIstoriko, formData),
-                            submittedFormValues: formData }
-                    })
-                : isFirstDeparture
-                    ? await writeEmployeeDeparture({
-                        scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
-                            kodikos: kodikosErgazomenoy },
-                        employeeId: ergazomenoiId,
-                        departureDate: submittedDeparture,
-                        input: profileInput(formData, 'edit'),
-                        effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo ||
-                            formData.hmeromhnia_allaghs_orarioy_apo || formData.hmeromhnia_proslhpshs,
-                        maintenance: { employeeChanges: filteredDataErgazomenoi,
-                            rejectConcurrentProfileChanges: true,
-                            submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
-                            historyChanges: updateFieldsIstoriko,
-                            submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
-                            submittedFormValues: formData,
-                            submittedFormFields: Object.keys(formData),
-                            identity: formData.istorikoId ? undefined : buildEmployeeMaintenanceIdentity(formData),
-                            originalHistoryId: formData.istorikoId || null,
-                            correctableIdentityFields: formData.istorikoId ? ['hmeromhnia_apoxorhshs'] : [] }
-                    })
-                    : await writeEmployeeEmploymentProfileWithAutomaticReconstruction({
-                    scope: {
-                        team: omadaErgasias,
-                        company_kod: kodikosEtaireias,
-                        kodikos: kodikosErgazomenoy
-                    },
-                    input: profileInput(formData, 'edit'),
+                : await writeEmployeeMaintenance({
+                    expectedStoredDeparture: storedDeparture,
+                    scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
+                        kodikos: kodikosErgazomenoy },
                     employeeId: ergazomenoiId,
-                    effectiveFrom:
-                        formData.hmeromhnia_isxyos_oron_ergasias_apo ||
-                        formData.hmeromhnia_allaghs_orarioy_apo ||
-                        formData.hmeromhnia_proslhpshs,
+                    input: profileInput(formData, 'edit'),
                     maintenance: {
                         expectedRevision: formData.historyExpectedRevision || null,
                         employeeChanges: filteredDataErgazomenoi,
-                        submittedEmployeeFields: submittedEmployeeMaintenanceFields(
-                            filteredDataErgazomenoi, formData),
+                        submittedEmployeeFields: submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData),
                         historyChanges: updateFieldsIstoriko,
                         submittedHistoryChanges: historyEditorChanges(updateFieldsIstoriko, formData),
                         submittedProfileFields: Object.keys(profileInput(formData, 'edit')),
                         submittedFormValues: formData,
-                        identity: formData.istorikoId
-                            ? undefined
-                            : buildEmployeeMaintenanceIdentity(formData),
-                        originalHistoryId: formData.istorikoId || null,
-                        correctableIdentityFields: formData.istorikoId
-                            ? ['hmeromhnia_apoxorhshs']
-                            : []
+                        submittedFormFields: Object.keys(formData)
                     },
-                    resolutionConfirmation,
                     reconstruction: req.body?.reconstruction,
-                    actorUserId: req.session?.userId ?? null,
-                    repairActor: {
-                        userId: req.session?.userId,
-                        userName: req.session?.userName || req.session?.username,
-                        sessionId: req.sessionID || req.session?.id
-                    }
+                    actorUserId: req.session?.userId ?? null
                 });
+            maintenanceResult = result;
             automaticReconstructionApplied = result.automaticReconstructionApplied === true;
             updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);
 
@@ -4787,7 +4722,13 @@ class ergazomenoiController {
         // =========================================================================
         return res.json({
             success: true,
-            message: automaticReconstructionApplied ? 'Η αποθήκευση ολοκληρώθηκε και το Ιστορικό τακτοποιήθηκε.' : 'Εργαζόμενος ενημερώθηκε επιτυχώς',
+            message: maintenanceResult?.historyUpdated
+                ? 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου και το Ιστορικό.'
+                : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.',
+            employeeUpdated: maintenanceResult?.employeeUpdated === true,
+            historyUpdated: maintenanceResult?.historyUpdated === true,
+            historyChangedRows: maintenanceResult?.historyChangedRows || 0,
+            lifecycleOperation: maintenanceResult?.lifecycleOperation || null,
             automaticReconstructionApplied,
             data: {
                 _id: ergazomenoiId,
