@@ -47,7 +47,7 @@ const documentStub = {
 const sandbox = {
     console,
     document: documentStub,
-    window: {},
+    window: { addEventListener: () => {} },
     URLSearchParams,
     fetch: async () => {
         fetchCalls++;
