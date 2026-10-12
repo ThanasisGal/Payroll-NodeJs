@@ -31,8 +31,9 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     const artifactDir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
     async function capture(name) {
         if (!artifactDir) return;
+        await page.waitForFunction(() => !document.body.classList.contains('loader-active'));
         fs.mkdirSync(artifactDir, { recursive: true });
-        await page.screenshot({ path: path.join(artifactDir, name + '.png'), fullPage: true });
+        await page.screenshot({ path: path.join(artifactDir, name + '.png'), fullPage: true, animations: 'disabled' });
         const visibleGuide = page.locator('[data-guidance-stage]:visible');
         if (await visibleGuide.count() === 1) {
             await visibleGuide.evaluate(node => {
@@ -40,7 +41,7 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
                 const scroller = getComputedStyle(inner).overflowY === 'visible' ? node.closest('.review-card-body') : inner;
                 scroller.scrollTop += node.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
             });
-            await page.screenshot({ path: path.join(artifactDir, name + '-detail.png'), fullPage: true });
+            await page.screenshot({ path: path.join(artifactDir, name + '-detail.png'), fullPage: true, animations: 'disabled' });
             const navigation = visibleGuide.locator('.review-guidance-navigation');
             if (await navigation.count()) {
                 await navigation.evaluate(node => {
@@ -48,7 +49,7 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
                     const scroller = getComputedStyle(inner).overflowY === 'visible' ? node.closest('.review-card-body') : inner;
                     scroller.scrollTop += node.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
                 });
-                await page.screenshot({ path: path.join(artifactDir, name + '-navigation.png'), fullPage: true });
+                await page.screenshot({ path: path.join(artifactDir, name + '-navigation.png'), fullPage: true, animations: 'disabled' });
             }
         }
     }
