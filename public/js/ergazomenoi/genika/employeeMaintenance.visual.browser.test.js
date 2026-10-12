@@ -220,7 +220,8 @@ async function verifyChoice(page, id) {
     });
     assert.ok(geometry.textDelta <= 1, `${id}: text center ${JSON.stringify(geometry)}`);
     assert.ok(geometry.delta <= 1, `${id}: ${JSON.stringify(geometry)}`);
-    assert.equal(geometry.gap, 12, `${id}: original gap`);
+    // Chromium rectangle coordinates can differ by a fraction of a CSS pixel.
+    assert.ok(Math.abs(geometry.gap - 12) <= 0.05, `${id}: original gap ${geometry.gap}px`);
     assert.equal(geometry.width, 20); assert.equal(geometry.height, 20);
     assert.equal(geometry.marginTop, '0px'); assert.equal(geometry.marginBottom, '0px');
     assert.equal(geometry.labelMarginTop, '0px'); assert.equal(geometry.labelMarginBottom, '0px');
