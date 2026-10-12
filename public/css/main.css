@@ -17045,7 +17045,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 }
 
 /* Employee draft status shares the date row and wraps safely on narrow screens. */
-.employee-draft-indicator { color: #b02a37; font-weight: 700; font-size: 1rem; line-height: 1.5; }
+.employee-draft-indicator { color: #b02a37; font-weight: 700; font-size: 1.1rem; line-height: 1.5; }
 @media (max-width: 575.98px) {
     .employee-draft-indicator { flex: 0 0 100%; max-width: 100%; padding-top: .25rem; }
 }
