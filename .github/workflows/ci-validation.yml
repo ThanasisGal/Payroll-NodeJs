@@ -940,6 +940,7 @@ jobs:
             -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/tom-select.css"
           node --test --test-concurrency=1 test/integration/employmentReviewEmployees.test.js test/integration/employmentReviewEmployees.browser.test.js
           node --test server/services/ergazomenoi/apasxoliseisReviewGuidance.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.blockedExplanation.test.js
+          node --test server/controllers/ergazomenoi/erganhController.stage1EmploymentScope.regression.test.js server/services/ergazomenoi/apasxoliseisDeferredTrailingWeekReview.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewGuidance.browser.test.js test/integration/employmentReviewGuidance.hover.browser.test.js
 
       - name: Preserve synthetic Employment Review visual checks

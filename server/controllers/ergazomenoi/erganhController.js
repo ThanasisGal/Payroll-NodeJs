@@ -241,6 +241,7 @@ const {
     isWeekFullyWithinEmploymentPeriod,
     restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,
+    restrictWeeklyReviewRowsToEmploymentDates,
     buildFullMonthBoundaryContextPreflight,
     deriveDeferredWeekScope,
     isDeferredWeekPending,
@@ -5359,8 +5360,8 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
     const stage3AuditDatesByEmployeeWeek =
         stage3AuditDecisionDatesByEmployeeWeek(workflowAudits);
     const lifecycleByWeek = new Map();
-    for (const [key, weekRows] of rowsByEmployeeWeek) {
-        const firstRow = weekRows[0];
+    for (const [key, loadedWeekRows] of rowsByEmployeeWeek) {
+        const firstRow = loadedWeekRows[0];
         const employee = lifecycleByKodikos.get(String(firstRow.kodikos || '')) ||
             employeeByCode.get(String(firstRow.kodikos || '')) || {};
         const weekStart = startOfWeekMondayUtc(firstRow.hmeromhnia);
@@ -5370,6 +5371,8 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
             period_start: ownershipPeriod.period_start, period_end: ownershipPeriod.period_end,
             hire_date: employee.hmeromhnia_proslhpshs,
             departure_date: employee.hmeromhnia_apoxorhshs, employee });
+        const weekRows = restrictWeeklyReviewRowsToEmploymentDates(
+            loadedWeekRows, employmentDateScope);
         const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
             dateKeyUtc(row.hmeromhnia), weeklyHrStage2LifecycleProfileFromRow(row)
         ]));
@@ -5955,8 +5958,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const stage3AuditDatesByEmployeeWeek =
         stage3AuditDecisionDatesByEmployeeWeek(workflowAudits);
     const lifecycleByWeek = new Map();
-    for (const [key, weekRows] of reviewWeekRows) {
-        const firstRow = weekRows[0];
+    for (const [key, loadedWeekRows] of reviewWeekRows) {
+        const firstRow = loadedWeekRows[0];
         const employee = lifecycleByKodikos.get(String(firstRow.kodikos || '')) ||
             ergByKodikos.get(String(firstRow.kodikos || '')) || {};
         const naturalWeekStart = startOfWeekMondayUtc(firstRow.hmeromhnia);
@@ -5970,6 +5973,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             departure_date: employee.hmeromhnia_apoxorhshs,
             employee
         });
+        const weekRows = restrictWeeklyReviewRowsToEmploymentDates(
+            loadedWeekRows, employmentDateScope);
         const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
             dateKeyUtc(row.hmeromhnia), {
                 hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
@@ -12290,8 +12295,9 @@ class erganhController {
             const payloads = [];
             for (const requested of requestedScopes) {
                 const key = `${String(requested.employee_kodikos || '').trim()}|${dateKeyUtc(requested.week_start)}`;
-                const weekRows = rowsByWeek.get(key) || [];
                 const lifecycleProjection = lifecycleByWeek.get(key);
+                const weekRows = restrictWeeklyReviewRowsToEmploymentDates(
+                    rowsByWeek.get(key) || [], lifecycleProjection?.employment_date_scope);
                 if (!weekRows.length || !lifecycleProjection) continue;
                 const state = workflowStateByWeek.get(key) || {};
                 const stage1 = lifecycleProjection.stages?.stage1 || {};

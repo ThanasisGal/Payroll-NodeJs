@@ -241,8 +241,13 @@ function resolveWeeklyHrWorkflow({
             expectedRepoCategory: dailyExpectedRepoCategory
         });
         if ((state.diagnostics || []).length > 0) {
-            state.diagnostics.forEach(code => block(code, [date],
-                dailyEvidence(row, actualFactsByDate.get(date))));
+            // Context-only days still inform the full-week rest calculation,
+            // but their daily conflicts belong to their own review period.
+            if ((!actionableDateSet || actionableDateSet.has(date)) &&
+                (!deferred || date <= boundary.period_end)) {
+                state.diagnostics.forEach(code => block(code, [date],
+                    dailyEvidence(row, actualFactsByDate.get(date))));
+            }
             return false;
         }
         return state.effectiveRepo === true &&

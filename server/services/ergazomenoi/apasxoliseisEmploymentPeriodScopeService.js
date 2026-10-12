@@ -237,6 +237,18 @@ function deriveEmploymentOwnedDateScope({ natural_week_start, natural_week_end,
     });
 }
 
+// Expanded weekly reads can include rows after departure or between employment
+// cycles. Review only the employment-owned dates, retaining invalid dates so
+// the structural validation can still report them.
+function restrictWeeklyReviewRowsToEmploymentDates(rows = [], employmentDateScope = null) {
+    if (!Array.isArray(employmentDateScope?.employment_owned_dates)) return rows;
+    const dates = new Set(employmentDateScope.employment_owned_dates);
+    return rows.filter((row) => {
+        const date = dateKeyUtc(row.hmeromhnia);
+        return !date || dates.has(date);
+    });
+}
+
 function isFullCalendarMonthRange(periodStartValue, periodEndValue) {
     const periodStart = dateKeyUtc(periodStartValue);
     const periodEnd = dateKeyUtc(periodEndValue);
@@ -327,6 +339,7 @@ module.exports = {
     isWeekFullyWithinEmploymentPeriod,
     restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,
+    restrictWeeklyReviewRowsToEmploymentDates,
     isFullCalendarMonthRange,
     buildFullMonthBoundaryContextPreflight
 };
