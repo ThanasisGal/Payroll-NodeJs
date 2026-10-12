@@ -212,3 +212,66 @@ test('02/09 declared ΑΝ remains rest with default false; real conflicting work
     assert.ok(worked.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
     assert.ok(!worked.known_repo_identity_days.includes('2026-09-02'));
 });
+
+
+test('declared rest survives non-work fact categories and independent diagnostics through displayed guidance', () => {
+    const { buildCanonicalApologistikosRows } = require('./apologistikosPinakasControlReportService');
+    for (const change of [{}, { argia: true }, { argia_apologistika: true },
+        { adeia: true }, { astheneia: true }, { ores_ergasias: -1 },
+        { explicit_hourly_leave_hours: -1 }]) {
+        const rows = week();
+        Object.assign(rows[2], { kathgoria_ergasias_apologistika: 'ΑΝ',
+            repo_apologistika: false, ores_ergasias_apologistika: 0,
+            apologistiko_biblio: false, ...change });
+        // Include a genuine book entry to prove that eligibility still filters rows.
+        Object.assign(rows[0], { kathgoria_ergasias_apologistika: 'ΕΡΓ', apologistiko_biblio: true });
+        const before = structuredClone(rows);
+        const bookBefore = buildCanonicalApologistikosRows({ rows });
+        assert.deepEqual(bookBefore.map(row => row.source_record_id), ['0']);
+        const workflow = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile: profile });
+        assert.ok(!workflow.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'), JSON.stringify(change));
+        assert.ok(!workflow.blocking_details.some(item => item.code === 'CATEGORY_REPO_CONFLICT'));
+        assert.ok(workflow.known_repo_identity_days.includes('2026-09-02'));
+        const result = payload(rows);
+        for (const stage of Object.values(result.lifecycle_projection.stages)) {
+            assert.ok(!(stage.blockers || []).includes('CATEGORY_REPO_CONFLICT'));
+            assert.ok(!(stage.diagnostics || []).some(item => item.code === 'CATEGORY_REPO_CONFLICT'));
+        }
+        const issues = ui.issues(result);
+        assert.ok(!issues.some(item => item.code === 'CATEGORY_REPO_CONFLICT'));
+        const html = ui.targets([result]).map(ui.detailHtml).join('');
+        assert.ok(!html.includes(guidance.describe('CATEGORY_REPO_CONFLICT').message));
+        const independent = change.ores_ergasias === -1 ? 'INVALID_DECLARED_HOURS'
+            : change.explicit_hourly_leave_hours === -1 ? 'INVALID_EXPLICIT_HOURLY_LEAVE_HOURS' : null;
+        if (independent) {
+            assert.equal(result.lifecycle_projection.stages.stage1.business_status, 'BLOCKED');
+            assert.deepEqual(workflow.blocking_reasons, [independent]);
+            assert.deepEqual(issues.find(item => item.code === independent).dates, ['2026-09-02']);
+        } else {
+            assert.notEqual(result.lifecycle_projection.stages.stage1.business_status, 'BLOCKED');
+        }
+        assert.deepEqual(buildCanonicalApologistikosRows({ rows }), bookBefore);
+        assert.deepEqual(rows, before);
+        assert.equal(rows[2].repo_apologistika, false);
+    }
+});
+
+test('documented work on declared rest remains in blockers, diagnostics and guidance', () => {
+    for (const change of [
+        { cards_apo_ora_01: '09:00', cards_eos_ora_01: '10:00', cards_ores_ergasias: 1 },
+        { ores_ergasias_apologistika: 1 }
+    ]) {
+        const rows = week();
+        Object.assign(rows[2], { kathgoria_ergasias_apologistika: 'ΑΝ',
+            repo_apologistika: false, ores_ergasias_apologistika: 0, argia: true, ...change });
+        const workflow = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile: profile });
+        assert.ok(workflow.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
+        assert.ok(!workflow.known_repo_identity_days.includes('2026-09-02'));
+        const result = payload(rows);
+        assert.equal(result.lifecycle_projection.stages.stage1.business_status, 'BLOCKED');
+        assert.deepEqual(ui.issues(result).find(item => item.code === 'CATEGORY_REPO_CONFLICT').dates,
+            ['2026-09-02']);
+        assert.ok(ui.targets([result]).map(ui.detailHtml).join('')
+            .includes(guidance.describe('CATEGORY_REPO_CONFLICT').message));
+    }
+});
