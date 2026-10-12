@@ -39,6 +39,8 @@ const sandbox = {
     stage1DisplayFilters: { employeeQuery: '', status: 'ALL', leave: false,
         sickness: false, absence: false },
     weeklyHrStage1Key: () => 'week',
+    employmentReviewGuidanceAttributes: () => '',
+    employmentReviewGuidanceInfo: () => '',
     weeklyHrStage1BusinessStatus: (payload) =>
         payload.lifecycle_projection.stages.stage1.business_status,
     weeklyHrHasOnlyOrphanBlockers: () => false,
@@ -155,6 +157,7 @@ assert.equal(currentContext.title, '');
 
 const draftSetterSource = source.match(/function setStage1DayDraft\([\s\S]*?\n}/)?.[0] || '';
 const setterSandbox = {
+    isEmploymentReviewDateOwned: sandbox.isEmploymentReviewDateOwned,
     weeklyHrStage1RowsById: new Map(rows.map((row) => [row._id, row])),
     weeklyHrStage1Payloads: new Map([['week', contextPayload]]),
     weeklyHrStage1DayDrafts: new Map(),

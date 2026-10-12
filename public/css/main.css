@@ -15444,6 +15444,12 @@ body.loader-active > *:not(.app-loader) {
     vertical-align: top;
 }
 
+.table > tbody > tr > td.employment-review-outside-employment {
+    --bs-table-bg: #e9ecef;
+    background-color: #e9ecef;
+    box-shadow: none;
+}
+
 .weekly-hr-stage1-day-tile {
     position: relative;
     min-height: 3.35rem;

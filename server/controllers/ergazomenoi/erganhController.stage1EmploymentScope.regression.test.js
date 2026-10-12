@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const dates = require('../../utils/date/mondaySundayWeek');
 const period = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
+const { distinctHireDates } = require('../../services/ergazomenoi/employeeEmploymentCycleContextLoaderService');
 const { buildWeeklyHrLifecycleProjection } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildWeeklyHrWorkflowProjection } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowProjectionService');
 const { resolveDailyActualWorkFacts } = require('../../services/ergazomenoi/apasxoliseisDailyActualWorkFactsService');
@@ -40,7 +41,7 @@ function request() {
 const common = { ...dates, ...period, buildWeeklyHrLifecycleProjection,
     mongoose: { trusted: value => value } };
 
-function exportLifecycle(rows) {
+function exportLifecycle(rows, lifecycleEmployee = employee) {
     const loop = source.match(/    for \(const \[key, \w+\] of reviewWeekRows\)/)?.[0];
     assert.ok(loop, 'Export lifecycle loop exists');
     const body = section(loop,
@@ -48,12 +49,12 @@ function exportLifecycle(rows) {
     assert.ok(body.length > 100, 'Execute the actual export lifecycle loop');
     return compile(`const lifecycleByWeek = new Map(); ${body}; return lifecycleByWeek;`, {
         ...common, req: request(), reviewWeekRows: new Map([[weekKey, rows]]),
-        lifecycleByKodikos: new Map([['0099', employee]]), ergByKodikos: new Map(),
+        lifecycleByKodikos: new Map([['0099', lifecycleEmployee]]), ergByKodikos: new Map(),
         workflowStateByWeek: new Map(), stage3AuditDatesByEmployeeWeek: new Map(),
         ownershipPeriod, companySettings: {}, companyPolicyRules: [], tolerateIncompleteLifecycle: true
     });
 }
-async function preparedLifecycle(rows) {
+async function preparedLifecycle(rows, lifecycleEmployee = employee) {
     const body = section('async function buildPreparedReviewLifecycleContext(',
         'async function getReviewRowsForExport(');
     const readModel = { find: () => query([]) };
@@ -66,7 +67,7 @@ async function preparedLifecycle(rows) {
         weeklyHrStage2LifecycleProfileFromRow: () => profile
     });
     return (await build({ req: request(), policyContextRows: rows, ownershipPeriod,
-        lifecycleByKodikos: new Map([['0099', employee]]), employeeByCode: new Map(),
+        lifecycleByKodikos: new Map([['0099', lifecycleEmployee]]), employeeByCode: new Map(),
         periodStart: ownershipPeriod.period_start, periodEnd: ownershipPeriod.period_end })).lifecycleByWeek;
 }
 async function bulkPayload(rows, lifecycle) {
@@ -104,6 +105,11 @@ test('search, export and bulk Stage 1 exclude post-departure leave without chang
         const stage1 = lifecycle.get(weekKey).stages.stage1;
         assert.equal(stage1.business_status, 'COMPLETED');
         assert.deepEqual(stage1.blockers, []);
+        for (const stage of Object.values(lifecycle.get(weekKey).stages)) {
+            assert.equal(stage.business_status, 'COMPLETED');
+            assert.deepEqual(stage.blockers, []);
+            assert.equal(stage.pending_count, 0);
+        }
         const payload = await bulkPayload(rows.slice(), lifecycle);
         assert.deepEqual(payload.rows.map(row => row.hmeromhnia), ['2026-09-28']);
         assert.equal(payload.lifecycle_projection.stages.stage1.business_status, 'COMPLETED');
@@ -144,6 +150,90 @@ test('employment filtering retains invalid dates, duplicate days and missing req
             effectiveProfile: profile, employmentDateScope });
         assert.ok(result.stages.stage1.blockers.includes('INCOMPLETE_NATURAL_WEEK'));
     }
+});
+
+test('before hire and a rehire gap are excluded in search, export, bulk and all lifecycle stages', async () => {
+    const rehire = { ...employee, hmeromhnia_proslhpshs: '2026-10-02', hmeromhnia_apoxorhshs: null,
+        employment_history: [{ ...employee }] };
+    const cases = [
+        { employee: { ...employee, hmeromhnia_proslhpshs: '2026-09-29', hmeromhnia_apoxorhshs: '2026-09-30' },
+            owned: ['2026-09-29', '2026-09-30'] },
+        { employee: rehire, owned: ['2026-09-28','2026-10-02','2026-10-03','2026-10-04'] }
+    ];
+    const rows = [...leaveRows(), ...[1, 2, 3, 4].map(day => ({ ...leaveRows()[0],
+        _id: `synthetic-october-${day}`, hmeromhnia: `2026-10-0${day}` }))];
+    const before = structuredClone(rows);
+    for (const item of cases) {
+        const scopeDates = period.deriveEmploymentOwnedDateScope({
+            natural_week_start: scope.week_start, natural_week_end: scope.week_end,
+            ...ownershipPeriod, employee: item.employee,
+            hire_date: item.employee.hmeromhnia_proslhpshs, departure_date: item.employee.hmeromhnia_apoxorhshs });
+        assert.deepEqual(scopeDates.employment_owned_dates, item.owned);
+        for (const row of rows) {
+            if (item.owned.includes(row.hmeromhnia)) {
+                period.assertEmploymentReviewDateOwned(row.hmeromhnia, [item.employee]);
+            } else {
+                assert.throws(() => period.assertEmploymentReviewDateOwned(row.hmeromhnia, [item.employee]),
+                    { code: 'EMPLOYMENT_REVIEW_DATE_OUTSIDE_EMPLOYMENT', statusCode: 409 });
+            }
+        }
+        for (const lifecycle of [exportLifecycle(rows, item.employee), await preparedLifecycle(rows, item.employee)]) {
+            const result = lifecycle.get(weekKey);
+            assert.deepEqual(result.employment_date_scope.employment_owned_dates, item.owned);
+            assert.deepEqual(result.stages.stage1.blockers, []);
+            const payload = await bulkPayload(rows.slice(), lifecycle);
+            assert.deepEqual(payload.rows.map(row => row.hmeromhnia), item.owned);
+            assert.deepEqual(payload.lifecycle_projection.stages.stage3.pending_dates, []);
+        }
+    }
+    assert.deepEqual(rows, before);
+});
+
+test('single-week commands load actual employment cycles and retain both valid sides of a rehire gap', async () => {
+    const history = [{ ...employee, hmeromhnia_apoxorhshs: '2026-09-15' }];
+    const current = { ...employee, hmeromhnia_proslhpshs: '2026-09-18', hmeromhnia_apoxorhshs: null };
+    const rows = Array.from({ length: 7 }, (_, index) => ({ ...leaveRows()[0],
+        _id: `synthetic-${14 + index}`, hmeromhnia: `2026-09-${14 + index}` }));
+    const before = structuredClone({ current, history, rows });
+    const body = section('async function loadWeeklyHrContext(', 'function prepareWeeklyHrStage3LifecycleInputs(');
+    const read = compile(`${body}; return loadWeeklyHrContext;`, {
+        ...common, distinctHireDates, mongoose: { isValidObjectId: () => true, trusted: value => value },
+        normalizeNaturalWeek: () => ({ startKey: '2026-09-14', endKey: '2026-09-20',
+            start: new Date('2026-09-14'), end: new Date('2026-09-20') }),
+        activeEmploymentReviewPeriodScope: async () => ownershipPeriod,
+        CompaniesModel: { findOne: () => query({}) },
+        ErgazomenoiModel: { findOne: () => query(current) }, finalizedEmployeeFilter: value => value,
+        ProdhlomenaOrariaModel: { find: () => query(rows) },
+        IstorikoProslhpseonAllagonModel: { find: () => query(history) },
+        CANONICAL_EMPLOYEE_PROFILE_FIELDS: '', CANONICAL_HISTORY_SELECT_FIELDS: '', REVIEW_SELECT_FIELDS: '',
+        preloadBorrowedEmploymentProfileContexts: async () => new Map(), borrowedProfileEmployeeKey: () => '',
+        getWeeklyRepoProfileInfo: () => ({ effectiveProfile: profile }),
+        getDailyRepoProfileInfo: () => ({ profile }),
+        weeklyHrApiError: (code, statusCode, message) => Object.assign(new Error(message), { code, statusCode })
+    });
+    const result = await read({ req: request(), input: { ...scope, week_start: '2026-09-14', week_end: '2026-09-20' } });
+    assert.deepEqual(result.employmentDateScope.employment_owned_dates,
+        ['2026-09-14','2026-09-15','2026-09-18','2026-09-19','2026-09-20']);
+    assert.deepEqual(result.rows.map(row => row.hmeromhnia), result.employmentDateScope.employment_owned_dates);
+    assert.deepEqual({ current, history, rows }, before);
+});
+
+test('daily review reads exclude before-hire and post-departure records before presentation and totals', async () => {
+    const loaded = [...leaveRows(), { ...leaveRows()[0], hmeromhnia: '2026-07-06' },
+        { ...leaveRows()[0], kodikos: 'missing-profile' }, { ...leaveRows()[0], hmeromhnia: 'invalid' }];
+    const before = structuredClone(loaded);
+    const start = source.indexOf('    const loadedReviewRows = await ProdhlomenaOrariaModel.find(reviewFilter)');
+    const readBody = source.slice(start, source.indexOf(
+        '    const companySettings = await loadSuspiciousShortCompanySettings(', start));
+    const read = compile(`return async () => {
+        ${readBody}
+        return rows;
+    };`, { ...period, dateKeyUtc: dates.dateKeyUtc, reviewFilter: {}, REVIEW_SELECT_FIELDS: '',
+        ProdhlomenaOrariaModel: { find: () => query(loaded) },
+        lifecycleEmployees: [{ ...employee, ypokatasthma: '0000' }] });
+    assert.deepEqual((await read()).map(row => [row.kodikos, row.hmeromhnia]),
+        [['0099','2026-09-28'], ['missing-profile','2026-09-28'], ['0099','invalid']]);
+    assert.deepEqual(loaded, before);
 });
 
 test('October daily rest conflicts do not block September; current-period errors remain', () => {

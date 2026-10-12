@@ -93,6 +93,7 @@ function overrides(persist, { record = oldRecord, loadRecord = null,
     prepareZeroLengthResolution = null, prepareDailyActualWorkResolution = null } = {}) {
     return {
         loadOldRecord: async () => structuredClone(loadRecord ? loadRecord() : record),
+        assertEmploymentDate: async () => {},
         prepareOrphanResolution: async (input) => prepareResolution
             ? prepareResolution(input) : preparedResolution(orphanType,
                 input.orphanResolutionCommand),

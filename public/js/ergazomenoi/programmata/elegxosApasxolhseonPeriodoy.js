@@ -9065,7 +9065,8 @@ function stage1PayloadsForDisplay() {
 function stage1RelevantDates(payload) {
     const dates = [...new Set([...(payload.workflow?.possible_leave_days || []),
         ...(payload.confirmed_leave_dates || []), ...(payload.confirmed_sickness_dates || []),
-        ...(payload.confirmed_absence_dates || [])])].sort();
+        ...(payload.confirmed_absence_dates || [])])]
+        .filter((date) => isEmploymentReviewDateOwned(payload, date)).sort();
     const actionable = payload.period_slice?.actionable_dates;
     return Array.isArray(actionable) && actionable.length
         ? dates.filter((date) => actionable.includes(date)) : dates;
@@ -10612,6 +10613,9 @@ function stage3DecisionExplanationHtml(item = {}) {
 }
 
 function renderStage3WeekRow(group, dateKey, pendingByDate, period) {
+    if (!isEmploymentReviewDateOwned(group.payload, dateKey)) {
+        return `<tr data-stage3-week-date="${escapeHtml(dateKey)}"><td>${escapeHtml(formatStage1DateKey(dateKey))}</td><td>${escapeHtml(stage3DayName(dateKey))}</td>${'<td class="employment-review-outside-employment"></td>'.repeat(4)}</tr>`;
+    }
     const row = (group.payload?.rows || []).find((item) => stage1DateKey(item.hmeromhnia) === dateKey) || {};
     const daily = stage3DailyPresentation(group, dateKey);
     const pendingItem = pendingByDate.get(dateKey) || null;
@@ -11884,6 +11888,13 @@ function stage1NaturalWeekDates(weekStart) {
     });
 }
 
+function isEmploymentReviewDateOwned(payload, date) {
+    const scope = payload?.employment_date_scope ||
+        payload?.lifecycle_projection?.employment_date_scope;
+    return !Array.isArray(scope?.employment_owned_dates) ||
+        scope.employment_owned_dates.includes(date);
+}
+
 function stage1ReadOnlyDayLabel(payload, date, row) {
     const classification = row ? stage1ClassificationForRow(row) : 'UNCLASSIFIED';
     if (classification !== 'UNCLASSIFIED') return stage1ClassificationLabel(classification);
@@ -11911,7 +11922,8 @@ function stage1DayTileState(payload, date, row) {
 }
 
 function isWeeklyHrStage1DayPending(payload, date) {
-    if (!isWeeklyHrStage1Selectable(payload) || !stage1RelevantDates(payload).includes(date)) {
+    if (!isEmploymentReviewDateOwned(payload, date) ||
+        !isWeeklyHrStage1Selectable(payload) || !stage1RelevantDates(payload).includes(date)) {
         return false;
     }
     const actionableDates = payload.period_slice?.actionable_dates;
@@ -11950,6 +11962,9 @@ function stage1ContextPeriodPresentation(payload, date) {
 }
 
 function renderStage1MatrixDayCell(payload, date, relevantDates) {
+    if (!isEmploymentReviewDateOwned(payload, date)) {
+        return '<td class="weekly-hr-stage1-matrix-day-cell employment-review-outside-employment"></td>';
+    }
     const row = stage1RowForDate(payload, date);
     const actionableDates = payload.period_slice?.actionable_dates;
     const actionable = Array.isArray(actionableDates)
@@ -12006,6 +12021,7 @@ function renderWeeklyHrStage1DayEditorPanel(rowId) {
     const row = weeklyHrStage1RowsById.get(String(rowId));
     if (!payload || !row) return '';
     const date = stage1DateKey(row.hmeromhnia);
+    if (!isEmploymentReviewDateOwned(payload, date)) return '';
     const state = stage1DayTileState(payload, date, row);
     const draft = weeklyHrStage1DayDrafts.get(String(rowId));
     const leaveCategory = draft?.kathgoria_adeias_apologistika ||
@@ -12037,6 +12053,8 @@ function renderWeeklyHrStage1DayEditorPanel(rowId) {
 }
 
 function openWeeklyHrStage1DayEditor(rowId) {
+    const content = renderWeeklyHrStage1DayEditorPanel(rowId);
+    if (!content) return;
     weeklyHrStage1EditorRowId = String(rowId);
     let panel = document.getElementById('weeklyHrStage1DayEditor');
     if (!panel) {
@@ -12046,7 +12064,7 @@ function openWeeklyHrStage1DayEditor(rowId) {
         panel.tabIndex = -1;
         document.body.appendChild(panel);
     }
-    panel.innerHTML = renderWeeklyHrStage1DayEditorPanel(weeklyHrStage1EditorRowId);
+    panel.innerHTML = content;
     bootstrap.Offcanvas.getOrCreateInstance(panel).show();
 }
 
@@ -12234,6 +12252,7 @@ function setStage1DayDraft(rowId, classification, leaveCategory = '') {
         (payload.rows || []).some((candidate) => String(candidate?._id) === String(rowId)));
     if (!owner) return;
     const date = stage1DateKey(row.hmeromhnia);
+    if (!isEmploymentReviewDateOwned(owner, date)) return;
     const actionableDates = owner?.period_slice?.actionable_dates;
     const actionable = Array.isArray(actionableDates)
         ? actionableDates.includes(date) : stage1RelevantDates(owner).includes(date);

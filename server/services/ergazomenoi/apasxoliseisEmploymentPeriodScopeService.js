@@ -179,6 +179,17 @@ function isWeekFullyWithinEmploymentPeriod(value, employee = {}) {
     return true;
 }
 
+function assertEmploymentReviewDateOwned(value, employees = []) {
+    if (employees.some(employee => isDateWithinEmploymentPeriod(value, employee))) return;
+    const error = new Error('Η ημέρα που επιχειρήσατε να αλλάξετε βρίσκεται εκτός εργασιακής σχέσης. ' +
+        'Ο χαρακτηρισμός ή η επεξεργασία της δεν επιτρέπεται. ' +
+        '1. Εκτελέστε νέα «Αναζήτηση». 2. Επιλέξτε ημέρα εντός εργασιακής σχέσης. ' +
+        'Δεν αποθηκεύτηκε καμία αλλαγή για αυτή την ημέρα. Αναφορά: EMPLOYMENT_REVIEW_DATE_OUTSIDE_EMPLOYMENT.');
+    error.code = 'EMPLOYMENT_REVIEW_DATE_OUTSIDE_EMPLOYMENT';
+    error.statusCode = 409;
+    throw error;
+}
+
 function enumerateDateKeys(startValue, endValue) {
     const startKey = dateKeyUtc(startValue);
     const endKey = dateKeyUtc(endValue);
@@ -336,6 +347,7 @@ module.exports = {
     endOfDepartureDay,
     startOfHireDay,
     isDateWithinEmploymentPeriod,
+    assertEmploymentReviewDateOwned,
     isWeekFullyWithinEmploymentPeriod,
     restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,

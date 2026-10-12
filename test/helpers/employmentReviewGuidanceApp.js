@@ -25,8 +25,10 @@ const { reviewErrorResponse } = require('../../server/services/ergazomenoi/apasx
 const { getMondaySundayWeekRange } = require('../../server/utils/date/mondaySundayWeek');
 const { appendStage4BlockedDeviationRows } = require('../../server/services/ergazomenoi/apasxoliseisStage4BlockedDeviationPresentationService');
 const guidance = require('../../public/js/ergazomenoi/programmata/employmentReviewGuidance');
+const { deriveEmploymentOwnedDateScope, restrictWeeklyReviewRowsToEmploymentDates } =
+    require('../../server/services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
 
-async function createGuidanceFixture(uri, vendorDir) {
+async function createGuidanceFixture(uri, vendorDir, { employmentScenarios = false } = {}) {
     assert.match(uri, /^mongodb:\/\/127\.0\.0\.1:271(?:39|49)\/payroll_period_employees_test_guidance_[a-z0-9_]+\?replicaSet=payrollDraftTest$/);
     const data = await fixture(uri);
     Object.assign(data.session, { userName: 'ΣΥΝΘΕΤΙΚΟΣ ΧΡΗΣΤΗΣ', yearInUse: '2026', companyKodikos: '0004', userStatus: 'A' });
@@ -36,7 +38,23 @@ async function createGuidanceFixture(uri, vendorDir) {
     await data.E.collection.updateMany({ ...base }, { $set: terms });
     await data.E.collection.insertOne({ ...base, ...terms, kodikos: '0011', eponymo: 'ΣΥΝΘΕΤΙΚΟΣ', onoma: 'ΤΕΛΙΚΟΣ ΕΛΕΓΧΟΣ',
         hmeromhnia_proslhpshs: new Date('2026-01-01'), energos: true, pososto_prosayxhshs_6hs_hmeras: null });
-    const employees = await data.E.find({ ...base, kodikos: mongoose.trusted({ $in: ['0001','0009','0011'] }) }).lean();
+    if (employmentScenarios) {
+        await data.E.collection.insertMany([
+            { ...base, ...terms, kodikos: '0032', eponymo: 'ΣΥΝΘΕΤΙΚΟΣ', onoma: 'ΑΠΟΧΩΡΗΣΗ',
+                hmeromhnia_proslhpshs: new Date('2026-09-02'), hmeromhnia_apoxorhshs: new Date('2026-09-28') },
+            { ...base, ...terms, kodikos: '0033', eponymo: 'ΣΥΝΘΕΤΙΚΟΣ', onoma: 'ΕΠΑΝΑΠΡΟΣΛΗΨΗ',
+                hmeromhnia_proslhpshs: new Date('2026-09-18') }
+        ]);
+        await data.H.collection.insertMany([
+            { ...base, kodikos: '0033', hmeromhnia_proslhpshs: new Date('2026-09-01'), hmeromhnia_apoxorhshs: new Date('2026-09-15') },
+            { ...base, kodikos: '0033', hmeromhnia_proslhpshs: new Date('2026-09-18') }
+        ]);
+    }
+    const employees = await data.E.find({ ...base, kodikos: mongoose.trusted({ $in:
+        ['0001','0009','0011', ...(employmentScenarios ? ['0032','0033'] : [])] }) }).lean();
+    for (const employee of employees.filter(item => item.kodikos === '0033')) {
+        employee.employment_history = await data.H.find({ ...base, kodikos: employee.kodikos }).lean();
+    }
     const employeeById = new Map(employees.map(employee => [String(employee._id), employee]));
     const records = [];
     for (const employee of employees) for (let day = 0; day < 35; day++) {
@@ -69,6 +87,14 @@ async function createGuidanceFixture(uri, vendorDir) {
             Object.assign(row, { kathgoria_ergasias: 'ΕΡΓ', repo: false, kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: false,
                 cards_apo_ora_01: '09:00', cards_eos_ora_01: '17:00', cards_ores_ergasias: 8,
                 ores_ergasias: 8, ores_ergasias_apologistika: 8 });
+        if (['0032','0033'].includes(employee.kodikos)) {
+            Object.assign(row, { cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0,
+                kathgoria_ergasias_apologistika: '', repo_apologistika: false,
+                adeia_apologistika: true, kathgoria_adeias_apologistika: 'ΑΔΚΑΝ' });
+            if (['2026-09-02', '2026-09-14', '2026-09-18', '2026-09-21'].includes(key)) {
+                Object.assign(row, { adeia_apologistika: false, kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' });
+            }
+        }
         records.push(row);
     }
     await D.collection.insertMany(records);
@@ -90,16 +116,23 @@ async function createGuidanceFixture(uri, vendorDir) {
         const scope = scopeFor(input);
         const filter = { ...base, kodikos: scope.employee_kodikos,
             hmeromhnia: mongoose.trusted({ $gte: scope.week_start, $lte: scope.week_end }) };
-        const rows = await D.find(filter).session(session || null).sort({ hmeromhnia: 1 }).lean();
+        const loadedRows = await D.find(filter).session(session || null).sort({ hmeromhnia: 1 }).lean();
         const state = await State.findOne(scope).session(session || null).lean();
         const employee = employeeById.get(String(scope.employee_id));
+        const employmentDateScope = ['0032','0033'].includes(employee.kodikos)
+            ? deriveEmploymentOwnedDateScope({ natural_week_start: scope.week_start, natural_week_end: scope.week_end,
+                period_start: '2026-09-01', period_end: '2026-09-30', employee,
+                hire_date: employee.hmeromhnia_proslhpshs, departure_date: employee.hmeromhnia_apoxorhshs }) : null;
+        const rows = restrictWeeklyReviewRowsToEmploymentDates(loadedRows, employmentDateScope);
         const profiles = Object.fromEntries(rows.map(row => [guidance.dateKey(row.hmeromhnia), employee]));
         const prepared = await preparedWeek({ scope, rows, employee });
         const lifecycle = buildWeeklyHrLifecycleProjection({ weekRows: rows, effectiveProfile: employee, effectiveProfilesByDate: profiles,
             persistedStage1State: state?.stage1, persistedStage2State: state?.stage2,
-            persistedStage3State: state?.stage3, persistedStage2DecisionState: prepared.record, scope });
+            persistedStage3State: state?.stage3, persistedStage2DecisionState: prepared.record, scope, employmentDateScope });
         const workflow = buildWeeklyHrWorkflowProjection({ weekRows: rows, effectiveProfile: employee,
-            effectiveProfilesByDate: profiles, persistedStage1State: state?.stage1, indexState: { ready: true } });
+            effectiveProfilesByDate: profiles, persistedStage1State: state?.stage1, indexState: { ready: true },
+            employment_date_scope: employmentDateScope, period_scope: employmentDateScope,
+            expected_date_keys: employmentDateScope?.employment_owned_dates || null });
         return { scope, rows, state, employee, profiles, lifecycle, workflow, prepared };
     }
     async function preparedWeek({ scope, rows, employee }) {
@@ -120,6 +153,7 @@ async function createGuidanceFixture(uri, vendorDir) {
             employee_id: String(scope.employee_id), week_start: guidance.dateKey(scope.week_start), week_end: guidance.dateKey(scope.week_end),
             period_start: '2026-09-01', period_end: '2026-09-30' }, rows,
         employee_name: `${employee.eponymo} ${employee.onoma}`, stage1: state?.stage1 || null,
+        employment_date_scope: lifecycle.employment_date_scope,
         stage1_status: lifecycle.stages.stage1.persisted_status, lifecycle_projection: lifecycle,
         stage1_daily_presentation: rows.map(row => ({ date: guidance.dateKey(row.hmeromhnia), employment_type: '0', employment_label: 'Πλήρης',
             actual_work_hours: row.ores_ergasias_apologistika, declared_hours: row.ores_ergasias,

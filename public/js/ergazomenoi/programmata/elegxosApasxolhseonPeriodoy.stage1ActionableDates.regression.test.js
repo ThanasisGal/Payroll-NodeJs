@@ -10,7 +10,7 @@ const functionSource = source.match(/function stage1RelevantDates\(payload\) \{[
 assert.ok(functionSource, 'stage1RelevantDates must exist');
 
 const stage1RelevantDates = vm.runInNewContext(
-    `(() => { ${functionSource}; return stage1RelevantDates; })()`
+    `(() => { ${source.match(/function isEmploymentReviewDateOwned\(payload, date\) \{[\s\S]*?\n}/)[0]}; ${functionSource}; return stage1RelevantDates; })()`
 );
 const result = (payload) => JSON.parse(JSON.stringify(stage1RelevantDates(payload)));
 
@@ -45,7 +45,7 @@ assert.deepEqual(result({ ...duplicateSources,
     period_slice: { actionable_dates: [] }
 }), uniqueSortedDates);
 
-assert.match(source, /Η αποθήκευση του Σταδίου 1 δεν είναι ακόμη διαθέσιμη επειδή δεν έχουν ενεργοποιηθεί οι απαιτούμενες δικλείδες της εβδομαδιαίας ροής HR\./);
+assert.match(source, /Δεν είναι διαθέσιμη η ασφαλής αποθήκευση\./);
 assert.doesNotMatch(source, /Η λειτουργία εγγραφής δεν έχει ακόμη ενεργοποιηθεί στη βάση\./);
 
 console.log('Stage 1 actionable dates regression tests: PASS');
