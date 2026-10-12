@@ -76,13 +76,13 @@ function editHandler(historyRows, calls = { history: [], writes: [] }) {
             };
         }
     });
-    const context = {
+    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'),
         Date,
         ...EditorState,
         semanticHistoryRows,
         console: { error() {} },
         CompaniesModel: readOnlyModel({ findById: () => query({ _id: employee.company_kod }) }),
-        ErgazomenoiModel: readOnlyModel({ findById: () => query(employee) }),
+        ErgazomenoiModel: readOnlyModel({ findOne: () => query(employee) }),
         IstorikoProslhpseonAllagonModel: readOnlyModel({ find(filter) {
             calls.history.push(['find', { ...filter }]);
             return historyQuery;
@@ -212,7 +212,7 @@ test('edit page timing labels are not process-global and unexpected failures are
         '    static editErgazomenoiForm = async (req, res, next) => {',
         '    static getIstorikoData = async (req, res) => {'
     ).replace('    static editErgazomenoiForm = ', '');
-    const context = {
+    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'),
         console: { error() {} },
         CompaniesModel: { findById: query },
         isEmploymentProfileError

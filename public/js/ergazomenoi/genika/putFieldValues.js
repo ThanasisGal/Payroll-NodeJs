@@ -335,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
+        const temporarySave = event.currentTarget?.dataset.saveMode === 'temporary';
 
         if (!window.validateEmploymentProfileBreak(document)) return;
         const formData = {};
@@ -500,6 +501,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             break;
                     }
                 }
+            }
+
+            if (temporarySave) {
+                await window.saveTemporaryEmployee({ formData, mode: 'edit' });
+                return;
             }
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -1197,6 +1203,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // =========================================================================
 
             const v = {
+                saveMode: 'final',
+                ...window.employeeSaveBaseline?.(),
                 formData: formData,
                 filesToUpdate: result.value,
                 ...(isRehireDraftMode
@@ -1599,6 +1607,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ct = response.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
                 const data = await response.json();
+                window.applyEmployeeFinalState?.(data);
                 message = data?.message || data?.errorMessage || '';
                 if (await handleEmployeeSaveHistoryAction(response, data, {
                     swal: Swal, documentRef: document

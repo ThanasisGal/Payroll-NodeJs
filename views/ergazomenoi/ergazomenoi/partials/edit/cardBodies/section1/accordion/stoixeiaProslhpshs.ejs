@@ -55,7 +55,7 @@
                     </label>
                 </div>
                 <div class="col-1-5">
-                    <input type="date" name="hmeromhnia_proslhpshs" id="hmeromhnia_proslhpshs" class="date-control" value="<%= safe('hmeromhnia_proslhpshs') ? new Date(safe('hmeromhnia_proslhpshs')).toISOString().split('T')[0] : '' %>" <%- currentRelationshipOpen ? 'readonly aria-readonly="true" title="Καταχωρήστε πρώτα την Αποχώρηση και έπειτα χρησιμοποιήστε την Επαναπρόσληψη."' : '' %> />
+                    <input type="date" name="hmeromhnia_proslhpshs" id="hmeromhnia_proslhpshs" class="date-control" value="<%= safe('hmeromhnia_proslhpshs') ? new Date(safe('hmeromhnia_proslhpshs')).toISOString().split('T')[0] : '' %>" <%- ergazomenoiData.oristikh_enhmerosh !== false ? 'readonly aria-readonly="true" title="Καταχωρήστε πρώτα την Αποχώρηση και έπειτα χρησιμοποιήστε την Επαναπρόσληψη."' : '' %> />
                 </div>
                 
                 <div class="col-2-5"></div>
@@ -146,11 +146,16 @@
                 </div>
             </div>
 
-            <% if (currentRelationshipOpen) { %>
+            <% if (recordData.oristikh_enhmerosh === false || currentRelationshipOpen) { %>
                 <div class="row margin-left--1rem margin-right--1rem mb-2">
-                    <div class="col-12 text-muted small">
-                        Η ημερομηνία πρόσληψης δεν αλλάζει όσο η τρέχουσα εργασιακή σχέση είναι ανοικτή.
-                        Καταχωρήστε πρώτα την Αποχώρηση και στη συνέχεια χρησιμοποιήστε την Επαναπρόσληψη.
+                    <div class="col-12 text-muted small" data-employee-hire-help>
+                        <% if (recordData.oristikh_enhmerosh === false) { %>
+                            Μπορείτε να διορθώσετε την ημερομηνία πρόσληψης όσο ο εργαζόμενος είναι προσωρινά αποθηκευμένος.
+                            Η ημερομηνία κλειδώνει με την Οριστική Αποθήκευση.
+                        <% } else { %>
+                            Η ημερομηνία πρόσληψης δεν αλλάζει όσο η τρέχουσα εργασιακή σχέση είναι ανοικτή.
+                            Καταχωρήστε πρώτα την Αποχώρηση και στη συνέχεια χρησιμοποιήστε την Επαναπρόσληψη.
+                        <% } %>
                     </div>
                 </div>
             <% } %>

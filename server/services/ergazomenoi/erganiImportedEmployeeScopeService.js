@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 
 const OUTSIDE_SCOPE_CODE = 'ERGANI_IMPORTED_EMPLOYEE_OUTSIDE_AUTHORIZED_COMPANY_SCOPE';
@@ -23,26 +24,26 @@ function assertCompleteScope(scope) {
 
 function employeeIsInAuthorizedScope(employee, scope) {
     const authorized = assertCompleteScope(scope);
-    return Boolean(employee) &&
+    return Boolean(employee) && employee.oristikh_enhmerosh !== false &&
         String(employee.team || '').trim() === authorized.team &&
         String(employee.company_kod || '').trim() === authorized.company_kod &&
         String(employee.ypokatasthma || '').trim().padStart(4, '0') === authorized.ypokatasthma;
 }
 
 function employeeIsEligibleForProdhlomenaOraria(employee) {
-    return Boolean(employee) &&
+    return Boolean(employee) && employee.oristikh_enhmerosh !== false &&
         !(employee.afora_daneismo_ergazomenoy === true &&
             employee.typos_ergodoth_daneismoy === false);
 }
 
 async function hasLendingSideBorrowedEmployees({ employeeModel, team, company_kod }) {
     if (!team || !company_kod) return false;
-    const employee = await employeeModel.findOne({
+    const employee = await employeeModel.findOne(finalizedEmployeeFilter({
         team,
         company_kod,
         afora_daneismo_ergazomenoy: true,
         typos_ergodoth_daneismoy: false
-    }).select('_id').lean();
+    })).select('_id').lean();
     return Boolean(employee);
 }
 
@@ -70,12 +71,12 @@ async function loadScopedErganiEmployees({ employeeModel, afms, scope }) {
     const authorized = assertCompleteScope(scope);
     const uniqueAfms = [...new Set((afms || []).map((afm) => String(afm || '').trim()).filter(Boolean))];
     if (uniqueAfms.length === 0) return indexScopedEmployees([], authorized);
-    const candidates = await employeeModel.find({
+    const candidates = await employeeModel.find(finalizedEmployeeFilter({
         team: authorized.team,
         company_kod: authorized.company_kod,
         ypokatasthma: authorized.ypokatasthma,
         afm: mongoose.trusted({ $in: uniqueAfms })
-    }).lean();
+    })).lean();
     return indexScopedEmployees(candidates, authorized);
 }
 

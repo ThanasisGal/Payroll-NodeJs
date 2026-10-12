@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { ProdhlomenaOrariaModel, ErgazomenoiModel, IstorikoProslhpseonAllagonModel, ProdhlomenaOrariaAuditModel } = require('../../models/ergazomenoi');
@@ -85,11 +86,11 @@ async function defaultContextLoader({
         kodikos: first.kodikos,
         hmeromhnia: mongoose.trusted({ $gte: new Date(`${week.start}T00:00:00.000Z`), $lte: new Date(`${week.end}T23:59:59.999Z`) })
     }).select(ROW_FIELDS.join(' ')).sort({ hmeromhnia: 1 }).lean();
-    const employeeCandidates = await employeeModel.find({
+    const employeeCandidates = await employeeModel.find(finalizedEmployeeFilter({
         team: scope.team,
         company_kod: scope.company_kod,
         kodikos: first.kodikos
-    }).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean();
+    })).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean();
     const employee = buildCompanyWideUniqueEmployeeByKodikos(employeeCandidates).get(String(first.kodikos));
     if (!employee || !isEmployeeCompatibleWithBranch(employee, first.ypokatasthma)) {
         throw conflict('Τα στοιχεία του εργαζομένου έχουν αλλάξει. Ανανεώστε τον έλεγχο.');

@@ -113,6 +113,8 @@ const { identifyEmployeeHistoryProblemScope } =
 const { normalizeCorrectionRequest, assertOrdinaryHistoryPolicy, assertCorrectionRolePolicy, planHistoryCorrection,
     correctionError } = require('./employeeHistoryCorrectionPolicyService');
 
+const SaveState = require('../../utils/ergazomenoi/employeeSaveState');
+const DRAFT_FINALIZATION = Symbol('employeeDraftFinalization');
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
 // Selected internally from fresh transactional reads; callers cannot force it.
@@ -1247,6 +1249,7 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
             await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
         }
         const current = await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         const originalRows = await completeHistoryLean(historyModel, filter, session);
         // The browser expectation is checked on fresh fenced reads, including retries.
@@ -1500,8 +1503,8 @@ const HISTORY_CURRENT_FIELDS = new Set([...BASE_HISTORY_FIELDS, ...IDENTITY_FIEL
 function cleanMaintenancePatch(patch = {}) {
     return Object.fromEntries(Object.entries(patch).filter(([field, value]) => value !== undefined &&
         !C.FACT_FIELDS.includes(field) && !['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
-            'createdAt', 'updatedAt', EMPLOYEE_MUTATION_SEQUENCE, T.ANCHOR, 'employment_profile_source', 'afora_proslhpsh',
-            'employment_departure_restore'].includes(field)));
+            'createdAt', 'updatedAt', '__v', EMPLOYEE_MUTATION_SEQUENCE, T.ANCHOR, 'employment_profile_source', 'afora_proslhpsh',
+            'employment_departure_restore', 'oristikh_enhmerosh', 'employee_draft_schedule'].includes(field)));
 }
 function legacyMaintenancePatch(patch = {}, stored, history = false) {
     const changes = cleanMaintenancePatch(patch);
@@ -1596,10 +1599,12 @@ function appendPredecessors({ openRows, datedRows, rows, current, from, rehireOp
 // the repository has no unique employee business-key index. This writer guarantees
 // current/history atomicity, not cross-route concurrent code allocation.
 async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom, newEmployee = null, employeeId = null,
-    mode = MODE_NEW_VERSION, historyId = null, maintenance = null, [ACTIVE_SESSION]: activeSession = null,
+    mode = MODE_NEW_VERSION, historyId = null, maintenance = null, initialSchedules,
+    scheduleModel = require('../../models/ergazomenoi').ProdhlomenaOrariaModel, [ACTIVE_SESSION]: activeSession = null,
     [EDITOR_OPERATION]: editorOperation = false, [REHIRE_OPERATION]: rehireOperation = false,
     [PREMUTATION_HISTORY_PATCHES]: preMutationHistoryPatches = null,
     [PLANNING_STATE]: planningState = null,
+    [DRAFT_FINALIZATION]: draftFinalization = false,
     connection = mongoose.connection, employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel,
     auditModel = EmployeeHistoryRepairAuditModel,
@@ -1639,6 +1644,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             if (employeeId && String(current?._id) !== String(employeeId)) throw failure('EMPLOYEE_PROFILE_STALE');
             if (newEmployee && current) throw failure('EMPLOYEE_PROFILE_ALREADY_EXISTS');
             if (!newEmployee && !current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
+            if (SaveState.isTemporaryEmployee(current) && !draftFinalization) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
             if (!editorOperation && !rehireOperation && current) {
                 ({ input, maintenance } = normalizeEmployeeNormalSaveRequest({ input, maintenance }, current));
             }
@@ -1704,7 +1710,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             let datedRows = rows.filter((row) => effectiveStart(row));
             // Maintenance supplies existing server-mapped fields, never raw request data.
             // Resolve the exact identity inside the transaction, including on retries.
-            const legacyMaintenance = !editorOperation && maintenance && !newEmployee && !T.versioned(current, rows) &&
+            const legacyMaintenance = !draftFinalization && !editorOperation && maintenance && !newEmployee && !T.versioned(current, rows) &&
                 !semanticEmploymentProfileChanged(current, maintenance, input);
             let patch = legacyMaintenance ? legacyMaintenancePatch(maintenance.employeeChanges, current) : cleanMaintenancePatch(maintenance?.employeeChanges);
             let historyPatch = cleanMaintenancePatch(maintenance?.historyChanges);
@@ -1722,7 +1728,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             // Hire date is employment-cycle identity. Normal Maintenance may send
             // the unchanged hire date back from the form, but it may not create a
             // different hire identity. Only the dedicated rehire command may do so.
-            if (!editorOperation && !rehireOperation && current && !newEmployee && rows.length > 0) {
+            if (!editorOperation && !rehireOperation && !draftFinalization && current && !newEmployee) {
                 const requestedHires = [
                     patch.hmeromhnia_proslhpshs,
                     historyPatch.hmeromhnia_proslhpshs
@@ -1748,7 +1754,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 diagnostics: canonicalBefore?.diagnostics || {}
             };
             let selection = { mode, historyId };
-            if (!editorOperation && !rehireOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION) {
+            if (!draftFinalization && !editorOperation && !rehireOperation && maintenance && !newEmployee && mode === MODE_NEW_VERSION) {
                 const ownedInput = Object.fromEntries((maintenance.submittedProfileFields || [])
                     .filter(field => input[field] !== undefined).map(field => [field, input[field]]));
                 const semanticProfilePatch = semanticEmploymentProfilePatch(current, {
@@ -2123,6 +2129,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                 ...currentProfileProjection(snapshot), ...(baseline ? { [T.ANCHOR]: baseline } : {}),
                 hmeromhnia_isxyos_oron_ergasias_apo: snapshot.hmeromhnia_isxyos_oron_ergasias_apo,
                 hmeromhnia_isxyos_oron_ergasias_eos: until };
+            if (draftFinalization) {
+                currentUpdate.oristikh_enhmerosh = true;
+                currentUpdate.employee_draft_schedule = [];
+            }
             if (rehireOperation) currentUpdate.employment_departure_restore = null;
             if (current && !rehireOperation) {
                 const proposedDeparture = Object.hasOwn(currentUpdate, 'hmeromhnia_apoxorhshs')
@@ -2143,7 +2153,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             const sequence = Math.max(0, ...rows.map((row) => Number(row.aa_eggrafhs) || 0)) + 1;
             const record = { ...historyPatch, ...filter, ...snapshot,
                 aa_eggrafhs: String(sequence).padStart(4, '0'),
-                afora_proslhpsh: !current || rehireOperation };
+                afora_proslhpsh: !current || rehireOperation || draftFinalization };
             if (mutationPlan && rows.length === 0 && current) {
                 for (const field of T.STANDARD_FIELDS) {
                     if ((!Object.hasOwn(record, field) || record[field] === undefined) &&
@@ -2219,6 +2229,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
         };
         await write();
         if (planningState) return result;
+        if (submittedNewEmployee && initialSchedules !== undefined) {
+            await persistInitialEmployeeSchedules({ scope: filter, schedules: initialSchedules, session, scheduleModel });
+            result.initialSchedulesWritten = true;
+        }
         // Created documents are used by the existing post-commit PDF workflow.
         result.employee?.$session?.(null);
         return result;
@@ -2372,6 +2386,7 @@ async function writeEmployeeEmploymentProfileWithGuidedResolution({
         const current = await requestScopedLean(
             employeeModel.findOne({ ...filter, _id: employeeId }), session,
             LARGE_EMPLOYEE_FIELDS_EXCLUSION);
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         if (!current || String(current._id) !== String(employeeId)) {
             throw failure('EMPLOYEE_PROFILE_STALE');
         }
@@ -2952,6 +2967,7 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
                 employeeModel, session, notFoundCode: A.PREFIX + 'STALE' });
             const current = await employeeModel.findOne({ ...scope, _id: employeeId })
                 .select('+employee_profile_mutation_sequence').session(session).lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
             if (!current) throw failure('EMPLOYEE_PROFILE_STALE');
             const profileRequest = normalizeEmployeeNormalSaveRequest(submittedRequest, current);
             const normalizedRequest = normalizedUniqueSafeRepairSaveRequest(profileRequest);
@@ -3109,6 +3125,7 @@ async function writeEmployeeDepartureWithAutomaticReconstruction({ reconstructio
                 employeeModel, session, notFoundCode: A.PREFIX + 'STALE' });
             const current = await employeeModel.findOne({ ...scope, _id: employeeId })
                 .select('+employee_profile_mutation_sequence').session(session).lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
             if (!current) throw A.failure('STALE');
             const history = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
             const request = D.normalizeFirstDepartureRequest(normalizeEmployeeNormalSaveRequest({
@@ -3233,6 +3250,7 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         let input = submittedInput, maintenance = submittedMaintenance;
         const current = planningState ? planningState.current
             : await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         // Normalize submitted base values before checking intent. Unlike derived
         // echoes, canonical zeros must survive omission of unchanged form fields.
@@ -3627,6 +3645,7 @@ async function writeEmployeeDepartureDateCorrection({ scope, employeeId, request
             notFoundCode: 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED' });
         const current = planningState ? planningState.current : await employeeModel.findOne({ ...filter, _id: employeeId })
             .session(session).lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         if (!current || current.archived === true) {
             throw failure('EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED');
         }
@@ -3880,6 +3899,7 @@ async function writeEmployeeInvalidDepartureCorrection({ scope, employeeId, expe
             notFoundCode: 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CORRECTION_BLOCKED_OTHER' });
         const current = await employeeModel.findOne({ ...filter, _id: employeeId })
             .session(session).lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         const persistedRows = await completeHistoryLean(historyModel, filter, session);
         return applyEmployeeInvalidDepartureCorrection({ filter, current, persistedRows,
             expectedRevision, expectedStoredDeparture, input, maintenance, session, employeeModel,
@@ -3906,6 +3926,7 @@ async function writeEmployeeDepartureCancellation({ scope, employeeId, input = {
         if (!planningState) await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session,
             notFoundCode: 'EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT' });
         const current = planningState ? planningState.current : await employeeModel.findOne({ ...filter, _id: employeeId }).session(session).lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         if (!current || current.archived === true) {
             throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
         }
@@ -4029,6 +4050,7 @@ async function writeEmployeeRehire({ scope, employeeId, rehireDate, input = {},
             .findOne({ ...filter, _id: employeeId })
             .session(session)
             .lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
 
         const rows = await completeHistoryLean(historyModel, filter, session);
@@ -4158,6 +4180,7 @@ async function repairEmployeeHistoryCanonical({ scope, employeeId,
         await acquireEmployeeMutationFence({ filter, employeeId, employeeModel, session });
         const current = await employeeModel.findOne({ ...filter, _id: employeeId })
             .session(session).lean();
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         const rows = await completeHistoryLean(historyModel, filter, session);
         const canonical = canonicalizeEmployeeHistory({ scope: filter,
@@ -4211,6 +4234,7 @@ async function repairEmployeeLegacyOpenCycles({ scope, employeeId,
         const current = await requestScopedLean(
             employeeModel.findOne({ ...filter, _id: employeeId }), session,
             LARGE_EMPLOYEE_FIELDS_EXCLUSION);
+        if (SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_REQUIRED');
         if (!current) throw failure('EMPLOYEE_PROFILE_NOT_FOUND');
         const rows = await completeHistoryLean(historyModel, filter, session);
         const cleanupPlan = planEmployeeLegacyOpenCycleCleanup({ scope: filter,
@@ -4414,6 +4438,103 @@ async function planEmployeeMaintenance({ request, current, history, session, dep
         targetHistoryId: target ? String(target._id) : null, preserveHistory };
 }
 
+function draftEmployeePatch(changes = {}, input = {}, current = {}) {
+    const patch = Object.fromEntries(Object.entries(changes).filter(([field, value]) => value !== undefined &&
+        !['_id', '__v', 'team', 'company_kod', 'kodikos', 'createdAt', 'updatedAt',
+            EMPLOYEE_MUTATION_SEQUENCE, T.ANCHOR, 'employment_departure_restore', 'oristikh_enhmerosh',
+            'employee_draft_schedule', 'employment_profile_source', 'afora_proslhpsh'].includes(field)));
+    for (const field of Object.keys(patch)) {
+        if (field.endsWith('_path') || field.startsWith('employment_') || field.startsWith('history_')) delete patch[field];
+    }
+    const proposed = { ...current, ...patch };
+    if (!String(proposed.eponymo || '').trim() || !String(proposed.onoma || '').trim() ||
+        !/^\d{9}$/.test(String(proposed.afm || '')) ||
+        (proposed.amka && !/^\d{11}$/.test(String(proposed.amka))) ||
+        !C.calendarDate(proposed.hmeromhnia_proslhpshs) ||
+        C.calendarDate(proposed.hmeromhnia_apoxorhshs) || proposed.archived === true) {
+        throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_DATA', 400);
+    }
+    return { ...patch, ...C.normalizeEmploymentProfileSubmission(input, proposed) };
+}
+
+async function persistInitialEmployeeSchedules({ scope, schedules = [], session, scheduleModel }) {
+    if (!Array.isArray(schedules) || schedules.length > 367) throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_DATA', 400);
+    const existing = await scheduleModel.find(scope).session(session).lean();
+    if (existing.length) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_HISTORY_EXISTS');
+    for (const schedule of schedules) {
+        const { _id, __v, team, company_kod, kodikos, ...values } = schedule;
+        // Rows are mapped by the server. No caller-owned scope survives this boundary.
+        await scheduleModel.create([{ ...values, ...scope }], { session });
+    }
+}
+
+// This path owns exactly one business model. It never calls History, schedules,
+// documents, mail, contract generators, submission helpers or reconstruction.
+async function writeEmployeeDraft({ scope, employeeId = null, newEmployee = null,
+    employeeChanges = {}, input = {}, draftSchedule, expectedEmployeeStateToken, actorUserId,
+    connection = mongoose.connection, employeeModel = ErgazomenoiModel,
+    userModel = require('../../models/userModel'), privilegeModel = require('../../models/privileges').UserPrivilegesModel,
+    capabilityProbe = transactionCapability }) {
+    if (!scope || !EMPLOYEE_SCOPE_FIELDS.every(field => typeof scope[field] === 'string' && scope[field].trim()) ||
+        Boolean(employeeId) === Boolean(newEmployee)) C.invalid('scope', 'one employee identity required');
+    const { authorizeEmployeeMaintenance, authorizeEmployeeCreation, authorizeEmployeeDraftCompany } = require('./employeeMaintenanceAuthorizationService');
+    return inProfileTransaction(connection, capabilityProbe, async session => {
+        await authorizeEmployeeDraftCompany({ scope, session });
+        let current;
+        let persistedId = employeeId;
+        if (employeeId) {
+            current = await employeeModel.findOne({ ...scope, _id: employeeId }).session(session).lean();
+            await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current, session, userModel, privilegeModel });
+            if (!SaveState.isTemporaryEmployee(current)) throw SaveState.saveStateError('EMPLOYEE_SAVE_ALREADY_FINAL');
+            SaveState.assertEmployeeState(current, expectedEmployeeStateToken, true);
+            await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
+            current = await employeeModel.findOne({ ...scope, _id: employeeId }).session(session).lean();
+            SaveState.assertEmployeeState(current, expectedEmployeeStateToken, true);
+        } else {
+            await authorizeEmployeeCreation({ actorUserId, scope, session, userModel, privilegeModel });
+            if (await employeeModel.findOne(scope).session(session).lean() ||
+                await employeeModel.findOne({ team: scope.team, company_kod: scope.company_kod,
+                    afm: newEmployee.afm }).session(session).lean()) {
+                throw SaveState.saveStateError('EMPLOYEE_SAVE_STATE_STALE');
+            }
+            current = newEmployee;
+        }
+        const patch = draftEmployeePatch(employeeId ? employeeChanges : newEmployee, input, current);
+        if (draftSchedule !== undefined) {
+            if (!Array.isArray(draftSchedule) || draftSchedule.length > 367) throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_DATA', 400);
+            patch.employee_draft_schedule = [];
+            for (const row of draftSchedule) {
+                const schedule = new (require('../../models/ergazomenoi').ProdhlomenaOrariaModel)({ ...row, ...scope });
+                await schedule.validate();
+                const { _id, __v, ...values } = schedule.toObject();
+                patch.employee_draft_schedule.push(values);
+            }
+        }
+        patch.oristikh_enhmerosh = false;
+        patch.updatedAt = nextHistoryRevision(current.updatedAt);
+        // Validate the complete proposed document before a query update as well.
+        const document = new ErgazomenoiModel({ ...current, ...patch, ...scope });
+        await document.validate();
+        if (employeeId) {
+            const changed = await employeeModel.updateOne({ ...scope, _id: employeeId }, { $set: patch }, { session });
+            if (changed.matchedCount !== 1) throw SaveState.saveStateError('EMPLOYEE_SAVE_STATE_STALE');
+        } else {
+            const values = document.toObject();
+            // The same reservation is used by new ordinary Add requests.
+            values._id = new mongoose.Types.ObjectId(SaveState.employeeCreationId(scope));
+            await employeeModel.create([values], { session });
+            persistedId = String(values._id);
+        }
+        const employee = await employeeModel.findOne({ ...scope, _id: persistedId }).session(session).lean();
+        return { employee, historyUpdated: false, temporary: true,
+            employeeStateToken: SaveState.employeeStateToken(employee) };
+    }).catch(error => {
+        if (error?.hasErrorLabel?.('UnknownTransactionCommitResult')) throw SaveState.saveStateError('EMPLOYEE_SAVE_COMMIT_UNCERTAIN', 503);
+        if (error?.code === 11000) throw SaveState.saveStateError('EMPLOYEE_SAVE_STATE_STALE');
+        throw error;
+    });
+}
+
 async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     userModel = require('../../models/userModel'), privilegeModel = require('../../models/privileges').UserPrivilegesModel,
     connection = mongoose.connection, employeeModel = ErgazomenoiModel,
@@ -4488,12 +4609,61 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         return await inProfileTransaction(connection, capabilityProbe, async session => {
             if (reconstruction) await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session, notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
             let snapshot = await read(session);
+            SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken,
+                SaveState.isTemporaryEmployee(snapshot.current) || Object.hasOwn(request, 'expectedEmployeeStateToken'));
+            if (request.expectedTemporary === true && !SaveState.isTemporaryEmployee(snapshot.current)) {
+                throw SaveState.saveStateError('EMPLOYEE_SAVE_ALREADY_FINAL');
+            }
+            if (SaveState.isTemporaryEmployee(snapshot.current)) {
+                await require('./employeeMaintenanceAuthorizationService').authorizeEmployeeDraftCompany({ scope, session });
+                if (reconstruction || request.maintenance?.submittedFormValues?.rehireIntent) {
+                    throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_MODE', 400);
+                }
+                await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
+                snapshot = await read(session);
+                SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken, true);
+                if (snapshot.history.length) throw SaveState.saveStateError('EMPLOYEE_SAVE_DRAFT_HISTORY_EXISTS');
+                const submitted = request.maintenance?.submittedEmployeeFields;
+                const changes = request.maintenance?.employeeChanges || {};
+                const owned = submitted ? Object.fromEntries(submitted.map(field => [field, changes[field]])) : changes;
+                const patch = draftEmployeePatch(owned, request.input, snapshot.current);
+                const hire = C.calendarDate(patch.hmeromhnia_proslhpshs || snapshot.current.hmeromhnia_proslhpshs);
+                const from = C.calendarDate(patch.hmeromhnia_isxyos_oron_ergasias_apo || hire);
+                if (!hire || !from || from < hire || C.calendarDate(patch.hmeromhnia_apoxorhshs)) {
+                    throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_DATA', 400);
+                }
+                const result = await writeEmployeeEmploymentProfile({ ...dependencies, scope, employeeId,
+                    input: request.input, effectiveFrom: from, [ACTIVE_SESSION]: session,
+                    [DRAFT_FINALIZATION]: true, maintenance: { employeeChanges: patch,
+                        historyChanges: { ...Object.fromEntries(BASE_HISTORY_FIELDS.map(field =>
+                            [field, patch[field] !== undefined ? patch[field] : snapshot.current[field]])),
+                            hmeromhnia_proslhpshs: hire, hmeromhnia_isxyos_oron_ergasias_apo: from } } });
+                await persistInitialEmployeeSchedules({ scope, session,
+                    schedules: request.draftSchedule ?? snapshot.current.employee_draft_schedule ?? [],
+                    scheduleModel: request.scheduleModel || require('../../models/ergazomenoi').ProdhlomenaOrariaModel });
+                const final = await read(session);
+                if (final.current.oristikh_enhmerosh !== true || final.history.length !== 1 ||
+                    final.history[0].afora_proslhpsh !== true ||
+                    C.calendarDate(final.history[0].hmeromhnia_proslhpshs)?.getTime() !== hire.getTime()) {
+                    throw SaveState.saveStateError('EMPLOYEE_SAVE_FAILED');
+                }
+                return { ...result, employee: final.current, history: final.history[0],
+                    employeeUpdated: true, historyUpdated: true, firstFinalization: true };
+            }
+            for (const changes of [request.maintenance?.employeeChanges, request.maintenance?.historyChanges]) {
+                if (Object.hasOwn(changes || {}, 'hmeromhnia_proslhpshs') && changes.hmeromhnia_proslhpshs !== undefined &&
+                    C.calendarDate(changes.hmeromhnia_proslhpshs)?.getTime() !==
+                    C.calendarDate(snapshot.current.hmeromhnia_proslhpshs)?.getTime()) {
+                    throw SaveState.saveStateError('EMPLOYEE_SAVE_HIRE_LOCKED');
+                }
+            }
             let planned = await plan(snapshot, session);
             if (!reconstruction) {
                 // Discovery has no writes. Once it proves continuation, acquire
                 // the fence and recompute everything from fresh transactional reads.
                 await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session, notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
                 snapshot = await read(session);
+                SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
                 planned = await plan(snapshot, session);
             }
             if (planned.automatic) {
@@ -4566,6 +4736,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
 
 module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE,
     transactionCapability, inProfileTransaction, acquireEmployeeMutationFence,
+    writeEmployeeDraft, persistInitialEmployeeSchedules,
     writeEmployeeMaintenance, planEmployeeMaintenance,
     executeEmployeeHistoryAutomaticReconstructionPlan,
     normalizeHistoryObjectIds, buildScopedHistoryDeleteFilter,

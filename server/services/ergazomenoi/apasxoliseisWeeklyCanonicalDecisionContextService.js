@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const mongoose = require('mongoose');
@@ -217,9 +218,9 @@ async function loadWeeklyCanonicalDecisionContext({
         ? Models.IstorikoProslhpseonAllagonModel : models.historyModel;
     const Execution = models.executionModel || ExecutionModel;
     const Decision = models.decisionModel || DecisionModel;
-    const employee = await queryLean(Employee.findOne({
+    const employee = await queryLean(Employee.findOne(finalizedEmployeeFilter({
         team, company_kod: company, ypokatasthma: branch, kodikos: employeeCode
-    }));
+    })));
     if (!employee) throw fail('Ο εργαζόμενος δεν βρέθηκε στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.', 403, 'SCOPE_MISMATCH');
     const rows = await sortedLean(Row.find({
         team, company_kod: company, ypokatasthma: branch, kodikos: employeeCode,

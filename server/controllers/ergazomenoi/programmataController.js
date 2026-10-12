@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 
 const { Builder, By, Key, until } = require('selenium-webdriver');
@@ -72,10 +73,10 @@ class programmataController {
         const { effectiveTeam, companyId } = req.programmataAccessScope;
 
         try {
-            const ergazomenoi = await ErgazomenoiModel.find({
+            const ergazomenoi = await ErgazomenoiModel.find(finalizedEmployeeFilter({
                 team: effectiveTeam,
                 company_kod: companyId
-            }).sort('eponymo onoma');
+            })).sort('eponymo onoma');
 
             res.json(ergazomenoi);
         } catch (error) {
@@ -87,11 +88,11 @@ class programmataController {
         const { effectiveTeam, companyId, employeeCode } = req.programmataAccessScope;
 
         try {
-            const ergazomenoi = await ErgazomenoiModel.findOne({
+            const ergazomenoi = await ErgazomenoiModel.findOne(finalizedEmployeeFilter({
                 team: effectiveTeam,
                 company_kod: companyId,
                 kodikos: employeeCode
-            });
+            }));
 
             res.json(ergazomenoi);
         } catch (error) {
@@ -921,7 +922,7 @@ class programmataController {
 
             // 2. Ανάκτηση των στοιχείων των εργαζομένων από το ErgazomenoiModel
             const employees = await ErgazomenoiModel.find(
-                { team: team, company_kod: company, kodikos: mongoose.trusted({ $in: kodikoi }) },
+                finalizedEmployeeFilter({ team: team, company_kod: company, kodikos: mongoose.trusted({ $in: kodikoi }) }),
                 { afm: 1, eponymo: 1, onoma: 1, kodikos: 1 }
             );
 

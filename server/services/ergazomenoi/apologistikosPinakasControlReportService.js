@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const mongoose = require('mongoose');
 const { ProdhlomenaOrariaModel, ErgazomenoiModel } = require('../../models/ergazomenoi');
@@ -169,7 +170,7 @@ async function buildReport({ team, company_kod, input, models = {} }) {
     const employeeQuery = { team: scopeTeam, company_kod: scopeCompany,
         kodikos: mongoose.trusted({ $in: employeeCodes }) };
     const employees = employeeCodes.length
-        ? await employeeModel.find(employeeQuery).select(`${EMPLOYEE_PROJECTION.join(' ')} -_id`).lean() : [];
+        ? await employeeModel.find(finalizedEmployeeFilter(employeeQuery)).select(`${EMPLOYEE_PROJECTION.join(' ')} -_id`).lean() : [];
     const eligibleSource = filterEligibleApologistikosSource({ rows: storedRows, employees });
     const canonicalRows = buildCanonicalApologistikosRows(eligibleSource);
     return { ...buildReportFromCanonical({ canonicalRows, criteria }), query, employeeQuery };

@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { deriveApprovedTimeShift } = require('../../services/ergazomenoi/apasxoliseisApprovedTimeShiftService');
 const { resolveArrangementContext } = require('../../services/ergazomenoi/apasxoliseisEffectiveHolidayContextProviderService');
 const { deriveApprovedHourlyLeave, scheduledWorkingDay } = require('../../services/ergazomenoi/apasxoliseisApprovedHourlyLeaveService');
@@ -1510,7 +1511,7 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
         payrollResults, payrollPhaseFacts, policyRules, companySettings] = await Promise.all([
         ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(range) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
         ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(weeklyRange) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
-        ErgazomenoiModel.find(base).select(temporalProfile.profileSelect('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth')).lean(),
+        ErgazomenoiModel.find(finalizedEmployeeFilter(base)).select(temporalProfile.profileSelect('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth')).lean(),
         ProdhlomenaOrariaDeviationsModel.find({ ...base, period_apo: asDateOnlyUtc(scope.period_start), period_eos: asDateOnlyUtc(scope.period_end, true) }).sort({ kodikos: 1, week_apo: 1 }).lean(),
         ApasxoliseisWeeklyCanonicalDecisionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), decision_status: 'RECORDED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
         ApasxoliseisWeeklyRepoTransferExecutionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), execution_status: 'APPLIED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
@@ -2068,7 +2069,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
 
     const [employeeRows, historyRows, auditRows] = await Promise.all([
         kodikoi.length
-            ? ErgazomenoiModel.find(employeeFilter)
+            ? ErgazomenoiModel.find(finalizedEmployeeFilter(employeeFilter))
                   .select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS)
                   .lean()
             : [],
@@ -2285,7 +2286,7 @@ async function runWeeklyRepoPostCheck({
         employeeQuery.ypokatasthma = selectedYpokatasthma;
     }
 
-    const employees = await ErgazomenoiModel.find(employeeQuery)
+    const employees = await ErgazomenoiModel.find(finalizedEmployeeFilter(employeeQuery))
         .select(temporalProfile.profileSelect(
             'company_kod ypokatasthma kodikos eponymo onoma ' +
                 'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
@@ -4429,7 +4430,7 @@ async function applyEmploymentDepartureScopeToFilters({
     if (cleanBranch) employeeFilter.ypokatasthma = cleanBranch.padStart(4, '0');
     if (cleanKodikos) employeeFilter.kodikos = cleanKodikos;
 
-    const employees = await ErgazomenoiModel.find(employeeFilter)
+    const employees = await ErgazomenoiModel.find(finalizedEmployeeFilter(employeeFilter))
         .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
         .lean();
     const lifecycleEmployees = await preloadEmployeeEmploymentCycleContexts({
@@ -4455,8 +4456,8 @@ const SUSPICIOUS_SHORT_COMPANY_SELECT_FIELDS =
 
 async function loadHrDailyActualWorkResolutionContext({ sessionTeam, companyId, row }) {
     const [employee, histories] = await Promise.all([
-        ErgazomenoiModel.findOne({ team: sessionTeam, company_kod: companyId,
-            ypokatasthma: row.ypokatasthma, kodikos: row.kodikos }).lean(),
+        ErgazomenoiModel.findOne(finalizedEmployeeFilter({ team: sessionTeam, company_kod: companyId,
+            ypokatasthma: row.ypokatasthma, kodikos: row.kodikos })).lean(),
         IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
             company_kod: companyId, kodikos: row.kodikos })
             .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
@@ -4553,7 +4554,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
         'mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta')).lean() || {};
     const companySettings = presentationSnapshot?.policy_context
         ?.suspicious_short_card_policy || liveCompanySettings;
-    const liveEmployee = await applySession(ErgazomenoiModel.findOne({ ...base, _id: employeeId })
+    const liveEmployee = await applySession(ErgazomenoiModel.findOne(finalizedEmployeeFilter({ ...base, _id: employeeId }))
         .select(`${CANONICAL_EMPLOYEE_PROFILE_FIELDS} eponymo onoma ` +
             'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs afora_daneismo_ergazomenoy ' +
             'typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy ' +
@@ -4923,8 +4924,8 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             freshRows: () => rowIds.length ? ProdhlomenaOrariaModel.find({ ...base,
                 _id: mongoose.trusted({ $in: rowIds }) }).select(`${REVIEW_SELECT_FIELDS} __v`)
                 .sort({ kodikos: 1, hmeromhnia: 1 }).lean() : [],
-            employees: () => employeeIds.length ? ErgazomenoiModel.find({ team: base.team,
-                company_kod: base.company_kod, _id: mongoose.trusted({ $in: employeeIds }) })
+            employees: () => employeeIds.length ? ErgazomenoiModel.find(finalizedEmployeeFilter({ team: base.team,
+                company_kod: base.company_kod, _id: mongoose.trusted({ $in: employeeIds }) }))
                 .select(temporalProfile.profileSelect(
                     'kodikos eponymo onoma ypokatasthma hmeromhnia_proslhpshs ' +
                     'hmeromhnia_apoxorhshs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
@@ -5458,11 +5459,11 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const kodikoi = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
 
     const ergazomenoi = kodikoi.length
-        ? await ErgazomenoiModel.find({
+        ? await ErgazomenoiModel.find(finalizedEmployeeFilter({
               team: req.session.userTeam,
               company_kod: req.session.companyInUse,
               kodikos: mongoose.trusted({ $in: kodikoi })
-          })
+          }))
               .select(temporalProfile.profileSelect(
                   'kodikos eponymo onoma ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
                       'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
@@ -6694,11 +6695,11 @@ class erganhController {
                 form: 'ExagoghOrarionSeErganh'
             }).exec();
 
-            const ergazomenoi = await ErgazomenoiModel.find({
+            const ergazomenoi = await ErgazomenoiModel.find(finalizedEmployeeFilter({
                 team: sessionTeam,
                 company_kod: companyId,
                 energos: true
-            });
+            }));
 
             res.render('ergazomenoi/programmata/exagoghOrarionSeErganh', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
@@ -7564,11 +7565,11 @@ class erganhController {
                 )
             ];
 
-            const ergazomenoi = await ErgazomenoiModel.find({
+            const ergazomenoi = await ErgazomenoiModel.find(finalizedEmployeeFilter({
                 team: sessionTeam,
                 company_kod: companyId,
                 kodikos: mongoose.trusted({ $in: kodikoiRows })
-            })
+            }))
                 .select(temporalProfile.profileSelect(
                     'kodikos eponymo onoma pososto_prosayxhshs_6hs_hmeras ' +
                         'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
@@ -8432,12 +8433,12 @@ class erganhController {
                 .lean();
             const result = countOrphanHitsByEmployee(rows);
             const flaggedCodes = result.employees.map((employee) => employee.kodikos);
-            const employeeRows = flaggedCodes.length ? await ErgazomenoiModel.find({
+            const employeeRows = flaggedCodes.length ? await ErgazomenoiModel.find(finalizedEmployeeFilter({
                 team: req.session.userTeam,
                 company_kod: req.session.companyInUse,
                 ypokatasthma: branch.padStart(4, '0'),
                 kodikos: mongoose.trusted({ $in: flaggedCodes })
-            }).select('kodikos eponymo onoma').lean() : [];
+            })).select('kodikos eponymo onoma').lean() : [];
             const employeeByCode = new Map(employeeRows.map((employee) => [
                 String(employee.kodikos || ''), employee
             ]));
@@ -8596,11 +8597,11 @@ class erganhController {
             const employeeContextByKodikos = new Map();
 
             if (kodikoiRows.length > 0) {
-                const employeeRows = await ErgazomenoiModel.find({
+                const employeeRows = await ErgazomenoiModel.find(finalizedEmployeeFilter({
                     team: sessionTeam,
                     company_kod: companyId,
                     kodikos: mongoose.trusted({ $in: kodikoiRows })
-                })
+                }))
                     .select('kodikos karta_ergasias')
                     .lean();
 
@@ -11425,7 +11426,7 @@ class erganhController {
                 employeeQuery.ypokatasthma = selectedYpokatasthma;
             }
 
-            const ergazomenoi = await ErgazomenoiModel.find(employeeQuery)
+            const ergazomenoi = await ErgazomenoiModel.find(finalizedEmployeeFilter(employeeQuery))
                 .select(temporalProfile.profileSelect(
                     'company_kod kodikos eponymo onoma ypokatasthma ' +
                         'hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
@@ -13034,10 +13035,10 @@ class erganhController {
                 team: req.session.userTeam, company_kod: req.session.companyInUse,
                 ypokatasthma: row.ypokatasthma, kodikos: row.kodikos
             }).select(REVIEW_SELECT_FIELDS).sort({ hmeromhnia: 1 }).lean();
-            const employee = await ErgazomenoiModel.findOne({
+            const employee = await ErgazomenoiModel.findOne(finalizedEmployeeFilter({
                 team: req.session.userTeam, company_kod: req.session.companyInUse,
                 ypokatasthma: row.ypokatasthma, kodikos: row.kodikos
-            }).lean();
+            })).lean();
             const histories = employee ? await IstorikoProslhpseonAllagonModel.find({
                 team: req.session.userTeam, company_kod: req.session.companyInUse,
                 kodikos: row.kodikos
@@ -13333,9 +13334,9 @@ class erganhController {
                         ProdhlomenaOrariaModel.find({ team: sessionTeam, company_kod: companyId,
                             ypokatasthma: oldRecord.ypokatasthma, kodikos: oldRecord.kodikos })
                             .select(REVIEW_SELECT_FIELDS).sort({ hmeromhnia: 1 }).lean(),
-                        ErgazomenoiModel.findOne({ team: sessionTeam, company_kod: companyId,
+                        ErgazomenoiModel.findOne(finalizedEmployeeFilter({ team: sessionTeam, company_kod: companyId,
                             ypokatasthma: oldRecord.ypokatasthma,
-                            kodikos: oldRecord.kodikos }).lean(),
+                            kodikos: oldRecord.kodikos })).lean(),
                         IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
                             company_kod: companyId, kodikos: oldRecord.kodikos })
                             .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
@@ -13430,10 +13431,10 @@ class erganhController {
                     dailyDerived = prepared.dailyDerived;
                 } else {
                     const [employee, histories] = await Promise.all([
-                        ErgazomenoiModel.findOne({ team: sessionTeam,
+                        ErgazomenoiModel.findOne(finalizedEmployeeFilter({ team: sessionTeam,
                             company_kod: companyId,
                             ypokatasthma: oldRecord.ypokatasthma,
-                            kodikos: oldRecord.kodikos }).lean(),
+                            kodikos: oldRecord.kodikos })).lean(),
                         IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
                             company_kod: companyId, kodikos: oldRecord.kodikos })
                             .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
@@ -14087,7 +14088,7 @@ class erganhController {
                 employeeQuery.kodikos = String(ergazomenosId).trim();
             }
 
-            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+            const ergazomenos = await ErgazomenoiModel.findOne(finalizedEmployeeFilter(employeeQuery)).lean();
 
             if (!ergazomenos) {
                 return res.status(404).json({
@@ -14522,7 +14523,7 @@ class erganhController {
                 employeeQuery.kodikos = String(ergazomenosId).trim();
             }
 
-            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+            const ergazomenos = await ErgazomenoiModel.findOne(finalizedEmployeeFilter(employeeQuery)).lean();
 
             if (!ergazomenos) {
                 return res.status(404).json({
@@ -14903,7 +14904,7 @@ class erganhController {
                 employeeQuery.kodikos = String(ergazomenosId).trim();
             }
 
-            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+            const ergazomenos = await ErgazomenoiModel.findOne(finalizedEmployeeFilter(employeeQuery)).lean();
 
             if (!ergazomenos) {
                 return res.status(404).json({
@@ -15373,7 +15374,7 @@ class erganhController {
                 employeeQuery.kodikos = String(ergazomenosId).trim();
             }
 
-            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+            const ergazomenos = await ErgazomenoiModel.findOne(finalizedEmployeeFilter(employeeQuery)).lean();
 
             if (!ergazomenos) {
                 return res.status(404).json({
@@ -15707,7 +15708,7 @@ class erganhController {
                 employeeQuery.kodikos = String(ergazomenosId).trim();
             }
 
-            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+            const ergazomenos = await ErgazomenoiModel.findOne(finalizedEmployeeFilter(employeeQuery)).lean();
 
             if (!ergazomenos) {
                 return res.status(404).json({
@@ -16768,7 +16769,7 @@ class erganhController {
                 employeeQuery.kodikos = String(ergazomenosId).trim();
             }
 
-            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+            const ergazomenos = await ErgazomenoiModel.findOne(finalizedEmployeeFilter(employeeQuery)).lean();
 
             if (!ergazomenos) {
                 return res.status(404).json({
@@ -17174,11 +17175,11 @@ class erganhController {
 
             const employeeCodes = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
 
-            const employees = await ErgazomenoiModel.find({
+            const employees = await ErgazomenoiModel.find(finalizedEmployeeFilter({
                 team,
                 company_kod: companyKodikos,
                 kodikos: mongoose.trusted({ $in: employeeCodes })
-            })
+            }))
                 .select('kodikos afm eponymo onoma afora_daneismo_ergazomenoy typos_ergodoth_daneismoy')
                 .lean();
 
@@ -17339,11 +17340,11 @@ class erganhController {
 
             const employeeCodes = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
 
-            const employees = await ErgazomenoiModel.find({
+            const employees = await ErgazomenoiModel.find(finalizedEmployeeFilter({
                 team,
                 company_kod: companyInUse,
                 kodikos: mongoose.trusted({ $in: employeeCodes })
-            })
+            }))
                 .select('kodikos afm afm_ergazomenoy eponymo onoma')
                 .lean();
 

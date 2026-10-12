@@ -27,7 +27,7 @@ test('two Add saves update scoped date rows without wiping later-stage facts', a
             apo_ora_01_01: time, apo_ora_01_02: time,
             eos_ora_01_01: '16:00', eos_ora_01_02: '16:00' };
         await vm.runInNewContext(`(async () => { ${schedule} })()`, {
-            Date, formData, sessionUserTeam: 'team', sessionCompanyInUse: 'company',
+            Date, formData, initialSchedulesWritten: false, sessionUserTeam: 'team', sessionCompanyInUse: 'company',
             persistenceTarget: { employee: { kodikos: '0004' } },
             aa_kod: null, newErgazomenos: { kodikos: '0004' },
             ProdhlomenaOrariaModel,

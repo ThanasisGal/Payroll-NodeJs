@@ -14,6 +14,6 @@ assert.match(source, /dataset\.currentRelationshipOpen/);
 assert.match(source, /hireCell\.dataset\.iso = currentHireDate/);
 assert.match(historyView, /data-current-relationship-open/);
 assert.match(historyView, /Αποχώρηση και μετά χρησιμοποιήστε την Επαναπρόσληψη/);
-assert.match(maintenanceView, /currentRelationshipOpen \? 'readonly aria-readonly="true"/);
+assert.match(maintenanceView, /ergazomenoiData\.oristikh_enhmerosh !== false \? 'readonly aria-readonly="true"/);
 assert.match(maintenanceView, /Καταχωρήστε πρώτα την Αποχώρηση και στη συνέχεια χρησιμοποιήστε την Επαναπρόσληψη/);
 console.log('PASS history lifecycle UI guard contract');

@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const mongoose = require('mongoose');
@@ -187,9 +188,9 @@ async function preloadBorrowedEmploymentProfileContexts({
     const companyIds = [...new Set(requested.map((item) => item.context.borrowingCompanyId))];
     const codes = [...new Set(requested.map((item) => item.code))];
     const sourceEmployees = requested.length
-        ? await queryLean(employeeModel.find({ team,
+        ? await queryLean(employeeModel.find(finalizedEmployeeFilter({ team,
             company_kod: mongoose.trusted({ $in: companyIds }),
-            kodikos: mongoose.trusted({ $in: codes }) }),
+            kodikos: mongoose.trusted({ $in: codes }) })),
         '_id team company_kod kodikos ypokatasthma hmeres_ergasias_ebdomadas ' +
         'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
         'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +

@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const crypto = require('node:crypto');
 const mongoose = require('mongoose');
@@ -248,14 +249,14 @@ async function loadAuthoritativeContext({ target: input, periodScope, session = 
     if (encode(validateTarget(pick(targetRow, IDENTITY_FIELDS))) !== encode(target)) fail('TARGET_IDENTITY_MISMATCH');
     // This projection reproduces the production employee eligibility set for
     // date-level holiday flags without loading other employees' payroll facts.
-    const eligibleEmployees = await m.employeeModel.find({ ...business, $and: mongoose.trusted([
+    const eligibleEmployees = await m.employeeModel.find(finalizedEmployeeFilter({ ...business, $and: mongoose.trusted([
         { $or: mongoose.trusted([{ hmeromhnia_proslhpshs: null },
             { hmeromhnia_proslhpshs: mongoose.trusted({ $lte: periodEnd }) }]) },
         { $or: mongoose.trusted([{ hmeromhnia_apoxorhshs: null },
             { hmeromhnia_apoxorhshs: mongoose.trusted({ $gte: scope.period_start }) }]) }
-    ]) }).select('_id kodikos hmeromhnia_proslhpshs hmeromhnia_apoxorhshs').lean();
+    ]) })).select('_id kodikos hmeromhnia_proslhpshs hmeromhnia_apoxorhshs').lean();
     assertUnique(eligibleEmployees, (row) => String(row.kodikos), 'EMPLOYEE_IDENTITY_AMBIGUOUS');
-    const employees = await m.employeeModel.find({ ...business, kodikos: target.kodikos }).select(EMPLOYEE_FIELDS.join(' ')).lean();
+    const employees = await m.employeeModel.find(finalizedEmployeeFilter({ ...business, kodikos: target.kodikos })).select(EMPLOYEE_FIELDS.join(' ')).lean();
     if (employees.length !== 1 || !eligibleEmployees.some((row) => String(row._id) === String(employees[0]._id))) fail('EMPLOYEE_IDENTITY_AMBIGUOUS');
     const employee = employees[0];
     if (!isDateWithinEmploymentPeriod(target.hmeromhnia, employee)) fail('TARGET_OUTSIDE_EMPLOYMENT');

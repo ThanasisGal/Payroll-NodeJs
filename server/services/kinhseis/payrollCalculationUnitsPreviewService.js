@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 
 const { ErgazomenoiModel } = require('../../models/ergazomenoi');
@@ -108,14 +109,14 @@ async function loadEmployeesForPreview({
     ypokatasthma
 }) {
     return ErgazomenoiModel.find(
-        buildEmployeeScopeQuery({
+        finalizedEmployeeFilter(buildEmployeeScopeQuery({
             team,
             company_kod,
             apoDate,
             eosDate,
             employeeId,
             ypokatasthma
-        })
+        }))
     )
         .select('_id kodikos eponymo onoma ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
         .sort({ kodikos: 1 })

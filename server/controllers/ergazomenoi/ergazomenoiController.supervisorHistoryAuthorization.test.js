@@ -34,7 +34,7 @@ async function page(user = supervisor, initial = problemFixture()) {
     const query = value => ({ mongooseOptions(options) { assert.equal(options.includeRedundantHistoryArtifacts, true); return options; },
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
-    const context = { Date, console: { error() {} }, ...A, ...S, ...M, semanticHistoryRows,
+    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...A, ...S, ...M, semanticHistoryRows,
         getEmployeeHistoryAccess: id => A.getEmployeeHistoryAccess(id, { userModel: userModel(user, c => captures.push(c)) }),
         identifyEmployeeHistoryProblemScope(args) {
             assert.equal(args.currentEmployee, initial.employee);
@@ -43,7 +43,7 @@ async function page(user = supervisor, initial = problemFixture()) {
             assert.equal(JSON.stringify(args.scope), JSON.stringify(scope));
             return P.identifyEmployeeHistoryProblemScope(args);
         },
-        CompaniesModel: { findById: () => query({}) }, ErgazomenoiModel: { findById: () => query(initial.employee) },
+        CompaniesModel: { findById: () => query({}) }, ErgazomenoiModel: { findOne: () => query(initial.employee) },
         IstorikoProslhpseonAllagonModel: { find(filter) { assert.equal(JSON.stringify(filter), JSON.stringify(scope)); return query(initial.history); } },
         PerifereiesModel: { find: () => query([]) }, GenikesParametroiModel: { find: () => query([]) },
         ProdhlomenaOrariaModel: { find: () => query([]) }, mongoose: { trusted: value => value },

@@ -31,6 +31,8 @@ async function resolveEmployeeAddPersistenceTarget({ employeeModel, historyModel
         'Υπάρχουν πολλαπλές εγγραφές με το ίδιο ΑΦΜ στην εταιρεία. Απαιτείται χειροκίνητος έλεγχος.');
     if (!employees.length) return { action: 'CREATE_NEW', afm };
     const employee = employees[0];
+    if (employee.oristikh_enhmerosh === false) throw conflict('EMPLOYEE_SAVE_STATE_STALE',
+        'Ο εργαζόμενος έχει ήδη αποθηκευτεί προσωρινά. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανοίξτε τη Συντήρηση Εργαζομένων.\n2. Συνεχίστε από την προσωρινή εγγραφή.\nΚωδικός αναφοράς: EMPLOYEE_SAVE_STATE_STALE');
     if (employee.archived === true || employee.energos !== true ||
         dateKeyUtc(employee.hmeromhnia_apoxorhshs)) {
         throw conflict('EMPLOYEE_ADD_REQUIRES_REHIRE',

@@ -1,9 +1,10 @@
+const SaveState = require('../../utils/ergazomenoi/employeeSaveState');
 const { contractParentKey, contractItemsForDisplay } = require('../../services/ergazomenoi/employeeContractDescriptionService');
 const { sendReconstructionSaveError, validateApproval } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract');
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
 const { submittedAddPatch, submittedProfileForm } = require('../../services/ergazomenoi/employeeAddSubmittedPatchService');
 const { getEmploymentProfileUiContext } = require('../../utils/ergazomenoi/employmentProfileUiContext');
-const { writeEmployeeMaintenance, writeEmployeeEmploymentProfile, writeEmployeeRehire,
+const { writeEmployeeDraft, writeEmployeeMaintenance, writeEmployeeEmploymentProfile, writeEmployeeRehire,
     writeEmployeeEmploymentHistoryOperations,
     deleteEmployeeAndEmploymentHistory, selectMaintenanceMode } =
     require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
@@ -96,6 +97,76 @@ const {
 let nextPageSearchTerm = '';
 let nextPageAnenergh = '';
 
+function sendTemporaryEmployeeSaved(res, result, status = 200) {
+    const employee = result.employee;
+    return res.status(status).json({ success: true, temporary: true, historyUpdated: false,
+        message: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν προσωρινά. Δεν δημιουργήθηκε Ιστορικό.',
+        data: { _id: employee._id, kodikos: employee.kodikos, oristikh_enhmerosh: false },
+        employeeStateToken: result.employeeStateToken,
+        redirectUrl: `/ergazomenoi/ergazomenoi/edit/${employee._id}` });
+}
+
+function buildEmployeeDraftSchedules(formData, scope, mode = 'add') {
+    const start = formData.hmeromhnia_allaghs_orarioy_apo;
+    const end = formData.hmeromhnia_allaghs_orarioy_eos;
+    if (!start && !end) return undefined;
+    if (!validateOrarioDateRangeFields(formData).valid) throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_DATA', 400);
+    const rows = [], from = new Date(start), until = new Date(end);
+    if ((until - from) / 86400000 > 366) throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_DATA', 400);
+    for (let date = new Date(from), i = 1; date <= until; date.setUTCDate(date.getUTCDate() + 1), i++) {
+        const i1 = String(i).padStart(2, '0');
+        const { kathgoriaErgasias, getTimeValue, getHourMetricValue } = normalizeTemporaryOrarioValue(formData, i1);
+        const row = {
+                    team: scope.team,
+                    company_kod: scope.company_kod,
+                    kodikos: scope.kodikos,
+                    hmeromhnia: new Date(date),
+                    kathgoria_ergasias: kathgoriaErgasias,
+                    apo_ora_01: getTimeValue(`apo_ora_01_${i1}`),
+                    eos_ora_01: getTimeValue(`eos_ora_01_${i1}`),
+                    dialleima_apo_ora_01: getTimeValue(`dialleima_apo_ora_01_${i1}`),
+                    dialleima_eos_ora_01: getTimeValue(`dialleima_eos_ora_01_${i1}`),
+                    apo_ora_02: getTimeValue(`apo_ora_02_${i1}`),
+                    eos_ora_02: getTimeValue(`eos_ora_02_${i1}`),
+                    dialleima_apo_ora_02: getTimeValue(`dialleima_apo_ora_02_${i1}`),
+                    dialleima_eos_ora_02: getTimeValue(`dialleima_eos_ora_02_${i1}`),
+                    apo_ora_03: getTimeValue(`apo_ora_03_${i1}`),
+                    eos_ora_03: getTimeValue(`eos_ora_03_${i1}`),
+                    dialleima_apo_ora_03: getTimeValue(`dialleima_apo_ora_03_${i1}`),
+                    dialleima_eos_ora_03: getTimeValue(`dialleima_eos_ora_03_${i1}`),
+                    repo: formData[`repo_${i1}`] || false,
+                    adeia: false,
+                    astheneia: false,
+                    argia: formData[`argia_${i1}`] || false,
+                    perigrafh_argias: formData[`perigrafh_argias_${i1}`] || '',
+                    kathgoria_adeias: '',
+                    ores_ergasias: firstPositiveHours(
+                        getHourMetricValue(`total_hours_day_${i1}`),
+                        calcHoursFromTimePairs(formData, i1)
+                    )
+                };
+        // Match Maintenance's existing mapping without recalculating any payroll value.
+        if (mode === 'edit') Object.assign(row, {
+            ores_nyxtas: getHourMetricValue(`night_hours_day_${i1}`),
+            ores_argion: getHourMetricValue(`holiday_hours_day_${i1}`),
+            ores_yperergasias: getHourMetricValue(`overwork_hours_day_${i1}`),
+            ores_yperergasias_nyxtas: getHourMetricValue(`night_overwork_hours_day_${i1}`),
+            ores_yperergasias_argion: getHourMetricValue(`holiday_overwork_hours_day_${i1}`),
+            ores_yperergasias_argion_nyxtas: getHourMetricValue(`night_holiday_overwork_hours_day_${i1}`),
+            ores_nominhs_yperorias: getHourMetricValue(`overtimeNomimh_hours_day_${i1}`),
+            ores_nominhs_yperorias_nyxtas: getHourMetricValue(`night_overtimeNomimh_hours_day_${i1}`),
+            ores_nominhs_yperorias_argion: getHourMetricValue(`holiday_overtimeNomimh_hours_day_${i1}`),
+            ores_nominhs_yperorias_argion_nyxtas: getHourMetricValue(`night_holiday_overtimeNomimh_hours_day_${i1}`),
+            ores_paranomhs_yperorias: getHourMetricValue(`overtimeParanomh_hours_day_${i1}`),
+            ores_paranomhs_yperorias_nyxtas: getHourMetricValue(`night_overtimeParanomh_hours_day_${i1}`),
+            ores_paranomhs_yperorias_argion: getHourMetricValue(`holiday_overtimeParanomh_hours_day_${i1}`),
+            ores_paranomhs_yperorias_argion_nyxtas: getHourMetricValue(`night_holiday_overtimeParanomh_hours_day_${i1}`)
+        });
+        rows.push(row);
+    }
+    return rows;
+}
+
 function wantsInactiveErgazomenoi(req) {
     return req?.query?.anenergh === 'on' || req?.body?.anenergh === 'on';
 }
@@ -103,7 +174,7 @@ function wantsInactiveErgazomenoi(req) {
 function buildErgazomenoiActiveInactiveFilter(showInactive) {
     return {
         archived: { $ne: true },
-        ...(showInactive ? {} : { energos: true })
+        ...(showInactive ? {} : { $and: [{ $or: [{ energos: true }, { oristikh_enhmerosh: false }] }] })
     };
 }
 
@@ -824,8 +895,9 @@ class ergazomenoiController {
             const companyData = await CompaniesModel.findById(companyId).lean();
 
             const ergazomenoiId = req.params.id;
-            const ergazomenoiData = await ErgazomenoiModel.findById(ergazomenoiId).lean().exec();
+            const ergazomenoiData = await ErgazomenoiModel.findOne({ _id: ergazomenoiId, team: userTeam, company_kod: companyId }).lean().exec();
 
+            if (!ergazomenoiData) return SaveState.sendEmployeeSaveStateError(res, SaveState.saveStateError('EMPLOYEE_SAVE_NOT_FOUND', 404));
             // const ergazomenoiKod = req.params.kod;
             const ergazomenoiKod = ergazomenoiData.kodikos;
 
@@ -873,7 +945,9 @@ class ergazomenoiController {
             const genikesParametroi = await GenikesParametroiModel.find()
                 .sort({ kodikos: 1 })
                 .lean();
-            const orariaData = await ProdhlomenaOrariaModel.find({
+            const orariaData = SaveState.isTemporaryEmployee(ergazomenoiData)
+                ? (ergazomenoiData.employee_draft_schedule || []).map(row => ProdhlomenaOrariaModel.hydrate(row))
+                : await ProdhlomenaOrariaModel.find({
                 team: userTeam,
                 company_kod: companyId,
                 kodikos: ergazomenoiKod,
@@ -910,6 +984,7 @@ class ergazomenoiController {
                 istorikoData,
                 originalEmploymentHistoryId,
                 originalEmploymentHistoryRevision,
+                employeeStateToken: SaveState.employeeStateToken(ergazomenoiData),
                 employeeHistoryStateToken,
                 orariaData,
                 ergazomenoiData: {
@@ -1367,6 +1442,9 @@ class ergazomenoiController {
             kodikosValue = 0;
 
         const { formData = {} } = req.body || {};
+        let saveMode;
+        try { saveMode = SaveState.employeeSaveMode(req.body); }
+        catch (error) { return SaveState.sendEmployeeSaveStateError(res, error); }
         const dailyRestValidation = validateEmployeeScheduleDailyRest(formData);
         if (!dailyRestValidation.valid) {
             return rejectEmployeeScheduleDailyRest(res, dailyRestValidation);
@@ -1426,6 +1504,7 @@ class ergazomenoiController {
                 formData, existingEmployeeId: req.body?.existingEmployeeId
             });
         } catch (error) {
+            if (SaveState.sendEmployeeSaveStateError(res, error)) return;
             if (error.statusCode === 409) return res.status(409).json({
                 success: false, reason: error.code, message: error.message
             });
@@ -1449,7 +1528,7 @@ class ergazomenoiController {
                 team: sessionUserTeam,
                 company_kod: sessionCompanyInUse
             })
-                .sort({ _id: -1 })
+                .sort({ kodikos: -1 })
                 .limit(1);
             let kodValue =
                 lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
@@ -1846,6 +1925,26 @@ class ergazomenoiController {
         setAddHistoryField("createdAt", Date.now());
         setAddHistoryField("updatedAt", Date.now());
 
+        if (persistenceTarget.action === 'CREATE_NEW') {
+            newErgazomenos._id = new mongoose.Types.ObjectId(SaveState.employeeCreationId({
+                team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: newErgazomenos.kodikos
+            }));
+        }
+        if (saveMode === 'temporary') {
+            try {
+                if (persistenceTarget.action !== 'CREATE_NEW') throw SaveState.saveStateError('EMPLOYEE_SAVE_ALREADY_FINAL');
+                const scope = { team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: newErgazomenos.kodikos };
+                const result = await writeEmployeeDraft({ scope, newEmployee: { ...newErgazomenos.toObject(), ...SaveState.draftAttachmentFields(formData) },
+                    input: profileInput(formData, 'add'), draftSchedule: buildEmployeeDraftSchedules(formData, scope),
+                    actorUserId: sessionUserId });
+                return sendTemporaryEmployeeSaved(res, result, 201);
+            } catch (error) {
+                if (SaveState.sendEmployeeSaveStateError(res, error)) return;
+                if (isEmploymentProfileError(error)) return profileError(res, error);
+                return SaveState.sendEmployeeSaveStateError(res, SaveState.saveStateError('EMPLOYEE_SAVE_FAILED', 400));
+            }
+        }
+        let initialSchedulesWritten = false;
         let savedErgazomenos = null; // ✅ Δήλωση
 
         try {
@@ -1858,13 +1957,15 @@ class ergazomenoiController {
                     employeeId: String(persistenceTarget.employee._id),
                     mode: 'MODE_CORRECT_EXISTING',
                     historyId: String(persistenceTarget.history._id)
-                } : { newEmployee: newErgazomenos.toObject() }),
+                } : { newEmployee: { ...newErgazomenos.toObject(), oristikh_enhmerosh: true },
+                    initialSchedules: buildEmployeeDraftSchedules(formData, { team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: newErgazomenos.kodikos }) }),
                 effectiveFrom: formData.hmeromhnia_isxyos_oron_ergasias_apo || formData.hmeromhnia_allaghs_orarioy_apo,
                 maintenance: correcting ? {
                     employeeChanges: submittedAddPatch(newErgazomenos, submittedFormKeys, addEmployeeOwnedFields),
                     historyChanges: submittedAddPatch(newIstoriko, submittedFormKeys, addHistoryOwnedFields)
                 } : { historyChanges: newIstoriko.toObject() }
             });
+            initialSchedulesWritten = result.initialSchedulesWritten === true;
             savedErgazomenos = correcting
                 ? await ErgazomenoiModel.findOne({ team: sessionUserTeam,
                     company_kod: sessionCompanyInUse, _id: persistenceTarget.employee._id })
@@ -2059,7 +2160,7 @@ class ergazomenoiController {
         const orarioValidation = validateOrarioFields(formData);
         const orarioDateRangeValidation = validateOrarioDateRangeFields(formData);
 
-        if (orarioDateRangeValidation.valid) {
+        if (orarioDateRangeValidation.valid && !initialSchedulesWritten) {
             function createOrarioData(i1) {
                 const { kathgoriaErgasias, getTimeValue, getHourMetricValue } =
                     normalizeTemporaryOrarioValue(formData, i1);
@@ -3428,6 +3529,9 @@ class ergazomenoiController {
 
     static postErgazomenoiUpdate = async (req, res) => {
         const ergazomenoiId = req.params.ergazomenoiId;
+        let saveMode;
+        try { saveMode = SaveState.employeeSaveMode(req.body); }
+        catch (error) { return SaveState.sendEmployeeSaveStateError(res, error); }
         const { formData = {}, filesToUpdate, rehireIntent = false, rehireDate = null } =
             req.body || {};
         let resolutionConfirmation;
@@ -3451,6 +3555,9 @@ class ergazomenoiController {
             objectId: mongoose.Types.ObjectId
         });
         if (!scopedAccess) return;
+        if (rehireIntent === true && SaveState.isTemporaryEmployee(scopedAccess.employee)) {
+            return SaveState.sendEmployeeSaveStateError(res, SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_MODE', 400));
+        }
         const dailyRestValidation = validateEmployeeScheduleDailyRest(formData);
         if (!dailyRestValidation.valid) {
             return rejectEmployeeScheduleDailyRest(res, dailyRestValidation);
@@ -3896,6 +4003,19 @@ class ergazomenoiController {
                 }
             });
 
+            if (saveMode === 'temporary') {
+                if (rehireIntent === true || req.body?.reconstruction || req.body?.resolution) {
+                    throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_MODE', 400);
+                }
+                const scope = { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy };
+                const result = await writeEmployeeDraft({ scope, employeeId: ergazomenoiId,
+                    employeeChanges: { ...Object.fromEntries(submittedEmployeeMaintenanceFields(filteredDataErgazomenoi, formData)
+                        .map(field => [field, filteredDataErgazomenoi[field]])), ...SaveState.draftAttachmentFields(formData) },
+                    input: profileInput(formData, 'edit'), draftSchedule: buildEmployeeDraftSchedules(formData, scope, 'edit'),
+                    expectedEmployeeStateToken: req.body?.expectedEmployeeStateToken,
+                    actorUserId: req.session?.userId });
+                return sendTemporaryEmployeeSaved(res, result);
+            }
             const submittedDeparture = typeof formData.hmeromhnia_apoxorhshs === 'string' &&
                 /^\d{4}-\d{2}-\d{2}$/.test(formData.hmeromhnia_apoxorhshs) &&
                 dateKeyUtc(formData.hmeromhnia_apoxorhshs);
@@ -3981,6 +4101,10 @@ class ergazomenoiController {
                     }
                 })
                 : await writeEmployeeMaintenance({
+                    expectedEmployeeStateToken: req.body?.expectedEmployeeStateToken,
+                    expectedTemporary: req.body?.expectedTemporary === true,
+                    draftSchedule: SaveState.isTemporaryEmployee(scopedAccess.employee)
+                        ? buildEmployeeDraftSchedules(formData, { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy }, 'edit') : undefined,
                     expectedStoredDeparture: storedDeparture,
                     scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
                         kodikos: kodikosErgazomenoy },
@@ -4000,6 +4124,11 @@ class ergazomenoiController {
                     actorUserId: req.session?.userId ?? null
                 });
             maintenanceResult = result;
+            if (result.firstFinalization) {
+                for (const [field, value] of Object.entries(result.employee)) {
+                    if (field.endsWith('_base64') && value && !formData[field]) formData[field] = value;
+                }
+            }
             automaticReconstructionApplied = result.automaticReconstructionApplied === true;
             updatedErgazomenos = ErgazomenoiModel.hydrate(result.employee);
 
@@ -4010,6 +4139,7 @@ class ergazomenoiController {
                 });
             }
         } catch (error) {
+            if (SaveState.sendEmployeeSaveStateError(res, error)) return;
             if (sendReconstructionSaveError(res, error)) return;
             if (isEmploymentProfileError(error) ||
                 String(error?.code || '').startsWith('EMPLOYEE_DEPARTURE_')) {
@@ -4117,7 +4247,7 @@ class ergazomenoiController {
         let currentDate = new Date(fromDate);
         let i = 1;
 
-        while (currentDate <= toDate) {
+        while (currentDate <= toDate && maintenanceResult?.firstFinalization !== true) {
             const i1 = i < 10 ? '0' + i : i;
             const orarioData = createOrarioData(i1);
 
@@ -4732,6 +4862,7 @@ class ergazomenoiController {
             automaticReconstructionApplied,
             data: {
                 _id: ergazomenoiId,
+                oristikh_enhmerosh: true,
                 kodikos: updatedErgazomenos.kodikos,
                 eponymo: updatedErgazomenos.eponymo,
                 onoma: updatedErgazomenos.onoma,

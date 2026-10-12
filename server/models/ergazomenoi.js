@@ -20,6 +20,8 @@ const ErgazomenoiSchema = new Schema(
         patronymo: { type: String, trim: true },
         eponymo_mhteras: { type: String, trim: true },
         mhtronymo: { type: String, trim: true },
+        oristikh_enhmerosh: { type: Boolean, default: true },
+        employee_draft_schedule: { type: [Schema.Types.Mixed], default: undefined },
         energos: { type: Boolean, default: false },
         archived: { type: Boolean, default: false },
         fylo: { type: Boolean, default: false },

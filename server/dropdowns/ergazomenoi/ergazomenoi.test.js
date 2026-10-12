@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const dropdown = require('./ergazomenoi');
+const finalized = require('mongoose').trusted({ $ne: false });
 
 assert.deepEqual(dropdown.options.searchFields.slice(0, 3), ['kodikos', 'eponymo', 'onoma']);
 assert.equal(dropdown.options.strictPreselectScope, true);
@@ -12,7 +13,7 @@ assert.match(dropdown.options.select, /eponymo/);
 assert.match(dropdown.options.select, /onoma/);
 assert.deepEqual(dropdown.options.extraQueryBuilder({ team: 'THA', company: 'company',
     ypokatasthma: '1', energoi: 'true' }), {
-    team: 'THA', company_kod: 'company', ypokatasthma: { $in: ['1', '0001'] },
+    oristikh_enhmerosh: finalized, team: 'THA', company_kod: 'company', ypokatasthma: { $in: ['1', '0001'] },
     energos: true, archived: false
 });
 const item = dropdown.options.mapItem({ kodikos: '0001', eponymo: 'Καραστερίου',

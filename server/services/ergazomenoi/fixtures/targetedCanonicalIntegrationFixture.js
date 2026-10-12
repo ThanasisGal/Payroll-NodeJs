@@ -60,6 +60,7 @@ function matches(row, filter) {
         if (value === null) return row[key] == null;
         if (value && Object.getPrototypeOf(value) === Object.prototype) {
             return Object.entries(value).every(([op, expected]) => {
+                if (op === '$ne') return row[key] !== expected;
                 if (op === '$in') return expected.some((x) => equal(row[key], x));
                 if (op === '$gte') return row[key] >= expected;
                 if (op === '$lte') return row[key] <= expected;

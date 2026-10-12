@@ -200,7 +200,7 @@ function handler(mode, db) {
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     const constants = source.slice(source.indexOf('const fieldsStoixeionSymbashs'), source.indexOf('function parseS3Uri'));
     return vm.runInNewContext(`${constants}\n${helpers}\n(${body}\nreturn res.json({ success: true });\n})`, {
-        Date, console: { log() {}, error(...args) { db.logs?.push(args); } }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
+        SaveState: require('../../utils/ergazomenoi/employeeSaveState'), buildEmployeeDraftSchedules: () => [], Date, console: { log() {}, error(...args) { db.logs?.push(args); } }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
         ErgazomenoiModel: db.employeeModel, IstorikoProslhpseonAllagonModel: db.historyModel,
         ...require('../../services/ergazomenoi/employeeAddSubmittedPatchService'),
         resolveEmployeeAddPersistenceTarget: db.resolveTarget || (async () => db.state().employee && db.retryTarget
@@ -218,7 +218,7 @@ function handler(mode, db) {
                     db.departureError = error; db.departureCorrectionError = error; throw error;
                 });
         },
-        writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps }),
+        writeEmployeeEmploymentProfile: args => W.writeEmployeeEmploymentProfile({ ...args, ...db.deps, scheduleModel: { find: () => ({ session() { return this; }, lean: async () => [] }) } }),
         ...require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract'),
         // Baseline controller regressions keep the original guided persistence
         // boundary; composite integration cases below explicitly opt into it.
@@ -257,7 +257,7 @@ function handler(mode, db) {
 }
 async function submit(mode, input, db = memory(), body = {}) {
     const requestScope = db.requestScope || scope;
-    const req = { body: { formData: plain(input), filesToUpdate: {}, skipContract: true, ...body },
+    const req = { body: { expectedEmployeeStateToken: db.state().employee ? require('../../utils/ergazomenoi/employeeSaveState').employeeStateToken(db.state().employee) : undefined, formData: plain(input), filesToUpdate: {}, skipContract: true, ...body },
         session: { userId:'authorized-user', userTeam: requestScope.team, companyInUse: requestScope.company_kod },
         params: { ergazomenoiId: db.state().employee?._id } };
     const res = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
@@ -909,6 +909,8 @@ test('controller downstream Save response, uploads, ERGANI and schedule code unc
             /hmeromhnia: \{\n\s*\$gte: new Date\(formData\.hmeromhnia_allaghs_orarioy_apo\),\n\s*\$lte: new Date\(formData\.hmeromhnia_allaghs_orarioy_eos\)\n\s*\}/,
             match => match.replace('hmeromhnia: {', 'hmeromhnia: mongoose.trusted({').replace(/\n(\s*)\}$/, '\n$1})'));
         const compared = source.slice(newStart)
+            .replace('while (currentDate <= toDate && maintenanceResult?.firstFinalization !== true)', 'while (currentDate <= toDate)')
+            .replace('                oristikh_enhmerosh: true,\n', '')
             .replace(/message: maintenanceResult\?\.historyUpdated[\s\S]*?lifecycleOperation: maintenanceResult\?\.lifecycleOperation \|\| null,\n\s*automaticReconstructionApplied,/, "message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',");
         assert(compared.startsWith(chunk), start);
     }
@@ -1328,7 +1330,7 @@ test('semantic controller audit: field maps retain baseline parity except approv
             `${field}: normalizeBaseExperienceValue(formData.${field}),`);
     }
     assert.equal(part(source, '        const filteredDataErgazomenoi =', '        const updateFieldsIstoriko =', editOffset(source)), expectedEditMap);
-    assert.equal(part(source, '            const toNumber =', '            const submittedDeparture =', editOffset(source)),
+    assert.equal(part(source, '            const toNumber =', "            if (saveMode === 'temporary')", editOffset(source)),
         part(baseline, '            const toNumber =', '            updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate', editOffset(baseline)));
     assert.match(source, /const addHistoryValues = \{/);
     assert.match(source, /submittedAddPatch\(newIstoriko, submittedFormKeys, addHistoryOwnedFields\)/);

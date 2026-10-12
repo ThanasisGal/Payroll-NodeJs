@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 
 const { CompaniesModel, YpokatasthmataModel } = require('../../models/companies');
@@ -253,7 +254,7 @@ async function loadE3NContext({ sessionTeam, companyId, ergazomenosId, body }) {
         employeeQuery.kodikos = String(ergazomenosId).trim();
     }
 
-    const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+    const ergazomenos = await ErgazomenoiModel.findOne(finalizedEmployeeFilter(employeeQuery)).lean();
 
     if (!ergazomenos) {
         const err = new Error('Δεν βρέθηκε ο εργαζόμενος για τον έλεγχο Ε3Ν.');

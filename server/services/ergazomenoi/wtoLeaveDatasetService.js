@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const mongoose = require('mongoose');
 const { ErgazomenoiModel, ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
@@ -81,10 +82,10 @@ async function loadWtoLeaveDataset({ scope, input, models = {} } = {}) {
         hmeromhnia: mongoose.trusted({ $gte: search.fromDate, $lte: search.toDate })
     }).sort({ hmeromhnia: 1, kodikos: 1 }).lean();
     const codes = [...new Set(sourceRows.map((row) => String(row.kodikos || '').trim()).filter(Boolean))];
-    const employees = codes.length ? await Employee.find({ team: authorized.team,
+    const employees = codes.length ? await Employee.find(finalizedEmployeeFilter({ team: authorized.team,
         company_kod: authorized.company, ypokatasthma: search.branch,
         kodikos: mongoose.trusted({ $in: codes })
-    }).select('_id kodikos afm eponymo onoma karta_ergasias afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmeromhnia_proslhpshs hmeromhnia_apoxorhshs hmeres_ergasias_ebdomadas kathestos_apasxolhshs typos_apasxolhshs proyphresia_adeias_se_eth').lean() : [];
+    })).select('_id kodikos afm eponymo onoma karta_ergasias afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmeromhnia_proslhpshs hmeromhnia_apoxorhshs hmeres_ergasias_ebdomadas kathestos_apasxolhshs typos_apasxolhshs proyphresia_adeias_se_eth').lean() : [];
 
     const type2Codes = new Set(employees.filter((employee) =>
         resolveEmploymentTypeValue(employee) === '2').map((employee) =>

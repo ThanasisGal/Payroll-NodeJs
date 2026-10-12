@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const mongoose = require('mongoose');
 const { CompaniesModel } = require('../../models/companies');
@@ -64,7 +65,7 @@ function targetSchedulesFilter({ scope, targetCodes }) {
 async function resolveBorrowedSourceContext({ scope, models = {} }) {
     const employeeModel = models.employeeModel || ErgazomenoiModel;
     const companiesModel = models.companiesModel || CompaniesModel;
-    const employees = await employeeModel.find(candidateEmployeeFilter(scope))
+    const employees = await employeeModel.find(finalizedEmployeeFilter(candidateEmployeeFilter(scope)))
         .select('kodikos afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth')
         .lean();
     const afms = [...new Set(employees

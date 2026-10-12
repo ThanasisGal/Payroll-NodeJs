@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
+        const temporarySave = event.currentTarget?.dataset.saveMode === 'temporary';
         if (!window.validateEmploymentProfileBreak(document)) return;
 
         const formData = {};
@@ -225,6 +226,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             await Promise.all(filePromises);
+            if (temporarySave) {
+                await window.saveTemporaryEmployee({ formData, mode: 'add' });
+                return;
+            }
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 

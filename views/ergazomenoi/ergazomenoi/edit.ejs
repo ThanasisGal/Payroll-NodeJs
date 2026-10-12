@@ -1,3 +1,4 @@
+<div id="employeeSaveState" hidden data-temporary="<%= ergazomenoiData.oristikh_enhmerosh === false %>" data-token="<%= typeof employeeStateToken !== 'undefined' ? employeeStateToken : '' %>"></div>
 <div class="tadded-container">
     <div class="container-fluid height-vh-100 padding-0">
     	<div class="menu_Links">
@@ -434,6 +435,7 @@
 <script src="<%= script('common/moveByEnter') %>"></script>
 <script src="<%= script('common/scrollToTop') %>"></script>
 <script src="<%= script('common/sectionsVisible') %>"></script>
+<script src="<%= script('ergazomenoi/genika/employeeDraftSave') %>"></script>
 <script src="<%= script('ergazomenoi/genika/loadDataFromEfka') %>"></script>
 <script src="<%= script('ergazomenoi/genika/putInputValuesToHiddenValues') %>"></script>
 

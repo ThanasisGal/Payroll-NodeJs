@@ -1,3 +1,4 @@
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 const DecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
 const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
@@ -104,7 +105,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
     const rowIds = rows.map((row) => row._id).filter(Boolean);
     const [employees, histories, audits] = await Promise.all([
         employeeCodes.length
-            ? employeeModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: mongoose.trusted({ $in: employeeCodes }) }).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean()
+            ? employeeModel.find(finalizedEmployeeFilter({ team: scope.team, company_kod: scope.company_kod, kodikos: mongoose.trusted({ $in: employeeCodes }) })).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean()
             : [],
         employeeCodes.length && historyModel
             ? historyModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: mongoose.trusted({ $in: employeeCodes }) }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS).sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, createdAt: 1 }).lean()

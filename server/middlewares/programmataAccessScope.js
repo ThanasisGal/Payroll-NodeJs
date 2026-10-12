@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const mongoose = require('mongoose');
 const path = require('path');
@@ -122,7 +123,7 @@ async function assertEmployees(scope, codes, ypokatasthma = '') {
         kodikos: mongoose.trusted({ $in: codes })
     };
     if (ypokatasthma) query.ypokatasthma = ypokatasthma;
-    const rows = await ErgazomenoiModel.find(query).select('kodikos').lean();
+    const rows = await ErgazomenoiModel.find(finalizedEmployeeFilter(query)).select('kodikos').lean();
     const found = new Set(rows.map((row) => String(row.kodikos).trim()));
     if (codes.some((code) => !found.has(code))) throw accessError(404);
 }

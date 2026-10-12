@@ -1,4 +1,5 @@
 'use strict';
+const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const crypto = require('crypto');
 const mongoose = require('mongoose');
@@ -210,8 +211,8 @@ function safeRow(item) {
 async function defaultProfileLoader({ scope, rows, employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel } = {}) {
     const codes = [...new Set(rows.map(row => text(row.kodikos)).filter(Boolean))];
-    const employees = await employeeModel.find({ team: scope.team, company_kod: scope.company_kod,
-        ypokatasthma: scope.ypokatasthma, kodikos: mongoose.trusted({ $in: codes }) }).lean();
+    const employees = await employeeModel.find(finalizedEmployeeFilter({ team: scope.team, company_kod: scope.company_kod,
+        ypokatasthma: scope.ypokatasthma, kodikos: mongoose.trusted({ $in: codes }) })).lean();
     const histories = await historyModel.find({ team: scope.team, company_kod: scope.company_kod,
         kodikos: mongoose.trusted({ $in: codes }) })
         .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 }).lean();
