@@ -79,13 +79,15 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     }
     await search('0001');
     await active(1);
-    let text = await guide(1).innerText();
+    assert.equal(await guide(1).locator('.review-guidance-detail').count(), 0);
+    await guide(1).locator('[data-guidance-move="first"]').click();
+    const explanation = page.locator('#employmentReviewGuidancePopover');
+    let text = await explanation.innerText();
     assert.match(text, /0001.*ΣΥΝΘΕΤΙΚΟΣ/);
     assert.match(text, /31\/08\/2026–06\/09\/2026/);
     assert.match(text, /01\/09\/2026/);
-    assert.match(text, /03\/09\/2026/);
-    assert.ok(await guide(1).locator('.review-guidance-issue').count() >= 2);
     assert.doesNotMatch(text, /INVALID_DECLARED_WORK_HOURS|ZERO_LENGTH_CARD/);
+    await page.keyboard.press('Escape');
     for (const stage of [2, 3, 4]) {
         const prerequisite = page.locator(`[data-guidance-prerequisite="STAGE${stage}"]`);
         assert.equal(await prerequisite.isVisible(), true);
@@ -108,7 +110,7 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     await refresh();
     await page.waitForFunction(() => !document.querySelector('[data-guidance-stage="STAGE1"]').innerText.includes('Οι δηλωμένες ώρες εργασίας δεν είναι'));
     await guide(1).locator('[data-guidance-move="first"]').click();
-    text = await guide(1).innerText();
+    text = await explanation.innerText();
     assert.match(text, /15\/09\/2026/);
     const beforeLeaves = await data.snapshot();
     await guide(1).locator('[data-guidance-move="next"]').click();
@@ -141,7 +143,9 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     assert.equal(rejection.status(), 200, await rejection.text());
     await refresh();
     await active(3);
-    assert.match(await guide(3).innerText(), /15\/09\/2026/);
+    await guide(3).locator('[data-guidance-move="first"]').click();
+    assert.match(await explanation.innerText(), /15\/09\/2026/);
+    await page.keyboard.press('Escape');
     const beforeStage3Navigation = await data.snapshot();
     await guide(3).locator('[data-guidance-move="first"]').click();
     assert.equal(await data.snapshot(), beforeStage3Navigation);
@@ -162,8 +166,10 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     assert.equal((await data.context(input)).lifecycle.stages.stage3.business_status, 'COMPLETED');
     await search('0011');
     await active(4);
-    assert.match(await guide(4).innerText(), /προσαύξηση|προσαύξησης/);
-    assert.match(await guide(4).innerText(), /19\/09\/2026/);
+    await guide(4).locator('[data-guidance-move="first"]').click();
+    assert.match(await explanation.innerText(), /προσαύξηση|προσαύξησης/);
+    assert.match(await explanation.innerText(), /19\/09\/2026/);
+    await page.keyboard.press('Escape');
     for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 });
         await guide(4).scrollIntoViewIfNeeded();

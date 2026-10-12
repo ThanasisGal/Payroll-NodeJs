@@ -23,6 +23,7 @@ const { resolveDailyActualWorkFacts } = require('../../server/services/ergazomen
 const { countOrphanHitsByEmployee } = require('../../server/services/ergazomenoi/apasxoliseisOrphanQualityCheckService');
 const { reviewErrorResponse } = require('../../server/services/ergazomenoi/apasxoliseisReviewErrorPresentationService');
 const { getMondaySundayWeekRange } = require('../../server/utils/date/mondaySundayWeek');
+const { appendStage4BlockedDeviationRows } = require('../../server/services/ergazomenoi/apasxoliseisStage4BlockedDeviationPresentationService');
 const guidance = require('../../public/js/ergazomenoi/programmata/employmentReviewGuidance');
 
 async function createGuidanceFixture(uri, vendorDir) {
@@ -57,7 +58,7 @@ async function createGuidanceFixture(uri, vendorDir) {
             apologistiko_biblio: false, is_locked: false, updatedAt: new Date('2026-10-01T00:00:00Z') };
         if (employee.kodikos === '0001' && day < 7) {
             Object.assign(row, { kathgoria_ergasias: day === 2 ? 'ΑΝ' : 'ΕΡΓ', repo: day === 2,
-                kathgoria_ergasias_apologistika: day === 0 ? 'ΕΡΓ' : '', repo_apologistika: false,
+                kathgoria_ergasias_apologistika: day === 0 ? 'ΕΡΓ' : day === 2 ? 'ΑΝ' : '', repo_apologistika: false,
                 cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0,
                 ores_ergasias_apologistika: 0, ores_ergasias: day === 1 ? -1 : day === 2 ? 0 : 8 });
             if (day === 3) Object.assign(row, { cards_apo_ora_01: '09:00', cards_eos_ora_01: '09:00' });
@@ -170,7 +171,9 @@ async function createGuidanceFixture(uri, vendorDir) {
         for (const start of starts) contexts.push(await context({ employee_id: String(employee._id), ypokatasthma: '0000',
             week_start: start, week_end: getMondaySundayWeekRange(start).weekEndKey }));
         const payloads = contexts.map(publicContext);
-        res.json({ success: true, rows: payloads.flatMap(p => p.rows), canonicalLifecycleProjections: payloads });
+        const reviewRows = payloads.flatMap(p => p.rows);
+        res.json({ success: true, rows: reviewRows, canonicalLifecycleProjections: payloads,
+            deviations: appendStage4BlockedDeviationRows({ canonicalLifecycleProjections: payloads, reviewRows }) });
     }));
     app.get('/api/dropdown/ergazomenoi/kathgoria_adeias', (_req,res) => res.json({ items: [{ value: 'ΑΔΚΑΝ', label: 'Κανονική άδεια' }] }));
     app.get('/api/prodhlomena-oraria/review/orphan-quality-check', wrap(async (_req,res) =>

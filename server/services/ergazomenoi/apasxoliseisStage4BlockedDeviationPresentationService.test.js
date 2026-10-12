@@ -60,6 +60,8 @@ assert.equal(completedRows[0].status, 'READY');
 
 const source = fs.readFileSync(path.join(__dirname,
     '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const guidanceSource = ['employmentReviewGuidanceAttributes', 'employmentReviewGuidanceInfo']
+    .map(name => source.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n}'))?.[0]).join('\n');
 const lifecycleStart = source.indexOf('function weeklyLifecyclePayloadForDeviation');
 const statusEnd = source.indexOf('function hasAdeiaSuggestion', lifecycleStart);
 const lifecycleSource = source.slice(lifecycleStart, statusEnd);
@@ -67,6 +69,8 @@ const appendSource = source.slice(source.indexOf('function appendEmployeeDeviati
     source.indexOf('const canonicalApplicabilityLabels'));
 const appended = [];
 const sandbox = {
+    EmploymentReviewGuidanceUi: require('../../../public/js/ergazomenoi/programmata/employmentReviewGuidanceUi'),
+    weeklyHrStage1Key: scope => scope.employee_kodikos + '|' + scope.week_start,
     currentCanonicalLifecyclePayloads: [projection], weeklyHrStage1Payloads: new Map(),
     stage1DateKey: (value) => String(value || '').slice(0, 10),
     reviewHrReasonLabel: () => 'Το ημερομηνιακά ισχύον ποσοστό προσαύξησης 6ης ημέρας λείπει ή δεν είναι έγκυρο.',
@@ -80,7 +84,7 @@ const sandbox = {
         innerHTML: '', querySelectorAll: () => [] }) }
 };
 vm.createContext(sandbox);
-vm.runInContext(`${lifecycleSource}\n${appendSource}\nthis.appendRows = appendEmployeeDeviationRows;`, sandbox);
+vm.runInContext(`${guidanceSource}\n${lifecycleSource}\n${appendSource}\nthis.appendRows = appendEmployeeDeviationRows;`, sandbox);
 sandbox.appendRows({ appendChild: (element) => appended.push(element) }, deviations, '0013');
 assert.equal(appended.length, 1);
 const detailHtml = appended[0].innerHTML;

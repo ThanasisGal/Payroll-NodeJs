@@ -72,14 +72,14 @@ test('multiple independent reasons keep employees, exact days and safe facts wit
     const rows = week();
     rows[0].ores_ergasias = -5;
     Object.assign(rows[1], { cards_apo_ora_01: '09:00', cards_eos_ora_01: '09:00', afm: 'SECRET-AFM', amka: 'SECRET-AMKA' });
-    Object.assign(rows[2], { kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: false });
+    Object.assign(rows[2], { kathgoria_ergasias: 'ΕΡΓ', repo: false, kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: false });
     const result = payload(rows);
     const issues = ui.issues(result);
     assert.ok(issues.length >= 3);
     assert.deepEqual(issues.find(item => item.code === 'INVALID_DECLARED_HOURS').dates, ['2026-08-31']);
     assert.deepEqual(issues.find(item => item.code === 'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION').dates, ['2026-09-01']);
     assert.deepEqual(issues.find(item => item.code === 'CATEGORY_REPO_CONFLICT').dates, ['2026-09-02']);
-    const html = ui.detailHtml(ui.targets([result])[0]);
+    const html = ui.targets([result]).map(ui.detailHtml).join('');
     assert.match(html, /0001/); assert.match(html, /ΣΥΝΘΕΤΙΚΟΣ ΕΡΓΑΖΟΜΕΝΟΣ/);
     assert.match(html, /31\/08\/2026–06\/09\/2026/);
     assert.match(html, /01\/09\/2026/); assert.match(html, /02\/09\/2026/);
@@ -179,4 +179,36 @@ test('bounded presentation for 2000 employees and five weeks uses existing paylo
     assert.equal(JSON.stringify(payloads), before);
     assert.ok(elapsed < 3000, `${elapsed} ms`);
     console.log(`guidance: 2000 employees / 10000 weeks in ${elapsed.toFixed(1)} ms, ${html.length} rendered characters`);
+});
+
+
+test('day targets retain all of that day’s causes and keep week-wide causes on the week', () => {
+    const result = { scope: { employee_kodikos: '0001', week_start: '2026-08-31', week_end: '2026-09-06' }, lifecycle_projection: { stages: { stage1: {
+        business_status: 'BLOCKED', blockers: ['INVALID_DECLARED_HOURS', 'INVALID_CARD_HOURS', 'INVALID_EFFECTIVE_WEEKLY_WORKDAYS'],
+        diagnostics: [
+            { code: 'INVALID_DECLARED_HOURS', dates: ['2026-09-01'] },
+            { code: 'INVALID_CARD_HOURS', dates: ['2026-09-01'] },
+            { code: 'INVALID_EFFECTIVE_WEEKLY_WORKDAYS', dates: [] }
+        ]
+    } } } };
+    const targets = ui.targets([result]);
+    assert.deepEqual(targets.map(item => item.date), ['2026-09-01', null]);
+    assert.deepEqual(targets[0].issues.map(item => item.code), ['INVALID_DECLARED_HOURS', 'INVALID_CARD_HOURS']);
+    assert.deepEqual(targets[1].issues.map(item => item.code), ['INVALID_EFFECTIVE_WEEKLY_WORKDAYS']);
+    assert.ok(!targets.some(item => item.date === '2026-09-02'), 'healthy day has no explanation');
+    assert.doesNotMatch(ui.stageHtml('STAGE1', targets[0], 0, targets.length), /review-guidance-detail|review-guidance-issue/);
+});
+
+test('02/09 declared ΑΝ remains rest with default false; real conflicting work remains blocked', () => {
+    const rows = week();
+    Object.assign(rows[2], { kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: false, ores_ergasias_apologistika: 0 });
+    const before = structuredClone(rows);
+    const result = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile: profile });
+    assert.ok(!result.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
+    assert.ok(result.known_repo_identity_days.includes('2026-09-02'));
+    assert.deepEqual(rows, before);
+    Object.assign(rows[2], { cards_apo_ora_01: '09:00', cards_eos_ora_01: '10:00', cards_ores_ergasias: 1, ores_ergasias_apologistika: 1 });
+    const worked = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile: profile });
+    assert.ok(worked.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
+    assert.ok(!worked.known_repo_identity_days.includes('2026-09-02'));
 });

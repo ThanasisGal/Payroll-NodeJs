@@ -16870,7 +16870,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
     .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
     .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-    #gotoProgrammaDypa
+    #gotoProgrammaDypa, .review-guidance-info
 )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop) {
     display: inline-flex;
 }
@@ -16880,7 +16880,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         align-items: center !important;
         justify-content: center !important;
@@ -16894,7 +16894,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close) {
         --button-color: #795548;
         --button-light: #f0e7e2;
@@ -16922,7 +16922,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         min-height: 2rem !important;
         padding: .3rem .55rem !important;
@@ -16947,7 +16947,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         --button-color: #0b5ed7 !important; --button-light: #e1ebfc !important;
     }
@@ -16955,7 +16955,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         --button-color: #146c43 !important; --button-light: #dfefe6 !important;
     }
@@ -16963,7 +16963,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         --button-color: #b02a37 !important; --button-light: #f8e1e5 !important;
     }
@@ -16971,7 +16971,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         --button-color: #805800 !important; --button-light: #fbecc1 !important;
     }
@@ -16979,7 +16979,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         --button-color: #08728a !important; --button-light: #dceff5 !important;
     }
@@ -16987,7 +16987,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         --button-color: #545b62 !important; --button-light: #e9ebed !important;
     }
@@ -16995,7 +16995,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) {
         --button-color: #795548 !important; --button-light: #f0e7e2 !important;
     }
@@ -17004,7 +17004,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close):is(:hover, :active, .active):not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: var(--button-color) !important;
         border-color: var(--button-color) !important;
@@ -17014,7 +17014,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )):focus-visible {
         outline: 2px solid var(--button-color, #795548) !important;
         outline-offset: 3px !important;
@@ -17024,7 +17024,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )):active:not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         box-shadow: inset 0 2px 4px #0003 !important;
     }
@@ -17032,7 +17032,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )):is(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: #e9ecef !important;
         border-color: #adb5bd !important;
@@ -17045,7 +17045,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) :is(i, svg, .bi) {
         color: inherit !important;
         line-height: 1 !important;
@@ -17057,7 +17057,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info
     )) .bi::before {
         vertical-align: 0 !important;
     }
@@ -17128,4 +17128,39 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 .employee-draft-indicator { color: #b02a37; font-weight: 700; font-size: 1.1rem; line-height: 1.5; }
 @media (max-width: 575.98px) {
     .employee-draft-indicator { flex: 0 0 100%; max-width: 100%; padding-top: .25rem; }
+}
+
+/* Contextual employment review explanations; rendered under body to escape table clipping. */
+.review-guidance-popover {
+    position: fixed;
+    z-index: 1100;
+    box-sizing: border-box;
+    width: 450px;
+    max-width: calc(100vw - 20px);
+    max-height: min(650px, calc(100dvh - 20px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 12px;
+    border: 1px solid var(--bs-border-color, #ced4da);
+    border-radius: 8px;
+    color: var(--bs-body-color, #212529);
+    background: var(--bs-body-bg, #fff);
+    box-shadow: 0 5px 22px #0003;
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.review-guidance-popover[hidden] { display: none; }
+.review-guidance-popover .review-guidance-detail { border: 0; margin: 0; padding: 0; background: transparent; }
+.review-guidance-popover h3 { font-size: 15px; font-weight: 700; line-height: 1.5; }
+.review-guidance-popover .small { font-size: 14px !important; }
+.review-guidance-close { position: sticky; top: 0; z-index: 1; display: block; margin: 0 0 8px auto; padding: 4px 8px; border: 1px solid #adb5bd; border-radius: 5px; background: var(--bs-tertiary-bg, #f8f9fa); color: inherit; }
+.review-guidance-info { border: 0; background: transparent; color: var(--bs-primary, #0d6efd); padding: 2px 6px; font-size: 16px; }
+[data-review-guidance-key]:focus-visible, .review-guidance-close:focus-visible, .review-guidance-info:focus-visible { outline: 3px solid var(--bs-primary, #0d6efd); outline-offset: -2px; }
+
+@media (max-width: 575.98px) {
+    #employmentReviewWorkspace .weekly-hr-stage1-bulk-toolbar,
+    #employmentReviewWorkspace .weekly-hr-stage1-table > thead > tr > th {
+        position: static;
+    }
 }

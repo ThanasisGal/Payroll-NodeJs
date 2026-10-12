@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const guidanceHelpers = ['employmentReviewGuidanceAttributes', 'employmentReviewGuidanceInfo']
+    .map(name => source.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n}'))?.[0]).join('\n');
 const css = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
 
 const defaultReason = 'Μετά από έλεγχο του προδηλωμένου ωραρίου, των πραγματικών στοιχείων απασχόλησης και του καθεστώτος μερικής/εκ περιτροπής απασχόλησης, η ημέρα χαρακτηρίζεται ως ΜΗ ΕΡΓΑΣΙΑ. Δεν προέκυψε άδεια, ασθένεια ή απουσία.';
@@ -97,7 +99,7 @@ const sandbox = {
     document: { getElementById: () => sandbox.container },
     container: { innerHTML: '' }
 };
-vm.runInNewContext(`${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
+vm.runInNewContext(`${guidanceHelpers}\n${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
     buildStage3EmployeeNameLookup, stage3EmployeeDisplayName,
     stage3DeclaredPresentation, stage3DecisionExplanation, stage3PayloadForItem,
     stage3DailyPresentation, stage3ApologistikoClassification,

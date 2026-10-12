@@ -6,6 +6,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const guidanceHelpers = ['employmentReviewGuidanceAttributes', 'employmentReviewGuidanceInfo']
+    .map(name => source.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n}'))?.[0]).join('\n');
 const view = fs.readFileSync(path.join(__dirname,
     '../../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
 const css = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
@@ -78,7 +80,7 @@ const sandbox = {
     loadResults: async () => { loadResultsCalls.push(true); },
     employmentReviewSwal: async (options) => { fallbackErrors.push(options); }
 };
-vm.runInNewContext(`${source.slice(helperStart, helperEnd)}
+vm.runInNewContext(`${guidanceHelpers}\n${source.slice(helperStart, helperEnd)}
 this.derive = derivePeriodLifecyclePresentation;`, sandbox);
 const stage = (business_status, pending_count = 0) => ({ business_status, pending_count,
     pending_dates: [], pending_reasons: [] });
@@ -181,7 +183,7 @@ const guideSandbox = {
         ? progressElement : id === 'employmentReviewAttentionSummary' ? attentionElement : null },
     CSS: { escape: (value) => value }, bootstrap: { Collapse: { getOrCreateInstance: () => ({ show() {} }) } }
 };
-vm.runInNewContext(`${source.slice(guideStart, guideEnd)}
+vm.runInNewContext(`${guidanceHelpers}\n${source.slice(guideStart, guideEnd)}
 this.renderGuide = renderEmploymentReviewWorkflowGuide;
 this.attention = employmentReviewAttentionPresentation;
 this.focusStage = focusEmploymentReviewStage;

@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const guidanceHelpers = ['employmentReviewGuidanceAttributes', 'employmentReviewGuidanceInfo']
+    .map(name => source.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n}'))?.[0]).join('\n');
 const view = fs.readFileSync(path.join(__dirname,
     '../../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
 const css = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
@@ -474,7 +476,7 @@ const cardSandbox = {
     formatStage1DateKey: scopeSandbox.helpers.formatStage1DateKey,
     escapeHtml: String
 };
-vm.runInNewContext(`${businessStatusFunction}\n${cardRendererSource}\n` +
+vm.runInNewContext(`${guidanceHelpers}\n${businessStatusFunction}\n${cardRendererSource}\n` +
     'this.render = renderWeeklyHrStage1Card;', cardSandbox);
 const deferredCard = cardSandbox.render({
     scope: { employee_kodikos: '0001', week_start: '2026-06-29', week_end: '2026-07-05' },
@@ -707,7 +709,7 @@ const expectedDefaultReason =
     'Ολοκλήρωση ελέγχου Σταδίου 1. – Δεν προέκυψαν επιπλέον χαρακτηρισμοί άδειας, ασθένειας ή απουσίας.';
 const bulkFunctionSource = source.slice(
     source.indexOf('async function completeWeeklyHrStage1BulkFromUi'),
-    source.indexOf("document.addEventListener('click'")
+    source.indexOf("document.addEventListener('click'", source.indexOf('async function completeWeeklyHrStage1BulkFromUi'))
 );
 const submittedReasons = [];
 const submittedScopes = [];

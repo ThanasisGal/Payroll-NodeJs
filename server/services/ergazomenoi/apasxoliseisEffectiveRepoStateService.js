@@ -1,3 +1,5 @@
+const { resolveDailyActualWorkFacts, nonNegativeNumber } = require('./apasxoliseisDailyActualWorkFactsService');
+
 const MODE = Object.freeze({
     CURRENT: 'CURRENT',
     PROPOSED: 'PROPOSED'
@@ -85,6 +87,20 @@ function resolveCurrent(row, expectedRepoCategory) {
     }
     if (!declaredRepo.ok || !apologistikaRepo.ok) {
         return invalid(DIAGNOSTIC.INVALID_REPO_VALUE);
+    }
+
+    // false is the schema default, not proof of a later cancellation of declared rest.
+    // Preserve only the unchanged declared ΑΝ, with no work or unresolved card evidence.
+    if (expectedRepoCategory === 'ΑΝ' && declaredCategory.value === 'ΑΝ' &&
+        apologistikaCategory.value === 'ΑΝ' && apologistikaRepo.value === false) {
+        const facts = resolveDailyActualWorkFacts(row);
+        const calculated = nonNegativeNumber(row.ores_ergasias_apologistika);
+        if (facts.category === 'ΑΝ' && facts.actualWorkHours === 0 && facts.cardHours === 0 &&
+            facts.countsAsActualWorkDay === false && calculated.ok && calculated.value === 0 &&
+            !facts.reasons.length && !facts.unresolvedCardPairNumbers.length &&
+            !facts.hasCompleteCardEvidence) {
+            return result('ΑΝ', true, PROVENANCE.DECLARED_CURRENT);
+        }
     }
 
     const hasMaterialApologistikaCategory = apologistikaCategory.value !== '';

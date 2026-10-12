@@ -240,3 +240,29 @@ test('invalid input fails closed without permissive coercion', () => {
         }
     }), null, null, null, [DIAGNOSTIC.INVALID_CATEGORY]);
 });
+
+
+test('unchanged declared ΑΝ with zero work preserves rest despite default false', () => {
+    const row = { kathgoria_ergasias: 'ΑΝ', repo: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: false,
+        ores_ergasias: 0, cards_ores_ergasias: 0, ores_ergasias_apologistika: 0 };
+    const before = structuredClone(row);
+    assertState(resolve(row, fullContext), 'ΑΝ', true, PROVENANCE.DECLARED_CURRENT);
+    assert.deepEqual(row, before);
+    for (const change of [
+        { cards_ores_ergasias: 1, cards_apo_ora_01: '09:00', cards_eos_ora_01: '10:00' },
+        { ores_ergasias_apologistika: 1 },
+        { cards_apo_ora_01: '09:00' },
+        { cards_apo_ora_01: '09:00', cards_eos_ora_01: '09:00' },
+        { cards_ores_ergasias: -1 },
+        { ores_ergasias_apologistika: -1 },
+        { adeia_apologistika: true }
+    ]) assert.deepEqual(resolve({ ...row, ...change }, fullContext).diagnostics,
+        [DIAGNOSTIC.CATEGORY_REPO_CONFLICT]);
+    assert.deepEqual(resolve(row, { ...fullContext, mode: MODE.PROPOSED,
+        proposedValues: { kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: false } }).diagnostics,
+        [DIAGNOSTIC.CATEGORY_REPO_CONFLICT], 'explicit contradictory proposals stay rejected');
+    assertState(resolve({ kathgoria_ergasias: 'ΕΡΓ', repo: false,
+        cards_ores_ergasias: 0, ores_ergasias_apologistika: 0 }, fullContext),
+        'ΕΡΓ', false, PROVENANCE.DECLARED_CURRENT);
+});
