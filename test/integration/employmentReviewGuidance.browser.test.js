@@ -99,6 +99,11 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     assert.equal(await page.evaluate(() => document.activeElement?.dataset.guidanceDate), '2026-09-01');
     await guide(1).locator('[data-guidance-move="next"]').click();
     await page.locator('[data-guidance-date="2026-09-03"].review-guidance-highlight').waitFor();
+    text = await explanation.innerText();
+    assert.match(text, /Ημέρα εντοπισμού: 03\/09\/2026/);
+    assert.match(text, /μηδενικό διάστημα κάρτας/);
+    assert.match(text, /09:00–09:00/);
+    assert.doesNotMatch(text, /15\/09\/2026/);
     assert.equal(await data.snapshot(), beforeNavigation, 'navigation never changes rows, states, audits or decisions');
     for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 });
@@ -108,10 +113,20 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     }
     await data.repairSyntheticFirstWeek();
     await refresh();
-    await page.waitForFunction(() => !document.querySelector('[data-guidance-stage="STAGE1"]').innerText.includes('Οι δηλωμένες ώρες εργασίας δεν είναι'));
+    // Details now live in the contextual popover, so the summary cannot signal
+    // completion by losing an old explanation. Wait for the refreshed targets.
+    await page.waitForFunction(() => {
+        const targets = EmploymentReviewGuidanceUi.targets(currentCanonicalLifecyclePayloads, 'STAGE1');
+        return targets[0]?.date === '2026-09-15' &&
+            !targets.some(target => ['2026-09-01', '2026-09-03'].includes(target.date));
+    });
     await guide(1).locator('[data-guidance-move="first"]').click();
+    await page.locator('[data-guidance-date="2026-09-15"].review-guidance-highlight').waitFor();
+    assert.equal(await page.evaluate(() => document.activeElement?.dataset.guidanceDate), '2026-09-15');
     text = await explanation.innerText();
-    assert.match(text, /15\/09\/2026/);
+    assert.match(text, /Ημέρα εντοπισμού: 15\/09\/2026/);
+    assert.match(text, /πιθανή άδεια/);
+    assert.doesNotMatch(text, /03\/09\/2026|μηδενικό διάστημα κάρτας|09:00–09:00/);
     const beforeLeaves = await data.snapshot();
     await guide(1).locator('[data-guidance-move="next"]').click();
     await page.locator('[data-guidance-date="2026-09-22"].review-guidance-highlight').waitFor();
