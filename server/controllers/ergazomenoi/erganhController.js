@@ -1,3 +1,4 @@
+const { resolveReviewRestState } = require('../../services/ergazomenoi/apasxoliseisReviewRestStateService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { deriveApprovedTimeShift } = require('../../services/ergazomenoi/apasxoliseisApprovedTimeShiftService');
 const { resolveArrangementContext } = require('../../services/ergazomenoi/apasxoliseisEffectiveHolidayContextProviderService');
@@ -3807,6 +3808,7 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
     ) || normalizeReviewEmploymentType(effectiveProfile.typos_apasxolhshs);
     const authoritativeEmploymentCode = explicitEmploymentCode;
     return { ...normalizedRow,
+        review_rest_state: resolveReviewRestState(row),
         kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
         // Presentation can neutralize an unchanged declared ME. Freshness must
         // still compare the persisted classification reviewed by HR.
@@ -4438,7 +4440,8 @@ async function applyEmploymentDepartureScopeToFilters({
     if (cleanKodikos) employeeFilter.kodikos = cleanKodikos;
 
     const employees = await ErgazomenoiModel.find(finalizedEmployeeFilter(employeeFilter))
-        .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
+        .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
+            'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy')
         .lean();
     const lifecycleEmployees = await preloadEmployeeEmploymentCycleContexts({
         team,
@@ -4447,7 +4450,31 @@ async function applyEmploymentDepartureScopeToFilters({
         historyModel: IstorikoProslhpseonAllagonModel
     });
     const descriptors = buildPostDepartureExclusionDescriptors(lifecycleEmployees);
-    filters.forEach((filter) => applyPostDepartureExclusionsToFilter(filter, descriptors));
+    filters.forEach((filter) => {
+        applyPostDepartureExclusionsToFilter(filter, descriptors);
+        const loanExclusions = [];
+        for (const employee of lifecycleEmployees) {
+            if (employee.afora_daneismo_ergazomenoy !== true) continue;
+            const identity = { kodikos: employee.kodikos, ypokatasthma: employee.ypokatasthma };
+            const start = dateKeyUtc(employee.hmnia_enarxhs_daneismoy);
+            const end = dateKeyUtc(employee.hmnia_lhxhs_daneismoy);
+            if (!start || (employee.hmnia_lhxhs_daneismoy && !end) || (end && end < start) ||
+                typeof employee.typos_ergodoth_daneismoy !== 'boolean') {
+                loanExclusions.push(identity);
+            } else if (employee.typos_ergodoth_daneismoy === false) {
+                loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
+                    $gte: new Date(`${start}T00:00:00.000Z`),
+                    ...(end ? { $lte: new Date(`${end}T23:59:59.999Z`) } : {}) }) });
+            } else {
+                loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
+                    $lt: new Date(`${start}T00:00:00.000Z`) }) });
+                if (end) loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
+                    $gt: new Date(`${end}T23:59:59.999Z`) }) });
+            }
+        }
+        if (loanExclusions.length) filter.$nor = mongoose.trusted([
+            ...(Array.isArray(filter.$nor) ? filter.$nor : []), ...loanExclusions]);
+    });
     return { employees: lifecycleEmployees, descriptors };
 }
 
@@ -12611,10 +12638,11 @@ class erganhController {
                 loadPreparedContexts: async () => prepared.contexts,
                 completePreparedScope: async ({ context, request_id, reason_or_notes,
                     expected_scope_fingerprint, bulk_kind }) => {
-                    const currentScope = buildWeeklyHrStage2BulkPreview({ contexts: [context] })
-                        .safe_scope_ids[0];
-                    const alreadyCompleted = context?.workflowState?.stage2?.status ===
-                        'COMPLETED' || Boolean(context?.preparedStage2Record?.current_execution);
+                    const currentPreview = buildWeeklyHrStage2BulkPreview({ contexts: [context] });
+                    const currentScope = currentPreview.safe_scope_ids[0];
+                    const alreadyCompleted = currentPreview.already_resolved_count === 1 &&
+                        (context?.workflowState?.stage2?.status === 'COMPLETED' ||
+                            Boolean(context?.preparedStage2Record?.current_execution));
                     if ((!currentScope && !alreadyCompleted) || (currentScope &&
                         currentScope.scope_fingerprint !== expected_scope_fingerprint)) {
                         throw weeklyHrApiError(

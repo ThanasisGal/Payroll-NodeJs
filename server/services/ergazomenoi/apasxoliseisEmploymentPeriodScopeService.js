@@ -1,3 +1,4 @@
+const { ownsEmploymentReviewDate } = require('./employmentReviewLoanOwnershipService');
 const {
     dateKeyUtc,
     startOfWeekMondayUtc,
@@ -144,7 +145,7 @@ function buildPostDepartureExclusionDescriptors(employees = []) {
 
 function isDateWithinEmploymentPeriod(value, employee = {}) {
     const rowKey = dateKeyUtc(value);
-    if (!rowKey) return false;
+    if (!rowKey || !ownsEmploymentReviewDate(rowKey, employee)) return false;
 
     // Opt-in lifecycle context: callers that preload canonical history attach it
     // as employment_history. Existing callers without it keep exact legacy behavior.
@@ -167,7 +168,7 @@ function isWeekFullyWithinEmploymentPeriod(value, employee = {}) {
     const weekEnd = dateKeyUtc(endOfWeekSundayUtc(value));
     if (!weekStart || !weekEnd) return false;
 
-    if (Array.isArray(employee.employment_history)) {
+    if (Array.isArray(employee.employment_history) || employee.afora_daneismo_ergazomenoy === true) {
         return enumerateDateKeys(weekStart, weekEnd)
             .every((date) => isDateWithinEmploymentPeriod(date, employee));
     }
@@ -181,9 +182,9 @@ function isWeekFullyWithinEmploymentPeriod(value, employee = {}) {
 
 function assertEmploymentReviewDateOwned(value, employees = []) {
     if (employees.some(employee => isDateWithinEmploymentPeriod(value, employee))) return;
-    const error = new Error('Η ημέρα που επιχειρήσατε να αλλάξετε βρίσκεται εκτός εργασιακής σχέσης. ' +
+    const error = new Error('Η ημέρα που επιχειρήσατε να αλλάξετε βρίσκεται εκτός εργασιακής σχέσης ή του διαστήματος ευθύνης του επιλεγμένου εργοδότη. ' +
         'Ο χαρακτηρισμός ή η επεξεργασία της δεν επιτρέπεται. ' +
-        '1. Εκτελέστε νέα «Αναζήτηση». 2. Επιλέξτε ημέρα εντός εργασιακής σχέσης. ' +
+        '1. Εκτελέστε νέα «Αναζήτηση». 2. Επιλέξτε ημέρα που αφορά τον επιλεγμένο εργοδότη. ' +
         'Δεν αποθηκεύτηκε καμία αλλαγή για αυτή την ημέρα. Αναφορά: EMPLOYMENT_REVIEW_DATE_OUTSIDE_EMPLOYMENT.');
     error.code = 'EMPLOYMENT_REVIEW_DATE_OUTSIDE_EMPLOYMENT';
     error.statusCode = 409;
@@ -230,6 +231,10 @@ function deriveEmploymentOwnedDateScope({ natural_week_start, natural_week_end,
             ? enumerateDateKeys(employmentStart, employmentEnd) : [];
     }
 
+    if (employee) employmentDates = employmentDates.filter(date =>
+        ownsEmploymentReviewDate(date, employee));
+    employmentStart = employmentDates[0] || null;
+    employmentEnd = employmentDates.at(-1) || null;
     const ownedDates = employmentDates.filter((key) =>
         key >= periodStart && key <= periodEnd);
     return Object.freeze({

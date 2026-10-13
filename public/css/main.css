@@ -16938,7 +16938,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
     .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
     #gotoProgrammaDypa, .review-guidance-info,
-    .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+    .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
 )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop) {
     display: inline-flex;
 }
@@ -16949,7 +16950,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         align-items: center !important;
         justify-content: center !important;
@@ -16964,7 +16966,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close) {
         --button-color: #795548;
         --button-light: #f0e7e2;
@@ -16993,7 +16996,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         min-height: 2rem !important;
         padding: .3rem .55rem !important;
@@ -17019,7 +17023,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #0b5ed7 !important; --button-light: #e1ebfc !important;
     }
@@ -17028,7 +17033,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #146c43 !important; --button-light: #dfefe6 !important;
     }
@@ -17037,7 +17043,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #b02a37 !important; --button-light: #f8e1e5 !important;
     }
@@ -17046,7 +17053,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #805800 !important; --button-light: #fbecc1 !important;
     }
@@ -17055,7 +17063,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #08728a !important; --button-light: #dceff5 !important;
     }
@@ -17064,7 +17073,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #545b62 !important; --button-light: #e9ebed !important;
     }
@@ -17073,7 +17083,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #795548 !important; --button-light: #f0e7e2 !important;
     }
@@ -17083,7 +17094,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close):is(:hover, :active, .active):not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: var(--button-color) !important;
         border-color: var(--button-color) !important;
@@ -17094,7 +17106,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):focus-visible {
         outline: 2px solid var(--button-color, #795548) !important;
         outline-offset: 3px !important;
@@ -17105,7 +17118,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):active:not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         box-shadow: inset 0 2px 4px #0003 !important;
     }
@@ -17114,7 +17128,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):is(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: #e9ecef !important;
         border-color: #adb5bd !important;
@@ -17128,7 +17143,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) :is(i, svg, .bi) {
         color: inherit !important;
         line-height: 1 !important;
@@ -17141,7 +17157,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
         #gotoProgrammaDypa, .review-guidance-info,
-        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) .bi::before {
         vertical-align: 0 !important;
     }
@@ -17260,4 +17277,34 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     #employmentReviewWorkspace .weekly-hr-stage1-table > thead > tr > th {
         position: static;
     }
+}
+
+/* Employee disclosure remains a full-width table row, including keyboard focus. */
+#employmentReviewStage4Collapse .employee-group-heading {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem .8rem;
+    min-width: 0;
+}
+#employmentReviewStage4Collapse .employee-group-row > td {
+    padding: .7rem .85rem;
+    border-radius: .25rem;
+}
+#employmentReviewStage4Collapse .employee-group-row > td::before { content: none; }
+#employmentReviewStage4Collapse .employee-group-heading::before {
+    content: '▸';
+    width: 1rem;
+    flex-shrink: 0;
+    color: #40586b;
+}
+#employmentReviewStage4Collapse .employee-group-row[aria-expanded="true"] .employee-group-heading::before {
+    content: '▾';
+}
+#employmentReviewStage4Collapse .employee-group-branch { color: #52616b; font-weight: 500; }
+#employmentReviewStage4Collapse .employee-group-code { font-variant-numeric: tabular-nums; }
+#employmentReviewStage4Collapse .employee-group-name { overflow-wrap: anywhere; min-width: 0; }
+#employmentReviewStage4Collapse .employee-group-badges { margin-left: auto; display: flex; gap: .4rem; flex-wrap: wrap; }
+#employmentReviewStage4Collapse .employee-group-row[aria-expanded="true"] > td {
+    box-shadow: inset 3px 0 #526d82;
 }

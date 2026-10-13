@@ -3416,6 +3416,10 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
         (isApologistikoIntervalPresent(row) ||
             (persistedCategory && !['ΑΝ', 'ΜΕ'].includes(persistedCategory)));
 
+    if (row.review_rest_state?.status === 'VALID_DECLARED_REST') {
+        return { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', className: 'cell-repo-day', source: 'declared_rest' };
+    }
+
     if (isCanonicalPersistedRepo) {
         return {
             text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
@@ -3469,7 +3473,7 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
     if (hasPartialRestOrNonWorkState) {
         const restLike = row.repo_apologistika === true || persistedCategory === 'ΑΝ';
         return {
-            text: `${restLike ? 'ΡΕΠΟ' : 'ΜΗ ΕΡΓΑΣΙΑ'} — ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ`,
+            text: `${restLike ? 'Ανάπαυση' : 'Μη εργασία'} — χρειάζεται έλεγχος στο Στάδιο 2`,
             className: 'cell-adeia-suggestion',
             source: 'persisted_noncanonical'
         };
@@ -3667,8 +3671,11 @@ function buildStage2DailyResolutionByKey(payloads = []) {
     const resolutions = new Map();
     (Array.isArray(payloads) ? payloads : []).forEach((payload) => {
         const employeeKodikos = payload?.scope?.employee_kodikos;
-        const items = payload?.lifecycle_projection?.stages?.stage3
-            ?.stage2_automatic_resolution_items || [];
+        const items = [
+            ...(payload?.lifecycle_projection?.stages?.stage3?.stage2_automatic_resolution_items || []),
+            ...(payload?.lifecycle_projection?.rest_review_items || [])
+                .filter(item => item.status === 'VALID_DECLARED_REST')
+        ];
         items.forEach((item) => {
             if (!['NON_WORK', 'REST_REPO'].includes(item?.classification)) return;
             resolutions.set(stage2DailyResolutionKey(employeeKodikos, item.date), item);
@@ -3836,14 +3843,12 @@ function renderReviewRows(rows = [], deviations = []) {
 
             groupTr.innerHTML = `
                 <td colspan="13" class="fw-bold">
-                    ${row.ypokatasthma || ''}
-                    |
-                    ${row.kodikos || ''}
-                    |
-                    ${row.eponymo || ''}
-                    ${row.onoma || ''}
-                    ${lifecycleBadge}
-                    ${departureBadge}
+                    <div class="employee-group-heading">
+                        <span class="employee-group-branch">Παράρτημα ${escapeHtml(row.ypokatasthma || '')}</span>
+                        <span class="employee-group-code">${escapeHtml(row.kodikos || '')}</span>
+                        <span class="employee-group-name">${escapeHtml(row.eponymo || '')} ${escapeHtml(row.onoma || '')}</span>
+                        <span class="employee-group-badges">${lifecycleBadge}${departureBadge}</span>
+                    </div>
                 </td>
             `;
 
@@ -9867,6 +9872,8 @@ function renderWeeklyHrStage2BulkSummary(container) {
                 preview.safe_bulk_count || 0)}</strong></span>
             <span class="ms-2">Αυτόματες τακτοποιήσεις: <strong>${escapeHtml(
                 preview.safe_automatic_count || 0)}</strong></span>
+            <span>Έγκυρες προδηλωμένες ημέρες ανάπαυσης, χωρίς αλλαγή: <strong>${escapeHtml(
+                preview.valid_declared_rest_count || 0)}</strong></span>
             <span>Μεταφορές ρεπό: <strong>${escapeHtml(
                 preview.safe_pair_count || 0)}</strong></span>
             <span>Ήδη τακτοποιημένες: <strong>${escapeHtml(

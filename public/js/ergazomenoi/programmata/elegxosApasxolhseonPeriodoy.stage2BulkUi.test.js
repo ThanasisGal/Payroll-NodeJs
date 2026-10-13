@@ -67,6 +67,8 @@ const modalInstance = { show() {
 }, hide() { elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal'); } };
 const sandbox = { currentWeeklyHrStage2BulkPreview: null,
     currentCanonicalLifecyclePayloads: [],
+    employmentReviewGuidanceAttributes: () => '', employmentReviewGuidanceInfo: () => '',
+    EmploymentReviewGuidanceUi: { failureHtml: ({ code }) => code },
     weeklyHrStage2BulkSubmitting: false, userCanRecordCanonicalDecision: () => true,
     userCanRecordRepoTransferDecision: () => false,
     canRecordEmploymentDecisionForCurrentPeriod: () => periodAllowsChanges,
@@ -105,6 +107,7 @@ assert.doesNotMatch(container.innerHTML.match(/weekly-hr-stage2-bulk-complete[^>
     /disabled/);
 assert.match(container.innerHTML, /Έτοιμες για μαζική ενημέρωση/);
 assert.match(container.innerHTML, /Αυτόματες τακτοποιήσεις/);
+assert.match(container.innerHTML, /Έγκυρες προδηλωμένες ημέρες ανάπαυσης, χωρίς αλλαγή/);
 assert.match(container.innerHTML, /Μεταφορές ρεπό/);
 assert.match(container.innerHTML, /Ήδη τακτοποιημένες/);
 assert.match(container.innerHTML, /Περιπτώσεις που χρειάζονται έλεγχο/);
@@ -354,7 +357,7 @@ const reasonSandbox = { policyPreviewReasonLabels: {}, atomicRepoTransferDiagnos
 vm.runInNewContext(`${source.slice(reasonStart, reasonEnd)}\n` +
     'this.reasonLabel = getStage2LifecycleReasonLabel;', reasonSandbox);
 assert.equal(reasonSandbox.reasonLabel('UNKNOWN_INTERNAL_REASON', false),
-    'Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.');
+    'Δεν προσδιορίστηκε συγκεκριμένη αιτία. Ζητήστε τεχνικό έλεγχο πριν συνεχίσετε.');
 assert.doesNotMatch(reasonSandbox.reasonLabel('UNKNOWN_INTERNAL_REASON', false),
     /UNKNOWN_INTERNAL_REASON/);
 

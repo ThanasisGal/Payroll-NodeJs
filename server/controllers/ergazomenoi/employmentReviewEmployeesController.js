@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const { LOAN_FIELDS, ownsEmploymentReviewDate } = require('../../services/ergazomenoi/employmentReviewLoanOwnershipService');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { YpokatasthmataModel } = require('../../models/companies');
 const { dateRange } = require('../../middlewares/programmataAccessScope');
@@ -12,7 +13,7 @@ const dropdown = require('../../dropdowns/ergazomenoi/ergazomenoi');
 
 const allowedKeys = new Set(['apo_hmeromhnia', 'eos_hmeromhnia', 'ypokatasthma',
     'search', 'value', 'page', 'limit']);
-const employeeFields = `${dropdown.options.select} oristikh_enhmerosh hmeromhnia_proslhpshs hmeromhnia_apoxorhshs`;
+const employeeFields = `${dropdown.options.select} oristikh_enhmerosh hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ${LOAN_FIELDS}`;
 
 function invalid() { throw Object.assign(new Error('Invalid employee selection'), { status: 400 }); }
 
@@ -40,9 +41,17 @@ function overlapsPeriod(employee, history, period) {
         (row.hmeromhnia_proslhpshs && !dateKeyUtc(row.hmeromhnia_proslhpshs)) ||
         (row.hmeromhnia_apoxorhshs && !dateKeyUtc(row.hmeromhnia_apoxorhshs)))) return false;
     try {
-        return buildEmploymentCycles({ currentEmployee: employee, history: rows }).some(cycle =>
-            cycle.hire_date <= period.endIso &&
-            (!cycle.departure_date || cycle.departure_date >= period.startIso));
+        return buildEmploymentCycles({ currentEmployee: employee, history: rows }).some(cycle => {
+            const start = cycle.hire_date > period.startIso ? cycle.hire_date : period.startIso;
+            const end = cycle.departure_date && cycle.departure_date < period.endIso
+                ? cycle.departure_date : period.endIso;
+            if (start > end) return false;
+            for (let day = new Date(`${start}T00:00:00.000Z`);
+                dateKeyUtc(day) <= end; day.setUTCDate(day.getUTCDate() + 1)) {
+                if (ownsEmploymentReviewDate(day, employee)) return true;
+            }
+            return false;
+        });
     } catch (error) {
         if (!error.code?.startsWith('EMPLOYMENT_CYCLE_')) throw error;
         // Do not invent continuity for contradictory/unterminated legacy cycles.

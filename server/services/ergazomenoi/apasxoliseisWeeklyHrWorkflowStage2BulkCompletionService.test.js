@@ -89,5 +89,20 @@ function context(index, kind = 'safe') {
         assert.equal(left.already_completed + right.already_completed, 1);
         assert.equal(claimed.size, 1);
     }
+    {
+        const staleCompleted = context(20);
+        const oldPreview = buildWeeklyHrStage2BulkPreview({ contexts: [staleCompleted] });
+        staleCompleted.workflowState.stage2 = { status: 'COMPLETED' };
+        staleCompleted.lifecycle.stages.stage2.blockers = ['REST_CLASSIFICATION_REVIEW_REQUIRED'];
+        let writes = 0;
+        const result = await completeWeeklyHrWorkflowStage2Bulk({ ...args,
+            expected_preview_fingerprint: oldPreview.preview_fingerprint,
+            batch_scopes: oldPreview.safe_scope_ids,
+            loadPreparedContexts: async () => [staleCompleted],
+            completePreparedScope: async () => { writes++; } });
+        assert.equal(result.stale, 1);
+        assert.equal(result.already_completed, 0);
+        assert.equal(writes, 0);
+    }
     console.log('weekly HR Stage-2 bulk completion tests passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

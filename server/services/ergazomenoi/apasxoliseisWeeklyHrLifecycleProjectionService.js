@@ -2,6 +2,7 @@
 
 // Pure presentation projection. It coordinates existing authoritative resolvers and never writes.
 
+const { resolveReviewRestState } = require('./apasxoliseisReviewRestStateService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { diagnostic, analysisDiagnostics } = require('./apasxoliseisReviewDiagnosticService');
 const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
@@ -755,8 +756,35 @@ function buildWeeklyHrLifecycleProjection({
         companyPolicyRules,
         companySettings
     });
-    const finalBlockers = finalAnalysis.status === 'NEEDS_HR_DECISION'
-        ? unique(finalAnalysis.reasons || []) : [];
+    const restReviewItems = rows.filter(row => !actionableDateSet ||
+        actionableDateSet.has(dateKeyUtc(row.hmeromhnia))).map(resolveReviewRestState);
+    const restPendingDates = restReviewItems.filter(item => item.status === 'REVIEW_REQUIRED')
+        .map(item => item.date);
+    const automaticPending = stage2AutomaticResolutionItems.length > 0 &&
+        stage1.business_status === BUSINESS_STATUS.COMPLETED &&
+        stage2.business_status === BUSINESS_STATUS.COMPLETED && !stage2.blockers.length;
+    const reviewedStage2 = restPendingDates.length ? stageResult('STAGE2', { ...stage2,
+        business_status: BUSINESS_STATUS.BLOCKED,
+        pending_count: stage2.pending_count + restPendingDates.length,
+        pending_dates: Object.freeze(unique([...stage2.pending_dates, ...restPendingDates])),
+        blockers: Object.freeze(unique([...stage2.blockers, 'REST_CLASSIFICATION_REVIEW_REQUIRED'])),
+        pending_reasons: Object.freeze(unique([...stage2.pending_reasons, 'REST_CLASSIFICATION_REVIEW_REQUIRED'])),
+        diagnostics: Object.freeze([...stage2.diagnostics,
+            diagnostic('REST_CLASSIFICATION_REVIEW_REQUIRED', restPendingDates)])
+    }) : automaticPending ? stageResult('STAGE2', { ...stage2,
+        business_status: stage2.business_status === BUSINESS_STATUS.COMPLETED
+            ? BUSINESS_STATUS.OPEN : stage2.business_status,
+        automatic_materialization_count: stage2AutomaticResolutionItems.length,
+        pending_count: stage2AutomaticResolutionItems.length,
+        pending_dates: Object.freeze(stage2AutomaticResolutionItems.map(item => item.date)),
+        pending_reasons: Object.freeze(unique([...stage2.pending_reasons,
+            'STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED']))
+    }) : stage2;
+    const finalBlockers = unique([
+        ...(finalAnalysis.status === 'NEEDS_HR_DECISION' ? finalAnalysis.reasons || [] : []),
+        ...(restPendingDates.length ? ['REST_CLASSIFICATION_REVIEW_REQUIRED'] : []),
+        ...(automaticPending ? ['STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED'] : [])
+    ]);
     const stage4 = stageResult('STAGE4', {
         business_status: finalBlockers.length
             ? BUSINESS_STATUS.BLOCKED : BUSINESS_STATUS.COMPLETED,
@@ -768,7 +796,7 @@ function buildWeeklyHrLifecycleProjection({
         final_weekly_analysis: finalAnalysis
     });
 
-    const stages = applySequentialPresentation({ stage1, stage2, stage3, stage4 });
+    const stages = applySequentialPresentation({ stage1, stage2: reviewedStage2, stage3, stage4 });
     const upstreamStagesCompleted = [stages.stage1, stages.stage2, stages.stage3]
         .every((stage) => stage.business_status === BUSINESS_STATUS.COMPLETED);
     stages.stage4 = Object.freeze({ ...stages.stage4,
@@ -804,6 +832,7 @@ function buildWeeklyHrLifecycleProjection({
         requires_hr_action: Boolean(activeStage),
         ...(boundary?.handoff_from_previous_period ? { deferred_week: boundary, deferred_action_required: true } : {}),
         employment_date_scope: employmentDateScope,
+        rest_review_items: Object.freeze(restReviewItems),
         stage1_no_classification_preview_items: stage1NoClassificationPreviewItems,
         stages: Object.freeze(stages)
     });

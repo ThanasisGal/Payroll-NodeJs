@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { resolveReviewRestState } = require('./apasxoliseisReviewRestStateService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { stableStringify } = require('./apasxoliseisStage3FingerprintService');
 const { AUTOMATIC_INSPECTION, inspectAutomaticMaterialization,
@@ -66,6 +67,7 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
     const safe = []; const resolved = []; const exceptions = [];
     const alreadyMaterialized = []; const noLongerApplicable = []; const technicalConflicts = [];
     let safePairCount = 0; let safeAutomaticCount = 0; let safeDayChangeCount = 0;
+    let validDeclaredRestCount = 0;
     for (const context of contexts) {
         const identity = scopeIdentity(context);
         if (!identity.employee_id || !identity.week_start || !identity.week_end ||
@@ -74,16 +76,16 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
                 'STAGE2_AUTHORITATIVE_CONTEXT_MISSING'));
             continue;
         }
-        if (context.workflowState?.stage2?.status === 'COMPLETED') {
-            resolved.push(identity); continue;
-        }
+        validDeclaredRestCount += context.rows.filter(row =>
+            resolveReviewRestState(row).status === 'VALID_DECLARED_REST').length;
         const diagnostic = context.stage2StateDiagnostic || context.lifecycle?.stages?.stage2
             ?.diagnostic || context.lifecycle?.stages?.stage2?.blockers?.[0];
         if (diagnostic) {
             technicalConflicts.push(exceptionSummary(context, diagnostic)); continue;
         }
         const lifecycleStage2 = context.lifecycle?.stages?.stage2 || {};
-        if (Number(lifecycleStage2.pending_count || 0) > 0 ||
+        if (Number(lifecycleStage2.pending_count || 0) >
+            Number(lifecycleStage2.automatic_materialization_count || 0) ||
             (lifecycleStage2.pending_items || []).length > 0) {
             const pair = preparedSafePair(context);
             if (pair) {
@@ -151,6 +153,7 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
     const page = Math.max(1, Number(exception_page) || 1);
     const offset = (page - 1) * pageSize;
     return { total_scopes: contexts.length, safe_bulk_count: safe.length,
+        valid_declared_rest_count: validDeclaredRestCount,
         safe_pair_count: safePairCount, safe_automatic_count: safeAutomaticCount,
         safe_employee_count: new Set(safe.map((item) => item.employee_id)).size,
         safe_week_count: safe.length, safe_day_change_count: safeDayChangeCount,

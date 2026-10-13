@@ -7,8 +7,8 @@ const {
 } = require('./apasxoliseisWeeklyCanonicalRepoCountService');
 
 const FULL = Object.freeze({ typos_apasxolhshs: 'PLHRHS' });
-const PARTIAL = Object.freeze({ typos_apasxolhshs: 'MERIKH' });
-const ROTATIONAL = Object.freeze({ typos_apasxolhshs: 'EK_PERITROPHS' });
+const PARTIAL = Object.freeze({ typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4 });
+const ROTATIONAL = Object.freeze({ typos_apasxolhshs: 'EK_PERITROPHS', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 2 });
 
 test('declared full-time repo with zero work and card hours counts as repo', () => {
     const result = resolveCanonicalRepoDayCountState({

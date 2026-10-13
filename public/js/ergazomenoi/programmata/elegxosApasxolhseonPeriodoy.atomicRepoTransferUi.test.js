@@ -685,7 +685,7 @@ function testDeclaredRepoPresentationDistinguishesNoncanonicalWorkAndAppliedStat
         isApologistikoNonWorkRow: false
     }, null);
     assert.strictEqual(noncanonical.declared.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
-    assert.match(noncanonical.apologistiko.text, /ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ/);
+    assert.match(noncanonical.apologistiko.text, /χρειάζεται έλεγχος στο Στάδιο 2/);
     assert.strictEqual(noncanonical.apologistiko.source, 'persisted_noncanonical');
     assert.strictEqual(noncanonical.isOriginalDeclaredRepo, true);
     assert.strictEqual(
@@ -752,7 +752,7 @@ function testDeclaredNonWorkDoesNotHideNoncanonicalApologistikoState() {
     }, null);
 
     assert.strictEqual(noncanonical.declared.text, 'ΜΗ ΕΡΓΑΣΙΑ');
-    assert.match(noncanonical.apologistiko.text, /ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ/);
+    assert.match(noncanonical.apologistiko.text, /χρειάζεται έλεγχος στο Στάδιο 2/);
     assert.strictEqual(noncanonical.apologistiko.source, 'persisted_noncanonical');
     assert.strictEqual(noncanonical.isOriginalDeclaredNonWork, true);
     assert.strictEqual(noncanonical.isOriginalDeclaredNeutral, true);
@@ -825,7 +825,7 @@ function testDeclaredNeutralIsOnlyTheFinalApologistikoFallback() {
         apologistiko_biblio: false,
         kathgoria_ergasias_apologistika: '', repo_apologistika: true
     });
-    assert.match(staleRepo.text, /^ΡΕΠΟ — ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ$/);
+    assert.match(staleRepo.text, /^Ανάπαυση — χρειάζεται έλεγχος στο Στάδιο 2$/);
     assert.notStrictEqual(staleRepo.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
 
     const inconsistentRepo = presentation({
@@ -833,7 +833,7 @@ function testDeclaredNeutralIsOnlyTheFinalApologistikoFallback() {
         apologistiko_biblio: true,
         kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: false
     });
-    assert.match(inconsistentRepo.text, /ΜΗ ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΗ ΕΓΓΡΑΦΗ/);
+    assert.match(inconsistentRepo.text, /χρειάζεται έλεγχος στο Στάδιο 2/);
     assert.notStrictEqual(inconsistentRepo.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
 }
 

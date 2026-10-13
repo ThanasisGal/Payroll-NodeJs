@@ -77,6 +77,22 @@ function resolveLayer({
     );
 }
 
+function isValidDeclaredRest(row = {}) {
+    const declared = String(row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? '').trim();
+    const retrospective = String(row.kathgoria_ergasias_apologistika ?? '').trim();
+    if (declared !== 'ΑΝ' || !['', 'ΑΝ'].includes(retrospective)) return false;
+    const facts = resolveDailyActualWorkFacts(row);
+    const calculated = nonNegativeNumber(row.ores_ergasias_apologistika);
+    const actual = nonNegativeNumber(row.ores_pragmatikhs_ergasias_apologistika);
+    const hasRetrospectiveInterval = [1, 2, 3].some(index =>
+        String(row[`apo_ora_0${index}_apologistika`] || '').trim() ||
+        String(row[`eos_ora_0${index}_apologistika`] || '').trim());
+    return facts.actualWorkHours === 0 && facts.cardHours === 0 &&
+        facts.countsAsActualWorkDay === false && calculated.ok && calculated.value === 0 &&
+        actual.ok && actual.value === 0 && !hasRetrospectiveInterval &&
+        !facts.unresolvedCardPairNumbers.length && !facts.hasCompleteCardEvidence;
+}
+
 function resolveCurrent(row, expectedRepoCategory) {
     const declaredCategory = category(row.kathgoria_ergasias);
     const declaredRepo = repoValue(row.repo);
@@ -89,19 +105,10 @@ function resolveCurrent(row, expectedRepoCategory) {
         return invalid(DIAGNOSTIC.INVALID_REPO_VALUE);
     }
 
-    // false is the schema default, not proof of a later cancellation of declared rest.
-    // Preserve unchanged declared ΑΝ when there is no work or unresolved card evidence.
-    // Non-work fact categories and independent validation errors do not cancel rest.
-    if (expectedRepoCategory === 'ΑΝ' && declaredCategory.value === 'ΑΝ' &&
-        apologistikaCategory.value === 'ΑΝ' && apologistikaRepo.value === false) {
-        const facts = resolveDailyActualWorkFacts(row);
-        const calculated = nonNegativeNumber(row.ores_ergasias_apologistika);
-        if (facts.actualWorkHours === 0 && facts.cardHours === 0 &&
-            facts.countsAsActualWorkDay === false && calculated.ok && calculated.value === 0 &&
-            !facts.unresolvedCardPairNumbers.length &&
-            !facts.hasCompleteCardEvidence) {
-            return result('ΑΝ', true, PROVENANCE.DECLARED_CURRENT);
-        }
+    // Participation in the retrospective book is independent of unchanged declared rest.
+    if (isValidDeclaredRest(row) && (apologistikaRepo.value === false ||
+        (apologistikaCategory.value === '' && apologistikaRepo.value !== true))) {
+        return result('ΑΝ', true, PROVENANCE.DECLARED_CURRENT);
     }
 
     const hasMaterialApologistikaCategory = apologistikaCategory.value !== '';
@@ -185,5 +192,6 @@ module.exports = {
     MODE,
     PROVENANCE,
     DIAGNOSTIC,
-    resolveEffectiveRepoState
+    resolveEffectiveRepoState,
+    isValidDeclaredRest
 };

@@ -197,8 +197,9 @@ assert.equal(completed0014.stages.stage3.business_status, 'COMPLETED');
 assert.deepEqual(completed0014.stages.stage3.stage2_automatic_resolution_items,
     [{ date: '2026-06-17', classification: 'REST_REPO',
         reason: 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }]);
-assert.equal(completed0014.stages.stage4.analysis_presentation_status,
-    'ELIGIBLE_FOR_FINALIZATION');
+assert.equal(completed0014.stages.stage2.business_status, 'OPEN');
+assert.equal(completed0014.stages.stage4.analysis_presentation_status, 'PROVISIONAL');
+assert.ok(completed0014.stages.stage4.blockers.includes('STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED'));
 
 function authoritativeStage3FingerprintContext({ projection, rows, selectedDate,
     scope, stage2Version = 0, dailyProfile = profile }) {
@@ -1105,7 +1106,8 @@ const mayBoundaryLifecycle = buildWeeklyHrLifecycleProjection({
         effective_fingerprint: mayBoundaryInitial.stages.stage1.current_fingerprint }
 });
 assert.equal(mayBoundaryLifecycle.stages.stage1.business_status, 'COMPLETED');
-assert.equal(mayBoundaryLifecycle.stages.stage2.business_status, 'COMPLETED');
+assert.equal(mayBoundaryLifecycle.stages.stage2.business_status, 'OPEN');
+assert.ok(mayBoundaryLifecycle.stages.stage4.blockers.includes('STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED'));
 assert.equal(mayBoundaryLifecycle.stages.stage3.business_status, 'COMPLETED');
 assert.equal(mayBoundaryLifecycle.stages.stage3.pending_count, 0);
 assert.deepEqual(mayBoundaryLifecycle.stages.stage3.pending_dates,
