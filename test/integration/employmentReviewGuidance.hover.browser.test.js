@@ -154,7 +154,8 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) await touchPage.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, 'touch-390.png') });
     await touchPage.locator('[data-review-guidance-close]').tap();
     assert.equal(await touchPage.locator('#employmentReviewGuidancePopover').isVisible(), false);
-    assert.equal(Object.keys(require('../../public/js/ergazomenoi/programmata/employmentReviewGuidance').catalog).length, 413);
+    const expectedCodes = Object.keys(require('../../public/js/ergazomenoi/programmata/employmentReviewGuidance').catalog).sort();
+    assert.deepEqual(await page.evaluate(() => Object.keys(EmploymentReviewGuidance.catalog).sort()), expectedCodes);
     assert.equal(await data.snapshot(), before, 'touch and weekly explanations also leave the database unchanged');
     assert.deepEqual(errors, []);
     assert.equal(mongoose.get('sanitizeFilter'), true);
