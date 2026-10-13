@@ -19,10 +19,10 @@ function context(index, kind = 'safe') {
         kathgoria_ergasias_apologistika: '', kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE',
         adeia_apologistika: false, astheneia_apologistika: false,
         apousia_apologistika: null, ores_ergasias_apologistika: 0 }],
-    effectiveProfilesByDate: { [date]: { typos_apasxolhshs: '0' } },
+    effectiveProfilesByDate: { [date]: { typos_apasxolhshs: '1', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4 } },
     workflowState: { stage1: { status: 'COMPLETED' } }, upstream: { stage1_current_fingerprint: FP },
     lifecycle: { stages: { stage2: {}, stage3: { pending_dates: [],
-        stage2_automatic_resolution_items: [{ date, classification: 'REST_REPO' }] } } } };
+        stage2_automatic_resolution_items: [{ date, classification: 'NON_WORK' }] } } } };
     if (kind === 'manual') value.stage2StateDiagnostic = 'AMBIGUOUS'; return value;
 }
 

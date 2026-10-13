@@ -15,8 +15,8 @@ assert.match(controller, /getReviewRowsForExport\(req, \{ includeLifecycle: true
 assert.match(controller, /__workflowStates/);
 assert.match(controller, /__workflowAudits/);
 assert.match(controller, /new Map/);
-assert.doesNotMatch(controller.match(/static completeWeeklyHrWorkflowStage2Bulk[\s\S]*?\n    };/)?.[0] || '',
-    /loadWeeklyHrStage2CompletionContext/);
+assert.match(controller.match(/static completeWeeklyHrWorkflowStage2Bulk[\s\S]*?\n    };/)?.[0] || '',
+    /loadFreshContext: \({ session }\) => loadWeeklyHrStage2CompletionContext\([\s\S]*?session/);
 assert.match(controller, /writeCanonicalDailyClassification/);
 assert.match(controller, /runWithPeriodWriteFence/);
 assert.match(controller, /expected_scope_fingerprint/);

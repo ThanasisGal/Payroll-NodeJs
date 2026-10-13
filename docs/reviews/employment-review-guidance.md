@@ -1145,3 +1145,109 @@ Chromium ελέγχει δύο διαδοχικές αναζητήσεις, πρ
 εκ περιτροπής απασχόληση βάσει ιστορικού, με πραγματική εγκεκριμένη εγγραφή
 ΑΝ/ΜΕ. Ο νέος οπτικός έλεγχος περιορίζεται σε 1280 και 1440 px και εντάχθηκε
 στο υπάρχον CI.
+
+## Γενική διόρθωση τεκμηρίωσης αναπαύσεων στο Στάδιο 2
+
+Η αρχική προβολή εξίσωνε το ιστορικό καθεστώς που απαιτεί ΑΝ με θετική
+τεκμηρίωση ότι κάθε αχαρακτήριστη ημέρα χωρίς κάρτα ήταν πράγματι ανάπαυση.
+Παράλληλα ο εβδομαδιαίος επιλυτής αφαιρούσε μια μοναδική ανεφάρμοστη πρόταση
+από το έλλειμμα. Έτσι μπορούσαν να εμφανιστούν περισσότερες αυτόματες
+μετατροπές από τις ελλείπουσες αναπαύσεις και εικονική ολοκλήρωση του Σταδίου 3.
+
+Η `assessWeeklyRestEvidence` διαχωρίζει απαιτούμενες, τεκμηριωμένες,
+ελλείπουσες και υποψήφιες αναπαύσεις. Σε σταθερούς ιστορικούς εβδομαδιαίους
+όρους η υποχρέωση μέσα στην απασχόληση είναι `max(0, N - W)`, όπου `N` οι
+ημερομηνίες που ανήκουν στην απασχόληση μέσα στη φυσική εβδομάδα και `W` οι
+ισχύουσες συμβατικές εβδομαδιαίες ημέρες. Για πλήρη εβδομάδα είναι `7 - W`.
+Το έλλειμμα είναι `max(0, απαιτούμενες - τεκμηριωμένες)`. Μια πρόταση δεν
+μειώνει κανένα από αυτά τα πραγματικά μεγέθη. Διαφορετικές συμβατικές ημέρες
+εντός της εβδομάδας αφήνουν το εβδομαδιαίο πλήθος μη προσδιορισμένο, με
+σαφή ανάγκη ελέγχου ιστορικών όρων, αντί να εφαρμόζουν τους τελευταίους όρους
+σε ολόκληρη την εβδομάδα. Δεν άλλαξε φόρμουλα αποδοχών ή προσαυξήσεων.
+
+Οι έγκυρες προδηλωμένες ΑΝ παραμένουν αναγνωρισμένες με `repo_apologistika=false`,
+χωρίς εγγραφή. Πραγματική εργασία, κάρτες, ισχυρότερες αποφάσεις, κλειδωμένες
+ημέρες και χειροκίνητες παρεμβάσεις αποκλείουν μη τεκμηριωμένη μετατροπή.
+Η μοναδικότητα υποψηφίου δεν αποτελεί απόδειξη. Οι ταξινομήσεις ΜΕ της μερικής
+και εκ περιτροπής απασχόλησης διατηρούν την υπάρχουσα ημερήσια σημασιολογία.
+
+| Διαδρομή | Κοινός κανόνας / προστασία |
+| --- | --- |
+| Εβδομαδιαίο έλλειμμα και υποψήφια ζεύγη | `apasxoliseisWeeklyHrWorkflowResolverService`: καμία υποθετική αφαίρεση ανάπαυσης, απόρριψη επιλογών πάνω από το έλλειμμα. |
+| Προβολή και Στάδια 1–4 | `apasxoliseisWeeklyHrLifecycleProjectionService`: καμία αυτόματη ΑΝ χωρίς θετική τεκμηρίωση, ημερήσιες εκκρεμότητες και προσωρινό Στάδιο 4. |
+| Μαζική προεπισκόπηση Σταδίου 2 | `apasxoliseisWeeklyHrStage2BulkPreviewService`: χωριστές ασφαλείς ενημερώσεις, ανθρώπινες αποφάσεις και αποκλεισμοί. Τα πραγματικά επηρεαζόμενα ημερήσια στοιχεία μετρούν μόνο εφαρμόσιμες αλλαγές. |
+| Αναλυτική προεπισκόπηση | `apasxoliseisWeeklyHrStage2BulkDetailsService`: επανέλεγχος του ίδιου αποτυπώματος. Το μοναδικό ζεύγος παρουσιάζεται ως υποψήφιο προς ρητή επιβεβαίωση. |
+| Τελική μαζική εφαρμογή Σταδίου 2 | `apasxoliseisWeeklyHrWorkflowStage2BulkCompletionService`: επαναχρησιμοποίηση προεπισκόπησης, νέα ανάγνωση ανά πεδίο εφαρμογής και υφιστάμενη συναλλαγή/προστασία περιόδου. |
+| Τελική αυτόματη ημερήσια καταγραφή | `inspectAutomaticMaterialization`: απόρριψη μη τεκμηριωμένης ΑΝ ακόμη και από παλαιό ή κατασκευασμένο αυτόματο αποτέλεσμα. |
+| Ρητή ημερήσια απόφαση | `apasxoliseisWeeklyHrWorkflowStage3ResolutionService`: ο ίδιος έλεγχος τεκμηρίωσης και ελλείμματος πριν και μέσα στη συναλλαγή, προστασία περιόδου, `updatedAt` ημέρας και έκδοση εβδομαδιαίας κατάστασης. |
+| Ρητή μαζική απόφαση | Προεπισκόπηση Σταδίου 3 με διαδοχική προσομοίωση της ίδιας προβολής. Πολλές επιλεγμένες αναπαύσεις δεν μπορούν να καταναλώσουν το ίδιο τελευταίο υπόλοιπο. Η εφαρμογή επανελέγχει μέσα στη συναλλαγή και διατηρεί την προστασία διπλής εκτέλεσης. |
+| Χρονικά όρια | Οι υφιστάμενοι επιλυτές κύκλων απασχόλησης και περιόδου εξαιρούν ημέρες εκτός απασχόλησης και διατηρούν ημέρες άλλου μήνα μόνο ως πλαίσιο. Η αποχώρηση περιλαμβάνεται. |
+
+Οι ημερήσιες αποφάσεις του Σταδίου 3 αποτελούν τη ρητή συνέχεια για τις
+μη τεκμηριωμένες αναπαύσεις του Σταδίου 2. Το Στάδιο 2 παραμένει ανοικτό,
+τα χειριστήρια του Σταδίου 3 γίνονται διαθέσιμα μετά το Στάδιο 1, και το
+Στάδιο 4 παραμένει προσωρινό. Δεν εμφανίζεται ολοκλήρωση λόγω της απλής
+ύπαρξης πρότασης. Μετά την κάλυψη του ελλείμματος αφαιρείται η επιλογή ΑΝ
+από τις υπόλοιπες υποψήφιες ημέρες, οι οποίες εξακολουθούν να χρειάζονται
+τον πραγματικό χαρακτηρισμό τους.
+
+Οι παλινδρομήσεις αναπαράγουν τους 0009/0011/0014 με συνθετικά στοιχεία μέσω
+των πραγματικών ελεγκτών HTTP, μοντέλων, συναλλαγών και Chromium.
+Ελέγχονται επιπλέον ιστορικές/μελλοντικές ημερομηνίες, ιστορικά καθεστώτα,
+όριο μήνα, πρόσληψη/αποχώρηση/επαναπρόσληψη, μεταβολή μετά την προεπισκόπηση,
+ταυτόχρονες αποφάσεις, διπλή εφαρμογή, απομόνωση εταιρειών/παραρτημάτων και
+διατήρηση ασφαλών μαζικών ΜΕ. Οι νέες δοκιμές εντάσσονται στο CI.
+
+Η παραγωγική MongoDB και τα διαπιστευτήριά της δεν χρησιμοποιούνται.
+Οι οπτικές δοκιμές χρησιμοποιούν παραγωγικά αρχεία EJS/JavaScript/CSS,
+την ακριβώς δηλωμένη SweetAlert `11.26.25`, συνθετική τοπική MongoDB και
+αποκλεισμό εξωτερικών αιτημάτων του φυλλομετρητή. Ελάχιστες αναλύσεις:
+1280 και 1440 px. Τα στιγμιότυπα φυλάσσονται στα τεχνουργήματα του CI.
+
+Τοπική επαλήθευση: 144/144 έλεγχοι υπηρεσιών/συμβολαίων, έλεγχος σύνταξης
+σε 34 αρχεία JavaScript, και τα 20 σενάρια HTTP/Chromium της σχετικής ομάδας.
+Μία δοκιμή επιλογής εργαζομένου χρειάστηκε ανεξάρτητη επανάληψη λόγω χρονισμού
+αναδημιουργίας του πεδίου· η επανάληψη πέρασε. Εξετάστηκαν πραγματικά τα
+στιγμιότυπα των 1280/1440 px, η μαζική προεπισκόπηση, οι αιτίες αποκλεισμού,
+οι αναδυόμενες πληροφορίες και η προεπισκόπηση ανθρώπινης απόφασης.
+Δεν έγινε δοκιμή φόρτου συναλλακτικών εγγραφών για 2000 εργαζομένους.
+
+Πλήρης κατάλογος αρχείων της διόρθωσης:
+
+- `.github/workflows/ci-validation.yml`
+- `docs/reviews/employment-review-guidance.md`
+- `public/css/main.css`
+- `public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.finalDerivedPresentation.test.js`
+- `public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js`
+- `public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage2BulkUi.test.js`
+- `public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage3Ui.test.js`
+- `public/js/ergazomenoi/programmata/employmentReviewGuidance.js`
+- `server/controllers/ergazomenoi/erganhController.js`
+- `server/controllers/ergazomenoi/erganhController.weeklyHrStage2Bulk.contract.test.js`
+- `server/models/apasxoliseisWeeklyHrWorkflowAudit.js`
+- `server/services/ergazomenoi/apasxoliseisPossibleLeaveRepoAutoResolutionService.js`
+- `server/services/ergazomenoi/apasxoliseisReviewRestStateService.test.js`
+- `server/services/ergazomenoi/apasxoliseisStage3FingerprintService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkDetailsService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkDetailsService.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkPreviewService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkPreviewService.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewParity.regression.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewPeriodSlice.regression.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewSimulationService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowResolverService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowResolverService.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2BulkCompletionService.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2CompletionService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2CompletionService.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3PeriodSliceRebase.regression.test.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3ResolutionService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyRestEvidenceService.js`
+- `server/services/ergazomenoi/apasxoliseisWeeklyRestEvidenceService.test.js`
+- `test/helpers/employmentReviewStage1CompletionApp.js`
+- `test/integration/employmentReviewNoWorkTerms.browser.test.js`
+- `test/integration/employmentReviewStage2Deadlock.browser.test.js`
+- `test/integration/employmentReviewStage2Evidence.browser.test.js`

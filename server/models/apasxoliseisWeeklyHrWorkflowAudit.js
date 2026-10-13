@@ -107,7 +107,7 @@ const schema = new Schema({
     },
     final_classification: {
         type: String,
-        enum: ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'],
+        enum: ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO'],
         immutable: true,
         required: function stage3FinalClassificationRequired() {
             return this.action === 'STAGE3_DAILY_RESOLVED';
@@ -115,7 +115,7 @@ const schema = new Schema({
     },
     requested_classification: {
         type: String,
-        enum: ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'],
+        enum: ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO'],
         immutable: true,
         required: function autoSatisfiedRequestedClassificationRequired() {
             return this.action === 'STAGE3_BULK_ITEM_AUTO_SATISFIED';

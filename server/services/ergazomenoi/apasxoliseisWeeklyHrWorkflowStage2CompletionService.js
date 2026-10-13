@@ -17,6 +17,8 @@ const { writeCanonicalDailyClassification, planCanonicalDailyClassification } = 
     './apasxoliseisCanonicalDailyClassificationWriterService'
 );
 
+const { resolveReviewRestState } = require('./apasxoliseisReviewRestStateService');
+
 const ACTION = 'STAGE2_COMPLETED';
 const WORKFLOW_VERSION = 'weekly-hr-workflow:v1';
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:._-]{7,99}$/;
@@ -108,6 +110,12 @@ function inspectAutomaticMaterialization(context = {}) {
             }
             const current = currentCanonicalState(row, facts);
             const intendedUpdates = planCanonicalDailyClassification({ row, classification });
+            if (classification === 'REST_REPO' && !rowMatchesUpdates(row, intendedUpdates) &&
+                resolveReviewRestState(row)
+                    .status !== 'VALID_DECLARED_REST') {
+                fail('UNCONFIRMED_WEEKLY_REST_DATES',
+                    'Η ημέρα χρειάζεται ρητή απόφαση προσωπικού πριν χαρακτηριστεί ως ρεπό.', 409);
+            }
             const itemState = stableStringify(current) ===
                 stableStringify(EXPECTED_INITIAL_CANONICAL_STATE)
                 ? AUTOMATIC_INSPECTION.READY_TO_MATERIALIZE

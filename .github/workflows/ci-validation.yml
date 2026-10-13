@@ -953,7 +953,8 @@ jobs:
           node --test --test-concurrency=1 test/integration/employmentReviewStage1Completion.browser.test.js test/integration/employmentReviewNoWorkTerms.browser.test.js
           node --test server/services/ergazomenoi/apasxoliseisReviewRestStateService.test.js server/services/ergazomenoi/employmentReviewLoanOwnershipService.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewFourFixes.browser.test.js test/integration/employmentReviewLoanScope.test.js
-          node --test test/integration/employmentReviewStage2Deadlock.browser.test.js
+          node --test server/services/ergazomenoi/apasxoliseisWeeklyRestEvidenceService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowResolverService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2CompletionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkPreviewService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkDetailsService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3ResolutionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3BulkApplyService.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage2BulkUi.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage3Ui.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewStage2Deadlock.browser.test.js test/integration/employmentReviewStage2Evidence.browser.test.js
 
       - name: Preserve synthetic Employment Review visual checks
         if: always()

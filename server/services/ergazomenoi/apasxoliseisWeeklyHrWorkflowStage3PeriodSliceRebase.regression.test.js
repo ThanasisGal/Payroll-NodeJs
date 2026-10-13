@@ -130,14 +130,14 @@ function assertTrustedRebase(version, previousContext, previousEffective) {
 
     const actionableChange = rows.map((row) => ({ ...row }));
     actionableChange[4].apo_ora_01 = '10:00';
-    assert.equal(lifecycle(actionableChange).stages.stage1.business_status, 'STALE');
+    assert.equal(lifecycle(actionableChange).stages.stage1.persisted_status, 'STALE');
     assert.notEqual(lifecycle(actionableChange).stages.stage1.current_completion_fingerprint,
         state.stage1.period_slices[0].effective_fingerprint);
 
     const contextOnlyChange = rows.map((row) => ({ ...row }));
     contextOnlyChange[3].apo_ora_01 = '10:00';
     const contextOnlyLifecycle = lifecycle(contextOnlyChange);
-    assert.equal(contextOnlyLifecycle.stages.stage1.business_status, 'STALE');
+    assert.equal(contextOnlyLifecycle.stages.stage1.persisted_status, 'STALE');
     assert.notEqual(contextOnlyLifecycle.stages.stage1.current_context_fingerprint,
         state.stage1.period_slices[0].context_fingerprint);
     assert.equal(contextOnlyLifecycle.stages.stage1.current_completion_fingerprint,

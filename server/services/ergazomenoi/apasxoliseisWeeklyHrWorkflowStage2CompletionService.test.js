@@ -14,7 +14,8 @@ function context(classification = 'REST_REPO') {
         week_start: new Date('2026-06-08Z'), week_end: new Date('2026-06-14Z') },
     rows: [{ _id: classification === 'REST_REPO' ? '6a7c515e6aeaefb3c8764c7c' :
         '507f191e810c19729de860ec', hmeromhnia: new Date(`${date}T00:00:00Z`),
-    updatedAt: new Date('2026-08-18Z'), repo: false, kathgoria_ergasias: 'ΕΡΓ',
+    updatedAt: new Date('2026-08-18Z'), repo: classification === 'REST_REPO',
+    kathgoria_ergasias: classification === 'REST_REPO' ? 'ΑΝ' : 'ΕΡΓ',
     cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0,
     apologistiko_biblio: false, repo_apologistika: false,
     kathgoria_ergasias_apologistika: '',

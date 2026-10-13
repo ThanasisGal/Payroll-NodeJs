@@ -107,8 +107,8 @@ assert.deepStrictEqual(direct.direct_repo_candidates, [{
 }]);
 assert.deepStrictEqual(direct.repo_transfer_candidates, []);
 assert.strictEqual(direct.known_repo_identity_count, 1);
-assert.strictEqual(direct.known_repo_identity_count_after_proposal, 2);
-assert.strictEqual(direct.unresolved_repo_identity_count_after_proposed_resolution, 0);
+assert.strictEqual(direct.known_repo_identity_count_after_proposal, 1);
+assert.strictEqual(direct.unresolved_repo_identity_count_after_proposed_resolution, 1);
 assert.strictEqual(direct.next_required_hr_stage, NEXT_STAGE.REPO_RESOLUTION);
 assert.deepStrictEqual(direct.unclassified_stage2_candidates, [{
     date: DATES[1], candidate_kind: 'REST_REPO',
@@ -162,9 +162,9 @@ assert.strictEqual(transfer.resting_repo_count, 0);
 assert.strictEqual(transfer.worked_repo_identity_count, 1);
 assert.strictEqual(transfer.known_repo_identity_count, 0);
 assert.strictEqual(transfer.unresolved_repo_identity_count_before_resolution, 2);
-assert.strictEqual(transfer.known_repo_identity_count_after_proposal, 1);
-assert.strictEqual(transfer.unresolved_repo_identity_count_after_proposed_resolution, 1);
-assert.strictEqual(transfer.resting_repo_count_after_proposal, 1);
+assert.strictEqual(transfer.known_repo_identity_count_after_proposal, 0);
+assert.strictEqual(transfer.unresolved_repo_identity_count_after_proposed_resolution, 2);
+assert.strictEqual(transfer.resting_repo_count_after_proposal, 0);
 assert.strictEqual(transfer.next_required_hr_stage, NEXT_STAGE.REPO_RESOLUTION);
 
 // Multiple equivalent targets remain proposals and are never selected arbitrarily.

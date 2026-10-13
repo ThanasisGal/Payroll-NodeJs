@@ -89,6 +89,12 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
             continue;
         }
         const lifecycleStage2 = context.lifecycle?.stages?.stage2 || {};
+        if (lifecycleStage2.resolution_route === 'STAGE3_HUMAN_DECISION') {
+            exceptions.push({ ...exceptionSummary(context, lifecycleStage2.pending_reasons?.[0]),
+                resolution_route: lifecycleStage2.resolution_route,
+                rest_evidence: lifecycleStage2.rest_evidence });
+            continue;
+        }
         if (Number(lifecycleStage2.pending_count || 0) >
             Number(lifecycleStage2.automatic_materialization_count || 0) ||
             (lifecycleStage2.pending_items || []).length > 0) {

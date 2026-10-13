@@ -143,11 +143,11 @@ test('automatic Stage 2 days never include a possible leave in the previous peri
     const result = lifecycle({ weekRows: rows, effectiveProfile: profile, scope, periodScope,
         persistedStage1State: { status: 'OPEN', period_slices: [{ ...slice,
             ...fingerprints, status: 'COMPLETED' }] } });
-    assert.deepEqual(result.stages.stage3.stage2_automatic_resolution_items.map(item => item.date), ['2026-09-06']);
+    assert.deepEqual(result.stages.stage3.stage2_automatic_resolution_items.map(item => item.date), []);
     assert.deepEqual(result.stages.stage2.pending_dates, ['2026-09-06']);
 });
 
-test('mixed 81-week reproduction separates 94 false flags from five dated automatic days', () => {
+test('mixed 81-week reproduction rejects five unconfirmed dates even in obsolete automatic input', () => {
     const fp = 'a'.repeat(64);
     const contexts = Array.from({ length: 81 }, (_, index) => {
         const rows = Array.from({ length: 7 }, (_, day) => ({ _id: `mixed-${index}-${day}`,
@@ -195,11 +195,11 @@ test('mixed 81-week reproduction separates 94 false flags from five dated automa
     const result = preview({ contexts });
     assert.equal(result.total_scopes, 81);
     assert.equal(result.valid_declared_rest_count, 44);
-    assert.equal(result.safe_bulk_count, 3);
-    assert.equal(result.safe_day_change_count, 5);
+    assert.equal(result.safe_bulk_count, 0);
+    assert.equal(result.safe_day_change_count, 0);
     assert.equal(result.pending_scope_count, 3);
     assert.equal(result.pending_day_count, 5);
     assert.equal(result.already_resolved_count, 78);
     assert.equal(result.manual_exception_count, 0);
-    assert.equal(result.technical_conflict_count, 0);
+    assert.equal(result.technical_conflict_count, 3);
 });

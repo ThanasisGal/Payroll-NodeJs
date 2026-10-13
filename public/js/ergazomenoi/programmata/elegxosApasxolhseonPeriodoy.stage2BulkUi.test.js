@@ -313,7 +313,8 @@ const reasonTextarea = viewSource.match(/<textarea id="weeklyHrStage2PreviewReas
 assert.match(reasonTextarea, /employment-review-reason-textarea/);
 assert.match(reasonTextarea, /\brequired\b/);
 assert.doesNotMatch(reasonTextarea, /\b(?:readonly|disabled)\b/);
-assert.match(renderSource, new RegExp(`reason\\.value = '${defaultStage2Reason}'`));
+assert.ok(renderSource.includes(defaultStage2Reason));
+assert.match(renderSource, /Επιβεβαιώνω ότι οι επιλεγμένες μεταφορές αντιστοιχούν σε πραγματικές αναπαύσεις/);
 assert.doesNotMatch(previewSource, /employmentReviewSwal\(\{ icon: 'info'/);
 assert.match(cssSource, /max-width: min\(1200px, 94vw\)/);
 assert.match(cssSource, /\.employment-review-stage2-bulk-preview-modal \.modal-body \{[\s\S]*overflow-y: auto/);

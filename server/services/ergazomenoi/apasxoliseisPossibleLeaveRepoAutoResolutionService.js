@@ -3,6 +3,8 @@ const { startOfWeekMondayUtc, endOfWeekSundayUtc, dateKeyUtc } = require('../../
 const { isPossibleLeave, classifyLeaveProvenance, LEAVE_PROVENANCE } = require('./apasxoliseisLeaveProvenanceService');
 const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
 
+const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
+
 const RULE = 'REUSABLE_SOURCE_APPROVAL_WITH_UNIQUE_POSSIBLE_LEAVE_TARGET';
 const RULE_VERSION = 'possible-leave-repo-auto-resolution:v1';
 const AUTHORITY = 'BASED_ON_REUSABLE_HR_APPROVAL';
@@ -55,8 +57,11 @@ function sourceEligible(row) {
         row.mixed_profile !== true && row.category_repo_conflict !== true;
 }
 function targetEligible(row) {
+    const actualFacts = resolveDailyActualWorkFacts(row);
     const cardVerification = resolveCardPairVerification(row);
-    return text(row.kathgoria_ergasias) === 'ΕΡΓ' && number(row.ores_ergasias) > 0 &&
+    return actualFacts.countsAsActualWorkDay !== true && !(actualFacts.reasons || []).length &&
+        row.apousia_apologistika !== true &&
+        text(row.kathgoria_ergasias) === 'ΕΡΓ' && number(row.ores_ergasias) > 0 &&
         number(row.cards_ores_ergasias) === 0 && isPossibleLeave(row) &&
         cardVerification.hasUnresolvedCardEvidence !== true &&
         cardVerification.completePairs?.length === 0 &&

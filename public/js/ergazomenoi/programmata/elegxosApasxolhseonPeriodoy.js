@@ -9541,6 +9541,16 @@ function derivePeriodLifecyclePresentation(payloads = [], periodControl = null,
         } else {
             stage.presentation_status = 'ACTIVE';
         }
+        // Stage 2 remains pending until an explicit daily decision resolves it.
+        // Open the existing daily-decision controls for these scopes without
+        // releasing the final weekly check or unresolved transfer scopes.
+        if (stageKey === 'STAGE3' && ['COMPLETED', 'DEFERRED_TO_NEXT_PERIOD']
+            .includes(stages.STAGE1.business_status) &&
+            projections.some(({ lifecycle }) => lifecycle.stages.stage2
+                ?.resolution_route === 'STAGE3_HUMAN_DECISION' &&
+                lifecycle.stages.stage3?.enabled === true)) {
+            stage.presentation_status = 'ACTIVE';
+        }
         stage.enabled = !['LOCKED', 'DEFERRED_TO_NEXT_PERIOD'].includes(stage.presentation_status);
         stage.open_by_default = index === firstUnresolvedIndex;
     });
@@ -9774,6 +9784,19 @@ function stage2BulkExceptionReviewContext(exception = {}) {
 }
 
 async function reviewWeeklyHrStage2Exception(exception = {}) {
+    if (exception.resolution_route === 'STAGE3_HUMAN_DECISION') {
+        const panel = document.getElementById('employmentReviewStage3Collapse');
+        if (panel) {
+            const scrollToDecisions = () => (panel.querySelector('.stage3-week-group') || panel)
+                .scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (panel.classList.contains('show')) scrollToDecisions();
+            else {
+                panel.addEventListener('shown.bs.collapse', scrollToDecisions, { once: true });
+                bootstrap.Collapse.getOrCreateInstance(panel, { toggle: false }).show();
+            }
+        }
+        return;
+    }
     const review = stage2BulkExceptionReviewContext(exception);
     const sourceDate = review.found?.source?.date;
     const targetDate = review.found?.target?.date;
@@ -9857,6 +9880,18 @@ function renderWeeklyHrStage2BulkSummary(container) {
             employment-review-action-secondary weekly-hr-open-day" data-row-id="${escapeHtml(row._id)}">Προβολή ${escapeHtml(formatStage1DateKey(date))}</button>`
             : escapeHtml(formatStage1DateKey(date));
     }).join(' ');
+    const restDecisionExplanation = item => {
+        if (item.resolution_route !== 'STAGE3_HUMAN_DECISION') return '';
+        const evidence = item.rest_evidence || {};
+        return `<div class="employment-review-stage2-rest-evidence mt-1">Απαιτούμενες αναπαύσεις: <strong>${escapeHtml(evidence.required_count ?? '—')}</strong> ·
+            Τεκμηριωμένες: <strong>${escapeHtml(evidence.recognized_count ?? '—')}</strong> ·
+            Ελλείπουσες: <strong>${escapeHtml(evidence.missing_count ?? '—')}</strong>.<br>
+            Υποψήφιες ημέρες: ${escapeHtml((evidence.candidate_dates || []).map(formatStage1DateKey).join(', '))}.
+            Η απουσία κάρτας δεν αποδεικνύει ανάπαυση.
+            <ol class="mb-1"><li>Πατήστε «Απόφαση προσωπικού» για τις ημερήσιες αποφάσεις του Σταδίου 3.</li>
+            <li>Επιλέξτε μόνο τις επιβεβαιωμένες ημέρες και ελέγξτε την προεπισκόπηση.</li></ol>
+            Καμία αλλαγή δεν αποθηκεύτηκε. Αναφορά: ${escapeHtml(item.code)}.</div>`;
+    };
     const restExplanation = item => item.code === 'REST_CLASSIFICATION_REVIEW_REQUIRED'
         ? `<div class="small">Απαιτείται ανθρώπινη απόφαση. ${escapeHtml((item.diagnostics || [])
             .filter(detail => detail.code !== item.code).map(detail =>
@@ -9870,10 +9905,10 @@ function renderWeeklyHrStage2BulkSummary(container) {
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(
             formatStage1DateKey(item.week_end))}</td>
         <td ${guidanceAttributes(item)}>${employmentReviewGuidanceInfo(guidanceAttributes(item))}${escapeHtml([...new Set([item.code, ...(item.reasons || [])])]
-            .filter(Boolean).map(code => getStage2LifecycleReasonLabel(code, false)).join(' · '))}${restExplanation(item)}</td>
+            .filter(Boolean).map(code => getStage2LifecycleReasonLabel(code, false)).join(' · '))}${restExplanation(item)}${restDecisionExplanation(item)}</td>
         <td>${item.code === 'REST_CLASSIFICATION_REVIEW_REQUIRED' ? reviewDays(item)
             : `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-exception-review"
-            data-exception-index="${index}">Έλεγχος</button>`}</td>
+            data-exception-index="${index}">${item.resolution_route === 'STAGE3_HUMAN_DECISION' ? 'Απόφαση προσωπικού' : 'Έλεγχος'}</button>`}</td>
     </tr>`).join('') + technicalConflicts.map(item => `<tr class="weekly-hr-stage2-technical-conflict">
         <td>${escapeHtml(item.employee_kodikos || '—')}</td>
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(formatStage1DateKey(item.week_end))}</td>
@@ -10005,7 +10040,9 @@ async function showWeeklyHrStage2BulkPreviewModal(preview, firstPageResult) {
     let pageResult = firstPageResult;
     let outcome = { isConfirmed: false, value: '' };
     let paginationError = null;
-    reason.value = 'Εφαρμογή των ασφαλών αυτόματων τακτοποιήσεων του Σταδίου 2, όπως προτάθηκαν από τον Έλεγχο Απασχολήσεων.';
+    reason.value = Number(preview.safe_pair_count || 0) > 0
+        ? 'Επιβεβαιώνω ότι οι επιλεγμένες μεταφορές αντιστοιχούν σε πραγματικές αναπαύσεις, αφού εξέτασα τις ημέρες προέλευσης και προορισμού.'
+        : 'Εφαρμογή των ασφαλών αυτόματων τακτοποιήσεων του Σταδίου 2, όπως προτάθηκαν από τον Έλεγχο Απασχολήσεων.';
     reason.classList.remove('is-invalid');
     reason.setCustomValidity('');
     const loadPage = async (page) => {
@@ -10448,7 +10485,7 @@ const STAGE3_NON_WORK_DEFAULT_REASON =
 
 function stage3ClassificationOptions(item) {
     const labels = { LEAVE: 'ΑΔΕΙΑ', SICKNESS: 'ΑΣΘΕΝΕΙΑ', ABSENCE: 'ΑΠΟΥΣΙΑ',
-        NON_WORK: 'ΜΗ ΕΡΓΑΣΙΑ' };
+        NON_WORK: 'ΜΗ ΕΡΓΑΣΙΑ', REST_REPO: 'ΡΕΠΟ — ΕΠΙΒΕΒΑΙΩΣΗ ΠΡΟΣΩΠΙΚΟΥ' };
     return '<option value="">Επιλέξτε</option>' + (item.allowed_classifications || [])
         .map((value) => `<option value="${value}">${labels[value]}</option>`).join('');
 }
@@ -10464,7 +10501,7 @@ function updateStage3LeaveCategoryVisibility(classificationSelect) {
 
 function stage3DecisionClassificationLabel(value) {
     return { LEAVE: 'Άδεια', SICKNESS: 'Ασθένεια', ABSENCE: 'Απουσία',
-        NON_WORK: 'Μη εργασία', ΑΔΕΙΑ: 'Άδεια', ΑΣΘΕΝΕΙΑ: 'Ασθένεια',
+        NON_WORK: 'Μη εργασία', REST_REPO: 'Ρεπό — επιβεβαίωση προσωπικού', ΑΔΕΙΑ: 'Άδεια', ΑΣΘΕΝΕΙΑ: 'Ασθένεια',
         ΑΠΟΥΣΙΑ: 'Απουσία', ΜΕ: 'Μη εργασία', ΑΝ: 'Ρεπό', ΕΡΓ: 'Εργασία' }[
         String(value || '').trim().toUpperCase()] || '';
 }
@@ -10615,7 +10652,7 @@ function stage3DecisionReason(item = {}) {
 function stage3DecisionExplanation(item = {}) {
     const facts = item.presentation_facts || {};
     const allowedLabels = { LEAVE: 'Άδεια', SICKNESS: 'Ασθένεια', ABSENCE: 'Απουσία',
-        NON_WORK: 'Μη εργασία' };
+        NON_WORK: 'Μη εργασία', REST_REPO: 'Ρεπό — επιβεβαίωση προσωπικού' };
     const allowed = (item.allowed_classifications || []).map((value) => allowedLabels[value])
         .filter(Boolean);
     const lines = [];
@@ -10626,6 +10663,11 @@ function stage3DecisionExplanation(item = {}) {
     if (facts.actual_work_missing === true) {
         lines.push({ type: 'information',
             text: 'Δεν προέκυψε πραγματική εργασία από κάρτες ή άλλα διαθέσιμα στοιχεία.' });
+    }
+    if (facts.weekly_rest_missing_count > 0) {
+        lines.push({ type: 'decision', text: `Απαιτούμενες αναπαύσεις: ${facts.weekly_rest_required_count}. ` +
+            `Τεκμηριωμένες: ${facts.weekly_rest_recognized_count}. Ελλείπουσες: ${facts.weekly_rest_missing_count}. ` +
+            'Η απουσία κάρτας δεν αποδεικνύει ανάπαυση. Επιβεβαιώστε ρητά ποιες ημέρες ήταν ρεπό.' });
     }
     if (facts.weekly_rest_already_satisfied === true) {
         lines.push({ type: 'resolved',
@@ -10638,7 +10680,7 @@ function stage3DecisionExplanation(item = {}) {
         lines.push({ type: 'blocker',
             text: 'Ορισμένα διαθέσιμα στοιχεία είναι ελλιπή ή αμφίσημα και χρειάζονται προσεκτική ανθρώπινη εξέταση.' });
     }
-    lines.push({ type: 'decision', text: `Χρειάζεται τελικός χαρακτηρισμός από το HR${
+    lines.push({ type: 'decision', text: `Χρειάζεται τελικός χαρακτηρισμός από τον υπεύθυνο προσωπικού${
         allowed.length ? `: ${allowed.join(', ')}.` : '.'}` });
     return lines;
 }
@@ -10692,7 +10734,11 @@ function renderStage3DecisionItem(group, item) {
         <td>${escapeHtml(item.employment_label || 'Άγνωστο')}</td>
         <td>${escapeHtml(stage3DeclaredPresentation(row, daily, item))}</td>
         <td>${escapeHtml(stage3ActualWorkPresentation(row, daily, item))}</td>
-        <td class="small stage3-decision-reason"><strong>Γιατί απαιτείται απόφαση:</strong>${stage3DecisionExplanationHtml(item)}</td>
+        <td class="small stage3-decision-reason"><strong>Γιατί απαιτείται απόφαση:</strong>${
+            (item.presentation_facts?.weekly_rest_candidate_dates || []).includes(item.date)
+                ? `<div>Η απουσία κάρτας δεν αποδεικνύει ανάπαυση. Χρειάζεται ρητή απόφαση προσωπικού.</div>
+                    <details class="mt-1"><summary>Αναλυτική εξήγηση</summary>${stage3DecisionExplanationHtml(item)}</details>`
+                : stage3DecisionExplanationHtml(item)}</td>
         <td class="stage3-decision-classification"><select class="form-select form-select-sm weekly-hr-stage3-classification"
                 data-row-id="${escapeHtml(item.row_id)}">${stage3ClassificationOptions(item)}</select>
             <select class="form-select form-select-sm mt-1 weekly-hr-stage3-leave-category d-none"
@@ -10707,6 +10753,18 @@ function stage3BoundaryWeekGuidance(group = {}) {
     return '<div class="small text-muted border-start border-3 ps-2 mb-2 stage3-boundary-week-guidance">' +
         'Η εβδομάδα περιλαμβάνει ημέρες από άλλη περίοδο. ' +
         'Οι ημέρες αυτές εμφανίζονται μόνο για πλαίσιο και δεν αλλάζουν από εδώ.</div>';
+}
+
+function stage3WeeklyRestSummary(group = {}) {
+    const item = (group.pending_items || []).find(item =>
+        (item.presentation_facts?.weekly_rest_candidate_dates || []).includes(item.date));
+    if (!item) return '';
+    const facts = item.presentation_facts;
+    return `<div class="stage3-weekly-rest-summary mb-2">Εβδομαδιαίες αναπαύσεις:
+        απαιτούμενες <strong>${escapeHtml(facts.weekly_rest_required_count ?? '—')}</strong> ·
+        τεκμηριωμένες <strong>${escapeHtml(facts.weekly_rest_recognized_count ?? '—')}</strong> ·
+        ελλείπουσες <strong>${escapeHtml(facts.weekly_rest_missing_count ?? '—')}</strong>.
+        Η επιλογή ρεπό απαιτεί επιβεβαίωση προσωπικού.</div>`;
 }
 
 function renderWeeklyHrStage3(lifecycle) {
@@ -10734,7 +10792,7 @@ function renderWeeklyHrStage3(lifecycle) {
                         formatStage1DateKey(group.scope.week_end))} · <span class="badge text-bg-warning">${escapeHtml(
                             group.pending_items.length)} προς απόφαση</span></div>
                 </div>
-                ${stage3BoundaryWeekGuidance(group)}
+                ${stage3BoundaryWeekGuidance(group)}${stage3WeeklyRestSummary(group)}
                 <div class="table-responsive stage3-decisions-table-wrapper"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
                     <colgroup>
                         <col class="stage3-col-select"><col class="stage3-col-date"><col class="stage3-col-day">
@@ -10783,7 +10841,7 @@ function weeklyHrStage3BulkSelectedItems() {
 }
 
 function weeklyHrStage3BulkAllowedClassifications(items = weeklyHrStage3BulkSelectedItems()) {
-    const order = ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'];
+    const order = ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO'];
     if (!items.length) return [];
     return order.filter((value) => items.every((item) =>
         (item.allowed_classifications || []).includes(value)));
@@ -10791,7 +10849,7 @@ function weeklyHrStage3BulkAllowedClassifications(items = weeklyHrStage3BulkSele
 
 function weeklyHrStage3BulkClassificationLabel(value) {
     return { LEAVE: 'ΑΔΕΙΑ', SICKNESS: 'ΑΣΘΕΝΕΙΑ', ABSENCE: 'ΑΠΟΥΣΙΑ',
-        NON_WORK: 'ΜΗ ΕΡΓΑΣΙΑ' }[String(value || '')] || '';
+        NON_WORK: 'ΜΗ ΕΡΓΑΣΙΑ', REST_REPO: 'ΡΕΠΟ — ΕΠΙΒΕΒΑΙΩΣΗ ΠΡΟΣΩΠΙΚΟΥ' }[String(value || '')] || '';
 }
 
 function invalidateWeeklyHrStage3FrozenApply() {

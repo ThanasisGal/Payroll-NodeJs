@@ -78,7 +78,10 @@ async function createStage1CompletionFixture(uri, vendorDir) {
         ['stage1/bulk-complete', controller.completeWeeklyHrWorkflowStage1Bulk],
         ['stage1/bulk-classify-days', controller.saveWeeklyHrStage1DailyClassificationsBulk],
         ['stage2/complete', controller.completeWeeklyHrWorkflowStage2],
-        ['stage2/bulk-complete', controller.completeWeeklyHrWorkflowStage2Bulk]
+        ['stage2/bulk-complete', controller.completeWeeklyHrWorkflowStage2Bulk],
+        ['stage3/resolve-day', controller.resolveWeeklyHrStage3Day],
+        ['stage3/bulk-preview', controller.previewWeeklyHrStage3Bulk],
+        ['stage3/bulk-apply', controller.applyWeeklyHrStage3Bulk]
     ]) app.post(prefix + '/weekly-hr-workflow/' + route, requireCriticalEmploymentDecisionRole, handler);
     // Ancillary read uses the real category records, with no external requests.
     app.get('/api/dropdown/ergazomenoi/kathgoria_adeias', async (_req, res) => res.json({

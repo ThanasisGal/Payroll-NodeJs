@@ -16545,19 +16545,19 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage3-decisions-table {
     width: 100%;
-    min-width: 82rem;
+    min-width: 0;
     table-layout: fixed;
 }
-.weekly-hr-stage3-decisions-table .stage3-col-select { width: 2.25rem; }
+.weekly-hr-stage3-decisions-table .stage3-col-select { width: 3%; }
 
-.weekly-hr-stage3-decisions-table .stage3-col-date { width: 9%; }
+.weekly-hr-stage3-decisions-table .stage3-col-date { width: 12%; }
 .weekly-hr-stage3-decisions-table .stage3-col-day { width: 6%; }
 .weekly-hr-stage3-decisions-table .stage3-col-day-status { width: 9%; }
-.weekly-hr-stage3-decisions-table .stage3-col-declared { width: 11%; }
-.weekly-hr-stage3-decisions-table .stage3-col-actual { width: 11%; }
-.weekly-hr-stage3-decisions-table .stage3-col-reason { width: 23%; }
-.weekly-hr-stage3-decisions-table .stage3-col-classification { width: 17%; }
-.weekly-hr-stage3-decisions-table .stage3-col-action { width: 14%; }
+.weekly-hr-stage3-decisions-table .stage3-col-declared { width: 9%; }
+.weekly-hr-stage3-decisions-table .stage3-col-actual { width: 9%; }
+.weekly-hr-stage3-decisions-table .stage3-col-reason { width: 16%; }
+.weekly-hr-stage3-decisions-table .stage3-col-classification { width: 14%; }
+.weekly-hr-stage3-decisions-table .stage3-col-action { width: 23%; }
 
 .weekly-hr-stage3-decisions-table th,
 .weekly-hr-stage3-decisions-table td {
@@ -17307,4 +17307,12 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 #employmentReviewStage4Collapse .employee-group-badges { margin-left: auto; display: flex; gap: .4rem; flex-wrap: wrap; }
 #employmentReviewStage4Collapse .employee-group-row[aria-expanded="true"] > td {
     box-shadow: inset 3px 0 #526d82;
+}
+
+/* Weekly-rest evidence must remain readable at the supported desktop widths. */
+.employment-review-stage2-rest-evidence,
+.stage3-weekly-rest-summary,
+.weekly-hr-stage3-decisions-table .stage3-decision-reason {
+    font-size: 0.875rem;
+    line-height: 1.5;
 }

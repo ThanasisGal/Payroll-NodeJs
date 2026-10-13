@@ -189,17 +189,15 @@ assert.deepEqual(completed0014.stages.stage1.reviewed_possible_leave_dates,
     ['2026-06-17']);
 assert.deepEqual(completed0014.stages.stage3.raw_remaining_possible_leave_dates,
     ['2026-06-17']);
-assert.deepEqual(completed0014.stages.stage3.resolved_before_stage3_dates,
-    ['2026-06-17']);
-assert.deepEqual(completed0014.stages.stage3.pending_dates, []);
-assert.equal(completed0014.stages.stage3.remaining_possible_leave_count, 0);
-assert.equal(completed0014.stages.stage3.business_status, 'COMPLETED');
-assert.deepEqual(completed0014.stages.stage3.stage2_automatic_resolution_items,
-    [{ date: '2026-06-17', classification: 'REST_REPO',
-        reason: 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }]);
+assert.deepEqual(completed0014.stages.stage3.resolved_before_stage3_dates, []);
+assert.deepEqual(completed0014.stages.stage3.pending_dates, ['2026-06-17']);
+assert.equal(completed0014.stages.stage3.remaining_possible_leave_count, 1);
+assert.equal(completed0014.stages.stage3.business_status, 'OPEN');
+assert.deepEqual(completed0014.stages.stage3.stage2_automatic_resolution_items, []);
 assert.equal(completed0014.stages.stage2.business_status, 'OPEN');
+assert.equal(completed0014.stages.stage3.enabled, true);
 assert.equal(completed0014.stages.stage4.analysis_presentation_status, 'PROVISIONAL');
-assert.ok(completed0014.stages.stage4.blockers.includes('STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED'));
+assert.equal(completed0014.stages.stage4.final_weekly_analysis_available, false);
 
 function authoritativeStage3FingerprintContext({ projection, rows, selectedDate,
     scope, stage2Version = 0, dailyProfile = profile }) {
@@ -265,8 +263,8 @@ const fullRepoResolvedProjection = buildWeeklyHrLifecycleProjection({
     persistedStage1State: { status: 'COMPLETED',
         completion_fingerprint: buildStage1Fingerprint(fullRepoResolved).fingerprint }
 });
-assert.deepEqual(fullRepoResolvedProjection.stages.stage3.pending_dates, []);
-assert.equal(fullRepoResolvedProjection.stages.stage3.pending_count, 0);
+assert.deepEqual(fullRepoResolvedProjection.stages.stage3.pending_dates, ['2026-06-16']);
+assert.equal(fullRepoResolvedProjection.stages.stage3.pending_count, 1);
 
 // Έγκυρη ολοκλήρωση του Σταδίου 1 επιτρέπει στο Στάδιο 2 να επιλύσει
 // αχαρακτήριστη ημέρα μη πλήρους απασχόλησης χωρίς εργασία ως ΜΗ ΕΡΓΑΣΙΑ.
@@ -303,9 +301,9 @@ for (const [system, days, expected] of [
             hmeres_ergasias_ebdomadas: days
         } }
     });
-    assert.equal(items[0].classification, expected, `${system}/${days}`);
+    assert.equal(items[0].classification, expected === 'REST_REPO' ? null : expected, `${system}/${days}`);
 }
-assert.deepEqual(completed0014.stages.stage3.pending_items, []);
+assert.equal(completed0014.stages.stage3.pending_items.length, 1);
 const unknown0014AtStage3Version = buildWeeklyHrLifecycleProjection({
     weekRows: employee0014, effectiveProfile: profile,
     effectiveProfilesByDate: { '2026-06-17': {} },
@@ -369,10 +367,10 @@ const reviewed0014Weeks = [
             completion_fingerprint: buildStage1Fingerprint(fixture).fingerprint } });
 });
 assert.equal(reviewed0014Weeks.reduce((sum, projection) =>
-    sum + projection.stages.stage3.pending_count, 0), 0);
+    sum + projection.stages.stage3.pending_count, 0), 4);
 assert.deepEqual(reviewed0014Weeks.flatMap((projection) =>
     projection.stages.stage3.pending_dates),
-[]);
+['2026-06-03', '2026-06-09', '2026-06-10', '2026-06-22']);
 
 const rotationalResidual = week('rotational');
 rotationalResidual[1] = possibleLeave(rotationalResidual[1]);
@@ -413,12 +411,12 @@ const deterministicFullProjection = buildWeeklyHrLifecycleProjection({
     weekRows: deterministicFullRepo, effectiveProfile: profile,
     persistedStage1State: { status: 'COMPLETED',
         completion_fingerprint: buildStage1Fingerprint(deterministicFullRepo).fingerprint } });
-assert.deepEqual(deterministicFullProjection.stages.stage3.pending_dates, []);
-assert.deepEqual(deterministicFullProjection.stages.stage3.stage2_automatic_resolved_dates,
-    ['2026-06-22']);
+assert.deepEqual(deterministicFullProjection.stages.stage3.pending_dates, ['2026-06-22']);
+assert.deepEqual(deterministicFullProjection.stages.stage3.stage2_automatic_resolved_dates, []);
 assert.deepEqual(deterministicFullProjection.stage1_no_classification_preview_items, [{
-    date: '2026-06-22', safe: true, classification: 'REST_REPO',
-    source_date: null, reasons: []
+    date: '2026-06-22', safe: false, classification: null,
+    source_date: null, requires_further_review: true,
+    reasons: ['NO_SOURCE_CANDIDATE', 'SOURCE_ALREADY_PROCESSED']
 }]);
 const deterministicFullAfterStage2 = deterministicFullRepo.map((row) => ({ ...row }));
 Object.assign(deterministicFullAfterStage2[0], { apologistiko_biblio: true,
@@ -680,8 +678,9 @@ const ambiguousPreview = buildStage1NoClassificationPreviewItems({
     repoTransfer: { reasons: ['MULTIPLE_SOURCE_CANDIDATES'] },
     stage2Actionability: { has_transferable_pair: false, has_bounded_selection: true }
 });
-assert.deepEqual(ambiguousPreview, [{ date: '2026-06-19', safe: true,
-    classification: 'REST_REPO', source_date: null, reasons: [] }]);
+assert.deepEqual(ambiguousPreview, [{ date: '2026-06-19', safe: false,
+    classification: null, source_date: null, requires_further_review: true,
+    reasons: ['MULTIPLE_SOURCE_CANDIDATES'] }]);
 
 const crossMonth = week('0014', '2026-06-29');
 crossMonth[0] = possibleLeave(crossMonth[0]);
@@ -1107,14 +1106,13 @@ const mayBoundaryLifecycle = buildWeeklyHrLifecycleProjection({
 });
 assert.equal(mayBoundaryLifecycle.stages.stage1.business_status, 'COMPLETED');
 assert.equal(mayBoundaryLifecycle.stages.stage2.business_status, 'OPEN');
-assert.ok(mayBoundaryLifecycle.stages.stage4.blockers.includes('STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED'));
-assert.equal(mayBoundaryLifecycle.stages.stage3.business_status, 'COMPLETED');
-assert.equal(mayBoundaryLifecycle.stages.stage3.pending_count, 0);
-assert.deepEqual(mayBoundaryLifecycle.stages.stage3.pending_dates,
-    []);
+assert.equal(mayBoundaryLifecycle.stages.stage4.final_weekly_analysis_available, false);
+assert.equal(mayBoundaryLifecycle.stages.stage3.business_status, 'OPEN');
+assert.equal(mayBoundaryLifecycle.stages.stage3.pending_count, 2);
+assert.deepEqual(mayBoundaryLifecycle.stages.stage3.pending_dates, ['2026-05-02', '2026-05-03']);
 assert.deepEqual(mayBoundaryLifecycle.stages.stage3.stage2_automatic_resolution_items
     .map((item) => [item.date, item.classification]),
-[['2026-05-02', 'REST_REPO'], ['2026-05-03', 'REST_REPO']]);
+[]);
 assert.deepEqual(mayBoundaryLifecycle.employment_date_scope.context_only_dates,
     ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30']);
 assert.deepEqual(mayBoundaryLifecycle.employment_date_scope.authoritative_date_set,

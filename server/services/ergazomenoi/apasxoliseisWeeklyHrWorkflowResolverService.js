@@ -149,12 +149,17 @@ function resolveWeeklyHrWorkflow({
         });
     }
 
+    const historicalWorkdays = [...new Set(expectedDates.map(date => {
+        const terms = Object.hasOwn(effectiveProfilesByDate || {}, date)
+            ? effectiveProfilesByDate[date] : effectiveProfile;
+        return Number(String(terms?.hmeres_ergasias_ebdomadas ?? '').replace(',', '.').trim());
+    }))];
     const profile = {
         ...(effectiveProfile && typeof effectiveProfile === 'object'
             ? effectiveProfile : {}),
         profile_changed_inside_week:
             profile_changed_inside_week === true ||
-            effectiveProfile?.profile_changed_inside_week === true
+            effectiveProfile?.profile_changed_inside_week === true || historicalWorkdays.length > 1
     };
     const expectedRepoResolution = resolveEffectiveExpectedWeeklyRepo({
         weekRows: orderedRows,
@@ -226,7 +231,10 @@ function resolveWeeklyHrWorkflow({
         }
     });
 
-    const expectedRepoCount = expectedRepoResolution.effectiveExpectedWeeklyRepo;
+    // Days outside employment never create a weekly obligation.
+    const expectedRepoCount = expectedRepoResolution.ok
+        ? Math.max(0, expectedDates.length - expectedRepoResolution.effectiveWeeklyWorkdays)
+        : null;
     const restingRepoDays = orderedRows.filter((row) => {
         const date = dateKeyUtc(row.hmeromhnia);
         if (classifiedDateSet.has(date)) return false;
@@ -321,7 +329,8 @@ function resolveWeeklyHrWorkflow({
     const selectedKeys = selectedTransfers.map((transfer) =>
         pairKey(transfer.source_date, transfer.target_date));
     if (repo_resolution_completed === true &&
-        (selectedKeys.some((key) => !candidateKeys.has(key)) ||
+        (selectedTransfers.length > (repoDeficitBefore || 0) ||
+            selectedKeys.some((key) => !candidateKeys.has(key)) ||
             new Set(selectedTransfers.map((item) => item.source_date)).size !== selectedTransfers.length ||
             new Set(selectedTransfers.map((item) => item.target_date)).size !== selectedTransfers.length)) {
         block('SELECTED_REPO_TRANSFER_NOT_CURRENTLY_VALID', selectedTransfers.flatMap(item =>
@@ -330,25 +339,12 @@ function resolveWeeklyHrWorkflow({
     const validSelectedCount = repo_resolution_completed === true && blockingReasons.length === 0
         ? Math.min(selectedTransfers.length, repoDeficitBefore || 0)
         : 0;
-    const uniqueDirectProposal = repo_resolution_completed !== true &&
-        directRepoCandidates.length === 1 ? directRepoCandidates[0] : null;
-    const uniqueTransferProposal = repo_resolution_completed !== true &&
-        repoTransferCandidates.length === 1 ? repoTransferCandidates[0] : null;
-    const proposedTargetDates = [
-        uniqueDirectProposal?.date,
-        uniqueTransferProposal?.target_date
-    ].filter(Boolean);
-    const uniquelyProposedCount = Math.min(
-        new Set(proposedTargetDates).size,
-        repoDeficitBefore || 0
-    );
+    // A candidate (even the only candidate) is not evidence of rest taken.
     const repoDeficitAfter = repoDeficitBefore === null ? null : Math.max(
-        repoDeficitBefore - (repo_resolution_completed ? validSelectedCount : uniquelyProposedCount),
-        0
-    );
-    const usedTargetDates = new Set(repo_resolution_completed === true
-        ? selectedTransfers.map((transfer) => transfer.target_date)
-        : proposedTargetDates);
+        repoDeficitBefore - validSelectedCount, 0);
+    const usedTargetDates = new Set(repo_resolution_completed === true &&
+        blockingReasons.length === 0
+        ? selectedTransfers.map((transfer) => transfer.target_date) : []);
     const knownRepoIdentityDaysAfterProposal = [...new Set([
         ...knownRepoIdentityDays,
         ...usedTargetDates

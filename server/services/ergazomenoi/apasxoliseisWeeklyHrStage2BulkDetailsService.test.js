@@ -20,11 +20,11 @@ function context(index) {
         kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE', adeia_apologistika: false,
         astheneia_apologistika: false, apousia_apologistika: false,
         ores_ergasias_apologistika: 8 }],
-    effectiveProfilesByDate: { [date]: { typos_apasxolhshs: '0' } },
+    effectiveProfilesByDate: { [date]: { typos_apasxolhshs: '1', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4 } },
     workflowState: { stage1: { status: 'COMPLETED' } },
     upstream: { stage1_current_fingerprint: 'a'.repeat(64) }, lifecycle: { stages: {
         stage2: {}, stage3: { pending_dates: [], stage2_automatic_resolution_items: [
-            { date, classification: 'REST_REPO' }] } } } };
+            { date, classification: 'NON_WORK' }] } } } };
 }
 
 const contexts = Array.from({ length: 7 }, (_, index) => context(index));
@@ -37,7 +37,7 @@ assert.deepEqual(Object.keys(details[0]).sort(), ['after', 'before', 'date', 'em
     'employee_kodikos', 'safety_reason', 'week_end', 'week_start'].sort());
 assert.match(details[0].employee, /0000 — ΔΟΚΙΜΗ ΧΡΗΣΤΗΣ/);
 assert.equal(details[0].before, 'Πιθανή άδεια');
-assert.equal(details[0].after, 'Ρεπό');
+assert.equal(details[0].after, 'Μη εργασία');
 assert.equal(details.length <= 50, true);
 
 // The main search intentionally keeps only the profile fields needed by Stage 2, while the
@@ -45,7 +45,7 @@ assert.equal(details.length <= 50, true);
 // produce the same guarded fingerprint on the first details request.
 const fullProfileContext = context(0);
 fullProfileContext.effectiveProfilesByDate['2026-05-04'] = {
-    typos_apasxolhshs: '0', employee_id: 'employee-0', valid_from: '2026-01-01',
+    typos_apasxolhshs: '1', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4, employee_id: 'employee-0', valid_from: '2026-01-01',
     unrelated_loader_field: 'not part of the Stage-2 safety decision'
 };
 const requestScope = { team: 'team-a', company_kod: 'company-a', ypokatasthma: '0001',
@@ -62,14 +62,14 @@ assert.equal(firstPage.page_size, 50);
 
 const changedProfileContext = context(0);
 changedProfileContext.effectiveProfilesByDate['2026-05-04'] = {
-    typos_apasxolhshs: '1', employee_id: 'employee-0', valid_from: '2026-01-01'
+    typos_apasxolhshs: '0', employee_id: 'employee-0', valid_from: '2026-01-01'
 };
 assert.throws(() => buildWeeklyHrStage2BulkDetails({ contexts: [changedProfileContext],
     cachedSeeds: [firstPage.cachedSeeds[0]] }),
 { code: 'STAGE2_INPUT_CHANGED', statusCode: 409 });
 
 const changed = context(0);
-changed.rows[0].kathgoria_ergasias_apologistika = 'ΜΕ';
+changed.rows[0].kathgoria_ergasias_apologistika = 'ΑΝ';
 assert.throws(() => buildWeeklyHrStage2BulkDetails({ contexts: [changed],
     cachedSeeds: [{ ...preview.safe_scope_ids[0], row_ids: ['row-0'] }] }),
 { code: 'STAGE2_INPUT_CHANGED', statusCode: 409 });

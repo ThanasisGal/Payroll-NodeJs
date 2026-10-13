@@ -12703,46 +12703,17 @@ class erganhController {
                         return { completed: true, idempotent:
                             created.idempotent === true || applied.idempotent === true };
                     }
-                    const mutableRows = context.rows.map((row) => ({ ...row }));
-                    const stateModel = { findOne: () => ({ session() { return this; },
-                        lean: async () => context.workflowState }),
-                    collection: ApasxoliseisWeeklyHrWorkflowStateModel.collection };
-                    const auditModel = { findOne: (filter) => ({ session() { return this; },
-                        lean: async () => context.audits.find((audit) =>
-                            audit.request_id === filter.request_id) || null }),
-                    create: (...args) => ApasxoliseisWeeklyHrWorkflowAuditModel.create(...args) };
                     const runStage2Fence = prepared.periodAccess.state.effective_mode ===
                         'HISTORICAL_RECONSTRUCTION_STALE'
                         ? runWithStaleStage2MaterializationWriteFence : runWithPeriodWriteFence;
                     return completeWeeklyHrWorkflowStage2({ initialContext: context, actor,
-                        reason_or_notes, request_id, stateModel, auditModel,
-                        loadFreshContext: async () => context,
-                        writeDaily: async (input) => {
-                            const written = await writeCanonicalDailyClassification(input);
-                            const target = mutableRows.find((row) =>
-                                String(row._id) === String(input.row._id));
-                            if (target && written.updates) Object.assign(target, written.updates,
-                                { is_locked: true, locked_by: actor.user_name,
-                                    kathgoria_ergasias_apologistika_original:
-                                        written.updates.kathgoria_ergasias_apologistika,
-                                    repo_apologistika_original: written.updates.repo_apologistika });
-                            return written;
-                        },
-                        loadPostWriteContext: async () => {
-                            const lifecycle = buildWeeklyHrLifecycleProjection({
-                                weekRows: mutableRows, effectiveProfile: context.effectiveProfile,
-                                effectiveProfilesByDate: context.effectiveProfilesByDate,
-                                persistedStage1State: context.workflowState.stage1 || null,
-                                persistedStage2State: context.workflowState.stage2 || null,
-                                persistedStage3State: context.workflowState.stage3 || null,
-                                scope: context.scope, periodScope: context.periodScope,
-                                employmentDateScope: context.employmentDateScope,
-                                companySettings: context.companySettings });
-                            return { ...context, rows: mutableRows, lifecycle,
-                                upstream: { ...context.upstream,
-                                    stage1_current_fingerprint:
-                                        lifecycle.stages.stage1.current_completion_fingerprint } };
-                        },
+                        reason_or_notes, request_id,
+                        // Re-read daily evidence, historical terms and state in the
+                        // write transaction; a prepared batch is only a preview.
+                        loadFreshContext: ({ session }) => loadWeeklyHrStage2CompletionContext({
+                            req, input: { ...req.body, ...context.scope }, session }),
+                        loadPostWriteContext: ({ session }) => loadWeeklyHrStage2CompletionContext({
+                            req, input: { ...req.body, ...context.scope }, session }),
                         transactionRunner: async (work) => {
                             const fenced = await runStage2Fence({
                                 scope: prepared.periodAccess.scope, expectedToken: {

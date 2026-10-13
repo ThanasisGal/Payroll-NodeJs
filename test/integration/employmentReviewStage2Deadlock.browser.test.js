@@ -16,8 +16,8 @@ test('Stage 2 reconciles participation, dated approvals and real conflicts throu
     t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-30T12:00:00Z').getTime() });
     const data = await createStage1CompletionFixture(uri, vendor);
     t.after(() => mongoose.disconnect());
-    const terms = { kathestos_apasxolhshs: '0', typos_apasxolhshs: '0', typos_ebdomadas: '5ΗΜΕΡΗ',
-        hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
+    const terms = { kathestos_apasxolhshs: '2', typos_apasxolhshs: '2', typos_ebdomadas: '5ΗΜΕΡΗ',
+        hmeres_ergasias_ebdomadas: 2, ores_ergasias_ebdomadas: 16, mo_oron_hmerhsias_ergasias: 8 };
     await data.E.updateOne({ _id: data.employee._id }, { $set: terms });
     for (const row of data.rows) {
         const date = dateKey(row.hmeromhnia);
@@ -155,6 +155,28 @@ test('Stage 2 reconciles participation, dated approvals and real conflicts throu
     assert.equal(await data.snapshot(), competingChange, 'a changed daily input cannot be overwritten');
     await data.D.collection.updateOne({ _id: day('2026-09-05')._id }, { $set: {
         repo_apologistika: false } });
+    // A profile can change after batch preparation but before the first
+    // transaction read. The final writer must reload historical terms itself.
+    const beforeTermsRace = await data.snapshot();
+    const originalStartSession = mongoose.startSession;
+    let injected = false;
+    const intercepted = t.mock.method(mongoose, 'startSession', async function(...args) {
+        if (!injected) {
+            injected = true;
+            await data.E.updateOne({ _id: data.employee._id }, { $set: {
+                kathestos_apasxolhshs: '0', typos_apasxolhshs: '0',
+                hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40 } });
+        }
+        return originalStartSession.apply(this, args);
+    });
+    const termsRace = await post('stage2/bulk-complete', { ...command,
+        bulk_request_id: 'stage2-deadlock-terms' });
+    intercepted.mock.restore();
+    assert.equal(injected, true);
+    assert.equal(termsRace.applied, 0, JSON.stringify(termsRace));
+    assert.equal(termsRace.stale, 1, JSON.stringify(termsRace));
+    assert.equal(await data.snapshot(), beforeTermsRace, 'prepared terms must not override current terms');
+    await data.E.updateOne({ _id: data.employee._id }, { $set: terms });
     const applied = await post('stage2/bulk-complete', command);
     assert.equal(applied.applied, 1, JSON.stringify(applied));
     assert.equal(applied.failed, 0, JSON.stringify(applied));

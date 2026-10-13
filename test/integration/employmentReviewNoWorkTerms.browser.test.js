@@ -58,7 +58,8 @@ test('date-effective AN/ME agrees between Stage 1, search, Stage 2 preview and a
             const week = await (await fetch(prefix + '/weekly-hr-workflow/stage1?' +
                 new URLSearchParams(data.scope))).json();
             assert.deepEqual(week.lifecycle_projection.stage1_no_classification_preview_items
-                .map(item => item.classification), [classification, classification]);
+                .map(item => item.classification), classification === 'REST_REPO'
+                    ? [null, null] : [classification, classification]);
             assert.equal(week.lifecycle_projection.stages.stage1.business_status, 'OPEN');
             assert.deepEqual(week.lifecycle_projection.stages.stage3.stage2_automatic_resolution_items, []);
             const before = await data.D.find(data.base).sort({ hmeromhnia: 1 }).lean();
@@ -84,6 +85,20 @@ test('date-effective AN/ME agrees between Stage 1, search, Stage 2 preview and a
                 await loadResults();
             });
             const preview = await page.evaluate(() => currentWeeklyHrStage2BulkPreview);
+            if (classification === 'REST_REPO') {
+                assert.equal(preview.safe_automatic_count, 0);
+                assert.equal(preview.safe_day_change_count, 0);
+                assert.equal(preview.manual_exception_count, 1);
+                assert.equal(await page.locator('.weekly-hr-stage2-bulk-complete').isDisabled(), true);
+                const fresh = await (await fetch(prefix + '/weekly-hr-workflow/stage1?' +
+                    new URLSearchParams(data.scope))).json();
+                assert.equal(fresh.lifecycle_projection.stages.stage3.pending_count, 2);
+                assert.equal(fresh.lifecycle_projection.stages.stage2.business_status, 'OPEN');
+                assert.equal(fresh.lifecycle_projection.stages.stage4.final_weekly_analysis_available, false);
+                assert.deepEqual(await data.D.find(data.base).sort({ hmeromhnia: 1 }).lean(), before);
+                assert.deepEqual(errors, []);
+                return;
+            }
             assert.equal(preview.safe_automatic_count, 1, JSON.stringify(preview));
             assert.equal(preview.technical_conflict_count, 0);
             assert.equal(preview.safe_day_change_count, 2);
