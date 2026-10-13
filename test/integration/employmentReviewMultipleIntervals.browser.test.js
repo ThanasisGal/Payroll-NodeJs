@@ -133,6 +133,13 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
     assert.equal(persisted.ores_apoysias_apologistika, 0);
     assert.equal(persisted.is_locked, true);
     const readBack = (await search()).find(item => item._id === String(row._id));
+    assert.equal(readBack.orphan_card_resolution_preview.eligible, true);
+    assert.deepEqual(readBack.orphan_card_resolution_preview.approvedWorkIntervals, two);
+    await page.evaluate(target => showDetailsModal(target), readBack);
+    await page.locator('.approved-orphan-decision').waitFor();
+    assert.match(await page.locator('.approved-orphan-decision').innerText(), /09:00–13:00[\s\S]*16:58–20:58/);
+    assert.equal(await page.locator('#orphanResolutionApprove').count(), 0);
+    await page.locator('#detailsModal').evaluate(node => bootstrap.Modal.getInstance(node).hide());
     for (const interval of two) {
         const pair = `0${interval.pairNumber}`;
         assert.equal(readBack[`apo_ora_${pair}_apologistika`], interval.start);

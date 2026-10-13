@@ -548,7 +548,19 @@ function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
     return rows.map((row) => {
         const key = `${String(row?.ypokatasthma || '')}|${String(row?.kodikos || '')}`;
         const employeeRows = contexts.get(key) || [];
-        const base = resolveOrphanCardResolution({ row, contextRows: employeeRows });
+        const decision = row.orphan_card_resolution;
+        const approvedWork = decision?.approved_work_intervals;
+        const matchesApprovedDay = isApprovedOrphanResolution(row) && Array.isArray(approvedWork) &&
+            decision.raw_card_snapshot && Object.entries(decision.raw_card_snapshot)
+                .every(([field, value]) => String(row[field] ?? '') === String(value ?? '')) &&
+            [1, 2, 3].every(number => {
+                const interval = approvedWork.find(item => Number(item.pairNumber) === number);
+                const pair = String(number).padStart(2, '0');
+                return String(row[`apo_ora_${pair}_apologistika`] || '') === (interval?.start || '') &&
+                    String(row[`eos_ora_${pair}_apologistika`] || '') === (interval?.end || '');
+            });
+        const manualInterval = matchesApprovedDay ? { work_intervals: approvedWork } : null;
+        const base = resolveOrphanCardResolution({ row, contextRows: employeeRows, manualInterval });
         const rowDate = new Date(row.hmeromhnia);
         const approval = reusableApprovals.find((candidate) => {
             const criteria = candidate?.reuse_match_criteria?.criteria || {};
@@ -562,6 +574,7 @@ function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
         });
         const preview = resolveOrphanCardResolution({
             row, contextRows: employeeRows,
+            manualInterval,
             reusableRule: approval?.reuse_match_criteria?.criteria || null
         });
         return { ...row, orphan_card_resolution_preview: {
