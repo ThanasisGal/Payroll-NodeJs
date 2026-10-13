@@ -1,6 +1,6 @@
 'use strict';
 
-const { isValidDeclaredRest } = require('./apasxoliseisEffectiveRepoStateService');
+const { isValidDeclaredRest, isValidDeclaredNonWork } = require('./apasxoliseisEffectiveRepoStateService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 
 // Read-only reconciliation. Valid declared rest never requires a retrospective write.
@@ -8,6 +8,8 @@ function resolveReviewRestState(row = {}) {
     const date = dateKeyUtc(row.hmeromhnia);
     if (isValidDeclaredRest(row)) return { date, status: 'VALID_DECLARED_REST',
         classification: 'REST_REPO', requires_write: false };
+    if (isValidDeclaredNonWork(row)) return { date, status: 'VALID_DECLARED_NON_WORK',
+        classification: 'NON_WORK', requires_write: false };
     const category = String(row.kathgoria_ergasias_apologistika_original ??
         row.kathgoria_ergasias_apologistika ?? '').trim();
     const repo = row.repo_apologistika_original ?? row.repo_apologistika;

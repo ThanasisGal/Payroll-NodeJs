@@ -80,3 +80,13 @@ test('presentation-neutralized declared ME preserves its actual stored canonical
         kathgoria_ergasias_apologistika_original: 'ΜΕ', repo_apologistika_original: false
     }).status, 'CANONICAL');
 });
+
+test('unchanged predeclared ME needs no retrospective participation and never becomes rest', () => {
+    for (const category of ['', 'ΜΕ']) {
+        const row = { ...rest, kathgoria_ergasias: 'ΜΕ', repo: false,
+            kathgoria_ergasias_apologistika: category, apologistiko_biblio: false };
+        assert.equal(resolve(row).status, 'VALID_DECLARED_NON_WORK');
+        assert.equal(resolve(row).classification, 'NON_WORK');
+        assert.notEqual(resolve({ ...row, cards_ores_ergasias: 1 }).status, 'VALID_DECLARED_NON_WORK');
+    }
+});

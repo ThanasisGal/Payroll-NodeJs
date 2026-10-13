@@ -77,10 +77,10 @@ function resolveLayer({
     );
 }
 
-function isValidDeclaredRest(row = {}) {
+function isUnchangedDeclaredNoWork(row = {}, expectedCategory) {
     const declared = String(row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? '').trim();
     const retrospective = String(row.kathgoria_ergasias_apologistika ?? '').trim();
-    if (declared !== 'ΑΝ' || !['', 'ΑΝ'].includes(retrospective)) return false;
+    if (declared !== expectedCategory || !['', expectedCategory].includes(retrospective)) return false;
     const facts = resolveDailyActualWorkFacts(row);
     const calculated = nonNegativeNumber(row.ores_ergasias_apologistika);
     const actual = nonNegativeNumber(row.ores_pragmatikhs_ergasias_apologistika);
@@ -91,6 +91,14 @@ function isValidDeclaredRest(row = {}) {
         facts.countsAsActualWorkDay === false && calculated.ok && calculated.value === 0 &&
         actual.ok && actual.value === 0 && !hasRetrospectiveInterval &&
         !facts.unresolvedCardPairNumbers.length && !facts.hasCompleteCardEvidence;
+}
+
+function isValidDeclaredRest(row = {}) {
+    return isUnchangedDeclaredNoWork(row, 'ΑΝ');
+}
+
+function isValidDeclaredNonWork(row = {}) {
+    return row.repo_apologistika !== true && isUnchangedDeclaredNoWork(row, 'ΜΕ');
 }
 
 function resolveCurrent(row, expectedRepoCategory) {
@@ -193,5 +201,6 @@ module.exports = {
     PROVENANCE,
     DIAGNOSTIC,
     resolveEffectiveRepoState,
-    isValidDeclaredRest
+    isValidDeclaredRest,
+    isValidDeclaredNonWork
 };
