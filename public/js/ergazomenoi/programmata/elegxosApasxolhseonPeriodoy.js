@@ -9888,7 +9888,7 @@ function renderWeeklyHrStage2BulkSummary(container) {
             Ελλείπουσες: <strong>${escapeHtml(evidence.missing_count ?? '—')}</strong>.<br>
             Υποψήφιες ημέρες: ${escapeHtml((evidence.candidate_dates || []).map(formatStage1DateKey).join(', '))}.
             Η απουσία κάρτας δεν αποδεικνύει ανάπαυση.
-            <ol class="mb-1"><li>Πατήστε «Απόφαση προσωπικού» για τις ημερήσιες αποφάσεις του Σταδίου 3.</li>
+            <ol class="mb-1"><li>Πατήστε «Απόφαση HR» για τις ημερήσιες αποφάσεις του Σταδίου 3.</li>
             <li>Επιλέξτε μόνο τις επιβεβαιωμένες ημέρες και ελέγξτε την προεπισκόπηση.</li></ol>
             Καμία αλλαγή δεν αποθηκεύτηκε. Αναφορά: ${escapeHtml(item.code)}.</div>`;
     };
@@ -9908,7 +9908,7 @@ function renderWeeklyHrStage2BulkSummary(container) {
             .filter(Boolean).map(code => getStage2LifecycleReasonLabel(code, false)).join(' · '))}${restExplanation(item)}${restDecisionExplanation(item)}</td>
         <td>${item.code === 'REST_CLASSIFICATION_REVIEW_REQUIRED' ? reviewDays(item)
             : `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-exception-review"
-            data-exception-index="${index}">${item.resolution_route === 'STAGE3_HUMAN_DECISION' ? 'Απόφαση προσωπικού' : 'Έλεγχος'}</button>`}</td>
+            data-exception-index="${index}">${item.resolution_route === 'STAGE3_HUMAN_DECISION' ? 'Απόφαση HR' : 'Έλεγχος'}</button>`}</td>
     </tr>`).join('') + technicalConflicts.map(item => `<tr class="weekly-hr-stage2-technical-conflict">
         <td>${escapeHtml(item.employee_kodikos || '—')}</td>
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(formatStage1DateKey(item.week_end))}</td>

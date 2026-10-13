@@ -138,6 +138,18 @@ assert.match(container.innerHTML, />Έλεγχος<\/button>/);
 assert.doesNotMatch(container.innerHTML, /MANUAL_REVIEW/);
 assert.doesNotMatch(container.innerHTML, /<article/);
 
+// The human-decision action and its guidance must use the same visible name.
+sandbox.currentWeeklyHrStage2BulkPreview.exceptions = [{
+    employee_kodikos: '0009', week_start: '2026-05-04', week_end: '2026-05-10',
+    code: 'UNCONFIRMED_WEEKLY_REST_DATES', resolution_route: 'STAGE3_HUMAN_DECISION',
+    rest_evidence: { required_count: 2, recognized_count: 1, missing_count: 1,
+        candidate_dates: ['2026-05-10'] }
+}];
+sandbox.render(container);
+assert.match(container.innerHTML, /data-exception-index="0">Απόφαση HR<\/button>/);
+assert.match(container.innerHTML, /Πατήστε «Απόφαση HR» για τις ημερήσιες αποφάσεις του Σταδίου 3/);
+assert.doesNotMatch(container.innerHTML, /Απόφαση προσωπικού/);
+
 sandbox.currentWeeklyHrStage2BulkPreview = { total_scopes: 85, safe_bulk_count: 0,
     safe_pair_count: 0, safe_automatic_count: 0, already_resolved_count: 66,
     manual_exception_count: 0, technical_conflict_count: 19, exceptions: [] };
