@@ -3808,6 +3808,11 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
     const authoritativeEmploymentCode = explicitEmploymentCode;
     return { ...normalizedRow,
         kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
+        // Presentation can neutralize an unchanged declared ME. Freshness must
+        // still compare the persisted classification reviewed by HR.
+        kathgoria_ergasias_apologistika_original:
+            row.kathgoria_ergasias_apologistika_original ?? row.kathgoria_ergasias_apologistika ?? '',
+        repo_apologistika_original: row.repo_apologistika_original ?? row.repo_apologistika ?? false,
         kathgoria_ergasias: effectiveKathgoria,
         kathgoria_ergasias_effective: effectiveKathgoria,
         effective_is_full_time: resolveReviewIsFullTimeProfile(effectiveProfile),
@@ -8237,10 +8242,8 @@ class erganhController {
                                     ergByKodikos.get(employeeKodikos) || null });
                             return { scope, rows: weekRows, lifecycle,
                                 effectiveProfilesByDate: Object.fromEntries(weekRows.map((row) => [
-                                    dateKeyUtc(row.hmeromhnia), {
-                                        typos_apasxolhshs: row.effective_typos_apasxolhshs,
-                                        kathestos_apasxolhshs:
-                                            row.effective_kathestos_apasxolhshs } ])),
+                                    dateKeyUtc(row.hmeromhnia),
+                                    weeklyHrStage2LifecycleProfileFromRow(row) ])),
                                 workflowState: state, upstream: { stage1_current_fingerprint:
                                     lifecycle.stages?.stage1?.current_completion_fingerprint },
                                 preparedStage2Record:
@@ -12691,7 +12694,10 @@ class erganhController {
                             const target = mutableRows.find((row) =>
                                 String(row._id) === String(input.row._id));
                             if (target && written.updates) Object.assign(target, written.updates,
-                                { is_locked: true, locked_by: actor.user_name });
+                                { is_locked: true, locked_by: actor.user_name,
+                                    kathgoria_ergasias_apologistika_original:
+                                        written.updates.kathgoria_ergasias_apologistika,
+                                    repo_apologistika_original: written.updates.repo_apologistika });
                             return written;
                         },
                         loadPostWriteContext: async () => {

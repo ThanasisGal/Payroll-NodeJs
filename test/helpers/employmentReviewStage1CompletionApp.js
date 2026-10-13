@@ -67,12 +67,18 @@ async function createStage1CompletionFixture(uri, vendorDir) {
     app.get(prefix + '/orphan-quality-check', controller.getProdhlomenaOrariaOrphanQualityCheck);
     app.get(prefix + '/weekly-hr-workflow/stage2/bulk-preview', controller.previewWeeklyHrWorkflowStage2Bulk);
     app.get(prefix + '/weekly-hr-workflow/stage1', controller.getWeeklyHrWorkflowStage1);
+    app.get(prefix + '/scenarios', controller.getProdhlomenaOrariaScenarioClassifications);
+    app.get(prefix + '/policies/preview', controller.getProdhlomenaOrariaPolicyPreview);
+    app.get(prefix + '/policies/approvals', controller.getProdhlomenaOrariaPolicyPreviewApprovals);
+    app.get(prefix + '/policies/apply-dry-run', controller.getProdhlomenaOrariaPolicyPreviewApplyDryRun);
+    app.get(prefix + '/repo-transfer-decisions/current', controller.getWeeklyRepoTransferDecisionBatch);
     app.post(prefix + '/weekly-hr-workflow/stage1/bulk-review', controller.getWeeklyHrWorkflowStage1Bulk);
     for (const [route, handler] of [
         ['stage1/complete', controller.completeWeeklyHrWorkflowStage1],
         ['stage1/bulk-complete', controller.completeWeeklyHrWorkflowStage1Bulk],
         ['stage1/bulk-classify-days', controller.saveWeeklyHrStage1DailyClassificationsBulk],
-        ['stage2/complete', controller.completeWeeklyHrWorkflowStage2]
+        ['stage2/complete', controller.completeWeeklyHrWorkflowStage2],
+        ['stage2/bulk-complete', controller.completeWeeklyHrWorkflowStage2Bulk]
     ]) app.post(prefix + '/weekly-hr-workflow/' + route, requireCriticalEmploymentDecisionRole, handler);
     // Ancillary read uses the real category records, with no external requests.
     app.get('/api/dropdown/ergazomenoi/kathgoria_adeias', async (_req, res) => res.json({

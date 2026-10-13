@@ -290,11 +290,11 @@ function buildWeeklyHrLifecycleProjection({
     companySettings = {}
 } = {}) {
     const rows = Array.isArray(weekRows) ? weekRows : [];
-    const fingerprintRows = rows.map((row) =>
-        Object.prototype.hasOwnProperty.call(row || {}, 'kathgoria_ergasias_original')
-            ? { ...row, kathgoria_ergasias: row.kathgoria_ergasias_original }
-            : row
-    );
+    const fingerprintRows = rows.map((row) => ({ ...row,
+        ...Object.fromEntries(['kathgoria_ergasias', 'kathgoria_ergasias_apologistika',
+            'repo_apologistika'].filter(field => Object.prototype.hasOwnProperty.call(
+            row || {}, `${field}_original`)).map(field => [field, row[`${field}_original`]]))
+    }));
     const fingerprint = buildStage1Fingerprint(fingerprintRows, { companySettings }).fingerprint;
     const boundary = deriveDeferredWeekScope({ scope, periodScope, employmentDateScope });
     if (isDeferredWeekPending({ boundary })) {
