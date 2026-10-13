@@ -555,3 +555,13 @@ assert.match(getCssRule('#employmentReviewStagesAccordion > .workflow-stage-bloc
 assert.match(getCssRule('.employment-review-action-primary'), /--bs-primary/);
 
 console.log('employment review four-stage accordion projection tests passed');
+
+{
+    const mixed = sandbox.derive([{ scope: { employee_kodikos: '0001' }, lifecycle_projection: { stages: {
+        stage1: stage('COMPLETED'), stage2: stage('BLOCKED', 4),
+        stage3: stage('OPEN', 2), stage4: stage('OPEN')
+    } } }], null, { safe_bulk_count: 3, manual_exception_count: 1, technical_conflict_count: 2 });
+    assert.equal(mixed.stages.STAGE2.pending_count, 6, 'all unresolved weekly categories share one unit');
+    assert.equal(mixed.stages.STAGE2.business_status, 'BLOCKED');
+    assert.equal(mixed.stages.STAGE3.enabled, false, 'ready scopes never conceal remaining real conflicts');
+}

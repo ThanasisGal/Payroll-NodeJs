@@ -109,7 +109,7 @@ assert.match(container.innerHTML, /Έτοιμες για μαζική ενημέ
 assert.match(container.innerHTML, /Αυτόματες τακτοποιήσεις/);
 assert.match(container.innerHTML, /Έγκυρες προδηλωμένες ημέρες ανάπαυσης, χωρίς αλλαγή/);
 assert.match(container.innerHTML, /Μεταφορές ρεπό/);
-assert.match(container.innerHTML, /Ήδη τακτοποιημένες/);
+assert.match(container.innerHTML, /Εβδομάδες χωρίς ενέργεια στο Στάδιο 2/);
 assert.match(container.innerHTML, /Περιπτώσεις που χρειάζονται έλεγχο/);
 assert.equal((container.innerHTML.match(/class="weekly-hr-stage2-exception"/g) || []).length, 50);
 assert.match(container.innerHTML, /<td>0<\/td>/);

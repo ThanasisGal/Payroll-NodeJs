@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { resolveReviewRestState } = require('./apasxoliseisReviewRestStateService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { stableStringify } = require('./apasxoliseisStage3FingerprintService');
-const { AUTOMATIC_INSPECTION, inspectAutomaticMaterialization,
+const { AUTOMATIC_INSPECTION, inspectAutomaticMaterialization, stage1AttestationForStage2,
     fingerprint: scopeFingerprint } = require(
     './apasxoliseisWeeklyHrWorkflowStage2CompletionService'
 );
@@ -30,6 +30,7 @@ function exceptionSummary(context, code, message) {
         reasons: [...new Set([text(code), ...(stage.blockers || []),
             ...(stage.pending_reasons || [])].filter(Boolean))],
         diagnostics: stage.diagnostics || [],
+        dates: [...new Set((stage.diagnostics || []).flatMap(item => item.dates || []))].sort(),
         message: text(message) || 'Η περίπτωση απαιτεί έλεγχο HR.' };
 }
 function preparedSafePair(context = {}) {
@@ -81,7 +82,11 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
         const diagnostic = context.stage2StateDiagnostic || context.lifecycle?.stages?.stage2
             ?.diagnostic || context.lifecycle?.stages?.stage2?.blockers?.[0];
         if (diagnostic) {
-            technicalConflicts.push(exceptionSummary(context, diagnostic)); continue;
+            const restReview = diagnostic === 'REST_CLASSIFICATION_REVIEW_REQUIRED' &&
+                (context.lifecycle.stages.stage2.blockers || []).every(code =>
+                    code === 'REST_CLASSIFICATION_REVIEW_REQUIRED');
+            (restReview ? exceptions : technicalConflicts).push(exceptionSummary(context, diagnostic));
+            continue;
         }
         const lifecycleStage2 = context.lifecycle?.stages?.stage2 || {};
         if (Number(lifecycleStage2.pending_count || 0) >
@@ -116,7 +121,11 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
             technicalConflicts.push(exceptionSummary(context, inspection.code)); continue;
         }
         if (inspection.status === AUTOMATIC_INSPECTION.READY_TO_MATERIALIZE) {
-            if (context.workflowState?.stage1?.status !== 'COMPLETED' ||
+            const sliced = context.lifecycle?.stages?.stage1?.attestation_scope === 'PERIOD_SLICE';
+            const stage1Ready = sliced
+                ? Boolean(stage1AttestationForStage2(context, context.workflowState?.stage1))
+                : context.workflowState?.stage1?.status === 'COMPLETED';
+            if (!stage1Ready ||
                 !text(context.upstream?.stage1_current_fingerprint)) {
                 technicalConflicts.push(exceptionSummary(context, 'STAGE2_UPSTREAM_STAGE1_STALE'));
                 continue;
@@ -152,7 +161,13 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
         Number(exception_page_size) || EXCEPTION_PAGE_SIZE));
     const page = Math.max(1, Number(exception_page) || 1);
     const offset = (page - 1) * pageSize;
-    return { total_scopes: contexts.length, safe_bulk_count: safe.length,
+    return { total_scopes: contexts.length,
+        pending_scope_count: safe.length + exceptions.length + technicalConflicts.length,
+        pending_day_count: contexts.reduce((sum, context) => sum + new Set(
+            context.lifecycle?.stages?.stage2?.pending_dates || []).size, 0),
+        deferred_scope_count: contexts.filter(context => context.lifecycle?.stages?.stage2
+            ?.business_status === 'DEFERRED_TO_NEXT_PERIOD').length,
+        safe_bulk_count: safe.length,
         valid_declared_rest_count: validDeclaredRestCount,
         safe_pair_count: safePairCount, safe_automatic_count: safeAutomaticCount,
         safe_employee_count: new Set(safe.map((item) => item.employee_id)).size,

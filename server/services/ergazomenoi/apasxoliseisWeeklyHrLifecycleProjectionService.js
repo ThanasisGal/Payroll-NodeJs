@@ -611,7 +611,8 @@ function buildWeeklyHrLifecycleProjection({
         ...stage2ResolvedDates,
         ...fullTimeResolvedDates,
         ...nonFullResolvedDates
-    ]).filter((date) => date !== rejectedTargetDate).sort();
+    ]).filter((date) => date !== rejectedTargetDate &&
+        (!actionableDateSet || actionableDateSet.has(date))).sort();
     const stage2AutomaticResolutionItems = stage2AutomaticResolvedDates.map((date) =>
         Object.freeze({ date,
             classification: nonFullResolvedDates.includes(date) ? 'NON_WORK' : 'REST_REPO',
@@ -770,7 +771,9 @@ function buildWeeklyHrLifecycleProjection({
         blockers: Object.freeze(unique([...stage2.blockers, 'REST_CLASSIFICATION_REVIEW_REQUIRED'])),
         pending_reasons: Object.freeze(unique([...stage2.pending_reasons, 'REST_CLASSIFICATION_REVIEW_REQUIRED'])),
         diagnostics: Object.freeze([...stage2.diagnostics,
-            diagnostic('REST_CLASSIFICATION_REVIEW_REQUIRED', restPendingDates)])
+            diagnostic('REST_CLASSIFICATION_REVIEW_REQUIRED', restPendingDates),
+            ...restReviewItems.filter(item => item.status === 'REVIEW_REQUIRED')
+                .map(item => diagnostic(item.reason_code, [item.date]))])
     }) : automaticPending ? stageResult('STAGE2', { ...stage2,
         business_status: stage2.business_status === BUSINESS_STATUS.COMPLETED
             ? BUSINESS_STATUS.OPEN : stage2.business_status,

@@ -9512,10 +9512,13 @@ function derivePeriodLifecyclePresentation(payloads = [], periodControl = null,
         periodControl?.effective_mode || '') === 'FINALIZED';
     const stage2ActionCount = finalizedPeriod ? 0 : Number(
         stage2BulkPreview?.safe_bulk_count || 0) + Number(
-        stage2BulkPreview?.manual_exception_count || 0);
+        stage2BulkPreview?.manual_exception_count || 0) + Number(
+        stage2BulkPreview?.technical_conflict_count || 0);
     if (stage2ActionCount > 0) {
-        stages.STAGE2.business_status = 'OPEN';
+        stages.STAGE2.business_status = stages.STAGE2.business_status === 'BLOCKED' ||
+            Number(stage2BulkPreview?.technical_conflict_count || 0) > 0 ? 'BLOCKED' : 'OPEN';
         stages.STAGE2.pending_count = stage2ActionCount;
+        stages.STAGE2.pending_unit = 'WEEK';
         stages.STAGE2.user_action_required = true;
     }
     const firstUnresolvedIndex = stageKeys.findIndex((stageKey) =>
@@ -9846,20 +9849,39 @@ function renderWeeklyHrStage2BulkSummary(container) {
     const technicalConflicts = Array.isArray(preview.technical_conflicts) ? preview.technical_conflicts.slice(0, 50) : [];
     const guidancePayload = item => currentCanonicalLifecyclePayloads.find(payload => payload.scope?.employee_kodikos === item.employee_kodikos && stage1DateKey(payload.scope?.week_start) === stage1DateKey(item.week_start));
     const guidanceAttributes = item => employmentReviewGuidanceAttributes(guidancePayload(item), 'STAGE2', null, true, [item.code, ...(item.reasons || [])].filter(Boolean));
+    const reviewDays = item => (item.dates || []).map(date => {
+        const row = (typeof currentReviewRows === 'undefined' ? [] : currentReviewRows)
+            .find(row => String(row.kodikos) === String(item.employee_kodikos) &&
+            String(row.hmeromhnia).slice(0, 10) === date);
+        return row ? `<button type="button" class="btn btn-sm employment-review-action-btn
+            employment-review-action-secondary weekly-hr-open-day" data-row-id="${escapeHtml(row._id)}">Προβολή ${escapeHtml(formatStage1DateKey(date))}</button>`
+            : escapeHtml(formatStage1DateKey(date));
+    }).join(' ');
+    const restExplanation = item => item.code === 'REST_CLASSIFICATION_REVIEW_REQUIRED'
+        ? `<div class="small">Απαιτείται ανθρώπινη απόφαση. ${escapeHtml((item.diagnostics || [])
+            .filter(detail => detail.code !== item.code).map(detail =>
+                getStage2LifecycleReasonLabel(detail.code, false)).join(' '))}
+            <ol class="mb-1"><li>Ανοίξτε την αναφερόμενη ημέρα και πατήστε «Φόρτωση ιστορικού».</li>
+            <li>Ο αρμόδιος υπεύθυνος πρέπει να επιβεβαιώσει την πραγματική εργασία και τον σωστό χαρακτηρισμό.
+            Η σύγκρουση εξαιρείται από τη μαζική ενημέρωση.</li></ol>
+            Καμία αλλαγή δεν αποθηκεύτηκε. Κωδικός αναφοράς: ${escapeHtml(item.code)}.</div>` : '';
     const exceptionRows = exceptions.map((item, index) => `<tr class="weekly-hr-stage2-exception">
         <td>${escapeHtml(item.employee_kodikos || '—')}</td>
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(
             formatStage1DateKey(item.week_end))}</td>
         <td ${guidanceAttributes(item)}>${employmentReviewGuidanceInfo(guidanceAttributes(item))}${escapeHtml([...new Set([item.code, ...(item.reasons || [])])]
-            .filter(Boolean).map(code => getStage2LifecycleReasonLabel(code, false)).join(' · '))}</td>
-        <td><button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-exception-review"
-            data-exception-index="${index}">Έλεγχος</button></td>
+            .filter(Boolean).map(code => getStage2LifecycleReasonLabel(code, false)).join(' · '))}${restExplanation(item)}</td>
+        <td>${item.code === 'REST_CLASSIFICATION_REVIEW_REQUIRED' ? reviewDays(item)
+            : `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-exception-review"
+            data-exception-index="${index}">Έλεγχος</button>`}</td>
     </tr>`).join('') + technicalConflicts.map(item => `<tr class="weekly-hr-stage2-technical-conflict">
         <td>${escapeHtml(item.employee_kodikos || '—')}</td>
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(formatStage1DateKey(item.week_end))}</td>
         <td ${guidanceAttributes(item)}>${employmentReviewGuidanceInfo(guidanceAttributes(item))}${guidancePayload(item) ? escapeHtml(getStage2LifecycleReasonLabel(item.code, false))
             : `<details><summary>${escapeHtml(getStage2LifecycleReasonLabel(item.code, false))}</summary>${EmploymentReviewGuidanceUi.failureHtml({ code: item.code, blocking_reasons: item.reasons }, { readOnly: true })}</details>`}</td>
-        <td>Ελέγξτε τις αιτίες πριν επαναλάβετε την προεπισκόπηση.</td></tr>`).join('');
+        <td>${reviewDays(item)}<ol class="small mb-0"><li>Επαναλάβετε την αναζήτηση για να φορτωθούν τα τρέχοντα στοιχεία.</li>
+            <li>Αν το εμπόδιο παραμένει, δώστε στην τεχνική υποστήριξη τον κωδικό ${escapeHtml(item.code)}
+            και την αναφερόμενη εβδομάδα.</li></ol>Καμία αλλαγή δεν αποθηκεύτηκε.</td></tr>`).join('');
     const safeCount = Number(preview.safe_bulk_count || 0);
     const canBulk = safeCount > 0 &&
         userCanRecordCanonicalDecision() && !weeklyHrStage2BulkSubmitting;
@@ -9867,6 +9889,8 @@ function renderWeeklyHrStage2BulkSummary(container) {
     container.innerHTML = `<section class="card border rounded employment-review-stage2-bulk"
         aria-label="Μαζική ενημέρωση μεταφοράς ρεπό"><div class="card-body py-2">
         <div class="fw-semibold mb-2">Μεταφορά Ρεπό</div>
+        <div class="small text-muted mb-2">Οι περιπτώσεις μετρούν εβδομάδες ανά εργαζόμενο.
+            Οι προδηλωμένες αναπαύσεις μετρούν ημέρες και μπορεί να ανήκουν στις ίδιες εβδομάδες.</div>
         <div class="d-flex flex-wrap gap-3 small mb-2">
             <span>Έτοιμες για μαζική ενημέρωση: <strong>${escapeHtml(
                 preview.safe_bulk_count || 0)}</strong></span>
@@ -9876,11 +9900,13 @@ function renderWeeklyHrStage2BulkSummary(container) {
                 preview.valid_declared_rest_count || 0)}</strong></span>
             <span>Μεταφορές ρεπό: <strong>${escapeHtml(
                 preview.safe_pair_count || 0)}</strong></span>
-            <span>Ήδη τακτοποιημένες: <strong>${escapeHtml(
+            <span>Εβδομάδες χωρίς ενέργεια στο Στάδιο 2: <strong>${escapeHtml(
                 preview.already_resolved_count || 0)}</strong></span>
+            <span>Από αυτές, εξέταση στην επόμενη περίοδο: <strong>${escapeHtml(
+                preview.deferred_scope_count || 0)}</strong></span>
             <span>Περιπτώσεις που χρειάζονται έλεγχο: <strong>${escapeHtml(
                 preview.manual_exception_count || 0)}</strong></span>
-            <span>Περιπτώσεις με μη διαθέσιμο ασφαλή έλεγχο: <strong>${escapeHtml(
+            <span>Εβδομάδες με τεχνικό εμπόδιο ή αλλαγή στοιχείων: <strong>${escapeHtml(
                 preview.technical_conflict_count || 0)}</strong></span>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -11576,6 +11602,8 @@ function renderStage4Summary(payloads = []) {
 
 function workflowStagePendingText(stage = {}, presentationStatus = '', noHrAction = false) {
     if (presentationStatus === 'LOCKED' || noHrAction) return '';
+    if (stage.pending_unit === 'WEEK') return ` <span class="small ms-2">${stage.pending_count}
+        ${stage.pending_count === 1 ? 'εβδομάδα απαιτεί' : 'εβδομάδες απαιτούν'} ενέργεια</span>`;
     const hasBlockers = ['pending_reasons', 'blocking_reasons', 'blocked_reasons', 'blockers']
         .some((field) => Array.isArray(stage[field]) && stage[field].length > 0);
     if (stage.business_status === 'BLOCKED' && Number(stage.pending_count || 0) === 0 &&

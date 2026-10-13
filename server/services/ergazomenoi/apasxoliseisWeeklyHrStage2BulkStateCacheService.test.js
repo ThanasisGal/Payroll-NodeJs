@@ -147,3 +147,15 @@ function contexts(count) {
 }
 
 console.log('weekly HR Stage-2 scoped continuation cache tests passed');
+
+{
+    const cache = new WeeklyHrStage2BulkStateCache();
+    const data = preview(0, 1);
+    data._technical_conflicts = Array.from({ length: 65 }, (_, index) => ({ employee_id: `technical-${index}` }));
+    cache.put({ preview: data, scope });
+    const page = cache.exceptionPage({ preview_fingerprint: data.preview_fingerprint, scope, exception_page: 2 });
+    assert.equal(page.exceptions.length, 0);
+    assert.equal(page.technical_conflicts.length, 15);
+    assert.equal(page.technical_conflicts[0].employee_id, 'technical-50');
+    assert.equal(page.exception_page_count, 2);
+}
