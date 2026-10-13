@@ -9136,6 +9136,10 @@ function renderStage1NoClassificationPreview(payload, date) {
     return `<div class="weekly-hr-stage1-no-classification-preview mt-2 border-start border-3 ps-2 py-1">
         <div class="small fw-semibold">Αν δεν επιλεγεί χαρακτηρισμός:</div>
         <div class="small">${escapeHtml(result)}</div>
+        ${preview.safe === true ? `<div class="small mt-1">Πρόκειται για προεπισκόπηση· δεν αποθηκεύτηκε τελικός χαρακτηρισμός.
+            Η Μαζική Ολοκλήρωση επιβεβαιώνει τον έλεγχο του Σταδίου 1.
+            1. Αποθηκεύστε τυχόν επιλογές άδειας, ασθένειας ή απουσίας και ολοκληρώστε τον έλεγχο.
+            2. Στο Στάδιο 2 ελέγξτε την προτεινόμενη τακτοποίηση και επιβεβαιώστε την εφαρμογή της.</div>` : ''}
     </div>`;
 }
 
@@ -11909,6 +11913,7 @@ function stage1ReadOnlyDayLabel(payload, date, row) {
     const presentation = stage1DailyPresentationForDate(payload, date);
     const current = String(presentation?.current_apologistiko_classification || '').trim();
     if (current === 'ΕΡΓ') return 'ΕΡΓ';
+    if (current === 'ΜΕ' || row?.kathgoria_ergasias_apologistika === 'ΜΕ') return 'ΜΗ ΕΡΓΑΣΙΑ';
     if (current === 'ΑΝ' || row?.repo === true) return 'ΡΕΠΟ';
     return '—';
 }
@@ -12431,23 +12436,51 @@ async function completeWeeklyHrStage1FromUi(scope, button) {
     finally { weeklyHrStage1Submitting.delete(key); if (button.isConnected) button.disabled = false; }
 }
 
-function renderWeeklyHrStage1BulkResult(result = {}) {
-    const successful = Number(result.completed_count || 0) +
-        Number(result.already_completed_count || 0);
-    const needsReview = Number(result.failed_count || 0) +
+function renderWeeklyHrStage1BulkResult(result = {}, { refreshSucceeded = true } = {}) {
+    const newlyCompleted = Number(result.completed_count || 0);
+    const alreadyCompleted = Number(result.already_completed_count || 0);
+    const successful = newlyCompleted + alreadyCompleted;
+    const unsuccessful = Number(result.failed_count || 0) +
         Number(result.blocked_count || 0);
-
-    const failures = (Array.isArray(result.results) ? result.results : [])
+    const items = Array.isArray(result.results) ? result.results : [];
+    const failures = items
         .filter((item) =>
             !['COMPLETED', 'ALREADY_COMPLETED'].includes(item.status));
-
+    let pendingDays = 0;
+    let pendingWeeks = 0;
+    let unverifiedWeeks = 0;
+    for (const item of items.filter(item => ['COMPLETED', 'ALREADY_COMPLETED'].includes(item.status))) {
+        const payload = refreshSucceeded && currentCanonicalLifecyclePayloads.find(payload =>
+            String(payload.scope?.employee_id) === String(item.scope?.employee_id) &&
+            payload.scope?.ypokatasthma === item.scope?.ypokatasthma &&
+            payload.scope?.week_start === item.scope?.week_start &&
+            payload.scope?.week_end === item.scope?.week_end);
+        const stage1 = payload?.lifecycle_projection?.stages?.stage1;
+        if (!stage1) { unverifiedWeeks++; continue; }
+        const dates = new Set([...(stage1.reviewed_possible_leave_dates || []),
+            ...(stage1.pending_dates || [])]);
+        if (dates.size) { pendingWeeks++; pendingDays += dates.size; }
+    }
+    const needsReview = unsuccessful + pendingWeeks + unverifiedWeeks + (refreshSucceeded ? 0 : 1);
     const summary =
-        `Ολοκληρώθηκαν ${successful} από ${Number(result.requested_count || 0)} εβδομάδες.` +
-        (needsReview ? ` ${needsReview} χρειάζονται επανέλεγχο.` : '');
+        `Ολοκληρώθηκε τώρα ο έλεγχος Σταδίου 1 για ${newlyCompleted} από ${Number(result.requested_count || 0)} εβδομάδες. ` +
+        `Ήδη ολοκληρωμένες εβδομάδες: ${alreadyCompleted}. ` +
+        (alreadyCompleted ? 'Δεν καταχωρίστηκε νέα ολοκλήρωση γι’ αυτές. ' : '') +
+        (newlyCompleted ? 'Αποθηκεύτηκε η επιβεβαίωση του ελέγχου. ' : 'Δεν αποθηκεύτηκε καμία νέα ολοκλήρωση. ') +
+        'Η ενέργεια δεν αλλάζει τους ημερήσιους χαρακτηρισμούς. ' +
+        (pendingDays ? `Παραμένουν ${pendingDays} πιθανές άδειες σε ${pendingWeeks} ${pendingWeeks === 1 ? 'εβδομάδα' : 'εβδομάδες'}, χωρίς τελικό χαρακτηρισμό. ` +
+            '1. Ανοίξτε το Στάδιο 2, ελέγξτε τις προτεινόμενες τακτοποιήσεις και επιβεβαιώστε τις επιτρεπόμενες εφαρμογές. ' +
+            '2. Αν παραμένουν ημέρες για τελική εξέταση, ακολουθήστε την καθοδήγηση του Σταδίου 3. ' : '') +
+        (unsuccessful ? `${unsuccessful} εβδομάδες δεν ολοκληρώθηκαν· δεν αποθηκεύτηκε ολοκλήρωση γι’ αυτές. ` +
+            '1. Διαβάστε την αιτία για κάθε εβδομάδα παρακάτω. 2. Εκτελέστε νέα «Αναζήτηση» πριν δοκιμάσετε ξανά. ' : '') +
+        (!refreshSucceeded || unverifiedWeeks ? 'Η νέα κατάσταση των ημερών δεν επιβεβαιώθηκε στην προβολή. ' +
+            '1. Εκτελέστε νέα «Αναζήτηση». 2. Ελέγξτε τις ημέρες και το επόμενο διαθέσιμο στάδιο πριν συνεχίσετε.' :
+            !pendingDays && !unsuccessful ? 'Συνεχίστε στο επόμενο διαθέσιμο στάδιο, εφόσον υπάρχει εκκρεμότητα.' : '');
 
     if (!failures.length) {
         return {
             successful,
+            newlyCompleted,
             needsReview,
             text: summary,
             html: ''
@@ -12476,6 +12509,7 @@ function renderWeeklyHrStage1BulkResult(result = {}) {
 
     return {
         successful,
+        newlyCompleted,
         needsReview,
         text: summary,
         html: `<p>${escapeHtml(summary)}</p><div class="table-responsive">
@@ -12503,6 +12537,9 @@ async function completeWeeklyHrStage1BulkFromUi() {
         weeklyHrStage1DraftCount(weeklyHrStage1Payloads.get(key)) > 0);
     if (selectedHaveDrafts || weeklyHrStage1DaySaving) return;
     const prompt = await employmentReviewSwal({ title: 'Μαζική ολοκλήρωση Σταδίου 1',
+        html: 'Θα καταχωριστεί η επιβεβαίωση του ελέγχου για τις επιλεγμένες εβδομάδες. ' +
+            'Οι πιθανές άδειες που αφήνετε χωρίς χαρακτηρισμό θα εξεταστούν στις επόμενες επιτρεπόμενες ενέργειες. ' +
+            'Η προεπισκόπηση «ΜΗ ΕΡΓΑΣΙΑ» εφαρμόζεται χωριστά στο Στάδιο 2, μετά τον έλεγχο και την επιβεβαίωσή σας.',
         input: 'textarea', inputLabel: 'Κοινή αιτιολογία', showCancelButton: true,
         inputValue: 'Ολοκλήρωση ελέγχου Σταδίου 1. – Δεν προέκυψαν επιπλέον χαρακτηρισμοί άδειας, ασθένειας ή απουσίας.',
         confirmButtonText: 'Μαζική ολοκλήρωση', cancelButtonText: 'Ακύρωση',
@@ -12540,16 +12577,13 @@ async function completeWeeklyHrStage1BulkFromUi() {
         } catch (error) {
             console.warn('[weeklyHrStage1BulkRefresh]', error);
         }
-        const presentation = renderWeeklyHrStage1BulkResult(result);
-        await employmentReviewSwal({ icon: presentation.needsReview ? 'warning' : 'success',
+        const presentation = renderWeeklyHrStage1BulkResult(result, { refreshSucceeded });
+        await employmentReviewSwal({ icon: presentation.needsReview ? 'warning' :
+            presentation.newlyCompleted ? 'success' : 'info',
             title: 'Μαζική ολοκλήρωση Σταδίου 1',
             ...(presentation.html
                 ? { html: presentation.html }
                 : { text: presentation.text }) });
-        if (!refreshSucceeded) {
-            await employmentReviewSwal({ icon: 'warning', title: 'Η προβολή δεν ανανεώθηκε',
-                text: 'Η μαζική ολοκλήρωση ολοκληρώθηκε, αλλά η προβολή δεν ανανεώθηκε. Πατήστε νέα «Αναζήτηση».' });
-        }
     } catch (error) {
         await employmentReviewSwal({ icon: 'error', title: 'Αποτυχία', text: error.message });
     } finally {

@@ -683,11 +683,12 @@ assert.match(css, /\.weekly-hr-stage1-bulk-toolbar \.weekly-hr-bulk-complete\s*\
 
 const resultRendererSource = source.match(
     /function renderWeeklyHrStage1BulkResult\([\s\S]*?\n}/)?.[0] || '';
+const resultPayloads = [];
 const resultRenderer = vm.runInNewContext(`(() => { ${resultRendererSource}
     return renderWeeklyHrStage1BulkResult; })()`, {
     escapeHtml: String,
     EmploymentReviewGuidanceUi: require('./employmentReviewGuidanceUi'),
-    currentCanonicalLifecyclePayloads: [],
+    currentCanonicalLifecyclePayloads: resultPayloads,
     formatStage1DateKey: scopeSandbox.helpers.formatStage1DateKey
 });
 const failedBulk = resultRenderer({ requested_count: 3, completed_count: 0,
@@ -702,6 +703,29 @@ assert.match(failedBulk.html, /01\/06\/2026–07\/06\/2026/);
 assert.ok(failedBulk.html.includes(require('./employmentReviewGuidance').describe(
     'PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED').message));
 assert.doesNotMatch(failedBulk.html, /PERIOD_CONTROL_HISTORICAL_RECONSTRUCTION_REQUIRED/);
+const resultScope = { employee_id: '0039-id', ypokatasthma: '0000',
+    week_start: '2026-09-07', week_end: '2026-09-13' };
+resultPayloads.push({ scope: { ...resultScope, week_start: '2026-09-14' },
+    lifecycle_projection: { stages: { stage1: { reviewed_possible_leave_dates: ['2026-09-15'] } } } });
+resultPayloads.push({ scope: resultScope, lifecycle_projection: { stages: { stage1: {
+    reviewed_possible_leave_dates: ['2026-09-12', '2026-09-13'], pending_dates: [] } } } });
+const completedResult = { requested_count: 1, completed_count: 1,
+    results: [{ scope: resultScope, status: 'COMPLETED' }] };
+const pendingResult = resultRenderer(completedResult);
+assert.match(pendingResult.text, /Παραμένουν 2 πιθανές άδειες σε 1 εβδομάδα/);
+assert.match(pendingResult.text, /Στάδιο 2/);
+assert.ok(pendingResult.needsReview > 0);
+const repeatedResult = resultRenderer({ ...completedResult, completed_count: 0,
+    already_completed_count: 1, results: [{ scope: resultScope, status: 'ALREADY_COMPLETED' }] });
+assert.match(repeatedResult.text, /Ήδη ολοκληρωμένες εβδομάδες: 1/);
+assert.match(repeatedResult.text, /Δεν αποθηκεύτηκε καμία νέα ολοκλήρωση/);
+const noRefresh = resultRenderer(completedResult, { refreshSucceeded: false });
+assert.match(noRefresh.text, /Η νέα κατάσταση των ημερών δεν επιβεβαιώθηκε/);
+assert.doesNotMatch(noRefresh.text, /Παραμένουν 2/);
+assert.ok(noRefresh.needsReview > 0);
+resultPayloads[1].lifecycle_projection.stages.stage1.reviewed_possible_leave_dates = [];
+const settledResult = resultRenderer(completedResult);
+assert.equal(settledResult.needsReview, 0, 'other weeks must not contaminate the result');
 assert.match(source, /Τελική εξέταση πιθανής άδειας στο Στάδιο 3\./);
 assert.match(source, /Δεν υπάρχουν ανέλεγκτες πιθανές άδειες\./);
 
@@ -714,6 +738,7 @@ const bulkFunctionSource = source.slice(
 const submittedReasons = [];
 const submittedScopes = [];
 const bulkEvents = [];
+const bulkPresentations = [];
 let editedReason = null;
 let bulkResponse = { ok: true, body: { success: true, requested_count: 1,
     completed_count: 1, already_completed_count: 0, failed_count: 0,
@@ -745,7 +770,11 @@ const bulkSandbox = {
         return loadResultsOutcome; },
     refreshWeeklyHrStage1Scope: async () => { scopeRefreshCalls++; },
     weeklyHrStage1Key: () => 'week-1',
-    renderWeeklyHrStage1BulkResult: () => ({ needsReview: 0, text: 'ok', html: '' }),
+    renderWeeklyHrStage1BulkResult: (_result, options) => {
+        bulkPresentations.push(options);
+        return { newlyCompleted: 1, needsReview: options.refreshSucceeded ? 0 : 1,
+            text: 'ok', html: '' };
+    },
     console
 };
 vm.runInNewContext(`${bulkFunctionSource}\nthis.runBulk = completeWeeklyHrStage1BulkFromUi;`, bulkSandbox);
@@ -782,7 +811,8 @@ vm.runInNewContext(`${bulkFunctionSource}\nthis.runBulk = completeWeeklyHrStage1
     await bulkSandbox.runBulk();
     assert.equal(loadResultsCalls, 5);
     assert.ok(bulkEvents.includes('alert:Μαζική ολοκλήρωση Σταδίου 1'));
-    assert.ok(bulkEvents.includes('alert:Η προβολή δεν ανανεώθηκε'));
+    assert.equal(bulkPresentations.at(-1).refreshSucceeded, false);
+    assert.equal(bulkEvents.filter(event => event === 'alert:Μαζική ολοκλήρωση Σταδίου 1').length, 5);
 
     bulkResponse = { ok: false, body: { success: false,
         message: 'Αποτυχία μαζικής ολοκλήρωσης.' } };
