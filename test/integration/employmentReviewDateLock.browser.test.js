@@ -10,7 +10,7 @@ const { requireCriticalEmploymentDecisionRole } = require('../../server/services
 const period = require('../../server/services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
 const cycles = require('../../server/services/ergazomenoi/employeeEmploymentCycleContextLoaderService');
 const { finalizedEmployeeFilter } = require('../../server/utils/ergazomenoi/finalizedEmployeeFilter');
-const { buildEmploymentReviewUpdateErrorResponse } = require('../../server/services/ergazomenoi/apasxoliseisOrphanResolutionPersistenceService');
+const { buildEmploymentReviewUpdateErrorResponse, removeClientRawCardUpdates } = require('../../server/services/ergazomenoi/apasxoliseisOrphanResolutionPersistenceService');
 const { reviewErrorResponse } = require('../../server/services/ergazomenoi/apasxoliseisReviewErrorPresentationService');
 const { saveStage1DailyClassificationsBulk } = require('../../server/services/ergazomenoi/apasxoliseisStage1DailyClassificationBulkService');
 const { dateKeyUtc } = require('../../server/utils/date/mondaySundayWeek');
@@ -29,7 +29,7 @@ test('employment dates stay blank and locked in Chromium and reject forged write
         ErgazomenoiModel: data.E, IstorikoProslhpseonAllagonModel: data.H,
         ProdhlomenaOrariaModel: data.D, REVIEW_SELECT_FIELDS: '',
         orphanResolutionBoundaryTestOverrides: null, canReviewEdit: () => true,
-        buildEmploymentReviewUpdateErrorResponse, saveStage1DailyClassificationsBulk,
+        buildEmploymentReviewUpdateErrorResponse, removeClientRawCardUpdates, saveStage1DailyClassificationsBulk,
         reviewErrorResponse, dateKeyUtc,
         activeEmploymentReviewPeriodScope: async () => ({ ypokatasthma: '0000',
             period_start: '2026-09-01', period_end: '2026-09-30' }),
