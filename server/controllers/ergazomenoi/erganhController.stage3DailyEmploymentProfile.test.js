@@ -170,7 +170,8 @@ for (const item of completedBoundary.stages.stage3.pending_items) {
     const stage1 = completedBoundary.stages.stage1;
     const authoritativeContext = {
         scope: boundaryScope, row, dailyProfile: authoritativeProfile, isResidual: true,
-        stage2: { fingerprint: item.stage2_fingerprint, status: 'COMPLETED',
+        stage2: { fingerprint: item.stage2_fingerprint,
+            status: completedBoundary.stages.stage3.stage2_status,
             resolution: 'NOT_APPLICABLE', resolved_dates: [] },
         upstream: { stage1_attestation_scope: 'PERIOD_SLICE',
             stage1_period_start: boundaryPeriod.period_start,
