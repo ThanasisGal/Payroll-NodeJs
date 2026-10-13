@@ -145,7 +145,7 @@ function buildPostDepartureExclusionDescriptors(employees = []) {
 
 function isDateWithinEmploymentPeriod(value, employee = {}) {
     const rowKey = dateKeyUtc(value);
-    if (!rowKey || !ownsEmploymentReviewDate(rowKey, employee)) return false;
+    if (!rowKey) return false;
 
     // Opt-in lifecycle context: callers that preload canonical history attach it
     // as employment_history. Existing callers without it keep exact legacy behavior.
@@ -168,7 +168,7 @@ function isWeekFullyWithinEmploymentPeriod(value, employee = {}) {
     const weekEnd = dateKeyUtc(endOfWeekSundayUtc(value));
     if (!weekStart || !weekEnd) return false;
 
-    if (Array.isArray(employee.employment_history) || employee.afora_daneismo_ergazomenoy === true) {
+    if (Array.isArray(employee.employment_history)) {
         return enumerateDateKeys(weekStart, weekEnd)
             .every((date) => isDateWithinEmploymentPeriod(date, employee));
     }
@@ -180,8 +180,12 @@ function isWeekFullyWithinEmploymentPeriod(value, employee = {}) {
     return true;
 }
 
+function isDateWithinEmploymentReviewPeriod(value, employee = {}) {
+    return isDateWithinEmploymentPeriod(value, employee) && ownsEmploymentReviewDate(value, employee);
+}
+
 function assertEmploymentReviewDateOwned(value, employees = []) {
-    if (employees.some(employee => isDateWithinEmploymentPeriod(value, employee))) return;
+    if (employees.some(employee => isDateWithinEmploymentReviewPeriod(value, employee))) return;
     const error = new Error('Η ημέρα που επιχειρήσατε να αλλάξετε βρίσκεται εκτός εργασιακής σχέσης ή του διαστήματος ευθύνης του επιλεγμένου εργοδότη. ' +
         'Ο χαρακτηρισμός ή η επεξεργασία της δεν επιτρέπεται. ' +
         '1. Εκτελέστε νέα «Αναζήτηση». 2. Επιλέξτε ημέρα που αφορά τον επιλεγμένο εργοδότη. ' +
@@ -296,7 +300,7 @@ function buildFullMonthBoundaryContextPreflight({ period_start, period_end,
     const periodDates = enumerateDateKeys(periodStart, periodEnd);
     const activeEmploymentRecordsByKey = new Map([...employeeRecordsByKey.entries()]
         .map(([employeeKey, records]) => [employeeKey, records.filter((employee) =>
-            periodDates.some((date) => isDateWithinEmploymentPeriod(date, employee)))])
+            periodDates.some((date) => isDateWithinEmploymentReviewPeriod(date, employee)))])
         .filter(([, records]) => records.length));
     const activeDuringPeriod = [...activeEmploymentRecordsByKey.values()].map((records) => records[0]);
     const side = (dates, rows = []) => {
@@ -307,7 +311,7 @@ function buildFullMonthBoundaryContextPreflight({ period_start, period_end,
             affected_employee_codes: Object.freeze([]) });
         const affectedEmploymentRecordsByKey = new Map([...activeEmploymentRecordsByKey.entries()]
             .filter(([, records]) => records.some((employee) => dates.some((date) =>
-                isDateWithinEmploymentPeriod(date, employee)))));
+                isDateWithinEmploymentReviewPeriod(date, employee)))));
         const affected = [...affectedEmploymentRecordsByKey.values()].map((records) => records[0]);
         const affectedKeys = new Set(affectedEmploymentRecordsByKey.keys());
         const evidenceEmployeeKeys = new Set();
@@ -318,7 +322,7 @@ function buildFullMonthBoundaryContextPreflight({ period_start, period_end,
             const rowDate = dateKeyUtc(row?.hmeromhnia);
             const employmentRecords = affectedEmploymentRecordsByKey.get(rowKey) || [];
             if (!affectedKeys.has(rowKey) || !dates.includes(rowDate) ||
-                !employmentRecords.some((employee) => isDateWithinEmploymentPeriod(rowDate, employee))) continue;
+                !employmentRecords.some((employee) => isDateWithinEmploymentReviewPeriod(rowDate, employee))) continue;
             const verification = resolveCardPairVerification(row);
             if (verification.hasCompleteCardEvidence || verification.hasUnresolvedCardEvidence) {
                 evidenceEmployeeKeys.add(rowKey);
@@ -352,6 +356,7 @@ module.exports = {
     endOfDepartureDay,
     startOfHireDay,
     isDateWithinEmploymentPeriod,
+    isDateWithinEmploymentReviewPeriod,
     assertEmploymentReviewDateOwned,
     isWeekFullyWithinEmploymentPeriod,
     restrictBoundaryContextToPeriodEmployees,
