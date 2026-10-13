@@ -54,10 +54,10 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
         }
     }
     await page.goto(origin + '/review');
-    await page.waitForFunction(() => Boolean(window.EmploymentReviewEmployees && window.EmploymentReviewBranches && document.getElementById('ypokatasthma').tomselect));
+    await page.waitForFunction(() => Boolean(window.EmploymentReviewEmployees && window.EmploymentReviewBranches && document.getElementById('ypokatasthma').tomselect?._preselectDone));
     await page.locator('#ypokatasthma + .ts-wrapper .ts-control').click();
     await page.locator('#ypokatasthma + .ts-wrapper .option[data-value="0000"]').click();
-    await page.waitForFunction(() => Boolean(document.getElementById('reviewEmployee').tomselect));
+    await page.waitForFunction(() => Boolean(document.getElementById('reviewEmployee').tomselect?._preselectDone));
     async function search(code) {
         const reset = page.locator('#reviewEmployee + .ts-wrapper .ts-single-reset-btn');
         if (await reset.isVisible()) await reset.click();
