@@ -1251,3 +1251,14 @@ Chromium ελέγχει δύο διαδοχικές αναζητήσεις, πρ
 - `test/integration/employmentReviewNoWorkTerms.browser.test.js`
 - `test/integration/employmentReviewStage2Deadlock.browser.test.js`
 - `test/integration/employmentReviewStage2Evidence.browser.test.js`
+
+- `server/services/ergazomenoi/apasxoliseisEmploymentReviewReportService.test.js`
+
+Η δοκιμή εξαγωγών επαληθεύει χωριστά την εκκρεμή μη τεκμηριωμένη ημέρα και
+την πραγματικά αποθηκευμένη απόφαση ανάπαυσης, χωρίς εικονική μετατροπή ΑΝ.
+
+Πρόσθετος έλεγχος αναφορών: 33/33 επιτυχείς δοκιμές. Στην παλαιότερη,
+ξεχωριστή `apasxoliseisReviewExportProjectionService.test.js` παραμένουν έξι
+αποτυχίες. Αναπαράχθηκαν οι ίδιες έξι και με τις υλοποιήσεις της αρχικής
+`268b69bf4`, επομένως δεν αποτελούν νέα παλινδρόμηση της διόρθωσης.
+Δεν μεταβλήθηκαν οι συγκεκριμένοι κανόνες εξαγωγής ή οι υπολογισμοί αποδοχών.
