@@ -946,6 +946,9 @@ jobs:
           node --test server/services/ergazomenoi/apasxoliseisFreshSearch.regression.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage1CompletionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStaleStage3ResolutionFence.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewDateLock.browser.test.js test/integration/employmentReviewCells.browser.test.js
           node --test server/controllers/ergazomenoi/erganhController.weeklyHrStage1.contract.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.weeklyHrStage1Ui.test.js
+          # The real controller imports XML generators. Build only their existing
+          # native dependency; keep the application's postinstall disabled.
+          npm rebuild libxmljs2 --ignore-scripts=false
           node --test test/integration/employmentReviewStage1Completion.browser.test.js
 
       - name: Preserve synthetic Employment Review visual checks
