@@ -6607,9 +6607,20 @@ function buildPreCalculationDataIssueGroups(rows = []) {
 
 function renderApprovedOrphanAuditBadge(row = {}) {
     const issue = resolveCardEvidenceIssue(row);
-    if (issue?.code !== 'ORPHAN_CARD_PUNCH' ||
-        row.orphan_card_resolution?.status !== 'HR_APPROVED') return '';
-    return '<div class="mt-1"><span class="badge text-bg-warning">ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ</span></div>';
+    if (issue?.code !== 'ORPHAN_CARD_PUNCH') return '';
+    const resolution = row.orphan_card_resolution;
+    const snapshotMatches = !resolution?.approved_work_intervals ||
+        (resolution.raw_card_snapshot && Object.entries(resolution.raw_card_snapshot)
+            .every(([field, value]) => String(row[field] ?? '') === String(value ?? '')) &&
+            [1, 2, 3].every(number => {
+                const interval = resolution.approved_work_intervals.find(item => Number(item.pairNumber) === number);
+                return String(row[`apo_ora_0${number}_apologistika`] || '') === (interval?.start || '') &&
+                    String(row[`eos_ora_0${number}_apologistika`] || '') === (interval?.end || '');
+            }));
+    const status = resolution?.status === 'HR_APPROVED' && snapshotMatches
+        ? 'Εγκεκριμένος χειρισμός HR· το αρχικό χτύπημα διατηρείται'
+        : 'Εκκρεμεί ρητή έγκριση χειρισμού από HR';
+    return `<div class="mt-1"><span class="badge text-bg-warning" title="${status}">ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ</span></div>`;
 }
 
 function renderPreCalculationDataIssues(rows = []) {
@@ -13359,15 +13370,15 @@ function renderOrphanCardResolutionSection(row = {}) {
     if (preview.orphanVisible !== true || unresolvedPairs.length === 0) return '';
     const splitPairDetails = unresolvedPairs.map((item) => {
         const pair = Number(item.pairNumber);
-        const declaredStart = row[`apo_ora_0${pair}`] || '—';
-        const declaredEnd = row[`eos_ora_0${pair}`] || '—';
+        const resolved = preview.resolvedPairs?.find(item => Number(item.pairNumber) === pair);
         const known = item.orphanType === 'START_ONLY'
             ? `Υπάρχει είσοδος: ${item.knownStart || '—'}`
             : `Υπάρχει έξοδος: ${item.knownEnd || '—'}`;
         const missing = item.missingPunch === 'END' ? 'Λείπει έξοδος' : 'Λείπει είσοδος';
         return `<div class="border rounded p-2 mb-2 orphan-unresolved-pair" data-pair-number="${pair}">
-            <strong>Ζεύγος ${pair}</strong><br>${escapeHtml(known)}<br>${escapeHtml(missing)}<br>
-            Προδηλωμένο σκέλος: ${escapeHtml(declaredStart)}–${escapeHtml(declaredEnd)}<br>
+            <strong>Ζεύγος ${pair} κάρτας</strong><br>${escapeHtml(known)}<br>${escapeHtml(missing)}<br>
+            ${resolved?.workPairNumber ? `Αντίστοιχο απολογιστικό σκέλος ${Number(resolved.workPairNumber)}:
+                ${escapeHtml(resolved.start)}–${escapeHtml(resolved.end)}<br>` : ''}
             <span class="fw-semibold">Ο HR πρέπει να ορίσει πλήρες απολογιστικό διάστημα Από–Έως.</span>
         </div>`;
     }).join('');
@@ -13412,7 +13423,9 @@ function renderOrphanCardResolutionSection(row = {}) {
         ? (singleUnresolvedPair.orphanType === 'START_ONLY'
             ? singleUnresolvedPair.knownStart : singleUnresolvedPair.knownEnd)
         : null;
-    const durationSource = proposal.durationSource === 'EFFECTIVE_DAILY_AVERAGE'
+    const durationSource = proposal.durationSource === 'HR_MANUAL_FULL_DAY'
+        ? 'Πλήρες απολογιστικό ωράριο προς έγκριση HR'
+        : proposal.durationSource === 'EFFECTIVE_DAILY_AVERAGE'
         ? 'Ημερομηνιακά ισχύων Μ.Ο. ημερήσιας εργασίας'
         : proposal.durationSource === 'HR_MANUAL_SPLIT_INTERVAL'
             ? 'Χειροκίνητο πραγματικό διάστημα σπαστού ωραρίου'
@@ -13461,7 +13474,10 @@ function renderOrphanCardResolutionSection(row = {}) {
             </div>` : ''}
             ${approved ? `<div class="alert alert-info py-2 approved-orphan-decision">
                 <div><strong>Εγκεκριμένη επίλυση:</strong>
-                    ${escapeHtml(approvedInterval.start || approvedDecision.approved_start || '-')}–${escapeHtml(approvedInterval.end || approvedDecision.approved_end || '-')}</div>
+                    ${Array.isArray(approvedDecision.approved_work_intervals)
+                        ? approvedDecision.approved_work_intervals.map(item =>
+                            `${escapeHtml(item.start)}–${escapeHtml(item.end)}`).join('<br>')
+                        : `${escapeHtml(approvedInterval.start || approvedDecision.approved_start || '-')}–${escapeHtml(approvedInterval.end || approvedDecision.approved_end || '-')}`}</div>
                 <div><strong>Εγκεκριμένες ώρες:</strong> ${escapeHtml(Number(
                     approvedInterval.workDurationHours ?? approvedInterval.durationHours ??
                     approvedDecision.approved_hours ?? row.ores_ergasias_apologistika ?? 0
@@ -13474,7 +13490,9 @@ function renderOrphanCardResolutionSection(row = {}) {
                 <strong>Τρέχουσα προεπισκόπηση / επανεκτίμηση:</strong>
                 ${escapeHtml(proposal.start || '-')}–${escapeHtml(proposal.end || '-')}
             </div>` : ''}` : `<div class="small mb-2">
-                <strong>Πρόταση:</strong> ${escapeHtml(proposal.start || '-')}–${escapeHtml(proposal.end || '-')}
+                <strong>Πρόταση:</strong> ${preview.approvedWorkIntervals
+                    ? preview.approvedWorkIntervals.map(item => `${escapeHtml(item.start)}–${escapeHtml(item.end)}`).join(' · ')
+                    : `${escapeHtml(proposal.start || '-')}–${escapeHtml(proposal.end || '-')}`}
                 · <strong>Απολογιστικό Βιβλίο:</strong>
                 ${preview.apologistikoBookUpdate === true ? 'ΝΑΙ' : 'ΟΧΙ'}
             </div>`}
@@ -13659,6 +13677,13 @@ const orphanDerivedPreviewEditableFields = new Set([
 ]);
 const orphanResolutionPreviewDrafts = new WeakMap();
 
+function orphanWorkIntervalsFromForm() {
+    return [1, 2, 3].map(pairNumber => ({ pairNumber,
+        start: document.getElementById(`edit_apo_ora_0${pairNumber}_apologistika`)?.value || '',
+        end: document.getElementById(`edit_eos_ora_0${pairNumber}_apologistika`)?.value || ''
+    })).filter(item => item.start || item.end);
+}
+
 function orphanResolutionPreviewRow(row) {
     const draft = orphanResolutionPreviewDrafts.get(row);
     return draft ? { ...row, ...draft } : row;
@@ -13695,13 +13720,14 @@ async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = 
             `edit_apo_ora_0${Number(item.pairNumber)}_apologistika`)?.value || '',
         end: document.getElementById(
             `edit_eos_ora_0${Number(item.pairNumber)}_apologistika`)?.value || '' }));
-    if ((currentPreview.scheduleKind === 'SPLIT' || unresolvedPairs.length > 1) &&
-        pairs.some((item) => !item.start || !item.end)) return;
+    const workIntervals = orphanWorkIntervalsFromForm();
+    if (!workIntervals.length || workIntervals.some(item => !item.start || !item.end)) return;
     const response = await fetch(
         `/api/prodhlomena-oraria/review/${row._id}/orphan-resolution/preview`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
             body: JSON.stringify({ apologistiko_start: start, apologistiko_end: end, pairs,
+                work_intervals: workIntervals,
                 reuse_scope: document.getElementById('orphanResolutionScope')?.value || 'ONE_TIME' })
         }
     );
@@ -13728,6 +13754,7 @@ async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = 
             approvalInput.checked = explicitApprovalChecked;
         }
     }
+    return payload;
 }
 
 async function initializeOrphanResolutionPreview(row) {
@@ -14770,8 +14797,9 @@ function showDetailsModal(row, { orphanResolution = false,
                 });
                 return;
             }
-            const orphanResolution = orphanApprove?.checked ? {
+            let orphanResolution = orphanApprove?.checked ? {
                 approve: true,
+                work_intervals: orphanWorkIntervalsFromForm(),
                 apologistiko_start: updates.apo_ora_01_apologistika,
                 apologistiko_end: updates.eos_ora_01_apologistika,
                 pairs: (orphanPreview.unresolvedPairs || []).map((item) => ({
@@ -14788,6 +14816,21 @@ function showDetailsModal(row, { orphanResolution = false,
                 employmentReviewSwal({ icon: 'warning', title: 'Ρητή ανάληψη ευθύνης',
                     text: 'Η αποθήκευση απαιτεί ρητή επιβεβαίωση της παραβίασης 11ωρης ανάπαυσης.' });
                 return;
+            }
+            if (orphanResolution) {
+                const previewResponse = await refreshOrphanResolutionPreview(row, { preserveExplicitApproval: true });
+                if (!previewResponse?.preview_fingerprint || !previewResponse.preview?.eligible) return;
+                const confirmation = await employmentReviewSwal({ icon: 'question',
+                    title: 'Έγκριση πλήρους απολογιστικού ωραρίου',
+                    html: orphanResolution.work_intervals.map(item =>
+                        `<div>${escapeHtml(item.start)}–${escapeHtml(item.end)}</div>`).join('') +
+                        `<p>Πραγματική εργασία: ${Number(previewResponse.preview.proposal.workDurationHours).toFixed(2)} ώρες.</p>` +
+                        '<p>Η έγκριση αφορά όλα τα παραπάνω διαστήματα και τον χειρισμό του ορφανού χτυπήματος. Τα αρχικά χτυπήματα παραμένουν αμετάβλητα.</p>',
+                    showCancelButton: true, confirmButtonText: 'Έγκριση HR και αποθήκευση',
+                    cancelButtonText: 'Ακύρωση' });
+                if (!confirmation.isConfirmed) return;
+                orphanResolution = { ...orphanResolution,
+                    preview_fingerprint: previewResponse.preview_fingerprint };
             }
 
             const zeroLengthPairs = zeroLengthCardPairs(row);

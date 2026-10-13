@@ -47,11 +47,18 @@ function canonicalOrphanResolutionMetadata(value = {}) {
         (Array.isArray(value.rest_conflicts) && value.rest_conflicts.length > 0);
     const resolvedPairs = Array.isArray(value.resolved_pairs) ? value.resolved_pairs
         .map((item) => ({ pairNumber: Number(item.pairNumber),
+            ...(item.workPairNumber ? { workPairNumber: Number(item.workPairNumber) } : {}),
             orphanType: String(item.orphanType || ''),
             start: String(item.start || ''), end: String(item.end || '') }))
         .sort((left, right) => left.pairNumber - right.pairNumber) : [];
     return {
         status: value.status || '',
+        ...(Array.isArray(value.approved_work_intervals) ? {
+            raw_card_snapshot: value.raw_card_snapshot,
+            approved_work_intervals: value.approved_work_intervals.map(item => ({
+                pairNumber: Number(item.pairNumber), start: String(item.start), end: String(item.end)
+            }))
+        } : {}),
         policy_version: value.policy_version || '',
         orphan_type: value.orphan_type || '',
         reuse_scope: reuseScope,

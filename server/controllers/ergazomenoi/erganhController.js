@@ -232,6 +232,7 @@ const {
     sanitizeAppliedRepoTransferUpdate
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionService');
 const {
+    RAW_CARD_FIELDS,
     removeClientRawCardUpdates,
     buildEmploymentReviewUpdateErrorResponse,
     persistOrphanResolutionWrite
@@ -273,6 +274,7 @@ const {
     POLICY_VERSION: ORPHAN_CARD_POLICY_VERSION,
     RESOLUTION_SCOPE: ORPHAN_RESOLUTION_SCOPE,
     resolveOrphanCardResolution,
+    orphanWorkPreviewFingerprint, orphanWorkError,
     attachOrphanResolutionPreviews
 } = require('../../services/ergazomenoi/apasxoliseisOrphanCardResolutionService');
 const {
@@ -13061,7 +13063,8 @@ class erganhController {
                 manualInterval: {
                     start: req.body?.apologistiko_start,
                     end: req.body?.apologistiko_end,
-                    pairs: req.body?.pairs
+                    pairs: req.body?.pairs,
+                    work_intervals: req.body?.work_intervals
                 },
                 reuseScope: req.body?.reuse_scope === ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
                     ? ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
@@ -13091,7 +13094,10 @@ class erganhController {
                     appliedProtectionContext
                 });
             }
-            return res.json({ success: true, preview, derived_preview: derivedPreview });
+            return res.json({ success: true, preview, derived_preview: derivedPreview,
+                preview_fingerprint: req.body?.work_intervals !== undefined
+                    ? orphanWorkPreviewFingerprint({ row, contextRows, effectiveEmployee,
+                        breakConfiguration, workIntervals: req.body.work_intervals }) : undefined });
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'ORPHAN_RESOLUTION_PREVIEW_FAILED',
@@ -13245,10 +13251,10 @@ class erganhController {
                     cleanUpdates[field] = updates[field];
                 }
             }
-            if (orphanResolutionCommand || zeroLengthResolutionCommand || dailyResolutionCommand) {
-                cleanUpdates = removeClientRawCardUpdates(cleanUpdates);
-            }
+            // Ο Έλεγχος Απασχολήσεων δεν αποτελεί διαδρομή μεταβολής πρωτογενών καρτών.
+            cleanUpdates = removeClientRawCardUpdates(cleanUpdates);
             if (zeroLengthResolutionCommand || dailyResolutionCommand) cleanUpdates = {};
+            if (orphanResolutionCommand?.work_intervals !== undefined) cleanUpdates = {};
 
             if (Object.prototype.hasOwnProperty.call(
                 cleanUpdates, 'kathgoria_adeias_apologistika'
@@ -13357,11 +13363,18 @@ class erganhController {
                         dialleima_se_lepta: breakConfiguration.break_minutes,
                         _breakConfiguration: breakConfiguration
                     };
+                    if (orphanResolutionCommand.work_intervals !== undefined && oldRecord.is_locked !== true &&
+                        orphanResolutionCommand.preview_fingerprint !== orphanWorkPreviewFingerprint({
+                            row: oldRecord, contextRows, effectiveEmployee, breakConfiguration,
+                            workIntervals: orphanResolutionCommand.work_intervals })) {
+                        throw orphanWorkError('ORPHAN_WORK_PREVIEW_STALE');
+                    }
                     approvedOrphanResolution = resolveOrphanCardResolution({
                         row: oldRecord, contextRows, effectiveEmployee, breakConfiguration,
                         manualInterval: { start: orphanResolutionCommand.apologistiko_start,
                             end: orphanResolutionCommand.apologistiko_end,
-                            pairs: orphanResolutionCommand.pairs },
+                            pairs: orphanResolutionCommand.pairs,
+                            work_intervals: orphanResolutionCommand.work_intervals },
                         riskAcknowledged: orphanResolutionCommand.risk_acknowledged === true,
                         reuseScope: orphanResolutionCommand.reuse_scope ===
                             ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
@@ -13413,6 +13426,12 @@ class erganhController {
                     status: 'HR_APPROVED', policy_version: ORPHAN_CARD_POLICY_VERSION,
                     orphan_type: approvedOrphanResolution.orphanType,
                     resolved_pairs: approvedOrphanResolution.resolvedPairs || [],
+                    ...(approvedOrphanResolution.approvedWorkIntervals ? {
+                        approved_work_intervals: approvedOrphanResolution.approvedWorkIntervals,
+                        raw_card_snapshot: Object.fromEntries([...new Set([
+                            ...RAW_CARD_FIELDS, ...Object.keys(oldRecord).filter(field => field.startsWith('cards_'))
+                        ])].map(field => [field, oldRecord[field] ?? '']))
+                    } : {}),
                     reuse_scope: approvedOrphanResolution.reuseScope,
                     approved_interval: approvedOrphanResolution.proposal,
                     reusable_decision_rule:

@@ -1,6 +1,25 @@
 'use strict';
 
 const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
+const { PREVIEW_ROW_FIELDS, buildHrDailyActualWorkPreviewFingerprint } =
+    require('./apasxoliseisHrDailyActualWorkResolutionService');
+
+function orphanWorkPreviewFingerprint({ row, contextRows, effectiveEmployee,
+    breakConfiguration, workIntervals }) {
+    const contextFields = [...PREVIEW_ROW_FIELDS, 'ores_ergasias', 'cards_ores_ergasias',
+        'orphan_card_resolution', 'apousia_apologistika', 'repo_apologistika'];
+    return buildHrDailyActualWorkPreviewFingerprint({ row,
+        command: { work_intervals: workIntervals },
+        effectiveEmployee: { effectiveEmployee, breakConfiguration,
+            contextRows: contextRows.map(candidate => Object.fromEntries(
+                contextFields.filter(field => candidate[field] !== undefined)
+                    .map(field => [field, candidate[field]]))) } });
+}
+
+function orphanWorkError(code) {
+    return Object.assign(new Error('Η έγκριση του απολογιστικού ωραρίου σταμάτησε επειδή τα διαστήματα δεν συμφωνούν με τον έλεγχο της ημέρας ή τα ορφανά χτυπήματα. 1. Ελέγξτε όλα τα διαστήματα Από–Έως. 2. Ανανεώστε την προεπισκόπηση και επιβεβαιώστε ξανά. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: ' + code),
+    { code, statusCode: 409 });
+}
 
 const {
     CARD_PAIR_STATE,
@@ -14,7 +33,8 @@ const {
 } = require('./apasxoliseisScenarioFactsService');
 const {
     MINIMUM_INTERDAY_REST_MINUTES,
-    evaluateSplitShiftRest
+    evaluateSplitShiftRest,
+    evaluateSplitIntervalRest
 } = require('./apasxoliseisRestPeriodPolicyService');
 
 const POLICY_VERSION = 'orphan-card-continuous:v1';
@@ -147,6 +167,84 @@ function buildProposal(row = {}, override = {}, effectiveEmployee = {}, breakCon
     const rawVerification = resolveCardPairVerification(row);
     const verification = { ...rawVerification,
         unresolvedPairs: actualOrphanPairs(rawVerification) };
+    // Οι θέσεις απολογιστικού ωραρίου είναι ανεξάρτητες από τις θέσεις καρτών.
+    // Η εντολή εγκρίνει όλη την ημέρα, ακόμη και σκέλη χωρίς διαθέσιμες κάρτες.
+    if (override.work_intervals !== undefined) {
+        const work = override.work_intervals;
+        const clock = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+        if (!Array.isArray(work) || work.length < 1 || work.length > 3 ||
+            work.some((item, index) => !item || Number(item.pairNumber) !== index + 1 ||
+                Object.keys(item).some(field => !['pairNumber', 'start', 'end'].includes(field)) ||
+                !clock.test(item.start) || !clock.test(item.end) || item.start === item.end)) {
+            throw orphanWorkError('ORPHAN_WORK_INTERVAL_INVALID');
+        }
+        const bounds = work.map(item => ({ ...item,
+            ...intervalBounds(row.hmeromhnia, item.start, item.end) }));
+        if (bounds.some((item, index) => index && item.startAt < bounds[index - 1].endAt)) {
+            throw orphanWorkError('SPLIT_INTERVALS_OVERLAP');
+        }
+        const unresolvedPairs = verification.unresolvedPairs.map(item => ({
+            pairNumber: Number(item.pairNumber), orphanType: item.state,
+            knownStart: item.start || '', knownEnd: item.end || '',
+            missingPunch: item.state === CARD_PAIR_STATE.START_ONLY ? 'END' : 'START'
+        }));
+        if (!unresolvedPairs.length || rawVerification.unresolvedPairs.length !== unresolvedPairs.length) {
+            throw orphanWorkError('ORPHAN_PAIR_SET_MISMATCH');
+        }
+        const resolvedPairs = unresolvedPairs.map(orphan => {
+            const matches = bounds.filter(item => orphan.orphanType === CARD_PAIR_STATE.START_ONLY
+                ? item.start === orphan.knownStart : item.end === orphan.knownEnd);
+            if (matches.length !== 1) throw orphanWorkError('ORPHAN_WORK_PUNCH_MISMATCH');
+            return { ...matches[0], ...orphan, workPairNumber: Number(matches[0].pairNumber) };
+        });
+        const approvedUpdates = { kathgoria_ergasias_apologistika: 'ΕΡΓ', apologistiko_biblio: true };
+        for (const number of [1, 2, 3]) {
+            const pair = String(number).padStart(2, '0');
+            approvedUpdates[`apo_ora_${pair}_apologistika`] = work[number - 1]?.start || '';
+            approvedUpdates[`eos_ora_${pair}_apologistika`] = work[number - 1]?.end || '';
+        }
+        if (work.length > 1) {
+            const splitValidation = evaluateSplitIntervalRest(bounds.map(item => ({
+                ...item, startMinutes: timeToMinutes(item.start)
+            })));
+            if (splitValidation.status === 'VIOLATION') {
+                throw orphanWorkError(splitValidation.reasons[0] || 'SPLIT_REST_POLICY_VIOLATION');
+            }
+        }
+        const proposedRow = { ...row, ...approvedUpdates };
+        const netWorkMinutes = resolvePayrollBreakIntervals({ row: proposedRow, effectiveEmployee,
+            workIntervals: bounds.map(item => ({ start: (item.startAt - dateStartUtc(row.hmeromhnia)) / 60000,
+                end: (item.endAt - dateStartUtc(row.hmeromhnia)) / 60000 })) }).netMinutes;
+        approvedUpdates.ores_ergasias_apologistika = netWorkMinutes / 60;
+        approvedUpdates.ores_pragmatikhs_ergasias_apologistika = netWorkMinutes / 60;
+        const continuousProposal = work.length === 1
+            ? buildProposal(row, { start: work[0].start, end: work[0].end },
+                effectiveEmployee, breakConfiguration) : null;
+        return { eligible: true, orphanType: unresolvedPairs.length === 1
+            ? unresolvedPairs[0].orphanType : 'MULTIPLE',
+            pairNumber: unresolvedPairs.length === 1 ? unresolvedPairs[0].pairNumber : null,
+            unresolvedPairs, resolvedPairs, approvedUpdates, proposedRow,
+            approvedWorkIntervals: work.map(item => ({ ...item })),
+            start: bounds[0].start, end: bounds[bounds.length - 1].end,
+            startAt: bounds[0].startAt, endAt: bounds[bounds.length - 1].endAt,
+            durationMinutes: netWorkMinutes, netWorkMinutes,
+            durationSource: 'HR_MANUAL_FULL_DAY',
+            scheduleKind: work.length > 1 ? SCHEDULE_KIND.SPLIT : SCHEDULE_KIND.CONTINUOUS,
+            rule: null, manualIntervalMatchesRule: false,
+            declaredDurationMinutes: null, effectiveDailyAverageHours: null,
+            effectiveProfileSource: null, effectiveProfileHistoryId: null,
+            automaticStart: null, automaticEnd: null,
+            ...(work.length > 1
+                ? { insideSchedule: false, declaredBreakMinutes: 0, externalBreakMinutes: 0 }
+                : resolveEffectiveBreakContext(row, effectiveEmployee, breakConfiguration)),
+            ...(continuousProposal?.eligible ? {
+                rule: continuousProposal.rule,
+                automaticStart: continuousProposal.automaticStart,
+                automaticEnd: continuousProposal.automaticEnd,
+                manualIntervalMatchesRule: continuousProposal.manualIntervalMatchesRule,
+                scheduleKind: continuousProposal.scheduleKind
+            } : {}) };
+    }
     const occupiedDeclared = buildDeclaredIntervals(row).filter((item) => item.start || item.end);
     const splitSchedule = occupiedDeclared.length >= 2;
     if (splitSchedule && verification.unresolvedPairs.length > 0) {
@@ -373,6 +471,7 @@ function resolveOrphanCardResolution({ row = {}, contextRows = [], manualInterva
             knownEnd: verification.unresolvedPairs[0]?.end || '',
             missingPunch: proposal.orphanType === CARD_PAIR_STATE.START_ONLY ? 'END' : 'START' }],
         resolvedPairs: proposal.resolvedPairs || null,
+        approvedWorkIntervals: proposal.approvedWorkIntervals || null,
         orphanVisible: true,
         blocking: !canApprove,
         proposal: { start: proposal.start, end: proposal.end,
@@ -476,6 +575,7 @@ function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
 }
 
 module.exports = { POLICY_VERSION, ORPHAN_RULE, SCHEDULE_KIND, RESOLUTION_SCOPE,
+    orphanWorkPreviewFingerprint, orphanWorkError,
     LEGACY_REUSABLE_ORPHAN_REASON,
     isSupportedOrphanState, actualOrphanPairs,
     resolveContinuousDeclaredSchedule, resolveAverageFallback,

@@ -45,6 +45,8 @@ async function runRefresh({ approvalChecked, scope, preserveExplicitApproval }) 
         renderOrphanCardResolutionSection: () => '<div></div>'
     };
     vm.createContext(sandbox);
+    vm.runInContext(source.slice(source.indexOf('function orphanWorkIntervalsFromForm'),
+        source.indexOf('function orphanResolutionPreviewRow')), sandbox);
     vm.runInContext(source.slice(start, end), sandbox);
     await sandbox.refreshOrphanResolutionPreview(
         { _id: 'row-1' }, { preserveExplicitApproval }

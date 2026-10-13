@@ -116,12 +116,20 @@ function evaluateSplitShiftRest(row = {}, options = {}) {
         });
     }
 
+    return evaluateSplitIntervalRest(verification.completePairs, { minimumRestMinutes });
+}
+
+// Κοινός έλεγχος διαστημάτων, χωρίς μεταφορά απολογιστικών ωρών σε πεδία καρτών.
+function evaluateSplitIntervalRest(intervals = [], options = {}) {
+    const minimumRestMinutes = Number.isFinite(Number(options.minimumRestMinutes))
+        ? Math.max(0, Number(options.minimumRestMinutes))
+        : MINIMUM_SPLIT_REST_MINUTES;
     const details = [];
     const reasons = [];
 
-    for (let index = 1; index < verification.completePairs.length; index += 1) {
-        const previousPair = verification.completePairs[index - 1];
-        const nextPair = verification.completePairs[index];
+    for (let index = 1; index < intervals.length; index += 1) {
+        const previousPair = intervals[index - 1];
+        const nextPair = intervals[index];
         const previousBounds = completePairBounds(previousPair);
         const nextBounds = completePairBounds(nextPair);
         const restMinutes = nextBounds.start - previousBounds.end;
@@ -256,5 +264,6 @@ module.exports = {
     STATUS,
     REASON,
     evaluateSplitShiftRest,
+    evaluateSplitIntervalRest,
     evaluateInterdayRest
 };
