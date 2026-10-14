@@ -17737,11 +17737,11 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 /* Employee Maintenance only: scale actions to the available content width. */
 .employee-maintenance-form {
     container: employee-maintenance / inline-size;
-    --employee-action-font: clamp(.875rem, .72rem + .25cqi, 1rem);
+    --employee-action-font: var(--maintenance-control-font);
     --employee-action-height: clamp(2.125rem, 1.75rem + .5cqi, 2.5rem);
     --employee-action-padding-y: clamp(.35rem, .2rem + .2cqi, .5rem);
     --employee-action-padding-x: clamp(.6rem, .4rem + .4cqi, .85rem);
-    --employee-schedule-font: clamp(.875rem, .72rem + .25cqi, 1rem);
+    --employee-schedule-font: var(--maintenance-control-font);
     --employee-schedule-columns: 2rem 9rem minmax(10rem, 1fr) repeat(4, minmax(6.75rem, 1fr)) 4rem;
     --employee-schedule-gap: clamp(.35rem, .6cqi, .65rem);
 }
@@ -17780,10 +17780,11 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 }
 .employee-maintenance-form .menu_Links ul {
     display: flex;
-    flex-wrap: wrap;
-    gap: .25rem .75rem;
+    flex-wrap: nowrap;
+    gap: clamp(.25rem, .65cqi, .75rem);
+    overflow-x: auto;
     height: auto !important;
-    white-space: normal !important;
+    white-space: nowrap !important;
 }
 .employee-maintenance-form .menu_Links li {
     font-size: var(--employee-action-font) !important;
@@ -17886,4 +17887,222 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     .employee-maintenance-form .employee-schedule-repo { grid-column: 2; }
     .employee-maintenance-form .employee-schedule-break-from { grid-column: 1; }
     .employee-maintenance-form .employee-schedule-break-to { grid-column: 2; }
+}
+
+/* Scoped maintenance forms: one scale for fields/actions, based on content width. */
+.maintenance-responsive-form {
+    container: maintenance-form / inline-size;
+    --maintenance-control-font: clamp(.9rem, .78rem + .25cqi, 1rem);
+    font-size: clamp(.85rem, .74rem + .25cqi, 1rem);
+    min-width: 0;
+}
+/* Keep the named schedule container used by the existing time-column queries. */
+.employee-maintenance-form { container-name: employee-maintenance maintenance-form; }
+.maintenance-responsive-form :is(.form-control, .form-select, .input-contents, .date-control, .input-date, .input-time, .ts-control, .ts-control input, .ts-control .item, .col-form-label, .form-check-label) {
+    font-size: var(--maintenance-control-font) !important;
+}
+.maintenance-responsive-form :is(.card, form, .card-body, .accordion-body, .sections, .row > div) { min-width: 0; }
+.maintenance-responsive-form .row.form-group:not(.employee-schedule-day, .employee-schedule-pair) {
+    margin-inline: 0 !important;
+    row-gap: .5rem;
+}
+.maintenance-responsive-form .row.form-group:not(.employee-schedule-day, .employee-schedule-pair) > div:not(:has(input[type="checkbox"], input[type="radio"])) {
+    min-width: 8rem;
+    max-width: 100%;
+}
+/* A file/search action claims its space before the flex row is laid out. */
+.maintenance-responsive-form .row.form-group > div:has(.btn, .pdf-button-wrapper) {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: max-content !important;
+    max-width: 100%;
+}
+.maintenance-responsive-form :is(.cardFooter01, .user-admin-actions, .modal-footer) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    margin-inline: 0 !important;
+}
+.maintenance-responsive-form .card:not(.modal .card) {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 9rem);
+    min-height: 0;
+    overflow: visible !important;
+}
+.maintenance-responsive-form .card > form,
+.maintenance-responsive-form .card > .card-body:has(> form) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+}
+.maintenance-responsive-form .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    overflow-y: auto;
+}
+.maintenance-responsive-form :is(.card-footer, .user-admin-card-footer) {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+}
+.maintenance-responsive-form :is(.table-responsive, .user-privileges-table-container) { min-width: 0; overflow-x: auto; }
+.maintenance-responsive-form table { font-size: clamp(.85rem, .74rem + .25cqi, 1rem); }
+.maintenance-responsive-form .modal-dialog { max-height: calc(100dvh - 2rem); }
+.maintenance-responsive-form .modal-content { max-height: calc(100dvh - 2rem); }
+.maintenance-responsive-form .modal-body { overflow-y: auto; min-height: 0; }
+.maintenance-responsive-form .menu_Links ul {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: clamp(.25rem, .65cqi, .75rem);
+    height: auto !important;
+    padding-inline: .5rem;
+}
+.maintenance-responsive-form .menu_Links li {
+    flex: 1 0 auto;
+    float: none;
+    margin-inline: 0 !important;
+    white-space: nowrap;
+    text-align: center;
+    font-size: var(--maintenance-control-font) !important;
+}
+@container maintenance-form (max-width: 70rem) {
+    .maintenance-responsive-form .row.form-group:not(.employee-schedule-day, .employee-schedule-pair) > div {
+        flex: 1 1 12rem;
+        width: auto;
+        max-width: 100%;
+    }
+    .maintenance-responsive-form .row.form-group > div:has(> .col-form-label) {
+        flex-basis: 10rem;
+        text-align: start;
+    }
+    .maintenance-responsive-form .row.form-group > div:has(.btn, .pdf-button-wrapper) { flex-basis: max-content; }
+}
+@layer application-buttons {
+    .maintenance-responsive-form :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row,
+        .accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop,
+        .istoriko-btn, .btn-small
+    )) {
+        font-size: var(--maintenance-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        min-height: clamp(2.125rem, 1.75rem + .5cqi, 2.5rem) !important;
+        padding: clamp(.35rem, .2rem + .2cqi, .5rem) clamp(.6rem, .4rem + .4cqi, .85rem) !important;
+    }
+    .maintenance-responsive-form :is(.btn, .buttons-content) > :is(i, svg) {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+.maintenance-responsive-form .card-footer {
+    height: auto !important;
+    min-height: 0;
+}
+.maintenance-responsive-form .istoriko-footer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+/* Structural header rows span the card; only field columns participate in wrapping. */
+.employee-maintenance-form .header-row {
+    display: grid;
+    grid-template-columns: auto minmax(8rem, 1fr) auto minmax(8rem, 1fr);
+    gap: .35rem .6rem;
+    padding: .5rem;
+}
+.employee-maintenance-form .header-row > div {
+    width: auto;
+    min-width: 0 !important;
+    padding: 0;
+    text-align: start;
+}
+.employee-maintenance-form .header-row > div:first-child { grid-column: 1 / -1; }
+.employee-maintenance-form .header-row > .col:empty { display: none; }
+@container maintenance-form (min-width: 70rem) {
+    .employee-maintenance-form .header-row {
+        grid-template-columns: auto auto minmax(9rem, 2fr) auto minmax(8rem, 1.5fr) auto minmax(7rem, 1fr) auto minmax(8rem, 1fr);
+    }
+    .employee-maintenance-form .header-row > div:first-child { grid-column: auto; }
+}
+.maintenance-responsive-form .menu_Links { margin-inline: 0; min-width: 0; }
+.maintenance-responsive-form .user-privileges-controls {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+.maintenance-responsive-form .user-privileges-user-field { padding-inline-end: 0; }
+.maintenance-responsive-form :is(.headers-content, h1, .h3, .h4) {
+    font-size: clamp(1.1rem, .9rem + .5cqi, 1.5rem);
+}
+.maintenance-responsive-form :is(.alert, [role="alert"]) { font-size: max(1rem, var(--maintenance-control-font)); }
+.maintenance-responsive-form .card-footer.d-flex,
+.maintenance-responsive-form .card-footer > .d-flex {
+    flex-wrap: wrap !important;
+    white-space: normal;
+    max-width: 100%;
+    gap: .5rem;
+}
+.maintenance-responsive-form .row.form-group > :is(.card-header, .row),
+.maintenance-responsive-form .row.form-group > div:has(> hr) {
+    flex: 0 0 100% !important;
+    width: 100% !important;
+}
+.employee-maintenance-form .header-row > div { width: auto !important; }
+.employee-maintenance-form .accordion-item { margin-block: .5rem !important; }
+.employee-maintenance-form .accordion-header { margin: 0; }
+.employee-maintenance-form .accordion-button {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: .65rem .9rem;
+    font-size: var(--maintenance-control-font) !important;
+}
+.employee-maintenance-form .accordion-body > .row.form-group {
+    margin-block: .5rem !important;
+}
+.maintenance-responsive-form :is(th, td, .page-link, .small) {
+    font-size: clamp(.85rem, .74rem + .25cqi, 1rem) !important;
+}
+.maintenance-responsive-form :is(.ts-dropdown, .ts-dropdown .option, .ts-dropdown input) {
+    font-size: var(--maintenance-control-font) !important;
+}
+/* Shared horizontal scroll keeps the separate sortable header with its rows. */
+.maintenance-responsive-form .maintenance-table-scroll {
+    overflow-x: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+.maintenance-responsive-form .maintenance-table-inner {
+    display: flex;
+    flex-direction: column;
+    min-width: 52rem;
+    height: min(50dvh, calc(100dvh - 22rem));
+}
+.maintenance-responsive-form .maintenance-table-contracts { min-width: 32rem; }
+.maintenance-responsive-form .maintenance-table-inner table { table-layout: fixed; width: 100%; }
+.maintenance-responsive-form .cardFooter02 { flex-wrap: wrap; width: auto !important; }
+.maintenance-responsive-form .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-width: 2em;
+    min-height: 2em;
+    padding: .25em .5em;
+    line-height: 1.25;
+    white-space: nowrap;
 }
