@@ -1806,7 +1806,7 @@ function ensureReviewTableStructure() {
                 max-width: 100%;
                 padding: 0.18rem 0.35rem;
                 border-radius: 999px;
-                font-size: 0.72rem;
+                font-size: var(--review-small, .875rem);
                 font-weight: 700;
                 line-height: 1.2;
                 white-space: normal;
@@ -1841,7 +1841,7 @@ function ensureReviewTableStructure() {
                 border: 1px solid #ced4da;
                 color: #495057;
                 background-color: #f8f9fa;
-                font-size: 0.68rem;
+                font-size: var(--review-small, .875rem);
                 font-weight: 600;
                 line-height: 1.25;
                 white-space: nowrap;
@@ -1869,7 +1869,7 @@ function ensureReviewTableStructure() {
                 border-radius: 0.25rem;
                 background-color: #f8f9fa;
                 border: 1px solid #dee2e6;
-                font-size: 0.8rem;
+                font-size: var(--review-small, .875rem);
             }
 
             .policy-preview-card .card-body {
@@ -1897,7 +1897,7 @@ function ensureReviewTableStructure() {
 
             .policy-preview-main-summary::before {
                 content: '▸';
-                font-size: 0.9rem;
+                font-size: var(--review-small, .875rem);
                 grid-column: 1;
             }
 
@@ -1916,7 +1916,7 @@ function ensureReviewTableStructure() {
             .policy-preview-main-toggle-label {
                 grid-column: 4;
                 color: #495057;
-                font-size: 0.75rem;
+                font-size: var(--review-small, .875rem);
                 font-weight: 600;
                 white-space: nowrap;
             }
@@ -1965,7 +1965,7 @@ function ensureReviewTableStructure() {
             }
 
             .policy-preview-code {
-                font-size: 0.72rem;
+                font-size: var(--review-small, .875rem);
             }
 
             .policy-preview-group-items {
@@ -1981,7 +1981,7 @@ function ensureReviewTableStructure() {
 
             .policy-preview-items-table {
                 min-width: 760px;
-                font-size: 0.68rem;
+                font-size: var(--review-small, .875rem);
             }
 
             .policy-preview-items-table th,
@@ -2035,14 +2035,14 @@ function ensureReviewTableStructure() {
             }
 
             .policy-preview-group-line {
-                font-size: 0.78rem;
+                font-size: var(--review-small, .875rem);
                 line-height: 1.25;
                 margin-top: 0.1rem;
             }
 
             .policy-preview-details-btn {
                 padding: 0.12rem 0.4rem;
-                font-size: 0.68rem;
+                font-size: var(--review-small, .875rem);
                 line-height: 1.2;
                 background-color: #cff4fc;
                 border-color: #0dcaf0;
@@ -2089,7 +2089,7 @@ function ensureReviewTableStructure() {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 0.25rem 0.75rem;
-                font-size: 0.75rem;
+                font-size: var(--review-small, .875rem);
             }
 
             .policy-preview-decision-actions {
@@ -2100,7 +2100,7 @@ function ensureReviewTableStructure() {
             }
 
             .policy-preview-decision-btn {
-                font-size: 0.7rem;
+                font-size: var(--review-small, .875rem);
                 line-height: 1.2;
             }
 
@@ -2218,7 +2218,7 @@ function ensureReviewTableStructure() {
 
             .policy-preview-history-table {
                 min-width: 1050px;
-                font-size: 0.7rem;
+                font-size: var(--review-small, .875rem);
             }
 
             .policy-preview-history-table th,
@@ -2294,7 +2294,7 @@ function ensureReviewTableStructure() {
             .review-hours-note {
                 display: block;
                 margin-top: 2px;
-                font-size: 0.72rem;
+                font-size: var(--review-small, .875rem);
                 line-height: 1.1;
                 color: inherit;
                 white-space: nowrap;
@@ -10809,7 +10809,7 @@ function renderWeeklyHrStage3(lifecycle) {
                             group.pending_items.length)} προς απόφαση</span></div>
                 </div>
                 ${stage3BoundaryWeekGuidance(group)}${stage3WeeklyRestSummary(group)}
-                <div class="table-responsive stage3-decisions-table-wrapper"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
+                <div class="table-responsive stage3-decisions-table-wrapper" tabindex="0" role="region" aria-label="Αποφάσεις για πιθανές άδειες — κύλιση πίνακα"><table class="table table-sm table-bordered align-middle mb-0 weekly-hr-stage3-decisions-table">
                     <colgroup>
                         <col class="stage3-col-select"><col class="stage3-col-date"><col class="stage3-col-day">
                         <col class="stage3-col-day-status"><col class="stage3-col-declared">
@@ -12261,7 +12261,7 @@ function renderWeeklyHrStage1Presentation() {
         <button type="button" class="btn btn-outline-secondary weekly-hr-stage1-page-next" ${weeklyHrStage1Page >= totalPages ? 'disabled' : ''}>Επόμενη</button></div></div>`;
     resetWeeklyHrStage1TooltipInteraction();
     cleanupWeeklyHrStage1BulkDropdownPortal();
-    container.innerHTML = `${renderWeeklyHrStage1BulkToolbar()}<div class="weekly-hr-stage1-table-shell"><table class="table table-sm table-bordered align-middle weekly-hr-stage1-table">
+    container.innerHTML = `${renderWeeklyHrStage1BulkToolbar()}<div class="weekly-hr-stage1-table-shell" tabindex="0" role="region" aria-label="Χαρακτηρισμός ημερών — κύλιση πίνακα"><table class="table table-sm table-bordered align-middle weekly-hr-stage1-table">
         <colgroup><col class="stage1-col-select"><col class="stage1-col-code"><col class="stage1-col-employee"><col class="stage1-col-week"><col class="stage1-col-status"><col span="7" class="stage1-col-day"></colgroup>
         <thead><tr><th>Επιλογή</th><th>Κωδικός</th><th>Εργαζόμενος</th><th>Εβδομάδα</th><th>Κατάσταση</th><th>Δευ</th><th>Τρι</th><th>Τετ</th><th>Πεμ</th><th>Παρ</th><th>Σαβ</th><th>Κυρ</th></tr></thead>
         <tbody>${cards.join('')}</tbody></table>${emptyFilteredResult}</div>${pagination}`;

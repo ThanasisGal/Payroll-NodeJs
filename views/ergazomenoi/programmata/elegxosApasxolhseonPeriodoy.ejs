@@ -88,9 +88,9 @@
 
         <div class="card-body review-card-body">
             <div class="review-filters-sticky">
-                <div class="row g-1 mb-2" id="reviewFiltersEnterScope">
+                <div class="row g-1 mb-2 employment-review-responsive-filters" id="reviewFiltersEnterScope">
                     <div class="col-md-2">
-                        <label class="form-label">Από Ημερομηνία</label>
+                        <label class="form-label" for="apo_hmeromhnia">Από Ημερομηνία</label>
                         <input
                             type="date"
                             id="apo_hmeromhnia"
@@ -100,7 +100,7 @@
                     </div>
 
                     <div class="col-md-2">
-                        <label class="form-label">Έως Ημερομηνία</label>
+                        <label class="form-label" for="eos_hmeromhnia">Έως Ημερομηνία</label>
                         <input
                             type="date"
                             id="eos_hmeromhnia"
@@ -266,7 +266,7 @@
                 <div id="employmentReviewStage4PreviewNotice" class="alert alert-info small py-2 mx-2 mt-2 mb-0 d-none">
                     Προεπισκόπηση — μόνο για ενημέρωση. Ο Τελικός Έλεγχος θα είναι διαθέσιμος μόλις ολοκληρωθεί το προηγούμενο στάδιο.
                 </div>
-                <div class="table-responsive results-table-wrapper">
+                <div class="table-responsive results-table-wrapper" tabindex="0" role="region" aria-label="Ημερήσιες απασχολήσεις — οριζόντια και κατακόρυφη κύλιση">
                     <table class="table table-bordered table-hover align-middle" id="resultsTable">
                     <colgroup class="employment-review-results-columns">
                         <col class="review-col-date" />
@@ -385,7 +385,7 @@
                     </div>
                 </div>
                 <div class="modal-body p-0">
-                    <iframe id="reviewPdfFrame" title="Προεπισκόπηση PDF" style="width:100%;height:calc(100vh - 70px);border:0;"></iframe>
+                    <iframe id="reviewPdfFrame" title="Προεπισκόπηση PDF" ></iframe>
                 </div>
             </div>
         </div>
