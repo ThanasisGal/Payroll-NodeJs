@@ -49,20 +49,20 @@
                                     </div>
 
                                     <div class="col-8 left-align font-size-rem-1_1 cdarkgreen">
-                                        <label class="font-weight-600">
+                                        <span class="font-weight-600" data-field-display>
                                             <%- krathsh.kodikos + "&nbsp; &nbsp; " + krathsh.perigrafh %>
-                                        </label>
+                                        </span>
                                     </div>
 
                                     <div class="col-1-5 right-align">
-                                        <label for="aa_eggrafhs" class="col-form-label label-font-size black"> 
+                                        <span id="aaEggrafhsLabel" data-field-group-label class="col-form-label label-font-size black">
                                             α/α Εγγραφής 
-                                        </label>
+                                        </span>
                                     </div>
                                     <div class="col-1 font-size-rem-1_1 cdarkgreen">
-                                        <label class="font-weight-600">
+                                        <span class="font-weight-600" data-field-display aria-labelledby="aaEggrafhsLabel">
                                         <%= totalRecs.toString().padStart(4, '0') %>
-                                        </label>
+                                        </span>
                                     </div>
                                 </div>
                                 <input type="hidden" name="aa_eggrafhs" id="aa_eggrafhs" value="<%= totalRecs.toString().padStart(4, '0') %>" />

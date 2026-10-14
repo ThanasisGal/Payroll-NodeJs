@@ -256,15 +256,16 @@
         class="row form-group align-items-start margin-left--1rem margin-right--1rem margin-top--0_5rem"
     >
         <div class="col-4 right-align">
-            <label
-                for="tropos_ypologismoy_pragmatikoy_oromisthioy"
+            <span
+                id="actualHourlyRateGroupLabel" data-field-group-label
                 class="col-form-label font-size-vw-0_72"
             >
                 Υπολογισμός Πραγματικού Ωρομισθίου σε περίπτωση Extra Αποδοχών
-            </label>
+            </span>
         </div>
 
-        <div class="col-4 left-align d-flex align-items-start">
+        <div class="col-8 payroll-radio-options" role="radiogroup" aria-labelledby="actualHourlyRateGroupLabel">
+<div class="col-4 left-align d-flex align-items-start">
             <input
                 type="radio"
                 class="form-check-input custom-checkbox checkbox-class margin-top-0_25rem"
@@ -298,6 +299,7 @@
                 Επί του συνολικού νόμιμου μισθού πλήρους απασχόλησης + Extra Αποδοχές
             </label>
         </div>
+</div>
     </div>
 
     <div class="row form-group g-3 align-items-center mb-0-5">

@@ -54,7 +54,7 @@ test('Four maintenance areas: typography, tabs, collision bounds and scroll reac
     const rendered=[];
     for (const [name,file,extra] of forms) rendered.push([name,strip(await ejs.renderFile(path.join(root,file),{...locals,...extra}))]);
     for (const [name,html] of rendered) {
-        await page.setContent(`<!doctype html><html lang="el"><meta charset="utf-8"><body><div class="container-fluid container-scroll"><div class="row">${sidebar}<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent">${html}</main></div></div></body></html>`);
+        await page.setContent(`<!doctype html><html lang="el"><meta charset="utf-8"><body><div class="container-fluid container-scroll"><div class="row">${sidebar}<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent payroll-form-layout">${html}</main></div></div></body></html>`);
         await page.addStyleTag({path:path.join(vendor,'tom-select.css')});
         for (const asset of ['public/css/bootstrap.min.css','public/css/main.css']) await page.addStyleTag({path:path.join(root,asset)});
         await page.addScriptTag({path:path.join(root,'public/js/bootstrap.bundle.min.js')});
@@ -66,6 +66,7 @@ test('Four maintenance areas: typography, tabs, collision bounds and scroll reac
         });
         if(name==='company-add')await page.addScriptTag({path:path.join(root,'public/js/companies/genikastoixeia/addFixedDetailsLayout.js')});
         await page.evaluate(()=>document.querySelectorAll('form').forEach(f=>f.addEventListener('submit',e=>e.preventDefault())));
+        await page.addScriptTag({ path: path.join(root, 'public/js/common/formLayout.js') });
         for (const [width,height] of sizes) for (const open of [true,false]) {
             await page.setViewportSize({width,height});
             await page.evaluate(open=>{
@@ -74,12 +75,16 @@ test('Four maintenance areas: typography, tabs, collision bounds and scroll reac
             },open);
             const sections = await page.locator('.sections > section').count();
             for (let section=0;section<Math.max(1,sections);section++) {
-                await page.evaluate(section=>document.querySelectorAll('.sections > section').forEach((e,i)=>{e.style.display=i===section?'block':'none';e.classList.toggle('visible',i===section);}),section);
+                await page.evaluate(async section=>{
+                    document.querySelectorAll('.sections > section').forEach((e,i)=>{e.style.display=i===section?'block':'none';e.classList.toggle('visible',i===section);});
+                    window.dispatchEvent(new Event('resize'));
+                    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+                },section);
                 await page.evaluate(()=>document.getAnimations().forEach(a=>{if(Number.isFinite(a.effect.getComputedTiming().endTime))a.finish();}));
                 const label=`${name}/${section}/${width}x${height}/${open?'open':'closed'}`;
                 const result=await page.evaluate(()=>{
                     const scope=document.querySelector('.maintenance-responsive-form');
-                    const visible=e=>e.getClientRects().length && getComputedStyle(e).visibility!=='hidden' && !e.matches('select.tomselected');
+                    const visible=e=>e.getClientRects().length && getComputedStyle(e).visibility!=='hidden' && !e.matches('select.tomselected,.sr-only,.visually-hidden');
                     const box=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
                     const intersects=(a,b)=>a.left<b.right-.5&&b.left<a.right-.5&&a.top<b.bottom-.5&&b.top<a.bottom-.5;
                     const buttons=[...scope.querySelectorAll('button,.btn,a.buttons-content')].filter(e=>visible(e)&&!e.matches('.btn-close,.btn-toTop,.accordion-button,.istoriko-btn,.clear-btn,#gotoProgrammaDypa,.clear-row,.ts-fill-reset-btn,.edit-apodoxes-tom-trash,.edit-employee-tom-trash,.btn-small'));

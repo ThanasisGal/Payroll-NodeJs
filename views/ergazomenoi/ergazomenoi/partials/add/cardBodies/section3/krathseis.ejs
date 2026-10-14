@@ -1,4 +1,4 @@
-<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem mb-3 margin-top--1rem">
+<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem mb-3 margin-top--1rem employee-retention-heading">
 	<div class="col-1 text-center">
 		<label class="col-form-label field-required">
 			α/α
@@ -27,9 +27,9 @@
 <% for (let index = 1; index <= 7; index++) { %>
 	<% const idNum = index.toString().padStart(2, '0'); %>
 
-	<div class="row form-group g-3 align-items-center mb-1">
+	<div class="row form-group g-3 align-items-center mb-1 employee-retention-row" role="group" aria-label="Κράτηση <%= index %>">
 		<div class="col-1 center-align">
-			<label for=<%= `select_krathsh_${index}` %> class="col-form-label label-font-size">#<%= index %>
+			<label for="<%= `select_krathsh_${idNum}` %>" class="col-form-label label-font-size">#<%= index %>
 			</label>
 		</div>
 
@@ -47,8 +47,8 @@
 
 		<div class="col-0-5"></div>
 
-		<div class="col-1-5">
-			<input type="text" name="ama_krathshs_<%= idNum %>" id="ama_krathshs_<%= idNum %>" class="form-control input-contents"
+		<div class="col-1-5 employee-ama-field">
+			<input type="text" name="ama_krathshs_<%= idNum %>" id="ama_krathshs_<%= idNum %>" aria-label="Α.Μ.Α. κράτησης <%= idNum %>" class="form-control input-contents"
 				value="<%= safe(`ama_krathshs_${idNum}`) %>" />
 		</div>
 	</div>
@@ -56,27 +56,7 @@
 
 <hr class="hr-style-5" />
 
-<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem mb-1">
-	<div class="col-4 text-center">
-		<label class="col-form-label field-required">
-			Φορέας Επικουρικής Ασφάλισης εκτός e-ΕΦΚΑ
-		</label>
-	</div>
-
-	<div class="col-4 text-center">
-		<label class="col-form-label field-required">
-			Φορέας Ασθένειας εκτός e-ΕΦΚΑ
-		</label>
-	</div>
-
-	<div class="col-4 text-center">
-		<label class="col-form-label field-required">
-			Ιδιότητα αντισυμβαλλόμενου στο έργο αρ.39 παρ.9
-		</label>
-	</div>
-</div>
-
-<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem mt-2">
+<div class="row form-group g-3 align-items-start employee-fund-fields margin-left--1rem margin-right--1rem mt-2">
 	<input
 		type="hidden"
 		name="epikoyrikh_xoris_efka_stathera"
@@ -85,7 +65,8 @@
 		value="<%= safe("epikoyrikh_xoris_efka_stathera") %>"
 	/>
 
-	<div class="col-3-75">
+	<div class="col-3-75 payroll-contained-field">
+		<label for="epikoyrikh_xoris_efka" class="col-form-label field-required">Φορέας Επικουρικής Ασφάλισης εκτός e-ΕΦΚΑ</label>
 		<select
 			id="epikoyrikh_xoris_efka"
 			name="epikoyrikh_xoris_efka"
@@ -111,7 +92,8 @@
 		value="<%= safe("astheneia_xoris_efka_stathera") %>"
 	/>
 
-	<div class="col-3-75">
+	<div class="col-3-75 payroll-contained-field">
+		<label for="astheneia_xoris_efka" class="col-form-label field-required">Φορέας Ασθένειας εκτός e-ΕΦΚΑ</label>
 		<select
 			id="astheneia_xoris_efka"
 			name="astheneia_xoris_efka"
@@ -137,7 +119,8 @@
 		value="<%= safe("idiothta_sto_ergo_39_stathera") %>"
 	/>
 
-	<div class="col-3-75">
+	<div class="col-3-75 payroll-contained-field">
+		<label for="idiothta_sto_ergo_39" class="col-form-label field-required">Ιδιότητα αντισυμβαλλόμενου στο έργο αρ.39 παρ.9</label>
 		<select
 			id="idiothta_sto_ergo_39"
 			name="idiothta_sto_ergo_39"

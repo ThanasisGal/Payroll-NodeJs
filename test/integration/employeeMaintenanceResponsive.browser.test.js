@@ -55,7 +55,7 @@ test('Employee Maintenance buttons and schedule alignment in Chromium across res
     await page.route('**/*', route => { requests.push(route.request().url()); return route.abort(); });
     await page.setContent(`<!doctype html><html lang="el"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <body><div class="container-fluid container-scroll"><div class="row">${sidebar}
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent">${html}</main></div></div></body></html>`);
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent payroll-form-layout">${html}</main></div></div></body></html>`);
     await page.addStyleTag({ path: path.join(vendor, 'tom-select.css') });
     for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css'])
         await page.addStyleTag({ path: path.join(root, file) });
@@ -85,6 +85,7 @@ test('Employee Maintenance buttons and schedule alignment in Chromium across res
     const capture = async name => {
         if (artifactDir) await page.screenshot({ path: path.join(artifactDir, `${name}.png`), animations: 'disabled' });
     };
+    await page.addScriptTag({ path: path.join(root, 'public/js/common/formLayout.js') });
     for (const [width, height] of sizes) for (const sidebarOpen of [true, false]) {
         const label = `${width}x${height}-${sidebarOpen ? 'open' : 'closed'}`;
         await page.setViewportSize({ width, height });
@@ -96,9 +97,11 @@ test('Employee Maintenance buttons and schedule alignment in Chromium across res
         }, sidebarOpen);
         const result = { label, tabs: [] };
         for (const section of ['Σταθερά Στοιχεία', 'Ωράριο Εργασίας']) {
-            await page.evaluate(section => {
+            await page.evaluate(async section => {
                 document.querySelectorAll('.sections > section').forEach(e => { e.classList.toggle('visible', e.dataset.section === section); e.style.display = e.dataset.section === section ? 'block' : 'none'; });
                 document.querySelectorAll('.menu_Links li').forEach(e => { e.classList.toggle('active', e.textContent.trim() === section); });
+                window.dispatchEvent(new Event('resize'));
+                await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
             }, section);
             const footer = page.locator(`section[data-section="${section}"] .cardFooter01`);
             await footer.scrollIntoViewIfNeeded();

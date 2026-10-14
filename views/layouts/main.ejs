@@ -106,7 +106,7 @@
         <div class="container-fluid container-scroll">
             <div class="row">
                 <%- include('../partials/sidebar.ejs') %>
-                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent">
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent payroll-form-layout">
                     <%- body %>
                 </main>
             </div>
@@ -130,6 +130,7 @@
         <script src="<%= script('common/getAppDate') %>"></script>
         <script src="<%= script('common/getUser') %>"></script>
         <script src="<%= script('common/navTabs') %>"></script>
+        <script src="<%= script('common/formLayout') %>"></script>
         <script src="<%= script('common/getUserRole') %>"></script>
         <script src="<%= script('common/moveByEnter') %>"></script>
         <script src="<%= script('common/changeFontSizeSelectDropdownMenu') %>"></script>

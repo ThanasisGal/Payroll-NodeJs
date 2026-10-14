@@ -2865,7 +2865,7 @@ a {
 
 .swal2-popup {
     right: auto !important;
-    left: 5% !important;
+    left: 0 !important;
     transform: translateX(0) !important;
     border-radius: 5% !important;
     width: auto;
@@ -3096,7 +3096,7 @@ a {
 
 .wide-popup {
     right: auto !important;
-    left: 5% !important;
+    left: 0 !important;
     transform: translateX(0) !important;
     width: 30vw;
     max-width: 90%; /* Για να μην ξεφεύγει από πολύ μικρές οθόνες */
@@ -3128,7 +3128,7 @@ a {
 
 .custom-swal-popup {
     right: auto !important;
-    left: 5% !important;
+    left: 0 !important;
     width: 600px !important; /* ✅ Fixed width */
     max-width: 90vw !important; /* ✅ Responsive */
     text-align: center !important;
@@ -5014,7 +5014,7 @@ select.tom-dropdown {
 }
 
 .ts-dropdown.maxh-ideal {
-    max-height: clamp(220px, 45vh, 420px);
+    max-height: min(clamp(220px, 45vh, 420px), var(--ts-available-space, 420px));
     overflow-y: auto;
 }
 .ts-dropdown.maxh-limited {
@@ -7838,11 +7838,11 @@ main {
 
 /* κάνε το dropdown πιο φαρδύ και αγκίστρωσέ το στο δεξί άκρο (απλώνει αριστερά) */
 #asfalistikh_klash + .ts-wrapper > .ts-dropdown {
-    width: auto !important; /* ακυρώνει inline width */
-    min-width: 33vw !important; /* ρύθμισε (π.χ. 780–900px) */
+    width: var(--ts-menu-width, 33vw) !important;
+    min-width: 0 !important;
     max-width: calc(100vw - 32px);
-    right: 0 !important; /* δεξιά στοίχιση */
-    left: auto !important; /* ακύρωσε left:0 */
+    right: auto !important;
+    left: var(--ts-menu-left, 0) !important;
     z-index: 9999;
     will-change: transform;
 }
@@ -9774,10 +9774,11 @@ body.upload-templates-page .file-input-wrapper {
 }
 
 body.upload-templates-page .file-input-wrapper input[type='file'] {
-    font-size: 100px;
+    font-size: var(--payroll-control-font, 1rem);
     position: absolute;
-    left: 0;
-    top: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     opacity: 0;
     cursor: pointer;
 }
@@ -16033,7 +16034,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-results-columns .review-col-absences {
-    width: 5.75rem;
+    width: 6.5rem;
 }
 
 .employment-review-results-columns .review-col-additional {
@@ -16091,11 +16092,13 @@ body.loader-active > *:not(.app-loader) {
 
 .swal2-popup.employment-review-swal-popup .swal2-html-container,
 .swal2-popup.employment-review-swal-popup .employment-review-swal-html-container,
-.swal2-popup.employment-review-swal-popup .swal2-input,
-.swal2-popup.employment-review-swal-popup .swal2-textarea,
 .swal2-popup.employment-review-swal-popup .swal2-validation-message,
 .swal2-popup.employment-review-swal-popup .swal2-input-label {
     font-size: var(--review-text, .95rem) !important;
+}
+.swal2-popup.employment-review-swal-popup :is(.swal2-input, .swal2-select, .swal2-textarea) {
+    font-size: var(--review-label, 1rem) !important;
+    font-weight: 400;
 }
 
 .swal2-popup.employment-review-swal-popup .swal2-html-container,
@@ -16981,7 +16984,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         min-height: 2.375rem !important;
         flex-shrink: 0 !important;
         padding: .5rem .8rem !important;
-        font-size: 1rem !important;
+        font-size: var(--payroll-control-font, 1rem) !important;
+        font-weight: 400 !important;
         line-height: 1.25 !important;
         text-align: center !important;
         border: 1px solid var(--button-color) !important;
@@ -17011,7 +17015,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 
     /* Keep the four compact actions above the full-width review action. */
     .istoriko-actions-col [data-action="review"].employee-history-correction-action {
-        font-size: .74rem !important;
+        font-size: var(--payroll-control-font, .875rem) !important;
         padding-inline: .35rem !important;
         grid-column: 1 / -1;
         grid-row: 2;
@@ -17892,7 +17896,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 /* Scoped maintenance forms: one scale for fields/actions, based on content width. */
 .maintenance-responsive-form {
     container: maintenance-form / inline-size;
-    --maintenance-control-font: clamp(.9rem, .78rem + .25cqi, 1rem);
+    --maintenance-control-font: var(--payroll-control-font, clamp(.9rem, .78rem + .25cqi, 1rem));
     font-size: clamp(.85rem, .74rem + .25cqi, 1rem);
     min-width: 0;
 }
@@ -17902,21 +17906,6 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     font-size: var(--maintenance-control-font) !important;
 }
 .maintenance-responsive-form :is(.card, form, .card-body, .accordion-body, .sections, .row > div) { min-width: 0; }
-.maintenance-responsive-form .row.form-group:not(.employee-schedule-day, .employee-schedule-pair) {
-    margin-inline: 0 !important;
-    row-gap: .5rem;
-}
-.maintenance-responsive-form .row.form-group:not(.employee-schedule-day, .employee-schedule-pair) > div:not(:has(input[type="checkbox"], input[type="radio"])) {
-    min-width: 8rem;
-    max-width: 100%;
-}
-/* A file/search action claims its space before the flex row is laid out. */
-.maintenance-responsive-form .row.form-group > div:has(.btn, .pdf-button-wrapper) {
-    flex: 1 1 auto;
-    width: auto;
-    min-width: max-content !important;
-    max-width: 100%;
-}
 .maintenance-responsive-form :is(.cardFooter01, .user-admin-actions, .modal-footer) {
     display: flex;
     flex-wrap: wrap;
@@ -17971,18 +17960,6 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     text-align: center;
     font-size: var(--maintenance-control-font) !important;
 }
-@container maintenance-form (max-width: 70rem) {
-    .maintenance-responsive-form .row.form-group:not(.employee-schedule-day, .employee-schedule-pair) > div {
-        flex: 1 1 12rem;
-        width: auto;
-        max-width: 100%;
-    }
-    .maintenance-responsive-form .row.form-group > div:has(> .col-form-label) {
-        flex-basis: 10rem;
-        text-align: start;
-    }
-    .maintenance-responsive-form .row.form-group > div:has(.btn, .pdf-button-wrapper) { flex-basis: max-content; }
-}
 @layer application-buttons {
     .maintenance-responsive-form :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
@@ -18019,27 +17996,6 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     flex-wrap: wrap;
     gap: .5rem;
 }
-/* Structural header rows span the card; only field columns participate in wrapping. */
-.employee-maintenance-form .header-row {
-    display: grid;
-    grid-template-columns: auto minmax(8rem, 1fr) auto minmax(8rem, 1fr);
-    gap: .35rem .6rem;
-    padding: .5rem;
-}
-.employee-maintenance-form .header-row > div {
-    width: auto;
-    min-width: 0 !important;
-    padding: 0;
-    text-align: start;
-}
-.employee-maintenance-form .header-row > div:first-child { grid-column: 1 / -1; }
-.employee-maintenance-form .header-row > .col:empty { display: none; }
-@container maintenance-form (min-width: 70rem) {
-    .employee-maintenance-form .header-row {
-        grid-template-columns: auto auto minmax(9rem, 2fr) auto minmax(8rem, 1.5fr) auto minmax(7rem, 1fr) auto minmax(8rem, 1fr);
-    }
-    .employee-maintenance-form .header-row > div:first-child { grid-column: auto; }
-}
 .maintenance-responsive-form .menu_Links { margin-inline: 0; min-width: 0; }
 .maintenance-responsive-form .user-privileges-controls {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
@@ -18061,7 +18017,6 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     flex: 0 0 100% !important;
     width: 100% !important;
 }
-.employee-maintenance-form .header-row > div { width: auto !important; }
 .employee-maintenance-form .accordion-item { margin-block: .5rem !important; }
 .employee-maintenance-form .accordion-header { margin: 0; }
 .employee-maintenance-form .accordion-button {
@@ -18105,4 +18060,354 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     padding: .25em .5em;
     line-height: 1.25;
     white-space: nowrap;
+}
+
+/* Only identified field pairs reflow. Bootstrap rows and input groups keep their semantics. */
+.payroll-navigation { --payroll-navigation-font: .85rem; }
+.payroll-navigation .header-app-title { font-size: .95rem !important; height: auto; margin-block: 0 !important; align-self: center; }
+.payroll-navigation > form > .input-group { flex-wrap: wrap; }
+.payroll-navigation > form > .input-group > div { flex: 1 1 9rem; width: auto; min-width: 0; }
+.payroll-navigation > form > .input-group > div:first-child { flex: 2 1 16rem; }
+.payroll-navigation .form-control {
+    font-size: var(--payroll-navigation-font) !important;
+    line-height: 1.35;
+    min-height: 2.25rem;
+    height: auto !important;
+    padding: .35rem .6rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+#sidebarMenu { --payroll-control-font: .875rem; }
+#sidebarMenu .sidebar-toolbar .form-control { font-size: var(--payroll-control-font); }
+#sidebarMenu .sidebar-toolbar .form-control::placeholder { font-size: inherit; }
+.container-fluid.container-scroll:has(> .row > main.payroll-form-layout) {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+.payroll-form-layout {
+    container: payroll-page / inline-size;
+    --payroll-control-font: clamp(.9rem, .78rem + .25cqi, 1rem);
+    --payroll-control-height: 2.25rem;
+    min-width: 0;
+    height: calc(100dvh - var(--payroll-main-top, var(--app-header-h)) - var(--app-footer-h));
+    max-height: calc(100dvh - var(--payroll-main-top, var(--app-header-h)) - var(--app-footer-h));
+    overflow-y: auto;
+    padding-bottom: .75rem;
+    width: calc(100% - var(--leftW));
+    margin-left: var(--leftW) !important;
+}
+#sidebarMenu:is(.d-none, [hidden]) ~ .payroll-form-layout { width: 100%; margin-left: 0 !important; }
+.payroll-form-layout .payroll-field-row {
+    --bs-gutter-y: 0;
+    margin-inline: 0 !important;
+    margin-block: .4rem !important;
+    gap: .75rem 1rem;
+    align-items: flex-start !important;
+}
+.payroll-form-layout .payroll-field-row > .payroll-field-group {
+    flex: 1 1 calc(var(--field-columns, 6) * 100% / 12 - 1rem);
+    min-width: min(100%, var(--field-min, 14rem));
+    max-width: 100%;
+    width: auto;
+    padding: 0;
+    margin: 0 !important;
+}
+.payroll-form-layout .payroll-field-group > :is(.payroll-field-label, .payroll-field-control, .payroll-field-actions) {
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: 0;
+    margin: 0 !important;
+    text-align: start !important;
+}
+.payroll-form-layout .payroll-field-label :is(label, [data-field-group-label]) {
+    display: inline-block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding: 0 0 .3rem;
+    margin: 0 !important;
+    line-height: 1.4;
+}
+.payroll-form-layout .payroll-field-actions { padding-top: .35rem; }
+.payroll-form-layout .payroll-field-control :is(input:not(.dropdown-input), select),
+.payroll-form-layout .payroll-field-control > .ts-wrapper { margin-block: 0 !important; }
+.payroll-form-layout .payroll-field-control :is([data-field-display], label:not(.col-form-label)) { font-size: var(--payroll-control-font) !important; }
+.employee-maintenance-form .row:has(> .employee-ama-field) { flex-wrap: nowrap; }
+.employee-maintenance-form .row > .employee-ama-field { flex: 0 0 8rem; width: 8rem; }
+.employee-maintenance-form .row:has(> .employee-ama-field) > .payroll-field-group { flex: 1 1 0; min-width: 0; }
+.employee-maintenance-form .employee-retention-row { gap: .5rem; margin-inline: 0; }
+.employee-maintenance-form .employee-retention-row > .col-1 { flex: 0 0 2rem; width: 2rem; padding-inline: 0; }
+.employee-maintenance-form .employee-retention-row > .col-8 { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 0; }
+.employee-maintenance-form .employee-retention-row > :is(.col-0-2, .col-0-3):not(button) { display: none; }
+.employee-maintenance-form .employee-retention-row > .employee-ama-field { padding-inline: 0; }
+.employee-maintenance-form .employee-retention-row > .edit-employee-tom-trash { flex: 0 0 1.75rem; width: 1.75rem; padding: 0; }
+.employee-maintenance-form .employee-retention-heading { flex-wrap: nowrap; gap: .5rem; margin-inline: 0; }
+.employee-maintenance-form .employee-retention-heading > .col-1 { flex: 0 0 2rem; width: 2rem; padding-inline: 0; white-space: nowrap; }
+.employee-maintenance-form .employee-retention-heading > .col-8 { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 0; }
+.employee-maintenance-form .employee-retention-heading > .col-1-5 { flex: 0 0 8rem; width: 8rem; padding-inline: 0; }
+.employee-maintenance-form .employee-retention-heading > :is(.col-0-2,.col-0-5) { display: none; }
+.employee-maintenance-form .employee-retention-heading > .col-0-3 { flex: 0 0 1.75rem; width: 1.75rem; padding: 0; }
+.employee-maintenance-form .row:has(> .employee-ama-field):not(.employee-retention-row) > .col-8 { flex: 1 1 0; width: auto; }
+.employee-maintenance-form .row:has(> .employee-ama-field):not(.employee-retention-row) > :is(.col-0-2, .col-0-3) { display: none; }
+#editKrathseisTomDropdownScope .row:has(> .employee-ama-field):not(.employee-retention-row) > .col-0-3 { display: block; flex: 0 0 1.75rem; width: 1.75rem; }
+.payroll-field-inputs { display: flex; gap: .5rem; }
+.payroll-field-inputs > .payroll-field-control { flex: 1 1 0; min-width: 0; width: auto !important; padding: 0; }
+.payroll-field-inputs > .payroll-field-control:has(input[type="text"]) { flex-grow: 2; }
+.payroll-form-layout .payroll-field-group:has(.pdf-button-wrapper) { flex-basis: 100%; }
+.payroll-form-layout .payroll-field-spacer { display: none; }
+.payroll-form-layout .payroll-field-row > .payroll-field-group-empty { display: none; }
+.payroll-form-layout .payroll-action-row { margin-inline: 0 !important; }
+.payroll-form-layout .payroll-action-row > div:not(.payroll-field-spacer) { flex: 1 1 100%; width: 100%; min-width: 0; }
+.payroll-form-layout .header-row { padding: .5rem; }
+.payroll-form-layout .header-row > div:first-child:not(.payroll-field-group) { flex-basis: 100%; width: 100%; }
+.payroll-form-layout .payroll-contained-field > label {
+    display: block;
+    margin: 0 0 .3rem !important;
+    padding: 0;
+    white-space: normal;
+}
+.payroll-form-layout .payroll-contained-field > :is(input, select) { margin-top: 0 !important; }
+.employee-maintenance-form .employee-fund-fields { gap: 1rem; margin-inline: 0 !important; }
+.employee-maintenance-form .employee-fund-fields > .col-3-75 { flex: 1 1 14rem; width: auto !important; min-width: 0; padding: 0; }
+.employee-maintenance-form .employee-fund-fields > .col-0-25 { display: none; }
+#editKrathseisTomDropdownScope .employee-fund-fields > .edit-employee-tom-field { flex-wrap: wrap; }
+#editKrathseisTomDropdownScope .employee-fund-fields > .edit-employee-tom-field > label { flex: 0 0 100%; text-align: start; }
+#editKrathseisTomDropdownScope .employee-fund-fields > .edit-employee-tom-field > .ts-wrapper { flex: 1 1 0; width: 0 !important; }
+.payroll-form-layout .pdf-modal-body :is(p, small) { font-size: var(--payroll-control-font) !important; }
+.payroll-form-layout .hover-modal {
+    left: auto;
+    right: 0;
+    top: 100%;
+    width: min(30rem, calc(100cqi - 2rem));
+    max-height: min(32rem, var(--payroll-hover-space, calc(100vh - var(--app-header-h) - 12rem)));
+    overflow-y: auto;
+    z-index: 1100;
+}
+.payroll-form-layout .hover-modal :is(.modal-item, .modal-item-value) { font-size: var(--payroll-control-font); }
+.payroll-form-layout .hover-modal:hover { display: block; }
+.payroll-form-layout .hover-modal.payroll-hover-above { top: auto; bottom: 100%; }
+.payroll-field-inline { display: flex; gap: .5rem; }
+.payroll-field-inline > input { flex: 1 1 0; width: 0; }
+.payroll-field-inline > div { flex: 1 1 0; min-width: 0; width: auto; padding: 0; }
+.payroll-field-inline > div > input { width: 100%; }
+.payroll-radio-options { display: flex; flex-wrap: wrap; gap: .75rem; }
+.payroll-radio-options > div { flex: 1 1 14rem; min-width: 0; width: auto; }
+
+.payroll-form-layout :is(.tadded-container, .wrapper-kinhseis) {
+    height: auto !important;
+    min-width: 0;
+    min-height: 0;
+    overflow: visible !important;
+}
+.payroll-form-layout .container-fluid:has(.sections) { height: auto !important; min-height: 0; overflow: visible !important; }
+.payroll-form-layout .sections > section { height: auto !important; overflow: visible !important; }
+.payroll-form-layout .sections > section > .container:has(form) { height: auto; overflow: visible; }
+.payroll-form-layout .payroll-scroll-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: auto !important;
+    max-height: var(--payroll-card-space, calc(100dvh - 10rem)) !important;
+    overflow: visible !important;
+    margin-bottom: .5rem !important;
+}
+.payroll-form-layout .payroll-scroll-card > form { display: flex; flex-direction: column; min-height: 0; }
+.payroll-form-layout .payroll-scroll-card > .card-body,
+.payroll-form-layout .payroll-scroll-card > form > .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    overflow-y: auto !important;
+}
+.payroll-form-layout .payroll-scroll-card .card-footer { flex: 0 0 auto; height: auto !important; position: static; }
+/* A tall form header must not squeeze its fields into a tiny second scrollport. */
+@container payroll-page (max-width: 45rem) {
+    .payroll-form-layout .payroll-scroll-card:not(:has(table, .payroll-entry-table)) { max-height: none !important; }
+    .payroll-form-layout .payroll-scroll-card:not(:has(table, .payroll-entry-table)) > .card-body,
+    .payroll-form-layout .payroll-scroll-card:not(:has(table, .payroll-entry-table)) > form > .card-body {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+}
+.payroll-form-layout .payroll-scroll-card > .card-footer,
+.payroll-form-layout .payroll-scroll-card > .card-footer > .d-flex { flex-wrap: wrap !important; gap: .5rem; white-space: normal; }
+.payroll-form-layout :is(.cardFooter01, .cardFooter02) { flex-wrap: wrap; gap: .5rem; width: auto !important; }
+.payroll-form-layout .card-header:has(> label, > h4) { height: auto !important; min-height: 3rem; }
+.payroll-form-layout .payroll-context-row { flex-wrap: wrap; }
+.payroll-form-layout .payroll-context-row > span { font-size: .85rem !important; white-space: normal; }
+.payroll-form-layout .payroll-context-row > span:last-child { flex: 1 1 15rem; overflow-wrap: anywhere; }
+.payroll-form-layout .card-header:has(> .row.form-group) { display: block; flex: 0 0 auto; }
+.payroll-form-layout .card-header:has(> .row.form-group) > label { display: block; height: auto !important; }
+.payroll-form-layout .card-header :is(.headers-content, h4) { font-size: 1.2rem !important; line-height: 1.4; margin: .25rem 0; white-space: normal; }
+.payroll-form-layout > .container:has(> form) { min-width: min(100%, 22rem); max-width: 100%; height: auto; overflow: visible; }
+.payroll-form-layout form[action="/login/userLogin"] .card-body a.small { font-size: .85rem; line-height: 1.5; display: inline-block; }
+.payroll-form-layout .menu_Links { margin-inline: 0; min-width: 0; }
+.payroll-form-layout .menu_Links > ul { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: .35rem; height: auto !important; padding-inline: .5rem; }
+.payroll-form-layout .menu_Links > ul > li { flex: 0 0 auto; width: auto; min-width: max-content; float: none; margin-inline: 0 !important; white-space: nowrap; font-size: var(--payroll-control-font) !important; }
+.payroll-form-layout :is(th, td, .page-link) { font-size: clamp(.85rem, .74rem + .25cqi, 1rem) !important; }
+.payroll-form-layout .payroll-scroll-card > .card-body:has(> table, > div > table) { overflow-x: auto !important; }
+.payroll-table-scroll { flex: 1 1 auto; min-height: 0; height: var(--payroll-table-height); overflow-x: auto; overflow-y: hidden; }
+.payroll-table-inner { display: flex; flex-direction: column; min-width: var(--payroll-table-width, 52rem); height: var(--payroll-table-height); }
+.payroll-table-inner > .card-body { flex: 1 1 auto; min-height: 0; height: auto !important; overflow-x: hidden !important; overflow-y: auto !important; }
+.payroll-table-inner > div:not(.card-body) { flex-shrink: 0; }
+.payroll-table-header { padding-inline-end: var(--payroll-table-gutter, 0px); }
+.payroll-table-inner table { table-layout: fixed; width: 100%; }
+.payroll-table-inner .table-responsive { overflow: visible; }
+.payroll-scroll-table { min-width: var(--payroll-table-width, 52rem); table-layout: fixed; }
+.payroll-form-layout :is(.payroll-scroll-table, .payroll-table-inner table, .maintenance-table-inner table) :is(th, td).col-1 { width: 6.5rem; white-space: nowrap; }
+.payroll-form-layout :is(.payroll-scroll-table, .payroll-table-inner table, .maintenance-table-inner table) :is(th, td).col-0-5 { width: 3.5rem; white-space: nowrap; }
+.payroll-scroll-table :is(th, td):has(> .btn-nesting, > .bi-chevron-expand) { width: 3.25rem !important; }
+.payroll-scroll-table:has(.btn-nesting) > :is(thead, tbody) > tr > :is(th, td):first-child { width: 3rem !important; }
+.payroll-form-layout .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-width: 2em;
+    min-height: 2em;
+    padding: .25em .5em;
+    line-height: 1.25;
+    white-space: nowrap;
+    font-size: var(--payroll-control-font) !important;
+}
+.payroll-form-layout .page-link > i { font-size: 1em !important; width: 1em; height: 1em; }
+
+/* One control scale per region, with the established review-dialog overrides retained. */
+.payroll-form-layout :is(.form-control, .form-control1, .form-control2, .input-contents, .input-content, select, .form-select, .date-control, .input-date, .input-time,
+    .ts-wrapper, .ts-control, .ts-control input, .ts-control .item,
+    .ts-dropdown, .ts-dropdown input, .ts-dropdown .option, .col-form-label, .form-label, .form-check-label) {
+    font-size: var(--payroll-control-font) !important;
+}
+.payroll-form-layout :is(.form-control, .form-control1, .form-control2, .input-contents, .input-content, select, .form-select, .date-control, .input-date, .input-time) {
+    min-width: 0;
+    max-width: 100%;
+    min-height: var(--payroll-control-height);
+    font-weight: 400 !important;
+    line-height: 1.4;
+}
+.payroll-form-layout :is(input, textarea)::placeholder,
+.payroll-form-layout .ts-wrapper .dropdown-input::placeholder { font-size: inherit !important; }
+.payroll-form-layout .ts-wrapper.tom-dropdown {
+    height: auto !important;
+    min-height: var(--payroll-control-height);
+    min-width: 0;
+    max-width: 100%;
+}
+.payroll-form-layout .ts-wrapper .ts-control {
+    min-height: calc(var(--payroll-control-height) - 2px);
+    height: auto;
+    border: 0 !important;
+    padding: .35rem 3rem .35rem .65rem !important;
+    font-weight: 400;
+    line-height: 1.4;
+}
+.payroll-form-layout .ts-control input { min-width: 0; font-weight: 400; }
+.payroll-form-layout .ts-control .item { min-width: 0; max-width: 100%; font-weight: 400; }
+.payroll-form-layout .ts-wrapper.multi .item { height: auto; margin-block: 0; line-height: 1.4; }
+.payroll-form-layout .ts-wrapper.multi .ts-control { padding-right: 5.25rem !important; }
+.payroll-form-layout .ts-wrapper.multi .ts-control > .item { display: flex; align-items: center; max-width: 100%; min-width: 0; }
+.payroll-form-layout .ts-wrapper.multi .ts-control > .item[hidden] { display: none; }
+.payroll-form-layout .ts-item-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payroll-form-layout .ts-wrapper.multi .item > .remove { flex-shrink: 0; }
+.payroll-form-layout .ts-overflow-indicator { right: 3.25rem; width: 1.5rem; height: 1.5rem; font-size: 1em; }
+.payroll-form-layout .ts-control .remove { height: auto; margin-block: 0; font-size: 1em; line-height: 1; }
+.payroll-form-layout select.ts-hidden-accessible {
+    min-height: 0 !important;
+    min-width: 0 !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+}
+.payroll-form-layout .ts-dropdown-content { overflow-y: auto; overscroll-behavior: contain; }
+.payroll-form-layout .ts-wrapper > .ts-dropdown {
+    width: var(--ts-menu-width, 100%) !important;
+    min-width: 0 !important;
+    max-width: none;
+    left: var(--ts-menu-left, 0) !important;
+    right: auto !important;
+}
+.payroll-form-layout .ts-wrapper.dropdown-active > .ts-dropdown { display: flex !important; flex-direction: column; }
+.payroll-form-layout .ts-wrapper.dropdown-active > .ts-dropdown .ts-dropdown-content { flex: 1 1 auto; min-height: 0; }
+.payroll-form-layout .ts-dropdown > .dropdown-input-wrap { flex-shrink: 0; }
+.payroll-form-layout .ts-wrapper.single .ts-control .item {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto;
+    background: transparent !important;
+    border: 0;
+}
+.payroll-form-layout .ts-wrapper > .ts-fill-reset-btn {
+    left: auto !important;
+    right: .25rem !important;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    font-size: 1em;
+}
+.payroll-form-layout .ts-wrapper > .ts-fill-reset-btn svg { width: 1em; height: 1em; }
+.payroll-form-layout .ts-wrapper:has(> .ts-fill-reset-btn:not([hidden]))::after { right: 2rem; }
+.payroll-form-layout .ts-dropdown .option:not(:has(.ts-option)) { overflow-wrap: anywhere; }
+.payroll-form-layout :is(select.is-invalid + .ts-wrapper, .ts-wrapper.is-invalid) { border-color: var(--bs-danger, #dc3545); }
+.payroll-form-layout :is(select.is-invalid + .ts-wrapper, .ts-wrapper.is-invalid).focus { box-shadow: 0 0 0 .2rem #dc354540 !important; }
+
+/* These older payroll fields use their own classes and ID-specific vw overrides. */
+.payroll-form-layout #apasxolhseisForm :is(.form-control1, .form-control2, .input-contents, select,
+    .ts-control, .ts-control input, .ts-control .item, .ts-dropdown, .ts-dropdown .option) {
+    font-size: var(--payroll-control-font) !important;
+}
+.payroll-form-layout #apasxolhseisForm .payroll-field-row { margin-block: .75rem !important; }
+.payroll-form-layout #apasxolhseisForm .payroll-field-control input { margin-inline: 0 !important; }
+.payroll-form-layout #apasxolhseisForm .card-body:has(> .payroll-entry-table) { overflow-x: auto !important; }
+.payroll-form-layout #apasxolhseisForm .payroll-entry-table { min-width: 80rem; padding-inline: .5rem; }
+.payroll-form-layout #apasxolhseisForm .payroll-entry-table .row.form-group:not(.payroll-field-row) { flex-wrap: nowrap; margin-inline: 0 !important; }
+.payroll-form-layout #apasxolhseisForm .payroll-entry-table label { font-size: var(--payroll-control-font) !important; }
+.payroll-form-layout #apasxolhseisForm .payroll-entry-table:has(> .foroi-body-row) { min-width: 35rem; }
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-row, .payroll-tax-heading) {
+    display: grid;
+    grid-template-columns: minmax(16rem, 2fr) repeat(2, minmax(8rem, 1fr));
+    gap: .75rem .5rem;
+    margin-block: .75rem;
+}
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-row, .payroll-tax-heading) > div { width: 100% !important; min-width: 0; padding-inline: 0; }
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-row, .payroll-tax-heading) > div:empty { display: none; }
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-annual, .payroll-tax-heading > div:nth-child(3)) { grid-column: 2; }
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-monthly, .payroll-tax-heading > div:last-child) { grid-column: 3; }
+.payroll-form-layout #apasxolhseisForm .krathseis-apodoxes-row { gap: .5rem; }
+.payroll-form-layout #apasxolhseisForm .krathseis-apodoxes-row > .col-2 { flex: 0 0 auto; width: max-content; }
+.payroll-form-layout #apasxolhseisForm .krathseis-apodoxes-row > .col-1-5 { flex: 0 0 10rem; width: 10rem; }
+
+@layer application-buttons {
+    .payroll-form-layout :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row,
+        .accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop,
+        .istoriko-btn, .btn-small
+    )) {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-height: var(--payroll-control-height) !important;
+        padding: .4rem .7rem !important;
+        min-width: max-content !important;
+    }
+    .payroll-form-layout :is(.btn, .buttons-content) > :is(i, svg) {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Body-mounted dialogs share a control scale; component-specific review scales still win. */
+.swal2-popup { --payroll-dialog-control-font: 1rem; }
+.swal2-popup :is(.swal2-input, .swal2-select, .swal2-textarea) { font-size: var(--payroll-dialog-control-font) !important; font-weight: 400; }
+@layer application-buttons {
+    .swal2-popup .swal2-actions button { font-size: var(--payroll-dialog-control-font) !important; font-weight: 400 !important; }
+    .swal2-popup .swal2-actions button :is(i, svg) { font-size: 1em !important; width: 1em; height: 1em; }
 }

@@ -7,10 +7,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const mongoose = require('mongoose');
 const { chromium } = require('playwright');
+const ejs = require('ejs');
+const { locals: layoutLocals, root } = require('../fixtures/responsiveForms');
+const { strip, addTypographyAssets } = require('../helpers/responsiveFormsBrowser');
 const { createGuidanceFixture } = require('../helpers/employmentReviewGuidanceApp');
 const uri = process.env.PAYROLL_GUIDANCE_TEST_MONGO_URI;
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
-const sizes = [[1920,1080], [1680,1050], [1600,900], [1440,900], [1280,1024], [1280,800], [1280,720], [1100,700]];
+const sizes = [[1920,1080], [1680,1050], [1600,900], [1440,900], [1280,1024], [1280,800], [1280,720], [1100,700], [800,700]];
 
 test('responsive employment review in Chromium: seven resolutions, sidebar, smaller window and dialogs', {
     skip: !uri || !vendor, timeout: 300000
@@ -41,17 +44,23 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
     await page.waitForFunction(() => Boolean(document.getElementById('reviewEmployee').tomselect?._preselectDone));
     // Reproduce the production layout's Bootstrap main/sidebar columns. Closing
     // the sidebar frees the whole row; the form itself never receives a width.
-    await page.evaluate(() => {
+    const sidebar = strip(await ejs.renderFile(path.join(root,'views/partials/sidebar.ejs'), layoutLocals));
+    const header = strip(await ejs.renderFile(path.join(root,'views/partials/header.ejs'), layoutLocals));
+    const footer = strip(await ejs.renderFile(path.join(root,'views/partials/footer.ejs'), layoutLocals));
+    await page.evaluate(({sidebar,header,footer}) => {
         const host = document.createElement('div');
         host.className = 'container-fluid container-scroll';
-        host.innerHTML = '<div class="row"><aside id="sidebarMenu" class="col-md-3 col-lg-2"><div class="p-3">Μενού εφαρμογής</div></aside><main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent"></main></div>';
+        host.innerHTML = '<div class="row">'+sidebar+'<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent payroll-form-layout"></main></div>'+footer;
         const shell = document.querySelector('.employment-review-page-shell');
+        document.body.insertAdjacentHTML('afterbegin',header);
         document.body.appendChild(host);
         host.querySelector('main').appendChild(shell);
-        document.documentElement.style.setProperty('--app-header-h', '0px');
         document.getElementById('ypokatasthma_stathera_advanced').value = '0000';
         document.getElementById('kodikos').value = '0001';
-    });
+    },{sidebar,header,footer});
+    await page.addStyleTag({path:path.join(root,'public/css/navTabs.css')});
+    await addTypographyAssets(page,vendor);
+    await page.addScriptTag({path:path.join(root,'public/js/common/formLayout.js')});
     await page.evaluate(async () => { await loadResults(); await loadPreparedWeeklyHrStage1(); });
     // Regression found by CI: a large explanation must not intercept the next
     // navigation control after the table and outer workspace have scrolled.
@@ -253,12 +262,19 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
             employmentReviewSwal({ title:'Προεπισκόπηση απόφασης HR', html:weeklyHrStage3BulkPreviewHtml({classification:'ABSENCE',selected_count:25,employee_count:1,will_apply_count:25,items:Array.from({length:25},()=>({employee_id:'synthetic',employee_name:'ΣΥΝΘΕΤΙΚΟΣ ΕΡΓΑΖΟΜΕΝΟΣ',employee_kodikos:'0001',decision_date:'2026-09-15',outcome:'APPLY'}))}), input:'textarea',inputLabel:'Αιτιολογία απόφασης',showCancelButton:true,confirmButtonText:'Επιβεβαίωση',cancelButtonText:'Ακύρωση',customClass:{popup:'employment-review-stage3-bulk-preview-popup'}});
         });
         await page.locator('.employment-review-swal-popup').waitFor();
+        await page.locator('.employment-review-swal-popup .swal2-cancel').click({trial:true});
+        await page.waitForFunction(()=>{
+            const popup=document.querySelector('.employment-review-swal-popup'),r=popup?.getBoundingClientRect();
+            return r?.width>=300&&r.height>=200&&Number(getComputedStyle(popup).opacity)>.99;
+        });
         await capture(`${label}-hr-confirmation`);
         const swal = await page.locator('.employment-review-swal-popup').evaluate(n => {
             const r=n.getBoundingClientRect(), a=n.querySelector('.swal2-actions').getBoundingClientRect();
-            return { fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,actionsVisible:a.bottom<=innerHeight,bodyFont:getComputedStyle(n.querySelector('.swal2-html-container')).fontSize };
+            return { fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,actionsVisible:a.bottom<=innerHeight,bodyFont:getComputedStyle(n.querySelector('.swal2-html-container')).fontSize,
+                fieldFont:getComputedStyle(n.querySelector('.swal2-textarea')).fontSize,buttonFont:getComputedStyle(n.querySelector('.swal2-confirm')).fontSize };
         });
         check(swal.fits && swal.actionsVisible, `HR confirmation ${JSON.stringify(swal)}`);
+        check(swal.fieldFont === swal.buttonFont, `HR confirmation control typography ${JSON.stringify(swal)}`);
         await page.evaluate(()=>Swal.close());
         measurements.push({label,stages,daily,orphan,drawer,canonical,pdf,bulk,swal});
     }

@@ -938,7 +938,23 @@ jobs:
           curl --fail --silent --show-error --location --retry 3 \
             https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css \
             -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/tom-select.css"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/bootstrap-icons.css"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.webpayrollsolutions.com/assets/fonts/bootstrap-icons.v2.woff2 \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/bootstrap-icons.woff2"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_3vqPQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-400.ttf"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_AP2PQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-600.ttf"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_Of2PQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-700.ttf"
           node --test test/integration/employeeMaintenanceResponsive.browser.test.js test/integration/maintenanceFormsResponsive.browser.test.js
+          node --test --test-concurrency=1 test/integration/formsInventory.contract.test.js test/integration/allFormsResponsive.browser.test.js test/integration/formControls.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewEmployees.test.js test/integration/employmentReviewEmployees.browser.test.js
           node --test server/services/ergazomenoi/apasxoliseisReviewGuidance.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.blockedExplanation.test.js
           node --test server/controllers/ergazomenoi/erganhController.stage1EmploymentScope.regression.test.js server/services/ergazomenoi/apasxoliseisDeferredTrailingWeekReview.test.js

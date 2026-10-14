@@ -134,9 +134,9 @@
 
         <div class="row form-group g-3 align-items-center mb-2">
           <div class="col-1-5 right-align">
-            <label for="group" class="col-form-label field-required">Role</label>
+            <span id="userRoleGroupLabel" data-field-group-label class="col-form-label field-required">Role</span>
           </div>
-          <div class="col-4 user-radio-group">
+          <div class="col-4 user-radio-group" role="radiogroup" aria-labelledby="userRoleGroupLabel">
             <% userRoleOptions.forEach((option) => { %>
               <div class="form-check form-check-inline user-radio-option">
                 <input
@@ -153,11 +153,10 @@
           </div>
 
           <div class="col-1-5 right-align">
-            <label for="group1" class="col-form-label field-required"
-              >Status</label
-            >
+            <span id="userStatusGroupLabel" data-field-group-label class="col-form-label field-required"
+              >Status</span>
           </div>
-          <div class="col-4 user-radio-group">
+          <div class="col-4 user-radio-group" role="radiogroup" aria-labelledby="userStatusGroupLabel">
             <div class="form-check form-check-inline user-radio-option">
               <input class="form-check-input" type="radio" name="radioStatus" id="radioActive" value="A" />
               <label class="form-check-label" for="radioActive">Ενεργός</label>
