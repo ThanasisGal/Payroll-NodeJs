@@ -2599,16 +2599,33 @@ function testSharedLifecyclePanelAndActiveWorkspaceScopeContract() {
 
 function testCorrectiveDropdownAndPageShellContract() {
     const repositionStart = dropdownHelperSource.indexOf('const reposition = () => {');
-    const repositionEnd = dropdownHelperSource.indexOf('requestAnimationFrame(reposition)', repositionStart);
+    const repositionEnd = dropdownHelperSource.indexOf('this._repositionDropdown = reposition;', repositionStart);
     const repositionSource = dropdownHelperSource.slice(repositionStart, repositionEnd);
-    const forcedDownStart = repositionSource.indexOf("if (forcedDirection === 'down')");
-    const forcedUpStart = repositionSource.indexOf("} else if (forcedDirection === 'up')");
-    const forcedDownSource = repositionSource.slice(forcedDownStart, forcedUpStart);
-
-    assert.ok(forcedDownStart >= 0 && forcedUpStart > forcedDownStart);
-    assert.ok(forcedDownSource.includes('spaceBelow - 8'));
-    assert.ok(forcedDownSource.includes("'place-below', 'maxh-limited'"));
-    assert.ok(!forcedDownSource.includes('place-above'));
+    assert.ok(repositionStart >= 0 && repositionEnd > repositionStart);
+    for (const [requested, top, expected, height] of [
+        ['down', 500, 'place-below', '106px'],
+        ['up', 220, 'place-above', '12px'],
+        ['auto', 220, 'place-below', '386px'],
+        ['auto', 500, 'place-above', '292px']
+    ]) {
+        const classes = new Set();
+        const styles = new Map();
+        const parent = { parentElement: null, getBoundingClientRect: () => ({top:200,bottom:650,left:100,right:900}) };
+        const instance = {
+            control: {getBoundingClientRect: () => ({top,bottom:top+36})},
+            wrapper: {parentElement:parent,matches:()=>true,getBoundingClientRect:()=>({left:700,width:200})},
+            dropdown: {style:{setProperty:(k,v)=>styles.set(k,v)},classList:{remove:(...names)=>names.forEach(n=>classes.delete(n)),add:(...names)=>names.forEach(n=>classes.add(n))}}
+        };
+        vm.runInNewContext('(function(){'+repositionSource+'reposition();}).call(instance)', {
+            instance,el:{dataset:{dropdownDirection:requested}},window:{innerWidth:1000,innerHeight:700},
+            getComputedStyle:()=>({overflowY:'auto',overflowX:'auto'})
+        });
+        assert.ok(classes.has(expected), `Requested ${requested} must keep its direction`);
+        assert.ok(!classes.has(expected==='place-above'?'place-below':'place-above'));
+        assert.strictEqual(styles.get('--ts-available-space'),height);
+        assert.strictEqual(styles.get('--ts-menu-width'),'800px');
+        assert.strictEqual(styles.get('--ts-menu-left'),'-600px');
+    }
     assert.ok(cssSource.includes('var(--ts-available-space, 260px)'));
 
     const shellMarkup = viewSource.match(/<div class="[^"]*employment-review-page-shell[^"]*">/)?.[0] || '';
