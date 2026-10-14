@@ -17733,3 +17733,157 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 #employmentReviewWorkspace #employmentReviewStage4Collapse :is(.stage4-sixth-day-badge, .stage4-seventh-day-badge) {
     line-height: 1.25;
 }
+
+/* Employee Maintenance only: scale actions to the available content width. */
+.employee-maintenance-form {
+    container: employee-maintenance / inline-size;
+    --employee-action-font: clamp(.875rem, .72rem + .25cqi, 1rem);
+    --employee-action-height: clamp(2.125rem, 1.75rem + .5cqi, 2.5rem);
+    --employee-action-padding-y: clamp(.35rem, .2rem + .2cqi, .5rem);
+    --employee-action-padding-x: clamp(.6rem, .4rem + .4cqi, .85rem);
+    --employee-schedule-font: clamp(.875rem, .72rem + .25cqi, 1rem);
+    --employee-schedule-columns: 2rem 9rem minmax(10rem, 1fr) repeat(4, minmax(6.75rem, 1fr)) 4rem;
+    --employee-schedule-gap: clamp(.35rem, .6cqi, .65rem);
+}
+@layer application-buttons {
+    .employee-maintenance-form :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row,
+        .accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop,
+        .istoriko-btn, .btn-sm, .btn-small
+    )) {
+        font-size: var(--employee-action-font) !important;
+        min-height: var(--employee-action-height) !important;
+        padding: var(--employee-action-padding-y) var(--employee-action-padding-x) !important;
+    }
+    .employee-maintenance-form .cardFooter01 > :is(button, a):not(.btn-toTop) > :is(i, svg) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+.employee-maintenance-form .card-footer:has(> .cardFooter01) {
+    flex: 0 0 auto;
+}
+.employee-maintenance-form .cardFooter01 {
+    justify-content: flex-start;
+    align-items: center;
+    gap: clamp(.5rem, .8cqi, .85rem);
+    margin-inline: 0 !important;
+}
+.employee-maintenance-form .menu_Links ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem .75rem;
+    height: auto !important;
+    white-space: normal !important;
+}
+.employee-maintenance-form .menu_Links li {
+    font-size: var(--employee-action-font) !important;
+    white-space: nowrap;
+}
+.employee-maintenance-form .employee-schedule-permission {
+    padding: .4rem 1rem;
+    background: #3d4e001e;
+    font-size: var(--employee-schedule-font);
+}
+.employee-maintenance-form #cardBody6 {
+    scrollbar-gutter: stable;
+}
+.employee-maintenance-form :is(.employee-schedule-heading, .employee-schedule-day) {
+    display: grid;
+    grid-template-columns: var(--employee-schedule-columns);
+    gap: .4rem var(--employee-schedule-gap);
+    align-items: center;
+    margin: 0;
+    padding: .5rem 0;
+}
+.employee-maintenance-form .employee-schedule-heading {
+    background: #3d4e001e;
+    font-size: var(--employee-schedule-font);
+    font-weight: 600;
+    text-align: center;
+}
+.employee-maintenance-form .employee-schedule-day > *,
+.employee-maintenance-form .employee-schedule-pair > * {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    margin: 0 !important;
+    padding: 0;
+}
+.employee-maintenance-form .employee-schedule-pair {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    gap: .4rem var(--employee-schedule-gap);
+    align-items: center;
+}
+.employee-maintenance-form .employee-schedule-day-label { grid-column: 1; }
+.employee-maintenance-form .employee-schedule-date { grid-column: 2; }
+.employee-maintenance-form .employee-schedule-category { grid-column: 3; }
+.employee-maintenance-form .employee-schedule-note { grid-column: 1 / 4; }
+.employee-maintenance-form .employee-schedule-work-from { grid-column: 4; }
+.employee-maintenance-form .employee-schedule-work-to { grid-column: 5; }
+.employee-maintenance-form .employee-schedule-break-from { grid-column: 6; }
+.employee-maintenance-form .employee-schedule-break-to { grid-column: 7; }
+.employee-maintenance-form .employee-schedule-repo { grid-column: 8; }
+.employee-maintenance-form .employee-schedule-spacer { display: none; }
+.employee-maintenance-form .employee-schedule-time-label { display: none; }
+.employee-maintenance-form .employee-schedule-day :is(input[type="time"], input[type="date"], select, .ts-control) {
+    width: 100% !important;
+    min-width: 0;
+    min-height: var(--employee-action-height);
+    height: var(--employee-action-height);
+    box-sizing: border-box;
+    padding: .25rem .35rem;
+    font-size: var(--employee-schedule-font) !important;
+    line-height: 1.25;
+}
+.employee-maintenance-form .employee-schedule-day :is(label, .ts-control input, .ts-control .item) {
+    font-size: var(--employee-schedule-font) !important;
+}
+.employee-maintenance-form .employee-schedule-note input {
+    width: 100%;
+    margin: 0 !important;
+    font-size: var(--employee-schedule-font) !important;
+}
+@container employee-maintenance (max-width: 58rem) {
+    .employee-maintenance-form .employee-schedule-heading { display: none; }
+    .employee-maintenance-form .employee-schedule-day {
+        grid-template-columns: repeat(4, minmax(6.75rem, 1fr));
+    }
+    .employee-maintenance-form .employee-schedule-day-label { grid-column: 1; grid-row: 1; }
+    .employee-maintenance-form .employee-schedule-date { grid-column: 2 / 4; grid-row: 1; }
+    .employee-maintenance-form .employee-schedule-category { grid-column: 1 / 4; grid-row: 2; }
+    .employee-maintenance-form .employee-schedule-repo { grid-column: 4; grid-row: 2; }
+    .employee-maintenance-form .employee-schedule-note { grid-column: 1 / -1; }
+    .employee-maintenance-form .employee-schedule-work-from { grid-column: 1; }
+    .employee-maintenance-form .employee-schedule-work-to { grid-column: 2; }
+    .employee-maintenance-form .employee-schedule-break-from { grid-column: 3; }
+    .employee-maintenance-form .employee-schedule-break-to { grid-column: 4; }
+    .employee-maintenance-form .employee-schedule-time-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.5em;
+        margin-bottom: .2rem;
+        font-size: .875rem !important;
+        line-height: 1.25;
+    }
+}
+@container employee-maintenance (max-width: 34rem) {
+    .employee-maintenance-form .employee-schedule-day { grid-template-columns: repeat(2, minmax(6.75rem, 1fr)); }
+    .employee-maintenance-form .employee-schedule-date { grid-column: 2; }
+    .employee-maintenance-form .employee-schedule-category { grid-column: 1; }
+    .employee-maintenance-form .employee-schedule-repo { grid-column: 2; }
+    .employee-maintenance-form .employee-schedule-break-from { grid-column: 1; }
+    .employee-maintenance-form .employee-schedule-break-to { grid-column: 2; }
+}
