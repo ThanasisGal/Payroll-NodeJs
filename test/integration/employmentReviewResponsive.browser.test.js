@@ -161,6 +161,20 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
                 await tableRegion.evaluate(n=>n.scrollLeft=0);
             }
             stages.push({ stage, ...metrics });
+            if (stage === 3) {
+                const action = page.locator('.weekly-hr-stage3-resolve').first();
+                await action.scrollIntoViewIfNeeded();
+                await page.mouse.move(1,1);
+                await action.evaluate(n=>n.blur());
+                await page.waitForFunction(() => {
+                    const n=document.querySelector('.weekly-hr-stage3-resolve');
+                    return !n.matches(':hover, :focus') && !n.getAnimations().length;
+                });
+                const normal = await action.evaluate(n=>getComputedStyle(n).backgroundColor);
+                await action.hover();
+                await page.waitForFunction(color=>getComputedStyle(document.querySelector('.weekly-hr-stage3-resolve')).backgroundColor!==color,normal);
+                await page.mouse.move(1,1);
+            }
         }
         await page.evaluate(() => {
             const row = currentReviewRows.find(row => String(row.hmeromhnia).startsWith('2026-09-15'));

@@ -222,6 +222,15 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
         if (dir) await page.screenshot({ path: path.join(dir, `stage2-daily-decisions-${width}.png`),
             fullPage: true, animations: 'disabled' });
         const button = page.locator('.weekly-hr-stage3-resolve').first();
+        // Scrolling/resizing may move this button under the existing pointer.
+        // Measure the normal state only after explicitly leaving hover/focus.
+        await button.scrollIntoViewIfNeeded();
+        await page.mouse.move(1, 1);
+        await button.evaluate(node => node.blur());
+        await page.waitForFunction(() => {
+            const node = document.querySelector('.weekly-hr-stage3-resolve');
+            return !node.matches(':hover, :focus') && !node.getAnimations().length;
+        });
         const normal = await button.evaluate(node => ({ background: getComputedStyle(node).backgroundColor,
             radius: parseFloat(getComputedStyle(node).borderRadius), whiteSpace: getComputedStyle(node).whiteSpace }));
         await button.hover();
