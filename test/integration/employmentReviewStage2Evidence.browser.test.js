@@ -207,8 +207,18 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
             .classList.contains('show'));
         await page.locator('.stage3-week-group').first().scrollIntoViewIfNeeded();
         const wrapper = page.locator('.stage3-decisions-table-wrapper').first();
-        assert.equal(await wrapper.evaluate(node => node.scrollWidth > node.clientWidth + 1), false,
-            JSON.stringify(await wrapper.evaluate(node => ({ width: node.clientWidth, scroll: node.scrollWidth, table: node.firstElementChild.getBoundingClientRect().width, cells: [...node.querySelectorAll('tr:last-child > td')].map(cell => ({ width: cell.clientWidth, scroll: cell.scrollWidth, text: cell.textContent.slice(0,45) })) }))));
+        const geometry = await wrapper.evaluate(node => ({
+            width: node.clientWidth, scroll: node.scrollWidth,
+            table: node.firstElementChild.getBoundingClientRect().width,
+            overflow: getComputedStyle(node).overflowX,
+            minimum: 86 * parseFloat(getComputedStyle(document.documentElement).fontSize),
+            pageOverflow: document.documentElement.scrollWidth - innerWidth
+        }));
+        assert.ok(geometry.table >= geometry.minimum - 1, JSON.stringify(geometry));
+        assert.equal(geometry.overflow, 'auto', JSON.stringify(geometry));
+        assert.equal(geometry.scroll > geometry.width + 1,
+            geometry.table > geometry.width + 1, JSON.stringify(geometry));
+        assert.ok(geometry.pageOverflow <= 1, JSON.stringify(geometry));
         if (dir) await page.screenshot({ path: path.join(dir, `stage2-daily-decisions-${width}.png`),
             fullPage: true, animations: 'disabled' });
         const button = page.locator('.weekly-hr-stage3-resolve').first();
