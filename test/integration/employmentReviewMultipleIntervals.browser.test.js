@@ -41,7 +41,7 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
     const makeRow = async (date, raw = {}) => {
         const row = { ...data.rows[0], _id: new mongoose.Types.ObjectId(), employee_id: employee._id,
             kodikos: employee.kodikos, hmeromhnia: new Date(date), kathgoria_ergasias: 'ΕΡΓ',
-            apo_ora_01: '09:00', eos_ora_01: '13:00', apo_ora_02: '17:00', eos_ora_02: '21:00',
+            apo_ora_01: '09:00', eos_ora_01: '13:00', apo_ora_02: '16:45', eos_ora_02: '20:45',
             ores_ergasias: 8, kathgoria_ergasias_apologistika: '', apologistiko_biblio: false,
             cards_apo_ora_01: '16:58', cards_eos_ora_01: '', cards_ores_ergasias: 0,
             ...Object.fromEntries(['01', '02', '03'].flatMap(pair => [
@@ -49,7 +49,8 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
             ...raw };
         await data.D.collection.insertOne(row); return row;
     };
-    const row = await makeRow('2026-09-23');
+    const row = await makeRow('2026-09-25', {
+        apo_ora_01_apologistika: '09:00', eos_ora_01_apologistika: '13:00' });
     const originalCards = cards(row);
     const server = data.app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
@@ -95,26 +96,106 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         document.getElementById('kodikos').value = '0088'; await loadResults();
     });
     await page.evaluate(target => showDetailsModal(target, { orphanResolution: true }), (await search()).find(item => item._id === String(row._id)));
-    for (const interval of two) {
-        await page.locator(`#edit_apo_ora_0${interval.pairNumber}_apologistika`).fill(interval.start);
-        await page.locator(`#edit_eos_ora_0${interval.pairNumber}_apologistika`).fill(interval.end);
-    }
-    await page.locator('#edit_reason').fill('Επιβεβαιωμένη συνθετική εργασία χωρίς διαβίβαση καρτών');
-    // Trigger the real debounced preview after all fields have been filled.
-    await page.locator('#edit_eos_ora_02_apologistika').dispatchEvent('change');
+    const beforeEditing = await data.snapshot();
+    const previewRequests = [];
+    page.on('request', req => { if (req.url().endsWith('/orphan-resolution/preview'))
+        previewRequests.push(req.postDataJSON()); });
+    let releaseRejected, rejectedReady;
+    const rejectedGate = new Promise(resolve => { releaseRejected = resolve; });
+    const rejectedResponse = new Promise(resolve => { rejectedReady = resolve; });
+    await page.route('**/orphan-resolution/preview', async route => {
+        const response = await route.fetch();
+        if (route.request().postDataJSON().work_intervals[1]?.start === '16:00') {
+            assert.equal(response.status(), 409);
+            assert.equal((await response.json()).code, 'ORPHAN_WORK_PUNCH_MISMATCH');
+            rejectedReady(); await rejectedGate;
+        }
+        await route.fulfill({ response });
+    });
+    // A real intermediate value is rejected while the HR finishes editing the same field.
+    await page.locator('#edit_apo_ora_02_apologistika').fill('16:00');
+    await page.locator('#edit_eos_ora_02_apologistika').fill('20:58');
+    await rejectedResponse;
+    await page.locator('#edit_apo_ora_02_apologistika').fill('16:58');
+    releaseRejected();
     await page.waitForFunction(() => document.querySelector('#orphanCardResolutionSection')?.textContent.includes('8.00'));
+    assert.deepEqual(previewRequests.at(-1).work_intervals, two);
+    assert.equal(await page.locator('#orphanResolutionApprove').isChecked(), false);
+    assert.equal(await data.snapshot(), beforeEditing);
+    await page.unroute('**/orphan-resolution/preview');
+    assert.equal(await page.locator('.swal2-popup').count(), 0, 'stale rejection is ignored');
+    const section = page.locator('#orphanCardResolutionSection');
+    assert.match(await section.innerText(), /Αντίστοιχο απολογιστικό σκέλος 2:[\s\S]*16:58–20:58/);
+    assert.match(await page.locator('.orphan-interval-without-cards').innerText(), /09:00–13:00/);
+
+    // A current rejection removes approval and explains the actual service failure in place.
+    await page.locator('#edit_eos_ora_01_apologistika').fill('18:00');
+    await page.waitForFunction(() => document.querySelector('#orphanCardResolutionSection')?.textContent.includes('SPLIT_INTERVALS_OVERLAP'));
+    assert.match(await section.innerText(), /τα διαστήματα εργασίας επικαλύπτονται/);
+    assert.doesNotMatch(await section.innerText(), /Δεν είναι δυνατή ασφαλής αυτόματη πρόταση/);
+    assert.equal(await page.locator('#orphanResolutionApprove').count(), 0);
+    assert.equal(await data.snapshot(), beforeEditing);
+    await page.locator('#edit_eos_ora_01_apologistika').fill('13:00');
+    await page.locator('#orphanResolutionApprove').waitFor();
+
+    // Deliver a real successful service response after a newer successful response.
+    let releaseOld, oldReady, oldDelivered;
+    const oldGate = new Promise(resolve => { releaseOld = resolve; });
+    const oldResponse = new Promise(resolve => { oldReady = resolve; });
+    const delivered = new Promise(resolve => { oldDelivered = resolve; });
+    await page.route('**/orphan-resolution/preview', async route => {
+        const response = await route.fetch();
+        const old = route.request().postDataJSON().work_intervals[1]?.end === '20:59';
+        if (old) { assert.equal(response.status(), 200); oldReady(); await oldGate; }
+        await route.fulfill({ response });
+        if (old) oldDelivered();
+    });
+    await page.locator('#edit_eos_ora_02_apologistika').fill('20:59');
+    await oldResponse;
+    await page.locator('#edit_eos_ora_02_apologistika').fill('20:58');
+    await page.waitForFunction(() => document.querySelector('#orphanCardResolutionSection')?.textContent.includes('8.00'));
+    releaseOld(); await delivered;
+    await page.waitForTimeout(100);
+    assert.match(await section.innerText(), /8.00 ώρες/);
+    assert.doesNotMatch(await section.innerText(), /20:59/);
+    await page.unroute('**/orphan-resolution/preview');
+    assert.equal(await data.snapshot(), beforeEditing);
+    await page.locator('#edit_reason').fill('Επιβεβαιωμένη συνθετική εργασία χωρίς διαβίβαση καρτών');
     const artifactDir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
     for (const width of [1280, 1440]) {
-        await page.setViewportSize({ width, height: 1000 });
-        await page.locator('.apologistiko-section').scrollIntoViewIfNeeded();
+        await page.setViewportSize({ width, height: width === 1280 ? 720 : 900 });
+        await page.locator('#edit_eos_ora_02_apologistika').fill('');
+        await page.waitForFunction(() => document.querySelector('#orphanCardResolutionSection')?.textContent.includes('περιμένει πλήρη διαστήματα'));
+        assert.equal(await page.locator('#orphanResolutionApprove').count(), 0);
+        await page.locator('#edit_eos_ora_02_apologistika').fill('20:58');
+        await page.locator('#orphanResolutionApprove').waitFor();
+        await section.scrollIntoViewIfNeeded();
         if (artifactDir) { fs.mkdirSync(artifactDir, { recursive: true }); await page.screenshot({
             path: path.join(artifactDir, `multiple-intervals-form-${width}.png`), animations: 'disabled' }); }
+        await page.locator('#orphanResolutionApprove').scrollIntoViewIfNeeded();
+        await page.locator('#orphanResolutionApprove').check();
+        await page.locator('#orphanResolutionApprove').uncheck();
+        await page.locator('#orphanResolutionScope').scrollIntoViewIfNeeded();
+        assert.equal(await page.locator('#orphanResolutionScope').inputValue(), 'ONE_TIME');
+        assert.equal(await page.locator('#orphanResolutionScope option[value="FUTURE_IDENTICAL"]').isDisabled(), true);
+        assert.equal(await section.evaluate(node => [...node.children].every(child => {
+            const bounds = child.getBoundingClientRect(), section = node.getBoundingClientRect();
+            return bounds.left >= section.left && bounds.right <= section.right + 1 &&
+                child.scrollWidth <= child.clientWidth + 1;
+        })), true);
+        if (artifactDir) await page.screenshot({ path: path.join(artifactDir,
+            `multiple-intervals-control-${width}.png`), animations: 'disabled' });
     }
+    assert.equal(await data.snapshot(), beforeEditing);
+    await page.locator('#saveRecordBtn').click();
+    await page.getByText('Ρητή έγκριση ορφανού χτυπήματος', { exact: true }).waitFor();
+    assert.equal(await data.snapshot(), beforeEditing);
+    await page.locator('.swal2-confirm').click();
     await page.locator('#orphanResolutionApprove').check();
     await page.locator('#saveRecordBtn').click();
     await page.getByText('Έγκριση πλήρους απολογιστικού ωραρίου', { exact: true }).waitFor();
     for (const width of [1280, 1440]) {
-        await page.setViewportSize({ width, height: 1000 });
+        await page.setViewportSize({ width, height: width === 1280 ? 720 : 900 });
         if (artifactDir) { fs.mkdirSync(artifactDir, { recursive: true }); await page.screenshot({
             path: path.join(artifactDir, `multiple-intervals-approval-${width}.png`), fullPage: false, animations: 'disabled' }); }
         assert.match(await page.locator('.swal2-popup').innerText(), /09:00–13:00[\s\S]*16:58–20:58/);
@@ -187,7 +268,7 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
     assert.deepEqual(cards(threeSaved), cards(threeRow));
     assert.equal(threeSaved.ores_pragmatikhs_ergasias_apologistika, 8);
     assert.equal((await search()).find(item => item._id === String(threeRow._id)).eos_ora_03_apologistika, '20:58');
-    const pending = await makeRow('2026-09-25');
+    const pending = await makeRow('2026-09-23');
     for (const intervals of [work(['09:00', '']), work(['09:00', '18:00'], ['16:58', '20:58']),
         work(['09:00', '14:00'], ['16:58', '20:58'])]) {
         const before = await data.snapshot();
@@ -195,6 +276,13 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         assert.equal(await data.snapshot(), before);
     }
     const pendingPreview = await preview(pending, two);
+    const beforeNoApproval = await data.snapshot();
+    const noApproval = await request(`/${pending._id}`, {
+        reason: 'Αποθήκευση χωρίς ρητή έγκριση',
+        orphan_resolution: { approve: false, work_intervals: two }
+    }, 400, 'PATCH');
+    assert.equal(noApproval.code, 'ORPHAN_RESOLUTION_EXPLICIT_APPROVAL_REQUIRED');
+    assert.equal(await data.snapshot(), beforeNoApproval);
     await data.D.updateOne({ _id: pending._id }, { $set: { eos_ora_02: '21:01' } });
     const staleSnapshot = await data.snapshot();
     await approve(pending, two, 409, pendingPreview.preview_fingerprint);
@@ -229,7 +317,8 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
     assert.equal(singleSaved.eos_ora_01_apologistika, '17:00');
     assert.equal(singleSaved.apo_ora_02_apologistika, '');
     // No cards: use the existing daily HR decision, preserving its validation and absence policy.
-    const noCards = await makeRow('2026-09-28', { cards_apo_ora_01: '' });
+    const noCards = await makeRow('2026-09-28', { cards_apo_ora_01: '',
+        apo_ora_02: '17:00', eos_ora_02: '21:00' });
     const dailyCommand = { approve: true, source_case: 'HR_CORRECTED_ACTUAL_DAY',
         work_intervals: work(['09:00', '13:00'], ['17:00', '21:00']), emergency_hourly_leave_intervals: [], leave_category: '' };
     const dailyBody = { reason: 'Τεκμηριωμένη συνθετική εργασία χωρίς διαθέσιμες κάρτες', daily_actual_work_resolution: dailyCommand };

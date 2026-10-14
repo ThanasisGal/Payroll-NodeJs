@@ -13403,7 +13403,7 @@ function renderOrphanCardResolutionSection(row = {}) {
                 · <strong>Προδηλωμένα σκέλη:</strong> ${escapeHtml(declaredIntervals)}
             </div>
             <div class="alert alert-warning py-2">
-                ${splitPolicyViolation
+                ${preview.message ? escapeHtml(preview.message) : splitPolicyViolation
                     ? 'Το χειροκίνητο διάστημα παραβιάζει τον κανόνα ελάχιστης τρίωρης διακοπής του σπαστού ωραρίου. Οι ώρες δεν μετακινήθηκαν αυτόματα.'
                     : `Δεν είναι δυνατή ασφαλής αυτόματη πρόταση επειδή το προδηλωμένο ωράριο
                 είναι σπαστό. Συμπληρώστε το πραγματικό απολογιστικό διάστημα: πλήρες Από–Έως για κάθε ζεύγος.`}
@@ -13433,7 +13433,7 @@ function renderOrphanCardResolutionSection(row = {}) {
     const futureIdenticalAvailable = proposal.manualIntervalMatchesRule !== false &&
         rest.hasViolation !== true;
     const derivedPreview = row.orphan_derived_preview || null;
-    const minutesLabel = (value) => Number.isFinite(Number(value))
+    const minutesLabel = (value) => value !== null && value !== undefined && Number.isFinite(Number(value))
         ? `${(Number(value) / 60).toFixed(2)} ώρες` : 'Δεν υπάρχει σχετική εργασία';
     const intervalLabel = (interval) => interval
         ? `${new Date(interval.startAt).toLocaleDateString('el-GR')} ${interval.start}–${interval.end}`
@@ -13496,6 +13496,18 @@ function renderOrphanCardResolutionSection(row = {}) {
                 · <strong>Απολογιστικό Βιβλίο:</strong>
                 ${preview.apologistikoBookUpdate === true ? 'ΝΑΙ' : 'ΟΧΙ'}
             </div>`}
+            ${(preview.approvedWorkIntervals || []).map(interval => {
+                const punches = [1, 2, 3].flatMap(number => [
+                    row[`cards_apo_ora_0${number}`], row[`cards_eos_ora_0${number}`]
+                ]).filter(Boolean);
+                const hasPunch = punches.some(time => interval.start <= interval.end
+                    ? time >= interval.start && time <= interval.end
+                    : time >= interval.start || time <= interval.end);
+                return hasPunch ? '' : `<div class="small mb-2 orphan-interval-without-cards">
+                    ${escapeHtml(interval.start)}–${escapeHtml(interval.end)}:
+                    Δεν υπάρχουν διαθέσιμα χτυπήματα σε αυτό το διάστημα.
+                </div>`;
+            }).join('')}
             <div class="small mb-2">
                 <div><strong>Προηγούμενη εργασία:</strong> ${escapeHtml(intervalLabel(rest.previous))}</div>
                 <div><strong>Ανάπαυση προς τα πίσω:</strong> ${escapeHtml(minutesLabel(rest.backwardMinutes))}</div>
@@ -13676,6 +13688,8 @@ const orphanDerivedPreviewEditableFields = new Set([
     'apousia_apologistika', 'kyriakes_apologistika'
 ]);
 const orphanResolutionPreviewDrafts = new WeakMap();
+const orphanResolutionPreviewRequests = new WeakMap();
+let orphanResolutionPreviewCleanup = null;
 
 function orphanWorkIntervalsFromForm() {
     return [1, 2, 3].map(pairNumber => ({ pairNumber,
@@ -13707,7 +13721,32 @@ function applyOrphanDerivedPreview(row, derivedPreview) {
     }
 }
 
+function orphanResolutionPreviewRequestState(row) {
+    const input = document.getElementById('edit_apo_ora_01_apologistika');
+    let state = orphanResolutionPreviewRequests.get(row);
+    if (!state || state.input !== input) {
+        state = { input, version: 0, timer: null };
+        orphanResolutionPreviewRequests.set(row, state);
+    }
+    return state;
+}
+
+function showOrphanResolutionPreviewStatus(row, message, manualPreviewState) {
+    const current = orphanResolutionPreviewRow(row).orphan_card_resolution_preview || {};
+    orphanResolutionPreviewDrafts.set(row, {
+        orphan_card_resolution_preview: { ...current, eligible: false, message,
+            manualPreviewState }, orphan_derived_preview: null
+    });
+    const section = document.getElementById('orphanCardResolutionSection');
+    if (section) section.outerHTML = renderOrphanCardResolutionSection(orphanResolutionPreviewRow(row));
+}
+
 async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = false } = {}) {
+    const state = orphanResolutionPreviewRequestState(row);
+    clearTimeout(state.timer);
+    const version = ++state.version;
+    const isCurrent = () => state.version === version && state.input ===
+        document.getElementById('edit_apo_ora_01_apologistika');
     const currentPreview = orphanResolutionPreviewRow(row)?.orphan_card_resolution_preview || {};
     const explicitApprovalChecked = preserveExplicitApproval &&
         document.getElementById('orphanResolutionApprove')?.checked === true;
@@ -13721,78 +13760,106 @@ async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = 
         end: document.getElementById(
             `edit_eos_ora_0${Number(item.pairNumber)}_apologistika`)?.value || '' }));
     const workIntervals = orphanWorkIntervalsFromForm();
-    if (!workIntervals.length || workIntervals.some(item => !item.start || !item.end)) return;
-    const response = await fetch(
-        `/api/prodhlomena-oraria/review/${row._id}/orphan-resolution/preview`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
-            body: JSON.stringify({ apologistiko_start: start, apologistiko_end: end, pairs,
-                work_intervals: workIntervals,
-                reuse_scope: document.getElementById('orphanResolutionScope')?.value || 'ONE_TIME' })
-        }
-    );
-    const payload = await response.json();
-    if (!response.ok || !payload.success) throw new Error(payload.message || 'Αποτυχία ελέγχου 11ώρου.');
-    const draft = {
-        orphan_card_resolution_preview: {
-            ...payload.preview,
-            ...(currentPreview.automaticReusableApplied ? {
-                automaticReusableApplied: true,
-                canAutomaticReuse: true,
-                reusableDecisionReason: currentPreview.reusableDecisionReason
-            } : {})
-        },
-        orphan_derived_preview: payload.derived_preview || null
-    };
-    orphanResolutionPreviewDrafts.set(row, draft);
-    applyOrphanDerivedPreview(row, draft.orphan_derived_preview);
-    const section = document.getElementById('orphanCardResolutionSection');
-    if (section) {
-        section.outerHTML = renderOrphanCardResolutionSection(orphanResolutionPreviewRow(row));
-        const approvalInput = document.getElementById('orphanResolutionApprove');
-        if (preserveExplicitApproval && approvalInput) {
-            approvalInput.checked = explicitApprovalChecked;
-        }
+    const scope = document.getElementById('orphanResolutionScope')?.value || 'ONE_TIME';
+    state.signature = JSON.stringify({ workIntervals, scope });
+    if (!workIntervals.length || workIntervals.some(item => !item.start || !item.end)) {
+        showOrphanResolutionPreviewStatus(row,
+            'Η προεπισκόπηση περιμένει πλήρη διαστήματα εργασίας. 1. Συμπληρώστε Από και Έως σε κάθε χρησιμοποιούμενο ζεύγος. 2. Περιμένετε τον έλεγχο πριν από τη ρητή έγκριση. Δεν αποθηκεύτηκε καμία αλλαγή.',
+            'INCOMPLETE');
+        return;
     }
-    return payload;
+    let rejectionMessage = '';
+    try {
+        const response = await fetch(
+            `/api/prodhlomena-oraria/review/${row._id}/orphan-resolution/preview`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+                body: JSON.stringify({ apologistiko_start: start, apologistiko_end: end, pairs,
+                    work_intervals: workIntervals,
+                    reuse_scope: scope })
+            }
+        );
+        const payload = await response.json();
+        if (!isCurrent()) return;
+        if (!response.ok || !payload.success) {
+            rejectionMessage = payload.message || '';
+            throw new Error('ORPHAN_RESOLUTION_PREVIEW_REJECTED');
+        }
+        const draft = {
+            orphan_card_resolution_preview: {
+                ...payload.preview,
+                ...(currentPreview.automaticReusableApplied ? {
+                    automaticReusableApplied: true,
+                    canAutomaticReuse: true,
+                    reusableDecisionReason: currentPreview.reusableDecisionReason
+                } : {})
+            },
+            orphan_derived_preview: payload.derived_preview || null
+        };
+        orphanResolutionPreviewDrafts.set(row, draft);
+        applyOrphanDerivedPreview(row, draft.orphan_derived_preview);
+        const section = document.getElementById('orphanCardResolutionSection');
+        if (section) {
+            section.outerHTML = renderOrphanCardResolutionSection(orphanResolutionPreviewRow(row));
+            const approvalInput = document.getElementById('orphanResolutionApprove');
+            if (preserveExplicitApproval && approvalInput) {
+                approvalInput.checked = explicitApprovalChecked;
+            }
+        }
+        return payload;
+    } catch (error) {
+        if (!isCurrent()) return;
+        showOrphanResolutionPreviewStatus(row, rejectionMessage ||
+            'Δεν ολοκληρώθηκε ο έλεγχος των απολογιστικών διαστημάτων, οπότε δεν επιτρέπεται ακόμη έγκριση. 1. Ελέγξτε τη σύνδεσή σας. 2. Ανοίξτε ξανά την ημέρα και συμπληρώστε τα διαστήματα για νέο έλεγχο. Δεν αποθηκεύτηκε καμία αλλαγή.',
+            'REJECTED');
+        return;
+    }
 }
 
 async function initializeOrphanResolutionPreview(row) {
+    orphanResolutionPreviewCleanup?.();
+    orphanResolutionPreviewCleanup = null;
+    orphanResolutionPreviewDrafts.delete(row);
     if (row?.orphan_card_resolution?.status === 'HR_APPROVED') return;
+    if (row?.orphan_card_resolution_preview?.orphanVisible !== true) return;
+    bindOrphanResolutionManualPreview(row);
     if (!prefillOrphanResolutionProposal(row)) {
-        bindOrphanResolutionManualPreview(row);
         return;
     }
-    try {
-        await refreshOrphanResolutionPreview(row);
-    } catch (error) {
-        employmentReviewSwal({ icon: 'error', title: 'Απολογιστική προεπισκόπηση',
-            text: error.message });
-    } finally {
-        bindOrphanResolutionManualPreview(row);
-    }
+    await refreshOrphanResolutionPreview(row);
 }
 
 function bindOrphanResolutionManualPreview(row) {
-    let timer = null;
+    const container = document.getElementById('detailsContainer');
+    if (!container) return;
+    const state = orphanResolutionPreviewRequestState(row);
     const refresh = (event) => {
-        const preserveExplicitApproval = event?.currentTarget?.id === 'orphanResolutionScope';
-        clearTimeout(timer);
-        timer = setTimeout(async () => {
-            try {
-                await refreshOrphanResolutionPreview(row, { preserveExplicitApproval });
-                bindOrphanResolutionManualPreview(row);
-            } catch (error) {
-                employmentReviewSwal({ icon: 'error', title: 'Έλεγχος 11ώρου', text: error.message });
-            }
+        const preserveExplicitApproval = event.target.id === 'orphanResolutionScope';
+        if (!preserveExplicitApproval && !/^edit_(apo|eos)_ora_0[123]_apologistika$/.test(event.target.id)) return;
+        if (preserveExplicitApproval && event.type !== 'change') return;
+        const signature = JSON.stringify({ workIntervals: orphanWorkIntervalsFromForm(),
+            scope: document.getElementById('orphanResolutionScope')?.value || 'ONE_TIME' });
+        if (state.signature === signature) return;
+        state.signature = signature;
+        clearTimeout(state.timer);
+        // Invalidate in-flight requests immediately, including during the debounce.
+        ++state.version;
+        if (!preserveExplicitApproval) showOrphanResolutionPreviewStatus(row,
+            'Τα διαστήματα εργασίας άλλαξαν και χρειάζονται νέο έλεγχο. 1. Ολοκληρώστε τις ώρες Από–Έως. 2. Περιμένετε την προεπισκόπηση και εγκρίνετε ρητά, εφόσον είναι σωστή. Δεν αποθηκεύτηκε καμία αλλαγή.',
+            'PENDING');
+        state.timer = setTimeout(async () => {
+            if (state.input !== document.getElementById('edit_apo_ora_01_apologistika')) return;
+            await refreshOrphanResolutionPreview(row, { preserveExplicitApproval });
         }, 250);
     };
-    ['edit_apo_ora_01_apologistika', 'edit_eos_ora_01_apologistika',
-        'edit_apo_ora_02_apologistika', 'edit_eos_ora_02_apologistika',
-        'edit_apo_ora_03_apologistika', 'edit_eos_ora_03_apologistika',
-        'orphanResolutionScope'].forEach((id) => {
-        document.getElementById(id)?.addEventListener('change', refresh, { once: true });
-    });
+    container.addEventListener('input', refresh);
+    container.addEventListener('change', refresh);
+    orphanResolutionPreviewCleanup = () => {
+        ++state.version;
+        clearTimeout(state.timer);
+        container.removeEventListener('input', refresh);
+        container.removeEventListener('change', refresh);
+    };
 }
 
 function prefillOrphanResolutionProposal(row) {
@@ -14789,6 +14856,10 @@ function showDetailsModal(row, { orphanResolution = false,
             const orphanApprove = document.getElementById('orphanResolutionApprove');
             const orphanPreview = orphanResolutionPreviewRow(row)
                 .orphan_card_resolution_preview || {};
+            if (orphanPreview.manualPreviewState) {
+                document.getElementById('orphanCardResolutionSection')?.scrollIntoView({ block: 'nearest' });
+                return;
+            }
             if (requiresExplicitOrphanResolutionApproval(row, orphanApprove)) {
                 employmentReviewSwal({
                     icon: 'warning',
