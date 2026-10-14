@@ -53,6 +53,19 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
         document.getElementById('kodikos').value = '0001';
     });
     await page.evaluate(async () => { await loadResults(); await loadPreparedWeeklyHrStage1(); });
+    // Regression found by CI: a large explanation must not intercept the next
+    // navigation control after the table and outer workspace have scrolled.
+    await page.setViewportSize({width:1440,height:1000});
+    await page.evaluate(()=>document.getElementById('employmentReviewStage1Collapse').classList.add('show'));
+    const guidance = page.locator('[data-guidance-stage="STAGE1"]');
+    await guidance.locator('[data-guidance-move="first"]').click();
+    await page.locator('#employmentReviewGuidancePopover').waitFor();
+    await guidance.locator('[data-guidance-move="next"]').click();
+    assert.match(await page.locator('#employmentReviewGuidancePopover').innerText(), /03\/09\/2026/);
+    await capture('guidance-navigation-regression');
+    await page.keyboard.press('Escape');
+    await page.mouse.move(1,1);
+
     await page.evaluate(() => {
         // Deliberately constructed view states exercise the other stages without
         // rerunning algorithms, approving anything or modifying stored state.

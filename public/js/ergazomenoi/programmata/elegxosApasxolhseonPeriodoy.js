@@ -11447,6 +11447,31 @@ function closeEmploymentReviewGuidancePopover(restoreFocus = false) {
     }
 }
 
+function positionEmploymentReviewGuidancePopover(anchor) {
+    const panel = employmentReviewGuidancePopover;
+    if (!panel || !anchor) return;
+    panel.style.maxHeight = '';
+    let minimumTop = 10, maximumBottom = innerHeight - 10;
+    const navigation = anchor.closest('.accordion-collapse')?.querySelector('.review-guidance-navigation');
+    const nav = navigation?.getBoundingClientRect();
+    const body = document.querySelector('.review-card-body');
+    const scroller = getComputedStyle(body).display === 'block'
+        ? body : document.querySelector('.employment-review-scroll-container');
+    const visible = scroller?.getBoundingClientRect();
+    if (nav?.height && nav.bottom > Math.max(10, visible?.top || 0) &&
+        nav.top < Math.min(innerHeight, visible?.bottom || innerHeight)) {
+        const below = innerHeight - 10 - nav.bottom - 8;
+        const above = nav.top - 8 - 10;
+        if (below >= 160 || below >= above) minimumTop = nav.bottom + 8;
+        else maximumBottom = nav.top - 8;
+        panel.style.maxHeight = `${Math.max(1, Math.min(650, maximumBottom - minimumTop))}px`;
+    }
+    const rect = panel.getBoundingClientRect();
+    const position = calculateWeeklyHrStage1TooltipPosition({ anchorRect: anchor.getBoundingClientRect(), tooltipRect: rect });
+    panel.style.left = `${Math.round(position.left)}px`;
+    panel.style.top = `${Math.round(Math.max(minimumTop, Math.min(position.top, maximumBottom - rect.height)))}px`;
+}
+
 function showEmploymentReviewGuidancePopover(anchor) {
     clearTimeout(employmentReviewGuidanceCloseTimer);
     if (anchor === employmentReviewGuidanceAnchor && !employmentReviewGuidancePopover?.hidden) return;
@@ -11481,9 +11506,7 @@ function showEmploymentReviewGuidancePopover(anchor) {
     panel.style.visibility = 'hidden';
     panel.style.top = '0px';
     panel.style.left = '0px';
-    const position = calculateWeeklyHrStage1TooltipPosition({ anchorRect: anchor.getBoundingClientRect(), tooltipRect: panel.getBoundingClientRect() });
-    panel.style.left = `${Math.round(position.left)}px`;
-    panel.style.top = `${Math.round(position.top)}px`;
+    positionEmploymentReviewGuidancePopover(anchor);
     panel.style.visibility = 'visible';
     employmentReviewGuidanceAnchor = anchor;
     anchor.setAttribute('aria-controls', panel.id);
@@ -11549,10 +11572,7 @@ function initializeEmploymentReviewGuidancePopover() {
             anchorRect.top > innerHeight || anchorRect.right < 0 || anchorRect.left > innerWidth) {
             closeEmploymentReviewGuidancePopover(); return;
         }
-        const position = calculateWeeklyHrStage1TooltipPosition({ anchorRect,
-            tooltipRect: employmentReviewGuidancePopover.getBoundingClientRect() });
-        employmentReviewGuidancePopover.style.left = `${Math.round(position.left)}px`;
-        employmentReviewGuidancePopover.style.top = `${Math.round(position.top)}px`;
+        positionEmploymentReviewGuidancePopover(employmentReviewGuidanceAnchor);
     }, true);
 }
 
