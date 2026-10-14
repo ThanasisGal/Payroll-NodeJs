@@ -729,6 +729,7 @@ declare -a common_files=(
     "public/js/common/scrollToTop.js"
     "public/js/common/searchFormSubmit.js"
     "public/js/common/sectionsVisible.js"
+    "public/js/common/formLayout.js"
     "public/js/common/selectUnselectAndChangeButtonTextContent.js"
     "public/js/common/setupTabKeyNavigation.js"
     "public/js/common/sessionRefresh.js"
