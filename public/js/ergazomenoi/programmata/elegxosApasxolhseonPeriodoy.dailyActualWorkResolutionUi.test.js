@@ -20,6 +20,8 @@ const sandbox = { escapeHtml: String, document: {
     querySelectorAll: (selector) => selector === '.daily-leave-start' ? leaveStarts : leaveEnds
 } };
 vm.createContext(sandbox);
+vm.runInContext(source.slice(source.indexOf('function hasCurrentOrphanResolutionApproval'),
+    source.indexOf('function buildPreCalculationDataIssueGroups')), sandbox);
 const errorHelpersStart = source.indexOf('function employmentReviewErrorEscapeHtml');
 const errorHelpersEnd = source.indexOf('const employmentReviewSwalCommonClasses');
 vm.runInContext(source.slice(errorHelpersStart, errorHelpersEnd), sandbox);

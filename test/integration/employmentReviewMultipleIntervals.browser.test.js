@@ -50,7 +50,15 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         await data.D.collection.insertOne(row); return row;
     };
     const row = await makeRow('2026-09-25', {
-        apo_ora_01_apologistika: '09:00', eos_ora_01_apologistika: '13:00' });
+        apo_ora_01_apologistika: '09:00', eos_ora_01_apologistika: '13:00',
+        // The real incident had a legacy approval for the wrong interval, not
+        // an unapproved row. No full-day intervals or raw-card snapshot existed.
+        orphan_card_resolution: { status: 'HR_APPROVED',
+            policy_version: 'orphan-card-continuous:v1', orphan_type: 'START_ONLY',
+            reuse_scope: 'ONE_TIME', raw_cards_preserved: true,
+            approved_interval: { start: '09:00', end: '13:00', durationHours: 4 },
+            resolved_pairs: [{ pairNumber: 1, orphanType: 'START_ONLY',
+                start: '09:00', end: '13:00' }] } });
     const originalCards = cards(row);
     const server = data.app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
@@ -95,7 +103,14 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         document.getElementById('ypokatasthma_stathera_advanced').value = '0000';
         document.getElementById('kodikos').value = '0088'; await loadResults();
     });
-    await page.evaluate(target => showDetailsModal(target, { orphanResolution: true }), (await search()).find(item => item._id === String(row._id)));
+    const pendingRow = (await search()).find(item => item._id === String(row._id));
+    assert.equal(pendingRow.orphan_card_resolution_preview.approvalCurrent, false);
+    assert.equal(pendingRow.orphan_card_resolution_preview.reason, 'ORPHAN_PAIR_SET_MISMATCH');
+    // Open through the same user-facing action as the real application.
+    await page.locator('[data-bs-target="#employmentReviewStage1Collapse"]').click();
+    await page.locator(`.weekly-hr-open-orphan[data-row-id="${row._id}"]`).first().click();
+    assert.match(await page.locator('#orphanCardResolutionSection').innerText(),
+        /ORPHAN_APPROVAL_EVIDENCE_MISMATCH/);
     const beforeEditing = await data.snapshot();
     const previewRequests = [];
     page.on('request', req => { if (req.url().endsWith('/orphan-resolution/preview'))
@@ -215,6 +230,7 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
     assert.equal(persisted.is_locked, true);
     const readBack = (await search()).find(item => item._id === String(row._id));
     assert.equal(readBack.orphan_card_resolution_preview.eligible, true);
+    assert.equal(readBack.orphan_card_resolution_preview.approvalCurrent, true);
     assert.deepEqual(readBack.orphan_card_resolution_preview.approvedWorkIntervals, two);
     await page.evaluate(target => showDetailsModal(target), readBack);
     await page.locator('.approved-orphan-decision').waitFor();

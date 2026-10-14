@@ -32,6 +32,8 @@ const sandbox = {
     document: { getElementById: (id) => modalInputs.get(id) || null }
 };
 vm.createContext(sandbox);
+vm.runInContext(source.slice(source.indexOf('function hasCurrentOrphanResolutionApproval'),
+    source.indexOf('function buildPreCalculationDataIssueGroups')), sandbox);
 vm.runInContext(source.slice(start, end), sandbox);
 const modalStart = source.indexOf('function renderOrphanCardResolutionSection');
 const modalEnd = source.indexOf('async function refreshOrphanResolutionPreview', modalStart);
@@ -254,6 +256,14 @@ assert.strictEqual(sandbox.requiresExplicitOrphanResolutionApproval({
         ...endRow.orphan_card_resolution_preview, eligible: true
     }
 }, { checked: false }), false);
+const staleApprovedRow = { ...endRow, orphan_card_resolution: { status: 'HR_APPROVED' },
+    orphan_card_resolution_preview: { ...endRow.orphan_card_resolution_preview,
+        eligible: true, approvalCurrent: false } };
+assert.strictEqual(sandbox.requiresExplicitOrphanResolutionApproval(
+    staleApprovedRow, { checked: false }), true);
+const staleApprovedHtml = sandbox.renderOrphanCardResolutionSection(staleApprovedRow);
+assert.match(staleApprovedHtml, /id="orphanResolutionApprove"/);
+assert.doesNotMatch(staleApprovedHtml, /class="alert alert-info py-2 approved-orphan-decision"/);
 assert.strictEqual(sandbox.requiresExplicitOrphanResolutionApproval({
     ...endRow, orphan_card_resolution_preview: { orphanVisible: false }
 }, { checked: false }), false);

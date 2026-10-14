@@ -6566,13 +6566,18 @@ function renderActionableIssueGroups(issueGroups = []) {
     `;
 }
 
+function hasCurrentOrphanResolutionApproval(row = {}) {
+    return row.orphan_card_resolution?.status === 'HR_APPROVED' &&
+        row.orphan_card_resolution_preview?.approvalCurrent !== false;
+}
+
 function buildPreCalculationDataIssueGroups(rows = []) {
     const groupsByCode = new Map();
     (Array.isArray(rows) ? rows : []).forEach((row) => {
         const issue = resolveCardEvidenceIssue(row);
         if (!issue) return;
         if (issue.code === 'ORPHAN_CARD_PUNCH' &&
-            row.orphan_card_resolution?.status === 'HR_APPROVED') return;
+            hasCurrentOrphanResolutionApproval(row)) return;
         if (issue.code === 'ZERO_LENGTH_CARD_EVIDENCE' &&
             row.zero_length_card_resolution?.status === 'HR_APPROVED') return;
         const groupCode = ['ORPHAN_CARD_PUNCH', 'ZERO_LENGTH_CARD_EVIDENCE']
@@ -6617,7 +6622,7 @@ function renderApprovedOrphanAuditBadge(row = {}) {
                 return String(row[`apo_ora_0${number}_apologistika`] || '') === (interval?.start || '') &&
                     String(row[`eos_ora_0${number}_apologistika`] || '') === (interval?.end || '');
             }));
-    const status = resolution?.status === 'HR_APPROVED' && snapshotMatches
+    const status = hasCurrentOrphanResolutionApproval(row) && snapshotMatches
         ? 'Εγκεκριμένος χειρισμός HR· το αρχικό χτύπημα διατηρείται'
         : 'Εκκρεμεί ρητή έγκριση χειρισμού από HR';
     return `<div class="mt-1"><span class="badge text-bg-warning" title="${status}">ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ</span></div>`;
@@ -9323,7 +9328,7 @@ function weeklyHrOrphanRows(payload = {}) {
         String(candidate._id) === String(row._id)) || row).filter((row) =>
         isCurrentPeriodReviewDate(row, payload) &&
         row?.orphan_card_resolution_preview?.orphanVisible === true &&
-        row?.orphan_card_resolution?.status !== 'HR_APPROVED');
+        !hasCurrentOrphanResolutionApproval(row));
 }
 
 function renderWeeklyHrOrphanItem(row = {}, { compact = false } = {}) {
@@ -13403,7 +13408,10 @@ function renderOrphanCardResolutionSection(row = {}) {
                 · <strong>Προδηλωμένα σκέλη:</strong> ${escapeHtml(declaredIntervals)}
             </div>
             <div class="alert alert-warning py-2">
-                ${preview.message ? escapeHtml(preview.message) : splitPolicyViolation
+                ${preview.message ? escapeHtml(preview.message)
+                    : row.orphan_card_resolution?.status === 'HR_APPROVED' && preview.approvalCurrent === false
+                    ? 'Η παλιά έγκριση δεν αντιστοιχεί στα τρέχοντα πραγματικά χτυπήματα και απολογιστικά διαστήματα, οπότε χρειάζεται νέος έλεγχος. 1. Συμπληρώστε όλα τα πραγματικά διαστήματα Από–Έως. 2. Περιμένετε την προεπισκόπηση και εγκρίνετε ρητά μόνο αν είναι σωστή. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: ORPHAN_APPROVAL_EVIDENCE_MISMATCH'
+                    : splitPolicyViolation
                     ? 'Το χειροκίνητο διάστημα παραβιάζει τον κανόνα ελάχιστης τρίωρης διακοπής του σπαστού ωραρίου. Οι ώρες δεν μετακινήθηκαν αυτόματα.'
                     : `Δεν είναι δυνατή ασφαλής αυτόματη πρόταση επειδή το προδηλωμένο ωράριο
                 είναι σπαστό. Συμπληρώστε το πραγματικό απολογιστικό διάστημα: πλήρες Από–Έως για κάθε ζεύγος.`}
@@ -13413,7 +13421,7 @@ function renderOrphanCardResolutionSection(row = {}) {
     }
     const proposal = preview.proposal || {};
     const rest = preview.rest || {};
-    const approved = row.orphan_card_resolution?.status === 'HR_APPROVED';
+    const approved = hasCurrentOrphanResolutionApproval(row);
     const approvedDecision = row.orphan_card_resolution || {};
     const approvedInterval = approvedDecision.approved_interval || {};
     const orphanLabel = preview.orphanType === 'START_ONLY' ? 'Μόνο είσοδος'
@@ -13706,7 +13714,7 @@ function orphanResolutionPreviewRow(row) {
 function requiresExplicitOrphanResolutionApproval(row, approvalInput) {
     const preview = orphanResolutionPreviewRow(row)?.orphan_card_resolution_preview || {};
     return preview.orphanVisible === true && preview.eligible === true &&
-        row?.orphan_card_resolution?.status !== 'HR_APPROVED' &&
+        !hasCurrentOrphanResolutionApproval(row) &&
         approvalInput?.checked !== true;
 }
 
@@ -13788,6 +13796,7 @@ async function refreshOrphanResolutionPreview(row, { preserveExplicitApproval = 
         const draft = {
             orphan_card_resolution_preview: {
                 ...payload.preview,
+                approvalCurrent: row.orphan_card_resolution_preview?.approvalCurrent,
                 ...(currentPreview.automaticReusableApplied ? {
                     automaticReusableApplied: true,
                     canAutomaticReuse: true,
@@ -13820,7 +13829,7 @@ async function initializeOrphanResolutionPreview(row) {
     orphanResolutionPreviewCleanup?.();
     orphanResolutionPreviewCleanup = null;
     orphanResolutionPreviewDrafts.delete(row);
-    if (row?.orphan_card_resolution?.status === 'HR_APPROVED') return;
+    if (hasCurrentOrphanResolutionApproval(row)) return;
     if (row?.orphan_card_resolution_preview?.orphanVisible !== true) return;
     bindOrphanResolutionManualPreview(row);
     if (!prefillOrphanResolutionProposal(row)) {
@@ -13865,7 +13874,7 @@ function bindOrphanResolutionManualPreview(row) {
 function prefillOrphanResolutionProposal(row) {
     const proposal = row?.orphan_card_resolution_preview?.proposal;
     if (row?.orphan_card_resolution_preview?.eligible !== true ||
-        row?.orphan_card_resolution?.status === 'HR_APPROVED' || !proposal) return false;
+        hasCurrentOrphanResolutionApproval(row) || !proposal) return false;
     const startInput = document.getElementById('edit_apo_ora_01_apologistika');
     const endInput = document.getElementById('edit_eos_ora_01_apologistika');
     if (startInput && !startInput.value) startInput.value = proposal.start || '';
@@ -14283,7 +14292,7 @@ function canStartManualDailyActualWorkResolution(row = {}) {
         return Number.isInteger(start) && Number.isInteger(end) && start !== end;
     });
     const unresolvedOrphan = row?.orphan_card_resolution_preview?.orphanVisible === true &&
-        row?.orphan_card_resolution?.status !== 'HR_APPROVED';
+        !hasCurrentOrphanResolutionApproval(row);
     const zeroLength = [1, 2, 3].some((number) => {
         const pair = String(number).padStart(2, '0');
         const start = String(row[`cards_apo_ora_${pair}`] || '').trim();

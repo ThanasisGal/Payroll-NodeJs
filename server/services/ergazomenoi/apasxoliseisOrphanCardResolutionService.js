@@ -547,6 +547,38 @@ function isApprovedOrphanResolution(row = {}) {
         metadata.policy_version === POLICY_VERSION);
 }
 
+// Presentation provenance only: a historical status must not suppress a fresh
+// preview when its approved intervals no longer account for the actual punch.
+function isCurrentOrphanResolutionApproval(row = {}) {
+    if (!isApprovedOrphanResolution(row)) return false;
+    const decision = row.orphan_card_resolution;
+    const approvedWork = decision.approved_work_intervals;
+    if (Array.isArray(approvedWork)) {
+        if (!approvedWork.length || !decision.raw_card_snapshot ||
+            !Object.entries(decision.raw_card_snapshot).every(([field, value]) =>
+                String(row[field] ?? '') === String(value ?? ''))) return false;
+        if (![1, 2, 3].every(number => {
+            const interval = approvedWork.find(item => Number(item.pairNumber) === number);
+            const pair = String(number).padStart(2, '0');
+            return String(row[`apo_ora_${pair}_apologistika`] || '') === (interval?.start || '') &&
+                String(row[`eos_ora_${pair}_apologistika`] || '') === (interval?.end || '');
+        })) return false;
+    }
+    const orphans = actualOrphanPairs(resolveCardPairVerification(row));
+    const resolved = decision.resolved_pairs || [];
+    if (!Array.isArray(resolved)) return false;
+    return orphans.length > 0 && orphans.every(orphan => {
+        const interval = resolved.find(item => Number(item.pairNumber) === Number(orphan.pairNumber));
+        if (!interval || interval.orphanType !== orphan.state ||
+            (orphan.state === CARD_PAIR_STATE.START_ONLY ? interval.start !== orphan.start
+                : interval.end !== orphan.end)) return false;
+        const pair = String(interval.workPairNumber || interval.pairNumber).padStart(2, '0');
+        return Boolean(interval.start && interval.end && interval.start !== interval.end &&
+            row[`apo_ora_${pair}_apologistika`] === interval.start &&
+            row[`eos_ora_${pair}_apologistika`] === interval.end);
+    });
+}
+
 function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
     reusableApprovals = [] } = {}) {
     const contexts = new Map();
@@ -560,16 +592,9 @@ function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
         const employeeRows = contexts.get(key) || [];
         const decision = row.orphan_card_resolution;
         const approvedWork = decision?.approved_work_intervals;
-        const matchesApprovedDay = isApprovedOrphanResolution(row) && Array.isArray(approvedWork) &&
-            decision.raw_card_snapshot && Object.entries(decision.raw_card_snapshot)
-                .every(([field, value]) => String(row[field] ?? '') === String(value ?? '')) &&
-            [1, 2, 3].every(number => {
-                const interval = approvedWork.find(item => Number(item.pairNumber) === number);
-                const pair = String(number).padStart(2, '0');
-                return String(row[`apo_ora_${pair}_apologistika`] || '') === (interval?.start || '') &&
-                    String(row[`eos_ora_${pair}_apologistika`] || '') === (interval?.end || '');
-            });
-        const manualInterval = matchesApprovedDay ? { work_intervals: approvedWork } : null;
+        const approvalCurrent = isCurrentOrphanResolutionApproval(row);
+        const manualInterval = approvalCurrent && Array.isArray(approvedWork)
+            ? { work_intervals: approvedWork } : null;
         const base = resolveOrphanCardResolution({ row, contextRows: employeeRows, manualInterval });
         const rowDate = new Date(row.hmeromhnia);
         const approval = reusableApprovals.find((candidate) => {
@@ -589,6 +614,7 @@ function attachOrphanResolutionPreviews({ rows = [], contextRows = rows,
         });
         return { ...row, orphan_card_resolution_preview: {
             ...preview,
+            approvalCurrent,
             ...(preview.automaticReusableApplied ? {
                 reusableDecisionReason: String(approval?.notes || '').trim() ||
                     LEGACY_REUSABLE_ORPHAN_REASON
@@ -604,4 +630,5 @@ module.exports = { POLICY_VERSION, ORPHAN_RULE, SCHEDULE_KIND, RESOLUTION_SCOPE,
     resolveContinuousDeclaredSchedule, resolveAverageFallback,
     resolveEffectiveBreakContext,
     buildProposal, authoritativeWorkIntervals, evaluateRestRisk,
-    resolveOrphanCardResolution, isApprovedOrphanResolution, attachOrphanResolutionPreviews };
+    resolveOrphanCardResolution, isApprovedOrphanResolution,
+    isCurrentOrphanResolutionApproval, attachOrphanResolutionPreviews };
