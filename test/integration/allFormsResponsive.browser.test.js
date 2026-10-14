@@ -54,6 +54,10 @@ function measure() {
         labels.push({id:target.id,group:!!group,beside,above,coherentHint:!!coherentHint,contains});
     }
     const fonts=[];
+    for(const button of main.querySelectorAll('.istoriko-actions [data-action="review"]'))if(visible(button)){
+        const b=box(button),c=box(button.closest('td')),s=getComputedStyle(button);
+        if(b.x<c.x||b.right>c.right||button.scrollWidth>button.clientWidth+1||parseFloat(s.fontSize)<14.39||s.fontWeight!=='400')problems.push({kind:'history-review-action',button:b,cell:c,font:s.fontSize});
+    }
     const controls=[...main.querySelectorAll('button,.btn,a.buttons-content')].filter(e=>visible(e)&&!e.matches(exceptions));
     for(const button of controls) {
         const b=box(button), s=getComputedStyle(button);
