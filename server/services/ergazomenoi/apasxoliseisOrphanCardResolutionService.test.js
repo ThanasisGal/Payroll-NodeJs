@@ -342,6 +342,14 @@ assert.strictEqual(pendingLegacy.orphan_card_resolution_preview.approvalCurrent,
 assert.strictEqual(pendingLegacy.orphan_card_resolution_preview.reason, 'ORPHAN_PAIR_SET_MISMATCH');
 const legacyValid = { ...legacyWrongInterval, cards_apo_ora_01: '09:00' };
 assert.strictEqual(isCurrentOrphanResolutionApproval(legacyValid), true);
+const legacyContinuous = { ...legacyValid, orphan_card_resolution: {
+    ...legacyValid.orphan_card_resolution, orphan_type: 'START_ONLY', resolved_pairs: [] } };
+assert.strictEqual(isCurrentOrphanResolutionApproval(legacyContinuous), true);
+assert.strictEqual(isCurrentOrphanResolutionApproval({ ...legacyContinuous,
+    cards_apo_ora_01: '16:58' }), false);
+const legacyEndOnly = { ...legacyContinuous, cards_apo_ora_01: '', cards_eos_ora_01: '13:00',
+    orphan_card_resolution: { ...legacyContinuous.orphan_card_resolution, orphan_type: 'END_ONLY' } };
+assert.strictEqual(isCurrentOrphanResolutionApproval(legacyEndOnly), true);
 assert.strictEqual(isCurrentOrphanResolutionApproval({ ...legacyValid,
     eos_ora_01_apologistika: '12:59' }), false);
 const correctedWork = [{ pairNumber: 1, start: '09:00', end: '13:00' },

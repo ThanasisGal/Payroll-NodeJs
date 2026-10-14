@@ -565,8 +565,14 @@ function isCurrentOrphanResolutionApproval(row = {}) {
         })) return false;
     }
     const orphans = actualOrphanPairs(resolveCardPairVerification(row));
-    const resolved = decision.resolved_pairs || [];
+    let resolved = decision.resolved_pairs || [];
     if (!Array.isArray(resolved)) return false;
+    // Older continuous approvals stored only approved_interval (or its aliases).
+    if (!resolved.length && !Array.isArray(approvedWork) && orphans.length === 1) {
+        resolved = [{ pairNumber: orphans[0].pairNumber, orphanType: decision.orphan_type,
+            start: decision.approved_interval?.start || decision.approved_start,
+            end: decision.approved_interval?.end || decision.approved_end }];
+    }
     return orphans.length > 0 && orphans.every(orphan => {
         const interval = resolved.find(item => Number(item.pairNumber) === Number(orphan.pairNumber));
         if (!interval || interval.orphanType !== orphan.state ||
