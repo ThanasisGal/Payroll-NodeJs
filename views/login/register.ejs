@@ -238,16 +238,14 @@
 
 
 
-<div
-    class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3-0 pb-2-0 mb-3 mt-2-5 border-bottom bg-hero-cdn">
-</div>
+
 
 <!-- ✅ FLASH MESSAGES (for success after redirect) -->
 <%- include('../partials/flash') %>
 
 <!-- ✅ DIRECT ERROR DISPLAY (for validation errors) -->
 <% if (typeof error !== 'undefined' && error) { %>
-  <div class="container w-50 mt-3">
+  <div class="account-error">
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
       <strong><i class="bi bi-exclamation-triangle-fill"></i> Σφάλμα:</strong> <%= error %>
       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -255,73 +253,71 @@
   </div>
 <% } %>
 
-</br> </br>
-
-<div class="container w-50">
+<div class="account-confirmation">
 	<form action="/register/userRegistration" method="POST">
 
 		<%- include('../partials/_csrfField') %>
 
 		<div class="card z-depth-5">
-			<label class="card-header bg-header text-center"
-				><h4>Εγγραφή Χρήστη</h4></label>
+			<div class="card-header bg-header text-center"><h4 class="account-title">Εγγραφή Χρήστη</h4></div>
 
 			<div class="card-body">
-				<div class="col-9">
+				<div class="account-input">
 					<input type="hidden" name="tmpEmail" id="tmpEmail" class="form-control" value="" readonly />
 				</div>
 
-			
-				<div class="row form-group g-3 align-items-center mt-2 mb-1">
-					<div class="col-3 right-align">
+
+				<div class="account-fields">
+<div class="account-field">
+					<div class="account-label">
 						<label for="firstName" class="col-form-label field-required">Όνομα</label>
 					</div>
-					<div class="col-9">
+					<div class="account-input">
 						<input type="text" name="firstName" id="firstName" class="form-control" value="" required />
 					</div>
 				</div>
 
-				<div class="row form-group g-3 align-items-center mb-1">
-					<div class="col-3 right-align">
+				<div class="account-field">
+					<div class="account-label">
 						<label for="lastName" class="col-form-label field-required">Επώνυμο</label>
 					</div>
-					<div class="col-9">
+					<div class="account-input">
 						<input type="text" name="lastName" id="lastName" class="form-control" value="" required />
 					</div>
 				</div>
 
-				<div class="row form-group g-3 align-items-center mb-1">
-					<div class="col-3 right-align">
+				<div class="account-field">
+					<div class="account-label">
 						<label for="email" class="col-form-label field-required">Email</label>
 					</div>
-					<div class="col-9">
+					<div class="account-input">
 						<input type="email" name="email" id="email" class="form-control" value="" readonly required />
 					</div>
 				</div>
 
-				<div class="row form-group g-3 align-items-center mb-1">
-					<div class="col-3 right-align">
+				<div class="account-field">
+					<div class="account-label">
 						<label for="tel" class="col-form-label">Τηλέφωνο</label>
 					</div>
-					<div class="col-9">
+					<div class="account-input">
 						<input type="tel" name="tel" id="tel" class="form-control" value="" pattern="[0-9]{10}" data-bs-title="10ψήφιο τηλέφωνο (πχ 2101234567)" />
 					</div>
 				</div>
 
-				<div class="row form-group g-3 align-items-center mb-1">
-					<div class="col-3 right-align">
+				<div class="account-field">
+					<div class="account-label">
 						<label for="team" class="col-form-label field-required">Ομάδα Εργασίας</label>
 					</div>
-					<div class="col-9">
+					<div class="account-input">
 						<input type="text" name="team" id="team" class="form-control" value="" maxlength="3" data-bs-title="Αν είστε supervisor ορίστε μία ομάδα εργασίας (μέχρι 3 χαρακτήρες), ενώ αν είστε απλός χρήστης πρέπει να απευθυνθείτε στον supervisor για να σας δηλώσει σε μια ομάδα εργασίας και να ορίσει τα δικαιώματά σας στην εφαρμογή" required />
 					</div>
 				</div>
 
-				<div class="row form-group g-3 align-items-center mb-1">
-					<div class="col-3 right-align">
+				<div class="account-field">
+					<div class="account-label">
 						<label for="password" class="col-form-label field-required" >Password</label>
 					</div>
-					<div class="col-9">
+					<div class="account-input">
 						<input type="password" name="password" id="password" class="form-control" minlength="8" value="" required aria-describedby="passwordHelpBlock" />
 						<!-- ✅ PASSWORD REQUIREMENTS HINT -->
 						<small id="passwordHelpBlock" class="form-text text-muted">
@@ -331,13 +327,15 @@
 					</div>
 				</div>
 
-				<div class="row form-group g-3 align-items-center mb-1">
-					<div class="col-3 right-align">
+				<div class="account-field">
+					<div class="account-label">
 						<label for="password_confirmation" class="col-form-label field-required" >Επιβεβαίωση Password</label>
 					</div>
-					<div class="col-9">
+					<div class="account-input">
 						<input type="password" name="password_confirmation" id="password_confirmation" class="form-control" minlength="8" value="" required />
 					</div>
+				</div>
+
 				</div>
 
 				<div>
@@ -351,7 +349,7 @@
 				<div>
 					<input type="hidden" name="details" id="details" class="form-control" value="" />
 				</div>
-				
+
 				<div>
 					<input type="hidden" name="isVerified" id="isVerified" class="form-control" value="false" />
 				</div>
@@ -361,11 +359,11 @@
 				</div>
 			</div>
 
-			<div class="card-footer cardFooter">
-				<div class="d-inline-block d-flex cardFooter01">
-					<button type="submit" class="btn btn-brown rounded-4 w-40 mb-1 mt-2"><i class="bi bi-person-plus"></i> Προσθήκη Χρήστη
+			<div class="card-footer">
+				<div class="account-actions">
+					<button type="submit" class="btn btn-brown"><i class="bi bi-person-plus"></i> Προσθήκη Χρήστη
 					</button>
-					<a class="btn btn-brown rounded-4 w-40 mb-1 mt-2" href="/login">
+					<a class="btn btn-brown" href="/login">
 						<i class="bi bi-chevron-double-left"></i> Επιστροφή</a>
 				</div>
 			</div>

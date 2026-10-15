@@ -1,4 +1,4 @@
-<div class="maintenance-responsive-form">
+<div class="maintenance-responsive-form user-management-page">
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom bg-hero-cdn">
 
     <form class="nav col-12 col-md-auto flex-end mb-2 ms-auto mb-md-0" role="search" method="POST" action="/admin/search">
@@ -19,12 +19,11 @@
 
 <%- include('./partials/flash') %>
 
-<div class="card z-depth-5 w-90">
-    <div class="card-body">
-        <label class="card-header bg-header text-center w-100 fs25px-fw600">Διαχείριση Χρηστών</label
+<div class="card z-depth-5 user-management-card">
+    <label class="card-header bg-header text-center w-100 fs25px-fw600">Διαχείριση Χρηστών</label
         >
+    <div class="card-body">
 
-        <div class="table-responsive">
             <table class="table table-striped table-sm table-hover" id="myTable">
                 <thead class="fs18px">
                     <tr>
@@ -39,7 +38,7 @@
                         <th scope="col" class="text-end">Ενέργειες</th>
                     </tr>
                 </thead>
-                
+
                 <tbody>
                     <% users.forEach(element => { %>
                         <tr class="align-middle">
@@ -78,7 +77,6 @@
                     <% }) %>
                 </tbody>
             </table>
-        </div>
     </div>
     <div class="card-footer user-admin-card-footer">
         <div class="user-admin-actions justify-content-between">
@@ -99,7 +97,7 @@
                             <li class="page-item disabled">
                                 <a href="#" class="page-link"><i class="bi bi-chevron-bar-left"></i></a>
                             </li>
-                
+
                             <li class="page-item disabled">
                                 <a href="#" class="page-link"><i class="bi bi-chevron-left"></i></a>
                             </li>
@@ -107,18 +105,18 @@
                             <li class="page-item">
                                 <a href="/admin/?page=1" class="page-link"><i class="bi bi-chevron-bar-left"></i></a>
                             </li>
-                
+
                             <li class="page-item">
                                 <a href="/admin/?page=<%= Number(current) - 1 %>" class="page-link"><i class="bi bi-chevron-left"></i></a>
                             </li>
-                        <% } %> 
-                        
-                        <% var i = Number(current) > 2 ? Number(current) -1 : 1 %> 
-                        
+                        <% } %>
+
+                        <% var i = Number(current) > 2 ? Number(current) -1 : 1 %>
+
                         <% if (i !== 1) { %>
                             <li class="page-item disabled"><a href="#" class="page-link">...</a></li>
-                        <% } %> 
-                        <% for( ; i <= (Number(current) + 2) && i <= pages; i++) { %> 
+                        <% } %>
+                        <% for( ; i <= (Number(current) + 2) && i <= pages; i++) { %>
                             <% if (i == current) { %>
                                 <li class="page-item">
                                     <a href="#" class="page-link pageItem"><%= i %></a>
@@ -127,23 +125,23 @@
                                 <li class="page-item">
                                     <a href="/admin/?page=<%= i %>" class="page-link"><%= i %></a>
                                 </li>
-                
-                            <% } %> 
-                            
+
+                            <% } %>
+
                             <% if (i == Number(current) + 2 && i < pages) { %>
                                 <li class="page-item disabled"><a href="#" class="page-link">...</a></li>
                                 <li class="page-item">
                                     <a href="/admin/?page=<%= pages %>" class="page-link"><%= pages %></a>
                                 </li>
-                
+
                             <% } %>
-                        <% } %> 
-                        
+                        <% } %>
+
                         <% if (current == pages) { %>
                             <li class="page-item disabled">
                                 <a href="#" class="page-link"><i class="bi bi-chevron-right"></i></a>
                             </li>
-                
+
                             <li class="page-item disabled">
                                 <a href="#" class="page-link"><i class="bi bi-chevron-bar-right"></i></a>
                             </li>
@@ -151,14 +149,14 @@
                             <li class="page-item">
                                 <a href="/admin/?page=<%= Number(current) + 1 %>" class="page-link"><i class="bi bi-chevron-right"></i></a>
                             </li>
-                
+
                             <li class="page-item">
                                 <a href="/admin/?page=<%= pages %>" class="page-link"><i class="bi bi-chevron-bar-right"></i></a>
                             </li>
                         <% } %>
                     </ul>
                 </nav>
-            <% } %> 
+            <% } %>
         </div>
     </div>
 </div>

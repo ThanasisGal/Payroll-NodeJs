@@ -50,6 +50,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (errors.length) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     icon: "warning",
@@ -59,7 +62,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     customClass: {
                         confirmButton: "class-warning custom-confirm-button custom-swal-button",
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     },
                 });
                 return;
@@ -99,6 +103,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // 4) 204 No Content → δικό μας redirect
             if (response.status === 204) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     icon: "success",
@@ -108,7 +115,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     customClass: {
                         confirmButton: "class-success custom-confirm-button custom-swal-button",
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     },
                 }).then(() => window.location.href = "/companies/ypokatasthmata");
                 return;
@@ -122,6 +130,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     icon: "success",
@@ -131,7 +142,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     customClass: {
                         confirmButton: "class-success custom-confirm-button custom-swal-button",
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     },
                 }).then(() => {
                     window.location.href = data.redirectUrl || "/companies/ypokatasthmata";
@@ -142,6 +154,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // 6) Άλλος content-type αλλά OK (π.χ. HTML)
             if (response.ok) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     icon: "success",
@@ -151,7 +166,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     customClass: {
                         confirmButton: "class-success custom-confirm-button custom-swal-button",
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     },
                 }).then(() => window.location.href = "/companies/ypokatasthmata");
                 return;
@@ -162,6 +178,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (err) {
             await Swal.fire({
+                target: document.querySelector('main.payroll-form-layout') || document.body,
+                heightAuto: false,
+                width: 'min(560px, 100%)',
                 backdrop: false,            // overlay
                 allowOutsideClick: false,
                 icon: "error",
@@ -173,7 +192,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 customClass: {
                     confirmButton: "class-error custom-confirm-button custom-swal-button",
                     title: "custom-title",
-                    popup: "custom-swal-popup",
+                    popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                    container: "new-year-confirmation-container",
                 },
             });
         }

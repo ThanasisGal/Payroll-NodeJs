@@ -1,6 +1,8 @@
 /* Presentation only. Keep existing controls, column nodes, listeners and form ownership. */
 (function () {
     'use strict';
+    // Τοπική δοκιμή εμφάνισης στη 5001: true για επαναφορά της αυτόματης ομαδοποίησης.
+    const automaticFieldGroupingEnabled = false;
     const fieldSelector = 'input:not([type="hidden"]), select, textarea';
     const excluded = '.employee-schedule-day, .employee-schedule-pair, .employee-retention-row, .input-group';
     const ignorable = e => e.matches('input[type="hidden"], script, template')
@@ -26,6 +28,7 @@
     }
 
     function groupRow(row) {
+        if (!automaticFieldGroupingEnabled) return;
         if (row.matches(excluded) || row.closest('table, .payroll-entry-table, #employmentReviewWorkspace')) return;
         const columns = [...row.children];
         for (const labelColumn of columns) {
@@ -196,9 +199,18 @@
                 for (const card of cards()) {
                     if (card.closest('.modal, #employmentReviewWorkspace') || !card.getClientRects().length) continue;
                     card.classList.add('payroll-scroll-card');
-                    const space = Math.max(192, Math.min(innerHeight, footerTop, main.getBoundingClientRect().bottom)
-                        - (card.getBoundingClientRect().top + main.scrollTop) - 20);
+                    const isUserAdministrationCard = card.matches('.user-management-page > .user-management-card, .user-privileges-layout .user-privileges-card, .disconnect-users-page > .disconnect-users-card, .companies-management-page .companies-management-card');
+                    // Οι εγκεκριμένες κάρτες διαχείρισης μοιράζονται αυτή τη μέτρηση ύψους.
+                    // Διατηρείται η εγκεκριμένη πρόβλεψη σκιάς 30px και καθαρό κενό 4px.
+                    const space = isUserAdministrationCard
+                        ? Math.max(0, footerTop - card.getBoundingClientRect().top - (30 + 4))
+                        : Math.max(192, Math.min(innerHeight, footerTop, main.getBoundingClientRect().bottom)
+                            - (card.getBoundingClientRect().top + main.scrollTop) - 20);
                     card.style.setProperty('--payroll-card-space', space + 'px');
+                    const inlineTableHeader = card.querySelector(':scope > .maintenance-table-scroll > .maintenance-table-companies > #myTable > thead');
+                    if (inlineTableHeader) {
+                        card.style.setProperty('--payroll-inline-table-header-height', inlineTableHeader.getBoundingClientRect().height + 'px');
+                    }
                     const tableScroll = card.querySelector(':scope > .payroll-table-scroll');
                     if (tableScroll) {
                         const otherHeight = [...card.children].filter(e => e !== tableScroll && e.getClientRects().length)
@@ -213,6 +225,22 @@
         }
         const resizeObserver = new ResizeObserver(scheduleCardSpace);
         resizeObserver.observe(main);
+        const userManagementPage = main.querySelector(':scope > .user-management-page');
+        const userPrivilegesPage = main.querySelector(':scope > .user-privileges-layout');
+        const disconnectUsersPage = main.querySelector(':scope > .disconnect-users-page');
+        const companiesManagementPage = main.querySelector(':scope > .companies-management-page');
+        if (userManagementPage || userPrivilegesPage || disconnectUsersPage || companiesManagementPage) {
+            const footer = document.querySelector('.footer');
+            if (footer) resizeObserver.observe(footer);
+            const search = (userManagementPage || companiesManagementPage)?.firstElementChild;
+            if (search) resizeObserver.observe(search);
+            if (companiesManagementPage) {
+                const companiesFilter = companiesManagementPage.querySelector('#companiesFilterForm');
+                if (companiesFilter) resizeObserver.observe(companiesFilter);
+                resizeObserver.observe(companiesManagementPage.querySelector('.card-footer'));
+            }
+            window.addEventListener('load', scheduleCardSpace, { once: true });
+        }
         main.querySelectorAll('.payroll-table-inner > .card-body').forEach(body => resizeObserver.observe(body));
         if (document.querySelector('header')) resizeObserver.observe(document.querySelector('header'));
         window.addEventListener('resize', scheduleCardSpace);
@@ -239,6 +267,8 @@
             for (const record of records) for (const node of record.addedNodes) {
                 if (node.nodeType === 1 && node.isConnected && !node.closest('.ts-wrapper, table')) layout(node);
             }
+            if ((userManagementPage || userPrivilegesPage || disconnectUsersPage || companiesManagementPage) && records.some(r => r.type === 'childList'
+                && (r.target === main || r.target.closest?.('.payroll-flash-messages')))) scheduleCardSpace();
             if (records.some(r => r.target.matches?.('.sections') || [...r.addedNodes].some(n => n.nodeType === 1 && n.matches('.card')))) scheduleCardSpace();
         });
         observer.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] });

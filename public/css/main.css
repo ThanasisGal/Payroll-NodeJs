@@ -14261,8 +14261,6 @@ body.loader-active > *:not(.app-loader) {
     display: flex;
     flex-direction: column;
     width: min(96rem, 100%);
-    max-height: calc(100vh - 8rem);
-    min-height: 28rem;
     overflow: hidden;
 }
 
@@ -14500,10 +14498,6 @@ body.loader-active > *:not(.app-loader) {
 }
 
 @media (max-width: 768px) {
-    .user-privileges-card {
-        max-height: calc(100vh - 5rem);
-    }
-
     .user-privileges-controls {
         grid-template-columns: 1fr;
     }
@@ -18062,21 +18056,89 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     white-space: nowrap;
 }
 
-/* Only identified field pairs reflow. Bootstrap rows and input groups keep their semantics. */
-.payroll-navigation { --payroll-navigation-font: .85rem; }
-.payroll-navigation .header-app-title { font-size: .95rem !important; height: auto; margin-block: 0 !important; align-self: center; }
-.payroll-navigation > form > .input-group { flex-wrap: wrap; }
-.payroll-navigation > form > .input-group > div { flex: 1 1 9rem; width: auto; min-width: 0; }
-.payroll-navigation > form > .input-group > div:first-child { flex: 2 1 16rem; }
+/* Η κεφαλίδα παραμένει σε μία σειρά χωρίς αποκοπή πληροφοριών. */
+.payroll-navigation {
+    --payroll-navigation-font: clamp(.8rem, .78vw, .95rem);
+    --payroll-navigation-gap: 3px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: center;
+    gap: var(--payroll-navigation-gap);
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+}
+.payroll-navigation .header-app-title {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    font-size: clamp(.85rem, .85vw, 1rem) !important;
+    letter-spacing: 0;
+    height: auto;
+    padding: .65rem 1px !important;
+    margin: 0 !important;
+    white-space: nowrap;
+}
+.payroll-navigation > form {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+}
+.payroll-navigation > form > .input-group {
+    flex-wrap: nowrap;
+    gap: var(--payroll-navigation-gap);
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+/* Οι λοιπές πληροφορίες καταλαμβάνουν μόνο το φυσικό πλάτος τους. */
+.payroll-navigation > form > .input-group > div {
+    flex: 0 0 auto;
+    /* Αναιρεί τα ποσοστιαία width !important των γενικών κλάσεων col-*. */
+    width: auto !important;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+}
+/* Η εταιρεία παίρνει μόνο τον χώρο που περισσεύει μετά τα υπόλοιπα περιεχόμενα. */
+.payroll-navigation > form > .input-group > div:first-child { flex: 1 0 auto; }
+/* Δέσμευση ολόκληρου του φυσικού πλάτους χρήστη και Group χωρίς συρρίκνωση. */
+.payroll-navigation > form > .input-group > div:last-child {
+    flex: 0 0 max-content;
+    width: max-content !important;
+}
 .payroll-navigation .form-control {
     font-size: var(--payroll-navigation-font) !important;
     line-height: 1.35;
-    min-height: 2.25rem;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: 2.75rem;
     height: auto !important;
-    padding: .35rem .6rem;
-    white-space: normal;
-    overflow-wrap: anywhere;
+    padding: .65rem 1px !important;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    overflow: visible;
 }
+.payroll-navigation .form-control > span { font-size: inherit; }
+/* Μικρή συμπίεση πριν από τον χρήστη, μόνο στα στενά παράθυρα. */
+@media (max-width: 1150px) {
+    .payroll-navigation .header-app-title,
+    .payroll-navigation > form > .input-group > div:not(:last-child) > .form-control {
+        padding-inline: 0 !important;
+        letter-spacing: -.025em;
+    }
+}
+/* Το padding συμμετέχει στο φυσικό πλάτος των τεσσάρων τελευταίων τμημάτων. */
+.payroll-navigation > form > .input-group > div:not(:first-child) > .form-control {
+    box-sizing: border-box;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+}
+/* Only identified field pairs reflow. Bootstrap rows and input groups keep their semantics. */
 #sidebarMenu { --payroll-control-font: .875rem; }
 #sidebarMenu .sidebar-toolbar .form-control { font-size: var(--payroll-control-font); }
 #sidebarMenu .sidebar-toolbar .form-control::placeholder { font-size: inherit; }
@@ -18410,4 +18472,1143 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 @layer application-buttons {
     .swal2-popup .swal2-actions button { font-size: var(--payroll-dialog-control-font) !important; font-weight: 400 !important; }
     .swal2-popup .swal2-actions button :is(i, svg) { font-size: 1em !important; width: 1em; height: 1em; }
+}
+
+/* Μόνο η κάρτα επιβεβαίωσης αποσύνδεσης. */
+.payroll-form-layout:has(> .logout-confirmation) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: safe center;
+    justify-items: center;
+    padding-block: .75rem;
+}
+.logout-confirmation {
+    container-type: inline-size;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+}
+.logout-confirmation > .card {
+    --logout-message-font: min(1rem, 2.8cqi);
+    --payroll-control-font: clamp(.85rem, 2.8cqi, 1rem);
+    --logout-spacing: clamp(.4rem, 1.5cqi, 1rem);
+    width: 100%;
+    min-width: 0;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 6px;
+}
+.logout-confirmation .card-header {
+    padding: var(--logout-spacing);
+    min-height: 0 !important;
+}
+.logout-confirmation .logout-title {
+    font-size: clamp(.95rem, 3.5cqi, 1.25rem) !important;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0;
+}
+.logout-confirmation .card-body {
+    padding: var(--logout-spacing);
+    overflow: visible !important;
+    max-height: none;
+}
+.logout-confirmation .logout-bell {
+    display: inline-block;
+    font-size: clamp(1.75rem, 5cqi, 3rem);
+    margin-bottom: var(--logout-spacing);
+}
+.logout-confirmation .logout-message {
+    font-size: var(--logout-message-font);
+    line-height: 1.4;
+    white-space: nowrap;
+    margin: 0;
+}
+.logout-confirmation .card-footer {
+    height: auto !important;
+    min-height: 0;
+    padding: var(--logout-spacing);
+    margin: 0 !important;
+}
+.logout-confirmation .logout-actions {
+    flex-wrap: wrap;
+    gap: var(--logout-spacing);
+}
+@layer application-buttons {
+    .logout-confirmation .btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-height: 2rem !important;
+        padding: clamp(.35rem, 1cqi, .5rem) clamp(.5rem, 1.5cqi, .8rem) !important;
+        border-radius: 6px !important;
+    }
+    .logout-confirmation .btn > i { font-size: 1em !important; }
+}
+
+/* Μόνο η φόρμα σύνδεσης: φυσικό πλάτος χωρίς αρνητικά περιθώρια στηλών. */
+.payroll-form-layout:has(> .login-confirmation) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: safe center;
+    justify-items: center;
+    padding-block: .75rem;
+}
+.login-confirmation {
+    container: login-card / inline-size;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    margin: 0;
+}
+.login-confirmation > form {
+    --payroll-control-font: clamp(.85rem, .78rem + .6cqi, 1rem);
+    --login-spacing: clamp(.5rem, 2.5cqi, 1rem);
+    min-width: 0;
+    width: 100%;
+    margin: 0;
+}
+.login-confirmation .card {
+    min-width: 0;
+    width: 100%;
+    height: auto;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 6px;
+}
+.login-confirmation :is(.card-header, .card-body, .card-footer) {
+    padding: var(--login-spacing);
+    height: auto !important;
+    max-height: none;
+    overflow: visible !important;
+    margin: 0 !important;
+}
+.login-confirmation .login-title {
+    display: block;
+    font-size: clamp(1.1rem, 3.5cqi, 1.25rem) !important;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    margin: 0;
+}
+.login-confirmation .login-fields {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: .4rem var(--login-spacing);
+    align-items: center;
+    margin-bottom: var(--login-spacing);
+}
+.login-confirmation .login-field { display: contents; }
+.login-confirmation :is(.login-label, .login-input) { min-width: 0; }
+.login-confirmation .form-control {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    height: var(--payroll-control-height);
+}
+.login-confirmation .login-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .5rem var(--login-spacing);
+}
+.payroll-form-layout .login-confirmation .card-body .login-links a.small {
+    font-size: var(--payroll-control-font);
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.login-confirmation .login-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--login-spacing);
+}
+@container login-card (max-width: 24rem) {
+    .login-confirmation .login-fields { grid-template-columns: minmax(0, 1fr); }
+}
+@layer application-buttons {
+    .login-confirmation .login-actions .btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        border-radius: 6px !important;
+    }
+}
+
+/* Τα μηνύματα καταλαμβάνουν δική τους σειρά πριν από τη φόρμα. */
+.payroll-form-layout:has(> .login-confirmation):has(> .payroll-flash-messages) {
+    grid-template-rows: auto minmax(min-content, 1fr);
+    row-gap: .75rem;
+}
+.payroll-form-layout > .payroll-flash-messages {
+    container: payroll-flash / inline-size;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    align-self: start;
+    justify-self: start;
+}
+.payroll-flash-messages > .alert {
+    position: relative;
+    width: fit-content;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 0 .5rem;
+    padding: .65rem 3rem .65rem .75rem;
+}
+.payroll-flash-messages .payroll-flash-text {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    font-size: clamp(.85rem, .78rem + .35cqi, 1rem) !important;
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow-x: auto;
+}
+.payroll-flash-messages .payroll-flash-text > i { font-size: 1em !important; }
+
+/* Κλείσιμο επάνω δεξιά, ανεξάρτητα από τη στοίχιση του κειμένου. */
+.payroll-flash-messages > .alert > .btn-close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    bottom: auto;
+    left: auto;
+    margin: 0;
+    /* Το εικονίδιο να μην κεντράρεται στο ύψος των γενικών κουμπιών. */
+    width: 1em;
+    height: 1em;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+}
+
+/* Εγγραφή και επαλήθευση email, μέσα στον διαθέσιμο κύριο περιέκτη. */
+.payroll-form-layout:has(> .account-confirmation) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
+    padding-block: .75rem;
+}
+.account-confirmation {
+    container: account-card / inline-size;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    margin-block: auto;
+}
+.account-confirmation > form {
+    --payroll-control-font: clamp(.85rem, .78rem + .6cqi, 1rem);
+    --account-spacing: clamp(.4rem, 1.8cqi, .75rem);
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+.account-confirmation .card {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 6px;
+}
+.account-confirmation :is(.card-header, .card-body, .card-footer) {
+    padding: var(--account-spacing);
+    height: auto !important;
+    max-height: none;
+    overflow: visible !important;
+    margin: 0 !important;
+}
+.account-confirmation .card-header .account-title {
+    font-size: clamp(1.1rem, 3.5cqi, 1.25rem) !important;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    margin: 0;
+}
+.account-confirmation .account-fields {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    gap: var(--account-spacing);
+    align-items: start;
+}
+.account-confirmation .account-field { display: contents; }
+.account-confirmation :is(.account-label, .account-input) { min-width: 0; }
+.account-confirmation .account-label .col-form-label {
+    display: flex;
+    align-items: center;
+    min-height: var(--payroll-control-height);
+    margin: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.account-confirmation .form-control {
+    width: 100%;
+    min-width: 0;
+    height: var(--payroll-control-height);
+    margin: 0;
+}
+.account-confirmation .form-text {
+    display: block;
+    font-size: var(--payroll-control-font);
+    line-height: 1.4;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.account-confirmation .account-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--account-spacing);
+}
+.payroll-form-layout:has(> .account-confirmation) > :is(.payroll-flash-messages, .account-error) {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    min-width: 0;
+    max-width: 100%;
+}
+.account-error { width: 100%; overflow-wrap: anywhere; }
+@container account-card (max-width: 28rem) {
+    .account-confirmation .account-fields { grid-template-columns: minmax(0, 1fr); }
+}
+@layer application-buttons {
+    .account-confirmation .account-actions .btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        border-radius: 6px !important;
+    }
+    .account-confirmation .account-actions .btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Φόρμες κωδικού: φυσικό ύψος και μία περιοχή κύλισης στον κύριο περιέκτη. */
+.payroll-form-layout:has(> .password-page) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(min-content, 1fr);
+    /* Συμμετρικός χώρος για την υφιστάμενη σκιά z-depth-5. */
+    padding-block: 48px;
+}
+.payroll-form-layout:has(> .password-page):has(> .payroll-flash-messages) {
+    grid-template-rows: auto minmax(min-content, 1fr);
+    row-gap: .5rem;
+}
+.password-page {
+    container: password-card / inline-size;
+    display: flex;
+    flex-direction: column;
+    justify-self: center;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    min-height: min-content;
+    overflow: visible;
+}
+.password-page > form {
+    flex: 0 0 auto;
+    --payroll-control-font: clamp(.85rem, .78rem + .6cqi, 1rem);
+    --password-spacing: clamp(.4rem, 1.8cqi, .75rem);
+    width: 100%;
+    min-width: 0;
+    margin-block: auto;
+}
+.password-page .card {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 6px;
+}
+.password-page :is(.card-header, .card-body, .card-footer) {
+    flex: 0 0 auto;
+    padding: var(--password-spacing);
+    height: auto !important;
+    max-height: none;
+    overflow: visible !important;
+    margin: 0 !important;
+}
+.password-page .card-header .password-title {
+    font-size: clamp(1.1rem, 3.5cqi, 1.25rem) !important;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    margin: 0;
+}
+.password-page .password-fields {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    gap: var(--password-spacing);
+    align-items: start;
+}
+.password-page .password-field { display: contents; }
+.password-page :is(.password-label, .password-input) { min-width: 0; }
+.password-page .password-label .col-form-label {
+    display: flex;
+    align-items: center;
+    min-height: var(--payroll-control-height);
+    margin: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.password-page .form-control {
+    width: 100%;
+    min-width: 0;
+    height: var(--payroll-control-height);
+    margin: 0;
+}
+.password-page .form-text {
+    display: block;
+    font-size: var(--payroll-control-font);
+    line-height: 1.4;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.password-page .password-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--password-spacing);
+}
+.password-page .alert { min-width: 0; overflow-wrap: anywhere; }
+@container password-card (max-width: 28rem) {
+    .password-page .password-fields { grid-template-columns: minmax(0, 1fr); }
+}
+@layer application-buttons {
+    .password-page .password-actions .btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        border-radius: 6px !important;
+    }
+    .password-page .password-actions .btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Διαχείριση Χρηστών: μοναδική περιοχή κύλισης το σώμα της κάρτας. */
+.payroll-form-layout:has(> .user-management-page) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > .user-management-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+}
+.user-management-page > :not(.user-management-card) { flex: 0 0 auto; min-width: 0; }
+.user-management-page > .user-management-card {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: var(--payroll-card-space, auto) !important;
+    max-height: var(--payroll-card-space, none) !important;
+    width: 100%;
+    margin: 0 !important;
+}
+.user-management-page .user-management-card > :is(.card-header, .card-footer) {
+    flex: 0 0 auto;
+    position: static;
+    margin: 0;
+}
+.user-management-page .user-management-card > .card-body {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+.user-management-page #myTable {
+    table-layout: auto;
+    width: 100%;
+    min-width: max(72rem, 100%) !important;
+}
+.user-management-page #myTable :is(th, td) { white-space: nowrap; }
+.user-management-page #myTable :is(th, td):last-child { min-width: 8rem; }
+.user-management-page .user-admin-row-actions {
+    flex-wrap: nowrap;
+    gap: .3rem;
+}
+@layer application-buttons {
+    .user-management-page .user-admin-row-actions .user-admin-action-btn {
+        font-size: .85rem !important;
+        min-height: 2rem !important;
+        min-width: 2rem !important;
+        padding: .3rem .4rem !important;
+        flex-shrink: 0 !important;
+    }
+    .user-management-page .user-admin-row-actions .user-admin-action-btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Επιβεβαίωση διαγραφής χρήστη: φυσικό ύψος και κύλιση μόνο στο σώμα. */
+.payroll-form-layout:has(> .user-delete-confirmation) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    justify-items: center;
+    padding-block: .75rem;
+    overflow: visible;
+}
+.user-delete-confirmation {
+    container: user-delete / inline-size;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    min-height: 0;
+    padding-block: 2rem;
+}
+.user-delete-confirmation > .card {
+    --payroll-control-font: clamp(.85rem, .78rem + .6cqi, 1rem);
+    --user-delete-spacing: clamp(.5rem, 2.5cqi, 1rem);
+    flex: 0 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: auto !important;
+    max-height: 100% !important;
+    margin: auto 0 !important;
+    border-radius: 6px !important;
+    overflow: visible !important;
+}
+.user-delete-confirmation .card-header {
+    flex: 0 0 auto;
+    height: auto !important;
+    padding: var(--user-delete-spacing);
+    border-top-left-radius: 6px !important;
+    border-top-right-radius: 6px !important;
+}
+.user-delete-confirmation .user-delete-title {
+    font-size: clamp(1.1rem, 3.5cqi, 1.25rem);
+    line-height: 1.35;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.user-delete-confirmation .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    max-height: none;
+    padding: var(--user-delete-spacing);
+    font-size: var(--payroll-control-font);
+    line-height: 1.5;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow-x: visible !important;
+    overflow-y: auto !important;
+}
+.user-delete-confirmation .card-footer {
+    flex: 0 0 auto;
+    position: static;
+    height: auto !important;
+    min-height: 0;
+    margin: 0;
+    padding: var(--user-delete-spacing);
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+.user-delete-confirmation .user-admin-actions {
+    justify-content: center;
+    gap: var(--user-delete-spacing);
+    min-width: 0;
+}
+.user-delete-confirmation .user-admin-actions > form { min-width: 0; max-width: 100%; }
+@layer application-buttons {
+    .user-delete-confirmation .user-admin-action-btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        border-radius: 6px !important;
+    }
+    .user-delete-confirmation .user-admin-action-btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Δικαιώματα Χρηστών: ίδιο εξωτερικό ύψος επιλογής χρήστη και ρόλου. */
+.user-privileges-controls #userPrivilegesRole,
+.user-privileges-controls .user-privileges-user-field > .ts-wrapper.tom-dropdown {
+    box-sizing: border-box;
+    height: var(--payroll-control-height, 2.25rem) !important;
+    min-height: var(--payroll-control-height, 2.25rem) !important;
+    max-height: var(--payroll-control-height, 2.25rem) !important;
+    margin-block: 0 !important;
+    font-size: var(--payroll-control-font, 1rem) !important;
+    line-height: 1.4;
+}
+.user-privileges-controls #userPrivilegesRole { padding-block: .35rem; }
+.user-privileges-controls .user-privileges-user-field > .ts-wrapper .ts-control {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    padding-block: .35rem !important;
+    align-items: center !important;
+    font-size: var(--payroll-control-font, 1rem) !important;
+    line-height: 1.4;
+}
+.user-privileges-controls .user-privileges-user-field .ts-control input {
+    height: auto !important;
+    min-height: 0 !important;
+    padding-block: 0 !important;
+    margin-block: 0 !important;
+    font-size: inherit !important;
+    line-height: inherit;
+}
+.user-privileges-controls .user-privileges-user-field .ts-control .item {
+    margin-block: 0;
+    padding-block: 0 !important;
+    font-size: inherit !important;
+    line-height: inherit;
+}
+
+/* Δικαιώματα Χρηστών: ίδιος υπολογισμός ύψους με τη Διαχείριση Χρηστών. */
+.payroll-form-layout:has(> .user-privileges-layout) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > .user-privileges-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+}
+.user-privileges-layout .user-privileges-shell {
+    flex: 1 1 0;
+    min-height: 0;
+    align-items: flex-start;
+    padding-bottom: 0;
+}
+.user-privileges-layout .user-privileges-shell > .user-privileges-card {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: var(--payroll-card-space, auto) !important;
+    max-height: var(--payroll-card-space, none) !important;
+    margin: 0 !important;
+}
+.user-privileges-layout .user-privileges-card > :is(.card-header, .card-footer) {
+    flex: 0 0 auto;
+    position: static;
+}
+.user-privileges-layout .user-privileges-card > .user-privileges-table-container {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+/* Διατηρείται το υπάρχον κουμπί καθαρισμού, έξω από το περίγραμμα. */
+.user-privileges-layout .user-privileges-controls .user-privileges-user-field {
+    padding-inline-end: 2rem;
+}
+.user-privileges-layout .user-privileges-user-field > .ts-wrapper {
+    overflow: visible;
+}
+.user-privileges-layout .user-privileges-user-field > .ts-wrapper > .ts-fill-reset-btn {
+    left: calc(100% + .375rem) !important;
+    right: auto !important;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+}
+.user-privileges-layout .user-privileges-user-field > .ts-wrapper:has(> .ts-fill-reset-btn:not([hidden]))::after {
+    right: .65rem;
+}
+
+/* Αποσύνδεση Χρηστών: ίδια στοίχιση και κοινή μέτρηση ύψους καρτών διαχείρισης. */
+.payroll-form-layout:has(> .disconnect-users-page) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > .disconnect-users-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+}
+.disconnect-users-page > .disconnect-users-card {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: var(--payroll-card-space, auto) !important;
+    max-height: var(--payroll-card-space, none) !important;
+    width: 100%;
+    margin: 0 !important;
+}
+.disconnect-users-card > .card-header {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 5vh;
+}
+.disconnect-users-card > .disconnect-users-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+}
+.disconnect-users-card > .disconnect-users-form > .card-body {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+.disconnect-users-card .disconnect-users-footer {
+    flex: 0 0 auto;
+    position: static;
+    margin: 0;
+    padding: 0 var(--bs-card-spacer-x) var(--bs-card-spacer-y);
+    background-color: var(--bs-card-bg);
+    border: 0;
+}
+
+/* Μόνο το αρχικό παράθυρο νέας χρήσης: συμπαγές όπως η αποσύνδεση. */
+.payroll-form-layout:has(> .new-year-confirmation-container) {
+    position: relative;
+    overflow: visible;
+}
+.payroll-form-layout > .new-year-confirmation-container {
+    position: absolute !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0;
+    min-height: 0;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: safe center;
+    justify-items: center;
+    padding: .75rem !important;
+    overflow-y: auto;
+}
+.new-year-confirmation-container > .new-year-confirmation.swal2-popup {
+    container-type: inline-size;
+    grid-area: 1 / 1 !important;
+    justify-self: center;
+    align-self: safe center;
+    display: flex !important;
+    flex-direction: column;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 560px !important;
+    min-width: 0;
+    min-height: 0;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+.new-year-confirmation > * {
+    --new-year-spacing: clamp(.4rem, 1.5cqi, 1rem);
+    flex: 0 0 auto;
+    min-width: 0;
+}
+.new-year-confirmation .swal2-icon {
+    /* Επιπλέον οπτική αύξηση 20%, χωρίς αλλαγή του χώρου στη διάταξη. */
+    font-size: clamp(1.75rem, 5cqi, 3rem);
+    scale: 1.44;
+    border-width: 1px;
+    box-sizing: border-box;
+    width: 1em;
+    height: 1em;
+    margin: var(--new-year-spacing) auto;
+}
+/* Τα σύνθετα σύμβολα χρειάζονται αναλογία 5em για να χωρούν στον κύκλο.
+   Το εξωτερικό μέγεθος παραμένει ίδιο· μόνο στις δύο ενότητες εταιρειών. */
+.payroll-form-layout:has(> .companies-management-page) > .new-year-confirmation-container .swal2-icon:is(.swal2-success, .swal2-error) {
+    font-size: clamp(.35rem, 1cqi, .6rem);
+    width: 5em;
+    height: 5em;
+}
+.new-year-confirmation .swal2-icon .swal2-icon-content {
+    font-size: .75em;
+    line-height: 1;
+}
+.new-year-confirmation.swal2-popup :is(.swal2-title, .swal2-html-container, .swal2-actions) {
+    padding: var(--new-year-spacing);
+    margin: 0;
+}
+.new-year-confirmation.swal2-popup .swal2-html-container {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible !important;
+}
+.new-year-confirmation.swal2-popup .swal2-actions {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--new-year-spacing);
+}
+.new-year-confirmation .swal2-actions > button { max-width: 100%; }
+
+/* Το min-height: 100% μαζί με το mt-4 προκαλούσε περιττή κύλιση στο main. */
+.payroll-form-layout > .active-sessions-content {
+    min-height: 0;
+}
+
+/* Γενικά στοιχεία εταιρειών: κοινή μέτρηση ύψους, τοπική κύλιση και εργαλεία. */
+.payroll-form-layout:has(> .companies-management-page) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > .companies-management-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+}
+.companies-management-page > :not(.companies-management-card) {
+    flex: 0 0 auto;
+    min-width: 0;
+}
+.payroll-form-layout .companies-management-page .companies-management-card {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: var(--payroll-card-space, auto) !important;
+    max-height: var(--payroll-card-space, none) !important;
+    width: 100%;
+    margin: 0 !important;
+}
+.companies-management-page .companies-management-card > :is(.card-header, .card-footer) {
+    flex: 0 0 auto;
+    position: static;
+    margin: 0;
+}
+.payroll-form-layout .companies-management-page .companies-management-card > .card-body {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    overflow: auto !important;
+}
+.companies-management-page .maintenance-table-companies {
+    height: auto;
+    min-width: 52rem;
+}
+.companies-management-page #myTable { margin-bottom: 0; }
+.companies-management-page .companies-management-footer {
+    --companies-footer-font: clamp(.85rem, .72rem + .25cqi, 1rem);
+    --companies-footer-gap: clamp(.2rem, .6cqi, .75rem);
+    gap: var(--companies-footer-gap) !important;
+    max-width: 100%;
+    min-width: 0;
+    padding: clamp(.35rem, .7cqi, .75rem);
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+/* Όλες οι ομάδες στην ίδια ζώνη, με τοπική κύλιση όταν δεν χωρούν. */
+.payroll-form-layout .companies-management-page .companies-management-footer {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap !important;
+}
+.payroll-form-layout .companies-management-page .companies-management-footer > :is(.d-flex, nav) {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+    max-width: none;
+    gap: var(--companies-footer-gap) !important;
+}
+.companies-management-page .companies-management-pagination { margin-left: auto; }
+.companies-management-page .companies-management-footer .pagination {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    margin: 0 !important;
+}
+.companies-management-page .companies-management-footer :is(.page-link, .small) {
+    font-size: var(--companies-footer-font) !important;
+    white-space: nowrap;
+}
+.companies-management-page .companies-management-footer :is(.btn, .page-link, .small) {
+    margin-block: 0 !important;
+}
+.companies-management-page .companies-management-footer .page-link {
+    min-width: 1.8em;
+    min-height: 1.8em;
+    padding: clamp(.2rem, .35cqi, .3rem) clamp(.3rem, .5cqi, .5rem);
+}
+.companies-management-page .companies-management-footer .page-link > i { font-size: 1em; }
+@layer application-buttons {
+    .companies-management-page .companies-management-footer .btn {
+        font-size: var(--companies-footer-font) !important;
+        min-height: clamp(2rem, 1.7rem + .5cqi, 2.5rem) !important;
+        min-width: max-content !important;
+        max-width: none !important;
+        padding: clamp(.3rem, .5cqi, .5rem) clamp(.4rem, .8cqi, .85rem) !important;
+        gap: clamp(.2rem, .35cqi, .35rem) !important;
+        white-space: nowrap !important;
+        overflow-wrap: normal;
+    }
+    .companies-management-page .companies-management-footer .btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Αναζήτηση εταιρειών: προοδευτική κλίμακα από το συμπαγές πρότυπο κεφαλίδας. */
+.payroll-form-layout .companies-management-page .companies-search-header {
+    min-height: clamp(3rem, 1rem + 3.35vw, 4rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.payroll-form-layout .companies-management-page .companies-search-header > label {
+    font-size: clamp(1.2rem, .95rem + .5vw, 1.4rem) !important;
+    margin: 0 !important;
+    text-align: center;
+}
+@media (min-width: 1432px) {
+    .payroll-form-layout .companies-management-page .companies-search-header {
+        min-height: 4rem;
+    }
+    .payroll-form-layout .companies-management-page .companies-search-header > label {
+        font-size: 1.4rem !important;
+    }
+}
+
+/* Κοινές σταθερές κεφαλίδες Εταιρειών μέσα στη μοναδική περιοχή κύλισης. */
+.companies-management-page .maintenance-table-companies > div:has(> #myTableHeader),
+.companies-management-page .maintenance-table-companies > #myTable > thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    flex-shrink: 0;
+    background-color: #fff;
+}
+.companies-management-page #myTableHeader thead th,
+.companies-management-page .maintenance-table-companies > #myTable > thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    --bs-table-bg: #fcfdfb;
+    background-color: #fcfdfb;
+}
+/* Κ.Π.Κ.: η επιλογή ή το hover της γραμμής δεν αλλάζει το χρώμα του chevron. */
+#myTable:has(.collapse[id^="antistoixiseis"]) > tbody > tr .btn-nesting:not(:is(:hover, :active, .active, :disabled, .disabled, [aria-disabled="true"])) > :is(.bi-chevron-up, .bi-chevron-down),
+#myTable:has(.collapse[id^="antistoixiseis"]) > tbody > tr .btn-nesting:not(:is(:hover, :active, .active, :disabled, .disabled, [aria-disabled="true"])) > :is(.bi-chevron-up, .bi-chevron-down)::before {
+    color: var(--button-color, currentColor) !important;
+    opacity: 1;
+}
+/* Οι διώροφες αναλυτικές κεφαλίδες κυλούν μαζί, κάτω από την κύρια κεφαλίδα. */
+.companies-management-page .maintenance-table-companies > #myTable .nested-table > thead {
+    position: sticky;
+    top: var(--payroll-inline-table-header-height, 0px);
+    z-index: 1;
+    background-color: #fff;
+}
+
+/* Προσθήκη/συντήρηση εταιρείας: αρχικές οριζόντιες στήλες και τοπική κύλιση. */
+.company-details-page :is(.tadded-container, .sections, .sections > section, .sections > section > div, .formRadius) {
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+}
+.company-details-page .sections > section {
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+}
+.company-details-page .card-body > .row.form-group {
+    flex-wrap: nowrap;
+    min-width: 48rem;
+    margin-inline: 0 !important;
+}
+/* Επαναφορά του αρχικού μεγέθους ετικέτας, χωρίς αλλαγή βάρους/χρώματος/στηλών. */
+.payroll-form-layout .company-details-page .col-form-label.label-font-size {
+    font-size: .7vw !important;
+}
+.company-details-page .menu_Links { max-width: 100%; }
+.company-details-page .menu_Links ul {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+.company-details-page .menu_Links li {
+    flex: 0 0 auto;
+    font-size: .85vw !important;
+    white-space: nowrap;
+}
+.company-details-page .companies-management-footer > .company-details-actions {
+    flex: 1 0 auto;
+    width: 100%;
+    min-width: max-content;
+    justify-content: space-around;
+}
+/* Ίδιο εξωτερικό ύψος για πεδία και Tom Select· δεν περιορίζονται textarea/listbox. */
+.company-details-page .card-body :is(input.form-control:not([type="hidden"]):not([type="file"]), select.form-select:not([multiple])) {
+    height: var(--payroll-control-height) !important;
+    min-height: var(--payroll-control-height);
+}
+.company-details-page .card-body .ts-wrapper.tom-dropdown {
+    --company-reset-space: 1.75rem;
+    box-sizing: border-box;
+    height: var(--payroll-control-height) !important;
+    min-height: var(--payroll-control-height);
+    width: calc(100% - var(--company-reset-space)) !important;
+    max-width: calc(100% - var(--company-reset-space));
+    margin-right: var(--company-reset-space);
+    margin-block: 0 !important;
+    flex-grow: 0;
+}
+.company-details-page .card-body .ts-wrapper > .ts-control {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    align-items: center;
+    padding-block: 0 !important;
+    padding-right: 2rem !important;
+}
+.company-details-page .card-body .ts-wrapper.multi > .ts-control {
+    padding-right: 4rem !important;
+}
+.company-details-page .card-body .ts-control input {
+    height: auto !important;
+    min-height: 0;
+    margin: 0 !important;
+}
+.company-details-page .card-body .ts-wrapper > .ts-fill-reset-btn {
+    left: calc(100% + .25rem) !important;
+    right: auto !important;
+    top: 50%;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    padding: 0;
+}
+.company-details-page .card-body .ts-wrapper:has(> .ts-fill-reset-btn:not([hidden]))::after {
+    right: .75rem;
+}
+.company-details-page .card-body .ts-overflow-indicator { right: 2rem; }
+
+/* Τα δύο βοηθητικά κείμενα στα «Διάφορα» παραμένουν δίπλα στα πεδία. */
+.company-details-page .company-diafora-scroll-container > .row.form-group:has(.company-inline-help) {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+.company-details-page .company-diafora-scroll-container .company-short-card-help {
+    flex: 1 1 0;
+    width: auto !important;
+    min-width: 0;
+}
+.payroll-form-layout .company-details-page .company-inline-help {
+    display: block;
+    max-width: 100%;
+    font-size: clamp(.75rem, .58rem + .22cqi, .85rem) !important;
+    font-weight: 400;
+    white-space: nowrap;
+    overflow-x: auto;
+    text-align: start;
+}
+
+/* Πραγματικός χώρος για πλήρη ημερομηνία και τα εγγενή χειριστήριά της. */
+.company-details-page .card-body .row.form-group > div:has(input[type="date"]) {
+    font-size: var(--payroll-control-font);
+    min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px + var(--bs-gutter-x, 1rem));
+}
+.company-details-page .card-body .row.form-group:has(input[type="date"]) > div:empty {
+    flex-shrink: 1;
+    min-width: 0;
+}
+.company-details-page .card-body input[type="date"] {
+    box-sizing: border-box;
+    height: var(--payroll-control-height) !important;
+    min-width: calc(12ch + 3rem);
+    padding-inline: .375rem;
+}
+
+/* Ημερομηνίες Εταιρειών: ημερολόγιο και Χ μέσα στο μοναδικό περίγραμμα. */
+.company-details-page .card-body .clearable-wrapper:has(> input[type="date"]) {
+    --company-date-icon-gap: 4px;
+    --company-date-icon-inset: .375rem;
+    position: relative;
+    display: block;
+    width: 100%;
+    min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px);
+}
+.company-details-page .card-body .clearable-wrapper > input[type="date"] {
+    width: 100%;
+    min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + var(--company-date-icon-gap));
+    /* Το εγγενές ημερολόγιο τελειώνει 4px πριν αρχίσει η δεσμευμένη θέση του Χ. */
+    padding-right: calc(var(--company-date-icon-inset) + var(--clear-size, 1.4rem) + var(--company-date-icon-gap)) !important;
+}
+.company-details-page .card-body .clearable-wrapper > input[type="date"]::-webkit-calendar-picker-indicator {
+    flex: 0 0 1.1rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+    padding: 0;
+    align-self: center;
+}
+.company-details-page .card-body .clearable-wrapper:has(> input[type="date"]) > .clear-btn {
+    position: absolute;
+    top: 50%;
+    right: calc(var(--company-date-icon-inset) + var(--bs-border-width, 1px)) !important;
+    transform: translateY(-50%) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--clear-size, 1.4rem);
+    height: var(--clear-size, 1.4rem);
+    margin: 0;
+    line-height: 1;
 }

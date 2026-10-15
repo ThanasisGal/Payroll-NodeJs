@@ -133,6 +133,9 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
 
             if (errors.length) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false, // overlay
                     allowOutsideClick: false,
                     icon: 'warning',
@@ -142,7 +145,8 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
                     customClass: {
                         confirmButton: 'class-warning custom-confirm-button custom-swal-button',
                         title: 'custom-title',
-                        popup: 'custom-swal-popup'
+                        popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                        container: 'new-year-confirmation-container'
                     }
                 });
                 return;
@@ -179,6 +183,9 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
             // 3) 204 No Content → δικό μας redirect (προσαρμόσ’ το όπου θέλεις)
             if (response.status === 204) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false, // overlay
                     allowOutsideClick: false,
                     icon: 'success',
@@ -188,7 +195,8 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
                     customClass: {
                         confirmButton: 'class-success custom-confirm-button custom-swal-button',
                         title: 'custom-title',
-                        popup: 'custom-swal-popup'
+                        popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                        container: 'new-year-confirmation-container'
                     }
                 }).then(() => (window.location.href = '/companies/genikastoixeia'));
                 return;
@@ -207,6 +215,9 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
                     throw new Error(companyAddErrorMessage(response.status, data, responseText));
                 }
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false, // overlay
                     allowOutsideClick: false,
                     icon: 'success',
@@ -216,7 +227,8 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
                     customClass: {
                         confirmButton: 'class-success custom-confirm-button custom-swal-button',
                         title: 'custom-title',
-                        popup: 'custom-swal-popup'
+                        popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                        container: 'new-year-confirmation-container'
                     }
                 }).then(() => {
                     window.location.href = data.redirectUrl || '/companies/genikastoixeia';
@@ -227,6 +239,9 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
             // 6) Άλλος content-type αλλά OK (π.χ. HTML)
             if (response.ok) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false, // overlay
                     allowOutsideClick: false,
                     icon: 'success',
@@ -236,7 +251,8 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
                     customClass: {
                         confirmButton: 'class-success custom-confirm-button custom-swal-button',
                         title: 'custom-title',
-                        popup: 'custom-swal-popup'
+                        popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                        container: 'new-year-confirmation-container'
                     }
                 }).then(() => (window.location.href = '/companies/genikastoixeia'));
                 return;
@@ -246,6 +262,9 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
             throw new Error(companyAddErrorMessage(response.status, data, responseText));
         } catch (err) {
             await Swal.fire({
+                target: document.querySelector('main.payroll-form-layout') || document.body,
+                heightAuto: false,
+                width: 'min(560px, 100%)',
                 backdrop: false, // overlay
                 allowOutsideClick: false,
                 icon: 'error',
@@ -257,7 +276,8 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
                 customClass: {
                     confirmButton: 'class-error custom-confirm-button custom-swal-button',
                     title: 'custom-title',
-                    popup: 'custom-swal-popup'
+                    popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                    container: 'new-year-confirmation-container'
                 }
             });
         }

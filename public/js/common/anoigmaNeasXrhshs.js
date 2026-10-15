@@ -14,7 +14,11 @@
         e.preventDefault();
 
         // ✅ SweetAlert confirm — ίδιο pattern με το υπόλοιπο codebase
+        const main = document.querySelector('main.payroll-form-layout');
         const result = await Swal.fire({
+            target: main || document.body,
+            heightAuto: false,
+            width: 'min(560px, 100%)',
             backdrop: true,
             allowOutsideClick: false,
             title: 'Άνοιγμα Νέας Χρήσης',
@@ -25,7 +29,8 @@
             cancelButtonText: 'Ακύρωση',
             customClass: {
                 title: 'custom-title',
-                popup: 'custom-swal-popup',
+                popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                container: 'new-year-confirmation-container',
                 confirmButton: 'class-danger custom-confirm-button custom-swal-button',
                 cancelButton: 'class-secondary custom-cancel-button custom-swal-button'
             }

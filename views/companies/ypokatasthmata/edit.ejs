@@ -1,14 +1,15 @@
+<div class="maintenance-responsive-form companies-management-page company-details-page">
 <div class="tadded-container">
     <body data-mode="<%= mode %>" data-context="<%= context %>"></body>
 
     <div class="container-fluid height-vh-100 padding-0">
-        <div class="menu_Links">
-            <ul>
+        <div class="menu_Links margin-top-0_5rem">
+            <ul class="white-space-nowrap">
                 <li class="active margin-left-1_5rem margin-right-0_5rem">Σταθερά Στοιχεία</li>
                 <li>Οικοδομικά Έργα</li>
             </ul>
         </div>
-        <hr class="margin-top--2rem" />
+        <hr class="margin-top--1rem" />
 
         <% const safe = (k) => (rec && rec[k]) || ''; %>
 
@@ -19,9 +20,9 @@
 
                         <%- include('../../partials/_csrfField') %>
                         
-                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
 
-                            <div class="card-header p-2 height-rem-3_5">
+                            <div class="card-header p-0 height-rem-3_5 companies-search-header">
                                 <label class="text-center w-100 headers-content sectionTitle"> </label>
                             </div>
                     
@@ -479,8 +480,8 @@
                                 </div>
                             </div>
 
-                            <div class="card-footer cardFooter">
-                                <div class="d-inline-block d-flex cardFooter01">
+                            <div class="card-footer d-flex align-items-center companies-management-footer">
+                                <div class="d-flex align-items-center companies-management-actions company-details-actions">
                                     <button
                                         type="button"
                                         class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton">
@@ -504,11 +505,10 @@
 
                         <%- include('../../partials/_csrfField') %>
 
-                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
 
-                            <div class="card-header p-2 height-rem-3_5">
+                            <div class="card-header p-0 height-rem-3_5 companies-search-header">
                                 <label class="text-center w-100 headers-content sectionTitle"> </label>
-                                </label>
                             </div>
 
                             <div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody2">
@@ -956,9 +956,9 @@
                                 </div>
                             </div>
 
-                            <div class="card-footer cardFooter">
+                            <div class="card-footer d-flex align-items-center companies-management-footer">
                                 <div 
-                                    class="d-inline-block d-flex cardFooter01">
+                                    class="d-flex align-items-center companies-management-actions company-details-actions">
 
                                         <button type="button" class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton"><i class="bi bi-floppy"></i> Αποθήκευση </button>
 
@@ -994,3 +994,5 @@
 <script src="<%= script('dates/getFieldsDate') %>"></script>
 <script src="<%= script('common/moveByEnter') %>"></script>
 <script src="<%= script('common/clearableInputs') %>"></script>
+
+</div>

@@ -18,6 +18,23 @@ const debounceByKey = (key, fn, delay = 400) => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Μόνο παρουσίαση: οι υπόλοιπες ενότητες κρατούν τις υπάρχουσες επιλογές.
+    const companyAlertPresentation = (options) => {
+        const main = document.querySelector('main.payroll-form-layout:has(> .companies-management-page)');
+        if (!main) return options;
+        return {
+            ...options,
+            target: main,
+            heightAuto: false,
+            width: 'min(560px, 100%)',
+            customClass: {
+                ...options.customClass,
+                popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                container: 'new-year-confirmation-container'
+            }
+        };
+    };
+
     // ==========================================================================
     // CSRF setup
     // ==========================================================================
@@ -477,7 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         inputEl.__swalOpen = true;
 
                         try {
-                            await Swal.fire({
+                            await Swal.fire(companyAlertPresentation({
                                 icon: 'warning',
                                 title: 'Λάθος ΑΦΜ',
                                 text: 'Πληκτρολογήστε σωστό 9-ψήφιο ΑΦΜ ή αφήστε το πεδίο κενό.',
@@ -500,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     title: 'custom-title',
                                     popup: 'custom-swal-popup'
                                 }
-                            });
+                            }));
                         } finally {
                             inputEl.value = '';
                             resetAfmState(inputEl);
@@ -566,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const epon = esc(data.eponymia);
             const first = esc(data.firstname);
 
-            Swal.fire({
+            Swal.fire(companyAlertPresentation({
                 icon: 'error',
                 title: 'Προσοχή',
                 html: `Η εταιρεία με ΑΦΜ <strong>${afmTxt} (${epon} ${first})</strong> είναι ήδη καταχωρημένη. Δεν επιτρέπεται διπλή, ως προς το ΑΦΜ, καταχώρηση.`,
@@ -578,7 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     popup: 'custom-swal-popup'
                 },
                 confirmButtonText: 'Κλείσιμο'
-            });
+            }));
         }
     }
 
@@ -867,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         .replace(/"/g, '&quot;')
                         .replace(/'/g, '&#39;');
 
-                await Swal.fire({
+                await Swal.fire(companyAlertPresentation({
                     icon: 'error',
                     title: 'Προσοχή',
                     html: `Υπάρχει ήδη καταχώρηση με ΑΦΜ <strong>${esc(data.afm)} (${esc(data.eponymia)} ${esc(data.firstname)})</strong>. Δεν επιτρέπεται διπλή καταχώρηση.`,
@@ -879,7 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         popup: 'custom-swal-popup'
                     },
                     confirmButtonText: 'Κλείσιμο'
-                });
+                }));
 
                 // ❌ Clear το πεδίο μετά το error
                 const inputEl = document.getElementById('afm_ergazomenoy');

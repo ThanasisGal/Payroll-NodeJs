@@ -181,7 +181,7 @@
 
     <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
         <div class="col-4 right-align">
-            <label for="hmeromhnia_payshs_polyetias_apo" class="col-form-label font-size-vw-0_72">
+            <label for="hmeromhnia_payshs_polyetias_apo" class="col-form-label label-font-size">
                 Περίοδος "Παγώματος" Ωρίμανσης Πολυετίας: ΑΠΟ
             </label>
         </div>
@@ -215,7 +215,7 @@
         <div class="col-4 right-align">
             <label
                 for="xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta"
-                class="col-form-label font-size-vw-0_72"
+                class="col-form-label label-font-size"
             >
                 Ανεκτός χρόνος πρόωρης αποχώρησης από την εργασία σε λεπτά που δεν λογίζεται σαν
                 απουσία.
@@ -247,18 +247,18 @@
     <div class="row form-group g-3 align-items-center mb-0-5">
         <div class="col-4 right-align"><label for="<%= field %>" class="col-form-label label-font-size"><%= label %></label></div>
         <div class="col-2"><input type="number" min="0" max="<%= field.includes('pososto') ? 100 : 1440 %>" step="1" class="form-control" id="<%= field %>" name="<%= field %>" value="0" disabled /></div>
-        <% if (field.includes('elaxistos_xronos')) { %><div class="col-6 text-muted small">Πόσος χρόνος πρέπει να λείπει από τις κάρτες σε σχέση με το προδηλωμένο ωράριο για να ζητηθεί έλεγχος.</div><% } %>
+        <% if (field.includes('elaxistos_xronos')) { %><div class="col-6 text-muted small company-short-card-help company-inline-help">Πόσος χρόνος πρέπει να λείπει από τις κάρτες σε σχέση με το προδηλωμένο ωράριο για να ζητηθεί έλεγχος.</div><% } %>
     </div>
     <% }); %>
     <hr />
 
     <div
-        class="row form-group align-items-start margin-left--1rem margin-right--1rem margin-top--0_5rem"
+        class="row form-group align-items-center margin-left--1rem margin-right--1rem margin-top--0_5rem"
     >
         <div class="col-4 right-align">
             <span
                 id="actualHourlyRateGroupLabel" data-field-group-label
-                class="col-form-label font-size-vw-0_72"
+                class="col-form-label label-font-size d-inline-block"
             >
                 Υπολογισμός Πραγματικού Ωρομισθίου σε περίπτωση Extra Αποδοχών
             </span>
@@ -339,7 +339,7 @@
         </div>
 
         <div class="col-2">
-            <label class="col-form-label font-size-vw-0_65"
+            <label class="col-form-label text-muted company-inline-help"
                 >Επιλογή πολλών χρηστών με Ctrl + click</label
             >
         </div>

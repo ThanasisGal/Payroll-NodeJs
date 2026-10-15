@@ -35,6 +35,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 e.preventDefault();
                 e.stopPropagation();
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     title: "Καμία επιλογή",
@@ -44,7 +47,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     confirmButtonText: "Κλείσιμο",
                     customClass: {
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                         confirmButton: "class-info custom-confirm-button custom-swal-button",
                     },
                 });
@@ -75,6 +79,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Ένας και μόνο handler για DELETE (CSP/CSRF-safe)
     if (btnDelete) {
+        // Η επιβεβαίωση δεν είναι πλοήγηση· η αναμονή ξεκινά από το fetch.
+        btnDelete.setAttribute("data-no-loader", "");
         btnDelete.addEventListener("click", async (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -83,6 +89,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (!selectedRowId) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     title: "Καμία επιλογή",
@@ -92,7 +101,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     confirmButtonText: "Κλείσιμο",
                     customClass: {
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                         confirmButton: "class-info custom-confirm-button custom-swal-button",
                     }
                 });
@@ -100,6 +110,9 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             const result = await Swal.fire({
+                target: document.querySelector('main.payroll-form-layout') || document.body,
+                heightAuto: false,
+                width: 'min(560px, 100%)',
                 backdrop: false,            // overlay
                 allowOutsideClick: false,
                 title: "Είστε σίγουρος/η;",
@@ -112,13 +125,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 cancelButtonText: "Ακύρωση",
                 customClass: {
                     title: "custom-title",
-                    popup: "custom-swal-popup",
+                    popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                    container: "new-year-confirmation-container",
                     confirmButton: "class-error custom-confirm-button custom-swal-button",
-                    cancelButton: "custom-cancel-button custom-swal-button",
+                    cancelButton: "class-secondary custom-cancel-button custom-swal-button",
                 },
                 didOpen: () => Swal.getCancelButton()?.focus(),
             });
-            if (!result.isConfirmed) return;
+            if (result.isConfirmed !== true) return;
 
             // URL από το href (έχει ήδη .../${selectedRowId})
             const url  = btnDelete.href;
@@ -137,6 +151,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 // auto-follow redirect
                 if (resp.redirected && resp.url) {
                     await Swal.fire({
+                        target: document.querySelector('main.payroll-form-layout') || document.body,
+                        heightAuto: false,
+                        width: 'min(560px, 100%)',
                         backdrop: false,            // overlay
                         allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
@@ -145,7 +162,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         showConfirmButton: false,
                         customClass: {
                             title: "custom-title",
-                            popup: "custom-swal-popup",
+                            popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                            container: "new-year-confirmation-container",
                         }
                     });
                     location.href = resp.url;
@@ -157,6 +175,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 const loc = resp.headers.get("Location") || resp.headers.get("location");
                 if (loc) {
                     await Swal.fire({
+                        target: document.querySelector('main.payroll-form-layout') || document.body,
+                        heightAuto: false,
+                        width: 'min(560px, 100%)',
                         backdrop: false,            // overlay
                         allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
@@ -165,7 +186,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         showConfirmButton: false,
                         customClass: {
                             title: "custom-title",
-                            popup: "custom-swal-popup",
+                            popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                            container: "new-year-confirmation-container",
                         }
                     });
                     location.href = loc.startsWith("http") ? loc : new URL(loc, location.origin).toString();
@@ -183,6 +205,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 // 204 No Content
                 if (resp.status === 204) {
                     await Swal.fire({
+                        target: document.querySelector('main.payroll-form-layout') || document.body,
+                        heightAuto: false,
+                        width: 'min(560px, 100%)',
                         backdrop: false,            // overlay
                         allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
@@ -191,7 +216,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         showConfirmButton: false,
                         customClass: {
                             title: "custom-title",
-                            popup: "custom-swal-popup",
+                            popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                            container: "new-year-confirmation-container",
                         }
                     });
 
@@ -207,6 +233,9 @@ document.addEventListener("DOMContentLoaded", function () {
                         throw new Error(`HTTP ${resp.status} / success=${data?.success}`);
                     }
                     await Swal.fire({
+                        target: document.querySelector('main.payroll-form-layout') || document.body,
+                        heightAuto: false,
+                        width: 'min(560px, 100%)',
                         backdrop: false,            // overlay
                         allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
@@ -215,7 +244,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         showConfirmButton: false,
                         customClass: {
                             title: "custom-title",
-                            popup: "custom-swal-popup",
+                            popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                            container: "new-year-confirmation-container",
                         }
                     });
                     location.href = data.redirectUrl || "/companies/ypokatasthmata";
@@ -225,6 +255,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 // Άλλος content-type αλλά OK (π.χ. HTML)
                 if (resp.ok) {
                     await Swal.fire({
+                        target: document.querySelector('main.payroll-form-layout') || document.body,
+                        heightAuto: false,
+                        width: 'min(560px, 100%)',
                         backdrop: false,            // overlay
                         allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
@@ -233,7 +266,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         showConfirmButton: false,
                         customClass: {
                             title: "custom-title",
-                            popup: "custom-swal-popup",
+                            popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                            container: "new-year-confirmation-container",
                         }
                     });
                     location.href = "/companies/ypokatasthmata";
@@ -244,6 +278,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
             } catch (error) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     icon: "error",
@@ -252,7 +289,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     confirmButtonText: "Κλείσιμο",
                     customClass: {
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                         confirmButton: "class-normal custom-confirm-button custom-swal-button",
                     },
                     willClose: () => {

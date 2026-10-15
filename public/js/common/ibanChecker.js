@@ -1,5 +1,23 @@
 // ibanChecker.js
 document.addEventListener('DOMContentLoaded', () => {
+    // Μόνο παρουσίαση στις Τράπεζες Ανά Εταιρεία· οι έλεγχοι IBAN παραμένουν ίδιοι.
+    const bankAlertPresentation = (options) => {
+        const bankField = document.querySelector('.companies-management-page.company-details-page select[data-api="/api/dropdown/trapezes/trapeza"]');
+        const main = bankField?.closest('main.payroll-form-layout');
+        if (!main) return options;
+        return {
+            ...options,
+            target: main,
+            heightAuto: false,
+            width: 'min(560px, 100%)',
+            customClass: {
+                ...options.customClass,
+                popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                container: 'new-year-confirmation-container'
+            }
+        };
+    };
+
     // ---- ΠΙΘΑΝΑ IDs ----
     const IBAN_CANDIDATES = [
         'iban', // (στη φόρμα ergazomenoi)
@@ -107,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isValidIbanGR(raw)) {
             setIbanStateError(inputEl);
             if (window.Swal) {
-                await Swal.fire({
+                await Swal.fire(bankAlertPresentation({
                     backdrop: false,
                     allowOutsideClick: false,
                     icon: 'warning',
@@ -119,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         title: 'custom-title',
                         popup: 'custom-swal-popup'
                     }
-                });
+                }));
             }
             inputEl.value = '';
             resetIbanState(inputEl);
@@ -136,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedBankCode && bankCodeFromIban !== selectedBankCode) {
             setIbanStateError(inputEl);
             if (window.Swal) {
-                await Swal.fire({
+                await Swal.fire(bankAlertPresentation({
                     backdrop: false,
                     allowOutsideClick: false,
                     icon: 'warning',
@@ -148,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         title: 'custom-title',
                         popup: 'custom-swal-popup'
                     }
-                });
+                }));
             }
             inputEl.value = '';
             resetIbanState(inputEl);

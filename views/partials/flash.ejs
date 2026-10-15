@@ -13,6 +13,7 @@ TYPES.forEach(function(type){
 // Αν δεν υπάρχουν μηνύματα, μην κάνεις render τίποτα
 %>
 <% if (all.length) { %>
+    <div class="payroll-flash-messages">
     <% all.forEach(({ type, msg }) => {
         const bsType = (type === 'error') ? 'danger' : type;
         const icon = (type === 'success') ? 'check-circle-fill'
@@ -21,7 +22,7 @@ TYPES.forEach(function(type){
                 : 'info-circle-fill';
     %>
     <div class="auto-close alert alert-<%= bsType %> alert-dismissible fade show" role="alert" data-autoclose="true">
-        <b class="fw-bold fs18px">
+        <b class="fw-bold fs18px payroll-flash-text" tabindex="0">
             <i class="bi bi-<%= icon %>"></i>
             &nbsp;<%= msg %>
         </b>
@@ -29,9 +30,23 @@ TYPES.forEach(function(type){
     </div>
     <% }) %>
 
+    </div>
+
     <!-- Auto-close μετά από 5s (Bootstrap 5) -->
     <script nonce="<%= nonce %>">
         (function(){
+            const script = document.currentScript;
+            const messages = script.previousElementSibling;
+            const main = script.closest('main.payroll-form-layout');
+            if (main && messages?.matches('.payroll-flash-messages')) {
+                const previous = main.querySelector(':scope > .payroll-flash-messages');
+                if (previous && previous !== messages) {
+                    while (messages.firstChild) previous.appendChild(messages.firstChild);
+                    messages.remove();
+                } else {
+                    main.prepend(messages);
+                }
+            }
             document.querySelectorAll('.auto-close[data-autoclose="true"]').forEach(function(el){
                 setTimeout(function(){
                     try {

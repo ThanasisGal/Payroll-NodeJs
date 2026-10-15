@@ -131,6 +131,22 @@
         <script src="<%= script('common/getUser') %>"></script>
         <script src="<%= script('common/navTabs') %>"></script>
         <script src="<%= script('common/formLayout') %>"></script>
+        <script nonce="<%= nonce %>">
+            // Η επεξήγηση δείχνει και την πλήρη τρέχουσα τιμή όταν το κείμενο αποκόπτεται.
+            document.querySelectorAll('.payroll-navigation a[data-bs-title]').forEach(link => {
+                const action = link.getAttribute('data-bs-title');
+                const updateTooltip = () => {
+                    const text = link.textContent.replace(/\s+/g, ' ').trim();
+                    link.setAttribute('data-bs-title', text ? action + ': ' + text : action);
+                };
+                link.addEventListener('pointerenter', updateTooltip);
+                link.addEventListener('focus', () => {
+                    updateTooltip();
+                    link.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                });
+                updateTooltip();
+            });
+        </script>
         <script src="<%= script('common/getUserRole') %>"></script>
         <script src="<%= script('common/moveByEnter') %>"></script>
         <script src="<%= script('common/changeFontSizeSelectDropdownMenu') %>"></script>

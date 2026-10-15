@@ -1,3 +1,4 @@
+<div class="maintenance-responsive-form companies-management-page">
 <div
     class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-5  mb-3 border-bottom bg-hero-cdn">
     <form class="nav col-12 col-md-auto flex-end mb-2 ms-auto mb-md-0">
@@ -6,8 +7,8 @@
     </form>
 </div>
 
-<div class="card d-flex flex-column z-depth-5 w-92 margin-left-percent-1 overflow-hidden">
-    <div class="card-header p-0 height-rem-3_5">
+<div class="card d-flex flex-column z-depth-5 companies-management-card">
+    <div class="card-header p-0 height-rem-3_5 companies-search-header">
         <label class="text-center w-100 headers-content mt-2">
             <% if (sTerm && sTerm.length > 0) { %>
             Εμφάνιση Νομίμων Εκπροσώπων ( με κριτήριο αναζήτησης "<%= sTerm %>" )
@@ -17,6 +18,7 @@
         </label>
     </div>
 
+    <div class="card-body p-0 bg-white maintenance-table-scroll" tabindex="0" aria-label="Οριζόντια κύλιση πίνακα"><div class="maintenance-table-inner maintenance-table-companies">
     <div>
         <table class="table table-striped table-bordered table-sm table-hover mb-0" id="myTableHeader">
             <thead class="backgroundColor-brown font-size-rem-1_1 center-align">
@@ -31,7 +33,7 @@
         </table>
     </div>
 
-    <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-58 bg-white">
+    <div class="companies-management-rows">
         <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
             <tbody>
                 <% if (nomimoiekprosopoiFilteredRecs && nomimoiekprosopoiFilteredRecs.length> 0) { %>
@@ -52,14 +54,14 @@
             </tbody>
         </table>
     </div>
+    </div></div>
 
-    <div class="card-footer cardFooter">
-        <div class="d-inline-block d-flex cardFooter01">
-            <div class="d-flex cardFooter02">
+    <div class="card-footer d-flex align-items-center companies-management-footer">
+            <div class="d-flex align-items-center companies-management-actions">
                 <a id="edit-btn" href="#" role="button" data-bs-toggle="tooltip"
                     data-bs-title="Εμφάνιση - Διόρθωση των στοιχείων του επιλεγμένου Νόμιμου Εκπροσώπου" data-bs-placement="top"
                     data-tooltip-max-width="15vw"
-                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-3 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.update) ? 'disabled-link' : '' %>"
+                    class="btn btn-brown rounded-4 buttons-content <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.update) ? 'disabled-link' : '' %>"
                     data-allowed="<%= (userPrivileges.privileges?.admin || userPrivileges.privileges?.update) ? '1' : '0' %>">
                     <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
                 </a>
@@ -67,24 +69,23 @@
                 <a id="delete-btn" href="#" role="button" data-bs-toggle="tooltip"
                     data-bs-title="Διαγραφή του επιλεγμένου Νόμιμου Εκπροσώπου" data-bs-placement="top"
                     data-tooltip-max-width="15vw"
-                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-3 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.delete) ? 'disabled-link' : '' %>"
+                    class="btn btn-brown rounded-4 buttons-content <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.delete) ? 'disabled-link' : '' %>"
                     data-allowed="<%= (userPrivileges.privileges?.admin || userPrivileges.privileges?.delete) ? '1' : '0' %>">
                     <i class="buttons-content bi bi-trash"></i> Διαγραφή
                 </a>
 
                 <a href="/companies/nomimoi_ekprosopoi" role="button" data-bs-toggle="tooltip" data-bs-placement="top"
                     data-tooltip-max-width="15vw" data-bs-title="Επιστροφή στην Αρχική Σελίδα των Νόμιμων Εκπροσώπων"
-                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-3">
+                    class="btn btn-brown rounded-4 buttons-content">
                     <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
                 </a>
             </div>
 
-            <div class="d-flex width-percent-15"></div>
 
             <% if (nomimoiekprosopoiFilteredRecs) { %>
             <!-- Pagination -->
-            <nav class="col-2" aria-label="Dashboard Pagination">
-                <ul class="pagination pagination-sm justify-content-end mt-2">
+            <nav class="companies-management-pagination" aria-label="Dashboard Pagination">
+                <ul class="pagination pagination-sm mb-0">
                     <% if (Number(current) === 1) { %>
                     <li class="page-item disabled">
                         <a href="#" class="page-link"><i class="bi bi-chevron-bar-left font-size-vw-0_5"></i></a>
@@ -114,12 +115,12 @@
                     <% for (; i <= (Number(current) + 1) && i <= pages; i++) { %>
                     <% if (i === Number(current)) { %>
                     <li class="page-item is-current" aria-current="page">
-                        <span class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= i %></span>
+                        <span class="page-link font-size-vw-0_5 fw500"><%= i %></span>
                     </li>
                     <% } else { %>
                     <li class="page-item fsvw-0_7">
                         <a href="/companies/nomimoi_ekprosopoi/search/?page=<%= i %>"
-                            class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= i %></a>
+                            class="page-link font-size-vw-0_5 fw500"><%= i %></a>
                     </li>
                     <% } %>
 
@@ -129,7 +130,7 @@
                     </li>
                     <li class="page-item">
                         <a href="/companies/nomimoi_ekprosopoi/search/?page=<%= pages %>"
-                            class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= pages %></a>
+                            class="page-link font-size-vw-0_5 fw500"><%= pages %></a>
                     </li>
                     <% } %>
                     <% } %>
@@ -154,7 +155,6 @@
                 </ul>
             </nav>
             <% } %>
-        </div>
     </div>
 </div>
 
@@ -166,4 +166,4 @@
 
 <script src="<%= script('common/blockInvalidClick') %>"></script>
 <script src="<%= script('companies/nomimoiekprosopoi/selectRowInTable') %>"></script>
-<script src="<%= script('common/sortTable') %>"></script>
+<script src="<%= script('common/sortTable') %>"></script></div>
