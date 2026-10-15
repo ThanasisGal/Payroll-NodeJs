@@ -42,18 +42,39 @@ const forms = [
     ['contract-list','views/symbaseis/symbaseis/symbaseis.ejs',{symbaseis:[contract]}], ['contract-search','views/symbaseis/symbaseis/search.ejs',{symbaseisFilteredRecs:[contract]}]
 ];
 
-test('Four maintenance areas: typography, tabs, collision bounds and scroll reachability', {timeout:180000,skip:!vendor}, async t => {
+// Approval labels describe the agreed scope, never an automatic passing result.
+// Every form remains mandatory, including pending employee and contract coverage.
+const suites = [
+    ['Approved users', forms.filter(([name]) => name.startsWith('user-'))],
+    ['Approved companies: general details', forms.filter(([name]) => name.startsWith('company-'))],
+    ['Pending employees', forms.filter(([name]) => name === 'employee')],
+    ['Other maintenance coverage: contracts', forms.filter(([name]) => name.startsWith('contract-'))]
+];
+assert.deepEqual(suites.flatMap(([, entries]) => entries.map(([name]) => name)).sort(),
+    forms.map(([name]) => name).sort(), 'Every original form must occur in exactly one mandatory suite');
+
+for (const [suiteName, suiteForms] of suites) {
+test(`${suiteName}: typography, tabs, collision bounds and scroll reachability`, {timeout:180000}, async t => {
+    assert.ok(vendor, 'PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR must provide the local Tom Select assets');
     const browser = await chromium.launch({headless:true}); t.after(()=>browser.close());
+    // Awaited subtests report failures without preventing the other forms from running.
+    for (const [name,file,extra] of suiteForms) await t.test(name, async t => {
     const page = await browser.newPage({locale:'el-GR'});
+    t.after(()=>page.close());
     const requests=[], errors=[], results=[];
+    t.after(()=>{
+        if(process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
+            fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,{recursive:true});
+            fs.writeFileSync(path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,`maintenance-${name}.json`),
+                JSON.stringify({suite:suiteName,form:name,completedCombinations:results},null,2));
+        }
+    });
     page.on('pageerror',e=>errors.push(e.message));
     await page.route('**/*',r=>{if(r.request().url()==='https://cdn.webpayrollsolutions.com/assets/img/wps1.png')return r.fulfill({contentType:'image/png',body:fs.readFileSync(path.join(root,'public/img/wps1.png'))});if(r.request().url()==='https://payroll.test/__fixture__')return r.fulfill({contentType:'text/html',body:'<!doctype html><html></html>'});requests.push(r.request().url());return r.abort();});
     await page.goto('https://payroll.test/__fixture__');
     const sidebar = strip(await ejs.renderFile(path.join(root,'views/partials/sidebar.ejs'),{...locals,userId:''}))
         .replace(/<img\b[^>]*>/g,'');
-    const rendered=[];
-    for (const [name,file,extra] of forms) rendered.push([name,strip(await ejs.renderFile(path.join(root,file),{...locals,...extra}))]);
-    for (const [name,html] of rendered) {
+    const html=strip(await ejs.renderFile(path.join(root,file),{...locals,...extra}));
         await page.setContent(`<!doctype html><html lang="el"><meta charset="utf-8"><body><div class="container-fluid container-scroll"><div class="row">${sidebar}<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent payroll-form-layout">${html}</main></div></div></body></html>`);
         await page.addStyleTag({path:path.join(vendor,'tom-select.css')});
         for (const asset of ['public/css/bootstrap.min.css','public/css/main.css']) await page.addStyleTag({path:path.join(root,asset)});
@@ -82,8 +103,22 @@ test('Four maintenance areas: typography, tabs, collision bounds and scroll reac
                 },section);
                 await page.evaluate(()=>document.getAnimations().forEach(a=>{if(Number.isFinite(a.effect.getComputedTiming().endTime))a.finish();}));
                 const label=`${name}/${section}/${width}x${height}/${open?'open':'closed'}`;
-                const result=await page.evaluate(()=>{
-                    const scope=document.querySelector('.maintenance-responsive-form');
+                const result=await page.evaluate(scopeSelector=>{
+                    const scope=document.querySelector(scopeSelector);
+                    if(!scope)throw new Error(`Missing form scope: ${scopeSelector}`);
+                    // Companies intentionally use a separate compact footer scale.
+                    // Compute its contract from rem and the actual query container,
+                    // independently of the CSS variable being checked.
+                    const rem=parseFloat(getComputedStyle(document.documentElement).fontSize);
+                    const companyFont=(e,footer)=>{
+                        let container=e.parentElement;
+                        while(container && getComputedStyle(container).containerType==='normal')container=container.parentElement;
+                        if(!container)throw new Error('Missing company font query container');
+                        const style=getComputedStyle(container);
+                        const contentWidth=parseFloat(style.width)-(style.boxSizing==='border-box'
+                            ? ['paddingLeft','paddingRight','borderLeftWidth','borderRightWidth'].reduce((sum,key)=>sum+parseFloat(style[key]),0):0);
+                        return Math.min(rem,Math.max((footer ? .85 : .9)*rem,(footer ? .72 : .78)*rem+.0025*contentWidth));
+                    };
                     const visible=e=>e.getClientRects().length && getComputedStyle(e).visibility!=='hidden' && !e.matches('select.tomselected,.sr-only,.visually-hidden');
                     const box=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
                     const intersects=(a,b)=>a.left<b.right-.5&&b.left<a.right-.5&&a.top<b.bottom-.5&&b.top<a.bottom-.5;
@@ -95,8 +130,15 @@ test('Four maintenance areas: typography, tabs, collision bounds and scroll reac
                             if(target===e||e.contains(target)||!visible(target)||target.contains(e))continue;
                             if(intersects(r,box(target)))collisions.push([e.id||e.textContent.trim(),target.id||target.textContent.trim()]);
                         }
-                        if(e.scrollWidth>e.clientWidth+1||r.right>innerWidth+1||r.left<0)clipped.push({id:e.id||e.textContent.trim(),width:r.width,scroll:e.scrollWidth,client:e.clientWidth,parent:box(e.parentElement),column:box(e.closest('.row > div')||e.parentElement)});
-                        return {text:e.textContent.trim(),...r,font:parseFloat(s.fontSize),weight:s.fontWeight,radius:s.borderRadius,nowrap:s.whiteSpace};
+                        // Off-screen content is allowed only in the approved local company scrollers.
+                        // Every action there must also pass the full visibility/hit check after scrolling below.
+                        const scroller=e.closest('.company-details-page .company-diafora-scroll-container,.companies-management-page .companies-management-footer');
+                        const localScroll=scroller && ['auto','scroll'].includes(getComputedStyle(scroller).overflowX)
+                            && scroller.scrollWidth>scroller.clientWidth+1;
+                        const column=e.matches('#select-all,#clear-image') && e.closest('.company-diafora-scroll-container')?box(e.parentElement):null;
+                        if(e.scrollWidth>e.clientWidth+1||(!localScroll && (r.right>innerWidth+1||r.left<0))
+                            ||(column && (r.left<column.left-1||r.right>column.right+1)))clipped.push({id:e.id||e.textContent.trim(),width:r.width,scroll:e.scrollWidth,client:e.clientWidth,parent:box(e.parentElement),column:box(e.closest('.row > div')||e.parentElement)});
+                        return {text:e.textContent.trim(),...r,companyFooter:!!e.closest('.companies-management-footer'),expectedCompanyFont:scope.matches('.companies-management-page')?companyFont(e,!!e.closest('.companies-management-footer')):null,font:parseFloat(s.fontSize),weight:s.fontWeight,radius:s.borderRadius,nowrap:s.whiteSpace};
                     });
                     const inputs=[...scope.querySelectorAll('.form-control:not([type="hidden"]),.form-select')].filter(visible);
                     const tabs=[...scope.querySelectorAll('.menu_Links li')].filter(visible).map(box);
@@ -104,16 +146,47 @@ test('Four maintenance areas: typography, tabs, collision bounds and scroll reac
                         const start=e.scrollTop;e.scrollTop=e.scrollHeight;const reached=e.scrollTop+e.clientHeight>=e.scrollHeight-1;e.scrollTop=start;
                         return {overflow:getComputedStyle(e).overflowY,reached,scroll:e.scrollHeight,client:e.clientHeight};
                     });
-                    return {buttons:measurements,inputs:inputs.map(e=>({font:parseFloat(getComputedStyle(e).fontSize),...box(e)})),collisions,clipped,tabs,scroll,viewportOverflow:document.documentElement.scrollWidth>innerWidth+1};
-                });
+                    return {buttons:measurements,inputs:inputs.map(e=>({font:parseFloat(getComputedStyle(e).fontSize),expectedCompanyFont:scope.matches('.companies-management-page')?companyFont(e,false):null,...box(e)})),collisions,clipped,tabs,scroll,viewportOverflow:document.documentElement.scrollWidth>innerWidth+1,companyFooterFonts:[...scope.querySelectorAll('.companies-management-footer :is(.btn,.page-link,.small)')].filter(visible).map(e=>({font:parseFloat(getComputedStyle(e).fontSize),expected:companyFont(e,true)})),rem};
+                },name==='user-delete'?'.user-delete-confirmation':'.maintenance-responsive-form');
+                if(name==='user-delete')assert.equal(result.buttons.length,2,`${label}: both confirmation actions must be measured`);
                 assert.deepEqual(result.collisions,[],`${label}: collisions`);
                 assert.deepEqual(result.clipped,[],`${label}: clipped captions`);
                 assert.equal(result.viewportOverflow,false,`${label}: page overflow`);
                 for(const b of result.buttons){
-                    assert.ok(b.font>=14.4,`${label}: font ${b.font}`);assert.equal(b.weight,'400',`${label}: ${b.text} weight`);
-                    if(result.inputs.length)assert.ok(Math.abs(b.font-result.inputs[0].font)<.05,`${label}: field/action font mismatch ${JSON.stringify(b)} input ${result.inputs[0].font}`);
+                    if(b.expectedCompanyFont!==null)assert.ok(Math.abs(b.font-b.expectedCompanyFont)<.05,`${label}: company action scale ${b.font} expected ${b.expectedCompanyFont}`);
+                    assert.ok(b.font>=(b.companyFooter ? .85*result.rem : 14.4),`${label}: font ${b.font}`);assert.equal(b.weight,'400',`${label}: ${b.text} weight`);
+                    if(result.inputs.length && !b.companyFooter)assert.ok(Math.abs(b.font-result.inputs[0].font)<.05,`${label}: field/action font mismatch ${JSON.stringify(b)} input ${result.inputs[0].font}`);
                     assert.equal(b.nowrap,'nowrap');
                 }
+                for(const input of result.inputs)if(input.expectedCompanyFont!==null)assert.ok(Math.abs(input.font-input.expectedCompanyFont)<.05,`${label}: company field scale ${input.font} expected ${input.expectedCompanyFont}`);
+                for(const footer of result.companyFooterFonts)assert.ok(Math.abs(footer.font-footer.expected)<.05,`${label}: company footer scale ${footer.font} expected ${footer.expected}`);
+                const localActions=await page.evaluate(async()=>{
+                    const checks=[];
+                    for(const scroller of document.querySelectorAll('.company-details-page .company-diafora-scroll-container,.companies-management-page .companies-management-footer')) {
+                        if(!scroller.getClientRects().length)continue;
+                        for(const action of scroller.querySelectorAll('button,.btn,.page-link')) {
+                            if(!action.getClientRects().length || getComputedStyle(action).visibility==='hidden')continue;
+                            const positions=[];
+                            for(let node=action.parentElement;node;node=node.parentElement)positions.push([node,node.scrollLeft,node.scrollTop]);
+                            action.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+                            await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+                            const r=action.getBoundingClientRect(),s=scroller.getBoundingClientRect();
+                            const left=s.left+scroller.clientLeft,top=s.top+scroller.clientTop;
+                            const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+                            // Disabled links and the current-page span remain visible, passive indicators.
+                            const passive=action.disabled||action.matches('.disabled-link,.disabled,[aria-disabled="true"]')
+                                ||action.closest('.page-item.disabled')||(action.matches('span.page-link')&&action.closest('[aria-current="page"]'));
+                            checks.push({action:action.id||action.textContent.trim()||action.getAttribute('aria-label')||action.innerHTML,
+                                localOverflow:['auto','scroll'].includes(getComputedStyle(scroller).overflowX),
+                                contained:r.left>=left-1&&r.right<=left+scroller.clientWidth+1&&r.top>=top-1&&r.bottom<=top+scroller.clientHeight+1,
+                                inViewport:r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1,
+                                reachable:!!hit&&(action.contains(hit)||(passive&&hit.contains(action)))});
+                            for(const [node,x,y] of positions){node.scrollLeft=x;node.scrollTop=y;}
+                        }
+                    }
+                    return checks;
+                });
+                for(const check of localActions)assert.ok(check.localOverflow&&check.contained&&check.inViewport&&check.reachable,`${label}: local action inaccessible ${JSON.stringify(check)}`);
                 if(result.tabs.length)assert.ok(Math.max(...result.tabs.map(r=>r.top))-Math.min(...result.tabs.map(r=>r.top))<1,`${label}: tabs wrap`);
                 assert.ok(result.scroll.every(s=>s.reached),`${label}: last field inaccessible`);
                 // Keyboard scrolling must reach the end without a save action.
@@ -166,8 +239,8 @@ test('Four maintenance areas: typography, tabs, collision bounds and scroll reac
                 await modal.waitFor({state:'hidden'});
             }
         }
-    }
-    if(process.env.PAYROLL_VISUAL_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,'maintenance-four-areas.json'),JSON.stringify(results,null,2));
     assert.deepEqual(requests,[]);assert.deepEqual(errors,[]);
-    console.log(`Verified ${results.length} form/section/viewport/sidebar combinations with actual templates.`);
+    console.log(`${suiteName}/${name}: verified ${results.length} form/section/viewport/sidebar combinations with actual templates.`);
+    });
 });
+}

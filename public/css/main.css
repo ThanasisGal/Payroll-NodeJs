@@ -19051,8 +19051,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         font-weight: 400 !important;
         min-width: 0 !important;
         max-width: 100%;
-        white-space: normal !important;
-        overflow-wrap: anywhere;
+        white-space: nowrap !important;
+        overflow-wrap: normal;
         border-radius: 6px !important;
     }
     .user-delete-confirmation .user-admin-action-btn > i {
@@ -19367,6 +19367,14 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     max-width: none;
     gap: var(--companies-footer-gap) !important;
 }
+/* Η κύλιση παραμένει στο υποσέλιδο και φέρνει ολόκληρη κάθε ενέργεια στο ορατό τμήμα. */
+.companies-management-page .companies-management-footer {
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: var(--companies-footer-gap);
+}
+.companies-management-page .companies-management-footer :is(.btn, .page-item) {
+    flex-shrink: 0;
+}
 .companies-management-page .companies-management-pagination { margin-left: auto; }
 .companies-management-page .companies-management-footer .pagination {
     display: flex;
@@ -19494,6 +19502,24 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     min-width: max-content;
     justify-content: space-around;
 }
+/* Στενά «Διάφορα»: οι ετικέτες διατηρούν τις στήλες τους, τα εργαλεία τον χώρο τους. */
+.company-details-page .company-diafora-scroll-container {
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+}
+@container maintenance-form (max-width: 64rem) {
+    .company-details-page .company-diafora-scroll-container .row > div:has(> :is(#select-all, #clear-image)) {
+        flex: 0 0 auto;
+        width: max-content;
+        min-width: max-content;
+    }
+    .company-details-page .company-diafora-scroll-container .row:has(> div > #select-all) > div:has(> .company-inline-help),
+    .company-details-page .company-diafora-scroll-container .row:has(> div > #clear-image) > div:has(> #customButton) {
+        flex: 1 1 0;
+        width: auto;
+    }
+}
+
 /* Ίδιο εξωτερικό ύψος για πεδία και Tom Select· δεν περιορίζονται textarea/listbox. */
 .company-details-page .card-body :is(input.form-control:not([type="hidden"]):not([type="file"]), select.form-select:not([multiple])) {
     height: var(--payroll-control-height) !important;
