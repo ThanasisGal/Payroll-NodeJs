@@ -818,6 +818,7 @@ declare -a symbaseis=(
 declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/employmentProfileUi.js"
     "public/js/ergazomenoi/genika/employeeDraftSave.js"
+    "public/js/ergazomenoi/genika/employeeAddPresentation.js"
     "public/js/ergazomenoi/genika/employeeTableReturnState.js"
     "public/js/ergazomenoi/genika/allodapoiPdfViewer.js"
     "public/js/ergazomenoi/genika/anhlikoiPdfViewer.js"
