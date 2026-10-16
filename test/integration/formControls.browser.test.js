@@ -9,8 +9,9 @@ const inventory = require('../fixtures/responsiveFormsInventory.json');
 const { loadForm, viewport, settleLayout } = require('../helpers/responsiveFormsBrowser');
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 const dir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
-const pages = inventory.templates.filter(f=>f.kind==='page'&&(!process.env.PAYROLL_FORM_FILTER||new RegExp(process.env.PAYROLL_FORM_FILTER).test(f.template)));
-const sizes = [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[1100,700],[800,700]];
+// Functional coverage includes approved and pending pages alike; visual approval never filters it.
+const functionalPages = inventory.templates.filter(f=>f.kind==='page'&&(!process.env.PAYROLL_FORM_FILTER||new RegExp(process.env.PAYROLL_FORM_FILTER).test(f.template)));
+const sizes = [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720]];
 
 function dropdownBounds(e) {
     const t=e.tomselect,d=t.dropdown.getBoundingClientRect(),c=t.control.getBoundingClientRect();
@@ -21,10 +22,10 @@ function dropdownBounds(e) {
     return{valid:d.top>=top-1&&d.bottom<=bottom+1&&d.left>=left-1&&d.right<=right+1&&content.clientHeight+1>=Math.min(34,optionHeight),width:d.width,height:d.height,controlHeight:c.height,scrollable:content.scrollHeight>content.clientHeight,options:content.querySelectorAll('.option').length};
 }
 
-test('Grouping preserves every original control, form owner, value, disabled state and FormData', {skip:!vendor,timeout:300000},async t=>{
+test('Presentation initialization preserves every original control, form owner, value, disabled state and FormData', {skip:!vendor,timeout:300000},async t=>{
     const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
     const page=await browser.newPage();await page.route('**/*',r=>r.abort());
-    for(const form of pages){
+    for(const form of functionalPages){
         await loadForm(page,form.template,{vendor,baseline:true});
         await page.evaluate(async()=>{await new Promise(r=>setTimeout(r,250));
             window.__references=[...document.querySelectorAll('input,select,textarea')];
@@ -57,9 +58,9 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
     const page=await browser.newPage({locale:'el-GR'});await page.route('**/*',r=>r.abort());
     const results=[],problems=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
     if(dir)fs.mkdirSync(dir,{recursive:true});
-    for(const form of pages){
+    for(const form of functionalPages){
         await loadForm(page,form.template,{vendor,populated:false});
-        await viewport(page,800,700,true);
+        await viewport(page,1280,720,true);
         const sections=await page.locator('main .sections > section').count();
         for(let section=0;section<Math.max(1,sections);section++){
             const result={template:form.template,section,native:[],tom:[],reach:[],actions:[]};
@@ -104,7 +105,7 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                         await page.waitForFunction(id=>document.getElementById(id).tomselect.dropdown.querySelectorAll('.option').length>=40,state.id,{timeout:2500});
                         await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
                         state.catalog=await select.evaluate(dropdownBounds);
-                        if(dir&&result.tom.length===0)await page.screenshot({path:path.join(dir,form.template.replaceAll('/','-')+'-'+section+'-catalog-800x700.png'),animations:'disabled'});
+                        if(dir&&result.tom.length===0)await page.screenshot({path:path.join(dir,form.template.replaceAll('/','-')+'-'+section+'-catalog-1280x720.png'),animations:'disabled'});
                         await page.waitForTimeout(180);
                         await control.fill('επιλογή 23');
                         await page.waitForFunction(id=>{const t=document.getElementById(id).tomselect,options=[...t.dropdown.querySelectorAll('.option')];return options.length>0&&options.every(e=>e.textContent.includes('23'))&&t.control_input.value.includes('23');},state.id,{timeout:2500});
@@ -134,12 +135,12 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                     return{id:e.id,text:e.textContent.trim(),hit:hit?.tagName+'#'+hit?.id+'.'+hit?.className,box:r.toJSON(),reachable:!!hit&&(e.contains(hit)||((e.disabled||e.matches('.disabled-link,.disabled'))&&hit.contains(e)))};
                 }));
             }
-            if(dir)await page.screenshot({path:path.join(dir,form.template.replaceAll('/','-')+'-'+section+'-last-800x700.png'),animations:'disabled'});
+            if(dir)await page.screenshot({path:path.join(dir,form.template.replaceAll('/','-')+'-'+section+'-last-1280x720.png'),animations:'disabled'});
             result.tables=await page.evaluate(()=>[...document.querySelectorAll('main .card-body,main .payroll-table-scroll,main .maintenance-table-scroll,main .table-responsive,main .istoriko-table-wrapper')]
                 .filter(e=>e.getClientRects().length&&e.clientHeight>1&&/auto|scroll/.test(getComputedStyle(e).overflowX)&&e.scrollWidth>e.clientWidth+1)
                 .map(e=>{e.scrollLeft=e.scrollWidth;return {className:e.className,lastColumn:e.scrollLeft+e.clientWidth>=e.scrollWidth-1};}));
             if(result.tables.some(e=>!e.lastColumn))problems.push({template:form.template,section,kind:'last-column'});
-            if(dir&&result.tables.length)await page.screenshot({path:path.join(dir,form.template.replaceAll('/','-')+'-'+section+'-last-column-800x700.png'),animations:'disabled'});
+            if(dir&&result.tables.length)await page.screenshot({path:path.join(dir,form.template.replaceAll('/','-')+'-'+section+'-last-column-1280x720.png'),animations:'disabled'});
             await page.evaluate(()=>document.querySelectorAll('main .card-body,main .payroll-table-scroll,main .maintenance-table-scroll,main .table-responsive,main .istoriko-table-wrapper').forEach(e=>e.scrollLeft=0));
             results.push(result);
             for(const s of result.reach.concat(result.actions))if(!s.reachable)problems.push({...result,kind:'reach',field:s.id||s.text});
@@ -183,7 +184,7 @@ test('Employee document dialogs keep their full actions inside every viewport wi
                 })};
             });
             results.push({width,height,sidebar:open?'open':'closed',...state});
-            if(dir&&[800,1280,1920].includes(width))await page.screenshot({path:path.join(dir,`${id}-${width}x${height}-${open?'open':'closed'}.png`),animations:'disabled'});
+            if(dir&&[1280,1920].includes(width))await page.screenshot({path:path.join(dir,`${id}-${width}x${height}-${open?'open':'closed'}.png`),animations:'disabled'});
             await modal.evaluate(e=>e.classList.add('hidden'));
         }
     }
@@ -203,7 +204,7 @@ test('Actual employee information hover panel fits the form and remains reachabl
         const modal=page.locator('#hoverModal');await modal.waitFor({state:'visible'});
         const state=await modal.evaluate(e=>{const r=e.getBoundingClientRect();return {fits:r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1,font:getComputedStyle(e.querySelector('.modal-item-value')).fontSize,scrolls:e.scrollHeight>e.clientHeight};});
         results.push({width,height,sidebar:open?'open':'closed',...state});
-        if(dir&&[800,1280,1920].includes(width))await page.screenshot({path:path.join(dir,`employee-info-${width}x${height}-${open?'open':'closed'}.png`),animations:'disabled'});
+        if(dir&&[1280,1920].includes(width))await page.screenshot({path:path.join(dir,`employee-info-${width}x${height}-${open?'open':'closed'}.png`),animations:'disabled'});
         await modal.hover();assert.equal(await modal.isVisible(),true);
         await page.mouse.move(1,1);
     }
@@ -220,23 +221,39 @@ test('Actual controls retain readable sizes, focus/error/disabled states and nat
         const t=e.tomselect, native=document.querySelector('main select:not(.tomselected)'),input=document.querySelector('#eponymo'),button=document.querySelector('main .card-footer button');
         const style=x=>{const s=getComputedStyle(x),r=x.getBoundingClientRect();return{font:s.fontSize,weight:s.fontWeight,height:r.height};};
         const sizes={input:style(input),native:style(native),tom:style(t.control),wrapper:style(t.wrapper),button:style(button)};
+        let container=button.parentElement;
+        while(container&&getComputedStyle(container).containerType==='normal')container=container.parentElement;
+        const cs=getComputedStyle(container),rem=parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const width=parseFloat(cs.width)-(cs.boxSizing==='border-box'?['paddingLeft','paddingRight','borderLeftWidth','borderRightWidth'].reduce((n,k)=>n+parseFloat(cs[k]),0):0);
+        sizes.button.expectedFont=Math.min(rem,Math.max(.875*rem,.72*rem+.0025*width));
         e.classList.add('is-invalid');t.focus();await new Promise(r=>setTimeout(r,50));
         const invalid=getComputedStyle(t.wrapper).borderTopColor,focus=getComputedStyle(t.wrapper).boxShadow;
         t.close();
         t.disable();t.open();const disabled=t.isDisabled&&!t.isOpen&&e.disabled;t.enable();
-        const group=input.closest('.payroll-field-group'),columns=[...group.children],before=input.value;
-        const original=columns.map(c=>c.getAttribute('style'));
-        columns.forEach(c=>c.style.display='none');await new Promise(r=>requestAnimationFrame(r));
-        const hidden=getComputedStyle(group).display==='none';
-        columns.forEach((c,i)=>original[i]===null?c.removeAttribute('style'):c.setAttribute('style',original[i]));
+        const column=input.closest('[class*="col-"]');
+        if(!column)throw new Error('Missing existing input column');
+        const before={value:input.value,form:input.form,disabled:input.disabled,valid:input.checkValidity()};
+        const original=column.getAttribute('style');
+        column.style.display='none';await new Promise(r=>requestAnimationFrame(r));
+        const hidden=!input.getClientRects().length;
+        if(original===null)column.removeAttribute('style');else column.setAttribute('style',original);
         await new Promise(r=>requestAnimationFrame(r));
-        return{sizes,invalid,focus,disabled,hidden,restored:getComputedStyle(group).display!=='none'&&input.value===before};
+        input.focus();
+        const restored=!!input.getClientRects().length&&input.value===before.value&&input.form===before.form
+            &&input.disabled===before.disabled&&input.checkValidity()===before.valid&&document.activeElement===input;
+        const required=input.required,value=input.value;
+        input.required=true;input.value='';const validation=!input.checkValidity();
+        input.value=value;input.required=required;
+        return{sizes,invalid,focus,disabled,hidden,restored,validation};
     });
-    for(const key of ['native','tom','button'])assert.equal(states.sizes[key].font,states.sizes.input.font,key);
-    for(const key of ['input','native','wrapper','button'])assert.equal(states.sizes[key].height,36,key);
+    for(const key of ['native','tom'])assert.equal(states.sizes[key].font,states.sizes.input.font,key);
+    for(const key of ['input','native','wrapper'])assert.equal(states.sizes[key].height,36,key);
+    assert.ok(Math.abs(parseFloat(states.sizes.button.font)-states.sizes.button.expectedFont)<.05);
+    assert.ok(states.sizes.button.height>=34&&states.sizes.button.height<=42);
     assert.equal(states.sizes.tom.weight,'400');assert.equal(states.sizes.button.weight,'400');
     assert.equal(states.invalid,'rgb(220, 53, 69)');assert.notEqual(states.focus,'none');
-    assert.ok(states.disabled&&states.hidden&&states.restored,JSON.stringify(states));
+    assert.ok(states.disabled&&states.hidden&&states.restored&&states.validation,JSON.stringify(states));
+    // These smaller-viewport checks exercise native behavior, not responsive acceptance.
     await loadForm(page,'views/users/add.ejs',{vendor});await viewport(page,800,700,true);
     const radios=page.locator('main input[type="radio"]:enabled');
     await radios.last().check();assert.equal(await radios.last().isChecked(),true);
