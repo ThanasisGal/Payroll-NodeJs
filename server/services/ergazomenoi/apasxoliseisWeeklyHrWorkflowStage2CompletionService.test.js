@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { inspectAutomaticMaterialization, buildWeeklyHrStage2FingerprintInput,
-    fingerprint, completeWeeklyHrWorkflowStage2 } = require(
+    fingerprint, stage1AttestationForStage2, completeWeeklyHrWorkflowStage2 } = require(
     './apasxoliseisWeeklyHrWorkflowStage2CompletionService'
 );
 
@@ -14,7 +14,8 @@ function context(classification = 'REST_REPO') {
         week_start: new Date('2026-06-08Z'), week_end: new Date('2026-06-14Z') },
     rows: [{ _id: classification === 'REST_REPO' ? '6a7c515e6aeaefb3c8764c7c' :
         '507f191e810c19729de860ec', hmeromhnia: new Date(`${date}T00:00:00Z`),
-    updatedAt: new Date('2026-08-18Z'), repo: false, kathgoria_ergasias: 'ΕΡΓ',
+    updatedAt: new Date('2026-08-18Z'), repo: classification === 'REST_REPO',
+    kathgoria_ergasias: classification === 'REST_REPO' ? 'ΑΝ' : 'ΕΡΓ',
     cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0,
     apologistiko_biblio: false, repo_apologistika: false,
     kathgoria_ergasias_apologistika: '',
@@ -40,9 +41,9 @@ function harness(classification, failure = '') {
         catch (error) { throw error; }
     };
     const stateModel = { findOne: () => ({ session() { return this; },
-        async lean() { return staged.state; } }), collection: { async updateOne() {
+        async lean() { return staged.state; } }), collection: { async updateOne(_filter, update) {
         if (failure === 'state') throw new Error('state');
-        staged.state.stage2 = { status: 'COMPLETED' }; return { matchedCount: 1 };
+        Object.assign(staged.state, update.$set); return { matchedCount: 1 };
     } } };
     const auditModel = { findOne: (filter) => ({ session() { return this; },
         async lean() { return staged.audits.find((item) =>
@@ -56,7 +57,7 @@ function harness(classification, failure = '') {
     const post = { ...initial, lifecycle: { stages: { stage3: {
         stage2_automatic_resolution_items: [] } } },
     upstream: { stage1_current_fingerprint: FP2 } };
-    return { initial, committed, args: { initialContext: initial,
+    return { initial, post, committed, args: { initialContext: initial,
         actor: { user_id: '507f191e810c19729de860ea', user_name: 'HR', role: 'HR' },
         reason_or_notes: 'Deterministic Stage 2 materialization',
         request_id: `stage2-${classification.toLowerCase()}-0001`, transactionRunner,
@@ -65,6 +66,31 @@ function harness(classification, failure = '') {
 }
 
 (async () => {
+    {
+        const h = harness('REST_REPO');
+        const slice = { period_start: '2026-06-01', period_end: '2026-06-30',
+            actionable_dates: ['2026-06-09'], context_only_dates: ['2026-05-31'],
+            context_fingerprint: 'c'.repeat(64), completion_fingerprint: FP1,
+            status: 'COMPLETED', version: 2 };
+        h.initial.lifecycle.stages.stage1 = { attestation_scope: 'PERIOD_SLICE',
+            current_context_fingerprint: slice.context_fingerprint, period_slice: slice };
+        h.committed.state.stage1 = { status: 'OPEN', version: 4, effective_fingerprint: '',
+            period_slices: [slice, { ...slice, period_start: '2026-05-01', period_end: '2026-05-31' }] };
+        h.post.lifecycle.stages.stage1 = { current_context_fingerprint: 'd'.repeat(64) };
+        assert.equal(stage1AttestationForStage2(h.initial, h.committed.state.stage1).scope, 'PERIOD_SLICE');
+        for (const change of [
+            { status: 'OPEN' }, { context_fingerprint: 'e'.repeat(64) },
+            { effective_fingerprint: 'e'.repeat(64) }, { period_end: '2026-06-29' }
+        ]) assert.equal(stage1AttestationForStage2(h.initial, { period_slices: [{ ...slice, ...change }] }), null);
+        await completeWeeklyHrWorkflowStage2(h.args);
+        const stage1 = h.committed.state.stage1;
+        assert.equal(stage1.status, 'OPEN', 'a slice must not attest the entire week');
+        assert.equal(stage1.effective_fingerprint, '');
+        assert.equal(stage1.period_slices[0].effective_fingerprint, FP2);
+        assert.equal(stage1.period_slices[0].context_fingerprint, 'd'.repeat(64));
+        assert.equal(stage1.period_slices[0].version, 3);
+        assert.deepEqual(stage1.period_slices[1], { ...slice, period_start: '2026-05-01', period_end: '2026-05-31' });
+    }
     {
         const minimal = context('REST_REPO');
         const expanded = structuredClone(minimal);

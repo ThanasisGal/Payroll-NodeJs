@@ -1,0 +1,1375 @@
+{
+  "baseline": "ae67a5c30",
+  "templates": {
+    "page": 94,
+    "partial": 83,
+    "unreferenced": 5,
+    "layout": 1
+  },
+  "pages": 94,
+  "sections": 129,
+  "combinations": 2322,
+  "resolutions": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          15.84,
+          16.0
+        ],
+        "closed": [
+          16.0,
+          16.8
+        ]
+      },
+      "problems": 0
+    },
+    {
+      "width": 1680,
+      "height": 1050,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          15.024,
+          15.93
+        ],
+        "closed": [
+          16.0,
+          16.032
+        ]
+      },
+      "problems": 0
+    },
+    {
+      "width": 1600,
+      "height": 900,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          14.752,
+          15.76
+        ],
+        "closed": [
+          15.712,
+          16.0
+        ]
+      },
+      "problems": 0
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          14.4,
+          15.41
+        ],
+        "closed": [
+          15.072,
+          15.96
+        ]
+      },
+      "problems": 0
+    },
+    {
+      "width": 1280,
+      "height": 1024,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          14.4,
+          15.01
+        ],
+        "closed": [
+          14.432,
+          15.56
+        ]
+      },
+      "problems": 0
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          14.4,
+          15.01
+        ],
+        "closed": [
+          14.432,
+          15.56
+        ]
+      },
+      "problems": 0
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          14.4,
+          15.01
+        ],
+        "closed": [
+          14.432,
+          15.56
+        ]
+      },
+      "problems": 0
+    },
+    {
+      "width": 1100,
+      "height": 700,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          14.4,
+          14.56
+        ],
+        "closed": [
+          14.4,
+          15.11
+        ]
+      },
+      "problems": 0
+    },
+    {
+      "width": 800,
+      "height": 700,
+      "combinations": 258,
+      "buttonFontsPx": {
+        "open": [
+          14.4
+        ],
+        "closed": [
+          14.4
+        ]
+      },
+      "problems": 0
+    }
+  ],
+  "controls": {
+    "sections": 129,
+    "native": 57,
+    "tom": 204,
+    "disabledTom": 6,
+    "searchedTom": 198,
+    "clearedTom": 195,
+    "horizontalScrollports": 28
+  },
+  "buttonFontWeight": [
+    "400"
+  ],
+  "problems": [],
+  "pagesCoverage": [
+    {
+      "template": "views/404.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "* (404)"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/admin/activeSessions.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/active-sessions"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/admin/disconnectUsers.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/disconnect-users"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/admin/uploadTemplates.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/api/admin/aws_s3"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/admin/usageReport.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/usage-report"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/antistoixiseis/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis/add/:id"
+        },
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis/addFromNested/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/antistoixiseis/antistoixiseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/antistoixiseis/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/antistoixiseis/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis/search"
+        },
+        {
+          "method": "post",
+          "path": "/companies/antistoixiseis/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/genikastoixeia/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/genikastoixeia/add"
+        }
+      ],
+      "sections": 8,
+      "combinations": 144,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/genikastoixeia/companies.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/genikastoixeia"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/genikastoixeia/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/genikastoixeia/edit/:id"
+        }
+      ],
+      "sections": 8,
+      "combinations": 144,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/genikastoixeia/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/companies/genikastoixeia/search"
+        },
+        {
+          "method": "get",
+          "path": "/companies/genikastoixeia/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/nomimoi_ekprosopoi/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/nomimoi_ekprosopoi/add"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/nomimoi_ekprosopoi/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/nomimoi_ekprosopoi/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/nomimoi_ekprosopoi/nomimoi_ekprosopoi.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/nomimoi_ekprosopoi"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/nomimoi_ekprosopoi/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/nomimoi_ekprosopoi/search"
+        },
+        {
+          "method": "post",
+          "path": "/companies/nomimoi_ekprosopoi/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/passwords/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/passwords/add"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/passwords/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/passwords/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/passwords/passwords.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/passwords"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/passwords/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/passwords/search"
+        },
+        {
+          "method": "post",
+          "path": "/companies/passwords/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/trapezes/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/trapezes/add"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/trapezes/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/trapezes/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/trapezes/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/trapezes/search"
+        },
+        {
+          "method": "post",
+          "path": "/companies/trapezes/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/trapezes/trapezes.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/trapezes"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/ypokatasthmata/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/ypokatasthmata/add"
+        }
+      ],
+      "sections": 2,
+      "combinations": 36,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/ypokatasthmata/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/ypokatasthmata/edit/:id"
+        }
+      ],
+      "sections": 2,
+      "combinations": 36,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/ypokatasthmata/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/companies/ypokatasthmata/search"
+        },
+        {
+          "method": "get",
+          "path": "/companies/ypokatasthmata/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/companies/ypokatasthmata/ypokatasthmata.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/ypokatasthmata"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/dates/appDate.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/dates/getAppDateForm"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/dates/periods.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/dates/getPeriodsForm"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/dates/yearInUse.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/dates/getYearsForm"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ektyposeis/apasxolhseis/atomikesEkkathariseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ektyposeis/apasxolhseis/ektyposhApasxolhseon"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ektyposeis/symbaseis/symbaseisErgazomenon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi/add"
+        }
+      ],
+      "sections": 8,
+      "combinations": 144,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi/edit/:id"
+        }
+      ],
+      "sections": 8,
+      "combinations": 144,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/employment-profile-conflict.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/ergazomenoi.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi/search"
+        },
+        {
+          "method": "post",
+          "path": "/ergazomenoi/ergazomenoi/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/antigrafhProgrammatonErgasias.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/antigrafhProgrammaton"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/apologistikosPinakasOrarion.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/apologistikosPinakasOrarion"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/apologistikosPinakasYperorion.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/apologistikosPinakasYperorion"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/calcApasxolhseisPeriodoy.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/calcApasxolhseisPeriodoy"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/exagoghOrarionSeErganh.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/exagoghOrarionSeErganh"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/katastashElegxouApologistikouPinaka.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/katastashElegxouApologistikouPinaka"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/lhpshOrarionApoErganh.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/lhpshOrarionApoErganh"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/lhpshOrarionApoKartes.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/lhpshOrarionApoKartes"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/programmaErgasias.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/programmaErgasias"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/ergazomenoi/programmata/ypovoliAdeion.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/ypovoliAdeion"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/home.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/index.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/kinhseis/apasxolhseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/kinhseis/apasxolhseis"
+        }
+      ],
+      "sections": 6,
+      "combinations": 108,
+      "problems": 0
+    },
+    {
+      "template": "views/krathseis/genika/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/genika/add"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/krathseis/genika/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/genika/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/krathseis/krathseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/krathseis"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/krathseis/pososta/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/pososta/add"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/krathseis/pososta/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/posostaKrathseon/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/krathseis/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/search"
+        },
+        {
+          "method": "post",
+          "path": "/krathseis/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/login/change_password.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login/change_password"
+        },
+        {
+          "method": "post",
+          "path": "/login/change_password/changepassword"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/login/login.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login"
+        },
+        {
+          "method": "post",
+          "path": "/register/userRegistration"
+        },
+        {
+          "method": "post",
+          "path": "/login/userLogin"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/login/logout.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login/logout"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/login/register.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/register"
+        },
+        {
+          "method": "post",
+          "path": "/register/userRegistration"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/login/reset_password.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/reset_password"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/login/set_new_password.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login/reset_old_password/:uid/:token"
+        },
+        {
+          "method": "post",
+          "path": "/login/reset_old_password/:uid/:token"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/login/verify_email.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login/verify-email"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/mainapp.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/mainapp"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/admin/search"
+        },
+        {
+          "method": "get",
+          "path": "/admin/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/eidikothtes/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/eidikothtes/add/:kodikosSymbashs_Kathgorias"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/eidikothtes/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/eidikothtes/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/eidikothtes/eidikothtes.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/eidikothtes"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/eidikothtes/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/eidikothtes/search"
+        },
+        {
+          "method": "post",
+          "path": "/symbaseis/eidikothtes/search/:kodikos_symbashs_kathgorias"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/kathgories/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/kathgories/add/:kodikosSymbashs"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/kathgories/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/kathgories/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/kathgories/kathgories.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/kathgories"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/kathgories/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/symbaseis/kathgories/search/:symbash"
+        },
+        {
+          "method": "get",
+          "path": "/symbaseis/kathgories/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/klimakia/klimakiaSymbaseon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/klimakia"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/stoixeiaSymbaseon/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/stoixeiaSymbaseon/add/:kodikosSymbashs_Kathgorias_Eidikothtas"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/stoixeiaSymbaseon/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/stoixeiaSymbaseon/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/stoixeiaSymbaseon/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/symbaseis/stoixeiaSymbaseon/search/:kodikos_symbashs_kathgorias_eidikothtas"
+        },
+        {
+          "method": "get",
+          "path": "/symbaseis/stoixeiaSymbaseon/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/stoixeiaSymbaseon/stoixeiaSymbaseon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/stoixeiaSymbaseon"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/symbaseis/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/symbaseis/add"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/symbaseis/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/symbaseis/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/symbaseis/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/symbaseis/search"
+        },
+        {
+          "method": "post",
+          "path": "/symbaseis/symbaseis/search"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/symbaseis/symbaseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/symbaseis"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/symbaseis/ypologismoiKlimakion/ypologismoiKlimakion.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/ypologismoiKlimakion"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/users/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/add"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/users/delete.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/delete/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/users/dikaiomataXrhston.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/user-privileges"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/users/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/edit/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    },
+    {
+      "template": "views/users/view.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/view/:id"
+        }
+      ],
+      "sections": 1,
+      "combinations": 18,
+      "problems": 0
+    }
+  ]
+}

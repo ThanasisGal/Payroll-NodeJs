@@ -9,7 +9,7 @@ const contract = css.match(
     /\.swal2-popup\.employment-review-swal-popup \.swal2-html-container,[\s\S]*?\n}/)?.[0] || '';
 assert.match(contract,
     /\.swal2-popup\.employment-review-swal-popup \.employment-review-swal-html-container/);
-assert.match(contract, /font-size:\s*0\.95rem !important/);
+assert.match(contract, /font-size:\s*var\(--review-text, \.95rem\) !important/);
 assert.doesNotMatch(contract, /font-size:\s*[^;]*vw/);
 assert.doesNotMatch(css.match(
     /\.swal2-popup\.employment-review-swal-popup \.swal2-title[\s\S]*?\n}/)?.[0] || '',

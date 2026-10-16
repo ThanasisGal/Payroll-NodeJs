@@ -38,7 +38,7 @@
 %>
 
 <div class="accordion-item margin-top--2_5rem">
-    <h2 class="accordion-header">
+    <h2 class="accordion-header p-0">
         <button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseTwo" aria-expanded="true" aria-controls="panelsStayOpen-collapseTwo" 
         tabindex="-1">
         Στοιχεία Πρόσληψης
@@ -49,6 +49,7 @@
 
         <div class="accordion-body bg-white margin-bottom--0_5rem">
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="hmeromhnia_proslhpshs" class="col-form-label label-font-size field-required">
                     Ημ/νία Πρόσληψης
@@ -60,6 +61,8 @@
                 
                 <div class="col-2-5"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="hmeromhnia_allaghs_symbashs" class="col-form-label label-font-size">
                     Ημ/νία Αλλαγής Σύμβασης
@@ -69,8 +72,10 @@
                     <input type="date" name="hmeromhnia_allaghs_symbashs" id="hmeromhnia_allaghs_symbashs" class="date-control" value="<%= safe('hmeromhnia_allaghs_symbashs') ? new Date(safe('hmeromhnia_allaghs_symbashs')).toISOString().split('T')[0] : '' %>" />
                 </div>
             </div>
+            </div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="hmeromhnia_allaghs_orarioy_apo" class="col-form-label font-size-vw-0_72">
                     Ημ/νία Αλλαγής Ωραρίου ΑΠΟ
@@ -82,6 +87,8 @@
 
                 <div class="col-2-5"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="hmeromhnia_allaghs_orarioy_eos" class="col-form-label" style="font-size: 0.72vw;">
                     Ημ/νία Αλλαγής Ωραρίου ΕΩΣ
@@ -101,8 +108,10 @@
                         value="" />
                 </div>
             </div>
+            </div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="hmeromhnia_isxyos_oron_ergasias_apo" class="col-form-label font-size-vw-0_72">
                     Ημ/νία Ισχύος Όρων Εργασίας ΑΠΟ
@@ -114,6 +123,8 @@
 
                 <div class="col-2-5"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="hmeromhnia_isxyos_oron_ergasias_eos" class="col-form-label font-size-vw-0_72">
                         Ημ/νία Ισχύος Όρων Εργασίας ΕΩΣ
@@ -123,8 +134,10 @@
                     <input type="date" name="hmeromhnia_isxyos_oron_ergasias_eos" id="hmeromhnia_isxyos_oron_ergasias_eos" class="date-control" value="<%= safe('hmeromhnia_isxyos_oron_ergasias_eos') ? new Date(safe('hmeromhnia_isxyos_oron_ergasias_eos')).toISOString().split('T')[0] : '' %>" />
                 </div>
             </div>
+            </div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="hmeromhnia_lhxhs_symbashs" class="col-form-label label-font-size field-required">
                     Ημ/νία Λήξης Σύμβασης
@@ -136,6 +149,8 @@
         
                 <div class="col-2-5"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="hmeromhnia_apoxorhshs" class="col-form-label label-font-size">
                     Ημ/νία Αποχώρησης  
@@ -144,6 +159,7 @@
                 <div class="col-1-5">
                     <input type="date" name="hmeromhnia_apoxorhshs" id="hmeromhnia_apoxorhshs" class="date-control" value="<%= safe('hmeromhnia_apoxorhshs') ? new Date(safe('hmeromhnia_apoxorhshs')).toISOString().split('T')[0] : '' %>" />  
                 </div>
+            </div>
             </div>
 
             <% if (recordData.oristikh_enhmerosh === false || currentRelationshipOpen) { %>
@@ -160,7 +176,6 @@
                 </div>
             <% } %>
 
-            <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
             
@@ -213,7 +228,6 @@
                 class="logos-peratoshs-section"
                 style="display: none;">
 
-                <div class="height-vh-0_2"></div>
 
                 <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                     <div class="col-2 left-align">
@@ -250,7 +264,7 @@
 
                 <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                     <div class="col-2 left-align">
-                        <label for="parathrhseis_peratosis" id="parathrhseis_peratosis_label" class="col-form-label label-font-size field-required">
+                        <label for="parathrhseis_peratoshs" id="parathrhseis_peratosis_label" class="col-form-label label-font-size field-required">
                         Παρατηρήσεις Περάτωσης Σ.Ο.Χ.
                         </label>
                     </div>
@@ -268,9 +282,9 @@
 
             <hr class="hr-style" />
 
-            <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="afora_daneismo_ergazomenoy" id="afora_daneismo_ergazomenoy_label" class="col-form-label label-font-size field-required">
                     Αφορά Δανεισμό Εργαζόμενου
@@ -320,6 +334,8 @@
                     </div>
                 </div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="typos_daneismoy" id="typos_daneismoy_label" class="col-form-label label-font-size field-required">
                     Τύπος Δανεισμού
@@ -350,10 +366,11 @@
                     </select>
                 </div>
             </div>
+            </div>
 
-            <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align" disabled>
                     <label for="hmnia_enarxhs_daneismoy" id="hmnia_enarxhs_daneismoy_label" class="col-form-label label-font-size field-required">
                     Ημ/νία Έναρξης Δανεισμού
@@ -365,6 +382,8 @@
                 
                 <div class="col-2-5"></div>
                 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="hmnia_lhxhs_daneismoy" id="hmnia_lhxhs_daneismoy_label" class="col-form-label label-font-size field-required">
                     Ημ/νία Λήξης Δανεισμού
@@ -374,8 +393,10 @@
                     <input type="date" name="hmnia_lhxhs_daneismoy" id="hmnia_lhxhs_daneismoy" class="date-control" value="<%= safe('hmnia_lhxhs_daneismoy') ? new Date(safe('hmnia_lhxhs_daneismoy')).toISOString().split('T')[0] : '' %>" />  
                 </div>
             </div>
+            </div>
 
             <div id="daneismos_afm_row" class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem d-none">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="afm_daneizontos_ergodoth" id="afm_daneizontos_ergodoth_label" class="col-form-label label-font-size field-required">
                     ΑΦΜ Δανείζοντος Εργοδότη
@@ -387,6 +408,8 @@
 
                 <div class="col-2-5"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="afm_daneizomenoy_ergodoth" id="afm_daneizomenoy_ergodoth_label" class="col-form-label label-font-size field-required">
                     ΑΦΜ Δανειζόμενου Εργοδότη
@@ -396,8 +419,10 @@
                     <input type="text" id="afm_daneizomenoy_ergodoth" name="afm_daneizomenoy_ergodoth" class="form-control input-contents" value="<%= safe('afm_daneizomenoy_ergodoth') %>" maxlength="9" pattern="[0-9]{1,}" autocomplete="off" />
                 </div>
             </div>
+            </div>
 
             <div id="daneismos_ergodoths_row" class="row form-group g-3 align-items-start margin-left--1rem margin-right--1rem d-none">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="typos_ergodoth_daneismoy" id="typos_ergodoth_daneismoy_label" class="col-form-label label-font-size field-required">
                     Τύπος Εργοδότη
@@ -411,6 +436,8 @@
 
                 <div class="col-2-5"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="kodikos_ergazomenoy_alloy_ergodoth" id="kodikos_ergazomenoy_alloy_ergodoth_label" class="col-form-label font-size-vw-0_72">
                     Κωδ. Εργ/νου στον Δανειζόμενο Εργοδότη
@@ -420,12 +447,13 @@
                     <input type="text" id="kodikos_ergazomenoy_alloy_ergodoth" name="kodikos_ergazomenoy_alloy_ergodoth" class="form-control input-contents" value="<%= safe('kodikos_ergazomenoy_alloy_ergodoth') %>" autocomplete="off" />
                 </div>
             </div>
+            </div>
 
-            <div class="height-vh-0_2"></div>
 
             <hr class="hr-style" />
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
             
                 <div class="col-2 left-align">
                     <label for="afora_dokimastikh_periodo" class="col-form-label label-font-size field-required">
@@ -440,6 +468,8 @@
 
                 <div class="col-0-25"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="hmnia_lhxhs_dokimastikhs_periodoy" class="col-form-label label-font-size field-required">
                     Ημ/νία Λήξης Δοκιμ/κής Περιόδου
@@ -449,12 +479,13 @@
                     <input type="date" id="hmnia_lhxhs_dokimastikhs_periodoy" name="hmnia_lhxhs_dokimastikhs_periodoy" data-bs-toggle="tooltip" data-bs-title="Στην Αορίστου Χρόνου η δοκιμαστική περίοδος είναι έως 6 μήνες ενώ στην ορισμένου χρόνου έως το ¼ της χρονικής διάρκειάς της και σε κάθε περίπτωση έως 6 μήνες." data-bs-placement="bottom" data-tooltip-max-width="15vw" class="date-control" value="<%= safe('hmnia_lhxhs_dokimastikhs_periodoy') ? new Date(safe('hmnia_lhxhs_dokimastikhs_periodoy')).toISOString().split('T')[0] : '' %>" />
                 </div>
             </div>
+            </div>
 
             <hr class="hr-style" />
 
-            <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 
                 <div class="col-2 left-align">
                     <label for="kathestos_apasxolhshs" class="col-form-label label-font-size field-required">
@@ -491,6 +522,8 @@
 
                 <div class="col-0-25"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="sxesh_ergasias" class="col-form-label label-font-size field-required">
                     Σχέση Εργασίας
@@ -525,10 +558,11 @@
                     </select>
                 </div>
             </div>
+            </div>
             
-            <div class="height-vh-0_1"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="proyphresia_se_eth" class="col-form-label label-font-size field-required">
                     Έτη Προϋπηρεσίας
@@ -540,6 +574,8 @@
         
                 <div class="col-3"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="proyphresia_se_mhnes" class="col-form-label label-font-size">
                     Μήνες Προϋπηρεσίας
@@ -549,8 +585,10 @@
                     <input type="number" id="proyphresia_se_mhnes" name="proyphresia_se_mhnes" class="form-control input-contents right-align" min="0" max="11" value="<%= safe('proyphresia_se_mhnes') || 0 %>" />
                 </div>
             </div>
+            </div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="synolo_proyphresias_se_eth" class="col-form-label label-font-size">
                     Σύνολο Ετών Προϋπηρεσίας
@@ -569,6 +607,8 @@
                     <input type="number" id="proyphresia_apozhmioshs_se_eth" name="proyphresia_apozhmioshs_se_eth" class="form-control input-contents right-align" value="<%= safe('proyphresia_apozhmioshs_se_eth') %>" readonly />
                 </div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="synolo_proyphresias_se_mhnes" class="col-form-label label-font-size-smaller">
                     Σύνολο Μηνών Προϋπηρεσίας
@@ -578,8 +618,10 @@
                     <input type="number" id="synolo_proyphresias_se_mhnes" name="synolo_proyphresias_se_mhnes" class="form-control input-contents right-align" value="<%= safe('synolo_proyphresias_se_mhnes') %>" readonly />
                 </div>
             </div>
+            </div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="proyphresia_adeias_se_eth" class="col-form-label label-font-size">
                     Έτη Προϋπηρεσίας (Άδεια)
@@ -591,6 +633,8 @@
         
                 <div class="col-3"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="misthologiko_klimakio" class="col-form-label label-font-size">
                     Μισθολογικό Κλιμάκιο
@@ -600,10 +644,11 @@
                     <input type="number" id="misthologiko_klimakio" name="misthologiko_klimakio" class="form-control input-contents right-align" value="<%= safe('misthologiko_klimakio') %>" readonly />
                 </div>
             </div>
+            </div>
 
-            <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="syggeneia" class="col-form-label label-font-size">
                     Συγγένεια
@@ -618,6 +663,8 @@
 
                 <div class="col-3"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="syggenikh_sxesh" id="syggenikh_sxesh_label" class="col-form-label label-font-size">
                     Συγγενική Σχέση
@@ -652,12 +699,13 @@
                     </select>
                 </div>
             </div>
+            </div>
 
             <hr class="hr-style" />
 
-            <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="thesh_eythynhs" class="col-form-label label-font-size">
                     Θέση Ευθύνης
@@ -694,6 +742,8 @@
 
                 <div class="col-0-25"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="eidikh_periptosh" class="col-form-label label-font-size">
                     Ειδική Περίπτωση
@@ -728,10 +778,11 @@
                     </select>
                 </div>
             </div>
+            </div>
 
-            <div class="height-vh-0_1"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="topos_ergasias" class="col-form-label label-font-size field-required">
                     Τόπος Εργασίας
@@ -745,6 +796,8 @@
 
                 <div class="col-0-25"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="topos_ergasias_parathrhseis" class="col-form-label label-font-size">
                     Τόπος Εργασίας-Παρατηρήσεις
@@ -754,8 +807,8 @@
                     <input type="text" id="topos_ergasias_parathrhseis" name="topos_ergasias_parathrhseis" class="form-control input-contents clearableInputs left-align" value="<%= safe('topos_ergasias_parathrhseis') %>" maxlength="500" />
                 </div>
             </div>
+            </div>
 
-            <div class="height-vh-0_1"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
@@ -769,9 +822,9 @@
                 </div>
             </div>
 
-            <div class="height-vh-0_1"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
                 <div class="col-2 left-align">
                     <label for="efarmostea_sse" class="col-form-label label-font-size field-required">
                     Εφαρμοστέα Σ.Σ.Ε.
@@ -785,6 +838,8 @@
 
                 <div class="col-0-25"></div>
 
+                </div>
+                <div class="employee-fixed-right-fields">
                 <div class="col-2 left-align">
                     <label for="efarmostea_sse_parathrhseis" class="col-form-label label-font-size">
                     Εφαρμοστέα ΣΣΕ-Παρατηρήσεις
@@ -794,8 +849,8 @@
                     <input type="text" id="efarmostea_sse_parathrhseis" name="parathrhseis_efarmosteas_sse" class="form-control input-contents clearableInputs left-align" value="<%= safe('efarmostea_sse_parathrhseis') %>" />
                 </div>
             </div>
+            </div>
 
-            <div class="height-vh-3_5"></div>
         </div>
     </div>
 </div>

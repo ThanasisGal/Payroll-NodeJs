@@ -1,5 +1,5 @@
 // /static/js/common/initTomDropdowns.js
-import { initTomDropdown, attachInlineSummary } from '../dropdown-item.js';
+import { initTomDropdown } from '../dropdown-item.js';
 
 // Global registry για instances (ώστε να μη διπλο-αρχικοποιούνται)
 window.__tomInstances = window.__tomInstances || {};
@@ -106,105 +106,15 @@ export function initOneTomSelect(sel) {
     const instance = ts || window.__tomInstances[key];
     if (!instance) return;
 
-    attachInlineSummary(instance, sel);
+    // Selected tags and their overflow indicator use one presentation in updateOverflow.
 
-    // Μόνο για την Ασφαλιστική Κλάση: φαρδύ dropdown & δεξιά ευθυγράμμιση (expand left)
-    // ⬇️ ΠΡΟΣΟΧΗ: εδώ ΔΕΝ συμπεριλαμβάνεται πλέον το eidikothta_erganh
+    // Width and anchoring are resolved once by dropdown-item.js against the scrollport.
     if (sel.dataset.ddWide === 'true' || sel.id === 'asfalistikh_klash') {
         instance.wrapper.classList.add('dd-wide', 'dd-right');
-
-        instance.on('dropdown_open', () => {
-            const dd = instance.dropdown;
-            const wrap = instance.wrapper;
-            if (!dd || !wrap) return;
-
-            const MIN_W = 820; // προσαρμόσ’ το στα columns σου
-            const wrapRect = wrap.getBoundingClientRect();
-            const wrapW = wrapRect.width;
-
-            // Μετράμε-ορίζουμε πλάτος και μετακινούμε με transform ώστε να ευθυγραμμιστεί δεξιά
-            requestAnimationFrame(() => {
-                dd.style.width = 'auto'; // αφήνουμε να «απλωθεί» για μέτρηση
-                const contentW = Math.max(dd.scrollWidth, MIN_W);
-                const ddW = Math.max(MIN_W, contentW);
-                dd.style.width = ddW + 'px';
-
-                // shift = πλάτος wrapper - πλάτος dropdown => αρνητικό => «άπλωμα» προς τα αριστερά
-                const shift = wrapW - ddW;
-                dd.style.transform = `translateX(${shift}px)`;
-            });
-        });
-
-        // καθάρισε το transform όταν κλείνει
-        instance.on('dropdown_close', () => {
-            const dd = instance.dropdown;
-            if (dd) dd.style.transform = '';
-        });
     }
-
-    // --- ΜΟΝΟ για Ειδικότητα ΕΡΓΑΝΗ: σταθερό 40vw, δεξιά αγκύρωση + observer ---
     if (sel.id === 'eidikothta_erganh' || sel.dataset.ddWidth) {
-        const W = sel.dataset.ddWidth || '40vw';
-
-        // Μην αφήσεις το generic wide εδώ
         instance.wrapper.classList.remove('dd-wide');
-        instance.wrapper.classList.add('dd-right'); // ανοίγει προς τα αριστερά (κολλάει δεξιά)
-
-        let obs = null;
-
-        const pinWidth = () => {
-            const dd = instance.dropdown;
-            if (!dd) return;
-
-            // δεξιά αγκύρωση + χωρίς μετατόπιση
-            dd.style.setProperty('left', 'auto', 'important');
-            dd.style.setProperty('right', '0', 'important');
-            dd.style.setProperty('transform', 'none', 'important');
-
-            // επιβολή πλάτους (ό,τι κι αν είναι το default CSS)
-            dd.style.setProperty('width', W, 'important');
-            dd.style.setProperty('min-width', W, 'important');
-            dd.style.setProperty('max-width', 'none', 'important');
-            dd.style.setProperty('box-sizing', 'border-box', 'important');
-
-            // το search input full width
-            const inp = dd.querySelector('.dropdown-input');
-            if (inp) {
-                inp.style.setProperty('width', '100%', 'important');
-                inp.style.setProperty('box-sizing', 'border-box', 'important');
-            }
-        };
-
-        const startObserver = () => {
-            const dd = instance.dropdown;
-            if (!dd || obs) return;
-
-            // Αν ο Tom Select ξαναγράψει style/κλάσεις, ξανά-εφάρμοσέ τα
-            obs = new MutationObserver(() => pinWidth());
-            obs.observe(dd, { attributes: true, attributeFilter: ['style', 'class'] });
-
-            // 2-3 ράφ για την περίπτωση που αλλάζει μετά το paint
-            requestAnimationFrame(() => {
-                pinWidth();
-                requestAnimationFrame(pinWidth);
-            });
-        };
-
-        const stopObserver = () => {
-            if (obs) {
-                obs.disconnect();
-                obs = null;
-            }
-        };
-
-        instance.on('dropdown_open', () => {
-            pinWidth();
-            startObserver();
-        });
-        instance.on('load', pinWidth);
-        instance.on('type', pinWidth);
-        instance.on('refresh_options', pinWidth);
-        instance.on('dropdown_close', stopObserver);
+        instance.wrapper.classList.add('dd-right');
     }
 
     const { value: preVal, hidden } = getPreselect(sel);

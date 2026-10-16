@@ -1,16 +1,17 @@
+<div class="maintenance-responsive-form companies-management-page company-details-page employee-edit-page">
 <div id="employeeSaveState" hidden data-temporary="<%= ergazomenoiData.oristikh_enhmerosh === false %>" data-token="<%= typeof employeeStateToken !== 'undefined' ? employeeStateToken : '' %>"></div>
-<div class="tadded-container">
+<div class="tadded-container employee-maintenance-form maintenance-responsive-form">
     <div class="container-fluid height-vh-100 padding-0">
     	<div class="menu_Links">
-            <ul class="white-space-nowrap">
+            <ul class="white-space-nowrap" tabindex="0" aria-label="Ενότητες εργαζομένου">
                	<li class="active margin-left-1_5rem margin-right-0_5rem">Σταθερά Στοιχεία</li>
                 <li>Αποδοχές</li>
                 <li>Κρατήσεις</li>
                 <li>Αλλοδαποί</li>
                 <li>Επαγγ. Κατάρτιση</li>
                 <li>Διάφορα</li>
-        		<li>Ωράριο Εργασίας</li>
-        		<li class="align-right">Ιστορικό Προσλήψεων/Αλλαγών</li>
+                <li data-tab-caption="Ωράρια" aria-label="Ωράρια"><span hidden>Ωράριο Εργασίας</span></li>
+                <li class="align-right" data-tab-caption="Ιστορικό" aria-label="Ιστορικό"><span hidden>Ιστορικό</span></li>
       		</ul>
     	</div>
   
@@ -25,18 +26,18 @@
 		<input type="hidden" name="hmeromhniaPayshsPolyetiasEos" id="hmeromhniaPayshsPolyetiasEos" class="form-control input-contents" value="<%= companyData.hmeromhnia_payshs_polyetias_eos %>" />
 
 		<div class="sections">
-		    <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+		    <section class="sel_1_section visible employee-add-fixed-details" data-section="Σταθερά Στοιχεία">
         		<div>
           			<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
 	                        <%- include('../../partials/_csrfField') %>
 						<% } %>
 
-						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+						<div class="card d-flex flex-column z-depth-5 companies-management-card">
 
 							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section1') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
+							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody">
 					
 								<input type="hidden" name="ergazomenoiId" id="ergazomenoiId" class="form-control input-contents" value="<%= ergazomenoiData._id %>" />
 								<input type="hidden" name="istorikoId" id="istorikoId" class="form-control input-contents" value="<%= originalEmploymentHistoryId %>" />
@@ -80,18 +81,18 @@
         		</div>
       		</section>
 
-			<section class="sel_2_section visible" data-section="Αποδοχές">
+			<section class="sel_2_section" data-section="Αποδοχές">
 				<div>
 					<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
 	                        <%- include('../../partials/_csrfField') %>
 						<% } %>
 
-                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
 
               				<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody1">
+							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody1">
 
 								<input type="hidden" name="selectedSymbash" id="selectedSymbash" />
 								<input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
@@ -108,18 +109,18 @@
         		</div>
       		</section>
 
-			<section class="sel_3_section visible" data-section="Κρατήσεις">
+			<section class="sel_3_section" data-section="Κρατήσεις">
 				<div>
 					<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
 							<%- include('../../partials/_csrfField') %>
 						<% } %>
 
-                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
 
               				<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody2">
+							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody2">
 
 								<%- include('./partials/edit/cardBodies/section3/krathseis') %>
 
@@ -132,18 +133,18 @@
 				</div>
 			</section>
 
-			<section class="sel_4_section visible" data-section="Αλλοδαποί">
+			<section class="sel_4_section" data-section="Αλλοδαποί">
 				<div>
 					<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
 							<%- include('../../partials/_csrfField') %>
 						<% } %>
 
-						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+						<div class="card d-flex flex-column z-depth-5 companies-management-card">
 
 							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody3">
+							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody3">
 				
 								<%- include('./partials/edit/cardBodies/section4/allodapoi') %>
 
@@ -156,18 +157,18 @@
         		</div>
       		</section>
 
-			<section class="sel_5_section visible" data-section="Επαγγ.Κατάρτιση">
+			<section class="sel_5_section" data-section="Επαγγ.Κατάρτιση">
 				<div>
 					<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
 							<%- include('../../partials/_csrfField') %>
 						<% } %>
 
-						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+						<div class="card d-flex flex-column z-depth-5 companies-management-card">
 
 							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody4	">
+							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody4	">
 
                 				<%- include('./partials/edit/cardBodies/section5/epaggelmatikhKatartish') %>
 
@@ -180,18 +181,18 @@
         		</div>
       		</section>
 
-			<section class="sel_6_section visible" data-section="Διάφορα">
+			<section class="sel_6_section" data-section="Διάφορα">
 				<div>
 					<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
 							<%- include('../../partials/_csrfField') %>
 						<% } %>
 
-						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+						<div class="card d-flex flex-column z-depth-5 companies-management-card">
 
 							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody5">
+							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody5">
 
 								<%- include('./partials/edit/cardBodies/section6/diafora') %>
 
@@ -204,98 +205,26 @@
         		</div>
       		</section>
 
-      		<section class="sel_8_section visible" data-section="Ωράριο Εργασίας">
+            <section class="sel_8_section" data-section="Ωράριο Εργασίας">
         		<div>
           			<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
 	                        <%- include('../../partials/_csrfField') %>
 						<% } %>
 
-                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
 
                             <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem mt-n-0-5 margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem">
-								<div class="col-5">
-									<label class="col-form-label font-size-rem-1_05 font-weight-500 <%= (companyData.apasxolhsh_kata_tis_argies === true || companyData. apasxolhsh_kata_tis_argies === 'true') ? 'cgreen' : 'cred' %>">
-										<%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') 
-											? 'Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
-											:  'Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
-										%>
-									</label>
-								</div>
+                            <div class="employee-schedule-permission">
+                                <span class="<%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') ? 'cgreen' : 'cred' %>">
+                                    <%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true')
+                                        ? 'Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες'
+                                        : 'Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' %>
+                                </span>
+                            </div>
 
-								<div class="col-2-1 text-center">
-									</label>
-									<label class="col-form-label field-required font-size-rem-1">
-									ΩΡΕΣ ΕΡΓΑΣΙΑΣ
-									</label>
-								</div>
-								
-								<div class="col-0-7"></div>
-								
-								<div class="col-1-5 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									ΩΡΕΣ ΔΙΑΛΕΙΜΜΑΤΟΣ
-									</label>
-								</div>
-							</div>
-
-							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem ">
-								<div class="col-0-5 text-center">
-									<label class="col-form-label field-required"></label>
-								</div>
-
-								<div class="col-1-5 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Ημερομηνία
-									</label>
-								</div>
-
-								<div class="col-2-5 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Τύπος Εργασίας
-									</label>
-								</div>
-
-								<div class="col-0-5"></div>
-
-								<div class="col-1-1 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Από
-									</label>
-								</div>
-
-								<div class="col-1-1-71 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Έως
-									</label>
-								</div>
-
-								<div class="col-0-5"></div>
-
-								<div class="col-1-1 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Από
-									</label>
-								</div>
-
-								<div class="col-1-2 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Έως
-									</label>
-								</div>
-
-								<div class="col-0-5"></div>
-
-								<div class="col-1 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Repo
-									</label>
-								</div>
-							</div>
-
-              				<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody6">
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody6">
                 				<input type="hidden" id="dateDifference" name="dateDifference" value="">
 
 				                <%- include('./partials/edit/cardBodies/section8/orarioErgasias') %>
@@ -308,18 +237,18 @@
         		</div>
       		</section>
 
-      		<section class="sel_7_section visible" data-section="Ιστορικό Προσλήψεων/Αλλαγών">
+            <section class="sel_7_section" data-section="Ιστορικό Προσλήψεων/Αλλαγών">
         		<div>
 					<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
 							<%- include('../../partials/_csrfField') %>
 						<% } %>
 
-						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80-5 overflow-hidden">
+						<div class="card d-flex flex-column z-depth-5 companies-management-card">
 
 							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody7">
+							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody7">
 
                 				<%- include('./partials/edit/cardBodies/section7/istoriko') %>
 
@@ -433,6 +362,7 @@
 <script src="<%= script('common/ibanChecker') %>"></script>
 <script src="<%= script('common/formatNumbers_2dec') %>"></script>
 <script src="<%= script('common/moveByEnter') %>"></script>
+<script src="<%= script('ergazomenoi/genika/employeeAddPresentation') %>"></script>
 <script src="<%= script('common/scrollToTop') %>"></script>
 <script src="<%= script('common/sectionsVisible') %>"></script>
 <script src="<%= script('ergazomenoi/genika/employeeDraftSave') %>"></script>
@@ -478,7 +408,7 @@
 
 
 <!-- <script src="<%= script('ergazomenoi/genika/loadDropdowns_edit') %>"></script> -->
-<!-- <script src="<%= script('ergazomenoi/genika/amkaChecker') %>"></script> --> -->
+<!-- <script src="<%= script('ergazomenoi/genika/amkaChecker') %>"></script> -->
 <!-- <script src="<%= script('ergazomenoi/genika/afmChecker') %>"></script> -->
 <!-- <script src="<%= script('ergazomenoi/genika/fillHiddenBankCode') %>"></script> -->
 <!-- <script src="<%= script('ergazomenoi/genika/infinityScrollingSelectJQuery') %>"></script> -->
@@ -751,6 +681,11 @@ PDF PREVIEW MODAL (Contract Preview & Download)
 	</div>
 </div>
 
+</div>
+</div>
+
 <script src="<%= script('ergazomenoi/genika/employmentProfileUi') %>" defer></script>
 
 <%- include('./partials/employmentTableNavigation') %>
+
+</div>

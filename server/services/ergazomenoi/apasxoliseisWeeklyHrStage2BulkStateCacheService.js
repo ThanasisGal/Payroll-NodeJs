@@ -75,12 +75,13 @@ class WeeklyHrStage2BulkStateCache {
         const entry = { createdAt: now, lastAccessAt: now, scope: canonicalScope(scope),
             safeScopes,
             exceptions: Array.isArray(preview._all_exceptions) ? preview._all_exceptions : [],
+            technicalConflicts: preview._technical_conflicts || [],
             pageSize: Math.min(50, Number(preview.exception_page_size) || 50) };
         const key = entryKey(fingerprint, entry.scope);
         this.entries.delete(key);
         this.entries.set(key, entry);
         const cachedScopeCount = () => [...this.entries.values()].reduce((total, item) =>
-            total + item.safeScopes.length + item.exceptions.length, 0);
+            total + item.safeScopes.length + item.exceptions.length + item.technicalConflicts.length, 0);
         while (this.entries.size > this.maxEntries ||
             cachedScopeCount() > this.maxCachedScopes) {
             this.entries.delete(this.entries.keys().next().value);
@@ -149,9 +150,11 @@ class WeeklyHrStage2BulkStateCache {
         const offset = (page - 1) * entry.pageSize;
         entry.lastAccessAt = this.now();
         return { exceptions: entry.exceptions.slice(offset, offset + entry.pageSize),
+            technical_conflicts: entry.technicalConflicts.slice(offset, offset + entry.pageSize),
             exception_page: page, exception_page_size: entry.pageSize,
             exception_page_count: Math.max(1,
-                Math.ceil(entry.exceptions.length / entry.pageSize)) };
+                Math.ceil(Math.max(entry.exceptions.length,
+                    entry.technicalConflicts.length) / entry.pageSize)) };
     }
 
     detailPageSeeds({ preview_fingerprint, scope, page = 1,

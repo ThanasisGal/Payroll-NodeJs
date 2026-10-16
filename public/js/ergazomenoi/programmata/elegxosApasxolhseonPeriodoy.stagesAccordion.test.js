@@ -6,6 +6,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const guidanceHelpers = ['employmentReviewGuidanceAttributes', 'employmentReviewGuidanceInfo']
+    .map(name => source.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n}'))?.[0]).join('\n');
 const view = fs.readFileSync(path.join(__dirname,
     '../../../../views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8');
 const css = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
@@ -78,7 +80,7 @@ const sandbox = {
     loadResults: async () => { loadResultsCalls.push(true); },
     employmentReviewSwal: async (options) => { fallbackErrors.push(options); }
 };
-vm.runInNewContext(`${source.slice(helperStart, helperEnd)}
+vm.runInNewContext(`${guidanceHelpers}\n${source.slice(helperStart, helperEnd)}
 this.derive = derivePeriodLifecyclePresentation;`, sandbox);
 const stage = (business_status, pending_count = 0) => ({ business_status, pending_count,
     pending_dates: [], pending_reasons: [] });
@@ -181,7 +183,7 @@ const guideSandbox = {
         ? progressElement : id === 'employmentReviewAttentionSummary' ? attentionElement : null },
     CSS: { escape: (value) => value }, bootstrap: { Collapse: { getOrCreateInstance: () => ({ show() {} }) } }
 };
-vm.runInNewContext(`${source.slice(guideStart, guideEnd)}
+vm.runInNewContext(`${guidanceHelpers}\n${source.slice(guideStart, guideEnd)}
 this.renderGuide = renderEmploymentReviewWorkflowGuide;
 this.attention = employmentReviewAttentionPresentation;
 this.focusStage = focusEmploymentReviewStage;
@@ -210,11 +212,10 @@ assert.equal(attentionElement.classList.contains('d-none'), true);
 assert.equal(attentionElement['aria-hidden'], 'true');
 
 guideSandbox.renderGuide(staleLifecycle);
-assert.match(attentionElement.innerHTML, /Τα στοιχεία άλλαξαν/);
-assert.match(attentionElement.innerHTML,
-    /Τα στοιχεία της εβδομάδας άλλαξαν από την τελευταία αναζήτηση/);
-assert.match(attentionElement.innerHTML,
-    /Κάντε νέα Αναζήτηση και επανελέγξτε την εβδομάδα/);
+assert.match(attentionElement.innerHTML, /Η προηγούμενη επιβεβαίωση χρειάζεται έλεγχο/);
+assert.match(attentionElement.innerHTML, /Ανοίξτε τη διάγνωση της εβδομάδας/);
+assert.match(attentionElement.innerHTML, /Δεν αποθηκεύτηκε αλλαγή από την προβολή/);
+assert.doesNotMatch(attentionElement.innerHTML, /τελευταία αναζήτηση|Κάντε νέα Αναζήτηση/);
 assert.doesNotMatch(attentionElement.innerHTML, /STALE|Παρωχημέν|ΜΗ ΕΓΚΥΡΟ/);
 
 const deferredLifecycle = { current_stage: null, stages: Object.fromEntries(
@@ -554,3 +555,13 @@ assert.match(getCssRule('#employmentReviewStagesAccordion > .workflow-stage-bloc
 assert.match(getCssRule('.employment-review-action-primary'), /--bs-primary/);
 
 console.log('employment review four-stage accordion projection tests passed');
+
+{
+    const mixed = sandbox.derive([{ scope: { employee_kodikos: '0001' }, lifecycle_projection: { stages: {
+        stage1: stage('COMPLETED'), stage2: stage('BLOCKED', 4),
+        stage3: stage('OPEN', 2), stage4: stage('OPEN')
+    } } }], null, { safe_bulk_count: 3, manual_exception_count: 1, technical_conflict_count: 2 });
+    assert.equal(mixed.stages.STAGE2.pending_count, 6, 'all unresolved weekly categories share one unit');
+    assert.equal(mixed.stages.STAGE2.business_status, 'BLOCKED');
+    assert.equal(mixed.stages.STAGE3.enabled, false, 'ready scopes never conceal remaining real conflicts');
+}

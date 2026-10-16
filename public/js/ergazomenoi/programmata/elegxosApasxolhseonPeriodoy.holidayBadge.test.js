@@ -24,7 +24,7 @@ const documentStub = {
 const sandbox = {
     console,
     document: documentStub,
-    window: {},
+    window: { addEventListener: () => {} },
     URLSearchParams,
     setTimeout: () => {},
     clearTimeout: () => {}

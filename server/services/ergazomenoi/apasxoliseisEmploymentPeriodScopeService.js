@@ -1,3 +1,4 @@
+const { ownsEmploymentReviewDate } = require('./employmentReviewLoanOwnershipService');
 const {
     dateKeyUtc,
     startOfWeekMondayUtc,
@@ -179,6 +180,21 @@ function isWeekFullyWithinEmploymentPeriod(value, employee = {}) {
     return true;
 }
 
+function isDateWithinEmploymentReviewPeriod(value, employee = {}) {
+    return isDateWithinEmploymentPeriod(value, employee) && ownsEmploymentReviewDate(value, employee);
+}
+
+function assertEmploymentReviewDateOwned(value, employees = []) {
+    if (employees.some(employee => isDateWithinEmploymentReviewPeriod(value, employee))) return;
+    const error = new Error('Η ημέρα που επιχειρήσατε να αλλάξετε βρίσκεται εκτός εργασιακής σχέσης ή του διαστήματος ευθύνης του επιλεγμένου εργοδότη. ' +
+        'Ο χαρακτηρισμός ή η επεξεργασία της δεν επιτρέπεται. ' +
+        '1. Εκτελέστε νέα «Αναζήτηση». 2. Επιλέξτε ημέρα που αφορά τον επιλεγμένο εργοδότη. ' +
+        'Δεν αποθηκεύτηκε καμία αλλαγή για αυτή την ημέρα. Αναφορά: EMPLOYMENT_REVIEW_DATE_OUTSIDE_EMPLOYMENT.');
+    error.code = 'EMPLOYMENT_REVIEW_DATE_OUTSIDE_EMPLOYMENT';
+    error.statusCode = 409;
+    throw error;
+}
+
 function enumerateDateKeys(startValue, endValue) {
     const startKey = dateKeyUtc(startValue);
     const endKey = dateKeyUtc(endValue);
@@ -219,6 +235,10 @@ function deriveEmploymentOwnedDateScope({ natural_week_start, natural_week_end,
             ? enumerateDateKeys(employmentStart, employmentEnd) : [];
     }
 
+    if (employee) employmentDates = employmentDates.filter(date =>
+        ownsEmploymentReviewDate(date, employee));
+    employmentStart = employmentDates[0] || null;
+    employmentEnd = employmentDates.at(-1) || null;
     const ownedDates = employmentDates.filter((key) =>
         key >= periodStart && key <= periodEnd);
     return Object.freeze({
@@ -234,6 +254,18 @@ function deriveEmploymentOwnedDateScope({ natural_week_start, natural_week_end,
             !ownedDates.includes(key))),
         is_full_natural_week: employmentDates.length === 7 &&
             employmentDates[0] === naturalStart && employmentDates[6] === naturalEnd
+    });
+}
+
+// Expanded weekly reads can include rows after departure or between employment
+// cycles. Review only the employment-owned dates, retaining invalid dates so
+// the structural validation can still report them.
+function restrictWeeklyReviewRowsToEmploymentDates(rows = [], employmentDateScope = null) {
+    if (!Array.isArray(employmentDateScope?.employment_owned_dates)) return rows;
+    const dates = new Set(employmentDateScope.employment_owned_dates);
+    return rows.filter((row) => {
+        const date = dateKeyUtc(row.hmeromhnia);
+        return !date || dates.has(date);
     });
 }
 
@@ -268,7 +300,7 @@ function buildFullMonthBoundaryContextPreflight({ period_start, period_end,
     const periodDates = enumerateDateKeys(periodStart, periodEnd);
     const activeEmploymentRecordsByKey = new Map([...employeeRecordsByKey.entries()]
         .map(([employeeKey, records]) => [employeeKey, records.filter((employee) =>
-            periodDates.some((date) => isDateWithinEmploymentPeriod(date, employee)))])
+            periodDates.some((date) => isDateWithinEmploymentReviewPeriod(date, employee)))])
         .filter(([, records]) => records.length));
     const activeDuringPeriod = [...activeEmploymentRecordsByKey.values()].map((records) => records[0]);
     const side = (dates, rows = []) => {
@@ -279,7 +311,7 @@ function buildFullMonthBoundaryContextPreflight({ period_start, period_end,
             affected_employee_codes: Object.freeze([]) });
         const affectedEmploymentRecordsByKey = new Map([...activeEmploymentRecordsByKey.entries()]
             .filter(([, records]) => records.some((employee) => dates.some((date) =>
-                isDateWithinEmploymentPeriod(date, employee)))));
+                isDateWithinEmploymentReviewPeriod(date, employee)))));
         const affected = [...affectedEmploymentRecordsByKey.values()].map((records) => records[0]);
         const affectedKeys = new Set(affectedEmploymentRecordsByKey.keys());
         const evidenceEmployeeKeys = new Set();
@@ -290,7 +322,7 @@ function buildFullMonthBoundaryContextPreflight({ period_start, period_end,
             const rowDate = dateKeyUtc(row?.hmeromhnia);
             const employmentRecords = affectedEmploymentRecordsByKey.get(rowKey) || [];
             if (!affectedKeys.has(rowKey) || !dates.includes(rowDate) ||
-                !employmentRecords.some((employee) => isDateWithinEmploymentPeriod(rowDate, employee))) continue;
+                !employmentRecords.some((employee) => isDateWithinEmploymentReviewPeriod(rowDate, employee))) continue;
             const verification = resolveCardPairVerification(row);
             if (verification.hasCompleteCardEvidence || verification.hasUnresolvedCardEvidence) {
                 evidenceEmployeeKeys.add(rowKey);
@@ -324,9 +356,12 @@ module.exports = {
     endOfDepartureDay,
     startOfHireDay,
     isDateWithinEmploymentPeriod,
+    isDateWithinEmploymentReviewPeriod,
+    assertEmploymentReviewDateOwned,
     isWeekFullyWithinEmploymentPeriod,
     restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,
+    restrictWeeklyReviewRowsToEmploymentDates,
     isFullCalendarMonthRange,
     buildFullMonthBoundaryContextPreflight
 };

@@ -1,6 +1,7 @@
 'use strict';
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
+const { isValidDeclaredRest } = require('./apasxoliseisEffectiveRepoStateService');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const {
@@ -157,6 +158,8 @@ function evaluateRow({ row = {}, effectiveProfile = {}, appliedRepoTransfer = fa
     const profileDate = dateKey(row.hmeromhnia);
     const semantic = resolveNoWorkDaySemanticForDate({ date: profileDate,
         effectiveProfilesByDate: { [profileDate]: effectiveProfile } });
+    if (isValidDeclaredRest(row)) return { status: 'VALID_DECLARED_REST',
+        exclusionReasons: [], semantic, proposed: null, changes: {} };
     if (isCanonicalNoWorkState(row)) return { status: 'ALREADY_CANONICAL',
         exclusionReasons: [], semantic, proposed: null, changes: {} };
     const reasons = legacyCandidateReasons(row, { appliedRepoTransfer });
@@ -241,7 +244,7 @@ async function buildRepairPreview({ scope: rawScope, rowModel = ProdhlomenaOrari
         ypokatasthma: scope.ypokatasthma,
         hmeromhnia: mongoose.trusted({ $gte: new Date(`${scope.period_start}T00:00:00.000Z`),
             $lte: new Date(`${scope.period_end}T23:59:59.999Z`) }),
-        $or: mongoose.trusted([{ repo_apologistika: true },
+        $or: mongoose.trusted([{ kathgoria_ergasias: 'ΑΝ' }, { repo_apologistika: true },
             { kathgoria_ergasias_apologistika: mongoose.trusted({ $in: ['ΑΝ', 'ΜΕ'] }) }])
     }).select(['_id', 'team', 'company_kod', 'ypokatasthma', 'kodikos', 'hmeromhnia',
         ...SOURCE_FIELDS].join(' ')).sort({ hmeromhnia: 1, kodikos: 1, _id: 1 }).lean();
@@ -273,6 +276,8 @@ async function buildRepairPreview({ scope: rawScope, rowModel = ProdhlomenaOrari
         proposed: item.evaluation.proposed, exclusions: item.evaluation.exclusionReasons }));
     const repairable = evaluated.filter(item => item.evaluation.status === 'REPAIRABLE');
     return { scope, matched_count: rows.length, repairable_count: repairable.length,
+        valid_declared_rest_count: evaluated.filter(item =>
+            item.evaluation.status === 'VALID_DECLARED_REST').length,
         already_canonical_count: evaluated.filter(item =>
             item.evaluation.status === 'ALREADY_CANONICAL').length,
         excluded_count: evaluated.filter(item => item.evaluation.status === 'EXCLUDED').length,

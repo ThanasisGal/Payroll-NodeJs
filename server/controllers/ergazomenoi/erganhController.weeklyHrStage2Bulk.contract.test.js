@@ -15,8 +15,8 @@ assert.match(controller, /getReviewRowsForExport\(req, \{ includeLifecycle: true
 assert.match(controller, /__workflowStates/);
 assert.match(controller, /__workflowAudits/);
 assert.match(controller, /new Map/);
-assert.doesNotMatch(controller.match(/static completeWeeklyHrWorkflowStage2Bulk[\s\S]*?\n    };/)?.[0] || '',
-    /loadWeeklyHrStage2CompletionContext/);
+assert.match(controller.match(/static completeWeeklyHrWorkflowStage2Bulk[\s\S]*?\n    };/)?.[0] || '',
+    /loadFreshContext: \({ session }\) => loadWeeklyHrStage2CompletionContext\([\s\S]*?session/);
 assert.match(controller, /writeCanonicalDailyClassification/);
 assert.match(controller, /runWithPeriodWriteFence/);
 assert.match(controller, /expected_scope_fingerprint/);
@@ -93,9 +93,12 @@ assert.equal(afterStream.error(new Error('raw database detail')), true);
 const afterEvents = after.output.writes.map((line) => JSON.parse(line));
 assert.deepEqual(afterEvents[0], { type: 'progress', processed_in_batch: 1,
     total_in_batch: 19 });
-assert.deepEqual(afterEvents[1], { type: 'error',
-    code: 'STAGE2_BULK_COMPLETION_FAILED',
-    message: 'Αποτυχία μαζικής ολοκλήρωσης Stage 2.' });
+assert.equal(afterEvents[1].type, 'error');
+assert.equal(afterEvents[1].code, 'STAGE2_BULK_COMPLETION_FAILED');
+assert.equal(afterEvents[1].save_state, 'NOT_CONFIRMED');
+assert.match(afterEvents[1].message, /1\..*Αναζήτηση/);
+assert.match(afterEvents[1].message, /αν αποθηκεύτηκε κάποια αλλαγή/);
+assert.match(afterEvents[1].message, /Αναφορά τεχνικής υποστήριξης: HR-[A-F0-9]+$/);
 assert.equal(after.output.ended, true);
 assert.equal(after.output.headers['X-Accel-Buffering'], 'no');
 assert.doesNotMatch(after.output.writes.join(''), /PII_FORBIDDEN|raw database detail/);

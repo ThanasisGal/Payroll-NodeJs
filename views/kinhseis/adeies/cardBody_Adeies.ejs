@@ -100,9 +100,9 @@
     
     <div class="row form-group align-items-center" style="margin-top: -0.2rem; margin-left: -1rem; margin-right: -1rem; margin-bottom: .5rem; font-size: 0.8rem;">
         <div class="col-0-5 text-center">
-            <label for="aa_<%= ("0" + i).slice(-2) %>">
+            <span>
                 <%= ("0" + i).slice(-2) %>
-            </label>
+            </span>
         </div>
 
         <div class="col-0-2"></div>
@@ -134,7 +134,7 @@
             <select class="form-select selectpicker-dropdown-normalform-select selectpicker-dropdown-small" data-live-search="true" 
                 name="eidos_adeias_<%= ("0" + i).slice(-2) %>"
                 id="eidos_adeias_<%= ("0" + i).slice(-2) %>"
-                style="font-weight: 400 !important; font-size: .8rem !important;" tabIndex="<%= tabIndexCounter++ %>" >
+                style="font-weight: 400 !important; font-size: var(--payroll-control-font) !important;" tabIndex="<%= tabIndexCounter++ %>" >
             </select>        
         </div>
 
@@ -201,7 +201,7 @@
         <input type="number" class="form-control2 input-contents-totals right-align no-spin" 
             name="synolo_hmeron_adeias" 
             id="synolo_hmeron_adeias" 
-            style="font-size: 1vw !important;" 
+            style="font-size: var(--payroll-control-font) !important;"
             value="" tabIndex="-1" readonly />
     </div>
 
@@ -212,7 +212,7 @@
             style="font-size: 1vw; background-color: #86cf5b30 !important;"
             name="synolo_oron_adeias" 
             id="synolo_oron_adeias" 
-            style="font-size: 1vw !important;" 
+            style="font-size: var(--payroll-control-font) !important;"
             placeholder="ωω:λλ" 
             pattern="^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
             value="" tabIndex="-1" readonly
@@ -225,7 +225,7 @@
         <input type="number" class="form-control2 input-contents-totals right-align no-spin" 
             name="synolo_apodoxon_epidomatos_adeias" 
             id="synolo_apodoxon_epidomatos_adeias"
-            style="font-size: 1vw !important;" 
+            style="font-size: var(--payroll-control-font) !important;"
             value="" tabIndex="-1" readonly />
     </div>
 
@@ -234,7 +234,7 @@
         <input type="number" class="form-control2 input-contents-totals right-align no-spin" 
             name="synolo_apodoxon_adeias" 
             id="synolo_apodoxon_adeias"
-            style="font-size: 1vw !important;" 
+            style="font-size: var(--payroll-control-font) !important;"
             value="" tabIndex="-1" readonly />
     </div>
 </div>

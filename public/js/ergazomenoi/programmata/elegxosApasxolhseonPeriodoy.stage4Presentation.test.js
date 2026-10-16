@@ -168,7 +168,7 @@ const seventhCss = css.match(
     /#employmentReviewStage4Collapse \.stage4-seventh-day-badge\s*\{[^}]*\}/)?.[0] || '';
 assert.ok(seventhCss);
 assert.match(seventhCss, /padding:\s*0\.12rem 0\.35rem/);
-assert.match(seventhCss, /font-size:\s*0\.68rem/);
+assert.match(seventhCss, /font-size:\s*var\(--review-small, \.875rem\)/);
 assert.match(seventhCss, /max-width:\s*100%/);
 assert.match(seventhCss, /white-space:\s*normal/);
 
@@ -210,13 +210,13 @@ assert.match(row, /stage4-week-code/);
                     <tr class="employee-deviation-row"><td><table class="weekly-deviation-table">
                     <thead><tr><th>6η ημέρα</th></tr></thead><tbody><tr><td>${sixthHtml}</td></tr>
                     </tbody></table></td></tr></tbody></table>
-                <table style="table-layout:fixed;width:120px"><tbody>
-                    <tr><td class="badge-check-cell" style="width:120px">${validCardsHtml}</td></tr>
-                    <tr><td class="badge-check-cell" style="width:120px">${missingCardsHtml}</td></tr>
-                    <tr><td class="badge-check-cell" style="width:120px">${sixthHtml}</td></tr>
-                    <tr><td class="badge-check-cell" style="width:120px">${missingWeeklyHtml}</td></tr>
+                <table style="table-layout:fixed;width:176px"><tbody>
+                    <tr><td class="badge-check-cell" style="width:176px">${validCardsHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:176px">${missingCardsHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:176px">${sixthHtml}</td></tr>
+                    <tr><td class="badge-check-cell" style="width:176px">${missingWeeklyHtml}</td></tr>
                 </tbody></table>
-                <table style="table-layout:fixed;width:90px"><tbody><tr>
+                <table style="table-layout:fixed;width:224px"><tbody><tr>
                     <td class="seventh-check-cell">${seventhHtml}</td>
                 </tr></tbody></table></div></div></section>`);
         const styles = await page.evaluate(() => {
@@ -243,7 +243,7 @@ assert.match(row, /stage4-week-code/);
         assert.equal(styles.pillBg, 'rgb(247, 232, 232)', JSON.stringify(styles));
         assert.equal(styles.sixthBg, 'rgb(251, 243, 223)', JSON.stringify(styles));
         assert.equal(styles.headerPosition, 'sticky');
-        assert.equal(styles.weeklyHeaderPosition, 'sticky');
+        assert.equal(styles.weeklyHeaderPosition, 'static');
         assert.equal(styles.hoursDisplay, 'grid');
         assert.equal(styles.hoursLines, 2);
         assert.equal(styles.clockAlignment, 'start');
@@ -271,7 +271,7 @@ assert.match(row, /stage4-week-code/);
         for (const size of sizes) {
             assert.equal(size.display, 'inline-flex');
             assert.equal(size.paddingTop, '1.92px');
-            assert.equal(size.fontSize, '10.88px');
+            assert.ok(parseFloat(size.fontSize) >= 13.6 && parseFloat(size.fontSize) <= 16);
             assert.ok(size.badgeRight <= size.cellRight + 0.5, JSON.stringify(size));
             assert.ok(size.badgeScrollWidth <= size.badgeClientWidth + 1, JSON.stringify(size));
             assert.ok(size.cellScrollWidth <= size.cellClientWidth + 1, JSON.stringify(size));
@@ -303,7 +303,7 @@ assert.match(row, /stage4-week-code/);
                 cellScroll: cell.scrollWidth, badgeWidth: badge.clientWidth,
                 badgeScroll: badge.scrollWidth };
         });
-        assert.equal(seventhSize.fontSize, '10.88px');
+        assert.ok(parseFloat(seventhSize.fontSize) >= 13.6 && parseFloat(seventhSize.fontSize) <= 16);
         assert.equal(seventhSize.paddingTop, '1.92px');
         assert.equal(seventhSize.whiteSpace, 'normal');
         assert.ok(seventhSize.cellScroll <= seventhSize.cellWidth + 1);

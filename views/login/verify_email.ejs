@@ -1,27 +1,22 @@
-<div
-    class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3-0 pb-2-0 mb-3 mt-2-5 border-bottom bg-hero-cdn">
-</div>
+
 <%- include('../partials/flash') %>
 
-</br></br></br></br></br></br></br></br>
-
-<div class="container w-40">
+<div class="account-confirmation">
     <form id="verifyForm" action="/login/verify-email" method="POST">
         <%- include('../partials/_csrfField') %>
-    
+
         <div class="card z-depth-5">
-            <label class="card-header bg-header text-center">
-                <h4>Επαλήθευση Email</h4>
-            </label>
-      
+            <div class="card-header bg-header text-center"><h4 class="account-title">Επαλήθευση Email</h4></div>
+
             <div class="card-body">
-                <div class="row form-group g-3 align-items-center mt-2 mb-5">
-                    <div class="col-2 left-align">
+                <div class="account-fields">
+<div class="account-field">
+                    <div class="account-label">
                         <label for="email" class="col-form-label field-required">
                             e-mail
                         </label>
                     </div>
-                    <div class="col-10">
+                    <div class="account-input">
                         <input
                             type="text"
                             name="email"
@@ -31,12 +26,13 @@
                         />
                     </div>
                 </div>
+                </div>
             </div>
 
-            <div class="card-footer cardFooter">
-                <div class="d-inline-block d-flex cardFooter01">
-                    <button type="submit" id="verifyBtn" class="btn btn-brown rounded-4 w-25 mb-1 mt-2"><i class="bi bi-send"></i> Αποστολή</button>
-                    <a class="btn btn-brown rounded-4 w-25 mb-1 mt-2" href="/"><i class="bi bi-x-octagon"></i> Ακύρωση</a>
+            <div class="card-footer">
+                <div class="account-actions">
+                    <button type="submit" id="verifyBtn" class="btn btn-brown"><i class="bi bi-send"></i> Αποστολή</button>
+                    <a class="btn btn-brown" href="/"><i class="bi bi-x-octagon"></i> Ακύρωση</a>
                 </div>
             </div>
         </div>

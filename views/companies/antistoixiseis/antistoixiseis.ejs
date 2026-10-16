@@ -1,3 +1,4 @@
+<div class="maintenance-responsive-form companies-management-page">
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom bg-hero-cdn">
 
     <form
@@ -16,22 +17,22 @@
                 name="searchTerm"
                 id="searchInput"
                 class="form-control rounded-end-2 ms-auto fsvw-1_1 border-radius-10 use-default-enter"
-                placeholder="Αναζήτηση... ( πατείστε Enter )"
+                placeholder="Αναζήτηση"
                 autocomplete="off"
                 aria-label="Search"/>
         </div>
     </form>
 </div>
 
-<div class="card d-flex flex-column z-depth-5 w-90 margin-left-percent-5 overflow-hidden">
-    <div class="card-header p-0 height-rem-3_5">
+<div class="card d-flex flex-column z-depth-5 companies-management-card">
+    <div class="card-header p-0 height-rem-3_5 companies-search-header">
         <label class="text-center w-100 headers-content mt-2">
         Διαχείριση Αντιστοιχίσεων Κ.Π.Κ.
         </label>
     </div>
 
-    <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-64 bg-white">
-        <div>
+    <div class="card-body p-0 bg-white maintenance-table-scroll" tabindex="0" aria-label="Οριζόντια κύλιση πίνακα">
+        <div class="maintenance-table-inner maintenance-table-companies">
             <table class="table table-striped table-bordered table-sm table-hover table-fixed mb-0" id="myTable">
                 <!-- ίδιες στήλες για thead & tbody γιατί έχουμε ένα table -->
                 <thead class="backgroundColor-brown font-size-rem-1_1 center-align">
@@ -102,10 +103,10 @@
         const end   = Math.min(total, cur + 1);
     %>
 
-    <div class="card-footer d-flex align-items-center flex-nowrap gap-0_75rem nowrap overflow-x-auto">
+    <div class="card-footer d-flex align-items-center companies-management-footer">
 
         <!-- Αριστερά: Κουμπιά δράσεων -->
-        <div class="d-flex align-items-center flex-nowrap gap-0_5rem">
+        <div class="d-flex align-items-center companies-management-actions">
             <a id="add-btn" href="/companies/antistoixiseis/add"
             class="btn btn-brown rounded-4 buttons-content <%= (!userPrivileges.admin && !userPrivileges.create) ? 'disabled-link' : '' %>"
             data-allowed="<%= (userPrivileges.admin || userPrivileges.create) ? '1' : '0' %>">
@@ -130,7 +131,7 @@
         </div>
 
         <!-- ΑΜΕΣΩΣ μετά το “Επιστροφή”: Πολλαπλασιαστής -->
-        <div class="d-flex align-items-center flex-nowrap gap-0_5rem ms-2" id="perx-block">
+        <div class="d-flex align-items-center" id="perx-block">
             <span class="small text-muted font-size-rem-0_72">Εγγραφές: <strong> <%= basePer %> </strong></span>
             <ul class="pagination pagination-sm mb-0 margin-top--0_5rem perx-pagination">
                 <% [1,2,3,4,5].forEach(n => { %>
@@ -142,11 +143,9 @@
             <label class="small text-muted text-center font-size-rem-0_72"><strong>= <%= entries %> </strong> / Σελίδα</label>
         </div>
 
-        <!-- ΟΛΟΣ ο υπόλοιπος χώρος μπαίνει εδώ -->
-        <div class="flex-grow-1"></div>
 
         <!-- Δεξιά: Pagination -->
-        <nav aria-label="Πλοήγηση σελίδων">
+        <nav class="companies-management-pagination" aria-label="Πλοήγηση σελίδων">
             <ul class="pagination pagination-sm mb-0 margin-top--0_5rem">
                 <!-- First / Prev -->
                 <li class="page-item <%= cur === 1 ? 'disabled' : '' %>">
@@ -207,3 +206,5 @@
 <script src="<%= script('companies/antistoixiseis/selectRowInTable') %>"></script>
 <script src="<%= script('companies/antistoixiseis/selectRowsInNestedTable') %>"></script>
 <script src="<%= script('common/hideTooltips') %>"></script>
+
+</div>

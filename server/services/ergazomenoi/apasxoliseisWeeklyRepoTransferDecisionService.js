@@ -21,7 +21,7 @@ const DECISION_ALLOWED_ROLES = CRITICAL_EMPLOYMENT_DECISION_ROLES;
 const COMMAND_KEYS = Object.freeze(['proposal_id','expected_source_id','expected_target_id','expected_proposal_version','expected_choice_code','decision_code','notes','request_id']);
 const MAX_COMMAND_BYTES = 16 * 1024;
 
-function errorWithStatus(message, statusCode) { const error = new Error(message); error.statusCode = statusCode; return error; }
+function errorWithStatus(message, statusCode, code = 'INVALID_REPO_DECISION_COMMAND') { const error = new Error(message); error.statusCode = statusCode; error.code = code; return error; }
 function decisionAuthorizationError() {
     const error = errorWithStatus('Δεν έχετε δικαίωμα καταγραφής απόφασης.', 403);
     error.code = 'DECISION_NOT_AUTHORIZED';
@@ -46,20 +46,20 @@ function assertWeeklyRepoTransferDecisionAuthorization(session = {}) {
 function validateCommand(payload) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw errorWithStatus('Μη έγκυρη εντολή απόφασης.', 400);
     let bytes; try { bytes = Buffer.byteLength(JSON.stringify(payload), 'utf8'); } catch { throw errorWithStatus('Μη έγκυρη εντολή απόφασης.', 400); }
-    if (bytes > MAX_COMMAND_BYTES) throw errorWithStatus('Η εντολή απόφασης υπερβαίνει το επιτρεπτό μέγεθος.', 413);
+    if (bytes > MAX_COMMAND_BYTES) throw errorWithStatus('Η εντολή απόφασης υπερβαίνει το επιτρεπτό μέγεθος.', 413, 'REPO_DECISION_COMMAND_TOO_LARGE');
     const unknown = Object.keys(payload).filter((key) => !COMMAND_KEYS.includes(key));
-    if (unknown.length || Object.keys(payload).some((key) => key.startsWith('$') || key.includes('.'))) throw errorWithStatus('Η εντολή περιέχει μη επιτρεπτά πεδία.', 400);
+    if (unknown.length || Object.keys(payload).some((key) => key.startsWith('$') || key.includes('.'))) throw errorWithStatus('Η εντολή περιέχει μη επιτρεπτά πεδία.', 400, 'REPO_DECISION_FIELDS_NOT_ALLOWED');
     const command = {
         proposal_id: text(payload.proposal_id, 200), expected_source_id: text(payload.expected_source_id, 50),
         expected_target_id: text(payload.expected_target_id, 50), expected_proposal_version: text(payload.expected_proposal_version, 100),
         expected_choice_code: text(payload.expected_choice_code, 100), decision_code: text(payload.decision_code, 50).toUpperCase(),
         notes: text(payload.notes, 2001), request_id: text(payload.request_id, 100)
     };
-    if (!command.proposal_id || !command.expected_proposal_version || !command.expected_choice_code || !command.request_id) throw errorWithStatus('Λείπουν απαραίτητα στοιχεία της απόφασης.', 400);
-    if (!mongoose.isValidObjectId(command.expected_source_id) || !mongoose.isValidObjectId(command.expected_target_id) || command.expected_source_id === command.expected_target_id) throw errorWithStatus('Μη έγκυρες εγγραφές της πρότασης.', 400);
-    if (!DECISION_CODES.includes(command.decision_code)) throw errorWithStatus('Η απόφαση δεν υποστηρίζεται.', 400);
-    if (command.notes.length > 2000) throw errorWithStatus('Οι σημειώσεις υπερβαίνουν το επιτρεπτό μήκος.', 400);
-    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/.test(command.request_id)) throw errorWithStatus('Μη έγκυρο request_id.', 400);
+    if (!command.proposal_id || !command.expected_proposal_version || !command.expected_choice_code || !command.request_id) throw errorWithStatus('Λείπουν απαραίτητα στοιχεία της απόφασης.', 400, 'REPO_DECISION_FIELDS_REQUIRED');
+    if (!mongoose.isValidObjectId(command.expected_source_id) || !mongoose.isValidObjectId(command.expected_target_id) || command.expected_source_id === command.expected_target_id) throw errorWithStatus('Μη έγκυρες εγγραφές της πρότασης.', 400, 'REPO_DECISION_ROWS_INVALID');
+    if (!DECISION_CODES.includes(command.decision_code)) throw errorWithStatus('Η απόφαση δεν υποστηρίζεται.', 400, 'REPO_DECISION_CHOICE_INVALID');
+    if (command.notes.length > 2000) throw errorWithStatus('Οι σημειώσεις υπερβαίνουν το επιτρεπτό μήκος.', 400, 'REPO_DECISION_NOTES_TOO_LONG');
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/.test(command.request_id)) throw errorWithStatus('Μη έγκυρο request_id.', 400, 'REPO_DECISION_REQUEST_ID_INVALID');
     return command;
 }
 function scopeFromSession(session) {
@@ -95,7 +95,7 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
     }).lean();
     if (retry) {
         if (retry.command_identity === normalizedCommandIdentity) return { decision: presentation(retry, retry.snapshot_fingerprint), idempotent: true };
-        throw errorWithStatus('Το αναγνωριστικό αιτήματος έχει ήδη χρησιμοποιηθεί.', 409);
+        throw errorWithStatus('Το αναγνωριστικό αιτήματος έχει ήδη χρησιμοποιηθεί.', 409, 'REPO_DECISION_REQUEST_ID_CONFLICT');
     }
     const initial = await reconstruct({ scope, command });
     const final = await reconstruct({ scope, command });
@@ -106,12 +106,12 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
             week_end: final.snapshot?.week_end
         });
     }
-    if (initial.fingerprint !== final.fingerprint) throw errorWithStatus('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο πριν καταγράψετε απόφαση.', 409);
+    if (initial.fingerprint !== final.fingerprint) throw errorWithStatus('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο πριν καταγράψετε απόφαση.', 409, 'REPO_DECISION_INPUT_CHANGED');
     if (command.decision_code !== 'APPROVE_PROPOSAL' &&
         final.group?.decision_grain === 'ATOMIC_LINKED_SET') {
         const reusable = buildAtomicReusableCriteriaV5(final.group);
         if (!reusable.fingerprint) {
-            throw errorWithStatus('Η πρόταση δεν είναι ασφαλής για έλεγχο επαναχρησιμοποιήσιμης πολιτικής.', 409);
+            throw errorWithStatus('Η πρόταση δεν είναι ασφαλής για έλεγχο επαναχρησιμοποιήσιμης πολιτικής.', 409, 'REPO_REUSABLE_PROPOSAL_NOT_ELIGIBLE');
         }
         const reusableCandidates = await approvalModel.find({
             team: scope.team,
@@ -149,7 +149,7 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
         proposal_identity: final.fingerprint,
         decision_status: 'RECORDED'
     }).lean();
-    if (existingDecision) throw errorWithStatus('Έχει ήδη καταγραφεί απόφαση για αυτή την πρόταση.', 409);
+    if (existingDecision) throw errorWithStatus('Έχει ήδη καταγραφεί απόφαση για αυτή την πρόταση.', 409, 'REPO_DECISION_ALREADY_RECORDED');
     const record = {
         proposal_identity: final.fingerprint, proposal_id: snapshot.proposal_id, canonical_group_key: snapshot.canonical_group_key,
         snapshot_version: snapshot.snapshot_version, snapshot_fingerprint: final.fingerprint, canonical_snapshot: snapshot,
@@ -184,16 +184,16 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
         if (!isDuplicateKey(error)) throw error;
         const racedRetry = await decisionModel.findOne({ team: scope.team, company_kod: scope.company_kod, request_id: command.request_id }).lean();
         if (racedRetry && racedRetry.command_identity === normalizedCommandIdentity) return { decision: presentation(racedRetry, racedRetry.snapshot_fingerprint), idempotent: true };
-        throw errorWithStatus('Έχει ήδη καταγραφεί απόφαση για αυτή την πρόταση.', 409);
+        throw errorWithStatus('Έχει ήδη καταγραφεί απόφαση για αυτή την πρόταση.', 409, 'REPO_DECISION_ALREADY_RECORDED');
     }
 }
 
-function parseDate(value, label) { const key = text(value, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) throw errorWithStatus(`Μη έγκυρη τιμή για ${label}.`, 400); const date = new Date(`${key}T00:00:00.000Z`); if (Number.isNaN(date.getTime()) || date.toISOString().slice(0,10) !== key) throw errorWithStatus(`Μη έγκυρη τιμή για ${label}.`, 400); return date; }
+function parseDate(value, label) { const key = text(value, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) throw errorWithStatus(`Μη έγκυρη τιμή για ${label}.`, 400, 'INVALID_PERIOD_SCOPE'); const date = new Date(`${key}T00:00:00.000Z`); if (Number.isNaN(date.getTime()) || date.toISOString().slice(0,10) !== key) throw errorWithStatus(`Μη έγκυρη τιμή για ${label}.`, 400, 'INVALID_PERIOD_SCOPE'); return date; }
 async function listWeeklyRepoTransferDecisions({ session, filters = {}, decisionModel = DecisionModel, reconstruct = reconstructWeeklyRepoTransferDecision }) {
     const scope = scopeFromSession(session); const ypokatasthma = text(filters.ypokatasthma, 20);
-    if (!ypokatasthma || ypokatasthma.toUpperCase() === 'ALL' || ypokatasthma.includes(',')) throw errorWithStatus('Επιλέξτε συγκεκριμένο υποκατάστημα.', 400);
+    if (!ypokatasthma || ypokatasthma.toUpperCase() === 'ALL' || ypokatasthma.includes(',')) throw errorWithStatus('Επιλέξτε συγκεκριμένο υποκατάστημα.', 400, 'SPECIFIC_BRANCH_REQUIRED');
     const start = parseDate(filters.apo_hmeromhnia, 'apo_hmeromhnia'); const end = parseDate(filters.eos_hmeromhnia, 'eos_hmeromhnia');
-    if (getAtomicPeriodRangeDiagnostic({ periodStart: start, periodEnd: end })) throw errorWithStatus('Το επιλεγμένο εύρος ημερομηνιών δεν υποστηρίζεται.', 400);
+    if (getAtomicPeriodRangeDiagnostic({ periodStart: start, periodEnd: end })) throw errorWithStatus('Το επιλεγμένο εύρος ημερομηνιών δεν υποστηρίζεται.', 400, 'INVALID_PERIOD_SCOPE');
     const query = { team: scope.team, company_kod: scope.company_kod, ypokatasthma, decision_status: 'RECORDED', week_start: mongoose.trusted({ $lte: end }), week_end: mongoose.trusted({ $gte: start }) };
     const proposalId = text(filters.proposal_id, 200); if (proposalId) query.proposal_id = proposalId;
     let currentFingerprint = null;

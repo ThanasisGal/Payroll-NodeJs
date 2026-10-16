@@ -8,7 +8,7 @@ const vm = require('vm');
 const source = fs.readFileSync(
     path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8'
 );
-const start = source.indexOf('async function refreshOrphanResolutionPreview');
+const start = source.indexOf('function orphanResolutionPreviewRequestState');
 const end = source.indexOf('async function initializeOrphanResolutionPreview', start);
 assert.ok(start >= 0 && end > start, 'orphan preview refresh function must exist');
 
@@ -40,11 +40,15 @@ async function runRefresh({ approvalChecked, scope, preserveExplicitApproval }) 
             }) };
         },
         orphanResolutionPreviewDrafts: new WeakMap(),
+        orphanResolutionPreviewRequests: new WeakMap(),
+        clearTimeout,
         orphanResolutionPreviewRow: (row) => row,
         applyOrphanDerivedPreview: () => {},
         renderOrphanCardResolutionSection: () => '<div></div>'
     };
     vm.createContext(sandbox);
+    vm.runInContext(source.slice(source.indexOf('function orphanWorkIntervalsFromForm'),
+        source.indexOf('function orphanResolutionPreviewRow')), sandbox);
     vm.runInContext(source.slice(start, end), sandbox);
     await sandbox.refreshOrphanResolutionPreview(
         { _id: 'row-1' }, { preserveExplicitApproval }
@@ -81,11 +85,11 @@ async function runRefresh({ approvalChecked, scope, preserveExplicitApproval }) 
         'start/end refresh must require renewed explicit approval');
 
     assert.match(source,
-        /event\?\.currentTarget\?\.id === 'orphanResolutionScope'/);
+        /event\.target\.id === 'orphanResolutionScope'/);
     assert.match(source,
         /await refreshOrphanResolutionPreview\(row, \{ preserveExplicitApproval \}\)/);
     assert.match(source,
-        /reuse_scope: document\.getElementById\('orphanResolutionScope'\)\?\.value/);
+        /const scope = document\.getElementById\('orphanResolutionScope'\)\?\.value/);
     assert.match(source,
         /if \(requiresExplicitOrphanResolutionApproval\(row, orphanApprove\)\)/);
     assert.match(source,

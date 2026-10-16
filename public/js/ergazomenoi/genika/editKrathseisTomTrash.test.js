@@ -198,7 +198,7 @@ test('each main-row trash3 is rendered after its AMA input', () => {
 
 test('AMA header uses the exact data-row columns and excludes the trash column', () => {
     const headerEnd = renderedView.indexOf(
-        '<div class="row form-group g-3 align-items-center mb-1">'
+        '<div class="row form-group g-3 align-items-center mb-1 employee-retention-row"'
     );
     const header = renderedView.slice(
         renderedView.indexOf(
@@ -210,13 +210,13 @@ test('AMA header uses the exact data-row columns and excludes the trash column',
         header.indexOf('class="col-1 text-center"'),
         header.indexOf('class="col-8 text-center"'),
         header.indexOf('class="col-0-2"'),
-        header.indexOf('class="col-1-5 text-center"'),
+        header.indexOf('class="col-1-5 text-center employee-ama-field"'),
         header.indexOf('class="col-0-3"')
     ];
 
     assert.ok(positions.every((position) => position >= 0));
     assert.deepEqual([...positions].sort((a, b) => a - b), positions);
-    assert.match(header, /class="col-1-5 text-center"[\s\S]*Α\.Μ\.Α\./);
+    assert.match(header, /class="col-1-5 text-center employee-ama-field"[\s\S]*Α\.Μ\.Α\./);
     assert.doesNotMatch(header, /margin-left|translateX|position:\s*absolute/);
 });
 

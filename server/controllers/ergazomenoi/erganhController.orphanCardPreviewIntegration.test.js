@@ -37,7 +37,7 @@ const document = { querySelector: () => null, querySelectorAll: () => [],
     createElement: () => ({ addEventListener: () => {}, appendChild: () => {},
         classList: { add: () => {}, toggle: () => {} }, dataset: {}, style: {} }),
     head: { appendChild: () => {} }, body: { appendChild: () => {} } };
-const sandbox = { console, document, window: {}, URLSearchParams,
+const sandbox = { console, document, window: { addEventListener: () => {} }, URLSearchParams,
     fetch: async () => { throw new Error('Unexpected fetch'); },
     setTimeout: () => 0, clearTimeout: () => {} };
 vm.createContext(sandbox);

@@ -28,6 +28,7 @@ const {
     resolveNoWorkDaySemanticForDate
 } = require('./apasxoliseisReviewEmploymentProfileService');
 const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
+const { dailyEvidence, diagnostic } = require('./apasxoliseisReviewDiagnosticService');
 
 const NEXT_STAGE = Object.freeze({
     LEAVE_CLASSIFICATION: 'LEAVE_CLASSIFICATION',
@@ -128,20 +129,37 @@ function resolveWeeklyHrWorkflow({
         !Array.isArray(actionable_date_keys) || actionable_date_keys.includes(date)))
         : Array.isArray(actionable_date_keys) ? new Set(uniqueDateKeys(actionable_date_keys)) : null;
     const blockingReasons = [];
+    const blockingDetails = [];
+    const block = (code, affectedDates = [], evidence = {}) => {
+        blockingReasons.push(code);
+        blockingDetails.push(diagnostic(code, affectedDates, evidence));
+    };
     const warnings = [];
 
     if ((!deferred && orderedRows.length !== expectedDates.length) || dates.some((date) => !date) ||
         new Set(dates).size !== dates.length || dates.some(date => !expectedDates.includes(date)) ||
         requiredDates.some((date) => !dates.includes(date))) {
-        blockingReasons.push('INCOMPLETE_NATURAL_WEEK');
+        const missing = requiredDates.filter(date => !dates.includes(date));
+        const duplicates = dates.filter((date, index) => date && dates.indexOf(date) !== index);
+        const unexpected = dates.filter(date => date && !expectedDates.includes(date));
+        block('INCOMPLETE_NATURAL_WEEK', [...missing, ...duplicates, ...unexpected], {
+            missing_dates: missing, duplicate_dates: [...new Set(duplicates)],
+            unexpected_dates: unexpected, invalid_date_count: dates.filter(date => !date).length,
+            required_count: requiredDates.length, actual_count: orderedRows.length
+        });
     }
 
+    const historicalWorkdays = [...new Set(expectedDates.map(date => {
+        const terms = Object.hasOwn(effectiveProfilesByDate || {}, date)
+            ? effectiveProfilesByDate[date] : effectiveProfile;
+        return Number(String(terms?.hmeres_ergasias_ebdomadas ?? '').replace(',', '.').trim());
+    }))];
     const profile = {
         ...(effectiveProfile && typeof effectiveProfile === 'object'
             ? effectiveProfile : {}),
         profile_changed_inside_week:
             profile_changed_inside_week === true ||
-            effectiveProfile?.profile_changed_inside_week === true
+            effectiveProfile?.profile_changed_inside_week === true || historicalWorkdays.length > 1
     };
     const expectedRepoResolution = resolveEffectiveExpectedWeeklyRepo({
         weekRows: orderedRows,
@@ -151,7 +169,10 @@ function resolveWeeklyHrWorkflow({
         if (expectedRepoResolution.reason === 'PROFILE_CHANGED_INSIDE_WEEK') {
             warnings.push(expectedRepoResolution.reason);
         } else {
-            blockingReasons.push(expectedRepoResolution.reason);
+            block(expectedRepoResolution.reason, [], {
+                contractual_weekly_days: expectedRepoResolution.effectiveWeeklyWorkdays,
+                scheduled_work_days: expectedRepoResolution.scheduledWorkDays
+            });
         }
     }
 
@@ -170,10 +191,11 @@ function resolveWeeklyHrWorkflow({
         .map((row) => dateKeyUtc(row.hmeromhnia));
     const possibleLeaveSet = new Set(possibleLeaveDays);
     if (classifiedDateSet.size !== classifiedDates.length) {
-        blockingReasons.push('POSSIBLE_LEAVE_CLASSIFICATION_CONFLICT');
+        block('POSSIBLE_LEAVE_CLASSIFICATION_CONFLICT', classifiedDates.filter((date, index) =>
+            classifiedDates.indexOf(date) !== index));
     }
     if (classifiedDates.some((date) => !possibleLeaveSet.has(date))) {
-        blockingReasons.push('CLASSIFIED_DATE_NOT_POSSIBLE_LEAVE');
+        block('CLASSIFIED_DATE_NOT_POSSIBLE_LEAVE', classifiedDates.filter(date => !possibleLeaveSet.has(date)));
     }
     const unclassifiedPossibleLeaveDays = possibleLeaveDays.filter(
         (date) => !classifiedDateSet.has(date)
@@ -182,7 +204,7 @@ function resolveWeeklyHrWorkflow({
         const candidate = resolveNoWorkCandidateForDate({ date,
             effectiveProfilesByDate, effectiveProfile: profile });
         if (candidate.semantic_status === 'UNKNOWN') {
-            blockingReasons.push('DAILY_EMPLOYMENT_REGIME_UNKNOWN');
+            block('DAILY_EMPLOYMENT_REGIME_UNKNOWN', [date]);
         }
         const { semantic_status: _semanticStatus, ...presentation } = candidate;
         return Object.freeze(presentation);
@@ -195,20 +217,24 @@ function resolveWeeklyHrWorkflow({
         actualFactsByDate.set(date, facts);
         const dateIsActionable = (!actionableDateSet || actionableDateSet.has(date)) &&
             (!deferred || date <= boundary.period_end);
-        if (dateIsActionable) blockingReasons.push(...(facts.reasons || []));
+        if (dateIsActionable) (facts.reasons || []).forEach(code =>
+            block(code, [date], dailyEvidence(row, facts)));
         const dailyProfile = effectiveProfilesByDate?.[date] || profile;
         if (deferred && dateIsActionable && dailyProfile.resolution_blocked === true) {
-            blockingReasons.push(dailyProfile.resolution_reason || 'EMPLOYMENT_PROFILE_BLOCKED');
+            block(dailyProfile.resolution_reason || 'EMPLOYMENT_PROFILE_BLOCKED', [date]);
         }
         warnings.push(...(facts.warnings || []));
         if (dateIsActionable &&
             (facts.warnings || []).includes('INCOMPLETE_CARD_INTERVAL') &&
             !HR_APPROVED_CARD_EVIDENCE_STATUSES.has(facts.cardVerificationStatus)) {
-            blockingReasons.push('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE');
+            block('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE', [date], dailyEvidence(row, facts));
         }
     });
 
-    const expectedRepoCount = expectedRepoResolution.effectiveExpectedWeeklyRepo;
+    // Days outside employment never create a weekly obligation.
+    const expectedRepoCount = expectedRepoResolution.ok
+        ? Math.max(0, expectedDates.length - expectedRepoResolution.effectiveWeeklyWorkdays)
+        : null;
     const restingRepoDays = orderedRows.filter((row) => {
         const date = dateKeyUtc(row.hmeromhnia);
         if (classifiedDateSet.has(date)) return false;
@@ -223,7 +249,13 @@ function resolveWeeklyHrWorkflow({
             expectedRepoCategory: dailyExpectedRepoCategory
         });
         if ((state.diagnostics || []).length > 0) {
-            blockingReasons.push(...state.diagnostics);
+            // Context-only days still inform the full-week rest calculation,
+            // but their daily conflicts belong to their own review period.
+            if ((!actionableDateSet || actionableDateSet.has(date)) &&
+                (!deferred || date <= boundary.period_end)) {
+                state.diagnostics.forEach(code => block(code, [date],
+                    dailyEvidence(row, actualFactsByDate.get(date))));
+            }
             return false;
         }
         return state.effectiveRepo === true &&
@@ -297,33 +329,22 @@ function resolveWeeklyHrWorkflow({
     const selectedKeys = selectedTransfers.map((transfer) =>
         pairKey(transfer.source_date, transfer.target_date));
     if (repo_resolution_completed === true &&
-        (selectedKeys.some((key) => !candidateKeys.has(key)) ||
+        (selectedTransfers.length > (repoDeficitBefore || 0) ||
+            selectedKeys.some((key) => !candidateKeys.has(key)) ||
             new Set(selectedTransfers.map((item) => item.source_date)).size !== selectedTransfers.length ||
             new Set(selectedTransfers.map((item) => item.target_date)).size !== selectedTransfers.length)) {
-        blockingReasons.push('SELECTED_REPO_TRANSFER_NOT_CURRENTLY_VALID');
+        block('SELECTED_REPO_TRANSFER_NOT_CURRENTLY_VALID', selectedTransfers.flatMap(item =>
+            [item.source_date, item.target_date]));
     }
     const validSelectedCount = repo_resolution_completed === true && blockingReasons.length === 0
         ? Math.min(selectedTransfers.length, repoDeficitBefore || 0)
         : 0;
-    const uniqueDirectProposal = repo_resolution_completed !== true &&
-        directRepoCandidates.length === 1 ? directRepoCandidates[0] : null;
-    const uniqueTransferProposal = repo_resolution_completed !== true &&
-        repoTransferCandidates.length === 1 ? repoTransferCandidates[0] : null;
-    const proposedTargetDates = [
-        uniqueDirectProposal?.date,
-        uniqueTransferProposal?.target_date
-    ].filter(Boolean);
-    const uniquelyProposedCount = Math.min(
-        new Set(proposedTargetDates).size,
-        repoDeficitBefore || 0
-    );
+    // A candidate (even the only candidate) is not evidence of rest taken.
     const repoDeficitAfter = repoDeficitBefore === null ? null : Math.max(
-        repoDeficitBefore - (repo_resolution_completed ? validSelectedCount : uniquelyProposedCount),
-        0
-    );
-    const usedTargetDates = new Set(repo_resolution_completed === true
-        ? selectedTransfers.map((transfer) => transfer.target_date)
-        : proposedTargetDates);
+        repoDeficitBefore - validSelectedCount, 0);
+    const usedTargetDates = new Set(repo_resolution_completed === true &&
+        blockingReasons.length === 0
+        ? selectedTransfers.map((transfer) => transfer.target_date) : []);
     const knownRepoIdentityDaysAfterProposal = [...new Set([
         ...knownRepoIdentityDays,
         ...usedTargetDates
@@ -407,6 +428,7 @@ function resolveWeeklyHrWorkflow({
             remaining_possible_leave_review_completed === true,
         next_required_hr_stage: nextRequiredHrStage,
         blocking_reasons: [...new Set(blockingReasons)],
+        blocking_details: blockingDetails,
         warnings: [...new Set(warnings)]
     });
 }

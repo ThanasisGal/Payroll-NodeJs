@@ -17,6 +17,8 @@ const { findStage1PeriodSlice, periodSliceKey } = require(
     './apasxoliseisStage1PeriodSliceService'
 );
 
+const { assessWeeklyRestEvidence } = require('./apasxoliseisWeeklyRestEvidenceService');
+
 const ACTION = 'STAGE3_DAILY_RESOLVED';
 const WORKFLOW_VERSION = 'weekly-hr-workflow:v1';
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:._-]{7,99}$/;
@@ -27,7 +29,7 @@ function fail(code, message, statusCode = 400) {
 function text(value, max = Infinity) { return String(value ?? '').trim().slice(0, max); }
 function classification(value) {
     const result = text(value).toUpperCase();
-    if (!['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'].includes(result)) {
+    if (!['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO'].includes(result)) {
         fail('INVALID_STAGE3_CLASSIFICATION', 'Μη έγκυρος τελικός χαρακτηρισμός Stage 3.');
     }
     return result;
@@ -70,6 +72,11 @@ function assertDecisionAllowed(context, finalClassification) {
         'Η ημέρα δεν αποτελεί πλέον εκκρεμότητα του Stage 3.', 409);
     if (context.actualFacts?.countsAsActualWorkDay === true) fail('STAGE3_ACTUAL_WORK_PRESENT',
         'Υπάρχει πραγματική εργασία και η ημέρα δεν μπορεί να επιλυθεί ως πιθανή άδεια.', 409);
+    const stage2 = context.lifecycle?.stages?.stage2;
+    if (finalClassification === 'REST_REPO' && stage2 &&
+        stage2.business_status !== 'COMPLETED' &&
+        stage2.resolution_route !== 'STAGE3_HUMAN_DECISION') fail('STAGE3_UPSTREAM_NOT_COMPLETED',
+        'Εκκρεμεί απόφαση μεταφοράς ρεπό ή έλεγχος αντικρουόμενων στοιχείων.', 409);
     const employmentType = normalizeEmploymentType(
         context.dailyProfile?.kathestos_apasxolhshs ??
         context.dailyProfile?.typos_apasxolhshs
@@ -80,6 +87,19 @@ function assertDecisionAllowed(context, finalClassification) {
     if (finalClassification === 'NON_WORK' && semantic.classification === 'REST_REPO') {
         fail('STAGE3_NON_WORK_NOT_ALLOWED_FOR_FULL_TIME',
             'Η ΜΗ ΕΡΓΑΣΙΑ δεν επιτρέπεται όταν οι ισχύοντες όροι απαιτούν ΑΝΑΠΑΥΣΗ / ΡΕΠΟ.', 409);
+    }
+    if (finalClassification === 'REST_REPO') {
+        const inputs = context.simulation_inputs || {};
+        const evidence = assessWeeklyRestEvidence({ rows: context.weekRows || [],
+            effectiveProfile: inputs.effectiveProfile || context.dailyProfile,
+            effectiveProfilesByDate: inputs.effectiveProfilesByDate,
+            expectedDateKeys: inputs.employmentDateScope?.employment_owned_dates || null,
+            actionableDates: inputs.employmentDateScope?.authoritative_date_set || null,
+            companySettings: inputs.companySettings });
+        if (!evidence.confirmable_dates.includes(dateKeyUtc(context.row.hmeromhnia))) {
+            fail('WEEKLY_REST_DECISION_NOT_ALLOWED',
+                'Η ημέρα δεν μπορεί πλέον να επιβεβαιωθεί ως ελλείπουσα εβδομαδιαία ανάπαυση.', 409);
+        }
     }
     return employmentType;
 }

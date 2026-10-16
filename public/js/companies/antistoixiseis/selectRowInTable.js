@@ -31,6 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Προαιρετικά: DELETE για ΚΥΡΙΑ εγγραφή (αν υπάρχει σε αυτή τη σελίδα)
   if (deleteBtn) {
+    // Η επιβεβαίωση δεν είναι πλοήγηση· η αναμονή ξεκινά από το fetch.
+    deleteBtn.setAttribute("data-no-loader", "");
     deleteBtn.addEventListener('click', async (event) => {
       event.preventDefault();
       if (!currentMainId) return;
@@ -38,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const deleteUrl = `/companies/antistoixiseis/delete/${currentMainId}`;
 
       const result = await Swal.fire({
+        target: document.querySelector('main.payroll-form-layout') || document.body,
+        heightAuto: false,
+        width: 'min(560px, 100%)',
         title: 'Είστε σίγουρος / η;',
         html:
           'ΠΡΟΣΟΧΗ!!! Θα διαγραφούν ΟΛΕΣ οι αντιστοιχίσεις Κ.Π.Κ. ' +
@@ -51,12 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmButtonText: 'Διαγραφή',
         cancelButtonText: 'Ακύρωση',
         customClass: {
+          title: 'custom-title',
+          popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+          container: 'new-year-confirmation-container',
           confirmButton: 'class-error custom-confirm-button custom-swal-button',
-          cancelButton:  'custom-cancel-button custom-swal-button',
+          cancelButton:  'class-secondary custom-cancel-button custom-swal-button',
         },
         didOpen: () => Swal.getCancelButton().focus(),
       });
-      if (!result.isConfirmed) return;
+      if (result.isConfirmed !== true) return;
 
       try {
         const response = await fetch(deleteUrl, {
@@ -72,22 +80,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await response.json();
 
         await Swal.fire({
+          target: document.querySelector('main.payroll-form-layout') || document.body,
+          heightAuto: false,
+          width: 'min(560px, 100%)',
           icon: 'success',
           title: 'Επιτυχής Διαγραφή των Αντιστοιχίσεων Κ.Π.Κ.',
           timer: 3000,
           confirmButtonText: 'Κλείσιμο',
-          customClass: { confirmButton: 'class-success custom-confirm-button custom-swal-button' },
+          customClass: { title: 'custom-title', popup: 'custom-swal-popup new-year-confirmation z-depth-5', container: 'new-year-confirmation-container', confirmButton: 'class-success custom-confirm-button custom-swal-button' },
         });
 
         window.location.href = data.redirectUrl;
       } catch (error) {
         await Swal.fire({
+          target: document.querySelector('main.payroll-form-layout') || document.body,
+          heightAuto: false,
+          width: 'min(560px, 100%)',
           icon: 'error',
           title: 'Σφάλμα κατά τη Διαγραφή των Αντιστοιχίσεων Κ.Π.Κ.',
           html: 'Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>',
           timer: 3000,
           confirmButtonText: 'Κλείσιμο',
-          customClass: { confirmButton: 'class-normal custom-confirm-button custom-swal-button' },
+          customClass: { title: 'custom-title', popup: 'custom-swal-popup new-year-confirmation z-depth-5', container: 'new-year-confirmation-container', confirmButton: 'class-normal custom-confirm-button custom-swal-button' },
         });
         window.location.href = '/companies/antistoixiseis';
       }

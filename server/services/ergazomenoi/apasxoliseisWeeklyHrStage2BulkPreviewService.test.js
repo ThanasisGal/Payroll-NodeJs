@@ -29,11 +29,11 @@ function context(index, kind = 'safe') {
     const value = { scope: { employee_id: `employee-${Math.floor(index / 5)}`,
         employee_kodikos: String(Math.floor(index / 5)).padStart(4, '0'),
         week_start: start, week_end: end }, rows: [row],
-    effectiveProfilesByDate: { [date]: { typos_apasxolhshs: '0' } },
+    effectiveProfilesByDate: { [date]: { typos_apasxolhshs: '1', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4 } },
     workflowState: { stage1: { status: 'COMPLETED' } },
     upstream: { stage1_current_fingerprint: FP }, lifecycle: { stages: {
         stage2: {}, stage3: { pending_dates: [], stage2_automatic_resolution_items:
-            [{ date, classification: 'REST_REPO' }] } } } };
+            [{ date, classification: 'NON_WORK' }] } } } };
     if (kind === 'manual') value.lifecycle.stages.stage2 = { business_status: 'OPEN',
         pending_count: 1, pending_items: [{}], pending_reasons: ['MULTIPLE_TARGET_CANDIDATES'],
         blockers: [], has_transferable_pair: true, has_bounded_selection: false };
@@ -64,7 +64,7 @@ function context(index, kind = 'safe') {
 {
     const already = context(2001);
     Object.assign(already.rows[0], { apologistiko_biblio: true,
-        repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: false, kathgoria_ergasias_apologistika: 'ΜΕ',
         kathgoria_adeias_apologistika: '', adeia_apologistika: false,
         astheneia_apologistika: false, apousia_apologistika: false,
         ores_ergasias_apologistika: 0 });
@@ -86,7 +86,7 @@ function context(index, kind = 'safe') {
 {
     const conflict = context(2003);
     conflict.lifecycle.stages.stage2.business_status = 'COMPLETED';
-    conflict.rows[0].kathgoria_ergasias_apologistika = 'ΜΕ';
+    conflict.rows[0].kathgoria_ergasias_apologistika = 'ΑΝ';
     const preview = buildWeeklyHrStage2BulkPreview({ contexts: [conflict] });
     assert.equal(preview.technical_conflict_count, 1);
     assert.equal(preview.manual_exception_count, 0);

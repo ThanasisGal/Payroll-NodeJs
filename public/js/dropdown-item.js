@@ -576,13 +576,37 @@ export const initTomDropdown = ({
                     const optionH = 34;
                     const idealHeight = searchH + optionH * 6.5;
 
-                    const cardRect = ts.wrapper.closest('.card')?.getBoundingClientRect() ?? {
-                        top: 0,
-                        bottom: window.innerHeight
-                    };
-
-                    const spaceAbove = controlRect.top - cardRect.top;
-                    const spaceBelow = cardRect.bottom - controlRect.bottom;
+                    // Menus stay inside the actual clipping scrollports, including modal bodies.
+                    const bounds = { top: 8, bottom: window.innerHeight - 8, left: 8, right: window.innerWidth - 8 };
+                    for (let parent = this.wrapper.parentElement; parent; parent = parent.parentElement) {
+                        const style = getComputedStyle(parent);
+                        const rect = parent.getBoundingClientRect();
+                        if (/auto|scroll|hidden|clip/.test(style.overflowY)) {
+                            bounds.top = Math.max(bounds.top, rect.top);
+                            bounds.bottom = Math.min(bounds.bottom, rect.bottom);
+                        }
+                        if (/auto|scroll|hidden|clip/.test(style.overflowX)) {
+                            bounds.left = Math.max(bounds.left, rect.left);
+                            bounds.right = Math.min(bounds.right, rect.right);
+                        }
+                    }
+                    const spaceAbove = Math.max(0, controlRect.top - bounds.top);
+                    const spaceBelow = Math.max(0, bounds.bottom - controlRect.bottom);
+                    const wrapperRect = this.wrapper.getBoundingClientRect();
+                    let requestedWidth = this.wrapper.matches('.dd-wide, .dd-wide-40') ? 820 : wrapperRect.width;
+                    if (el.dataset.ddWidth || el.id === 'eidikothta_erganh') {
+                        const requested = (el.dataset.ddWidth || '40vw').match(/^(\d+(?:\.\d+)?)(vw|px|rem|%)$/);
+                        if (requested) {
+                            const unit = requested[2];
+                            const base = unit === 'vw' ? innerWidth / 100 : unit === '%' ? wrapperRect.width / 100
+                                : unit === 'rem' ? parseFloat(getComputedStyle(document.documentElement).fontSize) : 1;
+                            requestedWidth = Number(requested[1]) * base;
+                        }
+                    }
+                    const width = Math.min(requestedWidth, Math.max(0, bounds.right - bounds.left));
+                    const left = Math.max(bounds.left, Math.min(wrapperRect.left, bounds.right - width));
+                    ddEl.style.setProperty('--ts-menu-width', `${width}px`);
+                    ddEl.style.setProperty('--ts-menu-left', `${left - wrapperRect.left}px`);
 
                     ddEl.classList.remove(
                         'place-above',
@@ -590,41 +614,32 @@ export const initTomDropdown = ({
                         'maxh-ideal',
                         'maxh-limited'
                     );
-                    ddEl.style.removeProperty('--ts-available-space');
-
-                    if (forcedDirection === 'down') {
-                        if (idealHeight <= spaceBelow) {
-                            ddEl.classList.add('place-below', 'maxh-ideal');
-                        } else {
-                            ddEl.style.setProperty(
-                                '--ts-available-space',
-                                `${Math.max(0, spaceBelow - 8)}px`
-                            );
-                            ddEl.classList.add('place-below', 'maxh-limited');
-                        }
-                    } else if (forcedDirection === 'up') {
-                        if (idealHeight <= spaceAbove) {
-                            ddEl.classList.add('place-above', 'maxh-ideal');
-                        } else {
-                            ddEl.style.setProperty(
-                                '--ts-available-space',
-                                `${Math.max(0, spaceAbove - 8)}px`
-                            );
-                            ddEl.classList.add('place-above', 'maxh-limited');
-                        }
-                    } else if (idealHeight <= spaceBelow) {
-                        ddEl.classList.add('place-below', 'maxh-ideal');
-                    } else if (idealHeight <= spaceAbove) {
-                        ddEl.classList.add('place-above', 'maxh-ideal');
-                    } else {
-                        ddEl.style.setProperty(
-                            '--ts-available-space',
-                            `${Math.max(0, spaceAbove - 8)}px`
-                        );
-                        ddEl.classList.add('place-above', 'maxh-limited');
-                    }
+                    const direction = forcedDirection !== 'auto' ? forcedDirection
+                        : idealHeight <= spaceBelow ? 'down'
+                        : idealHeight <= spaceAbove ? 'up'
+                        : spaceAbove >= spaceBelow ? 'up' : 'down';
+                    const space = direction === 'up' ? spaceAbove : spaceBelow;
+                    // Full catalogs, not just filtered results, must respect the same bounds.
+                    ddEl.style.setProperty('--ts-available-space', `${Math.max(0, space - 8)}px`);
+                    ddEl.classList.add(direction === 'up' ? 'place-above' : 'place-below',
+                        idealHeight <= space ? 'maxh-ideal' : 'maxh-limited');
                 };
 
+                this._repositionDropdown = reposition;
+                if (!this._dropdownLayoutCleanup) {
+                    const updatePosition = event => {
+                        if (this.isOpen && (event.type === 'resize' || event.target.contains?.(this.wrapper))) {
+                            requestAnimationFrame(() => this.isOpen && this._repositionDropdown());
+                        }
+                    };
+                    window.addEventListener('resize', updatePosition);
+                    document.addEventListener('scroll', updatePosition, true);
+                    this._dropdownLayoutCleanup = () => {
+                        window.removeEventListener('resize', updatePosition);
+                        document.removeEventListener('scroll', updatePosition, true);
+                    };
+                    this.on('destroy', this._dropdownLayoutCleanup);
+                }
                 requestAnimationFrame(reposition);
 
                 if (!this._loadWrappedForReposition) {
@@ -1355,7 +1370,10 @@ function updateOverflow(tom) {
         }
 
         const itemEl = ctrl.querySelector('.item');
-        if (itemEl) itemEl.classList.add('ts-item-ellipsis');
+        if (itemEl) {
+            itemEl.classList.add('ts-item-ellipsis');
+            itemEl.title = itemEl.textContent.trim();
+        }
 
         return;
     }
@@ -1539,21 +1557,30 @@ function updateOverflow(tom) {
         } catch (e) {}
     })();
 
-    const ARROW = 36,
-        GAP = 28;
-    const wrapW = wrapper.getBoundingClientRect().width;
-    let avail = wrapW - ARROW;
+    const GAP = 4;
+    const controlStyle = getComputedStyle(ctrl);
+    const avail = Math.max(0, ctrl.clientWidth - parseFloat(controlStyle.paddingLeft) - parseFloat(controlStyle.paddingRight));
     let total = 0;
 
     const items = Array.from(ctrl.querySelectorAll('.item')).filter(
         (i) => !i.closest('.ts-overflow-popup')
     );
+    for (const item of items) {
+        if (item.querySelector('.ts-item-label')) continue;
+        const remove = item.querySelector('.remove');
+        const label = document.createElement('span');
+        label.className = 'ts-item-label';
+        label.textContent = [...item.childNodes].filter(node => node !== remove).map(node => node.textContent).join('').trim();
+        item.title = label.textContent;
+        for (const node of [...item.childNodes]) if (node !== remove) node.remove();
+        item.prepend(label);
+    }
 
     ctrl.querySelector('.ts-overflow-indicator')?.remove();
     ctrl.querySelector('.ts-overflow-popup')?.remove();
 
     const hidden = [];
-    const pinFirst = tom && tom.input && tom.input.id === 'kathgoria_symbashs' && items.length > 0;
+    const pinFirst = items.length > 0;
     for (let i = 0; i < items.length; i++) {
         const el = items[i];
         el.hidden = false;

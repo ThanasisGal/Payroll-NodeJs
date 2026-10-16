@@ -1,9 +1,10 @@
 'use strict';
 
 const crypto = require('crypto');
+const { resolveReviewRestState } = require('./apasxoliseisReviewRestStateService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { stableStringify } = require('./apasxoliseisStage3FingerprintService');
-const { AUTOMATIC_INSPECTION, inspectAutomaticMaterialization,
+const { AUTOMATIC_INSPECTION, inspectAutomaticMaterialization, stage1AttestationForStage2,
     fingerprint: scopeFingerprint } = require(
     './apasxoliseisWeeklyHrWorkflowStage2CompletionService'
 );
@@ -24,7 +25,12 @@ function identityKey(identity = {}) {
     return `${identity.employee_id}|${identity.week_start}|${identity.week_end}`;
 }
 function exceptionSummary(context, code, message) {
+    const stage = context.lifecycle?.stages?.stage2 || {};
     return { ...scopeIdentity(context), code: text(code) || 'STAGE2_MANUAL_REVIEW_REQUIRED',
+        reasons: [...new Set([text(code), ...(stage.blockers || []),
+            ...(stage.pending_reasons || [])].filter(Boolean))],
+        diagnostics: stage.diagnostics || [],
+        dates: [...new Set((stage.diagnostics || []).flatMap(item => item.dates || []))].sort(),
         message: text(message) || 'Η περίπτωση απαιτεί έλεγχο HR.' };
 }
 function preparedSafePair(context = {}) {
@@ -62,6 +68,7 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
     const safe = []; const resolved = []; const exceptions = [];
     const alreadyMaterialized = []; const noLongerApplicable = []; const technicalConflicts = [];
     let safePairCount = 0; let safeAutomaticCount = 0; let safeDayChangeCount = 0;
+    let validDeclaredRestCount = 0;
     for (const context of contexts) {
         const identity = scopeIdentity(context);
         if (!identity.employee_id || !identity.week_start || !identity.week_end ||
@@ -70,16 +77,26 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
                 'STAGE2_AUTHORITATIVE_CONTEXT_MISSING'));
             continue;
         }
-        if (context.workflowState?.stage2?.status === 'COMPLETED') {
-            resolved.push(identity); continue;
-        }
+        validDeclaredRestCount += context.rows.filter(row =>
+            resolveReviewRestState(row).status === 'VALID_DECLARED_REST').length;
         const diagnostic = context.stage2StateDiagnostic || context.lifecycle?.stages?.stage2
             ?.diagnostic || context.lifecycle?.stages?.stage2?.blockers?.[0];
         if (diagnostic) {
-            technicalConflicts.push(exceptionSummary(context, diagnostic)); continue;
+            const restReview = diagnostic === 'REST_CLASSIFICATION_REVIEW_REQUIRED' &&
+                (context.lifecycle.stages.stage2.blockers || []).every(code =>
+                    code === 'REST_CLASSIFICATION_REVIEW_REQUIRED');
+            (restReview ? exceptions : technicalConflicts).push(exceptionSummary(context, diagnostic));
+            continue;
         }
         const lifecycleStage2 = context.lifecycle?.stages?.stage2 || {};
-        if (Number(lifecycleStage2.pending_count || 0) > 0 ||
+        if (lifecycleStage2.resolution_route === 'STAGE3_HUMAN_DECISION') {
+            exceptions.push({ ...exceptionSummary(context, lifecycleStage2.pending_reasons?.[0]),
+                resolution_route: lifecycleStage2.resolution_route,
+                rest_evidence: lifecycleStage2.rest_evidence });
+            continue;
+        }
+        if (Number(lifecycleStage2.pending_count || 0) >
+            Number(lifecycleStage2.automatic_materialization_count || 0) ||
             (lifecycleStage2.pending_items || []).length > 0) {
             const pair = preparedSafePair(context);
             if (pair) {
@@ -110,7 +127,11 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
             technicalConflicts.push(exceptionSummary(context, inspection.code)); continue;
         }
         if (inspection.status === AUTOMATIC_INSPECTION.READY_TO_MATERIALIZE) {
-            if (context.workflowState?.stage1?.status !== 'COMPLETED' ||
+            const sliced = context.lifecycle?.stages?.stage1?.attestation_scope === 'PERIOD_SLICE';
+            const stage1Ready = sliced
+                ? Boolean(stage1AttestationForStage2(context, context.workflowState?.stage1))
+                : context.workflowState?.stage1?.status === 'COMPLETED';
+            if (!stage1Ready ||
                 !text(context.upstream?.stage1_current_fingerprint)) {
                 technicalConflicts.push(exceptionSummary(context, 'STAGE2_UPSTREAM_STAGE1_STALE'));
                 continue;
@@ -146,7 +167,14 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
         Number(exception_page_size) || EXCEPTION_PAGE_SIZE));
     const page = Math.max(1, Number(exception_page) || 1);
     const offset = (page - 1) * pageSize;
-    return { total_scopes: contexts.length, safe_bulk_count: safe.length,
+    return { total_scopes: contexts.length,
+        pending_scope_count: safe.length + exceptions.length + technicalConflicts.length,
+        pending_day_count: contexts.reduce((sum, context) => sum + new Set(
+            context.lifecycle?.stages?.stage2?.pending_dates || []).size, 0),
+        deferred_scope_count: contexts.filter(context => context.lifecycle?.stages?.stage2
+            ?.business_status === 'DEFERRED_TO_NEXT_PERIOD').length,
+        safe_bulk_count: safe.length,
+        valid_declared_rest_count: validDeclaredRestCount,
         safe_pair_count: safePairCount, safe_automatic_count: safeAutomaticCount,
         safe_employee_count: new Set(safe.map((item) => item.employee_id)).size,
         safe_week_count: safe.length, safe_day_change_count: safeDayChangeCount,
@@ -162,8 +190,11 @@ function buildWeeklyHrStage2BulkPreview({ contexts = [], preview_scope = {}, exc
         },
         safe_scope_ids: safe, preview_fingerprint: previewFingerprint,
         exceptions: exceptions.slice(offset, offset + pageSize),
+        technical_conflicts: technicalConflicts.slice(offset, offset + pageSize),
+        technical_conflict_page_count: Math.max(1, Math.ceil(technicalConflicts.length / pageSize)),
         exception_page: page, exception_page_size: pageSize,
-        exception_page_count: Math.max(1, Math.ceil(exceptions.length / pageSize)),
+        exception_page_count: Math.max(1, Math.ceil(Math.max(exceptions.length,
+            technicalConflicts.length) / pageSize)),
         _all_exceptions: exceptions, _technical_conflicts: technicalConflicts };
 }
 

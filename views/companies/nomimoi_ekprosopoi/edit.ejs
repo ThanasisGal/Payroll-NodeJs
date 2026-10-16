@@ -1,3 +1,4 @@
+<div class="maintenance-responsive-form companies-management-page company-details-page">
 <div class="tadded-container margin-top-1rem">
     <div class="container-fluid height-vh-100 padding-0">
 
@@ -10,9 +11,9 @@
 
                         <%- include('../../partials/_csrfField') %>
 
-                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
 
-                            <div class="card-header p-2 height-rem-3_5">
+                            <div class="card-header p-0 height-rem-3_5 companies-search-header">
                                 <label class="text-center w-100 headers-content"> Συντήρηση Στοιχείων Νομίμων Εκπροσώπων
                                 </label>
                             </div>
@@ -482,8 +483,8 @@
                                 </div>
                             </div>
 
-                            <div class="card-footer mt-auto cardFooter">
-                                <div class="d-inline-block d-flex cardFooter01">
+                            <div class="card-footer d-flex align-items-center companies-management-footer">
+                                <div class="d-flex align-items-center companies-management-actions company-details-actions">
                                     <button type="button"
                                         class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton">
                                         <i class="bi bi-floppy"></i> Ενημέρωση
@@ -494,7 +495,7 @@
                                     </a>
                                 </div>
                             </div>
-                        <!-- </div> -->
+                        </div>
                     </form>
                 </div>
             </section>
@@ -537,3 +538,5 @@
 <script src="<%= script('dates/getFieldsDate') %>"></script>
 <script src="<%= script('common/moveByEnter') %>"></script>
 <script src="<%= script('common/clearableInputs') %>"></script>
+
+</div>

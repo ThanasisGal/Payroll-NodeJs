@@ -8,6 +8,7 @@ const policy = require('../../../../server/services/ergazomenoi/employeeHistoryC
 const { fixture, scope, historyId } = require('../../../../test/fixtures/employeeProfileTransactionStore');
 
 const root = path.resolve(__dirname, '../../../..');
+const { asset } = require('../../../../test/fixtures/employeeMaintenanceBrowserAssets');
 const endpoint = 'https://payroll.test/ergazomenoi/ergazomenoi/istoriko/update';
 const fingerprint = 'a'.repeat(64);
 const correction = { intent: 'REMOVE_ROW', targetHistoryId: historyId('employee', 1),
@@ -50,9 +51,9 @@ async function withPage(work) {
                 body: '<!doctype html><html lang="el"><body></body></html>' });
         });
         await page.goto('https://payroll.test/');
-        await page.addStyleTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.css') });
+        await page.addStyleTag(asset(root, 'node_modules/sweetalert2/dist/sweetalert2.css'));
         await page.addStyleTag({ path: path.join(root, 'public/css/main.css') });
-        await page.addScriptTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js') });
+        await page.addScriptTag(asset(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js'));
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
         await page.addScriptTag({ path: path.join(__dirname, 'employeeHistoryGuidedResolution.js') });
         assert.deepEqual(await page.evaluate(() => ({

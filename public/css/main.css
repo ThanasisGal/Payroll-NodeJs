@@ -2865,7 +2865,7 @@ a {
 
 .swal2-popup {
     right: auto !important;
-    left: 5% !important;
+    left: 0 !important;
     transform: translateX(0) !important;
     border-radius: 5% !important;
     width: auto;
@@ -3096,7 +3096,7 @@ a {
 
 .wide-popup {
     right: auto !important;
-    left: 5% !important;
+    left: 0 !important;
     transform: translateX(0) !important;
     width: 30vw;
     max-width: 90%; /* Για να μην ξεφεύγει από πολύ μικρές οθόνες */
@@ -3128,7 +3128,7 @@ a {
 
 .custom-swal-popup {
     right: auto !important;
-    left: 5% !important;
+    left: 0 !important;
     width: 600px !important; /* ✅ Fixed width */
     max-width: 90vw !important; /* ✅ Responsive */
     text-align: center !important;
@@ -5014,7 +5014,7 @@ select.tom-dropdown {
 }
 
 .ts-dropdown.maxh-ideal {
-    max-height: clamp(220px, 45vh, 420px);
+    max-height: min(clamp(220px, 45vh, 420px), var(--ts-available-space, 420px));
     overflow-y: auto;
 }
 .ts-dropdown.maxh-limited {
@@ -7838,11 +7838,11 @@ main {
 
 /* κάνε το dropdown πιο φαρδύ και αγκίστρωσέ το στο δεξί άκρο (απλώνει αριστερά) */
 #asfalistikh_klash + .ts-wrapper > .ts-dropdown {
-    width: auto !important; /* ακυρώνει inline width */
-    min-width: 33vw !important; /* ρύθμισε (π.χ. 780–900px) */
+    width: var(--ts-menu-width, 33vw) !important;
+    min-width: 0 !important;
     max-width: calc(100vw - 32px);
-    right: 0 !important; /* δεξιά στοίχιση */
-    left: auto !important; /* ακύρωσε left:0 */
+    right: auto !important;
+    left: var(--ts-menu-left, 0) !important;
     z-index: 9999;
     will-change: transform;
 }
@@ -8684,7 +8684,7 @@ tbody .group-row--category:first-of-type > td {
     background-color: #1a500144;
     border-radius: 4px;
 }
-#accordion .accordion-item {
+#accordion .accordion-item:not(:where(:is(.employee-add-page, .employee-edit-page) .accordion-item)) {
     margin-bottom: 0.25rem !important;
 }
 
@@ -9774,10 +9774,11 @@ body.upload-templates-page .file-input-wrapper {
 }
 
 body.upload-templates-page .file-input-wrapper input[type='file'] {
-    font-size: 100px;
+    font-size: var(--payroll-control-font, 1rem);
     position: absolute;
-    left: 0;
-    top: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     opacity: 0;
     cursor: pointer;
 }
@@ -11574,7 +11575,7 @@ body.loader-active > *:not(.app-loader) {
     border-radius: 999px;
     background-color: #fff3cd;
     color: #664d03;
-    font-size: 0.72rem;
+    font-size: var(--review-small, 0.72rem);
     font-weight: 800;
     letter-spacing: 0.04em;
 }
@@ -11585,7 +11586,7 @@ body.loader-active > *:not(.app-loader) {
     margin-top: 0.65rem;
     padding: 0.55rem 0.7rem;
     border-radius: 0.4rem;
-    font-size: 0.82rem;
+    font-size: var(--review-small, 0.82rem);
 }
 
 .atomic-repo-transfer-main-warning {
@@ -11617,11 +11618,11 @@ body.loader-active > *:not(.app-loader) {
     border: 1px solid #dee2e6;
     border-radius: 0.35rem;
     background-color: #ffffff;
-    font-size: 0.76rem;
+    font-size: var(--review-small, 0.76rem);
 }
 
 .atomic-repo-transfer-summary-item strong {
-    font-size: 0.9rem;
+    font-size: var(--review-small, 0.9rem);
 }
 
 .atomic-repo-transfer-diagnostics {
@@ -11635,7 +11636,7 @@ body.loader-active > *:not(.app-loader) {
 .atomic-repo-transfer-empty {
     padding: 0.5rem 0.65rem;
     border-radius: 0.35rem;
-    font-size: 0.78rem;
+    font-size: var(--review-small, 0.78rem);
 }
 
 .atomic-repo-transfer-diagnostic-message,
@@ -11669,7 +11670,7 @@ body.loader-active > *:not(.app-loader) {
     color: #212529;
     padding: 0.5rem 0.65rem;
     text-align: left;
-    font-size: 0.8rem;
+    font-size: var(--review-small, 0.8rem);
 }
 
 .actionable-issue-summary:hover,
@@ -11698,7 +11699,7 @@ body.loader-active > *:not(.app-loader) {
 .actionable-issue-guidance {
     display: grid;
     gap: 0.25rem;
-    font-size: 0.76rem;
+    font-size: var(--review-small, 0.76rem);
     margin-bottom: 0.5rem;
 }
 
@@ -11715,7 +11716,7 @@ body.loader-active > *:not(.app-loader) {
     border: 1px solid #e1e5e9;
     border-radius: 0.35rem;
     background: #fff;
-    font-size: 0.76rem;
+    font-size: var(--review-small, 0.76rem);
 }
 
 .actionable-issue-target-highlight {
@@ -11763,7 +11764,7 @@ body.loader-active > *:not(.app-loader) {
     border-radius: 999px;
     background-color: #fffdf5;
     color: #5c4700;
-    font-size: 0.72rem;
+    font-size: var(--review-small, 0.72rem);
     font-weight: 650;
 }
 
@@ -11940,14 +11941,14 @@ body.loader-active > *:not(.app-loader) {
 
 .atomic-repo-transfer-values dt {
     color: #6c757d;
-    font-size: 0.7rem;
+    font-size: var(--review-small, 0.7rem);
     font-weight: 600;
 }
 
 .atomic-repo-transfer-values dd {
     margin: 0;
     overflow-wrap: anywhere;
-    font-size: 0.82rem;
+    font-size: var(--review-small, 0.82rem);
     font-weight: 700;
 }
 
@@ -11963,7 +11964,7 @@ body.loader-active > *:not(.app-loader) {
     padding: 0.3rem 0.45rem;
     border-radius: 0.3rem;
     background-color: rgba(255, 255, 255, 0.75);
-    font-size: 0.78rem;
+    font-size: var(--review-small, 0.78rem);
     overflow-wrap: anywhere;
 }
 
@@ -12501,9 +12502,9 @@ body.loader-active > *:not(.app-loader) {
     position: sticky;
     right: 0;
     z-index: 8;
-    width: 8.8rem;
-    min-width: 8.8rem;
-    max-width: 8.8rem;
+    width: 12.5rem;
+    min-width: 12.5rem;
+    max-width: 12.5rem;
     background-color: #f7f8f3 !important;
     box-shadow: -0.18rem 0 0.45rem rgba(0, 0, 0, 0.1);
     white-space: nowrap;
@@ -12641,6 +12642,14 @@ body.loader-active > *:not(.app-loader) {
     text-overflow: ellipsis;
 }
 
+.employee-edit-page #istorikoTable thead th.istoriko-work-terms-heading {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+
 .istoriko-col-aa {
     width: 4.5rem;
 }
@@ -12654,7 +12663,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .istoriko-col-actions {
-    width: 8.8rem;
+    width: 12.5rem;
 }
 
 .istoriko-table td {
@@ -12880,6 +12889,11 @@ body.loader-active > *:not(.app-loader) {
     width: 12.5%;
     text-align: right;
     white-space: nowrap;
+}
+
+/* Μόνο οι δύο επικεφαλίδες ποσών του Ιστορικού στη Διόρθωση. */
+.employee-edit-page #istorikoDetailsModal .istoriko-contract-elements-table th.istoriko-modal-money-col {
+    text-align: right !important;
 }
 
 .istoriko-modal-totals-row td {
@@ -14260,8 +14274,6 @@ body.loader-active > *:not(.app-loader) {
     display: flex;
     flex-direction: column;
     width: min(96rem, 100%);
-    max-height: calc(100vh - 8rem);
-    min-height: 28rem;
     overflow: hidden;
 }
 
@@ -14499,10 +14511,6 @@ body.loader-active > *:not(.app-loader) {
 }
 
 @media (max-width: 768px) {
-    .user-privileges-card {
-        max-height: calc(100vh - 5rem);
-    }
-
     .user-privileges-controls {
         grid-template-columns: 1fr;
     }
@@ -14725,7 +14733,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-card > .card-header h3 {
-    font-size: 1.2rem;
+    font-size: var(--review-title, 1.2rem);
 }
 
 .employment-review-card > .card-footer {
@@ -14819,6 +14827,86 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-start-action .employment-review-action-btn {
     white-space: nowrap;
+}
+
+.review-guidance {
+    font-size: var(--review-small, .875rem);
+    line-height: 1.5;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.review-guidance-intro { margin-bottom: .5rem; }
+.review-guidance .small { font-size: var(--review-small, .875rem) !important; }
+.review-guidance-navigation {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    margin: .75rem 0;
+}
+.review-guidance-navigation .employment-review-action-btn,
+.review-guidance-week-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    border-radius: 6px;
+}
+.review-guidance-navigation .employment-review-action-btn:focus-visible,
+.review-guidance-week-button:focus-visible {
+    outline: 3px solid var(--bs-primary, #0d6efd);
+    outline-offset: 2px;
+}
+.review-guidance-week-button { margin-top: .25rem; }
+.review-guidance-detail {
+    padding: .75rem;
+    margin-bottom: .75rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 6px;
+    background: var(--bs-tertiary-bg, #f8f9fa);
+}
+.review-guidance-issue + .review-guidance-issue {
+    margin-top: .75rem;
+    padding-top: .75rem;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+}
+.review-guidance-issue summary { cursor: pointer; font-weight: 600; }
+.review-guidance-issue p { margin: .5rem 0; }
+.review-guidance-issue ol, .review-guidance-evidence { padding-left: 1.25rem; }
+.review-guidance-prerequisite {
+    margin: 0;
+    padding: 0 1.25rem .75rem;
+    color: var(--bs-secondary-color, #495057);
+    font-size: var(--review-small, .875rem);
+}
+.review-guidance-highlight {
+    outline: 3px solid var(--bs-primary, #0d6efd);
+    outline-offset: -3px;
+    scroll-margin-block: 5rem;
+}
+
+@media (max-width: 575.98px) {
+    #employmentReviewWorkspace .review-card-body {
+        display: block;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+    #employmentReviewWorkspace .review-filters-sticky { position: static; }
+    #employmentReviewWorkspace .employment-review-scroll-container { overflow: visible; }
+    #employmentReviewWorkspace .form-control,
+    #employmentReviewWorkspace .form-select,
+    #employmentReviewWorkspace .small,
+    #employmentReviewWorkspace small,
+    #employmentReviewWorkspace #reviewFiltersEnterScope input,
+    #employmentReviewWorkspace #reviewFiltersEnterScope .ts-control,
+    #employmentReviewWorkspace #reviewFiltersEnterScope .ts-control .item,
+    #employmentReviewWorkspace #reviewFiltersEnterScope .ts-dropdown,
+    #employmentReviewWorkspace #reviewFiltersEnterScope .ts-dropdown .option,
+    #employmentReviewWorkspace .employment-review-progress-step small {
+        font-size: var(--review-small, .875rem) !important;
+        line-height: 1.3;
+    }
 }
 
 .hr-review-status {
@@ -15126,7 +15214,7 @@ body.loader-active > *:not(.app-loader) {
 .employment-review-stage2-bulk-preview-modal .modal-body {
     overflow-x: hidden;
     overflow-y: auto;
-    font-size: 0.95rem;
+    font-size: var(--review-small, .875rem);
     line-height: 1.45;
 }
 
@@ -15214,7 +15302,7 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage2-preview-reason-detail {
     margin-top: 0.35rem;
     color: var(--bs-secondary-color, #6c757d);
-    font-size: 0.9rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .weekly-hr-stage2-preview-footer {
@@ -15242,7 +15330,7 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage2-preview-safety {
     width: 100%;
     color: var(--bs-secondary-color, #6c757d);
-    font-size: 0.9rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .weekly-hr-stage2-preview-reason {
@@ -15304,15 +15392,16 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage1-table {
     width: 100%;
+    min-width: 102rem;
     table-layout: fixed;
-    font-size: 0.78rem;
+    font-size: var(--review-small, .875rem);
     margin-bottom: 0;
 }
 
 .weekly-hr-stage1-table-shell {
     width: 100%;
     min-width: 0;
-    overflow: visible;
+    overflow: auto;
 }
 
 .weekly-hr-stage1-table > thead > tr > th {
@@ -15337,9 +15426,8 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage1-table .stage1-col-day { width: 8.35%; }
 
 .weekly-hr-stage1-employee {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: normal;
 }
 
 .weekly-hr-stage1-status {
@@ -15361,12 +15449,54 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage1-matrix-day-cell {
     overflow: hidden;
-    vertical-align: top;
+    position: relative;
+    vertical-align: middle;
+    text-align: center;
+}
+
+.weekly-hr-stage1-day-tile > .review-guidance-info {
+    position: absolute;
+    top: .1rem;
+    right: .1rem;
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    font-size: var(--review-small, .875rem);
+    line-height: 1;
+}
+
+.weekly-hr-stage1-matrix-day-cell.review-guidance-highlight,
+.weekly-hr-stage1-matrix-day-cell[data-review-guidance-key]:focus-visible {
+    outline: none;
+}
+
+.weekly-hr-stage1-matrix-day-cell.review-guidance-highlight .weekly-hr-stage1-day-tile,
+.weekly-hr-stage1-matrix-day-cell[data-review-guidance-key]:focus-visible .weekly-hr-stage1-day-tile {
+    border-color: var(--bs-primary, #0d6efd);
+    border-width: 2px;
+}
+
+/* A cell has one visual frame; Bootstrap's cell overlay is not a second state. */
+.table > tbody > tr > td.weekly-hr-stage1-matrix-day-cell {
+    box-shadow: none;
+}
+
+@media (max-width: 767.98px) {
+    .weekly-hr-stage1-table-shell { overflow-x: auto; }
+    .weekly-hr-stage1-table-shell > .weekly-hr-stage1-table { min-width: 102rem; }
+}
+
+.table > tbody > tr > td.employment-review-outside-employment {
+    --bs-table-bg: #e9ecef;
+    background-color: #e9ecef;
+    box-shadow: none;
 }
 
 .weekly-hr-stage1-day-tile {
     position: relative;
-    min-height: 3.35rem;
+    box-sizing: border-box;
+    width: 100%;
+    height: 4.5rem;
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: 0.3rem;
     background: var(--bs-body-bg, #fff);
@@ -15380,7 +15510,11 @@ body.loader-active > *:not(.app-loader) {
 .weekly-hr-stage1-day-tile.has-draft {
     border-color: #8eb6e8;
     background: #eef6ff;
-    box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.06);
+}
+
+.weekly-hr-stage1-day-tile:has(.weekly-hr-stage1-day-select:checked) {
+    border-color: var(--bs-primary, #0d6efd);
+    background: var(--bs-primary-bg-subtle, #cfe2ff);
 }
 
 .weekly-hr-stage1-day-tile .weekly-hr-stage1-day-select {
@@ -15393,11 +15527,11 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage1-draft-marker {
     position: absolute;
-    top: 0.12rem;
+    bottom: 0.12rem;
     right: 0.22rem;
     z-index: 2;
     color: var(--bs-primary, #0d6efd);
-    font-size: 0.7rem;
+    font-size: var(--review-small, .875rem);
     line-height: 1;
 }
 
@@ -15409,8 +15543,13 @@ body.loader-active > *:not(.app-loader) {
     justify-content: center;
     gap: 0.05rem;
     width: 100%;
-    min-height: 3.25rem;
-    padding: 0.15rem;
+    box-sizing: border-box;
+    height: 100%;
+    min-width: 0;
+    padding: 0.2rem;
+    border-radius: inherit;
+    font-size: var(--review-small, .875rem);
+    box-shadow: none;
     border: 0;
     color: inherit;
     background: transparent;
@@ -15428,19 +15567,34 @@ body.loader-active > *:not(.app-loader) {
     display: block;
     max-width: 100%;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: var(--review-small, .875rem);
+}
+
+.weekly-hr-stage1-day-tile:focus-within,
+.weekly-hr-stage1-day-tile:hover {
+    border-color: var(--bs-primary, #0d6efd);
 }
 
 .weekly-hr-stage1-open-editor:hover,
 .weekly-hr-stage1-open-editor:focus {
-    outline: 2px solid var(--bs-primary, #0d6efd);
-    outline-offset: -2px;
+    outline: none;
 }
 
+.weekly-hr-stage1-day-tile:has(:focus-visible) {
+    border-color: var(--bs-primary, #0d6efd);
+    border-width: 2px;
+}
+
+.weekly-hr-stage1-open-editor small,
 .weekly-hr-stage1-readonly-tile small {
     color: var(--bs-secondary-color, #6c757d);
-    font-size: 0.68rem;
+    font-size: var(--review-small, .875rem);
+}
+
+#employmentReviewWorkspace .weekly-hr-stage1-matrix-day-cell small {
+    font-size: var(--review-small, .875rem) !important;
+    line-height: 1.15;
 }
 
 .weekly-hr-stage1-day-date {
@@ -15452,7 +15606,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .weekly-hr-stage1-day-editor .weekly-hr-stage1-day-facts {
-    font-size: 0.85rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .weekly-hr-stage1-editor-navigation {
@@ -15581,7 +15735,7 @@ body.loader-active > *:not(.app-loader) {
     border-radius: 0.35rem;
     background: #f6faf7;
     color: #355c42;
-    font-size: 0.84rem;
+    font-size: var(--review-small, .875rem);
     font-weight: 650;
 }
 
@@ -15598,7 +15752,7 @@ body.loader-active > *:not(.app-loader) {
     padding: 0.18rem 0.48rem;
     border: 1px solid currentColor;
     border-radius: 999px;
-    font-size: 0.76rem;
+    font-size: var(--review-small, .875rem);
     font-weight: 700;
     line-height: 1.25;
     white-space: nowrap;
@@ -15641,7 +15795,7 @@ body.loader-active > *:not(.app-loader) {
     width: auto;
     max-width: max-content;
     padding: 0.12rem 0.35rem;
-    font-size: 0.68rem;
+    font-size: var(--review-small, .875rem);
     line-height: 1.1;
     font-weight: 700;
     white-space: nowrap;
@@ -15652,7 +15806,7 @@ body.loader-active > *:not(.app-loader) {
     box-sizing: border-box;
     max-width: 100%;
     padding: 0.12rem 0.35rem;
-    font-size: 0.68rem;
+    font-size: var(--review-small, .875rem);
     line-height: 1.1;
     font-weight: 700;
     white-space: normal;
@@ -15716,7 +15870,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 #employmentReviewStage4Collapse #resultsTable > tbody > .employee-group-row > td {
-    font-size: 0.94rem;
+    font-size: var(--review-small, .875rem);
     letter-spacing: 0.01em;
     border-bottom-color: #d7dee2;
 }
@@ -15733,7 +15887,7 @@ body.loader-active > *:not(.app-loader) {
 #employmentReviewStage4Collapse #resultsTable .weekly-deviation-table .stage4-week-code {
     display: block;
     color: #52616b;
-    font-size: 0.72rem;
+    font-size: var(--review-small, .875rem);
     font-weight: 700;
 }
 
@@ -15832,7 +15986,7 @@ body.loader-active > *:not(.app-loader) {
     padding: 0.3rem 0.25rem;
     background-color: #f8f9fa !important;
     color: #212529;
-    font-size: 0.72rem;
+    font-size: var(--review-small, .875rem);
     line-height: 1.15;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -15847,8 +16001,9 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-scroll-container .results-table-wrapper {
-    max-height: none;
-    overflow: visible;
+    max-height: min(42rem, 65dvh);
+    overflow: auto;
+    scrollbar-gutter: stable;
 }
 
 .employment-review-scroll-container #resultsTable {
@@ -15886,7 +16041,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-results-columns .review-col-absences {
-    width: 5.75rem;
+    width: 6.5rem;
 }
 
 .employment-review-results-columns .review-col-additional {
@@ -15944,11 +16099,13 @@ body.loader-active > *:not(.app-loader) {
 
 .swal2-popup.employment-review-swal-popup .swal2-html-container,
 .swal2-popup.employment-review-swal-popup .employment-review-swal-html-container,
-.swal2-popup.employment-review-swal-popup .swal2-input,
-.swal2-popup.employment-review-swal-popup .swal2-textarea,
 .swal2-popup.employment-review-swal-popup .swal2-validation-message,
 .swal2-popup.employment-review-swal-popup .swal2-input-label {
-    font-size: 0.95rem !important;
+    font-size: var(--review-text, .95rem) !important;
+}
+.swal2-popup.employment-review-swal-popup :is(.swal2-input, .swal2-select, .swal2-textarea) {
+    font-size: var(--review-label, 1rem) !important;
+    font-weight: 400;
 }
 
 .swal2-popup.employment-review-swal-popup .swal2-html-container,
@@ -16012,7 +16169,7 @@ body.loader-active > *:not(.app-loader) {
     height: auto;
     padding: 0.625rem 1rem;
     white-space: nowrap;
-    font-size: 0.9rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .employment-review-swal-popup .swal2-confirm.employment-period-lock-confirm-button {
@@ -16168,7 +16325,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .weekly-hr-stage1-bulk-toolbar .form-label {
-    font-size: 0.72rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .weekly-hr-stage1-counts {
@@ -16215,7 +16372,7 @@ body.loader-active > *:not(.app-loader) {
     border: 1px solid #e3cc73;
     border-radius: 0.35rem;
     box-shadow: 0 0.2rem 0.55rem rgba(73, 57, 8, 0.16);
-    font-size: 0.875rem;
+    font-size: var(--review-small, .875rem);
     line-height: 1.35;
     white-space: normal;
     text-align: left;
@@ -16337,7 +16494,7 @@ body.loader-active > *:not(.app-loader) {
     margin: 0 !important;
     padding: 0.75rem 3rem 0.75rem 1rem;
     justify-content: flex-start !important;
-    font-size: clamp(0.875rem, 1vw, 1rem);
+    font-size: var(--review-label, .95rem);
     line-height: 1.35;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -16380,16 +16537,16 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .stage3-employee-name {
-    font-size: 0.95rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .stage3-employee-code {
     color: var(--bs-secondary-color, #6c757d);
-    font-size: 0.8rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .stage3-week-summary {
-    font-size: 0.8rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .stage3-decisions-table-wrapper {
@@ -16398,19 +16555,19 @@ body.loader-active > *:not(.app-loader) {
 
 .weekly-hr-stage3-decisions-table {
     width: 100%;
-    min-width: 82rem;
+    min-width: 86rem;
     table-layout: fixed;
 }
-.weekly-hr-stage3-decisions-table .stage3-col-select { width: 2.25rem; }
+.weekly-hr-stage3-decisions-table .stage3-col-select { width: 3%; }
 
-.weekly-hr-stage3-decisions-table .stage3-col-date { width: 9%; }
+.weekly-hr-stage3-decisions-table .stage3-col-date { width: 12%; }
 .weekly-hr-stage3-decisions-table .stage3-col-day { width: 6%; }
 .weekly-hr-stage3-decisions-table .stage3-col-day-status { width: 9%; }
-.weekly-hr-stage3-decisions-table .stage3-col-declared { width: 11%; }
-.weekly-hr-stage3-decisions-table .stage3-col-actual { width: 11%; }
-.weekly-hr-stage3-decisions-table .stage3-col-reason { width: 23%; }
-.weekly-hr-stage3-decisions-table .stage3-col-classification { width: 17%; }
-.weekly-hr-stage3-decisions-table .stage3-col-action { width: 14%; }
+.weekly-hr-stage3-decisions-table .stage3-col-declared { width: 9%; }
+.weekly-hr-stage3-decisions-table .stage3-col-actual { width: 9%; }
+.weekly-hr-stage3-decisions-table .stage3-col-reason { width: 16%; }
+.weekly-hr-stage3-decisions-table .stage3-col-classification { width: 14%; }
+.weekly-hr-stage3-decisions-table .stage3-col-action { width: 23%; }
 
 .weekly-hr-stage3-decisions-table th,
 .weekly-hr-stage3-decisions-table td {
@@ -16611,12 +16768,12 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-attention-summary h4 {
     margin: 0 0 0.15rem;
-    font-size: 0.9rem;
+    font-size: var(--review-small, .875rem);
 }
 
 .employment-review-attention-summary p {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--review-small, .875rem);
 }
 
 @media (max-width: 767.98px) {
@@ -16790,7 +16947,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
     .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
     .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-    #gotoProgrammaDypa
+    #gotoProgrammaDypa, .review-guidance-info,
+    .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
 )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop) {
     display: inline-flex;
 }
@@ -16800,7 +16959,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         align-items: center !important;
         justify-content: center !important;
@@ -16814,7 +16975,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close) {
         --button-color: #795548;
         --button-light: #f0e7e2;
@@ -16828,7 +16991,8 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         min-height: 2.375rem !important;
         flex-shrink: 0 !important;
         padding: .5rem .8rem !important;
-        font-size: 1rem !important;
+        font-size: var(--payroll-control-font, 1rem) !important;
+        font-weight: 400 !important;
         line-height: 1.25 !important;
         text-align: center !important;
         border: 1px solid var(--button-color) !important;
@@ -16842,7 +17006,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         min-height: 2rem !important;
         padding: .3rem .55rem !important;
@@ -16856,7 +17022,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 
     /* Keep the four compact actions above the full-width review action. */
     .istoriko-actions-col [data-action="review"].employee-history-correction-action {
-        font-size: .74rem !important;
+        font-size: var(--payroll-control-font, .875rem) !important;
         padding-inline: .35rem !important;
         grid-column: 1 / -1;
         grid-row: 2;
@@ -16867,7 +17033,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #0b5ed7 !important; --button-light: #e1ebfc !important;
     }
@@ -16875,7 +17043,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #146c43 !important; --button-light: #dfefe6 !important;
     }
@@ -16883,7 +17053,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #b02a37 !important; --button-light: #f8e1e5 !important;
     }
@@ -16891,7 +17063,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #805800 !important; --button-light: #fbecc1 !important;
     }
@@ -16899,7 +17073,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #08728a !important; --button-light: #dceff5 !important;
     }
@@ -16907,7 +17083,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #545b62 !important; --button-light: #e9ebed !important;
     }
@@ -16915,7 +17093,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) {
         --button-color: #795548 !important; --button-light: #f0e7e2 !important;
     }
@@ -16924,7 +17104,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):not(.accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close):is(:hover, :active, .active):not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: var(--button-color) !important;
         border-color: var(--button-color) !important;
@@ -16934,7 +17116,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):focus-visible {
         outline: 2px solid var(--button-color, #795548) !important;
         outline-offset: 3px !important;
@@ -16944,7 +17128,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):active:not(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         box-shadow: inset 0 2px 4px #0003 !important;
     }
@@ -16952,7 +17138,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )):is(:disabled, .disabled, .is-disabled, [aria-disabled="true"]) {
         background: #e9ecef !important;
         border-color: #adb5bd !important;
@@ -16965,7 +17153,9 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) :is(i, svg, .bi) {
         color: inherit !important;
         line-height: 1 !important;
@@ -16977,9 +17167,24 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
         .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
         .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
         .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
-        #gotoProgrammaDypa
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row
     )) .bi::before {
         vertical-align: 0 !important;
+    }
+}
+
+/* Matrix status actions keep the shared button appearance, but their text must
+   fit the status column instead of painting behind neighbouring day frames. */
+@layer application-buttons {
+    .weekly-hr-stage1-table .weekly-hr-stage1-status :is(button, .btn):not(.review-guidance-info) {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        padding-inline: .35rem !important;
+        font-size: .875rem !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
     }
 }
 
@@ -17017,6 +17222,10 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 .history-preview-contract-items { width: 100%; margin-top: .8rem; border-collapse: collapse; font-size: .9rem; }
 .history-preview-contract-items th, .history-preview-contract-items td { padding: .6rem .4rem; border-bottom: 1px solid #dee2e6; overflow-wrap: anywhere; vertical-align: middle; }
 .history-preview-contract-items th { font-weight: 600; }
+.history-preview-contract-items thead th:nth-child(3),
+.history-preview-contract-items thead th:nth-child(4) {
+    text-align: right;
+}
 .history-preview-contract-items td:nth-child(n+3) { text-align: right; white-space: nowrap; }
 @media (max-width: 575.98px) {
     .history-preview-contract-items, .history-preview-contract-items tbody, .history-preview-contract-items tr, .history-preview-contract-items td { display: block; width: 100%; }
@@ -17048,4 +17257,2931 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 .employee-draft-indicator { color: #b02a37; font-weight: 700; font-size: 1.1rem; line-height: 1.5; }
 @media (max-width: 575.98px) {
     .employee-draft-indicator { flex: 0 0 100%; max-width: 100%; padding-top: .25rem; }
+}
+
+/* Contextual employment review explanations; rendered under body to escape table clipping. */
+.review-guidance-popover {
+    position: fixed;
+    z-index: 1100;
+    box-sizing: border-box;
+    width: 450px;
+    max-width: calc(100vw - 20px);
+    max-height: min(650px, calc(100dvh - 20px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 12px;
+    border: 1px solid var(--bs-border-color, #ced4da);
+    border-radius: 8px;
+    color: var(--bs-body-color, #212529);
+    background: var(--bs-body-bg, #fff);
+    box-shadow: 0 5px 22px #0003;
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.review-guidance-popover[hidden] { display: none; }
+.review-guidance-popover .review-guidance-detail { border: 0; margin: 0; padding: 0; background: transparent; }
+.review-guidance-popover h3 { font-size: 15px; font-weight: 700; line-height: 1.5; }
+.review-guidance-popover .small { font-size: 14px !important; }
+.review-guidance-close { position: sticky; top: 0; z-index: 1; display: block; margin: 0 0 8px auto; padding: 4px 8px; border: 1px solid #adb5bd; border-radius: 5px; background: var(--bs-tertiary-bg, #f8f9fa); color: inherit; }
+.review-guidance-info { border: 0; background: transparent; color: var(--bs-primary, #0d6efd); padding: 2px 6px; font-size: 16px; }
+[data-review-guidance-key]:focus-visible, .review-guidance-close:focus-visible, .review-guidance-info:focus-visible { outline: 3px solid var(--bs-primary, #0d6efd); outline-offset: -2px; }
+
+@media (max-width: 575.98px) {
+    #employmentReviewWorkspace .weekly-hr-stage1-bulk-toolbar,
+    #employmentReviewWorkspace .weekly-hr-stage1-table > thead > tr > th {
+        position: static;
+    }
+}
+
+/* Employee disclosure remains a full-width table row, including keyboard focus. */
+#employmentReviewStage4Collapse .employee-group-heading {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem .8rem;
+    min-width: 0;
+}
+#employmentReviewStage4Collapse .employee-group-row > td {
+    padding: .7rem .85rem;
+    border-radius: .25rem;
+}
+#employmentReviewStage4Collapse .employee-group-row > td::before { content: none; }
+#employmentReviewStage4Collapse .employee-group-heading::before {
+    content: '▸';
+    width: 1rem;
+    flex-shrink: 0;
+    color: #40586b;
+}
+#employmentReviewStage4Collapse .employee-group-row[aria-expanded="true"] .employee-group-heading::before {
+    content: '▾';
+}
+#employmentReviewStage4Collapse .employee-group-branch { color: #52616b; font-weight: 500; }
+#employmentReviewStage4Collapse .employee-group-code { font-variant-numeric: tabular-nums; }
+#employmentReviewStage4Collapse .employee-group-name { overflow-wrap: anywhere; min-width: 0; }
+#employmentReviewStage4Collapse .employee-group-badges { margin-left: auto; display: flex; gap: .4rem; flex-wrap: wrap; }
+#employmentReviewStage4Collapse .employee-group-row[aria-expanded="true"] > td {
+    box-shadow: inset 3px 0 #526d82;
+}
+
+/* Weekly-rest evidence must remain readable at the supported desktop widths. */
+.employment-review-stage2-rest-evidence,
+.stage3-weekly-rest-summary,
+.weekly-hr-stage3-decisions-table .stage3-decision-reason {
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Employment review: one continuous scale, measured against the form's width.
+   At the floor, grids reflow and tables scroll instead of shrinking text. */
+.employment-review-page-shell {
+    container: employment-review / inline-size;
+}
+
+#employmentReviewWorkspace,
+#employmentPeriodControlPanel {
+    --review-text: clamp(.85rem, calc(.55rem + .4cqi), 1rem);
+    --review-small: clamp(.85rem, calc(.55rem + .4cqi), 1rem);
+    --review-label: clamp(.9rem, calc(.6rem + .4cqi), 1.05rem);
+    --review-title: clamp(1.15rem, calc(.8rem + .5cqi), 1.4rem);
+    --review-space: clamp(.5rem, .7cqi, .9rem);
+    font-size: var(--review-text);
+    line-height: 1.45;
+}
+
+#employmentReviewWorkspace :is(.form-control, .form-select, .ts-control, .ts-control input,
+    .ts-control .item, .ts-dropdown, .ts-dropdown .option) {
+    font-size: var(--review-label) !important;
+    line-height: 1.4 !important;
+}
+
+#employmentReviewWorkspace :is(.form-control, .form-select, .ts-control) {
+    min-width: 0;
+    min-height: 2.35rem;
+    height: auto;
+    padding-block: .45rem !important;
+    padding-inline: .65rem;
+}
+
+#employmentReviewWorkspace :is(.form-label, .form-check-label) {
+    font-size: var(--review-label) !important;
+    line-height: 1.4;
+    white-space: normal;
+    margin-bottom: .35rem;
+}
+
+#employmentReviewWorkspace :is(.small, small, .badge),
+#employmentPeriodControlPanel :is(.small, small, .badge) {
+    font-size: var(--review-small) !important;
+    line-height: 1.4;
+}
+
+#employmentReviewWorkspace :is(h4, h5, h6, .modal-title, .hr-review-question) {
+    font-size: var(--review-title);
+    line-height: 1.4;
+}
+
+#employmentReviewWorkspace :is(.row, .accordion-item, .accordion-body,
+    .policy-preview-group-header, .hr-review-proposal-card) {
+    min-width: 0;
+}
+
+#employmentReviewWorkspace .accordion-body {
+    padding: var(--review-space);
+}
+
+#employmentReviewWorkspace #reviewFiltersEnterScope {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) minmax(10rem, 1fr) minmax(16rem, 2fr) minmax(18rem, 2fr);
+    align-items: end;
+    gap: var(--review-space);
+    margin-inline: 0;
+}
+
+#employmentReviewWorkspace #reviewFiltersEnterScope > div {
+    width: auto;
+    min-width: 0;
+    padding: 0;
+}
+
+#employmentReviewWorkspace #reviewFiltersEnterScope .ts-wrapper {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+#employmentReviewWorkspace .employment-review-workflow-progress {
+    flex-shrink: 0;
+}
+
+#employmentReviewWorkspace .employment-review-workflow-progress ol {
+    flex-wrap: wrap;
+    row-gap: .65rem;
+}
+
+#employmentReviewWorkspace .employment-review-progress-step {
+    flex-basis: 11rem;
+}
+
+#employmentReviewWorkspace .employment-review-scroll-container {
+    overflow-x: hidden;
+}
+
+#employmentReviewWorkspace :is(.weekly-hr-stage1-table-shell, .stage3-decisions-table-wrapper) {
+    max-width: 100%;
+    overflow: auto;
+    scrollbar-gutter: stable;
+}
+
+#employmentReviewWorkspace :is(table, .stage3-employee-name, .stage3-week-summary,
+    .stage3-employee-code, .weekly-hr-stage1-day-facts) {
+    font-size: var(--review-text);
+    line-height: 1.4;
+}
+
+#employmentReviewWorkspace :is(th, td) {
+    padding: var(--review-space);
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+#employmentReviewWorkspace .weekly-hr-stage1-table :is(th, td) {
+    padding: .4rem;
+}
+
+#employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-select { width: 5%; }
+#employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-employee { width: 13%; }
+#employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-status { width: 12%; }
+#employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-day { width: 8%; }
+
+#employmentReviewWorkspace .weekly-hr-stage1-table > thead > tr > th {
+    top: 0;
+}
+
+#employmentReviewWorkspace :is(.weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile) {
+    font-size: var(--review-text);
+    padding: .2rem;
+}
+
+#employmentReviewWorkspace :is(.weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile) :is(strong, span, small) {
+    font-size: var(--review-small) !important;
+    overflow: visible;
+    line-height: 1.2;
+}
+
+#employmentReviewWorkspace .weekly-hr-stage1-status > .badge {
+    overflow-wrap: normal;
+}
+
+#employmentReviewWorkspace #resultsTable {
+    width: max(100%, 96rem);
+    min-width: 96rem;
+    font-size: var(--review-text);
+}
+
+#employmentReviewWorkspace #resultsTable :is(th, td) {
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+#employmentReviewWorkspace #resultsTable .employee-detail-row > td:is(:nth-child(1), :nth-child(2), :nth-child(3)),
+#employmentReviewWorkspace #resultsTable .review-interval-line {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+#employmentReviewWorkspace .review-col-date { width: 10rem; }
+#employmentReviewWorkspace .review-col-branch { width: 8rem; }
+#employmentReviewWorkspace .review-col-code { width: 6rem; }
+#employmentReviewWorkspace :is(.review-col-declared, .review-col-cards) { width: 11rem; }
+#employmentReviewWorkspace .review-col-apologistiko { width: 14rem; }
+
+#employmentReviewWorkspace #resultsTable :is(.review-scenario-badge, .review-holiday-description-badge, .badge) {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: normal;
+    font-size: var(--review-small);
+}
+
+#employmentReviewWorkspace #resultsTable > thead > tr > th { top: 0; }
+
+/* Nested Bootstrap dialogs inherit the review scale and reserve their footer. */
+#employmentReviewWorkspace .modal-dialog:not(.modal-fullscreen) {
+    width: calc(100% - 2rem);
+    max-width: 76rem;
+    height: calc(100dvh - 2rem);
+    margin: 1rem auto;
+    min-height: 0;
+}
+
+#employmentReviewWorkspace .modal-content {
+    container: employment-review-dialog / inline-size;
+    max-height: 100%;
+    min-height: 0;
+}
+
+#employmentReviewWorkspace :is(.modal-header, .modal-footer) {
+    flex-shrink: 0;
+    gap: var(--review-space);
+    padding: var(--review-space);
+}
+
+#employmentReviewWorkspace .modal-header > div {
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+#employmentReviewWorkspace .modal-body {
+    min-height: 0;
+    overflow: auto;
+    padding: var(--review-space);
+    font-size: var(--review-text);
+}
+
+#employmentReviewWorkspace .modal-footer {
+    flex-wrap: wrap;
+}
+
+#employmentReviewWorkspace #pdfPreviewModal .modal-body {
+    display: flex;
+}
+
+#employmentReviewWorkspace #reviewPdfFrame {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 0;
+}
+
+#employmentReviewWorkspace .weekly-hr-stage2-preview-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--review-space);
+}
+
+#employmentReviewWorkspace .weekly-hr-stage2-preview-reason {
+    flex: 1 1 20rem;
+}
+
+#employmentReviewWorkspace :is(.weekly-hr-stage2-preview-pagination, .weekly-hr-stage2-preview-actions) {
+    flex-wrap: wrap;
+}
+
+/* Portals attached to body have their own bounded viewport scale. */
+:is(.swal2-popup.employment-review-swal-popup, .weekly-hr-stage1-day-editor, .review-guidance-popover) {
+    --review-text: clamp(.9rem, calc(.6rem + .35vw), 1rem);
+    --review-small: clamp(.85rem, calc(.55rem + .35vw), 1rem);
+    --review-label: clamp(.95rem, calc(.65rem + .35vw), 1.05rem);
+    --review-title: clamp(1.15rem, calc(.8rem + .5vw), 1.4rem);
+    font-size: var(--review-text);
+    line-height: 1.45;
+}
+
+.swal2-popup.employment-review-swal-popup {
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100dvh - 2rem) !important;
+    display: flex !important;
+    flex-direction: column;
+    overflow-y: auto !important;
+}
+
+.swal2-popup.employment-review-swal-popup > * { flex-shrink: 0; }
+.swal2-popup.employment-review-swal-popup .swal2-close { position: absolute; top: 0; right: 0; }
+
+.swal2-popup.employment-review-swal-popup .swal2-html-container {
+    flex: 0 1 auto;
+    min-width: 0;
+    min-height: 0;
+    max-height: max(8rem, calc(100dvh - 24rem));
+    overflow: auto !important;
+    overflow-wrap: normal;
+}
+
+.swal2-popup.employment-review-swal-popup :is(.swal2-title, h3, h4, h5, h6),
+.weekly-hr-stage1-day-editor .offcanvas-title,
+.review-guidance-popover h3 {
+    font-size: var(--review-title);
+    line-height: 1.4;
+}
+
+.swal2-popup.employment-review-swal-popup :is(.small, small, .badge),
+.weekly-hr-stage1-day-editor :is(.small, small, .badge),
+.review-guidance-popover .small {
+    font-size: var(--review-small) !important;
+    line-height: 1.4;
+}
+
+:is(.swal2-popup.employment-review-swal-popup, .weekly-hr-stage1-day-editor) :is(input, select, textarea, label) {
+    font-size: var(--review-label) !important;
+    line-height: 1.4;
+}
+
+.weekly-hr-stage1-day-editor .offcanvas-body { min-height: 0; overflow: auto; }
+.weekly-hr-stage1-day-editor .weekly-hr-stage1-editor-navigation { flex-wrap: wrap; flex-shrink: 0; }
+
+@container employment-review (max-width: 70rem) {
+    #employmentReviewWorkspace #reviewFiltersEnterScope {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    #employmentReviewWorkspace .policy-preview-group-header { grid-template-columns: 1fr; }
+    #employmentReviewWorkspace .employment-review-progress-step { flex-basis: 40%; }
+    #employmentReviewWorkspace .employment-review-progress-arrow { display: none; }
+}
+
+@container employment-review (max-width: 40rem) {
+    #employmentReviewWorkspace #reviewFiltersEnterScope { grid-template-columns: 1fr; }
+    #employmentReviewWorkspace .hr-review-days-grid { grid-template-columns: 1fr; }
+    #employmentReviewWorkspace .employment-review-progress-step { flex-basis: 100%; }
+    #employmentReviewWorkspace .review-card-body { display: block; overflow-y: auto; }
+    #employmentReviewWorkspace .review-filters-sticky { position: static; }
+    #employmentReviewWorkspace .employment-review-scroll-container { overflow: visible; }
+}
+
+@container employment-review-dialog (max-width: 60rem) {
+    #employmentReviewWorkspace .modal-body .row > :is(.col-md-3, .col-md-4) { width: 50%; }
+    #employmentReviewWorkspace .weekly-hr-stage2-preview-case-header { grid-template-columns: 1fr; }
+}
+
+@container employment-review-dialog (max-width: 35rem) {
+    #employmentReviewWorkspace .modal-body .row > :is(.col-md-3, .col-md-4, .col-md-6) { width: 100%; }
+}
+
+/* The shared button layer keeps its colors and special-control exceptions. */
+@layer application-buttons {
+    #employmentReviewWorkspace :is(.btn, button):not(:where(.btn-close, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .clear-button, .remove, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item)),
+    #employmentPeriodControlActions .btn,
+    .swal2-popup.employment-review-swal-popup .swal2-actions button,
+    .weekly-hr-stage1-day-editor .weekly-hr-stage1-editor-navigation button {
+        font-size: var(--review-label) !important;
+        min-height: 2.35rem !important;
+        padding: .4rem .7rem !important;
+        border-radius: 6px !important;
+        line-height: 1.35 !important;
+        white-space: nowrap !important;
+    }
+}
+
+/* At short heights the whole body can scroll, keeping every control reachable. */
+@media (max-height: 760px) {
+    #employmentReviewWorkspace .review-card-body { overflow-y: auto; display: block; }
+    #employmentReviewWorkspace .review-filters-sticky { position: static; }
+    #employmentReviewWorkspace .employment-review-scroll-container { overflow: visible; }
+}
+
+#employmentReviewWorkspace :is(.review-modal-section-title, .review-badge, .review-total-label,
+    .review-total-value, .review-lock-badge, .review-warning-badge, .review-adeia-badge) {
+    font-size: var(--review-label) !important;
+    line-height: 1.4;
+}
+
+#employmentReviewWorkspace .review-modal-grid-3 {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--review-space);
+}
+
+#employmentReviewWorkspace .review-time-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) minmax(0, 1fr);
+}
+
+#employmentReviewWorkspace .review-modal-section { min-width: 0; }
+#employmentReviewWorkspace .form-check-input { flex-shrink: 0; }
+
+#employmentReviewWorkspace :is(.alert, .invalid-feedback, .hr-review-error-state),
+.swal2-popup.employment-review-swal-popup .swal2-validation-message {
+    font-size: max(.95rem, var(--review-text)) !important;
+    line-height: 1.5;
+}
+
+#employmentReviewWorkspace .weekly-hr-stage1-table-shell { max-height: min(40rem, 65dvh); }
+#employmentReviewWorkspace #resultsTable :is(.employee-subtotal-row > td,
+    .weekly-deviation-section-title, .weekly-deviation-table > thead > tr > th) {
+    position: static;
+}
+
+@media (max-height: 760px) {
+    #employmentReviewWorkspace .weekly-hr-stage1-bulk-toolbar { position: static; }
+}
+
+/* Tom Select's original accessible select must not enlarge the dialog. */
+#employmentReviewWorkspace #detailsModal select.ts-hidden-accessible {
+    width: 1px !important;
+    height: 1px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+}
+
+.swal2-popup.employment-review-swal-popup:has(.swal2-error) .swal2-html-container,
+.swal2-popup.employment-review-swal-popup:has(.swal2-warning) .swal2-html-container {
+    font-size: max(.95rem, var(--review-text)) !important;
+}
+
+.weekly-hr-stage1-bulk-action-menu .dropdown-item {
+    font-size: clamp(.9rem, calc(.6rem + .35vw), 1rem);
+    line-height: 1.4;
+}
+
+#employmentReviewWorkspace #reviewFiltersEnterScope > .employment-review-advanced-branch {
+    padding-right: 2rem;
+}
+
+#employmentReviewWorkspace :is(input, textarea)::placeholder,
+.weekly-hr-stage1-day-editor :is(input, textarea)::placeholder,
+.swal2-popup.employment-review-swal-popup :is(input, textarea)::placeholder {
+    font-size: inherit !important;
+    line-height: inherit;
+}
+
+
+#employmentReviewWorkspace .weekly-hr-stage3-decisions-table .stage3-col-declared { width: 11%; }
+#employmentReviewWorkspace .weekly-deviation-table-shell { overflow: auto; }
+#employmentReviewWorkspace .weekly-deviation-table { min-width: 116rem; }
+#employmentReviewWorkspace :is(.weekly-deviation-date-column, .weekly-deviation-number-column) { width: 10rem; }
+#employmentReviewWorkspace .weekly-deviation-employment-type-column { width: 16rem; }
+#employmentReviewWorkspace .weekly-deviation-comment-column { width: 20rem; }
+
+#employmentReviewWorkspace #employmentReviewStage4Collapse :is(.stage4-sixth-day-badge, .stage4-seventh-day-badge) {
+    line-height: 1.25;
+}
+
+/* Employee Maintenance only: scale actions to the available content width. */
+.employee-maintenance-form {
+    container: employee-maintenance / inline-size;
+    --employee-action-font: var(--maintenance-control-font);
+    --employee-action-height: clamp(2.125rem, 1.75rem + .5cqi, 2.5rem);
+    --employee-action-padding-y: clamp(.35rem, .2rem + .2cqi, .5rem);
+    --employee-action-padding-x: clamp(.6rem, .4rem + .4cqi, .85rem);
+    --employee-schedule-font: var(--maintenance-control-font);
+    --employee-schedule-columns: 2rem 9rem minmax(10rem, 1fr) repeat(4, minmax(6.75rem, 1fr)) 4rem;
+    --employee-schedule-gap: clamp(.35rem, .6cqi, .65rem);
+}
+@layer application-buttons {
+    .employee-maintenance-form :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row,
+        .accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop,
+        .istoriko-btn, .btn-sm, .btn-small
+    )) {
+        font-size: var(--employee-action-font) !important;
+        min-height: var(--employee-action-height) !important;
+        padding: var(--employee-action-padding-y) var(--employee-action-padding-x) !important;
+    }
+    .employee-maintenance-form .cardFooter01 > :is(button, a):not(.btn-toTop) > :is(i, svg) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+.employee-maintenance-form .card-footer:has(> .cardFooter01) {
+    flex: 0 0 auto;
+}
+.employee-maintenance-form .cardFooter01 {
+    justify-content: flex-start;
+    align-items: center;
+    gap: clamp(.5rem, .8cqi, .85rem);
+    margin-inline: 0 !important;
+}
+.employee-maintenance-form .menu_Links ul {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: clamp(.25rem, .65cqi, .75rem);
+    overflow-x: auto;
+    height: auto !important;
+    white-space: nowrap !important;
+}
+.employee-maintenance-form .menu_Links li {
+    font-size: var(--employee-action-font) !important;
+    white-space: nowrap;
+}
+.employee-maintenance-form .employee-schedule-permission {
+    padding: .4rem 1rem;
+    background: #3d4e001e;
+    font-size: var(--employee-schedule-font);
+}
+.employee-maintenance-form #cardBody6 {
+    scrollbar-gutter: stable;
+}
+.employee-maintenance-form :is(.employee-schedule-heading, .employee-schedule-day) {
+    display: grid;
+    grid-template-columns: var(--employee-schedule-columns);
+    gap: .4rem var(--employee-schedule-gap);
+    align-items: center;
+    margin: 0;
+    padding: .5rem 0;
+}
+.employee-maintenance-form .employee-schedule-heading {
+    background: #3d4e001e;
+    font-size: var(--employee-schedule-font);
+    font-weight: 600;
+    text-align: center;
+}
+.employee-maintenance-form .employee-schedule-day > *,
+.employee-maintenance-form .employee-schedule-pair > * {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    margin: 0 !important;
+    padding: 0;
+}
+.employee-maintenance-form .employee-schedule-pair {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    gap: .4rem var(--employee-schedule-gap);
+    align-items: center;
+}
+.employee-maintenance-form .employee-schedule-day-label { grid-column: 1; }
+.employee-maintenance-form .employee-schedule-date { grid-column: 2; }
+.employee-maintenance-form .employee-schedule-category { grid-column: 3; }
+.employee-maintenance-form .employee-schedule-note { grid-column: 1 / 4; }
+.employee-maintenance-form .employee-schedule-work-from { grid-column: 4; }
+.employee-maintenance-form .employee-schedule-work-to { grid-column: 5; }
+.employee-maintenance-form .employee-schedule-break-from { grid-column: 6; }
+.employee-maintenance-form .employee-schedule-break-to { grid-column: 7; }
+.employee-maintenance-form .employee-schedule-repo { grid-column: 8; }
+.employee-maintenance-form .employee-schedule-spacer { display: none; }
+.employee-maintenance-form .employee-schedule-time-label { display: none; }
+.employee-maintenance-form .employee-schedule-day :is(input[type="time"], input[type="date"], select, .ts-control) {
+    width: 100% !important;
+    min-width: 0;
+    min-height: var(--employee-action-height);
+    height: var(--employee-action-height);
+    box-sizing: border-box;
+    padding: .25rem .35rem;
+    font-size: var(--employee-schedule-font) !important;
+    line-height: 1.25;
+}
+.employee-maintenance-form .employee-schedule-day :is(label, .ts-control input, .ts-control .item) {
+    font-size: var(--employee-schedule-font) !important;
+}
+.employee-maintenance-form .employee-schedule-note input {
+    width: 100%;
+    margin: 0 !important;
+    font-size: var(--employee-schedule-font) !important;
+}
+@container employee-maintenance (max-width: 58rem) {
+    .employee-maintenance-form .employee-schedule-heading { display: none; }
+    .employee-maintenance-form .employee-schedule-day {
+        grid-template-columns: repeat(4, minmax(6.75rem, 1fr));
+    }
+    .employee-maintenance-form .employee-schedule-day-label { grid-column: 1; grid-row: 1; }
+    .employee-maintenance-form .employee-schedule-date { grid-column: 2 / 4; grid-row: 1; }
+    .employee-maintenance-form .employee-schedule-category { grid-column: 1 / 4; grid-row: 2; }
+    .employee-maintenance-form .employee-schedule-repo { grid-column: 4; grid-row: 2; }
+    .employee-maintenance-form .employee-schedule-note { grid-column: 1 / -1; }
+    .employee-maintenance-form .employee-schedule-work-from { grid-column: 1; }
+    .employee-maintenance-form .employee-schedule-work-to { grid-column: 2; }
+    .employee-maintenance-form .employee-schedule-break-from { grid-column: 3; }
+    .employee-maintenance-form .employee-schedule-break-to { grid-column: 4; }
+    .employee-maintenance-form .employee-schedule-time-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.5em;
+        margin-bottom: .2rem;
+        font-size: .875rem !important;
+        line-height: 1.25;
+    }
+}
+@container employee-maintenance (max-width: 34rem) {
+    .employee-maintenance-form .employee-schedule-day { grid-template-columns: repeat(2, minmax(6.75rem, 1fr)); }
+    .employee-maintenance-form .employee-schedule-date { grid-column: 2; }
+    .employee-maintenance-form .employee-schedule-category { grid-column: 1; }
+    .employee-maintenance-form .employee-schedule-repo { grid-column: 2; }
+    .employee-maintenance-form .employee-schedule-break-from { grid-column: 1; }
+    .employee-maintenance-form .employee-schedule-break-to { grid-column: 2; }
+}
+
+/* Scoped maintenance forms: one scale for fields/actions, based on content width. */
+.maintenance-responsive-form {
+    container: maintenance-form / inline-size;
+    --maintenance-control-font: var(--payroll-control-font, clamp(.9rem, .78rem + .25cqi, 1rem));
+    font-size: clamp(.85rem, .74rem + .25cqi, 1rem);
+    min-width: 0;
+}
+/* Keep the named schedule container used by the existing time-column queries. */
+.employee-maintenance-form { container-name: employee-maintenance maintenance-form; }
+.maintenance-responsive-form :is(.form-control, .form-select, .input-contents, .date-control, .input-date, .input-time, .ts-control, .ts-control input, .ts-control .item, .col-form-label, .form-check-label) {
+    font-size: var(--maintenance-control-font) !important;
+}
+.maintenance-responsive-form :is(.card, form, .card-body, .accordion-body, .sections, .row > div) { min-width: 0; }
+.maintenance-responsive-form :is(.cardFooter01, .user-admin-actions, .modal-footer) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    margin-inline: 0 !important;
+}
+.maintenance-responsive-form .card:not(.modal .card) {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 9rem);
+    min-height: 0;
+    overflow: visible !important;
+}
+.maintenance-responsive-form .card > form,
+.maintenance-responsive-form .card > .card-body:has(> form) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+}
+.maintenance-responsive-form .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    overflow-y: auto;
+}
+.maintenance-responsive-form :is(.card-footer, .user-admin-card-footer) {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+}
+.maintenance-responsive-form :is(.table-responsive, .user-privileges-table-container) { min-width: 0; overflow-x: auto; }
+.maintenance-responsive-form table { font-size: clamp(.85rem, .74rem + .25cqi, 1rem); }
+.maintenance-responsive-form .modal-dialog { max-height: calc(100dvh - 2rem); }
+.maintenance-responsive-form .modal-content { max-height: calc(100dvh - 2rem); }
+.maintenance-responsive-form .modal-body { overflow-y: auto; min-height: 0; }
+.maintenance-responsive-form .menu_Links ul {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: clamp(.25rem, .65cqi, .75rem);
+    height: auto !important;
+    padding-inline: .5rem;
+}
+.maintenance-responsive-form .menu_Links li {
+    flex: 1 0 auto;
+    float: none;
+    margin-inline: 0 !important;
+    white-space: nowrap;
+    text-align: center;
+    font-size: var(--maintenance-control-font) !important;
+}
+@layer application-buttons {
+    .maintenance-responsive-form :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row,
+        .accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop,
+        .istoriko-btn, .btn-small
+    )) {
+        font-size: var(--maintenance-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        min-height: clamp(2.125rem, 1.75rem + .5cqi, 2.5rem) !important;
+        padding: clamp(.35rem, .2rem + .2cqi, .5rem) clamp(.6rem, .4rem + .4cqi, .85rem) !important;
+    }
+    .maintenance-responsive-form :is(.btn, .buttons-content) > :is(i, svg) {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+.maintenance-responsive-form .card-footer {
+    height: auto !important;
+    min-height: 0;
+}
+.maintenance-responsive-form .istoriko-footer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+.maintenance-responsive-form .menu_Links { margin-inline: 0; min-width: 0; }
+.maintenance-responsive-form .user-privileges-controls {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+.maintenance-responsive-form .user-privileges-user-field { padding-inline-end: 0; }
+.maintenance-responsive-form :is(.headers-content, h1, .h3, .h4) {
+    font-size: clamp(1.1rem, .9rem + .5cqi, 1.5rem);
+}
+.maintenance-responsive-form :is(.alert, [role="alert"]) { font-size: max(1rem, var(--maintenance-control-font)); }
+.maintenance-responsive-form .card-footer.d-flex,
+.maintenance-responsive-form .card-footer > .d-flex {
+    flex-wrap: wrap !important;
+    white-space: normal;
+    max-width: 100%;
+    gap: .5rem;
+}
+.maintenance-responsive-form .row.form-group > :is(.card-header, .row),
+.maintenance-responsive-form .row.form-group > div:has(> hr) {
+    flex: 0 0 100% !important;
+    width: 100% !important;
+}
+.employee-maintenance-form .accordion-item:not(:where(:is(.employee-add-page, .employee-edit-page) .accordion-item)) { margin-block: .5rem !important; }
+.employee-maintenance-form .accordion-header { margin: 0; }
+.employee-maintenance-form .accordion-button {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: .65rem .9rem;
+    font-size: var(--maintenance-control-font) !important;
+}
+.employee-maintenance-form .accordion-body > .row.form-group:not(:where(.employee-add-fixed-details .row.form-group)) {
+    margin-block: .5rem !important;
+}
+.maintenance-responsive-form :is(th, td, .page-link, .small) {
+    font-size: clamp(.85rem, .74rem + .25cqi, 1rem) !important;
+}
+.maintenance-responsive-form :is(.ts-dropdown, .ts-dropdown .option, .ts-dropdown input) {
+    font-size: var(--maintenance-control-font) !important;
+}
+/* Shared horizontal scroll keeps the separate sortable header with its rows. */
+.maintenance-responsive-form .maintenance-table-scroll {
+    overflow-x: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+.maintenance-responsive-form .maintenance-table-inner {
+    display: flex;
+    flex-direction: column;
+    min-width: 52rem;
+    height: min(50dvh, calc(100dvh - 22rem));
+}
+.maintenance-responsive-form .maintenance-table-contracts { min-width: 32rem; }
+.maintenance-responsive-form .maintenance-table-inner table { table-layout: fixed; width: 100%; }
+.maintenance-responsive-form .cardFooter02 { flex-wrap: wrap; width: auto !important; }
+.maintenance-responsive-form .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-width: 2em;
+    min-height: 2em;
+    padding: .25em .5em;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+/* Η κεφαλίδα παραμένει σε μία σειρά χωρίς αποκοπή πληροφοριών. */
+.payroll-navigation {
+    --payroll-navigation-font: clamp(.8rem, .78vw, .95rem);
+    --payroll-navigation-gap: 3px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: center;
+    gap: var(--payroll-navigation-gap);
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+}
+.payroll-navigation .header-app-title {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    font-size: clamp(.85rem, .85vw, 1rem) !important;
+    letter-spacing: 0;
+    height: auto;
+    padding: .65rem 1px !important;
+    margin: 0 !important;
+    white-space: nowrap;
+}
+.payroll-navigation > form {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+}
+.payroll-navigation > form > .input-group {
+    flex-wrap: nowrap;
+    gap: var(--payroll-navigation-gap);
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+/* Οι λοιπές πληροφορίες καταλαμβάνουν μόνο το φυσικό πλάτος τους. */
+.payroll-navigation > form > .input-group > div {
+    flex: 0 0 auto;
+    /* Αναιρεί τα ποσοστιαία width !important των γενικών κλάσεων col-*. */
+    width: auto !important;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+}
+/* Η εταιρεία παίρνει μόνο τον χώρο που περισσεύει μετά τα υπόλοιπα περιεχόμενα. */
+.payroll-navigation > form > .input-group > div:first-child { flex: 1 0 auto; }
+/* Δέσμευση ολόκληρου του φυσικού πλάτους χρήστη και Group χωρίς συρρίκνωση. */
+.payroll-navigation > form > .input-group > div:last-child {
+    flex: 0 0 max-content;
+    width: max-content !important;
+}
+.payroll-navigation .form-control {
+    font-size: var(--payroll-navigation-font) !important;
+    line-height: 1.35;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: 2.75rem;
+    height: auto !important;
+    padding: .65rem 1px !important;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    overflow: visible;
+}
+.payroll-navigation .form-control > span { font-size: inherit; }
+/* Μικρή συμπίεση πριν από τον χρήστη, μόνο στα στενά παράθυρα. */
+@media (max-width: 1150px) {
+    .payroll-navigation .header-app-title,
+    .payroll-navigation > form > .input-group > div:not(:last-child) > .form-control {
+        padding-inline: 0 !important;
+        letter-spacing: -.025em;
+    }
+}
+/* Το padding συμμετέχει στο φυσικό πλάτος των τεσσάρων τελευταίων τμημάτων. */
+.payroll-navigation > form > .input-group > div:not(:first-child) > .form-control {
+    box-sizing: border-box;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+}
+/* Only identified field pairs reflow. Bootstrap rows and input groups keep their semantics. */
+#sidebarMenu { --payroll-control-font: .875rem; }
+#sidebarMenu .sidebar-toolbar .form-control { font-size: var(--payroll-control-font); }
+#sidebarMenu .sidebar-toolbar .form-control::placeholder { font-size: inherit; }
+.container-fluid.container-scroll:has(> .row > main.payroll-form-layout) {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+.payroll-form-layout {
+    container: payroll-page / inline-size;
+    --payroll-control-font: clamp(.9rem, .78rem + .25cqi, 1rem);
+    --payroll-control-height: 2.25rem;
+    min-width: 0;
+    height: calc(100dvh - var(--payroll-main-top, var(--app-header-h)) - var(--app-footer-h));
+    max-height: calc(100dvh - var(--payroll-main-top, var(--app-header-h)) - var(--app-footer-h));
+    overflow-y: auto;
+    padding-bottom: .75rem;
+    width: calc(100% - var(--leftW));
+    margin-left: var(--leftW) !important;
+}
+#sidebarMenu:is(.d-none, [hidden]) ~ .payroll-form-layout { width: 100%; margin-left: 0 !important; }
+.payroll-form-layout .payroll-field-row {
+    --bs-gutter-y: 0;
+    margin-inline: 0 !important;
+    margin-block: .4rem !important;
+    gap: .75rem 1rem;
+    align-items: flex-start !important;
+}
+.payroll-form-layout .payroll-field-row > .payroll-field-group {
+    flex: 1 1 calc(var(--field-columns, 6) * 100% / 12 - 1rem);
+    min-width: min(100%, var(--field-min, 14rem));
+    max-width: 100%;
+    width: auto;
+    padding: 0;
+    margin: 0 !important;
+}
+.payroll-form-layout .payroll-field-group > :is(.payroll-field-label, .payroll-field-control, .payroll-field-actions) {
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: 0;
+    margin: 0 !important;
+    text-align: start !important;
+}
+.payroll-form-layout .payroll-field-label :is(label, [data-field-group-label]) {
+    display: inline-block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding: 0 0 .3rem;
+    margin: 0 !important;
+    line-height: 1.4;
+}
+.payroll-form-layout .payroll-field-actions { padding-top: .35rem; }
+.payroll-form-layout .payroll-field-control :is(input:not(.dropdown-input), select),
+.payroll-form-layout .payroll-field-control > .ts-wrapper { margin-block: 0 !important; }
+.payroll-form-layout .payroll-field-control :is([data-field-display], label:not(.col-form-label)) { font-size: var(--payroll-control-font) !important; }
+.employee-maintenance-form .row:has(> .employee-ama-field) { flex-wrap: nowrap; }
+.employee-maintenance-form .row > .employee-ama-field { flex: 0 0 8rem; width: 8rem; }
+.employee-maintenance-form .row:has(> .employee-ama-field) > .payroll-field-group { flex: 1 1 0; min-width: 0; }
+.employee-maintenance-form .employee-retention-row { gap: .5rem; margin-inline: 0; }
+.employee-maintenance-form .employee-retention-row > .col-1 { flex: 0 0 2rem; width: 2rem; padding-inline: 0; }
+.employee-maintenance-form .employee-retention-row > .col-8 { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 0; }
+.employee-maintenance-form .employee-retention-row > :is(.col-0-2, .col-0-3):not(button) { display: none; }
+.employee-maintenance-form .employee-retention-row > .employee-ama-field { padding-inline: 0; }
+.employee-maintenance-form .employee-retention-row > .edit-employee-tom-trash { flex: 0 0 1.75rem; width: 1.75rem; padding: 0; }
+/* Προσθήκη / Κρατήσεις: η διαχωριστική γραμμή χωρά χωρίς τα αρνητικά περιθώρια της hr-style-5. */
+:is(.employee-add-page, .employee-edit-page) .employee-retention-divider {
+    margin-block: 3.2rem .2rem;
+    margin-inline: 0;
+    color: #000000;
+}
+.employee-maintenance-form .employee-retention-heading { flex-wrap: nowrap; gap: .5rem; margin-inline: 0; }
+.employee-maintenance-form .employee-retention-heading > .col-1 { flex: 0 0 2rem; width: 2rem; padding-inline: 0; white-space: nowrap; }
+.employee-maintenance-form .employee-retention-heading > .col-8 { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 0; }
+.employee-maintenance-form .employee-retention-heading > .col-1-5 { flex: 0 0 8rem; width: 8rem; padding-inline: 0; }
+.employee-maintenance-form .employee-retention-heading > :is(.col-0-2,.col-0-5) { display: none; }
+.employee-maintenance-form .employee-retention-heading > .col-0-3 { flex: 0 0 1.75rem; width: 1.75rem; padding: 0; }
+.employee-maintenance-form .row:has(> .employee-ama-field):not(.employee-retention-row) > .col-8 { flex: 1 1 0; width: auto; }
+.employee-maintenance-form .row:has(> .employee-ama-field):not(.employee-retention-row) > :is(.col-0-2, .col-0-3) { display: none; }
+#editKrathseisTomDropdownScope .row:has(> .employee-ama-field):not(.employee-retention-row) > .col-0-3 { display: block; flex: 0 0 1.75rem; width: 1.75rem; }
+.payroll-field-inputs { display: flex; gap: .5rem; }
+.payroll-field-inputs > .payroll-field-control { flex: 1 1 0; min-width: 0; width: auto !important; padding: 0; }
+.payroll-field-inputs > .payroll-field-control:has(input[type="text"]) { flex-grow: 2; }
+.payroll-form-layout .payroll-field-group:has(.pdf-button-wrapper) { flex-basis: 100%; }
+.payroll-form-layout .payroll-field-spacer { display: none; }
+.payroll-form-layout .payroll-field-row > .payroll-field-group-empty { display: none; }
+.payroll-form-layout .payroll-action-row { margin-inline: 0 !important; }
+.payroll-form-layout .payroll-action-row > div:not(.payroll-field-spacer) { flex: 1 1 100%; width: 100%; min-width: 0; }
+.payroll-form-layout .header-row { padding: .5rem; }
+.payroll-form-layout .header-row > div:first-child:not(.payroll-field-group) { flex-basis: 100%; width: 100%; }
+.payroll-form-layout .payroll-contained-field > label {
+    display: block;
+    margin: 0 0 .3rem !important;
+    padding: 0;
+    white-space: normal;
+}
+.payroll-form-layout .payroll-contained-field > :is(input, select) { margin-top: 0 !important; }
+.employee-maintenance-form .employee-fund-fields { gap: 1rem; margin-inline: 0 !important; }
+.employee-maintenance-form .employee-fund-fields > .col-3-75 { flex: 1 1 14rem; width: auto !important; min-width: 0; padding: 0; }
+.employee-maintenance-form .employee-fund-fields > .col-0-25 { display: none; }
+#editKrathseisTomDropdownScope .employee-fund-fields > .edit-employee-tom-field { flex-wrap: wrap; }
+#editKrathseisTomDropdownScope .employee-fund-fields > .edit-employee-tom-field > label { flex: 0 0 100%; text-align: start; }
+#editKrathseisTomDropdownScope .employee-fund-fields > .edit-employee-tom-field > .ts-wrapper { flex: 1 1 0; width: 0 !important; }
+.payroll-form-layout .pdf-modal-body :is(p, small) { font-size: var(--payroll-control-font) !important; }
+.payroll-form-layout .hover-modal {
+    left: auto;
+    right: 0;
+    top: 100%;
+    width: min(30rem, calc(100cqi - 2rem));
+    max-height: min(32rem, var(--payroll-hover-space, calc(100vh - var(--app-header-h) - 12rem)));
+    overflow-y: auto;
+    z-index: 1100;
+}
+.payroll-form-layout .hover-modal :is(.modal-item, .modal-item-value) { font-size: var(--payroll-control-font); }
+.payroll-form-layout .hover-modal:hover { display: block; }
+.payroll-form-layout .hover-modal.payroll-hover-above { top: auto; bottom: 100%; }
+.payroll-field-inline { display: flex; gap: .5rem; }
+.payroll-field-inline > input { flex: 1 1 0; width: 0; }
+.payroll-field-inline > div { flex: 1 1 0; min-width: 0; width: auto; padding: 0; }
+.payroll-field-inline > div > input { width: 100%; }
+.payroll-radio-options { display: flex; flex-wrap: wrap; gap: .75rem; }
+.payroll-radio-options > div { flex: 1 1 14rem; min-width: 0; width: auto; }
+
+.payroll-form-layout :is(.tadded-container, .wrapper-kinhseis) {
+    height: auto !important;
+    min-width: 0;
+    min-height: 0;
+    overflow: visible !important;
+}
+.payroll-form-layout .container-fluid:has(.sections) { height: auto !important; min-height: 0; overflow: visible !important; }
+.payroll-form-layout .sections > section { height: auto !important; overflow: visible !important; }
+.payroll-form-layout .sections > section > .container:has(form) { height: auto; overflow: visible; }
+.payroll-form-layout .payroll-scroll-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: auto !important;
+    max-height: var(--payroll-card-space, calc(100dvh - 10rem)) !important;
+    overflow: visible !important;
+    margin-bottom: .5rem !important;
+}
+.payroll-form-layout .payroll-scroll-card > form { display: flex; flex-direction: column; min-height: 0; }
+.payroll-form-layout .payroll-scroll-card > .card-body,
+.payroll-form-layout .payroll-scroll-card > form > .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    overflow-y: auto !important;
+}
+.payroll-form-layout .payroll-scroll-card .card-footer { flex: 0 0 auto; height: auto !important; position: static; }
+/* A tall form header must not squeeze its fields into a tiny second scrollport. */
+@container payroll-page (max-width: 45rem) {
+    .payroll-form-layout .payroll-scroll-card:not(:has(table, .payroll-entry-table)) { max-height: none !important; }
+    .payroll-form-layout .payroll-scroll-card:not(:has(table, .payroll-entry-table)) > .card-body,
+    .payroll-form-layout .payroll-scroll-card:not(:has(table, .payroll-entry-table)) > form > .card-body {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+}
+.payroll-form-layout .payroll-scroll-card > .card-footer,
+.payroll-form-layout .payroll-scroll-card > .card-footer > .d-flex { flex-wrap: wrap !important; gap: .5rem; white-space: normal; }
+.payroll-form-layout :is(.cardFooter01, .cardFooter02) { flex-wrap: wrap; gap: .5rem; width: auto !important; }
+.payroll-form-layout .card-header:has(> label, > h4) { height: auto !important; min-height: 3rem; }
+.payroll-form-layout .payroll-context-row { flex-wrap: wrap; }
+.payroll-form-layout .payroll-context-row > span { font-size: .85rem !important; white-space: normal; }
+.payroll-form-layout .payroll-context-row > span:last-child { flex: 1 1 15rem; overflow-wrap: anywhere; }
+.payroll-form-layout .card-header:has(> .row.form-group) { display: block; flex: 0 0 auto; }
+.payroll-form-layout .card-header:has(> .row.form-group) > label { display: block; height: auto !important; }
+.payroll-form-layout .card-header :is(.headers-content, h4) { font-size: 1.2rem !important; line-height: 1.4; margin: .25rem 0; white-space: normal; }
+.payroll-form-layout > .container:has(> form) { min-width: min(100%, 22rem); max-width: 100%; height: auto; overflow: visible; }
+.payroll-form-layout form[action="/login/userLogin"] .card-body a.small { font-size: .85rem; line-height: 1.5; display: inline-block; }
+.payroll-form-layout .menu_Links { margin-inline: 0; min-width: 0; }
+.payroll-form-layout .menu_Links > ul { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: .35rem; height: auto !important; padding-inline: .5rem; }
+.payroll-form-layout .menu_Links > ul > li { flex: 0 0 auto; width: auto; min-width: max-content; float: none; margin-inline: 0 !important; white-space: nowrap; font-size: var(--payroll-control-font) !important; }
+.payroll-form-layout :is(th, td, .page-link) { font-size: clamp(.85rem, .74rem + .25cqi, 1rem) !important; }
+.payroll-form-layout .payroll-scroll-card > .card-body:has(> table, > div > table) { overflow-x: auto !important; }
+.payroll-table-scroll { flex: 1 1 auto; min-height: 0; height: var(--payroll-table-height); overflow-x: auto; overflow-y: hidden; }
+.payroll-table-inner { display: flex; flex-direction: column; min-width: var(--payroll-table-width, 52rem); height: var(--payroll-table-height); }
+.payroll-table-inner > .card-body { flex: 1 1 auto; min-height: 0; height: auto !important; overflow-x: hidden !important; overflow-y: auto !important; }
+.payroll-table-inner > div:not(.card-body) { flex-shrink: 0; }
+.payroll-table-header { padding-inline-end: var(--payroll-table-gutter, 0px); }
+.payroll-table-inner table { table-layout: fixed; width: 100%; }
+.payroll-table-inner .table-responsive { overflow: visible; }
+.payroll-scroll-table { min-width: var(--payroll-table-width, 52rem); table-layout: fixed; }
+.payroll-form-layout :is(.payroll-scroll-table, .payroll-table-inner table, .maintenance-table-inner table) :is(th, td).col-1 { width: 6.5rem; white-space: nowrap; }
+.payroll-form-layout :is(.payroll-scroll-table, .payroll-table-inner table, .maintenance-table-inner table) :is(th, td).col-0-5 { width: 3.5rem; white-space: nowrap; }
+.payroll-scroll-table :is(th, td):has(> .btn-nesting, > .bi-chevron-expand) { width: 3.25rem !important; }
+.payroll-scroll-table:has(.btn-nesting) > :is(thead, tbody) > tr > :is(th, td):first-child { width: 3rem !important; }
+.payroll-form-layout .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-width: 2em;
+    min-height: 2em;
+    padding: .25em .5em;
+    line-height: 1.25;
+    white-space: nowrap;
+    font-size: var(--payroll-control-font) !important;
+}
+.payroll-form-layout .page-link > i { font-size: 1em !important; width: 1em; height: 1em; }
+
+/* One control scale per region, with the established review-dialog overrides retained. */
+.payroll-form-layout :is(.form-control, .form-control1, .form-control2, .input-contents, .input-content, select, .form-select, .date-control, .input-date, .input-time,
+    .ts-wrapper, .ts-control, .ts-control input, .ts-control .item,
+    .ts-dropdown, .ts-dropdown input, .ts-dropdown .option, .col-form-label, .form-label, .form-check-label) {
+    font-size: var(--payroll-control-font) !important;
+}
+.payroll-form-layout :is(.form-control, .form-control1, .form-control2, .input-contents, .input-content, select, .form-select, .date-control, .input-date, .input-time) {
+    min-width: 0;
+    max-width: 100%;
+    min-height: var(--payroll-control-height);
+    font-weight: 400 !important;
+    line-height: 1.4;
+}
+.payroll-form-layout :is(input, textarea)::placeholder,
+.payroll-form-layout .ts-wrapper .dropdown-input::placeholder { font-size: inherit !important; }
+.payroll-form-layout .ts-wrapper.tom-dropdown {
+    height: auto !important;
+    min-height: var(--payroll-control-height);
+    min-width: 0;
+    max-width: 100%;
+}
+.payroll-form-layout .ts-wrapper .ts-control {
+    min-height: calc(var(--payroll-control-height) - 2px);
+    height: auto;
+    border: 0 !important;
+    padding: .35rem 3rem .35rem .65rem !important;
+    font-weight: 400;
+    line-height: 1.4;
+}
+.payroll-form-layout .ts-control input { min-width: 0; font-weight: 400; }
+.payroll-form-layout .ts-control .item { min-width: 0; max-width: 100%; font-weight: 400; }
+.payroll-form-layout .ts-wrapper.multi .item { height: auto; margin-block: 0; line-height: 1.4; }
+.payroll-form-layout .ts-wrapper.multi .ts-control { padding-right: 5.25rem !important; }
+.payroll-form-layout .ts-wrapper.multi .ts-control > .item { display: flex; align-items: center; max-width: 100%; min-width: 0; }
+.payroll-form-layout .ts-wrapper.multi .ts-control > .item[hidden] { display: none; }
+.payroll-form-layout .ts-item-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payroll-form-layout .ts-wrapper.multi .item > .remove { flex-shrink: 0; }
+.payroll-form-layout .ts-overflow-indicator { right: 3.25rem; width: 1.5rem; height: 1.5rem; font-size: 1em; }
+.payroll-form-layout .ts-control .remove { height: auto; margin-block: 0; font-size: 1em; line-height: 1; }
+.payroll-form-layout select.ts-hidden-accessible {
+    min-height: 0 !important;
+    min-width: 0 !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+}
+.payroll-form-layout .ts-dropdown-content { overflow-y: auto; overscroll-behavior: contain; }
+.payroll-form-layout .ts-wrapper > .ts-dropdown {
+    width: var(--ts-menu-width, 100%) !important;
+    min-width: 0 !important;
+    max-width: none;
+    left: var(--ts-menu-left, 0) !important;
+    right: auto !important;
+}
+.payroll-form-layout .ts-wrapper.dropdown-active > .ts-dropdown { display: flex !important; flex-direction: column; }
+.payroll-form-layout .ts-wrapper.dropdown-active > .ts-dropdown .ts-dropdown-content { flex: 1 1 auto; min-height: 0; }
+.payroll-form-layout .ts-dropdown > .dropdown-input-wrap { flex-shrink: 0; }
+.payroll-form-layout .ts-wrapper.single .ts-control .item {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto;
+    background: transparent !important;
+    border: 0;
+}
+.payroll-form-layout .ts-wrapper > .ts-fill-reset-btn {
+    left: auto !important;
+    right: .25rem !important;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    font-size: 1em;
+}
+.payroll-form-layout .ts-wrapper > .ts-fill-reset-btn svg { width: 1em; height: 1em; }
+.payroll-form-layout .ts-wrapper:has(> .ts-fill-reset-btn:not([hidden]))::after { right: 2rem; }
+.payroll-form-layout .ts-dropdown .option:not(:has(.ts-option)) { overflow-wrap: anywhere; }
+.payroll-form-layout :is(select.is-invalid + .ts-wrapper, .ts-wrapper.is-invalid) { border-color: var(--bs-danger, #dc3545); }
+.payroll-form-layout :is(select.is-invalid + .ts-wrapper, .ts-wrapper.is-invalid).focus { box-shadow: 0 0 0 .2rem #dc354540 !important; }
+
+/* These older payroll fields use their own classes and ID-specific vw overrides. */
+.payroll-form-layout #apasxolhseisForm :is(.form-control1, .form-control2, .input-contents, select,
+    .ts-control, .ts-control input, .ts-control .item, .ts-dropdown, .ts-dropdown .option) {
+    font-size: var(--payroll-control-font) !important;
+}
+.payroll-form-layout #apasxolhseisForm .payroll-field-row { margin-block: .75rem !important; }
+.payroll-form-layout #apasxolhseisForm .payroll-field-control input { margin-inline: 0 !important; }
+.payroll-form-layout #apasxolhseisForm .card-body:has(> .payroll-entry-table) { overflow-x: auto !important; }
+.payroll-form-layout #apasxolhseisForm .payroll-entry-table { min-width: 80rem; padding-inline: .5rem; }
+.payroll-form-layout #apasxolhseisForm .payroll-entry-table .row.form-group:not(.payroll-field-row) { flex-wrap: nowrap; margin-inline: 0 !important; }
+.payroll-form-layout #apasxolhseisForm .payroll-entry-table label { font-size: var(--payroll-control-font) !important; }
+.payroll-form-layout #apasxolhseisForm .payroll-entry-table:has(> .foroi-body-row) { min-width: 35rem; }
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-row, .payroll-tax-heading) {
+    display: grid;
+    grid-template-columns: minmax(16rem, 2fr) repeat(2, minmax(8rem, 1fr));
+    gap: .75rem .5rem;
+    margin-block: .75rem;
+}
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-row, .payroll-tax-heading) > div { width: 100% !important; min-width: 0; padding-inline: 0; }
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-row, .payroll-tax-heading) > div:empty { display: none; }
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-annual, .payroll-tax-heading > div:nth-child(3)) { grid-column: 2; }
+.payroll-form-layout #apasxolhseisForm :is(.payroll-tax-monthly, .payroll-tax-heading > div:last-child) { grid-column: 3; }
+.payroll-form-layout #apasxolhseisForm .krathseis-apodoxes-row { gap: .5rem; }
+.payroll-form-layout #apasxolhseisForm .krathseis-apodoxes-row > .col-2 { flex: 0 0 auto; width: max-content; }
+.payroll-form-layout #apasxolhseisForm .krathseis-apodoxes-row > .col-1-5 { flex: 0 0 10rem; width: 10rem; }
+
+@layer application-buttons {
+    .payroll-form-layout :is(button, .btn, a.buttons-content, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:where(
+        .sidebar-mini-btn, .clear-btn, .clear-row, .ts-fill-reset-btn, .ts-overflow-indicator,
+        .edit-apodoxes-tom-trash, .edit-employee-tom-trash,
+        .ts-popup-row > button, .ts-wrapper .clear-button, .ts-wrapper .remove,
+        #gotoProgrammaDypa, .review-guidance-info,
+        .weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile,
+        .weekly-hr-stage1-bulk-action-menu .dropdown-item, #resultsTable .employee-group-row,
+        .accordion-button, .nav-link, .navbar-toggler, .btn-close, .swal2-close, .btn-toTop,
+        .istoriko-btn, .btn-small
+    )) {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-height: var(--payroll-control-height) !important;
+        padding: .4rem .7rem !important;
+        min-width: max-content !important;
+    }
+    .payroll-form-layout :is(.btn, .buttons-content) > :is(i, svg) {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Body-mounted dialogs share a control scale; component-specific review scales still win. */
+.swal2-popup { --payroll-dialog-control-font: 1rem; }
+.swal2-popup :is(.swal2-input, .swal2-select, .swal2-textarea) { font-size: var(--payroll-dialog-control-font) !important; font-weight: 400; }
+@layer application-buttons {
+    .swal2-popup .swal2-actions button { font-size: var(--payroll-dialog-control-font) !important; font-weight: 400 !important; }
+    .swal2-popup .swal2-actions button :is(i, svg) { font-size: 1em !important; width: 1em; height: 1em; }
+}
+
+/* Μόνο η κάρτα επιβεβαίωσης αποσύνδεσης. */
+.payroll-form-layout:has(> .logout-confirmation) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: safe center;
+    justify-items: center;
+    padding-block: .75rem;
+}
+.logout-confirmation {
+    container-type: inline-size;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+}
+.logout-confirmation > .card {
+    --logout-message-font: min(1rem, 2.8cqi);
+    --payroll-control-font: clamp(.85rem, 2.8cqi, 1rem);
+    --logout-spacing: clamp(.4rem, 1.5cqi, 1rem);
+    width: 100%;
+    min-width: 0;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 6px;
+}
+.logout-confirmation .card-header {
+    padding: var(--logout-spacing);
+    min-height: 0 !important;
+}
+.logout-confirmation .logout-title {
+    font-size: clamp(.95rem, 3.5cqi, 1.25rem) !important;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0;
+}
+.logout-confirmation .card-body {
+    padding: var(--logout-spacing);
+    overflow: visible !important;
+    max-height: none;
+}
+.logout-confirmation .logout-bell {
+    display: inline-block;
+    font-size: clamp(1.75rem, 5cqi, 3rem);
+    margin-bottom: var(--logout-spacing);
+}
+.logout-confirmation .logout-message {
+    font-size: var(--logout-message-font);
+    line-height: 1.4;
+    white-space: nowrap;
+    margin: 0;
+}
+.logout-confirmation .card-footer {
+    height: auto !important;
+    min-height: 0;
+    padding: var(--logout-spacing);
+    margin: 0 !important;
+}
+.logout-confirmation .logout-actions {
+    flex-wrap: wrap;
+    gap: var(--logout-spacing);
+}
+@layer application-buttons {
+    .logout-confirmation .btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-height: 2rem !important;
+        padding: clamp(.35rem, 1cqi, .5rem) clamp(.5rem, 1.5cqi, .8rem) !important;
+        border-radius: 6px !important;
+    }
+    .logout-confirmation .btn > i { font-size: 1em !important; }
+}
+
+/* Μόνο η φόρμα σύνδεσης: φυσικό πλάτος χωρίς αρνητικά περιθώρια στηλών. */
+.payroll-form-layout:has(> .login-confirmation) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: safe center;
+    justify-items: center;
+    padding-block: .75rem;
+}
+.login-confirmation {
+    container: login-card / inline-size;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    margin: 0;
+}
+.login-confirmation > form {
+    --payroll-control-font: clamp(.85rem, .78rem + .6cqi, 1rem);
+    --login-spacing: clamp(.5rem, 2.5cqi, 1rem);
+    min-width: 0;
+    width: 100%;
+    margin: 0;
+}
+.login-confirmation .card {
+    min-width: 0;
+    width: 100%;
+    height: auto;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 6px;
+}
+.login-confirmation :is(.card-header, .card-body, .card-footer) {
+    padding: var(--login-spacing);
+    height: auto !important;
+    max-height: none;
+    overflow: visible !important;
+    margin: 0 !important;
+}
+.login-confirmation .login-title {
+    display: block;
+    font-size: clamp(1.1rem, 3.5cqi, 1.25rem) !important;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    margin: 0;
+}
+.login-confirmation .login-fields {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: .4rem var(--login-spacing);
+    align-items: center;
+    margin-bottom: var(--login-spacing);
+}
+.login-confirmation .login-field { display: contents; }
+.login-confirmation :is(.login-label, .login-input) { min-width: 0; }
+.login-confirmation .form-control {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    height: var(--payroll-control-height);
+}
+.login-confirmation .login-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .5rem var(--login-spacing);
+}
+.payroll-form-layout .login-confirmation .card-body .login-links a.small {
+    font-size: var(--payroll-control-font);
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.login-confirmation .login-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--login-spacing);
+}
+@container login-card (max-width: 24rem) {
+    .login-confirmation .login-fields { grid-template-columns: minmax(0, 1fr); }
+}
+@layer application-buttons {
+    .login-confirmation .login-actions .btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        border-radius: 6px !important;
+    }
+}
+
+/* Τα μηνύματα καταλαμβάνουν δική τους σειρά πριν από τη φόρμα. */
+.payroll-form-layout:has(> .login-confirmation):has(> .payroll-flash-messages) {
+    grid-template-rows: auto minmax(min-content, 1fr);
+    row-gap: .75rem;
+}
+.payroll-form-layout > .payroll-flash-messages {
+    container: payroll-flash / inline-size;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    align-self: start;
+    justify-self: start;
+}
+.payroll-flash-messages > .alert {
+    position: relative;
+    width: fit-content;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 0 .5rem;
+    padding: .65rem 3rem .65rem .75rem;
+}
+.payroll-flash-messages .payroll-flash-text {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    font-size: clamp(.85rem, .78rem + .35cqi, 1rem) !important;
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow-x: auto;
+}
+.payroll-flash-messages .payroll-flash-text > i { font-size: 1em !important; }
+
+/* Κλείσιμο επάνω δεξιά, ανεξάρτητα από τη στοίχιση του κειμένου. */
+.payroll-flash-messages > .alert > .btn-close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    bottom: auto;
+    left: auto;
+    margin: 0;
+    /* Το εικονίδιο να μην κεντράρεται στο ύψος των γενικών κουμπιών. */
+    width: 1em;
+    height: 1em;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+}
+
+/* Εγγραφή και επαλήθευση email, μέσα στον διαθέσιμο κύριο περιέκτη. */
+.payroll-form-layout:has(> .account-confirmation) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
+    padding-block: .75rem;
+}
+.account-confirmation {
+    container: account-card / inline-size;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    margin-block: auto;
+}
+.account-confirmation > form {
+    --payroll-control-font: clamp(.85rem, .78rem + .6cqi, 1rem);
+    --account-spacing: clamp(.4rem, 1.8cqi, .75rem);
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+.account-confirmation .card {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 6px;
+}
+.account-confirmation :is(.card-header, .card-body, .card-footer) {
+    padding: var(--account-spacing);
+    height: auto !important;
+    max-height: none;
+    overflow: visible !important;
+    margin: 0 !important;
+}
+.account-confirmation .card-header .account-title {
+    font-size: clamp(1.1rem, 3.5cqi, 1.25rem) !important;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    margin: 0;
+}
+.account-confirmation .account-fields {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    gap: var(--account-spacing);
+    align-items: start;
+}
+.account-confirmation .account-field { display: contents; }
+.account-confirmation :is(.account-label, .account-input) { min-width: 0; }
+.account-confirmation .account-label .col-form-label {
+    display: flex;
+    align-items: center;
+    min-height: var(--payroll-control-height);
+    margin: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.account-confirmation .form-control {
+    width: 100%;
+    min-width: 0;
+    height: var(--payroll-control-height);
+    margin: 0;
+}
+.account-confirmation .form-text {
+    display: block;
+    font-size: var(--payroll-control-font);
+    line-height: 1.4;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.account-confirmation .account-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--account-spacing);
+}
+.payroll-form-layout:has(> .account-confirmation) > :is(.payroll-flash-messages, .account-error) {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    min-width: 0;
+    max-width: 100%;
+}
+.account-error { width: 100%; overflow-wrap: anywhere; }
+@container account-card (max-width: 28rem) {
+    .account-confirmation .account-fields { grid-template-columns: minmax(0, 1fr); }
+}
+@layer application-buttons {
+    .account-confirmation .account-actions .btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        border-radius: 6px !important;
+    }
+    .account-confirmation .account-actions .btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Φόρμες κωδικού: φυσικό ύψος και μία περιοχή κύλισης στον κύριο περιέκτη. */
+.payroll-form-layout:has(> .password-page) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(min-content, 1fr);
+    /* Συμμετρικός χώρος για την υφιστάμενη σκιά z-depth-5. */
+    padding-block: 48px;
+}
+.payroll-form-layout:has(> .password-page):has(> .payroll-flash-messages) {
+    grid-template-rows: auto minmax(min-content, 1fr);
+    row-gap: .5rem;
+}
+.password-page {
+    container: password-card / inline-size;
+    display: flex;
+    flex-direction: column;
+    justify-self: center;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    min-height: min-content;
+    overflow: visible;
+}
+.password-page > form {
+    flex: 0 0 auto;
+    --payroll-control-font: clamp(.85rem, .78rem + .6cqi, 1rem);
+    --password-spacing: clamp(.4rem, 1.8cqi, .75rem);
+    width: 100%;
+    min-width: 0;
+    margin-block: auto;
+}
+.password-page .card {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 6px;
+}
+.password-page :is(.card-header, .card-body, .card-footer) {
+    flex: 0 0 auto;
+    padding: var(--password-spacing);
+    height: auto !important;
+    max-height: none;
+    overflow: visible !important;
+    margin: 0 !important;
+}
+.password-page .card-header .password-title {
+    font-size: clamp(1.1rem, 3.5cqi, 1.25rem) !important;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    margin: 0;
+}
+.password-page .password-fields {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    gap: var(--password-spacing);
+    align-items: start;
+}
+.password-page .password-field { display: contents; }
+.password-page :is(.password-label, .password-input) { min-width: 0; }
+.password-page .password-label .col-form-label {
+    display: flex;
+    align-items: center;
+    min-height: var(--payroll-control-height);
+    margin: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.password-page .form-control {
+    width: 100%;
+    min-width: 0;
+    height: var(--payroll-control-height);
+    margin: 0;
+}
+.password-page .form-text {
+    display: block;
+    font-size: var(--payroll-control-font);
+    line-height: 1.4;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.password-page .password-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--password-spacing);
+}
+.password-page .alert { min-width: 0; overflow-wrap: anywhere; }
+@container password-card (max-width: 28rem) {
+    .password-page .password-fields { grid-template-columns: minmax(0, 1fr); }
+}
+@layer application-buttons {
+    .password-page .password-actions .btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        border-radius: 6px !important;
+    }
+    .password-page .password-actions .btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Διαχείριση Χρηστών: μοναδική περιοχή κύλισης το σώμα της κάρτας. */
+.payroll-form-layout:has(> .user-management-page) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > .user-management-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+}
+.user-management-page > :not(.user-management-card) { flex: 0 0 auto; min-width: 0; }
+.user-management-page > .user-management-card {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: var(--payroll-card-space, auto) !important;
+    max-height: var(--payroll-card-space, none) !important;
+    width: 100%;
+    margin: 0 !important;
+}
+.user-management-page .user-management-card > :is(.card-header, .card-footer) {
+    flex: 0 0 auto;
+    position: static;
+    margin: 0;
+}
+.user-management-page .user-management-card > .card-body {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+.user-management-page #myTable {
+    table-layout: auto;
+    width: 100%;
+    min-width: max(72rem, 100%) !important;
+}
+.user-management-page #myTable :is(th, td) { white-space: nowrap; }
+.user-management-page #myTable :is(th, td):last-child { min-width: 8rem; }
+.user-management-page .user-admin-row-actions {
+    flex-wrap: nowrap;
+    gap: .3rem;
+}
+@layer application-buttons {
+    .user-management-page .user-admin-row-actions .user-admin-action-btn {
+        font-size: .85rem !important;
+        min-height: 2rem !important;
+        min-width: 2rem !important;
+        padding: .3rem .4rem !important;
+        flex-shrink: 0 !important;
+    }
+    .user-management-page .user-admin-row-actions .user-admin-action-btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Επιβεβαίωση διαγραφής χρήστη: φυσικό ύψος και κύλιση μόνο στο σώμα. */
+.payroll-form-layout:has(> .user-delete-confirmation) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    justify-items: center;
+    padding-block: .75rem;
+    overflow: visible;
+}
+.user-delete-confirmation {
+    container: user-delete / inline-size;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 560px;
+    min-width: 0;
+    min-height: 0;
+    padding-block: 2rem;
+}
+.user-delete-confirmation > .card {
+    --payroll-control-font: clamp(.85rem, .78rem + .6cqi, 1rem);
+    --user-delete-spacing: clamp(.5rem, 2.5cqi, 1rem);
+    flex: 0 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: auto !important;
+    max-height: 100% !important;
+    margin: auto 0 !important;
+    border-radius: 6px !important;
+    overflow: visible !important;
+}
+.user-delete-confirmation .card-header {
+    flex: 0 0 auto;
+    height: auto !important;
+    padding: var(--user-delete-spacing);
+    border-top-left-radius: 6px !important;
+    border-top-right-radius: 6px !important;
+}
+.user-delete-confirmation .user-delete-title {
+    font-size: clamp(1.1rem, 3.5cqi, 1.25rem);
+    line-height: 1.35;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.user-delete-confirmation .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    max-height: none;
+    padding: var(--user-delete-spacing);
+    font-size: var(--payroll-control-font);
+    line-height: 1.5;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow-x: visible !important;
+    overflow-y: auto !important;
+}
+.user-delete-confirmation .card-footer {
+    flex: 0 0 auto;
+    position: static;
+    height: auto !important;
+    min-height: 0;
+    margin: 0;
+    padding: var(--user-delete-spacing);
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+.user-delete-confirmation .user-admin-actions {
+    justify-content: center;
+    gap: var(--user-delete-spacing);
+    min-width: 0;
+}
+.user-delete-confirmation .user-admin-actions > form { min-width: 0; max-width: 100%; }
+@layer application-buttons {
+    .user-delete-confirmation .user-admin-action-btn {
+        font-size: var(--payroll-control-font) !important;
+        font-weight: 400 !important;
+        min-width: 0 !important;
+        max-width: 100%;
+        white-space: nowrap !important;
+        overflow-wrap: normal;
+        border-radius: 6px !important;
+    }
+    .user-delete-confirmation .user-admin-action-btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Δικαιώματα Χρηστών: ίδιο εξωτερικό ύψος επιλογής χρήστη και ρόλου. */
+.user-privileges-controls #userPrivilegesRole,
+.user-privileges-controls .user-privileges-user-field > .ts-wrapper.tom-dropdown {
+    box-sizing: border-box;
+    height: var(--payroll-control-height, 2.25rem) !important;
+    min-height: var(--payroll-control-height, 2.25rem) !important;
+    max-height: var(--payroll-control-height, 2.25rem) !important;
+    margin-block: 0 !important;
+    font-size: var(--payroll-control-font, 1rem) !important;
+    line-height: 1.4;
+}
+.user-privileges-controls #userPrivilegesRole { padding-block: .35rem; }
+.user-privileges-controls .user-privileges-user-field > .ts-wrapper .ts-control {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    padding-block: .35rem !important;
+    align-items: center !important;
+    font-size: var(--payroll-control-font, 1rem) !important;
+    line-height: 1.4;
+}
+.user-privileges-controls .user-privileges-user-field .ts-control input {
+    height: auto !important;
+    min-height: 0 !important;
+    padding-block: 0 !important;
+    margin-block: 0 !important;
+    font-size: inherit !important;
+    line-height: inherit;
+}
+.user-privileges-controls .user-privileges-user-field .ts-control .item {
+    margin-block: 0;
+    padding-block: 0 !important;
+    font-size: inherit !important;
+    line-height: inherit;
+}
+
+/* Δικαιώματα Χρηστών: ίδιος υπολογισμός ύψους με τη Διαχείριση Χρηστών. */
+.payroll-form-layout:has(> .user-privileges-layout) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > .user-privileges-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+}
+.user-privileges-layout .user-privileges-shell {
+    flex: 1 1 0;
+    min-height: 0;
+    align-items: flex-start;
+    padding-bottom: 0;
+}
+.user-privileges-layout .user-privileges-shell > .user-privileges-card {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: var(--payroll-card-space, auto) !important;
+    max-height: var(--payroll-card-space, none) !important;
+    margin: 0 !important;
+}
+.user-privileges-layout .user-privileges-card > :is(.card-header, .card-footer) {
+    flex: 0 0 auto;
+    position: static;
+}
+.user-privileges-layout .user-privileges-card > .user-privileges-table-container {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+/* Διατηρείται το υπάρχον κουμπί καθαρισμού, έξω από το περίγραμμα. */
+.user-privileges-layout .user-privileges-controls .user-privileges-user-field {
+    padding-inline-end: 2rem;
+}
+.user-privileges-layout .user-privileges-user-field > .ts-wrapper {
+    overflow: visible;
+}
+.user-privileges-layout .user-privileges-user-field > .ts-wrapper > .ts-fill-reset-btn {
+    left: calc(100% + .375rem) !important;
+    right: auto !important;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+}
+.user-privileges-layout .user-privileges-user-field > .ts-wrapper:has(> .ts-fill-reset-btn:not([hidden]))::after {
+    right: .65rem;
+}
+
+/* Αποσύνδεση Χρηστών: ίδια στοίχιση και κοινή μέτρηση ύψους καρτών διαχείρισης. */
+.payroll-form-layout:has(> .disconnect-users-page) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > .disconnect-users-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+}
+.disconnect-users-page > .disconnect-users-card {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: var(--payroll-card-space, auto) !important;
+    max-height: var(--payroll-card-space, none) !important;
+    width: 100%;
+    margin: 0 !important;
+}
+.disconnect-users-card > .card-header {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 5vh;
+}
+.disconnect-users-card > .disconnect-users-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+}
+.disconnect-users-card > .disconnect-users-form > .card-body {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+.disconnect-users-card .disconnect-users-footer {
+    flex: 0 0 auto;
+    position: static;
+    margin: 0;
+    padding: 0 var(--bs-card-spacer-x) var(--bs-card-spacer-y);
+    background-color: var(--bs-card-bg);
+    border: 0;
+}
+
+/* Μόνο το αρχικό παράθυρο νέας χρήσης: συμπαγές όπως η αποσύνδεση. */
+.payroll-form-layout:has(> .new-year-confirmation-container) {
+    position: relative;
+    overflow: visible;
+}
+.payroll-form-layout > .new-year-confirmation-container {
+    position: absolute !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0;
+    min-height: 0;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: safe center;
+    justify-items: center;
+    padding: .75rem !important;
+    overflow-y: auto;
+}
+.new-year-confirmation-container > .new-year-confirmation.swal2-popup {
+    container-type: inline-size;
+    grid-area: 1 / 1 !important;
+    justify-self: center;
+    align-self: safe center;
+    display: flex !important;
+    flex-direction: column;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 560px !important;
+    min-width: 0;
+    min-height: 0;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+.new-year-confirmation > * {
+    --new-year-spacing: clamp(.4rem, 1.5cqi, 1rem);
+    flex: 0 0 auto;
+    min-width: 0;
+}
+.new-year-confirmation .swal2-icon {
+    /* Επιπλέον οπτική αύξηση 20%, χωρίς αλλαγή του χώρου στη διάταξη. */
+    font-size: clamp(1.75rem, 5cqi, 3rem);
+    scale: 1.44;
+    border-width: 1px;
+    box-sizing: border-box;
+    width: 1em;
+    height: 1em;
+    margin: var(--new-year-spacing) auto;
+}
+/* Τα σύνθετα σύμβολα χρειάζονται αναλογία 5em για να χωρούν στον κύκλο.
+   Το εξωτερικό μέγεθος παραμένει ίδιο· μόνο στις δύο ενότητες εταιρειών. */
+.payroll-form-layout:has(> .companies-management-page) > .new-year-confirmation-container .swal2-icon:is(.swal2-success, .swal2-error) {
+    font-size: clamp(.35rem, 1cqi, .6rem);
+    width: 5em;
+    height: 5em;
+}
+.new-year-confirmation .swal2-icon .swal2-icon-content {
+    font-size: .75em;
+    line-height: 1;
+}
+.new-year-confirmation.swal2-popup :is(.swal2-title, .swal2-html-container, .swal2-actions) {
+    padding: var(--new-year-spacing);
+    margin: 0;
+}
+.new-year-confirmation.swal2-popup .swal2-html-container {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible !important;
+}
+.new-year-confirmation.swal2-popup .swal2-actions {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--new-year-spacing);
+}
+.new-year-confirmation .swal2-actions > button { max-width: 100%; }
+
+/* Το min-height: 100% μαζί με το mt-4 προκαλούσε περιττή κύλιση στο main. */
+.payroll-form-layout > .active-sessions-content {
+    min-height: 0;
+}
+
+/* Γενικά στοιχεία εταιρειών: κοινή μέτρηση ύψους, τοπική κύλιση και εργαλεία. */
+.payroll-form-layout:has(> .companies-management-page) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > .companies-management-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+}
+.companies-management-page > :not(.companies-management-card) {
+    flex: 0 0 auto;
+    min-width: 0;
+}
+.payroll-form-layout .companies-management-page .companies-management-card {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: var(--payroll-card-space, auto) !important;
+    max-height: var(--payroll-card-space, none) !important;
+    width: 100%;
+    margin: 0 !important;
+}
+.companies-management-page .companies-management-card > :is(.card-header, .card-footer) {
+    flex: 0 0 auto;
+    position: static;
+    margin: 0;
+}
+.payroll-form-layout .companies-management-page .companies-management-card > .card-body {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    overflow: auto !important;
+}
+.companies-management-page .maintenance-table-companies {
+    height: auto;
+    min-width: 52rem;
+}
+.companies-management-page #myTable { margin-bottom: 0; }
+.companies-management-page .companies-management-footer {
+    --companies-footer-font: clamp(.85rem, .72rem + .25cqi, 1rem);
+    --companies-footer-gap: clamp(.2rem, .6cqi, .75rem);
+    gap: var(--companies-footer-gap) !important;
+    max-width: 100%;
+    min-width: 0;
+    padding: clamp(.35rem, .7cqi, .75rem);
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+/* Όλες οι ομάδες στην ίδια ζώνη, με τοπική κύλιση όταν δεν χωρούν. */
+.payroll-form-layout .companies-management-page .companies-management-footer {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap !important;
+}
+.payroll-form-layout .companies-management-page .companies-management-footer > :is(.d-flex, nav) {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+    max-width: none;
+    gap: var(--companies-footer-gap) !important;
+}
+/* Η κύλιση παραμένει στο υποσέλιδο και φέρνει ολόκληρη κάθε ενέργεια στο ορατό τμήμα. */
+.companies-management-page .companies-management-footer {
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: var(--companies-footer-gap);
+}
+.companies-management-page .companies-management-footer :is(.btn, .page-item) {
+    flex-shrink: 0;
+}
+.companies-management-page .companies-management-pagination { margin-left: auto; }
+.companies-management-page .companies-management-footer .pagination {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    margin: 0 !important;
+}
+.companies-management-page .companies-management-footer :is(.page-link, .small) {
+    font-size: var(--companies-footer-font) !important;
+    white-space: nowrap;
+}
+.companies-management-page .companies-management-footer :is(.btn, .page-link, .small) {
+    margin-block: 0 !important;
+}
+.companies-management-page .companies-management-footer .page-link {
+    min-width: 1.8em;
+    min-height: 1.8em;
+    padding: clamp(.2rem, .35cqi, .3rem) clamp(.3rem, .5cqi, .5rem);
+}
+.companies-management-page .companies-management-footer .page-link > i { font-size: 1em; }
+@layer application-buttons {
+    .companies-management-page .companies-management-footer .btn {
+        font-size: var(--companies-footer-font) !important;
+        min-height: clamp(2rem, 1.7rem + .5cqi, 2.5rem) !important;
+        min-width: max-content !important;
+        max-width: none !important;
+        padding: clamp(.3rem, .5cqi, .5rem) clamp(.4rem, .8cqi, .85rem) !important;
+        gap: clamp(.2rem, .35cqi, .35rem) !important;
+        white-space: nowrap !important;
+        overflow-wrap: normal;
+    }
+    .companies-management-page .companies-management-footer .btn > i {
+        font-size: 1em !important;
+        width: 1em;
+        height: 1em;
+    }
+}
+
+/* Ίδιο μοντέλο περιγράμματος με το σώμα, ώστε οι οκτώ στήλες να συμπίπτουν. */
+.employee-list-page #myTableHeader { border-collapse: separate; border-spacing: 0; }
+/* Διατήρηση του αρχικού ελάχιστου πλάτους των οκτώ στηλών (8 × 8rem). */
+.employee-list-page .maintenance-table-inner { min-width: 64rem; }
+
+/* Αναζήτηση εταιρειών: προοδευτική κλίμακα από το συμπαγές πρότυπο κεφαλίδας. */
+.payroll-form-layout .companies-management-page .companies-search-header {
+    min-height: clamp(3rem, 1rem + 3.35vw, 4rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.payroll-form-layout .companies-management-page .companies-search-header > label {
+    font-size: clamp(1.2rem, .95rem + .5vw, 1.4rem) !important;
+    margin: 0 !important;
+    text-align: center;
+}
+@media (min-width: 1432px) {
+    .payroll-form-layout .companies-management-page .companies-search-header {
+        min-height: 4rem;
+    }
+    .payroll-form-layout .companies-management-page .companies-search-header > label {
+        font-size: 1.4rem !important;
+    }
+}
+
+/* Κοινές σταθερές κεφαλίδες Εταιρειών μέσα στη μοναδική περιοχή κύλισης. */
+.companies-management-page .maintenance-table-companies > div:has(> #myTableHeader),
+.companies-management-page .maintenance-table-companies > #myTable > thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    flex-shrink: 0;
+    background-color: #fff;
+}
+.companies-management-page #myTableHeader thead th,
+.companies-management-page .maintenance-table-companies > #myTable > thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    --bs-table-bg: #fcfdfb;
+    background-color: #fcfdfb;
+}
+/* Κ.Π.Κ.: η επιλογή ή το hover της γραμμής δεν αλλάζει το χρώμα του chevron. */
+#myTable:has(.collapse[id^="antistoixiseis"]) > tbody > tr .btn-nesting:not(:is(:hover, :active, .active, :disabled, .disabled, [aria-disabled="true"])) > :is(.bi-chevron-up, .bi-chevron-down),
+#myTable:has(.collapse[id^="antistoixiseis"]) > tbody > tr .btn-nesting:not(:is(:hover, :active, .active, :disabled, .disabled, [aria-disabled="true"])) > :is(.bi-chevron-up, .bi-chevron-down)::before {
+    color: var(--button-color, currentColor) !important;
+    opacity: 1;
+}
+/* Οι διώροφες αναλυτικές κεφαλίδες κυλούν μαζί, κάτω από την κύρια κεφαλίδα. */
+.companies-management-page .maintenance-table-companies > #myTable .nested-table > thead {
+    position: sticky;
+    top: var(--payroll-inline-table-header-height, 0px);
+    z-index: 1;
+    background-color: #fff;
+}
+
+/* Προσθήκη/συντήρηση εταιρείας: αρχικές οριζόντιες στήλες και τοπική κύλιση. */
+.company-details-page :is(.tadded-container, .sections, .sections > section, .sections > section > div, .formRadius) {
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+}
+.company-details-page .sections > section {
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+}
+.company-details-page .card-body > .row.form-group {
+    flex-wrap: nowrap;
+    min-width: 48rem;
+    margin-inline: 0 !important;
+}
+/* Επαναφορά του αρχικού μεγέθους ετικέτας, χωρίς αλλαγή βάρους/χρώματος/στηλών. */
+.payroll-form-layout .company-details-page .col-form-label.label-font-size {
+    font-size: .7vw !important;
+}
+.company-details-page .menu_Links { max-width: 100%; }
+.company-details-page .menu_Links ul {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+.company-details-page .menu_Links li {
+    flex: 0 0 auto;
+    font-size: .85vw !important;
+    white-space: nowrap;
+}
+.company-details-page .companies-management-footer > .company-details-actions {
+    flex: 1 0 auto;
+    width: 100%;
+    min-width: max-content;
+    justify-content: space-around;
+}
+/* Στενά «Διάφορα»: οι ετικέτες διατηρούν τις στήλες τους, τα εργαλεία τον χώρο τους. */
+.company-details-page .company-diafora-scroll-container {
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+}
+@container maintenance-form (max-width: 64rem) {
+    .company-details-page .company-diafora-scroll-container .row > div:has(> :is(#select-all, #clear-image)) {
+        flex: 0 0 auto;
+        width: max-content;
+        min-width: max-content;
+    }
+    .company-details-page .company-diafora-scroll-container .row:has(> div > #select-all) > div:has(> .company-inline-help),
+    .company-details-page .company-diafora-scroll-container .row:has(> div > #clear-image) > div:has(> #customButton) {
+        flex: 1 1 0;
+        width: auto;
+    }
+}
+
+/* Ίδιο εξωτερικό ύψος για πεδία και Tom Select· δεν περιορίζονται textarea/listbox. */
+.company-details-page .card-body :is(input.form-control:not([type="hidden"]):not([type="file"]), select.form-select:not([multiple])) {
+    height: var(--payroll-control-height) !important;
+    min-height: var(--payroll-control-height);
+}
+.company-details-page .card-body .ts-wrapper.tom-dropdown {
+    --company-reset-space: 1.75rem;
+    box-sizing: border-box;
+    height: var(--payroll-control-height) !important;
+    min-height: var(--payroll-control-height);
+    width: calc(100% - var(--company-reset-space)) !important;
+    max-width: calc(100% - var(--company-reset-space));
+    margin-right: var(--company-reset-space);
+    margin-block: 0 !important;
+    flex-grow: 0;
+}
+.company-details-page .card-body .ts-wrapper > .ts-control {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    align-items: center;
+    padding-block: 0 !important;
+    padding-right: 2rem !important;
+}
+.company-details-page .card-body .ts-wrapper.multi > .ts-control {
+    padding-right: 4rem !important;
+}
+.company-details-page .card-body .ts-control input {
+    height: auto !important;
+    min-height: 0;
+    margin: 0 !important;
+}
+.company-details-page .card-body .ts-wrapper > .ts-fill-reset-btn {
+    left: calc(100% + .25rem) !important;
+    right: auto !important;
+    top: 50%;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    padding: 0;
+}
+.company-details-page .card-body .ts-wrapper:has(> .ts-fill-reset-btn:not([hidden]))::after {
+    right: .75rem;
+}
+.company-details-page .card-body .ts-overflow-indicator { right: 2rem; }
+
+/* Τα δύο βοηθητικά κείμενα στα «Διάφορα» παραμένουν δίπλα στα πεδία. */
+.company-details-page .company-diafora-scroll-container > .row.form-group:has(.company-inline-help) {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+.company-details-page .company-diafora-scroll-container .company-short-card-help {
+    flex: 1 1 0;
+    width: auto !important;
+    min-width: 0;
+}
+.payroll-form-layout .company-details-page .company-inline-help {
+    display: block;
+    max-width: 100%;
+    font-size: clamp(.75rem, .58rem + .22cqi, .85rem) !important;
+    font-weight: 400;
+    white-space: nowrap;
+    overflow-x: auto;
+    text-align: start;
+}
+
+/* Πραγματικός χώρος για πλήρη ημερομηνία και τα εγγενή χειριστήριά της. */
+.company-details-page .card-body .row.form-group > div:has(input[type="date"]) {
+    font-size: var(--payroll-control-font);
+    min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px + var(--bs-gutter-x, 1rem));
+}
+.company-details-page .card-body .row.form-group:has(input[type="date"]) > div:empty {
+    flex-shrink: 1;
+    min-width: 0;
+}
+.company-details-page .card-body input[type="date"] {
+    box-sizing: border-box;
+    height: var(--payroll-control-height) !important;
+    min-width: calc(12ch + 3rem);
+    padding-inline: .375rem;
+}
+
+/* Ημερομηνίες Εταιρειών: ημερολόγιο και Χ μέσα στο μοναδικό περίγραμμα. */
+.company-details-page .card-body .clearable-wrapper:has(> input[type="date"]) {
+    --company-date-icon-gap: 4px;
+    --company-date-icon-inset: .375rem;
+    position: relative;
+    display: block;
+    width: 100%;
+    min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px);
+}
+.company-details-page .card-body .clearable-wrapper > input[type="date"] {
+    width: 100%;
+    min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + var(--company-date-icon-gap));
+    /* Το εγγενές ημερολόγιο τελειώνει 4px πριν αρχίσει η δεσμευμένη θέση του Χ. */
+    padding-right: calc(var(--company-date-icon-inset) + var(--clear-size, 1.4rem) + var(--company-date-icon-gap)) !important;
+}
+.company-details-page .card-body .clearable-wrapper > input[type="date"]::-webkit-calendar-picker-indicator {
+    flex: 0 0 1.1rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+    padding: 0;
+    align-self: center;
+}
+.company-details-page .card-body .clearable-wrapper:has(> input[type="date"]) > .clear-btn {
+    position: absolute;
+    top: 50%;
+    right: calc(var(--company-date-icon-inset) + var(--bs-border-width, 1px)) !important;
+    transform: translateY(-50%) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--clear-size, 1.4rem);
+    height: var(--clear-size, 1.4rem);
+    margin: 0;
+    line-height: 1;
+}
+
+/* Απόκρυψη ανενεργών καρτελών προσθήκης ήδη πριν από την αρχικοποίηση JavaScript. */
+:is(.employee-add-page, .employee-edit-page) .sections > section:not(.visible) {
+    display: none;
+}
+
+/* Προσθήκη: κεφαλίδες accordions από άκρη σε άκρη, με ίδιο εσωτερικό χώρο πεδίων. */
+:is(.employee-add-page, .employee-edit-page) .card-body:has(> .accordion) {
+    padding: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .card-body > .accordion {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .accordion-item {
+    margin: 4px 0 0 !important;
+    /* Ίδιο ορατό περίγραμμα, χωρίς να δεσμεύει χώρο γύρω από την κεφαλίδα. */
+    border: 0;
+    outline: var(--bs-accordion-border-width) solid var(--bs-accordion-border-color);
+    outline-offset: calc(-1 * var(--bs-accordion-border-width));
+}
+:is(.employee-add-page, .employee-edit-page) .card-body > .accordion > .accordion-item > .accordion-collapse > .accordion-body {
+    margin-block: 0 !important;
+    padding-inline: calc(var(--bs-accordion-body-padding-x, 1.25rem) + var(--bs-card-spacer-x, 1rem) + var(--bs-accordion-border-width, 1px));
+}
+
+/* Οι αρχικές αναλογίες χωρούν στο διαθέσιμο πλάτος, χωρίς υποχρεωτική γραμμή 64rem. */
+:is(.employee-add-page, .employee-edit-page) section:not(.employee-add-fixed-details) .card-body .row.form-group {
+    flex-wrap: wrap;
+    min-width: 0;
+    margin-inline: 0 !important;
+}
+:is(.employee-add-page, .employee-edit-page) section:not(.employee-add-fixed-details) .card-body .row.form-group > div {
+    flex-shrink: 1;
+}
+/* Μόνο Αλλοδαποί της προσθήκης: διαχωριστικά μέσα στο διαθέσιμο πλάτος. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-divider {
+    margin: .4vh 0 1rem;
+    color: #000000;
+}
+/* Ίδιο δεξί άκρο με τη γραμμή αριθμού: col-0-5 + col-9-3 + col-2. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-date-row {
+    --foreign-date-min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px);
+    display: grid;
+    grid-template-columns: max(var(--bs-gutter-x, 1rem), 4.17%) minmax(0, 1fr) minmax(calc(var(--foreign-date-min-width) + var(--bs-gutter-x, 1rem)), 16.66666667%) 1.66%;
+    font-size: var(--payroll-control-font);
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-date-label {
+    grid-column: 2;
+    min-width: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-date-column {
+    grid-column: 3;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-date-control {
+    /* Διατήρηση του πλάτους col-1-5 μέσα στη δεξιά στήλη col-2, μαζί με τα αρχικά gutters. */
+    flex: 0 0 auto;
+    width: max(var(--foreign-date-min-width), calc(75% - var(--bs-gutter-x, 1rem) * .25));
+    min-width: var(--foreign-date-min-width);
+}
+/* Μόνο Κατάρτιση της προσθήκης: το Έως τελειώνει στη στήλη του Έτους Απόκτησης. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-training-duration-row {
+    --training-date-min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px);
+    display: grid;
+    grid-template-columns: 16.66666667% max(12.5%, calc(var(--training-date-min-width) + var(--bs-gutter-x, 1rem))) minmax(0, 1fr) 16.66666667% max(12.5%, calc(var(--training-date-min-width) + var(--bs-gutter-x, 1rem))) 2.08333333%;
+    font-size: var(--payroll-control-font);
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-training-duration-row > div {
+    width: auto !important;
+}
+:is(.employee-add-page, .employee-edit-page) .card-body .row.form-group.employee-add-training-duration-row > .employee-add-training-end-column {
+    min-width: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-training-end-control {
+    flex: 0 0 auto;
+    width: max(100%, var(--training-date-min-width));
+    min-width: var(--training-date-min-width);
+}
+/* Σταθερά Στοιχεία: χωρίς το ελάχιστο πλάτος 64rem και το διπλό κάθετο κενό g-3. */
+.employee-add-fixed-details .accordion-body {
+    padding-block: .25rem 0;
+}
+.employee-add-fixed-details .accordion-body > .row.form-group {
+    --bs-gutter-y: 0;
+    flex-wrap: nowrap;
+    min-width: 0;
+    margin: calc(.2rem + var(--employee-add-row-extra-top, 0px)) 0 .2rem !important;
+}
+.employee-add-fixed-details .employee-add-unemployment-row {
+    --employee-add-row-extra-top: 12px;
+}
+/* Αφαιρούνται μόνο τα κενά στα δύο άκρα· οι ενδιάμεσες γραμμές μένουν ίδιες. */
+.employee-add-fixed-details .accordion-body > .row.form-group:first-of-type {
+    margin-top: 0 !important;
+}
+.employee-add-fixed-details .accordion-body > .row.form-group:last-child {
+    margin-bottom: 0 !important;
+}
+.employee-add-fixed-details .accordion-body > .row.form-group > div {
+    flex-shrink: 1;
+    margin-block: 0 !important;
+}
+.employee-add-fixed-details .accordion-body > .row.form-group > div:has(> input[type="checkbox"]) {
+    min-width: max-content;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .card-body .col-form-label {
+    font-size: clamp(.7rem, .7vw, 1rem) !important;
+}
+/* Η σειρά ταυτότητας έχει δική της ανοιχτόχρωμη ζώνη, κάτω από τον πράσινο τίτλο. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity {
+    min-width: 0;
+    background-color: #f8f9fa;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row {
+    flex-wrap: nowrap;
+    min-width: 0;
+    margin: 0 !important;
+    padding: .5rem;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row > div {
+    display: flex;
+    align-items: center;
+    flex-shrink: 1;
+    min-width: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row .col-form-label {
+    white-space: normal;
+}
+/* Οι δύο κύριες στήλες δεσμεύουν από μισή γραμμή, ανεξάρτητα από τις ημερομηνίες. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group > :is(.employee-fixed-left-fields, .employee-fixed-right-fields) {
+    display: flex;
+    flex: 0 0 50%;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 50%;
+    min-width: 0;
+    padding: 0;
+}
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div {
+    box-sizing: border-box;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-inline: calc(var(--bs-gutter-x, 1rem) * .5);
+}
+/* Η ένδειξη ηλικίας χρησιμοποιεί τον υπόλοιπο χώρο χωρίς περιττή δεύτερη γραμμή. */
+.employee-add-fixed-details #panelsStayOpen-collapseOne .employee-fixed-left-fields > div:has(> #label-anhlikos) {
+    flex: 1 1 0;
+    width: auto !important;
+    min-width: 0;
+}
+.employee-add-fixed-details #panelsStayOpen-collapseOne #label-anhlikos:empty {
+    display: none;
+}
+/* Η Διόρθωση έχει και Προβολή/Διαγραφή PDF στην ίδια αριστερή στήλη. */
+:is(.employee-add-page, .employee-edit-page) .companies-management-footer {
+    --companies-footer-font: clamp(.875rem, .72rem + .25cqi, 1rem);
+}
+@layer application-buttons {
+    /* Τα υποσέλιδα Εργαζομένων διατηρούν το εγκεκριμένο κατώτατο ύψος 34px. */
+    :is(.employee-add-page, .employee-edit-page) .companies-management-footer .btn:not(.btn-toTop) {
+        min-height: clamp(2.125rem, 1.7rem + .5cqi, 2.5rem) !important;
+    }
+    /* Μόνο το συγκεκριμένο PDF προσαρμόζεται στη δική του αμετάβλητη στήλη. */
+    :is(.employee-add-page, .employee-edit-page) #customButton_oysiodeis_oroi {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: auto;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        flex-shrink: 1;
+    }
+    .employee-edit-page .employee-fixed-left-fields .pdf-button-wrapper > :is(a.buttons-content, .pdf-upload-btn, .pdf-badge-replacement) {
+        min-width: 0 !important;
+        max-width: 100%;
+        flex-shrink: 1;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+    }
+    .employee-edit-page .employee-fixed-left-fields .pdf-button-wrapper > button[id^="deleteButton_"] {
+        flex-shrink: 0;
+    }
+}
+/* Η εσοχή ανήκει στη στήλη· το κενό μπαίνει μόνο μεταξύ των περιγραμμάτων. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-date-pair {
+    --employee-add-date-min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px);
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-date-pair > .employee-add-date-pair-field {
+    box-sizing: border-box;
+    /* Πλάτος Γέννησης όταν χωρά, διαφορετικά μισός διαθέσιμος χώρος με όριο αναγνωσιμότητας. */
+    flex: 0 0 min(var(--employee-add-date-reference-width, 100%), max(var(--employee-add-date-min-width), calc((100% - 12px) / 2)));
+    min-width: var(--employee-add-date-min-width);
+    margin: 0;
+    padding: 0;
+}
+/* Οι αρχικές αναλογίες των πεδίων υπολογίζονται πλέον μέσα στη μισή γραμμή. */
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-25 { width: 4.16% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-3 { width: 5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-4 { width: 6.68% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-5 { width: 8.34% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-75 { width: 12.5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1 { width: 16.66666667% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-1 { width: 18.34% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-4-5-5 { width: 24.5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-5 { width: 25% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-5-5 { width: 25.82% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-7 { width: 28.34% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-2 { width: 33.33333333% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-2-5 { width: 41.66% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-3 { width: 50% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-3-74 { width: 62.34% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-3-75 { width: 62.5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-3-99 { width: 66.5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-4 { width: 66.66666667% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-6 { width: 100% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div:has(input[type="date"]) {
+    font-size: var(--payroll-control-font);
+    min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px + var(--bs-gutter-x, 1rem));
+}
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div:has(> input[type="checkbox"]) {
+    min-width: max-content;
+}
+/* Όταν δεν χωρούν δύο ομάδες, κάθε ετικέτα μένει δίπλα στο δικό της πεδίο. */
+@container employee-maintenance (max-width: 60rem) {
+    .employee-add-fixed-details .accordion-body > .row.form-group {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+        align-items: center;
+    }
+    .employee-add-fixed-details .accordion-body > .row.form-group > div {
+        width: auto !important;
+        min-width: 0;
+        grid-column: 2;
+    }
+    .employee-add-fixed-details .accordion-body > .row.form-group > div:empty {
+        display: none;
+    }
+    .employee-add-fixed-details .accordion-body > .row.form-group > div:has(> .col-form-label):not(:has(input, select, textarea)) {
+        grid-column: 1;
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group > :is(.employee-fixed-left-fields, .employee-fixed-right-fields) {
+        display: contents;
+    }
+    .employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div {
+        width: auto !important;
+        min-width: 0 !important;
+        grid-column: 2;
+    }
+    .employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div:empty {
+        display: none;
+    }
+    .employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div:has(> .col-form-label):not(:has(input, select, textarea)) {
+        grid-column: 1;
+    }
+    .employee-add-fixed-details .payroll-field-inline {
+        flex-wrap: wrap;
+    }
+    .employee-add-fixed-details .payroll-field-inline > div {
+        flex-basis: 100%;
+    }
+    @layer application-buttons {
+        :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .card-body .pdf-upload-btn {
+            min-width: 0 !important;
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+        }
+    }
+}
+/* Σε στενό περιεχόμενο η ετικέτα προηγείται, ώστε να χωρά ολόκληρη η ημερομηνία. */
+@container employee-maintenance (max-width: 32rem) {
+    .employee-add-fixed-details .accordion-body > .row.form-group {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .employee-add-fixed-details .accordion-body > .row.form-group > div,
+    .employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div {
+        grid-column: 1;
+    }
+}
+@container employee-maintenance (max-width: 40rem) {
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row > div {
+        width: auto !important;
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row > div:empty {
+        display: none;
+    }
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-header {
+    display: block;
+    flex: 0 0 auto;
+    height: auto;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .card-body .col-form-label {
+    font-size: clamp(.85rem, .7vw, 1rem) !important;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-add-header .col-form-label {
+    font-size: clamp(.7rem, .7vw, 1rem) !important;
+}
+:is(.employee-add-page, .employee-edit-page) .menu_Links li {
+    font-size: clamp(.85rem, .85vw, 1rem) !important;
+}
+/* Σύντομη ορατή ονομασία, με αμετάβλητο textContent για τους υπάρχοντες χειριστές. */
+:is(.employee-add-page, .employee-edit-page) .menu_Links li[data-tab-caption]::after {
+    content: attr(data-tab-caption);
+}
+/* Το em παραμένει σταθερό και όταν αλλάζει το βάρος γραμματοσειράς της κατάστασης. */
+:is(.employee-add-page, .employee-edit-page) #label-energos {
+    flex: 0 0 7em;
+    inline-size: 7em;
+    white-space: nowrap;
+}
+/* Χωρίς μεταβολή διαστάσεων/χρωμάτων, ούτε κανόνες για radios ή άλλες ετικέτες. */
+:is(.employee-add-page, .employee-edit-page) :is(div, label):has(> input[type="checkbox"]) {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: .5rem;
+    margin-block: 0 !important;
+}
+/* Η Αργία παραμένει στο DOM, αλλά ολόκληρος ο περιέκτης της μένει κρυφός. */
+.employee-edit-page .sel_8_section .dispno-mt-0_4rem:has(> input[id^="argia_"]) {
+    display: none !important;
+}
+:is(.employee-add-page, .employee-edit-page) :is(div, label):has(> input[type="checkbox"]) > input[type="checkbox"] {
+    flex-shrink: 0;
+    margin: 0 !important;
+    vertical-align: middle;
+}
+:is(.employee-add-page, .employee-edit-page) :is(div, label):has(> input[type="checkbox"]) > label {
+    margin: 0 !important;
+    padding-block: 0;
+    white-space: normal;
+}
+/* Οι εμφωλευμένες σειρές δεν αφήνουν αρνητικά περιθώρια έξω από το σώμα. */
+:is(.employee-add-page, .employee-edit-page) .card-body > .row.form-group > .row.form-group {
+    margin-inline: 0 !important;
+}
+/* Η σύνοψη ταυτότητας ακολουθεί το κοινό εξωτερικό ύψος πεδίων. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-header :is(input.form-control, label.form-control) {
+    height: var(--payroll-control-height);
+    min-height: var(--payroll-control-height);
+    margin-block: 0 !important;
+}
+/* Ο χώρος του κουμπιού κορυφής παραμένει δεσμευμένος και όταν είναι κρυφό. */
+:is(.employee-add-page, .employee-edit-page) .companies-management-footer .scroll-to-top {
+    display: block;
+    visibility: hidden;
+    position: static;
+    flex: 0 0 auto;
+    height: auto;
+    margin: 0 !important;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-header .hr-style-header {
+    margin: 0 !important;
+}
+
+/* Μόνο Εργαζόμενοι: οι δύο μεγάλες ετικέτες μένουν μέσα στη δική τους στήλη. */
+:is(.employee-add-page, .employee-edit-page) label:is([for="epaggelmatikh_katartish"], [for="gnosh_ypologiston"]).col-form-label {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+/* Το δεύτερο ζεύγος ξεκινά μαζί σε νέα γραμμή, χωρίς μετακίνηση του πρώτου. */
+.employee-add-fixed-details .employee-fixed-left-fields > div:has(> label:is([for="eidopoihsh_prin_thn_anathesh"], [for="dialleima_entos_ektos_orarioy"])) {
+    width: 66.66666667% !important;
+}
+@container employee-maintenance (max-width: 60rem) {
+    .employee-add-fixed-details .employee-fixed-left-fields > div:has(> label:is([for="eidopoihsh_prin_thn_anathesh"], [for="dialleima_entos_ektos_orarioy"])) {
+        width: auto !important;
+    }
+}
+/* Σε μικρό πλάτος αναδιπλώνεται μόνο το ζεύγος Έως της κατάρτισης. */
+@container employee-maintenance (max-width: 40rem) {
+    :is(.employee-add-page, .employee-edit-page) .employee-add-training-duration-row {
+        grid-template-columns: 16.66666667% minmax(0, 1fr);
+        row-gap: .25rem;
+    }
+    .employee-edit-page .employee-add-fixed-identity-row > div:first-child:not(:has(label[for])) {
+        grid-column: 1 / -1;
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-add-training-duration-row > div:empty {
+        display: none;
+    }
+}
+@layer application-buttons {
+    :is(.employee-add-page, .employee-edit-page) :is(#customButton_allodapoi, #customButton_arxeio_symbashs) {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        height: auto;
+    }
+}
+/* Οι φορείς έχουν ξεχωριστό trash3: δεν δεσμεύεται και δεύτερος χώρος εκκαθάρισης. */
+.employee-edit-page #editKrathseisTomDropdownScope .employee-fund-fields > .edit-employee-tom-field > .ts-wrapper {
+    margin-right: 0;
+    height: auto !important;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-fund-fields .ts-wrapper.tom-dropdown {
+    height: auto !important;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-fund-fields .ts-wrapper > .ts-control {
+    height: auto;
+    min-height: calc(var(--payroll-control-height) - 2px);
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-fund-fields .ts-wrapper.single .ts-control > .item {
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
+/* Το εγκεκριμένο ελάχιστο της πλοήγησης εφαρμόζεται μόνο στις δύο φόρμες. */
+body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation {
+    --payroll-navigation-font: clamp(.85rem, .78vw, .95rem);
+}
+
+/* Η Κατάσταση ακολουθεί την ίδια αφετηρία πεδίων με τις διπλανές
+   γραμμές, χωρίς δέσμευση ύψους για την παλιά αναδιπλωμένη διάταξη. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group > .employee-status-fields {
+    display: grid;
+    grid-template-columns: 33.33333333% max-content max-content minmax(0, 1fr);
+    align-items: center;
+    grid-column: 1 / -1;
+}
+.employee-add-fixed-details .employee-fixed-left-fields.employee-status-fields > div {
+    width: 100% !important;
+    min-width: 0;
+    padding-inline: calc(var(--bs-gutter-x, 1rem) * .5);
+}
+.employee-add-fixed-details .employee-status-fields > div:empty { display: none; }
+.employee-add-fixed-details .employee-status-fields #label-fylo {
+    flex: 0 0 6em;
+    inline-size: 6em;
+    white-space: nowrap;
+}
+@container employee-maintenance (max-width: 60rem) {
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group > .employee-status-fields {
+        grid-template-columns: 25% max-content max-content minmax(0, 1fr);
+    }
+    .employee-add-fixed-details .employee-status-fields > div { grid-column: auto !important; }
+}
+/* Σταθερές στήλες: ο κρυφός κάδος δεν μεταβάλλει το πλάτος επιλογής/Α.Μ.Α. */
+:is(.employee-add-page, .employee-edit-page) .employee-retention-row {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr) var(--retention-spacer, 4.17%) var(--retention-last, 8rem);
+}
+.employee-edit-page .employee-retention-row {
+    --retention-spacer: 8rem;
+    --retention-last: 1.75rem;
+}
+/* Οι ποσοστιαίες Bootstrap στήλες γεμίζουν πλέον την κοινή στήλη grid. */
+:is(.employee-add-page, .employee-edit-page) .employee-retention-row > div { width: 100% !important; }
+.employee-edit-page .employee-retention-row > .employee-ama-field { grid-column: 3; }
+/* Ο κάδος ανήκει στον επιλογέα. Η δεύτερη στήλη παραμένει δεσμευμένη
+   όταν κρύβεται, ώστε ούτε ο επιλογέας ούτε το Α.Μ.Α. να αλλάζουν πλάτος. */
+.employee-edit-page .employee-retention-row > .col-8 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1.75rem;
+    align-items: center;
+}
+.employee-edit-page .employee-retention-row > .col-8 > .ts-wrapper {
+    width: 100% !important;
+    max-width: 100%;
+    margin-right: 0;
+}
+.employee-edit-page .employee-retention-row > .col-8 > .edit-employee-tom-trash {
+    grid-column: 2;
+    justify-self: end;
+    width: 1.5rem !important;
+    padding: 0;
+}
+/* Συμπαγής κοινή διάταξη μόνο στην καρτέλα Αλλοδαποί των add/edit. */
+:is(.employee-add-page, .employee-edit-page) section[data-section="Αλλοδαποί"] .card-body > .row.form-group {
+    margin-block: .25rem !important;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 5rem minmax(12rem, .65fr);
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row:not(:has(select)) {
+    grid-template-columns: minmax(0, 1fr) 5rem;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row > div { width: 100% !important; }
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-number-row {
+    display: grid;
+    grid-template-columns: max(var(--bs-gutter-x, 1rem), 4.17%) minmax(0, 1fr) minmax(12rem, 16.66666667%) 1.66%;
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-number-row > div { width: 100% !important; }
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-divider { margin-block: .65rem; }
+:is(.employee-add-page, .employee-edit-page) section[data-section="Αλλοδαποί"] .height-vh-3_5 { height: .5rem; }
+@container employee-maintenance (max-width: 50rem) {
+    :is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row {
+        grid-template-columns: minmax(0, 1fr) 5rem;
+        row-gap: .25rem;
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row > div:has(select) {
+        grid-column: 1 / -1;
+    }
 }

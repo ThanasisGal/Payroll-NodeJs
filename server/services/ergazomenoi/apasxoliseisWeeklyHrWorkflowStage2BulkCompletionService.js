@@ -64,10 +64,11 @@ async function completeWeeklyHrWorkflowStage2Bulk({ period_start, period_end, yp
             const context = byIdentity.get(identityKey(scope));
             let status;
             try {
-                const currentScope = buildWeeklyHrStage2BulkPreview({ contexts: [context] })
-                    .safe_scope_ids[0];
-                const alreadyCompleted = context?.workflowState?.stage2?.status === 'COMPLETED' ||
-                    Boolean(context?.preparedStage2Record?.current_execution);
+                const currentPreview = buildWeeklyHrStage2BulkPreview({ contexts: [context] });
+                const currentScope = currentPreview.safe_scope_ids[0];
+                const alreadyCompleted = currentPreview.already_resolved_count === 1 &&
+                    (context?.workflowState?.stage2?.status === 'COMPLETED' ||
+                        Boolean(context?.preparedStage2Record?.current_execution));
                 if ((!currentScope && !alreadyCompleted) || (currentScope &&
                     (currentScope.scope_fingerprint !== scope.scope_fingerprint ||
                     currentScope.bulk_kind !== scope.bulk_kind))) {

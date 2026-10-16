@@ -6,13 +6,17 @@ document.addEventListener("DOMContentLoaded", function () {
     if (cardBody && scrollToTopButtons[index]) { // Ελέγχουμε αν και τα δύο στοιχεία υπάρχουν
       const scrollToTopButton = scrollToTopButtons[index];
 
-      cardBody.addEventListener('scroll', function() {
-        if (cardBody.scrollTop > 40) {
-          scrollToTopButton.style.display = 'block';
+      const reserveSpace = !!scrollToTopButton.closest(':is(.employee-add-page, .employee-edit-page) .companies-management-footer');
+      const updateScrollToTop = function() {
+        const visible = cardBody.scrollTop > 40;
+        if (reserveSpace) {
+          scrollToTopButton.style.visibility = visible ? 'visible' : 'hidden';
         } else {
-          scrollToTopButton.style.display = 'none';
+          scrollToTopButton.style.display = visible ? 'block' : 'none';
         }
-      });
+      };
+      cardBody.addEventListener('scroll', updateScrollToTop);
+      if (reserveSpace) updateScrollToTop();
 
       scrollToTopButton.addEventListener('click', function() {
         cardBody.scrollTo({

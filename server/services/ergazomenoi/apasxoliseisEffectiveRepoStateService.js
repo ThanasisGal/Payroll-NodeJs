@@ -1,3 +1,5 @@
+const { resolveDailyActualWorkFacts, nonNegativeNumber } = require('./apasxoliseisDailyActualWorkFactsService');
+
 const MODE = Object.freeze({
     CURRENT: 'CURRENT',
     PROPOSED: 'PROPOSED'
@@ -75,6 +77,30 @@ function resolveLayer({
     );
 }
 
+function isUnchangedDeclaredNoWork(row = {}, expectedCategory) {
+    const declared = String(row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? '').trim();
+    const retrospective = String(row.kathgoria_ergasias_apologistika ?? '').trim();
+    if (declared !== expectedCategory || !['', expectedCategory].includes(retrospective)) return false;
+    const facts = resolveDailyActualWorkFacts(row);
+    const calculated = nonNegativeNumber(row.ores_ergasias_apologistika);
+    const actual = nonNegativeNumber(row.ores_pragmatikhs_ergasias_apologistika);
+    const hasRetrospectiveInterval = [1, 2, 3].some(index =>
+        String(row[`apo_ora_0${index}_apologistika`] || '').trim() ||
+        String(row[`eos_ora_0${index}_apologistika`] || '').trim());
+    return facts.actualWorkHours === 0 && facts.cardHours === 0 &&
+        facts.countsAsActualWorkDay === false && calculated.ok && calculated.value === 0 &&
+        actual.ok && actual.value === 0 && !hasRetrospectiveInterval &&
+        !facts.unresolvedCardPairNumbers.length && !facts.hasCompleteCardEvidence;
+}
+
+function isValidDeclaredRest(row = {}) {
+    return isUnchangedDeclaredNoWork(row, 'ΑΝ');
+}
+
+function isValidDeclaredNonWork(row = {}) {
+    return row.repo_apologistika !== true && isUnchangedDeclaredNoWork(row, 'ΜΕ');
+}
+
 function resolveCurrent(row, expectedRepoCategory) {
     const declaredCategory = category(row.kathgoria_ergasias);
     const declaredRepo = repoValue(row.repo);
@@ -85,6 +111,12 @@ function resolveCurrent(row, expectedRepoCategory) {
     }
     if (!declaredRepo.ok || !apologistikaRepo.ok) {
         return invalid(DIAGNOSTIC.INVALID_REPO_VALUE);
+    }
+
+    // Participation in the retrospective book is independent of unchanged declared rest.
+    if (isValidDeclaredRest(row) && (apologistikaRepo.value === false ||
+        (apologistikaCategory.value === '' && apologistikaRepo.value !== true))) {
+        return result('ΑΝ', true, PROVENANCE.DECLARED_CURRENT);
     }
 
     const hasMaterialApologistikaCategory = apologistikaCategory.value !== '';
@@ -168,5 +200,7 @@ module.exports = {
     MODE,
     PROVENANCE,
     DIAGNOSTIC,
-    resolveEffectiveRepoState
+    resolveEffectiveRepoState,
+    isValidDeclaredRest,
+    isValidDeclaredNonWork
 };

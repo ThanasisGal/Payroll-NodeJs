@@ -17,7 +17,7 @@ const { makeSimulation } = require(
 
 const MAX_STAGE3_BULK_PREVIEW_ITEMS = 100;
 const PREVIEW_LOAD_CONCURRENCY = 8;
-const ALLOWED_CLASSIFICATIONS = new Set(['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK']);
+const ALLOWED_CLASSIFICATIONS = new Set(['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK', 'REST_REPO']);
 const COMMAND_FIELDS = new Set([
     'ypokatasthma', 'period_start', 'period_end', 'final_classification',
     'leave_category', 'items'

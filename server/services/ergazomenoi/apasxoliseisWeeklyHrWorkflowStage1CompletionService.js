@@ -118,8 +118,10 @@ function validateWorkflowPrerequisite(weekRows, workflowContext = {}) {
         leave_classification_completed: false
     });
     if (result.next_required_hr_stage === NEXT_STAGE.BLOCKED) {
-        throw commandError('STAGE1_COMPLETION_BLOCKED', 409,
-            `Το Stage 1 δεν μπορεί να ολοκληρωθεί: ${result.blocking_reasons.join(', ')}`);
+        throw Object.assign(commandError('STAGE1_COMPLETION_BLOCKED', 409,
+            `Το Stage 1 δεν μπορεί να ολοκληρωθεί: ${result.blocking_reasons.join(', ')}`), {
+            blocking_reasons: result.blocking_reasons, diagnostics: result.blocking_details
+        });
     }
     return result;
 }

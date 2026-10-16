@@ -105,8 +105,9 @@ async function geometry(element) {
     });
 }
 
-// Compare the actual helper markup against the legacy stylesheet, with the
-// action layer omitted. No historical Git objects, CDN or database are needed.
+// Compare helpers with and without the action layer. Login retains its approved
+// layout in both snapshots; other screens retain their legacy baseline.
+// No historical Git objects, CDN or database are needed.
 const sharedCSS = fs.readFileSync(path.join(root, 'public/css/main.css'), 'utf8');
 const actionSystemStart = sharedCSS.indexOf('/* Primary action buttons share one system.');
 assert.ok(actionSystemStart > 100000, 'legacy styles and the action system boundary must be present');
@@ -190,9 +191,32 @@ async function helperSnapshot(page, selectors) {
     } finally { await session.detach(); }
 }
 
+async function assertLoginClearAlignment(page, snapshot) {
+    const geometry = await page.locator('#email').evaluate(input => {
+        const wrapper = input.parentElement;
+        const inputBox = input.getBoundingClientRect();
+        const wrapperBox = wrapper.getBoundingClientRect();
+        return {
+            inputHeight: inputBox.height, wrapperHeight: wrapperBox.height,
+            inputTop: inputBox.top, wrapperTop: wrapperBox.top,
+            controlHeight: parseFloat(getComputedStyle(input).getPropertyValue('--payroll-control-height'))
+                * parseFloat(getComputedStyle(document.documentElement).fontSize)
+        };
+    });
+    assert.equal(geometry.inputHeight, geometry.controlHeight, 'Login must use the approved common input height');
+    assert.equal(geometry.wrapperHeight, geometry.inputHeight, 'The clear-button anchor must match the input height');
+    assert.equal(geometry.wrapperTop, geometry.inputTop, 'The clear-button anchor must align with its input');
+    for (const [state, button] of Object.entries(snapshot['.clear-btn'])) {
+        assert.equal(parseFloat(button.styles.top), geometry.inputHeight / 2, `${state}: clear button must anchor at the input centre`);
+        assert.equal(button.styles.position, 'absolute');
+        assert.equal(button.styles.opacity, '1');
+        assert.equal(button.styles['pointer-events'], 'auto');
+    }
+}
+
 for (const width of [1440, 390]) {
     for (const screen of ['home', 'login', 'employee']) {
-        test(`helper scope: ${screen} matches legacy geometry and all states at ${width}px`, async () => {
+        test(`helper scope: ${screen} preserves helper geometry and all states at ${width}px`, async () => {
             const browser = await chromium.launch({ headless: true });
             try {
                 const page = await browser.newPage({ viewport: { width, height: 1200 } });
@@ -207,12 +231,33 @@ for (const width of [1440, 390]) {
                     return route.request().url() === `${origin}/__helper_scope__`
                         ? route.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="el">
                             <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-                            <body><main style="max-width:${screen === 'home' ? 240 : 800}px;padding:16px;margin:auto">${markup}</main></body></html>` })
+                            <body><main ${screen === 'login' ? 'class="payroll-form-layout"' : ''}
+                                style="max-width:${screen === 'home' ? 240 : 800}px;padding:16px;margin:auto;${screen === 'login' ? '--leftW:0px;--app-header-h:0px;--app-footer-h:0px' : ''}">${markup}</main></body></html>` })
                         : route.abort();
                 });
                 await page.goto(`${origin}/__helper_scope__`);
                 await page.addStyleTag({ path: path.join(root, 'public/css/bootstrap.min.css') });
-                const stylesheet = await page.addStyleTag({ content: legacyCSS });
+                const stylesheet = await page.addStyleTag({ content: screen === 'login' ? sharedCSS : legacyCSS });
+                if (screen === 'login') {
+                    // Keep the real control height and responsive login layout. Only the
+                    // primary-action layer is absent from this helper's baseline.
+                    const removedLayers = await stylesheet.evaluate(element => {
+                        let removed = 0;
+                        function removeActionLayer(group) {
+                            for (let i = group.cssRules.length - 1; i >= 0; i--) {
+                                const rule = group.cssRules[i];
+                                if (rule instanceof CSSLayerBlockRule && rule.name === 'application-buttons') {
+                                    group.deleteRule(i);
+                                    removed++;
+                                }
+                                else if (rule.cssRules && rule.deleteRule) removeActionLayer(rule);
+                            }
+                        }
+                        removeActionLayer(element.sheet);
+                        return removed;
+                    });
+                    assert.ok(removedLayers > 0, 'The login baseline must actually omit the primary-action layer');
+                }
                 await page.addStyleTag({ content: `*, *::before, *::after { transition: none !important; animation: none !important; }
                     #single, #multi { position:relative; width:min(260px, calc(100% - 64px)); }
                     .ts-control { border:1px solid #ccc; padding:6px; min-height:32px; }
@@ -257,9 +302,12 @@ for (const width of [1440, 390]) {
                         '.edit-apodoxes-tom-trash', '.edit-employee-tom-trash', '#clearSelectSymbaseon-1',
                         '#clearSelectKrathseon_2', '#gotoProgrammaDypa'];
                 const before = await helperSnapshot(page, selectors);
+                if (screen === 'login') await assertLoginClearAlignment(page, before);
                 await capture(page, `scope-${screen}-legacy`, width);
                 await stylesheet.evaluate((element, css) => { element.textContent = css; }, sharedCSS);
-                assert.deepEqual(await helperSnapshot(page, selectors), before, 'all helper styles must match the legacy appearance');
+                const after = await helperSnapshot(page, selectors);
+                if (screen === 'login') await assertLoginClearAlignment(page, after);
+                assert.deepEqual(after, before, 'all helper styles and geometry must survive the primary-action layer');
                 if (screen === 'home') {
                     for (const selector of selectors) assert.equal(before[selector].normal.height, 28);
                 } else if (screen === 'employee') {
@@ -283,7 +331,7 @@ for (const width of [1440, 390]) {
                     await page.locator('.ts-overflow-popup').evaluate(element => element.remove());
                     assert.equal(before['.ts-single-reset-btn'].normal.height, 28);
                     assert.equal(before['.ts-multi-reset-btn'].normal.height, 28);
-                    for (const selector of ['form .submitButton', 'form .cardFooter01 a.btn']) {
+                    for (const selector of ['form .submitButton', 'form .card-footer .company-details-actions a.btn[href="/ergazomenoi/ergazomenoi"]']) {
                         const primary = await geometry(page.locator(selector));
                         assert.equal(primary.align, 'center'); assert.equal(primary.whiteSpace, 'nowrap');
                         assert.equal(primary.radius, 6); assert.equal(primary.border, primary.color);

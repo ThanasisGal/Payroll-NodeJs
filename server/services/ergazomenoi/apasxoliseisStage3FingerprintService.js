@@ -99,7 +99,8 @@ function buildStage2ResolutionFingerprint(stage2 = {}) {
         status: text(stage2.status), resolution: text(stage2.resolution),
         resolved_dates: [...new Set((stage2.resolved_dates || [])
             .map(dateKeyUtc).filter(Boolean))].sort(),
-        reasons: [...new Set(stage2.reasons || [])].sort() };
+        reasons: [...new Set(stage2.reasons || [])].sort(),
+        ...(stage2.rest_evidence ? { rest_evidence: stage2.rest_evidence } : {}) };
     return crypto.createHash('sha256').update(stableStringify(material)).digest('hex');
 }
 

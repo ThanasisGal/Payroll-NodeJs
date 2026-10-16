@@ -23,7 +23,7 @@ const sandbox = {
         }),
         head: { appendChild: () => {} }, body: { appendChild: () => {} }
     },
-    window: {}, URLSearchParams,
+    window: { addEventListener: () => {} }, URLSearchParams,
     fetch: async () => { throw new Error('Unexpected fetch'); },
     setTimeout: () => {}, clearTimeout: () => {}
 };
@@ -67,7 +67,9 @@ const presentation = sandbox.resolveReviewRowPresentation(approved, {
 assert.strictEqual(presentation.apologistiko.text, '14:51 - 23:21');
 const badge = sandbox.renderApprovedOrphanAuditBadge(approved);
 assert.match(badge, /ΟΡΦΑΝΟ ΧΤΥΠΗΜΑ/);
-assert.strictEqual(sandbox.renderApprovedOrphanAuditBadge(orphanRow(null)), '');
+assert.match(sandbox.renderApprovedOrphanAuditBadge(orphanRow(null)), /Εκκρεμεί/);
+assert.match(badge, /Εγκεκριμένος/);
+assert.strictEqual(sandbox.renderApprovedOrphanAuditBadge({}), '');
 
 assert.match(source,
     /\$\{renderStage4ClassificationPill\(rowPresentation\.apologistiko\.text\)\}[\s\S]*\$\{renderApprovedOrphanAuditBadge\(row\)\}/);

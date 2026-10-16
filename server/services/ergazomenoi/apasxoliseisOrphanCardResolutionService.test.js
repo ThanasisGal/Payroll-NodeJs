@@ -4,6 +4,7 @@ const assert = require('assert');
 const {
     RESOLUTION_SCOPE,
     LEGACY_REUSABLE_ORPHAN_REASON,
+    isCurrentOrphanResolutionApproval,
     resolveOrphanCardResolution,
     attachOrphanResolutionPreviews
 } = require('./apasxoliseisOrphanCardResolutionService');
@@ -324,3 +325,45 @@ assert.strictEqual(manualFuture.reuseScope, 'ONE_TIME');
 assert.strictEqual(manualFuture.reusableDecisionRule, null);
 
 console.log('orphan card resolution pure tests passed (START/END/rest/reuse/split)');
+
+// Legacy approval in the real 25/09 incident claimed the morning interval for
+// an afternoon punch. Status alone must not suppress preview or imply approval.
+const legacyWrongInterval = row('2026-09-25', {
+    cards_apo_ora_01: '16:58', apo_ora_01: '09:00', eos_ora_01: '13:00',
+    apo_ora_02: '16:45', eos_ora_02: '20:45',
+    apo_ora_01_apologistika: '09:00', eos_ora_01_apologistika: '13:00',
+    orphan_card_resolution: { status: 'HR_APPROVED', policy_version: startResult.policyVersion,
+        approved_interval: { start: '09:00', end: '13:00' },
+        resolved_pairs: [{ pairNumber: 1, orphanType: 'START_ONLY', start: '09:00', end: '13:00' }] }
+});
+assert.strictEqual(isCurrentOrphanResolutionApproval(legacyWrongInterval), false);
+const pendingLegacy = attachOrphanResolutionPreviews({ rows: [legacyWrongInterval] })[0];
+assert.strictEqual(pendingLegacy.orphan_card_resolution_preview.approvalCurrent, false);
+assert.strictEqual(pendingLegacy.orphan_card_resolution_preview.reason, 'ORPHAN_PAIR_SET_MISMATCH');
+const legacyValid = { ...legacyWrongInterval, cards_apo_ora_01: '09:00' };
+assert.strictEqual(isCurrentOrphanResolutionApproval(legacyValid), true);
+const legacyContinuous = { ...legacyValid, orphan_card_resolution: {
+    ...legacyValid.orphan_card_resolution, orphan_type: 'START_ONLY', resolved_pairs: [] } };
+assert.strictEqual(isCurrentOrphanResolutionApproval(legacyContinuous), true);
+assert.strictEqual(isCurrentOrphanResolutionApproval({ ...legacyContinuous,
+    cards_apo_ora_01: '16:58' }), false);
+const legacyEndOnly = { ...legacyContinuous, cards_apo_ora_01: '', cards_eos_ora_01: '13:00',
+    orphan_card_resolution: { ...legacyContinuous.orphan_card_resolution, orphan_type: 'END_ONLY' } };
+assert.strictEqual(isCurrentOrphanResolutionApproval(legacyEndOnly), true);
+assert.strictEqual(isCurrentOrphanResolutionApproval({ ...legacyValid,
+    eos_ora_01_apologistika: '12:59' }), false);
+const correctedWork = [{ pairNumber: 1, start: '09:00', end: '13:00' },
+    { pairNumber: 2, start: '16:58', end: '20:58' }];
+const correctedPreview = resolveOrphanCardResolution({ row: legacyWrongInterval,
+    manualInterval: { work_intervals: correctedWork } });
+const correctedDay = { ...legacyWrongInterval, ...correctedPreview.approvedUpdates,
+    orphan_card_resolution: { ...legacyWrongInterval.orphan_card_resolution,
+        approved_work_intervals: correctedWork,
+        resolved_pairs: correctedPreview.resolvedPairs,
+        raw_card_snapshot: { cards_apo_ora_01: '16:58', cards_eos_ora_01: '' } } };
+assert.strictEqual(isCurrentOrphanResolutionApproval(correctedDay), true);
+assert.strictEqual(isCurrentOrphanResolutionApproval({ ...correctedDay,
+    cards_apo_ora_01: '16:59' }), false);
+assert.strictEqual(isCurrentOrphanResolutionApproval({ ...correctedDay,
+    eos_ora_02_apologistika: '20:59' }), false);
+console.log('legacy/current orphan approval provenance regression passed');

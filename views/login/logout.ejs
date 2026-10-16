@@ -1,40 +1,33 @@
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 mt-2 border-bottom bg-hero-cdn">
-</div>
-
-<div class="ht-12"></div>
-
-<div class="container w-40">
-    <div class="card z-depth-5 mt-6">
+<div class="logout-confirmation">
+    <div class="card z-depth-5">
         <!-- ✅ Card Header -->
         <div class="card-header">
-            <label class="w-100 text-center fs1_15vw-fw600">Αποσύνδεση & Έξοδος από την Εφαρμογή</label>
+            <label class="w-100 text-center logout-title">Αποσύνδεση & Έξοδος από την Εφαρμογή</label>
         </div>
-        
+
         <!-- ✅ Card Body -->
         <div class="card-body">
-            <div class="row form-group g-3 align-items-center mt-2 mb-3">
+            <div class="logout-content text-center">
                 <div class="text-center">
-                    <i class="bi bi-bell-fill fs4rem corange bi-logout-swing"></i>
-                    <br><br>
-                    <p>Είστε σίγουρος/η ότι θέλετε να κλείσετε την εφαρμογή;</p>
-                    <br>
+                    <i class="bi bi-bell-fill corange bi-logout-swing logout-bell"></i>
+                    <p class="logout-message">Είστε σίγουρος/η ότι θέλετε να κλείσετε την εφαρμογή;</p>
                 </div>
             </div>
         </div>
 
         <!-- ✅ Card Footer με σωστό spacing -->
         <div class="card-footer cardFooter">
-            <div class="d-flex justify-content-center gap-3 cardFooter01">
+            <div class="d-flex justify-content-center logout-actions">
                 <!-- ✅ POST form με CSRF -->
                 <form method="POST" action="/logout/userLogout" class="d-inline-block">
                     <%- include('../partials/_csrfField') %>
-                    <button type="submit" class="btn btn-brown rounded-4 mb-1 mt-2" style="min-width: 150px;">
+                    <button type="submit" class="btn btn-brown">
                         <i class="bi bi-box-arrow-right"></i> Έξοδος
                     </button>
                 </form>
-                
+
                 <!-- ✅ Επιστροφή link -->
-                <a class="btn btn-brown rounded-4 buttons-content mb-1 mt-2" href="/" style="min-width: 150px;">
+                <a class="btn btn-brown buttons-content" href="/">
                     <i class="bi bi-chevron-double-left"></i> Επιστροφή
                 </a>
             </div>

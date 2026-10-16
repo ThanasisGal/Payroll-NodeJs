@@ -8,6 +8,8 @@ const { buildWeeklyHrLifecycleProjection } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService');
 const { buildStage3InputFingerprint } = require(
     '../../services/ergazomenoi/apasxoliseisStage3FingerprintService');
+const { buildStage1Fingerprint } = require(
+    '../../services/ergazomenoi/apasxoliseisStage1FingerprintService');
 const { resolveNoWorkCandidateForDate } = require(
     '../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowResolverService');
 
@@ -168,7 +170,8 @@ for (const item of completedBoundary.stages.stage3.pending_items) {
     const stage1 = completedBoundary.stages.stage1;
     const authoritativeContext = {
         scope: boundaryScope, row, dailyProfile: authoritativeProfile, isResidual: true,
-        stage2: { fingerprint: item.stage2_fingerprint, status: 'COMPLETED',
+        stage2: { fingerprint: item.stage2_fingerprint,
+            status: completedBoundary.stages.stage3.stage2_status,
             resolution: 'NOT_APPLICABLE', resolved_dates: [] },
         upstream: { stage1_attestation_scope: 'PERIOD_SLICE',
             stage1_period_start: boundaryPeriod.period_start,
@@ -219,6 +222,40 @@ for (const changed of [
 ]) {
     assert.notEqual(buildStage3InputFingerprint({ ...genuineBase, ...changed }).fingerprint,
         genuineFingerprint);
+}
+
+// Neutral ME presentation must not invalidate the immutable HR attestation.
+const rotationalTerms = { kathestos_apasxolhshs: '2', typos_apasxolhshs: '2',
+    hmeres_ergasias_ebdomadas: 2, ores_ergasias_ebdomadas: 16,
+    mo_oron_hmerhsias_ergasias: 8, pososto_prosayxhshs_6hs_hmeras: 40 };
+const storedWeek = Array.from({ length: 7 }, (_, index) => ({
+    _id: `persisted-${index}`, hmeromhnia: `2026-09-${String(7 + index).padStart(2, '0')}`,
+    kathgoria_ergasias: index < 5 ? 'ΜΕ' : 'ΕΡΓ',
+    ores_ergasias: index < 5 ? 0 : 8, cards_ores_ergasias: 0,
+    kathgoria_ergasias_apologistika: index < 5 ? 'ΜΕ' : '',
+    repo_apologistika: false, kathgoria_adeias_apologistika: index < 5 ? '' : 'POSSIBLE_LEAVE'
+}));
+const attestation = { status: 'COMPLETED',
+    completion_fingerprint: buildStage1Fingerprint(storedWeek).fingerprint };
+const prepare = rows => rows.map(row => prepareWeeklyHrStage2LifecycleRow({ row,
+    effectiveProfile: rotationalTerms }));
+const displayWeek = prepare(storedWeek);
+assert.equal(displayWeek[0].kathgoria_ergasias_apologistika, '');
+assert.equal(displayWeek[0].kathgoria_ergasias_apologistika_original, 'ΜΕ');
+const project = rows => buildWeeklyHrLifecycleProjection({ weekRows: prepare(rows),
+    effectiveProfile: rotationalTerms, persistedStage1State: attestation });
+assert.equal(project(storedWeek).stages.stage1.persisted_status, 'COMPLETED');
+assert.deepEqual(project(storedWeek).stages.stage3.stage2_automatic_resolution_items
+    .map(item => item.classification), ['NON_WORK', 'NON_WORK']);
+for (const mutation of [
+    { kathgoria_ergasias_apologistika: 'ΑΝ', repo_apologistika: true },
+    { cards_ores_ergasias: 1, cards_apo_ora_01: '12:00', cards_eos_ora_01: '13:00' },
+    { kathgoria_adeias_apologistika: 'ΑΔΚΑΝ', adeia_apologistika: true },
+    { is_locked: true }
+]) {
+    const changed = storedWeek.map((row, index) => index === 6 ? { ...row, ...mutation } : row);
+    assert.equal(project(changed).stages.stage1.persisted_status, 'STALE');
+    assert.deepEqual(project(changed).stages.stage3.stage2_automatic_resolution_items, []);
 }
 
 console.log('Stage-3 daily employment profile equivalence tests passed');

@@ -67,6 +67,8 @@ const modalInstance = { show() {
 }, hide() { elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal'); } };
 const sandbox = { currentWeeklyHrStage2BulkPreview: null,
     currentCanonicalLifecyclePayloads: [],
+    employmentReviewGuidanceAttributes: () => '', employmentReviewGuidanceInfo: () => '',
+    EmploymentReviewGuidanceUi: { failureHtml: ({ code }) => code },
     weeklyHrStage2BulkSubmitting: false, userCanRecordCanonicalDecision: () => true,
     userCanRecordRepoTransferDecision: () => false,
     canRecordEmploymentDecisionForCurrentPeriod: () => periodAllowsChanges,
@@ -105,8 +107,9 @@ assert.doesNotMatch(container.innerHTML.match(/weekly-hr-stage2-bulk-complete[^>
     /disabled/);
 assert.match(container.innerHTML, /Έτοιμες για μαζική ενημέρωση/);
 assert.match(container.innerHTML, /Αυτόματες τακτοποιήσεις/);
+assert.match(container.innerHTML, /Έγκυρες προδηλωμένες ημέρες ανάπαυσης, χωρίς αλλαγή/);
 assert.match(container.innerHTML, /Μεταφορές ρεπό/);
-assert.match(container.innerHTML, /Ήδη τακτοποιημένες/);
+assert.match(container.innerHTML, /Εβδομάδες χωρίς ενέργεια στο Στάδιο 2/);
 assert.match(container.innerHTML, /Περιπτώσεις που χρειάζονται έλεγχο/);
 assert.equal((container.innerHTML.match(/class="weekly-hr-stage2-exception"/g) || []).length, 50);
 assert.match(container.innerHTML, /<td>0<\/td>/);
@@ -134,6 +137,18 @@ assert.match(container.innerHTML, /Ενέργεια/);
 assert.match(container.innerHTML, />Έλεγχος<\/button>/);
 assert.doesNotMatch(container.innerHTML, /MANUAL_REVIEW/);
 assert.doesNotMatch(container.innerHTML, /<article/);
+
+// The human-decision action and its guidance must use the same visible name.
+sandbox.currentWeeklyHrStage2BulkPreview.exceptions = [{
+    employee_kodikos: '0009', week_start: '2026-05-04', week_end: '2026-05-10',
+    code: 'UNCONFIRMED_WEEKLY_REST_DATES', resolution_route: 'STAGE3_HUMAN_DECISION',
+    rest_evidence: { required_count: 2, recognized_count: 1, missing_count: 1,
+        candidate_dates: ['2026-05-10'] }
+}];
+sandbox.render(container);
+assert.match(container.innerHTML, /data-exception-index="0">Απόφαση HR<\/button>/);
+assert.match(container.innerHTML, /Πατήστε «Απόφαση HR» για τις ημερήσιες αποφάσεις του Σταδίου 3/);
+assert.doesNotMatch(container.innerHTML, /Απόφαση προσωπικού/);
 
 sandbox.currentWeeklyHrStage2BulkPreview = { total_scopes: 85, safe_bulk_count: 0,
     safe_pair_count: 0, safe_automatic_count: 0, already_resolved_count: 66,
@@ -310,7 +325,8 @@ const reasonTextarea = viewSource.match(/<textarea id="weeklyHrStage2PreviewReas
 assert.match(reasonTextarea, /employment-review-reason-textarea/);
 assert.match(reasonTextarea, /\brequired\b/);
 assert.doesNotMatch(reasonTextarea, /\b(?:readonly|disabled)\b/);
-assert.match(renderSource, new RegExp(`reason\\.value = '${defaultStage2Reason}'`));
+assert.ok(renderSource.includes(defaultStage2Reason));
+assert.match(renderSource, /Επιβεβαιώνω ότι οι επιλεγμένες μεταφορές αντιστοιχούν σε πραγματικές αναπαύσεις/);
 assert.doesNotMatch(previewSource, /employmentReviewSwal\(\{ icon: 'info'/);
 assert.match(cssSource, /max-width: min\(1200px, 94vw\)/);
 assert.match(cssSource, /\.employment-review-stage2-bulk-preview-modal \.modal-body \{[\s\S]*overflow-y: auto/);
@@ -354,7 +370,7 @@ const reasonSandbox = { policyPreviewReasonLabels: {}, atomicRepoTransferDiagnos
 vm.runInNewContext(`${source.slice(reasonStart, reasonEnd)}\n` +
     'this.reasonLabel = getStage2LifecycleReasonLabel;', reasonSandbox);
 assert.equal(reasonSandbox.reasonLabel('UNKNOWN_INTERNAL_REASON', false),
-    'Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.');
+    'Δεν προσδιορίστηκε συγκεκριμένη αιτία. Ζητήστε τεχνικό έλεγχο πριν συνεχίσετε.');
 assert.doesNotMatch(reasonSandbox.reasonLabel('UNKNOWN_INTERNAL_REASON', false),
     /UNKNOWN_INTERNAL_REASON/);
 

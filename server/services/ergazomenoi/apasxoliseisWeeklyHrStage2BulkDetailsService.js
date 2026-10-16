@@ -51,7 +51,7 @@ function pairDetails(context) {
             rowById.get(text(item.prodhlomena_oraria_id))?.hmeromhnia),
         before: classificationLabel(item.current_category),
         after: classificationLabel(item.proposed_values?.kathgoria_ergasias_apologistika),
-        safety_reason: 'Η μεταφορά έχει μία μόνο ασφαλή εφαρμογή για τη συγκεκριμένη εβδομάδα.'
+        safety_reason: 'Υπάρχει ένα υποψήφιο ζεύγος. Η εφαρμογή απαιτεί ρητή επιβεβαίωση προσωπικού ότι η ημέρα προορισμού ήταν πράγματι ανάπαυση.'
     }));
 }
 function buildWeeklyHrStage2BulkDetails({ contexts = [], cachedSeeds = [], page_size = 50 } = {}) {

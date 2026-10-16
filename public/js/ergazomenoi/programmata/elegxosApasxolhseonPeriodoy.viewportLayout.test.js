@@ -34,7 +34,9 @@ async function measure(page, statusVisible) {
         );
         const shell = document.querySelector('.employment-review-page-shell');
         const card = document.querySelector('.employment-review-card');
-        const scroll = document.querySelector('.employment-review-scroll-container');
+        const workspaceScroll = document.querySelector('.employment-review-scroll-container');
+        const bodyScroll = document.querySelector('.review-card-body');
+        const scroll = getComputedStyle(bodyScroll).display === 'block' ? bodyScroll : workspaceScroll;
         const footer = document.getElementById('globalApplicationFooter');
         const shellRect = shell.getBoundingClientRect();
         const cardRect = card.getBoundingClientRect();

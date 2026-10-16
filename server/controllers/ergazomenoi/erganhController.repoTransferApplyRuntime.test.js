@@ -46,7 +46,11 @@ assert.ok(authorizationIndex >= 0);
 assert.ok(authorizationIndex < runtimeIndex);
 assert.ok(runtimeIndex < indexesIndex);
 assert.ok(indexesIndex < applyIndex);
-assert.ok(action.includes('Η εφαρμογή ακυρώθηκε πλήρως. Δεν αποθηκεύτηκε καμία αλλαγή.'));
+assert.ok(action.includes("reviewErrorResponse(error, 'REPO_APPLY_FAILED')"));
+const safeError = require('../../services/ergazomenoi/apasxoliseisReviewErrorPresentationService')
+    .reviewErrorResponse(new Error('raw database detail'), 'REPO_APPLY_FAILED');
+assert.match(safeError.message, /αν αποθηκεύτηκε κάποια αλλαγή/);
+assert.doesNotMatch(safeError.message, /raw database detail/);
 assert.ok(!action.includes('error.message'));
 assert.ok(!controller.includes('erganhApi') && !controller.includes('syncIndexes') && !controller.includes('createIndexes'));
 

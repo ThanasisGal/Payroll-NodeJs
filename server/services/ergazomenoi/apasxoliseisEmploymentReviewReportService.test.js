@@ -304,8 +304,12 @@ test('οι κατηγορίες εξαγωγής ταυτίζονται με τ�
             authoritative_date_set: dateKeys, is_full_natural_week: true }
     });
     const derivedItems = lifecycle.stages.stage3.stage2_automatic_resolution_items;
-    assert.deepEqual(derivedItems, [{ date: '2026-06-02', classification: 'REST_REPO',
-        reason: 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }]);
+    assert.deepEqual(derivedItems, []);
+    assert.deepEqual(lifecycle.stages.stage3.pending_dates, ['2026-06-02']);
+    assert.equal(lifecycle.stages.stage4.final_weekly_analysis_available, false);
+    const pendingReport = buildEmploymentReviewReportProjection({ rows: [policyContextRows[1]] });
+    assert.notEqual(pendingReport.daily[0].finalCategory, 'ΑΝ',
+        'η εκκρεμής ημερομηνία δεν εξάγεται ως επιβεβαιωμένη ανάπαυση');
     const stage2DailyResolutionsByDate = new Map(derivedItems.map((item) => [
         `0001|${item.date}`, item
     ]));
@@ -319,9 +323,13 @@ test('οι κατηγορίες εξαγωγής ταυτίζονται με τ�
         row({ kodikos: '0001', employeeName: 'ΕΛΕΓΧΟΣ ΚΑΤΗΓΟΡΙΩΝ',
             hmeromhnia: new Date('2026-06-02T00:00:00.000Z'),
             kathgoria_ergasias_original: 'ΕΡΓ', kathgoria_ergasias: 'ΕΡΓ',
-            kathgoria_ergasias_apologistika: 'ΕΡΓ', kathgoria_ergasias_effective: 'ΕΡΓ',
-            repo_apologistika: false, orphan_card_resolution_preview: null,
-            orphan_card_resolution: null }),
+            // A real saved HR rest decision, rather than a virtual proposal.
+            kathgoria_ergasias_apologistika: 'ΑΝ', kathgoria_ergasias_effective: 'ΑΝ',
+            repo_apologistika: true, apologistiko_biblio: true, is_locked: true,
+            cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0,
+            apo_ora_01_apologistika: '', eos_ora_01_apologistika: '',
+            ores_ergasias_apologistika: 0, ores_pragmatikhs_ergasias_apologistika: 0,
+            orphan_card_resolution_preview: null, orphan_card_resolution: null }),
         row({ kodikos: '0001', employeeName: 'ΕΛΕΓΧΟΣ ΚΑΤΗΓΟΡΙΩΝ',
             hmeromhnia: new Date('2026-06-03T00:00:00.000Z'),
             kathgoria_ergasias_original: 'ΕΡΓ', kathgoria_ergasias: 'ΕΡΓ',
@@ -335,7 +343,7 @@ test('οι κατηγορίες εξαγωγής ταυτίζονται με τ�
         ['2026-06-03', 'ΕΡΓ', 'ΕΡΓ']
     ]);
     assert.equal(report.daily[0].finalCategorySource, 'CANONICAL_DAILY');
-    assert.equal(report.daily[1].finalCategorySource, 'STAGE2_FINAL_PROJECTION');
+    assert.equal(report.daily[1].finalCategorySource, 'CANONICAL_DAILY');
 
     const sheet = buildEmploymentReviewWorkbook(report).getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
     const categoryCell = (rowNumber) => sheet.getRow(rowNumber).getCell(5).value;

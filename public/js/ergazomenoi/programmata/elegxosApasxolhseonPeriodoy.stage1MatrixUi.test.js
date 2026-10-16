@@ -39,6 +39,8 @@ const sandbox = {
     stage1DisplayFilters: { employeeQuery: '', status: 'ALL', leave: false,
         sickness: false, absence: false },
     weeklyHrStage1Key: () => 'week',
+    employmentReviewGuidanceAttributes: () => '',
+    employmentReviewGuidanceInfo: () => '',
     weeklyHrStage1BusinessStatus: (payload) =>
         payload.lifecycle_projection.stages.stage1.business_status,
     weeklyHrHasOnlyOrphanBlockers: () => false,
@@ -155,6 +157,7 @@ assert.equal(currentContext.title, '');
 
 const draftSetterSource = source.match(/function setStage1DayDraft\([\s\S]*?\n}/)?.[0] || '';
 const setterSandbox = {
+    isEmploymentReviewDateOwned: sandbox.isEmploymentReviewDateOwned,
     weeklyHrStage1RowsById: new Map(rows.map((row) => [row._id, row])),
     weeklyHrStage1Payloads: new Map([['week', contextPayload]]),
     weeklyHrStage1DayDrafts: new Map(),
@@ -180,7 +183,7 @@ assert.match(source, /filtered\.slice\(start, start \+ WEEKLY_HR_STAGE1_PAGE_SIZ
 assert.match(source, /weeklyHrStage1DayDrafts\.get\(rowId\)/);
 assert.match(source, /weeklyHrStage1Selected\.has\(key\)/);
 assert.match(css, /\.weekly-hr-stage1-table\s*\{[\s\S]*?table-layout:\s*fixed/);
-assert.match(css, /\.weekly-hr-stage1-table-shell\s*\{[\s\S]*?overflow:\s*visible/);
+assert.match(css, /\.weekly-hr-stage1-table-shell\s*\{[\s\S]*?overflow:\s*auto/);
 assert.match(css, /\.weekly-hr-stage1-table > thead > tr > th\s*\{[\s\S]*?position:\s*sticky[\s\S]*?top:\s*var\(--weekly-hr-stage1-toolbar-sticky-height, 0px\)[\s\S]*?z-index:\s*13/);
 assert.match(css, /\.weekly-hr-stage1-status\s*\{[\s\S]*?white-space:\s*normal/);
 assert.match(css, /\.weekly-hr-stage1-status > \.badge\s*\{[\s\S]*?overflow-wrap:\s*anywhere[\s\S]*?white-space:\s*normal/);
@@ -188,8 +191,8 @@ assert.match(source, /#weeklyHrStage1Container \.weekly-hr-stage1-bulk-toolbar[\
 assert.match(source, /--weekly-hr-stage1-toolbar-sticky-height/);
 assert.match(source, /shown\.bs\.collapse[\s\S]*?employmentReviewStage1Collapse[\s\S]*?refreshEmploymentReviewStickyLayout/);
 assert.match(source, /window\.addEventListener\?\.\('resize', refreshEmploymentReviewStickyLayout\)/);
-assert.doesNotMatch(css.match(/\.weekly-hr-stage1-table\s*\{[^}]*\}/)?.[0] || '',
-    /min-width/);
+assert.match(css.match(/\.weekly-hr-stage1-table\s*\{[^}]*\}/)?.[0] || '',
+    /min-width:\s*102rem/);
 assert.doesNotMatch(css, /weekly-hr-stage1-table[^\n]*nth-child[\s\S]*?left:/);
 assert.doesNotMatch(source, /bootstrap\.Tooltip/);
 assert.doesNotMatch(source, /getOrCreateInstance\([^)]*Tooltip/);

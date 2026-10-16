@@ -36,14 +36,10 @@ const deterministicLifecycle = buildWeeklyHrLifecycleProjection({ weekRows: dete
     persistedStage1State: { status: 'COMPLETED', version: 1,
         completion_fingerprint: deterministicFingerprint,
         effective_fingerprint: deterministicFingerprint }, scope });
-assert.deepEqual(deterministicLifecycle.stages.stage3.pending_dates, []);
+assert.deepEqual(deterministicLifecycle.stages.stage3.pending_dates, ['2026-05-26', '2026-05-27', '2026-05-28']);
 assert.deepEqual(deterministicLifecycle.stages.stage3.stage2_automatic_resolution_items
     .filter((item) => ['2026-05-26', '2026-05-27', '2026-05-28'].includes(item.date))
-    .map((item) => [item.date, item.classification, item.reason]), [
-    ['2026-05-26', 'REST_REPO', 'DETERMINISTIC_STAGE2_REPO_RESOLUTION'],
-    ['2026-05-27', 'REST_REPO', 'DETERMINISTIC_STAGE2_REPO_RESOLUTION'],
-    ['2026-05-28', 'REST_REPO', 'DETERMINISTIC_STAGE2_REPO_RESOLUTION']
-]);
+    .map((item) => [item.date, item.classification, item.reason]), []);
 assert.equal(deterministicRows.some((row) => row.apousia_apologistika === true), false);
 assert.equal(JSON.stringify(deterministicRows), sourceRowsBeforeProjection);
-console.log('Stage-3 bulk fixture deterministic FULL_TIME REST_REPO regression passed');
+console.log('Stage-3 bulk fixture unconfirmed rest remains a human decision regression passed');

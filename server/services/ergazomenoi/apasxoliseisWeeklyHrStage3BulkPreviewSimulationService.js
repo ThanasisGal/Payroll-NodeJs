@@ -86,6 +86,12 @@ function makeSimulation(source) {
         },
         apply(item, command) {
             const row = rows.find((candidate) => String(candidate._id) === item.row_id);
+            if (command.final_classification === 'REST_REPO' &&
+                !(lifecycle.stages.stage3.pending_items || []).find(entry =>
+                    entry.row_id === item.row_id)?.allowed_classifications.includes('REST_REPO')) {
+                fail('WEEKLY_REST_DECISION_NOT_ALLOWED',
+                    'Η επιλογή υπερβαίνει τις ελλείπουσες αναπαύσεις της εβδομάδας.');
+            }
             const updates = planCanonicalDailyClassification({ row,
                 classification: command.final_classification,
                 leave_category: command.leave_category });
@@ -100,7 +106,8 @@ function makeSimulation(source) {
             const remaining = after.stages.stage3.pending_dates || [];
             if (remaining.includes(item.decision_date) ||
                 after.stages.stage1.business_status !== 'COMPLETED' ||
-                after.stages.stage2.business_status !== 'COMPLETED') fail(
+                (after.stages.stage2.business_status !== 'COMPLETED' &&
+                    after.stages.stage2.resolution_route !== 'STAGE3_HUMAN_DECISION')) fail(
                 'STAGE3_PREVIEW_SIMULATION_DIVERGED',
                 'Η διαδοχική προεπισκόπηση δεν μπορεί να ολοκληρωθεί με ασφάλεια.');
             state.stage3 = { ...state.stage3,

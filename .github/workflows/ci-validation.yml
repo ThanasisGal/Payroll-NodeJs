@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feat/departure-auto-history-reconstruction
+      - fix/employment-control-period-employees
     types:
       - opened
       - synchronize
@@ -896,6 +897,8 @@ jobs:
         env:
           PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_draft_test_ci?replicaSet=payrollDraftTest
           PAYROLL_PERIOD_EMPLOYEES_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_ci?replicaSet=payrollDraftTest
+          PAYROLL_GUIDANCE_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_guidance_ci?replicaSet=payrollDraftTest
+          PAYROLL_VISUAL_ARTIFACT_DIR: ${{ runner.temp }}/employment-review-guidance-visual
           AWS_EC2_METADATA_DISABLED: "true"
         shell: bash
         run: |
@@ -935,7 +938,51 @@ jobs:
           curl --fail --silent --show-error --location --retry 3 \
             https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css \
             -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/tom-select.css"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/bootstrap-icons.css"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.webpayrollsolutions.com/assets/fonts/bootstrap-icons.v2.woff2 \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/bootstrap-icons.woff2"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_3vqPQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-400.ttf"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_AP2PQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-600.ttf"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_Of2PQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-700.ttf"
+          node --test test/integration/employeeMaintenanceResponsive.browser.test.js test/integration/maintenanceFormsResponsive.browser.test.js
+          node --test --test-concurrency=1 test/integration/formsInventory.contract.test.js test/integration/allFormsResponsive.browser.test.js test/integration/formControls.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewEmployees.test.js test/integration/employmentReviewEmployees.browser.test.js
+          node --test server/services/ergazomenoi/apasxoliseisReviewGuidance.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.blockedExplanation.test.js
+          node --test server/controllers/ergazomenoi/erganhController.stage1EmploymentScope.regression.test.js server/services/ergazomenoi/apasxoliseisDeferredTrailingWeekReview.test.js
+          node --test server/services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService.test.js server/services/ergazomenoi/employeeEmploymentCycleContextLoaderService.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage1ActionableDates.regression.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage1MatrixUi.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewGuidance.browser.test.js test/integration/employmentReviewGuidance.hover.browser.test.js
+          node --test server/services/ergazomenoi/apasxoliseisFreshSearch.regression.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage1CompletionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStaleStage3ResolutionFence.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewDateLock.browser.test.js test/integration/employmentReviewCells.browser.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewResponsive.browser.test.js
+          node --test server/controllers/ergazomenoi/erganhController.weeklyHrStage1.contract.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.weeklyHrStage1Ui.test.js
+          # The real controller imports XML generators. Build only their existing
+          # native dependency; keep the application's postinstall disabled.
+          npm rebuild libxmljs2 --ignore-scripts=false
+          node --test server/controllers/ergazomenoi/erganhController.stage3DailyEmploymentProfile.test.js server/services/ergazomenoi/apasxoliseisReviewEmploymentProfileService.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewStage1Completion.browser.test.js test/integration/employmentReviewNoWorkTerms.browser.test.js
+          node --test server/services/ergazomenoi/apasxoliseisReviewRestStateService.test.js server/services/ergazomenoi/employmentReviewLoanOwnershipService.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewFourFixes.browser.test.js test/integration/employmentReviewLoanScope.test.js
+          node --test server/services/ergazomenoi/apasxoliseisWeeklyRestEvidenceService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowResolverService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2CompletionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkPreviewService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkDetailsService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3ResolutionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrStage3BulkPreviewService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage3BulkApplyService.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage2BulkUi.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage3Ui.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewStage2Deadlock.browser.test.js test/integration/employmentReviewStage2Evidence.browser.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewMultipleIntervals.browser.test.js
+
+      - name: Preserve synthetic Employment Review visual checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: employment-review-guidance-visual
+          path: ${{ runner.temp }}/employment-review-guidance-visual
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Audit production dependencies
         run: node scripts/ci/audit-production-dependencies.js

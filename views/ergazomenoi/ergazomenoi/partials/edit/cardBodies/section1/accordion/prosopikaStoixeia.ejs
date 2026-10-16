@@ -36,7 +36,7 @@
 %>
 
 <div class="accordion-item margin-top--2_5rem">
-	<h2 class="accordion-header">
+	<h2 class="accordion-header p-0">
 		<button class="accordion-button bg-accordion font-size-vw-1 font-weight-700 caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseOne" aria-expanded="true" aria-controls="panelsStayOpen-collapseOne" tabindex="-1">
 		Προσωπικά Στοιχεία
 		</button>
@@ -46,6 +46,7 @@
 
 		<div class="accordion-body bg-white margin-bottom--0_5rem">
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="eponymo_patera" class="col-form-label label-font-size">
 					Επώνυμο Πατέρα
@@ -55,7 +56,9 @@
 					<input type="text" name="eponymo_patera" id="eponymo_patera" class="form-control input-contents" value="<%= safe('eponymo_patera') %>" autocomplete="off" />
 				</div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="patronymo" class="col-form-label label-font-size field-required">
 					Όνομα Πατέρα
 					</label>
@@ -64,10 +67,11 @@
 					<input type="text" name="patronymo" id="patronymo" class="form-control input-contents" value="<%= safe('patronymo') %>" autocomplete="off" />
 				</div>
 			</div>
+            </div>
 
-			<div class="height-vh-0_1"></div>
 
 			<div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="eponymo_mhteras" class="col-form-label label-font-size">
 					Επώνυμο Μητέρας
@@ -77,7 +81,9 @@
 					<input type="text" name="eponymo_mhteras" id="eponymo_mhteras" class="form-control input-contents field-required" value="<%= safe('eponymo_mhteras') %>" autocomplete="off" />
 				</div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="mhtronymo" class="col-form-label label-font-size field-required">
 					Όνομα Μητέρας
 					</label>
@@ -86,16 +92,17 @@
 					<input type="text" name="mhtronymo" id="mhtronymo" class="form-control input-contents" value="<%= safe('mhtronymo') %>" autocomplete="off" />
 				</div>
 			</div>
+            </div>
 
-			<div class="height-vh-0_2"></div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields employee-status-fields">
 				<div class="col-2 left-align">
 					<label for="energos" class="col-form-label label-font-size">
 					Κατάσταση Εργαζόμενου / ης
 					</label>
 				</div>
-				<div class="col-1 left-align checkbox-flex-center">
+				<div class="col-1 left-align checkbox-flex-center employee-active-control">
 					<input type="checkbox" class="form-check-input custom-checkbox checkbox-class margin-top--0_1rem" id="energos" name="energos" <%= safe('energos') ? 'checked' : '' %> value="" />
 					<label for="energos" id="label-energos" class="margin-left-0_75rem font-size-vw-0_875 margin-top--0_2rem">
 					ΑΝΕΝΕΡΓΟΣ
@@ -118,7 +125,9 @@
 
 				<div class="col-0-5"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="doy" class="col-form-label label-font-size field-required">Δ.Ο.Υ.</label>
 				</div>
 				<input
@@ -150,10 +159,11 @@
 					</select>
 				</div>
 			</div>
+            </div>
 
-			<div class="height-vh-0_2"></div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="typos_taytothtas" class="col-form-label label-font-size field-required">
 					Τύπος Νομ/κού Εγγράφου
@@ -191,7 +201,9 @@
 
 				<div class="col-0-25"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="adt" class="col-form-label label-font-size field-required">
 					Αριθ.Νομιμ/κού Εγγράφου
 					</label>
@@ -200,26 +212,30 @@
 					<input type="text" name="adt" id="adt" class="form-control input-contents" value="<%= safe('adt') %>" autocomplete="off" />
 				</div>
 			</div>
+            </div>
 
-			<div class="height-vh-0_2"></div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="hmeromhnia_ekdoshs" class="col-form-label label-font-size">
 					Ημ/νία Έκδοσης / Λήξης
 					</label>
 				</div>
-				<div class="col-1-5">
+				<div class="col-4 employee-add-date-pair-column">
+                    <div class="employee-add-date-pair">
+                        <div class="employee-add-date-pair-field">
 					<input type="date" name="hmeromhnia_ekdoshs" id="hmeromhnia_ekdoshs" class="date-control" value="<%= safe('hmeromhnia_ekdoshs') ? new Date(safe('hmeromhnia_ekdoshs')).toISOString().split('T')[0] : '' %>" />
 				</div>
-
-				<div class="col-1-5">
+                        <div class="employee-add-date-pair-field">
 					<input type="date" name="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" id="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" class="date-control" value="<%= safe('hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy') ? new Date(safe('hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy')).toISOString().split('T')[0] : '' %>" />
 				</div>
+                    </div>
+                </div>
 
-				<div class="col-1"></div>
-
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="arxh_ekdoshs" class="col-form-label label-font-size">
 					Αρχή Έκδοσης
 					</label>
@@ -228,8 +244,10 @@
 					<input type="text" name="arxh_ekdoshs" id="arxh_ekdoshs" class="form-control input-contents" value="<%= safe('arxh_ekdoshs') %>" />
 				</div>
 			</div>
+            </div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="hmeromhnia_gennhshs" class="col-form-label label-font-size field-required">
 					Ημ/νία Γέννησης
@@ -252,7 +270,9 @@
 					<label id="label-anhlikos" class="col-form-label"> </label>
 				</div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="topos_gennhshs" class="col-form-label label-font-size">
 					Τόπος Γέννησης
 					</label>
@@ -261,8 +281,10 @@
 					<input type="text" name="topos_gennhshs" id="topos_gennhshs" class="form-control input-contents" value="<%= safe('topos_gennhshs') %>" autocomplete="off" />
 				</div>
 			</div>
+            </div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="arithmos_bibliarioy_anhlikoy" class="col-form-label label-font-size">
 					Αριθ. Βιβλ. Ανηλίκου
@@ -318,7 +340,9 @@
 					</div>
 				</div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="email" class="col-form-label label-font-size field-required">
 					eMail
 					</label>
@@ -327,8 +351,10 @@
 					<input type="text" name="email" id="email" class="form-control input-contents" value="<%= safe('email') %>" autocomplete="off" />
 				</div>
 			</div>
+            </div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="yphkoothta" class="col-form-label label-font-size field-required">
 					Υπηκοότητα
@@ -366,7 +392,9 @@
 
 				<div class="col-0-25"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="eidikh_kathgoria_ergazomenoy" class="col-form-label label-font-size">
 					Ειδική Κατηγορία
 					</label>
@@ -401,10 +429,11 @@
 					</select>
 				</div>
 			</div>
+            </div>
 
-			<div class="height-vh-0_2"></div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="oikogeneiakh_katastash" class="col-form-label label-font-size field-required">
 					Οικογενειακή Κατάσταση
@@ -442,7 +471,9 @@
 
 				<div class="col-0-25"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="arithmos_teknon" class="col-form-label label-font-size field-required">
 					Αριθ. Τέκνων/Προστ.Μελών
 					</label>
@@ -451,10 +482,12 @@
 					<input type="number" name="arithmos_teknon" id="arithmos_teknon" class="form-control input-contents right-align" value="<%= safe('arithmos_teknon') %>" min="0" max="9" />
 				</div>
 			</div>
+            </div>
 
 			<hr class="hr-style" />
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="odos" class="col-form-label label-font-size">
 					Οδός
@@ -464,7 +497,9 @@
 					<input type="text" name="odos" id="odos" class="form-control input-contents field-required" value="<%= safe('odos') %>" autocomplete="off" />
 				</div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="arithmos" class="col-form-label label-font-size">
 					Αριθμός
 					</label>
@@ -473,8 +508,10 @@
 					<input type="text" name="arithmos" id="arithmos" class="form-control input-contents" value="<%= safe('arithmos') %>" autocomplete="off" />
 				</div>
 			</div>
+            </div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="tk" class="col-form-label label-font-size">
 					Ταχ.Κώδικας
@@ -486,7 +523,9 @@
 
 				<div class="col-3"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="thlefono" class="col-form-label label-font-size">
 					Τηλέφωνο
 					</label>
@@ -495,8 +534,10 @@
 					<input type="text" name="thlefono" id="thlefono" class="form-control input-contents" value="<%= safe('thlefono') %>" autocomplete="off" />
 				</div>
 			</div>
+            </div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="perifereia" class="col-form-label label-font-size">
 					Περιφέρεια
@@ -534,7 +575,9 @@
 
 				<div class="col-0-25"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="nomos" class="col-form-label label-font-size">
 					Περιφερειακή Ενότητα
 					</label>
@@ -569,10 +612,11 @@
 					</select>
 				</div>
 			</div>
+            </div>
 
-			<div class="height-vh-0_2"></div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="dhmos" class="col-form-label label-font-size">
 					Δημοτική Ενότητα
@@ -610,7 +654,9 @@
 
 				<div class="col-0-25"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="polh" class="col-form-label label-font-size">
 					Δημοτικό Διαμέρισμα
 					</label>
@@ -645,10 +691,12 @@
 					</select>
 				</div>
 			</div>
+            </div>
 
 			<hr class="hr-style" />
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-bottom-0_65rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="ekpaideytiko_epipedo" class="col-form-label label-font-size field-required">
 					Εκπαιδευτικό Επίπεδο
@@ -685,7 +733,9 @@
 
 				<div class="col-0-25"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="forologikh_klimaka" class="col-form-label label-font-size">
 					Φορολογική Κλίμακα
 					</label>
@@ -695,8 +745,10 @@
 					<input type="text" name="forologikh_klimaka" id="forologikh_klimaka" class="form-control input-contents" value="<%= safe('forologikh_klimaka') %>" readonly />
 				</div>
 			</div>
+            </div>
 
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
+                <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="trapeza" class="col-form-label label-font-size">
 					Τράπεζα Κατάθεσης Μισθού
@@ -734,7 +786,9 @@
 
 				<div class="col-0-25"></div>
 
-				<div class="col-2 left-align">
+				</div>
+                <div class="employee-fixed-right-fields">
+                <div class="col-2 left-align">
 					<label for="iban" class="col-form-label label-font-size">
 					IBAN Εργαζόμενου / ης
 					</label>
@@ -743,7 +797,7 @@
 					<input type="text" name="iban" id="iban" class="form-control input-contents" value="<%= safe('iban') %>" autocomplete="off" />
 				</div>
 			</div>
-			<div class="height-vh-3_5"></div>
+            </div>
 		</div>
 	</div>
 </div>

@@ -253,8 +253,33 @@ test('ADD and EDIT place a trailing divider after the suspicious-short settings 
         const finalFieldIndex = html.indexOf(
             'id="mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta"'
         );
-        const nextSectionIndex = html.indexOf('for="tropos_ypologismoy_pragmatikoy_oromisthioy"');
+        const nextSectionIndex = html.indexOf('id="actualHourlyRateGroupLabel"');
         assert.ok(finalFieldIndex >= 0 && nextSectionIndex > finalFieldIndex);
         assert.match(html.slice(finalFieldIndex, nextSectionIndex), /<hr\s*\/>/);
+        assert.match(tagWithId(html, 'span', 'actualHourlyRateGroupLabel'), /\bdata-field-group-label\b/);
+        assert.equal((html.match(/id="actualHourlyRateGroupLabel"/g) || []).length, 1);
+        const groupTag = html.match(/<div\b[^>]*role="radiogroup"[^>]*aria-labelledby="actualHourlyRateGroupLabel"[^>]*>/);
+        assert.ok(groupTag, 'The actual-hourly-rate group must reference its visible label');
+        assert.ok(groupTag.index > nextSectionIndex);
+        // Find the whole group, including both nested radio-option containers.
+        const divTags = /<\/?div\b[^>]*>/g;
+        divTags.lastIndex = groupTag.index;
+        let depth = 0;
+        let groupEnd = -1;
+        for (let tag; (tag = divTags.exec(html));) {
+            depth += tag[0].startsWith('</') ? -1 : 1;
+            if (depth === 0) { groupEnd = divTags.lastIndex; break; }
+        }
+        assert.ok(groupEnd > groupTag.index, 'The labelled field group must be complete');
+        const groupHtml = html.slice(groupTag.index, groupEnd);
+        const radios = groupHtml.match(/<input\b[^>]*>/g) || [];
+        assert.equal(radios.length, 2);
+        for (const radio of radios) {
+            assert.match(radio, /type="radio"/);
+            assert.match(radio, /name="tropos_ypologismoy_pragmatikoy_oromisthioy"/);
+            const id = radio.match(/\bid="([^"]+)"/);
+            assert.ok(id, 'Each radio option must retain an individually associated label');
+            assert.ok(groupHtml.includes('for="' + id[1] + '"'));
+        }
     }
 });

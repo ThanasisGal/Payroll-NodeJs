@@ -35,7 +35,7 @@
           <% krathseisFilteredRecs.forEach(element => { %>
             <tr data-id="<%= element._id %>">
               <td class="col-0-5">
-                <button class="btn btn-nesting text-center" style="font-size: 1vw !important; width: 4.16667vw !important;" type="button" data-bs-toggle="collapse" data-bs-target="#pososta<%= element._id %>" aria-expanded="false" aria-controls="pososta<%= element._id %>"><i class="bi bi-chevron-down"></i>
+                <button class="btn btn-nesting text-center" style="font-size: var(--payroll-control-font) !important; width: 4.16667vw !important;" type="button" data-bs-toggle="collapse" data-bs-target="#pososta<%= element._id %>" aria-expanded="false" aria-controls="pososta<%= element._id %>"><i class="bi bi-chevron-down"></i>
                 </button>
               </td>
               <td class="col-1" style="padding-top: 10px;"><%- element.kodikos %></td>

@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const guidanceHelpers = ['employmentReviewGuidanceAttributes', 'employmentReviewGuidanceInfo']
+    .map(name => source.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n}'))?.[0]).join('\n');
 const css = fs.readFileSync(path.join(__dirname, '../../../../public/css/main.css'), 'utf8');
 
 const defaultReason = 'Μετά από έλεγχο του προδηλωμένου ωραρίου, των πραγματικών στοιχείων απασχόλησης και του καθεστώτος μερικής/εκ περιτροπής απασχόλησης, η ημέρα χαρακτηρίζεται ως ΜΗ ΕΡΓΑΣΙΑ. Δεν προέκυψε άδεια, ασθένεια ή απουσία.';
@@ -74,6 +76,8 @@ const helperSource = source.slice(source.indexOf('function stage3DecisionClassif
 const sandbox = {
     currentCanonicalLifecyclePayloads: [],
     currentReviewRows: [],
+    isEmploymentReviewDateOwned: (payload, date) => !Array.isArray(payload?.employment_date_scope?.employment_owned_dates) ||
+        payload.employment_date_scope.employment_owned_dates.includes(date),
     currentReviewOwnershipPeriod: () => ({ period_start: '2026-05-01', period_end: '2026-05-31' }),
     compareLifecyclePendingItems: (left, right) => left.date.localeCompare(right.date),
     stage1DateKey: (value) => String(value || '').slice(0, 10),
@@ -97,7 +101,7 @@ const sandbox = {
     document: { getElementById: () => sandbox.container },
     container: { innerHTML: '' }
 };
-vm.runInNewContext(`${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
+vm.runInNewContext(`${guidanceHelpers}\n${helperSource}\nthis.helpers = { groupStage3PendingItems, renderWeeklyHrStage3,
     buildStage3EmployeeNameLookup, stage3EmployeeDisplayName,
     stage3DeclaredPresentation, stage3DecisionExplanation, stage3PayloadForItem,
     stage3DailyPresentation, stage3ApologistikoClassification,
@@ -163,22 +167,22 @@ assert.match(sandbox.container.innerHTML, /stage3-col-reason/);
 assert.match(sandbox.container.innerHTML, /stage3-decision-reason/);
 assert.match(sandbox.container.innerHTML, /stage3-decision-classification/);
 assert.match(sandbox.container.innerHTML, /stage3-decision-action/);
-assert.match(css, /\.weekly-hr-stage3-decisions-table\s*\{[^}]*min-width:\s*82rem[^}]*table-layout:\s*fixed/s);
-assert.match(css, /\.stage3-col-date\s*\{\s*width:\s*9%/);
+assert.match(css, /\.weekly-hr-stage3-decisions-table\s*\{[^}]*min-width:\s*86rem[^}]*table-layout:\s*fixed/s);
+assert.match(css, /\.stage3-col-date\s*\{\s*width:\s*12%/);
 assert.match(css, /\.stage3-col-day\s*\{\s*width:\s*6%/);
 assert.match(css, /\.stage3-col-day-status\s*\{\s*width:\s*9%/);
-assert.match(css, /\.stage3-col-declared\s*\{\s*width:\s*11%/);
-assert.match(css, /\.stage3-col-actual\s*\{\s*width:\s*11%/);
-assert.match(css, /\.stage3-col-reason\s*\{\s*width:\s*23%/);
-assert.match(css, /\.stage3-col-classification\s*\{\s*width:\s*17%/);
-assert.match(css, /\.stage3-col-action\s*\{\s*width:\s*14%/);
+assert.match(css, /#employmentReviewWorkspace \.weekly-hr-stage3-decisions-table \.stage3-col-declared\s*\{\s*width:\s*11%/);
+assert.match(css, /\.stage3-col-actual\s*\{\s*width:\s*9%/);
+assert.match(css, /\.stage3-col-reason\s*\{\s*width:\s*16%/);
+assert.match(css, /\.stage3-col-classification\s*\{\s*width:\s*14%/);
+assert.match(css, /\.stage3-col-action\s*\{\s*width:\s*23%/);
 assert.match(css,
     /\.stage3-decision-classification \.form-select,[^}]*\.stage3-decision-action \.weekly-hr-stage3-resolve\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0/s);
 assert.match(sandbox.container.innerHTML, /Υπήρχε προδηλωμένη εργασία 8,00 ωρών/);
 assert.match(sandbox.container.innerHTML, /Δεν προέκυψε πραγματική εργασία από κάρτες/);
 assert.match(sandbox.container.innerHTML, /Η εβδομαδιαία ανάπαυση έχει ήδη καλυφθεί/);
 assert.match(sandbox.container.innerHTML,
-    /Χρειάζεται τελικός χαρακτηρισμός από το HR: Άδεια, Ασθένεια, Απουσία/);
+    /Χρειάζεται τελικός χαρακτηρισμός από τον υπεύθυνο προσωπικού: Άδεια, Ασθένεια, Απουσία/);
 assert.doesNotMatch(sandbox.container.innerHTML, /stage3-boundary-week-guidance/,
     'μια κανονική εβδομάδα δεν εμφανίζει περιττή επεξήγηση άλλης περιόδου');
 assert.deepEqual(Array.from(sandbox.helpers.stage3DecisionExplanation({
@@ -190,7 +194,7 @@ assert.deepEqual(Array.from(sandbox.helpers.stage3DecisionExplanation({
     'Υπήρχε προδηλωμένη εργασία 8,00 ωρών.',
     'Δεν προέκυψε πραγματική εργασία από κάρτες ή άλλα διαθέσιμα στοιχεία.',
     'Δεν προέκυψε ασφαλής αυτόματη τελική ταξινόμηση για τη συγκεκριμένη ημέρα.',
-    'Χρειάζεται τελικός χαρακτηρισμός από το HR: Άδεια, Ασθένεια, Απουσία.'
+    'Χρειάζεται τελικός χαρακτηρισμός από τον υπεύθυνο προσωπικού: Άδεια, Ασθένεια, Απουσία.'
 ]);
 
 const loadedEmployeeRow = { kodikos: '0007', eponymo: 'ΣΠΥΡΙΔΩΝΟΣ', onoma: 'ΑΡΕΤΗ' };

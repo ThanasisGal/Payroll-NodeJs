@@ -5,6 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteBtn = document.getElementById('delete-btn');
     if (!table || !deleteBtn) return;
 
+    // Η επιβεβαίωση δεν είναι πλοήγηση· η αναμονή ξεκινά από το fetch.
+    deleteBtn.setAttribute("data-no-loader", "");
+
     deleteBtn.addEventListener('click', async (event) => {
         // Guard: αν είναι disabled ή δεν υπάρχει επιλεγμένο nested id, μην κάνεις τίποτα
         if (
@@ -26,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const deleteUrl = `/companies/antistoixiseis/deleteFromNested/${nestedId}`;
 
         const result = await Swal.fire({
+            target: document.querySelector('main.payroll-form-layout') || document.body,
+            heightAuto: false,
+            width: 'min(560px, 100%)',
             backdrop: false,            // overlay
             allowOutsideClick: false,
             title: "Είστε σίγουρος/η;",
@@ -38,13 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelButtonText: "Ακύρωση",
             customClass: {
                 title: "custom-title",
-                popup: "custom-swal-popup",
+                popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                container: "new-year-confirmation-container",
                 confirmButton: "class-warning custom-confirm-button custom-swal-button",
-                cancelButton: "custom-cancel-button custom-swal-button",
+                cancelButton: "class-secondary custom-cancel-button custom-swal-button",
             },
             didOpen: () => Swal.getCancelButton().focus(),
         });
-        if (!result.isConfirmed) return;
+        if (result.isConfirmed !== true) return;
 
         try {
             const resp = await fetch(deleteUrl, {
@@ -59,6 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // auto-follow redirect
             if (resp.redirected && resp.url) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     title: "Επιτυχής διαγραφή",
@@ -67,7 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     showConfirmButton: false,
                     customClass: {
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     }
                 });
                 location.href = resp.url;
@@ -79,6 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const loc = resp.headers.get("Location") || resp.headers.get("location");
             if (loc) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     title: "Επιτυχής διαγραφή",
@@ -87,7 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     showConfirmButton: false,
                     customClass: {
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     }
                 });
                 location.href = loc.startsWith("http") ? loc : new URL(loc, location.origin).toString();
@@ -105,6 +120,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // 204 No Content
             if (resp.status === 204) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     title: "Επιτυχής διαγραφή",
@@ -113,7 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     showConfirmButton: false,
                     customClass: {
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     }
                 });
 
@@ -129,6 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(`HTTP ${resp.status} / success=${data?.success}`);
                 }
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     title: "Επιτυχής διαγραφή",
@@ -137,7 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     showConfirmButton: false,
                     customClass: {
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     }
                 });
                 location.href = data.redirectUrl || "/companies/antistoixiseis";
@@ -147,6 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Άλλος content-type αλλά OK (π.χ. HTML)
             if (resp.ok) {
                 await Swal.fire({
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
                     title: "Επιτυχής διαγραφή",
@@ -155,7 +181,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     showConfirmButton: false,
                     customClass: {
                         title: "custom-title",
-                        popup: "custom-swal-popup",
+                        popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                        container: "new-year-confirmation-container",
                     }
                 });
                 location.href = "/companies/antistoixiseis";
@@ -166,6 +193,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             await Swal.fire({
+                target: document.querySelector('main.payroll-form-layout') || document.body,
+                heightAuto: false,
+                width: 'min(560px, 100%)',
                 backdrop: false,            // overlay
                 allowOutsideClick: false,
                 icon: "error",
@@ -174,7 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 confirmButtonText: "Κλείσιμο",
                 customClass: {
                     title: "custom-title",
-                    popup: "custom-swal-popup",
+                    popup: "custom-swal-popup new-year-confirmation z-depth-5",
+                    container: "new-year-confirmation-container",
                     confirmButton: "class-normal custom-confirm-button custom-swal-button",
                 },
                 willClose: () => {

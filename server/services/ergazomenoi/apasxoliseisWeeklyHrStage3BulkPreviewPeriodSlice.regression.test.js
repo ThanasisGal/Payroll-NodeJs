@@ -51,13 +51,10 @@ const deterministicLifecycle = buildWeeklyHrLifecycleProjection({
             completion_fingerprint: deterministicFingerprints.completion_fingerprint,
             effective_fingerprint: deterministicFingerprints.completion_fingerprint }] },
     scope, periodScope, employmentDateScope });
-assert.deepEqual(deterministicLifecycle.stages.stage3.pending_dates, []);
+assert.deepEqual(deterministicLifecycle.stages.stage3.pending_dates, ['2026-05-01', '2026-05-02']);
 assert.deepEqual(deterministicLifecycle.stages.stage3.stage2_automatic_resolution_items
     .filter((item) => ['2026-05-01', '2026-05-02'].includes(item.date))
-    .map((item) => [item.date, item.classification, item.reason]), [
-    ['2026-05-01', 'REST_REPO', 'DETERMINISTIC_STAGE2_REPO_RESOLUTION'],
-    ['2026-05-02', 'REST_REPO', 'DETERMINISTIC_STAGE2_REPO_RESOLUTION']
-]);
+    .map((item) => [item.date, item.classification, item.reason]), []);
 assert.equal(deterministicRows.some((row) => row.apousia_apologistika === true), false);
 assert.deepEqual(deterministicLifecycle.employment_date_scope.context_only_dates,
     ['2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30']);
@@ -65,4 +62,4 @@ assert.deepEqual(deterministicLifecycle.employment_date_scope.authoritative_date
     ['2026-05-01', '2026-05-02', '2026-05-03']);
 assert.equal(deterministicLifecycle.stages.stage1.attestation_scope, 'PERIOD_SLICE');
 assert.equal(JSON.stringify(deterministicRows), sourceRowsBeforeProjection);
-console.log('Stage-3 period-slice deterministic FULL_TIME REST_REPO regression passed');
+console.log('Stage-3 period-slice unconfirmed rest remains a human decision regression passed');

@@ -134,6 +134,8 @@ async function completeWeeklyHrWorkflowStage1Bulk({
         } catch (error) {
             return { scope: safeScope, status: resultStatus(error),
                 code: String(error?.code || 'STAGE1_BULK_ITEM_FAILED'),
+                blocking_reasons: error?.blocking_reasons || [],
+                diagnostics: error?.diagnostics || [],
                 message: error?.statusCode ? String(error.message || '') :
                     'Η ολοκλήρωση της εβδομάδας απέτυχε.' };
         }

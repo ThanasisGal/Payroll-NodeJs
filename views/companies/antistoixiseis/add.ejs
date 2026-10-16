@@ -1,3 +1,4 @@
+<div class="maintenance-responsive-form companies-management-page company-details-page">
 <div class="margin-top-1rem">
     <div class="container-fluid height-vh-100 padding-0">
         
@@ -10,14 +11,14 @@
 
                         <%- include('../../partials/_csrfField') %>
 
-                        <div class="card d-flex flex-column z-depth-5 w-80 margin-left-percent-10 overflow-hidden">
-                            <div class="card-header p-2 height-rem-3_5">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
+                            <div class="card-header p-0 height-rem-3_5 companies-search-header">
                                 <label class="text-center w-100 headers-content">
                                 Εισαγωγή Νέας Αντιστοίχισης Κ.Π.Κ.
                                 </label>
                             </div>
 
-                            <div class="card-body overflow-auto flex-grow-1 w-100 height-vh-42 bg-white" id="cardBody">
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody">
                                 <input type="hidden" name="team" id="team" value="<%= company.team %>" />
                                 <input type="hidden" name="companyId" id="companyId" value="<%= company._id %>" />
                                 <input type="hidden" name="companyKod" id="companyKod" value="<%= company.kod %>" />
@@ -49,20 +50,20 @@
                                     </div>
 
                                     <div class="col-8 left-align font-size-rem-1_1 cdarkgreen">
-                                        <label class="font-weight-600">
+                                        <span class="font-weight-600" data-field-display>
                                             <%- krathsh.kodikos + "&nbsp; &nbsp; " + krathsh.perigrafh %>
-                                        </label>
+                                        </span>
                                     </div>
 
                                     <div class="col-1-5 right-align">
-                                        <label for="aa_eggrafhs" class="col-form-label label-font-size black"> 
+                                        <span id="aaEggrafhsLabel" data-field-group-label class="col-form-label label-font-size black">
                                             α/α Εγγραφής 
-                                        </label>
+                                        </span>
                                     </div>
                                     <div class="col-1 font-size-rem-1_1 cdarkgreen">
-                                        <label class="font-weight-600">
+                                        <span class="font-weight-600" data-field-display aria-labelledby="aaEggrafhsLabel">
                                         <%= totalRecs.toString().padStart(4, '0') %>
-                                        </label>
+                                        </span>
                                     </div>
                                 </div>
                                 <input type="hidden" name="aa_eggrafhs" id="aa_eggrafhs" value="<%= totalRecs.toString().padStart(4, '0') %>" />
@@ -142,8 +143,8 @@
                                 </div>
                             </div>
 
-                            <div class="card-footer mt-auto cardFooter">
-                                <div class="d-inline-block d-flex cardFooter01">
+                            <div class="card-footer d-flex align-items-center companies-management-footer">
+                                <div class="d-flex align-items-center companies-management-actions company-details-actions">
                                     <button
                                         type="button"
                                         class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton">
@@ -177,3 +178,5 @@
 <script src="<%= script('common/sectionsVisible') %>"></script>
 <script src="<%= script('common/moveByEnter') %>"></script>
 <script src="<%= script('common/clearableInputs') %>"></script>
+
+</div>

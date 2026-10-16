@@ -1,0 +1,2362 @@
+{
+  "baseline": "ae67a5c30",
+  "catalog": [
+    {
+      "form": "Companies",
+      "formLabel": "Γενικά Στοιχεία",
+      "sidebarOrder": 1000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "Ypokatasthmata",
+      "formLabel": "Υποκαταστήματα",
+      "sidebarOrder": 2000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "NomimoiEkprosopoi",
+      "formLabel": "Νόμιμοι Εκπρόσωποι",
+      "sidebarOrder": 3000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "Passwords",
+      "formLabel": "Κωδικοί Πρόσβασης",
+      "sidebarOrder": 4000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "Antistoixiseis",
+      "formLabel": "Αντιστοιχίσεις Κ.Π.Κ.",
+      "sidebarOrder": 5000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "Trapezes",
+      "formLabel": "Τράπεζες Ανά Εταιρεία",
+      "sidebarOrder": 6000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "Ergazomenoi",
+      "formLabel": "Στοιχεία Εργαζομένων",
+      "sidebarOrder": 7000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "AntigrafhProgrammatonErgasias",
+      "formLabel": "Αντιγραφή Προγράμματος Από Έως Ημερ/νία",
+      "sidebarOrder": 8000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "LhpshOrarionApoErganh",
+      "formLabel": "ΜΗ Δανειζόμενων Εργαζόμενων",
+      "sidebarOrder": 9000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "LhpshProdhlomenonOrarionMonoDaneizomenon",
+      "formLabel": "ΜΟΝΟ Δανειζόμενων Εργαζόμενων",
+      "sidebarOrder": 9500,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "LhpshOrarionApoKartes",
+      "formLabel": "ΜΗ Δανειζόμενων Εργαζόμενων",
+      "sidebarOrder": 10000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "LhpshPshfiakonKartonMonoDaneizomenon",
+      "formLabel": "ΜΟΝΟ Δανειζόμενων Εργαζόμενων",
+      "sidebarOrder": 10500,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "CalcApasxolhseisPeriodoy",
+      "formLabel": "Υπολογισμός Απασχολήσεων Βάσει των Ψηφιακών Καρτών",
+      "sidebarOrder": 11000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "ElegxosApasxolhseonPeriodoy",
+      "formLabel": "Έλεγχος Απασχολήσεων",
+      "sidebarOrder": 12000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "ApologistikosPinakasOrarion",
+      "formLabel": "Απολογιστικός Πίνακας Ωραρίων",
+      "sidebarOrder": 13000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "ApologistikosPinakasYperorion",
+      "formLabel": "Απολογιστικός Πίνακας Υπερωριών",
+      "sidebarOrder": 14000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "KatastashElegxouApologistikouPinaka",
+      "formLabel": "Κατάσταση Ελέγχου Απολογιστικού Πίνακα",
+      "sidebarOrder": 14500,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "EktyposhOristikouApologistikouPinaka",
+      "formLabel": "Εκτύπωση Οριστικού Απολογιστικού Πίνακα",
+      "sidebarOrder": 14600,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "YpobolhAdeion",
+      "formLabel": "Υποβολή Αδειών",
+      "sidebarOrder": 14750,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "Krathseis",
+      "formLabel": "Κρατήσεις",
+      "sidebarOrder": 15000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "Symbaseis",
+      "formLabel": "Συμβάσεις",
+      "sidebarOrder": 16000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "KathgoriesSymbaseon",
+      "formLabel": "Κατηγορίες Συμβάσεων",
+      "sidebarOrder": 17000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "EidikothtesSymbaseon",
+      "formLabel": "Ειδικότητες Συμβάσεων",
+      "sidebarOrder": 18000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "StoixeiaSymbaseon",
+      "formLabel": "Στοιχεία Συμβάσεων",
+      "sidebarOrder": 19000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "KlimakiaSymbaseon",
+      "formLabel": "Κλιμάκια Συμβάσεων",
+      "sidebarOrder": 20000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "YpologismoiKlimakionSymbaseon",
+      "formLabel": "Υπολογισμός Κλιμακίων Συμβάσεων",
+      "sidebarOrder": 21000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "Apasxolhseis",
+      "formLabel": "Απασχολήσεις",
+      "sidebarOrder": 22000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "EktyposhAtomikonEkkathariseon",
+      "formLabel": "Αποδείξεις Μισθοδοσίας",
+      "sidebarOrder": 23000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "EktyposhSymbaseonErgazomenon",
+      "formLabel": "Εργαζόμενων",
+      "sidebarOrder": 24000,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "SynthrhshProgrammatosErgasias",
+      "formLabel": "Συντήρηση ωραρίων εργασίας",
+      "sidebarOrder": 100000,
+      "active": true,
+      "showInPrivileges": false
+    },
+    {
+      "form": "ExagoghOrarionSeErganh",
+      "formLabel": "Εξαγωγή Ωραρίων στο ΕΡΓΑΝΗ",
+      "sidebarOrder": 101000,
+      "active": true,
+      "showInPrivileges": false
+    }
+  ],
+  "templates": [
+    {
+      "template": "views/404.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "* (404)"
+        }
+      ],
+      "includes": [],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/admin/activeSessions.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/active-sessions"
+        }
+      ],
+      "includes": [],
+      "controls": 3,
+      "kind": "page"
+    },
+    {
+      "template": "views/admin/disconnectUsers.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/disconnect-users"
+        }
+      ],
+      "includes": [],
+      "controls": 3,
+      "kind": "page"
+    },
+    {
+      "template": "views/admin/uploadTemplates.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/api/admin/aws_s3"
+        }
+      ],
+      "includes": [],
+      "controls": 14,
+      "kind": "page"
+    },
+    {
+      "template": "views/admin/usageReport.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/usage-report"
+        }
+      ],
+      "includes": [],
+      "controls": 6,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/antistoixiseis/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis/add/:id"
+        },
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis/addFromNested/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 13,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/antistoixiseis/antistoixiseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/antistoixiseis/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 14,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/antistoixiseis/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/antistoixiseis/search"
+        },
+        {
+          "method": "post",
+          "path": "/companies/antistoixiseis/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/genikastoixeia/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/genikastoixeia/add"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/add/cardBodies/statheraStoixeia.ejs",
+        "views/companies/genikastoixeia/partials/add/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/add/cardBodies/drasthriothtes.ejs",
+        "views/companies/genikastoixeia/partials/add/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/add/cardBodies/texnikosAsfaleias.ejs",
+        "views/companies/genikastoixeia/partials/add/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/add/cardBodies/iatrosErgasias.ejs",
+        "views/companies/genikastoixeia/partials/add/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/add/cardBodies/logisths.ejs",
+        "views/companies/genikastoixeia/partials/add/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/add/cardBodies/diafora.ejs",
+        "views/companies/genikastoixeia/partials/add/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/add/cardBodies/emmesosErgodoths.ejs",
+        "views/companies/genikastoixeia/partials/add/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/add/cardBodies/diadoxosErgodoths.ejs",
+        "views/companies/genikastoixeia/partials/add/cardFooter.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/genikastoixeia/companies.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/genikastoixeia"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 4,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/genikastoixeia/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/genikastoixeia/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardBodies/statheraStoixeia.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardFooter1-2.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardBodies/drasthriothtes.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardFooter1-2.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardBodies/texnikosAsfaleias.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardBodies/iatrosErgasias.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardBodies/logisths.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardBodies/diafora.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardFooter1-2.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardBodies/emmesosErgodoths.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardFooter.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardBodies/diadoxosErgodoths.ejs",
+        "views/companies/genikastoixeia/partials/edit/cardFooter.ejs"
+      ],
+      "controls": 12,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardBodies/diadoxosErgodoths.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 11,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardBodies/diafora.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 21,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardBodies/drasthriothtes.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardBodies/emmesosErgodoths.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 13,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardBodies/iatrosErgasias.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 10,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardBodies/logisths.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 10,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardBodies/statheraStoixeia.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 28,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardBodies/texnikosAsfaleias.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 10,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardFooter.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 1,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/add/cardHeader.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardBodies/diadoxosErgodoths.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 12,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardBodies/diafora.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 21,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardBodies/drasthriothtes.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardBodies/emmesosErgodoths.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 13,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardBodies/iatrosErgasias.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 10,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardBodies/logisths.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 10,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardBodies/statheraStoixeia.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 27,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardBodies/texnikosAsfaleias.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 10,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardFooter.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardFooter1-2.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 1,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/partials/edit/cardHeader.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/companies/genikastoixeia/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/companies/genikastoixeia/search"
+        },
+        {
+          "method": "get",
+          "path": "/companies/genikastoixeia/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/nomimoi_ekprosopoi/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/nomimoi_ekprosopoi/add"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 38,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/nomimoi_ekprosopoi/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/nomimoi_ekprosopoi/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 42,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/nomimoi_ekprosopoi/nomimoi_ekprosopoi.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/nomimoi_ekprosopoi"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/nomimoi_ekprosopoi/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/nomimoi_ekprosopoi/search"
+        },
+        {
+          "method": "post",
+          "path": "/companies/nomimoi_ekprosopoi/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/passwords/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/passwords/add"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 8,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/passwords/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/passwords/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 9,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/passwords/passwords.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/passwords"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/passwords/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/passwords/search"
+        },
+        {
+          "method": "post",
+          "path": "/companies/passwords/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/trapezes/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/trapezes/add"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 11,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/trapezes/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/trapezes/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 14,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/trapezes/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/trapezes/search"
+        },
+        {
+          "method": "post",
+          "path": "/companies/trapezes/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/trapezes/trapezes.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/trapezes"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/ypokatasthmata/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/ypokatasthmata/add"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 46,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/ypokatasthmata/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/ypokatasthmata/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 56,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/ypokatasthmata/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/companies/ypokatasthmata/search"
+        },
+        {
+          "method": "get",
+          "path": "/companies/ypokatasthmata/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/companies/ypokatasthmata/ypokatasthmata.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/companies/ypokatasthmata"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/dates/appDate.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/dates/getAppDateForm"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/dates/periods.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/dates/getPeriodsForm"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/dates/yearInUse.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/dates/getYearsForm"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/ektyposeis/apasxolhseis/atomikesEkkathariseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ektyposeis/apasxolhseis/ektyposhApasxolhseon"
+        }
+      ],
+      "includes": [],
+      "controls": 10,
+      "kind": "page"
+    },
+    {
+      "template": "views/ektyposeis/symbaseis/symbaseisErgazomenon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon"
+        }
+      ],
+      "includes": [],
+      "controls": 7,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi/add"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section1.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/prosopikaStoixeia.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/stoixeiaProslhpshs.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/efka.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/dypa.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/kentraKostoys.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section2/apodoxes.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section3/krathseis.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section4/allodapoi.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section5/epaggelmatikhKatartish.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section6/diafora.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section8/orarioErgasias.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add_Oraria.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/employmentTableNavigation.ejs"
+      ],
+      "controls": 26,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section1.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/typoiMetabolon.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/prosopikaStoixeia.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/stoixeiaProslhpshs.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/efka.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/dypa.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/kentraKostoys.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section2/apodoxes.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section3/krathseis.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section4/allodapoi.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section5/epaggelmatikhKatartish.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section6/diafora.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section8/orarioErgasias.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit_6.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section2_8.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/employmentTableNavigation.ejs"
+      ],
+      "controls": 35,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/employment-profile-conflict.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi/edit/:id"
+        }
+      ],
+      "includes": [],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/ergazomenoi.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/employmentTableNavigation.ejs"
+      ],
+      "controls": 4,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/dypa.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 17,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/efka.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 41,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/kentraKostoys.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 4,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/prosopikaStoixeia.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 46,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs",
+      "routes": [],
+      "includes": [
+        "views/ergazomenoi/ergazomenoi/partials/employmentProfileBreakRows.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/employmentProfileArrangementRows.ejs"
+      ],
+      "controls": 45,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/stoixeiaProslhpshs.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 45,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section2/apodoxes.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 17,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section3/krathseis.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 10,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section4/allodapoi.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 16,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section5/epaggelmatikhKatartish.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 16,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section6/diafora.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 23,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section8/orarioErgasias.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 3,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 3,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardFooters/cardFooter_Add_Oraria.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section1.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 5,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section2_8.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/dypa.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 18,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/efka.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 41,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/kentraKostoys.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 4,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/prosopikaStoixeia.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 46,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/stoixeiaApasxolhshs.ejs",
+      "routes": [],
+      "includes": [
+        "views/ergazomenoi/ergazomenoi/partials/employmentProfileBreakRows.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/employmentProfileArrangementRows.ejs"
+      ],
+      "controls": 45,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/stoixeiaProslhpshs.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 52,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/typoiMetabolon.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 6,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section2/apodoxes.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 25,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section3/krathseis.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 14,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section4/allodapoi.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 16,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section5/epaggelmatikhKatartish.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 16,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section6/diafora.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 23,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 17,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section8/orarioErgasias.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 3,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 3,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardFooters/cardFooter_Edit_6.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section1.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 4,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section2_8.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/employmentProfileArrangementRows.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 8,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/employmentProfileBreakRows.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 6,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/employmentTableNavigation.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/ergazomenoi/search"
+        },
+        {
+          "method": "post",
+          "path": "/ergazomenoi/ergazomenoi/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/ergazomenoi/ergazomenoi/partials/employmentTableNavigation.ejs"
+      ],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/antigrafhProgrammatonErgasias.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/antigrafhProgrammaton"
+        }
+      ],
+      "includes": [],
+      "controls": 21,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/apologistikosPinakasOrarion.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/apologistikosPinakasOrarion"
+        }
+      ],
+      "includes": [],
+      "controls": 10,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/apologistikosPinakasYperorion.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/apologistikosPinakasYperorion"
+        }
+      ],
+      "includes": [],
+      "controls": 6,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/calcApasxolhseisPeriodoy.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/calcApasxolhseisPeriodoy"
+        }
+      ],
+      "includes": [],
+      "controls": 15,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka"
+        }
+      ],
+      "includes": [],
+      "controls": 5,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy"
+        }
+      ],
+      "includes": [],
+      "controls": 43,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/exagoghOrarionSeErganh.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/exagoghOrarionSeErganh"
+        }
+      ],
+      "includes": [],
+      "controls": 9,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/katastashElegxouApologistikouPinaka.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/katastashElegxouApologistikouPinaka"
+        }
+      ],
+      "includes": [],
+      "controls": 5,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/lhpshOrarionApoErganh.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/lhpshOrarionApoErganh"
+        }
+      ],
+      "includes": [],
+      "controls": 9,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/lhpshOrarionApoKartes.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/lhpshOrarionApoKartes"
+        }
+      ],
+      "includes": [],
+      "controls": 10,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/lhpshProdhlomenonOrarionMonoDaneizomenon"
+        }
+      ],
+      "includes": [],
+      "controls": 8,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/lhpshPshfiakonKartonMonoDaneizomenon"
+        }
+      ],
+      "includes": [],
+      "controls": 8,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/programmaErgasias.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/programmaErgasias"
+        }
+      ],
+      "includes": [],
+      "controls": 32,
+      "kind": "page"
+    },
+    {
+      "template": "views/ergazomenoi/programmata/ypovoliAdeion.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/ergazomenoi/programmata/ypovoliAdeion"
+        }
+      ],
+      "includes": [],
+      "controls": 6,
+      "kind": "page"
+    },
+    {
+      "template": "views/home.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/"
+        }
+      ],
+      "includes": [
+        "views/partials/flash.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/index.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/partials/flash.ejs"
+      ],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/kinhseis/adeies/cardBody_Adeies.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 30,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/adeies/cardFooter_Adeies.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/adeies/cardHeader_Adeies.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/apasxolhseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/kinhseis/apasxolhseis"
+        }
+      ],
+      "includes": [
+        "views/kinhseis/apasxolhseis/cardHeader_Apasxolhseis.ejs",
+        "views/kinhseis/apasxolhseis/payrollPhasesPanel.ejs",
+        "views/kinhseis/apasxolhseis/cardBody_Apasxolhseis.ejs",
+        "views/kinhseis/apasxolhseis/cardFooter_Apodoxes.ejs",
+        "views/kinhseis/krathseis/cardHeader_Krathseis.ejs",
+        "views/kinhseis/krathseis/cardBody_Krathseis.ejs",
+        "views/kinhseis/krathseis/cardFooter_Krathseis.ejs",
+        "views/kinhseis/foroi/cardHeader_Foroi.ejs",
+        "views/kinhseis/foroi/cardBody_Foroi.ejs",
+        "views/kinhseis/foroi/cardFooter_Foroi.ejs",
+        "views/kinhseis/astheneia/cardHeader_Astheneia.ejs",
+        "views/kinhseis/astheneia/cardBody_Astheneia.ejs",
+        "views/kinhseis/astheneia/cardFooter_Astheneia.ejs",
+        "views/kinhseis/adeies/cardHeader_Adeies.ejs",
+        "views/kinhseis/adeies/cardBody_Adeies.ejs",
+        "views/kinhseis/adeies/cardFooter_Adeies.ejs",
+        "views/kinhseis/diafora/cardHeader_Diafora.ejs",
+        "views/kinhseis/diafora/cardBody_Diafora.ejs",
+        "views/kinhseis/diafora/cardFooter_Diafora.ejs"
+      ],
+      "controls": 32,
+      "kind": "page"
+    },
+    {
+      "template": "views/kinhseis/apasxolhseis/cardBody_Apasxolhseis.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 87,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/apasxolhseis/cardFooter_Apodoxes.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/apasxolhseis/cardHeader_Apasxolhseis.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 22,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/apasxolhseis/payrollPhasesPanel.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 1,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/astheneia/cardBody_Astheneia.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 30,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/astheneia/cardFooter_Astheneia.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/astheneia/cardHeader_Astheneia.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/cardFooter.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "unreferenced"
+    },
+    {
+      "template": "views/kinhseis/diafora/cardBody_Diafora.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/diafora/cardFooter_Diafora.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/diafora/cardHeader_Diafora.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/employeeInfo.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "unreferenced"
+    },
+    {
+      "template": "views/kinhseis/foroi/cardBody_Foroi.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 12,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/foroi/cardFooter_Foroi.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/foroi/cardHeader_Foroi.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/krathseis/cardBody_Krathseis.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 8,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/krathseis/cardFooter_Krathseis.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/kinhseis/krathseis/cardHeader_Krathseis.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/krathseis/genika/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/genika/add"
+        }
+      ],
+      "includes": [],
+      "controls": 85,
+      "kind": "page"
+    },
+    {
+      "template": "views/krathseis/genika/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/genika/edit/:id"
+        }
+      ],
+      "includes": [],
+      "controls": 86,
+      "kind": "page"
+    },
+    {
+      "template": "views/krathseis/krathseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/krathseis"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 3,
+      "kind": "page"
+    },
+    {
+      "template": "views/krathseis/pososta/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/pososta/add"
+        }
+      ],
+      "includes": [],
+      "controls": 16,
+      "kind": "page"
+    },
+    {
+      "template": "views/krathseis/pososta/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/posostaKrathseon/edit/:id"
+        }
+      ],
+      "includes": [],
+      "controls": 17,
+      "kind": "page"
+    },
+    {
+      "template": "views/krathseis/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/krathseis/search"
+        },
+        {
+          "method": "post",
+          "path": "/krathseis/search"
+        }
+      ],
+      "includes": [],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/layouts/main.ejs",
+      "routes": [],
+      "includes": [
+        "views/partials/header.ejs",
+        "views/partials/sidebar.ejs",
+        "views/partials/footer.ejs"
+      ],
+      "controls": 0,
+      "kind": "layout"
+    },
+    {
+      "template": "views/login/change_password.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login/change_password"
+        },
+        {
+          "method": "post",
+          "path": "/login/change_password/changepassword"
+        }
+      ],
+      "includes": [
+        "views/partials/flash.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 5,
+      "kind": "page"
+    },
+    {
+      "template": "views/login/login.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login"
+        },
+        {
+          "method": "post",
+          "path": "/register/userRegistration"
+        },
+        {
+          "method": "post",
+          "path": "/login/userLogin"
+        }
+      ],
+      "includes": [
+        "views/partials/flash.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 3,
+      "kind": "page"
+    },
+    {
+      "template": "views/login/logout.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login/logout"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/login/logoutModal.ejs",
+      "routes": [],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 2,
+      "kind": "unreferenced"
+    },
+    {
+      "template": "views/login/register.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/register"
+        },
+        {
+          "method": "post",
+          "path": "/register/userRegistration"
+        }
+      ],
+      "includes": [
+        "views/partials/flash.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/partials/flash.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 29,
+      "kind": "page"
+    },
+    {
+      "template": "views/login/reset_password.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/reset_password"
+        }
+      ],
+      "includes": [
+        "views/partials/flash.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/login/set_new_password.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login/reset_old_password/:uid/:token"
+        },
+        {
+          "method": "post",
+          "path": "/login/reset_old_password/:uid/:token"
+        }
+      ],
+      "includes": [
+        "views/partials/flash.ejs",
+        "views/partials/_csrfField.ejs",
+        "views/partials/flash.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 8,
+      "kind": "page"
+    },
+    {
+      "template": "views/login/verify_email.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/login/verify-email"
+        }
+      ],
+      "includes": [
+        "views/partials/flash.ejs",
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/mainapp.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/mainapp"
+        }
+      ],
+      "includes": [],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/partials/_csrfField.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 1,
+      "kind": "partial"
+    },
+    {
+      "template": "views/partials/checks/checkAfm.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "unreferenced"
+    },
+    {
+      "template": "views/partials/checks/checkLogin.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "unreferenced"
+    },
+    {
+      "template": "views/partials/flash.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 1,
+      "kind": "partial"
+    },
+    {
+      "template": "views/partials/footer.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/partials/header.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/partials/modalDelete.ejs",
+      "routes": [],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 2,
+      "kind": "partial"
+    },
+    {
+      "template": "views/partials/sidebar.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 6,
+      "kind": "partial"
+    },
+    {
+      "template": "views/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/admin/search"
+        },
+        {
+          "method": "get",
+          "path": "/admin/search"
+        }
+      ],
+      "includes": [],
+      "controls": 2,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/eidikothtes/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/eidikothtes/add/:kodikosSymbashs_Kathgorias"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 6,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/eidikothtes/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/eidikothtes/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 6,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/eidikothtes/eidikothtes.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/eidikothtes"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 6,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/eidikothtes/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/eidikothtes/search"
+        },
+        {
+          "method": "post",
+          "path": "/symbaseis/eidikothtes/search/:kodikos_symbashs_kathgorias"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/kathgories/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/kathgories/add/:kodikosSymbashs"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 5,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/kathgories/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/kathgories/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 6,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/kathgories/kathgories.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/kathgories"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 4,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/kathgories/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/symbaseis/kathgories/search/:symbash"
+        },
+        {
+          "method": "get",
+          "path": "/symbaseis/kathgories/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/klimakia/klimakiaSymbaseon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/klimakia"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 13,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/stoixeiaSymbaseon/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/stoixeiaSymbaseon/add/:kodikosSymbashs_Kathgorias_Eidikothtas"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 12,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/stoixeiaSymbaseon/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/stoixeiaSymbaseon/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 12,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/stoixeiaSymbaseon/search.ejs",
+      "routes": [
+        {
+          "method": "post",
+          "path": "/symbaseis/stoixeiaSymbaseon/search/:kodikos_symbashs_kathgorias_eidikothtas"
+        },
+        {
+          "method": "get",
+          "path": "/symbaseis/stoixeiaSymbaseon/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/stoixeiaSymbaseon/stoixeiaSymbaseon.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/stoixeiaSymbaseon"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 8,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/symbaseis/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/symbaseis/add"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 3,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/symbaseis/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/symbaseis/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 4,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/symbaseis/search.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/symbaseis/search"
+        },
+        {
+          "method": "post",
+          "path": "/symbaseis/symbaseis/search"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 0,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/symbaseis/symbaseis.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/symbaseis"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/symbaseis/ypologismoiKlimakion/ypologismoiKlimakion.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/symbaseis/ypologismoiKlimakion"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 16,
+      "kind": "page"
+    },
+    {
+      "template": "views/users/add.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/add"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 12,
+      "kind": "page"
+    },
+    {
+      "template": "views/users/delete.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/delete/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs"
+      ],
+      "controls": 1,
+      "kind": "page"
+    },
+    {
+      "template": "views/users/dikaiomataXrhston.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/user-privileges"
+        }
+      ],
+      "includes": [],
+      "controls": 4,
+      "kind": "page"
+    },
+    {
+      "template": "views/users/edit.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/edit/:id"
+        }
+      ],
+      "includes": [
+        "views/partials/_csrfField.ejs",
+        "views/partials/modalDelete.ejs"
+      ],
+      "controls": 14,
+      "kind": "page"
+    },
+    {
+      "template": "views/users/view.ejs",
+      "routes": [
+        {
+          "method": "get",
+          "path": "/admin/view/:id"
+        }
+      ],
+      "includes": [],
+      "controls": 11,
+      "kind": "page"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
-<section class="container-fluid mt-4" aria-labelledby="disconnectUsersTitle">
-    <div class="card z-depth-5">
+<section class="disconnect-users-page" aria-labelledby="disconnectUsersTitle">
+    <div class="card z-depth-5 disconnect-users-card">
         <header class="card-header bg-header text-center">
             <h1 id="disconnectUsersTitle" class="h4 mb-0">Αποσύνδεση Χρηστών</h1>
         </header>
-        <form id="disconnectUsersForm" action="/admin/disconnect-users" method="post" class="card-body">
+        <form id="disconnectUsersForm" action="/admin/disconnect-users" method="post" class="disconnect-users-form">
+            <div class="card-body">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
             <label for="disconnectUsersTarget" class="form-label">Χρήστης</label>
             <select id="disconnectUsersTarget" name="userId" class="form-select" required <%= users.length ? '' : 'disabled' %>>
@@ -15,11 +16,14 @@
             <p id="disconnectUsersStatus" class="mt-3" role="status" aria-live="polite">
                 <%= users.length ? '' : 'Δεν υπάρχουν άλλοι ενεργοί χρήστες.' %>
             </p>
+            </div>
+            <div class="card-footer disconnect-users-footer">
             <div class="d-flex gap-2 mt-3">
                 <button id="disconnectUsersSubmit" type="submit" class="btn btn-brown rounded-4" <%= users.length ? '' : 'disabled' %>>
                     Αποσύνδεση
                 </button>
                 <a href="/mainapp" class="btn btn-brown rounded-4">Επιστροφή</a>
+            </div>
             </div>
         </form>
     </div>

@@ -11,9 +11,13 @@ const { stableStringify } = require('./apasxoliseisStage3FingerprintService');
 const { resolveDailyActualWorkFacts } = require('./apasxoliseisDailyActualWorkFactsService');
 const { normalizeEmploymentType, resolveNoWorkDaySemanticForDate } = require(
     './apasxoliseisReviewEmploymentProfileService');
+const { findStage1PeriodSlice, periodSliceKey, resolveStage1PeriodSliceStatus } = require(
+    './apasxoliseisStage1PeriodSliceService');
 const { writeCanonicalDailyClassification, planCanonicalDailyClassification } = require(
     './apasxoliseisCanonicalDailyClassificationWriterService'
 );
+
+const { resolveReviewRestState } = require('./apasxoliseisReviewRestStateService');
 
 const ACTION = 'STAGE2_COMPLETED';
 const WORKFLOW_VERSION = 'weekly-hr-workflow:v1';
@@ -79,6 +83,11 @@ function inspectAutomaticMaterialization(context = {}) {
                 fail('STAGE2_UNSAFE_RESOLUTION_ITEM',
                     'Το Stage 2 επέστρεψε μη ασφαλές automatic resolution.', 409);
             }
+            const slice = context.lifecycle?.stages?.stage1?.period_slice;
+            if (slice && !(slice.actionable_dates || []).includes(date)) {
+                fail('STAGE2_UNSAFE_RESOLUTION_ITEM',
+                    'Η προτεινόμενη ημέρα δεν ανήκει στο εγκεκριμένο τμήμα περιόδου.', 409);
+            }
             if (stage3Pending.has(date)) fail('STAGE2_DATE_MOVED_TO_STAGE3',
                 'Η ημέρα αποτελεί πλέον εκκρεμότητα του Stage 3.', 409);
             const semantic = resolveNoWorkDaySemanticForDate({ date,
@@ -101,6 +110,12 @@ function inspectAutomaticMaterialization(context = {}) {
             }
             const current = currentCanonicalState(row, facts);
             const intendedUpdates = planCanonicalDailyClassification({ row, classification });
+            if (classification === 'REST_REPO' && !rowMatchesUpdates(row, intendedUpdates) &&
+                resolveReviewRestState(row)
+                    .status !== 'VALID_DECLARED_REST') {
+                fail('UNCONFIRMED_WEEKLY_REST_DATES',
+                    'Η ημέρα χρειάζεται ρητή απόφαση προσωπικού πριν χαρακτηριστεί ως ρεπό.', 409);
+            }
             const itemState = stableStringify(current) ===
                 stableStringify(EXPECTED_INITIAL_CANONICAL_STATE)
                 ? AUTOMATIC_INSPECTION.READY_TO_MATERIALIZE
@@ -160,6 +175,23 @@ function querySession(query, session) {
     return session && query?.session ? query.session(session) : query;
 }
 
+function stage1AttestationForStage2(context = {}, stage1 = {}) {
+    const projected = context.lifecycle?.stages?.stage1 || {};
+    const fingerprint = text(context.upstream?.stage1_current_fingerprint);
+    if (!fingerprint) return null;
+    if (projected.attestation_scope === 'PERIOD_SLICE') {
+        const slice = projected.period_slice;
+        const persisted = findStage1PeriodSlice(stage1, slice?.period_start, slice?.period_end);
+        if (resolveStage1PeriodSliceStatus({ persisted_slice: persisted,
+            current_context_fingerprint: projected.current_context_fingerprint,
+            current_completion_fingerprint: fingerprint }) !== 'COMPLETED') return null;
+        return { scope: 'PERIOD_SLICE', slice: persisted };
+    }
+    return stage1.status === 'COMPLETED' &&
+        text(stage1.effective_fingerprint || stage1.completion_fingerprint) === fingerprint
+        ? { scope: 'WEEKLY' } : null;
+}
+
 async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
     reason_or_notes, request_id, transactionRunner, loadFreshContext, loadPostWriteContext,
     writeDaily = writeCanonicalDailyClassification, stateModel = StateModel,
@@ -201,9 +233,8 @@ async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
             ypokatasthma: fresh.scope.ypokatasthma, employee_id: fresh.scope.employee_id,
             week_start: fresh.scope.week_start, week_end: fresh.scope.week_end };
         const current = await querySession(stateModel.findOne(filter), session).lean();
-        if (!current?.stage1 || current.stage1.status !== 'COMPLETED' ||
-            text(current.stage1.effective_fingerprint || current.stage1.completion_fingerprint) !==
-                text(fresh.upstream?.stage1_current_fingerprint)) {
+        const attestation = stage1AttestationForStage2(fresh, current?.stage1);
+        if (!attestation) {
             fail('STAGE2_UPSTREAM_STAGE1_STALE', 'Το Stage 1 δεν είναι authoritative.', 409);
         }
         const previous = current.stage2 || { status: 'OPEN', completion_fingerprint: '', version: 0 };
@@ -223,8 +254,19 @@ async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
             completed_at: performedAt, completed_by_user_id: actor.user_id,
             completed_by_user_name: actor.user_name, completed_by_user_role: actor.role,
             reason_or_notes: reason, version: nextVersion };
-        const rebasedStage1 = { ...current.stage1, effective_fingerprint: postStage1Fingerprint,
+        const rebasedStage1 = { ...current.stage1,
             version: Number(current.stage1.version || 0) + 1 };
+        if (attestation.scope === 'PERIOD_SLICE') {
+            const postContextFingerprint = text(post.lifecycle?.stages?.stage1
+                ?.current_context_fingerprint);
+            if (!postContextFingerprint) fail('STAGE2_POST_WRITE_FINGERPRINT_MISSING',
+                'Δεν υπολογίστηκε το αποτύπωμα της εβδομάδας μετά την ενημέρωση.', 409);
+            rebasedStage1.period_slices = current.stage1.period_slices.map(slice =>
+                periodSliceKey(slice) === periodSliceKey(attestation.slice)
+                    ? { ...slice, context_fingerprint: postContextFingerprint,
+                        effective_fingerprint: postStage1Fingerprint,
+                        version: Number(slice.version || 0) + 1 } : slice);
+        } else rebasedStage1.effective_fingerprint = postStage1Fingerprint;
         const stage2Filter = current.stage2 ? { 'stage2.version': Number(previous.version || 0) }
             : { 'stage2.version': { $exists: false } };
         const persistedIdentity = { team: current.team, company_kod: current.company_kod,
@@ -259,5 +301,6 @@ async function completeWeeklyHrWorkflowStage2({ initialContext, actor: rawActor,
 }
 
 module.exports = { ACTION, AUTOMATIC_INSPECTION, effectiveProfileSignature,
+    stage1AttestationForStage2,
     inspectAutomaticMaterialization, buildWeeklyHrStage2FingerprintInput,
     normalizeItems, fingerprint, completeWeeklyHrWorkflowStage2 };

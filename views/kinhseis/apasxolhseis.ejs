@@ -76,7 +76,9 @@
 
                             <div class="card-body apx-csp-style-005" >
 
-                                <%- include('./krathseis/cardBody_Krathseis') %>
+                                <div class="payroll-entry-table" role="group" aria-label="Πίνακας κρατήσεων">
+                                    <%- include('./krathseis/cardBody_Krathseis') %>
+                                </div>
 
                             </div>
 
@@ -96,7 +98,9 @@
 
                             <div class="card-body overflow-auto flex-grow-1 apx-csp-style-007" >
 
-                                <%- include('./foroi/cardBody_Foroi') %>
+                                <div class="payroll-entry-table" role="group" aria-label="Ετήσια και μηνιαία ποσά φόρων">
+                                    <%- include('./foroi/cardBody_Foroi') %>
+                                </div>
 
                             </div>
 
@@ -123,7 +127,9 @@
                                 <input type="hidden" name="hmeromhnia_arxhs_epomenoy_ergasiakoy_etoys" id="hmeromhnia_arxhs_epomenoy_ergasiakoy_etoys" value="" />
                                 <input type="hidden" name="hmeromhnia_teloys_epomenoy_ergasiakoy_etoys" id="hmeromhnia_teloys_epomenoy_ergasiakoy_etoys" value="" />
 
-                                <%- include('./astheneia/cardBody_Astheneia') %>
+                                <div class="payroll-entry-table" role="group" aria-label="Πίνακας ασθενειών">
+                                    <%- include('./astheneia/cardBody_Astheneia') %>
+                                </div>
 
                             </div>
 
@@ -146,7 +152,9 @@
 
                                 <input type="hidden" name="arithmos_grammon_adeion" id="arithmos_grammon_adeion" value="<%= arithmos_grammon_adeion %>" />
 
-                                <%- include('./adeies/cardBody_Adeies') %>
+                                <div class="payroll-entry-table" role="group" aria-label="Πίνακας αδειών">
+                                    <%- include('./adeies/cardBody_Adeies') %>
+                                </div>
 
                             </div>
 

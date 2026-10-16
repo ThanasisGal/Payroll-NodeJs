@@ -2,8 +2,11 @@
 
 // Pure presentation projection. It coordinates existing authoritative resolvers and never writes.
 
+const { resolveReviewRestState } = require('./apasxoliseisReviewRestStateService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
+const { diagnostic, analysisDiagnostics } = require('./apasxoliseisReviewDiagnosticService');
 const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
+const { assessWeeklyRestEvidence } = require('./apasxoliseisWeeklyRestEvidenceService');
 const { isPossibleLeave } = require('./apasxoliseisLeaveProvenanceService');
 const {
     deriveStoredStage1Decisions,
@@ -145,7 +148,7 @@ function stageResult(stage, values = {}) {
     return Object.freeze({ stage, business_status: BUSINESS_STATUS.COMPLETED,
         presentation_status: PRESENTATION_STATUS.COMPLETED, pending_count: 0,
         pending_dates: Object.freeze([]), pending_reasons: Object.freeze([]),
-        blockers: Object.freeze([]), ...values });
+        blockers: Object.freeze([]), diagnostics: Object.freeze([]), ...values });
 }
 
 function resolveStage3ActionableDates({
@@ -202,7 +205,10 @@ function resolveSafeNonFullNonWorkDates(options = {}) {
 }
 
 function resolveSafeFullTimeRestDates(options = {}) {
-    return resolveSafeNoWorkDatesForClassification({ ...options, classification: 'REST_REPO' });
+    // Employment terms determine the kind of rest, not whether rest happened.
+    return resolveSafeNoWorkDatesForClassification({ ...options, classification: 'REST_REPO' })
+        .filter(date => resolveReviewRestState((options.rows || []).find(row =>
+            dateKeyUtc(row.hmeromhnia) === date)).status === 'VALID_DECLARED_REST');
 }
 
 function buildStage1NoClassificationPreviewItems({
@@ -289,11 +295,11 @@ function buildWeeklyHrLifecycleProjection({
     companySettings = {}
 } = {}) {
     const rows = Array.isArray(weekRows) ? weekRows : [];
-    const fingerprintRows = rows.map((row) =>
-        Object.prototype.hasOwnProperty.call(row || {}, 'kathgoria_ergasias_original')
-            ? { ...row, kathgoria_ergasias: row.kathgoria_ergasias_original }
-            : row
-    );
+    const fingerprintRows = rows.map((row) => ({ ...row,
+        ...Object.fromEntries(['kathgoria_ergasias', 'kathgoria_ergasias_apologistika',
+            'repo_apologistika'].filter(field => Object.prototype.hasOwnProperty.call(
+            row || {}, `${field}_original`)).map(field => [field, row[`${field}_original`]]))
+    }));
     const fingerprint = buildStage1Fingerprint(fingerprintRows, { companySettings }).fingerprint;
     const boundary = deriveDeferredWeekScope({ scope, periodScope, employmentDateScope });
     if (isDeferredWeekPending({ boundary })) {
@@ -341,20 +347,26 @@ function buildWeeklyHrLifecycleProjection({
             // period's deferred slice. Missing audit evidence still fails closed.
             ...(persistedStage2DecisionState || stage3DecisionInThisPeriod
                 ? ['EXISTING_WEEKLY_DECISION_REQUIRES_FULL_WEEK_VALIDATION'] : [])]);
-        const stale = persistedStatus === BUSINESS_STATUS.STALE;
-        const hasBlocker = stale || blockers.length > 0;
+        // A new read evaluates today's evidence. An obsolete attestation remains
+        // metadata, not a concurrent-write conflict or a new business blocker.
+        const hasBlocker = blockers.length > 0;
         const stages = Object.fromEntries(['stage1', 'stage2', 'stage3', 'stage4'].map((key, index) => {
             const activeBlocker = (index === 0 || index === 3) && hasBlocker;
             const stage2Diagnostics = index === 1 && stage2StateDiagnostic
                 ? [stage2StateDiagnostic] : [];
             return [key, stageResult(`STAGE${index + 1}`, {
-                business_status: activeBlocker ? (stale ? BUSINESS_STATUS.STALE : BUSINESS_STATUS.BLOCKED)
+                business_status: activeBlocker ? BUSINESS_STATUS.BLOCKED
                     : DEFERRED_WEEK_STATUS,
-                presentation_status: activeBlocker ? (stale ? 'STALE' : 'BLOCKED') : DEFERRED_WEEK_STATUS,
+                presentation_status: activeBlocker ? 'BLOCKED' : DEFERRED_WEEK_STATUS,
                 enabled: activeBlocker && index === 0, open_by_default: activeBlocker && index === 0,
                 pending_count: activeBlocker ? Math.max(1, blockers.length) : 0,
                 pending_reasons: activeBlocker ? blockers : stage2Diagnostics,
                 blockers: activeBlocker ? blockers : stage2Diagnostics,
+                diagnostics: Object.freeze(activeBlocker ? [
+                    ...(workflow.blocking_details || []),
+                    ...blockers.filter(code => !(workflow.blocking_reasons || []).includes(code))
+                        .map(code => diagnostic(code))
+                ] : stage2Diagnostics.map(code => diagnostic(code))),
                 persisted_status: index === 0 ? persistedStatus : 'OPEN',
                 ...(index === 0 ? { attestation_scope: 'PERIOD_SLICE', period_slice: slice,
                     current_fingerprint: fingerprint,
@@ -421,12 +433,12 @@ function buildWeeklyHrLifecycleProjection({
     const stage1PendingDates = possibleLeaveDates(rows)
         .filter((date) => !actionableDateSet || actionableDateSet.has(date));
     const stage1Blockers = unique(stage1Workflow.blocking_reasons || []);
-    const stage1BusinessStatus = persistedStatus === BUSINESS_STATUS.STALE
-        ? BUSINESS_STATUS.STALE
-        : persistedStatus === BUSINESS_STATUS.COMPLETED
-            ? BUSINESS_STATUS.COMPLETED
-            : stage1Blockers.length
-                ? BUSINESS_STATUS.BLOCKED
+    // Preserve the stored attestation and its fingerprint for write fences,
+    // while deriving actionable status from freshly loaded daily evidence.
+    const stage1BusinessStatus = persistedStatus === BUSINESS_STATUS.COMPLETED
+        ? BUSINESS_STATUS.COMPLETED
+        : stage1Blockers.length
+            ? BUSINESS_STATUS.BLOCKED
             : stage1PendingDates.length
                 ? BUSINESS_STATUS.OPEN
                 : BUSINESS_STATUS.COMPLETED;
@@ -456,7 +468,8 @@ function buildWeeklyHrLifecycleProjection({
                 ? ['POSSIBLE_LEAVE_REQUIRES_HR_CLASSIFICATION'] : []),
             ...stage1Blockers
         ])),
-        blockers: Object.freeze(stage1Blockers)
+        blockers: Object.freeze(stage1Blockers),
+        diagnostics: Object.freeze(stage1Workflow.blocking_details || [])
     });
 
     const stage1ResolvedRows = resolverRowsFromStoredDecisions(rows, decisions);
@@ -564,6 +577,11 @@ function buildWeeklyHrLifecycleProjection({
             ...stage2Diagnostics
         ]) : []),
         blockers: Object.freeze(stage2Blockers),
+        diagnostics: Object.freeze(unique([...stage2Blockers,
+            ...(stage2PendingCount ? repoReasons : [])]).map(code => diagnostic(code,
+            code.startsWith('SOURCE_') ? [repoTransfer.source?.hmeromhnia]
+                : code.startsWith('TARGET_') ? [repoTransfer.target?.hmeromhnia]
+                    : stage2CandidateDates))),
         stage2_applicability: stage2ActionableForScope
             ? 'ACTIONABLE' : 'NOT_APPLICABLE',
         workflow_requested_stage2: workflowRequestedStage2,
@@ -597,19 +615,25 @@ function buildWeeklyHrLifecycleProjection({
         ...stage2ResolvedDates,
         ...fullTimeResolvedDates,
         ...nonFullResolvedDates
-    ]).filter((date) => date !== rejectedTargetDate).sort();
+    ]).filter((date) => date !== rejectedTargetDate &&
+        (!actionableDateSet || actionableDateSet.has(date))).sort();
     const stage2AutomaticResolutionItems = stage2AutomaticResolvedDates.map((date) =>
         Object.freeze({ date,
             classification: nonFullResolvedDates.includes(date) ? 'NON_WORK' : 'REST_REPO',
             reason: nonFullResolvedDates.includes(date)
                 ? 'STAGE1_REVIEWED_NON_FULL_WITHOUT_ACTUAL_WORK'
                 : 'DETERMINISTIC_STAGE2_REPO_RESOLUTION' }));
-    const authoritativeWeeklyRestDates = unique(stage1ResolvedRows.filter((row) =>
-        row.repo_apologistika === true ||
-        String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΑΝ')
-        .map((row) => dateKeyUtc(row.hmeromhnia))).sort();
-    const unresolvedRepoCount = Number(afterStage1.unresolved_repo_count);
-    const weeklyRestAlreadySatisfied = Number.isFinite(unresolvedRepoCount) &&
+    const restEvidence = assessWeeklyRestEvidence({ rows,
+        effectiveProfile, effectiveProfilesByDate, expectedDateKeys,
+        actionableDates: actionableDateSet ? [...actionableDateSet] : null,
+        companySettings, workflow: afterStage1 });
+    const humanRestDecisionPending = restEvidence.candidate_dates.length > 0 &&
+        !stage2ResolvedByDecision && stage2.business_status === BUSINESS_STATUS.COMPLETED;
+    const stage2DecisionStatus = humanRestDecisionPending
+        ? BUSINESS_STATUS.OPEN : stage2.business_status;
+    const authoritativeWeeklyRestDates = unique(restEvidence.recognized_dates).sort();
+    const unresolvedRepoCount = afterStage1.unresolved_repo_count;
+    const weeklyRestAlreadySatisfied = Number.isInteger(unresolvedRepoCount) &&
         unresolvedRepoCount === 0 && authoritativeWeeklyRestDates.length > 0;
     const stage3Dates = resolveStage3ActionableDates({
         rawRemainingDates: unique([
@@ -623,10 +647,10 @@ function buildWeeklyHrLifecycleProjection({
     const remainingDates = stage3Dates.actionable
         .filter((date) => !actionableDateSet || actionableDateSet.has(date));
     const stage2Fingerprint = buildStage2ResolutionFingerprint({
-        status: stage2.business_status,
+        status: stage2DecisionStatus,
         resolution: stage2.stage2_applicability,
         resolved_dates: stage2AutomaticResolvedDates,
-        reasons: stage2.repo_transfer_reasons
+        reasons: stage2.repo_transfer_reasons, rest_evidence: restEvidence
     });
     const stage3Scope = { team: scope.team || rows[0]?.team,
         company_kod: scope.company_kod || rows[0]?.company_kod,
@@ -648,7 +672,7 @@ function buildWeeklyHrLifecycleProjection({
         );
         const context = { scope: stage3Scope, row, dailyProfile, actualFacts,
             isResidual: true, remaining_dates: remainingDates,
-            stage2: { fingerprint: stage2Fingerprint, status: stage2.business_status,
+            stage2: { fingerprint: stage2Fingerprint, status: stage2DecisionStatus,
                 resolution: stage2.stage2_applicability,
                 resolved_dates: stage3FingerprintResolvedDates({
                     stage2_automatic_resolved_dates: stage2AutomaticResolvedDates }) },
@@ -691,11 +715,17 @@ function buildWeeklyHrLifecycleProjection({
                     weeklyRestAlreadySatisfied ? authoritativeWeeklyRestDates : []),
                 current_period_writable: authoritativeDates.has(date),
                 context_only: contextOnlyDates.has(date),
+                weekly_rest_required_count: restEvidence.required_count,
+                weekly_rest_recognized_count: restEvidence.recognized_count,
+                weekly_rest_missing_count: restEvidence.missing_count,
+                weekly_rest_candidate_dates: Object.freeze(restEvidence.candidate_dates),
+                weekly_rest_decision_reason: restEvidence.reason,
                 final_human_decision_required: true
             }),
             allowed_classifications: Object.freeze(
                 semantic.classification === 'REST_REPO'
-                ? ['LEAVE', 'SICKNESS', 'ABSENCE']
+                ? ['LEAVE', 'SICKNESS', 'ABSENCE',
+                    ...(restEvidence.confirmable_dates.includes(date) && date !== rejectedTargetDate ? ['REST_REPO'] : [])]
                 : semantic.classification === 'NON_WORK'
                     ? ['LEAVE', 'SICKNESS', 'ABSENCE', 'NON_WORK'] : []),
             input_fingerprint: buildStage3InputFingerprint(context).fingerprint,
@@ -721,13 +751,15 @@ function buildWeeklyHrLifecycleProjection({
         stage2_automatic_resolved_dates: Object.freeze(stage2AutomaticResolvedDates),
         stage2_automatic_resolution_items: Object.freeze(stage2AutomaticResolutionItems),
         stage2_non_full_non_work_dates: Object.freeze(nonFullResolvedDates),
-        stage2_status: stage2.business_status,
+        stage2_status: stage2DecisionStatus,
         stage2_resolution: stage2.stage2_applicability,
         pending_reasons: Object.freeze(unknownRegimeDates.length
             ? ['DAILY_EMPLOYMENT_REGIME_UNKNOWN']
             : remainingDates.length ? ['REMAINING_POSSIBLE_LEAVE_REVIEW_REQUIRED'] : []),
         blockers: Object.freeze(unknownRegimeDates.length
-            ? ['DAILY_EMPLOYMENT_REGIME_UNKNOWN'] : [])
+            ? ['DAILY_EMPLOYMENT_REGIME_UNKNOWN'] : []),
+        diagnostics: Object.freeze(unknownRegimeDates.map(date =>
+            diagnostic('DAILY_EMPLOYMENT_REGIME_UNKNOWN', [date])))
     });
 
     const finalAnalysis = analyzeWeeklySixthSeventhDay({
@@ -740,19 +772,61 @@ function buildWeeklyHrLifecycleProjection({
         companyPolicyRules,
         companySettings
     });
-    const finalBlockers = finalAnalysis.status === 'NEEDS_HR_DECISION'
-        ? unique(finalAnalysis.reasons || []) : [];
+    const restReviewItems = rows.filter(row => !actionableDateSet ||
+        actionableDateSet.has(dateKeyUtc(row.hmeromhnia))).map(resolveReviewRestState);
+    const restPendingDates = restReviewItems.filter(item => item.status === 'REVIEW_REQUIRED')
+        .map(item => item.date);
+    const automaticPending = stage2AutomaticResolutionItems.length > 0 &&
+        stage1.business_status === BUSINESS_STATUS.COMPLETED &&
+        stage2.business_status === BUSINESS_STATUS.COMPLETED && !stage2.blockers.length;
+    const reviewedStage2 = restPendingDates.length ? stageResult('STAGE2', { ...stage2,
+        business_status: BUSINESS_STATUS.BLOCKED,
+        pending_count: stage2.pending_count + restPendingDates.length,
+        pending_dates: Object.freeze(unique([...stage2.pending_dates, ...restPendingDates])),
+        blockers: Object.freeze(unique([...stage2.blockers, 'REST_CLASSIFICATION_REVIEW_REQUIRED'])),
+        pending_reasons: Object.freeze(unique([...stage2.pending_reasons, 'REST_CLASSIFICATION_REVIEW_REQUIRED'])),
+        diagnostics: Object.freeze([...stage2.diagnostics,
+            diagnostic('REST_CLASSIFICATION_REVIEW_REQUIRED', restPendingDates),
+            ...restReviewItems.filter(item => item.status === 'REVIEW_REQUIRED')
+                .map(item => diagnostic(item.reason_code, [item.date]))])
+    }) : automaticPending ? stageResult('STAGE2', { ...stage2,
+        business_status: stage2.business_status === BUSINESS_STATUS.COMPLETED
+            ? BUSINESS_STATUS.OPEN : stage2.business_status,
+        automatic_materialization_count: stage2AutomaticResolutionItems.length,
+        pending_count: stage2AutomaticResolutionItems.length,
+        pending_dates: Object.freeze(stage2AutomaticResolutionItems.map(item => item.date)),
+        pending_reasons: Object.freeze(unique([...stage2.pending_reasons,
+            'STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED']))
+    }) : humanRestDecisionPending
+        ? stageResult('STAGE2', { ...stage2, business_status: BUSINESS_STATUS.OPEN,
+            resolution_route: 'STAGE3_HUMAN_DECISION', rest_evidence: Object.freeze(restEvidence),
+            pending_count: restEvidence.candidate_dates.length,
+            pending_dates: Object.freeze(restEvidence.candidate_dates),
+            pending_reasons: Object.freeze([restEvidence.reason]),
+            diagnostics: Object.freeze([diagnostic(restEvidence.reason,
+                restEvidence.candidate_dates)]) }) : stage2;
+    const finalBlockers = unique([
+        ...(finalAnalysis.status === 'NEEDS_HR_DECISION' ? finalAnalysis.reasons || [] : []),
+        ...(restPendingDates.length ? ['REST_CLASSIFICATION_REVIEW_REQUIRED'] : []),
+        ...(automaticPending ? ['STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED'] : [])
+    ]);
     const stage4 = stageResult('STAGE4', {
         business_status: finalBlockers.length
             ? BUSINESS_STATUS.BLOCKED : BUSINESS_STATUS.COMPLETED,
         pending_count: finalBlockers.length,
         pending_reasons: Object.freeze(finalBlockers),
         blockers: Object.freeze(finalBlockers),
+        diagnostics: Object.freeze(analysisDiagnostics(finalBlockers, finalAnalysis)),
         final_weekly_analysis_available: finalBlockers.length === 0,
         final_weekly_analysis: finalAnalysis
     });
 
-    const stages = applySequentialPresentation({ stage1, stage2, stage3, stage4 });
+    const stages = applySequentialPresentation({ stage1, stage2: reviewedStage2, stage3, stage4 });
+    if (stages.stage1.business_status === BUSINESS_STATUS.COMPLETED &&
+        reviewedStage2.resolution_route === 'STAGE3_HUMAN_DECISION') {
+        stages.stage3 = Object.freeze({ ...stages.stage3, enabled: true,
+            presentation_status: PRESENTATION_STATUS.ACTIVE });
+    }
     const upstreamStagesCompleted = [stages.stage1, stages.stage2, stages.stage3]
         .every((stage) => stage.business_status === BUSINESS_STATUS.COMPLETED);
     stages.stage4 = Object.freeze({ ...stages.stage4,
@@ -788,13 +862,25 @@ function buildWeeklyHrLifecycleProjection({
         requires_hr_action: Boolean(activeStage),
         ...(boundary?.handoff_from_previous_period ? { deferred_week: boundary, deferred_action_required: true } : {}),
         employment_date_scope: employmentDateScope,
+        rest_review_items: Object.freeze(restReviewItems),
         stage1_no_classification_preview_items: stage1NoClassificationPreviewItems,
         stages: Object.freeze(stages)
     });
 }
 
 function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
-    if (projection.deferred_week?.status === DEFERRED_WEEK_STATUS) return projection;
+    if (projection.deferred_week?.status === DEFERRED_WEEK_STATUS) {
+        // Frozen, reduced evidence cannot revalidate an old attestation. Keep
+        // the existing fail-closed presentation for finalized deferred slices.
+        if (projection.persisted_stage1_status !== BUSINESS_STATUS.STALE) return projection;
+        const stages = { ...projection.stages };
+        for (const key of ['stage1', 'stage4']) stages[key] = Object.freeze({ ...stages[key],
+            business_status: BUSINESS_STATUS.STALE, presentation_status: PRESENTATION_STATUS.STALE,
+            pending_count: Math.max(1, stages[key].pending_count || 0),
+            enabled: key === 'stage1', open_by_default: key === 'stage1' });
+        return Object.freeze({ ...projection, current_stage: 'STAGE1', requires_hr_action: true,
+            total_pending_count: Math.max(1, projection.total_pending_count || 0), stages: Object.freeze(stages) });
+    }
     const completedStages = Object.fromEntries(
         ['stage1', 'stage2', 'stage3', 'stage4'].map((key, index) => {
             const stage = projection?.stages?.[key] || {};
@@ -805,7 +891,7 @@ function buildFinalizedWeeklyHrLifecyclePresentation(projection = {}) {
                 enabled: true, open_by_default: false,
                 pending_count: 0, pending_dates: Object.freeze([]),
                 pending_items: Object.freeze([]), pending_reasons: Object.freeze([]),
-                blockers: Object.freeze([]) })];
+                blockers: Object.freeze([]), diagnostics: Object.freeze([]) })];
         })
     );
     completedStages.stage4 = Object.freeze({ ...completedStages.stage4,

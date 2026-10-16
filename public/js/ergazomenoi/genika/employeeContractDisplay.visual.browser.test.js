@@ -71,14 +71,16 @@ for (const width of [1440, 390]) test(`contract History, review borders and side
         const box = await review.evaluate(e => {
             const rect = e.getBoundingClientRect(), cell = e.closest('td').getBoundingClientRect(), style = getComputedStyle(e);
             return { left: rect.left, right: rect.right, cellLeft: cell.left, cellRight: cell.right,
-                font: parseFloat(style.fontSize), borderLeft: style.borderLeftWidth, borderRight: style.borderRightWidth,
+                font: parseFloat(style.fontSize), weight: style.fontWeight, borderLeft: style.borderLeftWidth, borderRight: style.borderRightWidth,
                 overflow: e.scrollWidth > e.clientWidth + 1, whiteSpace: style.whiteSpace, cellWidth: cell.width,
                 background: style.backgroundColor };
         });
-        assert.ok(box.font < 14); assert.equal(box.whiteSpace, 'nowrap'); assert.equal(box.overflow, false);
+        // This isolated partial has the 14px compact fallback; the full layout uses its shared 14.4–16px scale.
+        assert.ok(box.font >= 14 && box.font <= 16); assert.equal(box.weight, '400');
+        assert.equal(box.whiteSpace, 'nowrap'); assert.equal(box.overflow, false);
         assert.ok(box.left >= box.cellLeft + 1 && box.right <= box.cellRight - 1, JSON.stringify(box));
         assert.equal(box.borderLeft, '1px'); assert.equal(box.borderRight, '1px');
-        assert.ok(box.cellWidth < 150);
+        assert.ok(box.cellWidth <= 202);
         assert.ok(box.left >= 0 && box.right <= width, JSON.stringify(box));
         assert.equal(box.background, 'rgb(240, 231, 226)');
         const iconBoxes = await page.locator('.istoriko-row').first().locator('.istoriko-btn').evaluateAll(elements => elements.map(e => {
@@ -89,8 +91,15 @@ for (const width of [1440, 390]) test(`contract History, review borders and side
         await review.hover(); await page.waitForTimeout(200);
         assert.equal(await review.evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(121, 85, 72)');
         await page.mouse.move(0, 0); await capture('history-review');
+        // Bootstrap adds .show before the opening transition ends and ignores hide() during it.
+        // Register before opening so even a synchronous shown event cannot be missed.
+        await page.locator('#istorikoDetailsModal').evaluate(modal => {
+            window.__istorikoDetailsShown = false;
+            modal.addEventListener('shown.bs.modal', () => { window.__istorikoDetailsShown = true; }, { once: true });
+        });
         await page.locator('.istoriko-row').first().dblclick();
         await page.locator('#istorikoDetailsModal.show').waitFor();
+        await page.waitForFunction(() => window.__istorikoDetailsShown === true);
         const details = page.locator('#istorikoDetailsBody');
         assert.match(await details.innerText(), /0001\s*-\s*ΒΟΗΘΟΣ ΣΕΡΒΙΤΟΡΟΥ/);
         const items = details.locator('.istoriko-contract-elements-table tbody tr:not(.istoriko-modal-totals-row)');

@@ -1,3 +1,4 @@
+<div class="maintenance-responsive-form companies-management-page company-details-page">
 <div class="tadded-container">
     <div class="container-fluid height-vh-100 padding-0">
         
@@ -10,9 +11,9 @@
 
                         <%- include('../../partials/_csrfField') %>
 
-                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
 
-                            <div class="card-header p-2 height-rem-3_5">
+                            <div class="card-header p-0 height-rem-3_5 companies-search-header">
                                 <label class="text-center w-100 headers-content">
                                 Εισαγωγή Νέου Νομίμου Εκπροσώπου
                                 </label>
@@ -683,9 +684,9 @@
                                 </div>
                             </div>
 
-                            <div class="card-footer cardFooter">
+                            <div class="card-footer d-flex align-items-center companies-management-footer">
                                 <div
-                                        class="d-inline-block d-flex cardFooter01">
+                                        class="d-flex align-items-center companies-management-actions company-details-actions">
                                     <button
                                         type="button"
                                         class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton">
@@ -761,3 +762,5 @@
 <script src="<%= script('common/moveByEnter') %>"></script>
 <script src="<%= script('common/clearableInputs') %>"></script>
 
+
+</div>

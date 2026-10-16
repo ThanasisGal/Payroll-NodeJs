@@ -39,7 +39,14 @@ test('real Chromium, real selection HTTP handler and isolated MongoDB', { skip: 
         if (dir) { fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name+'.png'),fullPage:true}); }
     };
     await page.goto(origin+'/review');
-    await page.waitForFunction(()=>Boolean(document.getElementById('ypokatasthma').tomselect));
+    // Initialization schedules a deferred preselection. Selecting a branch before
+    // that phase finishes lets it clear/rebuild the dependent employee control
+    // during the first click. Wait for completion, not just instance creation.
+    await page.waitForFunction(()=>{
+        const branch = document.getElementById('ypokatasthma').tomselect;
+        return Boolean(window.EmploymentReviewEmployees && window.EmploymentReviewBranches &&
+            branch?._preselectDone && !branch._preselectAbort);
+    });
     await page.locator('#ypokatasthma + .ts-wrapper .ts-control').click();
     await page.locator('#ypokatasthma + .ts-wrapper .option[data-value="0000"]').click();
     assert.equal(await page.locator('#ypokatasthma_stathera_advanced').inputValue(),'0000');

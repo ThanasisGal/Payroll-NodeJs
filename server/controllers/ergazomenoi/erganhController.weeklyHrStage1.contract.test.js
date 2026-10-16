@@ -140,7 +140,9 @@ assert.match(browser, /const changes = draftsToSave\.map/);
 assert.match(browser, /saveStage1DailyClassificationDrafts\(\[holidaySaveButton\.dataset\.rowId\]\)/);
 assert.match(browser, /draftsToSave\.some\(\(\[rowId\]\)[\s\S]*affectedKeys\.add\(key\)/);
 assert.match(browser, /function renderStage1DailyClassificationSaveResult/);
-assert.match(browser, /JSON\.stringify\(\[status, code, message\]\)/);
+const classificationSavePresentation = browser.match(
+    /function renderStage1DailyClassificationSaveResult\([\s\S]*?\n}/)?.[0] || '';
+assert.match(classificationSavePresentation, /EmploymentReviewGuidanceUi\.failureHtml\(item\)/);
 assert.match(browser, /html: renderStage1DailyClassificationSaveResult\(result\)/);
 assert.doesNotMatch(browser, /requestedSet && Number\(result\.failed_count \|\| 0\) > 0/);
 assert.match(browser, /Οι ημέρες άλλου μήνα εμφανίζονται μόνο για τον εβδομαδιαίο έλεγχο/);

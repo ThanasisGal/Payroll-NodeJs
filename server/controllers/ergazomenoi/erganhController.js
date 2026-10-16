@@ -1,3 +1,4 @@
+const { resolveReviewRestState } = require('../../services/ergazomenoi/apasxoliseisReviewRestStateService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { deriveApprovedTimeShift } = require('../../services/ergazomenoi/apasxoliseisApprovedTimeShiftService');
 const { resolveArrangementContext } = require('../../services/ergazomenoi/apasxoliseisEffectiveHolidayContextProviderService');
@@ -231,6 +232,7 @@ const {
     sanitizeAppliedRepoTransferUpdate
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionService');
 const {
+    RAW_CARD_FIELDS,
     removeClientRawCardUpdates,
     buildEmploymentReviewUpdateErrorResponse,
     persistOrphanResolutionWrite
@@ -238,9 +240,11 @@ const {
 const {
     buildPostDepartureExclusionDescriptors,
     isDateWithinEmploymentPeriod,
+    assertEmploymentReviewDateOwned,
     isWeekFullyWithinEmploymentPeriod,
     restrictBoundaryContextToPeriodEmployees,
     deriveEmploymentOwnedDateScope,
+    restrictWeeklyReviewRowsToEmploymentDates,
     buildFullMonthBoundaryContextPreflight,
     deriveDeferredWeekScope,
     isDeferredWeekPending,
@@ -248,7 +252,8 @@ const {
     DEFERRED_WEEK_MESSAGE
 } = require('../../services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService');
 const {
-    preloadEmployeeEmploymentCycleContexts
+    preloadEmployeeEmploymentCycleContexts,
+    distinctHireDates
 } = require('../../services/ergazomenoi/employeeEmploymentCycleContextLoaderService');
 const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
@@ -269,6 +274,7 @@ const {
     POLICY_VERSION: ORPHAN_CARD_POLICY_VERSION,
     RESOLUTION_SCOPE: ORPHAN_RESOLUTION_SCOPE,
     resolveOrphanCardResolution,
+    orphanWorkPreviewFingerprint, orphanWorkError,
     attachOrphanResolutionPreviews
 } = require('../../services/ergazomenoi/apasxoliseisOrphanCardResolutionService');
 const {
@@ -484,6 +490,7 @@ const ApasxoliseisWeeklyHrWorkflowAuditModel = require('../../models/apasxolisei
 const {
     buildWeeklyHrWorkflowProjection
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowProjectionService');
+const { reviewErrorResponse } = require('../../services/ergazomenoi/apasxoliseisReviewErrorPresentationService');
 const {
     buildWeeklyHrLifecycleProjection,
     buildFinalizedWeeklyHrLifecyclePresentation,
@@ -557,9 +564,7 @@ function createWeeklyHrStage2BulkResponseStream(req, res) {
         result: (response) => { write({ type: 'result', ...response }); res.end(); },
         error: (error) => {
             if (!started) return false;
-            write({ type: 'error', code: error.code || 'STAGE2_BULK_COMPLETION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής ολοκλήρωσης Stage 2.' });
+            write({ type: 'error', ...reviewErrorResponse(error, 'STAGE2_BULK_COMPLETION_FAILED') });
             res.end(); return true;
         }
     });
@@ -3805,7 +3810,13 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
     ) || normalizeReviewEmploymentType(effectiveProfile.typos_apasxolhshs);
     const authoritativeEmploymentCode = explicitEmploymentCode;
     return { ...normalizedRow,
+        review_rest_state: resolveReviewRestState(row),
         kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
+        // Presentation can neutralize an unchanged declared ME. Freshness must
+        // still compare the persisted classification reviewed by HR.
+        kathgoria_ergasias_apologistika_original:
+            row.kathgoria_ergasias_apologistika_original ?? row.kathgoria_ergasias_apologistika ?? '',
+        repo_apologistika_original: row.repo_apologistika_original ?? row.repo_apologistika ?? false,
         kathgoria_ergasias: effectiveKathgoria,
         kathgoria_ergasias_effective: effectiveKathgoria,
         effective_is_full_time: resolveReviewIsFullTimeProfile(effectiveProfile),
@@ -4431,7 +4442,8 @@ async function applyEmploymentDepartureScopeToFilters({
     if (cleanKodikos) employeeFilter.kodikos = cleanKodikos;
 
     const employees = await ErgazomenoiModel.find(finalizedEmployeeFilter(employeeFilter))
-        .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
+        .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
+            'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy')
         .lean();
     const lifecycleEmployees = await preloadEmployeeEmploymentCycleContexts({
         team,
@@ -4440,8 +4452,40 @@ async function applyEmploymentDepartureScopeToFilters({
         historyModel: IstorikoProslhpseonAllagonModel
     });
     const descriptors = buildPostDepartureExclusionDescriptors(lifecycleEmployees);
-    filters.forEach((filter) => applyPostDepartureExclusionsToFilter(filter, descriptors));
+    filters.forEach((filter) => {
+        applyPostDepartureExclusionsToFilter(filter, descriptors);
+        const loanExclusions = [];
+        for (const employee of lifecycleEmployees) {
+            if (employee.afora_daneismo_ergazomenoy !== true) continue;
+            const identity = { kodikos: employee.kodikos, ypokatasthma: employee.ypokatasthma };
+            const start = dateKeyUtc(employee.hmnia_enarxhs_daneismoy);
+            const end = dateKeyUtc(employee.hmnia_lhxhs_daneismoy);
+            if (!start || (employee.hmnia_lhxhs_daneismoy && !end) || (end && end < start) ||
+                typeof employee.typos_ergodoth_daneismoy !== 'boolean') {
+                loanExclusions.push(identity);
+            } else if (employee.typos_ergodoth_daneismoy === false) {
+                loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
+                    $gte: new Date(`${start}T00:00:00.000Z`),
+                    ...(end ? { $lte: new Date(`${end}T23:59:59.999Z`) } : {}) }) });
+            } else {
+                loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
+                    $lt: new Date(`${start}T00:00:00.000Z`) }) });
+                if (end) loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
+                    $gt: new Date(`${end}T23:59:59.999Z`) }) });
+            }
+        }
+        if (loanExclusions.length) filter.$nor = mongoose.trusted([
+            ...(Array.isArray(filter.$nor) ? filter.$nor : []), ...loanExclusions]);
+    });
     return { employees: lifecycleEmployees, descriptors };
+}
+
+async function assertReviewRowEmploymentDate({ req, row }) {
+    const { employees } = await applyEmploymentDepartureScopeToFilters({
+        team: req.session.userTeam, companyId: req.session.companyInUse,
+        ypokatasthma: row.ypokatasthma, kodikos: row.kodikos
+    });
+    assertEmploymentReviewDateOwned(row.hmeromhnia, employees);
 }
 
 const REVIEW_SELECT_FIELDS = withHrDailyPreviewRowFields(
@@ -4583,6 +4627,8 @@ async function loadWeeklyHrContext({ req, input, session = null,
             team: base.team, company_kod: base.company_kod, kodikos: employee.kodikos
         }).select(CANONICAL_HISTORY_SELECT_FIELDS)
             .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 })).lean();
+    const lifecycleEmployee = distinctHireDates(employee, histories).size > 1
+        ? { ...employee, employment_history: histories } : employee;
     const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
         team: base.team, employees: [employee], session
     });
@@ -4600,7 +4646,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
         period_end: periodScope.period_end,
         hire_date: employee.hmeromhnia_proslhpshs,
         departure_date: employee.hmeromhnia_apoxorhshs,
-        employee
+        employee: lifecycleEmployee
     });
     const expectedDates = employmentDateScope?.employment_owned_dates || [];
     const expectedDateSet = new Set(expectedDates);
@@ -4629,7 +4675,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
         getDailyRepoProfileInfo({ row, istorikoRows: histories, ergazomenos: employee,
             resolveProfileForDate }).profile
     ]));
-    return { base, employee, rows, week, histories, resolveProfileForDate,
+    return { base, employee: lifecycleEmployee, rows, week, histories, resolveProfileForDate,
         employmentDateScope, periodScope,
         companySettings,
         effectiveProfile: profile.effectiveProfile,
@@ -5031,6 +5077,14 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
             rows, workflowState: state,
             stage2StateDiagnostic: 'STAGE2_INPUT_CHANGED' };
         const employeeHistory = historyByCode.get(employeeCode) || [];
+        const employmentDateScope = deriveEmploymentOwnedDateScope({
+            natural_week_start: seed.week_start, natural_week_end: seed.week_end,
+            period_start: periodStart, period_end: periodEnd,
+            hire_date: employee.hmeromhnia_proslhpshs,
+            departure_date: employee.hmeromhnia_apoxorhshs,
+            employee: distinctHireDates(employee, employeeHistory).size > 1
+                ? { ...employee, employment_history: employeeHistory } : employee });
+        rows = restrictWeeklyReviewRowsToEmploymentDates(rows, employmentDateScope);
         const resolveProfileForDate = (reviewDate) =>
             resolveEffectiveEmploymentProfileForReviewDate({
                 reviewDate, normalEmployee: employee, normalHistory: employeeHistory,
@@ -5054,11 +5108,6 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
         const effectiveProfile = effectiveProfilesByDate[
             dateKeyUtc(rows.at(-1)?.hmeromhnia)] || {};
         rowsByWeek.set(pairKey, rows);
-        const employmentDateScope = deriveEmploymentOwnedDateScope({
-            natural_week_start: seed.week_start, natural_week_end: seed.week_end,
-            period_start: periodStart, period_end: periodEnd,
-            hire_date: employee.hmeromhnia_proslhpshs,
-            departure_date: employee.hmeromhnia_apoxorhshs, employee });
         const periodScope = employmentDateScope?.context_only_dates?.length
             ? periodAccess.scope : null;
         const lifecycle = buildWeeklyHrLifecycleProjection({ weekRows: rows,
@@ -5360,8 +5409,8 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
     const stage3AuditDatesByEmployeeWeek =
         stage3AuditDecisionDatesByEmployeeWeek(workflowAudits);
     const lifecycleByWeek = new Map();
-    for (const [key, weekRows] of rowsByEmployeeWeek) {
-        const firstRow = weekRows[0];
+    for (const [key, loadedWeekRows] of rowsByEmployeeWeek) {
+        const firstRow = loadedWeekRows[0];
         const employee = lifecycleByKodikos.get(String(firstRow.kodikos || '')) ||
             employeeByCode.get(String(firstRow.kodikos || '')) || {};
         const weekStart = startOfWeekMondayUtc(firstRow.hmeromhnia);
@@ -5371,6 +5420,8 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
             period_start: ownershipPeriod.period_start, period_end: ownershipPeriod.period_end,
             hire_date: employee.hmeromhnia_proslhpshs,
             departure_date: employee.hmeromhnia_apoxorhshs, employee });
+        const weekRows = restrictWeeklyReviewRowsToEmploymentDates(
+            loadedWeekRows, employmentDateScope);
         const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
             dateKeyUtc(row.hmeromhnia), weeklyHrStage2LifecycleProfileFromRow(row)
         ]));
@@ -5448,10 +5499,22 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const lifecycleByKodikos = new Map(
         lifecycleEmployees.map((employee) => [String(employee.kodikos || ''), employee])
     );
-    const rows = await ProdhlomenaOrariaModel.find(reviewFilter)
+    const loadedReviewRows = await ProdhlomenaOrariaModel.find(reviewFilter)
         .select(REVIEW_SELECT_FIELDS)
         .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
         .lean();
+    const employmentIdentity = row => `${String(row.ypokatasthma || '').padStart(4, '0')}|${String(row.kodikos || '')}`;
+    const lifecycleByIdentity = new Map();
+    for (const employee of lifecycleEmployees) {
+        const key = employmentIdentity(employee);
+        if (!lifecycleByIdentity.has(key)) lifecycleByIdentity.set(key, []);
+        lifecycleByIdentity.get(key).push(employee);
+    }
+    const rows = loadedReviewRows.filter((row) => {
+        const employees = lifecycleByIdentity.get(employmentIdentity(row));
+        return !employees || !dateKeyUtc(row.hmeromhnia) ||
+            employees.some(employee => isDateWithinEmploymentPeriod(row.hmeromhnia, employee));
+    });
     const companySettings = await loadSuspiciousShortCompanySettings({
         team: req.session.userTeam, companyId: req.session.companyInUse
     });
@@ -5956,8 +6019,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const stage3AuditDatesByEmployeeWeek =
         stage3AuditDecisionDatesByEmployeeWeek(workflowAudits);
     const lifecycleByWeek = new Map();
-    for (const [key, weekRows] of reviewWeekRows) {
-        const firstRow = weekRows[0];
+    for (const [key, loadedWeekRows] of reviewWeekRows) {
+        const firstRow = loadedWeekRows[0];
         const employee = lifecycleByKodikos.get(String(firstRow.kodikos || '')) ||
             ergByKodikos.get(String(firstRow.kodikos || '')) || {};
         const naturalWeekStart = startOfWeekMondayUtc(firstRow.hmeromhnia);
@@ -5971,6 +6034,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             departure_date: employee.hmeromhnia_apoxorhshs,
             employee
         });
+        const weekRows = restrictWeeklyReviewRowsToEmploymentDates(
+            loadedWeekRows, employmentDateScope);
         const effectiveProfilesByDate = Object.fromEntries(weekRows.map((row) => [
             dateKeyUtc(row.hmeromhnia), {
                 hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
@@ -8206,10 +8271,8 @@ class erganhController {
                                     ergByKodikos.get(employeeKodikos) || null });
                             return { scope, rows: weekRows, lifecycle,
                                 effectiveProfilesByDate: Object.fromEntries(weekRows.map((row) => [
-                                    dateKeyUtc(row.hmeromhnia), {
-                                        typos_apasxolhshs: row.effective_typos_apasxolhshs,
-                                        kathestos_apasxolhshs:
-                                            row.effective_kathestos_apasxolhshs } ])),
+                                    dateKeyUtc(row.hmeromhnia),
+                                    weeklyHrStage2LifecycleProfileFromRow(row) ])),
                                 workflowState: state, upstream: { stage1_current_fingerprint:
                                     lifecycle.stages?.stage1?.current_completion_fingerprint },
                                 preparedStage2Record:
@@ -9586,12 +9649,7 @@ class erganhController {
                     'CANONICAL_DECISION_PROFILE_REFERENCE_INVALID',
                     'CANONICAL_WEEK_NOT_BLOCKED'].includes(error?.code) ? 409
                     : error.statusCode || 500;
-            return res.status(status).json({
-                success: false,
-                code: error.code || undefined,
-                message: status < 500 || status === 503
-                    ? error.message : 'Δεν ήταν δυνατή η καταγραφή της εβδομαδιαίας απόφασης.'
-            });
+            return res.status(status).json(reviewErrorResponse(error, 'CANONICAL_DECISION_SAVE_FAILED'));
         }
     };
 
@@ -9633,12 +9691,7 @@ class erganhController {
                 error?.statusCode || 500,
                 error?.message
             );
-            return res.status(error.statusCode || 500).json({
-                success: false,
-                message: error.statusCode && error.statusCode < 500
-                    ? error.message
-                    : 'Δεν ήταν δυνατή η καταγραφή της απόφασης.'
-            });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'REPO_DECISION_SAVE_FAILED'));
         }
     };
 
@@ -9716,11 +9769,7 @@ class erganhController {
         } catch (error) {
             console.error('[applyWeeklyRepoTransferDecision]', error?.code || 'INTERNAL_ERROR');
             const mapped = REPO_TRANSFER_APPLY_ERRORS[error?.code];
-            return res.status(mapped?.[0] || 500).json({
-                success: false,
-                code: error?.code || undefined,
-                message: mapped?.[1] || 'Η εφαρμογή ακυρώθηκε πλήρως. Δεν αποθηκεύτηκε καμία αλλαγή.'
-            });
+            return res.status(mapped?.[0] || 500).json(reviewErrorResponse(error, 'REPO_APPLY_FAILED'));
         }
     };
 
@@ -12169,9 +12218,7 @@ class erganhController {
                 stage1_status: lifecycleProjection.stages.stage1.persisted_status,
                 lifecycle_projection: lifecycleProjection });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_WORKFLOW_READ_FAILED',
-                message: error.statusCode ? error.message : 'Αποτυχία ανάγνωσης της εβδομαδιαίας ροής HR.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_WORKFLOW_READ_FAILED', { readOnly: true }));
         }
     };
 
@@ -12246,6 +12293,11 @@ class erganhController {
                 const employeeCode = String(requested.employee_kodikos || '').trim();
                 const weekStart = dateKeyUtc(requested.week_start);
                 const key = `${employeeCode}|${weekStart}`;
+                // Weekly repo transfer is not applicable to a partial employment week.
+                // Its owned-date completeness and daily errors remain in the lifecycle.
+                if (lifecycleByWeek.get(key)?.employment_date_scope?.is_full_natural_week === false) {
+                    continue;
+                }
                 const weekRows = (rowsByWeek.get(key) || []).slice().sort((left, right) =>
                     dateKeyUtc(left.hmeromhnia).localeCompare(dateKeyUtc(right.hmeromhnia)));
                 const weekEnd = dateKeyUtc(requested.week_end || endOfWeekSundayUtc(weekStart));
@@ -12307,8 +12359,9 @@ class erganhController {
             const payloads = [];
             for (const requested of requestedScopes) {
                 const key = `${String(requested.employee_kodikos || '').trim()}|${dateKeyUtc(requested.week_start)}`;
-                const weekRows = rowsByWeek.get(key) || [];
                 const lifecycleProjection = lifecycleByWeek.get(key);
+                const weekRows = restrictWeeklyReviewRowsToEmploymentDates(
+                    rowsByWeek.get(key) || [], lifecycleProjection?.employment_date_scope);
                 if (!weekRows.length || !lifecycleProjection) continue;
                 const state = workflowStateByWeek.get(key) || {};
                 const stage1 = lifecycleProjection.stages?.stage1 || {};
@@ -12421,10 +12474,7 @@ class erganhController {
             }
             return res.json({ success: true, payloads });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_WORKFLOW_BULK_READ_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής ανάγνωσης της εβδομαδιαίας ροής HR.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_WORKFLOW_BULK_READ_FAILED', { readOnly: true }));
         }
     };
 
@@ -12473,9 +12523,7 @@ class erganhController {
             });
             return res.json({ success: true, already_completed: result.idempotent === true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_STAGE1_COMPLETION_FAILED',
-                message: error.statusCode ? error.message : 'Αποτυχία ολοκλήρωσης του Stage 1.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_STAGE1_COMPLETION_FAILED'));
         }
     };
 
@@ -12497,10 +12545,7 @@ class erganhController {
             });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_STAGE1_BULK_COMPLETION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής ολοκλήρωσης του Stage 1.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_STAGE1_BULK_COMPLETION_FAILED'));
         }
     };
 
@@ -12539,10 +12584,7 @@ class erganhController {
             });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_STAGE2_COMPLETION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία canonical ολοκλήρωσης του Stage 2.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_STAGE2_COMPLETION_FAILED'));
         }
     };
 
@@ -12570,10 +12612,7 @@ class erganhController {
             return res.json({ success: true, preview_fingerprint: fingerprint,
                 ...pageResult });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE2_BULK_PREVIEW_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία προεπισκόπησης μαζικής ενημέρωσης Stage 2.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'STAGE2_BULK_PREVIEW_FAILED', { readOnly: true }));
         }
     };
 
@@ -12601,10 +12640,11 @@ class erganhController {
                 loadPreparedContexts: async () => prepared.contexts,
                 completePreparedScope: async ({ context, request_id, reason_or_notes,
                     expected_scope_fingerprint, bulk_kind }) => {
-                    const currentScope = buildWeeklyHrStage2BulkPreview({ contexts: [context] })
-                        .safe_scope_ids[0];
-                    const alreadyCompleted = context?.workflowState?.stage2?.status ===
-                        'COMPLETED' || Boolean(context?.preparedStage2Record?.current_execution);
+                    const currentPreview = buildWeeklyHrStage2BulkPreview({ contexts: [context] });
+                    const currentScope = currentPreview.safe_scope_ids[0];
+                    const alreadyCompleted = currentPreview.already_resolved_count === 1 &&
+                        (context?.workflowState?.stage2?.status === 'COMPLETED' ||
+                            Boolean(context?.preparedStage2Record?.current_execution));
                     if ((!currentScope && !alreadyCompleted) || (currentScope &&
                         currentScope.scope_fingerprint !== expected_scope_fingerprint)) {
                         throw weeklyHrApiError(
@@ -12665,43 +12705,17 @@ class erganhController {
                         return { completed: true, idempotent:
                             created.idempotent === true || applied.idempotent === true };
                     }
-                    const mutableRows = context.rows.map((row) => ({ ...row }));
-                    const stateModel = { findOne: () => ({ session() { return this; },
-                        lean: async () => context.workflowState }),
-                    collection: ApasxoliseisWeeklyHrWorkflowStateModel.collection };
-                    const auditModel = { findOne: (filter) => ({ session() { return this; },
-                        lean: async () => context.audits.find((audit) =>
-                            audit.request_id === filter.request_id) || null }),
-                    create: (...args) => ApasxoliseisWeeklyHrWorkflowAuditModel.create(...args) };
                     const runStage2Fence = prepared.periodAccess.state.effective_mode ===
                         'HISTORICAL_RECONSTRUCTION_STALE'
                         ? runWithStaleStage2MaterializationWriteFence : runWithPeriodWriteFence;
                     return completeWeeklyHrWorkflowStage2({ initialContext: context, actor,
-                        reason_or_notes, request_id, stateModel, auditModel,
-                        loadFreshContext: async () => context,
-                        writeDaily: async (input) => {
-                            const written = await writeCanonicalDailyClassification(input);
-                            const target = mutableRows.find((row) =>
-                                String(row._id) === String(input.row._id));
-                            if (target && written.updates) Object.assign(target, written.updates,
-                                { is_locked: true, locked_by: actor.user_name });
-                            return written;
-                        },
-                        loadPostWriteContext: async () => {
-                            const lifecycle = buildWeeklyHrLifecycleProjection({
-                                weekRows: mutableRows, effectiveProfile: context.effectiveProfile,
-                                effectiveProfilesByDate: context.effectiveProfilesByDate,
-                                persistedStage1State: context.workflowState.stage1 || null,
-                                persistedStage2State: context.workflowState.stage2 || null,
-                                persistedStage3State: context.workflowState.stage3 || null,
-                                scope: context.scope, periodScope: context.periodScope,
-                                employmentDateScope: context.employmentDateScope,
-                                companySettings: context.companySettings });
-                            return { ...context, rows: mutableRows, lifecycle,
-                                upstream: { ...context.upstream,
-                                    stage1_current_fingerprint:
-                                        lifecycle.stages.stage1.current_completion_fingerprint } };
-                        },
+                        reason_or_notes, request_id,
+                        // Re-read daily evidence, historical terms and state in the
+                        // write transaction; a prepared batch is only a preview.
+                        loadFreshContext: ({ session }) => loadWeeklyHrStage2CompletionContext({
+                            req, input: { ...req.body, ...context.scope }, session }),
+                        loadPostWriteContext: ({ session }) => loadWeeklyHrStage2CompletionContext({
+                            req, input: { ...req.body, ...context.scope }, session }),
                         transactionRunner: async (work) => {
                             const fenced = await runStage2Fence({
                                 scope: prepared.periodAccess.scope, expectedToken: {
@@ -12727,10 +12741,7 @@ class erganhController {
             return res.json(response);
         } catch (error) {
             if (responseStream.error(error)) return;
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'WEEKLY_HR_STAGE2_BULK_COMPLETION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής ολοκλήρωσης του Stage 2.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'WEEKLY_HR_STAGE2_BULK_COMPLETION_FAILED'));
         }
     };
 
@@ -12766,6 +12777,7 @@ class erganhController {
                         throw weeklyHrApiError('STAGE1_DATE_OUTSIDE_ACTIONABLE_PERIOD', 409,
                             'Η ημερομηνία δεν αποτελεί στόχο εγγραφής της περιόδου.');
                     }
+                    await assertReviewRowEmploymentDate({ req, row: authoritativeTarget });
                     if (['LEAVE', 'SICKNESS'].includes(classification)) {
                         const category = await Models_A.KathgoriesAdeiasModel.findOne({
                             kodikos: String(leave_category || '').trim(),
@@ -12836,9 +12848,7 @@ class erganhController {
             });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE1_DAILY_CLASSIFICATION_BULK_FAILED',
-                message: error.statusCode ? error.message : 'Αποτυχία μαζικής αποθήκευσης χαρακτηρισμών.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'STAGE1_DAILY_CLASSIFICATION_BULK_FAILED'));
         }
     };
 
@@ -12870,10 +12880,7 @@ class erganhController {
                 } });
             return res.json({ success: true, ...preview });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE3_BULK_PREVIEW_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία προεπισκόπησης μαζικών αποφάσεων Stage 3.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'STAGE3_BULK_PREVIEW_FAILED', { readOnly: true }));
         }
     };
 
@@ -12936,13 +12943,15 @@ class erganhController {
                 }) });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE3_BULK_APPLY_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία μαζικής εφαρμογής αποφάσεων Stage 3.',
+            return res.status(error.statusCode || 500).json({
+                ...reviewErrorResponse(error, 'STAGE3_BULK_APPLY_FAILED'),
                 applied_count: 0,
-                ...(Array.isArray(error.invalid_items)
-                    ? { invalid_items: error.invalid_items } : {}) });
+                ...(Array.isArray(error.invalid_items) ? { invalid_items:
+                    error.invalid_items.map(item => ({ row_id: item.row_id,
+                        employee_kodikos: item.employee_kodikos,
+                        decision_date: item.decision_date,
+                        ...reviewErrorResponse(item, 'STAGE3_BULK_ITEM_NOT_ELIGIBLE', { readOnly: true }) }))
+                } : {}) });
         }
     };
 
@@ -13011,10 +13020,7 @@ class erganhController {
             });
             return res.json({ success: true, ...result });
         } catch (error) {
-            return res.status(error.statusCode || 500).json({ success: false,
-                code: error.code || 'STAGE3_DAILY_RESOLUTION_FAILED',
-                message: error.statusCode ? error.message :
-                    'Αποτυχία αποθήκευσης της απόφασης Stage 3.' });
+            return res.status(error.statusCode || 500).json(reviewErrorResponse(error, 'STAGE3_DAILY_RESOLUTION_FAILED'));
         }
     };
 
@@ -13057,7 +13063,8 @@ class erganhController {
                 manualInterval: {
                     start: req.body?.apologistiko_start,
                     end: req.body?.apologistiko_end,
-                    pairs: req.body?.pairs
+                    pairs: req.body?.pairs,
+                    work_intervals: req.body?.work_intervals
                 },
                 reuseScope: req.body?.reuse_scope === ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
                     ? ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
@@ -13087,7 +13094,10 @@ class erganhController {
                     appliedProtectionContext
                 });
             }
-            return res.json({ success: true, preview, derived_preview: derivedPreview });
+            return res.json({ success: true, preview, derived_preview: derivedPreview,
+                preview_fingerprint: req.body?.work_intervals !== undefined
+                    ? orphanWorkPreviewFingerprint({ row, contextRows, effectiveEmployee,
+                        breakConfiguration, workIntervals: req.body.work_intervals }) : undefined });
         } catch (error) {
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code || 'ORPHAN_RESOLUTION_PREVIEW_FAILED',
@@ -13241,10 +13251,10 @@ class erganhController {
                     cleanUpdates[field] = updates[field];
                 }
             }
-            if (orphanResolutionCommand || zeroLengthResolutionCommand || dailyResolutionCommand) {
-                cleanUpdates = removeClientRawCardUpdates(cleanUpdates);
-            }
+            // Ο Έλεγχος Απασχολήσεων δεν αποτελεί διαδρομή μεταβολής πρωτογενών καρτών.
+            cleanUpdates = removeClientRawCardUpdates(cleanUpdates);
             if (zeroLengthResolutionCommand || dailyResolutionCommand) cleanUpdates = {};
+            if (orphanResolutionCommand?.work_intervals !== undefined) cleanUpdates = {};
 
             if (Object.prototype.hasOwnProperty.call(
                 cleanUpdates, 'kathgoria_adeias_apologistika'
@@ -13274,6 +13284,9 @@ class erganhController {
                     message: 'Δεν βρέθηκε η εγγραφή.'
                 });
             }
+            await (boundaryOverrides.assertEmploymentDate || assertReviewRowEmploymentDate)({
+                req, row: oldRecord
+            });
             const lockedOrphanApprovalReplayCandidate = oldRecord.is_locked === true &&
                 orphanResolutionCommand?.approve === true;
             const lockedZeroLengthReplayCandidate = oldRecord.is_locked === true &&
@@ -13350,11 +13363,18 @@ class erganhController {
                         dialleima_se_lepta: breakConfiguration.break_minutes,
                         _breakConfiguration: breakConfiguration
                     };
+                    if (orphanResolutionCommand.work_intervals !== undefined && oldRecord.is_locked !== true &&
+                        orphanResolutionCommand.preview_fingerprint !== orphanWorkPreviewFingerprint({
+                            row: oldRecord, contextRows, effectiveEmployee, breakConfiguration,
+                            workIntervals: orphanResolutionCommand.work_intervals })) {
+                        throw orphanWorkError('ORPHAN_WORK_PREVIEW_STALE');
+                    }
                     approvedOrphanResolution = resolveOrphanCardResolution({
                         row: oldRecord, contextRows, effectiveEmployee, breakConfiguration,
                         manualInterval: { start: orphanResolutionCommand.apologistiko_start,
                             end: orphanResolutionCommand.apologistiko_end,
-                            pairs: orphanResolutionCommand.pairs },
+                            pairs: orphanResolutionCommand.pairs,
+                            work_intervals: orphanResolutionCommand.work_intervals },
                         riskAcknowledged: orphanResolutionCommand.risk_acknowledged === true,
                         reuseScope: orphanResolutionCommand.reuse_scope ===
                             ORPHAN_RESOLUTION_SCOPE.FUTURE_IDENTICAL
@@ -13406,6 +13426,12 @@ class erganhController {
                     status: 'HR_APPROVED', policy_version: ORPHAN_CARD_POLICY_VERSION,
                     orphan_type: approvedOrphanResolution.orphanType,
                     resolved_pairs: approvedOrphanResolution.resolvedPairs || [],
+                    ...(approvedOrphanResolution.approvedWorkIntervals ? {
+                        approved_work_intervals: approvedOrphanResolution.approvedWorkIntervals,
+                        raw_card_snapshot: Object.fromEntries([...new Set([
+                            ...RAW_CARD_FIELDS, ...Object.keys(oldRecord).filter(field => field.startsWith('cards_'))
+                        ])].map(field => [field, oldRecord[field] ?? '']))
+                    } : {}),
                     reuse_scope: approvedOrphanResolution.reuseScope,
                     approved_interval: approvedOrphanResolution.proposal,
                     reusable_decision_rule:

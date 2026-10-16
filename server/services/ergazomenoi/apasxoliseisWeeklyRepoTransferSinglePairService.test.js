@@ -187,8 +187,9 @@ function testValidPartTimeAndCountsMeAndAnAsRepo() {
         cards_eos_ora_01: ''
     });
     const withAn = analyze(rows, { typos_apasxolhshs: 'MERIKH', typos_ebdomadas: '6ΗΜΕΡΗ' });
-    assertEligible(withAn, dateKey(2), dateKey(4), 'ΜΕ');
-    assert.strictEqual(withAn.counts.existing_actual_repo, 1);
+    // Explicit declared AN remains rest without a retrospective confirmation.
+    assertReason(withAn, 'REPO_LIMIT_EXCEEDED');
+    assert.strictEqual(withAn.counts.existing_actual_repo, 2);
 
     rows[0].repo = true;
     const withExplicitAnRepo = analyze(rows, { typos_apasxolhshs: 'MERIKH',

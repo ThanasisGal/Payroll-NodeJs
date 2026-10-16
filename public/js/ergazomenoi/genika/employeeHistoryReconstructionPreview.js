@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (applyButton) { applyButton.hidden = true; applyButton.disabled = true; }
     }
     function notice(titleText, text, icon) {
-        return Swal.fire({ titleText, text, icon, confirmButtonText: 'Κλείσιμο', allowOutsideClick: false,
+        return Swal.fire({ titleText, text, icon, confirmButtonText: 'Κλείσιμο', showCancelButton: false, allowOutsideClick: false,
             customClass: { title: 'custom-title', popup: 'custom-swal-popup employee-maintenance-swal', htmlContainer: 'custom-html-container',
                 confirmButton: 'class-warning custom-confirm-button custom-swal-button' } });
     }

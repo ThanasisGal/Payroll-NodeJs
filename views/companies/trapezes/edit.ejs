@@ -1,3 +1,4 @@
+<div class="maintenance-responsive-form companies-management-page company-details-page">
 <div class="margin-top-1rem">
     <div class="container-fluid height-vh-100 padding-0">
         <body data-mode="<%= mode %>" data-context="<%= context %>"></body>
@@ -11,15 +12,15 @@
 
                         <%- include('../../partials/_csrfField') %>
 
-                        <div class="card d-flex flex-column z-depth-5 w-80 margin-left-percent-10 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 companies-management-card">
 
-                            <div class="card-header p-2 height-rem-3_5">
+                            <div class="card-header p-0 height-rem-3_5 companies-search-header">
                                 <label class="text-center w-100 headers-content">
                                   Συντήρηση Τραπεζών
                                 </label>
                             </div>
 
-                            <div class="card-body overflow-auto flex-grow-1 w-100 height-vh-42 bg-white" id="cardBody">
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody">
                                 <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
                                 <input type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" />
                                 <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
@@ -48,7 +49,7 @@
                                 <div class="row form-group g-3 align-items-center mb-3 margin-top-1_5rem">
                                     <div class="col-2-5 right-align">
                                         <label
-                                            for="kodikos"
+                                            for="Kodikos"
                                             class="col-form-label label-font-size field-required">
                                             Κωδικός
                                         </label>
@@ -175,8 +176,8 @@
                                 </div>
 
                             </div>
-                            <div class="card-footer mt-auto cardFooter">
-                                <div class="d-inline-block d-flex cardFooter01">
+                            <div class="card-footer d-flex align-items-center companies-management-footer">
+                                <div class="d-flex align-items-center companies-management-actions company-details-actions">
                                     <button
                                         type="button"
                                         class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton">
@@ -214,3 +215,5 @@
 <script src="<%= script('common/moveByEnter') %>"></script>
 <script src="<%= script('common/clearableInputs') %>"></script>
 <script src="<%= script('companies/trapezes/loadMultiFieldsToHiddenInputs') %>"></script>
+
+</div>
