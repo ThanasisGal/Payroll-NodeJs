@@ -331,7 +331,7 @@ for (const width of [1440, 390]) {
                     await page.locator('.ts-overflow-popup').evaluate(element => element.remove());
                     assert.equal(before['.ts-single-reset-btn'].normal.height, 28);
                     assert.equal(before['.ts-multi-reset-btn'].normal.height, 28);
-                    for (const selector of ['form .submitButton', 'form .cardFooter01 a.btn']) {
+                    for (const selector of ['form .submitButton', 'form .card-footer .company-details-actions a.btn[href="/ergazomenoi/ergazomenoi"]']) {
                         const primary = await geometry(page.locator(selector));
                         assert.equal(primary.align, 'center'); assert.equal(primary.whiteSpace, 'nowrap');
                         assert.equal(primary.radius, 6); assert.equal(primary.border, primary.color);
