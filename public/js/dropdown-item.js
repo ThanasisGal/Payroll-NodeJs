@@ -193,8 +193,9 @@ export const initTomDropdown = ({
         plugins: [...(isMultiple ? ['remove_button'] : []), 'dropdown_input'],
 
         async load(searchText, callback) {
+            const requestId = hooks.guardAsyncResults ? (this._scopedRequestId = (this._scopedRequestId || 0) + 1) : null;
             const now = Date.now();
-            if (this._lastLoadTime && now - this._lastLoadTime < 150) {
+            if (!hooks.guardAsyncResults && this._lastLoadTime && now - this._lastLoadTime < 150) {
                 callback();
                 return;
             }
@@ -272,6 +273,7 @@ export const initTomDropdown = ({
                 const json = await fetch(urlToFetch, { signal: this._currentAbort.signal }).then(
                     (r) => r.json()
                 );
+                if (hooks.guardAsyncResults && (el.tomselect !== this || this._scopedRequestId !== requestId)) { callback(); return; }
                 let items = Array.isArray(json.items) ? json.items : [];
 
                 const vKey = this.settings.valueField || 'value';
@@ -1167,12 +1169,14 @@ export const initTomDropdown = ({
         if (content.scrollTop + content.clientHeight < content.scrollHeight - 50) return;
 
         instance._loadingNext = true;
+        const requestId = instance._scopedRequestId;
 
         const urlToFetch = instance.nextPage;
         const limit = getLimitFromUrl(urlToFetch);
 
         try {
             const json = await fetch(urlToFetch, { credentials: 'include' }).then((r) => r.json());
+            if (hooks.guardAsyncResults && (el.tomselect !== instance || instance._scopedRequestId !== requestId)) return;
             const items = Array.isArray(json.items) ? json.items : [];
 
             const hasMore = 'hasMore' in json ? Boolean(json.hasMore) : items.length === limit;

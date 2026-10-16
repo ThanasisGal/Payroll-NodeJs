@@ -1520,6 +1520,14 @@ router.get(
     erganhController.mainElegxosApasxolhseonPeriodoyForm
 );
 
+router.get(
+    '/api/prodhlomena-oraria/review/employees',
+    checkAuth,
+    requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'read'),
+    authorizeProgrammataSessionCompany,
+    require('../controllers/ergazomenoi/employmentReviewEmployeesController').createHandler()
+);
+
 router.get('/api/prodhlomena-oraria/review', checkAuth, requireEmploymentReviewAccess, erganhController.getProdhlomenaOrariaForReview);
 
 router.get(

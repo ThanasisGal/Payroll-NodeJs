@@ -58,6 +58,9 @@ elements.set('reviewEmployee', {
     replaceChildren() {}
 });
 elements.set('kodikos', { id: 'kodikos', value: '' });
+for (const [id, value] of [['apo_hmeromhnia', '2026-09-01'], ['eos_hmeromhnia', '2026-09-30']]) {
+    elements.set(id, { value, handlers: {}, addEventListener(event, callback) { this.handlers[event] = callback; } });
+}
 
 for (const [id, hiddenId] of [
     ['ypokatasthma', 'ypokatasthma_stathera_advanced']
@@ -135,7 +138,10 @@ vm.runInContext(source, sandbox, { filename: sourcePath });
     assert.strictEqual(employeeCall.disabledAtInitialization, false);
     assert.strictEqual(employeeCall.minChars, 1);
     assert.strictEqual(employeeCall.extraParams.ypokatasthma, '0001');
-    assert.strictEqual(employeeCall.extraParams.energoi, 'true');
+    assert.strictEqual(employeeCall.extraParams.apo_hmeromhnia, '2026-09-01');
+    assert.strictEqual(employeeCall.extraParams.eos_hmeromhnia, '2026-09-30');
+    assert.strictEqual(employeeCall.extraParams.energoi, undefined);
+    assert.strictEqual(employeeCall.hooks.guardAsyncResults, true);
     const rendered = employeeCall.render.option({ value: '0001', kodikos: '0001',
         eponymo: 'ΚΑΡΑΣΤΕΡΙΟΥ', onoma: 'ΑΓΓΕΛΙΚΗ' }, String);
     assert.match(rendered, /0001 — ΚΑΡΑΣΤΕΡΙΟΥ ΑΓΓΕΛΙΚΗ/);
@@ -153,6 +159,18 @@ vm.runInContext(source, sandbox, { filename: sourcePath });
     assert.strictEqual(initCalls[2].disabledAtInitialization, false);
     assert.strictEqual(elements.get('kodikos').value, '');
     assert.strictEqual(elements.get('reviewEmployee').disabled, false);
+
+    elements.get('kodikos').value = '0001';
+    elements.get('eos_hmeromhnia').value = '2026-10-31';
+    elements.get('eos_hmeromhnia').handlers.input();
+    assert.strictEqual(elements.get('kodikos').value, '');
+    assert.strictEqual(initCalls.at(-1).extraParams.eos_hmeromhnia, '2026-10-31');
+    const count = initCount;
+    elements.get('eos_hmeromhnia').handlers.change();
+    assert.strictEqual(initCount, count, 'same scope is initialized only once');
+    elements.get('apo_hmeromhnia').value = '2026-11-01';
+    elements.get('apo_hmeromhnia').handlers.input();
+    assert.strictEqual(elements.get('reviewEmployee').disabled, true);
 
     branch.clear(false);
     await new Promise((resolve) => setTimeout(resolve, 10));

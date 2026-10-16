@@ -65,19 +65,28 @@ function employeeOptionHtml(item, escape) {
 function clearEmployeeSelection() {
     const select = document.getElementById(REVIEW_EMPLOYEE_ID);
     const hidden = document.getElementById('kodikos');
+    select?.tomselect?._currentAbort?.abort();
     select?.tomselect?.destroy();
     if (select) { select.replaceChildren(); select.disabled = true; }
     if (hidden) hidden.value = '';
 }
 
+let employeeScopeKey = '';
+
 function initializeEmployee(branch) {
     const select = document.getElementById(REVIEW_EMPLOYEE_ID);
+    const apo = document.getElementById('apo_hmeromhnia')?.value || '';
+    const eos = document.getElementById('eos_hmeromhnia')?.value || '';
+    const scopeKey = [branch, apo, eos].join('|');
+    if (scopeKey === employeeScopeKey && select?.tomselect) return select.tomselect;
+    employeeScopeKey = scopeKey;
     clearEmployeeSelection();
-    if (!select || !branch) return null;
+    if (!select || !branch || !apo || !eos || apo > eos) return null;
     select.disabled = false;
     const instance = initTomDropdown({ selector: `#${REVIEW_EMPLOYEE_ID}`,
         url: select.dataset.api,
-        extraParams: { ypokatasthma: branch, energoi: 'true' }, minChars: 1,
+        extraParams: { ypokatasthma: branch, apo_hmeromhnia: apo, eos_hmeromhnia: eos }, minChars: 1,
+        hooks: { guardAsyncResults: true },
         render: { option: employeeOptionHtml, item: employeeOptionHtml } });
     instance?.enable?.();
     return instance;
@@ -119,6 +128,12 @@ function initialize(id) {
 document.addEventListener('DOMContentLoaded', async () => {
     initialize(REVIEW_BRANCH_ID);
     bindBranch(REVIEW_BRANCH_ID, initializeEmployee);
+    for (const id of ['apo_hmeromhnia', 'eos_hmeromhnia']) {
+        const input = document.getElementById(id);
+        const refresh = () => initializeEmployee(currentBranch(REVIEW_BRANCH_ID));
+        input?.addEventListener('input', refresh);
+        input?.addEventListener('change', refresh);
+    }
     const initialBranch = normalizedBranch(hiddenFor(REVIEW_BRANCH_ID)?.value);
     if (initialBranch) {
         await setBranch(REVIEW_BRANCH_ID, initialBranch, true);

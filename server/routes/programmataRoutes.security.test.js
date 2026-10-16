@@ -7,6 +7,7 @@ const path = require('path');
 const routes = fs.readFileSync(path.join(__dirname, 'usersRoute.js'), 'utf8');
 
 const contracts = [
+    ['GET', '/api/prodhlomena-oraria/review/employees', "requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/programmaErgasias', "requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/ergazomenoi/programmata/antigrafhProgrammaton', "requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'read')", 'authorizeProgrammataSessionCompany'],
     ['GET', '/api/getAllErgazomenoi/:selectedTeam/:selectedCompany', "requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'read')", 'authorizeProgrammataList'],
