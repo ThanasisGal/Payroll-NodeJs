@@ -91,8 +91,15 @@ for (const width of [1440, 390]) test(`contract History, review borders and side
         await review.hover(); await page.waitForTimeout(200);
         assert.equal(await review.evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(121, 85, 72)');
         await page.mouse.move(0, 0); await capture('history-review');
+        // Bootstrap adds .show before the opening transition ends and ignores hide() during it.
+        // Register before opening so even a synchronous shown event cannot be missed.
+        await page.locator('#istorikoDetailsModal').evaluate(modal => {
+            window.__istorikoDetailsShown = false;
+            modal.addEventListener('shown.bs.modal', () => { window.__istorikoDetailsShown = true; }, { once: true });
+        });
         await page.locator('.istoriko-row').first().dblclick();
         await page.locator('#istorikoDetailsModal.show').waitFor();
+        await page.waitForFunction(() => window.__istorikoDetailsShown === true);
         const details = page.locator('#istorikoDetailsBody');
         assert.match(await details.innerText(), /0001\s*-\s*ΒΟΗΘΟΣ ΣΕΡΒΙΤΟΡΟΥ/);
         const items = details.locator('.istoriko-contract-elements-table tbody tr:not(.istoriko-modal-totals-row)');
