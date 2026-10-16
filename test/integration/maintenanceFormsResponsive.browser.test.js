@@ -117,7 +117,8 @@ test(`${suiteName}: typography, tabs, collision bounds and scroll reachability`,
                         const style=getComputedStyle(container);
                         const contentWidth=parseFloat(style.width)-(style.boxSizing==='border-box'
                             ? ['paddingLeft','paddingRight','borderLeftWidth','borderRightWidth'].reduce((sum,key)=>sum+parseFloat(style[key]),0):0);
-                        return Math.min(rem,Math.max((footer ? .85 : .9)*rem,(footer ? .72 : .78)*rem+.0025*contentWidth));
+                        const footerMinimum=scope.matches('.employee-add-page,.employee-edit-page') ? .875 : .85;
+                        return Math.min(rem,Math.max((footer ? footerMinimum : .9)*rem,(footer ? .72 : .78)*rem+.0025*contentWidth));
                     };
                     const visible=e=>e.getClientRects().length && getComputedStyle(e).visibility!=='hidden' && !e.matches('select.tomselected,.sr-only,.visually-hidden');
                     const box=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
@@ -126,6 +127,13 @@ test(`${suiteName}: typography, tabs, collision bounds and scroll reachability`,
                     const collisions=[], clipped=[];
                     const measurements=buttons.map(e=>{
                         const r=box(e),s=getComputedStyle(e),row=e.closest('.row.form-group');
+                        const wrappedPdf=e.matches('.employee-edit-page .employee-fixed-left-fields .pdf-button-wrapper > :is(a.buttons-content,.pdf-upload-btn), :is(.employee-add-page,.employee-edit-page) :is(#customButton_oysiodeis_oroi,#customButton_allodapoi,#customButton_arxeio_symbashs)');
+                        const textRects=[],walker=document.createTreeWalker(e,NodeFilter.SHOW_TEXT);
+                        while(walker.nextNode())if(walker.currentNode.textContent.trim()){
+                            const range=document.createRange();range.selectNodeContents(walker.currentNode);
+                            textRects.push(...range.getClientRects());
+                        }
+                        const captionContained=textRects.every(t=>t.left>=r.left-1&&t.right<=r.right+1&&t.top>=r.top-1&&t.bottom<=r.bottom+1);
                         if(row) for(const target of row.querySelectorAll('label,input:not([type="hidden"]),select,.ts-control,button,.btn')) {
                             if(target===e||e.contains(target)||!visible(target)||target.contains(e))continue;
                             if(intersects(r,box(target)))collisions.push([e.id||e.textContent.trim(),target.id||target.textContent.trim()]);
@@ -138,7 +146,7 @@ test(`${suiteName}: typography, tabs, collision bounds and scroll reachability`,
                         const column=e.matches('#select-all,#clear-image') && e.closest('.company-diafora-scroll-container')?box(e.parentElement):null;
                         if(e.scrollWidth>e.clientWidth+1||(!localScroll && (r.right>innerWidth+1||r.left<0))
                             ||(column && (r.left<column.left-1||r.right>column.right+1)))clipped.push({id:e.id||e.textContent.trim(),width:r.width,scroll:e.scrollWidth,client:e.clientWidth,parent:box(e.parentElement),column:box(e.closest('.row > div')||e.parentElement)});
-                        return {text:e.textContent.trim(),...r,companyFooter:!!e.closest('.companies-management-footer'),expectedCompanyFont:scope.matches('.companies-management-page')?companyFont(e,!!e.closest('.companies-management-footer')):null,font:parseFloat(s.fontSize),weight:s.fontWeight,radius:s.borderRadius,nowrap:s.whiteSpace};
+                        return {id:e.id,wrappedPdf,captionContained,text:e.textContent.trim(),...r,companyFooter:!!e.closest('.companies-management-footer'),employeeFooter:!!e.closest(':is(.employee-add-page,.employee-edit-page) .companies-management-footer'),expectedCompanyFont:scope.matches('.companies-management-page')?companyFont(e,!!e.closest('.companies-management-footer')):null,font:parseFloat(s.fontSize),weight:s.fontWeight,radius:s.borderRadius,nowrap:s.whiteSpace};
                     });
                     const inputs=[...scope.querySelectorAll('.form-control:not([type="hidden"]),.form-select')].filter(visible);
                     const tabs=[...scope.querySelectorAll('.menu_Links li')].filter(visible).map(box);
@@ -154,9 +162,24 @@ test(`${suiteName}: typography, tabs, collision bounds and scroll reachability`,
                 assert.equal(result.viewportOverflow,false,`${label}: page overflow`);
                 for(const b of result.buttons){
                     if(b.expectedCompanyFont!==null)assert.ok(Math.abs(b.font-b.expectedCompanyFont)<.05,`${label}: company action scale ${b.font} expected ${b.expectedCompanyFont}`);
-                    assert.ok(b.font>=(b.companyFooter ? .85*result.rem : 14.4),`${label}: font ${b.font}`);assert.equal(b.weight,'400',`${label}: ${b.text} weight`);
+                    assert.ok(b.font>=(b.employeeFooter ? 14 : b.companyFooter ? .85*result.rem : 14.4),`${label}: font ${b.font}`);assert.equal(b.weight,'400',`${label}: ${b.text} weight`);
                     if(result.inputs.length && !b.companyFooter)assert.ok(Math.abs(b.font-result.inputs[0].font)<.05,`${label}: field/action font mismatch ${JSON.stringify(b)} input ${result.inputs[0].font}`);
-                    assert.equal(b.nowrap,'nowrap');
+                    assert.equal(b.nowrap,b.wrappedPdf?'normal':'nowrap',`${label}: ${b.text} white-space ${JSON.stringify(b)}`);
+                    if(b.wrappedPdf){
+                        assert.ok(b.captionContained,`${label}: PDF caption clipped ${JSON.stringify(b)}`);
+                        const action=page.locator('#'+b.id);
+                        await action.scrollIntoViewIfNeeded();
+                        assert.ok(await action.evaluate(e=>{
+                            // Bootstrap deliberately excludes disabled buttons from hit testing.
+                            // Probe the enabled fixture state, then restore it without clicking.
+                            const disabled=e.disabled;
+                            try {
+                                e.disabled=false;
+                                const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+                                return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1&&!!hit&&e.contains(hit);
+                            } finally { e.disabled=disabled; }
+                        }),`${label}: PDF action inaccessible ${b.id}`);
+                    }
                 }
                 for(const input of result.inputs)if(input.expectedCompanyFont!==null)assert.ok(Math.abs(input.font-input.expectedCompanyFont)<.05,`${label}: company field scale ${input.font} expected ${input.expectedCompanyFont}`);
                 for(const footer of result.companyFooterFonts)assert.ok(Math.abs(footer.font-footer.expected)<.05,`${label}: company footer scale ${footer.font} expected ${footer.expected}`);

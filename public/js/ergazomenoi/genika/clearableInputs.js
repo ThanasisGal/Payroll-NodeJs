@@ -6,6 +6,8 @@ function initClearableInputs(container = document) {
     const inputs = container.querySelectorAll('input[type="text"], input[type="date"], input[type="time"]');
     
     inputs.forEach(input => {
+        // Τα εσωτερικά πεδία του Tom Select διατηρούν τη δική τους διάταξη και καθαρισμό.
+        if (input.closest('.employee-add-page, .employee-edit-page') && input.closest('.ts-wrapper')) return;
         // Skip αν ήδη wrapped
         if (input.parentElement?. classList.contains('clearable-wrapper')) {
             return;

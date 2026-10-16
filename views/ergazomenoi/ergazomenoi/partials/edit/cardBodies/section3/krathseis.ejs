@@ -73,14 +73,6 @@
 				data-preselect=<%= `krathsh_${idNum}` %> data-preload-all="false" data-pad-length="4"
 				data-row-index="<%= idNum %>" data-external-reset="true" placeholder="Αναζήτηση Κρατήσεων">
 			</select>
-		</div>
-
-		<div class="col-0-2"></div>
-
-		<div class="col-1-5 employee-ama-field">
-			<input type="text" name="ama_krathshs_<%= idNum %>" id="ama_krathshs_<%= idNum %>" aria-label="Α.Μ.Α. κράτησης <%= idNum %>" class="form-control input-contents"
-				value="<%= safe(`ama_krathshs_${idNum}`) %>" />
-		</div>
 		<button
 			type="button"
 			class="btn rounded-4 col-0-3 border-0 edit-employee-tom-trash edit-krathseis-tom-trash"
@@ -91,12 +83,21 @@
 			hidden>
 			<i class="bi bi-trash3 cdarkred"></i>
 		</button>
+		</div>
+
+		<div class="col-0-2"></div>
+
+		<div class="col-1-5 employee-ama-field">
+			<input type="text" name="ama_krathshs_<%= idNum %>" id="ama_krathshs_<%= idNum %>" aria-label="Α.Μ.Α. κράτησης <%= idNum %>" class="form-control input-contents"
+				value="<%= safe(`ama_krathshs_${idNum}`) %>" />
+		</div>
+
 
 
 	</div>
 <% } %>
 
-<hr class="hr-style-5" />
+<hr class="employee-retention-divider" />
 
 <div class="row form-group g-3 align-items-start employee-fund-fields margin-left--1rem margin-right--1rem mt-2">
 	<input

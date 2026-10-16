@@ -12,6 +12,24 @@ const artifactDir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
 
 function measure() {
     const main = document.querySelector('main');
+    const employeeForm=main.querySelector('.employee-add-page,.employee-edit-page');
+    const rem=parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const textBoxes=e=>{
+        const walker=document.createTreeWalker(e,NodeFilter.SHOW_TEXT),rects=[];
+        while(walker.nextNode())if(walker.currentNode.textContent.trim()){
+            const range=document.createRange();range.selectNodeContents(walker.currentNode);
+            rects.push(...range.getClientRects());
+        }
+        return rects;
+    };
+    const intersects=(a,b)=>a.x<a.right&&a.y<a.bottom&&b.x<b.right&&b.y<b.bottom&&a.x<b.right-1&&b.x<a.right-1&&a.y<b.bottom-1&&b.y<a.bottom-1;
+    const queryWidth=e=>{
+        let c=e.parentElement;
+        while(c&&getComputedStyle(c).containerType==='normal')c=c.parentElement;
+        if(!c)throw new Error('Missing action query container');
+        const s=getComputedStyle(c);
+        return parseFloat(s.width)-(s.boxSizing==='border-box'?['paddingLeft','paddingRight','borderLeftWidth','borderRightWidth'].reduce((n,k)=>n+parseFloat(s[k]),0):0);
+    };
     const visible = e => !!e?.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
     const box = e => {const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
     const renderedField = e => e.tomselect?.control || e;
@@ -34,23 +52,44 @@ function measure() {
         const s=getComputedStyle(e);return {id:e.id,font:s.fontSize,weight:s.fontWeight,clipped:e.scrollWidth>e.clientWidth+1};
     });
     for(const field of navigation)if(parseFloat(field.font)<13.59||field.clipped)problems.push({kind:'navigation',...field});
+    for(const heading of main.querySelectorAll('.card-header :is(h4,.headers-content)'))if(employeeForm&&visible(heading)){
+        const font=parseFloat(getComputedStyle(heading).fontSize);
+        if(font<1.2*rem-.01||font>1.4*rem+.01||heading.scrollWidth>heading.clientWidth+1)problems.push({kind:'card-header',font,text:heading.textContent.trim()});
+    }
     for (const label of main.querySelectorAll('label[for]')) {
         if (!visible(label) || label.matches('.sr-only,.visually-hidden') || label.closest('table')) continue;
         const named=document.getElementById(label.htmlFor);
         const target = label.control || fields.find(e=>e.tomselect&&(e.tomselect.control===named||e.tomselect.control_input===named));
         if (!named || named.matches('input[type="hidden"]')) problems.push({kind:'label-target',id:label.htmlFor,text:label.textContent.trim()});
         if (!target || !visible(renderedField(target))) continue;
-        const field=renderedField(target), l=box(label), f=box(field.closest('.payroll-field-inputs, .payroll-field-inline')||field);
+        const field=renderedField(target), l=box(label), f=box(field.closest('.employee-add-date-pair, .payroll-field-inputs, .payroll-field-inline')||field);
         if(!l.width || !f.width)continue;
         const checkbox=target.matches('[type="checkbox"],[type="radio"]');
+        // Compare actual column edges, including flattened display:contents wrappers.
+        let row=label.closest('.employee-fixed-left-fields,.employee-fixed-right-fields,.row.form-group,.employee-add-fixed-identity-row');
+        if(row&&getComputedStyle(row).display==='contents')row=row.parentElement;
+        const columns=row?[...row.children].flatMap(e=>getComputedStyle(e).display==='contents'?[...e.children]:[e]).filter(visible):[];
+        const lc=columns.find(e=>e.contains(label)),fc=columns.find(e=>e.contains(field));
+        const li=columns.indexOf(lc),fi=columns.indexOf(fc);
+        const adjacentColumns=employeeForm&&lc&&fc&&li<fi&&columns.slice(li+1,fi).every(e=>!e.querySelector('label,input:not([type="hidden"]),select,textarea'));
+        const columnGap=adjacentColumns?box(fc).x-box(lc).right:Infinity;
+        const grid=row&&getComputedStyle(row).display==='grid';
+        const labelEdge=grid&&lc&&getComputedStyle(lc).gridColumnStart==='1'?box(row).x+parseFloat(getComputedStyle(row).gridTemplateColumns):lc?box(lc).right:0;
+        const fieldEdge=grid&&fc&&getComputedStyle(fc).gridColumnStart==='2'?box(row).right:fc?box(fc).right:0;
+        const columnAligned=adjacentColumns&&columnGap>=-2
+            &&l.x>=box(lc).x-2&&l.right<=labelEdge+2
+            &&f.x>=box(fc).x-2&&f.right<=fieldEdge+2;
         const beside=Math.abs(l.y+l.height/2-f.y-f.height/2)<=Math.max(8,l.height/2)
-            && (l.right<=f.x+2 || f.right<=l.x+2) && Math.min(Math.abs(l.right-f.x),Math.abs(f.right-l.x))<=48;
+            && (l.right<=f.x+2 || f.right<=l.x+2)
+            && (Math.min(Math.abs(l.right-f.x),Math.abs(f.right-l.x))<=48||columnAligned);
         const above=l.bottom<=f.y+2 && f.y-l.bottom<=28 && l.x>=f.x-2 && l.x<f.right;
         const group=label.closest('.payroll-field-group');
         const contains=checkbox&&label.contains(target);
         const coherentHint=group&&group.contains(target)&&label.htmlFor&&[...group.querySelectorAll('label')].some(h=>h!==label&&h.htmlFor===label.htmlFor&&h.getBoundingClientRect().bottom<=f.y+2)
             &&l.bottom<=f.y+2&&l.x>=group.getBoundingClientRect().left-2&&l.x<group.getBoundingClientRect().right;
         if ((!beside&&!above&&!contains&&!coherentHint) || (group&&!group.contains(target))) problems.push({kind:'label',id:target.id,text:label.textContent.trim(),label:l,field:f,checkbox});
+        if(label.scrollWidth>label.clientWidth+1||label.scrollHeight>label.clientHeight+1)problems.push({kind:'label-clipping',id:target.id,text:label.textContent.trim()});
+        if(!contains&&textBoxes(label).some(r=>intersects(r,box(field))))problems.push({kind:'label-overlap',id:target.id,text:label.textContent.trim()});
         labels.push({id:target.id,group:!!group,beside,above,coherentHint:!!coherentHint,contains});
     }
     const fonts=[];
@@ -65,11 +104,18 @@ function measure() {
         const peer=fields.find(e=>region.contains(e)&&!e.matches('[type="checkbox"],[type="radio"],[type="file"]'));
         const peerFont=peer?getComputedStyle(renderedField(peer)).fontSize:null;
         fonts.push({id:button.id,text:button.textContent.trim(),font:s.fontSize,weight:s.fontWeight,peerFont});
+        const employeeFooter=employeeForm&&button.closest('.companies-management-footer');
         const maxFont=button.closest('#employmentReviewWorkspace')?16.81:16.1;
-        if(parseFloat(s.fontSize)<14.39||parseFloat(s.fontSize)>maxFont)problems.push({kind:'button-readability',...fonts.at(-1)});
-        if(peerFont&&Math.abs(parseFloat(peerFont)-parseFloat(s.fontSize))>.1)problems.push({kind:'font',...fonts.at(-1)});
+        const minFont=employeeFooter?14:14.39;
+        if(parseFloat(s.fontSize)<minFont||parseFloat(s.fontSize)>maxFont)problems.push({kind:'button-readability',...fonts.at(-1)});
+        if(employeeFooter){
+            const expected=Math.min(rem,Math.max(.875*rem,.72*rem+.0025*queryWidth(button)));
+            if(Math.abs(parseFloat(s.fontSize)-expected)>.05)problems.push({kind:'footer-font',expected,...fonts.at(-1)});
+        }
+        if(!employeeFooter&&peerFont&&Math.abs(parseFloat(peerFont)-parseFloat(s.fontSize))>.1)problems.push({kind:'font',...fonts.at(-1)});
         if(s.fontWeight!=='400')problems.push({kind:'weight',...fonts.at(-1)});
-        if(button.scrollWidth>button.clientWidth+1)problems.push({kind:'caption',id:button.id,text:button.textContent.trim(),box:b,scroll:button.scrollWidth,client:button.clientWidth});
+        if(employeeFooter&&(b.height<34||b.height>42))problems.push({kind:'footer-height',...fonts.at(-1),height:b.height});
+        if(button.scrollWidth>button.clientWidth+1||button.scrollHeight>button.clientHeight+1||textBoxes(button).some(r=>r.x<b.x-1||r.right>b.right+1||r.y<b.y-1||r.bottom>b.bottom+1))problems.push({kind:'caption',id:button.id,text:button.textContent.trim(),box:b,scroll:button.scrollWidth,client:button.clientWidth});
         if(!button.closest('table,.table-responsive,.maintenance-table-scroll,.payroll-entry-table')&&(b.x<main.getBoundingClientRect().x-2||b.right>innerWidth+1))problems.push({kind:'button-width',id:button.id,text:button.textContent.trim(),box:b});
         for(const field of fields.map(renderedField)){
             if(button.contains(field)||field.contains(button))continue;
@@ -80,7 +126,16 @@ function measure() {
         }
     }
     for(const field of fields.map(renderedField)){
-        if(field.closest('.employee-fund-fields')&&field.getBoundingClientRect().width<160)problems.push({kind:'fund-control-width',width:field.getBoundingClientRect().width});
+        if(field.closest('.employee-fund-fields')){
+            const cell=field.closest('.edit-employee-tom-field'),trash=cell?.querySelector('button[data-tom-target]');
+            const items=[...field.querySelectorAll('.item')];
+            const b=box(field);
+            if(b.width<=0||items.some(e=>e.scrollWidth>e.clientWidth+1||e.scrollHeight>e.clientHeight+1||textBoxes(e).some(r=>r.x<b.x-1||r.right>b.right+1||r.y<b.y-1||r.bottom>b.bottom+1)))problems.push({kind:'fund-value-clipping',id:field.id,box:b});
+            if(trash&&visible(trash)){
+                const t=box(trash),c=box(cell);
+                if(intersects(t,b)||t.right>c.right+1||Math.abs(t.y+t.height/2-b.y-b.height/2)>1)problems.push({kind:'fund-trash',id:field.id,box:b,trash:t});
+            }
+        }
         if(field.closest('.payroll-tax-row')&&field.getBoundingClientRect().width<120)problems.push({kind:'tax-value-width',id:field.id,width:field.getBoundingClientRect().width});
         if(field.closest('table,.table-responsive,.maintenance-table-scroll,.payroll-entry-table'))continue;
         const b=box(field);
@@ -88,8 +143,24 @@ function measure() {
     }
     for(const reset of main.querySelectorAll('.ts-wrapper > .ts-fill-reset-btn:not([hidden])')){
         if(!visible(reset))continue;
-        const r=box(reset),w=box(reset.closest('.ts-wrapper'));
-        if(r.x<w.x-1||r.right>w.right+1||r.y<w.y-1||r.bottom>w.bottom+1)problems.push({kind:'tom-reset',id:reset.closest('.ts-wrapper').previousElementSibling?.id,box:r,wrapper:w});
+        const wrapper=reset.closest('.ts-wrapper'),r=box(reset),w=box(wrapper),c=box(wrapper.parentElement);
+        const external=employeeForm&&reset.closest('.company-details-page .card-body');
+        const geometryOk=external?r.x>=w.right&&Math.abs(r.x-w.right-.25*rem)<=1&&r.right<=c.right+1&&Math.abs(r.y+r.height/2-w.y-w.height/2)<=1:r.x>=w.x-1&&r.right<=w.right+1&&r.y>=w.y-1&&r.bottom<=w.bottom+1;
+        const painted=paintedBox(reset);
+        const hit=painted.x<painted.right&&painted.y<painted.bottom?document.elementFromPoint((painted.x+painted.right)/2,(painted.y+painted.bottom)/2):null;
+        const centerVisible=r.x+r.width/2>=painted.x&&r.x+r.width/2<=painted.right&&r.y+r.height/2>=painted.y&&r.y+r.height/2<=painted.bottom;
+        let covered=centerVisible&&hit&&!reset.contains(hit);
+        if(!centerVisible){
+            // Offscreen actions must become reachable through their existing scroll containers.
+            const positions=[];
+            for(let e=reset.parentElement;e;e=e.parentElement)positions.push([e,e.scrollLeft,e.scrollTop]);
+            reset.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+            const b=box(reset),target=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2);
+            covered=!target||!reset.contains(target);
+            for(const [e,left,top]of positions)e.scrollTo({left,top,behavior:'instant'});
+        }
+        const collision=fields.map(renderedField).some(f=>f!==wrapper.querySelector('.ts-control')&&!wrapper.contains(f)&&intersects(paintedBox(f),painted));
+        if(!geometryOk||covered||collision||r.x<main.getBoundingClientRect().x-1||r.right>innerWidth+1||!(reset.getAttribute('aria-label')||reset.title)||reset.disabled)problems.push({kind:'tom-reset',id:reset.closest('.ts-wrapper').previousElementSibling?.id,box:r,wrapper:w});
     }
     const tabs=[...main.querySelectorAll('.menu_Links li')].filter(visible).map(box);
     for(const heading of main.querySelectorAll('.employee-retention-heading > .col-1 label'))if(visible(heading)&&heading.getBoundingClientRect().height>parseFloat(getComputedStyle(heading).lineHeight)+17)problems.push({kind:'retention-heading-wrap'});

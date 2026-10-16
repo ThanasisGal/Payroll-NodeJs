@@ -8684,7 +8684,7 @@ tbody .group-row--category:first-of-type > td {
     background-color: #1a500144;
     border-radius: 4px;
 }
-#accordion .accordion-item {
+#accordion .accordion-item:not(:where(:is(.employee-add-page, .employee-edit-page) .accordion-item)) {
     margin-bottom: 0.25rem !important;
 }
 
@@ -12642,6 +12642,14 @@ body.loader-active > *:not(.app-loader) {
     text-overflow: ellipsis;
 }
 
+.employee-edit-page #istorikoTable thead th.istoriko-work-terms-heading {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+
 .istoriko-col-aa {
     width: 4.5rem;
 }
@@ -12881,6 +12889,11 @@ body.loader-active > *:not(.app-loader) {
     width: 12.5%;
     text-align: right;
     white-space: nowrap;
+}
+
+/* Μόνο οι δύο επικεφαλίδες ποσών του Ιστορικού στη Διόρθωση. */
+.employee-edit-page #istorikoDetailsModal .istoriko-contract-elements-table th.istoriko-modal-money-col {
+    text-align: right !important;
 }
 
 .istoriko-modal-totals-row td {
@@ -17209,6 +17222,10 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 .history-preview-contract-items { width: 100%; margin-top: .8rem; border-collapse: collapse; font-size: .9rem; }
 .history-preview-contract-items th, .history-preview-contract-items td { padding: .6rem .4rem; border-bottom: 1px solid #dee2e6; overflow-wrap: anywhere; vertical-align: middle; }
 .history-preview-contract-items th { font-weight: 600; }
+.history-preview-contract-items thead th:nth-child(3),
+.history-preview-contract-items thead th:nth-child(4) {
+    text-align: right;
+}
 .history-preview-contract-items td:nth-child(n+3) { text-align: right; white-space: nowrap; }
 @media (max-width: 575.98px) {
     .history-preview-contract-items, .history-preview-contract-items tbody, .history-preview-contract-items tr, .history-preview-contract-items td { display: block; width: 100%; }
@@ -18011,7 +18028,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     flex: 0 0 100% !important;
     width: 100% !important;
 }
-.employee-maintenance-form .accordion-item { margin-block: .5rem !important; }
+.employee-maintenance-form .accordion-item:not(:where(:is(.employee-add-page, .employee-edit-page) .accordion-item)) { margin-block: .5rem !important; }
 .employee-maintenance-form .accordion-header { margin: 0; }
 .employee-maintenance-form .accordion-button {
     width: 100% !important;
@@ -18019,7 +18036,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     padding: .65rem .9rem;
     font-size: var(--maintenance-control-font) !important;
 }
-.employee-maintenance-form .accordion-body > .row.form-group {
+.employee-maintenance-form .accordion-body > .row.form-group:not(:where(.employee-add-fixed-details .row.form-group)) {
     margin-block: .5rem !important;
 }
 .maintenance-responsive-form :is(th, td, .page-link, .small) {
@@ -18204,6 +18221,12 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
 .employee-maintenance-form .employee-retention-row > :is(.col-0-2, .col-0-3):not(button) { display: none; }
 .employee-maintenance-form .employee-retention-row > .employee-ama-field { padding-inline: 0; }
 .employee-maintenance-form .employee-retention-row > .edit-employee-tom-trash { flex: 0 0 1.75rem; width: 1.75rem; padding: 0; }
+/* Προσθήκη / Κρατήσεις: η διαχωριστική γραμμή χωρά χωρίς τα αρνητικά περιθώρια της hr-style-5. */
+:is(.employee-add-page, .employee-edit-page) .employee-retention-divider {
+    margin-block: 3.2rem .2rem;
+    margin-inline: 0;
+    color: #000000;
+}
 .employee-maintenance-form .employee-retention-heading { flex-wrap: nowrap; gap: .5rem; margin-inline: 0; }
 .employee-maintenance-form .employee-retention-heading > .col-1 { flex: 0 0 2rem; width: 2rem; padding-inline: 0; white-space: nowrap; }
 .employee-maintenance-form .employee-retention-heading > .col-8 { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 0; }
@@ -19413,6 +19436,11 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     }
 }
 
+/* Ίδιο μοντέλο περιγράμματος με το σώμα, ώστε οι οκτώ στήλες να συμπίπτουν. */
+.employee-list-page #myTableHeader { border-collapse: separate; border-spacing: 0; }
+/* Διατήρηση του αρχικού ελάχιστου πλάτους των οκτώ στηλών (8 × 8rem). */
+.employee-list-page .maintenance-table-inner { min-width: 64rem; }
+
 /* Αναζήτηση εταιρειών: προοδευτική κλίμακα από το συμπαγές πρότυπο κεφαλίδας. */
 .payroll-form-layout .companies-management-page .companies-search-header {
     min-height: clamp(3rem, 1rem + 3.35vw, 4rem);
@@ -19637,4 +19665,523 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     height: var(--clear-size, 1.4rem);
     margin: 0;
     line-height: 1;
+}
+
+/* Απόκρυψη ανενεργών καρτελών προσθήκης ήδη πριν από την αρχικοποίηση JavaScript. */
+:is(.employee-add-page, .employee-edit-page) .sections > section:not(.visible) {
+    display: none;
+}
+
+/* Προσθήκη: κεφαλίδες accordions από άκρη σε άκρη, με ίδιο εσωτερικό χώρο πεδίων. */
+:is(.employee-add-page, .employee-edit-page) .card-body:has(> .accordion) {
+    padding: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .card-body > .accordion {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .accordion-item {
+    margin: 4px 0 0 !important;
+    /* Ίδιο ορατό περίγραμμα, χωρίς να δεσμεύει χώρο γύρω από την κεφαλίδα. */
+    border: 0;
+    outline: var(--bs-accordion-border-width) solid var(--bs-accordion-border-color);
+    outline-offset: calc(-1 * var(--bs-accordion-border-width));
+}
+:is(.employee-add-page, .employee-edit-page) .card-body > .accordion > .accordion-item > .accordion-collapse > .accordion-body {
+    margin-block: 0 !important;
+    padding-inline: calc(var(--bs-accordion-body-padding-x, 1.25rem) + var(--bs-card-spacer-x, 1rem) + var(--bs-accordion-border-width, 1px));
+}
+
+/* Οι αρχικές αναλογίες χωρούν στο διαθέσιμο πλάτος, χωρίς υποχρεωτική γραμμή 64rem. */
+:is(.employee-add-page, .employee-edit-page) section:not(.employee-add-fixed-details) .card-body .row.form-group {
+    flex-wrap: wrap;
+    min-width: 0;
+    margin-inline: 0 !important;
+}
+:is(.employee-add-page, .employee-edit-page) section:not(.employee-add-fixed-details) .card-body .row.form-group > div {
+    flex-shrink: 1;
+}
+/* Μόνο Αλλοδαποί της προσθήκης: διαχωριστικά μέσα στο διαθέσιμο πλάτος. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-divider {
+    margin: .4vh 0 1rem;
+    color: #000000;
+}
+/* Ίδιο δεξί άκρο με τη γραμμή αριθμού: col-0-5 + col-9-3 + col-2. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-date-row {
+    --foreign-date-min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px);
+    display: grid;
+    grid-template-columns: max(var(--bs-gutter-x, 1rem), 4.17%) minmax(0, 1fr) minmax(calc(var(--foreign-date-min-width) + var(--bs-gutter-x, 1rem)), 16.66666667%) 1.66%;
+    font-size: var(--payroll-control-font);
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-date-label {
+    grid-column: 2;
+    min-width: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-date-column {
+    grid-column: 3;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-date-control {
+    /* Διατήρηση του πλάτους col-1-5 μέσα στη δεξιά στήλη col-2, μαζί με τα αρχικά gutters. */
+    flex: 0 0 auto;
+    width: max(var(--foreign-date-min-width), calc(75% - var(--bs-gutter-x, 1rem) * .25));
+    min-width: var(--foreign-date-min-width);
+}
+/* Μόνο Κατάρτιση της προσθήκης: το Έως τελειώνει στη στήλη του Έτους Απόκτησης. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-training-duration-row {
+    --training-date-min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px);
+    display: grid;
+    grid-template-columns: 16.66666667% max(12.5%, calc(var(--training-date-min-width) + var(--bs-gutter-x, 1rem))) minmax(0, 1fr) 16.66666667% max(12.5%, calc(var(--training-date-min-width) + var(--bs-gutter-x, 1rem))) 2.08333333%;
+    font-size: var(--payroll-control-font);
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-training-duration-row > div {
+    width: auto !important;
+}
+:is(.employee-add-page, .employee-edit-page) .card-body .row.form-group.employee-add-training-duration-row > .employee-add-training-end-column {
+    min-width: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-training-end-control {
+    flex: 0 0 auto;
+    width: max(100%, var(--training-date-min-width));
+    min-width: var(--training-date-min-width);
+}
+/* Σταθερά Στοιχεία: χωρίς το ελάχιστο πλάτος 64rem και το διπλό κάθετο κενό g-3. */
+.employee-add-fixed-details .accordion-body {
+    padding-block: .25rem 0;
+}
+.employee-add-fixed-details .accordion-body > .row.form-group {
+    --bs-gutter-y: 0;
+    flex-wrap: nowrap;
+    min-width: 0;
+    margin: calc(.2rem + var(--employee-add-row-extra-top, 0px)) 0 .2rem !important;
+}
+.employee-add-fixed-details .employee-add-unemployment-row {
+    --employee-add-row-extra-top: 12px;
+}
+/* Αφαιρούνται μόνο τα κενά στα δύο άκρα· οι ενδιάμεσες γραμμές μένουν ίδιες. */
+.employee-add-fixed-details .accordion-body > .row.form-group:first-of-type {
+    margin-top: 0 !important;
+}
+.employee-add-fixed-details .accordion-body > .row.form-group:last-child {
+    margin-bottom: 0 !important;
+}
+.employee-add-fixed-details .accordion-body > .row.form-group > div {
+    flex-shrink: 1;
+    margin-block: 0 !important;
+}
+.employee-add-fixed-details .accordion-body > .row.form-group > div:has(> input[type="checkbox"]) {
+    min-width: max-content;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .card-body .col-form-label {
+    font-size: clamp(.7rem, .7vw, 1rem) !important;
+}
+/* Η σειρά ταυτότητας έχει δική της ανοιχτόχρωμη ζώνη, κάτω από τον πράσινο τίτλο. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity {
+    min-width: 0;
+    background-color: #f8f9fa;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row {
+    flex-wrap: nowrap;
+    min-width: 0;
+    margin: 0 !important;
+    padding: .5rem;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row > div {
+    display: flex;
+    align-items: center;
+    flex-shrink: 1;
+    min-width: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row .col-form-label {
+    white-space: normal;
+}
+/* Οι δύο κύριες στήλες δεσμεύουν από μισή γραμμή, ανεξάρτητα από τις ημερομηνίες. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group > :is(.employee-fixed-left-fields, .employee-fixed-right-fields) {
+    display: flex;
+    flex: 0 0 50%;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 50%;
+    min-width: 0;
+    padding: 0;
+}
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div {
+    box-sizing: border-box;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-inline: calc(var(--bs-gutter-x, 1rem) * .5);
+}
+/* Η ένδειξη ηλικίας χρησιμοποιεί τον υπόλοιπο χώρο χωρίς περιττή δεύτερη γραμμή. */
+.employee-add-fixed-details #panelsStayOpen-collapseOne .employee-fixed-left-fields > div:has(> #label-anhlikos) {
+    flex: 1 1 0;
+    width: auto !important;
+    min-width: 0;
+}
+.employee-add-fixed-details #panelsStayOpen-collapseOne #label-anhlikos:empty {
+    display: none;
+}
+/* Η Διόρθωση έχει και Προβολή/Διαγραφή PDF στην ίδια αριστερή στήλη. */
+:is(.employee-add-page, .employee-edit-page) .companies-management-footer {
+    --companies-footer-font: clamp(.875rem, .72rem + .25cqi, 1rem);
+}
+@layer application-buttons {
+    /* Τα υποσέλιδα Εργαζομένων διατηρούν το εγκεκριμένο κατώτατο ύψος 34px. */
+    :is(.employee-add-page, .employee-edit-page) .companies-management-footer .btn:not(.btn-toTop) {
+        min-height: clamp(2.125rem, 1.7rem + .5cqi, 2.5rem) !important;
+    }
+    /* Μόνο το συγκεκριμένο PDF προσαρμόζεται στη δική του αμετάβλητη στήλη. */
+    :is(.employee-add-page, .employee-edit-page) #customButton_oysiodeis_oroi {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: auto;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        flex-shrink: 1;
+    }
+    .employee-edit-page .employee-fixed-left-fields .pdf-button-wrapper > :is(a.buttons-content, .pdf-upload-btn, .pdf-badge-replacement) {
+        min-width: 0 !important;
+        max-width: 100%;
+        flex-shrink: 1;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+    }
+    .employee-edit-page .employee-fixed-left-fields .pdf-button-wrapper > button[id^="deleteButton_"] {
+        flex-shrink: 0;
+    }
+}
+/* Η εσοχή ανήκει στη στήλη· το κενό μπαίνει μόνο μεταξύ των περιγραμμάτων. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-date-pair {
+    --employee-add-date-min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px);
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-date-pair > .employee-add-date-pair-field {
+    box-sizing: border-box;
+    /* Πλάτος Γέννησης όταν χωρά, διαφορετικά μισός διαθέσιμος χώρος με όριο αναγνωσιμότητας. */
+    flex: 0 0 min(var(--employee-add-date-reference-width, 100%), max(var(--employee-add-date-min-width), calc((100% - 12px) / 2)));
+    min-width: var(--employee-add-date-min-width);
+    margin: 0;
+    padding: 0;
+}
+/* Οι αρχικές αναλογίες των πεδίων υπολογίζονται πλέον μέσα στη μισή γραμμή. */
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-25 { width: 4.16% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-3 { width: 5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-4 { width: 6.68% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-5 { width: 8.34% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-0-75 { width: 12.5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1 { width: 16.66666667% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-1 { width: 18.34% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-4-5-5 { width: 24.5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-5 { width: 25% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-5-5 { width: 25.82% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-1-7 { width: 28.34% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-2 { width: 33.33333333% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-2-5 { width: 41.66% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-3 { width: 50% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-3-74 { width: 62.34% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-3-75 { width: 62.5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-3-99 { width: 66.5% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-4 { width: 66.66666667% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > .col-6 { width: 100% !important; }
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div:has(input[type="date"]) {
+    font-size: var(--payroll-control-font);
+    min-width: calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px + var(--bs-gutter-x, 1rem));
+}
+.employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div:has(> input[type="checkbox"]) {
+    min-width: max-content;
+}
+/* Όταν δεν χωρούν δύο ομάδες, κάθε ετικέτα μένει δίπλα στο δικό της πεδίο. */
+@container employee-maintenance (max-width: 60rem) {
+    .employee-add-fixed-details .accordion-body > .row.form-group {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+        align-items: center;
+    }
+    .employee-add-fixed-details .accordion-body > .row.form-group > div {
+        width: auto !important;
+        min-width: 0;
+        grid-column: 2;
+    }
+    .employee-add-fixed-details .accordion-body > .row.form-group > div:empty {
+        display: none;
+    }
+    .employee-add-fixed-details .accordion-body > .row.form-group > div:has(> .col-form-label):not(:has(input, select, textarea)) {
+        grid-column: 1;
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group > :is(.employee-fixed-left-fields, .employee-fixed-right-fields) {
+        display: contents;
+    }
+    .employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div {
+        width: auto !important;
+        min-width: 0 !important;
+        grid-column: 2;
+    }
+    .employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div:empty {
+        display: none;
+    }
+    .employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div:has(> .col-form-label):not(:has(input, select, textarea)) {
+        grid-column: 1;
+    }
+    .employee-add-fixed-details .payroll-field-inline {
+        flex-wrap: wrap;
+    }
+    .employee-add-fixed-details .payroll-field-inline > div {
+        flex-basis: 100%;
+    }
+    @layer application-buttons {
+        :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .card-body .pdf-upload-btn {
+            min-width: 0 !important;
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+        }
+    }
+}
+/* Σε στενό περιεχόμενο η ετικέτα προηγείται, ώστε να χωρά ολόκληρη η ημερομηνία. */
+@container employee-maintenance (max-width: 32rem) {
+    .employee-add-fixed-details .accordion-body > .row.form-group {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .employee-add-fixed-details .accordion-body > .row.form-group > div,
+    .employee-add-fixed-details :is(.employee-fixed-left-fields, .employee-fixed-right-fields) > div {
+        grid-column: 1;
+    }
+}
+@container employee-maintenance (max-width: 40rem) {
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row > div {
+        width: auto !important;
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-identity-row > div:empty {
+        display: none;
+    }
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-header {
+    display: block;
+    flex: 0 0 auto;
+    height: auto;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .card-body .col-form-label {
+    font-size: clamp(.85rem, .7vw, 1rem) !important;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-add-header .col-form-label {
+    font-size: clamp(.7rem, .7vw, 1rem) !important;
+}
+:is(.employee-add-page, .employee-edit-page) .menu_Links li {
+    font-size: clamp(.85rem, .85vw, 1rem) !important;
+}
+/* Σύντομη ορατή ονομασία, με αμετάβλητο textContent για τους υπάρχοντες χειριστές. */
+:is(.employee-add-page, .employee-edit-page) .menu_Links li[data-tab-caption]::after {
+    content: attr(data-tab-caption);
+}
+/* Το em παραμένει σταθερό και όταν αλλάζει το βάρος γραμματοσειράς της κατάστασης. */
+:is(.employee-add-page, .employee-edit-page) #label-energos {
+    flex: 0 0 7em;
+    inline-size: 7em;
+    white-space: nowrap;
+}
+/* Χωρίς μεταβολή διαστάσεων/χρωμάτων, ούτε κανόνες για radios ή άλλες ετικέτες. */
+:is(.employee-add-page, .employee-edit-page) :is(div, label):has(> input[type="checkbox"]) {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: .5rem;
+    margin-block: 0 !important;
+}
+/* Η Αργία παραμένει στο DOM, αλλά ολόκληρος ο περιέκτης της μένει κρυφός. */
+.employee-edit-page .sel_8_section .dispno-mt-0_4rem:has(> input[id^="argia_"]) {
+    display: none !important;
+}
+:is(.employee-add-page, .employee-edit-page) :is(div, label):has(> input[type="checkbox"]) > input[type="checkbox"] {
+    flex-shrink: 0;
+    margin: 0 !important;
+    vertical-align: middle;
+}
+:is(.employee-add-page, .employee-edit-page) :is(div, label):has(> input[type="checkbox"]) > label {
+    margin: 0 !important;
+    padding-block: 0;
+    white-space: normal;
+}
+/* Οι εμφωλευμένες σειρές δεν αφήνουν αρνητικά περιθώρια έξω από το σώμα. */
+:is(.employee-add-page, .employee-edit-page) .card-body > .row.form-group > .row.form-group {
+    margin-inline: 0 !important;
+}
+/* Η σύνοψη ταυτότητας ακολουθεί το κοινό εξωτερικό ύψος πεδίων. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-header :is(input.form-control, label.form-control) {
+    height: var(--payroll-control-height);
+    min-height: var(--payroll-control-height);
+    margin-block: 0 !important;
+}
+/* Ο χώρος του κουμπιού κορυφής παραμένει δεσμευμένος και όταν είναι κρυφό. */
+:is(.employee-add-page, .employee-edit-page) .companies-management-footer .scroll-to-top {
+    display: block;
+    visibility: hidden;
+    position: static;
+    flex: 0 0 auto;
+    height: auto;
+    margin: 0 !important;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-header .hr-style-header {
+    margin: 0 !important;
+}
+
+/* Μόνο Εργαζόμενοι: οι δύο μεγάλες ετικέτες μένουν μέσα στη δική τους στήλη. */
+:is(.employee-add-page, .employee-edit-page) label:is([for="epaggelmatikh_katartish"], [for="gnosh_ypologiston"]).col-form-label {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+/* Το δεύτερο ζεύγος ξεκινά μαζί σε νέα γραμμή, χωρίς μετακίνηση του πρώτου. */
+.employee-add-fixed-details .employee-fixed-left-fields > div:has(> label:is([for="eidopoihsh_prin_thn_anathesh"], [for="dialleima_entos_ektos_orarioy"])) {
+    width: 66.66666667% !important;
+}
+@container employee-maintenance (max-width: 60rem) {
+    .employee-add-fixed-details .employee-fixed-left-fields > div:has(> label:is([for="eidopoihsh_prin_thn_anathesh"], [for="dialleima_entos_ektos_orarioy"])) {
+        width: auto !important;
+    }
+}
+/* Σε μικρό πλάτος αναδιπλώνεται μόνο το ζεύγος Έως της κατάρτισης. */
+@container employee-maintenance (max-width: 40rem) {
+    :is(.employee-add-page, .employee-edit-page) .employee-add-training-duration-row {
+        grid-template-columns: 16.66666667% minmax(0, 1fr);
+        row-gap: .25rem;
+    }
+    .employee-edit-page .employee-add-fixed-identity-row > div:first-child:not(:has(label[for])) {
+        grid-column: 1 / -1;
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-add-training-duration-row > div:empty {
+        display: none;
+    }
+}
+@layer application-buttons {
+    :is(.employee-add-page, .employee-edit-page) :is(#customButton_allodapoi, #customButton_arxeio_symbashs) {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        height: auto;
+    }
+}
+/* Οι φορείς έχουν ξεχωριστό trash3: δεν δεσμεύεται και δεύτερος χώρος εκκαθάρισης. */
+.employee-edit-page #editKrathseisTomDropdownScope .employee-fund-fields > .edit-employee-tom-field > .ts-wrapper {
+    margin-right: 0;
+    height: auto !important;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-fund-fields .ts-wrapper.tom-dropdown {
+    height: auto !important;
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-fund-fields .ts-wrapper > .ts-control {
+    height: auto;
+    min-height: calc(var(--payroll-control-height) - 2px);
+}
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-fund-fields .ts-wrapper.single .ts-control > .item {
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
+/* Το εγκεκριμένο ελάχιστο της πλοήγησης εφαρμόζεται μόνο στις δύο φόρμες. */
+body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation {
+    --payroll-navigation-font: clamp(.85rem, .78vw, .95rem);
+}
+
+/* Η Κατάσταση ακολουθεί την ίδια αφετηρία πεδίων με τις διπλανές
+   γραμμές, χωρίς δέσμευση ύψους για την παλιά αναδιπλωμένη διάταξη. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group > .employee-status-fields {
+    display: grid;
+    grid-template-columns: 33.33333333% max-content max-content minmax(0, 1fr);
+    align-items: center;
+    grid-column: 1 / -1;
+}
+.employee-add-fixed-details .employee-fixed-left-fields.employee-status-fields > div {
+    width: 100% !important;
+    min-width: 0;
+    padding-inline: calc(var(--bs-gutter-x, 1rem) * .5);
+}
+.employee-add-fixed-details .employee-status-fields > div:empty { display: none; }
+.employee-add-fixed-details .employee-status-fields #label-fylo {
+    flex: 0 0 6em;
+    inline-size: 6em;
+    white-space: nowrap;
+}
+@container employee-maintenance (max-width: 60rem) {
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group > .employee-status-fields {
+        grid-template-columns: 25% max-content max-content minmax(0, 1fr);
+    }
+    .employee-add-fixed-details .employee-status-fields > div { grid-column: auto !important; }
+}
+/* Σταθερές στήλες: ο κρυφός κάδος δεν μεταβάλλει το πλάτος επιλογής/Α.Μ.Α. */
+:is(.employee-add-page, .employee-edit-page) .employee-retention-row {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr) var(--retention-spacer, 4.17%) var(--retention-last, 8rem);
+}
+.employee-edit-page .employee-retention-row {
+    --retention-spacer: 8rem;
+    --retention-last: 1.75rem;
+}
+/* Οι ποσοστιαίες Bootstrap στήλες γεμίζουν πλέον την κοινή στήλη grid. */
+:is(.employee-add-page, .employee-edit-page) .employee-retention-row > div { width: 100% !important; }
+.employee-edit-page .employee-retention-row > .employee-ama-field { grid-column: 3; }
+/* Ο κάδος ανήκει στον επιλογέα. Η δεύτερη στήλη παραμένει δεσμευμένη
+   όταν κρύβεται, ώστε ούτε ο επιλογέας ούτε το Α.Μ.Α. να αλλάζουν πλάτος. */
+.employee-edit-page .employee-retention-row > .col-8 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1.75rem;
+    align-items: center;
+}
+.employee-edit-page .employee-retention-row > .col-8 > .ts-wrapper {
+    width: 100% !important;
+    max-width: 100%;
+    margin-right: 0;
+}
+.employee-edit-page .employee-retention-row > .col-8 > .edit-employee-tom-trash {
+    grid-column: 2;
+    justify-self: end;
+    width: 1.5rem !important;
+    padding: 0;
+}
+/* Συμπαγής κοινή διάταξη μόνο στην καρτέλα Αλλοδαποί των add/edit. */
+:is(.employee-add-page, .employee-edit-page) section[data-section="Αλλοδαποί"] .card-body > .row.form-group {
+    margin-block: .25rem !important;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 5rem minmax(12rem, .65fr);
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row:not(:has(select)) {
+    grid-template-columns: minmax(0, 1fr) 5rem;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row > div { width: 100% !important; }
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-number-row {
+    display: grid;
+    grid-template-columns: max(var(--bs-gutter-x, 1rem), 4.17%) minmax(0, 1fr) minmax(12rem, 16.66666667%) 1.66%;
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-foreign-number-row > div { width: 100% !important; }
+:is(.employee-add-page, .employee-edit-page) .employee-add-foreign-divider { margin-block: .65rem; }
+:is(.employee-add-page, .employee-edit-page) section[data-section="Αλλοδαποί"] .height-vh-3_5 { height: .5rem; }
+@container employee-maintenance (max-width: 50rem) {
+    :is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row {
+        grid-template-columns: minmax(0, 1fr) 5rem;
+        row-gap: .25rem;
+    }
+    :is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row > div:has(select) {
+        grid-column: 1 / -1;
+    }
 }

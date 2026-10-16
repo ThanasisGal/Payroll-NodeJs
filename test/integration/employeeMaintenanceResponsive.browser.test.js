@@ -103,7 +103,10 @@ test('Employee Maintenance buttons and schedule alignment in Chromium across res
                 window.dispatchEvent(new Event('resize'));
                 await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
             }, section);
-            const footer = page.locator(`section[data-section="${section}"] .cardFooter01`);
+            const footer = page.locator(`section[data-section="${section}"] .card-footer > .companies-management-actions`);
+            assert.equal(await footer.count(), 1, `${label}/${section}: one action group is required`);
+            if (section === 'Ωράριο Εργασίας')
+                assert.equal(await page.locator('.menu_Links li.active').getAttribute('data-tab-caption'), 'Ωράρια');
             await footer.scrollIntoViewIfNeeded();
             await page.mouse.move(0,0);
             await page.waitForTimeout(180);
@@ -123,6 +126,7 @@ test('Employee Maintenance buttons and schedule alignment in Chromium across res
                     iconCenterDelta:Math.abs(icon.y+icon.height/2-r.y-r.height/2),
                     textCenterDelta:Math.max(...rects.map(t=>Math.abs(t.y+t.height/2-r.y-r.height/2))), lines:rects.length };
             }));
+            assert.equal(buttons.length, section === 'Σταθερά Στοιχεία' ? 3 : 2, `${label}/${section}: all footer actions must be measured`);
             for (const b of buttons) {
                 assert.ok(b.font >= 14 && b.font <= 16, `${label}: ${JSON.stringify(b)}`);
                 assert.ok(b.height >= 34 && b.height <= 42, `${label}: button height`);
@@ -186,4 +190,241 @@ test('Employee Maintenance buttons and schedule alignment in Chromium across res
     if (artifactDir) fs.writeFileSync(path.join(artifactDir, 'employee-maintenance-responsive-measurements.json'), JSON.stringify(measurements, null, 2));
     console.log(JSON.stringify(measurements.map(m => ({ label:m.label, font:m.tabs[0].buttons[0].font, buttonHeight:m.tabs[0].buttons[0].height, ...m.schedule }))));
     assert.deepEqual(errors, []); assert.deepEqual(requests, []);
+});
+
+// The three add/edit corrections share the real templates, typography and Tom
+// Select initializer. These fixtures never load write/calculation handlers.
+const { loadForm, viewport, settleLayout } = require('../helpers/responsiveFormsBrowser');
+const geometryTolerance = 1.5; // Visible alignment; sub-pixel differences are acceptable.
+const visaNumber = 'arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh';
+const visaDates = ['apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh', 'eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh'];
+async function selectEmployeeTab(page, tab) {
+    await page.evaluate(tab => {
+        [...document.querySelectorAll('.menu_Links li')].find(li => li.textContent.trim() === tab)?.click();
+        document.querySelectorAll('.sections > section').forEach(section => {
+            section.classList.toggle('visible', section.dataset.section === tab);
+            section.style.display = section.dataset.section === tab ? 'block' : 'none';
+        });
+        document.querySelectorAll('.menu_Links li').forEach(li => li.classList.toggle('active', li.textContent.trim() === tab));
+    }, tab);
+    await settleLayout(page);
+}
+function near(actual, expected, message) {
+    assert.ok(Math.abs(actual - expected) <= geometryTolerance, `${message}: ${actual} vs ${expected}`);
+}
+function measureEmployeeControls() {
+    const box = e => {
+        const r = e.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height, center: r.y + r.height / 2 };
+    };
+    const visible = e => !!e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+    const section = document.querySelector('.sections > section.visible');
+    const problems = [];
+    const textBoxes = e => {
+        const walker = document.createTreeWalker(e, NodeFilter.SHOW_TEXT), boxes = [];
+        while (walker.nextNode()) if (walker.currentNode.textContent.trim()) {
+            const range = document.createRange(); range.selectNodeContents(walker.currentNode);
+            boxes.push(...range.getClientRects());
+        }
+        return boxes;
+    };
+    const rendered = e => e.tomselect?.wrapper || e;
+    const scopes = section.dataset.section === 'Σταθερά Στοιχεία'
+        ? [document.querySelector('.employee-status-fields').parentElement]
+        : section.dataset.section === 'Κρατήσεις' ? [...section.querySelectorAll('.employee-retention-row')]
+        : [section.querySelector('.card-body')];
+    const fields = scopes.flatMap(scope => [...scope.querySelectorAll('input:not([type="hidden"]),select,textarea')])
+        .filter(e => !e.closest('.ts-wrapper') || e.tomselect).map(rendered).filter(visible);
+    for (const e of fields) {
+        const b = box(e), content = e.matches('.ts-wrapper') ? e.querySelector('.ts-control') : e;
+        // Locked Tom Select paints its lock outside the control, inside the
+        // reserved icon space. Check its actual text, not that pseudo-element's scrollWidth.
+        const clipped = e.matches('.ts-wrapper')
+            ? [...content.querySelectorAll('.item')].some(item => item.scrollWidth > item.clientWidth + 1
+                || textBoxes(item).some(r => r.left < b.left || r.right > b.right))
+            : e.matches('input[type="date"],textarea') && content.scrollWidth > content.clientWidth + 1;
+        if (b.left < 0 || b.right > innerWidth + 1 || clipped) problems.push({ kind: 'field-overflow', id: e.id, box: b });
+    }
+    for (const label of scopes.flatMap(scope => [...scope.querySelectorAll('label')])) if (visible(label)) {
+        if (label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1) problems.push({ kind: 'label-clipping', text: label.textContent.trim() });
+        for (const r of textBoxes(label)) for (const field of fields) {
+            if (label.contains(field)) continue;
+            const b = box(field);
+            if (r.left < b.right - 1 && b.left < r.right - 1 && r.top < b.bottom - 1 && b.top < r.bottom - 1)
+                problems.push({ kind: 'label-overlap', text: label.textContent.trim(), field: field.id });
+        }
+    }
+    for (const e of [document.documentElement, document.querySelector('main'), section, section.querySelector('.card-body')])
+        if (e && e.scrollWidth > e.clientWidth + 1) problems.push({ kind: 'container-overflow', class: e.className, scroll: e.scrollWidth, client: e.clientWidth });
+    return { problems, boxes: Object.fromEntries(fields.map(e => [e.previousElementSibling?.tomselect ? e.previousElementSibling.id : e.id, box(e)])) };
+}
+async function assertNativeDateVisible(cdp, id, inputBox, clearBox) {
+    // Inspect Chromium's actual native date segments, including the four-digit
+    // year, rather than assuming a CSS min-width proves they are visible.
+    const { root } = await cdp.send('DOM.getDocument', { depth: 0 });
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `#${id}` });
+    const { node } = await cdp.send('DOM.describeNode', { nodeId, depth: -1, pierce: true });
+    const flatten = n => [n, ...(n.children || []).flatMap(flatten), ...(n.shadowRoots || []).flatMap(flatten)];
+    const nodes = flatten(node);
+    const attrs = n => Object.fromEntries((n.attributes || []).reduce((pairs, v, i, a) => i % 2 ? pairs : [...pairs, [v, a[i + 1]]], []));
+    const nativeBox = async pseudo => {
+        const target = nodes.find(n => attrs(n).pseudo === pseudo);
+        assert.ok(target, `${id}: missing native ${pseudo}`);
+        const { model } = await cdp.send('DOM.getBoxModel', { backendNodeId: target.backendNodeId });
+        return { left: model.border[0], right: model.border[2], top: model.border[1], bottom: model.border[5] };
+    };
+    const edit = await nativeBox('-webkit-datetime-edit');
+    const calendar = await nativeBox('-webkit-calendar-picker-indicator');
+    assert.ok(calendar.right > calendar.left && calendar.left >= inputBox.left && calendar.right <= inputBox.right, `${id}: clipped calendar`);
+    const segments = [];
+    for (const part of ['day', 'month', 'year']) {
+        const pseudo = `-webkit-datetime-edit-${part}-field`;
+        const n = nodes.find(n => attrs(n).pseudo === pseudo);
+        assert.equal(attrs(n)['aria-valuenow'], part === 'year' ? '2026' : part === 'month' ? '10' : '14');
+        const b = await nativeBox(pseudo);
+        assert.ok(b.left >= edit.left - geometryTolerance && b.right <= edit.right + geometryTolerance
+            && b.left >= inputBox.left && b.right <= calendar.left + geometryTolerance, `${id}: clipped ${part} ${JSON.stringify({ b, edit, calendar })}`);
+        if (clearBox) assert.ok(b.right <= clearBox.left + geometryTolerance || b.left >= clearBox.right - geometryTolerance, `${id}: clear covers ${part}`);
+        segments.push({ part, ...b });
+    }
+    return { calendar, segments };
+}
+
+for (const form of ['add', 'edit']) test(`Employee ${form}: status/gender, seven retentions and VISA geometry`, { skip: !vendor, timeout: 180000 }, async t => {
+    const browser = await chromium.launch({ headless: true });
+    t.after(() => browser.close());
+    const page = await browser.newPage({ locale: 'el-GR' });
+    const errors = [], requests = [], measurements = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.route('**/*', route => { requests.push(route.request().url()); return route.abort(); });
+    await loadForm(page, `views/ergazomenoi/ergazomenoi/${form}.ejs`, { vendor, populated: false });
+    if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
+    await page.addScriptTag({ path: path.join(root, 'public/js/ergazomenoi/genika/clearableInputs.js') });
+    await page.evaluate(() => initClearableInputs(document.querySelector('main')));
+    // Bind only the two presentation choices, using their unchanged real handler.
+    await page.addScriptTag({ path: path.join(root, 'public/js/common/toggleLabelErgazomenon.js') });
+    await page.evaluate(() => {
+        for (const id of ['energos', 'fylo']) {
+            const input = document.getElementById(id);
+            input.addEventListener('change', () => toggleCheckboxState(id, input.checked));
+            toggleCheckboxState(id, input.checked);
+        }
+        document.querySelectorAll('select.krathsh-select').forEach(select => {
+            select.tomselect.addOption({ value: 'SYNTHETIC', label: '0001 — Συνθετική κράτηση' });
+            if (Number(select.dataset.rowIndex) <= 2) select.tomselect.setValue('SYNTHETIC');
+        });
+    });
+    const cdp = await page.context().newCDPSession(page);
+    t.after(async () => {
+        if (!process.env.PAYROLL_VISUAL_ARTIFACT_DIR) return;
+        fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
+        fs.writeFileSync(path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `employee-${form}-three-corrections.json`), JSON.stringify({ errors, requests, measurements }, null, 2));
+    });
+    for (const [width, height] of [[1440, 900], [1100, 700], [800, 700]]) for (const open of [true, false]) {
+        const label = `${form}/${width}x${height}/${open ? 'open' : 'closed'}`;
+        await t.test(label, async () => {
+            await viewport(page, width, height, open);
+            await selectEmployeeTab(page, 'Σταθερά Στοιχεία');
+            const states = [];
+            for (const active of [false, true]) for (const female of [false, true]) {
+                await page.evaluate(({ active, female }) => {
+                    for (const [id, checked] of [['energos', active], ['fylo', female]]) {
+                        const e = document.getElementById(id); e.checked = checked; e.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }, { active, female });
+                await settleLayout(page);
+                const geometry = await page.locator('.employee-status-fields').evaluate(group => {
+                    const rect = e => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, width: r.width, height: r.height, center: r.y + r.height / 2 }; };
+                    const parts = [...group.querySelectorAll('input,label')].map(e => ({ id: e.id, text: e.textContent.trim(), ...rect(e) }));
+                    const doy = document.getElementById('doy').tomselect.wrapper;
+                    return { groupHeight: group.getBoundingClientRect().height, parts, doy: rect(doy), label: rect(document.querySelector('label[for^="doy"]')), previous: rect(document.getElementById('eponymo_mhteras')), next: rect(document.getElementById('typos_taytothtas').tomselect.wrapper) };
+                });
+                assert.ok(geometry.groupHeight <= Math.max(...geometry.parts.map(p => p.height)) + geometryTolerance, `${label}: compact status row without reserved height`);
+                near(geometry.parts.find(p => p.id === 'energos').left, geometry.previous.left, `${label}: active checkbox shares the mother surname input start`);
+                for (const p of geometry.parts) near(p.center, geometry.parts[0].center, `${label}: status/gender vertical center`);
+                for (let i = 1; i < geometry.parts.length; i++) assert.ok(geometry.parts[i].left >= geometry.parts[i - 1].right - geometryTolerance, `${label}: overlapping choices`);
+                assert.equal(geometry.parts.find(p => p.id === 'label-energos').text, active ? 'ΕΝΕΡΓΟΣ' : 'ΑΝΕΝΕΡΓΟΣ');
+                assert.equal(geometry.parts.find(p => p.id === 'label-fylo').text, female ? 'ΓΥΝΑΙΚΑ' : 'ΑΝΔΡΑΣ');
+                if (states.length) {
+                    for (const key of ['doy', 'label', 'previous', 'next']) for (const prop of ['left', 'top', 'width', 'height']) near(geometry[key][prop], states[0][key][prop], `${label}: stable ${key}/${prop}`);
+                    geometry.parts.forEach((p, i) => near(p.left, states[0].parts[i].left, `${label}: stable choice position`));
+                }
+                states.push(geometry);
+            }
+            if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `focused-${label.replaceAll('/', '-')}-status.png`) });
+            const status = await page.evaluate(measureEmployeeControls);
+            assert.deepEqual(status.problems, [], `${label}: fixed details`);
+            await selectEmployeeTab(page, 'Κρατήσεις');
+            const retentions = [];
+            for (const values of ['mixed', 'filled', 'empty']) {
+                await page.evaluate(values => document.querySelectorAll('select.krathsh-select').forEach((e, i) => {
+                    e.tomselect.clear();
+                    e.tomselect.enable();
+                    e.tomselect.addOption({ value: 'SYNTHETIC', label: '0001 — Συνθετική κράτηση' });
+                    if (values === 'filled' || values === 'mixed' && i < 2) e.tomselect.addItem('SYNTHETIC');
+                    e.tomselect.blur();
+                }), values);
+                await settleLayout(page);
+                const rows = await page.locator('.employee-retention-row').evaluateAll(rows => rows.map(row => {
+                    const box = e => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, width: r.width, height: r.height, center: r.y + r.height / 2 }; };
+                    const trash = row.querySelector('.edit-employee-tom-trash');
+                    return { value: row.querySelector('select').tomselect.getValue(), select: box(row.querySelector('.ts-wrapper')), ama: box(row.querySelector('.employee-ama-field input')), trash: trash && !trash.hidden ? box(trash) : null };
+                }));
+                assert.equal(rows.length, 7);
+                for (const [index, row] of rows.entries()) {
+                    assert.equal(row.value, values === 'filled' || values === 'mixed' && index < 2 ? 'SYNTHETIC' : '', `${label}/${values}: actual selected value`);
+                    for (const prop of ['left', 'right', 'width']) near(row.select[prop], rows[0].select[prop], `${label}/${values}: seven select ${prop}`);
+                    near(row.ama.width, 128, `${label}: original AMA width`);
+                    if (retentions.length) for (const key of ['select', 'ama']) for (const prop of ['left', 'right', 'width']) near(row[key][prop], retentions[0].rows[0][key][prop], `${label}: stable ${key}/${prop}`);
+                    if (row.trash) {
+                        assert.ok(row.trash.left >= row.select.right - geometryTolerance && row.trash.right <= row.ama.left, `${label}: trash beside dropdown, before AMA`);
+                        assert.ok(row.trash.left - row.select.right <= 8, `${label}: trash stays in dropdown control area`);
+                        near(row.trash.center, row.select.center, `${label}: centered trash`);
+                    }
+                }
+                if (values === 'filled' && process.env.PAYROLL_VISUAL_ARTIFACT_DIR) await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `focused-${label.replaceAll('/', '-')}-retentions.png`) });
+                const measured = await page.evaluate(measureEmployeeControls);
+                assert.deepEqual(measured.problems, [], `${label}/${values}: retentions`);
+                retentions.push({ values, rows });
+            }
+            await selectEmployeeTab(page, 'Αλλοδαποί');
+            await page.locator('section[data-section="Αλλοδαποί"] .card-body').evaluate(e => { e.scrollTop = 0; });
+            if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `focused-${label.replaceAll('/', '-')}-foreign-top.png`) });
+            await page.locator(`#${visaNumber}`).evaluate(e => { e.value = '1'; });
+            await page.evaluate(ids => ids.forEach(id => {
+                const e = document.getElementById(id); e.disabled = false; e.value = '2026-10-14';
+                e.dispatchEvent(new Event('input', { bubbles: true }));
+            }), visaDates);
+            const dates = [];
+            const numberBox = await page.locator(`#${visaNumber}`).boundingBox();
+            for (const id of visaDates) {
+                await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+                await settleLayout(page);
+                const geometry = await page.locator(`#${id}`).evaluate(e => {
+                    const r = e.getBoundingClientRect(), clear = e.parentElement.querySelector('.clear-btn.is-visible')?.getBoundingClientRect();
+                    const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+                    return { reachable: hit === e || e.contains(hit), left: r.left, right: r.right, top: r.top, width: r.width, height: r.height, clear: clear ? { left: clear.left, right: clear.right } : null };
+                });
+                assert.ok(geometry.reachable, `${label}: date remains reachable after inner scrolling`);
+                near(geometry.right, numberBox.x + numberBox.width, `${label}: VISA right edge`);
+                near(geometry.height, 36, `${label}: approved date height`);
+                assert.ok(geometry.width >= 180 && geometry.left >= 0 && geometry.right <= width, `${label}: approved date width`);
+                assert.ok(geometry.clear, `${label}: preserved clear X`);
+                dates.push({ id, ...geometry, ...await assertNativeDateVisible(cdp, id, geometry, geometry.clear) });
+            }
+            const foreignRows = await page.locator('section[data-section="Αλλοδαποί"] .card-body > .row.form-group').evaluateAll(rows => rows.map(row => {
+                const b = row.getBoundingClientRect(), prev = row.previousElementSibling;
+                return { height: b.height, gap: prev?.matches('.row.form-group') ? b.top - prev.getBoundingClientRect().bottom : null };
+            }));
+            for (const row of foreignRows) if (row.gap !== null) assert.ok(row.gap >= -1 && row.gap <= 12, `${label}: uniform compact foreign row spacing ${JSON.stringify(row)}`);
+            const foreign = await page.evaluate(measureEmployeeControls);
+            assert.deepEqual(foreign.problems, [], `${label}: foreigners`);
+            if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR && width === 800) {
+                await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `employee-${label.replaceAll('/', '-')}-visa.png`) });
+            }
+            measurements.push({ label, states, retentions, dates, problems: [...status.problems, ...foreign.problems] });
+        });
+    }
+    assert.deepEqual(errors, []);
+    assert.deepEqual(requests, []);
 });

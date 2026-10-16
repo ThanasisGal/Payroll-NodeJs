@@ -1,5 +1,5 @@
 <div class="accordion-item margin-top--2_5rem">
-    <h2 class="accordion-header">
+    <h2 class="accordion-header p-0">
         <button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseThree" aria-expanded="true" aria-controls="panelsStayOpen-collapseThree" 
         tabindex="-1">
         Στοιχεία Απασχόλησης
@@ -14,7 +14,8 @@
             <input type="hidden" name="kodikos_eidikothtas_erganh" id="kodikos_eidikothtas_erganh" />
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4_5rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="plhrhs_apasxolhsh" class="col-form-label label-font-size">
                     Πλήρης Απασχόληση
                     </label>
@@ -28,7 +29,9 @@
         
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="mh_problepsimo_programma" class="col-form-label label-font-size field-required">
                     Μη Προβλέψιμο Πρόγραμμα Οργάνωσης Χρόνου Εργασίας
                     </label>
@@ -40,9 +43,11 @@
                     </label>
                 </div>
             </div>
+</div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="hmeres_ores_anaforas" class="col-form-label label-font-size field-required">
                     Ημέρες & Ώρες Αναφοράς
                     </label>
@@ -60,7 +65,9 @@
                     <input type="text" name="eidopoihsh_prin_thn_anathesh" id="eidopoihsh_prin_thn_anathesh" data-bs-toggle="tooltip" data-bs-title="Ενδεικτικό Παράδειγμα: Μεγαλύτερη των 24 ωρών, Ίση με 24 ώρες, Μικρότερη των 24 ωρών – Έκτακτη ανάγκη" data-bs-placement="bottom" data-tooltip-max-width="15vw" class="form-control input-contents" autocomplete="off" maxlength="50" />
                 </div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="prothesmia_akyroshs_ths_anatheshs" class="col-form-label label-font-size field-required">
                     Προθεσμία Ακύρωσης της Ανάθεσης Εργασίας
                     </label>
@@ -69,11 +76,13 @@
                     <input type="text" name="prothesmia_akyroshs_ths_anatheshs" id="prothesmia_akyroshs_ths_anatheshs" data-bs-toggle="tooltip" data-bs-title="Ενδεικτικό Παράδειγμα: Μεγαλύτερη των 24 ωρών, Ίση με 24 ώρες, Μικρότερη των 24 ωρών – Έκτακτη ανάγκη. &nbsp; &nbsp; &nbsp; Σε περίπτωση που μετά την ειδοποίηση και πάντως πριν από την ανάληψη της εργασίας ο εργοδότης ακυρώσει την ανάθεση της, ο εργαζόμενος δικαιούται αποζημίωση που αντιστοιχεί στα ωρομίσθια των ωρών εργασίας που δεν του ανατέθηκαν, σύμφωνα με την παρ. 3 του άρθρου 182Α του Κώδικα Ατομικού Εργατικού Δικαίου" data-bs-placement="bottom" data-tooltip-max-width="25vw" class="form-control input-contents" autocomplete="off" maxlength="50" />
                 </div>
             </div>
+</div>
 
             <div class="height-vh-0_2"></div>
             
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="dieythethsh_ergasias" class="col-form-label label-font-size">
                     Διευθέτηση Εργασίας
                     </label>
@@ -86,25 +95,32 @@
 
                 <div class="col-0-25"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="hmnia_enarxhs_dieythethshs_ergasias" id="hmnia_lhxhs_dokimastikhs_periodoy_label" class="col-form-label label-font-size ">
                     Έναρξη-Λήξη Διευθέτησης
                     </label>
                 </div>
-                <div class="col-3 left-align payroll-field-inline">
-<div class="col-1-5 left-align">
-                    <input type="date" id="hmnia_enarxhs_dieythethshs_ergasias" aria-label="Έναρξη διευθέτησης εργασίας" name="hmnia_enarxhs_dieythethshs_ergasias" class="date-control" value="" />
+                <div class="col-4 left-align employee-add-date-pair-column">
+                    <div class="employee-add-date-pair">
+                        <div class="employee-add-date-pair-field">
+                            <input type="date" id="hmnia_enarxhs_dieythethshs_ergasias" aria-label="Έναρξη διευθέτησης εργασίας" name="hmnia_enarxhs_dieythethshs_ergasias" class="date-control" value="" />
+                        </div>
+                        <div class="employee-add-date-pair-field">
+                            <input type="date" id="hmnia_lhxhs_dieythethshs_ergasias" aria-label="Λήξη διευθέτησης εργασίας" name="hmnia_lhxhs_dieythethshs_ergasias" data-bs-toggle="tooltip" data-bs-title="Ελάχιστη περίοδος διευθέτησης χρόνου εργασίας είναι 1 εβδομάδα και η μέγιστη 1 έτος" data-bs-placement="bottom" data-tooltip-max-width="15vw" class="date-control" value="" />
+                        </div>
+                    </div>
                 </div>
-                <div class="col-1-5 left-align">
-                    <input type="date" id="hmnia_lhxhs_dieythethshs_ergasias" aria-label="Λήξη διευθέτησης εργασίας" name="hmnia_lhxhs_dieythethshs_ergasias" data-bs-toggle="tooltip" data-bs-title="Ελάχιστη περίοδος διευθέτησης χρόνου εργασίας είναι 1 εβδομάδα και η μέγιστη 1 έτος" data-bs-placement="bottom" data-tooltip-max-width="15vw" class="date-control" value="" />
-                </div>
-</div>
+
             </div>
+</div>
 
             <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="hmeres_ergasias_ebdomadas" class="col-form-label label-font-size field-required">
                     Ημέρες Εβδ/διαίας Εργασίας
                     </label>
@@ -115,7 +131,9 @@
 
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="ores_ergasias_ebdomadas" class="col-form-label label-font-size field-required">
                     Ώρες Εβδ/διαίας Εργασίας
                     </label>
@@ -133,9 +151,11 @@
                     <input type="number" name="mo_oron_hmerhsias_ergasias" id="mo_oron_hmerhsias_ergasias" class="form-control input-contents right-align" value="" min="0" max="10" readonly />
                 </div>
             </div>
+</div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="dialleima_se_lepta" class="col-form-label label-font-size field-required">
                     Διάλλειμα (Σε Λεπτά)
                     </label>
@@ -158,7 +178,9 @@
                     </label>
                 </div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="symbatikes_ores_ergasias" class="col-form-label label-font-size field-required">
                     Συμβατικές Ώρες Εργασίας Π.Α.
                     </label>
@@ -167,11 +189,13 @@
                     <input type="number" name="symbatikes_ores_ergasias" id="symbatikes_ores_ergasias" class="form-control input-contents right-align" value="40" min="0" max="40" autocomplete="off" />
                 </div>
             </div>
+</div>
 
-            <%- include('../../../../employmentProfileBreakRows') %>
+            <%- include('../../../../employmentProfileBreakRows', { alignEmployeeAddRightFields: true }) %>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="typos_orarioy" class="col-form-label label-font-size">
                     Τύπος Ωραρίου
                     </label>
@@ -185,7 +209,9 @@
                 
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="synexes_diakekomeno" class="col-form-label label-font-size">
                     Συνεχές / Διακεκομμένο
                     </label>
@@ -197,9 +223,11 @@
                     </label>
                 </div>
             </div>
+</div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="pshfiakh_organosh" class="col-form-label label-font-size field-required">
                     Ψηφιακή Οργάνωση 
                     </label>
@@ -213,7 +241,9 @@
                 
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="apasxolhsh_basei_symbashs" class="col-form-label label-font-size field-required">
                     Απασχόληση Βάσει Σύμβασης
                     </label>
@@ -247,9 +277,11 @@
                     </select>
                 </div>
             </div>
+</div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="karta_ergasias" class="col-form-label label-font-size field-required">
                     Κάρτα Εργασίας
                     </label>
@@ -263,7 +295,9 @@
         
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="evelikth_proselefsh" class="col-form-label label-font-size">
                     Ευέλικτη Προσέλευση (λεπτά)
                     </label>
@@ -272,11 +306,13 @@
                     <input type="number" id="evelikth_proselefsh" name="evelikth_proselefsh_add" class="form-control input-contents right-align" min="0" max="120" value="120" autocomplete="off" disabled />
                 </div>
             </div>
+</div>
 
-            <%- include('../../../../employmentProfileArrangementRows') %>
+            <%- include('../../../../employmentProfileArrangementRows', { alignEmployeeAddRightFields: true }) %>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="apasxolhsh_gia_proth_fora" class="col-form-label label-font-size">
                     Απασχόληση για 1η φορά
                     </label>
@@ -290,7 +326,9 @@
         
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="ora_enarxhs_proths_foras" class="col-form-label label-font-size field-required">
                     Ώρα Έναρξης την 1η ημέρα
                     </label>
@@ -310,11 +348,13 @@
                     <input type="time" id="ora_apoxorhshs_proths_foras" name="ora_apoxorhshs_proths_foras" class="date-control" value="" />
                 </div>
             </div>
+</div>
 
             <hr class="hr-style" />
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="asfalish_me_tekmarta" class="col-form-label label-font-size">
                     Τεκμαρτή Ασφάλιση 
                     </label>
@@ -328,7 +368,9 @@
         
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="asfalistikh_klash" id="asfalistikh_klash_label" class="col-form-label label-font-size">
                     Ασφαλιστική Κλάση
                     </label>
@@ -363,11 +405,13 @@
                     </select>
                 </div>
             </div>
+</div>
 
             <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="epoxikos" class="col-form-label label-font-size">
                     Εποχικός
                     </label>
@@ -381,7 +425,9 @@
             
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="tmhma" class="col-form-label label-font-size">
                     Τμήμα
                     </label>
@@ -415,6 +461,7 @@
                     </select>
                 </div>
             </div>
+</div>
 
             <div class="height-vh-0_2"></div>
 
@@ -472,7 +519,8 @@
             <div class="height-vh-0_3"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="typos_ergazomenon" class="col-form-label label-font-size field-required">
                     Τύπος Εργαζόμενου / ης
                     </label>
@@ -508,7 +556,9 @@
 
                 <div class="col-0-25"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="ypokatasthma" class="col-form-label label-font-size field-required">
                     Υποκατάστημα
                     </label>
@@ -542,11 +592,13 @@
                     </select>
                 </div>
             </div>
+</div>
 
             <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="xarakthrismos_ergazomenon" class="col-form-label label-font-size field-required">
                     Χαρακτηρισμός Εργαζόμενου /ης
                     </label>
@@ -560,7 +612,9 @@
 
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="eidikothta" class="col-form-label label-font-size">
                     Ειδικότητα
                     </label>
@@ -594,11 +648,13 @@
                     </select>
                 </div>
             </div>
+</div>
 
             <hr class="hr-style" />
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
+                <div class="employee-fixed-left-fields">
+<div class="col-2 left-align">
                     <label for="diathesimothta" class="col-form-label label-font-size">
                     Βρίσκεται σε διαθεσιμότητα
                     </label>
@@ -612,7 +668,9 @@
 
                 <div class="col-3"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="enarxh_diathesimothtas" class="col-form-label label-font-size">
                     Ημ/νία Έναρξης Διαθ/τητας
                     </label>
@@ -621,11 +679,15 @@
                     <input type="date" name="enarxh_diathesimothtas" id="enarxh_diathesimothtas" class="date-control" value="" />
                 </div>
             </div>
+</div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-6"></div>
+                <div class="employee-fixed-left-fields">
+<div class="col-6"></div>
 
-                <div class="col-2 left-align">
+                </div>
+<div class="employee-fixed-right-fields">
+<div class="col-2 left-align">
                     <label for="lhxh_diathesimothtas" class="col-form-label label-font-size">
                     Ημ/νία Λήξης Διαθ/τητας
                     </label>
@@ -634,8 +696,8 @@
                     <input type="date" name="lhxh_diathesimothtas" id="lhxh_diathesimothtas" class="date-control" value="" />
                 </div>
             </div>
+</div>
             
-            <div class="height-vh-3_5"></div>
             
         </div>
     </div>

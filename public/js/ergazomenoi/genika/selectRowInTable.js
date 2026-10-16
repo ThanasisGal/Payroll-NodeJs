@@ -7,6 +7,29 @@ function employeeTableScrollContainer() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Μόνο η βασική λίστα χρησιμοποιεί το εγκεκριμένο συμπαγές παράθυρο νέας χρήσης.
+    // Η αναζήτηση διατηρεί τις υπάρχουσες επιλογές εμφάνισης και ενέργειες.
+    const listPage = document.querySelector('.employee-list-page');
+    const showEmployeeAlert = async (options) => {
+        if (!listPage) return Swal.fire(options);
+        // Ο γενικός χειριστής συνδέσμων μπορεί να έχει προγραμματίσει ένδειξη φόρτωσης.
+        window.AppLoader?.hide();
+        const result = await Swal.fire({
+            ...options,
+            target: listPage.closest('main.payroll-form-layout') || document.body,
+            heightAuto: false,
+            width: 'min(560px, 100%)',
+            customClass: {
+                title: 'custom-title',
+                ...options.customClass,
+                popup: `${options.customClass?.popup || 'custom-swal-popup'} new-year-confirmation z-depth-5`,
+                container: 'new-year-confirmation-container'
+            }
+        });
+        if (!result.isConfirmed) window.AppLoader?.hide();
+        return result;
+    };
+
     const rows = document.querySelectorAll('#myTable tbody tr');
     // const btnSelect = document.getElementById("select-btn");
     const btnAdd = document.getElementById('add-btn');
@@ -54,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!selectedRowId) {
                 e.preventDefault();
                 e.stopPropagation();
-                await Swal.fire({
+                await showEmployeeAlert({
                     backdrop: false, // overlay
                     allowOutsideClick: false,
                     title: 'Καμία επιλογή',
@@ -127,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!isAllowed(btnRehire)) return;
 
             if (!selectedRowId) {
-                await Swal.fire({
+                await showEmployeeAlert({
                     backdrop: false,
                     allowOutsideClick: false,
                     title: 'Καμία επιλογή',
@@ -140,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const minRehireDate = nextDateKey(selectedRowDeparture);
             if (!minRehireDate) {
-                await Swal.fire({
+                await showEmployeeAlert({
                     backdrop: false,
                     allowOutsideClick: false,
                     title: 'Δεν υπάρχει ημερομηνία αποχώρησης',
@@ -151,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            const prompt = await Swal.fire({
+            const prompt = await showEmployeeAlert({
                 backdrop: false,
                 allowOutsideClick: false,
                 title: 'Επαναπρόσληψη εργαζομένου',
@@ -212,7 +235,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!isAllowed(btnDelete)) return;
 
             if (!selectedRowId) {
-                await Swal.fire({
+                await showEmployeeAlert({
                     backdrop: false, // overlay
                     allowOutsideClick: false,
                     title: 'Καμία επιλογή',
@@ -229,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            const result = await Swal.fire({
+            const result = await showEmployeeAlert({
                 backdrop: false, // overlay
                 allowOutsideClick: false,
                 title: 'Είστε σίγουρος/η;',
@@ -270,7 +293,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // auto-follow redirect
                 if (resp.redirected && resp.url) {
-                    await Swal.fire({
+                    await showEmployeeAlert({
                         backdrop: false, // overlay
                         allowOutsideClick: false,
                         title: 'Επιτυχής διαγραφή',
@@ -290,7 +313,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (resp.status >= 300 && resp.status < 400) {
                     const loc = resp.headers.get('Location') || resp.headers.get('location');
                     if (loc) {
-                        await Swal.fire({
+                        await showEmployeeAlert({
                             backdrop: false, // overlay
                             allowOutsideClick: false,
                             title: 'Επιτυχής διαγραφή',
@@ -318,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // 204 No Content
                 if (resp.status === 204) {
-                    await Swal.fire({
+                    await showEmployeeAlert({
                         backdrop: false, // overlay
                         allowOutsideClick: false,
                         title: 'Επιτυχής διαγραφή',
@@ -342,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (!resp.ok || data?.success === false) {
                         throw new Error(`HTTP ${resp.status} / success=${data?.success}`);
                     }
-                    await Swal.fire({
+                    await showEmployeeAlert({
                         backdrop: false, // overlay
                         allowOutsideClick: false,
                         title: 'Επιτυχής διαγραφή',
@@ -360,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Άλλος content-type αλλά OK (π.χ. HTML)
                 if (resp.ok) {
-                    await Swal.fire({
+                    await showEmployeeAlert({
                         backdrop: false, // overlay
                         allowOutsideClick: false,
                         title: 'Επιτυχής διαγραφή',
@@ -378,7 +401,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 throw new Error(`HTTP error ${resp.status}`);
             } catch (error) {
-                await Swal.fire({
+                await showEmployeeAlert({
                     backdrop: false, // overlay
                     allowOutsideClick: false,
                     icon: 'error',

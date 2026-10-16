@@ -10,6 +10,7 @@ const { planEmployeeHistoryAutomaticReconstruction } = require('../../../../serv
 const { buildEmployeeHistoryReconstructionPreview } = require('../../../../server/services/ergazomenoi/employeeHistoryReconstructionPreviewService');
 const { profileError } = require('../../../../server/utils/ergazomenoi/employmentProfileMaintenance');
 const root = path.resolve(__dirname, '../../../..');
+const { asset } = require('../../../../test/fixtures/employeeMaintenanceBrowserAssets');
 const source = fs.readFileSync(path.join(__dirname, 'putFieldValues.js'), 'utf8');
 const helpers = source.slice(0, source.indexOf("document.addEventListener('DOMContentLoaded'"));
 function response(error) {
@@ -44,10 +45,10 @@ for (const width of [1440, 390]) test(`visual Employee Maintenance and History a
         });
         await page.goto('https://payroll.test/');
         for (const file of ['public/css/bootstrap.min.css', 'node_modules/sweetalert2/dist/sweetalert2.css', 'public/css/main.css'])
-            await page.addStyleTag({ path: path.join(root, file) });
+            await page.addStyleTag(asset(root, file));
         for (const file of ['public/js/bootstrap.bundle.min.js', 'node_modules/sweetalert2/dist/sweetalert2.all.js',
             'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js'])
-            await page.addScriptTag({ path: path.join(root, file) });
+            await page.addScriptTag(asset(root, file));
         await page.addScriptTag({ content: helpers + `
             const originalFire = Swal.fire.bind(Swal);
             Swal.fire = options => originalFire(withEmployeeMaintenanceButtonStyles(withCompactOrdinarySwalClasses(options)));
@@ -164,8 +165,8 @@ for (const width of [1440, 390]) for (const implementation of ['putFieldValues',
             await page.route('**/*', route => route.abort());
             await page.setContent('<!doctype html><html lang="el"><meta charset="utf-8"><body></body></html>');
             for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
-                await page.addStyleTag({ path: path.join(root, file) });
-            await page.addScriptTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js') });
+                await page.addStyleTag(asset(root, file));
+            await page.addScriptTag(asset(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js'));
             await page.addScriptTag({ content: helpers });
             for (const disabled of implementation === 'getFieldValues' ? [false, true] : [false]) {
                 const html = vm.runInNewContext('`' + template + '`', { ...optional, skipScheduleValidation: disabled });

@@ -7,7 +7,11 @@ const path = require('node:path');
 const appOrigin = process.env.PAYROLL_BROWSER_APP_ORIGIN;
 if (appOrigin) assert.equal(appOrigin, 'http://127.0.0.1:5001');
 const origin = appOrigin || 'https://payroll.test';
-const asset = (root, file) => appOrigin && file.startsWith('public/')
+// Offline browser runs can use the exact asserted SweetAlert version outside the repository.
+const sweetAlertVendor = process.env.PAYROLL_SWEETALERT_VENDOR_DIR;
+const asset = (root, file) => sweetAlertVendor && file.startsWith('node_modules/sweetalert2/dist/')
+    ? { path: path.join(sweetAlertVendor, path.basename(file)) }
+    : appOrigin && file.startsWith('public/')
     ? { url: `${origin}/static/${file.slice('public/'.length)}` }
     : { path: path.join(root, file) };
 
