@@ -5,14 +5,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         'Η άντληση των δεδομένων από το ΕΡΓΑΝΗ ΙΙ θα πρέπει να έχει γίνει από την Δανειζόμενη Εταιρεία. ' +
         'Με την παρούσα ενέργεια θα γίνει μόνο ενημέρωση των Προδηλωμένων Ωραρίων της Δανείζουσας Εταιρείας.';
     await Swal.fire({
+        target: document.querySelector('main.payroll-form-layout') || document.body,
+        heightAuto: false,
+        width: 'min(560px, 100%)',
         icon: 'info',
         text: ENTRY_MESSAGE,
-        confirmButtonText: 'Το κατάλαβα',
+        confirmButtonText: 'Κλείσιμο',
+        showCancelButton: false,
         allowOutsideClick: false,
         allowEscapeKey: false,
         customClass: {
             title: 'custom-title',
-            popup: 'custom-swal-popup',
+            popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+            container: 'new-year-confirmation-container erganh-borrowed-entry-container',
             confirmButton: 'class-info custom-confirm-button custom-swal-button'
         }
     });

@@ -20185,3 +20185,160 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
         grid-column: 1 / -1;
     }
 }
+
+/* Λήψη Ωραρίων ΕΡΓΑΝΗ: κοινή στοίχιση, χωρίς αλλαγή του πλάτους της κάρτας. */
+.payroll-form-layout .erganh-schedule-download-form .erganh-download-row > .col-2 {
+    flex: 0 0 max(16.666667%, 11rem);
+    width: max(16.666667%, 11rem);
+    max-width: 100%;
+}
+.payroll-form-layout .erganh-schedule-download-form .erganh-download-branch {
+    flex: 1 1 12rem;
+    width: auto;
+    min-width: 0;
+}
+.payroll-form-layout .erganh-schedule-download-form .erganh-download-date {
+    flex: 0 1 max(20.833333%, 12.5rem);
+    width: max(20.833333%, 12.5rem);
+    max-width: 100%;
+}
+/* Διατηρείται το υπάρχον συμπαγές ύψος, ακόμη όταν οι ετικέτες χωρούν σε μία γραμμή. */
+.payroll-form-layout .erganh-schedule-download-form .card-body {
+    min-height: 14.625rem;
+}
+@container payroll-page (max-width: 92rem) {
+    .payroll-form-layout .erganh-schedule-download-form .card-body {
+        min-height: calc(10.125rem + 7.5 * var(--payroll-control-font));
+    }
+}
+
+/* Σταθερό ύψος μόνο για το Παράρτημα της Λήψης Ωραρίων ΕΡΓΑΝΗ. */
+#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper {
+    box-sizing: border-box;
+    height: var(--payroll-control-height, 2.25rem) !important;
+    min-height: var(--payroll-control-height, 2.25rem);
+    max-height: var(--payroll-control-height, 2.25rem);
+    /* Ίδια πρόβλεψη εξωτερικού καθαρισμού με τις εγκεκριμένες φόρμες Εταιρειών. */
+    --company-reset-space: 1.75rem;
+    width: calc(100% - var(--company-reset-space)) !important;
+    max-width: calc(100% - var(--company-reset-space));
+    margin-right: var(--company-reset-space);
+    margin-block: 0 !important;
+    flex-grow: 0;
+}
+#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper > .ts-control {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    padding-block: 0 !important;
+    padding-right: 2rem !important;
+    align-items: center;
+}
+#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper > .ts-control > input {
+    height: auto;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+    line-height: 1.4;
+}
+#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper > .ts-fill-reset-btn {
+    left: calc(100% + .25rem) !important;
+    right: auto !important;
+    top: 50%;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    padding: 0;
+}
+#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper::after {
+    right: .75rem;
+}
+
+/* Μετακίνηση μόνο της συγκεκριμένης κάρτας στις μεγάλες οθόνες. */
+@media (width > 1775px) {
+    #transferForm.erganh-schedule-download-form > .card {
+        margin-top: 2rem;
+    }
+}
+
+/* Δανειζόμενα προδηλωμένα ωράρια: τοπική διάταξη με το εγκεκριμένο πρότυπο πεδίων. */
+#transferForm.erganh-borrowed-schedule-form .borrowed-schedule-card-body {
+    min-height: 20rem;
+}
+#transferForm.erganh-borrowed-schedule-form .borrowed-schedule-row > .col-2 {
+    flex: 0 0 max(25%, 14rem);
+    width: max(25%, 14rem);
+    max-width: 100%;
+}
+#transferForm.erganh-borrowed-schedule-form .col-form-label {
+    font-size: clamp(.85rem, .8rem + .1cqi, .875rem) !important;
+    line-height: 1.4;
+}
+#transferForm.erganh-borrowed-schedule-form .borrowed-schedule-control {
+    flex: 1 1 12.5rem;
+    width: auto;
+    min-width: 0;
+    margin-top: var(--bs-gutter-y) !important;
+}
+#transferForm.erganh-borrowed-schedule-form .borrowed-schedule-row > .col-2-5 {
+    flex: 0 1 max(20.833333%, 12.5rem);
+    width: max(20.833333%, 12.5rem);
+    max-width: 100%;
+}
+#transferForm.erganh-borrowed-schedule-form :is(.date-control, #source_ypokatasthma) {
+    box-sizing: border-box;
+    height: var(--payroll-control-height) !important;
+    min-height: var(--payroll-control-height);
+}
+#transferForm.erganh-borrowed-schedule-form #target_ypokatasthmata + .ts-wrapper {
+    --company-reset-space: 1.75rem;
+    box-sizing: border-box;
+    height: var(--payroll-control-height) !important;
+    min-height: var(--payroll-control-height);
+    max-height: var(--payroll-control-height);
+    width: calc(100% - var(--company-reset-space)) !important;
+    max-width: calc(100% - var(--company-reset-space));
+    margin-right: var(--company-reset-space);
+    margin-block: 0 !important;
+    flex-grow: 0;
+}
+#transferForm.erganh-borrowed-schedule-form #target_ypokatasthmata + .ts-wrapper > .ts-control {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    padding-block: 0 !important;
+    padding-right: 2rem !important;
+    align-items: center;
+}
+#transferForm.erganh-borrowed-schedule-form #target_ypokatasthmata + .ts-wrapper > .ts-control > input {
+    height: auto;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+    line-height: 1.4;
+}
+#transferForm.erganh-borrowed-schedule-form #target_ypokatasthmata + .ts-wrapper > .ts-fill-reset-btn {
+    left: calc(100% + .25rem) !important;
+    right: auto !important;
+    top: 50%;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    padding: 0;
+}
+#transferForm.erganh-borrowed-schedule-form #target_ypokatasthmata + .ts-wrapper::after {
+    right: .75rem;
+}
+@media (width > 1775px) {
+    #transferForm.erganh-borrowed-schedule-form > .card {
+        margin-top: 2rem;
+    }
+}
+
+/* Ίδια περιγράμματα παραρτημάτων· το εξωτερικό trash3 δεν μετρά στο πλάτος. */
+#transferForm.erganh-borrowed-schedule-form #source_ypokatasthma {
+    width: calc(100% - 1.75rem) !important;
+    max-width: calc(100% - 1.75rem);
+}
+
+/* Το συγκεκριμένο ενημερωτικό διατηρεί την εγκεκριμένη μονή στήλη και στη SweetAlert2 11.26. */
+.swal2-container.erganh-borrowed-entry-container {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+}

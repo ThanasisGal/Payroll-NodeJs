@@ -2,13 +2,19 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     await Swal.fire({
+        target: document.querySelector('main.payroll-form-layout') || document.body,
+        heightAuto: false,
+        width: 'min(560px, 100%)',
         icon: 'info',
         text: 'Η άντληση των δεδομένων Ψηφιακής Κάρτας από το ΕΡΓΑΝΗ ΙΙ θα πρέπει να έχει ήδη γίνει από τη Δανειζόμενη Εταιρεία. Η παρούσα ενέργεια ενημερώνει μόνο τις Ψηφιακές Κάρτες της Δανείζουσας Εταιρείας.',
-        confirmButtonText: 'Το κατάλαβα',
+        confirmButtonText: 'Κλείσιμο',
+        showCancelButton: false,
         allowOutsideClick: false,
         allowEscapeKey: false,
         customClass: {
-            title: 'custom-title', popup: 'custom-swal-popup',
+            title: 'custom-title',
+            popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+            container: 'new-year-confirmation-container erganh-borrowed-entry-container',
             confirmButton: 'class-info custom-confirm-button custom-swal-button'
         }
     });
