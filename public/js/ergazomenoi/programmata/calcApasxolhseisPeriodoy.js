@@ -1,3 +1,18 @@
+// Εμφάνιση μόνο των ενημερωτικών αποτελεσμάτων της συγκεκριμένης φόρμας.
+const calcApasxolhseisNoticeOptions = () => ({
+    target: document.querySelector('main.payroll-form-layout') || document.body,
+    heightAuto: false,
+    width: 'min(560px, 100%)',
+    confirmButtonText: 'Κλείσιμο',
+    showCancelButton: false,
+    customClass: {
+        title: 'custom-title',
+        popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+        container: 'new-year-confirmation-container calc-apasxolhseis-notice',
+        confirmButton: 'class-info custom-confirm-button custom-swal-button'
+    }
+});
+
 document.getElementById('calcApasxolhseonButton')?.addEventListener('click', async () => {
     const apo_hmeromhnia = document.getElementById('apo_hmeromhnia')?.value;
     const eos_hmeromhnia = document.getElementById('eos_hmeromhnia')?.value;
@@ -28,6 +43,7 @@ document.getElementById('calcApasxolhseonButton')?.addEventListener('click', asy
 
         if (!payload.success) {
             return Swal.fire({
+                ...calcApasxolhseisNoticeOptions(),
                 icon: 'warning',
                 title: 'Υπολογισμός Απασχολήσεων',
                 text: payload.message || 'Ο υπολογισμός δεν ολοκληρώθηκε.'
@@ -37,6 +53,7 @@ document.getElementById('calcApasxolhseonButton')?.addEventListener('click', asy
         console.log(payload);
 
         await Swal.fire({
+            ...calcApasxolhseisNoticeOptions(),
             icon: 'success',
             title: 'Υπολογισμός Απασχολήσεων',
             text: `Βρέθηκαν ${payload.employeesCount} εργαζόμενοι.`
@@ -45,6 +62,7 @@ document.getElementById('calcApasxolhseonButton')?.addEventListener('click', asy
         console.error(error);
 
         await Swal.fire({
+            ...calcApasxolhseisNoticeOptions(),
             icon: 'error',
             title: 'Υπολογισμός Απασχολήσεων',
             text: 'Σφάλμα επικοινωνίας με τον server.'

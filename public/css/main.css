@@ -20342,3 +20342,104 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     grid-template-columns: minmax(0, 1fr) !important;
     grid-template-rows: minmax(0, 1fr) !important;
 }
+
+/* Υπολογισμός απασχολήσεων από κάρτες: τοπική διάταξη, ίδιο πλάτος κάρτας. */
+#transferForm.calc-apasxolhseis-form .card-body {
+    min-height: 19.5rem;
+}
+#transferForm.calc-apasxolhseis-form .col-form-label {
+    font-size: clamp(.85rem, .8rem + .1cqi, .875rem) !important;
+    line-height: 1.4;
+}
+#transferForm.calc-apasxolhseis-form .calc-period-row > .col-2 {
+    flex: 0 0 max(16.666667%, 11rem);
+    width: max(16.666667%, 11rem);
+    max-width: 100%;
+}
+#transferForm.calc-apasxolhseis-form .calc-period-row .col-form-label {
+    white-space: nowrap;
+}
+#transferForm.calc-apasxolhseis-form .calc-period-branch {
+    flex: 1 1 12rem;
+    width: auto;
+    min-width: 0;
+}
+#transferForm.calc-apasxolhseis-form .calc-period-date {
+    flex: 0 1 max(20.833333%, 12.5rem);
+    width: max(20.833333%, 12.5rem);
+    max-width: 100%;
+}
+#transferForm.calc-apasxolhseis-form .date-control {
+    box-sizing: border-box;
+    height: 36px !important;
+    min-height: 36px;
+    width: 100%;
+}
+/* Κοινή σειρά επιλογών με τις ετικέτες επάνω, ώστε να μη στενεύουν οι τιμές. */
+#transferForm.calc-apasxolhseis-form .calc-tolerance-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    row-gap: .25rem;
+}
+#transferForm.calc-apasxolhseis-form .calc-tolerance-row > div {
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
+    margin-top: 0 !important;
+}
+#transferForm.calc-apasxolhseis-form .calc-tolerance-row .col-form-label {
+    padding-block: 0;
+}
+#transferForm.calc-apasxolhseis-form .calc-arrival-label { grid-area: 1 / 1; }
+#transferForm.calc-apasxolhseis-form .calc-departure-label { grid-area: 1 / 2; }
+#transferForm.calc-apasxolhseis-form .calc-tolerance-control { grid-row: 2; }
+#transferForm.calc-apasxolhseis-form .ts-wrapper.tom-dropdown {
+    box-sizing: border-box;
+    height: 36px !important;
+    min-height: 36px;
+    max-height: 36px;
+    width: calc(100% - 27px) !important;
+    max-width: calc(100% - 27px);
+    margin-right: 27px;
+    margin-block: 0 !important;
+    flex-grow: 0;
+}
+#transferForm.calc-apasxolhseis-form .ts-wrapper > .ts-control {
+    box-sizing: border-box;
+    height: 34px;
+    min-height: 34px;
+    padding-block: 0 !important;
+    padding-right: 2rem !important;
+    align-items: center;
+}
+#transferForm.calc-apasxolhseis-form .ts-control > input {
+    height: auto;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+    line-height: 1.4;
+}
+#transferForm.calc-apasxolhseis-form .ts-wrapper > .ts-fill-reset-btn {
+    /* Το περίγραμμα του Tom Select είναι 1px: το ορατό κενό μένει ακριβώς 3px. */
+    left: calc(100% + 4px) !important;
+    right: auto !important;
+    top: 50%;
+    width: 24px !important;
+    height: 24px !important;
+    padding: 0;
+}
+#transferForm.calc-apasxolhseis-form .ts-wrapper::after {
+    right: .75rem;
+}
+@media (width > 1775px) {
+    #transferForm.calc-apasxolhseis-form > .card { margin-top: 2rem; }
+}
+.swal2-container.calc-apasxolhseis-notice {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+}
+.calc-apasxolhseis-notice .swal2-icon:is(.swal2-success, .swal2-error) {
+    font-size: clamp(.35rem, 1cqi, .6rem);
+    width: 5em;
+    height: 5em;
+}
