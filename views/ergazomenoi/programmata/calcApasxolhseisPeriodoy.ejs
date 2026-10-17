@@ -1,5 +1,5 @@
 <br> <br> <br>                
-<form class="formRadius" id="transferForm">
+<form class="formRadius calc-apasxolhseis-form" id="transferForm">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     
     <div class="card d-flex flex-column z-depth-5 w-60 margin-left-percent-20 overflow-hidden">
@@ -58,7 +58,7 @@
             <input type="hidden" name="xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta" id="xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta" class="form-control input-contents" value="<%= xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta %>" />
 
             </br>
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 calc-period-row">
                 <div class="col-2 left-align">
                     <label for="ypokatasthmata" class="col-form-label label-font-size-smaller field-required">
                         Παράρτημα
@@ -74,7 +74,7 @@
                     readonly
                 />
 
-                <div class="col-9-5 mt-2">
+                <div class="col-9-5 calc-period-branch">
                     <select
                         id="ypokatasthmata"
                         name="ypokatasthmata"
@@ -97,34 +97,34 @@
 
             <div class="row form-group g-3 align-items-center mb-4"></div>
 
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 calc-period-row">
                 <div class="col-2 left-align">
                     <label for="apo_hmeromhnia" class="col-form-label label-font-size-smaller">
                         Από Ημερομηνία
                     </label>
                 </div>
-                <div class="col-2-5">
+                <div class="col-2-5 calc-period-date">
                     <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" value="<%= apoHmeromhniaValue %>" required />
                 </div>
             </div>
 
             <div class="row form-group g-3 align-items-center mb-4"></div>
 
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 calc-period-row">
                 <div class="col-2 left-align">
                     <label for="eos_hmeromhnia" class="col-form-label label-font-size-smaller">
                         Έως Ημερομηνία
                     </label>
                 </div>
-                <div class="col-2-5">
+                <div class="col-2-5 calc-period-date">
                     <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" value="<%= eosHmeromhniaValue %>" required />
                 </div>
             </div>
 
             <div class="row form-group g-3 align-items-center mb-4"></div>
 
-            <div class="row form-group g-3 align-items-center mb-3">
-                <div class="col-2 left-align mt-n-0-15 margin-top-0_5rem">
+            <div class="row form-group g-3 align-items-center mb-3 calc-tolerance-row">
+                <div class="col-2 left-align calc-arrival-label">
                     <label for="xronosProetoimasias" class="col-form-label label-font-size-smaller">
                         Πρόωρη Προσέλευση
                     </label>
@@ -139,7 +139,7 @@
                     readonly
                 />
 
-                <div class="col-3-15 mt-2">
+                <div class="col-3-15 calc-tolerance-control">
                     <select
                         id="xronosProetoimasias"
                         name="xronosProetoimasias"
@@ -155,7 +155,7 @@
                     </select>
                 </div>
 
-                <div class="col-3-2 left-align mt-n-0-15 text-end margin-top-0_5rem">
+                <div class="col-3-2 left-align calc-departure-label">
                     <label for="proorhApoxorhsh" class="col-form-label label-font-size-smaller">
                         Πρόωρη Αποχώρηση (απουσίες)
                     </label>
@@ -170,7 +170,7 @@
                     readonly
                 />
 
-                <div class="col-3-15 mt-2">
+                <div class="col-3-15 calc-tolerance-control">
                     <select
                         id="proorhApoxorhsh"
                         name="proorhApoxorhsh"
@@ -229,17 +229,21 @@
 
             if (companyTolerance !== selectedTolerance) {
                 Swal.fire({
-                    backdrop: false,
+                    target: document.querySelector('main.payroll-form-layout') || document.body,
+                    heightAuto: false,
+                    width: 'min(560px, 100%)',
                     allowOutsideClick: false,
                     icon: 'warning',
                     title: 'ΠΡΟΣΟΧΗ!',
                     text: `Ο ανεκτός χρόνος πρόωρης αποχώρησης που δεν λογίσεται σαν απουσία έχει δηλωθεί για την εταιρεία σε ${companyTolerance} λεπτά`,
                     showConfirmButton: true,
-                    confirmButtonText: 'Εντάξει',
+                    confirmButtonText: 'Κλείσιμο',
+                    showCancelButton: false,
                     customClass: {
                         confirmButton: 'class-warning custom-confirm-button custom-swal-button',
                         title: 'custom-title',
-                        popup: 'custom-swal-popup'
+                        popup: 'custom-swal-popup new-year-confirmation z-depth-5',
+                        container: 'new-year-confirmation-container calc-apasxolhseis-notice'
                     }
                 });
             }
