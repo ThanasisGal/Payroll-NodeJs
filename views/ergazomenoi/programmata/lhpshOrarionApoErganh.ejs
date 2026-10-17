@@ -1,5 +1,5 @@
 <br> <br> <br>                
-<form class="formRadius" id="transferForm">
+<form class="formRadius erganh-schedule-download-form" id="transferForm">
 
     <div class="card d-flex flex-column z-depth-5 w-60 margin-left-percent-20 overflow-hidden">
 
@@ -17,7 +17,7 @@
             <input type="hidden" name="ypokatasthmaHidden" id="ypokatasthmaHidden" class="form-control input-contents" value="" />
 
             </br>
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 erganh-download-row">
                 <div class="col-2 left-align">
                     <label for="ypokatasthmata" class="col-form-label label-font-size-smaller field-required">
                         Παράρτημα
@@ -33,7 +33,7 @@
                     readonly
                 />
 
-                <div class="col-9-5 mt-2">
+                <div class="col-9-5 erganh-download-branch">
                     <select
                         id="ypokatasthmata"
                         name="ypokatasthmata"
@@ -56,26 +56,26 @@
 
             <div class="row form-group g-3 align-items-center mb-4"></div>
 
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 erganh-download-row">
                 <div class="col-2 left-align">
                     <label for="apo_hmeromhnia" class="col-form-label label-font-size-smaller">
                         Από Ημερομηνία
                     </label>
                 </div>
-                <div class="col-2-5">
+                <div class="col-2-5 erganh-download-date">
                     <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" value="<%= periodRec && periodRec.apo ? new Date(periodRec.apo).toISOString().slice(0, 10) : safe('apo_hmeromhnia') %>" required />
                 </div>
             </div>
 
             <div class="row form-group g-3 align-items-center mb-4"></div>
 
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 erganh-download-row">
                 <div class="col-2 left-align">
                     <label for="eos_hmeromhnia" class="col-form-label label-font-size-smaller">
                         Έως Ημερομηνία
                     </label>
                 </div>
-                <div class="col-2-5">
+                <div class="col-2-5 erganh-download-date">
                     <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" value="<%= periodRec && periodRec.eos ? new Date(periodRec.eos).toISOString().slice(0, 10) : safe('eos_hmeromhnia') %>" required />
                 </div>
             </div>
