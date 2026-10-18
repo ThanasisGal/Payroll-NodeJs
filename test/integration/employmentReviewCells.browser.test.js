@@ -84,8 +84,11 @@ test('fresh searches and uniform single-layer day cells in Chromium at 1440 and 
                 const frame = cell.querySelector('.weekly-hr-stage1-day-tile,.weekly-hr-stage1-readonly-tile');
                 if (!frame) return { blank: cell.textContent === '', children: cell.children.length };
                 const button = frame.querySelector('button') || frame;
+                const guidance = frame.querySelector('[data-review-guidance-open]');
                 const c = cell.getBoundingClientRect(), f = frame.getBoundingClientRect(), b = button.getBoundingClientRect();
+                const g = guidance?.getBoundingClientRect();
                 const cs = getComputedStyle(cell), s = getComputedStyle(frame), bs = getComputedStyle(button);
+                const borderShare = getComputedStyle(cell.closest('table')).borderCollapse === 'collapse' ? .5 : 1;
                 const textFits = [...button.querySelectorAll('strong,span,small')].every(node => {
                     const range = document.createRange(); range.selectNodeContents(node);
                     const text = range.getBoundingClientRect(), n = node.getBoundingClientRect();
@@ -94,16 +97,23 @@ test('fresh searches and uniform single-layer day cells in Chromium at 1440 and 
                 });
                 return { date: cell.dataset.guidanceDate, month: button.querySelector('small')?.textContent || '',
                     cellWidth: c.width, width: f.width, height: f.height, left: f.left-c.left, right: c.right-f.right,
+                    availableWidth: c.width - borderShare * (parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth)) -
+                        parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
                     paddingLeft: s.paddingLeft, paddingRight: s.paddingRight,
                     frameBackground: s.backgroundColor, buttonBackground: bs.backgroundColor,
                     buttonBorder: bs.borderTopWidth, buttonShadow: bs.boxShadow, cellShadow: cs.boxShadow,
                     buttonFits: b.left >= f.left && b.right <= f.right && b.bottom <= f.bottom,
+                    guidanceFits: !g || (g.left >= f.left - .5 && g.right <= f.right + .5 &&
+                        g.top >= b.bottom - .5 && g.bottom <= f.bottom + .5 &&
+                        guidance.scrollWidth <= guidance.clientWidth + 1),
+                    contentFits: frame.scrollHeight <= frame.clientHeight + 1,
                     verticalCenter: Math.abs((f.top+f.bottom)-(c.top+c.bottom)) <= 1,
                     buttonPaddingLeft: bs.paddingLeft, buttonPaddingRight: bs.paddingRight,
                     textFits, label: button.querySelector('strong').textContent,
                     centered: bs.alignItems === 'center' && bs.justifyContent === 'center' &&
                         Math.abs((b.left+b.right)-(f.left+f.right)) < 1 &&
-                        Math.abs((b.top+b.bottom)-(f.top+f.bottom)) < 1,
+                        (g ? Math.abs((g.left+g.right)-(f.left+f.right)) < 1 :
+                            Math.abs((b.top+b.bottom)-(f.top+f.bottom)) < 1),
                     classes: [cell.className, frame.className, button.className],
                     before: getComputedStyle(frame, '::before').content, after: getComputedStyle(frame, '::after').content };
             });
@@ -122,9 +132,12 @@ test('fresh searches and uniform single-layer day cells in Chromium at 1440 and 
         for (const control of statusControls) check(control.left >= 0 && control.right >= 0 && control.textFits,
             `status control overlaps day cells: ${JSON.stringify(control)}`);
         for (const m of visible) {
+            check(m.width > 0 && m.height > 0, `visible day frame ${m.date}`);
             check(Math.abs(m.left-m.right) <= 1, `asymmetric ${m.date} ${m.left}/${m.right}`);
-            check(Math.abs(m.width-visible[0].width) <= 1 && Math.abs(m.height-visible[0].height) <= 1, `dimensions ${m.date}`);
-            check(m.buttonFits && m.textFits && m.centered && m.verticalCenter, `overflow/alignment ${m.date}`);
+            check(Math.abs(m.cellWidth-visible[0].cellWidth) <= 1, `column width ${m.date}`);
+            check(Math.abs(m.width-m.availableWidth) <= 1, `frame fills available cell width ${m.date}`);
+            check(m.buttonFits && m.guidanceFits && m.contentFits && m.textFits &&
+                m.centered && m.verticalCenter, `overflow/alignment ${m.date}`);
             check(m.buttonPaddingLeft === m.buttonPaddingRight, `padding ${m.date}`);
             check(m.before === 'none' && m.after === 'none', `pseudo layer ${m.date}`);
             check(m.month === ({ '08': 'Αύγουστος', '09': 'Σεπτέμβριος', '10': 'Οκτώβριος' })[m.date.slice(5,7)], `month ${m.date}: ${m.month}`);
@@ -158,14 +171,34 @@ test('fresh searches and uniform single-layer day cells in Chromium at 1440 and 
             weeklyHrStage1DayDrafts.set(id, { classification: 'ABSENCE' });
             rerenderWeeklyHrStage1Rows();
         });
+        const draftGeometry = await target.locator('.weekly-hr-stage1-day-tile').evaluate(n => {
+            const frame = n.getBoundingClientRect();
+            const editor = n.querySelector('.weekly-hr-stage1-open-editor').getBoundingClientRect();
+            const guidance = n.querySelector('[data-review-guidance-open]');
+            const instructions = guidance?.getBoundingClientRect();
+            return { height: frame.height, editorHeight: editor.height,
+                guidanceHeight: instructions?.height || 0,
+                guidanceCount: n.querySelectorAll('[data-review-guidance-open]').length,
+                contentFits: n.scrollHeight <= n.clientHeight + 1,
+                instructionsFit: !instructions || (instructions.top >= editor.bottom - .5 &&
+                    instructions.bottom <= frame.bottom + .5 && instructions.left >= frame.left - .5 &&
+                    instructions.right <= frame.right + .5 && guidance.scrollWidth <= guidance.clientWidth + 1) };
+        });
         const draft = await target.locator('.weekly-hr-stage1-day-tile').evaluate(n => ({
             pending: n.classList.contains('is-pending'), draft: n.classList.contains('has-draft'),
             background: getComputedStyle(n).backgroundColor, shadow: getComputedStyle(n).boxShadow,
-            height: n.getBoundingClientRect().height,
             innerBorder: getComputedStyle(n.querySelector('button')).borderTopWidth
         }));
         assert.deepEqual(draft, { pending: false, draft: true, background: 'rgb(238, 246, 255)',
-            shadow: 'none', height: 72, innerBorder: '0px' });
+            shadow: 'none', innerBorder: '0px' });
+        // The editor and the explicit instructions occupy separate rows. The
+        // frame grows with their content instead of clipping it to the old 72px.
+        assert.equal(draftGeometry.guidanceCount, 1, 'Draft instructions remain available');
+        assert.ok(draftGeometry.editorHeight > 0 && draftGeometry.guidanceHeight > 0,
+            JSON.stringify(draftGeometry));
+        assert.ok(draftGeometry.height >= draftGeometry.editorHeight + draftGeometry.guidanceHeight - 1,
+            JSON.stringify(draftGeometry));
+        assert.ok(draftGeometry.contentFits && draftGeometry.instructionsFit, JSON.stringify(draftGeometry));
         await target.evaluate(n => {
             weeklyHrStage1DayDrafts.delete(n.querySelector('.weekly-hr-stage1-open-editor').dataset.rowId);
             rerenderWeeklyHrStage1Rows();
